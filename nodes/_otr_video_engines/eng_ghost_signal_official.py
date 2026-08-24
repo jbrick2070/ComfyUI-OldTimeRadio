@@ -65,9 +65,12 @@ MM_V2_NAME = "mm_sd_v15_v2.ckpt"
 MM_V2_MIN_BYTES = 1_700_000_000
 
 
-@register
+# UNREGISTERED 2026-08-23. The class survives because the haunted lane inherits
+# it -- the v3 module, its byte floor and its recipe receipt are that lane's own
+# machinery. The public id `animatediff15_v3_video` is tombstoned in
+# RETIRED_ENGINE_IDS. Do not re-add @register to "fix" a missing engine.
 class GhostSignalV3Engine(GhostSignalEngine):
-    """``animatediff15_v3_video`` -- Ghost Signal on the official v3 module."""
+    """The official-v3 base. UNREGISTERED -- inherited by the haunted lane."""
 
     name = "animatediff15_v3_video"
 
@@ -85,27 +88,6 @@ class GhostSignalV3Engine(GhostSignalEngine):
     #: that reviewed. Apache-2.0 removes the BLOCKER; it does not by itself make
     #: the lane commercially clean, and saying so would be exactly the kind of
     #: overclaim the admission rules exist to stop.
-    commercial_clean = False
-
-
-@register
-class GhostSignalV2Engine(GhostSignalEngine):
-    """``animatediff15_v2_video`` -- Ghost Signal on the official v2 module."""
-
-    name = "animatediff15_v2_video"
-
-    motion_module_name = MM_V2_NAME
-    motion_min_bytes = MM_V2_MIN_BYTES
-    recipe_receipt_id = "animatediff_sd15_v2_static16_512x288_v1"
-
-    #: See the v3 note above -- same reasoning, same conservative declaration.
-    #:
-    #: WORTH KNOWING WHEN READING A COMPARISON: this module is 1,817,888,431
-    #: bytes and the golden lane's `mm-p_0.5.pth` is 1,817,894,327 -- 5,896
-    #: bytes apart. `mm-p_0.5` is almost certainly a v2 DERIVATIVE, so expect
-    #: this lane to look closer to the golden one than v3 does. If the operator
-    #: likes the golden look and cannot ship it, THIS is the likeliest licensed
-    #: substitute, and that is the practical reason it is here at all.
     commercial_clean = False
 
 

@@ -45,6 +45,15 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 #: (lean-mean order 4). Growing this set is deliberate and append-only, exactly
 #: like the production set it mirrors.
 _RETIRED_IDS = frozenset({
+    # The Ghost narrowing, 2026-08-23 ("delete any animatediff that are not
+    # haunted"). Listed here because this guard asserts the WHOLE retired set is
+    # unregistered and unaliased -- a retired id that still resolves through the
+    # public menu or a legacy alias is a stale selection that silently works.
+    "animatediff15_video",
+    "animatediff15_v2_video",
+    "animatediff15_v3_video",
+    "animatediff15_h3_video",
+    "animatediff15_h5_video",
     "cloud_vidu_q2_pro_fast_720p_sfx",
     "google_vid_sfx_omni",
     "google_vid_sfx_veo_fast",

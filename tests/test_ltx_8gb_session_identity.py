@@ -157,19 +157,10 @@ _ENGINES_WITH_A_SESSION = {
     # absence. It declares one anyway because it DOES hold local handles across
     # prepare -> render_clip, and an identity that exists before it is needed
     # costs nothing, while the reverse was learned at 730s into a live leg.
-    "animatediff15_video",
-    # Its two official-module peers inherit session_identity() unchanged; each
-    # reports its OWN module, so a session can never span two lanes.
-    "animatediff15_v2_video",
-    "animatediff15_v3_video",
-    # The domain-adapter sibling. Its identity additionally carries the
-    # adapter file and the STRENGTH applied, so a sweep across strengths
-    # can never let one arm reuse another arm's patched model.
+    # The five non-haunted siblings retired 2026-08-23. The survivor's identity
+    # carries the adapter file and the STRENGTH applied, so a sweep across
+    # strengths can never let one arm reuse another arm's patched model.
     "animatediff15_v3_haunted_video",
-    # Cadence peers inherit session_identity() unchanged; each reports
-    # its own recipe, so a session cannot span two cadences.
-    "animatediff15_h3_video",
-    "animatediff15_h5_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_i2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

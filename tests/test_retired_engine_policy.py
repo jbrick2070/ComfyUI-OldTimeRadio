@@ -41,12 +41,18 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_ten_known_ids():
-    # Five from the 2026-08-06 SFX-bed rip + five from the 2026-08-23
-    # dormant-3D retirement (lean-mean order 4). EXACT on purpose: the set is
-    # append-only, and an id appearing here that no ruling added -- or one
-    # vanishing -- must fail the suite, not drift silently.
+def test_the_retired_set_is_exactly_the_fifteen_known_ids():
+    # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
+    # retirement (lean-mean order 4), and five from the 2026-08-23 Ghost
+    # narrowing (operator: "delete any animatediff that are not haunted").
+    # EXACT on purpose: the set is append-only, and an id appearing here that no
+    # ruling added -- or one vanishing -- must fail the suite, not drift.
     assert RETIRED_ENGINE_IDS == frozenset({
+        "animatediff15_video",
+        "animatediff15_v2_video",
+        "animatediff15_v3_video",
+        "animatediff15_h3_video",
+        "animatediff15_h5_video",
         "cloud_vidu_q2_pro_fast_720p_sfx",
         "google_vid_sfx_omni",
         "google_vid_sfx_veo_fast",

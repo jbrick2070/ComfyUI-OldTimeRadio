@@ -322,7 +322,6 @@ except Exception:  # noqa: BLE001
 # sibling so a packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
     from . import eng_ghost_signal_official as _eng_ghost_signal_official  # noqa: F401
-    from . import eng_ghost_signal_cadence as _eng_ghost_signal_cadence  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
 

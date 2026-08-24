@@ -28,7 +28,9 @@ from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as vschemas
 from nodes._otr_video_engines import wrapper_bridge as wb
 
-NAME = "animatediff15_video"
+# The base lane retired 2026-08-23. Its CLASS is the surviving lane's base,
+# so every contract pinned here is the same code -- only the id changed.
+NAME = "animatediff15_v3_haunted_video"
 
 
 # --------------------------------------------------------------------------- #
@@ -46,8 +48,14 @@ def test_the_lane_is_registered_with_a_capabilities_row():
     assert row["needs_fp4_te"] is False
     assert row["practical_without_gpu"] is False
     assert row["sidecar_conditional"] is False
+    # THREE artifacts, where the retired siblings had two: the surviving lane
+    # loads the official v3 module AND the removable domain adapter that gives
+    # it its look. A haunted lane missing the adapter refuses rather than
+    # quietly rendering clean output, so preflight has to ask for it.
     assert row["model_requirements"] == [
-        "v1-5-pruned-emaonly-fp16.safetensors", "mm-p_0.5.pth"]
+        "v1-5-pruned-emaonly-fp16.safetensors",
+        "v3_sd15_mm.ckpt",
+        "v3_sd15_adapter.ckpt"]
     # No novel capability keys: the row's shape must match its siblings exactly.
     assert set(row) == set(vreg.CAPABILITIES["minimax_h3_video"])
 
@@ -58,7 +66,9 @@ def test_the_bare_id_passes_through_and_carries_a_friendly_label():
     bijection for nothing."""
     assert pub.resolve_engine_id(NAME) == NAME
     assert NAME not in pub._PUBLIC_ENGINES
-    assert pub._PUBLIC_LABEL[NAME] == "AnimateDiff -- Ghost Signal"
+    assert pub._PUBLIC_LABEL[NAME] == (
+        "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
+        "removable domain adapter, Apache-2.0; degraded transmission look)")
     # The public id carries no unmeasured cost token.
     assert "low" not in NAME and "high" not in NAME
 
@@ -851,7 +861,9 @@ def test_canonicalize_refuses_a_canvas_that_is_not_exactly_512x288(monkeypatch):
 
 def test_canonicalize_probes_once_and_carries_every_receipt(monkeypatch):
     probes = []
-    eng = gs.GhostSignalEngine()
+    # The registered lane, not the (now unregistered) base class -- canonicalize
+    # stamps engine_id from the instance, so the base would stamp a retired id.
+    eng = vreg.get_engine(NAME)
     monkeypatch.setattr(gs, "ffprobe_clip_fields",
                         lambda p: (probes.append(p),
                                    {"width": 512, "height": 288, "fps": 25})[1])

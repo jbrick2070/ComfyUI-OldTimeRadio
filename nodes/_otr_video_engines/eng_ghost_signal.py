@@ -283,7 +283,10 @@ def ghost_cadence_receipts(target_frame_count, source_request=None,
 # The adapter.
 # --------------------------------------------------------------------------- #
 
-@register
+# UNREGISTERED 2026-08-23. `animatediff15_video` is tombstoned in
+# RETIRED_ENGINE_IDS -- it carried this lane's published proof, so a saved graph
+# naming it earns the named refusal rather than "not registered". The CLASS is
+# the whole Ghost implementation and the surviving lane inherits it.
 class GhostSignalEngine(_MC.MotionEngineBase):
     """``animatediff15_video`` -- AnimateDiff Ghost Signal."""
 

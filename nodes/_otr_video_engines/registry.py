@@ -522,44 +522,22 @@ CAPABILITIES = {
     # and preflight fails CLOSED on any one of them; the audio VAE is NOT listed,
     # because listing an asset this lane never loads would make the S5 wizard ask
     # for 0.6 GB nobody needs (it belongs to lane 20).
-    # animatediff15_video (Ghost Signal, 2026-08-22): SD1.5 + the mm-p_0.5 v2
-    # motion module through AnimateDiff-Evolved's non-looped Standard Static
-    # context. cuda, no vendor gate, no sidecar, no toolchain. BOTH fp rows are
-    # False and that is the point: the artifacts are FP16 and the profile pins
-    # dtype_policy="no_fp8_no_fp4" so nothing silently opts them into ComfyUI's
-    # optional FP8/FP4 transformations. Two model_requirements because preflight
-    # fails CLOSED on either; the VAE is deliberately absent from the list --
-    # it is the checkpoint's own output slot 2, not a separate fetch, and
-    # listing it would make the S5 wizard ask for a file nobody needs.
+    # THE ONE GHOST LANE (operator, 2026-08-23: "delete any animatediff that are
+    # not haunted"). SD1.5 + AnimateDiff-Evolved's official v3 module through the
+    # non-looped Standard Static context, plus the removable domain adapter that
+    # gives the lane its degraded-transmission look. cuda, no vendor gate, no
+    # sidecar, no toolchain. BOTH fp rows are False and that is the point: the
+    # artifacts are FP16 and the profile pins dtype_policy="no_fp8_no_fp4" so
+    # nothing silently opts them into ComfyUI's optional FP8/FP4 transformations.
+    #
+    # THREE artifacts, where the retired siblings had two. The adapter is named
+    # here so the S5 wizard asks for it; a haunted lane without it refuses to
+    # render rather than quietly producing clean output.
     #
     # NO COST ROW EXISTS FOR THIS LANE. The operator declined a measurement
     # campaign, so it is recorded admission-unenforced in the evidence manifest
     # and makes no VRAM-fit claim -- see docs/2026-08-22-ghost-signal-
     # dependency-lock.json.
-    # The two OFFICIAL-module peers (2026-08-22). Identical capability shape to
-    # animatediff15_video -- same stack, same FP16 artifacts, same absence of a
-    # cost row. They differ ONLY in which motion module they load, which is the
-    # whole point: a comparison where anything else moved would prove nothing.
-    #
-    # model_requirements names each lane's OWN module so the S5 wizard asks for
-    # the file that lane actually loads.
-    "animatediff15_v3_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "v3_sd15_mm.ckpt"]},
-    "animatediff15_v2_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "mm_sd_v15_v2.ckpt"]},
-    # THREE artifacts -- the only Ghost lane with more than two. The adapter is
-    # named here so the S5 wizard asks for it; a haunted lane without it
-    # refuses to render rather than quietly producing clean output.
     "animatediff15_v3_haunted_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
@@ -568,30 +546,6 @@ CAPABILITIES = {
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
                                "v3_sd15_mm.ckpt",
                                "v3_sd15_adapter.ckpt"]},
-    "animatediff15_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "mm-p_0.5.pth"]},
-    # CADENCE PEERS. Same two artifacts as the golden lane -- they differ only
-    # in how many delivered frames each generated frame fills, so they are
-    # golden at a calmer rate rather than a different model.
-    "animatediff15_h3_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "mm-p_0.5.pth"]},
-    "animatediff15_h5_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
-                               "mm-p_0.5.pth"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

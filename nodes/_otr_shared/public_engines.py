@@ -298,33 +298,15 @@ _PUBLIC_LABEL = {
     # labels above names a real measured bucket -- and no measurement campaign
     # was run for this lane. "very-low-VRAM-targeted" is a design target, so the
     # label says targeted and nothing stronger.
-    "animatediff15_video": "AnimateDiff -- Ghost Signal",
-    # THE OFFICIAL-MODULE PEERS. The label names the MODULE, because that is the
-    # only thing that differs and it is what a chooser needs to know. No
-    # low/high token on either: G7.4 says that marker comes from a measurement
-    # receipt, and neither lane has one.
-    #
-    # "Apache-2.0" is IN the label deliberately. The golden lane's module has no
-    # licence at all, and for anyone deciding what to build on, that is the most
-    # load-bearing fact about these two.
-    "animatediff15_v3_video": (
-        "AnimateDiff v3 -- Ghost Signal (official v3 module, Apache-2.0; "
-        "smoother motion, less flicker)"),
-    "animatediff15_v2_video": (
-        "AnimateDiff v2 -- Ghost Signal (official v2 module, Apache-2.0; "
-        "the licensed relative of the default module)"),
-    # The adapter IS this lane's identity, so the label says so plainly rather
-    # than hiding it behind the word "experimental".
+    # ONE GHOST LANE (operator, 2026-08-23: "delete any animatediff that are
+    # not haunted"). The five siblings are RETIRED and tombstoned below. The
+    # adapter IS this lane's identity, so the label says so plainly. "Apache-2.0"
+    # is in the label deliberately: the golden lane's module had no licence at
+    # all, and for anyone deciding what to build on that is the most load-bearing
+    # fact about this one.
     "animatediff15_v3_haunted_video": (
         "AnimateDiff v3 haunted -- Ghost Signal (official v3 module + the "
         "removable domain adapter, Apache-2.0; degraded transmission look)"),
-    # The labels state the FRESH frame rate, which is the thing that changes.
-    # No low/high marker: G7.4 wants a measurement receipt for those and no
-    # cadence value has been qualified by eye yet.
-    "animatediff15_h3_video": (
-        "Ghost Signal hold-3 (8.3 fresh fps; calmer motion, cheaper render)"),
-    "animatediff15_h5_video": (
-        "Ghost Signal hold-5 (5 fresh fps; deliberate stop-action)"),
 }
 
 # Bijection guard: unique internals (no two public ids share one internal engine),
@@ -358,6 +340,22 @@ def resolve_engine_id(value) -> str:
 #: the registry's ``CAPABILITIES``, never importable as an adapter. IMMUTABLE:
 #: append here only when another engine is retired, never remove.
 RETIRED_ENGINE_IDS = frozenset({
+    # THE NON-HAUNTED GHOST LANES, RETIRED 2026-08-23 (operator: "delete any
+    # animatediff that are not haunted"). All five were PUBLIC, menu-selectable
+    # ids, and animatediff15_video carried the lane's published proof
+    # (signal_lost_the_constables_knock_20260822_050116, 8/8 beats) -- so a saved
+    # graph naming it is a graph that once worked, which is exactly why these are
+    # NAMED tombstones rather than the generic unregistered-engine refusal.
+    #
+    # THE CLASSES ARE NOT ALL GONE: GhostSignalV3HauntedEngine inherits
+    # GhostSignalV3Engine inherits GhostSignalEngine, so those two SURVIVE as the
+    # winner's own machinery -- unregistered, not deleted. Only the true leaves
+    # (v2, and the h3/h5 cadence pair) had their code removed.
+    "animatediff15_video",
+    "animatediff15_v2_video",
+    "animatediff15_v3_video",
+    "animatediff15_h3_video",
+    "animatediff15_h5_video",
     "cloud_vidu_q2_pro_fast_720p_sfx",
     "google_vid_sfx_omni",
     "google_vid_sfx_veo_fast",

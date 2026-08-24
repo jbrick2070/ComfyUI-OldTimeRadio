@@ -106,18 +106,10 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # fresh AnimateDiff timeline spanning the beat's whole audio budget. The
         # 16 in its context options is a sliding WINDOW, not a clip ceiling, so
         # there is nothing for the partitioner to split on either way.
-        "animatediff15_video",
-        # The two official-module PEERS inherit the same unbounded contract --
-        # they differ only in which motion module they load.
-        "animatediff15_v2_video",
-        "animatediff15_v3_video",
-        # The domain-adapter sibling: same unbounded contract again. The
-        # adapter patches the image model and touches no timing at all.
+        # The five non-haunted siblings retired 2026-08-23. The adapter patches
+        # the image model and touches no timing, so the unbounded contract that
+        # covered them all is unchanged on the lane that survived.
         "animatediff15_v3_haunted_video",
-        # The cadence peers change how many frames are GENERATED, never
-        # how many are delivered, so the unbounded contract is untouched.
-        "animatediff15_h3_video",
-        "animatediff15_h5_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

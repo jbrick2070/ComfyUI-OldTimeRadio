@@ -29,7 +29,26 @@ from nodes._otr_video_engines.registry import EngineUnusable
 HAUNTED = "animatediff15_v3_haunted_video"
 CLEAN_V3 = "animatediff15_v3_video"
 GOLDEN = "animatediff15_video"
-CLEAN_LANES = (GOLDEN, CLEAN_V3, "animatediff15_v2_video")
+# THE CLEAN LANES ARE UNREGISTERED SINCE 2026-08-23 ("delete any animatediff
+# that are not haunted"), and this file KEEPS COMPARING AGAINST THEM ON PURPOSE:
+# the comparison is what gives the haunted lane its meaning -- it is the clean
+# v3 plus exactly ONE variable, the adapter. Their CLASSES survive because the
+# haunted engine inherits them, so the comparison is made against the class
+# rather than a registry row. Same objects, same assertions, one public id.
+# `animatediff15_v2_video` left the tuple because its class was DELETED (a true
+# leaf), so nothing survives for it to compare against.
+CLEAN_LANES = (GOLDEN, CLEAN_V3)
+
+#: Retired ids -> the surviving class that used to answer to them.
+_UNREGISTERED = {GOLDEN: gs.GhostSignalEngine,
+                 CLEAN_V3: peers.GhostSignalV3Engine}
+
+
+def _engine(lane):
+    """The engine for ``lane``, registered or not."""
+    if lane in _UNREGISTERED:
+        return _UNREGISTERED[lane]()
+    return vreg.get_engine(lane)
 
 #: The adapter's real size on the Hub, 2026-08-22.
 ADAPTER_REAL_BYTES = 102_134_097
@@ -104,7 +123,7 @@ def _request(target=32, seed=4242, shot_id="shot_b001"):
 
 def _render(engine_id, monkeypatch, target=32):
     """Run one complete mocked beat on ``engine_id``; return the recorder."""
-    eng = vreg.get_engine(engine_id)
+    eng = _engine(engine_id)
     rec = _Recorder(source_request=gs.ghost_source_request(target))
     # THROUGH monkeypatch, NOT plain assignment. `get_engine` hands back the
     # registry's SHARED instance, so a bare `eng._classes = ...` would leave
@@ -313,7 +332,7 @@ def test_a_truncated_adapter_is_named_rather_than_traced(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("lane", CLEAN_LANES)
 def test_a_clean_lane_never_asks_for_an_adapter(lane):
-    eng = vreg.get_engine(lane)
+    eng = _engine(lane)
     assert eng.lora_name is None
     assert eng._lora_path() is None
     assert "lora" not in eng._node_candidates()
@@ -376,7 +395,7 @@ def test_the_override_reaches_the_graph_not_just_the_property(monkeypatch):
 def test_the_override_does_not_reach_any_clean_lane(monkeypatch):
     monkeypatch.setenv(peers.ADAPTER_V3_STRENGTH_ENV, "0.25")
     for lane in CLEAN_LANES:
-        assert vreg.get_engine(lane).lora_strength == 0.0
+        assert _engine(lane).lora_strength == 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -390,9 +409,12 @@ def test_the_haunted_lane_inherits_v3s_module_not_the_goldens():
 
 
 def test_the_receipt_is_distinct_from_every_other_ghost_lane():
-    receipts = {vreg.get_engine(n)._recipe_receipt()
-                for n in CLEAN_LANES + (HAUNTED,)}
-    assert len(receipts) == 4, receipts
+    # Was FOUR (golden, v2, clean v3, haunted). v2's class was deleted with its
+    # id on 2026-08-23, so three remain -- and the assertion still does its one
+    # job: no two Ghost lanes may stamp the same recipe receipt, or a comparison
+    # between them proves nothing.
+    receipts = {_engine(n)._recipe_receipt() for n in CLEAN_LANES + (HAUNTED,)}
+    assert len(receipts) == 3, receipts
 
 
 def test_the_capability_row_names_all_three_artifacts():
@@ -401,7 +423,7 @@ def test_the_capability_row_names_all_three_artifacts():
         "v1-5-pruned-emaonly-fp16.safetensors",
         "v3_sd15_mm.ckpt",
         "v3_sd15_adapter.ckpt"]
-    assert set(row) == set(vreg.CAPABILITIES[GOLDEN])
+    assert set(row) == set(vreg.CAPABILITIES[HAUNTED])
 
 
 def test_the_public_label_names_the_adapter_and_the_licence():
@@ -425,7 +447,7 @@ def test_it_declares_commercial_clean_false_like_its_parent():
 
 def test_the_golden_lane_is_still_untouched():
     """The operator's standing condition across every Ghost peer."""
-    gold = vreg.get_engine(GOLDEN)
+    gold = _engine(GOLDEN)
     assert gold.motion_module_name == "mm-p_0.5.pth"
     assert gold.lora_name is None
     assert gold.lora_strength == 0.0
@@ -434,7 +456,7 @@ def test_the_golden_lane_is_still_untouched():
 
 def test_everything_else_is_inherited_from_the_clean_v3_lane():
     """One variable. Anything else differing makes the comparison worthless."""
-    clean = vreg.get_engine(CLEAN_V3)
+    clean = _engine(CLEAN_V3)
     haunted = vreg.get_engine(HAUNTED)
     for attr in ("family", "roles", "default_roles", "required_inputs",
                  "render_aspect", "render_canvas", "target_fps",
@@ -462,7 +484,7 @@ def test_the_haunted_identity_differs_from_the_clean_v3_identity(monkeypatch):
     monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
     monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: "lo")
     assert (vreg.get_engine(HAUNTED).session_identity()
-            != vreg.get_engine(CLEAN_V3).session_identity())
+            != _engine(CLEAN_V3).session_identity())
 
 
 def test_two_strengths_are_two_sessions(monkeypatch):
@@ -493,7 +515,7 @@ def test_a_clean_lanes_identity_carries_no_adapter_field(lane, monkeypatch):
     existed, or every cached session in the repo silently invalidates."""
     monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
     monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
-    identity = vreg.get_engine(lane).session_identity()
+    identity = _engine(lane).session_identity()
     assert len(identity) == 6, identity
     assert not any("strength=" in str(p) for p in identity), identity
 

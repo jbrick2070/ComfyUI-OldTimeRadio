@@ -544,7 +544,7 @@ def test_the_driver_branches_on_the_capability_not_the_engine_name():
     from nodes._otr_video_engines import render_driver as rd
     src = inspect.getsource(rd.build_request_from_shot)
     assert "_gsp.GHOST_PROMPT_PROFILE" in src
-    assert '"animatediff15_video"' not in src, (
+    assert '"animatediff15_v3_haunted_video"' not in src, (
         "the Ghost branch compares an engine NAME; the plan's own law is that "
         "engine-id string tests must not substitute for a declared capability")
 
@@ -556,7 +556,7 @@ def test_the_ltx_face_suffix_can_never_land_on_a_ghost_shot():
     # id does not, and the M4 branch that carries it is additionally guarded by
     # `not _ghost_composed`.
     assert 'startswith("ltx")' in src
-    assert not "animatediff15_video".startswith("ltx")
+    assert not "animatediff15_v3_haunted_video".startswith("ltx")
     assert "if text_prompt and not _ghost_composed:" in src
 
 
@@ -582,7 +582,7 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     assert '"ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in"' in src
     ltx_tuple_line = [ln for ln in src.splitlines()
                       if '"ltx_video", "ltx25_video"' in ln][0]
-    assert "animatediff15_video" not in ltx_tuple_line
+    assert "animatediff15_v3_haunted_video" not in ltx_tuple_line
 
 
 def test_an_all_ghost_policy_spends_no_writer_llm_call():
@@ -597,7 +597,7 @@ def test_an_all_ghost_policy_spends_no_writer_llm_call():
         raise AssertionError("the writer LLM must not be resolved for an "
                              "all-Ghost policy")
 
-    policy = {"video_models": {slot: "animatediff15_video"
+    policy = {"video_models": {slot: "animatediff15_v3_haunted_video"
                                for slot in rs.ROLE_TO_VIDEO_SLOT.values()}}
     beats = [{"beat_id": "b001", "role": "character_video", "char_id": "c01",
               "target_frame_count": 32}]
@@ -624,7 +624,7 @@ def _ghost_shot(role="character_video", **kw):
     shot = {
         "shot_id": "shot_b001",
         "role": role,
-        "engine_id": "animatediff15_video",
+        "engine_id": "animatediff15_v3_haunted_video",
         "char_id": "c01",
         "source_line_ids": ["b001"],
         "target_frame_count": 32,

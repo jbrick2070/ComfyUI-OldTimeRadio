@@ -22,7 +22,9 @@ from nodes._otr_video_engines import ghost_signal_prompt as gsp
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_video_engines.schemas import ShotRow
 
-GHOST = "animatediff15_v3_video"
+# The non-haunted lanes retired 2026-08-23; the survivor inherits this
+# composer unchanged.
+GHOST = "animatediff15_v3_haunted_video"
 NON_GHOST = "ltx_video"
 
 POLICY = {
@@ -465,8 +467,7 @@ def test_node_92_asserts_the_writer_is_released(monkeypatch):
 
 def test_the_ghost_skip_predicate_reads_the_capability_not_a_name():
     from nodes.otr_video_render_batch import _ghost_prompt_owns_motion
-    for engine in ("animatediff15_video", GHOST, "animatediff15_h3_video",
-                   "animatediff15_h5_video", "animatediff15_v3_haunted_video"):
+    for engine in (GHOST,):
         assert _ghost_prompt_owns_motion({"engine_id": engine}), engine
     assert not _ghost_prompt_owns_motion({"engine_id": NON_GHOST})
     assert not _ghost_prompt_owns_motion({"engine_id": ""})

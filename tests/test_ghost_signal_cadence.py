@@ -27,15 +27,18 @@ import pytest
 
 import nodes._otr_video_engines  # noqa: F401 -- populate the registry
 from nodes._otr_video_engines import eng_ghost_signal as gs
-from nodes._otr_video_engines import eng_ghost_signal_cadence as cadence
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import wrapper_bridge as wb
 
-GOLDEN = "animatediff15_video"
-H3 = "animatediff15_h3_video"
-H5 = "animatediff15_h5_video"
-CADENCE_LANES = (H3, H5)
-EXPECTED_HOLD = {GOLDEN: 2, H3: 3, H5: 5}
+# THE CADENCE PEERS WERE RETIRED 2026-08-23 and their module is deleted. THIS
+# FILE DID NOT GO WITH THEM, because most of what it guards SURVIVED: the hold
+# arithmetic lives in `eng_ghost_signal`, which is the haunted lane's own base
+# class. Deleting the file would have dropped the golden-cadence pin -- the one
+# that catches a hold factor read from a module constant instead of through
+# `self`, which is the G1.3 defect this file exists for.
+GOLDEN = "animatediff15_v3_haunted_video"
+CADENCE_LANES = ()
+EXPECTED_HOLD = {GOLDEN: 2}
 
 #: A real episode beat. Legs on 2026-08-22 ran 2444-2944 delivered frames over
 #: 8 beats, so ~12 seconds each at 25fps.
@@ -71,9 +74,15 @@ def test_the_golden_lane_still_declares_hold_2():
 
 
 def test_the_golden_recipe_receipt_is_unchanged():
-    """The peers must not have renamed the lane that rendered the episode."""
+    """The lane must not silently rename its own recipe.
+
+    Was the mm-p_0.5 receipt while the base lane was the golden one. That lane
+    retired 2026-08-23; the receipt pinned here is the surviving lane's, and the
+    guard is the same one -- a recipe id is what a render receipt is read
+    against, so it may never drift without someone deciding it should.
+    """
     assert vreg.get_engine(GOLDEN)._recipe_receipt() == (
-        "animatediff_sd15_mmp05_static16_512x288_v1")
+        "animatediff_sd15_v3_haunted_static16_512x288_v1")
 
 
 # --------------------------------------------------------------------------- #
@@ -94,6 +103,7 @@ class _Recorder:
         self.calls = []
         self.decoded_frames = decoded_frames
         self.base_model = _Patcher()
+        self.lora_model = _Patcher()
         self.ade_model = _Patcher()
         self.clip = object()
         self.vae = object()
@@ -121,6 +131,10 @@ class _Recorder:
             "checkpoint": _node("ckpt", (rec.base_model, rec.clip, rec.vae)),
             "text_encode": _node("text_encode", (("cond",),)),
             "context": _node("context", ("CTX",)),
+            # The surviving lane inserts the domain adapter between the
+            # checkpoint and the ADE loader; without this node the mocked graph
+            # cannot be built at all.
+            "lora": _node("lora", (rec.lora_model,)),
             "ade": _node("ade", (rec.ade_model,)),
             "latent": _node("latent", ({"batch": 1},)),
             "sampler": _node("sampler", ("SAMPLED",)),
@@ -149,6 +163,10 @@ def _render(engine_id, monkeypatch, target=REAL_BEAT_FRAMES):
     monkeypatch.setattr(wb, "reclaim_idle_models", lambda reason="": None)
     monkeypatch.setattr(gs.GhostSignalEngine, "_ckpt_path", lambda self: "ck")
     monkeypatch.setattr(gs.GhostSignalEngine, "_motion_path", lambda self: "mm")
+    # The surviving lane loads a THIRD artifact the retired ones did not -- the
+    # removable domain adapter. Stub it here too or the mocked render asks the
+    # filesystem for a real .ckpt.
+    monkeypatch.setattr(gs.GhostSignalEngine, "_lora_path", lambda self: "lo")
     raw = eng.render_clip({
         "shot_id": "shot_b001", "request_id": "shot_b001",
         "text_prompt": "a tall stooped figure, mid-shot or wider, turns",
@@ -159,7 +177,7 @@ def _render(engine_id, monkeypatch, target=REAL_BEAT_FRAMES):
     return rec, raw, captured
 
 
-@pytest.mark.parametrize("lane", (GOLDEN,) + CADENCE_LANES)
+@pytest.mark.parametrize("lane", (GOLDEN,))
 def test_the_graph_asks_for_this_lanes_own_frame_count(lane, monkeypatch):
     """THE TEST THAT WOULD HAVE FAILED AGAINST THE BROKEN CODE. Reads the batch
     size the latent node actually received, not the declaration."""
@@ -169,7 +187,7 @@ def test_the_graph_asks_for_this_lanes_own_frame_count(lane, monkeypatch):
     assert latent["batch_size"] == expected
 
 
-@pytest.mark.parametrize("lane", (GOLDEN,) + CADENCE_LANES)
+@pytest.mark.parametrize("lane", (GOLDEN,))
 def test_a_lower_hold_generates_strictly_fewer_frames(lane, monkeypatch):
     rec, _raw, _cap = _render(lane, monkeypatch)
     latent = [kw for name, kw in rec.calls if name == "latent"][0]
@@ -178,7 +196,7 @@ def test_a_lower_hold_generates_strictly_fewer_frames(lane, monkeypatch):
         assert latent["batch_size"] < golden_ask
 
 
-@pytest.mark.parametrize("lane", (GOLDEN,) + CADENCE_LANES)
+@pytest.mark.parametrize("lane", (GOLDEN,))
 def test_the_delivered_frame_count_is_the_same_on_every_cadence(
         lane, monkeypatch):
     """THE AUDIO-SYNC CLAIM, and it is the one that must never break. T comes
@@ -188,7 +206,7 @@ def test_the_delivered_frame_count_is_the_same_on_every_cadence(
     assert captured["frames"].shape[0] == REAL_BEAT_FRAMES
 
 
-@pytest.mark.parametrize("lane", (GOLDEN,) + CADENCE_LANES)
+@pytest.mark.parametrize("lane", (GOLDEN,))
 def test_the_receipt_names_the_cadence_that_actually_ran(lane, monkeypatch):
     """A constant 'hold_2' here would make every peer's receipt claim the
     golden lane's rate -- the same defect class as the module functions."""
@@ -197,7 +215,7 @@ def test_the_receipt_names_the_cadence_that_actually_ran(lane, monkeypatch):
     assert raw["cadence_delivered_frame_count"] == REAL_BEAT_FRAMES
 
 
-@pytest.mark.parametrize("lane", (GOLDEN,) + CADENCE_LANES)
+@pytest.mark.parametrize("lane", (GOLDEN,))
 def test_the_tail_trim_stays_within_its_own_hold(lane, monkeypatch):
     _rec, raw, _cap = _render(lane, monkeypatch)
     assert 0 <= raw["cadence_tail_trim"] < EXPECTED_HOLD[lane]
@@ -215,8 +233,7 @@ def _windows(unique):
     return 1 + math.ceil((unique - gs.GHOST_CONTEXT_LENGTH) / stride)
 
 
-@pytest.mark.parametrize("lane,expected_windows",
-                         [(GOLDEN, 13), (H3, 8), (H5, 5)])
+@pytest.mark.parametrize("lane,expected_windows", [(GOLDEN, 13)])
 def test_the_window_count_on_a_real_twelve_second_beat(lane, expected_windows):
     """The number the whole cadence argument turns on. A real episode beat is
     ~12s, and the golden lane fuses THIRTEEN motion gestures into it."""
@@ -228,7 +245,7 @@ def test_the_window_count_on_a_real_twelve_second_beat(lane, expected_windows):
 def test_a_short_beat_collapses_to_one_clean_gesture_on_every_lane():
     """use_on_equal_length=False runs the module DIRECTLY at 16, so a short
     beat is one coherent gesture no matter the cadence."""
-    for lane in (GOLDEN,) + CADENCE_LANES:
+    for lane in (GOLDEN,):
         unique = gs.ghost_source_request(25, EXPECTED_HOLD[lane])
         assert _windows(unique) == 1
 
@@ -244,74 +261,6 @@ def test_the_source_floor_still_holds_on_the_slowest_lane():
 # G2 -- canvas truth. Every declaring lane needs a pin.
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_the_declared_canvas_is_512x288_and_the_fps_is_25(lane):
-    """The operator's ruling stands: the canvas does not move. Cadence changes
-    how many frames are generated, never their size or the delivery rate."""
-    eng = vreg.get_engine(lane)
-    assert eng.render_canvas == (512, 288)
-    assert eng.target_fps == 25
-    assert eng.render_canvas == vreg.get_engine(GOLDEN).render_canvas
-    assert eng.target_fps == vreg.get_engine(GOLDEN).target_fps
-
-
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_the_graph_emits_the_declared_canvas(lane, monkeypatch):
-    rec, _raw, _cap = _render(lane, monkeypatch)
-    latent = [kw for name, kw in rec.calls if name == "latent"][0]
-    assert (latent["width"], latent["height"]) == (512, 288)
-
-
 # --------------------------------------------------------------------------- #
 # ADDITIVE: everything else is inherited
 # --------------------------------------------------------------------------- #
-
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_only_the_cadence_differs_from_the_golden_lane(lane):
-    gold = vreg.get_engine(GOLDEN)
-    peer = vreg.get_engine(lane)
-    for attr in ("family", "roles", "default_roles", "required_inputs",
-                 "render_aspect", "render_canvas", "target_fps",
-                 "accepts_still", "still_plan", "subject_ownership",
-                 "prompt_profile", "prompt_budget_chars", "style_join",
-                 "delivery_scale_mode", "motion_source",
-                 "negative_prompt_binding", "motion_module_name",
-                 "motion_min_bytes", "lora_name"):
-        assert getattr(peer, attr) == getattr(gold, attr), attr
-    assert peer.hold_factor != gold.hold_factor
-
-
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_each_lane_stamps_its_own_recipe(lane):
-    receipts = {vreg.get_engine(n)._recipe_receipt()
-                for n in (GOLDEN,) + CADENCE_LANES}
-    assert len(receipts) == 3, receipts
-    assert str(EXPECTED_HOLD[lane]) in vreg.get_engine(lane)._recipe_receipt()
-
-
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_the_lane_is_registered_with_a_capability_row(lane):
-    assert vreg.is_registered(lane)
-    row = vreg.CAPABILITIES[lane]
-    assert set(row) == set(vreg.CAPABILITIES[GOLDEN])
-    # Same two artifacts as golden -- these are golden at another rate.
-    assert row["model_requirements"] == \
-        vreg.CAPABILITIES[GOLDEN]["model_requirements"]
-
-
-@pytest.mark.parametrize("lane", CADENCE_LANES)
-def test_the_public_label_states_the_fresh_frame_rate(lane):
-    from nodes._otr_shared import public_engines as pub
-    label = pub._PUBLIC_LABEL[lane]
-    assert "fresh fps" in label
-    # G7.4: no low/high marker without a measurement receipt.
-    assert " low " not in label.lower() and " high " not in label.lower()
-    for claim in ("GiB", "GB VRAM", "fits"):
-        assert claim not in label
-
-
-def test_the_constants_match_the_lane_names():
-    assert cadence.HOLD_THREE == 3
-    assert cadence.HOLD_FIVE == 5
-    assert vreg.get_engine(H3).hold_factor == cadence.HOLD_THREE
-    assert vreg.get_engine(H5).hold_factor == cadence.HOLD_FIVE
