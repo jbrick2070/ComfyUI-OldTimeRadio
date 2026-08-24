@@ -1776,3 +1776,41 @@ committed docs and an operator-facing recommendation. The control that broke
 it was two packs the operator found in five minutes of browsing. When a
 measurement says "this is broken for everyone", FIRST hunt for one
 counterexample before writing the ruling.
+
+## THE SMOKING GUN (2026-08-24): THE AUTOMATIC BACKFILL SCHEDULER IS PAUSED WITH A LEAP-DAY-ONLY SCHEDULE
+
+Read directly from `infrastructure/modules/node-pack-extract-trigger/main.tf`
+and the prod deployment `infrastructure/prod/main.tf` in
+`Comfy-Org/registry-backend`.
+
+**The Cloud Scheduler job that periodically sweeps `pending` extractions is
+provisioned `paused = true`, with a default `backfill_job_schedule` of
+`"30 3 29 2 *"` -- 3:30am on February 29th, UTC.** Next occurrence: 2028.
+Prod's `main.tf` does not override `backfill_job_schedule` or `paused` --
+it sets only `project_id`, `region`, `bucket_name`,
+`cloud_build_service_account`, `topic_name`, `registry_backend_url`,
+`backfill_job_name`. **So the periodic sweep is, by design or by default,
+never going to fire on its own.** This is strong evidence the backfill is
+meant to be triggered manually by a Comfy-Org engineer, not something that
+"just needs time."
+
+**There IS a second path that looks like it should be real-time:** a GCS
+bucket notification (`OBJECT_FINALIZE`) on the `comfy-registry` bucket
+publishes to Pub/Sub, which fires the SAME `node-pack-extract` Cloud Build
+job per-upload. **But its trigger substitution hardcodes
+`_CUSTOM_NODE_NAME = "custom-node"`** -- a literal string, not derived from
+the uploaded object's path. If that is genuinely what runs in production,
+every real-time extraction would filter on `python_module ==
+"custom_nodes.custom-node"`, matching NOTHING for any real pack id. This
+cannot be fully confirmed from the public repo alone (GCP console config can
+diverge from what Terraform last applied), so it is reported as what the
+source shows, not as certain fact.
+
+**CONSEQUENCE FOR THE ASK:** there is no publisher-facing API to trigger our
+own extraction, confirmed by reading `PublishNodeVersion` in full -- it
+creates the version and returns a signed upload URL, nothing else. Waiting
+longer is not expected to help on its own. **The correct next action is
+asking a human**, via Comfy-Org's Discord (`discord.gg/comfyorg`) or a
+GitHub issue on the public `Comfy-Org/registry-backend` tracker (issues
+enabled, 24 open) -- pointing at the two facts above and asking for a manual
+backfill run scoped to `comfyui-old-time-radio`.
