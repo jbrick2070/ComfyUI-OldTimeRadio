@@ -6285,3 +6285,47 @@ EXPECTED result, not a regression signal.
   STILL OPEN** -- all three r1 lanes independently ruled it a different fault
   (different pass, ladder, error type and validator), and it must not be
   reported as covered by this fix.
+
+## PBUG-20260824-02 -- `scifi_news_pro` dies on a bare `SCENE 1:` header with no setting
+- surfaced: the `scifi_news_pro`-only fast-iteration rate measurement started
+  to retire PBUG-20260824-01 (`scripts/otr_overnight_loop.sh scifi_news_pro`,
+  `tmp/legs/pass001/_bankgate_scifi_news_pro.log`), the FIRST leg run against
+  the Class A + Class B fixes plus the loop reliability fix, 2026-08-24.
+  `NewsProScriptError`, `RESULT FAIL`, 10.9 min.
+- symptom: the model wrote the scene header as `SCENE 1:` with NOTHING after
+  the colon. `_RE_SCENE` (`_otr_scifi_news_pro_markup.py:42`) requires a
+  nonempty setting after the colon (`(.+)$`), so the line falls through every
+  classifier and lands as `BAD_LINE_SHAPE` carrying the bare header. Because
+  `on_scene` never fires, EVERY character line that follows reads as "before
+  SCENE 1" -- 12 defects from one missing clause -- and salvage cannot recover
+  it: no scene ever opened, so no scene can hold a line.
+  (`SKELETON_BREAK: salvage cannot proceed: no scene contains a spoken line`).
+- root cause: the same shape as the bare-END bug (PBUG-20260815-03) -- the
+  generic repair turn says WHAT is wrong and never states the fix, so a retry
+  with no targeted note just repeats the omission. Confirmed live: the second
+  attempt in this leg reproduced nearly the identical 12-defect list.
+- fix: **FIXED, live proof owed.** Added `_scene_header_repair_note`
+  (`nodes/_otr_scifi_news_pro.py`), the same pattern as
+  `_end_delimiter_repair_note` -- self-silencing, fires only on a
+  `BAD_LINE_SHAPE` matching a bare `SCENE <n>:`, tells the model to add a
+  setting after the colon with a worked example pulled from the pack's own
+  `_FABLE2_FORMAT_EXAMPLE`. Deliberately NOT a grammar widening (unlike END's
+  cosmetic period, a scene's setting is real content -- it lands in
+  `scenes[].setting` and feeds shot direction), matching the operator's own
+  framing mid-session: *"we always knew these small LLMs aren't going to get
+  it right the first time, it takes cleanup runs to get it right."*
+  **QA caught a real collision before ship:** `_standalone_stage_direction_repair_note`'s
+  unlabelled-row catch-all (`BAD_LINE_SHAPE` not starting with `(`/`[`/`*`)
+  also matched the same bare header and told the model to fold-or-drop the
+  line -- the exact opposite of "keep it and add a setting" in the SAME
+  repair turn. Fixed by guarding that branch to go silent on the bare-header
+  shape and defer to the new note; regression-tested
+  (`tests/test_scifi_news_pro_scene_header_repair.py::test_the_stage_direction_note_does_not_contradict_this_one`).
+- confidence: HIGH on the mechanism (traced through the real classifier code,
+  not inferred); MEDIUM on prevalence (n=1 live occurrence so far -- the fast
+  loop is still gathering data).
+- bible-worthy: plausible (same reusable class as 12.132/END's precedent --
+  "a repair turn must name the fix, not just the offence" -- and now a second
+  instance, "two repair notes matching the same defect can contradict each
+  other, and only per-class silencing catches it"), but NOT promoted yet --
+  live proof is owed first per the admission rule.

@@ -2276,6 +2276,16 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
             continue
 
         if not detail.startswith(_STAGE_DIRECTION_PREFIXES):
+            # A BARE SCENE HEADER GETS ITS OWN NOTE, NOT THIS ONE (found by
+            # QA on 2026-08-24, PBUG-20260824-02). "SCENE 1:" with nothing
+            # after the colon opens with a letter, so without this guard it
+            # falls into the unlabelled-row branch below and gets told to
+            # "fold what it describes into the nearest labelled line, or
+            # drop it" -- directly contradicting _scene_header_repair_note's
+            # "keep it and add a setting", in the SAME repair turn. Go silent
+            # here and let the dedicated note own this shape.
+            if _RE_SCENE_HEADER_BARE.match(detail):
+                continue
             # AN UNLABELLED ROW, and it used to get NOTHING. A prose action
             # line that opens with a letter -- "Eli opens his package." --
             # failed every classifier, raised BAD_LINE_SHAPE, and matched no
@@ -2447,6 +2457,53 @@ def _end_delimiter_repair_note(defects) -> str:
         "unpaired bracket -- 'END' followed by anything else, '[END' without "
         "its closing bracket, and 'END]' without its opening one are all "
         "rejected. Emit the marker once, as the last line of the episode."
+    )
+
+
+#: A bare scene header with nothing after the colon -- the exact shape that
+#: falls through every classifier (`_RE_SCENE` demands `(.+)$` after the
+#: colon) and lands as `BAD_LINE_SHAPE` carrying the line itself.
+_RE_SCENE_HEADER_BARE = re.compile(r"^SCENE\s+\d{1,2}:$", re.IGNORECASE)
+
+
+def _scene_header_repair_note(defects) -> str:
+    """Tell the repair rung a SCENE line needs a setting, not just that it's wrong.
+
+    THE DEFECT (PBUG-20260824-02, found by the fast-iteration scifi_news_pro
+    rate measurement). `SCENE 1:` with nothing after the colon raises
+    `BAD_LINE_SHAPE` -- the grammar requires a setting description on the same
+    line. Because `on_scene` never fires, every character line that follows
+    reads as "before SCENE 1", cascading into a wall of SKELETON_BREAKs that
+    salvage cannot recover (no scene ever opened, so no scene can hold a
+    line) -- one leg died this way with 12 defects from one missing clause.
+
+    SAME SHAPE as the bare-END bug (PBUG-20260815-03): the defect list says
+    WHAT is wrong (bad shape) and never once states the fix, so a retry with
+    only the generic instruction just repeats the omission -- confirmed live,
+    the second attempt in the leg that found this reproduced nearly the same
+    defect list. Unlike END, THIS IS NOT A GRAMMAR WIDENING. A scene's
+    setting is real content -- it lands in `scenes[].setting` and feeds shot
+    direction -- so the fix teaches the model to WRITE one, not accepts its
+    absence.
+
+    Detected on the RAW defect text, like `_end_delimiter_repair_note`.
+    Self-silencing: absent defect, empty string.
+    """
+    hit = any(
+        getattr(d, "code", None) is NewsProParseDefect.BAD_LINE_SHAPE
+        and _RE_SCENE_HEADER_BARE.match(
+            str(getattr(d, "detail", "") or "").strip())
+        for d in (defects or ())
+    )
+    if not hit:
+        return ""
+    return (
+        "\nFORMAT REPAIR RULE -- SCENE HEADERS NEED A SETTING. A line reading "
+        "only 'SCENE <n>:' with nothing after the colon is rejected. Every "
+        "SCENE line must carry a short concrete setting on the SAME line, "
+        "right after the colon -- for example 'SCENE 1: a potting shed, "
+        "before dawn'. Add a few words of setting to every SCENE line that "
+        "is missing one; keep every other line exactly as it already is."
     )
 
 
@@ -2707,6 +2764,7 @@ def _run_markup_ladder(
             # carries exactly the rules its own defects call for.
             + _end_delimiter_repair_note(defects)
             + _frame_order_repair_note(defects)
+            + _scene_header_repair_note(defects)
             + "\n" + rendered
         )
 
