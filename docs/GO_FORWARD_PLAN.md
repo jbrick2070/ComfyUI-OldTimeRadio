@@ -224,6 +224,41 @@ story output is a closed subject. The case for promoting it is measured --
 **gemma-4-12b 8/8 accepted, Mistral-Nemo 4/8** on the real batch prompt -- and
 it is a one-line profile edit whenever he says the word.
 
+**GHOST RETIREMENT -- MEASURED, AWAITING THE OPERATOR'S EYE (2026-08-23).**
+Operator: *"Ghost is almost done, we have a v3 haunted plus adapter and prompts
+that I think may be our winning one, and we remove the others"* -- then, asked
+which profiles survive: *"not sure, I'll need to take a look when I get home."*
+**NOTHING WAS TOUCHED.** The measurement is banked here so the decision is cheap
+when he makes it, and so nobody re-derives it:
+
+* **SIX Ghost engines exist, and all six are PUBLIC menu entries**
+  (`nodes/_otr_shared/public_engines.py:301-327`): `animatediff15_video`,
+  `_v2_video`, `_v3_video`, `_h3_video`, `_h5_video`, `_v3_haunted_video`.
+  Retiring five means five NAMED tombstones -- the campaign's rule is that a
+  public id is tombstoned, never vanished.
+* **THE WINNER INHERITS FROM TWO OF THE CANDIDATES**, so "remove the others"
+  cannot mean delete their classes:
+  `GhostSignalV3HauntedEngine` <- `GhostSignalV3Engine` <- `GhostSignalEngine`.
+  The retirement is of MENU ENTRIES; `eng_ghost_signal.py` and the V3 class stay
+  as the winner's machinery. Only `eng_ghost_signal_cadence.py` (h3/h5) is a
+  pure leaf and could be deleted outright.
+* **Six profiles**: `otr_ghost_signal{,_h3,_h5,_v2,_v3,_v3_haunted}.json`. This
+  is the half that needs his eye, because the plan still calls
+  **`otr_ghost_signal_v3` the SHIP CANDIDATE with hand-edited settings** and it
+  is the subject of the DEFERRED variant drift (`build_variants.py --check`: 54
+  variants / 2 failures, both on that profile). If `v3_haunted` supersedes it,
+  that deferral dies with it; if not, both stay. **Do not run
+  `build_variants.py` without `--profiles` either way.**
+* Each engine id appears in 23-48 files, nearly all shared platform tables
+  (public engines, capability profiles, engine-contract rosters, slot matrix),
+  so this is a wiring change across those tables rather than five file deletes.
+* **THE ONE THING NOT YET MEASURED:** whether `animatediff15_v3_haunted_video`
+  has its own live `otr/obs` receipt. The published Ghost proof on record
+  (`signal_lost_the_constables_knock_20260822_050116`, 8/8 beats) ran on the
+  BASE `animatediff15_video`. The haunted lane's evidence is that the operator
+  and Gemini independently preferred its output -- a judgement, not a published
+  episode. Worth one live leg before its five siblings are retired behind it.
+
 **D. The guides/dialect/recipe refactor (operator's architecture, staged).**
 *"the PROMPT is the LANGUAGE from the video lane; the DIALECT is the
 instructions for prompting the image lane -- double vs single quotes, neg prompt
