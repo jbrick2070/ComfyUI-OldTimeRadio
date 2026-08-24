@@ -1,3 +1,138 @@
+## 2026-08-24 -- HEAD a39875f8 +handoff (v2.0-alpha) -- CODER (scifi_news_pro Class A fixed and LIVE-PROVEN; a regression I shipped and a live leg caught; Bible 12.133; plan pruned to open work; 4 commits)
+
+Did: closed PBUG-20260824-01 Class A, broke it once on the way, and let the GPU
+  say so.
+  THE PLAN'S FRAMING WAS WRONG AND THE PANEL PROVED IT. The NEXT ITEM called
+  this "the `**ANNOUNCER` markdown leak" (Bible 12.132). A surviving pass-11 leg
+  log carried a RICHER capture -- six rejected speaker tokens, of which markdown
+  was the MINORITY at 3; five carried a comma delivery tag (`ELI, whispering`)
+  and four were a shortened cast name (`DR. CHEN` against a roster holding
+  `Dr. Haorong Chen`). No mechanism covered even half.
+  AND A PERFECT MATCHER WOULD NOT HAVE SAVED THE LEG -- proved BEFORE writing
+  code by rebuilding the draft from its defect fingerprint and handing the real
+  parser a roster in which every label already resolved: 5 `BAD_LINE_SHAPE`
+  narration rows and 4 `SKELETON_BREAK`s survived. Two more mechanisms sat
+  behind the loud one: unlabelled prose rows, and a mid-scene ANNOUNCER row that
+  CLOSES the story frame. The driver's own anchor called those breaks derivative;
+  codex and Fable both corrected it, and `on_speaker` settles it -- an
+  unresolved label never changes parser state.
+  WHY FOUR ATTEMPTS ALWAYS BURNED: `_standalone_stage_direction_repair_note`
+  returned on the FIRST matching defect, which here was the line-5 action row,
+  so every repair turn carried the fold-the-stage-direction rule and never once
+  named the six broken labels. Compounding it, `_undecorated_label` stripped ONE
+  marker, so `**Ada**` became `*Ada*`, missed the roster, and a REAL cast member
+  wearing `**` was told to fold or omit the line. Every fixture in the suite used
+  a single `*`, which is why four QA rounds never saw it.
+  SHIPPED `6cdafdcd`: ONE shared resolver (`SpeakerRoster`) consumed by the
+  parser AND `_resolves_to_cast`, which previously copied the ladder while its
+  docstring claimed to import it -- Bible 12.132 verify-3 (one matcher, not two)
+  now actually holds. Exact match always first, then role parenthetical,
+  decoration, comma tag, and an alias index where an alias registers ONLY if
+  exactly one cast member claims it (two claimants and NEITHER gets it). No
+  fuzzy matching, so `test_unknown_speaker_is_hard_no_remap` still stands. Plus a
+  per-episode `_pass_cast_aliases` LLM pass on the operator's instruction
+  ("deterministic py is too strict") whose answers arrive as DATA so the parser
+  stays pure; a repair channel emitting one note per defect CLASS; a
+  `_frame_order_repair_note` for the mid-scene ANNOUNCER; and SALVAGE, which
+  delivers after four honest attempts rather than refusing ("accepts sometimes a
+  wrong name populated but shouldn't kill the whole episode").
+  THEN I BROKE IT, AND THE SUITE HID IT. The first post-fix live pass died at
+  3.8 min: "selected final draft parsed artifact seal is stale". Two layers --
+  `FinalDraft` gained the parse conditions but the CONSTRUCTOR was never given
+  them; and speaker-resolution receipts had been folded into `normalizations`,
+  a field `_parsed_payload` HASHES, so the seal began depending on HOW a label
+  resolved rather than on the script. The build parses against the full cast,
+  the integrity check against a smaller roster -- same script, different rung,
+  stale seal. A 12,097-test suite stayed green because it fires ONLY when a
+  speaker resolves through an alias: the exact case the fix existed to serve.
+  Fixed in `a19f3df2` (conditions travel with the draft; receipts moved to an
+  unsealed `speaker_resolutions`), WITH A NEGATIVE CONTROL that strips the
+  conditions back off and asserts refusal -- without it the test passes whether
+  or not the fix works.
+  LIVE PROOF, and it is the only thing that closed this: `RESULT SUCCESS` in
+  769 s, `signal_lost_the_caretakers_clause_20260824_114223_...mp4` (11.9 MB) in
+  `otr/obs`, and SALVAGE NOT USED -- the ladder got a clean parse on its own.
+  NO SFX ANYWHERE (operator: "there should be no SFX", "no SFX in the ledger").
+  A closed cue vocabulary is never cast as a character on any path, 17 spellings
+  proven. Keyed on the WORD not punctuation, because the first draft keyed on
+  decoration and would have discarded `(SOMEONE NEW): I have something to say.`
+  -- dialogue and all ("they should not chunk off dialogue"). Removed
+  `'*SFX: a door slams'` from `_stage_direction_rule`, the ONE model-visible SFX
+  token in the tree; it survived the 2026-07-01 token removal and the 2026-08-06
+  rip because it reads as documentation rather than pipeline output.
+  A TWO-LANE SFX SWEEP (Sonnet + agy) found NO second model-visible hit and
+  `workflows/otr_canonical.json` clean. The agy lane had to be REPAIRED first:
+  it returned `TOOL CHECK: FAIL` -- not quota, not timeout -- because a Gemini
+  PreToolUse telemetry hook had a malformed quoted path and killed every tool
+  call. Fixed in `~/.gemini/config/plugins/.../hooks.json` (backup
+  `hooks.json.bak-2026-08-24`), smoke-tested. Lesson: an agy lane that says it
+  cannot read the repo is not necessarily out of quota -- check the hook chain.
+  THREE THINGS DELIBERATELY NOT FIXED, each an operator ruling: `[SFX:]` inside
+  dialogue STAYS in `lines[].text` (2026-08-05 ruling, three live consumers, and
+  "now video models are doing native audio too" is a NEW reason to retain it);
+  `scenes[].env` stays (three readers -- ripping it holes the ledger); and
+  `_otr_story_brief.py:354`'s dead `{"music","env"}` filter STAYS -- "NO DONT
+  TOUCH MUSIC ROWS". That last one I had filed as an open defect, which was
+  backwards and dangerous: the outcome is correct and only the mechanism is
+  accidental, so a window "fixing" it would start feeding music rows into the
+  reflection prompt. Converted to a ruling in OTR_STANDING_RULINGS.md.
+  NEW RULING RECORDED: the LEDGER must be good; a few cue leaks into dialogue
+  are tolerable; and if a leak IS detected the cleanup is a BEAT-AWARE LLM pass
+  reading the beat before and after -- never a Python regex. A regex cannot tell
+  a cue from a line carrying brackets, and its only move is deletion.
+  BIBLE 12.133 PROMOTED (`8734208`, Bible repo): "a seal that verifies how the
+  artifact was derived instead of what it is". Checked against all 311 entries
+  and the 432-row coverage index first; nothing covered it. README synced in
+  BOTH phrasings -- "312 bible entries" and "312-entry", the latter being what
+  the three-file-contract regex actually reads and what a replace on the former
+  misses.
+  PLAN PRUNED `a39875f8`: 1374 -> 984 lines, 390 lines of receipts moved
+  VERBATIM to the archive. Most of what came out had been written into the plan
+  THE SAME DAY by this window -- recording finished work under a heading that
+  says OPEN is the fastest way to make the file lie.
+Current step: Class A is fixed and live-proven but OWES A RATE. One green leg
+  does not retire a defect measured at 6 failures in 10 live passes. The
+  measurement loop is RUNNING (see box state) and leg logs now archive per pass
+  to `tmp/legs/passNNN/`, so a failure is diagnosable from ONE loop.
+Next: (1) read the loop's `scifi_news_pro` rate and compare against the recorded
+  60%; do NOT mark PBUG-20260824-01 closed on a single episode. (2) CLASS B
+  (`_pass_news_read`) is the real next item and is UNTOUCHED -- all three r1
+  lanes independently ruled it a different fault. Candidate fix is the mirror of
+  the 2026-08-18 precedent: give the cast names to the VALIDATOR only (it
+  already receives them, `:1732-1735`) and remove them from the model's context.
+  [ASSUMPTION] that the listing causes the copying -- verify with matched prompt
+  variants first. (3) Small: set PATH inside `otr_overnight_loop.sh` itself so
+  the loop cannot run without archiving; do it when NO supervisor is running,
+  because bash reads a script incrementally as it executes.
+Models: rung 5 (Opus, this window) drove and judged. r1 was a THREE-SEAT SCOPED
+  ROUND, not a four-round arc, and it has a scope receipt at
+  `kibitz-runs/2026-08-24-scifi-news-pro-writer/r1/scope_receipt.md`: Fable
+  (cold, launched before the driver anchor existed), Sonnet 5, and codex
+  `gpt-5.6-sol` at reasoning high via `kibitz.py --only codex`. agy and cursor
+  did NOT sit that round. A separate two-lane SFX sweep used Sonnet + agy. The
+  panel earned it: codex and Fable both refuted the driver's claim that the
+  skeleton breaks were derivative, codex caught that a comma is legal INSIDE a
+  canonical roster label, and Sonnet found the double-marker bug in
+  `_undecorated_label`.
+Suite: 12100 passed / 120 skipped / 1 xfailed, EXIT=0 (356 s). Bible 22 passed /
+  26 skipped / 3 xfailed, 312 entries. `workflows/otr_canonical.json` NOT
+  touched this session.
+Box state: NOT CLEAN, and deliberately so. A ComfyUI server is RESIDENT on
+  :8000 (booted at `a19f3df2`) and ONE overnight loop supervisor is running
+  (bash 58488) with a live bank gate holding `tmp/_writer_bank_gate.lock`
+  (pid=24360). It is left running ON PURPOSE -- it is the rate measurement, and
+  it keeps publishing to `otr/obs` (176 entries at handoff, from 172 at loop
+  start). A DUPLICATE loop pair was found and killed during pre-flight: two
+  supervisors had been launched 24 s apart, and each clears the gate lock
+  between passes, so they would have interleaved. If the next window wants a
+  clean box, reset per CLAUDE.md section 4 -- selective CIM kill by CommandLine,
+  never a blanket python kill.
+Commits: `6cdafdcd` (Class A fix), `38887d88` (plan + loop-PATH gotcha),
+  `17b254f0` (music-rows ruling), `a19f3df2` (seal fix, live-proven),
+  `a39875f8` (plan pruned). Bible repo: `8734208`. The handoff commit lands ON
+  TOP of these -- see the kickoff line for the real head. The sha above is the
+  second-to-last on the branch; the last is this handoff commit.
+
 ## 2026-08-24 -- HEAD 452132d0 +handoff (v2.0-alpha) -- CODER (shakespeare fixed and live-proven; a 10-pass overnight loop; scifi_news_pro measured at 60% failure and promoted to NEXT; 6 commits)
 
 Did: fixed PBUG-20260802-02's THIRD manifestation, then ran the box all night
