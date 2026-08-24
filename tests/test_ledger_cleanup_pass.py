@@ -205,23 +205,18 @@ def test_cast_row_without_a_char_id_is_minted_and_stays_referenceable():
 # ---------------------------------------------------------------------------
 
 
-def test_spoken_language_is_left_exactly_as_written(monkeypatch):
+def test_spoken_language_is_left_exactly_as_written():
     """The safety repair pass is RETIRED -- the author's words survive.
 
     This test used to assert the opposite: that "damn" was rewritten out of a
     delivered row. Operator directive 2026-08-05 removed content guardrails
     from the generation path, so the cleanup must now leave the line alone. It
     is inverted rather than deleted so a re-armed repair pass fails loudly.
+
+    2026-08-23: it no longer needs to patch a must-not-run stub over
+    `apply_safety_cleanup`, because that function no longer exists -- see
+    `test_the_rewrite_machinery_is_gone_not_merely_quiet` below.
     """
-    called = {"n": 0}
-
-    def _must_not_run(ledger_data, slot_fn):
-        called["n"] += 1
-        return {"status": "patched", "patch_count": 1, "hits": []}
-
-    monkeypatch.setattr(
-        "nodes._otr_content_safety.apply_safety_cleanup", _must_not_run)
-
     ledger = _complete_ledger()
     original = "The damn lamp has not turned since Tuesday."
     ledger["lines"][1]["text"] = original
@@ -229,8 +224,37 @@ def test_spoken_language_is_left_exactly_as_written(monkeypatch):
 
     assert receipt["status"] == "complete"
     assert ledger["lines"][1]["text"] == original, "the cleanup edited the author"
-    assert called["n"] == 0, "the retired safety repair pass ran"
     assert receipt["safety"]["status"] == "retired"
+
+
+def test_the_rewrite_machinery_is_gone_not_merely_quiet():
+    """A pass that CANNOT run beats a pass that is asked not to.
+
+    The old guard monkeypatched a must-not-run stub over
+    `apply_safety_cleanup` and asserted the counter stayed at zero. That proved
+    the caller behaved -- it could not prove the machinery had not been re-armed
+    somewhere else, because the machinery was still sitting there, importable,
+    with an LLM prompt and an atomic ledger write in it.
+
+    It is deleted now (2026-08-23), so the guard is absence. What survives in
+    `_otr_content_safety` is the read-only VOCABULARY, which the directive does
+    not ban and which
+    `tests/test_bug_local_288_sfw_validator.py` deliberately keeps green.
+    """
+    from nodes import _otr_content_safety as safety
+
+    for gone in ("apply_safety_cleanup", "propose_safety_patches",
+                 "_SafetyPatchSet", "_SafetyLinePatch"):
+        assert not hasattr(safety, gone), (
+            "%s is back in _otr_content_safety -- that module rewrote a "
+            "delivered spoken row to match a hardcoded word list, which is the "
+            "exact thing the 2026-08-03 no-guardrails directive forbids" % gone)
+        assert gone not in (safety.__all__ or ())
+
+    # the half that is SUPPOSED to survive, still working
+    assert safety.find_text_hits("and then damn happened")
+    assert not safety.find_text_hits("The class had begun.")
+    assert safety.profanity_terms() == safety.PROFANITY_TERMS
 
 
 def test_the_safety_receipt_key_survives_with_a_defined_value():

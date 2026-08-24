@@ -1,25 +1,39 @@
-"""Narrow, shared spoken-content safety policy.
+"""The retired spoken-content vocabulary -- READ-ONLY, and it stays that way.
 
-This module is intentionally not a general prose classifier. It recognizes only
-three operator-authorized terminal categories with whole-word matching:
-profanity, explicit guns/knives/weapons, and explicit sexual/nudity terms.
-Smoking, style, genre, visual vocabulary, and ordinary English are out of
-scope.
+Three word lists (profanity, explicit weapons, explicit sexual/nudity) and a
+whole-word matcher. Nothing here judges, blocks, rewrites or refuses anything.
+
+THE REWRITE HALF IS GONE (2026-08-23, the lean-mean OPEN item). This module used
+to carry `propose_safety_patches` and `apply_safety_cleanup`: an LLM-driven pass
+that took a delivered spoken row matching one of these lists and REWROTE IT.
+That is precisely what the operator's 2026-08-03 directive forbids -- *"no
+violence or swearing guardrails, they just cause problems"* -- and on an
+adaptation lane it meant editing Shakespeare. The pass had already been unwired
+at its caller (`_otr_ledger_cleanup` stamps `safety.status = "retired"` on every
+path, so the ledger field keeps its owner) and `validate_sfw` had already been
+gutted to `return None`. What remained here was 165 lines of dormant rewrite
+machinery that anything could have re-armed, plus two bare `RuntimeError`s that
+would have killed a render if it ever ran.
+
+WHY THE VOCABULARY SURVIVES THE MACHINERY. The directive bans FILTERING, not
+knowing the words. `tests/test_bug_local_288_sfw_validator.py` keeps the whole
+retired list green on purpose -- every term must PASS a line -- and says why: a
+deleted test is silence, and silence is how a policy creeps back. Keeping the
+tuples means a future NON-blocking use (a report, a tag, an advisory the
+operator asked for) does not have to re-derive them, and it keeps that guard
+able to enumerate what must never block again.
+
+**If you are here to wire this into the generation path: don't.** A blocking
+caller is the thing that was removed, twice.
+
+Pure and stdlib-only: no pydantic, no LLM, no ledger writes.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from functools import lru_cache
-import json
 import re
-from typing import Any, Iterable, Mapping, MutableMapping
-
-from pydantic import BaseModel, Field, model_validator
-
-try:
-    from ._otr_script_prep import clean_spoken_text
-except ImportError:  # pragma: no cover -- flat test/standalone load
-    from _otr_script_prep import clean_spoken_text  # type: ignore
+from typing import Any, Mapping
 
 
 PROFANITY_TERMS: tuple[str, ...] = (
@@ -82,22 +96,6 @@ EXPLICIT_NUDITY_TERMS: tuple[str, ...] = (
 )
 
 SPOKEN_ROLES = frozenset({"character", "announcer"})
-
-
-class _SafetyLinePatch(BaseModel):
-    line_id: str = Field(min_length=1)
-    replacement_text: str = Field(min_length=1)
-
-
-class _SafetyPatchSet(BaseModel):
-    patches: list[_SafetyLinePatch]
-
-    @model_validator(mode="after")
-    def _unique_ids(self):
-        ids = [patch.line_id for patch in self.patches]
-        if len(ids) != len(set(ids)):
-            raise ValueError("duplicate line_id in safety patch set")
-        return self
 
 
 @dataclass(frozen=True)
@@ -175,179 +173,14 @@ def format_safety_hits(hits: Iterable[SafetyHit], *, limit: int = 8) -> str:
     return rendered
 
 
-def propose_safety_patches(
-    ledger_data: Mapping[str, Any],
-    slot_fn,
-) -> tuple[dict[str, str], dict[str, Any]]:
-    """Generate one atomic same-story patch set for current safety hits."""
-    hits = scan_spoken_ledger(ledger_data)
-    if not hits:
-        return {}, {"status": "clean", "hits": [], "patch_count": 0}
-
-    try:
-        from ._otr_structured_call import structured_call
-    except ImportError:  # pragma: no cover
-        from _otr_structured_call import structured_call  # type: ignore
-
-    hit_ids = {hit.line_id for hit in hits}
-    lines_by_id = {
-        str(row.get("line_id") or ""): row
-        for row in (ledger_data.get("lines") or ())
-        if isinstance(row, Mapping)
-    }
-    payload = [
-        {
-            "line_id": line_id,
-            "speaker_role": str(lines_by_id[line_id].get("speaker_role") or ""),
-            "text": str(lines_by_id[line_id].get("text") or ""),
-            "hits": [
-                {"category": hit.category, "term": hit.term}
-                for hit in hits
-                if hit.line_id == line_id
-            ],
-        }
-        for line_id in sorted(hit_ids)
-    ]
-    prompt = [
-        {
-            "role": "system",
-            "content": (
-                "You repair explicit safety terms in an accepted radio story. "
-                "Return JSON only. Preserve the exact story event, meaning, "
-                "speaker, cast, line identity, order, canon, and tone. Change "
-                "only the listed line text. Do not add stage directions, role "
-                "labels, profanity, explicit guns/knives/weapons, or explicit "
-                "sexual/nudity language."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                "Return {\"patches\":[{\"line_id\":...,"
-                "\"replacement_text\":...}]} with exactly one patch for "
-                "each listed line_id. Lines: "
-                + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-            ),
-        },
-    ]
-
-    def _validate(result: _SafetyPatchSet) -> str | None:
-        patches = {patch.line_id: patch.replacement_text for patch in result.patches}
-        if set(patches) != hit_ids:
-            return (
-                "patch line_ids must equal the exact requested set: "
-                + ", ".join(sorted(hit_ids))
-            )
-        for line_id, text in patches.items():
-            if not str(text or "").strip():
-                return f"replacement for {line_id} is empty"
-            if not clean_spoken_text(str(text)):
-                return (
-                    f"replacement for {line_id} has no spoken surface after "
-                    "stage-direction cleanup"
-                )
-            residual = find_text_hits(text)
-            if residual:
-                return f"replacement for {line_id} remains unsafe: {residual}"
-        return None
-
-    try:
-        # LLM slot: technical -- atomic replacement of explicitly unsafe prose.
-        result = structured_call(
-            prompt=prompt,
-            schema=_SafetyPatchSet,
-            slot_fn=slot_fn,
-            base_temperature=0.25,
-            structural_retry_temperature=0.1,
-            post_validator=_validate,
-            max_new_tokens=max(256, min(2048, 128 * len(hit_ids))),
-            max_attempts=3,
-            helper_name="spoken_safety_cleanup",
-        )
-    except Exception as exc:  # residual validation remains fail-closed
-        return {}, {
-            "status": "cleanup_failed",
-            "hits": [hit.to_dict() for hit in hits],
-            "patch_count": 0,
-            "error": f"{type(exc).__name__}: {exc}"[:600],
-        }
-    patches = {
-        patch.line_id: patch.replacement_text.strip()
-        for patch in result.patches
-    }
-    return patches, {
-        "status": "patched",
-        "hits": [hit.to_dict() for hit in hits],
-        "patch_count": len(patches),
-    }
-
-
-def apply_safety_cleanup(
-    ledger_data: MutableMapping[str, Any],
-    slot_fn,
-) -> dict[str, Any]:
-    """Atomically apply a validated safety-only patch set to ledger rows."""
-    patches, receipt = propose_safety_patches(ledger_data, slot_fn)
-    if not patches:
-        return receipt
-    try:
-        from ._otr_text_metrics import set_line_text_metrics
-    except ImportError:  # pragma: no cover
-        from _otr_text_metrics import set_line_text_metrics  # type: ignore
-    rows = {
-        str(row.get("line_id") or ""): row
-        for row in (ledger_data.get("lines") or ())
-        if isinstance(row, MutableMapping)
-    }
-    if set(patches) - set(rows):
-        return {
-            **receipt,
-            "status": "apply_failed",
-            "error": "validated line_id disappeared before atomic apply",
-        }
-    empty_spoken = [
-        line_id for line_id, replacement in patches.items()
-        if not clean_spoken_text(str(replacement))
-    ]
-    if empty_spoken:
-        return {
-            **receipt,
-            "status": "apply_failed",
-            "error": (
-                "replacement has no spoken surface after stage-direction "
-                "cleanup: " + ", ".join(sorted(empty_spoken))
-            ),
-        }
-    for line_id, replacement in patches.items():
-        set_line_text_metrics(rows[line_id], replacement)
-    empty_rows = [
-        line_id for line_id in patches
-        if not clean_spoken_text(str(rows[line_id].get("text") or ""))
-    ]
-    if empty_rows:
-        raise RuntimeError(
-            "safety cleanup invariant failed after atomic apply: empty spoken "
-            "surface in " + ", ".join(sorted(empty_rows))
-        )
-    residual = scan_spoken_ledger(ledger_data)
-    if residual:
-        raise RuntimeError(
-            "safety cleanup invariant failed after validated atomic apply: "
-            + format_safety_hits(residual)
-        )
-    return receipt
-
-
 __all__ = [
     "EXPLICIT_NUDITY_TERMS",
     "PROFANITY_TERMS",
     "EXPLICIT_WEAPON_TERMS",
     "SPOKEN_ROLES",
     "SafetyHit",
-    "apply_safety_cleanup",
     "find_text_hits",
     "format_safety_hits",
     "profanity_terms",
-    "propose_safety_patches",
     "scan_spoken_ledger",
 ]

@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from nodes import _otr_content_safety as safety
 from nodes import _otr_scifi_news_pro_markup as markup
 from nodes import _otr_openrouter_backend as openrouter
 from nodes import _otr_scifi_news_pro as scifi_news_pro
@@ -89,21 +88,13 @@ def test_still_spine_allows_visualizer_without_scene_manifest(
     assert ledger["images"]["still_spine_receipt"]["validated"] == []
 
 
-def test_safety_cleanup_rejects_replacement_with_empty_spoken_surface(
-        monkeypatch):
-    ledger = {"lines": [{
-        "line_id": "l1", "speaker_role": "character", "text": "damn it"
-    }]}
-    monkeypatch.setattr(
-        safety, "propose_safety_patches",
-        lambda _ledger, _slot: ({"l1": "(sound effect)"}, {"status": "patched"}),
-    )
-
-    receipt = safety.apply_safety_cleanup(ledger, lambda _prompt: "unused")
-
-    assert receipt["status"] == "apply_failed"
-    assert "spoken surface" in receipt["error"]
-    assert ledger["lines"][0]["text"] == "damn it"
+# `test_safety_cleanup_rejects_replacement_with_empty_spoken_surface` was here
+# and is DELETED (2026-08-23). It exercised `apply_safety_cleanup`'s internal
+# invariant -- an LLM-proposed replacement that emptied a spoken row -- and that
+# whole rewrite pass is gone from `_otr_content_safety`, unwired at its caller
+# since 2026-08-05. A test for machinery that cannot run is not coverage. What
+# replaces it is stronger and lives in `test_ledger_cleanup_pass.py`: an
+# assertion that the rewrite entry points DO NOT EXIST.
 
 
 def test_bounded_provider_capacity_fails_before_network(monkeypatch):
