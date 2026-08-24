@@ -889,6 +889,33 @@ class _Parse:
             return
         # character line
         if self.state in (_EXPECT_TITLE, _PREAMBLE):
+            if self.salvage:
+                # IMPLICIT SCENE (operator, 2026-08-24 -- "you never know
+                # what crazy stuff a model will throw at the parser").
+                # Salvage must not depend on recognizing which SPECIFIC way
+                # a scene header failed to parse -- a bare "SCENE 1:", a
+                # bracketed "SCENE [1]:", or any shape nobody has seen yet
+                # all land here the same way: real dialogue, no scene ever
+                # opened for it to belong to. Without this, salvage refused
+                # every one of them outright ("no scene contains a spoken
+                # line"), because `self.scenes` stayed empty regardless of
+                # how much real dialogue followed. Open an implicit scene 1
+                # from the first placeable line, the same way an unresolved
+                # speaker is ADOPTED rather than dropped -- this is a
+                # RECEIPT, not a defect, so it does not block salvage the
+                # way `self.skeleton(...)` would.
+                self._check_preamble_complete(no)
+                self.resolutions.append(
+                    f"line {no}: character line ({canonical_name}) arrived "
+                    "before any SCENE header parsed -- salvage opened an "
+                    "implicit SCENE 1"
+                )
+                self.scenes.append((1, "", []))
+                self.state = _SCENES
+                self.scenes[-1][2].append(
+                    ParsedLine(speaker=canonical_name, text=text)
+                )
+                return
             self.skeleton(
                 f"character line ({canonical_name}) before SCENE 1", no
             )

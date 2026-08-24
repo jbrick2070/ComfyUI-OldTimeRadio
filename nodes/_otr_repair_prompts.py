@@ -36,6 +36,7 @@ __all__ = [
     "schema_field_repair",
     "cast_membership_repair",
     "payload_null_repair",
+    "gender_literal_repair",
     "make_dispatching_repair_factory",
 ]
 
@@ -191,6 +192,75 @@ def payload_null_repair(
     )
 
 
+def gender_literal_repair(
+    *,
+    original_prompt: Any,
+    failed_output: str,
+    error: BaseException,
+) -> list[dict[str, str]]:
+    """Repair prompt for a `gender` field that failed its Literal check.
+
+    THE DEFECT (PBUG-20260824-03, found live by the `scifi_news_pro`
+    fast-iteration rate measurement). `CastVoice.gender` accepts only
+    `'male'` or `'female'` -- there is no third option, because every
+    downstream voice-stock entry is one or the other. A model offered a
+    hedge (`'both'`) instead of committing to one, and the generic
+    `schema_field_repair` directive ("fix the field named in the error")
+    does not say HOW to resolve the ambiguity -- it names the offence, not
+    the decision the model still has to make. Same class as
+    `payload_null_repair`: a vague "that field is wrong" retry lets the
+    model repeat its own indecision with a different word.
+
+    THIS IS NOT A SCHEMA WIDENING, same reasoning as the scene-header note
+    in `_otr_scifi_news_pro.py`: there is no real "both" voice to cast, so
+    accepting a third value would just move the failure downstream to a
+    voice-menu lookup with nothing to match. The fix asks for the same call
+    a casting director makes constantly -- commit to the single gender that
+    most plausibly fits the character, by name and description.
+    """
+    directive = (
+        "CRITICAL: Your previous response gave a `gender` value that is "
+        f"not allowed: {_error_text(error)}. This field accepts ONLY "
+        "'male' or 'female' -- there is no third option, and a value like "
+        "'both', 'nonbinary', or 'unspecified' will always be rejected, "
+        "because every available voice is one or the other. For EACH "
+        "character, pick the single gender that most plausibly fits their "
+        "name and description, exactly as a casting director would, and "
+        "commit to it. Keep every other field exactly as it was. Return "
+        "ONE valid JSON object, no Markdown, no prose."
+    )
+    return _compose_repair(
+        directive, failed_output=failed_output, original_prompt=original_prompt,
+    )
+
+
+# Matched on pydantic's own STRUCTURED error list (`.errors()`), not on the
+# rendered string. QA CAUGHT THE TEXT-MATCHING VERSION (2026-08-24): a
+# whole-error substring check ("gender" in str(error).lower()) would
+# misfire if `CastVoice`'s OTHER Literal field (`age_band`) ever failed in
+# the SAME multi-field ValidationError with a rejected value that happens
+# to CONTAIN the substring "gender" (e.g. a model writing 'transgender' as
+# an age_band) -- confusing "pick male or female" advice for an unrelated
+# field. `.errors()` gives each failure's exact field path and type
+# separately, so this checks the LAST path segment is literally `gender`,
+# never a substring of some other field's rejected value.
+_GENDER_FIELD_NAME: str = "gender"
+_LITERAL_ERROR_TYPE: str = "literal_error"
+
+
+def _is_gender_literal_validation_error(error: BaseException) -> bool:
+    """True iff `error` rejects a `gender` field's value against its
+    Literal enum. See `_GENDER_FIELD_NAME`/`_LITERAL_ERROR_TYPE`."""
+    if not isinstance(error, ValidationError):
+        return False
+    for row in error.errors():
+        loc = row.get("loc") or ()
+        if (row.get("type") == _LITERAL_ERROR_TYPE
+                and loc and loc[-1] == _GENDER_FIELD_NAME):
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher -- routes an Attempt-3 failure to the matching typed factory
 # ---------------------------------------------------------------------------
@@ -283,6 +353,12 @@ def make_dispatching_repair_factory(
             # prompt did not recover the Script Doctor edits pass.
             if _is_payload_null_validation_error(error):
                 return payload_null_repair(
+                    original_prompt=original_prompt,
+                    failed_output=failed_output,
+                    error=error,
+                )
+            if _is_gender_literal_validation_error(error):
+                return gender_literal_repair(
                     original_prompt=original_prompt,
                     failed_output=failed_output,
                     error=error,

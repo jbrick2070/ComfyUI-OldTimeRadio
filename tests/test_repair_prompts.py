@@ -52,6 +52,65 @@ def _payload_null_validation_error() -> ValidationError:
     raise AssertionError("model_validate should have raised")
 
 
+def _gender_literal_validation_error() -> ValidationError:
+    """The real shape: `CastVoice.gender: Literal["male", "female"]`
+    (`nodes/_otr_scifi_news_pro.py`), rejecting a hedge value."""
+    from typing import Literal
+
+    class _Cast(BaseModel):
+        name: str
+        gender: Literal["male", "female"]
+
+    class _Casting(BaseModel):
+        cast: list[_Cast]
+
+    try:
+        _Casting.model_validate({
+            "cast": [{"name": "Dr. Chen", "gender": "both"}],
+        })
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("model_validate should have raised")
+
+
+def _unrelated_literal_validation_error() -> ValidationError:
+    """A Literal failure on a DIFFERENTLY NAMED field. Must NOT be routed
+    to `gender_literal_repair` -- that note's advice ("pick male or
+    female") would be nonsense here."""
+    from typing import Literal
+
+    class _Row(BaseModel):
+        age_band: Literal["20s", "30s"]
+
+    try:
+        _Row.model_validate({"age_band": "ancient"})
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("model_validate should have raised")
+
+
+def _age_band_error_whose_value_contains_the_word_gender() -> ValidationError:
+    """QA CAUGHT THIS (2026-08-24): the first cut of the detector matched on
+    a SUBSTRING of the whole rendered error text, so a differently-named
+    field failing with a value that happens to CONTAIN "gender" would have
+    misfired. `gender` itself is VALID here -- only `age_band` fails, with
+    a rejected value chosen specifically to contain the word."""
+    from typing import Literal
+
+    class _Cast(BaseModel):
+        name: str
+        gender: Literal["male", "female"]
+        age_band: Literal["20s", "30s"]
+
+    try:
+        _Cast.model_validate({
+            "name": "Dr. Chen", "gender": "female", "age_band": "transgender",
+        })
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("model_validate should have raised")
+
+
 def _content(messages) -> str:
     assert isinstance(messages, list)
     assert len(messages) == 1
@@ -112,6 +171,46 @@ def test_payload_null_repair_can_omit_an_empty_edit_row():
     assert "OMIT" in text
 
 
+def test_gender_literal_repair_asks_the_model_to_commit_to_one():
+    """PBUG-20260824-03. A vague "that field is wrong" retry lets the model
+    repeat its own indecision with a different hedge word -- this note has
+    to say HOW to resolve it, not just that it was wrong."""
+    text = _content(rp.gender_literal_repair(
+        original_prompt=_ORIGINAL_PROMPT,
+        failed_output=_FAILED_OUTPUT,
+        error=_gender_literal_validation_error(),
+    ))
+    assert "'male' or 'female'" in text
+    assert "no third option" in text
+    assert "commit to it" in text
+
+
+def test_gender_literal_repair_is_scoped_to_the_gender_field_only():
+    """An unrelated Literal failure (a differently named field) must NOT
+    be routed here -- "pick male or female" is nonsense advice for
+    `age_band`, and must fall through to the generic field repair."""
+    assert not rp._is_gender_literal_validation_error(
+        _unrelated_literal_validation_error())
+    text = _content(_dispatch(_unrelated_literal_validation_error()))
+    assert "valid JSON but failed schema validation" in text
+    assert "'male' or 'female'" not in text
+
+
+def test_the_detector_is_not_fooled_by_a_substring_match():
+    """QA CAUGHT THIS (2026-08-24). The detector must key on the FIELD
+    PATH, not on whether the word "gender" appears anywhere in the
+    rendered error text -- a valid `gender` alongside a failing
+    `age_band` whose rejected value happens to contain "gender" must NOT
+    be routed to advice about picking male or female."""
+    error = _age_band_error_whose_value_contains_the_word_gender()
+    assert "gender" in str(error).lower(), (
+        "the fixture must actually contain the word, or this test proves "
+        "nothing")
+    assert not rp._is_gender_literal_validation_error(error)
+    text = _content(_dispatch(error))
+    assert "'male' or 'female'" not in text
+
+
 def test_structural_builders_return_one_user_message():
     error = PostValidationError("structural failure")
     for builder in (
@@ -119,6 +218,7 @@ def test_structural_builders_return_one_user_message():
         rp.schema_field_repair,
         rp.cast_membership_repair,
         rp.payload_null_repair,
+        rp.gender_literal_repair,
     ):
         message = builder(
             original_prompt=_ORIGINAL_PROMPT,
@@ -135,6 +235,8 @@ def test_dispatches_json_schema_payload_and_roster_failures():
         _dispatch(_validation_error())
     )
     assert "OMIT" in _content(_dispatch(_payload_null_validation_error()))
+    assert "'male' or 'female'" in _content(
+        _dispatch(_gender_literal_validation_error()))
     roster = PostValidationError(
         "speaker 'BANDITO' is not in locked cast ['ALICE', 'BEN']"
     )

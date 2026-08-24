@@ -140,3 +140,91 @@ def test_the_note_and_the_parser_cannot_drift():
     assert markup._RE_SCENE.match("SCENE 1: a potting shed, before dawn"), (
         "the repair note's own example must be accepted by the real grammar")
     assert note  # keeps the note referenced so this test fails loudly if renamed
+
+
+# --------------------------------------------------------------------------- #
+# salvage -- the GENERAL backstop, independent of the specific malformed shape
+# --------------------------------------------------------------------------- #
+#
+# Operator, 2026-08-24: "you never know what crazy stuff [a model will
+# throw at the parser] -- like maybe a model will say SCENE [3] or some
+# crazy stuff." The targeted repair note above only fires on the ONE shape
+# actually observed live (a bare "SCENE <n>:"). Salvage must not depend on
+# recognizing which specific way the header failed -- these tests use a
+# DIFFERENT malformed shape than the one the note detects, to prove the
+# rescue is genuinely shape-independent rather than accidentally narrow.
+CAST = ("Dr. Haorong Chen", "Eli Marsh")
+
+
+def _draft(scene_line: str) -> str:
+    return "\n".join([
+        "TITLE: The Quiet Frequency",
+        "MUSIC: low hum, tape hiss",
+        "ANNOUNCER: Tonight, a signal nobody asked for.",
+        scene_line,
+        "Dr. Haorong Chen: The readings do not make sense.",
+        "Eli Marsh: Then we are reading them wrong.",
+        "ANNOUNCER: The signal went quiet before dawn.",
+        "CODA: Nobody slept that night.",
+        "MUSIC: the hum returns, and out",
+        "END.",
+    ])
+
+
+def test_a_scene_header_shape_nobody_specifically_handled_still_salvages():
+    """`SCENE THREE` -- spelled out, in the operator's "you never know what
+    crazy stuff a model will throw at the parser" spirit -- matches NEITHER
+    the real grammar, NOR the bare-header note's regex, NOR (unlike a
+    bracketed variant) the speaker catch-all. It is simply an unrecognized
+    line, dropped in salvage same as any other -- and the rescue has to come
+    from the REAL dialogue that follows it, not from recognizing this shape
+    at all."""
+    shape = "SCENE THREE"
+    assert not markup._RE_SCENE.match(shape)
+    assert not scifi_news_pro._RE_SCENE_HEADER_BARE.match(shape + ":")
+    assert not markup._RE_SPEAKER.match(shape)
+
+    parsed, defects = markup.parse_scifi_news_pro_markup(
+        _draft(shape), CAST, salvage=True)
+    assert defects == (), f"salvage must deliver, got {defects}"
+    assert len(parsed.scenes) == 1
+    assert parsed.scenes[0].n == 1
+    spoken = [ln.speaker for ln in parsed.scenes[0].lines]
+    assert spoken == ["Dr. Haorong Chen", "Eli Marsh"]
+
+
+def test_a_bare_scene_header_also_salvages_via_the_general_path():
+    """The shape the targeted note DOES handle must still salvage on its
+    own if a retry never reaches it (e.g. the ladder is exhausted first)."""
+    draft = _draft("SCENE 1:")
+    parsed, defects = markup.parse_scifi_news_pro_markup(
+        draft, CAST, salvage=True)
+    assert defects == (), f"salvage must deliver, got {defects}"
+    assert len(parsed.scenes) == 1
+    assert parsed.scenes[0].setting == ""
+
+
+def test_without_salvage_the_same_draft_still_refuses_loudly():
+    """The honest (non-salvage) parse must NOT gain this leniency -- only
+    the last-resort rung may rescue a missing scene header."""
+    parsed, defects = markup.parse_scifi_news_pro_markup(
+        _draft("SCENE THREE"), CAST, salvage=False)
+    assert parsed is None
+    assert any(d.code is markup.NewsProParseDefect.BAD_LINE_SHAPE
+               for d in defects)
+
+
+def test_salvage_still_refuses_when_nothing_is_actually_salvageable():
+    """The pre-existing refusal must survive: a draft with no scene AND no
+    resolvable dialogue is still an empty episode, not a rescued one."""
+    empty = "\n".join([
+        "TITLE: Nothing Happened",
+        "MUSIC: low hum",
+        "ANNOUNCER: Tonight, nothing at all.",
+        "CODA: The end.",
+        "MUSIC: out",
+        "END.",
+    ])
+    parsed, defects = markup.parse_scifi_news_pro_markup(
+        empty, CAST, salvage=True)
+    assert parsed is None and defects

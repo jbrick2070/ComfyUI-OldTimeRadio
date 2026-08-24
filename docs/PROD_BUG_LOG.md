@@ -6329,3 +6329,88 @@ EXPECTED result, not a regression signal.
   instance, "two repair notes matching the same defect can contradict each
   other, and only per-class silencing catches it"), but NOT promoted yet --
   live proof is owed first per the admission rule.
+
+## PBUG-20260824-03 -- `scifi_news_pro` casting hedges gender as 'both'
+- surfaced: same fast-iteration measurement, a different pass entirely
+  (`casting_voices`, not the script markup ladder). `NewsProCastError` after
+  2 attempts: `cast.2.gender Input should be 'male' or 'female'
+  [type=literal_error, input_value='both', input_type=str]`.
+- symptom: `CastVoice.gender: Literal["male", "female"]` has no third
+  option (every voice-stock entry is one or the other), but the model wrote
+  `'both'` for a character and repeated the same failure on retry.
+- root cause: `_pass_casting` uses `structured_call` with the SHARED,
+  repo-wide dispatching repair factory (`make_dispatching_repair_factory`,
+  `nodes/_otr_repair_prompts.py`) -- already model-agnostic infrastructure
+  that echoes pydantic's own validation error back to the model. That error
+  message names the allowed values but never says HOW to resolve the
+  ambiguity, so a model that hedged once had no reason to stop hedging.
+  Same class as the already-shipped `payload_null_repair` fix for a
+  different field (BUG-LOCAL-275): a vague "that field is wrong" retry
+  lets the model repeat its own indecision with a different word.
+  Confirmed there is no pre-established gender lock this could instead
+  read from: `CastShape` (the treatment-time cast entry) carries no
+  `gender` field at all -- `CastVoice.gender` is the first and only point
+  `scifi_news_pro` decides a character's gender.
+- fix: **FIXED, live proof owed.** Added `gender_literal_repair` +
+  `_is_gender_literal_validation_error` to the SHARED repair-prompts module
+  (not scifi_news_pro-local, since the dispatcher is repo-wide), wired
+  ahead of the generic `schema_field_repair` fallback. Tells the model to
+  commit to the single gender that most plausibly fits the character's name
+  and description, "exactly as a casting director would" -- not a schema
+  widening (there is no real "both" voice to cast; accepting a third value
+  would just move the failure to the voice-menu lookup). Detector matches
+  on pydantic's structured `.errors()` list (exact field path + error
+  type), not on error text -- QA caught that a text-substring version could
+  misfire if `CastVoice`'s OTHER Literal field (`age_band`) ever failed in
+  the same combined error with a rejected value that happens to contain the
+  word "gender" (e.g. a model writing `'transgender'` as an age band).
+  Regression-tested for exactly that collision
+  (`tests/test_repair_prompts.py::test_the_detector_is_not_fooled_by_a_substring_match`).
+  Repo-wide grep confirms `gender: Literal` has exactly one hit today, so
+  this cannot collide with any other schema yet -- and being schema-agnostic
+  infrastructure, it is ready if one is added later.
+- confidence: HIGH on the mechanism; MEDIUM on prevalence (n=1 live
+  occurrence).
+- bible-worthy: plausible (the `payload_null_repair` precedent is already
+  informally establishing "a repair note must resolve ambiguity, not just
+  name it" as a reusable class across the shared dispatcher), not promoted
+  yet -- live proof owed.
+
+## PBUG-20260824-04 -- salvage refused ANY unrecognized scene header, regardless of shape
+- surfaced: same `scifi_news_pro`-only fast-iteration measurement, immediately
+  after PBUG-20260824-02 shipped. Operator, live: *"you never know what crazy
+  stuff [a model will throw at the parser] -- like maybe a model will say
+  SCENE [3] or some crazy stuff."*
+- symptom: `_scene_header_repair_note` (PBUG-20260824-02) only targets the
+  ONE shape actually observed (a bare `SCENE 1:`). Any OTHER malformed scene
+  header -- a spelled-out number, brackets, a dash instead of a colon,
+  anything nobody has specifically coded for -- still made the last-resort
+  SALVAGE rung refuse outright: `on_speaker`'s "character line" handler
+  recorded a `SKELETON_BREAK` and dropped the line whenever no scene had yet
+  opened, so `self.scenes` stayed empty and the terminal check
+  ("salvage cannot proceed: no scene contains a spoken line") always fired,
+  discarding perfectly good dialogue that followed the bad header.
+- root cause: salvage's rescue depended on recognizing the SPECIFIC way a
+  header failed, which does not scale -- a new model can mangle the header
+  in a shape nobody has seen. The correct backstop is shape-independent:
+  rescue on the strength of the DIALOGUE, not on recognizing the header.
+- fix: **FIXED, live proof owed.** `on_speaker`'s character-line branch now
+  opens an implicit `SCENE 1` (empty setting) in salvage mode when no real
+  scene has opened yet, and files the line into it -- recorded as a
+  RESOLUTION (`self.resolutions`), never a defect, matching the existing
+  "unresolved speaker gets ADOPTED, not rejected" salvage convention (a
+  defect is what blocks the whole parse; a resolution is a receipt).
+  Deliberately independent of shape: tested against `"SCENE THREE"`, which
+  matches neither the real grammar, nor PBUG-20260824-02's bare-header
+  regex, nor the speaker catch-all -- proving the rescue does not depend on
+  recognizing this or any other specific malformed header.
+  `_check_preamble_complete` is still called on the implicit path (same as
+  the normal `on_scene` transition), so a genuinely broken preamble (no
+  opening MUSIC, no announcer intro) still refuses -- this only rescues a
+  broken SCENE header, not a broken episode.
+- confidence: HIGH (traced through the state machine; the honest,
+  non-salvage path is unchanged and still refuses loudly, pinned by
+  `test_without_salvage_the_same_draft_still_refuses_loudly`).
+- bible-worthy: plausible -- "a last-resort rescue must not depend on
+  recognizing the specific way something broke" is a reusable principle
+  beyond this one lane -- but NOT promoted yet, live proof owed.
