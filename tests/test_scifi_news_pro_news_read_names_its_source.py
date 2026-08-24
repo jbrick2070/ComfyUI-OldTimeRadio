@@ -119,3 +119,18 @@ def test_the_pass_is_actually_wired_to_the_validator():
 
     source = inspect.getsource(F2._pass_news_read)
     assert "post_validator=_make_news_read_validator(" in source
+
+
+def test_cast_names_never_reach_the_model_only_the_validator():
+    """PBUG-20260824-01 Class B, THE FIX. `_pass_news_read` used to build a
+    "FICTIONAL CAST NAMES (never use these ...)" block into the model's own
+    prompt -- the exact tokens it must not emit, mirroring the distractor
+    `_script_user_prompt` already excludes `news_close_read` for (2026-08-18).
+    `cast_names` must still reach the validator, which checks it
+    independently of whatever the prompt contains; without that half this
+    test would pass whether or not the validator was also broken."""
+    import inspect
+
+    source = inspect.getsource(F2._pass_news_read)
+    assert "FICTIONAL CAST NAMES" not in source
+    assert "post_validator=_make_news_read_validator(dossier, cast_names)" in source

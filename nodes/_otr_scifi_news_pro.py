@@ -1782,6 +1782,13 @@ def _pass_news_read(
     cast_names: "list[str]",
 ) -> NewsCloseRead:
     """Author one source-grounded factual close through a typed ladder."""
+    # `cast_names` is NOT listed here (PBUG-20260824-01 Class B). The
+    # validator below still checks every name -- see `_make_news_read_validator`,
+    # which receives `cast_names` independently -- but showing a small local
+    # model the exact tokens it must not emit is a distractor it does not
+    # reliably resist, the same reasoning `_script_user_prompt` already applies
+    # to `news_close_read` (2026-08-18). Keep both call sites honest if this
+    # changes: the validator's copy is the only one that may see the names.
     user = (
         "SOURCE DOSSIER:\n"
         + json.dumps(dossier.model_dump(), ensure_ascii=False, indent=2)
@@ -1790,8 +1797,6 @@ def _pass_news_read(
         + "\n\nBOUNDED SOURCE PREVIEW (names and numbers may be quoted; "
         + "the dossier above owns complete-source coverage):\n"
         + digest
-        + "\n\nFICTIONAL CAST NAMES (never use these in the factual read): "
-        + (", ".join(cast_names) or "(none)")
         + "\n\nWrite the closing news read now."
     )
     try:
