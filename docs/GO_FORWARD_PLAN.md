@@ -110,7 +110,10 @@ B, C and E's doc half closed 2026-08-22.
 
 
 **STILL THE OPERATOR'S CALL, from the archived Ghost Prompt V2 item:**
-`config/profiles/otr_ghost_signal_v3.json` still pins `technical_model` to
+(SUPERSEDED 2026-08-23: that profile retired with the non-haunted lanes, so this
+call is now about `otr_ghost_signal_v3_haunted.json` if he still wants it. The
+measurement below stands either way.)
+`config/profiles/otr_ghost_signal_v3_haunted.json` pins `technical_model` to
 Mistral-Nemo. B2 pinned gemma PER-LEG via `--set` rather than editing the
 shipped profile, because promoting it would change SCRIPTS on this lane and
 story output is a closed subject. The case for promoting it is measured --
@@ -688,7 +691,7 @@ fails the server log names the branch itself -- arm, token, index, canonical
 `prompt_hash`, repr-escaped excerpt -- plus a compact JSON `MISSING_TARGET`
 record emitted BEFORE the raise (the canonical runner truncates the exception at
 500 chars, `scripts/otr_api.py:749`). The log survives reboot;
-`scripts/_otr_rotate_log.ps1` rotates instead of truncating. D3 then fixes THAT
+`scripts/otr_rotate_log.ps1` rotates instead of truncating. D3 then fixes THAT
 branch at its root and `PROD_BUG_LOG.md` gets a mechanism, not a guess.
 
 **Do NOT:** weaken the completion gate, revive the portrait-init fallback, or
@@ -763,10 +766,10 @@ Grounded by the 2026-08-03 four-agent forensics; every line has a file:line in t
 session traces.
 
 1. **"Invent one and tag it"**: add a derived style/genre field to
-   `run_story_brief_reflection` (`_otr_story_brief.py:446` -- proven content-loyal on
+   `run_story_brief_reflection` (`_otr_story_brief.py:513` -- proven content-loyal on
    both specimens), stamp beside `story_brief`, repoint the treatment `Style:` line
    (`video_engine.py:1762`) and the HUD (`video_engine.py:1336` -> `_build_left`
-   `:1466`) at it. Highest-leverage item here: it fixes the credits line for all six
+   `:1592`) at it. Highest-leverage item here: it fixes the credits line for all six
    banks uniformly.
 2. **Rename `meta.style` -> `meta.story_scaffold`** (operator: too many metas; the
    field is neither scifi nor a description). Consumers move in ONE atomic change:
@@ -1136,13 +1139,14 @@ these rows exist so a window working THIS list actually sees them.
   judgment call:** sweeping the working tree instead of the diff would widen the gate
   to every untouched file in the repo. Cheap mitigation until then -- re-run the full
   suite once after the FIRST commit of any new test file.
-- **NOTED, not a defect: two `scripts/` bake-off runners now abort a whole sweep on a
-  count mismatch.** `scripts/run_ltx_av_q_bakeoff.py:453` and
-  `scripts/run_humo_bakeoff.py:660` call the encoder inside per-leg loops with no
-  try/except and DISCARD its return value (both set `result["frame_count"]` from
-  `int(frames.shape[0])` independently). A disagreement that was previously invisible
-  there is now fatal to the run. That is the correct direction -- a lying count is not
-  a leg worth finishing -- but a sweep operator should know it before an overnight run.
+- **MOOT since 2026-08-23 -- kept as one line so the finding is not re-derived.**
+  This row noted that two `scripts/` bake-off runners aborted a whole sweep on an
+  encoder count mismatch, and called it the correct direction that an operator
+  should know before an overnight run. **Both runners were deleted with every
+  other bake-off** ("delete any animatediff..." was the Ghost half; "I think I am
+  done with all bakeoffs" was this one). The finding still generalises: a runner
+  that discards the encoder's return value and recomputes the count independently
+  will disagree with it silently. Worth carrying into any replacement sweep.
 - **LATENT, not reachable today: the fewest-segments partitioner can accept a
   disproportionate trim on a WIDE discrete menu.** WIRE-W1 makes `partition_beat` take
   the lowest segment count that covers, including via a permitted tail trim. On a
