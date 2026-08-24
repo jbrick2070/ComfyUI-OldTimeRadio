@@ -6246,9 +6246,14 @@ EXPECTED result, not a regression signal.
     Ripping it would punch the hole `CLAUDE.md` forbids.
   * `_otr_story_brief.py:354` filters `speaker_role in {"music","env"}` inside
     a LIVE reflection-prompt builder; no such role exists, so that prompt's
-    "NON-DIALOGUE ROWS" block is ALWAYS EMPTY. Real defect, own item -- making
-    it match would inject music rows into a prompt that has never seen them
-    and change story output, which is settled territory.
+    "NON-DIALOGUE ROWS" block is ALWAYS EMPTY. **RULED CLOSED the same day, and
+    NOT a defect: operator, unprompted -- *"NO DONT TOUCH MUSIC ROWS"*.** The
+    outcome is correct and only the mechanism is accidental. It was briefly
+    written up as an open item; that was the dangerous kind of wrong, because
+    a window reading "dead filter, real defect" would repair it, music rows
+    would reach the reflection prompt, and story output would change. The
+    standing rule now lives in `docs/GO_FORWARD_PLAN.md` under "DO NOT 'FIX'
+    `_otr_story_brief.py:354`".
 - suite at the fix: **12097 passed / 120 skipped / 1 xfailed, EXIT=0** (356 s).
   **+43 collected tests, itemised:** 41 from the new
   `tests/test_scifi_news_pro_speaker_resolution.py` (18 functions,

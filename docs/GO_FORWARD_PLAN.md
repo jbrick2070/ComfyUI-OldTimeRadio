@@ -96,21 +96,35 @@ gitignored `scripts/_otr_overnight_loop_launch.ps1` (ignored by
 `.gitignore:70`, `scripts/_*.ps1`), which sets the PATH before launching and
 prints the last log lines so an empty timestamp is visible immediately.
 
-### NEW OPEN ITEM -- a dead filter inside a LIVE prompt builder
+### RULED, NOT OPEN -- DO NOT "FIX" `_otr_story_brief.py:354` (operator, 2026-08-24, hard)
 
-`nodes/_otr_story_brief.py:354` filters `speaker_role in {"music", "env"}`, but
-`VALID_SPEAKER_ROLES` (`_otr_speaker_role.py`) is `character / announcer /
-music_open / music_close / music_inter`. **`"music"` matches none of them**, so
-the "NON-DIALOGUE ROWS" section of a live reflection prompt has ALWAYS been
-empty. Found by the Sonnet lane of the 2026-08-24 SFX sweep, confirmed by the
-driver against both files.
+**Operator, in capitals and unprompted: *"NO DONT TOUCH MUSIC ROWS"*.**
 
-**Why it was not fixed in that sweep:** making the filter match would inject
-music rows into a prompt that has never seen them, which changes story output
--- settled territory since 2026-08-04. This needs an operator call on whether
-the reflection pass SHOULD see music rows, not a silent behaviour change
-smuggled into an unrelated commit. Same defect CLASS as the SFX finding: stale
-vocabulary surviving inside a live prompt builder.
+`nodes/_otr_story_brief.py:354` filters `speaker_role in {"music", "env"}`
+inside `_build_reflection_input()`, which assembles the text handed to the
+reflection pass. `VALID_SPEAKER_ROLES` (`_otr_speaker_role.py`) is
+`character / announcer / music_open / music_close / music_inter`, so **`"music"`
+matches none of them** and the prompt's "NON-DIALOGUE ROWS" section has ALWAYS
+been empty.
+
+**THE OUTCOME IS CORRECT. ONLY THE MECHANISM IS ACCIDENTAL.** It was surfaced
+by the Sonnet lane of the 2026-08-24 SFX sweep as a dead-code defect and was
+briefly written into this file as an open item. That framing was WRONG and it
+is corrected here, because it is the dangerous kind of wrong: a future window
+reading "dead filter, real defect" would repair the filter, music rows would
+start reaching the reflection prompt, and story output would change -- which is
+exactly what the operator has now forbidden.
+
+**SO THE RULE IS: leave it alone.** Do not repair the filter, do not "tidy" the
+dead branch, and do not add music rows to any reflection or brief prompt by
+another route. If a future audit flags `{"music", "env"}` as stale vocabulary
+again -- and it will, because it genuinely looks like one -- this paragraph is
+the answer.
+
+**What was deliberately NOT done, and why that is also correct:** the dead
+branch was not deleted either. Removing it would preserve behaviour, but the
+code is the only place the reader meets this question, and a comment pointing
+here is worth more than a tidy diff. Nothing in the pipeline reads it.
 
 ### >>> THE ORIGINAL PROBLEM STATEMENT (2026-08-24) -- superseded in part, kept for its evidence <<<
 
