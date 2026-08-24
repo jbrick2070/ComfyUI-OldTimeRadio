@@ -384,6 +384,51 @@ def _speakers_from_text(text: str) -> list[str]:
     return seen
 
 
+def cast_presence_from_text(text: str) -> dict[str, dict[str, Any]]:
+    """Per-speaker line count and first attested speech, from the RAW
+    (pre-normalization) scene text.
+
+    Exists so a cast member whose composed dialogue turned up empty (a tight
+    beat budget can under-serve a slot even when the source gives them real
+    lines -- PBUG-20260802-02) can be repaired with the SOURCE's own words
+    rather than a freshly invented line. `first_speech` is exactly the prose
+    a mechanical VERBATIM slice would carry: the speaker's opening line plus
+    any immediate continuation lines, stopping at the next speaker prefix, a
+    stage direction in brackets, or a blank line. Reuses `_speaker_from_line`
+    -- one speaker-line classifier, not a second one that could drift from
+    `_speakers_from_text`.
+    """
+    lines = str(text or "").splitlines()
+    out: dict[str, dict[str, Any]] = {}
+    i = 0
+    while i < len(lines):
+        speaker = _speaker_from_line(lines[i])
+        if not speaker:
+            i += 1
+            continue
+        stripped = lines[i].rstrip()
+        if ":" in stripped:
+            first = stripped.split(":", 1)[1].strip()
+        else:
+            match = _FOLGER_SPEECH_RE.match(stripped)
+            first = stripped[match.end():].strip() if match else ""
+        speech_parts = [first] if first else []
+        j = i + 1
+        while j < len(lines):
+            candidate = lines[j]
+            body = candidate.strip()
+            if not body or body.startswith("[") or _speaker_from_line(candidate):
+                break
+            speech_parts.append(body)
+            j += 1
+        entry = out.setdefault(speaker, {"line_count": 0, "first_speech": ""})
+        entry["line_count"] += 1
+        if not entry["first_speech"] and speech_parts:
+            entry["first_speech"] = " ".join(speech_parts).strip()
+        i = j if j > i + 1 else i + 1
+    return out
+
+
 def payload_from_scene(
     resolved: ShakespeareScene,
     *,
@@ -427,6 +472,7 @@ def source_rights_from_scene(resolved: ShakespeareScene) -> dict[str, Any]:
 
 def source_meta_from_scene(
     resolved: ShakespeareScene, *, text_path: "Path | None" = None,
+    text: str | None = None,
 ) -> dict[str, Any]:
     """Metadata sidecar for the selected scene.
 
@@ -437,6 +483,13 @@ def source_meta_from_scene(
 
     The key is added only when the roster is non-empty -- an absent key is honest
     absence, where an empty list would read as "the source has no characters".
+
+    When ``text`` is supplied (the pre-normalization scene body the caller
+    already holds), ``cast_hints_presence`` carries each hinted name's real
+    line count and first attested speech -- the data a repair pass needs to
+    ground a silent cast member (PBUG-20260802-02) in the source's own words
+    rather than free invention. cast_hints itself is UNCHANGED: this is
+    additional evidence about the hints, never a filter on them.
     """
     scene = resolved.scene
     meta: dict[str, Any] = {
@@ -454,6 +507,10 @@ def source_meta_from_scene(
         characters = _roster_gender.load_roster_characters(text_path)
         if characters:
             meta["characters"] = [dict(row) for row in characters]
+    if text:
+        presence = cast_presence_from_text(text)
+        if presence:
+            meta["cast_hints_presence"] = presence
     return meta
 
 
@@ -500,7 +557,7 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
         ) from exc
     return _osp.SourceFetchResult(
         payload=payload_from_scene(resolved, text=text),
-        source_meta=source_meta_from_scene(resolved, text_path=text_path),
+        source_meta=source_meta_from_scene(resolved, text_path=text_path, text=text),
         source_rights=source_rights_from_scene(resolved),
         # Transient: the COMPLETE scene. shakespeare is a style_pool_class
         # "adaptation" bank, so it is gated into source-derived grounding

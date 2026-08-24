@@ -420,6 +420,49 @@ def _check_per_line_invariants(
     info["voiced_beat_count"] = voiced
 
 
+def cast_coverage_gaps(ledger_data: dict) -> list[tuple[str, str]]:
+    """Non-announcer cast rows referenced by zero non-skipped lines.
+
+    ``(char_id, name)`` pairs, in CAST ORDER. Extracted from
+    ``_check_per_cast_invariants`` (PBUG-20260802-02's universal backstop) so
+    a REPAIR pass can find the same gaps one stage earlier -- before the
+    freeze gate has to refuse -- without a second, drifting implementation of
+    "what counts as coverage". Iterating ``cast`` in its own order rather than
+    the set the inline check used to walk is a harmless correctness fix, not
+    a behavior change: the SET of gaps is identical either way, and the
+    freeze gate's pass/fail verdict only ever depended on whether that set
+    was empty.
+    """
+    cast = ledger_data.get("cast")
+    if not isinstance(cast, list) or not cast:
+        return []
+    from ._otr_cast_voice_coverage import is_announcer_cast_row
+    lines = ledger_data.get("lines") or []
+    referenced: set[str] = set()
+    for ln in lines:
+        if not isinstance(ln, dict) or ln.get("skip"):
+            continue
+        cid = ln.get("char_id")
+        if isinstance(cid, str) and cid:
+            referenced.add(cid)
+    _ann = [row for row in cast
+            if isinstance(row, dict) and is_announcer_cast_row(row)]
+    announcer_ids = {str(_ann[0].get("char_id") or "")} if _ann else set()
+    seen: set[str] = set()
+    gaps: list[tuple[str, str]] = []
+    for row in cast:
+        if not isinstance(row, dict):
+            continue
+        char_id = row.get("char_id")
+        if not isinstance(char_id, str) or not char_id or char_id in seen:
+            continue
+        seen.add(char_id)
+        if char_id in announcer_ids or char_id in referenced:
+            continue
+        gaps.append((char_id, str(row.get("name") or "")))
+    return gaps
+
+
 def _check_per_cast_invariants(
     ledger_data: dict,
     errors: List[str],
@@ -534,10 +577,6 @@ def _check_per_cast_invariants(
         if isinstance(cid, str) and cid:
             referenced.add(cid)
     from ._otr_cast_voice_coverage import is_announcer_cast_row
-    name_by_id = {
-        str(row.get("char_id") or ""): str(row.get("name") or "")
-        for row in cast if isinstance(row, dict)
-    }
     # ONLY THE FIRST announcer-matching row is credited by the sentinel; any
     # further row whose name/role merely says "Announcer" is an ordinary
     # character and must own a line. Matching them all let a second one ship
@@ -565,27 +604,27 @@ def _check_per_cast_invariants(
                     f"cast char_id={char_id!r} (ANNOUNCER) has no non-skipped "
                     f"sentinel-announcer line"
                 )
-            continue
-        if char_id not in referenced:
-            # ESCALATED warning -> ERROR (operator ruling 2026-08-02,
-            # PBUG-20260802-02): "every cast member needs a voice -- it's a
-            # radio drama, not a mime show." This is the UNIVERSAL backstop:
-            # every bank converges on this cascade, while the sayable-text
-            # gate at stamp_receipt only covers the two content-owned lanes
-            # (five of seven banks never mint an authorship receipt). By the
-            # time this runs, the writer-tail cleanup has already converted
-            # "nothing sayable" into skip=True, so non-skipped IS the sayable
-            # predicate here -- the two checks share one meaning at two
-            # moments. A cast member no non-skipped line references is an
-            # unrenderable ghost: no voice, no dialogue, but a portrait, a
-            # credit and a caption slot all still pointing at them.
-            errors.append(
-                f"cast char_id={char_id!r} "
-                f"(name={name_by_id.get(char_id, '')!r}) has no non-skipped "
-                f"line. Every cast member gets a VOICE: write real dialogue "
-                f"for them or reroll the cast so they never enter the ledger. "
-                f"(operator ruling 2026-08-02; PBUG-20260802-02)"
-            )
+    # ESCALATED warning -> ERROR (operator ruling 2026-08-02, PBUG-20260802-02):
+    # "every cast member needs a voice -- it's a radio drama, not a mime
+    # show." This is the UNIVERSAL backstop: every bank converges on this
+    # cascade, while the sayable-text gate at stamp_receipt only covers the
+    # two content-owned lanes (five of seven banks never mint an authorship
+    # receipt). By the time this runs, the writer-tail cleanup has already
+    # converted "nothing sayable" into skip=True, so non-skipped IS the
+    # sayable predicate here -- the two checks share one meaning at two
+    # moments. A cast member no non-skipped line references is an
+    # unrenderable ghost: no voice, no dialogue, but a portrait, a credit and
+    # a caption slot all still pointing at them. Shared with
+    # nodes/_otr_cast_coverage_repair.py, which finds this same gap one stage
+    # earlier so the writer can fill it before this ever has to fire.
+    for char_id, name in cast_coverage_gaps(ledger_data):
+        errors.append(
+            f"cast char_id={char_id!r} "
+            f"(name={name!r}) has no non-skipped "
+            f"line. Every cast member gets a VOICE: write real dialogue "
+            f"for them or reroll the cast so they never enter the ledger. "
+            f"(operator ruling 2026-08-02; PBUG-20260802-02)"
+        )
 
 
 def _check_meta_invariants(

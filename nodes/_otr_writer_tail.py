@@ -1399,6 +1399,32 @@ class WriterTailMixin:
         if _clean_window is not None:
             _clean_window.reconcile()
 
+        # PBUG-20260802-02 repair, right here and nowhere else: this is the
+        # LAST point before the freeze cascade node runs, and (per the
+        # comment below) the last thing that touches canonical `text` --
+        # exactly why a repaired line's word receipt, stamped a few lines
+        # down, already reflects the post-repair state instead of needing a
+        # second restamp. Content-owned lanes (scifi_news_pro today) are
+        # skipped: their own earlier gate (stamp_receipt/require_voice_
+        # coverage) already runs before this tail is ever reached for them,
+        # and a deliberately silent non-speaking cast entity (a Relay, not a
+        # person) must never be forced to speak by a generic repair pass.
+        from . import _otr_freeze_cascade as _OTRFC
+        if _OTRFC.resolve_freeze_policy(meta).run_inline_safety_cleanup:
+            from . import _otr_cast_coverage_repair as _OTRCCR
+            meta["cast_coverage_repair"] = _OTRCCR.repair_zero_coverage_cast(
+                led,
+                creative_fn=creative_generate_fn,
+                canon_header=_OTRC.render_episode_canon_header(canon) if canon else "",
+                style_descriptor=str(contract.label if contract else "").strip(),
+                source_bank_id=str(meta.get("source_bank") or ""),
+                meta=meta,
+                creative_repo_id=str(resolved.get("creative_writing_model") or "") or None,
+                slot_scheduler=slot_scheduler,
+            )
+            if meta["cast_coverage_repair"].get("repaired"):
+                _PL.refresh_ledger_text_metrics(led)
+
         # THE DELIVERED WORD RECEIPT IS RESTAMPED HERE, on every lane, because
         # the window above is the last thing that touches canonical `text`:
         # the clean stage rewrites rows and the cleanup re-stamps their

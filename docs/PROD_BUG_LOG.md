@@ -3522,6 +3522,106 @@ doors", and the implication that fixing the fable2 parser gap had anything to do
 with the `scifi_news_pro` failure. Two lanes, two mechanisms, one shared
 symptom.
 
+## PBUG-20260802-02 -- THIRD MANIFESTATION AND FIX (2026-08-24, shakespeare/MARIA)
+- surfaced: `scripts/otr_writer_bank_gate.py --acts 1`, bank=shakespeare,
+  profile=otr_w45_still_flat, live headless leg 2026-08-23 23:14-23:17.
+  `[LFC:phase_10] 1 critical gap(s) -- FREEZE REJECTED. First: cast
+  char_id='c03' (name='MARIA') has no non-skipped line.` -- the same universal
+  backstop named in the original entry, firing for the first time on the
+  shakespeare lane.
+- **ROSTER CORRECTION.** `nodes/_otr_scifi_fable2.py` does not exist anywhere
+  in the live tree (confirmed by direct check and a repo-wide grep; only
+  stale pytest fixtures reference the name). `config/story_packs/banks.json`
+  lists six live banks -- media_archive, original, scifi_news_pro,
+  public_domain, shakespeare, custom_source_bank -- not seven. Whether
+  scifi_fable2 was retired, renamed, or merged into scifi_news_pro is NOT
+  re-established here; the original entry's `wan_ti2v` manifestation cannot be
+  re-verified, regressed, or fixed by this change because there is nothing
+  left to point it at. Flagged rather than silently implied as covered.
+- root cause, precisely: `nodes/_otr_outline.py`'s `_phase_check` validates
+  outline cast membership in only ONE direction (`invented = used_speakers -
+  locked_cast_set`) -- it never checks the reverse. A locked cast member
+  (shakespeare: drawn from the scene's curated `cast_hints`, e.g.
+  `['Malvolio','Maria','Toby']` for `folger-twelfth-night:act2-scene5-
+  malvolio-letter`) can legitimately receive ZERO beats under a tight budget
+  (a 1-act/45-word run buys very few voiced beats for three competing
+  characters). Maria is not a phantom: she has three real speeches in the
+  source (`config/source_banks/shakespeare/sources/
+  twelfth_night__act2_scene5.txt:29,295,299`) and exits early in the scene,
+  which is exactly the shape a tight window can miss.
+- fix: `nodes/_otr_cast_coverage_repair.py` (new), wired into
+  `_otr_writer_tail.py._run_writer_tail` immediately after
+  `_clean_window.reconcile()` -- the last point that touches canonical text
+  before the freeze cascade node runs. Gated on
+  `_otr_freeze_cascade.resolve_freeze_policy(meta).run_inline_safety_cleanup`
+  (config-driven, never a hardcoded bank list), so content-owned lanes
+  (today: scifi_news_pro, whose own earlier gate at `stamp_receipt`/
+  `require_voice_coverage` already covers it before this tail is ever
+  reached) are skipped -- a deliberately silent non-speaking entity (a
+  Relay, per the CORRECTION entry above) must never be forced to speak.
+  For each gap found by the new pure `_otr_ledger_freeze.cast_coverage_gaps`
+  (extracted, byte-identical, from `_check_per_cast_invariants`): MODE 1
+  retries an existing skip=True slot; MODE 2 mints one new ledger-only
+  lines[]/beats[] row (never added to the pydantic `Outline.beats`) for a
+  character Stage 2 never allocated at all. Exactly ONE `compose_line` call
+  per gap, through the same seeded `creative_fn` every other line already
+  uses -- no new sampling mechanism. On failure the row is left BYTE-
+  IDENTICAL to today's refuse-and-halt; only the success case improves.
+  Fidelity graft: when `meta.source_meta.cast_hints_presence`
+  (`_otr_shakespeare_sources.cast_presence_from_text`, new) names a real
+  attested speech for the gap character, it rides into
+  `LineRequest.source_block` so the repair is grounded in Shakespeare's own
+  words rather than free invention -- honoring "the author's own language is
+  carried as written" instead of working around its absence.
+- ledger fields touched, one owner each: `lines[].text/char_count/word_count`
+  and `.skip/.tts_skip_reason/.compose_flags` -- `_otr_cast_coverage_repair`,
+  via the existing `patch_line_text`/`patch_line_fields` owners, called one
+  more time; Mode-2-only `lines[]`/`beats[]` new rows -- same module, reusing
+  `production_ledger.init_lines_from_outline`'s exact row shape;
+  `meta.source_meta.cast_hints_presence` -- `_otr_shakespeare_sources.
+  source_meta_from_scene`, sole writer, shakespeare-only, additive;
+  `meta.cast_coverage_repair` -- new telemetry receipt, sole writer;
+  `cast[]`, `meta.cast_contract.cast_seed`/`num_characters_request` --
+  UNTOUCHED (no cast row is ever added, removed, or reordered, so
+  `OTR_CastLock`'s replay contract needs no new reasoning about desync).
+- determinism: the trigger (`cast_coverage_gaps` non-empty) is a pure
+  function of the already-seeded generation stream. The repair's
+  `compose_line` call is one more call into the identical seeded slot every
+  other line goes through. Mode 2's minted `beat_id` is the next integer in
+  the existing `bNNN` scheme, scanned from settled state, never randomly
+  chosen. A seed that previously refused now produces a real render instead
+  of nothing (the fix); a seed run twice after the fix must still produce
+  byte-identical output both times.
+- verify: 18 unit tests in `tests/test_cast_coverage_repair.py`, including a
+  negative control pinning the gate still fires, Mode 1, Mode 2 (with a
+  beat_id-collision check), a composition-exhaustion test proving failure
+  leaves the row byte-identical to today's refuse-and-halt, the fidelity
+  graft against the REAL shipped source file (not a fixture), and a
+  cast[]/cast_contract parity check. `cast_coverage_gaps`'s extraction from
+  `_check_per_cast_invariants` verified behavior-preserving against the full
+  freeze/gap-audit suite (301 passed, unchanged).
+- **NOT re-reproduced on the exact original random scene draw.** The
+  writer-bank-gate's `selection_mode: random` redraws a fresh scene each run;
+  a same-night reproduction attempt drew a different scene and passed
+  cleanly (no gap to repair). The fix is proven at the unit level against a
+  ledger shaped identically to the original failure (same cast_hints, same
+  char_id/name pairing, the real MARIA source text), plus a live full-suite
+  run with no regression on the four other banks. The overnight writer-gate
+  loop will exercise the shakespeare bank repeatedly and is expected to hit
+  this scene/budget combination again naturally; when it does, the repair
+  now runs live rather than refusing.
+- bible-worthy: yes -- "a producer that locks a slot has no obligation to
+  serve it" is the general defect class (Stage 2 checks invention, never
+  starvation), and the fix shape (repair upstream of the gate, gate stays
+  refuse-only, no post-ledger surgery) is portable to any future lane with
+  the same allocate-then-compose split.
+- confidence: HIGH on mechanism (verified against real call graph, real
+  source text, real freeze-gate code) and on the fix's correctness at the
+  unit level; MEDIUM on live-leg closure pending a natural or forced
+  re-reproduction of the exact original scene.
+- status: **FIXED, live-verification pending the overnight loop** (was: NOT
+  FIXED, 2026-08-02).
+
 ## PBUG-20260805-01 -- every adaptation cast rolled its gender, so 44 published rows contradict the source
 - surfaced: published episodes, measured 2026-08-05 across every adaptation
   ledger under `output/otr` (88 ledgers, 176 non-announcer rows). Visible in
