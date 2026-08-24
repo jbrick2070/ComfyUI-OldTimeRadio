@@ -35,6 +35,7 @@ from typing import Any, Callable, Literal, Mapping, Sequence
 from pydantic import (
     BaseModel,
     Field,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -409,6 +410,33 @@ class CastVoice(BaseModel):
     character_description: str
     gender: Literal["male", "female"]
     age_band: Literal["20s", "30s", "40s", "50s", "60s", "n/a"] = "n/a"
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def _canonicalize_gender_synonyms(cls, value):
+        """RUNG 1 of two: fix the spellings, guess nothing.
+
+        `woman` is not `female` to a Literal, and a model that writes `Male`
+        or `M` has answered the question correctly in a spelling this schema
+        refuses. Those are transport, not decisions, so they are canonicalized
+        here -- exactly as `age_band` above already normalizes its own junk.
+
+        THE AUTHORITY IS IMPORTED, NOT RE-TYPED. `canonical_bank_gender` is
+        the voice bank's synonym map and it PASSES THROUGH anything it does
+        not recognise, lower-cased. That pass-through is the point: a genuine
+        HEDGE (`both`, `n/a`, `nonbinary`) is NOT a spelling problem and must
+        NOT be silently resolved to a coin-flip here -- it still fails the
+        Literal and falls to rung 2, which reads the answer off the voice the
+        model actually picked. A fourth private copy of the male/female
+        vocabulary is precisely the defect class fixed elsewhere today.
+        """
+        if value is None:
+            return value
+        try:
+            from ._otr_roster_gender import canonical_bank_gender
+        except ImportError:  # pragma: no cover -- flat/standalone load
+            from _otr_roster_gender import canonical_bank_gender  # type: ignore
+        return canonical_bank_gender(value)
 
     @field_validator("age_band", mode="before")
     @classmethod
@@ -2895,6 +2923,91 @@ def _speakers_in_order(parsed: ParsedScript) -> "list[str]":
     return seen
 
 
+def _make_casting_gender_repair(menu: VoiceMenu):
+    """RUNG 2 of two: a hedged gender is answered by the VOICE they picked.
+
+    THE DEFECT (PBUG-20260824-03, live twice in one evening on the
+    fast-iteration loop). `CastVoice.gender` is `Literal["male", "female"]`
+    -- there is no third option, because every voice in stock is one or the
+    other. A model that will not commit writes a hedge instead, and it does
+    not repeat itself: the first live failure was `'both'`, the second, hours
+    later and WITH the targeted repair prompt already deployed, was `'n/a'`
+    (a legal `age_band` value, so it is confusing the two fields). Both died
+    after 2 attempts and killed the episode.
+
+    A PROMPT COULD NOT FIX THIS, and the second failure is the proof. Telling
+    a small local model "commit to one" is still asking the question it just
+    declined to answer, and there is always another hedge word.
+
+    SO STOP ASKING AND READ IT OFF THE ARTIFACT. The row already carries
+    `timbre` -- the menu id the model CHOSE from the voice stock -- and every
+    menu entry has a gender. `_make_casting_validator` exists to enforce that
+    those two agree, which is the same statement from the other side: in this
+    lane the voice IS the gender. So a row whose gender is unusable but whose
+    timbre names a real voice is not ambiguous at all; the model answered the
+    question when it picked the larynx.
+
+    NO GUESSING, and deliberately no name inference: a four-tier name->gender
+    ladder was specced and REFUSED twice (r2 and r3 both NO), so inventing one
+    here would resurrect rejected work. If the timbre is missing or unknown
+    this returns None and the LLM repair rung runs as before -- fail-closed,
+    never a silent coin flip.
+
+    A REPAIR RUNG, NOT A BYPASS: `structured_call` re-validates whatever this
+    returns through the schema AND the real `post_validator`, so a row this
+    cannot fix still fails loudly.
+    """
+    by_id = menu.by_id()
+    legal = {"male", "female"}
+
+    def _repair(failed_output: str, error: BaseException):
+        if not isinstance(error, ValidationError):
+            return None
+        # Only OUR failure class. A different validation error must reach its
+        # own typed repair prompt rather than being swallowed here.
+        if not any(
+            (row.get("type") == "literal_error"
+             and (row.get("loc") or ("",))[-1] == "gender")
+            for row in error.errors()
+        ):
+            return None
+        try:
+            payload = json.loads(failed_output)
+        except Exception:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        rows = payload.get("cast")
+        if not isinstance(rows, list):
+            return None
+
+        repaired = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                return None
+            if str(row.get("gender") or "").strip().lower() in legal:
+                continue
+            entry = by_id.get(str(row.get("timbre") or ""))
+            if entry is None or str(entry.gender) not in legal:
+                return None          # cannot answer it -- let the model try
+            row["gender"] = str(entry.gender)
+            repaired += 1
+        if not repaired:
+            return None
+        try:
+            fixed = CastingVoices.model_validate(payload)
+        except ValidationError:
+            return None
+        log.info(
+            "[scifi_news_pro] casting gender resolved from the chosen voice "
+            "on %d row(s) -- the model hedged, its timbre pick did not",
+            repaired,
+        )
+        return fixed
+
+    return _repair
+
+
 def _pass_casting(
     slot_fn,
     pack,
@@ -2942,7 +3055,12 @@ def _pass_casting(
             slot_fn=slot_fn,
             base_temperature=_TEMP["casting_voices"],
             structural_retry_temperature=_TEMP["casting_voices"] / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
+            # The deterministic rung runs FIRST and can settle a hedged gender
+            # with no model call at all; anything it declines still gets the
+            # typed prompt, and whatever it returns is re-validated.
+            repair_prompt_factory=make_dispatching_repair_factory(
+                deterministic_repair=_make_casting_gender_repair(menu),
+            ),
             post_validator=_make_casting_validator(menu, speakers),
             max_new_tokens=None,
             helper_name="scifi_news_pro_casting_voices",
