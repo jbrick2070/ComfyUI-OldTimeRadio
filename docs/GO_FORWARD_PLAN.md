@@ -28,6 +28,80 @@ configuration. That was an intent then and it is the state now.
 
 ### OPEN, IN PRIORITY ORDER
 
+### >>> NEXT ITEM (operator, 2026-08-24): THE `scifi_news_pro` WRITER FAILS 60% OF THE TIME <<<
+
+**Operator: *"lets mark scifi news writer error as our next plan ... we need to
+help fix scifi_news_pro."*** This is the top of the queue.
+
+**THE MEASUREMENT, and it is the reason this is now a priority rather than a
+shrug.** The overnight writer-gate loop (2026-08-24 00:36-08:22 PDT, 10 full
+passes over all five banks, `scripts/otr_overnight_loop.sh`, log at
+`tmp/otr_overnight_loop.log`) put every bank through the canonical workflow ten
+times. Four banks were near-perfect. `scifi_news_pro` **FAILED 6 of 10 passes**
+-- 60%. Every other bank's failures over the same window: zero, except the
+single shakespeare failure that was root-caused and fixed the same night
+(PBUG-20260802-02 third manifestation). This lane is the outlier by an enormous
+margin, and it is the ONE lane that is DISPATCHED rather than inline
+(`nodes/_otr_lane_specs.py` -- `scifi_news_pro_multipass` is the only entry in
+LANE_SPECS; everything else runs Section I).
+
+**PASS ORDER, verified in `run_scifi_news_pro_episode`:** `_pass_treatment`
+(:3607) -> `_pass_news_read` (:3621) -> `_pass_script` (:3636). **The failure
+DURATION identifies which pass died**, which is how the two classes below were
+separated without needing every leg log:
+
+**CLASS A -- the script/markup pass (~4 min to fail, 3 confirmed occurrences).**
+`UNKNOWN_SPEAKER` plus `SKELETON_BREAK`. The model emits speakers that are not
+in the locked cast and structure the skeleton forbids. Real captures:
+* `UNKNOWN_SPEAKER: DR. LEE` x3 + `SKELETON_BREAK: character line (DR. LEE)
+  after the last scene`
+* `UNKNOWN_SPEAKER: **ANNOUNCER` -- **markdown bold leaking into the speaker
+  token** -- plus `SKELETON_BREAK: character line (**ANNOUNCER) before SCENE 1`
+  and `SKELETON_BREAK: announcer intro missing`, and
+  `UNKNOWN_SPEAKER: DR. RAPHAEL ZUFFERERY`
+* `UNKNOWN_SPEAKER: THOR`, `UNKNOWN_SPEAKER: LUCAS`, `SKELETON_BREAK` on both
+  plus `Dr. Schmidt` after the last scene
+The `**ANNOUNCER` capture is the most actionable single clue in this entry: a
+speaker the parser SHOULD recognize, rejected only because the model wrapped it
+in markdown. That is a transport/normalization gap, not a story problem, and it
+is cheap to test.
+
+**CLASS B -- the news_read pass (~1.5-2.9 min to fail, 1 fully captured).**
+`NewsProTreatmentError` from `_pass_news_read` (`nodes/_otr_scifi_news_pro.py:1802`),
+after **2 attempts**: *"the closing read is a FACTUAL report and it names
+invented characters (Laura Goodkind). Report only what the source says, using
+the source's own names."* The validator
+(`_make_news_read_validator`, :1748-1755) is CORRECT -- a factual news close
+must not cite the drama's fictional cast -- but the pass is being asked to
+write a factual read while the fictional cast names sit in its own prompt
+(`_pass_news_read` builds `FICTIONAL CAST NAMES (never use these in the factual
+read): ...`). Telling a small model "never say X" while showing it X is a known
+weak instruction shape. Worth checking whether the ladder's 2 attempts is the
+real budget and whether the repair prompt actually names the offending token.
+
+**WHAT IS NOT KNOWN, stated honestly:** passes 7 and 8 failed with the bare
+label `WRITER` and no captured reason. Their durations (2.2 and 1.5 min) put
+them in Class B's profile, but that is INFERENCE, not evidence. The reason is
+lost because **`tmp/_bankgate_<bank>.log` is overwritten by every pass** -- a
+real harness gap this entry surfaces as a side finding: the overnight loop
+destroys the evidence for every failure except the most recent one per bank.
+Anyone taking this item should fix that FIRST (append, or stamp the pass number
+into the filename), or they will be re-running the loop to recover data that
+was already collected once.
+
+**SCOPE QUESTION FOR WHOEVER TAKES IT -- decide before coding.** Two classes,
+two mechanisms, one lane. They are NOT obviously one fix, and the last time two
+`scifi_news_pro`-adjacent symptoms were filed as "one fault, two doors"
+(PBUG-20260802-02's original entry) that framing was wrong and had to be
+corrected the same day. Treat A and B as separate until proven otherwise.
+
+**DO NOT let this become story-quality work.** The operator's 2026-08-04
+directive stands: scripts are ACCEPTED as they are. This item is about a lane
+that REFUSES TO PRODUCE AN EPISODE 60% of the time -- a structural/renderability
+defect, explicitly inside the "any structural or ledger fault" carve-out. The
+fix is to make the lane produce a valid ledger, not to make its prose better.
+
+
 **THE CLOSED ITEMS MOVED OUT ON 2026-08-23.** Ghost Prompt V2, item A (Ghost
 Signal), A-ORIGINAL, B, C and E's closed half were receipts of SHIPPED work
 sitting inside a section headed OPEN -- exactly what the 2026-08-16 self-audit
