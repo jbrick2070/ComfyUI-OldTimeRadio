@@ -28,7 +28,91 @@ configuration. That was an intent then and it is the state now.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> NEXT ITEM (operator, 2026-08-24): THE `scifi_news_pro` WRITER FAILS 60% OF THE TIME <<<
+### >>> CLASS A IS FIXED AND PUSHED (`6cdafdcd`, 2026-08-24) -- LIVE PROOF IS RUNNING, CLASS B IS STILL OPEN <<<
+
+**Read this before the entry below it**, which is preserved as the problem
+statement that opened the item and is now partly superseded.
+
+**WHAT SHIPPED.** One shared speaker resolver (`SpeakerRoster` in
+`_otr_scifi_news_pro_markup.py`) consumed by the parser AND `_resolves_to_cast`;
+a per-episode cast-alias LLM pass whose answers arrive as DATA so the parser
+stays pure; a repair channel that emits ONE NOTE PER DEFECT CLASS instead of
+returning on the first; a frame-order note for the mid-scene ANNOUNCER; and
+SALVAGE, which delivers an episode after the four honest attempts are spent
+rather than refusing. Suite **12097 / 120 / 1, EXIT=0**; Bible **22/26/3**;
+**+43 tests**. Full detail in `docs/PROD_BUG_LOG.md` under PBUG-20260824-01.
+
+**THE ENTRY BELOW GOT THE FRAMING WRONG, and it is worth knowing why.** It
+called this "the `**ANNOUNCER` markdown leak" and recommended that half as the
+first swing. Markdown was the MINORITY mechanism -- 3 of 6 rejected tokens,
+against 5 comma delivery tags and 4 shortened cast names -- and a matcher-only
+fix, however perfect, was PROVEN not to save the observed leg before any code
+was written. Two further mechanisms sat behind the loud one: unlabelled prose
+rows, and a mid-scene ANNOUNCER row that closes the story frame. **Do not read
+the block below as a current description of the defect.**
+
+**WHAT IS STILL OWED, and neither is optional:**
+1. **LIVE PROOF.** A green suite cannot retire a defect measured as 6 failures
+   in 10 LIVE passes. The post-fix loop was started at `6cdafdcd` on a freshly
+   booted server (17:02Z) and archives leg logs per pass to `tmp/legs/passNNN/`.
+   **Compare the `scifi_news_pro` failure rate against the recorded 60%.**
+2. **CLASS B (`_pass_news_read`) IS UNTOUCHED.** All three r1 lanes
+   independently ruled it a different fault -- different pass, ladder, error
+   type and validator. It must never be reported as covered by this fix.
+
+**THREE THINGS DELIBERATELY NOT FIXED (reasons in the PBUG entry):**
+`[SFX: ...]` inside dialogue stays in `lines[].text` (2026-08-05 ruling, three
+live consumers, and the operator's *"now video models are doing native audio
+too"* is a NEW reason to retain it); `scenes[].env` stays (three readers --
+ripping it holes the ledger); and `_otr_story_brief.py:354`'s dead
+`speaker_role in {"music","env"}` filter stays for now.
+
+### NEW OPEN ITEM (small, do it when the loop is IDLE) -- the overnight loop can run without archiving
+
+**THE GOTCHA, found 2026-08-24 by reading the log header rather than trusting
+that the process was alive.** Launching `scripts/otr_overnight_loop.sh` via
+`Start-Process` inherits the caller's PATH. When that PATH lacks Git's
+`usr\bin`, the loop STILL RUNS -- the bank gate is a Windows python call and
+works perfectly -- but every coreutil inside the supervisor silently returns
+nothing. The tell is a header reading
+
+    [] pass 1: launching bank gate (obs=)
+
+instead of `[17:02:33Z] pass 1: launching bank gate (obs=166)`.
+
+**That is not cosmetic.** The same missing binaries break `mkdir -p` and
+`cp -p` in the per-pass archive step -- the step added in `f84906c8` precisely
+because `tmp/_bankgate_<bank>.log` is overwritten every pass, which is how two
+of the six 2026-08-24 failure reasons were lost. **A loop that runs but does
+not archive is a loop that has to be run again.**
+
+**THE DURABLE FIX, not yet applied:** prepend
+`/c/Program Files/Git/usr/bin` to `PATH` inside `otr_overnight_loop.sh` itself,
+so the loop is self-sufficient however it is launched. **It was NOT done on
+2026-08-24 because the loop was mid-pass and bash reads a script incrementally
+as it executes** -- editing a running shell script can make it execute garbage.
+Do it when no supervisor is running. The interim workaround is the local,
+gitignored `scripts/_otr_overnight_loop_launch.ps1` (ignored by
+`.gitignore:70`, `scripts/_*.ps1`), which sets the PATH before launching and
+prints the last log lines so an empty timestamp is visible immediately.
+
+### NEW OPEN ITEM -- a dead filter inside a LIVE prompt builder
+
+`nodes/_otr_story_brief.py:354` filters `speaker_role in {"music", "env"}`, but
+`VALID_SPEAKER_ROLES` (`_otr_speaker_role.py`) is `character / announcer /
+music_open / music_close / music_inter`. **`"music"` matches none of them**, so
+the "NON-DIALOGUE ROWS" section of a live reflection prompt has ALWAYS been
+empty. Found by the Sonnet lane of the 2026-08-24 SFX sweep, confirmed by the
+driver against both files.
+
+**Why it was not fixed in that sweep:** making the filter match would inject
+music rows into a prompt that has never seen them, which changes story output
+-- settled territory since 2026-08-04. This needs an operator call on whether
+the reflection pass SHOULD see music rows, not a silent behaviour change
+smuggled into an unrelated commit. Same defect CLASS as the SFX finding: stale
+vocabulary surviving inside a live prompt builder.
+
+### >>> THE ORIGINAL PROBLEM STATEMENT (2026-08-24) -- superseded in part, kept for its evidence <<<
 
 **Operator: *"lets mark scifi news writer error as our next plan ... we need to
 help fix scifi_news_pro."*** This is the top of the queue.
