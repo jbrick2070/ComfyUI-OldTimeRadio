@@ -492,3 +492,59 @@ it. The 2026-08-11 review routing at the top governs; no full arc is implied.
      `cloud_kling_avatar`).
    * The shared `row_is_active(...)` evaluator over captured state -- confirmed
      absent from the tree -- closing the four env-read sites named in OPEN BUGS.
+
+---
+
+## Sprint items 2 and 3 -- closed on re-grounding, 2026-08-23
+
+Neither was done by the window that archived them; both were already true at
+HEAD and the plan had not caught up. Verbatim as they stood:
+
+### 2. THE NON-COMMERCIAL NOTICE REACHES NO HUMAN SURFACE (~30 min)
+
+Fully scoped, ledger-clean, and the smallest real win on the board.
+`nodes/OTR_LedgerScriptWriter.py:3590` stamps `meta["noncommercial_notice"]` (via
+`_otr_provenance.noncommercial_notice`, `:124`) and logs it. **Nothing renders
+it.** `nodes/otr_credits_roll.py:516` reads only `credits_source_line`.
+
+Add a sibling printed-credits item beside that block -- `:516-518` is the exact
+three-line shape to copy -- plus an integration test. The ledger field already
+exists and already has an owner, so this adds a CONSUMER, not a field: no
+ownership question to answer. Fires on Folger sources.
+
+**Acceptance (r1 + r2 + r3 + r4):** `meta.noncommercial_notice` present -> ONE
+rendered credits item; absent when empty, exact text, exactly ONCE. The
+existing source item renders as `>> SOURCE: ...` (`otr_credits_roll.py:510-518`)
+-- state the notice's literal prefix the same way, and the notice renders even
+when a malformed legacy ledger lacks `credits_source_line`; ADJACENCY (source
+line immediately followed by the notice, each its own `intercept` entry)
+applies when both exist. No new wrapping helper: the existing intercept renderer already
+measures and wraps every entry through `_wrap`
+(`otr_credits_roll.py:1131-1135`). Test the ORDERED flow list (do not convert
+`col3_flow` to a dict -- duplicate `"intercept"` keys collapse). Integration
+fixture proves the Folger wording survives flow construction unchanged.
+Legibility on canvas is eyeballed on the next permitted render, not claimed
+from the test.
+
+### 3. THE TEST-ORDERING POLLUTION (~30 min)
+
+`tests/test_public_domain_sources.py` pollutes
+`tests/test_public_domain_interpreter.py::test_empty_cast_is_rejected_and_retried_to_failure`.
+Confirmed 2026-08-04: fails when the two run adjacently, passes **11/11** when
+the interpreter file runs alone, invisible in full-suite order. Pre-existing --
+already proven by stashing and reproducing at the prior commit.
+
+Worth the half hour because it costs a real signal: any targeted run touching
+those two files reports a red line that has to be re-diagnosed as benign every
+time. **Build shape (r2 -- the r1 "cleanup fixture" idea was WRONG and is
+withdrawn):** the mechanism is MODULE-IDENTITY breakage, not leaked state.
+`test_module_import_is_lazy` (`tests/test_public_domain_sources.py:223-233`)
+calls `importlib.reload(pd)` twice, which REPLACES the module's class objects,
+while the interpreter test file imported exception classes at collection time
+-- so `except OldClass` no longer matches instances raised by the reloaded
+module. No cleanup fixture can restore class identity. Fix (r3-refined): run
+the lazy-import assertion in a SUBPROCESS -- `sys.executable`, repo-root
+`cwd`, `check=True`, fresh import with the read guard installed -- and pin
+BOTH test-order permutations as regressions. The private-module-name
+alternative is CUT: it risks exercising fallback import paths instead of the
+production `nodes._otr_public_domain_sources` package identity.

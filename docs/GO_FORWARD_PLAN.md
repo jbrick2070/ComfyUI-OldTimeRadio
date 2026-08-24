@@ -490,54 +490,25 @@ real proof is a render. Renders HAVE RESUMED (2026-08-05), so the
 `production-qualified` leg is runnable whenever a render window is free; until
 it runs, claim only `code-complete + suite-green`.
 
-### 2. THE NON-COMMERCIAL NOTICE REACHES NO HUMAN SURFACE (~30 min)
+### 2 and 3 -- BOTH CLOSED, re-verified against HEAD 2026-08-23
 
-Fully scoped, ledger-clean, and the smallest real win on the board.
-`nodes/OTR_LedgerScriptWriter.py:3590` stamps `meta["noncommercial_notice"]` (via
-`_otr_provenance.noncommercial_notice`, `:124`) and logs it. **Nothing renders
-it.** `nodes/otr_credits_roll.py:516` reads only `credits_source_line`.
+Neither was done by this window; both had simply gone stale in the file. Full
+text of the two rows is in `docs/GO_FORWARD_ARCHIVE.md`.
 
-Add a sibling printed-credits item beside that block -- `:516-518` is the exact
-three-line shape to copy -- plus an integration test. The ledger field already
-exists and already has an owner, so this adds a CONSUMER, not a field: no
-ownership question to answer. Fires on Folger sources.
-
-**Acceptance (r1 + r2 + r3 + r4):** `meta.noncommercial_notice` present -> ONE
-rendered credits item; absent when empty, exact text, exactly ONCE. The
-existing source item renders as `>> SOURCE: ...` (`otr_credits_roll.py:510-518`)
--- state the notice's literal prefix the same way, and the notice renders even
-when a malformed legacy ledger lacks `credits_source_line`; ADJACENCY (source
-line immediately followed by the notice, each its own `intercept` entry)
-applies when both exist. No new wrapping helper: the existing intercept renderer already
-measures and wraps every entry through `_wrap`
-(`otr_credits_roll.py:1131-1135`). Test the ORDERED flow list (do not convert
-`col3_flow` to a dict -- duplicate `"intercept"` keys collapse). Integration
-fixture proves the Folger wording survives flow construction unchanged.
-Legibility on canvas is eyeballed on the next permitted render, not claimed
-from the test.
-
-### 3. THE TEST-ORDERING POLLUTION (~30 min)
-
-`tests/test_public_domain_sources.py` pollutes
-`tests/test_public_domain_interpreter.py::test_empty_cast_is_rejected_and_retried_to_failure`.
-Confirmed 2026-08-04: fails when the two run adjacently, passes **11/11** when
-the interpreter file runs alone, invisible in full-suite order. Pre-existing --
-already proven by stashing and reproducing at the prior commit.
-
-Worth the half hour because it costs a real signal: any targeted run touching
-those two files reports a red line that has to be re-diagnosed as benign every
-time. **Build shape (r2 -- the r1 "cleanup fixture" idea was WRONG and is
-withdrawn):** the mechanism is MODULE-IDENTITY breakage, not leaked state.
-`test_module_import_is_lazy` (`tests/test_public_domain_sources.py:223-233`)
-calls `importlib.reload(pd)` twice, which REPLACES the module's class objects,
-while the interpreter test file imported exception classes at collection time
--- so `except OldClass` no longer matches instances raised by the reloaded
-module. No cleanup fixture can restore class identity. Fix (r3-refined): run
-the lazy-import assertion in a SUBPROCESS -- `sys.executable`, repo-root
-`cwd`, `check=True`, fresh import with the read guard installed -- and pin
-BOTH test-order permutations as regressions. The private-module-name
-alternative is CUT: it risks exercising fallback import paths instead of the
-production `nodes._otr_public_domain_sources` package identity.
+* **2. The non-commercial notice -- DONE (2026-08-07).** The row said *"Nothing
+  renders it. `otr_credits_roll.py:516` reads only `credits_source_line`."* False
+  at HEAD: `otr_credits_roll.py:554` reads `meta["noncommercial_notice"]` and
+  appends its own `intercept` entry. It was built to the row's exact acceptance
+  conditions -- a SEPARATE `if` rather than an `elif` (so a malformed legacy
+  ledger missing `credits_source_line` still shows the rights warning), no
+  second prefix (the string already begins "NON-COMMERCIAL SOURCE:"), `.strip()`
+  so a whitespace-only field cannot emit a bare `>>`, and adjacency falling out
+  of the append order. Covered in three test files.
+* **3. The test-ordering pollution -- NO LONGER REPRODUCES.** Running
+  `tests/test_public_domain_sources.py` and `tests/test_public_domain_interpreter.py`
+  ADJACENTLY -- the exact condition the row describes -- gives 28 passed. The
+  module-identity breakage it diagnosed (a double `importlib.reload` replacing
+  class objects the other file had already imported) is not observable at HEAD.
 
 ### 4. THE SPOKEN-CITATION CODA IS CLOSED -- re-verified against HEAD 2026-08-23
 
@@ -605,9 +576,17 @@ configuration-derived `scene_coherence_required` and write
 READ-ONLY (`_otr_ledger_freeze.py:664-698`), so the gate must not mutate the
 ledger; the phase wrappers already persist the report. Measure OFFLINE over the
 published corpus first, then arm in ONE change -- no intermediate flag-off ship.
-Replace the stale hard-coded bank list at `tests/test_scene_guard_v4.py:89-99`
+**CORRECTED 2026-08-23 -- this row's premise moved under it.** It used to say
+"replace the stale hard-coded bank list at `tests/test_scene_guard_v4.py:89-99`
 with registry-derived coverage (it omits `scifi_news`, the one bank that enables
-the flag).
+the flag)". Both halves are now false: **`scifi_news` NO LONGER EXISTS** (the
+live banks are media_archive, original, scifi_news_pro, public_domain,
+shakespeare, custom_source_bank, and that test's list is exactly the first five),
+and **NO bank sets `defaults.scene_coherence_check` at all** -- the writer reads
+it at `OTR_LedgerScriptWriter.py:3176` and nothing supplies it. So the gate is
+not merely inert on current banks; it has no consumer anywhere. What survives is
+the DESIGN above (the join, the vacuity refusal, request-vs-verdict) and the
+lesson beneath it. Whoever arms this decides first whether any bank should.
 
 **The vacuity class is now proven twice** -- this gate, and the freeze test at
 `test_g9_sfw_ship_stop.py` that filtered on a retired code prefix (fixed
