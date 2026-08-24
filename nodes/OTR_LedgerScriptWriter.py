@@ -119,7 +119,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Mapping
 
 # S30 B2a: catalog drives the dropdown_choices() for the two model widgets
 # at INPUT_TYPES() registration time. Pure-Python module, no torch /

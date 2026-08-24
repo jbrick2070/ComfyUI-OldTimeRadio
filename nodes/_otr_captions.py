@@ -50,7 +50,6 @@ Audio is never touched -- the burn happens on the video stream only, downstream.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Optional

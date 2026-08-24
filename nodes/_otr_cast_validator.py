@@ -20,7 +20,7 @@ refused); any unknown/missing char_id; wrong count; duplicate names.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict
 
 ALLOWED_PASS1_KEYS = frozenset(
     {"char_id", "name", "one_line_presence", "dialogue_style"})

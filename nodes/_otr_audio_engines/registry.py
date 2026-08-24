@@ -23,7 +23,6 @@ promotion, not by a hidden substitution at dispatch time.
 from __future__ import annotations
 
 import enum
-import os
 from typing import Optional, Protocol, runtime_checkable
 
 

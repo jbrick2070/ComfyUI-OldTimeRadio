@@ -57,7 +57,7 @@ except ImportError:  # pragma: no cover
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Iterable, List, Literal, Optional
+from typing import List, Literal, Optional
 
 log = logging.getLogger("OTR.ledger_freeze")
 

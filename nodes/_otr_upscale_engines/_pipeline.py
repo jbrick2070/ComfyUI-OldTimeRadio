@@ -23,7 +23,6 @@ import os
 import subprocess
 import tempfile
 import typing
-from pathlib import Path
 
 if typing.TYPE_CHECKING:
     import torch

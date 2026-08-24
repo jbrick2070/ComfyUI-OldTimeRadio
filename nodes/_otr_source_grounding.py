@@ -28,7 +28,6 @@ Nothing here loads a model, touches the GPU or reads the network.
 """
 from __future__ import annotations
 
-import re
 from types import MappingProxyType
 from typing import Mapping, Sequence
 

@@ -31,7 +31,6 @@ import contextlib
 import contextvars
 import importlib
 import inspect
-import os
 import threading
 import time
 import uuid

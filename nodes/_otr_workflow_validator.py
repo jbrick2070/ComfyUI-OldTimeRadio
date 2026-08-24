@@ -36,7 +36,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 log = logging.getLogger("OTR.workflow_validator")
 

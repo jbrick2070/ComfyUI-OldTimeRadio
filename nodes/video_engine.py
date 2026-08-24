@@ -21,7 +21,6 @@ VRAM cost: zero. Runs entirely on CPU (numpy + PIL).
 v2.0  2026-04-05  Jeffrey Brick
 """
 
-import hashlib
 import json
 import logging
 import math

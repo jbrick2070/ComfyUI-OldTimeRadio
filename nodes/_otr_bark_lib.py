@@ -21,7 +21,6 @@ Special Bark tokens (insert in text):
 v1.0  2026-04-04  Jeffrey Brick
 """
 
-import json
 import logging
 import os
 import re
