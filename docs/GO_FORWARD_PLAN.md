@@ -548,21 +548,39 @@ else-arm popped a key nothing had put there. Removed, with a tombstone comment
 naming the reason -- the same shape as the `news_coda_fallback` receipt above
 it, which tested for a string "no composer has ever emitted".
 
-### 5. 1,090 CAST ROWS CLAIM A NON-COMMERCIAL MODEL IS COMMERCIALLY CLEAN
+### 5. THE COMMERCIAL-CLEAN JOIN IS CLOSED (done 2026-08-23; full row in the archive)
 
-`eng_indextts2.py:55` says `commercial_clean = False` (bilibili non-commercial);
-all 40 bank rows say `true`; `cast_lock.py` trusts the bank row. The row flag is
-the CLIP's licence and the engine flag is the MODEL's -- genuinely different
-facts, both already in the right layers. **Stamp the JOIN. Do NOT edit the 40
-bank rows** (`otr_dl_indextts2_refs.py:11-17` documents them as clip provenance;
-the ingest mints three rows across three engines from one PD clip).
+Built to the row's own shape: the JOIN is stamped, the 40 bank rows were NOT
+touched, resolution is one profile by `(role, engine)` through
+`EngineProfileResolver.profile_for`, and enforcement stays OFF (the `gated`
+count still feeds one non-blocking I-8 warning).
 
-**Must heal ATOMICALLY or it creates the defect it fixes:** the stamp
-(`cast_lock.py:742`), the `gated` counter (`:575/:614/:661/:670`) AND the three
-report strings (`:578/:618/:673`) -- otherwise the report prints `clean=True`
-beside a ledger saying `False`. Resolve ONE profile by `(role, engine)` --
-role-scoped, never engine-name-scoped. **Enforcement stays OFF.**
-Prospective-only for the 1,090 frozen ledgers.
+**Where it landed.** `nodes/cast_lock.py` gained
+`_delivered_commercial_clean(entry, ref)` -- the clip's licence AND the model's,
+joined -- and it is now the ONLY reader of a bank row's flag in that file. All
+five `gated` counters, both `clean=` report strings and the `_stamp` funnel go
+through it. The two report sites compute the value ONCE into a local that feeds
+both the counter and the string, so the report can no longer disagree with the
+ledger printed beside it.
+
+**The row's premise held, with two corrections.** The engine flag is at
+`eng_indextts2.py:159`, not `:55` (line drift). And the authority for the model's
+licence is not the adapter class attribute but the ENGINE-PROFILE layer, which
+already knew: `char_indextts2_v1` carries
+`commercial_clean: false  # Bilibili license -- non-commercial use gated`. The
+cast layer had been contradicting the profile layer about the same audio.
+
+**A second suspected site was checked and is NOT broken.**
+`allowed_for_release` (`_otr_voice_node_common.py:1389`) derives from
+`effective_license_state(profile)` -- the profile layer -- so the release
+manifest was already truthful, and the release gate is armed nowhere but in its
+own tests. No change made there.
+
+**One deliberate design call:** the join DOWNGRADES only on a KNOWN-gated model.
+An engine with no curated profile leaves the clip flag standing, so a partial
+install behaves exactly as it did before. Guarded by an AST ratchet plus a
+negative control in `tests/test_cast_lock_commercial_clean_join.py` (10 tests):
+nothing outside the join helper may read a bank row's clip licence again.
 
 ### 6. A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD
 

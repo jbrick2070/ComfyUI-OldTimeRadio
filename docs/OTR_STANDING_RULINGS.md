@@ -928,14 +928,28 @@ changes scripts, and the next section's own rule is "prove it on an artifact
 before touching it". This is the artifact-hunt made much cheaper: the thing to
 look for is a P0 payload sitting exactly at 6 facts / 4 entities.
 
-**2b. `_otr_determinism.seed_all_rngs` -- and this one names its own
-consequence.** Its docstring: *"Used by the legacy audio nodes to make their
-forwards reproducible (I-2): legacy audio seeds nothing today, so a render-twice
-diverges. Seeding here ... is what the R0a operator bit-identity baseline (step
-f) locks in."* **Nothing calls it.** So the function written to make a re-render
-bit-identical is not in the path, and the divergence it describes is the current
-behaviour. Found on the second sweep, after the bake-off retirement removed the
-references that had been hiding it.
+**2b. `_otr_determinism.seed_all_rngs` -- DEAD, and MY OWN CONSEQUENCE CLAIM
+HERE WAS WRONG (corrected 2026-08-23, on the "verify before you code" pass).**
+The symbol is genuinely unreferenced: zero callers repo-wide, twice confirmed
+(here, and by the 2026-08-18 kibitz run). **What was wrong is what I said it
+MEANT.** This entry read its docstring -- *"legacy audio seeds nothing today, so
+a render-twice diverges"* -- and concluded "the divergence it describes is the
+current behaviour". It is not. **The docstring is stale, and the coverage moved
+rather than vanished:** `deterministic_inference` seeds python / numpy / torch /
+cuda from the same int (`_otr_determinism.py:150-156`), and EVERY audio
+generation path runs inside it -- voice at `_otr_voice_node_common.py:1289` and
+`:1296`, music at `stable_audio_theme.py:266` -- with Bark, MusicGen and
+Stable Audio each seeding directly on top. The scoped context manager also
+saves and RESTORES prior RNG state, which is strictly better than a permanent
+global seed for per-forward bit-identity. So this is a SUPERSEDED symbol, not a
+missing guarantee.
+
+**THE LESSON, which is why the correction is kept rather than quietly edited:**
+a docstring is evidence about the day it was written, not about HEAD. This entry
+treated one as a live measurement and would have sent the next window hunting a
+determinism hole that does not exist -- or, worse, wiring a global seeder back
+into a path that is already scoped. Verify the CONSEQUENCE, not just the
+reference count.
 
 **3. `_otr_scifi_news_pro._validate_scene_envelope`** -- a fail-closed validator
 that raises `NewsProScriptError("final_draft", ...)` when an envelope is not an

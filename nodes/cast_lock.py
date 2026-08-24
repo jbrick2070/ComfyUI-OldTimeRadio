@@ -164,6 +164,65 @@ def _is_announcer_entry(entry: dict) -> bool:
     return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
 
 
+def _profile_role_for_entry(entry: dict) -> str:
+    """The engine-profile role a cast row draws its voice from."""
+    return "announcer_voice" if _is_announcer_entry(entry) else "char_voice"
+
+
+def _model_license_clean(role: str, engine: str) -> bool | None:
+    """Whether ``engine``'s MODEL is commercial-clean for ``role``.
+
+    Resolved through the engine-profile resolver, which already owns this fact:
+    `char_indextts2_v1` carries `commercial_clean: false` for the bilibili Model
+    Use License. Exactly ONE profile answers, looked up by the (role, engine)
+    pair -- never by engine name alone, because the same engine can be curated
+    differently for the announcer than for a character.
+
+    ``None`` means no profile covers the pair. That is not a licence: the caller
+    keeps the clip's own flag rather than inventing a verdict either way.
+    """
+    # Imported HERE, not at module scope, on purpose: `_otr_engine_profiles`
+    # reaches `_otr_audio_engines`, whose `base.py` imports torch. Cast locking
+    # runs on paths that must stay light, so the dependency is paid only when a
+    # licence is actually being resolved -- the same lazy shape `eng_bark` uses
+    # to read a profile default.
+    from . import _otr_engine_profiles as profiles
+
+    resolver = profiles.load_resolver()
+    if resolver is None:
+        return None
+    profile = resolver.profile_for(role, str(engine or ""))
+    if profile is None:
+        return None
+    return profiles.effective_license_state(profile) == "clean"
+
+
+def _delivered_commercial_clean(entry: dict, ref) -> bool:
+    """The DELIVERED audio's commercial standing -- the CLIP's licence AND the
+    MODEL's, joined.
+
+    TWO DIFFERENT LICENCES MEET HERE and only one of them used to be read. A
+    voice-bank row's `commercial_clean` describes the reference CLIP (the 40
+    indextts2 rows are public-domain recordings, so they say true, correctly).
+    The MODEL that speaks with that clip has a licence of its own, and
+    indextts2's is non-commercial. Reading the clip alone made the cast report
+    print `clean=True` for audio no one could ship, and stamped that on the
+    ledger.
+
+    Either half gates the result. An unknown model licence leaves the clip's
+    flag standing, so a partial install or an engine with no curated profile
+    behaves exactly as it did before this join existed.
+    """
+    clip_clean = bool(getattr(ref, "commercial_clean", False))
+    if not clip_clean:
+        return False
+    model_clean = _model_license_clean(
+        _profile_role_for_entry(entry), getattr(ref, "engine", ""))
+    if model_clean is None:
+        return clip_clean
+    return model_clean
+
+
 class CastLock:
     """Registered as ``OTR_CastLock``. Single v2 ledger authority."""
 
@@ -789,10 +848,11 @@ class CastLock:
                         announcer_engine, bank=bank_entries,
                         episode_seed=episode_seed)
                     _stamp_row(entry, ref)
-                    gated += 0 if ref.commercial_clean else 1
+                    announcer_clean = _delivered_commercial_clean(entry, ref)
+                    gated += 0 if announcer_clean else 1
                     report.append(
                         f"  {char_id or 'ANNOUNCER'}: announcer {ref.voice_ref_id} "
-                        f"({ref.engine}, clean={ref.commercial_clean})"
+                        f"({ref.engine}, clean={announcer_clean})"
                     )
                 except VoiceCastingError as exc:
                     if announcer_engine == "google_tts":
@@ -818,7 +878,8 @@ class CastLock:
                     entry, _ROUTE.ROUTE_TIER_QUALIFIED,
                     route_id=str(policy_claim.voice_route.get("route_id") or ""))
                 _mark_used(policy_claim.bank_entry)
-                gated += 0 if policy_claim.bank_entry.commercial_clean else 1
+                gated += 0 if _delivered_commercial_clean(
+                    entry, policy_claim.bank_entry) else 1
                 report.append(
                     f"  {char_id}: {policy_claim.voice_ref_id} "
                     f"({policy_claim.engine}, QUALIFIED policy route "
@@ -840,7 +901,8 @@ class CastLock:
                 _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_PROVISIONAL,
                                   route_id=provisional_claim.route_id)
                 _mark_used(provisional_claim.bank_entry)
-                gated += 0 if provisional_claim.bank_entry.commercial_clean else 1
+                gated += 0 if _delivered_commercial_clean(
+                    entry, provisional_claim.bank_entry) else 1
                 report.append(
                     f"  {char_id}: {provisional_claim.voice_ref_id} "
                     f"({provisional_claim.engine}, PROVISIONAL route "
@@ -921,7 +983,8 @@ class CastLock:
                     continue
                 _stamp_row(entry, fallback_ref, fallback="gender_unservable")
                 _mark_used(fallback_ref)
-                gated += 0 if fallback_ref.commercial_clean else 1
+                gated += 0 if _delivered_commercial_clean(
+                    entry, fallback_ref) else 1
                 report.append(
                     f"  {char_id}: {fallback_ref.voice_ref_id} "
                     f"({fallback_ref.engine}, gender {gender!r} unservable -- "
@@ -930,10 +993,11 @@ class CastLock:
                 continue
             _stamp_row(entry, ref)
             _mark_used(ref)
-            gated += 0 if ref.commercial_clean else 1
+            drawn_clean = _delivered_commercial_clean(entry, ref)
+            gated += 0 if drawn_clean else 1
             report.append(
                 f"  {char_id}: {ref.voice_ref_id} ({ref.engine}, "
-                f"clean={ref.commercial_clean})"
+                f"clean={drawn_clean})"
             )
 
         # LEDGER COMPLETENESS FOR THE TIER, and this sweep is why the three fields
@@ -972,7 +1036,8 @@ class CastLock:
         if gated:
             report.append(
                 f"auto_registry: {gated} assigned voice(s) are known-gated "
-                f"(commercial_clean=false) -- non-blocking warning (I-8)"
+                f"(reference clip and/or model licence is not commercial-clean) "
+                f"-- non-blocking warning (I-8)"
             )
 
     # ------------------------------------------------------------------ #
@@ -1274,7 +1339,7 @@ class CastLock:
         """
         entry["voice_ref_id"] = ref.voice_ref_id
         entry["voice_engine"] = ref.engine
-        entry["commercial_clean"] = bool(ref.commercial_clean)
+        entry["commercial_clean"] = _delivered_commercial_clean(entry, ref)
         entry["voice_cast_fallback"] = fallback
         # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
         # DELIVERED voice presents as, taken from the reference actually chosen

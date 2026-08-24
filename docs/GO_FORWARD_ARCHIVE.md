@@ -548,3 +548,29 @@ the lazy-import assertion in a SUBPROCESS -- `sys.executable`, repo-root
 BOTH test-order permutations as regressions. The private-module-name
 alternative is CUT: it risks exercising fallback import paths instead of the
 production `nodes._otr_public_domain_sources` package identity.
+
+## Sprint item 5 -- closed 2026-08-23 (the commercial-clean JOIN)
+
+Verbatim row as it stood before the fix, kept because its reasoning about WHICH
+layer owns which licence is the half that still teaches:
+
+> ### 5. 1,090 CAST ROWS CLAIM A NON-COMMERCIAL MODEL IS COMMERCIALLY CLEAN
+>
+> `eng_indextts2.py:55` says `commercial_clean = False` (bilibili non-commercial);
+> all 40 bank rows say `true`; `cast_lock.py` trusts the bank row. The row flag is
+> the CLIP's licence and the engine flag is the MODEL's -- genuinely different
+> facts, both already in the right layers. **Stamp the JOIN. Do NOT edit the 40
+> bank rows** (`otr_dl_indextts2_refs.py:11-17` documents them as clip provenance;
+> the ingest mints three rows across three engines from one PD clip).
+>
+> **Must heal ATOMICALLY or it creates the defect it fixes:** the stamp
+> (`cast_lock.py:742`), the `gated` counter (`:575/:614/:661/:670`) AND the three
+> report strings (`:578/:618/:673`) -- otherwise the report prints `clean=True`
+> beside a ledger saying `False`. Resolve ONE profile by `(role, engine)` --
+> role-scoped, never engine-name-scoped. **Enforcement stays OFF.**
+> Prospective-only for the 1,090 frozen ledgers.
+
+The atomicity warning was the useful part and it was honoured structurally
+rather than by care: at both report sites the verdict is computed once into a
+local that feeds the counter AND the string, and an AST ratchet refuses any new
+direct read of the clip flag. See the plan's closed stub for what shipped.
