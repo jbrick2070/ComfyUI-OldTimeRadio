@@ -627,9 +627,20 @@ class ParsedScript:
     character_word_count: int
     announcer_word_count: int
     # Retained for receipt compatibility; prose normalization is retired.
-    # Speaker resolutions that were NOT exact are appended here too, so a
-    # receipt always names how a label reached its character.
+    #
+    # SPEAKER RESOLUTIONS DO NOT BELONG HERE, and putting them here cost a live
+    # leg on 2026-08-24. `_parsed_payload` SEALS this field, and the seal is
+    # re-verified by re-parsing the raw source. The build parses against the
+    # treatment's full `cast_names`; the seal check parses against
+    # `_speakers_in_order(parsed)` -- a SMALLER roster. Same script, same
+    # speakers, but a label can reach its character by a different RUNG, so the
+    # receipt STRING differs and the seal reports "parsed artifact seal is
+    # stale" for a draft nothing touched. A seal must depend on the script, not
+    # on how the parser got there.
     normalizations: "tuple[str, ...]" = ()
+    #: How each non-exact speaker label reached its character. A RECEIPT, and
+    #: deliberately OUTSIDE the sealed payload for the reason above.
+    speaker_resolutions: "tuple[str, ...]" = ()
     #: Speakers admitted by salvage that the locked roster did not contain.
     #: The producer owns giving each one a voice and a cast row.
     adopted_speakers: "tuple[str, ...]" = ()
@@ -1026,7 +1037,8 @@ def parse_scifi_news_pro_markup(text: str, cast_names, extra_aliases=None,
         coda=p.coda or "",
         character_word_count=character_words,
         announcer_word_count=announcer_words,
-        normalizations=tuple(normalizations) + tuple(p.resolutions),
+        normalizations=tuple(normalizations),
+        speaker_resolutions=tuple(p.resolutions),
         adopted_speakers=tuple(p.adopted),
         dropped_rows=tuple(p.dropped),
     )

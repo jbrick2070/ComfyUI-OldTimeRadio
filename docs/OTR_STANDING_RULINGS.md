@@ -827,6 +827,47 @@ fixing it costs on this hardware and the operator priced it.
 
 **F1 -- action in a spoken row -- remains ON and is the shipped capability.**
 
+### THE LEDGER MUST BE GOOD. A LEAK IS TOLERABLE; A REGEX CLEANING IT IS NOT (operator, 2026-08-24 -- hard)
+
+Operator, verbatim: *"THE LEDGER MUST BE GOOD, I'LL LIVE WITH FEW LEAKS INTO
+DIALOGUE IF AFTER THE PASSES IT STILL DOESN'T FIND IT MY THING. IF IT FINDS IT
+AN LLM DOES A A/B BEFORE AND AFTER BEAT-AWARE APPROACH TO CLEANLY CLEAN UP THE
+LEDGER DIALOGUE, NOT HACK IT WITH PY[THON]."*
+
+**THE PRIORITY ORDER, and it settles a whole class of argument:**
+
+1. **The LEDGER being correct is the thing that matters.** It is what every
+   downstream consumer reads -- TTS, per-beat slicing, video/shot direction,
+   captions, credits, `obs_publish`.
+2. **A few cue leaks into spoken dialogue are ACCEPTABLE.** They do not fail an
+   episode and they are not worth a gate. If the repair ladder's passes never
+   notice one, that is fine and explicitly the operator's problem, not a defect
+   to chase.
+3. **BUT IF A LEAK IS DETECTED, THE CLEANUP IS AN LLM'S JOB.** It must be
+   **beat-aware**: the pass reads the beat BEFORE and the beat AFTER the
+   offending line and repairs it in context, so the result is a line that still
+   plays. **A Python regex may DETECT. It may never REPAIR.**
+
+**WHY, because the reasoning is the reusable part.** A regex cannot tell a
+sound cue from a spoken line that happens to carry brackets, and its only move
+is deletion -- so it silently removes words rather than repairing a row. That is
+the same failure the 2026-08-05 `clean_spoken_text` ruling guards from the other
+direction, and it is why the obvious fix was REFUSED on 2026-08-24: a driver
+proposed stripping `[SFX: ...]` from `lines[].text` with a regex at the ledger
+boundary, and the operator rejected it on the spot -- *"we may need that for
+music or tts"*, and *"now video models are doing native audio too."*
+
+**WHAT THIS FORBIDS, concretely:** any new regex, `str.replace`, or Python
+sanitizer that edits `lines[].text` to remove leaked cues, stage directions or
+markup. Detection helpers are fine. Reporting is fine. Editing is not.
+
+**WHAT IT WOULD LOOK LIKE WHEN BUILT (design, not yet built):** a repair pass
+handed the offending line plus its immediate neighbours, asked to return the
+line as it should be spoken, with the ledger row replaced only on an accepted
+result and the original preserved in the receipt. It is a PRODUCER, so it
+degrades rather than refusing -- an episode is never failed because a cleanup
+pass declined.
+
 ### DO NOT "FIX" `clean_spoken_text`. THE OPERATOR RULED ON IT 2026-08-05.
 
 An earlier cut of this file ranked it the worst no-shims violation in the tree.

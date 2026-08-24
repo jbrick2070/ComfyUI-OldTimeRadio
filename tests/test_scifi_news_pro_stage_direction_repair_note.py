@@ -179,7 +179,11 @@ def test_a_REAL_cast_name_wearing_a_stray_marker_now_RESOLVES_IN_THE_PARSER():
     spoken = [ln.speaker for scene in parsed.scenes for ln in scene.lines]
     assert "Ada" in spoken
     # It resolved to the CANONICAL spelling, and the receipt says how.
-    assert any("resolved to 'Ada'" in n for n in parsed.normalizations)
+    # The receipt lives in `speaker_resolutions`, NOT in `normalizations`:
+    # `_parsed_payload` seals that field, and a note about how a label resolved
+    # must never decide whether a draft's seal matches (PBUG-20260824-01
+    # follow-up -- it cost a live leg).
+    assert any("resolved to 'Ada'" in n for n in parsed.speaker_resolutions)
 
 
 def test_a_BRACKETED_real_cast_name_still_earns_the_RESTORE_rule():

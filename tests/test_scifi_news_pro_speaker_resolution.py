@@ -46,6 +46,8 @@ WHAT THIS SUITE PINS:
 * the repair channel names EVERY defect class it saw, not just the first;
 * salvage delivers an episode rather than refusing one, and says so loudly.
 """
+import dataclasses
+
 import pytest
 
 from nodes._otr_scifi_news_pro_markup import (
@@ -55,6 +57,7 @@ from nodes._otr_scifi_news_pro_markup import (
     build_speaker_roster,
     parse_scifi_news_pro_markup,
 )
+from nodes import _otr_scifi_news_pro as _F2
 from nodes._otr_scifi_news_pro import (
     _frame_order_repair_note,
     _resolves_to_cast,
@@ -288,7 +291,7 @@ def test_SALVAGE_delivers_the_episode_that_died():
     assert parsed.coda and parsed.music_close
     # And every trade is on the record.
     assert len(parsed.dropped_rows) == 5
-    assert any("resolved to" in n for n in parsed.normalizations)
+    assert any("resolved to" in n for n in parsed.speaker_resolutions)
 
 
 def test_SALVAGE_is_OFF_by_default_so_the_honest_gate_never_moved():
@@ -373,7 +376,7 @@ def test_dropping_a_CUE_never_costs_a_line_of_DIALOGUE():
     assert "SOMEONE NEW" in spoken
     # The raw label stays traceable in the receipt.
     assert any("'(SOMEONE NEW)' ADOPTED as 'SOMEONE NEW'" in n
-               for n in parsed.normalizations)
+               for n in parsed.speaker_resolutions)
 
 
 def test_the_repair_rule_NEVER_SHOWS_the_model_a_sound_cue_token():
@@ -392,6 +395,134 @@ def test_the_repair_rule_NEVER_SHOWS_the_model_a_sound_cue_token():
         f"the rule text still names a sound-cue token: {rule_text!r}")
     assert "a door slams" not in got
     assert "sound-effect speaker" not in got
+
+
+# ---------------------------------------------------------------------------
+# THE SEAL MUST BE RE-READ THE WAY IT WAS WRITTEN
+# ---------------------------------------------------------------------------
+def test_a_draft_whose_speaker_resolved_BY_ALIAS_survives_its_own_seal_check():
+    """CAUGHT ON A LIVE LEG, 2026-08-24, and it was a regression I introduced.
+
+    `FinalDraft` gained `salvaged` and `speaker_aliases` so the integrity check
+    could re-parse a draft under the SAME rules that produced it.
+    `build_final_draft` was taught to use them -- and the CONSTRUCTOR was never
+    given them, so every draft carried `salvaged=False` and an EMPTY alias map.
+    `_validate_final_draft_integrity` then re-parsed the same bytes under
+    different rules, got a different artifact, and raised
+    *"selected final draft parsed artifact seal is stale"* for a draft nothing
+    had touched. The first post-fix loop pass died on it at 3.8 minutes.
+
+    THE NASTY PART, and why the unit suite was green: it fires ONLY when a
+    speaker actually resolves through an alias -- exactly the episodes the
+    alias work exists to save. Every already-passing episode stayed green, so
+    the fix broke precisely the case it was written for.
+
+    This test pins the invariant that was missing: a draft must survive its own
+    seal check. It fails without the constructor arguments.
+    """
+    cast = ("Dr. Haorong Chen",)
+    aliases = {"Dr. Haorong Chen": ["Doc"]}
+    raw = "\n".join([
+        "TITLE: The Quiet Relay",
+        "MUSIC: low hum",
+        "ANNOUNCER: Tonight, a signal.",
+        "SCENE 1: a relay station",
+        # Resolves ONLY through the authored alias -- neither exact nor any
+        # derived short form of the canonical name produces 'Doc'.
+        "Doc: The sample is not decaying.",
+        "ANNOUNCER: The station went quiet.",
+        "CODA: It never stopped.",
+        "MUSIC: closing tone",
+        "END.",
+    ])
+    parsed, defects = parse_scifi_news_pro_markup(raw, cast, aliases)
+    assert defects == (), f"fixture drift: {defects}"
+    assert [ln.speaker for sc in parsed.scenes for ln in sc.lines] == [
+        "Dr. Haorong Chen"], "the alias must be what resolved this line"
+
+    trace = (_F2.PassAttemptTrace(
+        attempt=1,
+        temperature=_F2._TEMP["script"],
+        outcome="accepted",
+        selected=True,
+        character_words=parsed.character_word_count,
+        scene_character_words=_F2._scene_character_word_counts(parsed),
+    ),)
+    treatment = _F2.Treatment.model_validate({
+        "title": "The Quiet Relay",
+        "dramatic_question": "Will the doctor trust the relay before dawn?",
+        "setting": "a mountain relay station at night",
+        "cast_shapes": [{
+            "name": "Dr. Haorong Chen",
+            "role": "relay keeper",
+            "want": "to recover the buried transmission",
+            "pressure": "the station is losing power",
+            "register": "plain, quick answers",
+        }],
+        "turn": "The silence is the message.",
+        "priced_ending": {
+            "choice": "The doctor sends the record onward.",
+            "cost_paid": "The last reserve charge is spent.",
+        },
+        "news_thread": "A survey found measurable heat before tremors.",
+        "news_close_read": (
+            "The source survey measured heat before tremors at Mount Etna."),
+    })
+
+    draft = _F2.build_final_draft(
+        raw, parsed, treatment, p3_attempts=trace, speaker_aliases=aliases)
+    # The conditions travelled with the draft...
+    assert draft.alias_map() == aliases
+    # ...so re-reading it under its own rules agrees.
+    _F2._validate_selected_final_draft(draft, treatment=treatment)
+
+    # NEGATIVE CONTROL -- reproduce the live failure exactly, so this test
+    # cannot pass vacuously. Strip the conditions back off the SAME draft and
+    # the seal check re-parses under different rules and rejects it. This is
+    # byte-for-byte the state every draft was in before the fix.
+    stripped = dataclasses.replace(draft, speaker_aliases=())
+    with pytest.raises(_F2.NewsProScriptError) as caught:
+        _F2._validate_selected_final_draft(stripped, treatment=treatment)
+    # 'Doc' is reachable ONLY through the authored alias, so a re-parse without
+    # it cannot resolve the speaker at all and the check refuses outright.
+    # Either refusal proves the same thing -- the conditions are load-bearing.
+    assert ("no longer parses" in str(caught.value)
+            or "seal is stale" in str(caught.value)), (
+        f"expected a refusal naming the mismatch, got: {caught.value}")
+
+
+def test_a_SALVAGED_draft_also_survives_its_own_seal_check():
+    """Same invariant, the other flag. A salvaged draft re-parsed WITHOUT
+    `salvage=True` re-rejects exactly the rows salvage admitted."""
+    cast = ("Dr. Haorong Chen", "Eli Marsh")
+    parsed, defects = parse_scifi_news_pro_markup(
+        PASS11_DRAFT, CAST, salvage=True)
+    assert defects == ()
+    trace = (_F2.PassAttemptTrace(
+        attempt=1,
+        temperature=_F2._TEMP["script"],
+        outcome="accepted",
+        selected=True,
+        character_words=parsed.character_word_count,
+        scene_character_words=_F2._scene_character_word_counts(parsed),
+    ),)
+    treatment = _F2.Treatment.model_validate({
+        "title": "The Quiet Frequency",
+        "dramatic_question": "Will Eli believe the doctor before dawn?",
+        "setting": "a cramped lab after midnight",
+        "cast_shapes": [
+            {"name": n, "role": "scientist", "want": "the truth",
+             "pressure": "time", "register": "clipped"} for n in cast],
+        "turn": "The sample is not decaying.",
+        "priced_ending": {"choice": "Eli stays.", "cost_paid": "He is exposed."},
+        "news_thread": "A survey found measurable heat before tremors.",
+        "news_close_read": (
+            "The source survey measured heat before tremors at Mount Etna."),
+    })
+    draft = _F2.build_final_draft(
+        PASS11_DRAFT, parsed, treatment, p3_attempts=trace, salvaged=True)
+    assert draft.salvaged is True
+    _F2._validate_selected_final_draft(draft, treatment=treatment)
 
 
 def test_SALVAGE_adopts_an_invented_character_rather_than_refusing():

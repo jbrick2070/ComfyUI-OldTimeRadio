@@ -3216,6 +3216,22 @@ def build_final_draft(
         parsed=authoritative,
         proof_map=proof_map,
         p3_attempts=p3_attempts,
+        # THE PARSE CONDITIONS MUST TRAVEL WITH THE DRAFT, and forgetting them
+        # here cost a live leg on 2026-08-24. The field and the accessor were
+        # added and `build_final_draft` was taught to USE them -- but the
+        # constructor was never given them, so every draft carried
+        # `salvaged=False` and an EMPTY alias map. `_validate_final_draft_integrity`
+        # then re-parsed the same raw source under DIFFERENT rules than the
+        # ones that produced it, got a different artifact, and reported
+        # "parsed artifact seal is stale" for a draft nothing had touched.
+        #
+        # WORSE THAN A PLAIN OMISSION: it fired ONLY when a speaker actually
+        # resolved through an alias -- i.e. exactly the episodes the alias work
+        # exists to save -- so the fix broke the case it was written for while
+        # leaving every already-passing episode green.
+        salvaged=bool(salvaged),
+        speaker_aliases=tuple(
+            (name, tuple(values)) for name, values in sorted(aliases.items())),
         hashes=FinalDraftHashes(
             raw_sha256=raw_hash,
             normalized_sha256=normalized_hash,
@@ -4016,6 +4032,10 @@ def run_scifi_news_pro_episode(
         "defects_by_attempt": p3_meta["defects_by_attempt"],
         "structural_retries": p3_meta["structural_retries"],
         "normalizations": list(final_draft.parsed.normalizations),
+        # The resolution receipt is surfaced HERE rather than folded into
+        # `normalizations`, because that field is SEALED and a receipt about
+        # how a label resolved must never decide whether a seal matches.
+        "speaker_resolutions": list(final_draft.parsed.speaker_resolutions),
         "attempt_trace": [_attempt_payload(value) for value in p3_attempts],
         # A SALVAGED EPISODE MUST NEVER READ AS A CLEAN ONE. These three are
         # the receipt that the ladder ran out of honest attempts and the lane
