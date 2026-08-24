@@ -6106,3 +6106,68 @@ EXPECTED result, not a regression signal.
 - status: FIXED, live-verified. Bible promotion: PENDING (candidate rule: a
   watcher's timeout must be reported as a fact about the WATCHER, never
   worded as a fact about the work).
+
+## PBUG-20260824-01 -- `scifi_news_pro` refuses to produce an episode 60% of the time
+- surfaced: the overnight writer-gate loop, 2026-08-24 00:36-08:22 PDT
+  (`scripts/otr_overnight_loop.sh`, log `tmp/otr_overnight_loop.log`), 10 full
+  passes of `scripts/otr_writer_bank_gate.py --acts 1` over all five banks on
+  the canonical workflow, profile `otr_w45_still_flat`.
+- symptom: **`scifi_news_pro` FAILED 6 of 10 passes (60%)**. Every other bank
+  failed ZERO times across the same ten passes, except the single shakespeare
+  failure root-caused and fixed the same night (PBUG-20260802-02 third
+  manifestation). `scifi_news_pro` is also the ONE dispatched lane -- the only
+  `LANE_SPECS` entry in `nodes/_otr_lane_specs.py`; every other bank runs
+  Section I inline.
+- **TWO DISTINCT CLASSES, separated by failure DURATION** against the verified
+  pass order in `run_scifi_news_pro_episode` (`_pass_treatment` :3607 ->
+  `_pass_news_read` :3621 -> `_pass_script` :3636):
+  * **CLASS A -- script/markup pass, ~4 min to fail, 3 confirmed.**
+    `UNKNOWN_SPEAKER` + `SKELETON_BREAK`: the model emits speakers absent from
+    the locked cast (`DR. LEE`, `THOR`, `LUCAS`, `DR. RAPHAEL ZUFFERERY`,
+    `Dr. Schmidt`) and structure the skeleton forbids (character line before
+    SCENE 1 / after the last scene; announcer intro missing). **The sharpest
+    clue in the whole record: `UNKNOWN_SPEAKER: **ANNOUNCER` -- markdown bold
+    leaking into the speaker token, so a speaker the parser SHOULD accept is
+    rejected purely for formatting.** That is a transport/normalization gap,
+    not a story problem, and it is the cheapest thing here to test.
+  * **CLASS B -- news_read pass, ~1.5-2.9 min to fail, 1 fully captured.**
+    `NewsProTreatmentError` from `_pass_news_read`
+    (`nodes/_otr_scifi_news_pro.py:1802`) after 2 attempts: *"the closing read
+    is a FACTUAL report and it names invented characters (Laura Goodkind).
+    Report only what the source says, using the source's own names."* The
+    validator (`_make_news_read_validator`, :1748-1755) is CORRECT -- a factual
+    news close must not cite the drama's fictional cast. The weakness is the
+    prompt shape: `_pass_news_read` builds `FICTIONAL CAST NAMES (never use
+    these in the factual read): ...`, i.e. it shows a small model the exact
+    tokens it must not emit.
+- root cause: NOT established. Two mechanisms, one lane, and they are not
+  obviously one fault. **Do not file them as one before proving it** -- the last
+  time two `scifi_news_pro`-adjacent symptoms were filed as "one fault, two
+  doors" (PBUG-20260802-02's original entry) that framing was wrong and had to
+  be corrected the same day.
+- **EVIDENCE LOST, and the harness gap that caused it (FIXED here).** Passes 7
+  and 8 failed with the bare label `WRITER` and no captured reason; their
+  durations (2.2 and 1.5 min) match Class B's profile, but that is INFERENCE,
+  not evidence. Cause: `tmp/_bankgate_<bank>.log` is OVERWRITTEN by every pass,
+  so a failure's reason survives only until the next pass touches that bank.
+  `scripts/otr_overnight_loop.sh` now archives every leg log to
+  `tmp/legs/passNNN/` after each pass, so a 60%-failure lane is diagnosable
+  from ONE loop instead of another overnight re-run.
+- fix: **NOT FIXED.** Recorded as the go-forward's NEXT item on operator
+  instruction ("we need to help fix scifi_news_pro"). Class A's markdown-leak
+  half is the recommended first swing: it is mechanical, cheap to test, and
+  needs no story-quality judgement.
+- verify idea (automatable, no render): feed the markup parser a speaker token
+  wrapped in markdown emphasis (`**ANNOUNCER`, `*ANNOUNCER*`, `__ANNOUNCER__`)
+  and assert it resolves to the same cast member as the bare token -- or, if
+  refusal is deliberate, that the refusal names the formatting as the reason
+  rather than reporting the speaker as unknown.
+- **NOT story-quality work.** This lane REFUSES TO PRODUCE AN EPISODE 60% of the
+  time -- squarely inside the 2026-08-04 directive's "any structural or ledger
+  fault" carve-out. The goal is a valid ledger, never better prose.
+- bible-worthy: yes for the Class A normalization half -- "a parser that
+  rejects a VALID token because the model wrapped it in markdown" is a reusable
+  defect class with a cheap, portable verify. Promoted as 12.132.
+- confidence: HIGH on the measurement (10 live headless passes, logged);
+  HIGH on both class mechanisms (real captured errors); NONE on root cause.
+- status: OPEN -- next go-forward item.
