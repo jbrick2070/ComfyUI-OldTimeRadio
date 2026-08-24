@@ -1557,3 +1557,57 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
   the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
   move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
   `OTR_CastLock` freeze cascade (`wan_ti2v`).
+
+## THE REGISTRY AND COMFYUI-MANAGER ARE TWO DIFFERENT SYSTEMS (measured 2026-08-23)
+
+Written because a publishing plan was drafted on the belief that shipping a file
+would make registry.comfy.org list our nodes, with "34 exact OTR_* node IDs" as
+its input. Every number in that sentence was wrong, and the mechanism does not
+exist. **Measure before publishing -- a version string is burned permanently.**
+
+**1. THE PACK IS FINE. `GET https://api.comfy.org/nodes/comfyui-old-time-radio`
+returns `status: NodeStatusActive`, `latest_version: 2.0.0-alpha.6`, 13
+downloads.** Not pending, not flagged. The install path works.
+
+**2. THE PER-NODE PANEL IS DEAD FOR EVERYONE, NOT FOR US.**
+`GET /nodes/<id>/comfy-nodes` returned **HTTP 404 for every pack sampled** --
+`comfyui-old-time-radio`, `comfyui-kjnodes`, `rgthree-comfy`,
+`comfyui-dramabox`. kjnodes and rgthree are among the most-installed packs in
+the ecosystem. **An empty node panel is the universal state**, so it can never
+be an acceptance test, and no file we ship changes it. This re-confirms
+CLAUDE.md section 7A from the other direction.
+
+**3. COMFYUI-MANAGER IS A SEPARATE DATABASE AND WE ARE NOT IN IT.** Manager
+keeps `custom-node-list.json` and `extension-node-map.json` (**4,189 repos
+mapped**, keyed by repo URL -> node id list) inside its OWN repo. **OTR appears
+in NEITHER (0 matches in both).** That -- not the Registry -- is why
+missing-node auto-suggestion does not offer OTR. Getting in is an EXTERNAL act
+(a PR to ltdrdata's repo), not something a publish accomplishes.
+
+**4. THE ONE REAL DEFECT ON OUR SIDE: our node ids were not statically
+readable.** `__init__.py` sets `NODE_CLASS_MAPPINGS = {}` and fills it at import
+time from `_NODE_MODULES` plus a merged `_otr_class_registry` table, through 14
+try/except guards. **An AST scanner keyed on `NODE_CLASS_MAPPINGS` extracts ZERO
+ids.** Any external extractor sees nothing. Fixed by generating a literal
+root-level `node_list.json` (ships -- no `.comfyignore` pattern catches it) and
+pinning it with `tests/test_node_list_manifest.py`, which includes a VACUITY
+FLOOR so an empty-vs-empty comparison cannot pass.
+
+**5. THE COUNT WAS WRONG THREE WAYS, AND THAT IS THE REAL LESSON.**
+* A comment in `__init__.py` said **34** -- pre-lean-mean, retired nodes. It was
+  quoted back as fact in the plan. Comment now removed.
+* `/object_info` shows **29** `OTR_*` ids -- but **4 belong to a DIFFERENT pack**
+  (`ComfyUI-OTR-UpstreamStoryLab`, per each node's `python_module`), and are not
+  ours to declare.
+* This pack declares and loads exactly **25**.
+`/object_info` plus each node's `python_module` is the authority on who owns an
+id. A grep for `OTR_` is not -- it crosses pack boundaries.
+
+**WHAT IS STILL UNPROVEN, STATED HONESTLY:** whether ANY consumer reads
+`node_list.json`. The convention's real-world use (comfyui-impact-pack, the
+canonical example) is a rename/alias hint map -- `{"Old Name": "renamed to X"}`
+-- not a node index. The file is cheap, correct, drift-guarded and ships with
+the next version bump anyway, so it costs nothing; but **it was not published as
+a fix, because the acceptance test it was meant to satisfy cannot pass for any
+pack.** `pyproject.toml` was deliberately NOT touched: editing it auto-fires a
+publish, and there was no measured reason to spend a version.

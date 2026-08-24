@@ -405,7 +405,8 @@ if _loaded == _total:
     print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
 else:
     print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
-# A first-time user has 34 nodes and no idea the episode graph exists. Registering
+# A first-time user has a menu full of nodes and no idea the episode graph
+# exists. Registering
 # nodes is not the deliverable -- the workflow is. Point at it from the one place
 # they are already looking on first boot.
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "

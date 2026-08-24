@@ -94,13 +94,16 @@ plan authorship stays with the planner window):**
   May) and its orphaned `watcher_overrides.json` gone; the shim's one live
   function moved byte-identically to `scripts/treatment_scanner.py`, the
   address the shim's own docstring had always named.
-* **STILL OWED FROM THIS WINDOW: a live canonical render published to
-  `otr/obs`.** One was launched on `otr_g4_wan_ti2v` and reached the video
-  stage -- writer, master audio and per-beat slices all proven live, VRAM peak
-  13.2 GB -- then the operator said to skip it and move on, so it was stopped
-  selectively (VRAM back to 809 MiB, ports free). The five-bank writer gate
-  (`scripts/otr_writer_bank_gate.py`, all valid banks) was queued and skipped
-  on the same instruction. **Neither is a failure; both are unrun.**
+* **THE LIVE RENDER IS PAID. `otr/obs` went 116 -> 117 on 2026-08-23.**
+  `signal_lost_shadows_of_the_vault_20260823_223635_silent_procgen_blended_captioned_with_credits_final.mp4`,
+  `RESULT SUCCESS`, via `scripts/otr_writer_bank_gate.py --acts 1` on the
+  canonical workflow (profile `otr_w45_still_flat`, bank `media_archive`). The
+  gate then continued to bank `original` on its own. **The all-banks sweep is
+  RUNNING, not unrun** -- read `tmp/_bankgate_<bank>.log` for where it got to,
+  and the obs count for what it published. One caution learned here: the gate
+  launched as a background job reports its PARENT shell exiting while the render
+  child keeps working, so a bare exit code is not the leg's verdict. Read the
+  leg log for `RESULT SUCCESS` and the obs count, per the obs directive.
 * **F is HALF PROVEN, HALF BLOCKED** (unchanged). `otr_g4_wan_ti2v` proven end
   to end; `otr_upscale_ship` blocked on the operator
   (`docs/2026-08-23-item-F-upscale-ship-writer-failure.md`).
@@ -293,6 +296,33 @@ gets exactly ONE change this sprint: its dangling comma (item 3). The keystone
 "compile source speech, do not generate it" (THE ADAPTATION DESIGN) binds the
 VERBATIM lane; `public_domain` is the operator-ruled FUZZY PROSE lane, where
 grounding the generative composer is the correct move, not a contradiction.
+
+**PREMISE CORRECTION 2026-08-23 (re-grounded at HEAD before any code, on the
+operator's "make sure it's not already done or invalid" instruction). THE DEFECT
+IS REAL AND UNFIXED -- `nodes/_otr_compose_exchange.py` still has ZERO
+references to `source_text` / `full_text` / `source_meta` / `excerpt` /
+`canonical_body` / `source_window`, so the pack's CARRY-THEM instruction is
+still bound to an absent document. BUT LEG (a)'s COORDINATE SYSTEM IS ALREADY
+BUILT, and the text below describing it as work to do is stale:**
+* `nodes/_otr_source_document.py` EXISTS and carries `SourceSpan` with half-open
+  Unicode `start_char`/`end_char` offsets plus a `canonical_body`.
+* `nodes/_otr_public_domain_sources.py` already separates the UNCAPPED
+  `normalize_public_domain_body` from `_project_to_payload_window(body,
+  max_chars=12000)` -- the exact refactor r3 asked for -- and exposes
+  `source_document_from_text` / `build_source_document`.
+* The document ALREADY REACHES THE WRITER: `OTR_LedgerScriptWriter.py:3718`
+  does `resolved.get("source_document")` -- but uses `_sd.canonical_body` ONLY
+  to derive a sound world for the style contract. The composer is never passed
+  any of it.
+* Provenance sidecars went from 1 to 95 on disk, so the hash-discipline
+  paragraph below is also measuring a corpus that has moved.
+**So what remains is the SELECTOR plus the CONSUMER wiring, not the coordinate
+system.** The item is much cheaper than it reads. It is also a PROMPT change,
+which is the one thing standing ruling 2a says to prove on an artifact first,
+and it sits next to the operator's "story quality is done" directive -- the
+fidelity reading (a Wells adaptation inventing "Arkham, Massachusetts" is a
+correctness fault on a fidelity lane) is why it is still listed as open rather
+than struck.
 
 Three legs, ALL required -- the panel killed the raw-injection shape:
 
