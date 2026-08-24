@@ -1272,7 +1272,7 @@ and real dialogue sharing one row ("The monitor flatlines. Someone should call
 the desk."). The per-sentence lever catches them and costs precision elsewhere;
 a calibration example for the MIXED row is the cheaper thing to try first.
 
-### OPEN -- FOUR UNWIRED SYMBOLS, found 2026-08-23 by a zero-reference sweep
+### OPEN -- FIVE UNWIRED SYMBOLS, found 2026-08-23 by a zero-reference sweep
 
 A dead-symbol scan over `nodes/` (module-level defs whose name appears exactly
 ONCE in the whole repo -- its own definition) returned 13 candidates. Nine are
@@ -1299,6 +1299,15 @@ changes scripts, and the next section's own rule is "prove it on an artifact
 before touching it". This is the artifact-hunt made much cheaper: the thing to
 look for is a P0 payload sitting exactly at 6 facts / 4 entities.
 
+**2b. `_otr_determinism.seed_all_rngs` -- and this one names its own
+consequence.** Its docstring: *"Used by the legacy audio nodes to make their
+forwards reproducible (I-2): legacy audio seeds nothing today, so a render-twice
+diverges. Seeding here ... is what the R0a operator bit-identity baseline (step
+f) locks in."* **Nothing calls it.** So the function written to make a re-render
+bit-identical is not in the path, and the divergence it describes is the current
+behaviour. Found on the second sweep, after the bake-off retirement removed the
+references that had been hiding it.
+
 **3. `_otr_scifi_news_pro._validate_scene_envelope`** -- a fail-closed validator
 that raises `NewsProScriptError("final_draft", ...)` when an envelope is not an
 exact `SceneEnvelope` or does not match its advisory scene plan. Never called.
@@ -1313,7 +1322,32 @@ failure mode is a late OOM, an unapplied VRAM sentinel is worth a look rather
 than a delete. (`story_orchestrator` also imported `force_vram_offload` without
 using it; that import was swept.)
 
-**The nine ordinary dead helpers were left alone too**, deliberately: the sweep
+**THE ORDINARY DEAD HELPERS ARE GONE NOW (408 lines, suite unchanged at 12096 --
+not one test touched, which is what "dead" should mean).** Removed:
+`story_orchestrator._generate_character_profile` / `_generate_announcer_profile`
+/ `_name_similarity` / `_flush_vram_keep_llm`, `_otr_captions._cli` /
+`color_for`, `_otr_cast_env.cast_genre` / `other_name_policy`,
+`_otr_voice_bank.voice_ref_entry`, `stable_audio_theme._load_meta`,
+`slot_matrix.profile_keys_for_all_roles`,
+`cloud_media_canonical._not_built_yet`, `_otr_episode_budget._self_test`, and
+`_otr_ledger_clean.probe_context_visibility` / `_grade_probe`.
+
+**DELIBERATELY KEPT, and each for a stated reason:** the four schema classes
+(`AdapterDescriptor`, `VideoProfileRow`, `ImageEngineConfig`,
+`ImageLedgerSection`) are declared contract shapes and the campaign protects
+protocol fixtures; `otr_silent_composite.freezedetect_silent` documents its own
+non-wiring ("NOT wired into the default assemble path -- it adds a full decode
+pass"), so it is an opt-in diagnostic rather than a miss; `content_oracle`'s
+manifest wrappers sit over a live oracle; and **every symbol in
+`_otr_scifi_p0_contract` stays untouched because that module is the subject of
+the finding above** -- deleting `p0_contract_instruction` would destroy the
+evidence for it. Note for whoever picks that up: FIVE of that module's symbols
+are unreferenced (`compact_p0_repair_context` at 105 lines,
+`p0_source_char_budget`, `p0_contract_instruction`, `p0_contract_receipt`,
+`P0RepairTrimReceipt`), against just two live exports. Most of that file is
+unreachable.
+
+The earlier note said the nine ordinary helpers were left alone, deliberately: the sweep
 that found them also found the four above, and a pass that has just learned its
 scan surfaces unwired guards is the wrong pass to bulk-delete on. They are
 recorded here so the next window does not re-derive them --

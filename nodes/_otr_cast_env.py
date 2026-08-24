@@ -28,14 +28,6 @@ def name_mode() -> str:
     return v if v in _VALID_MODES else "pool"
 
 
-def cast_genre() -> str:
-    """OTR_CAST_GENRE: 'auto' (full pool, byte-identical default) or a flavor
-    subset name. Validation against the actual genre table lives in
-    cast_pools.names_for_genre, which falls back to the full pool for an
-    unknown genre -- so this just normalizes the string."""
-    return (os.environ.get("OTR_CAST_GENRE", "auto") or "auto").strip().lower()
-
-
 def cross_gender_rate() -> float:
     """OTR_NAME_CROSS_GENDER_RATE in [0.0, 1.0].
 
@@ -50,11 +42,3 @@ def cross_gender_rate() -> float:
         return 0.0
     return min(1.0, max(0.0, v))
 
-
-def other_name_policy() -> str:
-    """OTR_OTHER_NAME_POLICY: for 'other'-gender slots, draw repair/fill names
-    from the 'unisex' bucket (default) or from 'all' names. 'other' slots are
-    never flagged as mismatches; this only steers an explicit name choice."""
-    v = (os.environ.get("OTR_OTHER_NAME_POLICY", "unisex")
-         or "unisex").strip().lower()
-    return v if v in _VALID_OTHER_POLICY else "unisex"

@@ -220,14 +220,6 @@ def distribute_time(n: int, start: float, end: float,
     return out
 
 
-def color_for(char_id: str, role: str, style: dict, order_map: dict) -> str:
-    """Return the \\c bbggrr color for a speaker's NAME label."""
-    if role == "announcer":
-        return style.get("announcer_color", _ANNOUNCER_COLOR_BBGGRR)
-    idx = order_map.setdefault(char_id, len(order_map))
-    return _NAME_COLORS_BBGGRR[idx % len(_NAME_COLORS_BBGGRR)]
-
-
 # -- Hero title style -------------------------------------------------------
 # A SECOND style line, deliberately additive: the SDH bytes above are unchanged.
 #
@@ -543,22 +535,3 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         report.append("  LINT: clean (all cues within CPS + duration rules)")
     return (str(out_path), "\n".join(report))
 
-
-def _cli(argv: list[str]) -> int:
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-    if not argv:
-        print("usage: otr_captions.py <ledger.json> [style] [margin_v]")
-        return 2
-    ledger = argv[0]
-    style = argv[1] if len(argv) > 1 else "sdh_standard"
-    mv = int(argv[2]) if len(argv) > 2 else None
-    out, report = build_ass_from_ledger(ledger, style=style, margin_v=mv)
-    print(report)
-    if out:
-        print("\n=== ASS FILE ===")
-        print(Path(out).read_text(encoding="utf-8"))
-        return 0
-    return 1

@@ -124,13 +124,6 @@ def validate_partner_result(raw: dict) -> PartnerResult:
     )
 
 
-def _not_built_yet(modality: str, sprint: str):
-    raise NotImplementedError(
-        f"canonicalize_{modality} lands in {sprint} (S0 ships the contract "
-        f"only) -- see docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md"
-    )
-
-
 def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
     """S0/C8 (cloud-audio 2026-07-03). Conform a provider audio result to the
     local lane's contract so a cloud WAV drops into OTR_EpisodeAssembler exactly

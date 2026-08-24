@@ -42,20 +42,6 @@ _LEGACY_FIRST_FALLBACK = ("musicgen", "stable_audio_music")
 _CUE_SLOTS = ("opening", "closing")
 
 
-def _load_meta(*sources) -> dict:
-    """Best-effort ledger meta from the first parseable source. Empty on miss."""
-    from . import _otr_ledger_consumers as _OTRLC
-
-    for src in sources:
-        if not (src or "").strip():
-            continue
-        try:
-            return _OTRLC.load_ledger(src).get("meta") or {}
-        except Exception:  # noqa: BLE001 -- prompts fall back to neutral defaults
-            continue
-    return {}
-
-
 class StableAudioTheme:
     """Generic theme-music node. Registered as ``OTR_StableAudioTheme``.
 

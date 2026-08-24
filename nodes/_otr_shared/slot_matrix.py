@@ -74,11 +74,6 @@ def build_all_role_profile(base_profile: dict, role_engines: Optional[dict] = No
     return profile
 
 
-def profile_keys_for_all_roles() -> list:
-    """The three dotted profile keys the applier will patch (one per video slot)."""
-    return [f"role_overrides.{ROLE_TO_PROFILE_KEY[r]}" for r in ALL_ROLES]
-
-
 def eligible_engines_for_role(role: str) -> list:
     """Capability-eligible engine names for ``role`` (the C2 registry override).
     Lazy registry import so this module stays cold-import clean.

@@ -59,27 +59,6 @@ from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 # with no live consumer remaining; no replacement import needed.)
 
 
-def _flush_vram_keep_llm():
-    """Lightweight VRAM flush: clears KV cache fragments and fragmentation
-    but keeps the LLM model weights on GPU.
-
-    Use between LLM phases within a single write_script() run where the same
-    model will be called again immediately. Avoids the ~13s-per-reload penalty
-    caused by force_vram_offload() evicting the model from VRAM.
-
-    force_vram_offload() is still used at node BOUNDARIES where we need to
-    hand off GPU to a different model (e.g., LLM - Bark TTS).
-    """
-    import gc
-    try:
-        import torch
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except Exception:
-        gc.collect()
-
-
 # Lazy heavy imports (Section 8) - torch, numpy, transformers inside methods/classes only
 
 log = logging.getLogger("OTR")
@@ -848,106 +827,6 @@ def _pick_accent(rng) -> tuple:
             return label, code
     # Fallback (rounding errors)
     return "neutral", "en"
-
-
-def _generate_character_profile(character_idx: int, episode_seed: str = "",
-                                gender_hint: str = None) -> dict:
-    """Generate a full procedural character profile - deterministic per episode.
-
-    Returns a dict with: name, gender, age, demeanor, accent, voice_preset, notes.
-    All traits are seeded so reruns of the same episode produce identical casts.
-
-    Voice preset selection:
-      1. Pick gender, age, demeanor, accent procedurally
-      2. Filter voice profiles by gender AND accent language code
-      3. Score by trait overlap (age, demeanor)
-      4. Best match wins (ties broken by RNG shuffle)
-
-    Safety rails (downstream):
-      - ASCII sanitizer strips non-ASCII from all text before Bark
-      - Temperature capped at 0.55 for international presets
-      - All dialogue is always written in pure English
-    """
-    rng = random.Random(f"{episode_seed}_char_{character_idx}")
-
-    # Generate name
-    first = rng.choice(_FIRST_NAMES)
-    last = rng.choice(_LAST_NAMES)
-    name = f"{first} {last}".upper()
-
-    # Generate traits - honor gender_hint from script's [VOICE: NAME, gender, ...] tag
-    # if provided. This is BUG-004 fix: previously the procedural cast picked random
-    # genders, producing male voices on female characters and vice versa.
-    if gender_hint and gender_hint.lower() in ("male", "female"):
-        gender = gender_hint.lower()
-    else:
-        gender = rng.choice(_GENDERS)
-    age = rng.choice(_AGE_BRACKETS)
-    demeanor = rng.choice(_DEMEANORS)
-    accent_label, lang_code = _pick_accent(rng)
-
-    # Filter voice profiles by gender AND language code
-    candidates = [vp for vp in _VOICE_PROFILES
-                  if vp[1] == gender and vp[2] == lang_code]
-
-    # If no match for this gender+accent combo, fall back to same-gender English
-    if not candidates:
-        candidates = [vp for vp in _VOICE_PROFILES
-                      if vp[1] == gender and vp[2] == "en"]
-        accent_label = "neutral"
-        lang_code = "en"
-
-    # Safety net - should never happen
-    if not candidates:
-        candidates = [vp for vp in _VOICE_PROFILES if vp[2] == "en"]
-
-    # Score each candidate by how many tags overlap with character traits
-    char_tags = {age, demeanor}
-    scored = []
-    for preset, _, _, tags in candidates:
-        overlap = len(char_tags & tags)
-        scored.append((overlap, preset, tags))
-
-    # Sort by overlap (best match first), break ties with RNG shuffle
-    rng.shuffle(scored)
-    scored.sort(key=lambda x: x[0], reverse=True)
-    best_preset = scored[0][1]
-
-    # Build descriptive notes
-    accent_note = f", {accent_label} accent" if accent_label != "neutral" else ""
-    notes = f"{gender.capitalize()}, {demeanor}, {age}{accent_note}"
-
-    return {
-        "name": name,
-        "gender": gender,
-        "age": age,
-        "demeanor": demeanor,
-        "accent": accent_label,
-        "voice_preset": best_preset,
-        "notes": notes,
-    }
-
-
-def _generate_announcer_profile(episode_seed: str = "", gender_hint: str | None = None) -> dict:
-    """Pick a Announcer voice from the balanced pool, seeded per episode.
-    If gender_hint is provided (from script [VOICE: ANNOUNCER, gender, ...] tag),
-    filter the pool to matching gender first; fall back to full pool if none match.
-    ANNOUNCER always uses neutral English - no accent."""
-    rng = random.Random(f"{episode_seed}_announcer")
-    pool = _ANNOUNCER_PRESETS
-    if gender_hint:
-        gh = gender_hint.lower()
-        # Use startswith to avoid "male" matching inside "female"
-        filtered = [(p, n) for p, n in _ANNOUNCER_PRESETS
-                    if n.lower().startswith(gh)]
-        if filtered:
-            pool = filtered
-    preset, notes = rng.choice(pool)
-    return {
-        "name": "ANNOUNCER",
-        "voice_preset": preset,
-        "notes": notes,
-    }
 
 
 # -----------------------------------------------------------------------------
@@ -1987,29 +1866,6 @@ def _normalize_dialogue_names(text):
 # (NEMEO_SIRIKIT instead of NEMO SIRIKIT). This pure-Python pass reads
 # the canonical cast from config/episode_cast.txt and fuzzy-matches
 # every CHARACTER: line against the roster. No LLM call, no VRAM cost.
-
-def _name_similarity(a: str, b: str) -> float:
-    """Simple character-level similarity ratio (0.0 to 1.0).
-    Uses longest common subsequence length / max length.
-    Good enough for catching NEMEO->NEMO without pulling in difflib."""
-    a, b = a.upper(), b.upper()
-    if a == b:
-        return 1.0
-    if not a or not b:
-        return 0.0
-    # Levenshtein-style: count matching chars in order
-    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
-    matches = 0
-    last_idx = -1
-    for ch in shorter:
-        for j in range(last_idx + 1, len(longer)):
-            if longer[j] == ch:
-                matches += 1
-                last_idx = j
-                break
-    return matches / max(len(a), len(b))
-
-
 
 # Register the LLM unloader with the VRAM Power Wash system so that
 # force_vram_offload() at node entry points also evicts the LLM.

@@ -677,21 +677,6 @@ def default_char_engine(
     return ""
 
 
-def voice_ref_entry(
-    voice_ref_id: str, engine: str,
-    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-) -> Optional[VoiceBankEntry]:
-    """The bank entry for (voice_ref_id, engine), or None. Pure + fail-soft."""
-    if not voice_ref_id or not engine:
-        return None
-    try:
-        entries = bank if bank is not None else load_voice_bank()[0]
-    except Exception:  # noqa: BLE001
-        return None
-    return next(
-        (e for e in entries
-         if e.voice_ref_id == voice_ref_id and e.engine == engine), None
-    )
 def bark_preset_gender(preset: str) -> str:
     """Gender of a bark ``v2/en_speaker_*`` preset, read from
     ``config/cast_pools.VOICE_PROFILES`` (the single source of truth -- never a
