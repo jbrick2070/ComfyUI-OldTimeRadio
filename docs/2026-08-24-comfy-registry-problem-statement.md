@@ -10,8 +10,9 @@ run, not an inference.** Publisher `fluxus`, node id `comfyui-old-time-radio`.
 Two separate things were being called "my nodes don't register," and only one of
 them is real: **`2.0.0-alpha.7` has been sitting at `NodeVersionStatusPending`
 since 2026-08-24T05:48:29Z, so `latest_version` still resolves to `alpha.6`** —
-and separately, **the registry has no per-node listing for ANY pack**, so an
-empty node panel is not evidence of anything wrong with this pack.
+and separately, **node extraction has never succeeded for this pack** -- the
+registry's import-based extractor (see 3b) has recorded zero nodes for every
+version, while healthy packs show thousands.
 
 ## 2. What is PROVEN WORKING (so it stops being re-investigated)
 
@@ -98,7 +99,8 @@ curl -s https://api.comfy.org/nodes/comfyui-old-time-radio
 curl -s https://api.comfy.org/nodes/comfyui-old-time-radio/versions
 curl -s https://api.comfy.org/nodes/comfyui-old-time-radio/versions/2.0.0-alpha.7
 curl -sI https://cdn.comfy.org/fluxus/comfyui-old-time-radio/2.0.0-alpha.7/node.zip
-curl -s -o /dev/null -w "%{http_code}\n" https://api.comfy.org/nodes/comfyui-kjnodes/comfy-nodes
+curl -s "https://api.comfy.org/comfy-nodes?node_id=comfyui-old-time-radio"   # ours: total=0
+curl -s "https://api.comfy.org/comfy-nodes?node_id=rgthree-comfy" | head -c 200  # control: populated
 ```
 
 ---
@@ -109,8 +111,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://api.comfy.org/nodes/comfyui-kjn
 now ships (generated from the loader's declaration table, pinned by
 `tests/test_node_list_manifest.py` with a vacuity floor). The idea of replacing
 dynamic registration with a literal static `NODE_CLASS_MAPPINGS` **cannot**
-achieve registry node visibility — there is no schema field for the result to
-land in — so it must not be attempted as a fix for this.
+achieve registry node visibility — extraction is import-based (a real ComfyUI
+boot reading `/object_info`), and dynamic packs like rgthree extract fine — so
+it must not be attempted as a fix for this.
 
 The only remaining publisher-side lever on any `supported_*` field is
 `requires-comfyui` in `[tool.comfy]` (as `ComfyUI-AnimateDiff-Evolved` declares),
