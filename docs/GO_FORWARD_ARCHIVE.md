@@ -838,3 +838,394 @@ Verbatim, as it stood:
 > real proof is a render. Renders HAVE RESUMED (2026-08-05), so the
 > `production-qualified` leg is runnable whenever a render window is free; until
 > it runs, claim only `code-complete + suite-green`.
+
+
+---
+
+# ARCHIVED 2026-08-24 -- pruned from the go-forward plan
+
+Moved on the operator's instruction to make the plan *"accurate, truly go forward items"*. Verbatim, nothing edited.
+**This file is not read to resume.**
+
+
+## Ghost ship intent -- superseded 2026-08-23
+
+### GHOST SHIP INTENT -- SUPERSEDED 2026-08-23 (the section it replaces is in the archive)
+
+The 2026-08-22 SHIP INTENT block said *"the peers are RETAINED until he says
+otherwise. Do not delete `animatediff15_v3_video`, the cadence peers or the v2
+peer on the strength of this line."* **He said otherwise on 2026-08-23** --
+*"delete any animatediff that are not haunted"* -- and they are gone
+(`187380d0`). The block is archived rather than edited because a superseded
+instruction that still reads as current is the most dangerous kind of stale
+note: a future window would have followed it and re-created the six lanes.
+
+**What survives from it:** `v3_haunted` + Prompt v2.1 IS the ship
+configuration. That was an intent then and it is the state now.
+
+
+
+## PBUG-20260824-01 original problem statement (Class A now fixed)
+
+### >>> THE ORIGINAL PROBLEM STATEMENT (2026-08-24) -- superseded in part, kept for its evidence <<<
+
+**Operator: *"lets mark scifi news writer error as our next plan ... we need to
+help fix scifi_news_pro."*** This is the top of the queue.
+
+**THE MEASUREMENT, and it is the reason this is now a priority rather than a
+shrug.** The overnight writer-gate loop (2026-08-24 00:36-08:22 PDT, 10 full
+passes over all five banks, `scripts/otr_overnight_loop.sh`, log at
+`tmp/otr_overnight_loop.log`) put every bank through the canonical workflow ten
+times. Four banks were near-perfect. `scifi_news_pro` **FAILED 6 of 10 passes**
+-- 60%. Every other bank's failures over the same window: zero, except the
+single shakespeare failure that was root-caused and fixed the same night
+(PBUG-20260802-02 third manifestation). This lane is the outlier by an enormous
+margin, and it is the ONE lane that is DISPATCHED rather than inline
+(`nodes/_otr_lane_specs.py` -- `scifi_news_pro_multipass` is the only entry in
+LANE_SPECS; everything else runs Section I).
+
+**PASS ORDER, verified in `run_scifi_news_pro_episode`:** `_pass_treatment`
+(:3607) -> `_pass_news_read` (:3621) -> `_pass_script` (:3636). **The failure
+DURATION identifies which pass died**, which is how the two classes below were
+separated without needing every leg log:
+
+**CLASS A -- the script/markup pass (~4 min to fail, 3 confirmed occurrences).**
+`UNKNOWN_SPEAKER` plus `SKELETON_BREAK`. The model emits speakers that are not
+in the locked cast and structure the skeleton forbids. Real captures:
+* `UNKNOWN_SPEAKER: DR. LEE` x3 + `SKELETON_BREAK: character line (DR. LEE)
+  after the last scene`
+* `UNKNOWN_SPEAKER: **ANNOUNCER` -- **markdown bold leaking into the speaker
+  token** -- plus `SKELETON_BREAK: character line (**ANNOUNCER) before SCENE 1`
+  and `SKELETON_BREAK: announcer intro missing`, and
+  `UNKNOWN_SPEAKER: DR. RAPHAEL ZUFFERERY`
+* `UNKNOWN_SPEAKER: THOR`, `UNKNOWN_SPEAKER: LUCAS`, `SKELETON_BREAK` on both
+  plus `Dr. Schmidt` after the last scene
+The `**ANNOUNCER` capture is the most actionable single clue in this entry: a
+speaker the parser SHOULD recognize, rejected only because the model wrapped it
+in markdown. That is a transport/normalization gap, not a story problem, and it
+is cheap to test.
+
+**CLASS B -- the news_read pass (~1.5-2.9 min to fail, 1 fully captured).**
+`NewsProTreatmentError` from `_pass_news_read` (`nodes/_otr_scifi_news_pro.py:1802`),
+after **2 attempts**: *"the closing read is a FACTUAL report and it names
+invented characters (Laura Goodkind). Report only what the source says, using
+the source's own names."* The validator
+(`_make_news_read_validator`, :1748-1755) is CORRECT -- a factual news close
+must not cite the drama's fictional cast -- but the pass is being asked to
+write a factual read while the fictional cast names sit in its own prompt
+(`_pass_news_read` builds `FICTIONAL CAST NAMES (never use these in the factual
+read): ...`). Telling a small model "never say X" while showing it X is a known
+weak instruction shape. Worth checking whether the ladder's 2 attempts is the
+real budget and whether the repair prompt actually names the offending token.
+
+**WHAT IS NOT KNOWN, stated honestly:** passes 7 and 8 failed with the bare
+label `WRITER` and no captured reason. Their durations (2.2 and 1.5 min) put
+them in Class B's profile, but that is INFERENCE, not evidence. The reason is
+lost because **`tmp/_bankgate_<bank>.log` is overwritten by every pass** -- a
+real harness gap this entry surfaces as a side finding: the overnight loop
+destroys the evidence for every failure except the most recent one per bank.
+Anyone taking this item should fix that FIRST (append, or stamp the pass number
+into the filename), or they will be re-running the loop to recover data that
+was already collected once.
+
+**SCOPE QUESTION FOR WHOEVER TAKES IT -- decide before coding.** Two classes,
+two mechanisms, one lane. They are NOT obviously one fix, and the last time two
+`scifi_news_pro`-adjacent symptoms were filed as "one fault, two doors"
+(PBUG-20260802-02's original entry) that framing was wrong and had to be
+corrected the same day. Treat A and B as separate until proven otherwise.
+
+**DO NOT let this become story-quality work.** The operator's 2026-08-04
+directive stands: scripts are ACCEPTED as they are. This item is about a lane
+that REFUSES TO PRODUCE AN EPISODE 60% of the time -- a structural/renderability
+defect, explicitly inside the "any structural or ledger fault" carve-out. The
+fix is to make the lane produce a valid ledger, not to make its prose better.
+
+
+**THE CLOSED ITEMS MOVED OUT ON 2026-08-23.** Ghost Prompt V2, item A (Ghost
+Signal), A-ORIGINAL, B, C and E's closed half were receipts of SHIPPED work
+sitting inside a section headed OPEN -- exactly what the 2026-08-16 self-audit
+flagged and did not dare fix blind. They are VERBATIM in
+`docs/GO_FORWARD_ARCHIVE.md`, which is **not read to resume**. What follows is
+what is actually open, plus every ruling those items carried, because the
+rulings are the half that still binds.
+
+**RULINGS LIFTED OUT OF THE ARCHIVED ITEMS -- STILL IN FORCE:**
+
+* **THE GHOST SIGNAL LOOK IS ACCEPTED. DO NOT CHASE IT.** The motion reads fast
+  (12.5 fps of AnimateDiff held to 25). Operator, watching the published
+  episode: *"i was expecting experimental vj"* and *"its perfect"*. Not a defect.
+* **NO VRAM CLAIM ON THE GHOST LANE.** Admission stays unenforced and the lane
+  may OOM. A single 5872 MiB / 100% reading was observed and is NOT a qualified
+  cost row.
+* **A REDUCTION COMES BACK A COMPLETE THOUGHT; AN AUTHORED LINE COMES BACK
+  BYTE-IDENTICAL.** `_still_word_fit_card` takes whole comma clauses before any
+  word cut. Scoped to REDUCTIONS on purpose: a line that ends on "the" because
+  the AUTHOR wrote it that way is the author's, and THE LAW forbids rewriting a
+  story for style. Both halves are pinned. The rule lives once, in
+  `nodes/_otr_shared/text_tails.py`.
+* **GREP THE CODE BEFORE RE-PLANNING A CARRIED ITEM.** Half of item B was
+  already fixed before the window that "opened" it looked -- a refusing engine
+  had recorded `reason="model_refusal"` skip evidence and the completeness gate
+  already tolerated exactly that reason. The decision the item asked for had
+  been made, in favour of DEGRADE.
+* **G3.7:** `_portrait_free_roles_from_policy` is INERT for a lane with an EMPTY
+  `still_plan` -- it looks for a portrait row saying "never". A no-still lane is
+  covered by the stronger `accepts_still = False` gate at the image dispatcher.
+  Adding a portrait/never row to light it up would be a declaration the lane
+  cannot honour.
+* **AND ONE HONEST LINE KEPT ON THE RECORD:** Ghost Signal shipped with its
+  independent finished-diff review seat UNFILLED -- the Agent tool was disabled
+  and the substituted Codex lane thrashed and was killed. The live leg is
+  stronger evidence and caught the real blocker, but it is not a review, and the
+  plan said so rather than implying coverage.
+
+**QUEUE STATE, updated 2026-08-24 by the OVERNIGHT coder window (state only;
+plan authorship stays with the planner window):**
+* **SHAKESPEARE IS FIXED AND PROVEN LIVE (`8ca3f13a`).** PBUG-20260802-02's
+  third manifestation -- a locked cast member (MARIA) served zero dialogue
+  under a tight beat budget, refused by the freeze gate. Root cause:
+  `_otr_outline._phase_check` validates cast membership one-directionally
+  (invented = used - locked) and never checks starvation. Fixed with
+  `nodes/_otr_cast_coverage_repair.py`, a repair pass in the writer's own tail
+  BEFORE the freeze cascade -- the gate stays refuse-only per the standing
+  "gates refuse, producers repair" convention. 18 new tests; suite
+  **12053 / 120 skipped / 1 xfailed**, zero regressions. Bible **12.131**.
+  **Live proof: shakespeare PASSED in both of the last two full overnight
+  passes** (different random scene draws each time).
+* **THE OVERNIGHT LOOP RAN 10 FULL PASSES** (00:36-08:22 PDT,
+  `scripts/otr_overnight_loop.sh`, log `tmp/otr_overnight_loop.log`), five banks
+  per pass, and published **43 episodes to `otr/obs` (121 -> 164)**. Stopped on
+  operator instruction after pass 10 with a success in hand; pass 11's
+  media_archive leg was interrupted mid-flight and correctly reported itself as
+  INTERRUPTED rather than as a node exception.
+* **THAT LOOP IS WHAT PRODUCED THE NEW TOP ITEM.** `scifi_news_pro` failed
+  **6 of 10 passes (60%)** while every other bank failed zero. Recorded as
+  **PBUG-20260824-01** (`452132d0`) with both failure classes and their real
+  captured errors; Class A's markdown-leak half promoted as Bible **12.132**.
+  See the NEXT ITEM block at the top of this file.
+* **A HARNESS GAP WAS FIXED IN PASSING (`f84906c8`).** `tmp/_bankgate_<bank>.log`
+  was overwritten every pass, which is why two of the six `scifi_news_pro`
+  failure reasons are lost. The loop now archives leg logs to
+  `tmp/legs/passNNN/`, so the next diagnosis needs ONE loop, not another night.
+* **REGISTRY (2026-08-24, no code change):** node extraction is import-based and
+  runs in Comfy-Org's own Cloud Build; our pack loads 25/25 nodes under a
+  faithful local reproduction of that container, so the empty node panel is NOT
+  ours. Their automatic backfill scheduler is provisioned `paused = true` with a
+  leap-day cron, so it does not self-resolve. Problem statement ready to send at
+  `docs/2026-08-24-comfy-registry-problem-statement.md`; `2.0.0-alpha.7` was
+  published and sits at `NodeVersionStatusPending` (their queue, not a failure).
+
+**PRIOR QUEUE STATE, 2026-08-23 by the DAYLIGHT coder window:**
+* **THE LEAN-MEAN CAMPAIGN IS EFFECTIVELY COMPLETE.** Orders 1-6 closed
+  overnight, 7 cancelled by ruling. This window closed **8** (the shared
+  ffprobe boundary + eleven callers, `00ac7df8` / `8dd9f2cf`), **9** (the
+  writer split, `8182b38c` / `d99c1adc` -- 1,927 lines out, 7,418 -> 5,490,
+  byte-identical with a sha256 per block), and **11** (the `scripts/` owner
+  table, `e541db1d`). Truth table:
+  `docs/2026-08-23-lean-mean-progress.md`.
+* **ORDER 10 REMAINS HELD and a coder should not unhold it.** Workflow-atomic,
+  and a blanket variant regeneration still reverts the operator's hand-edited
+  `ghost_signal_v3` ship-candidate settings. **Order 12** stays blocked on
+  `otr_cloud_lanes` ratification.
+* **A LIVE BUG THE SEAM FOUND (`0acdc993`).** `_run_writer_tail` read
+  `_style_roll` -- a local of `run()`, a SIBLING method -- and called
+  `random.Random` in a module that never imported `random`. Both on the
+  dynamic-style FLOOR FALLBACK branch, so a failed style reflection raised
+  NameError instead of degrading to a floor style. It survived because the
+  invariant was tested with `co_freevars == ()`, which **cannot fail** on a
+  sibling's local (that compiles to LOAD_GLOBAL). The replacement walks the
+  bytecode for global loads the module does not define, with a negative-control
+  test. NOT filed as a PBUG: the proof is a disassembly, not a live artifact.
+* **OPERATOR RULINGS 2026-08-23, executed (`cc36c64b`).** *"Rip it out"* --
+  `otr_hazard.py` gone. *"Soak op delete, we'll make a new soak op"* --
+  `soak_operator.py` (a 304-line legacy shim since BUG-LOCAL-002 gutted it in
+  May) and its orphaned `watcher_overrides.json` gone; the shim's one live
+  function moved byte-identically to `scripts/treatment_scanner.py`, the
+  address the shim's own docstring had always named.
+* **THE LIVE RENDER IS PAID. `otr/obs` went 116 -> 117 on 2026-08-23.**
+  `signal_lost_shadows_of_the_vault_20260823_223635_silent_procgen_blended_captioned_with_credits_final.mp4`,
+  `RESULT SUCCESS`, via `scripts/otr_writer_bank_gate.py --acts 1` on the
+  canonical workflow (profile `otr_w45_still_flat`, bank `media_archive`). The
+  gate then continued to bank `original` on its own. **The all-banks sweep is
+  RUNNING, not unrun** -- read `tmp/_bankgate_<bank>.log` for where it got to,
+  and the obs count for what it published. One caution learned here: the gate
+  launched as a background job reports its PARENT shell exiting while the render
+  child keeps working, so a bare exit code is not the leg's verdict. Read the
+  leg log for `RESULT SUCCESS` and the obs count, per the obs directive.
+* **F is HALF PROVEN, HALF BLOCKED** (unchanged). `otr_g4_wan_ti2v` proven end
+  to end; `otr_upscale_ship` blocked on the operator
+  (`docs/2026-08-23-item-F-upscale-ship-writer-failure.md`).
+* **D is PARKED by the operator** (unchanged). Evidence banked at
+  `docs/2026-08-22-negative-channel-declaration/driver_anchor.md`.
+B, C and E's doc half closed 2026-08-22.
+
+
+**STILL THE OPERATOR'S CALL, from the archived Ghost Prompt V2 item:**
+(SUPERSEDED 2026-08-23: that profile retired with the non-haunted lanes, so this
+call is now about `otr_ghost_signal_v3_haunted.json` if he still wants it. The
+measurement below stands either way.)
+`config/profiles/otr_ghost_signal_v3_haunted.json` pins `technical_model` to
+Mistral-Nemo. B2 pinned gemma PER-LEG via `--set` rather than editing the
+shipped profile, because promoting it would change SCRIPTS on this lane and
+story output is a closed subject. The case for promoting it is measured --
+**gemma-4-12b 8/8 accepted, Mistral-Nemo 4/8** on the real batch prompt -- and
+it is a one-line profile edit whenever he says the word.
+
+**GHOST IS ONE LANE -- DONE 2026-08-23 (`187380d0`).** Operator: *"I def dont
+need 6 shit lanes"* / *"delete any animatediff that are not haunted"*. Six became
+`animatediff15_v3_haunted_video`. The two parent CLASSES survive UNREGISTERED
+because the winner inherits them; only the true leaves (v2, the h3/h5 cadence
+pair) lost code. Five NAMED tombstones in `RETIRED_ENGINE_IDS`, one of which
+carried the lane's published proof. Five profiles and three variant sets went
+with them.
+
+**TWO THINGS FROM THAT CHANGE ARE STILL LIVE:**
+* **THE HAUNTED LANE HAS NO `otr/obs` RECEIPT OF ITS OWN.** The Ghost proof on
+  record (`signal_lost_the_constables_knock_20260822_050116`, 8/8 beats) ran on
+  the BASE lane that just retired. The survivor's evidence is that the operator
+  and Gemini independently preferred its output -- a judgement, not a published
+  episode. **One live leg is the next thing this lane owes**, and it is now the
+  only Ghost lane there is to run.
+* **STILLS ON THE ANIMATEDIFF LANE -- PARKED BY THE OPERATOR, 2026-08-23.**
+  *"Perhaps animatediff was not using stills but maybe it should be"*, then
+  *"not sure if I can accept stills"*, then *"image in we can park"*. The lane
+  declares no stills today and `test_ghost_signal_lane` pins that the image
+  dispatcher mints none for any ghost role; the G3.7 note above explains why the
+  portrait-policy seam is inert for it rather than broken. Whether it SHOULD
+  consume a still is a design question with more than one defensible answer --
+  a full arc when he picks it up, not a knob.
+
+**AND ONE HAZARD LOST ITS SUBJECT.** `build_variants.py --check` read 54 variants
+/ 2 FAILURES all week, both on `otr_ghost_signal_v3` -- the hand-edited ship
+candidate a blanket regeneration would have reverted, which is the stated reason
+order 10 is HELD. That profile retired with its siblings and the check now reads
+**51 variants, 0 failures**. Order 10's other half (widget position is persisted
+production data) is untouched and it stays HELD, but the drift it was waiting on
+is gone.
+
+**D. The guides/dialect/recipe refactor (operator's architecture, staged).**
+*"the PROMPT is the LANGUAGE from the video lane; the DIALECT is the
+instructions for prompting the image lane -- double vs single quotes, neg prompt
+vs no neg prompt, temperature, seed, knobs."* Three layers, all existing repo
+vocabulary: **prompt** (lane) / **dialect** (engine phrasing) / **recipe**
+(engine parameters -- the repo already says `recipe`). Today the composer
+PRE-JOINS everything and each engine regexes it back apart; `ideogram4_local`
+already implements a dialect without it being called one. Its own item, its own
+arc -- do NOT bundle it with a small fix. `docs/2026-08-22-golden-rule-any-engine-any-slot/PLAN.md` section 8.
+
+
+**E -- THE ENFORCEMENT HALF, STILL OPEN.** (The closed half, which corrected
+IG2.2 from "SERVES" to "DECLARES", is in the archive.)
+**The enforcement half needs an arc and is DELIBERATELY NOT DONE SOLO.** What
+would close it is a per-KIND declaration -- "every engine serves every request
+KIND its lane asks for" -- and no image engine declares a kind surface today.
+Adding one is a design choice with more than one defensible answer (what the
+kinds are, who owns the role-to-kind map, what a partial declaration does to the
+menu), so by the 2026-08-17 routing rule it wants a full arc, and it belongs
+with item D rather than bolted onto a gate doc.
+
+
+**F. Regression sweep over shipped video profiles** (carried): only
+`otr_w45_wan_ti2v` is proven; `otr_g4_wan_ti2v` and `otr_upscale_ship` remain
+unexercised.
+
+
+
+## Coding-sprint items 1-5 -- all closed or removed by ruling
+
+### 1. -- REMOVED. PUBLIC_DOMAIN IS LEFT AS IS (operator, 2026-08-23)
+
+*"no more chasing public domain, leave it as is, remove any public domain
+updates from go forward."* Nothing about this lane is go-forward work. The
+ruling that settles it lives in `docs/OTR_STANDING_RULINGS.md`; the retired
+campaign text is in `docs/GO_FORWARD_ARCHIVE.md`. Do not re-add a row here.
+
+### 2 and 3 -- BOTH CLOSED, re-verified against HEAD 2026-08-23
+
+Neither was done by this window; both had simply gone stale in the file. Full
+text of the two rows is in `docs/GO_FORWARD_ARCHIVE.md`.
+
+* **2. The non-commercial notice -- DONE (2026-08-07).** The row said *"Nothing
+  renders it. `otr_credits_roll.py:516` reads only `credits_source_line`."* False
+  at HEAD: `otr_credits_roll.py:554` reads `meta["noncommercial_notice"]` and
+  appends its own `intercept` entry. It was built to the row's exact acceptance
+  conditions -- a SEPARATE `if` rather than an `elif` (so a malformed legacy
+  ledger missing `credits_source_line` still shows the rights warning), no
+  second prefix (the string already begins "NON-COMMERCIAL SOURCE:"), `.strip()`
+  so a whitespace-only field cannot emit a bare `>>`, and adjacency falling out
+  of the append order. Covered in three test files.
+* **3. The test-ordering pollution -- NO LONGER REPRODUCES.** Running
+  `tests/test_public_domain_sources.py` and `tests/test_public_domain_interpreter.py`
+  ADJACENTLY -- the exact condition the row describes -- gives 28 passed. The
+  module-identity breakage it diagnosed (a double `importlib.reload` replacing
+  class objects the other file had already imported) is not observable at HEAD.
+
+### 4. THE SPOKEN-CITATION CODA IS CLOSED -- re-verified against HEAD 2026-08-23
+
+The operator asked whether this was already fixed. It was, and this row had gone
+stale: **all four owed items are done**, and the last fragment was closed in the
+same check.
+
+* **B4, extract the coda helper -- DONE.** It is
+  `OTR_LedgerScriptWriter._compose_and_stamp_announcer_close`, a MODULE-LEVEL
+  function (the row's old line range, `:5463-5588`, no longer exists). **And the
+  TRAP was honoured:** `news_meta` stays in the CALLER -- it is defined at
+  `:5393` inside `run()` and read below there, exactly as the warning required,
+  and the extracted function's own docstring records why.
+* **B6, bump `CURRENT_SCHEMA_VERSION` -- DONE.** It reads `l4-2026-08-07`, and
+  `scripts/audit_spoken_citations.py` requires `spoken_coda_source` on anything
+  newer while holding the COMPLETE pre-l4 lineage as legacy. The comment there
+  even guards the boundary string against being "helpfully" updated, which would
+  invert the audit over 1,587 historical ledgers.
+* **Writer-level routing tests -- DONE.** `tests/test_announcer_close_routing_matrix.py`
+  (10 tests) walks both fidelity banks x {owned fact, silent}, asserts the coda
+  is PRESENT rather than merely URL-free, carries it through to a real
+  `Dialogue:` cue, and uses `media_archive` as the control exactly as specified.
+* **Bug Bible coverage -- DONE.** `BUG_BIBLE.yaml:5249` carries the rule: "the
+  edited function has no callers on the production path".
+
+**AND THE PARKED WORKTREE ITEM IS CLOSED TOO (2026-08-23).** The deletion that
+another session staged and stood down was never merged -- that worktree is clean
+at an old commit -- so it was re-verified from scratch and done here. Both
+symbols were confirmed dead at HEAD: `finalize_news_coda_surface` had ZERO
+callers, and `news_coda_spoken_reduction` was gated on two compose flags,
+`news_coda_fact_reduced` and `news_coda_fact_deferred_to_credits`, that are READ
+in that one place and SET NOWHERE in the tree. The branch could never fire; the
+else-arm popped a key nothing had put there. Removed, with a tombstone comment
+naming the reason -- the same shape as the `news_coda_fallback` receipt above
+it, which tested for a string "no composer has ever emitted".
+
+### 5. THE COMMERCIAL-CLEAN JOIN IS CLOSED (done 2026-08-23; full row in the archive)
+
+Built to the row's own shape: the JOIN is stamped, the 40 bank rows were NOT
+touched, resolution is one profile by `(role, engine)` through
+`EngineProfileResolver.profile_for`, and enforcement stays OFF (the `gated`
+count still feeds one non-blocking I-8 warning).
+
+**Where it landed.** `nodes/cast_lock.py` gained
+`_delivered_commercial_clean(entry, ref)` -- the clip's licence AND the model's,
+joined -- and it is now the ONLY reader of a bank row's flag in that file. All
+five `gated` counters, both `clean=` report strings and the `_stamp` funnel go
+through it. The two report sites compute the value ONCE into a local that feeds
+both the counter and the string, so the report can no longer disagree with the
+ledger printed beside it.
+
+**The row's premise held, with two corrections.** The engine flag is at
+`eng_indextts2.py:159`, not `:55` (line drift). And the authority for the model's
+licence is not the adapter class attribute but the ENGINE-PROFILE layer, which
+already knew: `char_indextts2_v1` carries
+`commercial_clean: false  # Bilibili license -- non-commercial use gated`. The
+cast layer had been contradicting the profile layer about the same audio.
+
+**A second suspected site was checked and is NOT broken.**
+`allowed_for_release` (`_otr_voice_node_common.py:1389`) derives from
+`effective_license_state(profile)` -- the profile layer -- so the release
+manifest was already truthful, and the release gate is armed nowhere but in its
+own tests. No change made there.
+
+**One deliberate design call:** the join DOWNGRADES only on a KNOWN-gated model.
+An engine with no curated profile leaves the clip flag standing, so a partial
+install behaves exactly as it did before. Guarded by an AST ratchet plus a
+negative control in `tests/test_cast_lock_commercial_clean_join.py` (10 tests):
+nothing outside the join helper may read a bank row's clip licence again.
+
