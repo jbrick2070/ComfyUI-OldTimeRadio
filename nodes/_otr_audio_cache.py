@@ -231,9 +231,6 @@ class FileAudioCache:
     def _sidecar_path(self, key: str) -> str:
         return os.path.join(self.cache_dir, f"{key}.json")
 
-    def _audio_path(self, key: str) -> str:
-        return os.path.join(self.cache_dir, f"{key}.npy")
-
     # -- read --
     def has(self, request) -> bool:
         return os.path.exists(self._sidecar_path(self.key_for(request)))

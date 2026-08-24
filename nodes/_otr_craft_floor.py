@@ -138,11 +138,6 @@ class ParsedSlot:
     text: str
     raw: str = ""
 
-    def as_tuple(self):
-        """Return (slot_id, speaker, text) -- the parse_slot_lines shape."""
-        return (self.slot_id, self.speaker, self.text)
-
-
 @dataclass
 class SlotFailure:
     """One Tier-A failure, machine-readable.

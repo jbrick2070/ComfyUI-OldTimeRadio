@@ -520,16 +520,6 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _stable_index(key, n: int) -> int:
-        """A deterministic index in [0, n) from a string key -- stable across
-        runs regardless of PYTHONHASHSEED (Python's built-in hash() is salted).
-        """
-        if n <= 0:
-            return 0
-        digest = hashlib.sha1(str(key).encode("utf-8")).hexdigest()
-        return int(digest, 16) % n
-
-    @staticmethod
     def _resolve_character_voices_fail_soft(cast, lines, voice_bank="default") -> list:
         """STEP 3 (NO-FALLBACK rip, operator 2026-07-03): guarantee every
         speaker_role='character' line reaches node-81 with a resolvable voice, or
