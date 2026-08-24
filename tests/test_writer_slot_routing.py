@@ -126,7 +126,9 @@ def test_writer_has_slot_tag_comments_at_every_llm_call_site():
     """Defense in depth: every top-level LLM call site inside
     OTR_LedgerScriptWriter.run carries a `# LLM slot: ...` tag near
     the call, naming the slot that fires."""
-    src = WRITER_PATH.read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import family_source
+
+    src = family_source()
     # Per the continuation plan, "# LLM slot: creative" or
     # "# LLM slot: technical" must appear at every LLM call site.
     creative_hits = src.count("# LLM slot: creative")
@@ -450,7 +452,9 @@ def test_writer_stamps_slot_transitions_meta():
     """Writer must stamp `meta["slot_transitions"]` (int) +
     `meta["slot_calls_by_slot"]` (dict) so a forensic audit can read
     the scheduler trace without re-running the writer."""
-    src = WRITER_PATH.read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import family_source
+
+    src = family_source()
     assert 'meta["slot_transitions"]' in src
     assert 'meta["slot_calls_by_slot"]' in src
     assert 'meta["gen_params_by_phase"]' in src

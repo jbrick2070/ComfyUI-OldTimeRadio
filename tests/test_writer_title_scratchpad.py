@@ -249,7 +249,9 @@ def test_excerpt_set_short_script_no_crash():
 def test_composition_header_uses_tbd_literal():
     """The writer builds the per-line composer's canon header with the
     literal `EPISODE_TITLE: TBD`, so no provisional title is spoken."""
-    src = WRITER_PATH.read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import family_source
+
+    src = family_source()
     assert "EPISODE_TITLE: TBD" in src, (
         "composition header must carry the EPISODE_TITLE: TBD literal"
     )
@@ -260,7 +262,9 @@ def test_post_hoc_title_substitution_is_removed():
     min-length guard, and the J.6 section are all gone. Needles are
     assembled from fragments so this test file's own strings do not
     self-match if it is ever scanned alongside the writer."""
-    src = WRITER_PATH.read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import family_source
+
+    src = family_source()
     sub_helper_def = "def _substitute" + "_title_in_text"
     assert sub_helper_def not in src, (
         "post-hoc verbatim title-substitution helper must be removed"
@@ -294,25 +298,13 @@ def test_title_call_passes_premise_for_grounding():
     the extracted `_run_writer_tail` (tail extraction, architecture doc
     sections 11/13) -- the pin follows it there.
     """
-    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+    # order 9 slice 2: the tail moved to nodes/_otr_writer_tail.py, carried onto
+    # the node by WriterTailMixin. It is still ONE method with the same name and
+    # the same body -- so the pin looks it up by name across the writer family
+    # rather than by the class that happens to declare it this month.
+    from tests.fixtures.writer_family import find_function
 
-    tail_fn = None
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.ClassDef)
-            and node.name == "OTR_LedgerScriptWriter"
-        ):
-            for sub in node.body:
-                if (
-                    isinstance(sub, ast.FunctionDef)
-                    and sub.name == "_run_writer_tail"
-                ):
-                    tail_fn = sub
-                    break
-    assert tail_fn is not None, (
-        "writer must have OTR_LedgerScriptWriter._run_writer_tail "
-        "(the S1a tail extraction owns J.5)"
-    )
+    tail_fn = find_function("_run_writer_tail")
 
     title_calls = [
         node for node in ast.walk(tail_fn)

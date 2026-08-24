@@ -17,6 +17,16 @@ EXEMPT_FILES: frozenset[str] = frozenset({
     "_otr_creative_prompt_router.py",
     "_otr_json.py",
     "OTR_LedgerScriptWriter.py",
+    # The writer's tail, split out of the file above in lean-mean order 9
+    # slice 2 (2026-08-23) byte-identically. It is EXEMPT FOR THE SAME REASON
+    # THE WRITER IS, and the reason is the sweep's 8-line search window: inside
+    # `_generate_title_from_script` the call is `generate_fn(...)`, a callable
+    # the helper was HANDED, and the slot is declared where the slot is chosen
+    # -- at the caller ("# LLM slot: creative -- title regen is a narrative
+    # pass"), hundreds of lines away. Carrying the exemption keeps this sweep
+    # covering exactly what it covered before the move; widening it to files it
+    # never checked would be a scope change riding on a relocation.
+    "_otr_writer_tail.py",
     "vram_context_test.py",
 })
 

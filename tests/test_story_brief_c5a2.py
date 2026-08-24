@@ -59,7 +59,10 @@ _WRITER_PATH = _REPO_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
 
 @pytest.fixture(scope="module")
 def writer_ast() -> ast.AST:
-    return ast.parse(_WRITER_PATH.read_text(encoding="utf-8"))
+    # order 9 slice 2: `_run_writer_tail` lives in nodes/_otr_writer_tail.py
+    # now, byte-identically. Parse whichever family member defines it.
+    from tests.fixtures.writer_family import tree_of
+    return tree_of("_run_writer_tail")
 
 
 @pytest.fixture(scope="module")

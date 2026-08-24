@@ -44,25 +44,29 @@ def _meta_assignments(meta_key: str) -> list[ast.AST]:
     Matches both Subscript(value=Name("meta"), slice=Constant(meta_key))
     and the older Index-wrapped variant. Returns the Assign nodes.
     """
-    tree = ast.parse(WRITER_SRC.read_text(encoding="utf-8"))
+    from tests.fixtures.writer_family import trees
+
+    # order 9 split the writer across three files; a meta stamp may live in
+    # any of them, so walk them all.
     out: list[ast.AST] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if not isinstance(target, ast.Subscript):
+    for _path, tree in trees():
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
                 continue
-            if not (
-                isinstance(target.value, ast.Name)
-                and target.value.id == "meta"
-            ):
-                continue
-            slice_node = target.slice
-            if (
-                isinstance(slice_node, ast.Constant)
-                and slice_node.value == meta_key
-            ):
-                out.append(node)
+            for target in node.targets:
+                if not isinstance(target, ast.Subscript):
+                    continue
+                if not (
+                    isinstance(target.value, ast.Name)
+                    and target.value.id == "meta"
+                ):
+                    continue
+                slice_node = target.slice
+                if (
+                    isinstance(slice_node, ast.Constant)
+                    and slice_node.value == meta_key
+                ):
+                    out.append(node)
     return out
 
 
@@ -123,7 +127,11 @@ def test_meta_stamping_lands_after_story_brief_reflection_pass() -> None:
 
     Source-line ordering check, not runtime ordering.
     """
-    src = WRITER_SRC.read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import source_defining
+
+    # The ordering law is WITHIN the function that owns these stamps, so read
+    # the one family member that defines the tail -- never a concatenation.
+    src = source_defining("_run_writer_tail")
     lines = src.splitlines()
 
     def _find_line_idx(needle: str) -> int:

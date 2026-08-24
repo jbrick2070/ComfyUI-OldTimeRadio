@@ -850,12 +850,11 @@ def test_the_clean_stage_is_wired_into_the_one_shared_producer_boundary():
     Before ``run_ledger_cleanup``, because that pass re-stamps text metrics:
     a row rewritten here has to be measured after the rewrite, not before.
     """
-    from pathlib import Path
+    from tests.fixtures.writer_family import family_source
 
-    source = (
-        Path(__file__).resolve().parents[1]
-        / "nodes" / "OTR_LedgerScriptWriter.py"
-    ).read_text(encoding="utf-8")
+    # `_run_writer_tail` moved to nodes/_otr_writer_tail.py in lean-mean
+    # order 9 slice 2, byte-identically; the pin follows the family.
+    source = family_source()
 
     tail = source.split("def _run_writer_tail", 1)
     assert len(tail) == 2, "the shared writer tail has been renamed"

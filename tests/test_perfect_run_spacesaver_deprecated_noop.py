@@ -85,7 +85,8 @@ def test_no_production_consumer_remains():
         # of the writer file byte-identically, which is a relocation of the
         # declaration side, not a new consumer. What this guard is really
         # hunting is a THIRD module quietly acting on the flag.
-        if p.name in ("OTR_LedgerScriptWriter.py", "_otr_writer_inputs.py"):
+        if p.name in ("OTR_LedgerScriptWriter.py", "_otr_writer_inputs.py",
+                      "_otr_writer_tail.py"):
             continue
         src = p.read_text(encoding="utf-8", errors="replace")
         for pat in STAMP_PATTERNS:

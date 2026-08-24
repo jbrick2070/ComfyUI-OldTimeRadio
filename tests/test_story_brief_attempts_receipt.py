@@ -90,9 +90,8 @@ def test_hook_never_breaks_the_pass_on_a_bad_value(monkeypatch):
 def test_the_writer_still_reads_the_key_this_sets():
     """Both halves of the contract, so a rename cannot silently desync them --
     the exact failure mode BUG-12.86 describes."""
-    from pathlib import Path
-    writer = (Path(__file__).resolve().parents[1] / "nodes"
-              / "OTR_LedgerScriptWriter.py").read_text(encoding="utf-8")
+    from tests.fixtures.writer_family import family_source
+    writer = family_source()
     assert 'get("story_brief_attempts"' in writer, (
         "the writer no longer reads story_brief_attempts -- either it was "
         "renamed on one side only, or the receipt lost its source"

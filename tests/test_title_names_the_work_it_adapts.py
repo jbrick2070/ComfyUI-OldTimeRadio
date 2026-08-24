@@ -206,7 +206,9 @@ def test_unknown_lane_yields_no_anchor():
 # --------------------------------------------------------------------------
 
 def _tail_method() -> ast.FunctionDef:
-    tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
+    from tests.fixtures.writer_family import tree_of
+    # order 9 slice 2: the tail moved out of the writer file byte-identically.
+    tree = tree_of("_run_writer_tail")
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == "_run_writer_tail":
             return node

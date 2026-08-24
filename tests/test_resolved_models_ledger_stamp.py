@@ -20,12 +20,12 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-SRC = (Path(__file__).resolve().parents[1] / "nodes"
-       / "OTR_LedgerScriptWriter.py")
+from tests.fixtures.writer_family import WRITER_FAMILY, family_source
 
 
 def _writer_source() -> str:
-    return SRC.read_text(encoding="utf-8")
+    """The whole writer family -- order 9 split it across three files."""
+    return family_source()
 
 
 def test_writer_stamps_resolved_models_into_meta():
@@ -71,8 +71,13 @@ def test_provenance_can_never_fail_a_render():
 
 
 def test_the_writer_module_still_parses():
-    """Cheap AST gate -- this edit sits deep in a 6600-line file."""
-    ast.parse(_writer_source())
+    """Cheap AST gate -- this edit sits deep in a very large file.
+
+    Parsed per FILE, never on the concatenation: three modules glued together
+    put a `from __future__` import in the middle, which is a SyntaxError.
+    """
+    for path in WRITER_FAMILY:
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
 def test_backend_still_exposes_the_snapshot_helper():

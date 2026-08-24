@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import OTR_LedgerScriptWriter as writer_module  # noqa: E402
 from nodes import _otr_writer_inputs as writer_inputs_module  # noqa: E402
+from nodes import _otr_writer_tail as writer_tail_module  # noqa: E402
 from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     WriterTailContext,
@@ -231,8 +232,9 @@ def _functions_of(module):
                 yield label, function
 
 
-@pytest.mark.parametrize("module", [writer_module, writer_inputs_module],
-                         ids=["writer", "writer_inputs"])
+@pytest.mark.parametrize(
+    "module", [writer_module, writer_inputs_module, writer_tail_module],
+    ids=["writer", "writer_inputs", "writer_tail"])
 def test_no_function_loads_a_global_its_module_does_not_define(module):
     """A borrowed local is a NameError with a delay on it."""
     offenders = {}
@@ -434,7 +436,10 @@ def test_run_story_spine_true_runs_once(tmp_path, monkeypatch):
 
 
 def _spy_title_regen(monkeypatch):
-    import nodes.OTR_LedgerScriptWriter as writer_module
+    # The tail resolves `_generate_title_from_script` in ITS OWN module
+    # globals, and since order 9 slice 2 that module is _otr_writer_tail --
+    # patching the writer would spy on a name nothing calls.
+    import nodes._otr_writer_tail as writer_module
 
     calls = []
 

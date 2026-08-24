@@ -18,11 +18,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WRITER_SOURCE = REPO_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
 
 
+def _writer_family_source() -> str:
+    """order 9 split the writer across three files; these are text pins."""
+    from tests.fixtures.writer_family import family_source
+    return family_source()
+
+
 def test_j5_title_pass_stamps_episode_title():
     """J.5 stamps meta.episode_title from the resolved final_title
     (user-typed, else LLM regen from the finished script, else
     outline.title fallback)."""
-    src = WRITER_SOURCE.read_text(encoding="utf-8")
+    src = _writer_family_source()
     assert "J.5. Post-composition title regen" in src
     assert 'meta["episode_title"] = final_title' in src
 
@@ -30,7 +36,7 @@ def test_j5_title_pass_stamps_episode_title():
 def test_no_widget_only_clobber_returns():
     """The retired K.5.7 widget-only re-stamp must not come back -- it
     clobbered J.5's generated title with the empty widget value."""
-    src = WRITER_SOURCE.read_text(encoding="utf-8")
+    src = _writer_family_source()
     assert "K.5.7:" not in src, "K.5.7 widget-only title clobber resurrected"
     assert '_widget_title = (episode_title or' not in src, (
         "widget-only episode_title re-stamp resurrected"
@@ -40,7 +46,7 @@ def test_no_widget_only_clobber_returns():
 def test_j5_stamp_lives_inside_run_before_return_assembly():
     """J.5's stamp must be on the writer's hot path, before the
     L. return-assembly block."""
-    src = WRITER_SOURCE.read_text(encoding="utf-8")
+    src = _writer_family_source()
     run_idx = src.find("def run(")
     stamp_idx = src.find('meta["episode_title"] = final_title')
     l_idx = src.find("# --- L. Assemble return values")
