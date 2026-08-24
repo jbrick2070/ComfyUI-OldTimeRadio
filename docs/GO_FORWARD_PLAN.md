@@ -13,125 +13,18 @@ go forward plans. Only."*
 
 ## THE CURRENT STEP, 2026-08-22 -- READ THIS FIRST
 
-### ALSO DONE AND PUSHED 2026-08-22 -- THE VIDEO-LANE SESSION (Opus coder window)
+### GHOST SHIP INTENT -- SUPERSEDED 2026-08-23 (the section it replaces is in the archive)
 
-Everything below is committed, pushed, and lockstep-verified. Suite 12,084
-passed / 0 failed at the last full run. **A new window does not need to rebuild
-any of it -- read this to know what already exists.**
-
-**1. `animatediff15_v3_haunted_video` -- v3 + the removable domain adapter.**
-The clean v3 lane plus AnimateDiff v3's optional `v3_sd15_adapter.ckpt` (97 MB)
-on the MODEL path via stock `LoraLoaderModelOnly`. Two design questions were
-settled by READING THE ARTIFACT, not its documentation: it carries 256 tensors,
-all UNet attention, ZERO text-encoder -- hence model-only and CLIP untouched --
-and its keys are the legacy diffusers attn-processor spelling that ComfyUI maps
-natively, so no conversion and no custom loader. **The operator and Gemini
-independently preferred its output.** Apache-2.0 end to end: this is the first
-Ghost configuration that could be published.
-
-**2. Two CADENCE peers, `animatediff15_h3_video` / `animatediff15_h5_video`.**
-The hold factor is now a class attribute every call site reads through `self`.
-It was three module functions hard-wired to hold-2, so a peer declaring hold-5
-would have rendered hold-2 under its own receipt -- **G1.3 for the third time in
-one day.** Golden's cadence is pinned across 16 frame counts against an
-INDEPENDENTLY RECOMPUTED reference, not by calling the new code with hold=2.
-
-**3. `OTR_WRITER_SEED` -- the reason four comparisons failed today.**
-`gen_kwargs` carried `do_sample=True` with no seed, so every leg wrote a
-different episode and every impression formed while comparing two legs turned
-out to be about the SCRIPT. Opt-in, off in production, keyed on the PROMPT not a
-call counter (a counter makes seeds order-dependent, so one conditional pass
-shifts everything after it and the reproduction drifts silently).
-
-**4. The cast-seed guard.** The operator asked whether GULLIVER REEVES in every
-episode was random. It was not: four bake-off legs ran with a leaked
-`OTR_CAST_SEED=42` -- BUG-LOCAL-269 through a different door. The resolver now
-warns LOUD when the seed is set and `OTR_C7` is not, naming the cast it will
-produce, and a test sweeps all 37 launcher scripts. **The launcher now states
-its seed mode in BOTH branches; silence in the production branch is what let
-this ride an entire bake-off.**
-
-**5. A preflight model gate on the canonical runner.** A haunted leg ran the
-script pass, the whole voice pass and part of the video pass before
-`assert_usable` reported the adapter missing -- the weight was on disk but under
-a root the headless model-paths config does not name. The runner now asks the
-running server what it can SEE via `/object_info` before submitting. Same
-failure now costs 5 seconds instead of 428.
-
-**6. Preflight G1.3** -- a per-artifact constant (byte floor, filename, recipe
-receipt) must be a CLASS attribute a sibling can override. Both directions are
-pinned: below its own artifact, and within ~15% of it.
-
-**7. Model-refusal degrade** -- a refusing image model no longer kills the
-episode; the beat records skip evidence and the completeness gate tolerates it.
-
-**LIVE ARTIFACTS -- eight episodes in `otr/obs/` from this session**, including
-the complete cadence ladder on ONE module and ONE style (13 -> 8 -> 5 motion
-windows per beat): `magnifying_the_past` (hold-2), `reel_478_extraterrestrial`
-(hold-3), `feline_fallen_from_the_stars` (hold-5). Hold-5 rendered in 825s
-against hold-2's 1676s.
-
-**MEASURED, so nobody re-litigates it:** the domain adapter does NOT wash out
-colour. Five measurements across two styles, never once below its clean
-counterpart (archival 2.50 vs 2.07; anime 6.19 and 12.88 vs 5.13). Separately,
-the single v2 anime episode measured SATAVG 51.97 against 5-13 for every v3
-episode -- a possible real module trait, still n=1, worth one seeded A/B.
-
-**THREE PROBLEM STATEMENTS written for later pickup:**
-* `docs/2026-08-22-GHOST-CADENCE-PROBLEM-STATEMENT.md` -- long beats fuse
-  THIRTEEN sliding motion windows; motion energy per beat is an uncontrolled
-  function of how long the writer's sentence happened to be.
-* `docs/2026-08-22-PHASE3-TRANSMISSION-STATE-PROBLEM-STATEMENT.md` -- rebuilt
-  around the operator's own idea (drive contamination from the per-line VOICE
-  AROUSAL the repo already computes) rather than `arc_phase`. No LLM, no new
-  ledger field; still needs one declared `VideoRequest` field.
-* `docs/2026-08-22-GHOST-PROMPT-PROBLEM-STATEMENT.md` -- the source the Ghost
-  Prompt V2 plan cites. Its finding 1 (Ghost emits a 21-char cue where the style
-  pack authors 262 chars, and the STILL lane uses the rich tails) is marked
-  WONTFIX for the prompt sprint and remains available afterwards.
-
-### SHIP INTENT -- OPERATOR, 2026-08-22 EVENING (read before touching the Ghost lane)
-
-**`v3_haunted` + Prompt v2.1 IS THE PRESUMPTIVE SHIP CONFIGURATION.** In his
-words: *"i think v3_haunted 2.1 will ship and we may ditch the rest we shall
-see."* Not a verdict -- an intent -- so the peers are RETAINED until he says
+The 2026-08-22 SHIP INTENT block said *"the peers are RETAINED until he says
 otherwise. Do not delete `animatediff15_v3_video`, the cadence peers or the v2
-peer on the strength of this line.
+peer on the strength of this line."* **He said otherwise on 2026-08-23** --
+*"delete any animatediff that are not haunted"* -- and they are gone
+(`187380d0`). The block is archived rather than edited because a superseded
+instruction that still reads as current is the most dangerous kind of stale
+note: a future window would have followed it and re-created the six lanes.
 
-**THE DOMAIN ADAPTER IS WHAT MAKES A STYLE PACK LAND, and it took his eye to
-see it.** He compared two anime episodes -- one looks anime, one does not:
-
-    signal_lost_whiskers_in_the_stacks_20260822_150524      v3_HAUNTED  -> anime
-    signal_lost_turntables_lament_the_last_spin_20260822_185304  v3 clean -> not
-
-Read straight off the per-beat clip filenames. Every arm rendered on 2026-08-22
-except the top-ranked one used the CLEAN engine, because that is what
-`otr_ghost_signal_v3` pins -- which is why a whole day of style comparisons was
-quietly handicapped.
-
-**TWO AXES, AND THEY ARE ORTHOGONAL. Do not conflate them again:**
-* **Subject legibility = the PROMPT.** Proved on an engine-matched same-seed
-  A/B (both clean v3): v1 4/4 recognisable, v2 0/4, v2.1 6/8 with people back.
-* **Style capture = the ADAPTER.** Proved by the two anime episodes above.
-
-**FRAME RATE / SMOOTHNESS IS PARKED, NOT FORGOTTEN (operator, hard).** He asked
-whether the frame rate should drop so it reads smoother and less experimental,
-then answered himself: *"maybe not i dont know noty wortyjh chasng now clos eto
-release ... 2.1 we can chase fream,earets"*. **So do not touch fps, cadence or
-the hold factor before release.** It is a real want for AFTER 2.1, and the
-recipes-are-not-on-the-table directive still governs how it is approached.
-
-**STILL HONESTLY UNANSWERED -- his own question, and nobody should pretend
-otherwise:** which engine is better SYNCHED to the audio and the beats. He said
-plainly he cannot tell, and that clean v3 might synch better if better prompted
-while lacking the anime feel. The two episodes he compared differ in engine AND
-prompts AND script, so nothing isolates it. Answering it properly wants a
-matched pair -- same script, same seeds, haunted vs clean, prompts held
-constant. It has NOT been run.
-
-**The dropdown now says which profile to pick** (`SHIP CANDIDATE -- pick this
-one` vs `clean, NO adapter (weaker style capture)`), because the default being
-non-obvious is exactly what cost a day of confounded comparisons.
+**What survives from it:** `v3_haunted` + Prompt v2.1 IS the ship
+configuration. That was an intent then and it is the state now.
 
 ### OPEN, IN PRIORITY ORDER
 
@@ -224,40 +117,37 @@ story output is a closed subject. The case for promoting it is measured --
 **gemma-4-12b 8/8 accepted, Mistral-Nemo 4/8** on the real batch prompt -- and
 it is a one-line profile edit whenever he says the word.
 
-**GHOST RETIREMENT -- MEASURED, AWAITING THE OPERATOR'S EYE (2026-08-23).**
-Operator: *"Ghost is almost done, we have a v3 haunted plus adapter and prompts
-that I think may be our winning one, and we remove the others"* -- then, asked
-which profiles survive: *"not sure, I'll need to take a look when I get home."*
-**NOTHING WAS TOUCHED.** The measurement is banked here so the decision is cheap
-when he makes it, and so nobody re-derives it:
+**GHOST IS ONE LANE -- DONE 2026-08-23 (`187380d0`).** Operator: *"I def dont
+need 6 shit lanes"* / *"delete any animatediff that are not haunted"*. Six became
+`animatediff15_v3_haunted_video`. The two parent CLASSES survive UNREGISTERED
+because the winner inherits them; only the true leaves (v2, the h3/h5 cadence
+pair) lost code. Five NAMED tombstones in `RETIRED_ENGINE_IDS`, one of which
+carried the lane's published proof. Five profiles and three variant sets went
+with them.
 
-* **SIX Ghost engines exist, and all six are PUBLIC menu entries**
-  (`nodes/_otr_shared/public_engines.py:301-327`): `animatediff15_video`,
-  `_v2_video`, `_v3_video`, `_h3_video`, `_h5_video`, `_v3_haunted_video`.
-  Retiring five means five NAMED tombstones -- the campaign's rule is that a
-  public id is tombstoned, never vanished.
-* **THE WINNER INHERITS FROM TWO OF THE CANDIDATES**, so "remove the others"
-  cannot mean delete their classes:
-  `GhostSignalV3HauntedEngine` <- `GhostSignalV3Engine` <- `GhostSignalEngine`.
-  The retirement is of MENU ENTRIES; `eng_ghost_signal.py` and the V3 class stay
-  as the winner's machinery. Only `eng_ghost_signal_cadence.py` (h3/h5) is a
-  pure leaf and could be deleted outright.
-* **Six profiles**: `otr_ghost_signal{,_h3,_h5,_v2,_v3,_v3_haunted}.json`. This
-  is the half that needs his eye, because the plan still calls
-  **`otr_ghost_signal_v3` the SHIP CANDIDATE with hand-edited settings** and it
-  is the subject of the DEFERRED variant drift (`build_variants.py --check`: 54
-  variants / 2 failures, both on that profile). If `v3_haunted` supersedes it,
-  that deferral dies with it; if not, both stay. **Do not run
-  `build_variants.py` without `--profiles` either way.**
-* Each engine id appears in 23-48 files, nearly all shared platform tables
-  (public engines, capability profiles, engine-contract rosters, slot matrix),
-  so this is a wiring change across those tables rather than five file deletes.
-* **THE ONE THING NOT YET MEASURED:** whether `animatediff15_v3_haunted_video`
-  has its own live `otr/obs` receipt. The published Ghost proof on record
-  (`signal_lost_the_constables_knock_20260822_050116`, 8/8 beats) ran on the
-  BASE `animatediff15_video`. The haunted lane's evidence is that the operator
+**TWO THINGS FROM THAT CHANGE ARE STILL LIVE:**
+* **THE HAUNTED LANE HAS NO `otr/obs` RECEIPT OF ITS OWN.** The Ghost proof on
+  record (`signal_lost_the_constables_knock_20260822_050116`, 8/8 beats) ran on
+  the BASE lane that just retired. The survivor's evidence is that the operator
   and Gemini independently preferred its output -- a judgement, not a published
-  episode. Worth one live leg before its five siblings are retired behind it.
+  episode. **One live leg is the next thing this lane owes**, and it is now the
+  only Ghost lane there is to run.
+* **STILLS ON THE ANIMATEDIFF LANE -- PARKED BY THE OPERATOR, 2026-08-23.**
+  *"Perhaps animatediff was not using stills but maybe it should be"*, then
+  *"not sure if I can accept stills"*, then *"image in we can park"*. The lane
+  declares no stills today and `test_ghost_signal_lane` pins that the image
+  dispatcher mints none for any ghost role; the G3.7 note above explains why the
+  portrait-policy seam is inert for it rather than broken. Whether it SHOULD
+  consume a still is a design question with more than one defensible answer --
+  a full arc when he picks it up, not a knob.
+
+**AND ONE HAZARD LOST ITS SUBJECT.** `build_variants.py --check` read 54 variants
+/ 2 FAILURES all week, both on `otr_ghost_signal_v3` -- the hand-edited ship
+candidate a blanket regeneration would have reverted, which is the stated reason
+order 10 is HELD. That profile retired with its siblings and the check now reads
+**51 variants, 0 failures**. Order 10's other half (widget position is persisted
+production data) is untouched and it stays HELD, but the drift it was waiting on
+is gone.
 
 **D. The guides/dialect/recipe refactor (operator's architecture, staged).**
 *"the PROMPT is the LANGUAGE from the video lane; the DIALECT is the
@@ -302,43 +192,6 @@ be tangled in here:
 
 `CLAUDE.md` is unchanged and remains the highest authority.
 
-## HOW TO READ THIS FILE (lean pass 2026-08-16 evening)
-
-**Start at THE LIVE QUEUE, at the top of this file (2026-08-20).** It is the
-only authority on what is OPEN and in what order; the numbered bodies further
-down are detail you read when you pick an item up, not a second to-do list.
-The older "THE QUEUE, DRIVER-SET 2026-08-17" block below is SUPERSEDED as an
-ordering authority -- it still says "G IS NEXT", and G was closed by its own
-newer body. Keep it for its rulings, not its order.
-
-The file was audited end to end on 2026-08-16 and it had drifted badly from its
-own forward-only rule. What the audit found, so the next reader is not misled:
-
-* **Eleven internal cross-references are already BROKEN** -- they point at
-  headings that no longer exist (`section 0`, `0-BIS`, `0-TER`, `0-QUATER`,
-  `0A`, `WHAT IS ACTUALLY LEFT`, `NEXT CODING QUEUE`, `STORY LAB RECOVERY
-  BASE`, `ON DECK item 5`). If a pointer sends you nowhere, that is why: the
-  target was removed and the pointer was not. Do not go hunting.
-* **The bulk of the remaining length was DONE narrative inline inside OPEN
-  sections** -- receipts, shipped-work paragraphs and superseded framings mixed
-  into live items. **THE ARCHIVE SPLIT THIS DEMANDED IS DONE (2026-08-23):**
-  `docs/GO_FORWARD_ARCHIVE.md` now holds the closed items VERBATIM and is **not
-  read to resume**. It was done the careful way this note asked for -- every
-  ruling those items carried was lifted back into the plan BEFORE the block
-  moved, because roughly a third of these sections are standing operator rulings
-  phrased as "do not re-open", and losing one costs more than the length does.
-  The section headed OPEN went from 235 lines to 117 and now contains only work
-  that is actually open.
-* **Where a heading says something SHIPPED or CLOSED, believe it and move on.**
-  The value in those sections is the ruling or the trap attached to them, never
-  the receipt.
-
-**Two contradictions the audit found are now resolved in favour of the newer
-statement, and both old ones are struck:** the suite receipt (this file now has
-ONE, in BASELINES below), and the Lemmy-vs-render-proofs ordering (THE QUEUE
-below supersedes the 2026-08-13 ruling's ordering half; that ruling's
-non-ordering content still binds).
-
 ## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
 
 **ROW 1 BELOW IS SUPERSEDED by PRIORITY 1 above (operator 2026-08-14).** Its
@@ -359,26 +212,6 @@ queue in the same push.
 | 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
 | 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
 | 5 | **Handoff after executable rows 1-4** | Continue in `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. This row is a pointer, not work that precedes lean-mean. Lean-mean scope and coding order live only in `docs/LEAN_MEAN_CLEANUP.md`. |
-
-### THE STORY LAB IS RETIRED -- two guardrails survive it
-
-The lab ([`jbrick2070/ComfyUI-OTR-UpstreamStoryLab`](https://github.com/jbrick2070/ComfyUI-OTR-UpstreamStoryLab),
-`main` = `7df7c80`) is READ-ONLY reference. **Do not develop in it. Do not ship
-its duplicate workflow, production mirror or bridge into OTR.**
-
-Its two detector files were inventoried and NOT ported, deliberately:
-`spoken_text_policy.py` and `ledger_verifiers.py` are both REGEX detectors --
-the lab's own header says *"a future fuzzy or model-assisted policy requires a
-new policy"* -- so porting them would not solve the generalization problem the
-model judge was built for.
-
-**The canonical `scifi_news` episode topology STANDS and is still the
-contract:** opening music -> ANNOUNCER introduction -> character drama
-with interstitial music only where the script asks -> ANNOUNCER source-backed
-real-news summary -> closing music. Both announcer bookends and the opening and
-closing music are structural reservations independent of `target_words`. The
-opening establishes story, place and time and connects the premise to the news;
-the ending summarizes the real news and distinguishes fact from fiction.
 
 ## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
 
@@ -415,97 +248,6 @@ as its own row, and leave this section as the standing context.
 * The recipes are NOT on the table (standing directive). A video-path sprint
   refines PATHS -- routing, canvas negotiation, admission, extension -- never
   the shipped render recipe.
-
-### 1. Z-Image generic reference conditioning is CLOSED and OUT
-
-The permanent matched harness is `scripts/otr_zimage_reference_ab.py`; its live
-artifacts are under
-`output/otr/episodes/zimage_reference_ab_20260820/stills/{off,on}`. Each arm used
-the same installed NVFP4 UNET, Qwen FP8 encoder, VAE, prompt, negative, seed 7,
-1472x832 canvas and eight-step recipe on a separate fresh server boot. The OFF
-arm was clean. The ON `graph.json` structurally proves the exact dual
-`ReferenceLatent` chain reaches both sampler conditionings; its separate
-`SUCCESS` receipt and fresh output prove that submitted graph executed. The ON
-pixel output reproduced the square grid across the walls and clothing. This is
-a by-eye pixel verdict; no gridscore number is evidence.
-
-**DECISION:** generic `ReferenceLatent` is not an approved semantic path for the
-installed Z-Image Turbo checkpoint and is OUT of production. A node accepting a
-graph proves structural compatibility, not training compatibility. The engine
-now advertises `accepts_reference_image=False`; `engine_version` is `2` so every
-possibly gridded v1 still misses cache. The portrait-derived deterministic seed
-remains enabled, so character scenes stamp `portrait_anchor_mode='seed'`, never
-blank. **Correction from the 2026-08-21 mixed canonical QA:** that seed prevents
-random anchor selection but does not guarantee face/costume identity across
-beats; the open visual-identity item is in THE CURRENT STEP. The diagnostic
-graph remains only so future weights can be retested against the same
-single-variable harness; it is not a production fallback.
-
-### 2-PRE. OPERATOR CALLS ALREADY MADE -- do not re-open, do not re-panel
-
-**BANANA ROUTE: VISUALS ONLY. The spoken script is NOT touched
-(operator ruling 2026-08-06).** Operator, asked whether the filter should reach
-spoken lines as well as image prompts: *"No. Just visuals. I do not want people
-discussing the Cavendish versus the other variety."*
-
-So the substitution happens on the STILL/VIDEO PROMPT and nowhere else. The
-announcer still says "he drew his revolver" over a shot of a man holding a
-banana -- which the problem statement flagged as either the joke or the thing
-that breaks it. It is the joke. **The dialogue ledger, the writer, and the
-adaptation lanes are all out of scope**, which also keeps this clear of the
-closed story-quality directive and of the fidelity lanes' invents-nothing rule
-at the TEXT level.
-
-This closes the second half of section 7 of
-`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (committed `9c686886`).
-
-**THE DEFAULT AND THE REACH ARE ALSO RULED NOW (2026-08-06, `ec9da848`) --
-that question is CLOSED, do not reopen it.** Global default **ON**, with
-`shakespeare` + `public_domain` defaulting **OFF** via the copied `_LEMMY`
-exclusion idiom, plus `OTR_BANANA_INCLUDE_FIDELITY_BANKS` as the operator's
-force-on override. **NO node widget and NO `workflows/otr_canonical.json`
-change.** So `Is this a dagger which I see before me` stays a dagger on the
-fidelity lanes unless the operator flips the override. Two env switches
-(`OTR_BANANA_STILLS`, `OTR_BANANA_VIDEO`), one per funnel. The whole contract is
-`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; SHIPPED -- see
-section 0-QUATER above (`bc8a1bde`).
-
-### 2. Operator calls nobody can make for you
-
-- **ARIEL and PUCK.** The curated supplement ships 10 entries and deliberately omits
-  these two: Folger's stage directions use "he" for both, but neither has a roster fact
-  and both are editorial. They stay on the roll, so the corpus gate asserts 40 of 42.
-  Say the word and they become 42.
-- **Tier floor 2 or 3.** Shipped at 2: it removes every 100% voice pin while 5 of 24
-  (engine x gender x timbre) combos still honour the requested timbre. Floor 3 also
-  removes them but leaves only 2 of 24 honouring timbre -- it buys spread by deleting the
-  dimension. `OTR_CAST_MIN_TIER_POOL=3` makes it a one-leg A/B, and the floor is folded
-  into the cast seed so the two settings can never both claim policy '3'.
-- **`num_characters` is still 2.** Every published adaptation ran 2, so a 7-speaker scene
-  loses five people. Correct gender for two survivors is still a truncated scene. This
-  collides with the count-match invariant at `OTR_LedgerScriptWriter.py:4119` and is its
-  own piece of work, not a tail of this one.
-
-### 3. Standing facts worth not re-deriving
-
-`slot.gender` is NOT a voice field. It feeds the description LLM
-(`_otr_casting.py:777`), the outline prompt (`OTR_LedgerScriptWriter.py:4144`), the
-dialogue cast block (`_otr_line_composer.py:446`) and the image prompt's gender anchor
-(`otr_meta_brief_image_prompt.py:78-90`). **The gender fix therefore changes scripts and
-portraits.** That is a downstream consequence of a correctness fix, not a violation of
-the closed story-quality directive -- exactly as "Malvolio speaks with a woman's voice"
-is a bug while rewriting his dialogue is not.
-
-Do NOT feed pinned genders into `prior_genders`, and do NOT re-call
-`_plan_gender_distribution` with a reduced count. Measured: `(1, ['male'])` returns
-female 400/400, and the shuffle's stream consumption varies with count (getrandbits
-0, 0, 3, 3, 9, 11 for counts 0..5). The shipped design overrides in place and leaves the
-allocator untouched.
-
-**Source-grounding sprint, the one piece left:** chunk 3b-ii -- the supply line
-that feeds grounding into the writer -- is BUILT-BUT-UNWIRED and PARKED under the
-story-quality directive. The delivery mechanism exists and nothing calls it. A
-contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
 
 ## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
 
@@ -940,11 +682,14 @@ Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
 `unknown` rows. That fixes 32 rows without ever second-guessing a parsed
 dramatis personae. **Operator decision, not a driver call.**
 
-### Bench leftovers (relocated)
+### Two carried items with no home of their own
 
-The old conditional bench block is gone (unreachable once item 1 grew, and two
-of its three items already live in NEXT CODING QUEUE item 6). The remaining
-one: **the three works that refuse to vendor** (`ghost_ship` gid 11045,
+(Titled "Bench leftovers" until 2026-08-23 -- a name that now reads as the
+retired VIDEO bench and has nothing to do with it. The block it referred to was
+an older conditional list, gone long before. Renamed rather than moved: both
+items below are real and open.)
+
+The first: **the three works that refuse to vendor** (`ghost_ship` gid 11045,
 `purple_cloud` 11229, `beleaguered_city` 11521 --
 `scripts/otr_vendor_public_domain_library.py:303/341/542` against the parser
 at `:594-686`) **needs one Gutenberg fetch, so it is operator-opt-in only** --
@@ -954,71 +699,6 @@ not schedulable inside an offline sprint.
 multi-session structural change gated on the ownership table
 (`docs/2026-08-03-fidelity-pass-ownership.md`) with four overwrite paths to close
 first, and starting it half-way is worse than not starting it.
-
-## HISTORICAL CODING BACKLOG -- subordinate to the current runway at the top
-
-This 2026-08-04 inventory may still contain real work, but it is not the active
-order. Re-ground any item against HEAD only after the current top runway reaches
-it. The 2026-08-11 review routing at the top governs; no full arc is implied.
-
-1. **Style/identity campaign, items 1-4 (one campaign, ~1 day).** Highest
-   leverage: fixes the credits style line for all six banks uniformly.
-   Re-verified: `run_story_brief_reflection` is `_otr_story_brief.py:446`;
-   `_build_left` is `video_engine.py:1442`; the treatment line renders as
-   padded `Style    :` at `video_engine.py:1762` (an earlier "no longer greps"
-   note here was a driver grep miss, corrected by the r2 panel -- BOTH
-   consumers are live and both move in the repoint). Sharper finding on
-   item 4: `ending_template` is NOT "computed and never read" -- the catalog
-   computes it (`_otr_style_catalog.py:906`) AND the composer reads it
-   (`_otr_line_composer.py:809-810`); what is missing is the THREAD between
-   them -- no call site passes it into a LineRequest. That is a DECISION GATE
-   inside the campaign, not a confirmed build step: wire the thread or rip the
-   dead ends, decided with the panel at build. Same for the ghost-name fork:
-   **default = scrub briefs after cast lock** (conservative -- no unlocked name
-   reaches the listener); the operator may overrule to propagate pitch names.
-   `style_seed_env` confirmed validator-only (`capability_profiles.py:116`).
-   Item 5 (the 120-key `meta` rip) stays a gated block of its own, NOT part of
-   this campaign.
-2. **The P0 repair rung tells the truth (2 items, ~0.5 day).**
-   `repair_literal_source_metadata` (`_otr_scifi_source_repair.py`, called from
-   `_otr_scifi_codex.py`): (a) emit a receipt per pruned span/evidence-row/fact
-   -- silent pruning violates the plan's own Invariant 3; (b) give the repairer
-   the `allowed_source_fields` allowlist or prune per row, so one bad rehome
-   stops poisoning the whole artifact. Suite-provable with fixtures. The HTML
-   block-join separator stays an OPERATOR decision (coordinate-system change)
-   and is NOT part of this chunk.
-3. **Script-parse repair: fix the SPEC, then code it (~0.5 day docs + panel,
-   then 1-2 days code).** The claim that increments 1-5 are code-ready is
-   STALE: `docs/2026-08-03-script-parse-repair-CODE-READY.md` itself says r3
-   returned seven must-fixes that invalidate the call/trace design and
-   everything after its STATUS block is a draft. The next chunk is the spec
-   correction folding those seven in (a kibitz arc IS the vehicle); only then do
-   increments 1-5 become codeable.
-4. **Passage-lane craft scoring + the stichomythia floor (~1 day).**
-   `_otr_passage_selector.py` has no scoring functions -- the Fable craft
-   criteria (French-scene boundaries, entrance/exit starts, couplet ends,
-   continuation-word penalties) are all unbuilt. Score, keep top-K, seeded hash
-   within the class. Same chunk: the per-beat word floor excludes stichomythia,
-   so a merge rule or floor exemption in `_otr_episode_budget`. Pure Python +
-   tests. **Sequencing (r1): runs AFTER the ON DECK sprint lands and re-grounds
-   against whatever item 1 changed** -- both touch the fidelity selection
-   surfaces.
-5. **Cast-list parser: the two weak plays (~0.5 day).** Midsummer 1/12 and
-   Comedy of Errors 1/7 gendered -- mechanicals/servants in shapes
-   `_otr_character_roster.py` does not read yet. Vendored texts are on disk;
-   offline; suite-provable against the sidecars.
-6. **Small-items batch (~0.5 day, ONE campaign over the batch, one commit each):**
-   * `OTRImageGenDispatcher` (`otr_image_gen_dispatcher.py:1412`) has no
-     `IS_CHANGED` while depending on external file existence -- confirmed by
-     grep, none in the file. Decide the CONTRACT before coding (r2): either
-     fingerprint EVERY actual external dependency or deliberately force
-     re-runs for this side-effectful node -- a partial path fingerprint still
-     serves stale results.
-   * Rotated server logs have no retention policy.
-   * The `provider_side` three-part-rule regression (picked AND forced
-     `cloud_kling_avatar`).
-   * The shared `row_is_active(...)` evaluator over captured state -- confirmed
-     absent from the tree -- closing the four env-read sites named in OPEN BUGS.
 
 ## PARKED -- D2 (renders have resumed; run when a render window is free for fail-hunting soak legs)
 
@@ -1058,14 +738,6 @@ Open judgment question (render-window, not a coder slot): the LOCAL mistral/gemm
 writer matrix. The Sonnet arm of the creative-writer question is answered
 (`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
 never ran.
-
-### Re-ground gate for active work
-
-Re-ground each active table item against current committed HEAD before coding.
-The normal entry is `r3 -> r4`; drop to r2 when the coding plan, authority, or
-precondition is wrong rather than merely line-stale. No item executes without
-current r4 convergence and recorded round artifacts. Lean-mean has the stronger
-full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
 
 ## THE ADAPTATION DESIGN (hardened, NOT yet built)
 
@@ -1538,43 +1210,6 @@ it, tombstone it.
   at the next operator fan-out (green codex leg `c1f3891f` is the retire candidate).
 - **Phase-2 de-naming** (module filenames, `meta[]` ledger keys, wire-schema `.v4`
   literals) -- DEFERRED, operator-flagged, from the keep-6 rename.
-
-## KNOWN OPEN -- do not rediscover these
-
-* The VRAM admission guard covers coverage-executed beats only; the single-clip path
-  returns via `render_shot()` first, and `ltx_audio_in` is not in
-  `PLANNING_CAP_ENGINES` -- so the hottest-peaking engine is unguarded.
-* `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA/reserve are
-  env-configurable; a measured row needs a calibration IDENTITY.
-* Four adapters still cite missing receipts (`ltx_audio_in`, `mesh_stage`, `viz_green`,
-  `viz_mxc_mandala`).
-* The HuMo lip-sync onset fix is SPECIFIED but unbuilt, blocked on M1 classification
-  (`BUG_BIBLE.yaml:2343`: audio leads the lips by 100-200 ms with the face static for
-  the first 3-6 frames). Pre-roll + equal trim is algebraically a NO-OP if the lag is
-  constant rather than onset-only, so the classification must come first: early-only ->
-  pre-roll fix; constant -> advance the 25 Hz conditioning features; growing -> a
-  rate/timestamp bug, not a pad. Run a matched no-LoRA control -- Kijai reports the
-  lightx2v distill is not fully HuMo-compatible, so the defect may be ours.
-* Cap authority is not yet collapsed to one (`video.max_render_frames` should be sole;
-  env twins must be absent-or-equal).
-* `otr_w45_campaign.py` runs SIX engines while claiming all local ones, and its
-  acceptance would not reject a mirror. Fix before trusting a campaign result.
-* The reuse detector cannot separate a deliberately quiet shot from a duplicated frame;
-  it is ADVISORY in `otr_w45_campaign.py` until that is solved. The engine-layer and
-  composite guards (`MirrorExtensionForbidden`, `ClipUnderrunsItsBeat`) are terminal
-  and unaffected.
-* `humo_1.7B` and `ltx_8gb` are marked CUDA-only with no fp8, no fp4 and no stated
-  reason. Unexamined, not proven.
-* M2's raw rows sit in swept `tmp/` with no pinned digest or config manifest.
-* `docs/2026-08-02-IDEA-hardware-compatibility-matrix.md` -- captured, not scoped.
-  Includes the Mac research: Metal has no `Float8_e4m3fn`, ComfyUI+MPS video is
-  impractical (82 min for a 2-second clip), Draw Things and MLX are ~100x faster and DO
-  support LTX-2.3 with joint audio, and the `viz_*`/`still_*` lanes need no GPU at all.
-* Writer scaffolding repair increments 1-5 -- the spec needs its r3 CORRECTION
-  before any code (NEXT CODING QUEUE item 3; the "code-ready" title is stale);
-  the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
-  move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
-  `OTR_CastLock` freeze cascade (`wan_ti2v`).
 
 ## Bug Bible promotion field -- pending actions only
 

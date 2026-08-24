@@ -1429,3 +1429,117 @@ chunk in `docs/HANDOFF_LOG.md` while removing it from this forward plan.
 The render runner must be recreated only after Lemmy is green. Its seven legs
 prove the code that will ship; no stale pre-Lemmy runner or prompt is admissible.
 
+---
+
+# Moved from the plan 2026-08-23 (second pass)
+
+### 2-PRE. OPERATOR CALLS ALREADY MADE -- do not re-open, do not re-panel
+
+**BANANA ROUTE: VISUALS ONLY. The spoken script is NOT touched
+(operator ruling 2026-08-06).** Operator, asked whether the filter should reach
+spoken lines as well as image prompts: *"No. Just visuals. I do not want people
+discussing the Cavendish versus the other variety."*
+
+So the substitution happens on the STILL/VIDEO PROMPT and nowhere else. The
+announcer still says "he drew his revolver" over a shot of a man holding a
+banana -- which the problem statement flagged as either the joke or the thing
+that breaks it. It is the joke. **The dialogue ledger, the writer, and the
+adaptation lanes are all out of scope**, which also keeps this clear of the
+closed story-quality directive and of the fidelity lanes' invents-nothing rule
+at the TEXT level.
+
+This closes the second half of section 7 of
+`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (committed `9c686886`).
+
+**THE DEFAULT AND THE REACH ARE ALSO RULED NOW (2026-08-06, `ec9da848`) --
+that question is CLOSED, do not reopen it.** Global default **ON**, with
+`shakespeare` + `public_domain` defaulting **OFF** via the copied `_LEMMY`
+exclusion idiom, plus `OTR_BANANA_INCLUDE_FIDELITY_BANKS` as the operator's
+force-on override. **NO node widget and NO `workflows/otr_canonical.json`
+change.** So `Is this a dagger which I see before me` stays a dagger on the
+fidelity lanes unless the operator flips the override. Two env switches
+(`OTR_BANANA_STILLS`, `OTR_BANANA_VIDEO`), one per funnel. The whole contract is
+`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; SHIPPED -- see
+section 0-QUATER above (`bc8a1bde`).
+
+### 2. Operator calls nobody can make for you
+
+- **ARIEL and PUCK.** The curated supplement ships 10 entries and deliberately omits
+  these two: Folger's stage directions use "he" for both, but neither has a roster fact
+  and both are editorial. They stay on the roll, so the corpus gate asserts 40 of 42.
+  Say the word and they become 42.
+- **Tier floor 2 or 3.** Shipped at 2: it removes every 100% voice pin while 5 of 24
+  (engine x gender x timbre) combos still honour the requested timbre. Floor 3 also
+  removes them but leaves only 2 of 24 honouring timbre -- it buys spread by deleting the
+  dimension. `OTR_CAST_MIN_TIER_POOL=3` makes it a one-leg A/B, and the floor is folded
+  into the cast seed so the two settings can never both claim policy '3'.
+- **`num_characters` is still 2.** Every published adaptation ran 2, so a 7-speaker scene
+  loses five people. Correct gender for two survivors is still a truncated scene. This
+  collides with the count-match invariant at `OTR_LedgerScriptWriter.py:4119` and is its
+  own piece of work, not a tail of this one.
+
+### 3. Standing facts worth not re-deriving
+
+`slot.gender` is NOT a voice field. It feeds the description LLM
+(`_otr_casting.py:777`), the outline prompt (`OTR_LedgerScriptWriter.py:4144`), the
+dialogue cast block (`_otr_line_composer.py:446`) and the image prompt's gender anchor
+(`otr_meta_brief_image_prompt.py:78-90`). **The gender fix therefore changes scripts and
+portraits.** That is a downstream consequence of a correctness fix, not a violation of
+the closed story-quality directive -- exactly as "Malvolio speaks with a woman's voice"
+is a bug while rewriting his dialogue is not.
+
+Do NOT feed pinned genders into `prior_genders`, and do NOT re-call
+`_plan_gender_distribution` with a reduced count. Measured: `(1, ['male'])` returns
+female 400/400, and the shuffle's stream consumption varies with count (getrandbits
+0, 0, 3, 3, 9, 11 for counts 0..5). The shipped design overrides in place and leaves the
+allocator untouched.
+
+**Source-grounding sprint, the one piece left:** chunk 3b-ii -- the supply line
+that feeds grounding into the writer -- is BUILT-BUT-UNWIRED and PARKED under the
+story-quality directive. The delivery mechanism exists and nothing calls it. A
+contributor may pick it up; chunk detail under THE CODING SPRINT item 1.
+
+### Re-ground gate for active work
+
+Re-ground each active table item against current committed HEAD before coding.
+The normal entry is `r3 -> r4`; drop to r2 when the coding plan, authority, or
+precondition is wrong rather than merely line-stale. No item executes without
+current r4 convergence and recorded round artifacts. Lean-mean has the stronger
+full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
+
+## KNOWN OPEN -- do not rediscover these
+
+* The VRAM admission guard covers coverage-executed beats only; the single-clip path
+  returns via `render_shot()` first, and `ltx_audio_in` is not in
+  `PLANNING_CAP_ENGINES` -- so the hottest-peaking engine is unguarded.
+* `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA/reserve are
+  env-configurable; a measured row needs a calibration IDENTITY.
+* Four adapters still cite missing receipts (`ltx_audio_in`, `mesh_stage`, `viz_green`,
+  `viz_mxc_mandala`).
+* The HuMo lip-sync onset fix is SPECIFIED but unbuilt, blocked on M1 classification
+  (`BUG_BIBLE.yaml:2343`: audio leads the lips by 100-200 ms with the face static for
+  the first 3-6 frames). Pre-roll + equal trim is algebraically a NO-OP if the lag is
+  constant rather than onset-only, so the classification must come first: early-only ->
+  pre-roll fix; constant -> advance the 25 Hz conditioning features; growing -> a
+  rate/timestamp bug, not a pad. Run a matched no-LoRA control -- Kijai reports the
+  lightx2v distill is not fully HuMo-compatible, so the defect may be ours.
+* Cap authority is not yet collapsed to one (`video.max_render_frames` should be sole;
+  env twins must be absent-or-equal).
+* `otr_w45_campaign.py` runs SIX engines while claiming all local ones, and its
+  acceptance would not reject a mirror. Fix before trusting a campaign result.
+* The reuse detector cannot separate a deliberately quiet shot from a duplicated frame;
+  it is ADVISORY in `otr_w45_campaign.py` until that is solved. The engine-layer and
+  composite guards (`MirrorExtensionForbidden`, `ClipUnderrunsItsBeat`) are terminal
+  and unaffected.
+* `humo_1.7B` and `ltx_8gb` are marked CUDA-only with no fp8, no fp4 and no stated
+  reason. Unexamined, not proven.
+* M2's raw rows sit in swept `tmp/` with no pinned digest or config manifest.
+* `docs/2026-08-02-IDEA-hardware-compatibility-matrix.md` -- captured, not scoped.
+  Includes the Mac research: Metal has no `Float8_e4m3fn`, ComfyUI+MPS video is
+  impractical (82 min for a 2-second clip), Draw Things and MLX are ~100x faster and DO
+  support LTX-2.3 with joint audio, and the `viz_*`/`still_*` lanes need no GPU at all.
+* Writer scaffolding repair increments 1-5 -- the spec needs its r3 CORRECTION
+  before any code (NEXT CODING QUEUE item 3; the "code-ready" title is stale);
+  the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
+  move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
+  `OTR_CastLock` freeze cascade (`wan_ti2v`).
