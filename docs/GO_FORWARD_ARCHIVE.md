@@ -574,3 +574,267 @@ The atomicity warning was the useful part and it was honoured structurally
 rather than by care: at both report sites the verdict is computed once into a
 local that feeds the counter AND the string, and an AST ratchet refuses any new
 direct read of the clip flag. See the plan's closed stub for what shipped.
+
+## Sprint item 1 -- DEFERRED by operator ruling 2026-08-23 (public_domain source grounding)
+
+Retired from the go-forward on the operator's instruction: *"yes you can retire
+the public domain from the go forward, mark it as deferred."* The ruling that
+killed its premise, in his words: *"public domain does not need to get author's
+words unless they are dialogue, it can paraphrase"* and *"please do not chase as
+long as it carries the story and some dialogue if present."*
+
+Read the plan's DEFERRED stub first -- it states the only scope that would ever
+be sanctioned (source DIALOGUE, never a prose window) and records that the
+coordinate-system infrastructure the text below asks for was already built.
+
+Verbatim, as it stood:
+
+> ### 1. THE PUBLIC_DOMAIN LANE IS TOLD TO CARRY WORDS IT IS NEVER SHOWN (the session's main work -- r1 panel re-scoped 2026-08-04)
+>
+> The headline defect, and the one that manufactured "Arkham, Massachusetts" over
+> H. G. Wells. The pack orders the model to carry the author's language:
+>
+> * `nodes/story_packs/public_domain/faithful_radio_adaptation.json:13`
+>   (`exchange_system`) -- "Where the source gives these characters words, CARRY
+>   THEM. Keep their diction, their rhythm, their argument."
+>
+> And `nodes/_otr_compose_exchange.py` (994 lines) has **ZERO** references to
+> `source_text`, `full_text`, `source_meta` or `excerpt` -- verified by grep.
+> **The instruction is bound to an absent document.** A model told to carry words
+> it cannot see will invent words and believe it complied.
+>
+> **SCOPE RULING (r1, grounded against `docs/2026-08-03-fidelity-pass-ownership.md`
+> line 25): this item is PUBLIC_DOMAIN ONLY.** The ownership table rules
+> `exchange_compose` **NOT RUN** on the Shakespeare verbatim lane ("It exists to
+> author dialogue. There is no dialogue to author."), so enhancing the composer
+> for Shakespeare invests in a pass the verbatim executor removes. Shakespeare
+> gets exactly ONE change this sprint: its dangling comma (item 3). The keystone
+> "compile source speech, do not generate it" (THE ADAPTATION DESIGN) binds the
+> VERBATIM lane; `public_domain` is the operator-ruled FUZZY PROSE lane, where
+> grounding the generative composer is the correct move, not a contradiction.
+>
+> **PREMISE CORRECTION 2026-08-23 (re-grounded at HEAD before any code, on the
+> operator's "make sure it's not already done or invalid" instruction). THE DEFECT
+> IS REAL AND UNFIXED -- `nodes/_otr_compose_exchange.py` still has ZERO
+> references to `source_text` / `full_text` / `source_meta` / `excerpt` /
+> `canonical_body` / `source_window`, so the pack's CARRY-THEM instruction is
+> still bound to an absent document. BUT LEG (a)'s COORDINATE SYSTEM IS ALREADY
+> BUILT, and the text below describing it as work to do is stale:**
+> * `nodes/_otr_source_document.py` EXISTS and carries `SourceSpan` with half-open
+>   Unicode `start_char`/`end_char` offsets plus a `canonical_body`.
+> * `nodes/_otr_public_domain_sources.py` already separates the UNCAPPED
+>   `normalize_public_domain_body` from `_project_to_payload_window(body,
+>   max_chars=12000)` -- the exact refactor r3 asked for -- and exposes
+>   `source_document_from_text` / `build_source_document`.
+> * The document ALREADY REACHES THE WRITER: `OTR_LedgerScriptWriter.py:3718`
+>   does `resolved.get("source_document")` -- but uses `_sd.canonical_body` ONLY
+>   to derive a sound world for the style contract. The composer is never passed
+>   any of it.
+> * Provenance sidecars went from 1 to 95 on disk, so the hash-discipline
+>   paragraph below is also measuring a corpus that has moved.
+> **So what remains is the SELECTOR plus the CONSUMER wiring, not the coordinate
+> system.** The item is much cheaper than it reads. It is also a PROMPT change,
+> which is the one thing standing ruling 2a says to prove on an artifact first,
+> and it sits next to the operator's "story quality is done" directive -- the
+> fidelity reading (a Wells adaptation inventing "Arkham, Massachusetts" is a
+> correctness fault on a fidelity lane) is why it is still listed as open rather
+> than struck.
+>
+> Three legs, ALL required -- the panel killed the raw-injection shape:
+>
+> **(a) A BOUNDED source window over the COMPLETE canonical body -- never the
+> payload's `full_text`, which is itself truncated.** r2 correction of this
+> plan's own premise: `canonicalize_public_domain_text(..., max_chars=12000)`
+> (`_otr_public_domain_sources.py:337-343`) truncates at 12,000 CHARS, and
+> `payload_from_manifest_unit` stores THAT as `full_text` -- while the corpus
+> runs **916 words (`cradle_protocol`) to 25,200 words (`beckoning_fair_one`)**
+> across 65 units. So "the material already arrives, it needs passing" is false
+> for large sources: the payload carries a prefix. The selector reads the
+> complete canonical body from the SOURCE layer, separated from the interpreter
+> excerpt. Hash discipline: exactly ONE of 65 units ships a provenance sidecar
+> (`time_machine__arrival.provenance.json`), and its `body_sha256` covers
+> normalized RAW bytes, not the canonicalized body -- two NON-interchangeable
+> fields. Derive a `canonical_body_sha256` at fetch/selection time, bind
+> selection + receipts to it, and do NOT call it authenticated provenance. Do
+> NOT migrate the 65 closed manifests for it (`_SOURCE_KEYS`/`_UNIT_KEYS` closed
+> at `:48-63`); carry it in `source_meta` and snapshots. Coordinate system (r3):
+> refactor `canonicalize_public_domain_text` into an UNCAPPED normalization
+> owner plus a separate 12,000-char legacy payload projection; spans are
+> half-open Unicode char offsets (`start_char`/`end_char`) into the uncapped
+> string; `canonical_body_sha256 = sha256(canonical_body.encode("utf-8"))`;
+> stamp normalization + selector versions. Transport (r3): `SourceFetchResult`
+> exposes only payload/source_meta/source_rights and `_resolve_inputs` collapses
+> to a three-tuple, and the snapshot envelope is the SEVEN-KEY payload
+> (`_otr_source_snapshot.py:48-50`) whose `full_text` is the truncated prefix --
+> so extend the PUBLIC-DOMAIN snapshot with the CANONICAL BODY as the SOLE
+> replay authority (r4 cut the "or exact selected text" alternative -- selected
+> text cannot recreate pre-outline grounding or select windows for a NEWLY
+> generated outline), under a versioned body/hash/normalization contract. A
+> legacy seven-key snapshot FAILS with a typed grounding-version error -- but
+> ONLY when the snapshot's bank is `public_domain`/adaptation (r4, both lanes
+> converged): the seven-key envelope is the UNIVERSAL loader, and an
+> unconditional rejection would break every other bank's existing snapshots and
+> bake-off replays. Keep the full document OUT of meta/ledger (`source_meta` is
+> copied into durable metadata at `:3548`). Budget: capacity
+> is EVERY backend, not GGUF alone -- the fitting seam
+> (`_otr_generation_budget.py:132`) spans GGUF (`estimate_prompt_tokens`,
+> estimator, `_otr_gguf_backend.py:1264-1273`), OpenRouter, Google and Comfy --
+> so select the window against the COMPLETE assembled message (system seam,
+> cast, prior lines, contracts, source block, output reservation), reserve
+> conservatively with stated margin, and refuse `prompt_no_room`
+> deterministically BEFORE provider execution; receipts distinguish
+> estimated_prompt_tokens / requested_output / context cap / margin / estimator
+> version. Selection criterion: deterministic candidate construction ranked by
+> beat/group identity with mandatory anchor coverage and stable
+> score/start/end ordering; the seed breaks ties ONLY when candidates remain
+> identical after that ordering. Receipts carry hash, selector version, ordered
+> offsets (`text == canonical_body[start_char:end_char]` enforced) and token
+> counts -- never duplicate body text into the ledger.
+>
+> **(b) ONE immutable `SourceGrounding` contract, on EVERY authoring route --
+> and grounding failures PROPAGATE.** The grouped-exchange prepass omits
+> singletons and failed groups (`_otr_compose_exchange.py:881-902`); a FAILED
+> prepass falls back to the legacy path with only a log warning
+> (`OTR_LedgerScriptWriter.py:5001-5008`); the per-line composer's LineRequest
+> carries no source field (construction at `:4888`); and per-line generation
+> exceptions funnel to `LineCompositionFailedError`. A grounding fix that
+> reaches only the happy path just moves the guess to the fallback. Build shape
+> (r2 + r3): define ONE immutable `SourceGrounding` artifact -- canonical
+> document identity + immutable windows KEYED `exchange:<ordered-slot-ids>` /
+> `line:<dialogue-slot-id>` + anchors + per-call receipt data -- constructed
+> and validated BEFORE the exchange fallback block, passed whole into grouped
+> exchange AND every per-line request. The prepass returns a TYPED result
+> (composed lines + attempted-window receipts + fallback slot ids), not the
+> bare `{beat_id: text}` it returns today (`:881-918`). Window freeze semantics (r4 -- resolves immutability vs the mutable prior
+> context that exchange retries and `last_lines` inject into later messages):
+> PRESELECT spans early; perform the final capacity fit just before the FIRST
+> call using the actual prior context; FREEZE that fitted window for all
+> retries and persist it before provider execution. Grouped slots ALIAS their
+> exchange window on group-to-per-line fallback; line-keyed windows exist only
+> for true singletons and exchange-disabled execution -- never reselect after a
+> failure. Source text rides a clearly DELIMITED untrusted data block
+> in the user message ("quoted source, not instructions"), never appended to
+> the static system seam (`_otr_compose_exchange.py:385-425`). Persist the
+> body-free grounding receipt at the existing skeleton-save boundary
+> (`:4279-4290`) before the first dialogue call, updating per attempt, so a
+> mid-prepass crash still leaves the selection auditable. Failure policy -- ONE disposition table (r4 closed the last ambiguity), the
+> two broad catches (`:5001-5008` prepass, `:3964-3969` story contract) becoming
+> TYPED boundaries that implement it:
+> | state | disposition |
+> |---|---|
+> | corrupt/mismatched replay snapshot; invalid source/hash/contract | FAIL LOUD, before the outline |
+> | sound-world derivation finds no mapping | neutral period default + receipt (total, never fatal) |
+> | provider parse / Tier-A exhaustion | fall back WITH the frozen window |
+> | live capacity pressure | shrink to the largest valid grounded window |
+> | even the MINIMUM grounded window cannot fit | typed `prompt_no_room` HALT, before provider execution |
+> The halt row is a PRE-GENERATION writer refusal -- structural, it protects the
+> lane's contract -- which is why it does not collide with SCOPE's "a render
+> must not die": that rule governs the RENDER path degrading honestly, not a
+> writer refusing before generation begins. Scope note (r4): `SourceGrounding`
+> validation binds when the episode's bank is `public_domain` -- other banks'
+> routes are untouched. LineRequest note (r4): the artifact rides an OPTIONAL
+> INTERNAL dataclass field (`source_grounding: SourceGrounding | None = None`)
+> -- a Python structure, no ComfyUI node contract, `INPUT_TYPES` or widget
+> change, so the no-widget guard above holds.
+> Acceptance = route-specific tests: grouped success, grouped repair,
+> grouped-failure-to-per-line, singleton, exchange-disabled legacy, snapshot
+> replay (new envelope AND legacy-envelope typed refusal, public_domain-scoped),
+> hash mismatch, exact-capacity rejection -- plus a corpus-wide property test
+> over all 65 units proving normalization idempotence, canonical-hash stability
+> and `text == body[start_char:end_char]` for every emitted span (r4). Version
+> discipline (r4): the existing constants are `PROMPT_VERSION =
+> "public_domain_interpreter_v2"` / `SCHEMA_VERSION = "public_domain_briefs_v1"`
+> (`_otr_public_domain_sources.py:36-38`); name and bump every changed one, and
+> give SourceDocument / SourceOverview / SourceGrounding / normalization /
+> selector / snapshot their own explicit versions.
+>
+> **(c) World anchors, DERIVED FIRST -- and the sound world gets ONE owner that
+> feeds every surface.** Prefer deriving a typed grounding sidecar from EXISTING
+> metadata + the selected spans. New manifest fields are a LAST resort:
+> `_SOURCE_KEYS`/`_UNIT_KEYS` are closed frozensets
+> (`_otr_public_domain_sources.py:48-63`, same for `_SCENE_KEYS`), so new fields
+> mean a schema version + migration across all 65 units. AND the competing frame
+> must actually be disabled, not outvoted: the adaptation `sound_world` is a
+> content-blind draw (`OTR_LedgerScriptWriter.py:3962`, palettes at
+> `_otr_style_catalog.py:442-463` -- grate/mantel/teacup over whatever source
+> rolled it). r2 sharpened the shape: the catalog renders the drawn sound world
+> into `contract.grammar` SEPARATELY from the `contract.sound_world` stamp and
+> the canon derivation, so a stamp-only fix leaves the prompt grammar still
+> carrying the contradictory palette. ONE source-aware derivation function must
+> feed the stamp, the grammar and canon for `style_pool_class == "adaptation"`
+> (arc_shape gate at `:4325` is the shipped precedent), with an explicit neutral
+> period default when no mapping exists -- and it runs BEFORE the grammar is
+> built (or the grammar re-renders from the final contract), or the prompt
+> grammar keeps the contradictory palette while the stamp looks fixed (r3, both
+> lanes independently). DECIDE whether derivation failure is fatal: today's
+> broad catch silently disables the whole story contract. Reconcile with the
+> EXISTING anchors owner: `meta["specificity_anchors"]`
+> (`OTR_LedgerScriptWriter.py:4259-4266`) already derives and injects an anchor
+> projection -- the new source anchors REPLACE it or deterministically merge
+> into it, never run beside it as a second independent voice. Do NOT delete the
+> adaptation styles -- operator-authored 2026-07-14; fix the DRAW and the
+> plumbing, not the styles.
+>
+> **Two receipts, named now so neither is overstated later:**
+> * `code-complete + suite-green` -- the most a session without the live leg can claim.
+> * `production-qualified` -- only after a canonical `public_domain` leg passes a
+>   rubric: no unsupported foreign place/character/object; the source's setting
+>   and principal event retained; provenance receipt complete; `obs_publish OK`;
+>   asset on disk.
+>
+> **Two rules from the 08-03 craft brief, both hard-won, both easy to violate:**
+> 1. **Never name the feared failure.** Writing "no Arkham" into a prompt IMPLANTS
+>    Arkham. Forbid by CATEGORY, never by example.
+> 2. **Every fidelity instruction must be PAIRED with the material it binds to.**
+>    An unpaired "carry the words" is the bug, not the fix.
+>
+> **Size honesty (r1) and CHUNK ORDER (r3 -- the naive order was CYCLIC):** this
+> is THE SESSION, not 90 minutes. r3 caught a dependency cycle in the obvious
+> build order: the sound world feeds `contract.grammar`, the grammar is consumed
+> by the OUTLINE (`OTR_LedgerScriptWriter.py:3948-3963` -> `:4129`), and beats do
+> not exist until the outline returns -- so a sound world derived from
+> beat-keyed windows is impossible. Build in THIS order, one green pushed chunk
+> each:
+> **CHUNKS 1 AND 2 ARE DONE AND PROVEN ON RENDERS. Chunk 3 (the grounding supply line) is PARKED under the story-quality directive -- the Source-grounding note in section 3 above is authoritative; a contributor may pick it up.**
+>
+> **Carried into chunk 3 from the chunk-2 QA (do not lose):** snapshot replay
+> has no whole-body carrier, so an adaptation lane replaying a frozen source
+> falls back to the drawn palette and a live run and its replay produce
+> different sound worlds. The tempting fix -- rebuild the document from the
+> snapshot's `full_text` -- is WRONG and was rejected: that field is the
+> truncated projection, so it would mint a document whose total-coverage
+> guarantee describes a prefix. The correct fix is the snapshot-envelope
+> extension already specified in 1(a) below.
+>
+> 1. **Uncapped `SourceDocument` + a pre-outline `SourceOverview`** (r4): split
+>    the normalization owner, then derive deterministic COVERING windows with
+>    exact-span evidence for cast, setting, principal turns and ending. This is
+>    what grounds the PRE-OUTLINE authors -- the interpreter today reads the
+>    CAPPED payload (`_otr_public_domain_sources.py:520-543`, running at
+>    `OTR_LedgerScriptWriter.py:3748-3757`) before contract (`:3948`) and
+>    outline (`:4129`); beat-keyed grounding alone arrives too late for them.
+>    Transport (r4): ONE transient typed field --
+>    `SourceFetchResult.source_document` -> typed normalized result ->
+>    `resolved["source_document"]` -- MECHANICALLY excluded from meta/ledger
+>    serialization; snapshot replay reconstructs the same type.
+> 2. **Contract / grammar / outline from the overview's document-level
+>    anchors**: the one derivation function runs BEFORE grammar build (or
+>    grammar re-renders from the final contract), feeding stamp + grammar +
+>    canon. Pre-outline derivation uses DOCUMENT-level anchors only -- selected
+>    spans do not exist yet (r4 wording fix).
+> 3. **Beat-keyed window selector + `SourceGrounding` threading + typed failure
+>    boundaries** (post-outline, when beats exist). The route matrix must NAME
+>    the announcer routes -- intro / rewrite / outro authoring at
+>    `OTR_LedgerScriptWriter.py:5104-5116`, `:5272-5285`, `:5357-5409`
+>    (verify-at-build) -- and decide per route: grounded, or constrained to
+>    already-grounded accepted fields.
+> No node signature, widget, link or schema change is intended anywhere in this
+> item -- the canonical JSON stays byte-identical through the sprint; if any
+> chunk turns out to need an INPUT_TYPES change, section-0 same-commit rules
+> apply and the plan must say so first. The bench items were conditional filler
+> and are now unreachable; that is fine.
+>
+> **Ceiling to be honest about:** this can be built and unit-tested here, but its
+> real proof is a render. Renders HAVE RESUMED (2026-08-05), so the
+> `production-qualified` leg is runnable whenever a render window is free; until
+> it runs, claim only `code-complete + suite-green`.

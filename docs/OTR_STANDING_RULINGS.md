@@ -1611,3 +1611,40 @@ the next version bump anyway, so it costs nothing; but **it was not published as
 a fix, because the acceptance test it was meant to satisfy cannot pass for any
 pack.** `pyproject.toml` was deliberately NOT touched: editing it auto-fires a
 publish, and there was no measured reason to spend a version.
+
+## PUBLIC_DOMAIN MAY PARAPHRASE. ONLY DIALOGUE IS OWED (operator ruling 2026-08-23, hard)
+
+**This QUALIFIES the older "fidelity lanes invent nothing" line, which had been
+read as binding `public_domain` and `shakespeare` equally. It does not.**
+
+The operator, ending the source-grounding item outright:
+
+> *"no no public domain does not need to get author's words unless they are
+> dialogue, it can paraphrase"*
+
+> *"please do not chase as long as it carries the story and some dialogue if
+> present"*
+
+**THE BAR ON `public_domain`, and it is the whole bar:** the episode carries the
+STORY, and carries some DIALOGUE where the source actually has dialogue.
+**A paraphrased narration is CORRECT OUTPUT, not a defect.** Do not open
+writing-quality work against it, do not file a PBUG because an episode reworded
+the author's prose, and do not re-open the grounding campaign -- it is DEFERRED
+in the go-forward, with its full original text in the archive.
+
+**`shakespeare` IS UNCHANGED.** It remains the VERBATIM lane, `exchange_compose`
+is NOT RUN there, and the author's language is carried as written. The two lanes
+were never the same contract; treating them as one is what produced a
+three-leg campaign for a lane that only ever needed dialogue.
+
+**IF IT IS EVER TAKEN UP AGAIN**, the only sanctioned scope is source DIALOGUE
+when the source has it -- never a prose window over the canonical body. The
+infrastructure exists already (`_otr_source_document.SourceSpan` with half-open
+offsets, the uncapped `normalize_public_domain_body`, and the document already
+reaching the writer at `OTR_LedgerScriptWriter.py:3718`), so the work would be a
+dialogue extractor plus one prompt seam.
+
+**WHY THIS IS WRITTEN DOWN RATHER THAN JUST OBEYED:** the item was the sprint's
+headline row, motivated by a real artifact (a Wells adaptation that produced
+"Arkham, Massachusetts"). A future reader WILL rediscover that anecdote and read
+it as an open defect. It is not one. The operator was asked and answered.
