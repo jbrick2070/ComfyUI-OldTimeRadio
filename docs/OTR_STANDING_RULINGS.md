@@ -1666,3 +1666,44 @@ look like a three-leg campaign.
 headline row, motivated by a real artifact (a Wells adaptation that produced
 "Arkham, Massachusetts"). A future reader WILL rediscover that anecdote and read
 it as an open defect. It is not one. The operator was asked and answered.
+
+### THE DECISIVE EVIDENCE (added 2026-08-23): THE REGISTRY SCHEMA HAS NO PLACE TO PUT NODES
+
+Probed directly, so nobody spends another version chasing this.
+
+**A version record's COMPLETE key set** (`GET
+/nodes/comfyui-old-time-radio/versions/2.0.0-alpha.6`, HTTP 200): `changelog`,
+`createdAt`, `dependencies`, `deprecated`, `downloadUrl`, `id`, `node_id`,
+`status`, `supported_accelerators`, `supported_comfyui_frontend_version`,
+`supported_comfyui_version`, `supported_os`, `tags`, `tags_admin`, `version`.
+**There is NO node-list field of any kind.** The registry models the PACK, not
+the node classes inside it. Both endpoints that would enumerate them --
+`/comfy-nodes` and `/nodes` -- return **404**.
+
+**OUR RECORD IS SHAPED IDENTICALLY TO THE MOST-INSTALLED PACKS.**
+`comfyui-kjnodes` 1.5.0 returns `supported_os []`, `supported_comfyui_version ""`,
+`supported_accelerators []`, `tags []` -- exactly ours -- and its `[tool.comfy]`
+is the same three keys we declare (PublisherId / DisplayName / Icon). **We are not
+misconfigured.** Nothing about our packaging explains the empty node panel,
+because the panel is not fed by anything we can publish.
+
+**THEREFORE the "replace dynamic registration with a literal static
+NODE_CLASS_MAPPINGS" idea CANNOT achieve registry node visibility** -- there is no
+field for the result to land in. Making ids statically readable was still worth
+doing on its own merits (see `node_list.json` above), but it is not a fix for
+this, and it must not be sold as one.
+
+**THE ONE REAL LEVER THAT EXISTS**, and it is small: `requires-comfyui` (e.g.
+`requires-comfyui = ">=0.3.68"`, as `ComfyUI-AnimateDiff-Evolved` declares in
+`[tool.comfy]`) populates `supported_comfyui_version`. It is the only supported_*
+field with a publisher-side input. It affects compatibility filtering, NOT node
+listing. Costs a version bump, so only spend it alongside a change worth
+publishing.
+
+**AND THE PENDING WINDOW IS NOT A FAILURE.** `2.0.0-alpha.7` uploaded correctly
+with `deps=12` and sat at `NodeVersionStatusPending`, during which
+`latest_version` still resolved to `alpha.6`. That is the documented behaviour --
+Comfy-Org's cron only considers versions older than 30 minutes and there is no
+publisher self-service path to Active. "The push isn't done" and "the push
+failed" look identical for half an hour. Read the versions list, not
+`latest_version`.
