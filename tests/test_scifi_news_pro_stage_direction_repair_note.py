@@ -120,7 +120,12 @@ def test_THE_LIVE_DEFECT_now_gets_the_rule():
 def test_the_rule_names_the_speaker_label_case_explicitly():
     got = note(*real_defects("*SFX: a door slams"))
     assert "SPEAKER LABEL" in got
-    assert "sound-effect speaker" in got
+    # RE-POINTED 2026-08-24 -- see the sibling note in the ladder suite. The
+    # phrase "sound-effect speaker" travelled with an invented example of a
+    # token from a subsystem this pipeline ripped out, inside text returned
+    # INTO the writer's prompt. Same meaning, nothing for a model to copy.
+    assert "only the cast and the announcer can speak" in got
+    assert "a door slams" not in got.split("The parser reported")[0]
 
 
 def test_the_rule_reports_the_line_number_it_was_given():
@@ -152,22 +157,62 @@ def test_the_original_parenthetical_case_is_UNCHANGED():
 # ---------------------------------------------------------------------------
 # A decorated REAL cast name -- the second rule
 # ---------------------------------------------------------------------------
-def test_a_REAL_cast_name_wearing_a_stray_marker_is_told_to_RESTORE_the_label():
-    """THE PANEL'S BEST FINDING. `*Ada: Hello` looks exactly like `*SFX: ...`;
-    only the roster separates them. Going silent was the first design and it was
-    wrong -- silence returns the generic instruction that already failed four
-    attempts. A decorated real name has a safe repair, so say it."""
-    defects = real_defects("*Ada: We continue.")
-    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects), (
-        "fixture drift: the parser now resolves a stray-marker name, so this "
-        "test no longer exercises the case it was written for -- re-derive it")
-    got = note(*defects)
+def test_a_REAL_cast_name_wearing_a_stray_marker_now_RESOLVES_IN_THE_PARSER():
+    """RE-DERIVED 2026-08-24, exactly as the old assertion instructed.
+
+    This test used to prove the repair NOTE handled `*Ada: Hello`. It carried
+    its own fixture-drift guard -- "the parser now resolves a stray-marker
+    name, so this test no longer exercises the case it was written for --
+    re-derive it" -- and PBUG-20260824-01's shared speaker resolver is exactly
+    the change that tripped it.
+
+    That is a STRICT IMPROVEMENT and the reason it is re-derived rather than
+    restored: the old path cost a whole repair attempt to tell the model to
+    rewrite a label, and the model had to comply. Now the line is simply read
+    correctly the first time, and no attempt is spent at all.
+    """
+    parsed, defects = parse_scifi_news_pro_markup(
+        script_with("*Ada: We continue."), CAST)
+    assert defects == (), (
+        "a real cast name wearing a stray marker must now resolve in the "
+        f"parser, not merely earn advice; got {defects}")
+    spoken = [ln.speaker for scene in parsed.scenes for ln in scene.lines]
+    assert "Ada" in spoken
+    # It resolved to the CANONICAL spelling, and the receipt says how.
+    assert any("resolved to 'Ada'" in n for n in parsed.normalizations)
+
+
+def test_a_BRACKETED_real_cast_name_still_earns_the_RESTORE_rule():
+    """The note's decorated-cast branch is still live and still needed.
+
+    `(Ada)` is a shape the parser deliberately does NOT resolve --
+    `_strip_role_parenthetical` strips a TRAILING role group, never a name
+    that is parenthesised outright, because that would mangle a name into
+    something that could collide with a different cast member. So the note
+    keeps its job for the bracket/paren family, and must still give the safe
+    repair rather than the advice that deletes a character.
+    """
+    got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, "(Ada)", 9))
     assert "Restore the plain canonical label" in got
     assert "'Ada: '" in got
     assert "KEEP THE DIALOGUE EXACTLY AS WRITTEN" in got
     # And it must NOT carry the advice that deletes a character.
     assert "omit it when nonessential" not in got
     assert "there is no sound-effect speaker" not in got
+
+
+def test_a_DOUBLE_asterisk_real_cast_name_is_not_mangled_into_the_delete_rule():
+    """PBUG-20260824-01. `_undecorated_label` stripped ONE marker character
+    and looked for ONE closer, so `**Ada**` came back as `*Ada*`, missed the
+    roster, and a REAL character was handed the fold-or-omit rule -- advice
+    that deletes their dialogue. Every fixture in this suite used a single
+    `*`, which is why four QA rounds never saw it. Double markers are what the
+    local models actually emit."""
+    for label in ("**Ada**", "**Ada", "***Ada***"):
+        got = note(ParseDefect(NewsProParseDefect.UNKNOWN_SPEAKER, label, 9))
+        assert "Restore the plain canonical label" in got, label
+        assert "'Ada: '" in got, label
+        assert "omit it when nonessential" not in got, label
 
 
 def test_the_role_parenthetical_survives_the_decoration_strip():
@@ -187,12 +232,33 @@ def test_a_decorated_TYPO_name_still_gets_the_stage_direction_rule():
     assert "Restore the plain canonical label" not in got
 
 
-def test_an_UNDECORATED_misspelled_cast_name_gets_NO_advice_at_all():
-    """The original promise, still kept: an ordinary unknown speaker is not this
-    note's business, and inventing advice for it would lose a line."""
+def test_an_UNDECORATED_misspelled_cast_name_IS_TOLD_THE_LEGAL_LABELS():
+    """CHANGED DELIBERATELY 2026-08-24, and the promise underneath is kept.
+
+    This used to assert `note() == ""`. The stated reason was that "inventing
+    advice for it would lose a line" -- but that reasoning was aimed at ONE
+    specific piece of bad advice, the fold-or-omit rule, not at advice as
+    such. Silence is not neutral: it hands back the generic "repair the
+    defects below", which is the exact instruction measured burning four
+    attempts on a live leg (PBUG-20260812-03), and again on 2026-08-24.
+
+    So the note now names the legal labels. THE REAL GUARD -- never tell the
+    model to delete or fold a character's line -- is asserted explicitly
+    below, and is stronger than the silence it replaces.
+    """
     defects = real_defects("Adda: We continue.")
-    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects)
-    assert note(*defects) == ""
+    assert any(d.code is NewsProParseDefect.UNKNOWN_SPEAKER for d in defects), (
+        "fixture drift: 'Adda' must remain a genuine near-miss that the "
+        "resolver REFUSES -- if it now resolves, the no-fuzzy-remap guarantee "
+        "has been broken and that is the real failure")
+    got = note(*defects)
+    assert "is not one of this episode's characters" in got
+    assert "Ada" in got and "Bo" in got          # the exact legal labels
+    assert "KEEP THE DIALOGUE EXACTLY AS WRITTEN" in got
+    # THE GUARD THAT ACTUALLY MATTERED, now explicit rather than implied by
+    # silence: a real character's line must never be folded away or deleted.
+    assert "omit it when nonessential" not in got
+    assert "Do not delete the line" in got
 
 
 def test_the_roster_check_is_case_and_space_insensitive():

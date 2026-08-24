@@ -26,9 +26,12 @@ __all__ = [
     "ParsedLine",
     "ParsedScene",
     "ParsedScript",
+    "SpeakerRoster",
+    "build_speaker_roster",
     "normalize_scifi_news_pro_markup_text",
     "parse_scifi_news_pro_markup",
     "render_defects",
+    "speaker_identity_key",
 ]
 
 ANNOUNCER_NAME = "ANNOUNCER"
@@ -235,6 +238,315 @@ def _strip_role_parenthetical(name: str) -> str:
     return stripped or str(name).strip()
 
 
+# --- speaker identity: ONE matcher, shared with the writer -------------------
+#
+# WHY THIS LIVES HERE AND WHY IT IS THE ONLY COPY (Bug Bible 12.132, verify
+# condition 3). Until 2026-08-24 the "is this label a cast member" rule existed
+# in TWO compositions -- this module's `on_speaker` and the writer's
+# `_resolves_to_cast` -- plus TWO hand-written copies of the identity key.
+# `_resolves_to_cast`'s own docstring claimed it was "imported rather than
+# reimplemented", but only the HELPERS were imported; the LADDER was copied.
+# That is not a style complaint: `_resolves_to_cast` decides whether the repair
+# rung tells the model "restore this real character's label" or "fold or omit
+# this row", so a parser that accepts a label the note believes is illegal
+# instructs the model to DELETE A LINE THE PARSER WOULD HAVE TAKEN.
+#
+# THE LAYER MATTERS. `_canonicalize_transport_line` above normalizes LINE TEXT
+# and is deliberately closed -- it feeds `normalize_scifi_news_pro_markup_text`,
+# whose output is hashed into the receipt, and its dated refusal
+# (PBUG-20260812-03) still stands there. Everything below normalizes only a
+# LOOKUP CANDIDATE. It never edits the line, never reaches the hashed artifact,
+# and on failure the defect still carries the RAW supplied label -- which is
+# exactly what keeps `_standalone_stage_direction_repair_note` firing on
+# `*SFX`. The apparent conflict between the refusal and Bible 12.132 is a
+# layer confusion; resolved by putting the normalization here.
+
+
+def speaker_identity_key(value: str) -> str:
+    """Case/spacing-insensitive speaker identity; display text stays canonical.
+
+    THE one identity rule. The writer imports this rather than restating it.
+    """
+    return " ".join(str(value).split()).casefold()
+
+
+#: Titles that may precede a name. A CLOSED set on purpose -- an open
+#: "first token is an honorific" heuristic would treat a one-word character
+#: name as a title and alias the character to nothing.
+_HONORIFICS = frozenset((
+    "dr", "doctor", "mr", "mrs", "ms", "miss", "prof", "professor",
+    "capt", "captain", "cmdr", "commander", "sgt", "sergeant",
+    "lt", "lieutenant", "col", "colonel", "gen", "general",
+    "adm", "admiral", "maj", "major", "sr", "sister", "fr", "father",
+    "rev", "reverend", "chief", "officer", "agent", "sir", "dame",
+    "lady", "lord", "madam", "madame", "detective", "inspector",
+    "nurse", "coach", "judge", "mayor", "governor", "senator",
+))
+
+#: The emphasis markers a LABEL may be wearing, longest first so ``**`` is
+#: tried before ``*``. Same closed family as ``_TRANSPORT_MARKERS`` -- a label
+#: is not a licence to run a general Markdown sanitizer either.
+_LABEL_MARKERS = ("**", "__", "*", "_")
+
+_RE_TRAILING_COMMA_CLAUSE = re.compile(r",[^,]*$")
+
+
+def _strip_label_decoration(label: str) -> str:
+    """Remove emphasis markers wrapping a speaker LABEL. Candidate only.
+
+    ``**DR. CHEN**`` -> ``DR. CHEN``; ``**ANNOUNCER`` -> ``ANNOUNCER``.
+
+    UNMATCHED LEADING MARKERS ARE STRIPPED HERE, and that does NOT reopen
+    PBUG-20260812-03. That refusal protects `_canonicalize_transport_line`,
+    which rewrites the line and the hashed artifact, and its second stated
+    reason was that stripping there would disarm the stage-direction repair
+    note. Neither applies at this layer: nothing is rewritten, and an
+    unresolvable candidate still reports the RAW label, so ``*SFX`` still
+    reaches the note looking exactly like a stage direction.
+    """
+    token = str(label).strip()
+    changed = True
+    while changed and token:
+        changed = False
+        for marker in _LABEL_MARKERS:
+            if token.startswith(marker) and len(token) > len(marker):
+                token = token[len(marker):].strip()
+                changed = True
+                break
+            if token.endswith(marker) and len(token) > len(marker):
+                token = token[:-len(marker)].strip()
+                changed = True
+                break
+    return token or str(label).strip()
+
+
+def _strip_trailing_delivery_tag(label: str) -> str:
+    """``"ELI, whispering"`` -> ``"ELI"``. Strips ONE trailing comma clause.
+
+    A DELIVERY TAG IS NOT THE ONLY THING A COMMA MEANS, which is why this can
+    never run before the exact match. ``DR. ORION NINE, SENIOR SIGNAL ANALYST``
+    is a legal CANONICAL roster label carrying a comma (and a passing test in
+    `tests/test_scifi_news_pro_markup.py`), so the exact rung claims it first
+    and this function is never consulted for it. Here it only ever proposes a
+    candidate, and a candidate that hits nothing changes nothing.
+    """
+    token = str(label).strip()
+    if "," not in token:
+        return token
+    stripped = _RE_TRAILING_COMMA_CLAUSE.sub("", token).strip()
+    return stripped or token
+
+
+def _label_candidates(label: str) -> "tuple[str, ...]":
+    """Ordered lookup candidates for ``label``; the RAW label is always first.
+
+    Breadth-first over the three strippers so single-defect labels resolve
+    before compound ones, and so a compound label like
+    ``**DR. CHEN**, urgent`` -- decoration AND a delivery tag, which is the
+    shape that actually killed the 2026-08-24 leg -- is reachable by composing
+    them in either order without hard-coding a sequence.
+    """
+    ordered: "list[str]" = []
+    seen: "set[str]" = set()
+    frontier = [" ".join(str(label).split())]
+    while frontier:
+        current = frontier.pop(0)
+        key = speaker_identity_key(current)
+        if not current or key in seen:
+            continue
+        seen.add(key)
+        ordered.append(current)
+        for strip in (_strip_role_parenthetical,
+                      _strip_trailing_delivery_tag,
+                      _strip_label_decoration):
+            nxt = strip(current)
+            if nxt and speaker_identity_key(nxt) not in seen:
+                frontier.append(nxt)
+    return tuple(ordered)
+
+
+def _proposed_aliases(name: str) -> "tuple[str, ...]":
+    """Short forms a script writer would plausibly use for ``name``.
+
+    CLOSED and structural -- never fuzzy. ``test_unknown_speaker_is_hard_no_remap``
+    pins "no near-miss remap" as deliberate policy, and an edit-distance rule
+    would merge a genuinely invented character as readily as it fixes a typo.
+    Every form here is a SUBSTRING-BY-TOKEN of the canonical name.
+
+    ``Dr. Haorong Chen`` -> ``Dr. Chen``, ``Chen``, ``Haorong``
+    ``DR. ORION NINE, SENIOR SIGNAL ANALYST`` -> ``DR. ORION NINE``, ``DR. NINE``,
+    ``NINE``, ``ORION``
+    """
+    full = " ".join(str(name).split())
+    if not full:
+        return ()
+    out: "list[str]" = []
+    head = full.split(",", 1)[0].strip()
+    if head and head != full:
+        out.append(head)          # the name proper, role clause dropped
+    words = head.split()
+    honorific = ""
+    if len(words) > 1 and words[0].rstrip(".").casefold() in _HONORIFICS:
+        honorific = words[0]
+        words = words[1:]
+    if len(words) >= 2:
+        surname, given = words[-1], words[0]
+        if honorific:
+            out.append(f"{honorific} {surname}")
+        out.append(surname)
+        out.append(given)
+    elif len(words) == 1 and honorific:
+        out.append(words[0])
+    return tuple(dict.fromkeys(w for w in out if w))
+
+
+class SpeakerRoster:
+    """The ONE authority on whether a supplied label names a cast member.
+
+    Built once per parse and shared with the writer's repair rung, so the
+    parser and the note can never disagree about what is a legal speaker.
+
+    THE LADDER, and exact identity ALWAYS wins first: a roster that genuinely
+    carries parentheses, commas or asterisks matches itself before any relaxed
+    rung runs.
+
+    THE AMBIGUITY GUARD IS THE WHOLE SAFETY ARGUMENT. An alias enters the index
+    only if EXACTLY ONE cast member proposes it and it collides with no exact
+    key. When two members claim one alias, NEITHER gets it -- both degrade to
+    exact-only and their short-form lines fail loudly, exactly as they do
+    today. Suppression, never a coin flip: silently merging two characters
+    would mis-cast a voice and corrupt the ledger, which is far worse than the
+    refusal it replaces.
+    """
+
+    def __init__(self, cast_names, extra_aliases=None) -> None:
+        self.cast_names = tuple(str(name).strip() for name in cast_names)
+        self.exact: "dict[str, str]" = {
+            speaker_identity_key(ANNOUNCER_NAME): ANNOUNCER_NAME,
+        }
+        self.blank_labels = 0
+        self.ambiguous_labels: "list[tuple[str, str]]" = []
+        for name in self.cast_names:
+            key = speaker_identity_key(name)
+            if not key:
+                self.blank_labels += 1
+                continue
+            prior = self.exact.get(key)
+            if prior is not None:
+                self.ambiguous_labels.append((prior, name))
+                continue
+            self.exact[key] = name
+
+        claims: "dict[str, set[str]]" = {}
+        for name in self.exact.values():
+            if name == ANNOUNCER_NAME:
+                continue
+            for spoken_label in _proposed_aliases(name):
+                claims.setdefault(
+                    speaker_identity_key(spoken_label), set()).add(name)
+        # AUTHORED ALIASES, from the model that invented the cast (operator
+        # 2026-08-24: deterministic token rules are "too strict and may not
+        # catch edge cases"). They are ADDITIVE and arrive as DATA -- the
+        # parser stays pure, so one script always parses one way -- and they
+        # are held to exactly the same ambiguity guard below. An alias naming
+        # nobody on the roster is dropped rather than trusted.
+        for owner, aliases in dict(extra_aliases or {}).items():
+            canonical = self.exact.get(speaker_identity_key(owner))
+            if canonical is None or canonical == ANNOUNCER_NAME:
+                continue
+            for spoken_label in aliases or ():
+                key = speaker_identity_key(spoken_label)
+                if key:
+                    claims.setdefault(key, set()).add(canonical)
+        self.aliases: "dict[str, str]" = {}
+        self.suppressed_aliases: "tuple[str, ...]" = tuple(sorted(
+            key for key, owners in claims.items()
+            if len(owners) > 1 or key in self.exact))
+        for key, owners in claims.items():
+            if len(owners) == 1 and key not in self.exact:
+                self.aliases[key] = next(iter(owners))
+
+    def resolve(self, supplied: str) -> "tuple[str | None, str]":
+        """``(canonical_name_or_None, how)``. Never raises, never rewrites."""
+        candidates = _label_candidates(supplied)
+        for index, candidate in enumerate(candidates):
+            hit = self.exact.get(speaker_identity_key(candidate))
+            if hit is not None:
+                return hit, ("exact" if index == 0
+                             else f"normalized {candidate!r}")
+        for candidate in candidates:
+            hit = self.aliases.get(speaker_identity_key(candidate))
+            if hit is not None:
+                return hit, f"alias {candidate!r}"
+        return None, "unresolved"
+
+    def names_a_cast_member(self, supplied: str) -> bool:
+        """Whether ``supplied`` resolves at all -- the writer's question."""
+        return self.resolve(supplied)[0] is not None
+
+
+def build_speaker_roster(cast_names, extra_aliases=None) -> SpeakerRoster:
+    """Public constructor; the writer calls this rather than rebuilding it."""
+    return SpeakerRoster(cast_names, extra_aliases)
+
+
+#: LABELS THAT NAME A SOUND, NOT A PERSON. A CLOSED vocabulary.
+#:
+#: THE RULE IS THE WORD, NOT THE PUNCTUATION (operator, 2026-08-24: *"they
+#: should not chunk off dialogue, we should just never do any SFX"*). The first
+#: draft of this dropped any DECORATED unresolvable label, which is wrong and
+#: was caught immediately: ``(SOMEONE NEW): I have something to say.`` is a
+#: character the model invented, wearing brackets, WITH DIALOGUE IN IT.
+#: Dropping it would delete a real spoken line -- the one thing salvage exists
+#: to prevent. Decoration is not evidence that something is not a person.
+#:
+#: A cue word IS that evidence. ``SFX: a door slams`` carries no dialogue: it
+#: describes a sound, and this pipeline HAS NO SOUND EFFECTS. The `[SFX: ...]`
+#: ledger token was removed 2026-07-01 and the whole SFX bed subsystem was
+#: ripped 2026-08-06, so a cue row can only ever become a character reading a
+#: stage direction aloud in their own voice.
+#:
+#: MUSIC is absent on purpose -- it is a real structural delimiter with its own
+#: classifier, and listing it here would be dead code.
+_SOUND_CUE_LABELS = frozenset((
+    "sfx", "s f x", "sound", "sounds", "sound effect", "sound effects",
+    "soundeffect", "sound fx", "fx", "foley", "effect", "effects",
+    "env", "environment", "ambience", "ambient", "ambiance", "atmos",
+    "atmosphere", "noise", "stinger", "cue", "sound cue", "audio",
+    "sfx cue", "background", "bg",
+))
+
+
+def _undecorated_speaker_name(label: str) -> str:
+    """A display name fit for a cast row, a caption and a credit line.
+
+    ``(SOMEONE NEW)`` -> ``SOMEONE NEW``; ``**THORNE**`` -> ``THORNE``.
+    Falls back to the original if stripping would leave nothing, because a
+    nameless character is worse than a decorated one.
+    """
+    bare = _strip_label_decoration(str(label).strip()).strip("()[]<>*_ \t")
+    bare = " ".join(bare.split())
+    return bare or " ".join(str(label).split())
+
+
+def _is_sound_cue_label(label: str) -> bool:
+    """``SFX``/``*SFX*``/``[ENV]`` -> True. ``(SOMEONE NEW)`` -> False.
+
+    Only ever consulted AFTER the resolver has failed, so a real cast member
+    -- decorated or not -- has already resolved and can never reach this.
+    Decoration is stripped first so the cue is recognised however it is
+    dressed, but the VERDICT comes from the vocabulary alone.
+    """
+    # Brackets and parentheses are stripped here as well as emphasis markers,
+    # because a cue is written every one of these ways in the wild:
+    # ``SFX:``, ``*SFX:``, ``[SFX]:``, ``(sound)``. This is a local strip for
+    # a VOCABULARY TEST only -- it proposes nothing to the roster and cannot
+    # admit anybody.
+    bare = _strip_label_decoration(str(label).strip()).strip("()[]<>*_ \t")
+    # A cue label is the word itself, not a sentence that mentions it.
+    return speaker_identity_key(bare) in _SOUND_CUE_LABELS
+
+
 def _normalize_line(line: str) -> "tuple[str, tuple[str, ...]]":
     """Normalize transport whitespace and balanced label emphasis.
 
@@ -315,7 +627,15 @@ class ParsedScript:
     character_word_count: int
     announcer_word_count: int
     # Retained for receipt compatibility; prose normalization is retired.
+    # Speaker resolutions that were NOT exact are appended here too, so a
+    # receipt always names how a label reached its character.
     normalizations: "tuple[str, ...]" = ()
+    #: Speakers admitted by salvage that the locked roster did not contain.
+    #: The producer owns giving each one a voice and a cast row.
+    adopted_speakers: "tuple[str, ...]" = ()
+    #: Rows salvage discarded, and locked cast who never spoke. Empty on every
+    #: honest parse -- a non-empty value means the episode was salvaged.
+    dropped_rows: "tuple[str, ...]" = ()
 
 
 def render_defects(defects: "tuple[ParseDefect, ...]") -> str:
@@ -334,26 +654,22 @@ _EXPECT_TITLE, _PREAMBLE, _SCENES, _POSTAMBLE, _DONE = range(5)
 class _Parse:
     """Mutable walk state (module-private; the public surface is pure)."""
 
-    def __init__(self, cast_names) -> None:
+    def __init__(self, cast_names, extra_aliases=None, salvage=False) -> None:
         self.state = _EXPECT_TITLE
         self.defects: "list[ParseDefect]" = []
-        self.cast_names = tuple(str(name).strip() for name in cast_names)
-        self.speaker_by_key = {
-            self._speaker_key(ANNOUNCER_NAME): ANNOUNCER_NAME,
-        }
-        for name in self.cast_names:
-            key = self._speaker_key(name)
-            if not key:
-                self.skeleton("cast roster contains a blank speaker label")
-                continue
-            prior = self.speaker_by_key.get(key)
-            if prior is not None:
-                self.skeleton(
-                    f"cast roster labels {prior!r} and {name!r} are "
-                    "ambiguous under case-insensitive identity"
-                )
-                continue
-            self.speaker_by_key[key] = name
+        self.roster = SpeakerRoster(cast_names, extra_aliases)
+        self.cast_names = self.roster.cast_names
+        self.resolutions: "list[str]" = []
+        self.salvage = bool(salvage)
+        self.adopted: "list[str]" = []
+        self.dropped: "list[str]" = []
+        for _ in range(self.roster.blank_labels):
+            self.skeleton("cast roster contains a blank speaker label")
+        for prior, name in self.roster.ambiguous_labels:
+            self.skeleton(
+                f"cast roster labels {prior!r} and {name!r} are "
+                "ambiguous under case-insensitive identity"
+            )
         self.title: "str | None" = None
         self.title_first = True
         self.music_open: "str | None" = None
@@ -365,10 +681,12 @@ class _Parse:
         self.coda: "str | None" = None
         self.saw_end = False
 
-    @staticmethod
-    def _speaker_key(value: str) -> str:
-        """Case/spacing-insensitive identity; display text stays canonical."""
-        return " ".join(str(value).split()).casefold()
+    #: RETIRED 2026-08-24. The identity rule now lives once, module level, as
+    #: `speaker_identity_key`, which the writer imports instead of keeping its
+    #: own hand-written copy. Kept as a thin alias only so a caller reaching
+    #: for the old private name gets the same answer rather than an
+    #: AttributeError; there is no second implementation behind it.
+    _speaker_key = staticmethod(speaker_identity_key)
 
     def defect(self, code: NewsProParseDefect, detail: str = "",
                line_no: "int | None" = None) -> None:
@@ -444,7 +762,11 @@ class _Parse:
             self.state = _PREAMBLE
         elif self.state == _SCENES:
             self._close_scene(no)
-            self.skeleton("announcer outro missing before the CODA", no)
+            # In salvage the frame was deliberately held open so post-outro
+            # drama could still land, so outro text already collected is NOT
+            # a missing outro. Only a genuinely absent one is reported.
+            if not (self.salvage and self.outro):
+                self.skeleton("announcer outro missing before the CODA", no)
             self.state = _POSTAMBLE
         self.coda = text
 
@@ -464,39 +786,88 @@ class _Parse:
 
     def on_speaker(self, name: str, text: str, no: int) -> None:
         supplied_name = " ".join(name.split())
-        canonical_name = self.speaker_by_key.get(
-            self._speaker_key(supplied_name)
-        )
+        # ONE MATCHER (`SpeakerRoster.resolve`), shared with the writer's
+        # repair rung. Exact identity wins first; the relaxed rungs -- role
+        # parenthetical, emphasis decoration, trailing delivery tag, and the
+        # unambiguous alias index -- only ever propose a lookup candidate.
+        #
+        # THE DEFECT KEEPS THE RAW LABEL. Bible 12.132 asks for exactly this:
+        # normalize before comparing, but report what the model actually wrote,
+        # so `_standalone_stage_direction_repair_note` still sees `*SFX` as a
+        # stage direction and a reader can tell a formatting artifact from a
+        # genuinely absent roster entry.
+        canonical_name, how = self.roster.resolve(supplied_name)
         if canonical_name is None:
-            # THE ROLE PARENTHETICAL (2026-08-02, live wan_ti2v leg).
-            # The writer re-states a speaker with the role it was cast in --
-            # "Commander Vance (Space Force Tactician)" against a roster that
-            # says "Commander Vance" -- and every one of that character's lines
-            # then raised UNKNOWN_SPEAKER. Four repair attempts later the markup
-            # ladder exhausted and the leg died in the writer, 2.7 minutes in,
-            # having never reached a video engine at all.
-            #
-            # It is a restatement of the cast, not a different character, so it
-            # resolves rather than fails. Deliberately a FALLBACK and never the
-            # primary key: a roster that genuinely carries parentheses still
-            # matches exactly first, and this cannot merge two distinct cast
-            # members because it only rewrites the SUPPLIED name before looking
-            # it up in the roster map that was already built from exact keys.
-            bare = _strip_role_parenthetical(supplied_name)
-            if bare != supplied_name:
-                canonical_name = self.speaker_by_key.get(
-                    self._speaker_key(bare)
+            if _is_sound_cue_label(supplied_name):
+                # A SOUND CUE IS NEVER A CHARACTER, in salvage or out of it.
+                # THIS PIPELINE HAS NO SOUND EFFECTS -- the ledger token went
+                # 2026-07-01 and the SFX subsystem was ripped 2026-08-06 -- so
+                # a cue row can only become a character reading a stage
+                # direction aloud in their own voice, or an SFX row in a
+                # ledger that has nowhere to put one.
+                #
+                # DROPPED, NOT ADOPTED, and it costs no dialogue: a cue row
+                # describes a sound, it does not speak. Rows that DO carry
+                # dialogue -- including a character the model invented -- are
+                # adopted below and keep every word.
+                #
+                # Deliberately NOT gated on salvage. An SFX row must never
+                # reach the ledger by any path, and on the honest path this
+                # still reports UNKNOWN_SPEAKER via the fall-through below,
+                # so the repair rung is still told to fix it.
+                if self.salvage:
+                    self.dropped.append(
+                        f"line {no}: sound cue, not a character: "
+                        f"{supplied_name}")
+                    return
+            if self.salvage:
+                # ADOPTION (operator, 2026-08-24): "sometimes a wrong name
+                # populated but shouldn't kill the whole episode." A speaker
+                # the roster cannot place is a character the model wrote, so
+                # in salvage the episode KEEPS the line and the character is
+                # admitted for real -- the producer deals them a voice and
+                # they reach the ledger. A slightly wrong name in a delivered
+                # episode beats a perfect refusal, which is THE LAW: an audit
+                # may improve a story, it may never fail one.
+                # ADOPT THE UNDECORATED FORM. The label arrives wearing
+                # whatever the model put on it, and that name becomes a real
+                # CAST ROW -- it reaches the voice deal, the ledger, the
+                # captions and the credits. Adopting `(SOMEONE NEW)` verbatim
+                # would print the brackets in the credit roll and read as a
+                # broken episode rather than a salvaged one. The raw label is
+                # still recorded in the receipt line below, so the adoption
+                # stays traceable to exactly what the model wrote.
+                canonical_name = _undecorated_speaker_name(supplied_name)
+                if canonical_name not in self.adopted:
+                    self.adopted.append(canonical_name)
+                self.resolutions.append(
+                    f"line {no}: speaker {supplied_name!r} ADOPTED as "
+                    f"{canonical_name!r} -- not on the locked roster; "
+                    "admitted as a speaking character")
+            else:
+                self.defect(
+                    NewsProParseDefect.UNKNOWN_SPEAKER, supplied_name, no
                 )
-        if canonical_name is None:
-            self.defect(
-                NewsProParseDefect.UNKNOWN_SPEAKER, supplied_name, no
-            )
-            canonical_name = supplied_name
+                canonical_name = supplied_name
+        elif how != "exact":
+            # Every non-exact resolution is receipted, never hidden.
+            self.resolutions.append(
+                f"line {no}: speaker {supplied_name!r} resolved to "
+                f"{canonical_name!r} by {how}")
         if canonical_name == ANNOUNCER_NAME:
             if self.state in (_EXPECT_TITLE, _PREAMBLE):
                 self.state = max(self.state, _PREAMBLE)
                 self.intro.append(text)
             elif self.state == _SCENES:
+                if self.salvage:
+                    # THE FRAME STAYS OPEN IN SALVAGE. A mid-scene ANNOUNCER
+                    # row is what actually killed the 2026-08-24 leg: it
+                    # closed the story frame, and every later character line
+                    # became "after the last scene". Here the outro text is
+                    # KEPT (the ledger needs a non-empty outro) but the scenes
+                    # stay open, so the drama that follows still lands.
+                    self.outro.append(text)
+                    return
                 self._close_scene(no)
                 self.state = _POSTAMBLE
                 self.outro.append(text)
@@ -521,7 +892,8 @@ class _Parse:
             )
 
 
-def parse_scifi_news_pro_markup(text: str, cast_names) -> (
+def parse_scifi_news_pro_markup(text: str, cast_names, extra_aliases=None,
+                                salvage: bool = False) -> (
         "tuple[ParsedScript | None, tuple[ParseDefect, ...]]"):
     """Parse whole-play scifi_news_pro markup against the legal cast.
 
@@ -531,8 +903,29 @@ def parse_scifi_news_pro_markup(text: str, cast_names) -> (
     Returns ``(ParsedScript, ())`` on a clean parse or ``(None, defects)``
     with EVERY defect collected. Pure: no I/O, no mutation of arguments,
     never rewrites a spoken word.
+
+    ``extra_aliases`` maps a canonical roster name to additional labels the
+    cast's own author says it will use for that character. Additive, and held
+    to the same ambiguity guard as the derived ones.
+
+    ``salvage`` IS NOT A LOOSER PARSER -- IT IS THE LAST RUNG OF THE PRODUCER.
+    It is False for every honest attempt, and the writer turns it on only when
+    the repair ladder has already spent its attempts and the alternative is
+    delivering NO EPISODE. Operator, 2026-08-24: *"accepts sometimes a wrong
+    name populated but shouldn't kill the whole episode."* In salvage:
+
+    * a speaker the roster cannot place is ADOPTED as a real character
+      (``script.adopted_speakers``) rather than refused;
+    * an unlabelled row is DROPPED and recorded (``script.dropped_rows``)
+      rather than refused -- this is the one place the module may discard a
+      row, and it discards only rows that name no speaker and therefore
+      cannot be performed by anyone;
+    * a mid-scene ANNOUNCER row keeps its text but does not close the frame.
+
+    Everything else still refuses. Salvage cannot invent a TITLE, a CODA, an
+    END or a scene, so a draft with no story in it still fails loudly.
     """
-    p = _Parse(cast_names)
+    p = _Parse(cast_names, extra_aliases, salvage)
     normalizations: "list[str]" = []
     for no, raw in enumerate(str(text).splitlines(), start=1):
         line = raw.strip()
@@ -568,6 +961,12 @@ def parse_scifi_news_pro_markup(text: str, cast_names) -> (
         if m:
             p.on_speaker(m.group(1), m.group(2).strip(), no)
             continue
+        if p.salvage:
+            # An unlabelled row names no speaker, so no voice can perform it
+            # and no ledger row can own it. In salvage it is dropped and
+            # RECORDED rather than allowed to refuse the whole episode.
+            p.dropped.append(f"line {no}: {line[:80]}")
+            continue
         p.defect(NewsProParseDefect.BAD_LINE_SHAPE, line[:80], no)
         if p.state == _EXPECT_TITLE:
             p.state = _PREAMBLE
@@ -586,7 +985,26 @@ def parse_scifi_news_pro_markup(text: str, cast_names) -> (
     spoken = {ln.speaker for _n, _s, lines in p.scenes for ln in lines}
     for name in p.cast_names:
         if name not in spoken:
+            if p.salvage:
+                # A locked cast member who never spoke cannot be conjured
+                # into speech without authoring dialogue, which is forbidden.
+                # In salvage they simply do not appear in this episode; the
+                # producer drops their cast row so the ledger's speaker set
+                # still matches exactly, with no hole and no silent voice.
+                p.dropped.append(f"cast member never spoke: {name}")
+                continue
             p.defect(NewsProParseDefect.CAST_MEMBER_SILENT, name)
+
+    if p.salvage and not any(lines for _n, _s, lines in p.scenes):
+        # Salvage still refuses a draft with no drama in it. Delivering an
+        # episode of nothing is not the operator's "wrong name populated".
+        # Checked on SPOKEN LINES, not on whether a SCENE header exists: a
+        # draft can open "SCENE 1:" and then contain nothing but unlabelled
+        # narration, which salvage drops -- leaving a scene with no drama in
+        # it and nobody to perform.
+        p.defects[:] = [d for d in p.defects
+                        if d.code is not NewsProParseDefect.EMPTY_SCENE]
+        p.skeleton("salvage cannot proceed: no scene contains a spoken line")
 
     if p.defects:
         return None, tuple(p.defects)
@@ -608,6 +1026,8 @@ def parse_scifi_news_pro_markup(text: str, cast_names) -> (
         coda=p.coda or "",
         character_word_count=character_words,
         announcer_word_count=announcer_words,
-        normalizations=tuple(normalizations),
+        normalizations=tuple(normalizations) + tuple(p.resolutions),
+        adopted_speakers=tuple(p.adopted),
+        dropped_rows=tuple(p.dropped),
     )
     return script, ()

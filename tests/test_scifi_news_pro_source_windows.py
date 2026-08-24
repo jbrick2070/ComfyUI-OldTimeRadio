@@ -721,6 +721,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         _digest,
         _envelope,
         cast_names,
+        _extra_aliases=None,
     ):
         counting_fn([], temperature=0.75, max_new_tokens=None)
         raw = _valid_markup()

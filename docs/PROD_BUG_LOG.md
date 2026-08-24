@@ -6153,10 +6153,110 @@ EXPECTED result, not a regression signal.
   `scripts/otr_overnight_loop.sh` now archives every leg log to
   `tmp/legs/passNNN/` after each pass, so a 60%-failure lane is diagnosable
   from ONE loop instead of another overnight re-run.
-- fix: **NOT FIXED.** Recorded as the go-forward's NEXT item on operator
-  instruction ("we need to help fix scifi_news_pro"). Class A's markdown-leak
-  half is the recommended first swing: it is mechanical, cheap to test, and
-  needs no story-quality judgement.
+- fix: **FIXED 2026-08-24 (Class A).** The recommended first swing above --
+  "Class A's markdown-leak half" -- was CORRECT but INCOMPLETE, and acting on
+  it alone would have shipped a fix that did not save the observed leg.
+
+  **THE FRAMING WAS WRONG AND THE MEASUREMENT SAYS SO.** A pass-11 leg log
+  survived (`tmp/_bankgate_scifi_news_pro.log`) carrying a richer capture than
+  the three above: SIX rejected speaker tokens. Markdown was the MINORITY
+  mechanism -- 3 of 6. Five carried a comma delivery tag (`ELI, whispering`),
+  four were a shortened cast name (`DR. CHEN` against a roster holding
+  `Dr. Haorong Chen`). No single mechanism covered even half, and the leg
+  needed all six to resolve.
+
+  **AND A PERFECT MATCHER STILL WOULD NOT HAVE SAVED IT.** Proved BEFORE any
+  code was written by rebuilding the draft from its defect fingerprint and
+  feeding the real parser a roster in which every supplied label already
+  resolved: 5 `BAD_LINE_SHAPE` narration rows and 4 `SKELETON_BREAK`s
+  survived. Two more mechanisms were hiding behind the loud one -- unlabelled
+  prose action rows, and a mid-scene ANNOUNCER row that CLOSES the story frame
+  so every later character line lands "after the last scene". The r1 panel
+  (Fable cold, Sonnet 5, codex `gpt-5.6-sol`) corrected the driver's own claim
+  that the skeleton breaks were derivative; `on_speaker` never changes parser
+  state for an unresolved label, so only a RESOLVED ANNOUNCER row can do it.
+
+  **WHY FOUR ATTEMPTS ALWAYS BURNED.** `_standalone_stage_direction_repair_note`
+  returned on the FIRST matching defect. Here that was the line-5 action row, so
+  every repair turn carried the fold-the-stage-direction rule and never once
+  named the six broken labels. Compounding it, `_undecorated_label` stripped
+  ONE marker character, so `**Ada**` became `*Ada*`, missed the roster, and a
+  REAL cast member wearing `**` was told to fold or omit the line -- advice
+  that deletes a character's dialogue. Every fixture in the suite used a single
+  `*`, which is why four QA rounds never saw it.
+
+  **WHAT SHIPPED:**
+  * ONE shared speaker resolver in `_otr_scifi_news_pro_markup.py`
+    (`SpeakerRoster` / `build_speaker_roster` / `speaker_identity_key`),
+    consumed by the parser AND by `_resolves_to_cast`, which previously
+    re-implemented the ladder while its docstring claimed to import it. Bug
+    Bible 12.132 verify-condition 3 (one matcher, never two) is now true.
+    Rungs, exact match ALWAYS first: role parenthetical -> emphasis decoration
+    -> trailing comma delivery tag -> unambiguous alias index. Every non-exact
+    resolution is receipted; the defect keeps the RAW label so the repair note
+    still sees `*SFX` as a stage direction.
+  * The alias index is built at roster time and an alias registers ONLY if
+    exactly one cast member claims it -- two claimants and NEITHER gets it,
+    both degrading to exact-only. No fuzzy or edit-distance matching, so
+    `test_unknown_speaker_is_hard_no_remap` still holds.
+  * A per-episode `_pass_cast_aliases` LLM pass (operator: *"deterministic py
+    is too strict ... asking an llm to look for aliases and who this person is
+    may be more natural"*). Its answers arrive as DATA, so the parser stays
+    pure and one script always parses one way; they pass the same ambiguity
+    guard; and any failure degrades to the derived aliases rather than raising.
+  * The repair channel now emits ONE NOTE PER DEFECT CLASS instead of
+    returning on the first, gained a rule for unlabelled prose rows and one
+    for unresolved-but-near-roster labels, and `_frame_order_repair_note` tells
+    the model its ANNOUNCER outro closed the show early -- a mechanism that had
+    no advice at all. `_undecorated_label` now strips a RUN of markers.
+  * **SALVAGE (operator, 2026-08-24: "accepts sometimes a wrong name populated
+    but shouldn't kill the whole episode").** After all four honest attempts
+    are spent, the best draft is re-read with unplaceable speakers ADOPTED as
+    real characters, unperformable unlabelled rows dropped, and a mid-scene
+    ANNOUNCER no longer closing the frame. Marked `salvaged` in the ledger and
+    logged as a warning; a storyless draft still raises. The honest path is
+    byte-for-byte unchanged (`salvage=False` on every attempt).
+  * **NO SFX, ANYWHERE (operator: "there should be no SFX", "we ripped out all
+    SFX layers", "no SFX in the ledger").** A closed cue vocabulary
+    (`_SOUND_CUE_LABELS`) is never cast as a character on any path -- 17
+    spellings proven. The rule keys on the WORD, not on punctuation, because
+    the first draft keyed on decoration and would have discarded
+    `(SOMEONE NEW): I have something to say.` -- dialogue and all. Operator:
+    *"they should not chunk off dialogue."* Adopted names are undecorated so a
+    salvaged episode's credits read clean.
+  * `_stage_direction_rule` no longer shows the model `'*SFX: a door slams'`.
+    That string was RETURNED INTO THE WRITER'S PROMPT and was the only
+    model-visible SFX token in the tree -- it survived the 2026-07-01 token
+    removal and the 2026-08-06 rip because it reads as documentation rather
+    than as pipeline output.
+- **DELIBERATELY NOT FIXED, each with its reason:**
+  * `[SFX: ...]` inside dialogue still reaches `lines[].text` on the inline
+    banks. Observed by the agy lane and verified; the REMEDY is rejected. The
+    2026-08-05 ruling makes `lines[].text` the canonical direction-bearing
+    record with three live consumers (TTS strips independently, the caption
+    burn diverges by design, `_otr_motion_clause._line_text_index` drives the
+    i2v motion clause). Operator, independently: *"we may need that for music
+    or tts"*, and *"now video models are doing native audio too"* -- a video
+    model with native audio can consume the cue directly, which is a NEW
+    reason to retain it that the 2026-08-05 ruling did not have.
+  * `scenes[].env` (`production_ledger.py:1116`) is a dead ledger schema slot
+    with THREE live readers (`video_engine.py:1748`,
+    `scripts/render_flux_batch.py:234`, and `tests/test_video_ledger.py:188`
+    asserts on it). Always `None`, so it is not SFX content in the ledger.
+    Ripping it would punch the hole `CLAUDE.md` forbids.
+  * `_otr_story_brief.py:354` filters `speaker_role in {"music","env"}` inside
+    a LIVE reflection-prompt builder; no such role exists, so that prompt's
+    "NON-DIALOGUE ROWS" block is ALWAYS EMPTY. Real defect, own item -- making
+    it match would inject music rows into a prompt that has never seen them
+    and change story output, which is settled territory.
+- suite at the fix: **12097 passed / 120 skipped / 1 xfailed, EXIT=0** (356 s).
+  **+43 collected tests, itemised:** 41 from the new
+  `tests/test_scifi_news_pro_speaker_resolution.py` (18 functions,
+  parametrized) and 2 new cases in the repair-note suite. Bible **22/26/3**.
+  Three existing tests asserted the OLD "fail closed" policy and were rewritten
+  to the operator's new rule rather than added to a known-fail list; two more
+  were re-derived because the fix made their fixtures resolve at parse time --
+  one of which carried its own instruction to do exactly that.
 - verify idea (automatable, no render): feed the markup parser a speaker token
   wrapped in markdown emphasis (`**ANNOUNCER`, `*ANNOUNCER*`, `__ANNOUNCER__`)
   and assert it resolves to the same cast member as the bare token -- or, if
@@ -6169,5 +6269,14 @@ EXPECTED result, not a regression signal.
   rejects a VALID token because the model wrapped it in markdown" is a reusable
   defect class with a cheap, portable verify. Promoted as 12.132.
 - confidence: HIGH on the measurement (10 live headless passes, logged);
-  HIGH on both class mechanisms (real captured errors); NONE on root cause.
-- status: OPEN -- next go-forward item.
+  HIGH on both class mechanisms (real captured errors); **HIGH on Class A root
+  cause** -- five mechanisms named from a real capture, each reproduced against
+  the live parser before any code was written.
+- status: **CLASS A FIXED, green on the suite, LIVE PROOF STILL OWED.** A green
+  suite does not close this: the measurement that opened it was 6 failures in
+  10 LIVE passes, so only a fresh overnight loop can retire it. Re-run
+  `scripts/otr_overnight_loop.sh` and compare the `scifi_news_pro` failure rate
+  against the recorded 60%. **CLASS B (`_pass_news_read`) IS UNTOUCHED AND
+  STILL OPEN** -- all three r1 lanes independently ruled it a different fault
+  (different pass, ladder, error type and validator), and it must not be
+  reported as covered by this fix.

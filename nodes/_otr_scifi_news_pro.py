@@ -28,7 +28,7 @@ import random
 import re
 import warnings
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
 
@@ -58,9 +58,11 @@ try:
         ParseDefect,
         ParsedScript,
         _strip_role_parenthetical,
+        build_speaker_roster,
         normalize_scifi_news_pro_markup_text,
         parse_scifi_news_pro_markup,
         render_defects,
+        speaker_identity_key,
     )
     from . import _otr_canon as _OTRC
     from . import _otr_word_delivery as _OTRWD
@@ -86,9 +88,11 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         ParseDefect,
         ParsedScript,
         _strip_role_parenthetical,
+        build_speaker_roster,
         normalize_scifi_news_pro_markup_text,
         parse_scifi_news_pro_markup,
         render_defects,
+        speaker_identity_key,
     )
     import _otr_canon as _OTRC  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
@@ -790,6 +794,17 @@ class FinalDraft:
     proof_map: "tuple[ProofMapEntry, ...]"
     p3_attempts: "tuple[PassAttemptTrace, ...]"
     hashes: FinalDraftHashes
+    #: Whether this draft reached acceptance through the ladder's salvage
+    #: rung. IT MUST TRAVEL WITH THE DRAFT: the seal checks below re-parse the
+    #: raw source and compare, and a re-parse under DIFFERENT rules is not a
+    #: seal of the same artifact -- it would re-reject exactly the rows
+    #: salvage admitted and report a stale seal for a draft nothing changed.
+    salvaged: bool = False
+    #: The alias map the parse was performed against, for the same reason.
+    speaker_aliases: "tuple[tuple[str, tuple[str, ...]], ...]" = ()
+
+    def alias_map(self) -> "dict[str, list[str]]":
+        return {name: list(values) for name, values in self.speaker_aliases}
 
 
 # ---------------------------------------------------------------------------
@@ -1804,6 +1819,103 @@ def _pass_news_read(
         ) from exc
 
 
+class CharacterAliases(BaseModel):
+    """The labels one character will actually be called in the script."""
+
+    name: str
+    aliases: "list[str]" = Field(default_factory=list)
+
+
+class CastAliases(BaseModel):
+    """Every character's spoken-label set, authored by the cast's own author."""
+
+    characters: "list[CharacterAliases]" = Field(default_factory=list)
+
+
+#: INLINE, NOT A PACK SEAM, AND DELIBERATELY SO. Adding a required seam key
+#: would change every pack, and a frozen embedded pack is sealed by a sha256
+#: receipt -- the 2026-08-17 panel killed exactly that shape of change because
+#: it bricks every frozen pack. This pass is new, small, and optional, so it
+#: carries its own instruction rather than taxing the pack format.
+_CAST_ALIAS_SYSTEM = (
+    "You name characters for a radio drama. You are given the locked cast of "
+    "one episode. For each character, list the OTHER labels a script would "
+    "naturally use for them in a speaker position -- what the other "
+    "characters would call them out loud. Include the surname on its own when "
+    "people would use it, a title with the surname, a first name, and any "
+    "nickname or short form that fits the character. Do not invent a new "
+    "character, do not return a label for anyone not listed, and never return "
+    "a label that could mean two different people in this cast. Return the "
+    "canonical name exactly as given, with its aliases."
+)
+
+
+def _pass_cast_aliases(technical_fn, pack, treatment: Treatment) -> "dict":
+    """Ask the cast's own author what it will call each character.
+
+    WHY THIS PASS EXISTS (operator, 2026-08-24): *"deterministic py is too
+    strict and may not catch edge cases -- asking an llm to look for aliases
+    and who this person is may be more natural."* And he is right about the
+    phenomenon: *"sometimes people like to call each other by their own last
+    name."* The same model that invented "Dr. Haorong Chen" writes "DR. CHEN"
+    four lines later, and no token rule predicts a nickname.
+
+    ONCE PER EPISODE, NOT PER LINE. The parser stays pure -- it receives these
+    as DATA -- so one script always parses one way, which a model call inside
+    identity resolution could never promise.
+
+    BEST-EFFORT BY CONSTRUCTION, AND THAT IS THE POINT. A pass that can refuse
+    would trade one 60%-failure lane for another, so every failure here
+    degrades to the deterministic aliases instead of raising. It also cannot
+    widen anything dangerously: `SpeakerRoster` holds these to the same
+    ambiguity guard as the derived ones, so an alias claimed by two characters
+    is suppressed for BOTH and a label naming nobody is dropped.
+    """
+    roster = [
+        {"name": shape.name, "role": shape.role}
+        for shape in treatment.cast_shapes
+    ]
+    user = (
+        "LOCKED CAST:\n"
+        + json.dumps(roster, ensure_ascii=False, indent=2)
+        + "\n\nList each character's spoken labels now."
+    )
+    try:
+        # LLM slot: technical -- naming judgment, no story content.
+        result = structured_call(
+            prompt=ProviderCapacityMessages([
+                {"role": "system", "content": _CAST_ALIAS_SYSTEM},
+                {"role": "user", "content": user},
+            ]),
+            schema=CastAliases,
+            slot_fn=technical_fn,
+            base_temperature=0.10,
+            structural_retry_temperature=0.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=None,
+            helper_name="scifi_news_pro_cast_aliases",
+        )
+    except Exception as exc:  # noqa: BLE001 -- degrade, never refuse
+        log.info("[scifi_news_pro] cast alias pass declined (%s); using "
+                 "derived aliases only", exc)
+        return {}
+    out: "dict[str, list[str]]" = {}
+    for row in result.characters:
+        name = str(row.name or "").strip()
+        if not name:
+            continue
+        labels = [str(a).strip() for a in (row.aliases or [])]
+        # A label carrying a colon would be read as a row delimiter, and one
+        # equal to ANNOUNCER would shadow the show's frame.
+        keep = [a for a in labels
+                if a and ":" not in a
+                and _speaker_identity_key(a) != _speaker_identity_key(
+                    ANNOUNCER_NAME)]
+        if keep:
+            out.setdefault(name, []).extend(keep)
+    return out
+
+
 def _script_user_prompt(
     treatment: Treatment,
     digest: str,
@@ -1962,9 +2074,12 @@ def require_ledger_save(led, what: str) -> None:
         )
 
 
-def _speaker_identity_key(value: str) -> str:
-    """Case/spacing-insensitive speaker identity, matching the parser's own."""
-    return " ".join(str(value).split()).casefold()
+#: THE PARSER'S OWN IDENTITY RULE, IMPORTED -- not a second copy of it.
+#: Until 2026-08-24 this was a hand-written duplicate of `_Parse._speaker_key`.
+#: The two agreed by luck, and nothing made them keep agreeing; Bug Bible
+#: 12.132 verify-condition 3 asks for exactly one matcher, so this is now an
+#: alias for the module that owns the rule.
+_speaker_identity_key = speaker_identity_key
 
 
 #: LEMMY's name, from the ONE profile that owns his identity. Never a literal
@@ -1986,20 +2101,24 @@ def _is_lemmy(value: str) -> bool:
     return _speaker_identity_key(value) == _LEMMY_IDENTITY_KEY
 
 
-def _resolves_to_cast(label: str, roster: "set[str]") -> bool:
+def _resolves_to_cast(label: str, roster) -> bool:
     """Whether ``label`` names someone on the roster, the parser's way.
 
-    Mirrors the two-step lookup at `_otr_scifi_news_pro_markup` `on_speaker`: exact
-    identity first, then the same trailing-role-parenthetical fallback, so
-    ``Ada (Engineer)`` resolves to Ada exactly as it does during parsing.
-    Imported rather than reimplemented -- the parser is the one authority on
-    what counts as the same speaker, and a second copy of that rule is a second
-    answer waiting to disagree.
+    NOW GENUINELY THE PARSER'S WAY, which it previously only claimed to be.
+    The old body re-implemented the lookup ladder inline -- exact, then the
+    parenthetical fallback -- while its docstring said "imported rather than
+    reimplemented". Only the HELPERS were imported; the LADDER was a copy, and
+    the moment `on_speaker` grew a rung the copy went stale.
+
+    WHY A STALE COPY IS A LIVE BUG AND NOT A TIDINESS ISSUE: this function is
+    what decides whether the repair rung says "restore this real character's
+    canonical label and KEEP THE DIALOGUE" or falls through to "fold or omit
+    this row". If the parser accepts a label this says is unresolvable, the
+    model is told to DELETE A LINE THE PARSER WOULD HAVE TAKEN.
+
+    ``roster`` is a `SpeakerRoster` built by the parser's own constructor.
     """
-    if _speaker_identity_key(label) in roster:
-        return True
-    bare = _strip_role_parenthetical(label)
-    return bare != label and _speaker_identity_key(bare) in roster
+    return roster.names_a_cast_member(label)
 
 
 def _undecorated_label(label: str) -> str:
@@ -2021,7 +2140,26 @@ def _undecorated_label(label: str) -> str:
     token = str(label).strip()
     if not token.startswith(_STAGE_DIRECTION_PREFIXES):
         return ""
-    closer = {"(": ")", "[": "]", "*": "*"}[token[0]]
+    opener = token[0]
+    closer = {"(": ")", "[": "]", "*": "*"}[opener]
+    # A RUN, NOT A CHARACTER (fixed 2026-08-24). This stripped exactly one
+    # opener and one closer, so the DOUBLE-asterisk shape the local models
+    # actually emit was mangled rather than undecorated: `**Ada**` came back
+    # as `*Ada*` and `**DR. CHEN**, urgent` as `*DR. CHEN**, urgent`. Neither
+    # ever hit the roster, so a REAL cast member wearing `**` fell through to
+    # the stage-direction branch and the model was told to fold or omit the
+    # line -- deleting a real character's dialogue. Every fixture in
+    # `tests/test_scifi_news_pro_stage_direction_repair_note.py` used a single
+    # `*`, which is why four QA rounds never saw it.
+    # Brackets and parentheses do not nest this way in a speaker label, so the
+    # run is only ever consumed for the asterisk family.
+    if opener == "*":
+        while token.startswith(opener):
+            token = token[1:]
+        token = token.strip()
+        while token.endswith(closer):
+            token = token[:-1]
+        return token.strip()
     token = token[1:].strip()
     if token.endswith(closer):
         token = token[:-1].strip()
@@ -2068,8 +2206,26 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
     ``BAD_LINE_SHAPE`` carries a LINE FRAGMENT rather than a label, so a roster
     lookup against it is a category error and is not attempted.
     """
-    roster = {_speaker_identity_key(name) for name in cast_names}
-    roster.add(_speaker_identity_key(ANNOUNCER_NAME))
+    roster = build_speaker_roster(cast_names)
+
+    # ONE NOTE PER DEFECT CLASS, NOT ONE NOTE PER TURN (fixed 2026-08-24).
+    #
+    # THE DEFECT THIS CLOSES, measured on the live 2026-08-24 leg that ran the
+    # ladder to exhaustion: this function used to RETURN on the first matching
+    # defect. That draft's first one was a `BAD_LINE_SHAPE` action row, so all
+    # four repair turns carried the fold-the-stage-direction rule and NEVER
+    # ONCE mentioned the six broken speaker labels that were actually failing
+    # the parse. The model re-emitted the same shape four times because nobody
+    # ever told it about the shape that mattered, and the episode died.
+    #
+    # Aggregating per CLASS rather than per DEFECT is what keeps the repair
+    # turn short: ten rows of the same shape teach the model nothing that one
+    # row does not, and a wall of near-identical paragraphs is its own failure
+    # mode. Each class quotes the FIRST example it saw, with its line number.
+    classes: "dict[str, str]" = {}
+
+    def _remember(key: str, note: str) -> None:
+        classes.setdefault(key, note)
 
     for defect in defects:
         if defect.code not in _STAGE_DIRECTION_CODES:
@@ -2080,10 +2236,8 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
 
         if defect.code is NewsProParseDefect.UNKNOWN_SPEAKER:
             label = _undecorated_label(detail)
-            if not label:
-                continue  # an undecorated unknown name -- not our business
-            if _resolves_to_cast(label, roster):
-                return (
+            if label and _resolves_to_cast(label, roster):
+                _remember("decorated_cast", (
                     "\nFORMAT REPAIR RULE: a legal cast member was given a "
                     "decorated speaker label. The parser reported the label "
                     f"{detail!r}{where}, which is the character {label!r} "
@@ -2093,30 +2247,142 @@ def _standalone_stage_direction_repair_note(defects, *, cast_names):
                     "this line, do not merge it into a neighbouring line, and "
                     "do not rename the character. A speaker label carries no "
                     "asterisks, parentheses or brackets."
-                    "\nReturn no explanation, markdown, or repair commentary."
-                )
+                ))
+                continue
+            if not label:
+                # An UNDECORATED label the roster could not place. Naming the
+                # legal labels is safe, specific advice; telling it to fold
+                # the row away would lose a real character's line, which is
+                # the mistake this function has always refused to make.
+                _remember("unknown_label", (
+                    "\nFORMAT REPAIR RULE: the speaker label "
+                    f"{detail!r}{where} is not one of this episode's "
+                    "characters. Use one of these EXACT labels and no others: "
+                    + "; ".join([ANNOUNCER_NAME] + list(roster.cast_names))
+                    + ". If that row is this episode's own character speaking, "
+                    "rewrite the label to the exact form above and KEEP THE "
+                    "DIALOGUE EXACTLY AS WRITTEN. Do not delete the line and "
+                    "do not invent a character who is not listed."
+                ))
+                continue
             evidence = (f"The parser reported the illegal speaker label "
                         f"{detail!r}{where}.")
-        else:
-            if not detail.startswith(_STAGE_DIRECTION_PREFIXES):
-                continue
-            evidence = (f"The parser reported this malformed line, which may be "
-                        f"truncated: {detail!r}{where}.")
+            _remember("stage_direction", _stage_direction_rule(evidence))
+            continue
 
-        return (
+        if not detail.startswith(_STAGE_DIRECTION_PREFIXES):
+            # AN UNLABELLED ROW, and it used to get NOTHING. A prose action
+            # line that opens with a letter -- "Eli opens his package." --
+            # failed every classifier, raised BAD_LINE_SHAPE, and matched no
+            # branch here, so the ladder never once told the model that rows
+            # like it are illegal. Five of them sat in the leg that died.
+            _remember("unlabelled_row", (
+                "\nFORMAT REPAIR RULE: every nonblank row must begin with a "
+                "legal label followed by a colon -- TITLE, MUSIC, SCENE, "
+                "ANNOUNCER, a cast label, CODA or END. The parser reported "
+                f"this unlabelled row: {detail!r}{where}. It is narration or "
+                "an action beat with no speaker, and nobody can perform it. "
+                "Either fold what it describes into the nearest labelled "
+                "spoken line as natural words, or drop it. Do not return it "
+                "as its own row."
+            ))
+            continue
+        evidence = (f"The parser reported this malformed line, which may be "
+                    f"truncated: {detail!r}{where}.")
+        _remember("stage_direction", _stage_direction_rule(evidence))
+
+    if not classes:
+        return ""
+    # Stable order so a repair turn reads the same way every time.
+    order = ("decorated_cast", "unknown_label", "unlabelled_row",
+             "stage_direction")
+    return "".join(classes[k] for k in order if k in classes) + (
+        "\nReturn no explanation, markdown, or repair commentary.")
+
+
+def _stage_direction_rule(evidence: str) -> str:
+    """The standalone-stage-direction rule, with its own quoted evidence."""
+    return (
             "\nFORMAT REPAIR RULE: a standalone parenthetical, bracketed "
             "or asterisked row is an illegal stage direction. Do not return "
             "it as its own line, and do not use it as a SPEAKER LABEL -- a "
-            "row like '*SFX: a door slams' is a stage direction wearing a "
-            "label, not a character, and there is no sound-effect speaker. "
+            "row describing a sound or an action is not a character, and "
+            "only the cast and the announcer can speak. "
             "Preserve a necessary event only by folding it into the "
             "nearest legal labelled spoken line as natural words, or omit "
             "it when nonessential. Every nonblank row must begin with a "
             "legal label; do not invent an unlabeled narration row."
-            f"\n{evidence} It must not appear as a standalone output row. "
-            "Return no explanation, markdown, or repair commentary."
-        )
-    return ""
+            f"\n{evidence} It must not appear as a standalone output row."
+    )
+# THE WORKED EXAMPLE THAT USED TO SIT IN THAT RULE IS GONE (2026-08-24).
+#
+# It read "a row like '*SFX: a door slams' is a stage direction wearing a
+# label". Operator: *"there should be no SFX"* -- and this pipeline HAS no
+# sound effects: the `[SFX: ...]` ledger token went 2026-07-01 and the SFX bed
+# subsystem was ripped 2026-08-06. So the single place in the whole generation
+# path that said the word to a model was a repair note that survived both rips
+# because it reads as documentation rather than as pipeline output.
+#
+# WHY THIS IS A REAL DEFECT AND NOT A TIDY-UP: this string is RETURNED INTO THE
+# WRITER'S PROMPT. Every repair turn handed a small local model a concrete,
+# copyable example of a token nothing downstream can render. It is the same
+# self-defeating shape as showing a model the names it must not use -- and
+# Bug Bible 12.132 says plainly that instructing a model about a forbidden form
+# is what produces an intermittent, expensive-to-diagnose failure.
+#
+# The rule loses nothing by it. `evidence` immediately below quotes the
+# model's OWN offending row with its line number, which teaches the shape far
+# better than an invented example ever did.
+
+
+#: The skeleton breaks that mean "the story frame closed and then more drama
+#: arrived". Matched on the DETAIL text because `skeleton()` details are
+#: descriptive English sentences rather than typed codes -- the same reason
+#: `SKELETON_BREAK` is deliberately absent from `_STAGE_DIRECTION_CODES`.
+_FRAME_ORDER_MARKERS = (
+    "after the last scene",
+    "after the announcer outro began",
+    "ANNOUNCER line after the CODA",
+)
+
+
+def _frame_order_repair_note(defects) -> str:
+    """Tell the model its ANNOUNCER outro closed the show too early.
+
+    THE DEFECT THIS CLOSES, and it had NO note at all before 2026-08-24. The
+    ANNOUNCER is the show's frame: the first ANNOUNCER row after the scenes
+    begin ENDS the drama. A model that uses the announcer as a mid-scene
+    narrator therefore closes the episode by accident, and every character
+    line it writes afterwards raises "character line (X) after the last
+    scene". Four of those sat in the leg that died on 2026-08-24, and the
+    repair turns never mentioned the frame once -- so the model had no way to
+    know the announcer row was the problem rather than the dialogue.
+
+    Self-silencing, like every other note here: absent defect, empty string.
+    """
+    hits = [d for d in defects
+            if d.code is NewsProParseDefect.SKELETON_BREAK
+            and any(m in str(d.detail) for m in _FRAME_ORDER_MARKERS)]
+    if not hits:
+        return ""
+    where = (" (reported at line %d)" % hits[0].line_no
+             if hits[0].line_no is not None else "")
+    return (
+        "\nFORMAT REPAIR RULE: the ANNOUNCER is the show's frame, not a "
+        "narrator inside the story. The ANNOUNCER speaks in the opening "
+        "introduction and again in the closing outro, and NOWHERE ELSE -- the "
+        "first ANNOUNCER row after SCENE 1 begins ends the drama, so every "
+        f"character line after it is out of the show. The parser reported "
+        f"{str(hits[0].detail)!r}{where}"
+        + (f", and {len(hits)} rows in total landed outside the frame."
+           if len(hits) > 1 else ".")
+        + " Keep every one of those lines: move them back inside their scene "
+        "and move the ANNOUNCER outro down so it comes after all the drama. "
+        "The closing order is: last scene, ANNOUNCER outro, CODA, closing "
+        "MUSIC, END. If the announcer row was describing something happening "
+        "in the scene, give that description to a character instead."
+        "\nReturn no explanation, markdown, or repair commentary."
+    )
 
 
 #: The four forms the parser accepts, quoted exactly as it will read them.
@@ -2268,6 +2534,7 @@ def _run_markup_ladder(
     cast_names: "list[str]",
     initial_temperature: float,
     format_example: "str | None" = None,
+    extra_aliases: "dict[str, list[str]] | None" = None,
 ) -> "tuple[str, ParsedScript, dict]":
     """Return the first structurally clean whole-play parse.
 
@@ -2284,6 +2551,11 @@ def _run_markup_ladder(
     #: The draft the NEXT attempt has to repair. Empty until an attempt is
     #: rejected, and reset to "" whenever the draft could not be carried.
     rejected_draft = ""
+    #: The most recent rejected draft, kept for the salvage rung below. Held
+    #: separately from `rejected_draft`, which is cleared when a draft will
+    #: not fit the repair turn -- salvage re-reads text, so it does not care
+    #: about the prompt budget that cleared it.
+    last_raw = ""
     cold_regenerations = 0
     last_temp: "float | None" = None
 
@@ -2367,7 +2639,9 @@ def _run_markup_ladder(
             max_new_tokens=None,
         )
         raw = _strip_conversational_wrapper(raw)
-        parsed, defects = parse_scifi_news_pro_markup(raw, cast_names)
+        last_raw = raw
+        parsed, defects = parse_scifi_news_pro_markup(
+            raw, cast_names, extra_aliases)
         if parsed is not None:
             traces.append(PassAttemptTrace(
                 attempt=attempt,
@@ -2423,12 +2697,68 @@ def _run_markup_ladder(
             # because `PassAttemptTrace.parse_defects` enforces exactly that.
             + _standalone_stage_direction_repair_note(
                 defects, cast_names=cast_names)
-            # The required SHAPE, not only the offence. Both notes are
-            # self-silencing when their defect is absent, so a repair turn
+            # The required SHAPE, not only the offence. Every note is
+            # self-silencing when its defect is absent, so a repair turn
             # carries exactly the rules its own defects call for.
             + _end_delimiter_repair_note(defects)
+            + _frame_order_repair_note(defects)
             + "\n" + rendered
         )
+
+    # ---- LAST RUNG: SALVAGE, so the lane delivers instead of refusing ------
+    #
+    # OPERATOR, 2026-08-24: "accepts sometimes a wrong name populated but
+    # shouldn't kill the whole episode." Everything above is the honest
+    # attempt to get it RIGHT -- four calls, each taught what it actually got
+    # wrong. This runs only when all of them are spent, and the real choice
+    # left is a slightly wrong episode or no episode at all.
+    #
+    # THE LAW settles which: an audit may improve a story, it may NEVER fail
+    # one. So the best draft is re-read in salvage mode -- unplaceable
+    # speakers are adopted as real characters, unlabelled rows that nobody
+    # could perform are dropped, and a mid-scene ANNOUNCER stops closing the
+    # show early. Every one of those decisions is recorded on the artifact
+    # (`adopted_speakers`, `dropped_rows`, `normalizations`) so a salvaged
+    # episode is never mistaken for a clean one.
+    #
+    # SALVAGE IS NOT A SHIM AND IT DOES NOT WEAKEN THE GATE: `salvage=False`
+    # on every attempt above, so nothing about the honest path moved. It also
+    # still refuses a draft with no drama in it -- see the parser's own
+    # "salvage cannot proceed" guard.
+    if traces and last_raw:
+        salvaged, salvage_defects = parse_scifi_news_pro_markup(
+            last_raw, cast_names, extra_aliases, salvage=True)
+        if salvaged is not None:
+            # The last row is REWRITTEN rather than a new row appended: no
+            # fifth LLM call happened, and `PassAttemptTrace` documents real
+            # calls. It keeps its `parse_defects`, so the receipt still shows
+            # exactly what had to be salvaged over.
+            traces[-1] = replace(
+                traces[-1],
+                outcome="accepted",
+                selected=True,
+                character_words=salvaged.character_word_count,
+                scene_character_words=_scene_character_word_counts(salvaged),
+            )
+            trace_tuple = tuple(traces)
+            _validate_attempt_sequence(pass_id, trace_tuple)
+            return last_raw, salvaged, {
+                "defects_by_attempt": defects_by_attempt,
+                "structural_retries": len(traces) - 1,
+                "attempts": len(traces),
+                "output_budget_mode": "provider_capacity",
+                "requested_max_new_tokens": None,
+                "attempt_trace": trace_tuple,
+                "cold_regenerations": cold_regenerations,
+                "salvaged": True,
+                "salvage_adopted_speakers": list(salvaged.adopted_speakers),
+                "salvage_dropped_rows": list(salvaged.dropped_rows),
+            }
+        # Salvage could not find an episode in it either. Say so, with both
+        # defect lists, rather than reporting only the honest one.
+        last_defect_text = (
+            f"{last_defect_text}\nsalvage also refused:\n"
+            f"{render_defects(salvage_defects)}")
 
     raise NewsProScriptError(
         pass_id,
@@ -2475,6 +2805,7 @@ END."""
 
 def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                  envelope: SceneEnvelope, cast_names: "list[str]",
+                 extra_aliases: "dict[str, list[str]] | None" = None,
                  ) -> "tuple[str, ParsedScript, dict]":
     """P3 whole-play markup through the shared observed-attempt ladder."""
     system = _seam(pack, "scifi_news_pro_script_system")
@@ -2488,6 +2819,7 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
         cast_names=cast_names,
         initial_temperature=_TEMP["script"],
         format_example=_FABLE2_FORMAT_EXAMPLE,
+        extra_aliases=extra_aliases,
     )
 
 
@@ -2840,13 +3172,20 @@ def build_final_draft(
     treatment: Treatment,
     *,
     p3_attempts: "tuple[PassAttemptTrace, ...]" = (),
+    salvaged: bool = False,
+    speaker_aliases: "dict[str, list[str]] | None" = None,
 ) -> FinalDraft:
     """Build proof and hash seals for the sole accepted P3 artifact."""
     p3_attempts = tuple(p3_attempts)
     _validate_attempt_sequence("P3", p3_attempts)
     normalized = normalize_scifi_news_pro_markup_text(raw_source)
     cast_names = [shape.name for shape in treatment.cast_shapes]
-    authoritative, defects = parse_scifi_news_pro_markup(raw_source, cast_names)
+    # RE-PARSE THE WAY IT WAS FIRST PARSED. Same roster, same aliases, same
+    # salvage setting -- otherwise this is not re-verifying the artifact, it
+    # is parsing a different document and calling the difference a defect.
+    aliases = dict(speaker_aliases or {})
+    authoritative, defects = parse_scifi_news_pro_markup(
+        raw_source, cast_names, aliases, salvage=salvaged)
     if authoritative is None:
         raise NewsProParseError(
             "final_draft",
@@ -2919,7 +3258,8 @@ def _validate_final_draft_integrity(label: str, draft: Any) -> None:
             "final_draft", f"{label} normalized source seal is stale"
         )
     authoritative, defects = parse_scifi_news_pro_markup(
-        draft.raw_source, _speakers_in_order(draft.parsed)
+        draft.raw_source, _speakers_in_order(draft.parsed),
+        draft.alias_map(), salvage=draft.salvaged,
     )
     if authoritative is None:
         raise NewsProScriptError(
@@ -3616,6 +3956,17 @@ def run_scifi_news_pro_episode(
     cast_names = [shape.name for shape in treatment.cast_shapes]
     meta["num_characters_locked"] = len(cast_names)
 
+    # WHAT WILL THIS SCRIPT ACTUALLY CALL THESE PEOPLE? Asked once, of the
+    # model that just invented them, before a single line is written. Costs
+    # one small local call and saves the ladder from rejecting "DR. CHEN" as
+    # a stranger four attempts running (PBUG-20260824-01).
+    fn, box = _counting(technical_fn)
+    with _helper_ctx(slot_scheduler, "scifi_news_pro_cast_aliases"):
+        cast_aliases = _pass_cast_aliases(fn, pack, treatment)
+    if box["calls"]:
+        receipt("cast_aliases", technical_model, box["calls"], 0.10, None)
+    f2["cast_aliases"] = {k: list(v) for k, v in cast_aliases.items()}
+
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_news_read"):
         read = _pass_news_read(
@@ -3634,7 +3985,8 @@ def run_scifi_news_pro_episode(
     fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_script"):
         script_text, parsed, p3_meta = _pass_script(
-            fn, pack, treatment, source_preview, envelope, cast_names
+            fn, pack, treatment, source_preview, envelope, cast_names,
+            cast_aliases,
         )
     p3_attempts = tuple(p3_meta["attempt_trace"])
     if box["calls"] != len(p3_attempts):
@@ -3654,7 +4006,9 @@ def run_scifi_news_pro_episode(
     f2["safety_cleanup"] = safety
     f2["treatment"] = treatment.model_dump()
     final_draft = build_final_draft(
-        script_text, parsed, treatment, p3_attempts=p3_attempts
+        script_text, parsed, treatment, p3_attempts=p3_attempts,
+        salvaged=bool(p3_meta.get("salvaged")),
+        speaker_aliases=cast_aliases,
     )
     _validate_selected_final_draft(final_draft, treatment=treatment)
     f2["final_draft"] = _final_draft_ledger_payload(final_draft)
@@ -3663,7 +4017,24 @@ def run_scifi_news_pro_episode(
         "structural_retries": p3_meta["structural_retries"],
         "normalizations": list(final_draft.parsed.normalizations),
         "attempt_trace": [_attempt_payload(value) for value in p3_attempts],
+        # A SALVAGED EPISODE MUST NEVER READ AS A CLEAN ONE. These three are
+        # the receipt that the ladder ran out of honest attempts and the lane
+        # chose delivery over refusal, and exactly what it traded away.
+        "salvaged": bool(p3_meta.get("salvaged")),
+        "salvage_adopted_speakers": list(
+            p3_meta.get("salvage_adopted_speakers", [])),
+        "salvage_dropped_rows": list(
+            p3_meta.get("salvage_dropped_rows", [])),
     }
+    if p3_meta.get("salvaged"):
+        log.warning(
+            "[scifi_news_pro] SALVAGED episode: the markup ladder spent every "
+            "attempt, so the best draft was accepted with %d adopted speaker(s) "
+            "and %d dropped row(s). Adopted: %s",
+            len(p3_meta.get("salvage_adopted_speakers", [])),
+            len(p3_meta.get("salvage_dropped_rows", [])),
+            p3_meta.get("salvage_adopted_speakers") or "(none)",
+        )
 
     # ONE speaker list decides everything below it. `speaker_order` is the
     # script's truth and drives the cast rows; `casting_speakers` is the subset

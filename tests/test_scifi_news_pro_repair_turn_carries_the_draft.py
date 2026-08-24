@@ -246,8 +246,33 @@ def test_a_clean_first_attempt_still_costs_exactly_one_call():
     assert len(writer.prompts) == 1
 
 
-def test_an_unrepairable_model_still_fails_CLOSED():
-    """Carrying the draft must not make an invalid script valid."""
+def test_an_unrepairable_model_SPENDS_EVERY_ATTEMPT_then_SALVAGES():
+    """POLICY CHANGED 2026-08-24 BY THE OPERATOR, deliberately and on the
+    record: *"accepts sometimes a wrong name populated but shouldn't kill the
+    whole episode."*
+
+    This used to assert the ladder RAISES. That was the right rule while
+    refusing was free; it is not, and the measurement is why -- this lane
+    refused to produce an episode on 6 of 10 overnight passes
+    (PBUG-20260824-01), which is the most expensive possible outcome. THE LAW
+    settles it: an audit may improve a story, it may never fail one.
+
+    WHAT THE OLD TEST WAS PROTECTING IS STILL PROTECTED, and asserted below:
+    carrying the draft must not make an invalid script silently valid. So the
+    honest ladder is unchanged -- every attempt is still spent trying to get
+    a CLEAN parse -- and what changes is only what happens after they are all
+    gone. The outcome is marked, and a storyless draft still raises
+    (`test_SALVAGE_still_REFUSES_a_draft_with_no_story_in_it`).
+    """
     writer = ScriptedWriter([BAD] * 8)
-    with pytest.raises(scifi_news_pro.NewsProScriptError):
-        run_ladder(writer)
+    _raw, parsed, diag = run_ladder(writer)
+
+    # The honest path did NOT get shorter or more permissive.
+    assert len(writer.prompts) == 4, "every repair attempt must still be spent"
+    assert diag["structural_retries"] == 3
+    # And the outcome says plainly that it was salvaged, not clean.
+    assert diag["salvaged"] is True
+    assert parsed is not None
+    # The unlabelled row nobody could perform was dropped, and recorded.
+    assert any("Johannes Lachner enters" in row
+               for row in diag["salvage_dropped_rows"])
