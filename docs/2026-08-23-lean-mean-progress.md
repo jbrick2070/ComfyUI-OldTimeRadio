@@ -16,6 +16,27 @@ unholding it is his call, not a coder's.
 | 11 scripts audit + test-root cleanup | **DONE.** Test-root half was already closed on evidence (no repo-root conftest, no pythonpath key, so the 175 per-file `sys.path.insert` calls are load-bearing). Scripts half is now `docs/2026-08-23-lean-mean-order-11-scripts-owner-table.md`: 167 entries classified -- 95 wired, 27 documented-only, 11 unreferenced-and-tracked, 34 untracked. Nothing deleted. THREE files go to the operator, and one of them is a real find: `watcher_overrides.json` documents an allowlist "honored by soak_operator.py:apply_watcher_overrides", and that function no longer exists. |
 | 12 OpenRouter diet | BLOCKED, unchanged -- draft `otr_cloud_lanes.json` is still unratified. |
 
+**THE BAKE-OFFS ARE RETIRED (operator, 2026-08-23: "I think I am done with all
+bakeoffs").** Fifteen files out of `scripts/` -- four runners, two graph
+builders, two pinned graphs, the five `bench_graphs/` arms and the vendored
+`bench_helper/` -- plus the two test files that existed only for them.
+**CLAUDE.md section 0A went with them**, because that carve-out existed for one
+reason: to license the ONE exemption to "every API / headless / soak run must
+load the real canonical JSON". With no bench, there is no exemption, and the
+section now says so rather than describing machinery that is gone.
+
+Two guards in `test_dmd_sampler_and_recipe_seam.py` read the vendored helper and
+were RE-HOMED rather than deleted: one was an anti-duplication check (the DMD
+sampler must live in exactly one tree) and is now an absence guard; the other
+scanned two files for a retired fallback path and now scans the production one,
+which is the file it always mattered for. `dmd_sampler.py` and `eng_fastwan_8gb.py`
+cited bench paths as provenance and were re-pointed -- the bench is gone, the
+findings it produced stand.
+
+**Coverage loss was measured, not estimated:** collecting both trees and diffing
+node ids gives 115 tests lost and ALL 115 are the two deleted bake-off files
+(110 + 5 after parametrize expansion). Nothing else moved.
+
 **A LIVE BUG THE SEAM FOUND, and it is the best thing this window produced.**
 Measuring the tail before moving it turned up TWO unbound globals on one branch
 of `_run_writer_tail`: `_style_roll`, which is a local of `run()` (a SIBLING

@@ -14,6 +14,8 @@ import ast
 import io
 import os
 
+from pathlib import Path
+
 import pytest
 
 from nodes._otr_video_engines import dmd_sampler as _DS
@@ -34,19 +36,19 @@ def test_pack_owns_the_dmd_node_key():
 def test_bench_helper_no_longer_registers_the_key():
     """A duplicate registration under one node key is ambiguous.
 
-    The bench graphs are digest-pinned and name this class, so the KEY must not
-    move -- only its owner. The helper keeps its VRAM probes: those are
-    measurement machinery, and that asymmetry is deliberate."""
-    src = io.open(os.path.join(_REPO, "scripts", "bench_helper",
-                               "otr_bakeoff_helper", "__init__.py"),
-                  encoding="utf-8").read()
-    tree = ast.parse(src)
-    classes = {n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
-    funcs = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
-    assert "OTR_DMDRestartSamplerSelect" not in classes
-    assert "_dmd_restart_sampler" not in funcs
-    # ...but the measurement machinery stays put.
-    assert "OTR_BakeoffVramProbe" in classes
+    This used to compare production against the VENDORED bench helper, which
+    also declared ComfyUI nodes: the DMD sampler had to live in exactly one of
+    them. The operator retired every bake-off on 2026-08-23, so the second
+    declarer is gone and the guard is now ABSENCE -- there is no other tree that
+    can claim this node key. `OTR_DMDRestartSamplerSelect` itself is unaffected:
+    it moved OUT of the bakeoff category into production before any of this, and
+    the rest of this file exercises it directly."""
+    helper = Path(_REPO) / "scripts" / "bench_helper"
+    assert not helper.exists(), (
+        "scripts/bench_helper is back -- it declared ComfyUI nodes of its own, "
+        "so a returning copy can silently re-register this node key against "
+        "the production one in nodes/_otr_video_engines/dmd_sampler.py")
+    assert not (Path(_REPO) / "scripts" / "bench_graphs").exists()
 
 
 def test_root_registration_points_at_the_pack_module():
@@ -119,12 +121,13 @@ def test_sampler_refuses_by_name_before_step_1(model, needle):
 
 
 def test_no_fallback_flow_path_remains_anywhere():
-    for path in (_DS.__file__,
-                 os.path.join(_REPO, "scripts", "bench_helper",
-                              "otr_bakeoff_helper", "__init__.py")):
-        src = io.open(path, encoding="utf-8").read()
-        assert "FALLBACK-flow" not in src.replace(
-            "noise_scaling=FALLBACK-flow", "")  # only the comment may name it
+    # The vendored bench helper was the second file scanned here until the
+    # operator retired every bake-off (2026-08-23). The guard is unchanged in
+    # substance -- it always mattered for the PRODUCTION sampler, and that is
+    # the file that survived.
+    src = io.open(_DS.__file__, encoding="utf-8").read()
+    assert "FALLBACK-flow" not in src.replace(
+        "noise_scaling=FALLBACK-flow", "")  # only the comment may name it
 
 
 # --------------------------------------------------------------------------- #

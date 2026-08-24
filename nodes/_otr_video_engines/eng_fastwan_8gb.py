@@ -132,7 +132,8 @@ FASTWAN_LORA_NAME = "Wan2_2_5B_FastWanFullAttn_lora_rank_128_bf16.safetensors"
 
 #: THE SCHEDULE, AS A STRING, because that is the wire format. ``ManualSigmas``
 #: takes a COMMA-SEPARATED STRING, not a tuple -- verified against the working
-#: bench graph (``scripts/bench_graphs/arm_c_fastwan_lora_gguf.json`` node ``9b``).
+#: bench graph that qualified this recipe (node ``9b``; the bench itself was
+#: retired 2026-08-23, the finding it produced stands).
 #: A tuple here would not serialize into the graph.
 #:
 #: These are FastVideo's ``denoising_step_list`` divided by 1000. ``steps`` is

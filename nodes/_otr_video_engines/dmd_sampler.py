@@ -1,13 +1,15 @@
 """The DMD / Self-Forcing restart transition, as a registered ComfyUI SAMPLER.
 
-THE ONE OWNER (kibitz r2 F2 / r4). This transition used to live in the diagnostic
-bench helper (``scripts/bench_helper/otr_bakeoff_helper``), which is vendored under
-the CLAUDE.md s0A bench carve-out and installed into ``custom_nodes`` by the bench
-runner. A PRODUCTION engine may not depend on a diagnostic package, and two copies
-of a sampling transition is exactly how a silent divergence ships -- so the
-implementation MOVED here and the bench helper imports it. Its own class and its
-``NODE_CLASS_MAPPINGS`` entry are deleted; a duplicate registration under the same
-node key is ambiguous, and a helper-only registration is unavailable in production.
+THE ONE OWNER (kibitz r2 F2 / r4). This transition used to live in a diagnostic
+bench helper that was vendored into ``scripts/`` and installed into
+``custom_nodes`` by the bench runner. A PRODUCTION engine may not depend on a
+diagnostic package, and two copies of a sampling transition is exactly how a
+silent divergence ships -- so the implementation MOVED here.
+
+That was the right call twice over: the operator retired every bake-off on
+2026-08-23 and the helper went with them, so this file is now the ONLY owner by
+existence rather than by discipline. `tests/test_dmd_sampler_and_recipe_seam.py`
+keeps the guard as an absence check.
 
 WHY A REGISTERED NODE rather than an in-process ``KSAMPLER`` object: the bench
 submits an API-format JSON graph to real ComfyUI, which resolves by REGISTERED CLASS
@@ -31,10 +33,9 @@ import uuid
 
 _LOG = logging.getLogger("OTR.dmd_sampler")
 
-#: Node key. Unchanged from the bench helper's, deliberately: the pinned bench
-#: graphs (``scripts/bench_graphs/arm_c_fastwan_lora_gguf.json``) name this class
-#: and are digest-pinned in the campaign manifest, so renaming it would invalidate
-#: the very cells that qualified the recipe.
+#: Node key. Inherited from the retired bench helper and KEPT: it is what the
+#: shipped recipe was qualified under, and a node key is saved-workflow data --
+#: renaming it costs something and buys nothing now that the bench is gone.
 DMD_NODE_KEY = "OTR_DMDRestartSamplerSelect"
 
 
