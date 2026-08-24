@@ -1272,6 +1272,60 @@ and real dialogue sharing one row ("The monitor flatlines. Someone should call
 the desk."). The per-sentence lever catches them and costs precision elsewhere;
 a calibration example for the MIXED row is the cheaper thing to try first.
 
+### OPEN -- FOUR UNWIRED SYMBOLS, found 2026-08-23 by a zero-reference sweep
+
+A dead-symbol scan over `nodes/` (module-level defs whose name appears exactly
+ONCE in the whole repo -- its own definition) returned 13 candidates. Nine are
+ordinary dead helpers. **Four are not dead code at all: they are code that was
+written to run and never wired**, which is a different and more interesting
+thing. NONE were deleted. Each is reported with what it would have done.
+
+**1-2. `_otr_scifi_p0_contract.p0_contract_instruction` and
+`p0_contract_receipt` -- and this pair may explain the suspicion in the section
+below.** `_otr_scifi_news_pro` imports only `MAX_QUOTE_CHARS` and
+`p0_source_chunks` from that module. `p0_contract_instruction` returns "the
+model-visible compact-extraction contract for every P0 rung" -- the text that
+tells the model *at most 6 facts, 4 entities, 3 numeric rows, one literal span
+each, do not paraphrase quotes*. **Nothing calls it, and grepping
+`_otr_scifi_news_pro` for `MAX_FACT_ROWS`, `MAX_ENTITY_ROWS` or the phrase "at
+most" returns NOTHING.** So the model is never told the caps; it extracts
+freely and the grammar ceiling truncates whatever overflows. That is precisely
+the "silent evidence thinning" mechanism the next section suspects, arrived at
+from the opposite direction. `p0_contract_receipt` -- "the durable bounds
+receipt paired with a P0 call journal" -- is likewise never written, so no
+ledger records which bounds were (not) applied.
+**NOT FIXED HERE ON PURPOSE.** Wiring the instruction in changes a PROMPT, which
+changes scripts, and the next section's own rule is "prove it on an artifact
+before touching it". This is the artifact-hunt made much cheaper: the thing to
+look for is a P0 payload sitting exactly at 6 facts / 4 entities.
+
+**3. `_otr_scifi_news_pro._validate_scene_envelope`** -- a fail-closed validator
+that raises `NewsProScriptError("final_draft", ...)` when an envelope is not an
+exact `SceneEnvelope` or does not match its advisory scene plan. Never called.
+A guard nobody invokes is not protection, and deleting it would silently accept
+a loss nobody chose.
+
+**4. `_vram_log.vram_sentinel`** -- a decorator that snapshots VRAM at entry and
+calls `force_vram_offload()` when a TTS/audio function starts above a 6 GB
+ceiling. Applied to nothing. Its own docstring calls it "defensive depth, not a
+hard gate", so it is not a missing guarantee -- but on a 16 GB card whose known
+failure mode is a late OOM, an unapplied VRAM sentinel is worth a look rather
+than a delete. (`story_orchestrator` also imported `force_vram_offload` without
+using it; that import was swept.)
+
+**The nine ordinary dead helpers were left alone too**, deliberately: the sweep
+that found them also found the four above, and a pass that has just learned its
+scan surfaces unwired guards is the wrong pass to bulk-delete on. They are
+recorded here so the next window does not re-derive them --
+`story_orchestrator._generate_character_profile` (76 lines) and
+`_generate_announcer_profile` (20), `_otr_captions._cli` (18) and `color_for`
+(6), `_otr_voice_bank.voice_ref_entry` (15), `stable_audio_theme._load_meta`
+(12), `_otr_cast_env.cast_genre` (6), and
+`_otr_shared/slot_matrix.profile_keys_for_all_roles` (3).
+`_otr_video_engines/schemas.VideoProfileRow` is ALSO unreferenced and is
+explicitly KEPT: it is the declared row shape for a live `video_profiles.yaml`,
+and the campaign protects protocol fixtures.
+
 ### OPEN -- still suspect, deliberately not fixed
 
 The codex lane carries the cap-equals-trim shape on `MAX_FACT_ROWS` (6) and
