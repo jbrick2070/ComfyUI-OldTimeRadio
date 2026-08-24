@@ -149,3 +149,62 @@ def test_the_prompt_no_longer_calls_the_request_a_CEILING():
     assert "N_MAX (speaking-character ceiling)" not in source
     assert "REQUESTED cast size" in source
     assert "a REQUEST, not a limit" in source
+
+
+# ---------------------------------------------------------------------------
+# The LEGACY lane's smaller stock degrades the request; it must never raise
+# ---------------------------------------------------------------------------
+#
+# THE DEFECT (found 2026-08-24 by the character-selection trace). The widget
+# spans BOTH lanes and advertises the dispatched lane's ceiling (10), but the
+# legacy assembler seats only what its Bark stock can voice (6) -- and it
+# enforced that by RAISING. An operator moving the slider to 7 on `original`
+# or `media_archive` killed the run with an uncaught ValueError out of
+# `assemble_pre_locked_rows`, after the RSS fetch, the bank roll and the
+# story-contract build had already spent minutes, producing no episode.
+def test_the_widget_can_out_ask_the_legacy_lane_and_that_is_expected():
+    """The premise. These two bounds are SUPPOSED to differ -- the lanes draw
+    from different voice stocks -- which is exactly why an over-request has to
+    degrade rather than refuse."""
+    from nodes import _otr_casting
+
+    assert writer_node._FABLE2_MAX_CAST > _otr_casting._LEGACY_MAX_SPEAKING_CAST
+
+
+def test_an_over_request_is_CLAMPED_by_lock_cast_never_raised():
+    """THE FIX. `lock_cast` reduces an over-request to the largest cast this
+    lane can actually voice, and says so at WARNING -- the operator asked for
+    8 and is getting 6, and a silent clamp is how that becomes a mystery
+    instead of a decision."""
+    from nodes import _otr_casting
+
+    source = inspect.getsource(_otr_casting.lock_cast)
+
+    assert "if num_characters > _LEGACY_MAX_SPEAKING_CAST:" in source, (
+        "lock_cast must clamp an over-request before the assembler sees it")
+    assert "log.warning(" in source, (
+        "a clamp the operator cannot see is a mystery, not a decision")
+
+
+def test_the_assembler_still_REFUSES_a_programming_error():
+    """The clamp must not become a blanket swallow. A 0 or a negative is a
+    caller bug, not an operator request, and still raises -- CastLock's replay
+    detonating with 'num_characters must be 1-6, got 0' is a real diagnostic
+    the content-owned contract comments cite by name."""
+    from nodes import _otr_casting
+
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            _otr_casting.assemble_pre_locked_rows(num_characters=bad)
+
+
+def test_the_bound_and_the_clamp_read_ONE_constant():
+    """Named rather than a bare 6 in two places: the assembler's bound and
+    lock_cast's clamp have to move together, or an over-request starts
+    raising again."""
+    from nodes import _otr_casting
+
+    assert _otr_casting._LEGACY_MAX_SPEAKING_CAST == 6
+    bound = inspect.getsource(_otr_casting.assemble_pre_locked_rows)
+    assert "1 <= num_characters <= _LEGACY_MAX_SPEAKING_CAST" in bound, (
+        "the assembler's bound must read the shared constant, not a literal")

@@ -1165,6 +1165,16 @@ class CastSlot:
 # Source-faithful adaptations must use their own cast, never the recurring
 # Lemmy cameo. This overrides both the entropy roll and the operator cameo
 # setting; invention and archive banks retain the existing cameo behavior.
+#: The most named characters THIS assembler can seat, set by the Bark voice
+#: stock it draws from -- two characters never share a voice, so the pool is
+#: the real ceiling. NAMED, not a bare 6 in two places: the bound and the
+#: clamp in `lock_cast` have to move together or an over-request starts
+#: raising again. Deliberately NOT `_otr_scifi_news_pro.MAX_SPEAKING_CAST`
+#: (10): that lane seats its own cast from a different stock, and the
+#: `num_characters` widget spans both, which is exactly why an over-request
+#: has to degrade here rather than refuse.
+_LEGACY_MAX_SPEAKING_CAST = 6
+
 _LEMMY_EXCLUDED_SOURCE_BANK_IDS = frozenset({"public_domain", "shakespeare"})
 
 
@@ -1455,9 +1465,10 @@ def assemble_pre_locked_rows(
             characters (Python rolled names, LLM fills the rest).
         - lemmy_hit: True if LEMMY was rolled in, False otherwise.
     """
-    if not (1 <= num_characters <= 6):
+    if not (1 <= num_characters <= _LEGACY_MAX_SPEAKING_CAST):
         raise ValueError(
-            f"num_characters must be 1-6, got {num_characters}"
+            f"num_characters must be 1-{_LEGACY_MAX_SPEAKING_CAST}, "
+            f"got {num_characters}"
         )
 
     rng = rng or random.Random()
@@ -1913,6 +1924,39 @@ def lock_cast(
     # (C7). A fresh Random() when the caller passed none keeps the
     # non-deterministic path working too.
     cast_rng = rng or random.Random()
+
+    # A CAST SIZE IS A REQUEST, NOT A GATE -- so deliver the closest
+    # performable cast instead of killing the episode.
+    #
+    # THE DEFECT (found 2026-08-24 by the character-selection trace). The
+    # `num_characters` widget advertises 1-10 and `_resolve_inputs` clamps to
+    # that same band, because the DISPATCHED lane really does seat up to
+    # `MAX_SPEAKING_CAST` (10). This legacy assembler's ceiling is 6 -- the
+    # voice stock it draws from -- and it enforced that by RAISING. So an
+    # operator who moved the slider to 7 on `original` or `media_archive` got
+    # an uncaught `ValueError: num_characters must be 1-6, got 7` out of
+    # `assemble_pre_locked_rows`, with no try/except between here and the
+    # node body: the run died after the RSS fetch, the bank roll and the
+    # story-contract build had already spent minutes, and produced no episode.
+    #
+    # That is exactly the shape the standing directive forbids: "The target
+    # value is a REQUEST, not a gate: no refusals, no hard caps, no shunts ...
+    # a request beyond it simply delivers the closest performable episode."
+    # `_resolve_inputs` already clamps rather than raises for the same reason.
+    #
+    # LOUDLY, never silently -- the operator asked for 8 and is getting 6, and
+    # a quiet clamp is how that becomes a mystery instead of a decision. The
+    # assembler keeps its own 1-6 contract intact (a 0 or a negative is still
+    # a programming error and still raises); this only converts an
+    # OVER-request into the largest cast this lane can actually voice.
+    if num_characters > _LEGACY_MAX_SPEAKING_CAST:
+        log.warning(
+            "[lock_cast] requested %d speaking characters; this lane's voice "
+            "stock seats %d, so the cast is the closest performable size. "
+            "The request is honoured as far as it can be, never refused.",
+            num_characters, _LEGACY_MAX_SPEAKING_CAST,
+        )
+        num_characters = _LEGACY_MAX_SPEAKING_CAST
 
     # THE CAMEO IS DECIDED HERE, ONCE, AND CARRIED -- never re-derived.
     # Resolved before `assemble_pre_locked_rows` and handed to it, so the
