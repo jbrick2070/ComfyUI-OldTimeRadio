@@ -275,37 +275,46 @@ it walks the AST and refuses the call inside any broad-`except` try.
 `c27dff36`; 54 variants / 0 failures; forbidden sweep 0 runtime hits; BOM /
 0-byte / AST clean. `pyproject.toml` untouched (it is a publish trigger).
 
-**QUEUE STATE, updated 2026-08-23 by the overnight coder window (state only;
+**QUEUE STATE, updated 2026-08-23 by the DAYLIGHT coder window (state only;
 plan authorship stays with the planner window):**
-* **D is PARKED by the operator.** He narrowed it to "fix the one real bug"
-  (the prohibition-as-positive-text defect), then redirected to F and then to
-  the cleanup before code was written. The evidence is BANKED, not lost:
-  `docs/2026-08-22-negative-channel-declaration/driver_anchor.md` (untracked by
-  the `docs/2026-*/` convention) carries the full anchor PLUS an independent
-  cold Fable review that converged on the same design. Whoever resumes D
-  starts from evidence, not re-derivation.
-* **F is HALF PROVEN, HALF BLOCKED.** `otr_g4_wan_ti2v` is PROVEN end to end
-  -- published episode 115 in the live `otr/obs`, all three deltas verified
-  separately (`docs/2026-08-23-item-F-g4-wan-ti2v-receipt.md`).
-  `otr_upscale_ship` is BLOCKED ON THE OPERATOR: its pinned Mistral-Nemo
-  writer fails the markup ladder before the upscale stage ever runs, and there
-  is NO legitimate per-leg override (gguf_quant is profile-owned by design) --
-  the three options are laid out in
-  `docs/2026-08-23-item-F-upscale-ship-writer-failure.md`. Running F also
-  found and FIXED two runner defects: PBUG-20260823-01 (the preflight gate
-  could never pass nine profiles) and PBUG-20260823-02 (a healthy render
-  reported as RESULT TIMEOUT).
-* **THE LEAN-MEAN CAMPAIGN consumed the rest of the session: orders 1-6 are
-  COMPLETE, 7 cancelled by ruling, 8 APPROVED and queued.** Full truth table:
-  `docs/2026-08-23-lean-mean-progress.md`. **THE NEXT CODER WINDOW'S QUEUE, by
-  the operator's own words ("do it with everything else that is safe in a new
-  window and lets regression test"): order 8 (ffprobe resolver, failure
-  policies stay per-caller), then the order-9 Writer-split slices (seams
-  pre-measured: 398 / 38 / 911 lines), then the order-11 scripts-audit half
-  -- full suite + Bible every chunk, and a LIVE canonical render proof to the
-  live `otr/obs` before the window closes.** Order 10 stays HELD until after
-  2.1 (workflow-atomic; a blanket variant regen reverts the hand-edited ship
-  candidate). Order 12 stays blocked on `otr_cloud_lanes` ratification.
+* **THE LEAN-MEAN CAMPAIGN IS EFFECTIVELY COMPLETE.** Orders 1-6 closed
+  overnight, 7 cancelled by ruling. This window closed **8** (the shared
+  ffprobe boundary + eleven callers, `00ac7df8` / `8dd9f2cf`), **9** (the
+  writer split, `8182b38c` / `d99c1adc` -- 1,927 lines out, 7,418 -> 5,490,
+  byte-identical with a sha256 per block), and **11** (the `scripts/` owner
+  table, `e541db1d`). Truth table:
+  `docs/2026-08-23-lean-mean-progress.md`.
+* **ORDER 10 REMAINS HELD and a coder should not unhold it.** Workflow-atomic,
+  and a blanket variant regeneration still reverts the operator's hand-edited
+  `ghost_signal_v3` ship-candidate settings. **Order 12** stays blocked on
+  `otr_cloud_lanes` ratification.
+* **A LIVE BUG THE SEAM FOUND (`0acdc993`).** `_run_writer_tail` read
+  `_style_roll` -- a local of `run()`, a SIBLING method -- and called
+  `random.Random` in a module that never imported `random`. Both on the
+  dynamic-style FLOOR FALLBACK branch, so a failed style reflection raised
+  NameError instead of degrading to a floor style. It survived because the
+  invariant was tested with `co_freevars == ()`, which **cannot fail** on a
+  sibling's local (that compiles to LOAD_GLOBAL). The replacement walks the
+  bytecode for global loads the module does not define, with a negative-control
+  test. NOT filed as a PBUG: the proof is a disassembly, not a live artifact.
+* **OPERATOR RULINGS 2026-08-23, executed (`cc36c64b`).** *"Rip it out"* --
+  `otr_hazard.py` gone. *"Soak op delete, we'll make a new soak op"* --
+  `soak_operator.py` (a 304-line legacy shim since BUG-LOCAL-002 gutted it in
+  May) and its orphaned `watcher_overrides.json` gone; the shim's one live
+  function moved byte-identically to `scripts/treatment_scanner.py`, the
+  address the shim's own docstring had always named.
+* **STILL OWED FROM THIS WINDOW: a live canonical render published to
+  `otr/obs`.** One was launched on `otr_g4_wan_ti2v` and reached the video
+  stage -- writer, master audio and per-beat slices all proven live, VRAM peak
+  13.2 GB -- then the operator said to skip it and move on, so it was stopped
+  selectively (VRAM back to 809 MiB, ports free). The five-bank writer gate
+  (`scripts/otr_writer_bank_gate.py`, all valid banks) was queued and skipped
+  on the same instruction. **Neither is a failure; both are unrun.**
+* **F is HALF PROVEN, HALF BLOCKED** (unchanged). `otr_g4_wan_ti2v` proven end
+  to end; `otr_upscale_ship` blocked on the operator
+  (`docs/2026-08-23-item-F-upscale-ship-writer-failure.md`).
+* **D is PARKED by the operator** (unchanged). Evidence banked at
+  `docs/2026-08-22-negative-channel-declaration/driver_anchor.md`.
 B, C and E's doc half closed 2026-08-22.
 
 **A. GHOST SIGNAL IS BUILT, PROVEN AND SHIPPING (closed 2026-08-22).**
@@ -937,7 +946,7 @@ generic reference capability can ship.
 `tests/test_legacy_audit_clean.py::test_no_unclassified_legacy_references`
 FAILING. Item I's new `nodes/_otr_name_authority.py:90` used *"Professor & Lab
 Director"* as an example job title in a comment, and the standing legacy audit
-forbids a bare `Director` in `*.py`/`*.json` outside a forensic context --
+forbids a bare `\bDirector\b` in `*.py`/`*.json` outside a forensic context --
 it cannot tell an example from a surviving Director-era symbol. **Why four QA
 rounds missed it:** the `[KNOWN-FAIL-GUARD]` line prints AFTER the 100% line and
 the conftest suppresses pytest's own summary on a failing run, so the log ends
@@ -1213,18 +1222,27 @@ had BLESSED as genuine speech -- greppable as rows where
 `clean_spoken_text(text) != text` with no `unclean_spoken_text` flag and no
 policy finding. Narrow the net then; never remove it.
 
-### OPEN -- the one no-shims violation that survived the rip
+### CLOSED 2026-08-23 -- the last no-shims violation
 
-The 2026-08-14 audit found three; the 2026-08-16 `scifi_news` rip closed two
-(codex `P5R _call_scene_review` and `_canonicalize_script_spoken_text` died
-with the module). One remains:
+`_otr_content_safety.py`'s REWRITE half is gone (`ed92bff7`):
+`propose_safety_patches` (the LLM prompt that reworded a delivered spoken row)
+and `apply_safety_cleanup` (the atomic ledger write, carrying both bare
+`RuntimeError`s), plus the two pydantic patch models. 165 lines.
 
-* **`_otr_content_safety.py` is dormant but loaded** -- hardcoded
-  `PROFANITY_TERMS` / `EXPLICIT_WEAPON_TERMS` / `EXPLICIT_NUDITY_TERMS`
-  (`:25-82`) driving model rewrites, contrary to the 2026-08-03 no-guardrails
-  directive, plus two bare `RuntimeError`s (`:328`, `:334`) that would kill a
-  render. Nothing calls it. Delete it or rebuild it before anything wires it
-  back.
+**The vocabulary DELIBERATELY survives, and that is not a half-measure.** The
+directive bans FILTERING, not knowing the words, and
+`tests/test_bug_local_288_sfw_validator.py` keeps the whole retired list green
+on purpose -- every term must PASS a line -- because "a deleted test is
+silence, and silence is how a policy creeps back". Deleting the tuples would
+have deleted that guard's ability to enumerate what must never block again.
+
+THE LAW was checked first: `meta.ledger_cleanup.safety` already has a
+deterministic owner (`_otr_ledger_cleanup.py` stamps `status: retired` on every
+path), and `validate_sfw` had been `return None` since 2026-08-05. The guard
+that replaces the old monkeypatched must-not-run stub asserts ABSENCE -- the
+four rewrite entry points do not exist and are not exported -- which the old
+one structurally could not do. Module is pure and stdlib-only now, 354 -> 187
+lines, and no longer pulls pydantic.
 
 ### OPEN -- a tension the clean stage created, worth one look
 
