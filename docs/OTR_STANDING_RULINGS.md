@@ -1638,11 +1638,29 @@ were never the same contract; treating them as one is what produced a
 three-leg campaign for a lane that only ever needed dialogue.
 
 **IF IT IS EVER TAKEN UP AGAIN**, the only sanctioned scope is source DIALOGUE
-when the source has it -- never a prose window over the canonical body. The
-infrastructure exists already (`_otr_source_document.SourceSpan` with half-open
-offsets, the uncapped `normalize_public_domain_body`, and the document already
-reaching the writer at `OTR_LedgerScriptWriter.py:3718`), so the work would be a
-dialogue extractor plus one prompt seam.
+when the source has it -- never a prose window over the canonical body.
+
+**AND CORRECT THE RECORD FIRST: the claim that "the composer sees no source at
+all" is FALSE, and it was mine.** It came from grepping
+`source_text|full_text|source_meta|excerpt|canonical_body|source_window` -- none
+of which is the name the code uses. The real name is **`source_block`**, and the
+machinery is BUILT AND TESTED:
+* `build_exchange_prompt(source_block=...)` at `nodes/_otr_compose_exchange.py:300`,
+  with its paired CARRY-THEM text at `:430-435` and a loud non-str refusal at
+  `:420-428`; forwarded through `compose_exchange` at `:551/:569`.
+* `LineRequest.source_block` at `nodes/_otr_line_composer.py:292`, rendered above
+  the WRITE LINE cue at `:908-915`.
+* An ENTIRE selector module, `nodes/_otr_source_grounding.py` (16 KB) --
+  `select_grounding` at `:255`, `SourceGrounding` at `:168`,
+  `render_source_block` at `:362`.
+**`select_grounding` has ZERO production callers: 1 reference under `nodes/`
+(its own definition) against 33 under `tests/`.** So this was never a design
+problem. It is an unwired supply line between a built producer and a built
+consumer, and the honest scope is three seams -- the exchange prepass, the
+writer's `select_grounding` call, and the `LineRequest` construction.
+**THE LESSON: a zero-reference grep proves nothing unless you grepped the name
+the code actually uses.** That false premise is exactly what made a wiring job
+look like a three-leg campaign.
 
 **WHY THIS IS WRITTEN DOWN RATHER THAN JUST OBEYED:** the item was the sprint's
 headline row, motivated by a real artifact (a Wells adaptation that produced

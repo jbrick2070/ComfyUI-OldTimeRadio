@@ -273,49 +273,12 @@ Everything below was verified against the real files on 2026-08-04, is
 non-GPU, and is provable by the suite alone. Work them in order; each ends
 green and pushed on its own.
 
-### 1. THE PUBLIC_DOMAIN SOURCE-GROUNDING ITEM IS DEFERRED -- OPERATOR RULING 2026-08-23
+### 1. -- REMOVED. PUBLIC_DOMAIN IS LEFT AS IS (operator, 2026-08-23)
 
-**The operator stood this down. Do NOT re-open it, do not "improve" it, and do
-not treat a paraphrased public_domain episode as a defect.** In his words:
-
-> *"no no public domain does not need to get author's words unless they are
-> dialogue, it can paraphrase"*
-
-> *"please do not chase as long as it carries the story and some dialogue if
-> present"*
-
-> *"yes you can retire the public domain from the go forward, mark it as
-> deferred"*
-
-**WHAT THIS SETTLES.** The item was built on the premise that the pack's
-"CARRY THEM" instruction obliges the lane to reproduce the author's PROSE, and
-that a paraphrase is therefore a fidelity failure. That premise is now
-explicitly rejected by the operator: on `public_domain`, **paraphrase is
-correct behaviour.** The acceptance bar is only that the episode CARRIES THE
-STORY, and carries some DIALOGUE where the source actually has dialogue. The
-Wells / "Arkham, Massachusetts" anecdote that motivated the item is not
-sufficient reason to re-open it.
-
-**WHAT REMAINS TRUE BUT NO LONGER URGENT** (kept because it is a measured fact,
-not because it is work): `nodes/_otr_compose_exchange.py` still has ZERO
-references to `source_text` / `full_text` / `source_meta` / `excerpt` /
-`canonical_body`, so the composer sees no source at all -- not even dialogue.
-IF this is ever taken up again, the ONLY sanctioned scope is **source DIALOGUE
-when the source has it**, never a prose window. The infrastructure for that
-already exists and does not need building: `nodes/_otr_source_document.py`
-carries `SourceSpan` with half-open `start_char`/`end_char` offsets and a
-`canonical_body`, `_otr_public_domain_sources.py` already separates the
-UNCAPPED `normalize_public_domain_body` from the 12,000-char legacy
-`_project_to_payload_window`, and `OTR_LedgerScriptWriter.py:3718` already
-receives the document (it uses `canonical_body` only to derive a sound world).
-So the remaining work would be a dialogue extractor plus one prompt seam --
-NOT the three-leg campaign the archived text describes.
-
-**Full original text, including the r1-r4 design that is now moot, is in
-`docs/GO_FORWARD_ARCHIVE.md`.** It is archived rather than deleted because the
-r2/r3 corrections in it (the 12,000-char truncation, the two non-interchangeable
-hash fields) are real measurements about the source layer that a future reader
-may want, whatever is decided about grounding.
+*"no more chasing public domain, leave it as is, remove any public domain
+updates from go forward."* Nothing about this lane is go-forward work. The
+ruling that settles it lives in `docs/OTR_STANDING_RULINGS.md`; the retired
+campaign text is in `docs/GO_FORWARD_ARCHIVE.md`. Do not re-add a row here.
 
 ### 2 and 3 -- BOTH CLOSED, re-verified against HEAD 2026-08-23
 
