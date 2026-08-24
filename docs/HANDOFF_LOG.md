@@ -1,3 +1,98 @@
+## 2026-08-24 -- HEAD 452132d0 +handoff (v2.0-alpha) -- CODER (shakespeare fixed and live-proven; a 10-pass overnight loop; scifi_news_pro measured at 60% failure and promoted to NEXT; 6 commits)
+
+Did: fixed PBUG-20260802-02's THIRD manifestation, then ran the box all night
+  and let the data pick the next item.
+  SHAKESPEARE FIX `8ca3f13a` -- a live leg refused with `[LFC:phase_10] cast
+  char_id='c03' (name='MARIA') has no non-skipped line`. Root cause is a
+  one-directional check: `_otr_outline._phase_check` asks only "did an invented
+  speaker sneak in" (`invented = used_speakers - locked_cast_set`), never the
+  reverse, so a locked cast member can receive ZERO beats under a tight budget
+  and nothing objects until the universal freeze backstop refuses. MARIA is not
+  a phantom -- she has three real speeches in
+  `config/source_banks/shakespeare/sources/twelfth_night__act2_scene5.txt`
+  (:29/:295/:299) and exits early, exactly the shape a tight window misses.
+  Fixed with `nodes/_otr_cast_coverage_repair.py`, wired into
+  `_otr_writer_tail._run_writer_tail` right after `_clean_window.reconcile()` --
+  the last point that touches canonical text before the freeze cascade node
+  runs. The GATE IS UNTOUCHED and stays refuse-only, per the standing
+  "gates refuse, producers repair" convention in `_otr_cast_voice_coverage.py`.
+  Gated on `resolve_freeze_policy(meta).run_inline_safety_cleanup` (config-driven,
+  never a hardcoded bank list) so content-owned lanes are skipped -- a
+  deliberately silent Relay must never be forced to speak. Mode 1 retries an
+  existing skip=True slot; Mode 2 mints one ledger-only row for a character the
+  outline never allocated, never appended to the pydantic `Outline.beats`.
+  ONE `compose_line` call per gap through the same seeded slot; on failure the
+  row is left BYTE-IDENTICAL to today's refuse-and-halt. Fidelity graft:
+  `_otr_shakespeare_sources.cast_presence_from_text` feeds the character's real
+  attested speech into `LineRequest.source_block`, so the repair carries
+  Shakespeare's own words instead of inventing a line.
+  A FOUR-AGENT DESIGN ARC RAN BEFORE ANY CODE (three competing framings, three
+  judges, one convergence). It earned its keep: the panel corrected the winning
+  proposal's placement (it originally targeted a closure-scoped nested function
+  not callable from the tail) and caught that `nodes/_otr_scifi_fable2.py`,
+  cited by all three framings and by the original PBUG, DOES NOT EXIST in the
+  live tree -- the roster is six banks, not seven.
+  OVERNIGHT LOOP -- `scripts/otr_overnight_loop.sh` (new), 10 full passes over
+  five banks, 00:36-08:22 PDT, **43 episodes published to `otr/obs` (121 ->
+  164)**. Stopped on operator instruction at pass 10 with a success in hand.
+  SHAKESPEARE PASSED IN BOTH OF THE LAST TWO FULL PASSES on different random
+  scene draws -- that is the live proof, not a unit test.
+  THE LOOP PICKED THE NEXT ITEM `452132d0` -- `scifi_news_pro` failed **6 of 10
+  passes (60%)** while every other bank failed zero over the same ten. Filed as
+  PBUG-20260824-01 with two classes separated by failure DURATION against the
+  verified pass order (`_pass_treatment` -> `_pass_news_read` -> `_pass_script`):
+  Class A ~4 min, `UNKNOWN_SPEAKER`/`SKELETON_BREAK` including
+  `UNKNOWN_SPEAKER: **ANNOUNCER` (markdown bold leaking into the speaker token
+  -- a speaker the parser SHOULD accept, rejected for formatting); Class B
+  ~1.5-2.9 min, the factual news close naming a fictional cast member
+  ("Laura Goodkind") after 2 attempts. Root cause NOT established and the entry
+  says so -- two mechanisms, one lane, and the last time two `scifi_news_pro`
+  symptoms were filed as "one fault, two doors" that framing was wrong and
+  corrected the same day.
+  HARNESS GAP FIXED `f84906c8` -- `tmp/_bankgate_<bank>.log` is overwritten
+  every pass, which is why the reasons for passes 7 and 8 are LOST (their
+  durations match Class B, but that is inference, not evidence). The loop now
+  archives leg logs to `tmp/legs/passNNN/`.
+  REGISTRY, no code change -- corrected two of my own wrong conclusions from the
+  prior window. Node extraction is import-based in Comfy-Org's Cloud Build
+  container; the published alpha.7 zip loads 25/25 nodes under a faithful local
+  reproduction, so the empty panel is not ours. Their backfill scheduler is
+  provisioned `paused = true` with a leap-day cron, so it never self-resolves.
+  My earlier "the endpoint 404s for every pack" ruling was a WRONG-URL artifact
+  -- `GET /comfy-nodes?node_id=<id>` works and returns 7,921 entries for
+  impact-pack, 4,206 for kjnodes, 0 for us. Both docs corrected.
+Current step: `scifi_news_pro` is the NEXT ITEM at the top of GO_FORWARD.
+  Shakespeare, the registry investigation and the lean-mean campaign are closed.
+Next: take PBUG-20260824-01. Recommended first swing is Class A's markdown-leak
+  half -- mechanical, needs no story-quality judgement, and Bible 12.132 already
+  carries an automatable render-free verify (feed the parser `**X` / `*X*` /
+  `__X__` / `` `X` `` / `X:` and assert they resolve to the same identity as the
+  bare token, or that the refusal names the FORMATTING). Treat Class A and B as
+  separate until proven otherwise. Operator has asked for
+  `kibitz-plugin:kibitz` help from codex and agy as needed. FIRST ACTION for
+  whoever takes it: re-run the loop long enough to capture fresh leg logs now
+  that they are archived per pass -- two of six failure reasons are currently
+  missing, and the archive fix means one loop recovers them.
+Models: Opus 5 throughout. A four-agent Workflow design arc ran on the
+  shakespeare fix BEFORE code (3 framings + 3 judges + 1 convergence, all 7
+  returned). That is a FULL arc for that item and is reported as such. The
+  registry investigation and the scifi_news_pro measurement were driver-only
+  work with no panel -- no arc is claimed for either. An earlier workflow this
+  session lost 12 of 15 agents to API 529s; its item-5 review seat was
+  explicitly reported as UNFILLED rather than implied covered.
+Box: server UP and idle on :8000, VRAM back to desktop baseline (1508 MiB, 8%).
+  One STALE `queue_running` entry remains from the interrupted pass-11 leg --
+  cosmetic, the work is not running (VRAM proves it); a fresh boot clears it.
+  No bank-gate, canonical-runner or loop processes alive. Overnight loop STOPPED.
+Suite: **12053 passed / 120 skipped / 1 xfailed** (full run, this session, zero
+  regressions). Bug Bible: **311 entries, 22 passed / 26 skipped / 3 xfailed**;
+  12.131 and 12.132 promoted this session with index rows and README count.
+Commits: `8ca3f13a` (shakespeare fix), `f84906c8` (go-forward NEXT item +
+  harness archive), `452132d0` (PBUG-20260824-01); registry docs `df89c6dd`,
+  `89f4a2c1`, `5ff63c80`. Bible repo `main`: `b57e868`, `0245cf1`, `5887e68`.
+  The sha above is the second-to-last on the branch; the last is this handoff
+  commit. The kickoff line below carries the real post-push head.
+
 ## 2026-08-23 -- HEAD 8e4bb275 (v2.0-alpha) -- CODER (lean-mean orders 8, 9 and 11 complete; a live NameError; two operator rips; 9 commits)
 
 Did: closed the lean-mean campaign's remaining coder work.

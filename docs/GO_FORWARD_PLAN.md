@@ -140,8 +140,43 @@ rulings are the half that still binds.
   stronger evidence and caught the real blocker, but it is not a review, and the
   plan said so rather than implying coverage.
 
-**QUEUE STATE, updated 2026-08-23 by the DAYLIGHT coder window (state only;
+**QUEUE STATE, updated 2026-08-24 by the OVERNIGHT coder window (state only;
 plan authorship stays with the planner window):**
+* **SHAKESPEARE IS FIXED AND PROVEN LIVE (`8ca3f13a`).** PBUG-20260802-02's
+  third manifestation -- a locked cast member (MARIA) served zero dialogue
+  under a tight beat budget, refused by the freeze gate. Root cause:
+  `_otr_outline._phase_check` validates cast membership one-directionally
+  (invented = used - locked) and never checks starvation. Fixed with
+  `nodes/_otr_cast_coverage_repair.py`, a repair pass in the writer's own tail
+  BEFORE the freeze cascade -- the gate stays refuse-only per the standing
+  "gates refuse, producers repair" convention. 18 new tests; suite
+  **12053 / 120 skipped / 1 xfailed**, zero regressions. Bible **12.131**.
+  **Live proof: shakespeare PASSED in both of the last two full overnight
+  passes** (different random scene draws each time).
+* **THE OVERNIGHT LOOP RAN 10 FULL PASSES** (00:36-08:22 PDT,
+  `scripts/otr_overnight_loop.sh`, log `tmp/otr_overnight_loop.log`), five banks
+  per pass, and published **43 episodes to `otr/obs` (121 -> 164)**. Stopped on
+  operator instruction after pass 10 with a success in hand; pass 11's
+  media_archive leg was interrupted mid-flight and correctly reported itself as
+  INTERRUPTED rather than as a node exception.
+* **THAT LOOP IS WHAT PRODUCED THE NEW TOP ITEM.** `scifi_news_pro` failed
+  **6 of 10 passes (60%)** while every other bank failed zero. Recorded as
+  **PBUG-20260824-01** (`452132d0`) with both failure classes and their real
+  captured errors; Class A's markdown-leak half promoted as Bible **12.132**.
+  See the NEXT ITEM block at the top of this file.
+* **A HARNESS GAP WAS FIXED IN PASSING (`f84906c8`).** `tmp/_bankgate_<bank>.log`
+  was overwritten every pass, which is why two of the six `scifi_news_pro`
+  failure reasons are lost. The loop now archives leg logs to
+  `tmp/legs/passNNN/`, so the next diagnosis needs ONE loop, not another night.
+* **REGISTRY (2026-08-24, no code change):** node extraction is import-based and
+  runs in Comfy-Org's own Cloud Build; our pack loads 25/25 nodes under a
+  faithful local reproduction of that container, so the empty node panel is NOT
+  ours. Their automatic backfill scheduler is provisioned `paused = true` with a
+  leap-day cron, so it does not self-resolve. Problem statement ready to send at
+  `docs/2026-08-24-comfy-registry-problem-statement.md`; `2.0.0-alpha.7` was
+  published and sits at `NodeVersionStatusPending` (their queue, not a failure).
+
+**PRIOR QUEUE STATE, 2026-08-23 by the DAYLIGHT coder window:**
 * **THE LEAN-MEAN CAMPAIGN IS EFFECTIVELY COMPLETE.** Orders 1-6 closed
   overnight, 7 cancelled by ruling. This window closed **8** (the shared
   ffprobe boundary + eleven callers, `00ac7df8` / `8dd9f2cf`), **9** (the
