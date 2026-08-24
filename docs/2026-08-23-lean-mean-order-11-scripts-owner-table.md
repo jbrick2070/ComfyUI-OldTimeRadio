@@ -75,20 +75,29 @@ rule, never by code, so a reference count was never going to find them:
   documents. Deleting a generator while keeping its output is how a graph
   becomes unreproducible.
 
-**PUT TO THE OPERATOR -- three, and only three:**
+**PUT TO THE OPERATOR -- three, and only three. TWO WERE RULED ON THE SAME DAY:**
 
-1. **`watcher_overrides.json`** (2026-04-13, 1 KB) -- **its reader is gone.**
-   The file documents an allowlist "honored by `soak_operator.py:apply_watcher_overrides`",
-   and that function is not in `soak_operator.py`. So either the soak watcher
-   lost a feature it should still have, or the config outlived it. Which one is
-   a question about the SOAK, not about tidiness -- that is why it is here and
-   not deleted.
-2. **`otr_hazard.py`** (2026-08-02, 7 KB) -- "BIG RED LIGHT: this tree is
-   mid-surgery and knowingly broken", written under an operator ruling of
-   2026-08-02 about coders being too hesitant mid-refactor. The surgery it
-   announced is long finished. It is a SIGNAL, and a signal nobody is reading is
-   worse than no signal -- but retiring it is the operator's call because he
-   raised it.
+1. **`watcher_overrides.json`** -- **DELETED, 2026-08-23.** Operator: *"soak op
+   delete, we'll make a new soak op."* The audit's finding was that its declared
+   reader `soak_operator.py:apply_watcher_overrides` no longer exists; the
+   reason turned out to be that BUG-LOCAL-002 gutted that 1,500-line runner back
+   on 2026-05-02 and the config was never removed with it. It went with the shim.
+2. **`otr_hazard.py`** -- **DELETED, 2026-08-23.** Operator: *"don't worry, rip
+   it out, it was my idea to help things."* The "BIG RED LIGHT: this tree is
+   mid-surgery" banner outlived its surgery.
+
+   **And the third file the ruling reached, which this audit had classed WIRED:**
+   `soak_operator.py` itself. It was a LEGACY SHIM -- 304 lines holding exactly
+   ONE function, `scan_treatment`, kept alive only by
+   `tests/test_treatment_scanner_unicode.py`. Its own docstring named the right
+   home (*"prefer adding to scripts/treatment_scanner.py"*) and that module had
+   never been created. So the function moved there BYTE-IDENTICALLY (sha256
+   `9c0a4c1dedc87de2c5cc6ce49a22eea93d65ab2be4782ca828219075210cd83e`), the test
+   imports it from its new address, and the shim is gone. The BUG-LOCAL-033 fix
+   it carries -- accepting U+2500 separators and U+2192 cast arrows -- is
+   untouched, because a scanner that loses it starts a false-positive flag storm
+   on every real treatment.
+
 3. **`_consult_question_ltx23_res4lyf.md`** (2026-07-07, 8 KB) -- a consult
    question about integrating LTX 2.3 + RES4LYF, addressed to an outside reader.
    The LTX 2.5 lane shipped since. Kept or archived, it is a document, not code.
@@ -316,7 +325,9 @@ closed on its own evidence: there is no repo-root `conftest.py` and no
 calls across the test tree are the LOAD-BEARING import mechanism rather than
 redundancy. That row's premise was false at HEAD and the plan already says so.
 
-**Three files need a word from the operator** (above): `watcher_overrides.json`,
-`otr_hazard.py`, `_consult_question_ltx23_res4lyf.md`. Everything else is
-recorded, and the ffprobe adoption for standalone scripts is a real chunk with a
+**Two of the three were ruled on the day this table was written** and are
+deleted (`watcher_overrides.json`, `otr_hazard.py`), taking the
+`soak_operator.py` shim with them and promoting its one live function to
+`scripts/treatment_scanner.py`. `_consult_question_ltx23_res4lyf.md` is still
+open. Everything else is recorded, and the ffprobe adoption for standalone scripts is a real chunk with a
 real gate, not a sweep.

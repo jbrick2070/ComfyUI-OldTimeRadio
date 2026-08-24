@@ -19,7 +19,12 @@ import pytest
 
 # Ensure scripts/ is importable from the project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-from soak_operator import scan_treatment
+# `scan_treatment` moved here from the `soak_operator.py` legacy shim on
+# 2026-08-23 (operator: "soak op delete, we'll make a new soak op"). The shim
+# had been one function in 304 lines since BUG-LOCAL-002 gutted it in May, and
+# its own docstring named this module as the right home. The function is
+# byte-identical; this test's fixture and every assertion below are unchanged.
+from treatment_scanner import scan_treatment
 
 FIXTURE = os.path.join(
     os.path.dirname(__file__), "fixtures", "treatment_141936.txt"

@@ -1,28 +1,27 @@
+"""``scan_treatment`` -- the read-only treatment-file flag scanner.
+
+It lived in ``scripts/soak_operator.py``, and that file told you where it
+belonged: *"for any new code, prefer adding to scripts/treatment_scanner.py"*.
+That module never existed, so the last live function in a 2026-05-02 legacy
+shim kept the shim alive for three months.
+
+WHAT THE SHIM WAS. ``soak_operator.py`` was a 1,500-line soak runner whose
+``WV_*`` POSITIONAL widget indices had drifted off the live writer node --
+`episode_title` and `num_characters` were added between v1.5 and v2.0, so a
+`creativity` value would land in `style_custom` and `optimization_profile` in
+`arc_enhancer`. BUG-LOCAL-002 gutted it in favour of ``scripts/otr_api.py``,
+which patches widgets BY NAME against the live ``/object_info`` schemas. What
+survived was 304 lines holding one function.
+
+Operator ruling 2026-08-23: *"soak op delete, we'll make a new soak op."* The
+shim and its orphaned config (``watcher_overrides.json``, whose declared reader
+``soak_operator.py:apply_watcher_overrides`` had been gone since the gutting)
+are deleted. This function is moved BYTE-IDENTICALLY -- it carries the
+BUG-LOCAL-033 fix, and a scanner that stops accepting U+2500 separators and
+U+2192 cast arrows starts a false-positive flag storm on every real treatment.
+
+Read-only and stdlib-only: it never modifies a file and never tries to fix one.
 """
-soak_operator.py -- LEGACY SHIM (BUG-LOCAL-002 fix, 2026-05-02).
-
-This module used to be a 1500-line soak runner with stale `WV_*` positional
-widget indices that no longer matched the live OTR_LedgerScriptWriter node
-(`episode_title` and `num_characters` were added between v1.5 and v2.0,
-shifting every downstream index off by 1-2 slots). Anything calling
-`patch_workflow()` from supersoaker would write to the wrong slots --
-e.g. `creativity` value would land in `style_custom`, `optimization_profile`
-in `arc_enhancer`. supersoaker.py has been deleted.
-
-The current canonical surface for talking to ComfyUI's HTTP API lives in
-``scripts/otr_api.py`` -- it patches widgets by NAME (not position) using
-the live `/object_info` schemas, so widget reorders in the future cannot
-silently corrupt a run.
-
-The only function still exposed here is `scan_treatment` (read-only file
-scanner used by ``tests/test_treatment_scanner_unicode.py``). It is kept
-in this module to avoid churning the test import; for any new code, prefer
-adding to ``scripts/treatment_scanner.py``.
-
-DO NOT add new helpers here. Add them to ``scripts/otr_api.py`` (HTTP API)
-or ``scripts/treatment_scanner.py`` (file scanning).
-"""
-
 from __future__ import annotations
 
 import re
