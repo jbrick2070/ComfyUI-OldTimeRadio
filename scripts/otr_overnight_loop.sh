@@ -32,8 +32,18 @@ LAUNCH="C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio
 BOOT_LOG="$REPO/tmp/otr_overnight_server_boot.log"
 RESET_PS1="$REPO/scripts/_otr_loop_server_reset.ps1"
 
+# Optional bank filter (2026-08-24): $1, passed straight through to the gate's
+# own --banks flag. Lets a fast-iteration run target one bank (e.g.
+# scifi_news_pro during a rate measurement) without waiting through the other
+# four every pass. Empty/unset = every registered bank, same as before this.
+BANK_FILTER="${1:-}"
+
 mkdir -p "$REPO/tmp"
-echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >> "$LOG"
+if [ -n "$BANK_FILTER" ]; then
+  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) (banks=$BANK_FILTER) ===" >> "$LOG"
+else
+  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >> "$LOG"
+fi
 
 pass_n=0
 while true; do
@@ -68,7 +78,11 @@ while true; do
 
   cd "$REPO"
   export PYTHONUTF8=1
-  "$PY" scripts/otr_writer_bank_gate.py --acts 1 >> "$LOG" 2>&1
+  if [ -n "$BANK_FILTER" ]; then
+    "$PY" scripts/otr_writer_bank_gate.py --acts 1 --banks "$BANK_FILTER" >> "$LOG" 2>&1
+  else
+    "$PY" scripts/otr_writer_bank_gate.py --acts 1 >> "$LOG" 2>&1
+  fi
   gate_exit=$?
 
   obs_after=$(ls "$OBS" 2>/dev/null | wc -l)
