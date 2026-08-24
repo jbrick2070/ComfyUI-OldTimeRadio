@@ -166,6 +166,12 @@ workflows/*.json.bak
 !scripts/_otr_single_engine_smoke.py
 !scripts/_otr_soak_server_launch.cmd
 !scripts/_otr_soak_marathon.py
+# --- 2026-08-24: scripts/otr_overnight_loop.sh's crash-recovery calls this
+# by -File. Leaving it machine-local under the blanket scripts/_*.ps1 ignore
+# would make the loop reference a file that does not exist on a fresh
+# checkout -- keep it versioned by exception, same reasoning as the launch
+# .cmd two lines up.
+!scripts/_otr_loop_server_reset.ps1
 # Per-image-engine live GPU smoke tools (the image counterpart to the video-only
 # _otr_single_engine_smoke.py): drive the engine recipe via /prompt + measure the
 # resident peak. Keep versioned by exception.

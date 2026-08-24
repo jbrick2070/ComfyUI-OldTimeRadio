@@ -15,12 +15,22 @@
 # session's own MCP tooling), confirm port 8000 and VRAM are back to
 # baseline, then reboot via the documented launcher.
 set -u
+# PATH GOTCHA (2026-08-24): launched via Start-Process, this script inherits
+# the caller's PATH. Without Git's usr/bin the loop still runs -- the bank
+# gate is a Windows python call and works fine -- but every coreutil below
+# (mkdir -p, cp -p, date) silently no-ops, and the per-pass archive step
+# (added in f84906c8 to stop tmp/_bankgate_<bank>.log from being overwritten
+# before a failure reason can be read) never runs. Prepending it here makes
+# the loop self-sufficient regardless of how it is launched, instead of
+# relying on the caller to have set it up first.
+export PATH="/c/Program Files/Git/usr/bin:$PATH"
 REPO="/c/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio"
 PY="/c/Users/jeffr/Documents/ComfyUI/.venv/Scripts/python.exe"
 LOG="$REPO/tmp/otr_overnight_loop.log"
 OBS="/c/Users/jeffr/Documents/ComfyUI/output/otr/obs"
 LAUNCH="C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\scripts\\_otr_soak_server_launch.cmd"
 BOOT_LOG="$REPO/tmp/otr_overnight_server_boot.log"
+RESET_PS1="$REPO/scripts/_otr_loop_server_reset.ps1"
 
 mkdir -p "$REPO/tmp"
 echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >> "$LOG"
@@ -32,19 +42,19 @@ while true; do
   # Health check before every pass -- reboot only if genuinely dead.
   if ! curl -s -m 8 http://127.0.0.1:8000/queue > /dev/null 2>&1; then
     echo "[$(date -u +%H:%M:%SZ)] pass $pass_n: server unresponsive, resetting per section 4" >> "$LOG"
-    powershell -NoProfile -Command '
-      Get-CimInstance Win32_Process -Filter "Name='"'"'python.exe'"'"'" |
-        Where-Object { $_.CommandLine -match "ComfyUI-OldTimeRadio|main\.py.*--port 8000|otr_writer_bank_gate|otr_canonical_api_run" } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    ' >> "$LOG" 2>&1
-    sleep 5
-    if [ -z "$(netstat -ano 2>/dev/null | grep ':8000' | grep -i listen)" ]; then
-      powershell -NoProfile -Command "Start-Process -FilePath \"$LAUNCH\" -ArgumentList \"\`\"$BOOT_LOG\`\"\" -WindowStyle Hidden" >> "$LOG" 2>&1
-      for i in $(seq 1 30); do
-        curl -s -m 3 http://127.0.0.1:8000/queue > /dev/null 2>&1 && break
-        sleep 2
-      done
-    fi
+    # ONE call, no nested quoting (2026-08-24). This used to be an inline
+    # powershell -Command STRING built with backslash-escaped quotes and an
+    # escaped backtick -- syntactically correct PowerShell, but git-bash's
+    # MSYS argument translation re-quotes a string handed to a native exe
+    # before CreateProcess sees it, so the loop's own health-check-triggered
+    # reboot failed silently every time it actually fired (never caught
+    # earlier because every "loop started" restart before that point was a
+    # human relaunching the whole script by hand). See _otr_loop_server_reset.ps1.
+    powershell -NoProfile -ExecutionPolicy Bypass -File "$RESET_PS1" -LauncherCmd "$LAUNCH" -BootLog "$BOOT_LOG" >> "$LOG" 2>&1
+    for i in $(seq 1 30); do
+      curl -s -m 3 http://127.0.0.1:8000/queue > /dev/null 2>&1 && break
+      sleep 2
+    done
     if ! curl -s -m 8 http://127.0.0.1:8000/queue > /dev/null 2>&1; then
       echo "[$(date -u +%H:%M:%SZ)] pass $pass_n: reboot FAILED, sleeping 5m before retry" >> "$LOG"
       sleep 300
