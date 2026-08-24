@@ -3857,6 +3857,25 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # (gender/timbre/role/age_band/speech_signature/description_digest) into
         # the frozen ledger meta so OTR_CastLock's bank caster can match on
         # timbre/age, not just gender. Free-form meta -> ledger schema unchanged.
+        # THE CAMEO ROLL RECEIPT. This copy is REQUIRED for the same reason the
+        # ones around it are: `lock_cast`'s meta is not merged wholesale, it is
+        # copied key by key right here, so a key stamped upstream and not named
+        # on this line never reaches the ledger.
+        #
+        # Measured on disk 2026-08-24, and it is why this line exists: across
+        # 1853 shipped ledgers, `scifi_news_pro` (which calls the decision
+        # function directly) carried this receipt 24 times, while
+        # `media_archive` (153 episodes), `original` (103) and `science_news`
+        # (157) carried it ZERO times. Those lanes recorded WHETHER the cameo
+        # landed and never WHY -- so a forced-off harness run and a roll that
+        # came up short were indistinguishable, and the shipped rate could not
+        # be read at all.
+        #
+        # `.get(..., {})` rather than a fabricated default, matching the
+        # fail-closed convention of `voice_cast_mode` below: an empty receipt
+        # must read as "upstream did not stamp one", never as a decision
+        # nobody made.
+        meta["lemmy_roll_receipt"] = cast_meta.get("lemmy_roll_receipt") or {}
         meta["cast_voice_slots"] = cast_meta.get("cast_voice_slots") or {}
         # VC chunk 4 (2026-06-22): carry the HYBRID LLM voice-fit decision
         # (proposed/accepted voice_ref_id + reproducibility keys) into the frozen

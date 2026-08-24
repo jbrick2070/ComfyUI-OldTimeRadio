@@ -1414,6 +1414,7 @@ def assemble_pre_locked_rows(
     taken_names: Optional[set[str]] = None,
     source_character_names: Optional[List[str]] = None,
     source_bank_id: str | None = None,
+    decision: "LemmyCameoDecision | None" = None,
 ) -> tuple[List[dict], List[CastSlot], bool]:
     """Roll ANNOUNCER + (maybe LEMMY) + open-slot names. Pure Python,
     no LLM.
@@ -1469,20 +1470,40 @@ def assemble_pre_locked_rows(
     pre_locked.append(announcer)
     taken_names.add("ANNOUNCER")
 
-    # 2. LEMMY 11% roll (or forced via the testing knob).
-    # roll_lemmy() always uses OS entropy, never the seeded `rng` --
-    # the cameo is decoupled from the C7 seed so it stays a genuine
-    # ~11% surprise (BUG-LOCAL-260: a fixed seed otherwise pinned
-    # LEMMY to 100% or 0%). Source-faithful Shakespeare and public-domain
-    # adaptations override both the entropy roll and the operator cameo control:
-    # their casts must contain only source-appropriate people.
-    source_fidelity_excludes_lemmy = _source_bank_excludes_lemmy(source_bank_id)
-    if source_fidelity_excludes_lemmy:
-        lemmy_hit = False
-    elif force_lemmy is None:
-        lemmy_hit = _POOLS.roll_lemmy()
-    else:
-        lemmy_hit = bool(force_lemmy)
+    # 2. LEMMY: ONE DECISION FUNCTION, NOT A SECOND COPY OF THE RULE.
+    #
+    # This block used to re-implement `resolve_lemmy_cameo` inline -- the same
+    # three branches in the same order (fidelity exclusion, then the natural
+    # roll, then the forced knob), deciding the same thing from the same
+    # inputs. The two agreed by luck and nothing made them keep agreeing: no
+    # test compared them, and a change to the exclusion set or to the
+    # precedence had to be remembered in two places. That is Bug Bible 12.132's
+    # class exactly ("one matcher, never two"), and it cost the LEGACY lanes
+    # their receipt -- a bare bool cannot say WHY, so `media_archive`,
+    # `original` and `science_news` shipped 0 cameo receipts across 413
+    # episodes while `scifi_news_pro`, which calls the real function, stamped
+    # one every time.
+    #
+    # `roll_lemmy()` inside it still uses OS entropy, never the seeded `rng` --
+    # the cameo stays decoupled from the C7 seed (BUG-LOCAL-260: a fixed seed
+    # otherwise pinned LEMMY to 100% or 0%) -- and the fidelity exclusion still
+    # outranks the operator knob.
+    #
+    # `decision` is passed in by `lock_cast` so the roll happens EXACTLY ONCE
+    # per episode and the receipt cannot disagree with the cast. Left None (the
+    # standalone/test path) it is resolved here, which is still the one
+    # implementation.
+    if decision is None:
+        decision = resolve_lemmy_cameo(source_bank_id, force_lemmy)
+    lemmy_hit = bool(decision.lemmy_hit)
+    # READ OFF THE DECISION, never re-derived. The open-slot name filter below
+    # needs this too: on a fidelity-bound adaptation a SOURCE character
+    # literally named "Lemmy" is skipped, so the play's own people cannot
+    # smuggle the cameo in through the back door. Taking it from the carried
+    # policy keeps one authority -- calling `_source_bank_excludes_lemmy` again
+    # here would restore the duplication this change exists to delete.
+    source_fidelity_excludes_lemmy = (
+        decision.lemmy_policy == LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION)
 
     next_cid_int = 2
     if lemmy_hit and num_characters >= 1:
@@ -1893,12 +1914,21 @@ def lock_cast(
     # non-deterministic path working too.
     cast_rng = rng or random.Random()
 
+    # THE CAMEO IS DECIDED HERE, ONCE, AND CARRIED -- never re-derived.
+    # Resolved before `assemble_pre_locked_rows` and handed to it, so the
+    # single OS-entropy roll cannot happen twice and disagree with itself
+    # between the cast rows and the receipt. This is the same shape the
+    # dispatched `scifi_news_pro` lane already uses, and the chunk B build
+    # contract asked for on BOTH lanes; only that one lane ever got it.
+    lemmy_decision = resolve_lemmy_cameo(source_bank_id, force_lemmy)
+
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
         num_characters=num_characters,
         rng=cast_rng,
         force_lemmy=force_lemmy,
         source_character_names=source_character_names,
         source_bank_id=source_bank_id,
+        decision=lemmy_decision,
     )
 
     cast: list[dict] = list(pre_locked)
@@ -2227,11 +2257,21 @@ def lock_cast(
 
     meta.update({
         "lemmy_hit":              lemmy_hit,
-        "lemmy_policy": (
-            LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION
-            if _source_bank_excludes_lemmy(source_bank_id)
-            else LEMMY_POLICY_OPERATOR_CAMEO
-        ),
+        # BOTH READ THE CARRIED DECISION -- this key used to re-derive the
+        # policy from `_source_bank_excludes_lemmy` all over again, a THIRD
+        # independent derivation of the same rule sitting a thousand lines from
+        # the first two. It could only ever express two of the four outcomes,
+        # so a forced include and a natural hit stamped identically.
+        "lemmy_policy":           lemmy_decision.lemmy_policy,
+        # THE RECEIPT THE LEGACY LANES NEVER HAD. `lemmy_hit` alone cannot say
+        # whether the roll was SPENT: a harness forcing the cameo off and a
+        # roll that came up short both stamp False, which is exactly why the
+        # shipped-episode rate was unreadable. `to_meta()` carries knob_state
+        # and roll_executed alongside, so "asked and declined" is finally
+        # distinguishable from "never asked" and from "forced off".
+        # Primitive-only by construction -- `Ledger.save()` never raises, so a
+        # non-serializable value here would lose the receipt in silence.
+        "lemmy_roll_receipt":     lemmy_decision.to_meta(),
         "casting_attempts":       casting_attempts,
         "num_characters_request": num_characters,
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
