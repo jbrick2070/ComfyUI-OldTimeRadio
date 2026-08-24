@@ -1,3 +1,77 @@
+## 2026-08-23 -- HEAD 8e4bb275 (v2.0-alpha) -- CODER (lean-mean orders 8, 9 and 11 complete; a live NameError; two operator rips; 9 commits)
+
+Did: closed the lean-mean campaign's remaining coder work.
+  ORDER 8 `00ac7df8`+`8dd9f2cf` -- `nodes/_otr_shared/ffprobe.py` owns binary
+  resolution, the raw probe and the rational rate parse for all eleven
+  node/runtime callers; every caller KEEPS its failure policy
+  (GraphExecutionError / -1 UNPROVEN / None / 25.0 / CORRUPT_OUTPUT). Three real
+  defects: OTR_FFPROBE reached ONE node out of eleven (a bare "ffprobe" written
+  as a signature default out-ranked the operator's pin everywhere); the "25/1"
+  parse existed in four dialects, one of which raised ZeroDivisionError on
+  "0/0"; and `otr_post_upscale_procgen_blend` resolved its binary by replacing
+  "ffmpeg" with "ffprobe" across the WHOLE path -- silently wrong whenever the
+  DIRECTORY is also named ffmpeg, falling back to a hardcoded 25.0 fps. Guarded
+  by three AST scans + a checked-in evasive fixture (a QA pass defeated the
+  first version with module-level constants one hop from the call site).
+  ORDER 9 `8182b38c`+`d99c1adc` -- writer 7,418 -> 5,490 lines. 19 blocks moved
+  BYTE-IDENTICALLY with a sha256 each: `_resolve_inputs` + its widget menus to
+  `nodes/_otr_writer_inputs.py`, the 911-line tail + ten helpers + two contracts
+  to `nodes/_otr_writer_tail.py`. The tail travels as a MIXIN because it reads
+  `self` ZERO times and a free function would have meant re-indenting 911 lines,
+  which no hash can check. 31 structural tests followed it and NOT ONE assertion
+  was weakened -- their shared address now lives once in
+  `tests/fixtures/writer_family.py`.
+  ORDER 11 `e541db1d` -- `docs/2026-08-23-lean-mean-order-11-scripts-owner-table.md`:
+  167 files classified (95 wired / 27 documented-only / 11 unreferenced-tracked /
+  34 untracked). Nothing deleted on my own authority. It also answered order 8's
+  deferred half: all eleven standalone ffprobe callers are LIVE tools, so that
+  migration is a real chunk with a real gate, not a sweep.
+  A LIVE BUG THE SEAM FOUND `0acdc993` -- `_run_writer_tail` read `_style_roll`
+  (a local of `run()`, a SIBLING method) and called `random.Random` in a module
+  that never imported `random`, both on the dynamic-style FLOOR FALLBACK branch.
+  A failed style reflection raised NameError instead of degrading to a floor
+  style. IT SURVIVED BECAUSE THE GUARD COULD NOT FAIL: the invariant was tested
+  with `co_freevars == ()`, and a sibling's local compiles to LOAD_GLOBAL, which
+  never appears in co_freevars. Replacement walks the bytecode for global loads
+  the module does not define, plus a negative-control test that builds the exact
+  defect and proves the OLD assertion still passes on it. NOT filed as a PBUG --
+  the proof is a disassembly, not a live artifact, and the admission rule wants
+  an artifact.
+  OPERATOR RIPS `cc36c64b` -- "rip it out" (`otr_hazard.py`) and "soak op
+  delete, we'll make a new soak op": `soak_operator.py` (a 304-line legacy shim
+  since BUG-LOCAL-002 gutted it in May, holding ONE live function) and its
+  orphaned `watcher_overrides.json`, whose declared reader
+  `apply_watcher_overrides` had been gone since that gutting. The one live
+  function moved byte-identically to `scripts/treatment_scanner.py` -- the
+  address the shim's own docstring had always named and that had never been
+  created. Git recorded it as a rename.
+  LAST NO-SHIMS ITEM `ed92bff7` -- `_otr_content_safety`'s REWRITE half deleted
+  (an LLM pass that reworded a delivered spoken row to match a hardcoded word
+  list, carrying both bare RuntimeErrors). The VOCABULARY deliberately survives:
+  the directive bans filtering, not knowing the words, and
+  `test_bug_local_288_sfw_validator.py` keeps the whole retired list green on
+  purpose. THE LAW checked first -- `meta.ledger_cleanup.safety` already had a
+  deterministic owner. Module now pure/stdlib-only, 354 -> 187 lines, no pydantic.
+Current step: lean-mean 1-9 and 11 COMPLETE, 7 cancelled, 10 HELD (workflow-atomic;
+  a blanket variant regen still reverts the hand-edited ghost_signal_v3 ship
+  candidate -- do NOT unhold without the operator), 12 blocked on
+  otr_cloud_lanes ratification. Suite 12212/135/1 EXIT=0 at every push, Bible
+  22/26/3, canonical validator 23 nodes / 57 links with the workflow
+  byte-identical, pack 25 nodes, writer widgets audited 33 == 33 in order,
+  pyproject.toml never touched.
+Next: TWO THINGS THIS WINDOW OWES AND DID NOT RUN, both by operator instruction
+  ("skip the render etc and 5 bank"), neither a failure: (1) a LIVE canonical
+  render published to `otr/obs` -- one was launched on `otr_g4_wan_ti2v` and
+  reached the video stage with writer, master audio and per-beat slices all
+  proven live (VRAM peak 13.2 GB), then was stopped selectively (VRAM 809 MiB,
+  ports free); (2) `scripts/otr_writer_bank_gate.py --acts 1` across all five
+  valid banks (media_archive, original, scifi_news_pro, public_domain,
+  shakespeare) on a FRESH server -- the writer split is byte-identical and the
+  suite is green, but no bank has been proven to fill a ledger end-to-end since.
+  Boot the server AFTER the code is committed or the gate tests stale bytes.
+  Also open: `_consult_question_ltx23_res4lyf.md` awaits an operator word (the
+  third file from the order-11 audit; the other two were ruled and executed).
+
 ## 2026-08-23 -- HEAD 8e0b739d +handoff (v2.0-alpha) -- CODER (lean-mean orders 1-6 complete + item F run + order 3/4/5/6 retirements; 19 commits)
 
 Did: the whole lean-mean campaign through order 6, item F exercised live, and
