@@ -1559,6 +1559,7 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
   `OTR_CastLock` freeze cascade (`wan_ti2v`).
 
 ## THE REGISTRY AND COMFYUI-MANAGER ARE TWO DIFFERENT SYSTEMS (measured 2026-08-23)
+### >>> PARTLY SUPERSEDED 2026-08-24: points 2 and 4's conclusions are WRONG -- see THE REAL NODE-EXTRACTION PIPELINE below. The Manager half (point 3) still stands. <<<
 
 Written because a publishing plan was drafted on the belief that shipping a file
 would make registry.comfy.org list our nodes, with "34 exact OTR_* node IDs" as
@@ -1667,7 +1668,8 @@ headline row, motivated by a real artifact (a Wells adaptation that produced
 "Arkham, Massachusetts"). A future reader WILL rediscover that anecdote and read
 it as an open defect. It is not one. The operator was asked and answered.
 
-### THE DECISIVE EVIDENCE (added 2026-08-23): THE REGISTRY SCHEMA HAS NO PLACE TO PUT NODES
+### SUPERSEDED 2026-08-24 -- THIS SECTION'S CONCLUSION WAS WRONG (kept as a lesson in probing the wrong endpoint)
+#### was: THE DECISIVE EVIDENCE (added 2026-08-23): THE REGISTRY SCHEMA HAS NO PLACE TO PUT NODES
 
 Probed directly, so nobody spends another version chasing this.
 
@@ -1707,3 +1709,70 @@ Comfy-Org's cron only considers versions older than 30 minutes and there is no
 publisher self-service path to Active. "The push isn't done" and "the push
 failed" look identical for half an hour. Read the versions list, not
 `latest_version`.
+
+## THE REAL NODE-EXTRACTION PIPELINE (source-verified 2026-08-24 -- supersedes both sections above where they conflict)
+
+The operator produced two packs whose registry pages DO list nodes
+(`wanblockswap`, `ComfyUI-WithAnyone`). That control broke last night's
+conclusion, and the true mechanism was then read out of
+`Comfy-Org/registry-backend` directly.
+
+**1. THE ENDPOINT EXISTS -- last night's probe used the wrong URL shape.**
+`GET /nodes/<id>/comfy-nodes` 404s for everyone, which is what produced the
+false "dead for all packs" ruling. The REAL shapes work:
+`GET /comfy-nodes?node_id=<id>` and
+`GET /nodes/<id>/versions/<version>/comfy-nodes`. Measured totals:
+comfyui-impact-pack **7,921**, comfyui-kjnodes **4,206**, rgthree-comfy
+**1,124**, wanblockswap 1, ComfyUI-WithAnyone populated (ids are
+CASE-SENSITIVE; the lowercase spelling returns an empty 200, not an error) --
+and **comfyui-old-time-radio 0, on alpha.6 AND alpha.7.**
+
+**2. EXTRACTION IS IMPORT-BASED, NOT STATIC.**
+`registry-backend/node-pack-extract/` boots a REAL CPU-only ComfyUI
+(`ai-dock/comfyui:v2-cpu-22.04`), installs the published CDN zip into
+`custom_nodes/<node_id>/`, runs `pip install -r requirements.txt` (under
+`set -e`) plus `install.py` if present, then polls `localhost:8188/object_info`
+(TIMEOUT=3600) filtering on `python_module == "custom_nodes.<node_id>"`. Zero
+matches -> `"node cannot be loaded into comfy ui"` -- the exact frontend
+message. **Registration style is IRRELEVANT: rgthree builds its mappings
+dynamically and extracted 1,124.** So a literal static `NODE_CLASS_MAPPINGS`
+rewrite is still pointless for this -- for the OPPOSITE reason recorded last
+night. `node_list.json` is equally irrelevant to this pipeline (harmless;
+keep it for its own sake).
+
+**3. OUR PACK LOADS CLEAN UNDER A FAITHFUL REPRODUCTION.** The published
+alpha.7 zip, extracted into a folder named `comfyui-old-time-radio`, imported
+under the exact hyphenated module name with prestartup executed first, NO
+OTR_TEST_MODE, CPU-only: **prestartup ok, 25/25 nodes registered, zero
+failures.** The pack is not the reason extraction returns nothing.
+
+**4. WHY OURS IS EMPTY -- the pipeline's own bookkeeping.** Every version row
+carries `comfy_node_extract_status`, default **'pending'**. The ONLY thing
+that fires extraction is `TriggerComfyNodesBackfill`
+(`services/registry/registry_svc.go`), exposed as `POST /comfy-nodes/backfill`
+(auth-gated, **default max_node=10 per sweep**), which queues ONLY
+status='pending' versions onto Pub/Sub -> Cloud Build. Two consequences:
+* A fresh version can sit 'pending' for a long time -- the sweep takes 10
+  versions per run ACROSS THE WHOLE REGISTRY, unordered.
+* `MarkComfyNodeExtractionFailed` flips a version to 'failed', and **the
+  backfill query never selects 'failed' -- a failed extraction is TERMINAL,
+  never retried.** If alpha.4-6 ran and failed (e.g. a pip failure inside
+  their container), they will stay node-less forever no matter what we do.
+The status field is NOT exposed on the public API, so pending-vs-failed for
+our versions cannot be read from outside. That is the precise question for
+Comfy-Org, and it replaces the older ask: *"what is
+comfy_node_extract_status for comfyui-old-time-radio's versions -- and if
+'failed', what did the Cloud Build log say, and can they be re-queued?"*
+
+**5. WHAT REMAINS TRUE FROM LAST NIGHT:** alpha.7's `Pending`
+security-scan status is a separate pipeline from node extraction; the
+ComfyUI-Manager database is a third, separate system; and the pack itself is
+healthy (25/25 from the shipped artifact).
+
+**THE LESSON, twice in one day: a 404 is evidence about ONE URL, not about a
+capability.** Last night's "dead for every pack" ruling generalized four 404s
+from a wrong path shape into a system-wide claim, and it survived into two
+committed docs and an operator-facing recommendation. The control that broke
+it was two packs the operator found in five minutes of browsing. When a
+measurement says "this is broken for everyone", FIRST hunt for one
+counterexample before writing the ruling.

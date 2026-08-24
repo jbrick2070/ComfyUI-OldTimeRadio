@@ -42,38 +42,45 @@ older than 30 minutes. **There is no publisher self-service path to Active.**
 change on its own within the observed window.** That is why this is being raised
 rather than waited out again.
 
-### 3b. The per-node panel is empty for EVERY pack, not just this one
+### 3b. Node extraction has never succeeded for this pack (CORRECTED 2026-08-24)
 
-This is a separate issue and is almost certainly not a bug in this pack:
+The earlier draft of this section claimed the node panel was empty for every
+pack; that was a wrong-endpoint artifact. The truth, verified against
+`Comfy-Org/registry-backend` source and live API reads:
 
-* A version record's **complete** key set is `changelog, createdAt,
-  dependencies, deprecated, downloadUrl, id, node_id, status,
-  supported_accelerators, supported_comfyui_frontend_version,
-  supported_comfyui_version, supported_os, tags, tags_admin, version`.
-  **There is no field anywhere for node classes.**
-* `GET /nodes/<id>/comfy-nodes` -> **404** for `comfyui-old-time-radio`,
-  `comfyui-kjnodes`, `rgthree-comfy`, `comfyui-dramabox`.
-* `GET /nodes/<id>/nodes` -> **404** as well.
-* **Control comparison:** `comfyui-kjnodes` 1.5.0 — one of the most-installed
-  packs in the ecosystem — returns `supported_os []`,
-  `supported_comfyui_version ""`, `supported_accelerators []`, `tags []`:
-  identical in shape to ours, with the same three `[tool.comfy]` keys
-  (`PublisherId`, `DisplayName`, `Icon`).
+* `GET /comfy-nodes?node_id=<id>` works: comfyui-impact-pack 7,921 entries,
+  comfyui-kjnodes 4,206, rgthree-comfy 1,124 -- **comfyui-old-time-radio 0**,
+  on alpha.6 and alpha.7 alike.
+* Extraction is import-based: `node-pack-extract` boots a CPU ComfyUI with the
+  published zip installed and reads `/object_info`, filtering on
+  `python_module == "custom_nodes.comfyui-old-time-radio"`. Dynamic
+  registration is fine (rgthree extracts 1,124).
+* **Our pack loads clean under a faithful local reproduction of those
+  conditions** -- the published alpha.7 zip in a folder named
+  `comfyui-old-time-radio`, hyphenated module name, prestartup first, no env,
+  CPU: 25/25 nodes, zero failures.
+* Versions carry `comfy_node_extract_status` (default `pending`). Extraction
+  fires only via `POST /comfy-nodes/backfill` (auth-gated, default
+  `max_node=10` per sweep, pending-only). **A version marked `failed` is never
+  selected again.** The field is not publicly readable.
 
-**Conclusion:** node listing is fed by a separate extraction service that does
-not appear to populate for most or all packs. Nothing a publisher ships can
-change it.
+So the empty panel means one of exactly two things, and only Comfy-Org can say
+which: our versions are still `pending` (waiting on a 10-per-sweep global
+backfill), or an extraction ran, failed inside their container, and is now
+terminally parked.
 
 ## 4. The ask, stated precisely
 
-1. **Can `2.0.0-alpha.7` be promoted from `Pending` to `Active`,** or can you say
-   what is blocking its security scan? The artifact is complete and served, and
-   the same publishing path produced `Active` for `alpha.4`, `alpha.5` and
-   `alpha.6`.
-2. **Is the per-node listing (`/comfy-nodes`) expected to work at all?** If it is
-   deprecated or not populated for most packs, saying so publicly would stop
-   publishers debugging their own packaging over it. If it *is* meant to work,
-   what does a pack have to ship for the extractor to find its nodes?
+1. **What is `comfy_node_extract_status` for `comfyui-old-time-radio`'s
+   versions?** If any are `failed`: what did the node-pack-extract Cloud Build
+   log record, and can they be re-queued (the backfill selects `pending` only,
+   so `failed` appears terminal)? If `pending`: roughly when does the backfill
+   sweep reach newly published packs? Our pack loads 25/25 nodes under a
+   faithful local reproduction of the extractor's conditions, so we expect a
+   run to succeed.
+2. **Can `2.0.0-alpha.7` be promoted from `Pending` to `Active`,** or can you
+   say what is blocking its security scan? The same path produced `Active` for
+   alpha.4/5/6.
 
 ## 5. What is explicitly NOT being asked
 
