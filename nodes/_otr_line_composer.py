@@ -44,7 +44,6 @@ __all__ = [
     "fallback_announcer_outro",
     "compose_announcer_intro",
     "compose_announcer_outro",
-    "finalize_news_coda_surface",
     # The safe-open contract. Exported because _otr_story_brief's derive
     # validator shares this exact predicate -- one definition, two callers, so
     # a brief that validator accepts is always one this composer can use.
@@ -1664,14 +1663,6 @@ def _assemble_news_coda_surface(bridge: str, fact: str) -> str:
     if not fact:
         return ""
     return " ".join((f"{bridge}: {fact}" if bridge else fact).split())
-
-
-def finalize_news_coda_surface(
-    *, bridge: str, fact: str, req: LineRequest,
-) -> LineResult:
-    """Append the complete factual note; never score, shorten, or replace it."""
-    del req
-    return LineResult(_assemble_news_coda_surface(bridge, fact), ())
 
 
 def compose_news_coda(

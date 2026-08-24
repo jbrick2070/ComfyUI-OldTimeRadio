@@ -1988,30 +1988,14 @@ def _compose_and_stamp_announcer_close(
         led.data, last_announcer_id,
         {"compose_flags": list(outro_res.compose_flags)},
     )
-    _coda_action = (
-        "fact_reduced"
-        if "news_coda_fact_reduced" in outro_res.compose_flags
-        else "fact_deferred_to_credits"
-        if "news_coda_fact_deferred_to_credits"
-        in outro_res.compose_flags
-        else ""
-    )
-    if _coda_action:
-        import hashlib as _hashlib_coda
-        meta["news_coda_spoken_reduction"] = {
-            "schema_version": 1,
-            "line_id": last_announcer_id,
-            "action": _coda_action,
-            "source_fact_sha256": _hashlib_coda.sha256(
-                nc_brief.encode("utf-8")
-            ).hexdigest(),
-            "spoken_line_sha256": _hashlib_coda.sha256(
-                outro_res.text.encode("utf-8")
-            ).hexdigest(),
-            "source_fact_retained_in_meta_news": True,
-        }
-    else:
-        meta.pop("news_coda_spoken_reduction", None)
+    # `news_coda_spoken_reduction` was stamped here and is DELETED (2026-08-23).
+    # It was gated on `news_coda_fact_reduced` / `news_coda_fact_deferred_to_credits`
+    # -- two compose flags that are READ here and SET NOWHERE in the tree, so the
+    # branch never fired and the receipt was never written on any episode. The
+    # else-arm popped a key nothing had put there. Its reader count was zero too,
+    # so no downstream consumer loses a field: this is the same shape as the
+    # `news_coda_fallback` receipt above it, which tested for a string "no
+    # composer has ever emitted".
 
     return outro_res
 

@@ -539,44 +539,40 @@ BOTH test-order permutations as regressions. The private-module-name
 alternative is CUT: it risks exercising fallback import paths instead of the
 production `nodes._otr_public_domain_sources` package identity.
 
-### 4. THE SPOKEN-CITATION CODA STILL OWES ITS TESTABILITY (~2h, OPEN)
+### 4. THE SPOKEN-CITATION CODA IS CLOSED -- re-verified against HEAD 2026-08-23
 
-**The LEAK is closed and live-proven; the WORK below is not.** The old heading led with the closed half and a 2026-08-13 cleanup pass duly cut the whole section as done. Four coder items remain, and the two traps under them have each already cost real episodes.
+The operator asked whether this was already fixed. It was, and this row had gone
+stale: **all four owed items are done**, and the last fragment was closed in the
+same check.
 
-The spoken-citation defect SHIPPED and is live-proven (`3943dd38`, `0957e169`,
-`104c3f78`; receipt in `PROD_BUG_LOG.md` PBUG-20260805-04). Seven legs, six lanes,
-zero leaked lines, and the corpus audit held at 69 findings across eight new
-episodes. Licensed sources are now credit-only -- the announcer names neither the
-licence nor the licensor, because Folger publishes the edition and Shakespeare
-wrote the play.
+* **B4, extract the coda helper -- DONE.** It is
+  `OTR_LedgerScriptWriter._compose_and_stamp_announcer_close`, a MODULE-LEVEL
+  function (the row's old line range, `:5463-5588`, no longer exists). **And the
+  TRAP was honoured:** `news_meta` stays in the CALLER -- it is defined at
+  `:5393` inside `run()` and read below there, exactly as the warning required,
+  and the extracted function's own docstring records why.
+* **B6, bump `CURRENT_SCHEMA_VERSION` -- DONE.** It reads `l4-2026-08-07`, and
+  `scripts/audit_spoken_citations.py` requires `spoken_coda_source` on anything
+  newer while holding the COMPLETE pre-l4 lineage as legacy. The comment there
+  even guards the boundary string against being "helpfully" updated, which would
+  invert the audit over 1,587 historical ledgers.
+* **Writer-level routing tests -- DONE.** `tests/test_announcer_close_routing_matrix.py`
+  (10 tests) walks both fidelity banks x {owned fact, silent}, asserts the coda
+  is PRESENT rather than merely URL-free, carries it through to a real
+  `Dialogue:` cue, and uses `media_archive` as the control exactly as specified.
+* **Bug Bible coverage -- DONE.** `BUG_BIBLE.yaml:5249` carries the rule: "the
+  edited function has no callers on the production path".
 
-What it still owes, all specified in `kibitz-runs/2026-08-05-item7-citation/r4/final.md`:
-
-* **B4 -- extract the coda helper** so tests exercise the production reader.
-  **TRAP:** do NOT extract `OTR_LedgerScriptWriter.py:5463-5588` verbatim.
-  `news_meta` is defined inside that range and read by the caller below it --
-  extracting as written is a `NameError` on every episode. Both review lanes
-  caught this independently. Keep `news_meta` in the caller.
-* **B6 -- bump `CURRENT_SCHEMA_VERSION`** (`nodes/_otr_ledger.py:58`). The audit
-  must REQUIRE `spoken_coda_source` on post-fix ledgers while tolerating its
-  absence on the 1,587 legacy ones; without a version boundary a dropped receipt
-  is indistinguishable from history. `LEGACY_SCHEMA_VERSIONS` in
-  `scripts/audit_spoken_citations.py` is already written to expect the bump.
-* **Writer-level routing tests** (depend on B4): both fidelity banks x
-  {non-empty, empty} provenance, plus an owned/non-empty case with
-  `_style_grammar_on == False`. Assert the coda is PRESENT, not merely that the
-  URL is absent. Control is `media_archive`, NEVER `scifi_news` -- that lane
-  dispatches to `scifi_news_circuit` and returns before this block.
-* **Bug Bible coverage** -- mandatory per `CLAUDE.md`, not a judgment call. The
-  rule to promote: **a fix applied to a function with no callers is not a fix.**
-  The 2026-08-04 attempt at this same defect edited `spoken_coda_line()`, which
-  had zero readers, and 30 episodes leaked after it "landed".
-
-Also parked and owed a merge: another session's worktree
-`.claude/worktrees/awesome-brahmagupta-a509b4` holds the uncommitted deletion of
-the dead `news_coda_spoken_reduction` receipt chain and `finalize_news_coda_surface`
-(no callers tree-wide, no producer for its two trigger flags). It stood down so it
-would not collide with B4. Re-ground it against the new helper boundary, then merge.
+**AND THE PARKED WORKTREE ITEM IS CLOSED TOO (2026-08-23).** The deletion that
+another session staged and stood down was never merged -- that worktree is clean
+at an old commit -- so it was re-verified from scratch and done here. Both
+symbols were confirmed dead at HEAD: `finalize_news_coda_surface` had ZERO
+callers, and `news_coda_spoken_reduction` was gated on two compose flags,
+`news_coda_fact_reduced` and `news_coda_fact_deferred_to_credits`, that are READ
+in that one place and SET NOWHERE in the tree. The branch could never fire; the
+else-arm popped a key nothing had put there. Removed, with a tombstone comment
+naming the reason -- the same shape as the `news_coda_fallback` receipt above
+it, which tested for a string "no composer has ever emitted".
 
 ### 5. 1,090 CAST ROWS CLAIM A NON-COMMERCIAL MODEL IS COMMERCIALLY CLEAN
 
