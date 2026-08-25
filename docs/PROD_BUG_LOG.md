@@ -6277,14 +6277,22 @@ EXPECTED result, not a regression signal.
   HIGH on both class mechanisms (real captured errors); **HIGH on Class A root
   cause** -- five mechanisms named from a real capture, each reproduced against
   the live parser before any code was written.
-- status: **CLASS A FIXED, green on the suite, LIVE PROOF STILL OWED.** A green
-  suite does not close this: the measurement that opened it was 6 failures in
-  10 LIVE passes, so only a fresh overnight loop can retire it. Re-run
-  `scripts/otr_overnight_loop.sh` and compare the `scifi_news_pro` failure rate
-  against the recorded 60%. **CLASS B (`_pass_news_read`) IS UNTOUCHED AND
-  STILL OPEN** -- all three r1 lanes independently ruled it a different fault
-  (different pass, ladder, error type and validator), and it must not be
-  reported as covered by this fix.
+- status: **CLOSED 2026-08-25 -- BOTH CLASSES FIXED AND LIVE-PROVEN.**
+  Class B shipped same-day (`b19a11ef`, "stop showing the news-read model its
+  own forbidden names") -- `_pass_news_read`'s prompt no longer lists
+  `cast_names`; `_make_news_read_validator` still checks every name
+  independently, unchanged. This was recorded as "UNTOUCHED" in this entry
+  for a full day after it shipped -- a plan/log drift caught 2026-08-25 when
+  a window about to re-code it read the actual file first. Lesson for next
+  time: a status line is not self-updating: a fix landing in a later commit
+  must return here.
+  **THE RATE, measured correctly this time.** The original 60% measurement
+  (6/10) predates both fixes. Counting only `scifi_news_pro` passes from
+  `tmp/otr_overnight_loop.log` AFTER both fixes were live (first post-fix
+  pass 2026-08-24 16:47 PDT) through 2026-08-25: **17 PASS / 0 FAIL.** Zero
+  recurrence of either Class A's speaker-resolution signature or Class B's
+  `NewsProTreatmentError` "names invented characters" signature across all
+  17 legs. That is the live proof this entry was waiting on.
 
 ## PBUG-20260824-02 -- `scifi_news_pro` dies on a bare `SCENE 1:` header with no setting
 - surfaced: the `scifi_news_pro`-only fast-iteration rate measurement started

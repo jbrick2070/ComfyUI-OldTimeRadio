@@ -27,72 +27,24 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> NEXT ITEM: `scifi_news_pro` -- CLASS B IS OPEN, AND CLASS A OWES A RATE <<<
+### >>> NEXT ITEM: RE-TRIAGE OWED -- both prior top-of-queue items were already closed <<<
 
-**Class A shipped and is LIVE-PROVEN** (`a19f3df2`). The receipt is in
-`docs/PROD_BUG_LOG.md` under PBUG-20260824-01; do not restate it here.
-First post-fix pass: `RESULT SUCCESS` in 12.8 min, episode published to
-`otr/obs`, salvage NOT used. **What remains is open work, and it is two things.**
+**Found 2026-08-25, before re-coding what this banner used to name.** The
+`scifi_news_pro` Class A/B item (was here) and the loop PATH-inheritance
+item (was right after it) were BOTH already fixed and committed hours
+earlier the same day -- Class B by `b19a11ef`, the PATH fix already sitting
+in `scripts/otr_overnight_loop.sh:26`. Neither banner was ever updated to
+say so. Full receipts moved verbatim to `docs/GO_FORWARD_ARCHIVE.md`
+(search "CLOSED 2026-08-25"); the scifi_news_pro closure is also in
+`docs/PROD_BUG_LOG.md` PBUG-20260824-01 (17 PASS / 0 FAIL, counted correctly
+from after both fixes landed).
 
-**1. CLASS A OWES A RATE, NOT A PASS.** One green leg proves the lane can
-produce again. It does NOT retire a defect that was measured at **6 failures in
-10 live passes**. Let the loop run and compare the `scifi_news_pro` failure rate
-against that 60%. Leg logs now archive per pass to `tmp/legs/passNNN/`, so a
-failure can be diagnosed from ONE loop instead of another night.
-**Do not mark PBUG-20260824-01 closed on a single episode.**
-
-**2. CLASS B (`_pass_news_read`) IS UNTOUCHED AND IS THE REAL NEXT ITEM.**
-`NewsProTreatmentError` after 2 attempts: *"the closing read is a FACTUAL report
-and it names invented characters (Laura Goodkind)."* The validator
-(`_make_news_read_validator`, `nodes/_otr_scifi_news_pro.py:1748-1755`) is
-CORRECT -- a factual news close must not cite the drama's fictional cast. The
-suspect shape is the prompt: `_pass_news_read` builds
-`FICTIONAL CAST NAMES (never use these in the factual read): ...`
-(`:1778-1779`), i.e. it hands a small local model the exact tokens it must not
-emit, and that block is the ONLY channel by which those names reach its
-context at all.
-
-* **All three r1 lanes independently ruled Class B a DIFFERENT fault** --
-  different pass, different ladder (typed `structured_call`, 2 attempts),
-  different error type, different validator, no shared code path with the
-  markup parser. **It must never be reported as covered by the Class A fix.**
-* The repo has already ruled the mirror case: `news_close_read` is excluded
-  from the SCRIPT prompt because it is *"a distractor a small local model does
-  not reliably resist"* (`:1819-1829`). The candidate fix is the same move --
-  give the names to the VALIDATOR only (it already receives them, `:1732-1735`)
-  and remove them from the model's context, after which the failure becomes
-  impossible rather than merely less likely.
-* **[ASSUMPTION] until measured:** that the listing CAUSES the copying. Verify
-  with matched prompt variants before changing that pass.
-
-### NEW OPEN ITEM (small, do it when the loop is IDLE) -- the overnight loop can run without archiving
-
-**THE GOTCHA, found 2026-08-24 by reading the log header rather than trusting
-that the process was alive.** Launching `scripts/otr_overnight_loop.sh` via
-`Start-Process` inherits the caller's PATH. When that PATH lacks Git's
-`usr\bin`, the loop STILL RUNS -- the bank gate is a Windows python call and
-works perfectly -- but every coreutil inside the supervisor silently returns
-nothing. The tell is a header reading
-
-    [] pass 1: launching bank gate (obs=)
-
-instead of `[17:02:33Z] pass 1: launching bank gate (obs=166)`.
-
-**That is not cosmetic.** The same missing binaries break `mkdir -p` and
-`cp -p` in the per-pass archive step -- the step added in `f84906c8` precisely
-because `tmp/_bankgate_<bank>.log` is overwritten every pass, which is how two
-of the six 2026-08-24 failure reasons were lost. **A loop that runs but does
-not archive is a loop that has to be run again.**
-
-**THE DURABLE FIX, not yet applied:** prepend
-`/c/Program Files/Git/usr/bin` to `PATH` inside `otr_overnight_loop.sh` itself,
-so the loop is self-sufficient however it is launched. **It was NOT done on
-2026-08-24 because the loop was mid-pass and bash reads a script incrementally
-as it executes** -- editing a running shell script can make it execute garbage.
-Do it when no supervisor is running. The interim workaround is the local,
-gitignored `scripts/_otr_overnight_loop_launch.ps1` (ignored by
-`.gitignore:70`, `scripts/_*.ps1`), which sets the PATH before launching and
-prints the last log lines so an empty timestamp is visible immediately.
+**Do not trust the rest of this file's OPEN sections at face value either
+without a quick grep-the-real-code check first** -- this is now a confirmed,
+repeatable failure mode for this file (two stale banners found in one pass),
+not a one-off. The CURRENT RUNWAY table below (operator-ordered 2026-08-13)
+is the next candidate; spot-check row 2 (LEMMY Phases 2-4) against the real
+files before starting it, the same way this catch was made.
 
 ## HOW TO READ THIS FILE (three files since 2026-08-23)
 

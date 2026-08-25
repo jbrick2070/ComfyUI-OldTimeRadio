@@ -1229,3 +1229,72 @@ install behaves exactly as it did before. Guarded by an AST ratchet plus a
 negative control in `tests/test_cast_lock_commercial_clean_join.py` (10 tests):
 nothing outside the join helper may read a bank row's clip licence again.
 
+
+---
+
+## CLOSED 2026-08-25 -- `scifi_news_pro` Class A + Class B (was the top-of-file NEXT ITEM)
+
+Moved verbatim from `docs/GO_FORWARD_PLAN.md`'s `>>> NEXT ITEM <<<` banner.
+Class B had actually shipped same-day as Class A (`b19a11ef`) but this
+banner was never updated to say so -- a full day of drift, caught when a
+window about to re-code Class B read the real file first. See
+`docs/PROD_BUG_LOG.md` PBUG-20260824-01 for the closing receipt: 17 PASS /
+0 FAIL for `scifi_news_pro` counted correctly from AFTER both fixes landed
+(the original 60% measurement predates both).
+
+### >>> NEXT ITEM: `scifi_news_pro` -- CLASS B IS OPEN, AND CLASS A OWES A RATE <<<
+
+**Class A shipped and is LIVE-PROVEN** (`a19f3df2`). The receipt is in
+`docs/PROD_BUG_LOG.md` under PBUG-20260824-01; do not restate it here.
+First post-fix pass: `RESULT SUCCESS` in 12.8 min, episode published to
+`otr/obs`, salvage NOT used. **What remains is open work, and it is two things.**
+
+**1. CLASS A OWES A RATE, NOT A PASS.** One green leg proves the lane can
+produce again. It does NOT retire a defect that was measured at **6 failures in
+10 live passes**. Let the loop run and compare the `scifi_news_pro` failure rate
+against that 60%. Leg logs now archive per pass to `tmp/legs/passNNN/`, so a
+failure can be diagnosed from ONE loop instead of another night.
+**Do not mark PBUG-20260824-01 closed on a single episode.**
+
+**2. CLASS B (`_pass_news_read`) IS UNTOUCHED AND IS THE REAL NEXT ITEM.**
+`NewsProTreatmentError` after 2 attempts: *"the closing read is a FACTUAL report
+and it names invented characters (Laura Goodkind)."* The validator
+(`_make_news_read_validator`, `nodes/_otr_scifi_news_pro.py:1748-1755`) is
+CORRECT -- a factual news close must not cite the drama's fictional cast. The
+suspect shape is the prompt: `_pass_news_read` builds
+`FICTIONAL CAST NAMES (never use these in the factual read): ...`
+(`:1778-1779`), i.e. it hands a small local model the exact tokens it must not
+emit, and that block is the ONLY channel by which those names reach its
+context at all.
+
+* **All three r1 lanes independently ruled Class B a DIFFERENT fault** --
+  different pass, different ladder (typed `structured_call`, 2 attempts),
+  different error type, different validator, no shared code path with the
+  markup parser. **It must never be reported as covered by the Class A fix.**
+* The repo has already ruled the mirror case: `news_close_read` is excluded
+  from the SCRIPT prompt because it is *"a distractor a small local model does
+  not reliably resist"* (`:1819-1829`). The candidate fix is the same move --
+  give the names to the VALIDATOR only (it already receives them, `:1732-1735`)
+  and remove them from the model's context, after which the failure becomes
+  impossible rather than merely less likely.
+* **[ASSUMPTION] until measured:** that the listing CAUSES the copying. Verify
+  with matched prompt variants before changing that pass.
+
+---
+
+## CLOSED (already, before 2026-08-25) -- overnight loop PATH-inheritance gotcha
+
+Also found stale during the 2026-08-25 plan-drift catch above: this item's
+"durable fix, not yet applied" is already applied. `scripts/otr_overnight_loop.sh:26`
+carries `export PATH="/c/Program Files/Git/usr/bin:$PATH"`, and the loop's
+own log shows real, non-empty timestamps throughout
+(`[07:36:33Z] pass 1: launching bank gate (obs=121)`), confirming coreutils
+resolve correctly. Moved verbatim, not re-verified further.
+
+**THE GOTCHA, found 2026-08-24 by reading the log header rather than trusting
+that the process was alive.** Launching `scripts/otr_overnight_loop.sh` via
+`Start-Process` inherits the caller's PATH. When that PATH lacks Git's
+`usr\bin`, the loop STILL RUNS -- the bank gate is a Windows python call and
+works perfectly -- but every coreutil inside the supervisor silently returns
+nothing. The tell was a header reading `[] pass 1: launching bank gate (obs=)`
+instead of a real timestamp.
