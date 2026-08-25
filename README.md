@@ -53,11 +53,64 @@ the active branch:
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 cd ComfyUI-OldTimeRadio
 git checkout v2.0-alpha
+pip install -r requirements.txt
 ```
 
 Then restart ComfyUI so it loads the nodes.
 
-### 3. Install the models
+> **Don't skip the `pip install`.** Manager and `comfy node registry-install` run it for you;
+> a bare `git clone` does not. Each node imports in its own `try`/`except`, so a missing
+> library doesn't break the pack — it silently *skips* the affected node and prints
+> `[OldTimeRadio] Skipped '<name>': <reason>` in the console. If a node you expect is
+> missing from the menu, that line is where to look. Use the same Python that runs
+> ComfyUI (for portable installs: `python_embeded\python.exe -m pip install -r requirements.txt`).
+
+### 3. Hugging Face token — only if you pick a gated model
+
+**Most people need no token at all.** The shipped canonical workflow pins
+`google/gemma-4-12b-it`, which is Apache-2.0 and ungated, so a normal first run downloads
+without any account. You only need a token if you switch the writer dropdown to one of the
+gated rows below.
+
+**Gated — you must accept the terms on the model page first, then supply a token:**
+
+| Model | Accept terms at |
+|---|---|
+| `google/gemma-2-2b-it` | https://huggingface.co/google/gemma-2-2b-it |
+
+**Ungated — nothing required:** `google/gemma-4-12b-it`, `Qwen/Qwen2.5-14B-Instruct`,
+`mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`.
+
+> **Note:** Gemma **4** is Apache-2.0 and ungated, unlike Gemma **2** and Gemma **3**. Only
+> `gemma-2-2b-it` still requires a terms click (verified against the Hugging Face API, which
+> reports `"gated": "manual"` for that repo and `"gated": false` for every other curated row).
+
+Accepting the terms is a **manual, one-time click** while signed in to Hugging Face — a token
+alone is not enough, and the download fails until you have done both. Get a token at
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (a **read** token is
+all you need).
+
+**Where to put it.** OTR reads `HF_TOKEN` from the process environment first, then — on
+Windows only — from `HKCU\Environment`. That registry fallback exists because **ComfyUI
+Desktop does not inherit user-scope environment variables**, so a token you set in the
+System Properties dialog is invisible to it until you either bake it in or reboot.
+
+Windows (PowerShell) — sets it user-wide, where ComfyUI Desktop will find it:
+
+```powershell
+[Environment]::SetEnvironmentVariable("HF_TOKEN", "hf_your_token_here", "User")
+```
+
+macOS / Linux — add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export HF_TOKEN=hf_your_token_here
+```
+
+Restart ComfyUI afterwards. If a gated model still fails, the console error names the exact
+repo and the two steps it is missing.
+
+### 4. Install the models
 
 The shipped canonical workflow is lighter than you'd expect: its video-role dropdowns default
 to the **procedural still/CRT floor** (no GPU video checkpoint required at all), and its image
@@ -72,7 +125,7 @@ fallback: the procedural CRT path is a route you **select** (and the canonical w
 with it selected), not a net that catches a failed engine. Watch the console on the first run;
 it names any missing weight and where it expects it.
 
-### 4. Run it
+### 5. Run it
 
 1. Open **Workflow → Browse Templates**, scroll the left sidebar to **EXTENSIONS**,
    click **comfyui-old-time-radio**, and pick **otr_canonical**. (The console prints

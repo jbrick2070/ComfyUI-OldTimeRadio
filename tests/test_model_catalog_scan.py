@@ -148,7 +148,25 @@ def test_test_oversized_llm_constant_NOT_in_curated_set():
 def test_gated_curated_models_derived_from_requires_auth():
     expected = {m.repo_id for m in catalog.CURATED_LLM_MODELS if m.requires_auth}
     assert set(catalog.GATED_CURATED_MODELS) == expected
-    assert catalog.DEFAULT_LLM in catalog.GATED_CURATED_MODELS  # Mistral is gated
+    # 2026-08-25: this line used to read `DEFAULT_LLM in GATED_CURATED_MODELS`
+    # with the comment "Mistral is gated". That was FALSE -- the Hugging Face
+    # API reports `"gated": false` for Mistral-Nemo and for both Gemma 4 rows,
+    # and only `google/gemma-2-2b-it` answers `"gated": "manual"`. The flags
+    # were demanding an HF_TOKEN for models that download freely, which is why
+    # a fresh install with no token could not reach the writer at all.
+    assert "google/gemma-2-2b-it" in catalog.GATED_CURATED_MODELS
+
+
+def test_default_llm_is_not_gated():
+    """A fresh install must reach the writer with NO Hugging Face token.
+
+    The default row is what a freshly-dropped node and every zero-config user
+    lands on. Gating it means the very first Queue Prompt raises
+    GatedModelError instead of rendering, so this is a shipping contract, not
+    a preference. If a future edit wants a gated model at the default, that is
+    a deliberate operator decision and this test is where it must be argued.
+    """
+    assert catalog.DEFAULT_LLM not in catalog.GATED_CURATED_MODELS
 
 
 def test_default_llm_is_pass_tier_for_c7_baseline():

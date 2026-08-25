@@ -191,9 +191,14 @@ def test_auto_download_gated_no_token_raises_before_snapshot_download(tmp_path, 
     )
     snap = MagicMock()
     api = MagicMock()
+    # 2026-08-25: this used to pass DEFAULT_LLM with the comment "Mistral-Nemo
+    # is gated". It is not -- the HF API reports `"gated": false` for it. Take
+    # a genuinely gated row from the derived set instead, so the test cannot go
+    # stale again the next time a vendor removes a gate.
+    gated_repo = sorted(catalog.GATED_CURATED_MODELS)[0]
     with pytest.raises(GatedModelError) as exc:
         catalog.auto_download_if_missing(
-            catalog.DEFAULT_LLM,  # Mistral-Nemo is gated
+            gated_repo,
             hub_root=tmp_path,
             _snapshot_download=snap,
             _hf_api=api,
@@ -203,7 +208,7 @@ def test_auto_download_gated_no_token_raises_before_snapshot_download(tmp_path, 
     api.model_info.assert_not_called()
     msg = str(exc.value)
     assert "huggingface.co/join" in msg
-    assert catalog.DEFAULT_LLM in msg
+    assert gated_repo in msg
     assert "license" in msg.lower()
 
 

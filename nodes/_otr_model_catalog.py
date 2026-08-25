@@ -121,7 +121,12 @@ class CuratedModel:
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     CuratedModel(
         repo_id="mistralai/Mistral-Nemo-Instruct-2407",
-        requires_auth=True,
+        # 2026-08-25: was True. The Hugging Face API reports `"gated": false`
+        # for this repo -- the flag was demanding an HF_TOKEN for a model that
+        # downloads freely, so a fresh install with no token hit
+        # GatedModelError on the DEFAULT row and never reached the writer.
+        # Only `google/gemma-2-2b-it` is genuinely gated (`"gated": "manual"`).
+        requires_auth=False,
         loader_backend="transformers_safetensors",
         vram_fit_tier="PASS",
         approx_safetensors_gb=24.0,
@@ -139,7 +144,11 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     ),
     CuratedModel(
         repo_id="google/gemma-4-E2B-it",
-        requires_auth=True,
+        # 2026-08-25: was True. Gemma 4 is Apache-2.0 and UNGATED, unlike
+        # Gemma 2/3 -- the HF API reports `"gated": false`. This flag was the
+        # likeliest silent failure on a fresh 8 GB install, because the small
+        # writer rows an 8 GB card must use were all refusing without a token.
+        requires_auth=False,
         loader_backend="transformers_multimodal_text_only",
         vram_fit_tier="PASS",
         approx_safetensors_gb=6.0,
@@ -154,7 +163,9 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     ),
     CuratedModel(
         repo_id="google/gemma-4-E4B-it",
-        requires_auth=True,
+        # 2026-08-25: was True. Gemma 4 is Apache-2.0 and UNGATED
+        # (HF API: `"gated": false`). See the E2B row above.
+        requires_auth=False,
         loader_backend="transformers_multimodal_text_only",
         vram_fit_tier="PASS",
         approx_safetensors_gb=9.0,
