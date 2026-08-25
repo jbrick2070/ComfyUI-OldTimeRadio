@@ -58,6 +58,7 @@ try:
         NewsProParseDefect,
         ParseDefect,
         ParsedScript,
+        _HONORIFICS,
         _strip_role_parenthetical,
         build_speaker_roster,
         normalize_scifi_news_pro_markup_text,
@@ -88,6 +89,7 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         NewsProParseDefect,
         ParseDefect,
         ParsedScript,
+        _HONORIFICS,
         _strip_role_parenthetical,
         build_speaker_roster,
         normalize_scifi_news_pro_markup_text,
@@ -2923,7 +2925,30 @@ def _speakers_in_order(parsed: ParsedScript) -> "list[str]":
     return seen
 
 
-def _make_casting_gender_repair(menu: VoiceMenu):
+def _pool_gender_for_label(label: str) -> str:
+    """Our name pool's reading of a SPEAKER LABEL, honorific stripped.
+
+    CAUGHT BY ITS OWN TEST, 2026-08-24, and it is the exact incoherence the
+    operator asked to prevent. `gender_of_first_name` classifies "only the
+    first whitespace token" by design, so a script label like
+    `DR. MICHAEL ELOTWIZ` hands it `DR.` -- not a name, so "unknown" -- and
+    MICHAEL was minted FEMALE on the first live-shaped run of the completion
+    rung. Script labels routinely carry an honorific; treatment names do not.
+
+    Stripping uses the parser's OWN `_HONORIFICS` set, the same one
+    `_proposed_aliases` uses to build short forms, so the two cannot disagree
+    about what a title is.
+
+    Still conservative: anything the curated pool does not recognise comes
+    back "unknown", and callers must not force a repair on that.
+    """
+    words = str(label or "").split()
+    if len(words) > 1 and words[0].rstrip(".").casefold() in _HONORIFICS:
+        words = words[1:]
+    return _POOLS.gender_of_first_name(" ".join(words))
+
+
+def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
     """RUNG 2 of two: a hedged gender is answered by the VOICE they picked.
 
     THE DEFECT (PBUG-20260824-03, live twice in one evening on the
@@ -2997,7 +3022,7 @@ def _make_casting_gender_repair(menu: VoiceMenu):
         # repair that can regress a settled character.
         if _is_lemmy(name):
             return model_gender
-        tag = _POOLS.gender_of_first_name(name)
+        tag = _pool_gender_for_label(name)
         if tag in legal and model_gender in legal and tag != model_gender:
             log.info(
                 "[scifi_news_pro] casting gender %r disagrees with the name "
@@ -3008,9 +3033,117 @@ def _make_casting_gender_repair(menu: VoiceMenu):
             return tag
         return model_gender
 
+    def _complete_cast(payload: dict) -> bool:
+        """THE SAFETY NET. Fill in any speaker the model left uncast.
+
+        Operator: *"I don't want fails."* THE LAW agrees -- an audit may
+        improve a story, it may never fail one -- and everything above this is
+        the honest attempt to get it right. This runs only when the model has
+        still not covered the sealed speaker list, and the real choice left is
+        a deterministically-cast episode or no episode at all.
+
+        WHY NOT JUST LOOSEN THE VALIDATOR, which was my instinct and is the
+        obvious move: the kibitz r1 panel refuted it and the code agrees.
+        `_assign_voices` runs AFTER the retry ladder and raises on a speaker
+        it cannot find -- its message literally reads "speaker-set equality
+        gate should have caught this" -- and `_assemble` compares the sets
+        again. Accepting a subset converts a RETRYABLE validator refusal into
+        an unretryable crash one seam later, with the audio work already
+        spent. So equality stays exactly as strict; the cast is COMPLETED to
+        satisfy it instead.
+
+        GENDER FIRST, FROM OUR OWN POOL (operator, and Bug Bible 10.08).
+        A minted row picks its gender before its voice: the name pool
+        classifies the label when it can, and only then is a voice of that
+        gender taken. Never the reverse, or the row is coherent by luck.
+
+        The rng is ISOLATED and seeded on the speaker's own name -- 10.08 is
+        explicit that a repair drawing from the shared sequence reshuffles
+        every downstream draw and takes byte-identity with it. Seeding on the
+        name also makes the same episode mint the same voice twice running.
+        """
+        rows = payload.get("cast")
+        if not isinstance(rows, list):
+            return False
+        have = {
+            _norm_ws(str(r.get("name") or "")).casefold()
+            for r in rows if isinstance(r, dict)
+        }
+        want = {_norm_ws(s).casefold() for s in speakers}
+        missing = [s for s in speakers
+                   if _norm_ws(s).casefold() not in have]
+        # EXTRAS COUNT TOO, and returning early on `not missing` was a real
+        # gap this file's own test caught: the live failure's commonest shape
+        # is the model answering with the TREATMENT's people, which can be a
+        # pure SUBSTITUTION -- nobody missing once the names differ, just a
+        # row naming somebody the sealed script never had. Equality fails
+        # either way, so both halves have to be reconciled.
+        extras = [r for r in rows
+                  if isinstance(r, dict)
+                  and _norm_ws(str(r.get("name") or "")).casefold() not in want]
+        if not missing and not extras:
+            return False
+        used = {str(r.get("timbre") or "") for r in rows if isinstance(r, dict)}
+        for name in missing:
+            # 1. GENDER, from the pool, before any voice is considered.
+            tag = _pool_gender_for_label(name)
+            if tag not in legal:
+                # Not in the curated pool -- 10.08 says never force a repair on
+                # a name we cannot confidently gender, so take a stable coin
+                # from the ISOLATED rng rather than defaulting to one gender
+                # for every unknown name.
+                iso = random.Random(f"news_pro_cast_fill:{name}")
+                tag = "male" if iso.random() < 0.5 else "female"
+            # 2. THEN the voice, of that gender, unused.
+            pick = next(
+                (e.menu_id for e in menu.entries
+                 if str(e.gender) == tag and e.menu_id not in used),
+                None,
+            )
+            if pick is None:
+                # Stock exhausted for that gender. Fail closed rather than
+                # reuse a larynx: two characters sharing one voice is the
+                # invariant `_assign_voices` and `_assert_unique_bark_voices`
+                # both exist to protect, and a confusing episode is worse than
+                # a retry.
+                return False
+            used.add(pick)
+            rows.append({
+                "name": name, "role": "", "character_description": "",
+                "gender": tag, "timbre": pick, "register": "",
+                "want": "", "pressure": "",
+            })
+            log.warning(
+                "[scifi_news_pro] speaker %r was left uncast by the model; "
+                "minted deterministically as %s/%s so the finished episode "
+                "ships rather than being discarded", name, tag, pick,
+            )
+        # Extra rows naming nobody in the sealed script are dropped -- a cast
+        # row is not dialogue, so nothing a character said is lost.
+        payload["cast"] = [
+            r for r in rows
+            if isinstance(r, dict)
+            and _norm_ws(str(r.get("name") or "")).casefold() in want
+        ]
+        return True
+
     def _repair(failed_output: str, error: BaseException):
+        # THE COVERAGE FAILURE arrives as a PostValidationError from
+        # `_make_casting_validator`, not as a schema error, so it is handled
+        # before the ValidationError gate below.
         if not isinstance(error, ValidationError):
-            return None
+            if "script speakers" not in str(error):
+                return None
+            try:
+                payload = json.loads(failed_output)
+            except Exception:
+                return None
+            if not isinstance(payload, dict) or not _complete_cast(payload):
+                return None
+            try:
+                return CastingVoices.model_validate(payload)
+            except ValidationError:
+                return None
         # Only OUR failure class. A different validation error must reach its
         # own typed repair prompt rather than being swallowed here.
         if not any(
@@ -3076,6 +3209,60 @@ def _make_casting_gender_repair(menu: VoiceMenu):
     return _repair
 
 
+def _shapes_for_speakers(treatment: Treatment, speakers: "list[str]",
+                         final_draft: FinalDraft) -> "list[dict]":
+    """Cast shapes keyed by the SPEAKER LABEL the model must return.
+
+    THE DEFECT (kibitz r1, Cursor and Fable independently; live pass006).
+    This prompt used to dump `treatment.cast_shapes` verbatim -- carrying the
+    names the TREATMENT invented -- directly above an instruction to return
+    one row per SCRIPT SPEAKER. On a salvaged episode those two name sets
+    disagree, because the script writer mislabelled its own cast. The model
+    was handed `Dr. Michael Elowitz` in the shapes and `DR. MICHAEL ELOTWIZ`
+    in the speaker list, sensibly answered with the treatment's people, and
+    `_make_casting_validator` refused it for not matching the script. Two
+    attempts later a finished episode was discarded.
+
+    The model was not being unreasonable; the prompt was self-contradicting.
+    So the shapes are RE-KEYED onto the labels the script actually used, and
+    a treatment character who never spoke is OMITTED rather than dangled in
+    front of the model as a name it might return.
+
+    THE SCRIPT'S LABELS WIN because the script is SEALED. Its speaker labels
+    are already in `lines[].speaker`, already the ledger's identity for every
+    downstream consumer, and renaming a character here would desync dialogue
+    from cast. Matching runs through the parse's OWN resolver -- the same
+    roster and alias rungs that produced the labels -- so this introduces no
+    new matching policy and no fuzzy step.
+
+    A speaker with NO matching shape is a salvage-adopted stranger. They are
+    listed with empty descriptive fields rather than dropped: the model still
+    has to cast them, and inventing a description for them here would put
+    words in the treatment's mouth.
+    """
+    roster = build_speaker_roster(
+        [shape.name for shape in treatment.cast_shapes],
+        final_draft.alias_map(),
+    )
+    by_canonical = {shape.name: shape for shape in treatment.cast_shapes}
+    out: "list[dict]" = []
+    for label in speakers:
+        canonical, _how = roster.resolve(label)
+        shape = by_canonical.get(canonical) if canonical else None
+        if shape is not None:
+            row = shape.model_dump()
+            # The label the SCRIPT used, which is what the validator compares
+            # and what the ledger already carries.
+            row["name"] = label
+            out.append(row)
+        else:
+            out.append({
+                "name": label, "role": "", "want": "", "pressure": "",
+                "register": "",
+            })
+    return out
+
+
 def _pass_casting(
     slot_fn,
     pack,
@@ -3099,15 +3286,16 @@ def _pass_casting(
         speakers = _speakers_in_order(parsed)
     script_view = _script_view(parsed, treatment, include_news_read=False)
     shapes = json.dumps(
-        [shape.model_dump() for shape in treatment.cast_shapes],
+        _shapes_for_speakers(treatment, speakers, final_draft),
         ensure_ascii=False,
         indent=2,
     )
     user = (
         f"THE FINISHED SCRIPT:\n{script_view}\n\n"
-        f"TREATMENT CAST SHAPES:\n{shapes}\n\n"
+        f"CAST SHAPES, KEYED BY THE SPEAKER LABEL YOU MUST RETURN:\n{shapes}\n\n"
         f"AVAILABLE VOICE STOCK (menu ids only):\n{menu.prompt_lines()}\n\n"
-        f"Return exactly one entry per script speaker: {', '.join(speakers)}."
+        f"Return exactly one entry per script speaker, using these EXACT "
+        f"names and no others: {', '.join(speakers)}."
     )
     try:
         # LLM slot: technical -- voice-stock assignment only.
@@ -3127,7 +3315,7 @@ def _pass_casting(
             # with no model call at all; anything it declines still gets the
             # typed prompt, and whatever it returns is re-validated.
             repair_prompt_factory=make_dispatching_repair_factory(
-                deterministic_repair=_make_casting_gender_repair(menu),
+                deterministic_repair=_make_casting_repair(menu, speakers),
             ),
             post_validator=_make_casting_validator(menu, speakers),
             max_new_tokens=None,
