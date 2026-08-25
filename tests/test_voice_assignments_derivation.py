@@ -33,8 +33,8 @@ def test_voice_assignments_from_cast_basic():
 
 
 def test_voice_assignments_excludes_announcer():
-    """ANNOUNCER lives in the Kokoro namespace; not part of the Bark
-    voice_assignments surface."""
+    """This surface is character-only by design, regardless of which engine
+    delivers the announcer (Kokoro, or -- since 2026-08-24 -- Bark)."""
     led = {
         "cast": [
             {"char_id": "announcer", "name": "ANNOUNCER", "voice_preset": "bm_george"},

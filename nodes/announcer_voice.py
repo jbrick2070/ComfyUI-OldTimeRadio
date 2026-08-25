@@ -10,6 +10,10 @@ voice-node dispatch core with OTR_BatchCharacterVoices:
   * ``chatterbox`` / ``dia`` (opt-in, ``per_line``) -> one frozen
     ``ResolvedVoiceRequest`` per announcer line, prepared text, the adapter
     call, then ``pack_audio_batch`` into the Bark AUDIO-batch contract (C-4).
+  * ``bark`` (opt-in, ``per_line``, 2026-08-24) -> the same preset engine
+    character voices use. The ANNOUNCER row's ``v2/*`` preset is drawn and
+    stamped by ``OTR_CastLock._assign_bark_voices`` at cast-lock time, never
+    fetched or chosen here.
 
 Only the announcer lines (``speaker_role == "announcer"``) are routed here; the
 character bus stays on OTR_BatchCharacterVoices. Teardown-before-done (I-7), the
@@ -38,7 +42,7 @@ class AnnouncerVoice(OTRVoiceNodeBase):
     # saved graph using either. Held equal by
     # `tests/test_tts_voice_preflight_matrix.py`.
     LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia", "elevenlabs",
-                             "google_tts")
+                             "google_tts", "bark")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

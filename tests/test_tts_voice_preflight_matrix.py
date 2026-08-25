@@ -70,6 +70,17 @@ def test_p1_2_every_char_voice_engine_is_registered_and_serves_the_role():
         assert "char_voice" in REGISTRY.get_engine(name).roles, name
 
 
+def test_p1_2_every_announcer_voice_engine_is_registered_and_serves_the_role():
+    """P1.2 twin for announcer_voice -- added 2026-08-24 alongside Bark
+    joining the announcer dropdown. Before this twin existed, adding an
+    engine name to the announcer fallback WITHOUT also declaring the role on
+    that engine's adapter would not be caught by the suite at all -- it would
+    only surface as a live `EngineUnusable` at dispatch."""
+    for name in legacy_first_engines("announcer_voice"):
+        assert REGISTRY.is_registered(name), name
+        assert "announcer_voice" in REGISTRY.get_engine(name).roles, name
+
+
 # --- P2: bank truth -------------------------------------------------------
 
 

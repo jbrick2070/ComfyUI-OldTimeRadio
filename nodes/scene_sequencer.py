@@ -1057,13 +1057,16 @@ class SceneSequencer:
                 is_announcer = (speaker_role == "announcer")
 
                 if is_announcer and announcer_clip_idx < len(announcer_clips):
-                    # Dedicated Kokoro announcer bus - clean, no Bark filler sounds.
+                    # Dedicated announcer bus - clean, no character-bus filler
+                    # sounds. Kokoro by default; Bark since 2026-08-24 when
+                    # announcer_voice_engine="bark" -- the log line below does
+                    # not name an engine so it never has to know which.
                     clip_np, clip_sr = announcer_clips[announcer_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _level_dialogue_clip(segment_np)
                     announcer_clip_idx += 1
                     announcer_bus_line_ids.append(item.get("line_id"))
-                    render_log.append(f"[{global_idx}] ANNOUNCER (Kokoro): {line[:40]}...")
+                    render_log.append(f"[{global_idx}] ANNOUNCER: {line[:40]}...")
                 elif tts_clip_idx < len(tts_clips):
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)

@@ -184,6 +184,23 @@ def test_null_tts_skip_reason_becomes_an_empty_string():
     assert ledger["lines"][0]["tts_skip_reason"] == ""
 
 
+def test_ABSENT_tts_skip_reason_also_becomes_an_empty_string():
+    """The KEY-ABSENT case, not just key-present-with-None. A live
+    shakespeare-bank leg hit this for real: the writer never wrote the key
+    for one row, `.get("tts_skip_reason")` reads back `None` exactly like an
+    explicit null does, but the old normalization guard
+    (`"tts_skip_reason" in row and ...`) only fired when the key existed --
+    so an absent key sailed through this pass untouched and the freeze
+    cascade's Phase 10 hard-failed with 'tts_skip_reason is null; expected
+    str', rejecting the whole episode."""
+    ledger = _complete_ledger()
+    assert "tts_skip_reason" not in ledger["lines"][0], (
+        "fixture must start with the key ABSENT, not merely None, to prove "
+        "this case")
+    lc.run_ledger_cleanup(ledger, slot_fn=None)
+    assert ledger["lines"][0]["tts_skip_reason"] == ""
+
+
 def test_stale_text_metrics_are_restamped():
     ledger = _complete_ledger()
     ledger["lines"][1]["word_count"] = 999

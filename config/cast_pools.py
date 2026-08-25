@@ -341,11 +341,21 @@ VOICE_PROFILES = [
 
 # ANNOUNCER voice pool - randomized per episode for gender balance.
 #
-# CRITICAL: The announcer renders through Kokoro TTS, NOT Bark. These voice
-# IDs are Kokoro-namespaced (bm_* = British male, bf_* = British female) and
-# CANNOT collide with the Bark VOICE_PROFILES above -- they live in separate
-# TTS namespaces. Open-character voice picking only excludes Bark presets;
-# the announcer's Kokoro voice is never on the Bark exclusion list.
+# THIS IS THE KOKORO POOL ONLY. The announcer's DEFAULT engine is Kokoro,
+# and these voice IDs are Kokoro-namespaced (bm_* = British male, bf_* =
+# British female) -- they CANNOT collide with the Bark VOICE_PROFILES above,
+# since they live in separate TTS namespaces. Open-character voice picking
+# only excludes Bark presets; a Kokoro announcer voice is never on that list.
+#
+# BARK IS ALSO A VALID ANNOUNCER ENGINE (2026-08-24, operator-selectable via
+# announcer_voice_engine="bark"). It does NOT draw from this list -- there is
+# no separate "Bark announcer pool" constant. `OTR_CastLock._assign_bark_
+# announcer` draws directly from `VOICE_PROFILES` above (the same ten
+# presets characters use), dynamically excluding whatever a character in the
+# episode already took. `pick_announcer()` below always returns a Kokoro
+# row; CastLock re-stamps it to Bark AFTER this function runs, when
+# requested. Do not read "the announcer renders through Kokoro" as universal
+# fact anymore -- it is the DEFAULT, not the only path.
 #
 # Pool composition (2 male + 2 female) drives the natural 50/50 announcer
 # gender split per episode that Jeffrey called out 2026-05-10.

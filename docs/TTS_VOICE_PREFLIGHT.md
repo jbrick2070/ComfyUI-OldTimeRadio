@@ -87,6 +87,29 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   (`bm_george` -> `"british_leaning"`), and the qualified Lemmy clone row
   carries **no Cockney tag at all** -- its accent lives in the id string and the
   wav bytes. Never assert an accent from a bank row; it is not recorded there.
+- **P2.7 A name next to `VOICE_PROFILES` does not mean it draws from
+  `VOICE_PROFILES`.** `config/cast_pools.py`'s `ANNOUNCER_PRESETS`
+  (immediately below the Bark `VOICE_PROFILES` table, same file) LOOKS like a
+  Bark preset pool and is not one -- its own comment says so, but a reader
+  skimming the table alone would miss it: the four entries (`bm_george`,
+  `bm_fable`, `bf_emma`, `bf_lily`) are **Kokoro voice IDs**, the DEFAULT
+  announcer pool, kept in that file only because the announcer's
+  gender-balance policy lives there too. This cost real investigation time
+  on 2026-08-24 chasing "does Bark already have an announcer pool" before
+  the comment was read closely.
+  **SHIPPED 2026-08-24** (full 4-round kibitz arc, see
+  `kibitz-runs/2026-08-24-bark-announcer/`): Bark now declares BOTH roles
+  (`roles = ("char_voice", "announcer_voice")`,
+  `nodes/_otr_audio_engines/eng_bark.py`), backed by a real
+  `announcer_bark_v1` profile (`config/audio_engine_profiles.yaml`). It does
+  NOT draw from `ANNOUNCER_PRESETS` (that stays Kokoro-only) or from a
+  separate Bark-native announcer pool -- `OTR_CastLock._assign_bark_announcer`
+  draws directly from the SAME `VOICE_PROFILES` ten presets characters use,
+  dynamically excluding whatever a character in the episode already took
+  (no permanent reservation -- see the r1 campaign for why a reserved
+  subset would re-break FIX-3's gender-exhaustion fix).
+  *Twin:* `test_p1_2_every_announcer_voice_engine_is_registered_and_serves_the_role`
+  (`tests/test_tts_voice_preflight_matrix.py`).
 
 ## Gate 3 -- Generated data
 

@@ -226,8 +226,15 @@ def _complete_deterministic(
             # else: left blank on purpose -> reported as a gap below.
         role = str(row.get("speaker_role") or "")
 
-        # tts_skip_reason must be a string when present, never null.
-        if "tts_skip_reason" in row and row.get("tts_skip_reason") is None:
+        # tts_skip_reason must never be null -- present-with-null and
+        # ABSENT both read back as None through .get(), and the freeze
+        # cascade's Phase 0/10 gate treats either the same way (a live
+        # shakespeare-bank leg hit exactly this: the writer never wrote the
+        # key for one row, so this branch's old `"tts_skip_reason" in row`
+        # guard skipped it, and Phase 10 hard-failed with "tts_skip_reason
+        # is null; expected str" on a KeyError-shaped gap, not a None-shaped
+        # one). Normalize both the same way.
+        if row.get("tts_skip_reason") is None:
             row["tts_skip_reason"] = ""
             actions.append({
                 "field": f"line_id={line_id}.tts_skip_reason",

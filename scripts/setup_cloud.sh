@@ -206,7 +206,7 @@ huggingface-cli download google/gemma-4-E2B-it       # ~5 GB, fastest
 # OR
 # huggingface-cli download mistralai/Mistral-Nemo-Instruct-2407   # ~24 GB, gated
 
-# 6. Bark TTS (~3.5 GB, character voices)
+# 6. Bark TTS (~3.5 GB, character voices + optional announcer)
 huggingface-cli download suno/bark
 
 # 7. Kokoro TTS (~300 MB, fallback / utility voices)

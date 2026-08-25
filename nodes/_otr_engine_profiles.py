@@ -55,8 +55,11 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
         "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
         "google_tts",
     ),
+    # bark APPENDED 2026-08-24 -- a second zero-setup engine for a fresh
+    # install (voices baked into weights, no reference WAV to supply).
+    # kokoro stays index 0 -- byte-identical default combo.
     "announcer_voice": (
-        "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts",
+        "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts", "bark",
     ),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.

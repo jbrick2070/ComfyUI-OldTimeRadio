@@ -96,8 +96,10 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     it = A.INPUT_TYPES()
     engines = list(it["required"]["engine"][0])
     # Dia joins the local Path-B announcer lane; external providers stay after
-    # local engines and index 0 remains the byte-identical kokoro.
-    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs", "google_tts"]
+    # local engines and index 0 remains the byte-identical kokoro. Bark
+    # (2026-08-24) is appended last -- a second zero-setup engine, opt-in.
+    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs",
+                       "google_tts", "bark"]
     assert it["required"]["engine"][1]["default"] == "kokoro"
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     assert list(A.INPUT_TYPES()["required"]["engine"][0]) == engines
@@ -116,7 +118,8 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     # google_tts were appended to the profiles table and this hardcoded stand-in
     # was never updated, so the assertion had become the bug's bodyguard.
     # tests/test_tts_voice_preflight_matrix.py now holds the two lists equal.
-    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs", "google_tts"]
+    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs",
+                       "google_tts", "bark"]
     assert engines[0] == "kokoro", "index 0 is the byte-identical default"
     assert engines
 
@@ -198,12 +201,79 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
     assert unknown.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
 
     with pytest.raises(EngineUnusable) as wrong_role:
-        node.generate(script_json=script, engine="bark")  # char-voice only
+        node.generate(script_json=script, engine="indextts2")  # char-voice only
     assert wrong_role.value.reason is EngineUsabilityReason.INCOMPATIBLE_PROFILE
 
     # C6: no GATED_BY_FLAG dispatch case any more -- a registered engine is
     # selectable (the registry IS the menu). The fail-closed taxonomy here is
     # MALFORMED_CONFIG (unknown engine) + INCOMPATIBLE_PROFILE (wrong role) above.
+
+
+def test_bark_now_serves_the_announcer_role():
+    """2026-08-24: bark used to be the INCOMPATIBLE_PROFILE example above --
+    it is registered for announcer_voice now, so requesting it must NOT
+    raise on role grounds. Confirms the exact drift the taxonomy test above
+    would otherwise still assert against."""
+    from nodes._otr_audio_engines import registry as REGISTRY
+
+    assert "announcer_voice" in REGISTRY.get_engine("bark").roles
+
+
+def test_cross_widget_announcer_engine_mismatch_fails_loud():
+    """kibitz r3 MUST-FIX (cursor), corrected in r4 (codex caught a
+    false-positive in the first cut -- see the module-level guard's own
+    comment). OTR_CastLock.announcer_voice_engine and this node's own
+    'engine' widget are two INDEPENDENTLY settable controls -- if CastLock
+    resolved bark (meta.announcer_voice_engine="bark", which it stamps
+    unconditionally for every cast_voice_policy) but this widget still says
+    kokoro, eng_kokoro would receive an empty voice_ref_id (bark stamping
+    clears it) and silently fall back to its own per-episode seeded pick --
+    a real, audible wrong voice while credits still say bark. Must refuse
+    before any engine loads, naming both engines. Compares against
+    meta.announcer_voice_engine, NEVER the row's own voice_engine/tts_model
+    -- see test_cross_widget_agreement_is_silent_when_engines_match for why."""
+    from nodes._otr_audio_engines import EngineUnusable, EngineUsabilityReason
+    from nodes.announcer_voice import AnnouncerVoice
+
+    script = json.dumps({
+        "lines": [{"line_id": "a1", "speaker_role": "announcer",
+                   "text": "hello", "char_id": "announcer"}],
+        "cast": [{"char_id": "announcer", "name": "ANNOUNCER",
+                  "voice_preset": "v2/en_speaker_0"}],
+        "meta": {"announcer_voice_engine": "bark"},
+    })
+    with pytest.raises(EngineUnusable) as exc:
+        AnnouncerVoice().generate(script_json=script, engine="kokoro")
+    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
+    assert "bark" in str(exc.value) and "kokoro" in str(exc.value)
+
+
+def test_cross_widget_agreement_is_silent_when_engines_match(monkeypatch):
+    """THE FALSE-POSITIVE THIS GUARDS (kibitz r4, codex). Under
+    `preserve_ledger` (the DEFAULT cast_voice_policy), CastLock re-casts
+    only the policy-claimed row -- the announcer row keeps whatever the
+    writer's pick_announcer() wrote, which is ALWAYS tts_model="kokoro"
+    regardless of what engine was actually requested. An earlier cut of the
+    guard read that stale row field and would have raised "controls
+    disagree" here even though both real controls (meta.announcer_voice_engine
+    and this widget) agree on chatterbox. This ledger's cast row
+    deliberately still says nothing about chatterbox (mirrors the real
+    preserve_ledger shape) -- only meta.announcer_voice_engine does -- to
+    prove the guard reads the right signal."""
+    monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
+    from nodes.announcer_voice import AnnouncerVoice
+
+    script = json.dumps({
+        "lines": [{"line_id": "a1", "speaker_role": "announcer",
+                   "text": "hello", "char_id": "announcer"}],
+        "cast": [{"char_id": "announcer", "name": "ANNOUNCER",
+                  "tts_model": "kokoro", "voice_ref_path": "x.wav"}],
+        "meta": {"announcer_voice_engine": "chatterbox"},
+    })
+    audio, log_str, done = AnnouncerVoice().generate(
+        script_json=script, engine="chatterbox")
+    assert "controls disagree" not in log_str
+    assert done.startswith("announcer:done")
 
 
 def test_zero_line_role_still_emits_gate_and_empty_batch(monkeypatch):

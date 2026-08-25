@@ -1,4 +1,9 @@
-"""Bark character-voice adapter -- self-contained per_line (clean-break 1a).
+"""Bark voice adapter -- self-contained per_line (clean-break 1a).
+
+Serves both char_voice and announcer_voice (2026-08-24) -- the same v2/*
+preset mechanism either way; the caller's ``role`` (threaded onto the
+adapter instance by the dispatch core) only selects which curated profile
+(``char_bark_v1`` / ``announcer_bark_v1``) supplies the per-stage temps.
 
 Sources inference from _otr_bark_lib (relocated, delegation-free); no
 construction of the heavy batch node. interface == "per_line". Library imports
@@ -22,7 +27,7 @@ from .registry import register
 @register
 class BarkEngine:
     name = "bark"
-    roles = ("char_voice",)
+    roles = ("char_voice", "announcer_voice")
     default_roles = ()                   # DEMOTED 2026-06-04: indextts2 is now the char_voice default; bark stays selectable
     commercial_clean = False             # Suno Bark terms not confirmed commercial
     requires_flag = None
@@ -69,7 +74,9 @@ class BarkEngine:
         return _clean_text_for_bark(text)
 
     def _resolve_stage_temps(self):
-        """(semantic, coarse, fine) temps from the char_bark_v1 profile, with the
+        """(semantic, coarse, fine) temps from the char_bark_v1 /
+        announcer_bark_v1 profile (role-dependent -- ``self.role`` is set by
+        the dispatch core before ``generate_voice`` runs), with the
         BarkEngine class attrs as the fail-soft fallback.
 
         Alias ladder (precise -- a key is used only if PRESENT and NOT None, so an
@@ -85,7 +92,8 @@ class BarkEngine:
 
             resolver = load_resolver()
             if resolver is not None:
-                prof = resolver.profile_for("char_voice", self.name)
+                prof = resolver.profile_for(
+                    getattr(self, "role", "char_voice"), self.name)
                 if prof is not None:
                     params = dict(prof.default_params or {})
         except Exception:  # noqa: BLE001 -- profile read must never break a render
@@ -125,7 +133,8 @@ class BarkEngine:
 
         if not voice_preset or not str(voice_preset).startswith("v2/"):
             raise EngineUnusable(
-                self.name, "char_voice", EngineUsabilityReason.MALFORMED_CONFIG,
+                self.name, getattr(self, "role", "char_voice"),
+                EngineUsabilityReason.MALFORMED_CONFIG,
                 f"bark requires a v2/* voice_preset; got {voice_preset!r}",
             )
         model, processor = _load_bark("suno/bark")

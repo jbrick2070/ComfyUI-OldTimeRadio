@@ -6414,3 +6414,111 @@ EXPECTED result, not a regression signal.
 - bible-worthy: plausible -- "a last-resort rescue must not depend on
   recognizing the specific way something broke" is a reusable principle
   beyond this one lane -- but NOT promoted yet, live proof owed.
+
+## PBUG-20260824-05 -- wan_ti2v coverage-planned segments compound color/exposure drift across the chain
+- surfaced: operator flagged a published `otr/obs` episode as "really sloppy",
+  suspecting knobs or the graph, and asked for a byte-level trace against a
+  known-good state. Live artifact:
+  `otr/obs/signal_lost_the_weeping_valve_20260823_001152_silent_procgen_blended_captioned_with_credits_final.mp4`
+  (published 2026-08-23; `otr/episodes/signal_lost_the_weeping_valve_20260823_001152/`
+  still has every pipeline stage on disk: `..._silent.mp4` through
+  `..._final.mp4`, plus the per-beat `clips/` and `stills/`).
+- symptom: beat b001 (`shot_b001_announcer_visual_wan_ti2v.mp4`, 18.44s, the
+  episode's longest clip) opens clean -- frame 1 matches its conditioning
+  still (`still_b001_15cab80d1da7.png`) almost exactly, coherent background
+  extras, a correctly-shaped thin wire antenna -- and by ~9s in, the antenna
+  has morphed into a floating solid rectangular block, background faces have
+  started to melt, and lighting has shifted toward a garish pink/blue wash.
+  By the final frame the shot has blown out almost entirely to white/cyan
+  with a warped, alien-looking background face and dissolved textures. A
+  4.6s beat in the SAME episode (`shot_b003_...`) stays sharp and coherent
+  frame-to-frame with no drift at all. Confirmed present ALREADY in the
+  earliest pipeline artifact (`..._silent.mp4`, pre-blend/pre-caption/
+  pre-credits) -- every later stage (procgen blend, captioning, credits mux)
+  faithfully carries the defect forward unchanged, so none of them are the
+  cause. The conditioning still itself is clean, so the defect is not
+  inherited from the image phase either (contrast with the grid-artifact
+  precedent where the still WAS the culprit) -- it is MINTED by the video
+  render itself.
+- root cause (traced, not yet operator-confirmed): `eng_wan_ti2v.py`'s
+  ping-pong/mirror-extend fallback was deliberately ripped 2026-08-02
+  ("NO MIRRORS... every second of audio gets ORIGINAL video") and replaced
+  with COVERAGE PLANNING -- a beat too long for one VRAM-affordable native
+  render is split into several independently-rendered NATIVE segments
+  (`multi_clip` path, `_planned_length`) instead of being padded. The
+  segment-to-segment handoff (`render_driver.py` ~line 918, "the frame its
+  predecessor ended on", and the `accepts_last_frame` / `asset_refs.last_frame`
+  -> `init_image` overwrite ~lines 1817-1840) feeds each new segment the
+  PREVIOUS segment's ending frame as its own init_image. That frame has to
+  round-trip through the VAE (decode out of the previous segment, re-encode
+  into the next segment's conditioning) at every handoff, and a VAE
+  encode/decode round trip is a well-known source of a small, non-zero
+  color/exposure shift. On an 18.44s beat needing several chained segments,
+  that shift compounds segment over segment -- explaining both why the drift
+  visibly worsens across the clip's OWN duration (more segments have
+  compounded by the tail) and why short, single-segment beats (b003, native
+  in one pass, no handoff at all) show none of it. Not yet directly
+  instrumented (no per-segment frame diff run against this specific episode's
+  render), so this is the traced mechanism, not a proven measurement.
+- fix: **NOT FIXED.** This is a real architecture tradeoff, not a one-line
+  knob flip -- candidate directions (re-anchor/color-match at each segment
+  boundary; cap total chain length and let coverage planning refuse/shorten
+  rather than chain indefinitely; a continuation strategy that does not
+  round-trip the handoff frame through the VAE) each cost something
+  different and need the operator's own call, so nothing was changed
+  tonight. Per the operator's own recipe ruling, this is NOT a prompt/wording
+  problem and must not be chased that way.
+- confidence: HIGH on "coverage-planned multi-segment beats are where this
+  lives, and short single-segment beats do not show it" (multiple beats in
+  the same episode compared directly, silent/pre-blend stage isolated as the
+  origin, conditioning still ruled out). MEDIUM on the exact "VAE round-trip
+  at the last-frame handoff" mechanism -- traced through the code's own
+  comments and control flow, not confirmed with an instrumented render.
+- bible-worthy: plausible -- "a chained/continuation generation strategy
+  needs an explicit anti-drift measure (re-anchoring, color-matching, or a
+  bounded chain length), or errors compound silently and only show up at the
+  tail of long beats" is a reusable principle for any future segment-chaining
+  engine -- but NOT promoted yet, mechanism unconfirmed and no fix landed.
+
+## PBUG-20260824-06 -- key-absent tts_skip_reason slipped past cleanup, hard-failed the freeze gate
+- surfaced: the operator's own overnight 3-hour regression loop
+  (`otr_writer_bank_gate.py`, all five banks). `shakespeare` FAILed one pass
+  (4/5 banks green) -- `tmp/_bankgate_shakespeare.log`:
+  `OTR_CastLock: freeze cascade stamped freeze_verdict='needs_full_rerun'
+  for structural ledger corruption`. The server log
+  (`tmp/otr_overnight_server_boot.log`) pinned the real cause:
+  `[LFC:phase_10] 1 critical gap(s) -- FREEZE REJECTED. First:
+  line_id='b007' tts_skip_reason is null; expected str`.
+- symptom: a line the writer never stamped `tts_skip_reason` onto at all
+  (the KEY absent, not merely `None`) reached the freeze cascade unrepaired
+  and hard-failed the whole episode.
+- root cause: `nodes/_otr_ledger_cleanup.py`'s null-to-empty-string
+  normalization guarded on `"tts_skip_reason" in row and row.get(...) is
+  None` -- the `in row` check meant a row missing the key ENTIRELY skipped
+  normalization, even though `.get("tts_skip_reason")` reads back `None`
+  identically for "key absent" and "key present with null". The freeze
+  cascade's Phase 0/10 gate does not distinguish the two either, so an
+  absent key produced the exact same fatal error text as an explicit null
+  -- but only the null case was actually being repaired.
+- fix: **FIXED, live proof owed.** Dropped the `"tts_skip_reason" in row`
+  guard; the condition is now bare `row.get("tts_skip_reason") is None`,
+  which normalizes both shapes identically. New regression test
+  `test_ABSENT_tts_skip_reason_also_becomes_an_empty_string` in
+  `tests/test_ledger_cleanup_pass.py` uses the suite's own `_complete_ledger()`
+  fixture, whose rows already omit the key by default -- proving the
+  ABSENT case specifically, not just re-proving the already-covered null
+  case. Full suite + Bug Bible green after the fix.
+- confidence: HIGH on the mechanism (read the exact guard condition, traced
+  it against the exact log line the live failure produced, confirmed the
+  fixture naturally reproduces key-absence). MEDIUM on WHY the writer left
+  the key off b007 in the first place for this particular shakespeare
+  ledger (7 lines, one `protected_fact_component` row at b006 immediately
+  before it) -- not traced to the writer's own line-authoring code path;
+  the fix closes the DOWNSTREAM gap regardless of which upstream path leaves
+  the key off.
+- bible-worthy: plausible -- "a field's null-repair and its key-absence case
+  are not the same code path unless you write them to be; `.get()` erases
+  the distinction downstream even when an upstream guard preserves it" is a
+  reusable review question for any other `"field" in row and row.get(...)`
+  guard in this codebase -- NOT promoted yet, no sweep for sibling
+  instances has been run.

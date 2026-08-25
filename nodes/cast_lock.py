@@ -69,7 +69,7 @@ _CHAR_VOICE_ENGINES = (
     "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
     "google_tts")
 _ANNOUNCER_VOICE_ENGINES = (
-    "auto", "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts")
+    "auto", "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts", "bark")
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 
 
@@ -360,7 +360,9 @@ class CastLock:
         # the bark voices here, then runs the relocated voice invariants (Gate 1,
         # formerly in lock_cast). Runs regardless of cast_voice_policy (the policy
         # governs the clip-engine voice bank, not bark casting).
-        self._assign_bark_voices(cast, meta, report)
+        self._assign_bark_voices(
+            cast, meta, report,
+            announcer_voice_engine=announcer_voice_engine)
 
         # STEP 2 (plan 5.2): resolve the bank and stamp the engine metadata ONCE,
         # for BOTH modes, before any route is looked at. It used to happen inside
@@ -511,9 +513,13 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _assign_bark_voices(cast, meta, report) -> None:
+    def _assign_bark_voices(cast, meta, report,
+                             announcer_voice_engine="auto") -> None:
         """Sprint 2 (a): stamp bark voice_preset onto the cast by REPLAYING the
-        writer's deterministic picker.
+        writer's deterministic picker. Also owns the ANNOUNCER's bark preset
+        (2026-08-24) when Bark is the resolved announcer engine -- CastLock is
+        the established Bark-casting owner for characters, so the announcer
+        joins the same owner rather than gaining a second one.
 
         The writer persists ``cast_seed`` (OS-entropy per episode) in
         ``meta.cast_contract`` and no longer stamps voice_preset itself.
@@ -524,11 +530,32 @@ class CastLock:
         invariants then run HERE, after assignment.
 
         A ledger with no persisted cast_seed (legacy graph / minimal test
-        fixture) cannot be replayed; its voice_preset is preserved untouched and
-        the post-assignment invariant is skipped (nothing was assigned).
+        fixture) cannot be replayed; character voice_preset is preserved
+        untouched, and -- UNLESS the announcer is also drawing a bark preset
+        this call -- the invariants are skipped too, exactly as before this
+        function grew announcer support: a missing/malformed character
+        voice_preset in that case is NOT this function's concern to raise on;
+        `lock()`'s STEP 3 (`_resolve_character_voices_fail_soft`) is the
+        actual, more specific NO-FALLBACK gate for that (raises
+        `VoiceCastingError`, a different exception with a different message --
+        pinned by tests/test_cast_lock.py::test_seedless_missing_preset_fails_loud).
+        Running Gate 1 unconditionally would preempt that gate with the wrong
+        exception type for a case this function never touched.
+
+        The announcer draw does NOT depend on cast_seed -- it must run under
+        `preserve_ledger` too (the default cast_voice_policy), where
+        `_auto_registry` never runs at all -- so it is not gated on the
+        character-replay branch below, and it is the one case where the
+        invariants DO still need to run even with no cast_seed (this function
+        just stamped a fresh preset onto the announcer row, so its own
+        correctness is this function's concern).
         """
         from . import _otr_casting as _OTRCAST
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta
+
+        announcer_engine = CastLock._resolve_announcer_engine(
+            announcer_voice_engine)
+        content_owned = delivery_mode_for_meta(meta) == CONTENT_OWNED
 
         # A content-owned lane builds its OWN cast rows and stamps their
         # voice_preset in the lane runner; the writer's seeded picker never ran,
@@ -536,8 +563,37 @@ class CastLock:
         # replay it with. Replaying anyway would fabricate a cast that was never
         # rolled and overwrite the voices the lane chose. VERIFY what the lane
         # assigned instead -- the Gate 1 invariants still run, so a content-owned
-        # lane can never ship duplicate or non-v2/ bark voices.
-        if delivery_mode_for_meta(meta) == CONTENT_OWNED:
+        # lane can never ship duplicate or non-v2/ bark voices. A bark ANNOUNCER
+        # is explicitly OUT OF SCOPE for content-owned lanes today (2026-08-24) --
+        # `_otr_scifi_news_pro.py` calls `cast_pools.pick_announcer()` directly
+        # and stays on Kokoro regardless of `announcer_voice_engine` until that
+        # lane gets its own wiring, a deliberately separate follow-up.
+        #
+        # FAIL LOUD here rather than silently preserving the Kokoro row
+        # (kibitz r3, MUST-FIX, codex + cursor independently): the coordinated
+        # `slot_overrides.announcer_voice_engine` override reaches BOTH
+        # `OTR_CastLock` and `OTR_AnnouncerVoice` in one pass (widget_mapping.json),
+        # so a real acceptance leg or operator override that sets bark globally
+        # would otherwise sail through this lock() silently -- the report line
+        # said "not wired" but returned success -- and only crash minutes later
+        # at `eng_bark.py`'s Gate 3 (`bark requires a v2/* voice_preset; got
+        # 'bm_george'`), with no hint the actual cause was a content-owned lane.
+        # Refusing HERE, at the point the mismatch is knowable from pure
+        # metadata, is the same "refuse before the GPU work" discipline this
+        # file already uses elsewhere (see the STEP 1/2 ordering comment above).
+        if content_owned and announcer_engine == "bark":
+            from ._otr_voice_bank import VoiceCastingError
+
+            raise VoiceCastingError(
+                "announcer_voice_engine='bark' was requested but this ledger's "
+                "delivery mode is CONTENT_OWNED -- content-owned lanes "
+                "(e.g. scifi_news_pro) build their own announcer row via "
+                "cast_pools.pick_announcer() and always stay on Kokoro; a bark "
+                "announcer is not wired for content-owned lanes yet. Set "
+                "announcer_voice_engine to a non-bark engine for this ledger, "
+                "or route this bank through a lane that supports it."
+            )
+        if content_owned:
             report.append(
                 "bark voices: content-owned lane owns its cast -- "
                 "voice_preset preserved (no writer replay)"
@@ -548,34 +604,141 @@ class CastLock:
 
         contract = (meta or {}).get("cast_contract") or {}
         cast_seed = contract.get("cast_seed")
-        if cast_seed is None:
+        if cast_seed is not None:
+            num_characters = int(contract.get("num_characters_request") or 0)
+            lemmy_hit = bool(contract.get("lemmy_hit"))
+            voices = _OTRCAST.replay_voice_assignment(
+                cast_seed=int(cast_seed), num_characters=num_characters,
+                lemmy_hit=lemmy_hit,
+            )
+            stamped = 0
+            for row in cast:
+                if not isinstance(row, dict):
+                    continue
+                cid = row.get("char_id")
+                if cid in voices:
+                    row["voice_preset"] = voices[cid]
+                    stamped += 1
+            report.append(
+                f"bark voices: replayed cast_seed -> {stamped} voice_preset(s) "
+                f"stamped (CastLock owns bark casting)"
+            )
+        else:
             report.append(
                 "bark voices: no cast_seed in meta.cast_contract -- "
-                "voice_preset preserved (no replay)"
+                "character voice_preset preserved (no replay)"
+            )
+
+        bark_announcer = announcer_engine == "bark"
+        if bark_announcer:
+            CastLock._assign_bark_announcer(cast, meta, report)
+
+        # Gate 1 (relocated from the writer's lock_cast): every bark-delivered
+        # row now carries a v2/* voice_preset, and no two bark rows share one.
+        # Conditional on tts_model, not on identity alone -- a non-bark
+        # announcer (the common case) is exempt exactly as before. Only run
+        # when this call actually stamped something (character replay, or the
+        # bark announcer draw just above) -- see the docstring: a no-op call
+        # (no cast_seed, non-bark announcer) must defer entirely to `lock()`'s
+        # own later, more specific NO-FALLBACK gate.
+        if cast_seed is not None or bark_announcer:
+            _OTRCAST._assert_unique_bark_voices(cast)
+            _OTRCAST._assert_voice_preset_invariant(cast)
+
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _assign_bark_announcer(cast, meta, report) -> None:
+        """Draw and stamp a ``v2/*`` Bark preset onto the ANNOUNCER row.
+
+        Dynamic exclusion, not a standing reservation (r1 ruling, 2026-08-24):
+        `VOICE_PROFILES` is 6 male / 4 female, and the 4-female pool has
+        already been exhausted by a 3-female character cast once before
+        (FIX-3, `config/cast_pools.py`). Reserving presets for the announcer
+        would recreate that exhaustion, so the announcer draws from the SAME
+        ten presets, excluding only what a character in THIS episode actually
+        took.
+
+        Seeded independently from the character stream (a distinct sha1
+        discriminator, not a bare int reuse of ``episode_seed`` -- two
+        ``random.Random`` instances seeded with the same integer are NOT
+        independent, they replay the identical sequence), so this draw never
+        perturbs -- and is never correlated with -- character voice picks.
+
+        Clears stale cross-engine identity before stamping (mirrors
+        `_stamp_row`'s "clear and stamp are atomic" contract): a re-locked
+        episode that was previously cast with Kokoro left `voice_ref_id` /
+        `voice_engine` on the row, and the credits roll reads those AHEAD of
+        `voice_preset` -- an uncleared row would credit the old engine for
+        audio Bark actually rendered.
+        """
+        import random
+
+        from . import _otr_casting as _OTRCAST
+        from ._otr_voice_node_common import coerce_int_seed
+        from config import cast_pools as _POOLS
+
+        row = next((r for r in cast
+                    if isinstance(r, dict) and _is_announcer_entry(r)), None)
+        if row is None:
+            report.append(
+                "bark voices: announcer_voice_engine=bark but no ANNOUNCER "
+                "row found -- nothing to stamp"
             )
             return
-        num_characters = int(contract.get("num_characters_request") or 0)
-        lemmy_hit = bool(contract.get("lemmy_hit"))
-        voices = _OTRCAST.replay_voice_assignment(
-            cast_seed=int(cast_seed), num_characters=num_characters,
-            lemmy_hit=lemmy_hit,
+
+        taken = {r.get("voice_preset") for r in cast
+                 if isinstance(r, dict) and r.get("voice_preset")
+                 and not _is_announcer_entry(r)}
+        pool = _POOLS.open_voice_pool(taken)
+
+        episode_seed = coerce_int_seed((meta or {}).get("episode_seed"))
+        seed_key = hashlib.sha1(
+            f"bark_announcer:{episode_seed}".encode("utf-8")
+        ).hexdigest()
+        rng = random.Random(seed_key)
+
+        slot = _OTRCAST.EnsembleSlot(
+            char_id=str(row.get("char_id") or "announcer"),
+            name="ANNOUNCER",
+            gender=str(row.get("gender") or ""),
+            timbre="",
+            role="announcer",
         )
-        stamped = 0
-        for row in cast:
-            if not isinstance(row, dict):
-                continue
-            cid = row.get("char_id")
-            if cid in voices:
-                row["voice_preset"] = voices[cid]
-                stamped += 1
+        preset = _OTRCAST.python_assign_voice_preset(
+            slot, available_voices=pool, rng=rng)
+
+        # Gender coherence (kibitz r3 MUST-FIX, codex): python_assign_voice_preset
+        # deliberately falls back to the FULL pool when the requested gender's
+        # column is exhausted (`candidates = gender_pool or list(available_voices)`
+        # in _otr_casting.py) -- and this codebase has hit that exhaustion for
+        # real (FIX-3, 3-female character casts against the 4-female pool). A
+        # fallback draw can therefore hand this row a preset of the OPPOSITE
+        # gender from `row["gender"]`. Trusting the stale field here would be
+        # exactly the "two correlated attributes, each locally plausible,
+        # globally incoherent" class Bug Bible 10.08 exists for -- so derive
+        # `presentation_gender` from what was ACTUALLY drawn, never from what
+        # was merely requested.
+        from ._otr_voice_bank import bark_preset_gender
+
+        delivered_gender = bark_preset_gender(preset) or str(row.get("gender") or "")
+
+        row["voice_preset"] = preset
+        row["tts_model"] = "bark"
+        row["voice_engine"] = "bark"
+        row["voice_ref_id"] = ""
+        row["commercial_clean"] = False
+        row["voice_cast_fallback"] = ""
+        row["presentation_gender"] = delivered_gender
         report.append(
-            f"bark voices: replayed cast_seed -> {stamped} voice_preset(s) "
-            f"stamped (CastLock owns bark casting)"
+            f"bark voices: announcer stamped {preset} "
+            f"(excluded {len(taken)} character preset(s))"
         )
-        # Gate 1 (relocated from the writer's lock_cast): every non-ANNOUNCER row
-        # now carries a v2/* voice_preset, and no two bark rows share a voice.
-        _OTRCAST._assert_unique_bark_voices(cast)
-        _OTRCAST._assert_voice_preset_invariant(cast)
+        if delivered_gender and delivered_gender != str(row.get("gender") or ""):
+            report.append(
+                f"bark voices: announcer gender pool exhausted -- requested "
+                f"{row.get('gender')!r}, delivered {delivered_gender!r} "
+                f"(presentation_gender stamped from the actual preset)"
+            )
 
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -843,6 +1006,20 @@ class CastLock:
             entry.setdefault("voice_cast_fallback", "")
 
             if _is_announcer_entry(entry):
+                if announcer_engine == "bark":
+                    # Bark has zero bank rows (P2.2) -- the bank-ref lookup
+                    # below can never serve it, and `_assign_bark_voices`
+                    # already stamped the v2/* preset earlier in `lock()`,
+                    # before this method ever runs. Report truthfully instead
+                    # of falling into the try/except below, which would raise
+                    # VoiceCastingError, get swallowed, and log a false
+                    # "announcer NOT cast" for a row that was, in fact, cast.
+                    report.append(
+                        f"  {char_id or 'ANNOUNCER'}: announcer "
+                        f"{entry.get('voice_preset')} (bark, stamped by "
+                        f"_assign_bark_voices)"
+                    )
+                    continue
                 try:
                     ref = announcer_ref or announcer_voice_ref(
                         announcer_engine, bank=bank_entries,

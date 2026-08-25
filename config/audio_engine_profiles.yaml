@@ -244,6 +244,31 @@ profiles:
     license_state: clean
     warn_text: ""
 
+  # Bark as an announcer alternative (2026-08-24). Bark is preset-driven
+  # (P2.2: no bank rows, ever -- see docs/TTS_VOICE_PREFLIGHT.md), so this
+  # mirrors char_bark_v1's params exactly rather than the bank-backed
+  # profiles above it. The announcer's v2/* preset is drawn by
+  # OTR_CastLock._assign_bark_voices, same owner as character Bark casting,
+  # excluding whatever presets the characters already drew that episode.
+  - profile_id: announcer_bark_v1
+    role: announcer_voice
+    engine: bark
+    commercial_clean: false        # Suno Bark terms not confirmed for commercial use
+    model_path: ""
+    model_sha256: ""
+    default_params: {semantic_temp: 0.7, coarse_temp: 0.5, fine_temp: 0.5, text_temp: 0.7, waveform_temp: 0.7, normalize_bark_output: false}
+    allowed_voice_banks: [bark_legacy]
+    engine_impl_version: "1"
+    sample_rate: 24000
+    requires_hf_token: false
+    rank: 4                         # announcer fallback-only (never the scope default)
+    is_default: false
+    runtime: in_graph
+    needs_ref_clip: false           # bark uses speaker presets, not a ref clip
+    caps: {emotion_vector: false, duration_control: false}
+    license_state: gated            # mirrors commercial_clean=false
+    warn_text: "Bark (Suno) weights: commercial terms unconfirmed. Local/personal use OK; verify Suno terms before commercial release."
+
   # --- music ---
   - profile_id: music_musicgen_v1
     role: music

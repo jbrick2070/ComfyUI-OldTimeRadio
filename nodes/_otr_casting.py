@@ -1977,12 +1977,17 @@ def lock_cast(
 
     cast: list[dict] = list(pre_locked)
     # Open-character voice exclusion set tracks BARK voices only.
-    # ANNOUNCER renders through Kokoro TTS (separate namespace --
-    # voice IDs like "bm_george" / "bf_emma" can never collide with
-    # Bark's "v2/en_speaker_X" pool), so the announcer's voice is
-    # NOT added here. Per Jeffrey 2026-05-10: "announcer is in
-    # Kokoro so there can be no cast overlaps." LEMMY's voice
-    # (v2/en_speaker_8, Bark) IS added when LEMMY is rolled in.
+    # At THIS writer-stage point the announcer row is ALWAYS Kokoro-shaped
+    # (pick_announcer() stamps a "bm_george" / "bf_emma"-style id here,
+    # never a Bark id -- separate namespace, so it could never collide with
+    # Bark's "v2/en_speaker_X" pool anyway), so the announcer's voice is NOT
+    # added here. Per Jeffrey 2026-05-10: "announcer is in Kokoro so there
+    # can be no cast overlaps." OTR_CastLock may re-stamp the announcer to a
+    # real Bark v2/* preset LATER (2026-08-24, announcer_voice_engine=
+    # "bark") -- that happens downstream of this function and is exactly
+    # why CastLock owns its own dynamic exclusion set
+    # (`_assign_bark_announcer`) rather than trusting this one. LEMMY's
+    # voice (v2/en_speaker_8, Bark) IS added when LEMMY is rolled in.
     taken_voices: set[str] = {
         row["voice_preset"]
         for row in pre_locked
@@ -2341,14 +2346,47 @@ def lock_cast(
     return cast, meta
 
 
+def _row_is_announcer(row: dict) -> bool:
+    """The ONE canonical "is this row the announcer" predicate
+    (``_otr_cast_voice_coverage.is_announcer_cast_row``), re-exposed under
+    this module's own name. NOT re-implemented: this module used to carry a
+    hand-rolled duplicate of ``cast_lock._is_announcer_entry`` (import from
+    ``cast_lock`` is unsafe -- it already imports this module, a cycle), but
+    ``_otr_cast_voice_coverage`` imports neither, so it is the safe shared
+    home (kibitz r3, cursor: unify rather than grow a fourth near-duplicate).
+
+    Relative-then-absolute fallback (matches ``_otr_voice_bank.bark_preset_
+    gender``'s existing pattern): ``lock_cast``'s own dynamic-import path can
+    leave THIS module loaded without its normal ``nodes`` package context
+    (bare ``_otr_casting`` in ``sys.modules`` rather than
+    ``nodes._otr_casting``), which makes the relative import below raise
+    ``ImportError: attempted relative import with no known parent package``
+    -- caught live by the suite, not hypothetical."""
+    try:
+        from ._otr_cast_voice_coverage import is_announcer_cast_row
+    except ImportError:
+        import os
+        import sys
+
+        here = os.path.dirname(os.path.abspath(__file__))
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        from _otr_cast_voice_coverage import is_announcer_cast_row  # type: ignore
+
+    return is_announcer_cast_row(row)
+
+
 def _assert_voice_preset_invariant(cast: List[dict]) -> None:
     """Gate 1 (writer cast-lock exit) -- the earliest of three gates
     enforcing the cast.voice_preset contract for the voice-path-cleanbreak.
 
     Every non-ANNOUNCER cast row must carry a non-empty ``voice_preset``
-    starting with ``v2/`` (the Bark preset namespace). ANNOUNCER is
-    intentionally excluded because it lives in the Kokoro namespace
-    (``bm_*`` / ``bf_*``) by construction.
+    starting with ``v2/`` (the Bark preset namespace). The ANNOUNCER row is
+    excluded UNLESS it was itself delivered on Bark (``tts_model == "bark"``,
+    2026-08-24) -- Bark is no longer exclusively a character engine, so an
+    announcer actually rendered on Bark must satisfy the same v2/* contract
+    a character row does. A non-Bark announcer (the common case, Kokoro's
+    ``bm_*`` / ``bf_*`` namespace) stays exempt exactly as before.
 
     Empty / None / non-v2 preset on a Bark row indicates a writer
     contract violation. Today the pre-filter + cast LLM + reroll chain
@@ -2364,8 +2402,7 @@ def _assert_voice_preset_invariant(cast: List[dict]) -> None:
     for row in cast or []:
         if not isinstance(row, dict):
             continue
-        if (str(row.get("char_id") or "").strip().lower() == "announcer"
-                or row.get("name") == "ANNOUNCER"):
+        if _row_is_announcer(row) and row.get("tts_model") != "bark":
             continue
         char_id = row.get("char_id") or "<no char_id>"
         preset = row.get("voice_preset")
@@ -2396,7 +2433,13 @@ def _assert_voice_preset_invariant(cast: List[dict]) -> None:
 
 def _assert_unique_bark_voices(cast: List[dict]) -> None:
     """Raise CastingFailedError if any two Bark cast rows share a
-    voice_preset. ANNOUNCER (Kokoro namespace) is excluded.
+    voice_preset. A non-Bark ANNOUNCER (Kokoro namespace) is excluded; an
+    announcer actually delivered on Bark (``tts_model == "bark"``,
+    2026-08-24) is included, same as any character row -- two shipping
+    8gb-tier profiles mix ``char_voice_engine: bark`` with a Kokoro
+    announcer, and both legitimately carry the SAME leftover Bark-namespace
+    label with no live collision; only a bark-delivered announcer needs the
+    uniqueness guarantee a bark-delivered character already gets.
 
     Called at the end of lock_cast() as a final invariant check.
     Today this is guaranteed-true by the pre-filter + validator +
@@ -2404,9 +2447,9 @@ def _assert_unique_bark_voices(cast: List[dict]) -> None:
     """
     bark_voices: list[tuple[str, str]] = []  # (char_id, voice_preset)
     for row in cast:
-        if row["name"] == "ANNOUNCER":
+        if _row_is_announcer(row) and row.get("tts_model") != "bark":
             continue
-        bark_voices.append((row["char_id"], row["voice_preset"]))
+        bark_voices.append((row.get("char_id"), row.get("voice_preset")))
     voices_only = [v for _, v in bark_voices]
     if len(set(voices_only)) != len(voices_only):
         # Build a precise duplicate report for the error message

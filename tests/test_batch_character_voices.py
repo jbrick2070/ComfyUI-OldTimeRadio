@@ -200,6 +200,43 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
     # MALFORMED_CONFIG (unknown engine) + INCOMPATIBLE_PROFILE (wrong role) above.
 
 
+def test_announcer_engine_mismatch_guard_does_not_apply_to_characters(monkeypatch):
+    """kibitz r4 (codex + antigravity, independently): the original version
+    of this test used engine="stable_audio_3" (music-only for char_voice),
+    which fails on the PRE-EXISTING role check before dispatch ever reaches
+    `_render_per_line` -- so it never actually exercised the guard at all,
+    vacuously "passing" no matter what the guard did.
+
+    `OTRVoiceNodeBase.generate`'s cross-widget announcer-engine guard
+    (2026-08-24) lives in the SHARED dispatch base both voice nodes use,
+    scoped by `if self.ROLE == "announcer_voice"` and comparing `engine`
+    against `meta["announcer_voice_engine"]`. Build a ledger shaped EXACTLY
+    like the announcer-mismatch trigger (meta.announcer_voice_engine
+    disagrees with the widget engine) but on a CHARACTER line, using a real
+    usable char_voice engine (chatterbox) so dispatch actually reaches past
+    the role check and into real per-line rendering -- proving the guard
+    never even runs for char_voice, not just that this particular engine
+    choice happens to fail for an unrelated reason."""
+    monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
+    import json
+
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    script = json.dumps({
+        "lines": [{"line_id": "c1", "speaker_role": "character",
+                   "text": "hi", "char_id": "x"}],
+        "cast": [{"char_id": "x", "name": "X",
+                  "voice_ref_path": "x.wav"}],
+        # Disagrees with engine="chatterbox" below -- exactly the shape that
+        # raises for the announcer. Must be silently ignored for char_voice.
+        "meta": {"announcer_voice_engine": "bark"},
+    })
+    audio, log_str, done = BatchCharacterVoices().generate(
+        script_json=script, engine="chatterbox")
+    assert "controls disagree" not in log_str
+    assert done.startswith("char_voice:done")
+
+
 # ----------------------------------------------------------------------------
 # Gate + empty-batch behavior (E.5 / C-4)
 # ----------------------------------------------------------------------------

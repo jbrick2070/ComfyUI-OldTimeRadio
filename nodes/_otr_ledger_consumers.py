@@ -175,7 +175,10 @@ def voice_assignments_from_cast(led: dict) -> dict:
     Shape:
         {
           "<name>": { "voice_preset": "<v2/...>" },
-          ...   # ANNOUNCER excluded -- Kokoro namespace, not Bark
+          ...   # ANNOUNCER excluded regardless of engine -- this surface is
+          ...   # character-only by design (voice_assignments has never
+          ...   # covered the announcer row, whether it renders on Kokoro or,
+          ...   # since 2026-08-24, Bark)
         }
 
     The ``notes`` field is intentionally absent. Sprint 2 mirrored

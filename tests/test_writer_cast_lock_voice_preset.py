@@ -68,13 +68,29 @@ def test_assert_voice_preset_invariant_raises_on_non_v2_preset():
 
 
 def test_assert_voice_preset_invariant_excludes_announcer():
-    """ANNOUNCER's Kokoro voice id is intentionally excluded from the check."""
+    """A non-Bark ANNOUNCER's Kokoro voice id is excluded from the check
+    (no ``tts_model`` field, or any value other than ``"bark"``, reads as
+    non-Bark -- the common case)."""
     cast = [
         # bf_emma is a Kokoro id — legitimately not v2/*.
         {"char_id": "c00", "name": "ANNOUNCER", "voice_preset": "bf_emma"},
         {"char_id": "c01", "name": "LEMMY",     "voice_preset": "v2/en_speaker_8"},
     ]
     _otr_casting._assert_voice_preset_invariant(cast)
+
+
+def test_assert_voice_preset_invariant_INCLUDES_a_bark_announcer():
+    """A Bark-delivered ANNOUNCER (2026-08-24, ``tts_model == "bark"``) must
+    satisfy the same v2/* contract a character row does -- it is no longer
+    exempt just for being the announcer."""
+    cast = [
+        {"char_id": "c00", "name": "ANNOUNCER", "tts_model": "bark",
+         "voice_preset": "bf_emma"},
+        {"char_id": "c01", "name": "LEMMY",     "voice_preset": "v2/en_speaker_8"},
+    ]
+    with pytest.raises(_otr_casting.CastingFailedError) as exc:
+        _otr_casting._assert_voice_preset_invariant(cast)
+    assert "v2/" in str(exc.value) or "non-v2" in str(exc.value).lower()
 
 
 def test_assert_voice_preset_invariant_empty_cast_passes():

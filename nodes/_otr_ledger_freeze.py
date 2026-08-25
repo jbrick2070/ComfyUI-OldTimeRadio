@@ -523,8 +523,16 @@ def _check_per_cast_invariants(
         # G6 invariant (voice-path-cleanbreak, Gate 2 of 3).
         # Every non-ANNOUNCER cast row must carry a non-empty
         # ``voice_preset`` starting with ``v2/`` (the Bark preset
-        # namespace). ANNOUNCER is intentionally excluded because it
-        # lives in the Kokoro namespace (bm_* / bf_*) by construction.
+        # namespace). ANNOUNCER is intentionally excluded from the v2/
+        # shape check HERE regardless of its eventual engine (Kokoro's
+        # bm_*/bf_* namespace, or -- 2026-08-24 -- Bark's own v2/*
+        # namespace when announcer_voice_engine=="bark"): this freeze gate
+        # runs at the WRITER stage, before OTR_CastLock has assigned
+        # anything, so the announcer row still carries whatever the
+        # writer's pick_announcer() stamped either way. CastLock's own
+        # exit invariants (_assert_voice_preset_invariant /
+        # _assert_unique_bark_voices, engine-conditional on tts_model) are
+        # the real, post-assignment gate for a Bark-delivered announcer.
         # Empty / None / non-v2 preset is a writer contract violation.
         # S28 cleanbreak: dropped the "promoted from the legacy
         # WARN-fallback (tts_model / speaker_role substitutes) which
@@ -540,8 +548,9 @@ def _check_per_cast_invariants(
         from ._otr_cast_voice_coverage import is_announcer_cast_row
         is_announcer = is_announcer_cast_row(row)
         if is_announcer:
-            # Kokoro namespace -- voice_preset still must be non-empty
-            # but the v2/ prefix does not apply.
+            # WARN-only, no namespace/shape check -- CastLock has not run
+            # yet at this pipeline stage, so this is whatever the writer's
+            # pick_announcer() stamped regardless of the eventual engine.
             if not row.get("voice_preset"):
                 warnings.append(
                     f"cast[{idx}] (char_id={char_id!r}, ANNOUNCER) has no "

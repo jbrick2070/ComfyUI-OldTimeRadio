@@ -432,5 +432,215 @@ def test_legacy_lane_without_cast_seed_still_preserves_presets():
     assert any("no cast_seed" in line for line in report)
 
 
+# ----------------------------------------------------------------------------
+# Bark as an announcer engine (2026-08-24)
+# ----------------------------------------------------------------------------
+def _bark_announcer_cast():
+    return [
+        {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
+         "tts_model": "kokoro", "voice_engine": "kokoro",
+         "voice_ref_id": "bm_george", "voice_preset": "bm_george",
+         "commercial_clean": True},
+        {"char_id": "c1", "name": "MONTY", "gender": "male",
+         "voice_preset": "v2/en_speaker_1"},
+        {"char_id": "c2", "name": "VERA", "gender": "female",
+         "voice_preset": "v2/en_speaker_9"},
+    ]
+
+
+def test_bark_announcer_is_stamped_with_a_v2_preset_and_engine_fields():
+    from nodes.cast_lock import CastLock
+
+    cast = _bark_announcer_cast()
+    meta = {"episode_seed": 42}
+    report: list = []
+
+    CastLock._assign_bark_voices(cast, meta, report,
+                                 announcer_voice_engine="bark")
+
+    row = next(r for r in cast if r["name"] == "ANNOUNCER")
+    assert str(row["voice_preset"]).startswith("v2/")
+    assert row["tts_model"] == "bark"
+    assert row["voice_engine"] == "bark"
+    assert any("announcer stamped" in line for line in report)
+
+
+def test_bark_announcer_clears_stale_kokoro_identity_on_relock():
+    """A re-locked episode that was previously cast with Kokoro must not
+    leave `voice_ref_id` / `commercial_clean` around -- the credits roll
+    reads `voice_ref_id` AHEAD of `voice_preset`, so a stale kokoro ref
+    would credit the wrong engine for audio Bark actually rendered."""
+    from nodes.cast_lock import CastLock
+
+    cast = _bark_announcer_cast()  # starts with a real kokoro stamp
+    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
+                                 announcer_voice_engine="bark")
+
+    row = next(r for r in cast if r["name"] == "ANNOUNCER")
+    assert row["voice_ref_id"] == ""
+    assert row["commercial_clean"] is False
+
+
+def test_bark_announcer_never_shares_a_preset_with_a_character():
+    from nodes.cast_lock import CastLock
+
+    cast = _bark_announcer_cast()
+    CastLock._assign_bark_voices(cast, {"episode_seed": 7}, [],
+                                 announcer_voice_engine="bark")
+
+    presets = [r["voice_preset"] for r in cast]
+    assert len(presets) == len(set(presets)), presets
+
+
+def test_bark_announcer_draw_is_deterministic_per_episode_seed():
+    from nodes.cast_lock import CastLock
+
+    a = _bark_announcer_cast()
+    b = _bark_announcer_cast()
+    CastLock._assign_bark_voices(a, {"episode_seed": 99}, [],
+                                 announcer_voice_engine="bark")
+    CastLock._assign_bark_voices(b, {"episode_seed": 99}, [],
+                                 announcer_voice_engine="bark")
+
+    a_preset = next(r for r in a if r["name"] == "ANNOUNCER")["voice_preset"]
+    b_preset = next(r for r in b if r["name"] == "ANNOUNCER")["voice_preset"]
+    assert a_preset == b_preset
+
+
+def test_bark_announcer_draw_does_not_perturb_character_voice_draws():
+    """The announcer draw runs on an isolated RNG (a distinct sha1
+    discriminator, not a shared stream with the character replay) -- adding
+    it must not change what a character's own voice_preset already was."""
+    from nodes.cast_lock import CastLock
+
+    without = _bark_announcer_cast()
+    CastLock._assign_bark_voices(without, {"episode_seed": 55}, [],
+                                 announcer_voice_engine="kokoro")
+    with_bark = _bark_announcer_cast()
+    CastLock._assign_bark_voices(with_bark, {"episode_seed": 55}, [],
+                                 announcer_voice_engine="bark")
+
+    char_presets_without = {r["char_id"]: r["voice_preset"]
+                             for r in without if r["name"] != "ANNOUNCER"}
+    char_presets_with = {r["char_id"]: r["voice_preset"]
+                          for r in with_bark if r["name"] != "ANNOUNCER"}
+    assert char_presets_without == char_presets_with
+
+
+def test_bark_announcer_runs_under_preserve_ledger_the_default_policy():
+    """THE SILENT-NO-OP THIS GUARDS. `_auto_registry` never runs under
+    `preserve_ledger` (the default cast_voice_policy) -- a fix placed only
+    inside `_auto_registry` would leave the writer's Kokoro row on the
+    announcer with `announcer_voice_engine="bark"` requested, and the render
+    would only fail later at Gate 3. `_assign_bark_voices` runs
+    unconditionally in `lock()`, before the policy fork, so this must pass
+    end-to-end through `lock()` itself, not just the helper."""
+    from nodes.cast_lock import CastLock
+
+    out = CastLock().lock(
+        script_json=_ledger(_bark_announcer_cast()),
+        cast_voice_policy="preserve_ledger",
+        announcer_voice_engine="bark",
+    )
+    led = json.loads(out[0])
+    row = next(r for r in led["cast"] if r["name"] == "ANNOUNCER")
+    assert str(row["voice_preset"]).startswith("v2/")
+    assert row["tts_model"] == "bark"
+
+
+def test_bark_announcer_runs_under_auto_registry_too():
+    from nodes.cast_lock import CastLock
+
+    out = CastLock().lock(
+        script_json=_ledger(_bark_announcer_cast()),
+        cast_voice_policy="auto_registry",
+        announcer_voice_engine="bark",
+    )
+    led = json.loads(out[0])
+    row = next(r for r in led["cast"] if r["name"] == "ANNOUNCER")
+    assert str(row["voice_preset"]).startswith("v2/")
+    assert row["tts_model"] == "bark"
+    # The old swallow-and-log-"announcer NOT cast" path must never fire once
+    # _auto_registry's explicit bark skip is in place.
+    assert not any("NOT cast" in line for line in out[2].splitlines())
+
+
+def test_bark_announcer_fails_loud_on_content_owned_ledger():
+    """kibitz r3 MUST-FIX (codex + cursor, independently). A coordinated
+    `slot_overrides.announcer_voice_engine=bark` reaches BOTH OTR_CastLock
+    and OTR_AnnouncerVoice in one pass -- if this ledger is content-owned
+    (scifi_news_pro builds its own announcer row and never wires bark),
+    silently preserving the Kokoro row would defer the failure to a
+    confusing crash minutes later at eng_bark.py's Gate 3. Must refuse HERE,
+    with a message that names the actual cause."""
+    from nodes._otr_voice_bank import VoiceCastingError
+    from nodes.cast_lock import CastLock
+
+    cast = _content_owned_cast()
+    meta = {"source_bank": "scifi_news_pro", "episode_seed": 42}
+
+    with pytest.raises(VoiceCastingError, match="CONTENT_OWNED"):
+        CastLock._assign_bark_voices(cast, meta, [],
+                                     announcer_voice_engine="bark")
+
+
+def test_bark_announcer_stamps_presentation_gender_from_delivered_preset():
+    from nodes.cast_lock import CastLock
+
+    cast = _bark_announcer_cast()  # ANNOUNCER row starts with gender="male"
+    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
+                                 announcer_voice_engine="bark")
+
+    row = next(r for r in cast if r["name"] == "ANNOUNCER")
+    from nodes._otr_voice_bank import bark_preset_gender
+
+    assert row["presentation_gender"] == bark_preset_gender(row["voice_preset"])
+
+
+def test_bark_announcer_gender_exhaustion_stamps_the_ACTUAL_delivered_gender():
+    """kibitz r3 MUST-FIX (codex). python_assign_voice_preset falls back to
+    the FULL pool when the requested gender's column is exhausted -- proven
+    historically real by FIX-3 (3-female character casts against the
+    4-female VOICE_PROFILES pool). A female-requesting announcer row whose
+    gender column is exhausted by characters must be credited for whatever
+    gender it ACTUALLY got, never the stale request -- Bug Bible 10.08."""
+    from nodes.cast_lock import CastLock
+
+    cast = [
+        {"char_id": "a1", "name": "ANNOUNCER", "gender": "female",
+         "tts_model": "kokoro", "voice_preset": "bm_george"},
+        # Every female VOICE_PROFILES preset already taken by characters.
+        {"char_id": "c1", "name": "A", "voice_preset": "v2/en_speaker_2"},
+        {"char_id": "c2", "name": "B", "voice_preset": "v2/en_speaker_4"},
+        {"char_id": "c3", "name": "C", "voice_preset": "v2/en_speaker_9"},
+        {"char_id": "c4", "name": "D", "voice_preset": "v2/en_speaker_7"},
+    ]
+    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
+                                 announcer_voice_engine="bark")
+
+    row = next(r for r in cast if r["name"] == "ANNOUNCER")
+    from nodes._otr_voice_bank import bark_preset_gender
+
+    delivered = bark_preset_gender(row["voice_preset"])
+    assert delivered == "male", "every female preset was taken; must fall back"
+    assert row["presentation_gender"] == "male", (
+        "presentation_gender must reflect the ACTUAL delivered preset, not "
+        "the exhausted 'female' request")
+
+
+def test_non_bark_announcer_engine_leaves_the_bark_helper_a_no_op():
+    """`announcer_voice_engine` defaulting/resolving to anything other than
+    bark must not touch the announcer row at all -- today's byte-identical
+    behavior for the common case."""
+    from nodes.cast_lock import CastLock
+
+    cast = _bark_announcer_cast()
+    before = dict(next(r for r in cast if r["name"] == "ANNOUNCER"))
+    CastLock._assign_bark_voices(cast, {"episode_seed": 42}, [],
+                                 announcer_voice_engine="kokoro")
+    after = next(r for r in cast if r["name"] == "ANNOUNCER")
+    assert after == before
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

@@ -847,6 +847,14 @@ class OTRVoiceNodeBase:
             # The old per-adapter cuda->mps->cpu waterfalls are deleted.
             adapter.requested_device = _voice_device_from_ledger(
                 ledger_json, script_json)
+            # Role threading (2026-08-24): a preset engine that serves more than
+            # one role (Bark: char_voice + announcer_voice) resolves its curated
+            # profile by role, not by a hardcoded string -- see
+            # BarkEngine._resolve_stage_temps. Adapters are registry singletons
+            # (get_engine returns the same instance across calls), but character
+            # and announcer generate() calls are sequential, never concurrent, so
+            # overwriting this attribute per call is safe.
+            adapter.role = self.ROLE
             interface = getattr(adapter, "interface", "per_line")
             sr_hint = int(getattr(adapter, "sample_rate", 24000) or 24000)
 
@@ -918,6 +926,43 @@ class OTRVoiceNodeBase:
         sr = int(profile.sample_rate or sr)
 
         meta = led.get("meta") or {}
+
+        # Cross-widget announcer-engine agreement (2026-08-24, kibitz r3
+        # MUST-FIX, corrected in r4 after codex caught a false-positive).
+        # `OTR_CastLock.announcer_voice_engine` and this node's own `engine`
+        # widget are two INDEPENDENTLY settable controls -- nothing else
+        # checks they agree. A mismatch is not just cosmetic: CastLock's bark
+        # stamp CLEARS `voice_ref_id` (bark has no bank identity), so if this
+        # widget still reads 'kokoro' while CastLock resolved bark, eng_kokoro
+        # receives an empty voice_ref and silently falls back to its own
+        # per-episode seeded pick -- a real, audible, WRONG voice speaks the
+        # line while the ledger and credits still say 'bark'.
+        #
+        # COMPARE AGAINST `meta["announcer_voice_engine"]`, NEVER the row's
+        # own `voice_engine`/`tts_model` field. `_stamp_voice_engine_
+        # selection` stamps that meta key UNCONDITIONALLY for every
+        # cast_voice_policy, but under `preserve_ledger` (the DEFAULT
+        # policy) CastLock only re-casts the policy-CLAIMED row -- the
+        # announcer row itself keeps whatever the writer's `pick_announcer()`
+        # wrote, which is ALWAYS `tts_model="kokoro"` regardless of what
+        # engine was actually requested. An earlier cut of this guard read
+        # the row's stale field and would have raised "controls disagree" on
+        # every agreeing chatterbox/dia announcer request under
+        # preserve_ledger -- a real regression against existing, working
+        # functionality, caught by kibitz r4 before it shipped.
+        if self.ROLE == "announcer_voice":
+            stamped = str(meta.get("announcer_voice_engine") or "")
+            if stamped and stamped != engine:
+                raise EngineUnusable(
+                    engine, self.ROLE,
+                    EngineUsabilityReason.MALFORMED_CONFIG,
+                    f"OTR_CastLock resolved announcer_voice_engine="
+                    f"{stamped!r} but this node's own 'engine' widget is "
+                    f"{engine!r} -- the two announcer-engine controls "
+                    f"disagree. Set both OTR_CastLock.announcer_voice_engine "
+                    f"and this node's 'engine' widget to the same value.",
+                )
+
         episode_seed = coerce_int_seed(meta.get("episode_seed"))
         cast_lock_revision = int(meta.get("cast_lock_revision") or 0)
         mono = (stereo_policy == "mono_safe")

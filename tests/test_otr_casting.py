@@ -1455,16 +1455,34 @@ def test_assert_unique_bark_voices_catches_collision():
         f"error must name both colliding char_ids: {msg!r}"
 
 
-def test_assert_unique_bark_voices_ignores_announcer():
-    """ANNOUNCER's voice (Kokoro namespace) is exempt from the
-    uniqueness check."""
+def test_assert_unique_bark_voices_ignores_a_non_bark_announcer():
+    """A non-Bark ANNOUNCER (the common case, Kokoro namespace) is exempt
+    from the uniqueness check -- its `voice_preset` field is a leftover
+    label, never rendered, and two shipping 8gb-tier profiles legitimately
+    mix `char_voice_engine: bark` with a Kokoro announcer that carries the
+    same leftover Bark-namespace string with no live collision."""
     cast = [
-        {"char_id": "c01", "name": "ANNOUNCER",
+        {"char_id": "c01", "name": "ANNOUNCER", "tts_model": "kokoro",
          "voice_preset": "v2/en_speaker_4"},
         {"char_id": "c02", "name": "ALICE",
          "voice_preset": "v2/en_speaker_4"},
     ]
     _OTRC._assert_unique_bark_voices(cast)
+
+
+def test_assert_unique_bark_voices_INCLUDES_a_bark_announcer():
+    """A Bark-delivered ANNOUNCER (2026-08-24) is a real Bark row and must
+    satisfy the same uniqueness guarantee a Bark character row already
+    gets -- sharing a preset with a character is no longer harmless once
+    Bark actually renders the announcer."""
+    cast = [
+        {"char_id": "c01", "name": "ANNOUNCER", "tts_model": "bark",
+         "voice_preset": "v2/en_speaker_4"},
+        {"char_id": "c02", "name": "ALICE",
+         "voice_preset": "v2/en_speaker_4"},
+    ]
+    with pytest.raises(_OTRC.CastingFailedError):
+        _OTRC._assert_unique_bark_voices(cast)
 
 
 def test_voice_preset_invariant_uses_announcer_char_id_with_display_name():
