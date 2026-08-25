@@ -173,7 +173,10 @@ def _require_transformers_model_support(
 # ---------------------------------------------------------------------------
 
 
-def _plan_max_memory(model_id: str, total_vram: float, *, cuda_available: bool):
+def _plan_max_memory(
+    model_id: str, total_vram: float, *, cuda_available: bool,
+    quant_policy: str,
+):
     """VRAM-budget plan for the transformers loader.
 
     Returns the ``max_memory`` dict for ``from_pretrained`` or ``None``.
@@ -182,8 +185,35 @@ def _plan_max_memory(model_id: str, total_vram: float, *, cuda_available: bool):
     built the CUDA-keyed dict from model-id string tags alone, handing
     transformers a device map for hardware that does not exist on
     cpu/mps hosts (fresh-install breaker).
+
+    2026-08-25: every budget below (3.2GiB for a 2B-tag, 6.8GiB for a
+    9b/12b/e4b/4b-it tag, ``total_vram - 2.5`` above 12 GiB) was sized for a
+    4-BIT (NF4) footprint -- the S1 comment above ``load_llm`` records that
+    "its resolved value for every production id was NF4" back when these
+    numbers were chosen, i.e. a tagged model_id was ALWAYS quantized at the
+    time. ``quant_policy="none"`` pairing with a small tagged model (e.g.
+    ``otr_4060_floor``'s ``google/gemma-4-E2B-it``) postdates this function
+    and was never threaded back in -- so an UNQUANTIZED bf16 load (needing
+    roughly 4x a 4-bit footprint) was still being capped at the 4-bit number,
+    with the remainder silently CPU-offloaded by ``device_map="auto"``. Live
+    symptom on an 8 GB RTX 4060 tonight: the 3-4B ``E2B`` model ran
+    noticeably SLOWER than the 12B NF4 model on the same card -- exactly what
+    partial CPU offload looks like, every forward pass paying PCIe
+    round-trips for the CPU-resident layers.
+
+    So this budget applies ONLY to an actually-quantized load. An
+    unquantized (``quant_policy == "none"``) request returns ``None`` here,
+    unconditionally, before any ``total_vram``/tag branching -- no cap, no
+    artificial CPU-offload escape hatch. The model either fits fully on GPU
+    (the normal case for a profile that chose a small model BECAUSE it chose
+    no quantization) or ``model = model.to(device)`` (the existing
+    ``quant_config is None and max_memory is None`` branch, already
+    exercised today by every non-tagged model_id) raises a fast, honest CUDA
+    OOM instead of a silent multi-minute-per-line render that looks hung.
     """
     if not cuda_available:
+        return None
+    if quant_policy not in ("bnb_nf4", "bnb_8bit"):
         return None
     sid = (model_id or "").lower()
     is_actually_2b = any(tag in sid for tag in ("2b-it", "2b_it")) or sid.endswith("2b")
@@ -368,7 +398,8 @@ def load_llm(
         # is only built when CUDA exists (see _plan_max_memory).
         max_memory = _plan_max_memory(
             _stripped_model_id, total_vram,
-            cuda_available=torch.cuda.is_available())
+            cuda_available=torch.cuda.is_available(),
+            quant_policy=_policy.quant_policy)
         if max_memory is not None and total_vram >= 12.0:
             _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {total_vram - 2.5:.1f}GB Budget")
 

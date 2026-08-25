@@ -12,6 +12,17 @@ Committed-state defects that broke every non-CUDA tier outright:
 
 The suite env hides CUDA (conftest sets ``CUDA_VISIBLE_DEVICES=''``), so
 every direct call below IS the non-CUDA host case the defects broke.
+
+2026-08-25: ``_plan_max_memory`` gained a required ``quant_policy`` kwarg.
+Every 4-bit-sized budget below (3.2GiB / 6.8GiB / ``total_vram-2.5``) was
+tuned for an NF4 footprint; live on an 8 GB RTX 4060 the SAME numbers were
+being applied to an UNQUANTIZED (``quant_policy="none"``) load, capping a
+bf16 model's GPU allocation to roughly a quarter of what it actually needed
+and silently CPU-offloading the rest via ``device_map="auto"`` -- the
+observed symptom was a 3-4B model running slower than a 12B one on the same
+card. Existing calls below now pass ``quant_policy="bnb_nf4"`` to keep
+testing the historically-correct quantized case unchanged; the new
+``test_plan_max_memory_none_when_unquantized`` pins the fix.
 """
 from __future__ import annotations
 
@@ -38,26 +49,68 @@ def test_plan_max_memory_is_none_off_cuda(model_id):
     The pre-S0 code keyed ``{0: ...}`` off string tags alone; the 2b/9b/12b
     branches fired on CUDA-less hosts and handed transformers a device map
     for hardware that does not exist."""
-    assert ml._plan_max_memory(model_id, 0.0, cuda_available=False) is None
+    assert ml._plan_max_memory(
+        model_id, 0.0, cuda_available=False, quant_policy="bnb_nf4") is None
     # Paranoia: even a (mis)reported total_vram must not resurrect the plan.
-    assert ml._plan_max_memory(model_id, 16.0, cuda_available=False) is None
+    assert ml._plan_max_memory(
+        model_id, 16.0, cuda_available=False, quant_policy="bnb_nf4") is None
 
 
 def test_plan_max_memory_cuda_branches_unchanged():
-    """On CUDA the plan is byte-identical to the pre-S0 behaviour."""
-    assert ml._plan_max_memory("anything", 16.0, cuda_available=True) == {
+    """On CUDA, for an ACTUALLY QUANTIZED load, the plan is byte-identical
+    to the pre-S0 behaviour -- these budgets were always sized for NF4."""
+    assert ml._plan_max_memory("anything", 16.0, cuda_available=True,
+                               quant_policy="bnb_nf4") == {
         0: "13.5GiB", "cpu": "32GiB"}
     assert ml._plan_max_memory("google/gemma-2-2b-it", 8.0,
-                               cuda_available=True) == {
+                               cuda_available=True,
+                               quant_policy="bnb_nf4") == {
         0: "3.2GiB", "cpu": "32GiB"}
     # NB: ids ENDING in "2b" (e.g. "foo-12b") hit the 2b branch -- that is
     # the pre-S0 tag semantics, preserved verbatim. A 9b id exercises the
     # mid branch cleanly.
     assert ml._plan_max_memory("google/gemma-2-9b-it", 8.0,
-                               cuda_available=True) == {
+                               cuda_available=True,
+                               quant_policy="bnb_nf4") == {
         0: "6.8GiB", "cpu": "32GiB"}
     assert ml._plan_max_memory("some/tiny-model", 8.0,
-                               cuda_available=True) is None
+                               cuda_available=True,
+                               quant_policy="bnb_nf4") is None
+    # 8-bit is the other genuinely-quantized policy; same budgets apply.
+    assert ml._plan_max_memory("google/gemma-2-9b-it", 8.0,
+                               cuda_available=True,
+                               quant_policy="bnb_8bit") == {
+        0: "6.8GiB", "cpu": "32GiB"}
+
+
+@pytest.mark.parametrize(("model_id", "total_vram"), [
+    ("google/gemma-2-2b-it", 8.0),      # was the 2b branch: 3.2GiB
+    ("google/gemma-2-9b-it", 8.0),      # was the 9b/12b/e4b branch: 6.8GiB
+    ("anything", 16.0),                 # was the >=12GiB dynamic branch
+    ("some/tiny-model", 8.0),           # was already None
+])
+def test_plan_max_memory_none_when_unquantized(model_id, total_vram):
+    """PBUG-20260825-03. Every budget above was sized for a 4-bit (NF4)
+    footprint -- applying the SAME cap to an unquantized bf16 load starves
+    it to roughly a quarter of what it needs, and device_map="auto" then
+    silently CPU-offloads the remainder instead of failing loud. Live on an
+    8 GB RTX 4060: gemma-4-E2B-it under quant_policy="none" ran slower than
+    a 12B NF4 model on the SAME card -- the exact shape of partial CPU
+    offload. None here means no cap and no device_map key at all, so the
+    model either fits fully on GPU or model.to(device) raises a fast, honest
+    CUDA OOM (the already-existing, already-tested
+    "quant_config is None and max_memory is None" branch) instead of a
+    render that looks hung.
+
+    Parametrized across every branch of the function, including the
+    total_vram >= 12.0 branch: that one is not reachable by any shipped
+    profile today (no profile pairs quant_policy="none" with a large
+    non-GGUF model on a >=12GB target), but it is the identical bug class
+    and would silently reappear the moment a 16GB-tier bf16 profile existed.
+    """
+    assert ml._plan_max_memory(
+        model_id, total_vram, cuda_available=True, quant_policy="none"
+    ) is None
 
 
 # --------------------------------------------------------------------------

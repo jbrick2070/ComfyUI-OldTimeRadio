@@ -6488,6 +6488,124 @@ EXPECTED result, not a regression signal.
   tail of long beats" is a reusable principle for any future segment-chaining
   engine -- but NOT promoted yet, mechanism unconfirmed and no fix landed.
 
+## PBUG-20260825-04 -- BUG-LOCAL-098 (NF4 silent-fp16-fallback tripwire) fired live on a real render; the bug itself was never actually logged
+- surfaced: the operator, on the 8 GB RTX 4060 (`otr_4060_floor`, model
+  swapped to `google/gemma-4-E4B-it`), running `scifi_news_pro`. NOTED ONLY
+  per operator instruction ("just note it") -- not investigated to a fix in
+  this entry.
+- symptom: `RuntimeError: BUG-LOCAL-098: NF4 quantized load did not
+  materialize for 'google/gemma-4-E4B-it'. linear4bit_count=592
+  is_loaded_in_4bit=True vram_delta=-0.00GiB. This is the bitsandbytes
+  second-load silent fp16 fallback.` -- the loader's own tripwire
+  (`nodes/_otr_model_loader.py:623-681`) fired correctly and failed loud
+  rather than silently continuing on an unquantized model.
+- what the log shows, narratively: two upstream stages timed out first
+  ("[Timeout] NewsCuration phase exceeded 65s", "NewsCurationDeep exceeded
+  40s"), each logging "orphan worker still on GPU. Halting workflow to
+  prevent the next visual stage from racing the orphan's CUDA kernels." The
+  writer then loaded gemma-4-E4B-it successfully once (warmup completed, one
+  heartbeat generated), but moments later a SECOND `Loading LLM model:
+  google/gemma-4-E4B-it (quantized=True)` fired for the dossier pass, then a
+  THIRD (`[Selector] load_llm raised ... running unload_llm() to drop any
+  orphan VRAM before retry`), and the retry ALSO tripped BUG-LOCAL-098
+  before failing the episode. `vram_delta=-0.00GiB` on the failing load is
+  the tell: the "loaded" model consumed essentially no additional VRAM,
+  meaning nothing was actually resident despite `is_loaded_in_4bit=True`.
+- root cause: NOT YET CONFIRMED BY CODE READ -- this entry records the live
+  occurrence, not a diagnosis. The timing is suggestive (two orphan-GPU-
+  worker warnings immediately preceding the failing reload sequence) but the
+  causal link between the NewsCuration timeout's orphan worker and the
+  Selector's own load_llm retry has not been traced. The existing tripwire
+  comment (`_otr_model_loader.py:439-450`, BUG-LOCAL-098's original note)
+  already names the general mechanism -- "transformers mutates internal
+  flags during from_pretrained; a reused instance silently skips
+  quantization on the second call" -- and the loader already instantiates a
+  FRESH `BitsAndBytesConfig` per call specifically to prevent that. That
+  this still fired means either (a) the fresh-config fix does not cover
+  every path that re-enters `load_llm` for the same model_id in rapid
+  succession, or (b) a genuinely orphaned CUDA context (from the timed-out
+  NewsCuration worker) left the device in a state the fresh config can't
+  route around. Needs its own read of `_otr_scifi_news_pro.py`'s
+  NewsCuration/NewsCurationDeep timeout handling before either is confirmed.
+- fix: NONE YET -- explicitly deferred per operator instruction this
+  session. The documented workaround (restart ComfyUI Desktop, re-queue)
+  already exists in the tripwire's own error message and is presumably
+  sufficient for now.
+- confidence: MEDIUM on the symptom (directly observed, real traceback),
+  LOW on root cause (timing-correlated hypothesis only, not traced).
+- bible-worthy: NOT YET -- admissible as a live PROD_BUG_LOG entry (the
+  admission rule's bar), but promotion needs the actual root cause, which
+  this session did not chase.
+- NOTE ON PROCESS: "BUG-LOCAL-098" has been referenced in
+  `nodes/_otr_model_loader.py` and `nodes/story_orchestrator.py` comments
+  for some time (its own fresh-BitsAndBytesConfig fix, and this detection
+  tripwire, both already exist in the code) but was never actually written
+  up in BUG_LOG.md, BUG_LOG_2026-06.md, or this file -- grepped all three,
+  zero hits before this entry. So the ORIGINAL bug this tripwire was built
+  to catch has no record of what triggered it the first time either. This
+  entry is the first formal log record BUG-LOCAL-098 has ever had.
+
+## PBUG-20260825-03 -- unquantized (bf16) loads inherited a VRAM cap sized for 4-bit, silently CPU-offloading and running much slower
+- surfaced: the operator, driving an 8 GB RTX 4060 laptop with
+  `otr_4060_floor` (`llm.quant_policy: "none"`, `google/gemma-4-E2B-it`),
+  reported plainly: "I change the option [to gemma-4-12b-it], 4E2B seemed to
+  run slower." A 3-4B model running slower than a 12B model on the SAME
+  card, both loaded through the same node, was the tell.
+- symptom: no crash, no error -- the render completed, just far more slowly
+  than the far larger NF4-quantized model on identical hardware. The kind of
+  bug that looks like "the pack is just slow" rather than a defect, which is
+  exactly why it is worth writing down.
+- root cause: CONFIRMED BY READING THE CODE, then independently re-verified
+  by a second grounded pass. `nodes/_otr_model_loader.py::_plan_max_memory`
+  builds a `max_memory` dict for `from_pretrained(..., device_map="auto")`
+  from `total_vram` and `model_id` SUBSTRING TAGS ALONE -- it had zero
+  visibility into `quant_policy` and was called unconditionally regardless
+  of whether the load was actually quantized. The budgets themselves
+  (3.2GiB for a 2B-tag, 6.8GiB for a 9b/12b/e4b/4b-it tag) were sized for a
+  4-BIT (NF4) footprint -- the S1 comment on `load_llm` records that when
+  these numbers were chosen, "its resolved value for every production id
+  was NF4", i.e. a tagged model_id was ALWAYS quantized at the time.
+  `quant_policy="none"` pairing with a small tagged model postdates this
+  function and was never threaded back in. So an UNQUANTIZED bf16 load
+  (needing roughly 4x a 4-bit footprint) still got capped at the 4-bit
+  number, and `device_map="auto"` silently CPU-offloaded the remainder --
+  every forward pass then pays PCIe round-trips for the CPU-resident
+  layers, which is exactly what "ran slower" sounds like and is.
+- fix: **FIXED 2026-08-25.** `_plan_max_memory` gained a required
+  `quant_policy` kwarg and returns `None` (no cap, no `device_map` key at
+  all) whenever the policy is not `bnb_nf4`/`bnb_8bit` -- checked FIRST,
+  before any `total_vram`/tag branching, so the same fix also closes the
+  identical latent bug in the `total_vram >= 12.0` branch (not reachable by
+  any shipped profile today, but the same bug class, and would have
+  resurfaced the moment a 16 GB-tier bf16 profile existed). Verified safe
+  rather than assumed: with no `max_memory` and no `device_map` set, the
+  loader's existing `quant_config is None and max_memory is None` branch
+  (`model = model.to(device)`) already handles this -- already exercised
+  today by every untagged model_id -- and raises a normal, fast CUDA OOM if
+  the model genuinely does not fit, rather than a silent multi-minute
+  CPU-offloaded render. Checked every shipped profile with
+  `quant_policy: "none"` (14 total): 11 pick a GGUF repo id and never reach
+  this function at all (different loader backend entirely); the 3 that pick
+  `google/gemma-4-E2B-it` (`otr_4060_floor`, `otr_4060_nano`,
+  `otr_4060_h3_nano`) are exactly the case this fixes, and none pairs
+  `quant_policy: "none"` with a model too large to plausibly fit its
+  target card, so no shipped profile is made worse. Added
+  `test_plan_max_memory_none_when_unquantized`, parametrized across every
+  branch of the function including the latent `>=12.0` one; verified
+  non-vacuous by reverting the guard and confirming 3 of 4 cases fail (the
+  4th, an untagged model_id, was already `None`). Full suite and Bug Bible
+  clean.
+- confidence: HIGH -- the mechanism is a direct code read confirmed twice
+  independently (my own trace, then a second grounded review that also
+  found the `>=12.0` branch I had not extended to), and the live symptom
+  (2-3B slower than 12B on identical hardware) is the textbook signature of
+  partial CPU offload, not a coincidence.
+- bible-worthy: plausible -- "a VRAM/memory budget tuned for one code path
+  (quantized) must be re-verified, not silently reused, when a sibling path
+  (unquantized) is added later" is a reusable class for any budgeting
+  function whose inputs grew a new dimension after the numbers were chosen
+  -- but NOT promoted yet, single occurrence.
+
 ## PBUG-20260825-01 -- `act_count` 7 and 8 are offered as valid but can never produce an outline
 - surfaced: operator asked for "long episodes" -- 7 acts, real video, across
   all five banks. `media_archive` and `original` both failed in under 10
