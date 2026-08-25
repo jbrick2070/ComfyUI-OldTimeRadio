@@ -227,7 +227,55 @@ def test_auto_download_gated_with_token_proceeds(tmp_path, monkeypatch):
     assert kwargs["token"] == "fake-token"
     assert ".safetensors" in " ".join(kwargs["allow_patterns"])
     assert ".gguf" not in " ".join(kwargs["allow_patterns"])
+    assert kwargs["cache_dir"] == str(tmp_path)
     assert out == str(tmp_path / "fake-snapshot")
+
+
+def test_auto_download_sends_the_weights_where_it_says_it_will(
+    tmp_path, monkeypatch
+):
+    """The download destination must equal the announced hub_root.
+
+    2026-08-25 regression guard. `auto_download_if_missing` resolved
+    `hub_root_path` and used it for the local-cache scan, the disk-space check
+    and the "Downloading ... -> {hub_root_path}" console line -- but never
+    passed it to snapshot_download. So the bytes went to whatever
+    `huggingface_hub` had frozen into `constants.HF_HUB_CACHE` at import time,
+    while every OTR reader looked at hub_root. The model then read as MISSING
+    forever and re-downloaded on every single run, with the console cheerfully
+    naming the folder it was not using.
+
+    An env var cannot fix this: HF_HUB_CACHE is frozen at import, and the
+    documented real-world case (ComfyUI Desktop inheriting a stale value that
+    ensure_hf_home() must REPAIR afterwards) happens strictly after that
+    import. Only the explicit argument wins, which is what this pins.
+    """
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.setattr("nodes._otr_hf_auth.resolve_hf_token", lambda: None)
+    # Point the frozen-cache lookalike somewhere ELSE entirely, so a
+    # regression that silently falls back to it is caught rather than masked
+    # by tmp_path happening to be the default.
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "wrong-place"))
+
+    destination = tmp_path / "the-real-hub"
+    snap = MagicMock(return_value=str(destination / "snapshot"))
+    ungated = "google/gemma-4-12b-it"
+    assert ungated not in catalog.GATED_CURATED_MODELS
+
+    catalog.auto_download_if_missing(
+        ungated,
+        hub_root=destination,
+        _snapshot_download=snap,
+    )
+
+    kwargs = snap.call_args.kwargs
+    assert kwargs["cache_dir"] == str(destination), (
+        "snapshot_download must be told WHERE to write. Without cache_dir the "
+        "weights land in huggingface_hub's import-time cache while OTR reads "
+        "hub_root, so the model is never found."
+    )
+    assert "wrong-place" not in kwargs["cache_dir"]
 
 
 def test_auto_download_disk_space_precheck(tmp_path, monkeypatch):

@@ -1869,10 +1869,30 @@ def auto_download_if_missing(
 
     # Forward the token + allow_patterns; let the caller wire a
     # ProgressBar via tqdm_class if they're on the worker-thread.
+    #
+    # cache_dir is NOT optional (fixed 2026-08-25). Every other step in this
+    # function already resolves `hub_root_path` and uses it -- the local-cache
+    # scan at :1822, the disk-space check at :1849, and the "Downloading ... ->
+    # {hub_root_path}" line printed at :1863. Only the download itself did not
+    # receive it, so the console announced one destination and the bytes landed
+    # in another, and every later reader (scan_local_llm_cache, load_llm) looked
+    # where the message said rather than where the file went. The model then
+    # reads as MISSING forever and re-downloads on every run.
+    #
+    # Passing it explicitly is the whole fix, and it has to be explicit:
+    # huggingface_hub freezes `constants.HF_HUB_CACHE` at IMPORT time, so
+    # `ensure_hf_home()`'s os.environ write and prestartup_script.py's HF_HOME
+    # default only reach snapshot_download if they happened before
+    # huggingface_hub was first imported. The loader's own comment
+    # (_otr_model_loader.py:1150-1152) describes exactly the case where they
+    # cannot -- ComfyUI Desktop inheriting a stale HF_HUB_CACHE that the helper
+    # has to REPAIR after import. An env var cannot win that race; an argument
+    # always does.
     kwargs: dict[str, object] = {
         "repo_id": repo_id,
         "allow_patterns": list(ALLOW_PATTERNS),
         "token": resolve_hf_token(),
+        "cache_dir": str(hub_root_path),
     }
     if progress_pbar is not None:
         kwargs["tqdm_class"] = _make_pbar_tqdm_adapter(progress_pbar)
