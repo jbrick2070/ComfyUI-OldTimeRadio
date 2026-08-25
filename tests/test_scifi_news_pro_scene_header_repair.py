@@ -228,3 +228,76 @@ def test_salvage_still_refuses_when_nothing_is_actually_salvageable():
     parsed, defects = markup.parse_scifi_news_pro_markup(
         empty, CAST, salvage=True)
     assert parsed is None and defects
+
+
+# --------------------------------------------------------------------------- #
+# Adoption is BIDIRECTIONAL -- one stranger, whichever order their labels land
+# --------------------------------------------------------------------------- #
+#
+# CAUGHT BY THE KIBITZ r1 PANEL (Cursor and Opus, independently) in the FIRST
+# cut of SpeakerRoster.adopt, which registered forward only.
+# `_proposed_aliases('ELOTWIZ')` is EMPTY -- one token, no honorific -- so a
+# long-then-short script collapsed to one speaker while short-then-long minted
+# two. Same script, different order, different cast, and the second order is
+# the one that reaches casting as an extra person and discards the episode.
+def _ordered_draft(rows):
+    return "\n".join([
+        "TITLE: The Quiet Frequency",
+        "MUSIC: low hum",
+        "ANNOUNCER: Tonight, a signal.",
+        "SCENE 1: a cramped lab",
+        *rows,
+        "ANNOUNCER: It went quiet.",
+        "CODA: Nobody slept.",
+        "MUSIC: out",
+        "END.",
+    ])
+
+
+def _speakers(rows, cast=CAST):
+    parsed, defects = markup.parse_scifi_news_pro_markup(
+        _ordered_draft(rows), cast, salvage=True)
+    assert defects == (), f"salvage must deliver, got {defects}"
+    return sorted({ln.speaker for s in parsed.scenes for ln in s.lines})
+
+
+def test_a_stranger_is_ONE_person_whichever_order_their_labels_arrive():
+    long_first = _speakers(["DR. MICHAEL ELOTWIZ: A.", "ELOTWIZ: B."])
+    short_first = _speakers(["ELOTWIZ: B.", "DR. MICHAEL ELOTWIZ: A."])
+
+    assert len(long_first) == 1, long_first
+    assert len(short_first) == 1, short_first
+
+
+def test_the_full_live_failure_collapses_to_two_people():
+    """The exact pass006 shape: a real cast member reached by surname, plus a
+    typo'd stranger named two ways. Four labels, two people.
+
+    Uses the LIVE cast from that leg, not this file's default -- the whole
+    point is that `DEL VECCHIO` resolves to a LOCKED member whose multi-word
+    surname the alias generator could not previously express."""
+    live_cast = ("Dr. Domitilla Del Vecchio", "Dr. Michael Elowitz")
+    assert _speakers([
+        "DEL VECCHIO: The readings hold.",
+        "DR. MICHAEL ELOTWIZ: Then we log it.",
+        "ELOTWIZ: And again.",
+    ], cast=live_cast) == ["DR. MICHAEL ELOTWIZ", "Dr. Domitilla Del Vecchio"]
+
+
+def test_two_genuinely_different_strangers_stay_different():
+    """THE NEGATIVE CONTROL. Bidirectional adoption must collapse spellings of
+    ONE stranger without merging two real invented characters -- that would be
+    the edit-distance behaviour the roster deliberately refuses."""
+    assert _speakers(["ZORAN VEX: a.", "MIRA KADE: b."]) == [
+        "MIRA KADE", "ZORAN VEX"]
+
+
+def test_reverse_containment_never_runs_against_the_LOCKED_cast():
+    """Load-bearing restriction. Locked names are authoritative; running
+    containment backwards against them would let an invented `Dr. Michael
+    Chen` swallow a locked `Chen` who is a different character."""
+    locked = ("Chen", "Dr. Domitilla Del Vecchio")
+    got = _speakers(["Dr. Michael Chen: a.", "Chen: b."], cast=locked)
+
+    assert "Chen" in got, "the locked character must keep their own lines"
+    assert len(got) == 2, f"the invented doctor must stay separate: {got}"

@@ -445,6 +445,10 @@ class SpeakerRoster:
         }
         self.blank_labels = 0
         self.ambiguous_labels: "list[tuple[str, str]]" = []
+        #: Salvage-adopted strangers only, keyed by identity. Held SEPARATE
+        #: from `exact` because reverse containment (`adopt`) may run against
+        #: these and must never run against the locked cast.
+        self._adopted: "dict[str, str]" = {}
         for name in self.cast_names:
             key = speaker_identity_key(name)
             if not key:
@@ -485,18 +489,39 @@ class SpeakerRoster:
             if len(owners) == 1 and key not in self.exact:
                 self.aliases[key] = next(iter(owners))
 
-    def adopt(self, name: str) -> None:
-        """Register a SALVAGE-ADOPTED speaker so the rest of the script can
-        find them again.
+    def adopt(self, name: str) -> str:
+        """Register a SALVAGE-ADOPTED speaker and return the name their line
+        belongs to -- which may be a stranger adopted EARLIER.
+
+        RETURNS a name because adoption is BIDIRECTIONAL. Registering forward
+        only was order-dependent, and the kibitz r1 panel (Cursor and Opus,
+        independently) caught it in the first cut of this method:
+        `_proposed_aliases('ELOTWIZ')` is EMPTY -- one token, no honorific --
+        so `DR. MICHAEL ELOTWIZ` arriving first adopts a person whose surname
+        resolves, but `ELOTWIZ` arriving FIRST adopts a person with no aliases
+        at all, and the longer label then matches nothing and mints a SECOND
+        stranger. Measured on the real parser: long-then-short gave one
+        speaker, short-then-long gave two. Same script, different order,
+        different cast.
+
+        So the reverse direction is checked too: if a proposed alias of the
+        NEW label is already an ADOPTED name, the new label is another way of
+        naming that same stranger.
+
+        ADOPTED NAMES ONLY, never the locked cast, and that restriction is
+        load-bearing. Locked names are authoritative and their aliases are
+        already registered forward at construction; running containment
+        backwards against them would let a script's `Dr. Michael Chen` swallow
+        a locked `Chen` who is a different character. Strangers have no such
+        authority -- they exist only because the parser could not place them --
+        so collapsing two spellings of one stranger loses nothing.
 
         THE DEFECT THIS CLOSES (live, 2026-08-24). Adoption recorded the new
         character in `p.adopted` and never told the roster, so the roster the
         NEXT label is resolved against still did not contain them. A model
         that mislabelled one character twice therefore minted TWO strangers,
-        not one: `DR. MICHAEL ELOTWIZ` was adopted, then `ELOTWIZ` -- its own
-        surname, and a form `_proposed_aliases` generates -- resolved against
-        nothing and was adopted again. Two real characters arrived at casting
-        as four speakers and a finished episode was discarded.
+        not one. Two real characters arrived at casting as four speakers and a
+        finished episode was discarded.
 
         So the typo half of that failure was never "unresolvable by policy"
         at all. The typo makes ONE stranger, which is unavoidable and honest;
@@ -511,9 +536,29 @@ class SpeakerRoster:
         """
         canonical = " ".join(str(name).split())
         key = speaker_identity_key(canonical)
-        if not key or key in self.exact:
-            return
+        if not key:
+            return canonical
+        settled = self.exact.get(key)
+        if settled is not None:
+            return settled
+
+        # REVERSE CONTAINMENT, adopted strangers only -- see the docstring.
+        # Exactly one claimant, or nothing: two adopted strangers both
+        # answering to this label is precisely the ambiguity the forward guard
+        # refuses, and it is refused identically here.
+        claimants = {
+            owner for owner in (
+                self._adopted.get(speaker_identity_key(label))
+                for label in _proposed_aliases(canonical)
+            ) if owner
+        }
+        if len(claimants) == 1:
+            existing = next(iter(claimants))
+            self.exact[key] = existing
+            return existing
+
         self.exact[key] = canonical
+        self._adopted[key] = canonical
         # An alias this new name would claim, but which is already an exact
         # name or already claimed by someone else, must NOT be stolen.
         for label in _proposed_aliases(canonical):
@@ -527,6 +572,7 @@ class SpeakerRoster:
                 # Ambiguous now that a second claimant exists: neither gets
                 # it, exactly as the constructor's guard decides.
                 del self.aliases[alias_key]
+        return canonical
 
     def resolve(self, supplied: str) -> "tuple[str | None, str]":
         """``(canonical_name_or_None, how)``. Never raises, never rewrites."""
@@ -910,13 +956,16 @@ class _Parse:
                 # broken episode rather than a salvaged one. The raw label is
                 # still recorded in the receipt line below, so the adoption
                 # stays traceable to exactly what the model wrote.
-                canonical_name = _undecorated_speaker_name(supplied_name)
+                # TELL THE ROSTER, and take back the name it settled on.
+                # Without this the adopted character is unfindable by their own
+                # surname and the next mention mints ANOTHER stranger; the
+                # RETURN value is what makes it order-independent, attaching a
+                # longer label to a stranger already adopted under a shorter
+                # one -- see `SpeakerRoster.adopt`.
+                canonical_name = self.roster.adopt(
+                    _undecorated_speaker_name(supplied_name))
                 if canonical_name not in self.adopted:
                     self.adopted.append(canonical_name)
-                # TELL THE ROSTER. Without this the adopted character is
-                # unfindable by their own surname and the next mention mints
-                # ANOTHER stranger -- see `SpeakerRoster.adopt`.
-                self.roster.adopt(canonical_name)
                 self.resolutions.append(
                     f"line {no}: speaker {supplied_name!r} ADOPTED as "
                     f"{canonical_name!r} -- not on the locked roster; "
