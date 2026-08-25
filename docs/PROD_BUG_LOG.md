@@ -6488,6 +6488,44 @@ EXPECTED result, not a regression signal.
   tail of long beats" is a reusable principle for any future segment-chaining
   engine -- but NOT promoted yet, mechanism unconfirmed and no fix landed.
 
+## PBUG-20260825-01 -- `act_count` 7 and 8 are offered as valid but can never produce an outline
+- surfaced: operator asked for "long episodes" -- 7 acts, real video, across
+  all five banks. `media_archive` and `original` both failed in under 10
+  minutes, before any rendering, at the outline-assembly step.
+- symptom: `pydantic_core.ValidationError: 1 validation error for Outline /
+  beats / List should have at most 32 items after validation, not 36`.
+  Reproduced identically on two different banks (`media_archive` at
+  `num_characters=3`, `original` at `num_characters=4`) -- the character
+  count varies, the beat-count overflow does not, confirming it is
+  `act_count` alone that overflows, not a cast-size interaction.
+- root cause: CONFIRMED BY ARITHMETIC, not inference. `nodes/_otr_outline.py`'s
+  `Outline.beats` field is `Field(..., min_length=1, max_length=32)`.
+  `nodes/_otr_episode_budget.py`'s topology is
+  `4*act_count` voiced beats (`BEATS_PER_ACT=4`, uniform per act) +
+  `2` announcer beats + `(act_count - 1)` music-interstitial beats
+  (`include_act_breaks` defaults `True` end to end, confirmed at
+  `OTR_LedgerScriptWriter.py:2766,4021`) = `5*act_count + 1` total beats.
+  That is `<= 32` only for `act_count <= 6` (31 beats). `MAX_ACT_COUNT = 8`
+  in the same module accepts 7 and 8 as valid requests, but they compute to
+  36 and 41 beats respectively -- both already past the schema's own hard
+  cap before a single beat is authored. **Every request for act_count 7 or 8
+  is a guaranteed failure, not an occasional one -- there is no cast size,
+  bank, or seed that saves it.**
+- fix: **NOT FIXED.** Two defensible directions, an operator call: (a) raise
+  `Outline.beats.max_length` past 41 so `MAX_ACT_COUNT=8` becomes reachable,
+  or (b) lower `MAX_ACT_COUNT` to 6 so the advertised range matches what the
+  schema can actually hold. Whichever way, `compute_episode_budget`'s own
+  `[MIN_ACT_COUNT, MAX_ACT_COUNT]` range check should not accept a value it
+  is mathematically certain to reject three call-frames later -- that
+  disagreement is the real defect, independent of which bound moves.
+  Workaround used tonight: cap real long-episode requests at `act_count=6`.
+- confidence: HIGH -- reproduced live twice, and the arithmetic is exact
+  (`5*7+1=36` matches the observed error message character for character).
+- bible-worthy: plausible -- "a request-time range check and a downstream
+  schema constraint must be proven to agree, not merely both exist" is a
+  reusable class (the exact inverse of the freeze-cascade absent-vs-null gap
+  found the same week) -- but NOT promoted yet, single lane class observed.
+
 ## PBUG-20260824-06 -- key-absent tts_skip_reason slipped past cleanup, hard-failed the freeze gate
 - surfaced: the operator's own overnight 3-hour regression loop
   (`otr_writer_bank_gate.py`, all five banks). `shakespeare` FAILed one pass
