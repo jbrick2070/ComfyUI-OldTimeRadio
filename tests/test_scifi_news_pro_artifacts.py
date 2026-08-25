@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import _otr_scifi_news_pro as F2  # noqa: E402
+from nodes._otr_episode_budget import MAX_ACT_COUNT  # noqa: E402
 
 
 PACK_PATH = (
@@ -145,7 +146,7 @@ def test_one_pitch_is_dealt_for_every_act_count():
     exactly one pitch is dealt whatever the episode's shape.
     """
     deck = F2._load_frame_deck()
-    for act_count in (1, 3, 5, 8):
+    for act_count in (1, 3, 5, MAX_ACT_COUNT):
         cards, stance = F2._deal(random.Random(act_count), deck)
         envelope = F2._build_envelope(act_count)
         assert len(cards) == 1
@@ -156,7 +157,7 @@ def test_one_pitch_is_dealt_for_every_act_count():
 @pytest.mark.parametrize(
     ("act_count", "dialogue"),
     [
-        (8, "Go."),
+        (MAX_ACT_COUNT, "Go."),
         (1, ("Signal " * 700) + "holds."),
     ],
     ids=("tiny-script-many-acts", "huge-script-one-act"),

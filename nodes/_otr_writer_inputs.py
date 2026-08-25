@@ -106,8 +106,11 @@ def _resolve_creativity(creativity: str) -> tuple[float, float]:
 #: It is NOT derived from anything -- deriving it is what was removed.
 _DEFAULT_ACT_COUNT: int = 3
 
-#: Operator-facing act choices. Explicit 1..8; there is deliberately no
-#: 'auto' option, because 'auto' meant "derive from target_words".
+#: Operator-facing act choices. Explicit 1..6 (narrowed from 1..8,
+#: PBUG-20260825-01 -- 7 and 8 always overflowed Outline.beats' own
+#: max_length=32); there is deliberately no 'auto' option, because 'auto'
+#: meant "derive from target_words". DERIVED from MIN/MAX_ACT_COUNT, not a
+#: second hardcoded range -- the two stay in lockstep by construction.
 _ACT_COUNT_CHOICES: list[str] = [
     str(n) for n in range(_OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT + 1)
 ]
@@ -235,7 +238,8 @@ def _resolve_inputs(
     num_characters = max(1, min(_FABLE2_MAX_CAST, int(num_characters)))
 
     # ACT COUNT IS THE ONLY LENGTH-SHAPED KNOB (operator directive
-    # 2026-08-14). The widget is an explicit 1..8 combo. There is no
+    # 2026-08-14). The widget is an explicit 1..6 combo (narrowed from 1..8,
+    # PBUG-20260825-01). There is no
     # 'auto' any more: 'auto' meant "derive the act count from
     # target_words", and target_words no longer exists. Nor is the pick
     # validated against a derived [default..max] band -- that band came

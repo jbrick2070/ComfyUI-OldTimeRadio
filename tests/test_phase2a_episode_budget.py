@@ -79,13 +79,18 @@ class TestComputeEpisodeBudget:
         with pytest.raises(InvalidEpisodeBudgetError):
             compute_episode_budget(MAX_ACT_COUNT + 1, True, 2)
 
-    def test_eight_acts_is_now_in_range(self):
-        # The ceiling moved 7 -> 8 on 2026-08-14; 8 used to be the first
-        # REJECTED value and this test previously asserted that.
-        eb = compute_episode_budget(8, True, 2)
-        assert eb.act_count == 8
-        assert len(eb.arc_phases) == 8
-        assert "crisis" in eb.arc_phases
+    def test_seven_and_eight_acts_are_rejected_again(self):
+        # The ceiling moved 7 -> 8 on 2026-08-14, making this test assert
+        # 8 was IN range; it moved back to 6 on 2026-08-25
+        # (PBUG-20260825-01) -- 7 and 8 were reachable through this check
+        # but guaranteed to fail three frames later at Outline construction
+        # (Outline.beats' own max_length=32 only fits act_count<=6). Both
+        # values are OUT of range again, same as the original pre-08-14
+        # ceiling, for an unrelated reason this time.
+        with pytest.raises(InvalidEpisodeBudgetError):
+            compute_episode_budget(7, True, 2)
+        with pytest.raises(InvalidEpisodeBudgetError):
+            compute_episode_budget(8, True, 2)
 
     def test_num_characters_below_one_rejected(self):
         with pytest.raises(InvalidEpisodeBudgetError):
@@ -128,18 +133,18 @@ class TestComputeEpisodeBudget:
 
 class TestActCountConfigSanity:
 
-    @pytest.mark.parametrize("ac", list(range(1, 9)))
+    @pytest.mark.parametrize("ac", list(range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)))
     def test_lengths_match_act_count(self, ac):
         cfg = ACT_COUNT_CONFIG[ac]
         assert len(cfg["arc_phases"]) == ac
         assert len(cfg["voiced_beats_per_act"]) == ac
 
-    @pytest.mark.parametrize("ac", list(range(1, 9)))
+    @pytest.mark.parametrize("ac", list(range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)))
     def test_arc_phase_guidance_covers_all_phases(self, ac):
         for phase in ACT_COUNT_CONFIG[ac]["arc_phases"]:
             assert phase in ARC_PHASE_GUIDANCE,                 f"ARC_PHASE_GUIDANCE missing {phase!r}"
 
-    @pytest.mark.parametrize("ac", list(range(1, 9)))
+    @pytest.mark.parametrize("ac", list(range(MIN_ACT_COUNT, MAX_ACT_COUNT + 1)))
     def test_no_word_keys_left_in_the_topology(self, ac):
         cfg = ACT_COUNT_CONFIG[ac]
         assert "act_word_fractions" not in cfg

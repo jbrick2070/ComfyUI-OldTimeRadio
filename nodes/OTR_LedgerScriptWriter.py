@@ -10,7 +10,7 @@ Pipeline (unchanged from v2.0 LPL):
          _otr_style_catalog.build_story_contract(), made once cast_seed
          and script_brief both exist (style-engine consolidation,
          2026-07-05). No widget, no LLM picker.
-       - act_count from widget (1-8); episode length is an observation
+       - act_count from widget (1-6, PBUG-20260825-01); episode length is an observation
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
          only computed post-hoc for the est_minutes output socket.
@@ -76,7 +76,7 @@ Widget surface (current as of 2026-05-23):
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
         include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
                                     beats between acts; False -> continuous)
-        act_count         combo   ('1'-'8' -- THE one length-shaped knob;
+        act_count         combo   ('1'-'6' -- THE one length-shaped knob;
                                    always honoured, never derived)
         creativity        combo   (maps to temperature + top_p preset)
         perfect_run_spacesaver BOOLEAN (DEPRECATED 2026-08-08 -- no-op
@@ -2167,12 +2167,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # and the range grew from 1-7 to 1-8. Whatever is picked
                 # here is honoured: there is no derived floor or ceiling
                 # that can refuse it.
+                # NARROWED 1-8 -> 1-6 (PBUG-20260825-01, operator decision,
+                # 2026-08-25): 7 and 8 were reachable but mathematically
+                # guaranteed to fail at Outline construction (36/41 beats
+                # against Outline.beats' own max_length=32) -- not a
+                # "refuse it" ceiling, a bound the schema already had that
+                # this range simply now agrees with.
                 "act_count": (
                     _ACT_COUNT_CHOICES,
                     {
                         "default": str(_DEFAULT_ACT_COUNT),
                         "tooltip": (
-                            "Number of acts, 1-8. This is the only knob "
+                            "Number of acts, 1-6. This is the only knob "
                             "that shapes episode length, and your pick "
                             "is always honoured.\n\n"
                             "More acts means a story with more turns in "
