@@ -110,6 +110,13 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   subset would re-break FIX-3's gender-exhaustion fix).
   *Twin:* `test_p1_2_every_announcer_voice_engine_is_registered_and_serves_the_role`
   (`tests/test_tts_voice_preflight_matrix.py`).
+  **Gate 7 PROVEN 2026-08-25**, live canonical leg (profile
+  `otr_bark_announcer_acceptance`, bank `original`): `RESULT SUCCESS`,
+  `obs_publish OK`, published file confirmed on disk. Ledger's ANNOUNCER
+  row: `tts_model="bark"`, `voice_preset="v2/en_speaker_2"`, `voice_ref_id=""`
+  (cleared), `presentation_gender="female"` matching the delivered preset
+  (gender coherence held, not just the pre-draw request). No longer a
+  follow-up -- this is a shipped, live-proven capability.
 
 ## Gate 3 -- Generated data
 
