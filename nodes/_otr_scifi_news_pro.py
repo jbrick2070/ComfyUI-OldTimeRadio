@@ -2960,6 +2960,54 @@ def _make_casting_gender_repair(menu: VoiceMenu):
     by_id = menu.by_id()
     legal = {"male", "female"}
 
+    def _coherent_gender(row: dict, model_gender: str) -> str:
+        """GENDER FIRST, FROM OUR OWN POOL -- Bug Bible 10.08.
+
+        Operator, 2026-08-24: *"it has to pull from the pool and pick the
+        gender first"*. 10.08 is the law behind that instinct: two correlated
+        attributes of one entity drawn by two independent generators are each
+        correct in isolation and incoherent together -- the MALIK-HIBBERT-
+        voiced-female defect. Its fix is "make one attribute authoritative and
+        reconcile the other against it", and its verify demands the repair be
+        a true no-op when nothing is wrong.
+
+        WHICH ATTRIBUTE IS AUTHORITATIVE IS LANE-SPECIFIC, and transposing the
+        legacy lane naively would corrupt this one. On `media_archive` /
+        `original` the cast is named BEFORE the script exists, so
+        `_otr_casting` can hold the slot's gender authoritative and SWAP the
+        first name from the same-gender pool. Here the cast is derived FROM a
+        sealed script: the name is already spoken in dialogue and printed in
+        the speaker labels, so renaming a character would desync the ledger
+        from its own script. So the authority inverts -- the NAME is fixed,
+        our pool CLASSIFIES it, and the voice follows the gender.
+
+        `gender_of_first_name` is the same classifier the legacy lane uses
+        (`_otr_casting.py`), not a second copy, and it is deliberately
+        conservative: "unknown" for a name outside the curated pool, and
+        callers must treat unknown like unisex and never force a repair on a
+        name we cannot confidently gender. So this only ever overrides a
+        CONFIDENT disagreement.
+        """
+        name = str(row.get("name") or "")
+        # LEMMY IS EXEMPT AND MUST STAY EXEMPT. His identity is pinned from
+        # LEMMY_PROFILE -- canonical name, gender, and his own audition-proven
+        # Cockney voice, withheld from the menu on a cameo episode. He is the
+        # "explicitly named / source-owned entity" 10.08 tells us to exempt;
+        # reclassifying the recurring cameo from a name pool would be the one
+        # repair that can regress a settled character.
+        if _is_lemmy(name):
+            return model_gender
+        tag = _POOLS.gender_of_first_name(name)
+        if tag in legal and model_gender in legal and tag != model_gender:
+            log.info(
+                "[scifi_news_pro] casting gender %r disagrees with the name "
+                "pool's reading of %r (%s); the name is sealed in the script, "
+                "so the pool wins and the voice follows",
+                model_gender, name, tag,
+            )
+            return tag
+        return model_gender
+
     def _repair(failed_output: str, error: BaseException):
         if not isinstance(error, ValidationError):
             return None
@@ -2990,7 +3038,27 @@ def _make_casting_gender_repair(menu: VoiceMenu):
             entry = by_id.get(str(row.get("timbre") or ""))
             if entry is None or str(entry.gender) not in legal:
                 return None          # cannot answer it -- let the model try
-            row["gender"] = str(entry.gender)
+            # The voice answers the hedge; the NAME POOL then gets the final
+            # word, so a resolved gender can never be incoherent with the name
+            # the script already speaks aloud.
+            resolved = _coherent_gender(row, str(entry.gender))
+            if resolved != str(entry.gender):
+                # The pool overruled the voice, so the voice must move too --
+                # otherwise `_make_casting_validator` refuses the row for the
+                # very mismatch this is fixing. Take an unused menu id of the
+                # corrected gender; if there is none, let the model retry
+                # rather than ship an incoherent pair.
+                used = {str(r.get("timbre") or "") for r in rows
+                        if isinstance(r, dict)}
+                swap = next(
+                    (e.menu_id for e in menu.entries
+                     if str(e.gender) == resolved and e.menu_id not in used),
+                    None,
+                )
+                if swap is None:
+                    return None
+                row["timbre"] = swap
+            row["gender"] = resolved
             repaired += 1
         if not repaired:
             return None

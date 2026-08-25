@@ -181,3 +181,113 @@ def test_the_deterministic_rung_runs_before_the_prompt():
     prompt = source.index("_is_gender_literal_validation_error")
     assert det < prompt, (
         "the deterministic rung must be attempted before the typed prompt")
+
+
+# --------------------------------------------------------------------------- #
+# Bug Bible 10.08 -- the name pool gets the final word, and LEMMY is exempt
+# --------------------------------------------------------------------------- #
+#
+# Operator, 2026-08-24: "it has to pull from the pool and pick the gender
+# first". 10.08 is the law: two correlated attributes of one entity from two
+# independent generators are each correct alone and incoherent together (the
+# MALIK-HIBBERT-voiced-female defect). Here the NAME is sealed in the script,
+# so our pool CLASSIFIES it and the voice follows -- the inverse of the legacy
+# lane, which names the cast before the script exists and may rename instead.
+def _mixed_menu():
+    """A menu with a spare voice of each gender, so a corrected gender has
+    somewhere to go."""
+    return F2.VoiceMenu(entries=(
+        F2.VoiceMenuEntry(menu_id="m1", gender="male",
+                          description="gravelly", preset="v2/en_speaker_1"),
+        F2.VoiceMenuEntry(menu_id="m2", gender="male",
+                          description="dry", preset="v2/en_speaker_3"),
+        F2.VoiceMenuEntry(menu_id="f1", gender="female",
+                          description="clipped", preset="v2/en_speaker_2"),
+        F2.VoiceMenuEntry(menu_id="f2", gender="female",
+                          description="warm", preset="v2/en_speaker_4"),
+    ))
+
+
+def _named_payload(name, gender, timbre):
+    return json.dumps({"cast": [{
+        "name": name, "role": "lead",
+        "character_description": "a tired physicist",
+        "gender": gender, "timbre": timbre,
+    }]})
+
+
+def _named_error(name, gender, timbre) -> ValidationError:
+    with pytest.raises(ValidationError) as caught:
+        F2.CastingVoices.model_validate(
+            json.loads(_named_payload(name, gender, timbre)))
+    return caught.value
+
+
+def _pool_name(gender: str) -> str:
+    """A first name our OWN pool confidently classifies, so the test cannot
+    drift from the curated vocabulary."""
+    from config import cast_pools
+
+    for candidate in cast_pools.FIRST_NAMES_BY_GENDER[gender]:
+        if cast_pools.gender_of_first_name(candidate) == gender:
+            return candidate
+    raise AssertionError(f"no confidently-{gender} name in the pool")
+
+
+def test_the_name_pool_overrules_a_voice_that_disagrees_with_it():
+    """A hedge resolved from a MALE voice, on a confidently-female name, must
+    come back female -- and the voice must move with it, or the validator
+    would refuse the very pair this repaired."""
+    female_name = _pool_name("female")
+    repair = F2._make_casting_gender_repair(_mixed_menu())
+
+    fixed = repair(_named_payload(female_name, "both", "m1"),
+                   _named_error(female_name, "both", "m1"))
+
+    assert fixed is not None
+    assert fixed.cast[0].gender == "female"
+    assert fixed.cast[0].timbre.startswith("f"), (
+        "the voice must follow the corrected gender, not stay male")
+
+
+def test_a_name_the_pool_cannot_classify_keeps_the_voice_answer():
+    """`gender_of_first_name` returns 'unknown' outside the curated pool and
+    callers must never force a repair on that -- so an invented sci-fi name
+    keeps the gender its chosen voice implies."""
+    repair = F2._make_casting_gender_repair(_mixed_menu())
+
+    fixed = repair(_named_payload("Zyrelle-9", "both", "m1"),
+                   _named_error("Zyrelle-9", "both", "m1"))
+
+    assert fixed is not None
+    assert fixed.cast[0].gender == "male"
+    assert fixed.cast[0].timbre == "m1", "no voice change was warranted"
+
+
+def test_LEMMY_is_EXEMPT_from_the_name_pool_reclassification():
+    """THE CAMEO IS PINNED. His name, gender and audition-proven Cockney voice
+    come from LEMMY_PROFILE, and 10.08 tells us to exempt an explicitly named
+    entity. Reclassifying the recurring cameo from a name pool is the one
+    repair that could regress a settled character."""
+    from config import cast_pools
+
+    lemmy = str(cast_pools.LEMMY_PROFILE["name"])
+    repair = F2._make_casting_gender_repair(_mixed_menu())
+
+    fixed = repair(_named_payload(lemmy, "both", "m1"),
+                   _named_error(lemmy, "both", "m1"))
+
+    assert fixed is not None
+    assert fixed.cast[0].gender == "male", "LEMMY is male, from his profile"
+    assert fixed.cast[0].timbre == "m1", (
+        "LEMMY's voice must not be reshuffled by the name-pool rung")
+
+
+def test_the_classifier_is_the_legacy_lane_s_not_a_second_copy():
+    """One classifier, not two -- the same `gender_of_first_name` the legacy
+    casting path uses. A private copy here is the defect class fixed three
+    times today."""
+    import inspect
+
+    source = inspect.getsource(F2._make_casting_gender_repair)
+    assert "_POOLS.gender_of_first_name(" in source

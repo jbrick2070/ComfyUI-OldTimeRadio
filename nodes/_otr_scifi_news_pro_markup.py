@@ -390,11 +390,30 @@ def _proposed_aliases(name: str) -> "tuple[str, ...]":
         honorific = words[0]
         words = words[1:]
     if len(words) >= 2:
-        surname, given = words[-1], words[0]
-        if honorific:
-            out.append(f"{honorific} {surname}")
-        out.append(surname)
-        out.append(given)
+        # A SURNAME IS NOT ALWAYS ONE WORD, and assuming it was cost a live
+        # episode (2026-08-24). This took `words[-1]`, so
+        # `Dr. Domitilla Del Vecchio` proposed `Vecchio` and never
+        # `Del Vecchio` -- the model used the surname a person would use, the
+        # roster could not express it, the label went unresolved, and salvage
+        # minted a second character for someone already in the cast. Same hole
+        # for `van Helsing`, `de Gaulle`, `von Braun`, `Mac Alister`.
+        #
+        # TRAILING n-grams, not ALL n-grams. A surname is a SUFFIX of the name,
+        # so `Del Vecchio` and `Vecchio` are proposed while `Domitilla Del` --
+        # a contiguous n-gram nobody would ever use as a label -- is not.
+        # Over-proposing is not free: every junk alias is another chance to
+        # collide with a real character and be suppressed by the ambiguity
+        # guard, which would lose a GOOD alias to protect a fake one.
+        #
+        # Still CLOSED, still structural, still SUBSTRING-BY-TOKEN: every form
+        # below is a contiguous run of the canonical name's own tokens. No
+        # edit distance, no particle vocabulary to keep one culture short.
+        for start in range(1, len(words)):
+            suffix = " ".join(words[start:])
+            if honorific:
+                out.append(f"{honorific} {suffix}")
+            out.append(suffix)
+        out.append(words[0])          # the given name on its own
     elif len(words) == 1 and honorific:
         out.append(words[0])
     return tuple(dict.fromkeys(w for w in out if w))
@@ -465,6 +484,49 @@ class SpeakerRoster:
         for key, owners in claims.items():
             if len(owners) == 1 and key not in self.exact:
                 self.aliases[key] = next(iter(owners))
+
+    def adopt(self, name: str) -> None:
+        """Register a SALVAGE-ADOPTED speaker so the rest of the script can
+        find them again.
+
+        THE DEFECT THIS CLOSES (live, 2026-08-24). Adoption recorded the new
+        character in `p.adopted` and never told the roster, so the roster the
+        NEXT label is resolved against still did not contain them. A model
+        that mislabelled one character twice therefore minted TWO strangers,
+        not one: `DR. MICHAEL ELOTWIZ` was adopted, then `ELOTWIZ` -- its own
+        surname, and a form `_proposed_aliases` generates -- resolved against
+        nothing and was adopted again. Two real characters arrived at casting
+        as four speakers and a finished episode was discarded.
+
+        So the typo half of that failure was never "unresolvable by policy"
+        at all. The typo makes ONE stranger, which is unavoidable and honest;
+        the missing write-back is what split that stranger in two, and that
+        is a plain bug.
+
+        SAME RUNGS, SAME GUARD, NO NEW POLICY. The adopted name goes in as an
+        exact key and its `_proposed_aliases` forms go through the identical
+        ambiguity check the locked cast uses -- an alias claimed by two
+        characters is registered for NEITHER, and an alias that collides with
+        any exact name loses. No fuzzy matching is introduced or implied.
+        """
+        canonical = " ".join(str(name).split())
+        key = speaker_identity_key(canonical)
+        if not key or key in self.exact:
+            return
+        self.exact[key] = canonical
+        # An alias this new name would claim, but which is already an exact
+        # name or already claimed by someone else, must NOT be stolen.
+        for label in _proposed_aliases(canonical):
+            alias_key = speaker_identity_key(label)
+            if not alias_key or alias_key in self.exact:
+                continue
+            prior = self.aliases.get(alias_key)
+            if prior is None:
+                self.aliases[alias_key] = canonical
+            elif prior != canonical:
+                # Ambiguous now that a second claimant exists: neither gets
+                # it, exactly as the constructor's guard decides.
+                del self.aliases[alias_key]
 
     def resolve(self, supplied: str) -> "tuple[str | None, str]":
         """``(canonical_name_or_None, how)``. Never raises, never rewrites."""
@@ -851,6 +913,10 @@ class _Parse:
                 canonical_name = _undecorated_speaker_name(supplied_name)
                 if canonical_name not in self.adopted:
                     self.adopted.append(canonical_name)
+                # TELL THE ROSTER. Without this the adopted character is
+                # unfindable by their own surname and the next mention mints
+                # ANOTHER stranger -- see `SpeakerRoster.adopt`.
+                self.roster.adopt(canonical_name)
                 self.resolutions.append(
                     f"line {no}: speaker {supplied_name!r} ADOPTED as "
                     f"{canonical_name!r} -- not on the locked roster; "
