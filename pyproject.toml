@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.7"
+version = "2.0.0-alpha.8"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -20,6 +20,10 @@ dependencies = [
     "tokenizers>=0.22,<=0.23",
     "sentencepiece>=0.1.99",
     "bitsandbytes>=0.42.0",
+    # See requirements.txt for the full note: the loader passes
+    # low_cpu_mem_usage / device_map / max_memory / quantization_config, all of
+    # which transformers routes through accelerate, yet it was never declared.
+    "accelerate>=1.1.0",
     "lm-format-enforcer>=0.11.3,<1.0",
     "spandrel~=0.4.1",
     "pydantic>=2.0",

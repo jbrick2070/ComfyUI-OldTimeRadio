@@ -29,6 +29,20 @@ sentencepiece>=0.1.99
 
 bitsandbytes>=0.42.0
 
+# 2026-08-25: accelerate was NEVER declared, in either this file or
+# pyproject.toml, and it is only a transformers EXTRA -- never a base
+# requirement. But nodes/_otr_model_loader.py passes low_cpu_mem_usage=True
+# UNCONDITIONALLY (:528), plus device_map / max_memory (:538-546) and
+# quantization_config (:543), and transformers routes every one of those
+# through accelerate. So a fresh registry install, or a bare
+# `pip install -r requirements.txt`, got a writer that cannot load a model.
+# This box only ever worked because accelerate 1.13.0 arrived transitively
+# from ComfyUI core or another pack -- which is precisely why the gap was
+# invisible here and fatal on the 8 GB scratch install that found it.
+# Floor is 1.1.0, which is transformers 5.10's own extras floor (NOT the
+# 0.26.0 an outside report suggested -- that predates the v5 line).
+accelerate>=1.1.0
+
 # Sprint 10A step 3 -- grammar-constrained generation for the Stage 1
 # structural-plan call. Pure Python wheel, no compiled deps; works on
 # the project's torch 2.10 + CUDA 13 + Blackwell sm_120 + Windows stack
