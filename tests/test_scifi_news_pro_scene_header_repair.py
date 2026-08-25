@@ -301,3 +301,29 @@ def test_reverse_containment_never_runs_against_the_LOCKED_cast():
 
     assert "Chen" in got, "the locked character must keep their own lines"
     assert len(got) == 2, f"the invented doctor must stay separate: {got}"
+
+
+def test_adopting_a_stranger_never_erases_a_LOCKED_member_s_alias():
+    """THE BLOCKER, found by the Sonnet QA pass on the finished diff and
+    reproduced live before it was fixed.
+
+    `adopt()`'s alias write-back deleted ANY contested alias -- including one
+    a real cast member already owned. Adopting a stranger called
+    `PROFESSOR CHEN` therefore erased locked `Dr. Haorong Chen`'s own `Chen`
+    alias; his later `CHEN:` line resolved to nothing, was adopted as a THIRD
+    identity, and the locked doctor vanished from his own episode with ZERO
+    defects raised. Silent, and the exact defect class this work exists to
+    remove -- reintroduced through a new door, which made it worse than the
+    bug it replaced.
+
+    The earlier locked-cast test passed throughout because it exercised a
+    locked EXACT name; this is the ALIAS path, which is a different map."""
+    got = _speakers(
+        ["PROFESSOR CHEN: A stranger speaks.", "CHEN: The doctor answers."],
+        cast=("Dr. Haorong Chen",),
+    )
+
+    assert "Dr. Haorong Chen" in got, (
+        "the locked doctor must keep the line addressed to him by his own "
+        f"alias; got {got}")
+    assert len(got) == 2, f"the stranger stays separate, no third identity: {got}"

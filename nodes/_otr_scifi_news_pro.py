@@ -3083,8 +3083,26 @@ def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
                   and _norm_ws(str(r.get("name") or "")).casefold() not in want]
         if not missing and not extras:
             return False
-        used = {str(r.get("timbre") or "") for r in rows if isinstance(r, dict)}
+        # COUNT ONLY THE VOICES THAT SURVIVE. Taking `used` from every row
+        # including the extras about to be dropped reserved larynges for
+        # characters who are leaving, so on a thin menu the rung could decline
+        # a completion it actually had room for -- pushing the episode back
+        # into the retry ladder, against this rung's whole purpose. Caught by
+        # the Sonnet QA pass on the finished diff.
+        keep = [r for r in rows
+                if isinstance(r, dict)
+                and _norm_ws(str(r.get("name") or "")).casefold() in want]
+        used = {str(r.get("timbre") or "") for r in keep}
         for name in missing:
+            # LEMMY IS NEVER MINTED HERE. Defence in depth, per the Sonnet QA
+            # pass: today `_pass_casting` is only ever handed
+            # `casting_speakers`, which already excludes the cameo when he is
+            # in play, so this cannot fire -- but his identity is PINNED from
+            # LEMMY_PROFILE, and a rung that would deal him a pool voice must
+            # refuse rather than rely on an upstream exclusion staying correct
+            # forever. `_coherent_gender` already guards the other rung.
+            if _is_lemmy(name):
+                return False
             # 1. GENDER, from the pool, before any voice is considered.
             tag = _pool_gender_for_label(name)
             if tag not in legal:

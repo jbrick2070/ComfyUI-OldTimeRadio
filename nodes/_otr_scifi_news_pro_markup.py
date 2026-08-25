@@ -488,6 +488,13 @@ class SpeakerRoster:
         for key, owners in claims.items():
             if len(owners) == 1 and key not in self.exact:
                 self.aliases[key] = next(iter(owners))
+        #: Alias keys owned by the LOCKED cast. Frozen here, before any
+        #: salvage adoption can touch `self.aliases`, because `adopt()` must
+        #: be able to tell "an alias a real cast member already owns" from
+        #: "an alias another stranger claimed". Without this distinction it
+        #: deleted the former, which silently erased a locked character --
+        #: see the guard in `adopt`.
+        self._locked_alias_keys: "frozenset[str]" = frozenset(self.aliases)
 
     def adopt(self, name: str) -> str:
         """Register a SALVAGE-ADOPTED speaker and return the name their line
@@ -565,12 +572,31 @@ class SpeakerRoster:
             alias_key = speaker_identity_key(label)
             if not alias_key or alias_key in self.exact:
                 continue
+            # A LOCKED MEMBER'S ALIAS IS NEVER STOLEN AND NEVER DELETED.
+            #
+            # THE REGRESSION THIS CLOSES, caught by the Sonnet QA pass on the
+            # finished diff and reproduced live: the ambiguity branch below
+            # deleted ANY contested alias, including one a real cast member
+            # already owned. So adopting a stranger called `PROFESSOR CHEN`
+            # erased locked `Dr. Haorong Chen`'s own `Chen` alias, his later
+            # `CHEN:` line then resolved to nothing and was adopted as a THIRD
+            # identity, and the locked doctor vanished from his own episode --
+            # with ZERO defects raised. That is the exact defect class this
+            # work exists to remove, reintroduced through a new door and
+            # silent, which makes it worse than the bug it replaced.
+            #
+            # A stranger simply does not get to contest it: skipping leaves
+            # the locked owner's claim intact, which is what "locked names are
+            # authoritative" has to mean at THIS seam too, not only in the
+            # reverse-containment check above.
+            if alias_key in self._locked_alias_keys:
+                continue
             prior = self.aliases.get(alias_key)
             if prior is None:
                 self.aliases[alias_key] = canonical
             elif prior != canonical:
-                # Ambiguous now that a second claimant exists: neither gets
-                # it, exactly as the constructor's guard decides.
+                # Two STRANGERS contesting it: neither gets it, exactly as the
+                # constructor's guard decides for the locked cast.
                 del self.aliases[alias_key]
         return canonical
 
