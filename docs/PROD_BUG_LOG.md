@@ -6511,14 +6511,21 @@ EXPECTED result, not a regression signal.
   cap before a single beat is authored. **Every request for act_count 7 or 8
   is a guaranteed failure, not an occasional one -- there is no cast size,
   bank, or seed that saves it.**
-- fix: **NOT FIXED.** Two defensible directions, an operator call: (a) raise
-  `Outline.beats.max_length` past 41 so `MAX_ACT_COUNT=8` becomes reachable,
-  or (b) lower `MAX_ACT_COUNT` to 6 so the advertised range matches what the
-  schema can actually hold. Whichever way, `compute_episode_budget`'s own
-  `[MIN_ACT_COUNT, MAX_ACT_COUNT]` range check should not accept a value it
-  is mathematically certain to reject three call-frames later -- that
-  disagreement is the real defect, independent of which bound moves.
-  Workaround used tonight: cap real long-episode requests at `act_count=6`.
+- fix: **FIXED 2026-08-25 (`fc4039a7`).** Operator picked direction (b):
+  lowered `MAX_ACT_COUNT` to 6 rather than raising `Outline.beats`'
+  `max_length`. `_ACT_COUNT_CHOICES` (the widget combo), the writer's own
+  range validation, and `scifi_news_pro`'s envelope check all derive from
+  `MIN_ACT_COUNT`/`MAX_ACT_COUNT` rather than duplicating the range, so
+  that one constant was the actual fix; the unreachable 7/8 rows in
+  `ACT_COUNT_CONFIG` were removed alongside it. Confirmed before narrowing
+  that the canonical workflow and every variant save `act_count='3'`
+  (the default), never `'7'`/`'8'`, so no saved graph went invalid. Also
+  found and fixed in the same change: two test sites hardcoded a literal
+  `8` instead of deriving from `MAX_ACT_COUNT` and would have silently
+  started testing an invalid value. Full suite 12209/0/1, Bug Bible clean.
+  Live proof owed: a real long episode at `act_count=6` has not yet
+  finished end to end (attempted at the wrong `act_count=7` tonight; a
+  corrected `act_count=6` batch was queued to follow).
 - confidence: HIGH -- reproduced live twice, and the arithmetic is exact
   (`5*7+1=36` matches the observed error message character for character).
 - bible-worthy: plausible -- "a request-time range check and a downstream
