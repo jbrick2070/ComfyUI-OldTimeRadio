@@ -64,3 +64,35 @@ logging.getLogger("OTR").info(
     os.environ.get("HF_HOME"))
 print("[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any "
       "transformers import")
+
+# ---------------------------------------------------------------------------
+# 3. One-time Kokoro English voice prefetch (operator, 2026-08-24).
+#
+# A fresh registry install has NO reference WAVs, and three of the five local
+# TTS engines clone -- they cannot speak without one. That left Bark (4.2 GB)
+# as the only zero-setup voice against Kokoro's 327 MB, a 13x tax on the 8 GB
+# tier. The whole gap was ~15 MB of 523 KB voice files.
+#
+# HERE, NOT IN THE ENGINE, and that placement is the point: `eng_kokoro`
+# refuses to fetch mid-render on purpose (V-9 / C-7) because a hub fetch once
+# 404'd and aborted a finished episode. Prestartup runs before ComfyUI loads a
+# single node, so this is not inside any render.
+#
+# DELIBERATELY LAST IN THIS FILE. The banner above is what a reader checks, and
+# this file's own docstring records that anything below a FAILING statement
+# silently never runs -- so the network-touching part goes after everything
+# load-bearing, and cannot cost the mock or the banner if it misbehaves.
+# `prefetch_at_boot` swallows everything internally; the try here is the
+# second belt, covering even an import error.
+try:
+    _otr_nodes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "nodes")
+    if _otr_nodes_dir not in sys.path:
+        sys.path.insert(0, _otr_nodes_dir)
+    from _otr_kokoro_voice_prefetch import prefetch_at_boot as _otr_prefetch
+
+    _otr_prefetch()
+except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
+    logging.getLogger("OTR").info(
+        "OldTimeRadio: Kokoro voice prefetch unavailable (%s); Bark needs no "
+        "voice files and is unaffected", _otr_exc)
