@@ -226,6 +226,50 @@ def _plan_max_memory(
     return None
 
 
+def _bug098_scan_linear4bit_devices(model) -> tuple[int, list[str]]:
+    """Model-local BUG-LOCAL-098 check: for every ``bitsandbytes.Linear4bit``
+    module in ``model``, is its actual weight tensor on a CUDA device?
+
+    Returns ``(linear4bit_count, off_cuda_module_paths)``.
+    ``linear4bit_count == -1`` means the scan itself raised (e.g. an exotic
+    module tree that breaks ``named_modules()``) -- callers treat that as
+    "could not verify", not as "verified fine", and fall through to the
+    ``is_loaded_in_4bit`` flag as the remaining signal.
+
+    2026-08-25 (PBUG-20260825-04): this REPLACES a process-global
+    ``torch.cuda.memory_allocated()`` delta as the correctness predicate.
+    That counter reflects the WHOLE process, not this call's own
+    allocation -- a concurrent orphan worker (an abandoned
+    NewsCuration/NewsCurationDeep timeout thread, left running because
+    generation is not cancellable mid-token -- see
+    ``story_orchestrator._run_with_timeout``) freeing its own tensors in
+    the same wall-clock window can produce a negative or near-zero NET
+    delta even when THIS load fully succeeded. Confirmed live on an 8 GB
+    RTX 4060: ``linear4bit_count=592``, ``is_loaded_in_4bit=True``, and
+    every actual weight tensor really was on CUDA -- yet the old delta
+    check (``delta >= 0.0``) saw ``vram_delta=-0.00GiB`` and killed a
+    working load. Asking the model directly is immune to whatever else the
+    process's allocator is doing concurrently.
+    """
+    count = 0
+    off_cuda: list[str] = []
+    try:
+        for mod_path, m in model.named_modules():
+            cls_name = type(m).__name__
+            mod_module = type(m).__module__ or ""
+            if not (cls_name == "Linear4bit"
+                    and mod_module.startswith("bitsandbytes")):
+                continue
+            count += 1
+            w = getattr(m, "weight", None)
+            wdev = getattr(w, "device", None)
+            if wdev is None or wdev.type != "cuda":
+                off_cuda.append(f"{mod_path}={wdev}")
+    except Exception:  # noqa: BLE001
+        return -1, []
+    return count, off_cuda
+
+
 def _apply_matmul_precision_policy() -> None:
     """TF32 OFF for byte-identical determinism (I-2 / C-1); Ampere+ (sm80+)
     gets 'high' matmul precision for LLM throughput. The capability probe is
@@ -620,42 +664,36 @@ def load_llm(
                 f"(no HTTP checks)"
             )
 
-            # BUG-LOCAL-098 tripwire: fail loud if NF4 silently dropped to fp16.
+            # BUG-LOCAL-098 tripwire: fail loud if NF4 silently dropped to
+            # fp16. See _bug098_scan_linear4bit_devices's docstring for why
+            # this checks the model directly rather than a VRAM delta.
             if quant_config is not None and torch.cuda.is_available():
                 _bug098_vram_after_gib = torch.cuda.memory_allocated() / (1024 ** 3)
                 _bug098_delta_gib = (
                     _bug098_vram_after_gib - _bug098_vram_before_gib
                 )
-                _bug098_linear4bit_count = 0
-                try:
-                    for _m in model.modules():
-                        _cls_name = type(_m).__name__
-                        _mod_name = type(_m).__module__ or ""
-                        if (_cls_name == "Linear4bit"
-                                and _mod_name.startswith("bitsandbytes")):
-                            _bug098_linear4bit_count += 1
-                except Exception:  # noqa: BLE001
-                    _bug098_linear4bit_count = -1
+                _bug098_linear4bit_count, _bug098_off_cuda = (
+                    _bug098_scan_linear4bit_devices(model)
+                )
                 _bug098_is_loaded_in_4bit = bool(
                     getattr(model, "is_loaded_in_4bit", False)
                 )
-                _bug098_max_gib = 11.0
                 _bug098_module_signal = (
                     _bug098_linear4bit_count > 0
                     or _bug098_is_loaded_in_4bit
                 )
-                _bug098_vram_signal = (
-                    _bug098_delta_gib >= 0.0
-                    and _bug098_delta_gib <= _bug098_max_gib
-                )
+                # Vacuously true when linear4bit_count <= 0 (nothing found
+                # to check) -- _bug098_module_signal is what catches that
+                # case; this signal only speaks to modules it actually saw.
+                _bug098_materialized = not _bug098_off_cuda
                 _runtime_log(
                     f"[BUG-098 tripwire] post-load: "
                     f"linear4bit_count={_bug098_linear4bit_count} "
                     f"is_loaded_in_4bit={_bug098_is_loaded_in_4bit} "
-                    f"vram_delta={_bug098_delta_gib:.2f}GiB "
-                    f"(ceiling={_bug098_max_gib:.2f}GiB)"
+                    f"materialized_on_cuda={_bug098_materialized} "
+                    f"vram_delta={_bug098_delta_gib:.2f}GiB (telemetry only)"
                 )
-                if not _bug098_module_signal or not _bug098_vram_signal:
+                if not _bug098_module_signal or not _bug098_materialized:
                     try:
                         model.cpu()
                     except Exception:  # noqa: BLE001
@@ -675,7 +713,9 @@ def load_llm(
                         f"materialize for {_stripped_model_id!r}. "
                         f"linear4bit_count={_bug098_linear4bit_count} "
                         f"is_loaded_in_4bit={_bug098_is_loaded_in_4bit} "
-                        f"vram_delta={_bug098_delta_gib:.2f}GiB. "
+                        f"off_cuda_modules={_bug098_off_cuda[:5]!r}"
+                        f"{'...' if len(_bug098_off_cuda) > 5 else ''} "
+                        f"vram_delta={_bug098_delta_gib:.2f}GiB (telemetry). "
                         f"This is the bitsandbytes second-load silent "
                         f"fp16 fallback. Workaround: restart ComfyUI "
                         f"Desktop and re-queue. Tracked as BUG-LOCAL-098."

@@ -1242,6 +1242,18 @@ def _llm_rank_news_candidates(
         for r in ranked:
             log.info("[NewsFetcher]   - %s", (r.get("headline") or "")[:80])
         return ranked
+    except _LLMTimeoutWorkflowPause:
+        # 2026-08-25: this subtype's own docstring says "ComfyUI catches
+        # this at the node boundary and halts the queue cleanly" -- but the
+        # broad `except Exception` below used to catch it here FIRST and
+        # (when load_config is None) silently fall back to shuffle order,
+        # letting the main thread immediately start ANOTHER LLM load while
+        # this phase's orphan worker is still alive on GPU (generation is
+        # not cancellable mid-token -- _run_with_timeout abandons it, it
+        # does not stop it). That is exactly the window PBUG-20260825-04
+        # was found in. Re-raise unconditionally so the pause always
+        # reaches the node boundary, regardless of load_config.
+        raise
     except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
         if load_config is not None:
             log.error(
@@ -1360,6 +1372,18 @@ def _llm_rerank_with_bodies(
             idx + 1, (chosen.get("headline") or "")[:80],
         )
         return [chosen] + rest
+    except _LLMTimeoutWorkflowPause:
+        # 2026-08-25: this subtype's own docstring says "ComfyUI catches
+        # this at the node boundary and halts the queue cleanly" -- but the
+        # broad `except Exception` below used to catch it here FIRST and
+        # (when load_config is None) silently fall back to shuffle order,
+        # letting the main thread immediately start ANOTHER LLM load while
+        # this phase's orphan worker is still alive on GPU (generation is
+        # not cancellable mid-token -- _run_with_timeout abandons it, it
+        # does not stop it). That is exactly the window PBUG-20260825-04
+        # was found in. Re-raise unconditionally so the pause always
+        # reaches the node boundary, regardless of load_config.
+        raise
     except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
         if load_config is not None:
             log.error(
