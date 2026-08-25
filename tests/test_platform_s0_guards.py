@@ -137,25 +137,34 @@ def test_detect_host_shape_and_vendor_consistency():
 # bark registry ruling + cpu_floor runnability
 # --------------------------------------------------------------------------
 
-def test_bark_registry_row_is_cuda_only():
-    """R4 ruling: bark's generation path hardcodes CUDA (tensor-factory
-    monkeypatches + forced .cuda() moves), so the cpu_ok=True row was a
-    lie. Registry exclusion, no bark code surgery this campaign."""
+def test_bark_registry_row_admits_cpu_but_stays_impractical_there():
+    """2026-08-25: _generate_single_line no longer hardcodes CUDA (it asks
+    the loaded model for its real device), so a CPU-loaded bark generates
+    correctly instead of crashing on the first line -- "cpu" belongs in
+    device_backends now. It still is not a PRACTICAL cpu_floor choice: bark
+    is a ~1B-parameter three-stage autoregressive stack, so
+    practical_without_gpu stays False and the profile-fit reason below must
+    become REASON_IMPRACTICAL_ON_CPU rather than REASON_REQUIRES_CUDA."""
     from nodes._otr_audio_engines import registry as areg
 
-    assert areg.CAPABILITIES["bark"]["device_backends"] == ["cuda"] and areg.CAPABILITIES["bark"]["practical_without_gpu"] is False
+    assert areg.CAPABILITIES["bark"]["device_backends"] == ["cuda", "cpu"]
+    assert areg.CAPABILITIES["bark"]["practical_without_gpu"] is False
 
 
 def test_cpu_floor_profile_is_runnable_on_cpu():
-    """The committed cpu_floor profile selected bark (broken on CPU today).
-    Post-S0 it must select only engines whose declarations admit the cpu
-    backend, and the bark_legacy voice bank goes with bark."""
+    """The committed cpu_floor profile must select only engines whose
+    declarations admit the cpu backend, and the bark_legacy voice bank goes
+    with bark. bark itself stays excluded from cpu_floor -- CUDA is no
+    longer REQUIRED (device_backends includes "cpu"), but running a
+    three-stage autoregressive TTS stack on CPU is not PRACTICAL, so the
+    exclusion reason changes from REASON_REQUIRES_CUDA to
+    REASON_IMPRACTICAL_ON_CPU rather than disappearing."""
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_shared import capability_profiles as cp
 
     prof = cp.load_profile("cpu_floor")
     avail = cp.availability(prof, areg.CAPABILITIES)
-    assert avail["bark"] == cp.REASON_REQUIRES_CUDA
+    assert avail["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
     for slot in ("char_voice_engine", "announcer_voice_engine",
                  "music_engine"):
         eng = prof["slot_overrides"][slot]

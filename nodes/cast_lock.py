@@ -675,7 +675,43 @@ class CastLock:
 
         from . import _otr_casting as _OTRCAST
         from ._otr_voice_node_common import coerce_int_seed
-        from config import cast_pools as _POOLS
+
+        # Relative first (production: ComfyUI loads this as part of the
+        # ComfyUI-OldTimeRadio package -- `..config` resolves from `nodes`'
+        # own __package__). Absolute fallback for tests, which add the repo
+        # root to sys.path directly. This is the SAME two-tier shape already
+        # used at :50-55 in this file and at 10+ other cast_pools call sites
+        # (_otr_casting.py, _otr_voice_bank.py, _otr_voice_route.py,
+        # _otr_scifi_fable2.py) -- this one function was missing it.
+        #
+        # 2026-08-25 PBUG: a bare `from config import cast_pools` here (no
+        # relative-first, no fallback) worked by ACCIDENT in every proof leg
+        # run tonight via otr_canonical_api_run.py, because that script's
+        # working directory happens to put the repo root on sys.path -- the
+        # same accident that makes tests pass. It does NOT work under a real
+        # ComfyUI Desktop install, where the pack is loaded as a submodule and
+        # its own root is never added to sys.path as a bare entry. Introduced
+        # in f3130f6d (bark-as-announcer, 2026-08-24) and reviewed by a full
+        # 4-round kibitz arc that did not catch it -- the arc grounds panel
+        # claims against the tree, it does not simulate a second install.
+        try:
+            from ..config import cast_pools as _POOLS  # type: ignore
+        except ImportError:
+            try:
+                from config import cast_pools as _POOLS  # type: ignore
+            except ImportError:
+                # Fail soft HERE, fail closed DOWNSTREAM (this file's own
+                # convention -- see _resolve_lemmy_voice_policy above). The
+                # announcer row is left unstamped; _assert_voice_preset_invariant,
+                # run by the caller right after this returns, raises a named,
+                # actionable error instead of this function's own opaque
+                # ModuleNotFoundError traceback.
+                report.append(
+                    "bark voices: cast_pools import failed (broken install?) "
+                    "-- announcer left unstamped, downstream invariant will "
+                    "raise"
+                )
+                return
 
         row = next((r for r in cast
                     if isinstance(r, dict) and _is_announcer_entry(r)), None)

@@ -234,7 +234,11 @@ def _load_bark(model_id="suno/bark", device=None):
             _BARK_CACHE["model"] = model
             _BARK_CACHE["processor"] = processor
             _BARK_CACHE["device"] = device
-            log.info("Bark loaded: %s on cuda (gen-config patched)", type(model).__name__)
+            # Report the device actually used, not a hardcoded "cuda" -- the
+            # loader has always been able to land on CPU, and a log line that
+            # claims otherwise sends the next reader hunting the wrong thing.
+            log.info("Bark loaded: %s on %s (gen-config patched)",
+                     type(model).__name__, device)
         except Exception as e:
             log.exception("Failed to load Bark: %s", e)
             raise
@@ -708,35 +712,72 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(int(seed))
 
+    # THE DEVICE THE MODEL IS ACTUALLY ON -- resolved once, from the model
+    # itself, never assumed (2026-08-25).
+    #
+    # These three sites used to hardcode the literal "cuda". `_load_bark` has
+    # always been device-aware (it picks `cuda if torch.cuda.is_available()
+    # else cpu` and builds device_map/dtype from that), so on a Mac, an Intel
+    # box, or any CUDA-less install the model loaded happily on CPU and then
+    # the FIRST spoken line raised here. Nothing gated it either: the
+    # CAPABILITIES row declares bark `device_backends: ["cuda"]`, but that
+    # table feeds capability_profiles to derive per-profile enable-sets and is
+    # NOT consulted at voice dispatch -- `registry.assert_usable` only checks
+    # "registered + role-compatible". So a stranger who picked bark (the
+    # zero-setup announcer/char engine, which is exactly what a fresh install
+    # reaches for) walked into an AssertionError mid-render, after the story,
+    # the casting and every still had already been paid for.
+    #
+    # Asking the model is the right source: `_load_bark` does `model.to(device)`
+    # and forces every sub-model to the same device, so the parameters are
+    # uniform and they are the ground truth about where generate() will run.
+    # No try/except here, deliberately. A first cut guarded this with
+    # `except StopIteration: _dev = torch.device("cuda" if ... else "cpu")`,
+    # and review proved that the GUARD ITSELF crashed on every CUDA box:
+    # `torch.device("cuda")` carries index=None, `_move_to_device` lands the
+    # tensors on `cuda:0`, and `device(type='cuda', index=0)` does NOT equal
+    # `device(type='cuda')` -- so the assert below fired every time the
+    # fallback ran. A BarkModel always has parameters; if it somehow does not,
+    # a StopIteration naming this line is a far better bug report than a
+    # confusing device-mismatch assertion three lines later.
+    _dev = next(model.parameters()).device
+
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)
-        # Recursively move ALL processor outputs to CUDA - including the
-        # nested 'history_prompt' dict that contains semantic/coarse/fine
-        # numpy arrays from the voice preset NPZ file.
-        inputs = _move_to_device(inputs, torch.device("cuda"))
+        # Recursively move ALL processor outputs to the model's device -
+        # including the nested 'history_prompt' dict that contains
+        # semantic/coarse/fine numpy arrays from the voice preset NPZ file.
+        inputs = _move_to_device(inputs, _dev)
 
         if "attention_mask" not in inputs and "input_ids" in inputs:
             inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
 
-        assert inputs["input_ids"].device.type == "cuda", "input_ids not on CUDA before generate"
+        # Keep the assert -- it caught real device drift. It was simply
+        # comparing against the wrong thing.
+        assert inputs["input_ids"].device == _dev, (
+            f"input_ids on {inputs['input_ids'].device}, expected {_dev} "
+            "before generate"
+        )
 
-        # Monkey-patch torch.tensor and torch.arange to default to CUDA.
-        # Bark's internal sub-model loops call these without a device argument,
-        # which defaults to CPU and causes the index_select device mismatch.
-        # Context managers and set_default_device don't reach inside Bark's
-        # C-level ops - patching the Python functions is the only reliable fix.
+        # Monkey-patch torch.tensor and torch.arange to default to the model's
+        # device. Bark's internal sub-model loops call these without a device
+        # argument, which defaults to CPU and causes the index_select device
+        # mismatch. Context managers and set_default_device don't reach inside
+        # Bark's C-level ops - patching the Python functions is the only
+        # reliable fix. Restored in the `finally` below, so this never leaks
+        # into the wider ComfyUI process.
         _orig_tensor = torch.tensor
         _orig_arange = torch.arange
-        def _tensor_cuda(*args, **kwargs):
+        def _tensor_on_dev(*args, **kwargs):
             if "device" not in kwargs:
-                kwargs["device"] = "cuda"
+                kwargs["device"] = _dev
             return _orig_tensor(*args, **kwargs)
-        def _arange_cuda(*args, **kwargs):
+        def _arange_on_dev(*args, **kwargs):
             if "device" not in kwargs:
-                kwargs["device"] = "cuda"
+                kwargs["device"] = _dev
             return _orig_arange(*args, **kwargs)
-        torch.tensor = _tensor_cuda
-        torch.arange = _arange_cuda
+        torch.tensor = _tensor_on_dev
+        torch.arange = _arange_on_dev
         try:
             with torch.no_grad():
                 # Prefixed-kwargs route (transformers BarkModel.generate): each

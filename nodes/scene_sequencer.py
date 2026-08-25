@@ -708,29 +708,40 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
     all_audio = []
     silence_pad = np.zeros(int(sample_rate * 0.08), dtype=np.float32)  # 80ms gap
 
+    # 2026-08-25: this function has no live caller (see the RETIRED docstring
+    # above), but it duplicates _otr_bark_lib._generate_single_line's device
+    # handling closely enough that leaving the old hardcoded-"cuda" version
+    # here would hand a future reviver the exact bug that was just fixed in
+    # the live path. Ask the model, same as there.
+    _dev = next(model.parameters()).device
+
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)
-        # Recursively move ALL processor outputs to CUDA - including the
-        # nested 'history_prompt' dict with voice preset numpy arrays.
-        inputs = _move_to_device(inputs, torch.device("cuda"))
+        # Recursively move ALL processor outputs to the model's device -
+        # including the nested 'history_prompt' dict with voice preset numpy
+        # arrays.
+        inputs = _move_to_device(inputs, _dev)
 
         if "attention_mask" not in inputs and "input_ids" in inputs:
             inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
 
-        assert inputs["input_ids"].device.type == "cuda", "input_ids not on CUDA before generate"
+        assert inputs["input_ids"].device == _dev, (
+            f"input_ids on {inputs['input_ids'].device}, expected {_dev} "
+            "before generate"
+        )
 
         _orig_tensor = torch.tensor
         _orig_arange = torch.arange
-        def _tensor_cuda(*args, **kwargs):
+        def _tensor_on_dev(*args, **kwargs):
             if "device" not in kwargs:
-                kwargs["device"] = "cuda"
+                kwargs["device"] = _dev
             return _orig_tensor(*args, **kwargs)
-        def _arange_cuda(*args, **kwargs):
+        def _arange_on_dev(*args, **kwargs):
             if "device" not in kwargs:
-                kwargs["device"] = "cuda"
+                kwargs["device"] = _dev
             return _orig_arange(*args, **kwargs)
-        torch.tensor = _tensor_cuda
-        torch.arange = _arange_cuda
+        torch.tensor = _tensor_on_dev
+        torch.arange = _arange_on_dev
         try:
             with torch.no_grad():
                 output = model.generate(

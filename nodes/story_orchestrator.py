@@ -467,7 +467,17 @@ def _bark_test_presets(presets_to_test):
     # Smoke test on a single preset before the full sweep -- catches
     # "Bark itself is broken" early so we don't mark every preset failed.
     try:
-        model, processor = _load_bark(device="cuda")
+        # 2026-08-25: was _load_bark(device="cuda"), the only call site in the
+        # tree that overrode the auto-detect default (every other caller --
+        # eng_bark.py, scene_sequencer.py, bark_preset_audition.py -- lets
+        # _load_bark pick cuda-if-available-else-cpu). On a Mac or any
+        # CUDA-less install that forced from_pretrained onto a "cuda:0"
+        # device_map and raised HERE, before _generate_single_line's device
+        # fix below is ever reached -- so this health check reported a
+        # misleading CUDA error instead of the real "bark probe failed" it
+        # should give on CPU. Also risked a cache thrash against the
+        # single-slot _BARK_CACHE if bark was already loaded on "cpu".
+        model, processor = _load_bark()
         _probe, _ = _generate_single_line("Test.", presets_to_test[0], model, processor, temperature=0.6)
     except Exception as e:
         log.warning("[VoiceHealth] Bark probe failed (%s) - leaving presets untested", e)

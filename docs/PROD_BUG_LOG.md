@@ -6533,6 +6533,57 @@ EXPECTED result, not a regression signal.
   reusable class (the exact inverse of the freeze-cascade absent-vs-null gap
   found the same week) -- but NOT promoted yet, single lane class observed.
 
+## PBUG-20260825-02 -- unguarded `from config import cast_pools` crashed the LAST step of an 18-minute render on a real ComfyUI Desktop install
+- surfaced: a fresh 8 GB RTX 4060 laptop, the `otr_4060_floor` variant (bark
+  for both voices, act_count=1), driven through the real ComfyUI Desktop GUI
+  (not the headless API script). Full story generation succeeded --
+  ~18 minutes, six lines, a title, an outline -- and the render died on the
+  very last step: announcer voice casting.
+- symptom: `ModuleNotFoundError: No module named 'config'` from
+  `nodes/cast_lock.py:678`, inside `CastLock._assign_bark_announcer`, called
+  from `CastLock.lock` via `_assign_bark_voices`.
+- root cause: CONFIRMED BY READING THE CODE, not inferred. That one function
+  imported its dependency with a bare `from config import cast_pools`, no
+  relative attempt first and no fallback. That resolves only when the repo
+  root is on `sys.path` as a bare entry -- true under pytest and true under
+  `scripts/otr_canonical_api_run.py` (both add the repo root themselves), but
+  NOT true under a real ComfyUI install, which loads the pack as a submodule
+  of `custom_nodes` and never adds the pack's own root to `sys.path` directly.
+  The correct two-tier shape (`try: from ..config import cast_pools except
+  ImportError: from config import cast_pools`) already existed at 10+ other
+  call sites for the SAME import, including another function three lines
+  above this one in the SAME file (`_resolve_lemmy_voice_policy`, :49-55) --
+  proof the pattern was known and simply not applied at this one site.
+  Introduced in `f3130f6d` (bark-as-announcer, 2026-08-24), which went
+  through a full 4-round kibitz arc that did not catch it: the arc grounds
+  panel claims against the tree, it does not simulate loading the pack a
+  second way. Every proof leg run against this same profile earlier
+  2026-08-25 (5/5 SUCCESS, published to obs) passed by the same accident that
+  makes pytest pass -- none of them exercised a real Desktop install, so none
+  of them could have caught this.
+- fix: **FIXED 2026-08-25.** Gave `_assign_bark_announcer` the same two-tier
+  fallback used everywhere else in the file. On total import failure (both
+  forms), fail SOFT here and let the caller's existing
+  `_assert_voice_preset_invariant` fail CLOSED downstream with a named,
+  actionable error instead of this function's own opaque
+  `ModuleNotFoundError` traceback -- matching this file's own stated
+  convention ("Fail-SOFT here and fail-CLOSED downstream", `cast_lock.py:44`).
+  Added `tests/test_cast_lock_config_import_portability.py`: an AST-level
+  check that EVERY `cast_pools` import site across the five files that use it
+  is inside a guarded try/except, plus a direct pin on
+  `_assign_bark_announcer` specifically. Verified non-vacuous by reverting the
+  fix and confirming both new tests fail. Full suite 12216/0, Bug Bible 22/0.
+- confidence: HIGH -- the traceback is a live ComfyUI Desktop artifact, the
+  root cause is a direct code read (not inference), and the fix is the exact
+  pattern already proven correct at 10+ sibling call sites in this repo.
+- bible-worthy: YES, candidate for promotion -- "a fallback-import pattern
+  proven at N sibling call sites is not itself a review checklist item, and a
+  panel that grounds claims against the tree will not catch a call site that
+  is simply missing the pattern" generalizes past this one function, and past
+  this one repo: any codebase with a relative/absolute import fallback
+  convention can silently grow one ungated site. Needs a second independent
+  occurrence (this repo or another) before promotion per the admission rule.
+
 ## PBUG-20260824-06 -- key-absent tts_skip_reason slipped past cleanup, hard-failed the freeze gate
 - surfaced: the operator's own overnight 3-hour regression loop
   (`otr_writer_bank_gate.py`, all five banks). `shakespeare` FAILed one pass

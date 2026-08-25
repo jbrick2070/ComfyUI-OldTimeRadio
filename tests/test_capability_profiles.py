@@ -215,9 +215,18 @@ def test_v2_vendor_pins_gate_amd_hosts():
 
 
 def test_v2_bark_excluded_from_cpu_but_fine_on_cuda():
+    """2026-08-25: bark's device_backends grew "cpu" once
+    _generate_single_line stopped hardcoding CUDA (it now asks the loaded
+    model for its real device -- see nodes/_otr_bark_lib.py and
+    tests/test_platform_s0_guards.py::test_bark_registry_row_admits_cpu_but_stays_impractical_there).
+    cpu_floor still excludes it -- a ~1B-parameter three-stage autoregressive
+    stack is not a PRACTICAL cpu_floor choice even though it now runs there
+    -- so the exclusion reason moved from REASON_REQUIRES_CUDA (cuda was
+    genuinely the only backend) to REASON_IMPRACTICAL_ON_CPU (cpu works, it
+    is just not the tier's job to offer it)."""
     decls = _declarations_by_registry()["audio"]
     floor = cp.load_profile("cpu_floor")
-    assert cp.availability(floor, decls)["bark"] == cp.REASON_REQUIRES_CUDA
+    assert cp.availability(floor, decls)["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
     nv = cp.load_profile("16gb_full")
     assert cp.availability(nv, decls)["bark"] == cp.REASON_OK
 

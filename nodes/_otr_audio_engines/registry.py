@@ -186,14 +186,26 @@ def assert_usable(name: str, role: str) -> str:
 # impractical engines off the cpu floor; needs_fp8_te/needs_fp4_te flag
 # fp8/fp4 artifact dependencies (excluded on ROCm/MPS tiers).
 CAPABILITIES = {
-    # S0 portability ruling (R4, 2026-07-10): bark's GENERATION path hardcodes
-    # CUDA (_otr_bark_lib._generate_single_line force-moves inputs to
-    # torch.device("cuda"), asserts input_ids.device.type == "cuda", and
-    # monkeypatches torch.tensor/arange to default device="cuda"), so the old
-    # cpu_ok=True row was a lie -- cpu_floor selected bark and crashed on the
-    # first line. Registry exclusion ONLY; no bark code surgery this campaign.
+    # S0 portability ruling (R4, 2026-07-10) UPDATED 2026-08-25: bark's
+    # generation path used to hardcode CUDA (_generate_single_line
+    # force-moved inputs to torch.device("cuda"), asserted
+    # input_ids.device.type == "cuda", and monkeypatched torch.tensor/arange
+    # to default device="cuda"), so the old cpu_ok=True row really was a lie
+    # -- cpu_floor selected bark and it crashed on the first line. That is
+    # fixed: _generate_single_line now asks the loaded model for its real
+    # device (next(model.parameters()).device) and uses that everywhere, so a
+    # CPU-loaded bark generates correctly instead of asserting.
+    # "cpu" is now a HONEST backend -- it runs. It is not a PRACTICAL one --
+    # bark is a ~1B-parameter three-stage autoregressive stack, so
+    # practical_without_gpu stays False and cpu_floor still excludes it
+    # (REASON_IMPRACTICAL_ON_CPU, not REASON_REQUIRES_CUDA -- see
+    # tests/test_platform_s0_guards.py). "mps" is deliberately NOT listed:
+    # _load_bark has no MPS branch, so on Apple Silicon
+    # torch.cuda.is_available() is False and it falls to the (working) CPU
+    # path already covered by "cpu" -- there is no separate MPS code path to
+    # declare.
     "bark": {"required_toolchain": None, "requires_sidecar": False,
-             "device_backends": ["cuda"], "requires_vendor": None,
+             "device_backends": ["cuda", "cpu"], "requires_vendor": None,
              "needs_fp8_te": False, "needs_fp4_te": False,
              "practical_without_gpu": False, "sidecar_conditional": False,
              "model_requirements": ["suno-bark"]},
