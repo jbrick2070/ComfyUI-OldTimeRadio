@@ -1,0 +1,87 @@
+{
+  "id": "otr_4060_h3_nano",
+  "display_name": "4060 H3 Nano (E2B + H3 Low Video)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "minimax_h3_video",
+    "music_visual": "minimax_h3_video",
+    "character_visual": "minimax_h3_video",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "voice_bank": "kokoro_builtin",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "kokoro",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "minimax_h3_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 6.8,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "google/gemma-4-E2B-it",
+    "technical_model": "google/gemma-4-E2B-it",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "fp8_ok"
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 864,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": ["google/gemma-4-E2B-it"],
+    "required_keys": []
+  },
+  "launch": {
+    "boot_contract": "h3",
+    "sage_attention": false,
+    "extra_args": [
+      "--disable-pinned-memory"
+    ],
+    "env": {
+      "OTR_HEADLESS_DISABLE_PINNED": "1"
+    }
+  }
+}
