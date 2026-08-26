@@ -69,7 +69,25 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
                 "otr_soak_still_word_flux2_klein",
                 "otr_soak_still_word_z_image_turbo",
                 "otr_soak_word_razzle_ideo",
-                "otr_soak_word_razzle_lumina_image")
+                "otr_soak_word_razzle_lumina_image",
+                # LLM x IMAGE x UPSCALE SWEEP (2026-08-25, operator: "one act
+                # test of all seven [LLMs] onboard ... varying image models
+                # ... a variety of upscalers"). Each leg pairs one LLM as
+                # creative with a DIFFERENT one as technical (cyclic, so all
+                # 7 rows play both roles across the 7 legs), THREE distinct
+                # still engines and THREE distinct local image engines (one
+                # per role: announcer/music/character), and alternates the
+                # only two real upscale engines. The llm.* block in each file
+                # is a harmless unused default -- scripts/otr_llm_image_upscale_sweep.py
+                # passes --creative-model/--technical-model on the CLI, which
+                # apply_profile-then-shortcuts ordering makes authoritative.
+                "otr_soak_llmsweep_01",
+                "otr_soak_llmsweep_02",
+                "otr_soak_llmsweep_03",
+                "otr_soak_llmsweep_04",
+                "otr_soak_llmsweep_05",
+                "otr_soak_llmsweep_06",
+                "otr_soak_llmsweep_07")
 
 
 class EmitRefused(RuntimeError):

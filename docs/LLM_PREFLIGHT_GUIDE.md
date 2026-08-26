@@ -98,11 +98,37 @@ llama.cpp sidecar, HTTP request, or port. Copy that shape for a new row.
 ### Gate 5 -- IT GENERATES CONSTRAINED JSON
 
 **This is the gate that actually fails, and prose passing tells you nothing about
-it.** OTR's structured passes are schema-constrained, and a model that writes
-beautiful prose can still be unable to fill a schema.
+it.** A model that writes beautiful prose can still be unable to fill a schema.
 
-* transformers lane -> lm-format-enforcer via `prefix_allowed_tokens_fn`.
+**CORRECTED 2026-08-25 (found by Cursor, mid-sweep) -- the line this replaced
+claimed OTR's structured passes ARE schema-constrained. That is not true for
+every lane.** The hard-constraint machinery genuinely exists and genuinely
+works:
+
+* transformers lane -> lm-format-enforcer via `prefix_allowed_tokens_fn`
+  (`nodes/_otr_constrained_generate.py`).
 * `gguf_native` lane -> llama-cpp `response_format` grammar.
+
+**But it is opt-in per call, via `_otr_bind_schema` on the generate closure
+(`nodes/OTR_LedgerScriptWriter.py:729-737`), and most callers never opt in.**
+The only LIVE production consumer is the writer's own top-level SlotJobFields
+pass (`OTR_LedgerScriptWriter.py:4407-4415`). `scifi_news_pro`'s technical-slot
+structured calls (dossier, cast_aliases, news_read, casting_voices) are
+**post-validated only** -- the schema reaches the prompt as text instruction
+and the parser as a validation contract, never the sampler. This is why a
+model can generate what looks like well-formed JSON in the log and still fail
+"no decodable top-level JSON object found": nothing stopped it from sampling
+EOS, or an unbalanced bracket, before the object actually closed.
+
+`_otr_bind_schema` is leftover from a sibling lane (`_otr_scifi_codex`) ripped
+2026-08-16 (PBUG-20260816-01); nothing else was ever pointed at it, and
+`docs/WRITER_INPUT_MATRIX.md` already documents this as a known, live
+extension point rather than a shipped path. **Do not assume gate 5 is
+enforced just because the machinery exists in the repo -- verify the specific
+call your new row will make actually binds a schema**, e.g. by checking
+whether `slot_fn` carries `_otr_bind_schema` AND whatever wrapper sits between
+your caller and it (a call-counter, a retry shim) actually forwards `_otr_*`
+markers rather than stripping them.
 
 Known sharp edges: lm-format-enforcer 0.11.3 mishandles a numeric JSON-Schema
 `const` (production schemas use bounded ints instead), and a reasoning model can

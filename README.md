@@ -385,6 +385,8 @@ suite so the doc cannot drift from the code.
 | image models | [`docs/IMAGE_GEN_PREFLIGHT.md`](docs/IMAGE_GEN_PREFLIGHT.md) | `tests/test_image_gen_preflight_matrix.py` |
 | TTS voices | [`docs/TTS_VOICE_PREFLIGHT.md`](docs/TTS_VOICE_PREFLIGHT.md) | `tests/test_tts_voice_preflight_matrix.py` |
 | source banks / story | [`docs/SOURCE_BANK_PREFLIGHT.md`](docs/SOURCE_BANK_PREFLIGHT.md) | the roster/bijection suites it names |
+| LLMs (writer models) | [`docs/LLM_PREFLIGHT_GUIDE.md`](docs/LLM_PREFLIGHT_GUIDE.md) | seven gates before a row joins the dropdown |
+| driving a soak leg | [`docs/SOAK_LEG_GUIDE.md`](docs/SOAK_LEG_GUIDE.md) | not a preflight gate -- the widget map + sanctioned-lever rules for varying engines/models/upscalers across legs |
 
 The rule that binds them (operator, 2026-08-21): **every video lane obeys the
 per-role image-model dropdowns** -- the picture a `still_*` or motion lane holds
