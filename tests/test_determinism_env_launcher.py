@@ -96,6 +96,27 @@ def test_launcher_hydrates_remote_llm_keys_before_python():
         assert key_index < main_index
 
 
+def test_launcher_hydrates_image_engine_weight_paths_before_python():
+    """lumina_image and flux2_klein read an ABSOLUTE weights path out of the
+    environment and fail CLOSED on it -- `os.getenv(...)` plus
+    `os.path.isfile(...)` with no folder_paths fallback. The image dispatcher
+    does not degrade either: a missing engine raises ImageRenderError
+    "NO FALLBACK", so an unhydrated boot does not lose one picture, it kills
+    the whole episode. A detached cmd does not inherit `setx` User env -- the
+    same gotcha that already forced OTR_BLENDER_EXE into this launcher after
+    mesh_stage silently fell back to still_parallax.
+
+    z_image_turbo is deliberately absent: it ranks and auto-discovers its own
+    unet, so it needs no variable to survive.
+    """
+    text = _LAUNCH_CMD.read_text(encoding="utf-8")
+    main_index = text.index("main.py")
+    for key in ("OTR_LUMINA_CKPT", "OTR_FLUX2_KLEIN_CKPT"):
+        key_index = text.index(f"GetEnvironmentVariable('{key}','User')")
+        assert key_index < main_index, (
+            f"{_LAUNCH_CMD.name}: {key} must be hydrated before python starts")
+
+
 # --- model-loader TF32 flip pinned ----------------------------------------
 
 def test_model_loader_tf32_disabled():

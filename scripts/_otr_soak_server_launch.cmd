@@ -63,6 +63,20 @@ rem Blender; a detached cmd doesn't inherit setx User env -- the same gotcha).
 rem Without it mesh_stage fails closed missing_model -> falls back to
 rem still_parallax (the 2026-06-12 catch: PASS but engine NOT in the trace).
 for /f "usebackq delims=" %%b in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_BLENDER_EXE','User')"`) do set OTR_BLENDER_EXE=%%b
+rem Hydrate the two image-engine WEIGHT PATHS from the User env for the same
+rem reason (2026-08-26). lumina_image and flux2_klein read an ABSOLUTE path out
+rem of these and fail closed on it -- assert_usable is `os.getenv(...)` plus
+rem `os.path.isfile(...)` with NO folder_paths fallback
+rem (_otr_image_engines/lumina_image.py:405, flux2_klein.py:311). The image
+rem dispatcher does not degrade either: it raises ImageRenderError "NO FALLBACK"
+rem (otr_image_gen_dispatcher.py:1462), so an unhydrated boot does not lose one
+rem picture -- it KILLS the episode. Both weights are on disk; only the variable
+rem naming them goes missing, which is exactly the OTR_BLENDER_EXE gotcha above.
+rem A boot that inherits them already simply re-sets the same value.
+rem z_image_turbo is deliberately NOT here: it ranks and auto-discovers its own
+rem unet (z_image_turbo.py:197-249), so it needs no variable to survive.
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_LUMINA_CKPT','User')"`) do set OTR_LUMINA_CKPT=%%m
+for /f "usebackq delims=" %%m in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_FLUX2_KLEIN_CKPT','User')"`) do set OTR_FLUX2_KLEIN_CKPT=%%m
 rem OUTPUT UNIFICATION (operator directive 2026-06-09): even headless, ALL
 rem outputs -- episodes, portraits, finals, EVERYTHING -- land in the REAL
 rem output folder the operator watches. --output-directory pins ComfyUI's

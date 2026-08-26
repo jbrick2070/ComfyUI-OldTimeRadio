@@ -1648,43 +1648,55 @@ _DOSSIER_SECTION_MAP: "dict[str, Any]" = {
 #: `*FACTS:**`, and an emphasised header would be eaten as an item.
 _DOSSIER_BULLET_RE = re.compile(r"^\s*(?:\*(?!\*)|[-•–—+]|\d+[.)])\s+")
 _DOSSIER_FENCE_RE = re.compile(r"^\s*```[a-zA-Z0-9_-]*\s*$")
-#: A header line: the label, optionally colon-terminated, optionally wrapped in
-#: markdown emphasis or heading marks.
-#: The colon may sit INSIDE the emphasis (`**FACTS:**`) or outside it
-#: (`**FACTS**:`); both are shapes models emit unprompted, so allow an optional
-#: colon on either side of the closing marks rather than only after them.
-#: A header line, optionally followed by INLINE content after the colon.
-#: Group 1 is the label; group 2 is whatever followed on the same line.
-#: `(\([^)]*\))?` absorbs a parenthetical the model adds unprompted --
-#: "FACTS (6):" -- which otherwise fails the label charset and silently
-#: discards every bullet beneath it. Both shapes were found by review, both
-#: reproduced, and both cost a whole ladder attempt on a section the model
-#: had actually written correctly.
+#: THE HEADER RULE, stated once (r2 QA: "one rule must win"): a line is a
+#: header ONLY when nothing follows its colon, or it is a bare known label
+#: ("## FACTS"). A colon with content after it is CONTENT -- except a KNOWN
+#: label with inline content, which is a NAMED DEFECT (DossierSectionDefect
+#: below), never a guess in either direction.
+#:
+#: group 1 = label, group 2 = the colon (or empty), group 3 = trailing text.
+#: The label is GREEDY -- a lazy `{3,20}?` next to the `(.*)$` capture once
+#: matched `FACTS:` as label `FAC` + tail `TS:`, silently unmatching EVERY
+#: header. Tolerated decoration, all seen in real model output: #-headings,
+#: * / _ emphasis (label-edge underscores are stripped at LOOKUP, so
+#: `__FACTS__:` resolves -- r2 QA finding 3), surrounding quotes
+#: (`"PEOPLE":`), a - / | , qualifier that may carry digits
+#: (`PEOPLE - TOP 5:` -- r2 QA finding 4), and a bracketed aside
+#: (`FACTS (6):`).
 _DOSSIER_HEADER_RE = re.compile(
-    # The label is GREEDY. It was `{3,20}?` while the pattern ended in `$`,
-    # where the anchor forced full consumption anyway. Adding the inline
-    # capture `(.*)$` gave the lazy quantifier somewhere to dump the rest, so
-    # `FACTS:` began matching as label `FAC` + inline `TS:` -- silently
-    # unmatching EVERY header. Greedy stops at the colon on its own, because
-    # `:` is not in the label charset.
-    # group 1 = label, group 2 = the colon (or empty), group 3 = inline tail.
-    # `(?:[/|,][A-Za-z_ /|,]{0,30})?` absorbs a QUALIFIER the model adds to a
-    # header -- "PEOPLE / CHARACTERS:" -- which otherwise left "/ CHARACTERS:"
-    # as group 3 and filed it as a PERSON.
-    # group 1 = label, group 2 = the colon (or empty), group 3 = inline tail.
-    # The qualifier class covers `/ | , -` and bracketed asides, because a
-    # model writes "PEOPLE - KEY ROLES:" and "PEOPLE [main]:" as readily as
-    # "PEOPLE:". Missing `-` was MF-2: the header never matched, the whole
-    # section stayed closed, and its people were appended to FACTS.
-    r"^\s*#{0,6}\s*[*_]{0,2}\s*([A-Za-z_ ]{3,20})"
-    r"\s*(?:[-/|,][A-Za-z_ /|,-]{0,30})?"
+    r"^\s*#{0,6}\s*[*_]{0,2}\s*[\"']?\s*([A-Za-z_ ]{3,20})"
+    r"\s*(?:[-/|,][A-Za-z0-9_ /|,-]{0,30})?"
     r"\s*(?:[\(\[][^)\]]*[\)\]])?"
-    r"\s*(:?)\s*[*_]{0,2}\s*:?\s*(.*)$")
+    r"\s*[\"']?\s*(:?)\s*[*_]{0,2}\s*:?\s*(.*)$")
 
-#: An inline tail that is ITSELF just a bare word-and-colon ("PEOPLE: ROLES:")
-#: is a second header fragment, not content. Storing it filed "ROLES:" as a
-#: person (MF-3).
-_DOSSIER_HEADER_FRAGMENT_RE = re.compile(r"^[A-Za-z_ ]{1,20}:$")
+
+class DossierSectionDefect(json.JSONDecodeError):
+    """A named, RETRYABLE defect in a labelled-section reply.
+
+    Subclasses ``json.JSONDecodeError`` DELIBERATELY -- not because the reply
+    is JSON, but because that is the one class the shared ladder's structural
+    rung treats as a syntax failure (r2 QA finding 5: a text-mode miss that
+    surfaced as a ValidationError skipped that rung and exhausted the ladder
+    after two calls despite ``max_attempts=3``). Raising THIS class restores
+    the full budget: same prompt at lower temperature first, then the typed
+    repair carrying the source and this defect message.
+
+    Raised today for exactly one shape: a KNOWN header with inline content.
+    "FACTS: a fact" might be a header plus its item; "PEOPLE: including
+    Dr. Smith" mid-FACTS is a fact that starts with a section word. BOTH
+    wrong guesses shipped tonight and were caught by review -- the first
+    dropped a supplied fact, the second HIJACKED the open section and filed
+    every later fact as a person. The parser therefore refuses to guess:
+    loud and retryable beats silently wrong in either direction, and the
+    repair prompt tells the model precisely what to change.
+    """
+
+    def __init__(self, code: str, lineno: int, line: str) -> None:
+        super().__init__(
+            "labelled-section defect %s at reply line %d: %r"
+            % (code, lineno, line.strip()[:80]),
+            line, 0)
+        self.defect_code = code
 
 
 def _dossier_add(out: "dict[str, Any]", target: "Any", item: str) -> None:
@@ -1699,13 +1711,21 @@ def _dossier_add(out: "dict[str, Any]", target: "Any", item: str) -> None:
 def parse_dossier_sections(raw: str) -> "dict[str, Any]":
     """Build a DossierLLM-shaped dict from a labelled-section reply.
 
-    TOLERANT BY DESIGN, and never raises. Unknown headers, prose outside any
-    section, markdown fences, blank lines and stray emphasis are ignored;
-    whichever buckets were populated are returned. Emptiness is NOT decided
-    here -- `DossierLLM.facts_to_keep` carries `min_length=1`, so an extraction
-    that found no facts still fails validation and still earns a ladder retry.
-    Swallowing that decision here would turn a real miss into a silent empty
-    dossier, which is precisely the failure mode that ruled grammar out.
+    THE ONE RULE (r2 QA: "one rule must win"): a line is a header ONLY when
+    nothing follows its colon, or it is a bare known label ("## FACTS"). A
+    colon with content after it is content -- "Source: Nature" mid-FACTS is a
+    fact, not a section break. The single exception is a KNOWN label with
+    inline content, which raises :class:`DossierSectionDefect` (see its
+    docstring for why neither guess is safe) -- the ONLY exception this
+    function ever raises. Everything else is tolerated without raising:
+    unknown-label lines, prose outside a section, fences, blank lines, stray
+    emphasis.
+
+    Emptiness is NOT decided here -- `DossierLLM.facts_to_keep` carries
+    `min_length=1`, so a hollow extraction still fails validation and still
+    earns a ladder retry. Swallowing that decision would turn a real miss
+    into a silent empty dossier, which is the failure mode that ruled
+    grammar-constrained decoding out.
 
     Duplicate headers ACCUMULATE rather than overwrite: a model that emits
     FACTS twice meant to add facts, and dropping the first block would discard
@@ -1718,70 +1738,73 @@ def parse_dossier_sections(raw: str) -> "dict[str, Any]":
         "dramatizable_vectors": [],
     }
     current: "Any" = None
-    for line in (raw or "").splitlines():
+    for lineno, line in enumerate((raw or "").splitlines(), 1):
         if _DOSSIER_FENCE_RE.match(line):
             continue
         # BULLETS ARE TESTED FIRST, and the order is the whole trick. The
-        # header pattern is deliberately permissive (models wrap headers in
-        # #, *, _ and stray colons), permissive enough that `* a fact` also
-        # matches it -- so testing headers first silently ate every
-        # star-bulleted item as an unknown header. Caught by
-        # test_tolerates_the_decoration_models_actually_emit.
+        # header pattern is deliberately permissive, permissive enough that
+        # `* a fact` also matches it -- so testing headers first silently ate
+        # every star-bulleted item as an unknown header.
         is_bullet = bool(_DOSSIER_BULLET_RE.match(line))
         header = None if is_bullet else _DOSSIER_HEADER_RE.match(line)
         # A NUMBERED HEADER ("1. FACTS:") looks like a bullet to the test
         # above, so it lost its header status and every item beneath it was
-        # dropped. If a bullet-shaped line is really a KNOWN section header,
-        # it is a header. Checked only for known labels so an ordinary
-        # numbered fact ("1. the system is portable") stays an item.
+        # dropped. Promoted back only for KNOWN labels with a colon, so an
+        # ordinary numbered fact ("1. the system is portable") stays an item.
         if is_bullet:
             stripped = _DOSSIER_BULLET_RE.sub("", line)
             candidate = _DOSSIER_HEADER_RE.match(stripped)
             if candidate and candidate.group(2) and (
-                candidate.group(1).strip().upper().replace(" ", "")
+                candidate.group(1).strip().upper()
+                .replace(" ", "").strip("*_")
                 in _DOSSIER_SECTION_MAP
             ):
                 header = candidate
         if header:
-            key = header.group(1).strip().upper().replace(" ", "")
+            # .strip("*_") at LOOKUP is the __FACTS__: fix (r2 QA finding 3):
+            # the emphasis wrapper class eats at most two marks and the label
+            # charset includes `_`, so doubled underscores leaked into the
+            # key and the section was silently lost.
+            key = (header.group(1).strip().upper()
+                   .replace(" ", "").strip("*_"))
             has_colon = bool(header.group(2))
             inline = (header.group(3) or "").strip().strip("*_ ").strip()
             known = key in _DOSSIER_SECTION_MAP
-            # A COLON IS WHAT MAKES A LINE A HEADER. Without one, only a bare
-            # known label counts ("## FACTS").
-            #
-            # This is the guard that stops a WRAPPED FACT from destroying the
-            # rest of its section: a continuation line like "onto a second
-            # line" matches the (deliberately permissive) label pattern, and
-            # before this it was read as an unknown header, which set
-            # current=None and silently discarded every remaining item.
             if not has_colon and (not known or inline):
-                pass  # not a header -- fall through and treat as an item
+                # No colon and not a bare known label: not a header. This is
+                # what keeps a WRAPPED FACT's continuation line from ending
+                # its section.
+                pass
             elif known:
+                if inline:
+                    # Refuse to guess -- see DossierSectionDefect.
+                    raise DossierSectionDefect(
+                        "ambiguous_inline_header", lineno, line)
                 current = _DOSSIER_SECTION_MAP[key]
-                # INLINE CONTENT: "FACTS: a single inline fact" is a header
-                # AND its only item. Dropping the tail loses a supplied fact.
-                #
-                # Strip a bullet the model put after the colon ("FACTS: - a
-                # fact"), which was being stored WITH its "- " (MF-4); and
-                # drop a bare second header fragment ("PEOPLE: ROLES:"), which
-                # was being filed as a person (MF-3).
-                inline = _DOSSIER_BULLET_RE.sub("", inline).strip()
-                if inline and not _DOSSIER_HEADER_FRAGMENT_RE.match(inline):
-                    _dossier_add(out, current, inline)
                 continue
             elif not inline:
                 # A BARE unknown header ("SUMMARY:") ENDS the current section
-                # rather than silently appending someone else's items to it.
+                # rather than silently absorbing someone else's items.
                 current = None
                 continue
-            # AN UNKNOWN LABEL THAT CARRIES CONTENT IS CONTENT (MF-1).
-            # "Source: Nature" and "The system: a portable scanner" are facts
-            # that happen to contain a colon. Treating them as headers closed
-            # the section and silently discarded every remaining item -- the
-            # most destructive shape found, and the likeliest to occur, since
-            # a colon inside a fact is ordinary English. Only a bare
-            # `Word:` with nothing after it reads as a section break.
+            # else: an UNKNOWN label with content after its colon is CONTENT
+            # ("Source: Nature", "The system: a portable scanner") -- reading
+            # these as headers closed the section and discarded everything
+            # after, the most destructive shape review found. Fall through.
+        if (current is not None and not is_bullet
+                and line.strip().endswith(":") and len(line.strip()) <= 48):
+            # HEADER-SHAPED BUT UNCLASSIFIABLE (r2 QA finding 4's residue): a
+            # short, bare, colon-terminated, unbulleted line that is not a
+            # known header -- an exotic label like "KEY TAKEAWAYS 2024:" --
+            # reads as a section break, never as data. This check sits OUTSIDE
+            # the header branch on purpose: such a line may match the header
+            # regex as unknown-label-plus-tail ("2024:" as the tail) and fall
+            # through, or miss the regex entirely; both routes must land here.
+            # Dropping the odd section is recoverable by validation; storing
+            # its header as a fact or its items in the wrong bucket is silent
+            # contamination -- the outcome every review round ranked worst.
+            current = None
+            continue
         if current is None:
             continue
         item = _DOSSIER_BULLET_RE.sub("", line).strip()

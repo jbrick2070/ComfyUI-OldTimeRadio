@@ -6874,3 +6874,88 @@ EXPECTED result, not a regression signal.
   reusable review question for any other `"field" in row and row.get(...)`
   guard in this codebase -- NOT promoted yet, no sweep for sibling
   instances has been run.
+
+## PBUG-20260825-05 -- a 2B model cannot balance a brace: the P0 dossier died on unclosed JSON, three times, and took the episode with it
+- surfaced: LIVE headless leg, 2026-08-25 -- `otr_llm_image_upscale_sweep.py`
+  leg 1 (`otr_soak_llmsweep_01`, bank `scifi_news_pro`, creative
+  `mistralai/Mistral-Nemo-Instruct-2407`, technical `google/gemma-4-E2B-it`).
+  Evidence preserved at `docs/2026-08-25-leg1-dossier-failure-evidence.md`,
+  extracted from `tmp/llmsweep_server.log` because the sweep receipt had been
+  overwritten by a later `--dry-run` of the same driver -- the server log was
+  the surviving primary source.
+- symptom: `'scifi_news_pro_dossier' exhausted the retry ladder after 3
+  attempt(s); raising StructuredCallFailedError`, every rung failing with the
+  SAME error -- `no decodable top-level JSON object found: line 1 column 1
+  (char 0)`. The episode died at its first LLM stage. The `raw head:` on each
+  attempt shows well-formed, richly-populated content: the model had done the
+  extraction correctly and only failed to terminate the object.
+- root cause: the pass asked a 3.0 GB model to emit ONE nested JSON object
+  (four top-level keys, one of them a nested dict, three of them arrays) and
+  to close every bracket in the right order. It could not. The generation
+  heartbeats are unambiguous -- attempt 1 stopped at **503 tokens of a
+  700-token budget**, i.e. the model believed it had FINISHED, and its final
+  emitted characters were `"...non-expert medical guidance"   } }`: it closed
+  the `dramatizable_vectors` ARRAY with a brace instead of `]`. Nesting is
+  precisely the thing a small model cannot hold. This was never a truncation
+  bug and never a budget bug; raising `max_new_tokens` would not have touched
+  it.
+- fix: the model is no longer asked to balance a brace. The dossier pass now
+  requests LABELLED SECTIONS -- six flat headers, one bullet per line -- and
+  Python assembles the object (`parse_dossier_sections`,
+  `nodes/_otr_scifi_news_pro.py`). ONE contract for small AND large models,
+  not a small-model fallback lane. The schema `DossierLLM` is UNCHANGED, so
+  only the transport moved; `facts_to_keep`'s `min_length=1` still bites and a
+  hollow extraction still earns a ladder retry.
+  Three design points that are load-bearing and were each paid for in review:
+  1. THE ONE RULE: a line is a header only when nothing follows its colon, or
+     it is a bare known label. A colon WITH content is content -- "Source:
+     Nature" mid-FACTS is a fact, not a section break. Reading it as a header
+     closed the section and discarded everything after it, the most
+     destructive shape found.
+  2. THE ONE EXCEPTION: a KNOWN label with inline content ("FACTS: a fact")
+     raises `DossierSectionDefect` rather than guessing. BOTH guesses were
+     written and both were caught before shipping -- the first silently
+     dropped a supplied fact, the second HIJACKED the open section and filed
+     every later fact as a person. Loud and retryable beats silently wrong in
+     either direction.
+  3. `DossierSectionDefect` subclasses `json.JSONDecodeError` DELIBERATELY --
+     not because the reply is JSON, but because that is the one class the
+     shared ladder's structural rung treats as a syntax failure. Without it a
+     text-mode miss surfaced as a `ValidationError`, which routes straight to
+     the typed repair, making `max_attempts=3` really TWO calls. Proven by
+     probe through the real `structured_call`: temps `[0.3, 0.15]`
+     defect->good; `[0.3, 0.15, 0.1]` defect,defect,repair-good; honest
+     EXHAUSTED at 3.
+  Pack prompt gained one sentence in the same change ("Never put an item on
+  the same line as its header."), written INSIDE `prompt_stages` -- a
+  top-level write had previously added an unknown key, fired
+  `StoryPackValidationError` inside `OTR_LedgerScriptWriter.INPUT_TYPES()`,
+  and turned 377 tests red.
+- live proof: 2026-08-26, the EXACT failing pairing re-run on the canonical
+  workflow (`otr_canonical_api_run.py --act-count 1 --source-bank
+  scifi_news_pro --profile otr_soak_llmsweep_01 --creative-model
+  "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)" --technical-model
+  "google/gemma-4-E2B-it (3.0 GB)"`): `RESULT SUCCESS` + `obs_publish OK` +
+  `signal_lost_echoes_of_the_chemical_sea_20260826_003631_..._final.mp4`
+  (50,131,757 B) in `output/otr/obs/`, `Prompt executed in 00:23:53`. The
+  dossier logged `attempt 1/3` THREE times across the episode and never once
+  escalated to a structural retry, a repair, or a defect -- where the old
+  path had burned all three rungs on this same model.
+- verify idea: feed `parse_dossier_sections` the verbatim `raw head:` payload
+  from this incident (an object whose final array is closed with `}`) and
+  assert it is IRRELEVANT -- the parser never sees JSON. The real machine
+  check is the pairing one: assert `DossierSectionDefect` is a subclass of
+  `json.JSONDecodeError`, since that single `issubclass` relationship is what
+  buys text mode its third call, and a well-meaning refactor to a plain
+  `ValueError` would silently halve the ladder with every test still green.
+  Covered now by `tests/test_dossier_labelled_sections.py` (26 tests,
+  including three that drive the REAL `structured_call` with a fake slot to
+  pin the temperature sequence).
+- bible-worthy: YES, and the reusable rule is not about dossiers. "When a
+  small model must produce structure, move the structure into your code and
+  ask it only for flat text" is one half; the sharper half is the ladder
+  coupling -- an exception class chosen for its SEMANTICS can silently cost a
+  retry rung, because the retry ladder dispatches on exception TYPE. Any
+  project with a typed-repair ladder has this failure mode available to it.
+  Not yet checked against `otr_coverage_index.yaml` + `BUG_BIBLE.yaml`.
+- status: OPEN

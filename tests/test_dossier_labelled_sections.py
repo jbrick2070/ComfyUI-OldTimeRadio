@@ -153,13 +153,26 @@ def test_greedy_label_regression():
     assert got["facts_to_keep"] == ["one", "two"]
 
 
-def test_inline_and_bulleted_items_share_one_append_path():
-    """A header with inline content AND bullets under it keeps both, in order.
-    Two append routes that drift would file one of them in the wrong bucket."""
+def test_inline_known_header_raises_a_named_defect():
+    """r2 QA findings 1+2: one rule must win. Both prior guesses shipped
+    and were caught (silent drop, then section hijack), so the parser
+    refuses to guess: loud and retryable beats silently wrong."""
+    from nodes._otr_scifi_news_pro import DossierSectionDefect
+    for shape in ("FACTS: a fact",
+                  "FACTS: inline one\n- bullet two",
+                  "FACTS:\n- one\nPEOPLE: including Dr. Smith\n- two",
+                  "PEOPLE: ROLES:\n- Ada",
+                  "FACTS: - a fact"):
+        with pytest.raises(DossierSectionDefect) as exc:
+            parse_dossier_sections(shape)
+        assert exc.value.defect_code == "ambiguous_inline_header", shape
+
+
+def test_exotic_colon_header_ends_the_section_without_contaminating_it():
     got = parse_dossier_sections(
-        "FACTS: inline one\n- bullet two\nNUMBERS: 42\n")
-    assert got["facts_to_keep"] == ["inline one", "bullet two"]
-    assert got["allowed_numbers"] == ["42"]
+        "FACTS:\n- f\nKEY TAKEAWAYS 2024:\n- stray\n")
+    assert got["facts_to_keep"] == ["f"]
+    assert got["named_entities"]["people"] == []
 
 
 # --------------------------------------------------------------------------- #
@@ -245,13 +258,59 @@ def test_dash_and_bracket_header_qualifiers_still_open_their_section():
         assert got["facts_to_keep"] == ["f"], f"{header} contaminated FACTS"
 
 
-def test_double_colon_header_does_not_store_the_fragment():
-    """MF-3. `PEOPLE: ROLES:` stored "ROLES:" as a person."""
-    got = parse_dossier_sections("PEOPLE: ROLES:\n- Ada\n")
-    assert got["named_entities"]["people"] == ["Ada"]
+# --------------------------------------------------------------------------- #
+# r2 QA finding 5 (Fable): text mode used to skip the structural rung. A parse
+# miss surfaced as a ValidationError, which the ladder routes straight to the
+# typed repair -- so max_attempts=3 was really two calls. DossierSectionDefect
+# subclasses json.JSONDecodeError precisely so the structural rung engages.
+# These drive the REAL structured_call with a fake slot to pin the ladder.
+# --------------------------------------------------------------------------- #
+
+def _drive_ladder(replies):
+    from nodes._otr_structured_call import (
+        structured_call, StructuredCallFailedError)
+    from nodes._otr_scifi_news_pro import (
+        DossierLLM, parse_dossier_sections, _dossier_section_repair)
+    it = iter(replies)
+    temps = []
+
+    def slot_fn(messages, *, temperature, max_new_tokens):
+        temps.append(round(temperature, 3))
+        return next(it)
+
+    try:
+        out = structured_call(
+            prompt=[{"role": "system", "content": "extract"},
+                    {"role": "user",
+                     "content": "SCIENCE STORY:\nA portable scanner."}],
+            schema=DossierLLM, slot_fn=slot_fn,
+            base_temperature=0.3, structural_retry_temperature=0.15,
+            repair_prompt_factory=_dossier_section_repair,
+            max_new_tokens=700, helper_name="ladder_probe",
+            text_parser=parse_dossier_sections)
+        return temps, out.facts_to_keep
+    except StructuredCallFailedError as exc:
+        return temps, ("EXHAUSTED", exc.attempts)
 
 
-def test_inline_bullet_after_a_header_is_stripped():
-    """MF-4. `FACTS: - a fact` stored the item with its leading "- "."""
-    assert parse_dossier_sections("FACTS: - a fact")["facts_to_keep"] == [
-        "a fact"]
+def test_section_defect_engages_the_structural_rung():
+    """A defective reply earns the SAME-prompt lower-temperature retry, not a
+    straight jump to typed repair. The temperature sequence is the proof."""
+    temps, facts = _drive_ladder(["FACTS: inline bad", "FACTS:\n- good fact"])
+    assert facts == ["good fact"]
+    assert temps == [0.3, 0.15], (
+        "structural rung did not fire for a section defect")
+
+
+def test_text_mode_has_a_true_three_call_budget():
+    """defect -> defect -> typed repair rescues. Three real model calls."""
+    temps, facts = _drive_ladder(
+        ["FACTS: bad", "FACTS: bad again", "FACTS:\n- rescued"])
+    assert facts == ["rescued"]
+    assert len(temps) == 3
+
+
+def test_text_mode_exhausts_honestly_at_three():
+    temps, verdict = _drive_ladder(["FACTS: a", "FACTS: b", "FACTS: c"])
+    assert verdict == ("EXHAUSTED", 3)
+    assert len(temps) == 3

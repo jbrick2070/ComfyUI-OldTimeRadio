@@ -503,6 +503,50 @@ Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
 review findings never create entries on their own.
 
+### Soak runs — how a change is actually proven
+
+A green unit suite proves the code parses, not that an episode renders. Nothing here is
+called done until it has produced a finished, playable episode in `output/otr/obs/`.
+
+A **soak leg** is one real end-to-end render through the canonical workflow. It passes only
+when all three of these hold — any one alone is not a pass:
+
+| Signal | Where | Means |
+|---|---|---|
+| `RESULT SUCCESS` | leg log | the graph completed |
+| `obs_publish OK` | server log | the episode was published |
+| the `.mp4` on disk | `output/otr/obs/` | it is actually watchable |
+
+A finished render leaves the server **resident** at ~9–10 GB and 1% GPU — that is the
+no-teardown behavior, not a crash. Read the log for `Prompt executed` before declaring a
+run dead, and reset the box before the next boot.
+
+**Sweep drivers** run a matrix of legs unattended, one at a time (ComfyUI serializes
+prompts, and this project is sequential-execution only). Each waits for the queue to drain
+before submitting, so a leg's timeout measures its own render rather than its predecessor's;
+a failed leg is logged and the sweep continues; and the receipt JSON is rewritten after
+every leg, so killing a run mid-flight still leaves a complete record.
+
+- [`scripts/otr_llm_image_upscale_sweep.py`](scripts/otr_llm_image_upscale_sweep.py) —
+  every curated local LLM in both writer slots, across image engines, stills, and upscalers.
+- [`scripts/otr_bank_engine_sweep.py`](scripts/otr_bank_engine_sweep.py) — the smallest local
+  model (`gemma-4-E2B-it`, 3.0 GB) in **both** writer slots across every runnable source bank
+  and all five local image engines. A 2B model is the worst case for structured extraction,
+  so a bank that survives it survives everything above it.
+
+```
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_bank_engine_sweep.py
+```
+
+Engine dropdowns move **only** through profile `role_overrides` in `config/profiles/*.json`
+— exactly what a human clicking the announcer / music / character dropdowns and saving the
+graph would produce. A sweep driver never edits `workflows/otr_canonical.json` and never
+pokes `widgets_values`; the image and video engine widgets are managed and refuse ad-hoc
+patching by design.
+
+A `--dry-run` validates prompt shape without rendering, and **is not a pass** — it needs
+`--offline-schemas`, and a dry leg finishing in 0.1 min has proven nothing about a model.
+
 ---
 
 ## Known limitation: character drift
