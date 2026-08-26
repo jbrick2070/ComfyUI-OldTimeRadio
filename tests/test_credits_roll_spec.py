@@ -865,12 +865,17 @@ def test_the_card_shows_mixed_rather_than_one_clips_recipe():
     """Row 1 and row 2 meet here: the card draws what the PER-FIELD roll-up
     reports, so an engine that rendered two recipes says so on screen."""
     from nodes.otr_video_render_batch import _build_render_engines_payload
+    # `exists: True` on both rows (2026-08-26). Since the sanctioned-gap work,
+    # only rows with a clip actually on disk populate delivered-engine
+    # accounting -- a refused beat must never be credited as motion somebody
+    # rendered. Both beats here DID render, which is the whole premise of a
+    # "two recipes on one engine" card, so they say so.
     ren = _build_render_engines_payload({"clips": [
         {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx_8gb",
-         "recipe": "RECIPE_LTX8_I2V_v2", "quant": "Q8_0"},
+         "recipe": "RECIPE_LTX8_I2V_v2", "quant": "Q8_0", "exists": True},
         {"shot_id": "s2", "role": "music_visual", "engine_id": "ltx_8gb",
          "recipe": "RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off]",
-         "quant": "Q8_0"}]}, None)
+         "quant": "Q8_0", "exists": True}]}, None)
     block = _models_block(
         {"ltx_8gb": cr._recipe_suffix(ren, "ltx_8gb")},
         video_rows=cr._video_role_rows(ren))

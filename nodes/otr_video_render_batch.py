@@ -131,6 +131,28 @@ def _roll_up_engine_receipts(receipts):
     return rolled
 
 
+def _clip_delivered_motion(clip):
+    """Pure: did this manifest row actually put rendered frames on the timeline?
+
+    ONE PAYLOAD MAY NOT COUNT "WHICH ENGINE DELIVERED" TWO DIFFERENT WAYS. The
+    ``histogram`` key that ships beside ``by_role`` is minted by
+    :func:`render_driver.build_clip_manifest`, which counts a row only once its
+    clip is real on disk (``if exists: hist[eid] += 1``); the composite reaches
+    the same verdict one layer down, emitting a clip segment for a row with
+    ``exists`` and a floor/black segment for one without
+    (:mod:`nodes.otr_silent_composite`). So ``exists`` is already what
+    "delivered" means on both sides of this payload, and the accounting below
+    now says the same word.
+
+    ``exists`` ALONE, deliberately -- not ``exists and path``. The manifest
+    builder derives ``exists`` FROM the path (a video row is real when the file
+    is on disk; a directory row when it holds its full frame count), so adding
+    a second path test here would either be redundant or a quiet second opinion
+    about a fact the builder already settled.
+    """
+    return bool((clip or {}).get("exists"))
+
+
 def _build_render_engines_payload(manifest, vram_peak_mb):
     """Pure: the ``meta.render_engines`` payload. Preserves the existing keys
     (histogram / video_revision / by_role / vram_peak_mb) and ADDS the S-E5
@@ -139,11 +161,66 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     -- never one clip's receipt standing in for the rest) -- so every saved
     episode self-documents "what did I use?" (the durable twin of no-fallbacks
     + dropdown labels). An engine that emits no receipt stamps recipe=None
-    (never drops the row). No I/O; unit-testable."""
+    (never drops the row). No I/O; unit-testable.
+
+    A GAP ROW IS NOT DELIVERED VIDEO (2026-08-26). Until now every manifest row
+    was projected into ``by_role`` / ``per_clip`` / the by-engine roll-up with
+    no reference to ``exists`` at all. That is harmless only while every planned
+    beat renders. This payload is the DURABLE MOTION RECEIPT
+    ``OTR_CreditsRoll`` reads to state which engine rendered each beat, so
+    billing a floored beat to an engine puts a claim on the credits card that no
+    frame on screen supports. An all-refused episode -- which the operator ruled
+    on 2026-08-26 must still publish, full audio and correct timing over a
+    floored picture -- would advertise a complete slate of rendered video while
+    containing none of it.
+
+    **NO SANCTIONED GAP CAN REACH THIS FUNCTION YET, AND THAT IS NOT AN
+    OVERSIGHT -- IT IS THE STATE OF THE BUILD.** Stated plainly because a
+    reader would otherwise conclude the survivable-gap path is finished: the
+    image dispatcher DOES record a model refusal and continue
+    (``otr_image_gen_dispatcher`` ``is_model_refusal``), and the composite DOES
+    floor a row lacking ``exists``+``path``
+    (``otr_silent_composite``) -- but nothing in between yet MINTS that row. On
+    the canonical ``still_flat`` path the refused object is omitted from the
+    required-target receipt, ``_still_spine_requires_scene`` is True, and
+    ``validate_and_repair_still_spine`` raises before any manifest is built; if
+    that were bypassed, ``_require_still`` raises again in ``render_clip``.
+    So today this filter is correct-by-construction and inert.
+
+    It lands NOW anyway, ahead of the control path that will feed it, because
+    the alternative is shipping that path against accounting already known to be
+    wrong -- and the first thing a sanctioned gap would have done on arrival is
+    quietly invent delivered motion on the credits card.
+
+    THE GAPS ARE COUNTED, NEVER DROPPED. Silently omitting the refused beats
+    would trade one untruth for another: a receipt that shows six delivered
+    beats where the ledger planned fourteen, with nothing saying where the
+    other eight went. ``sanctioned_gap_count`` and ``sanctioned_gap_shot_ids``
+    carry them in manifest order (which is beat order), so the two halves add
+    back up to the episode.
+
+    THE PAYLOAD IS NEVER EMPTY, and that is load-bearing rather than tidy:
+    ``OTR_CreditsRoll._require`` rejects ``{}``/``[]``/``None``/``""``, so an
+    all-gap episode returning an empty payload would convert a publishable
+    degraded episode into a hard failure at mux time -- the exact outcome the
+    sanctioned gap exists to prevent. Every key below is present on every
+    return, whatever the clips did."""
     by_role: dict[str, dict[str, int]] = {}
     per_clip: list = []
     receipts_by_engine: dict[str, list] = {}
+    sanctioned_gap_shot_ids: list = []
     for clip in (manifest or {}).get("clips") or []:
+        if not _clip_delivered_motion(clip):
+            # The beat is a real fact about the episode, so it leaves this loop
+            # by the OTHER door rather than vanishing. It keeps its shot id and
+            # its position; what it does not keep is a claim that an engine
+            # rendered it. Its ``engine_id`` is read PAST deliberately -- the
+            # gap row still names the engine that was PLANNED, and reading that
+            # name here is the precise move that produced the wrong receipt.
+            # The plan stays recoverable from the ledger's own video section,
+            # which is where a plan belongs; a receipt records delivery.
+            sanctioned_gap_shot_ids.append(str(clip.get("shot_id") or "?"))
+            continue
         role = str(clip.get("role") or "?")
         eng = str(clip.get("engine_id") or "?")
         by_role.setdefault(role, {})
@@ -185,6 +262,12 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
         "vram_peak_mb": vram_peak_mb,
         "per_clip": per_clip,        # E5
         "by_engine": by_engine,      # E5
+        # THE OTHER HALF OF THE EPISODE (2026-08-26). Present on every payload,
+        # zero on a clean render -- an absent key would make "no gaps" and "an
+        # older ledger that never looked" read identically, and a reader
+        # auditing a refusal needs to tell those apart.
+        "sanctioned_gap_count": len(sanctioned_gap_shot_ids),
+        "sanctioned_gap_shot_ids": sanctioned_gap_shot_ids,
     }
 
 

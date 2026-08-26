@@ -489,9 +489,9 @@ _LTX_8GB_STILL_PLAN = (
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",
                  framing_geometry=(
-                     ("cinematic three-quarter framing, people shown with "
-                      "full heads and clear headroom inside frame, faces "
-                      "unobstructed, balanced composition")),
+                     ("cinematic three-quarter framing, the subject shown "
+                      "whole with clear space around it inside frame, "
+                      "balanced composition")),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide", required="always",

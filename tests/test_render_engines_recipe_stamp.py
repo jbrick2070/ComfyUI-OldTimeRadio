@@ -22,11 +22,21 @@ def _manifest_with_recipe():
     return {
         "engine_histogram": {"ltx_audio_in": 1, "still_pan": 1},
         "video_revision": 3,
+        # `exists: True` is REQUIRED on every row here, and was not until
+        # 2026-08-26. These fixtures predate the sanctioned-gap work: the
+        # payload builder used to project every manifest row into the delivered
+        # -engine accounting without asking whether a clip was ever written, so
+        # a row with no `exists` key still counted as delivered video. It no
+        # longer does -- a gap row must not be billed as motion somebody
+        # rendered -- and these fixtures describe DELIVERED beats, so they say
+        # so explicitly. A fixture that means "this beat produced no clip"
+        # should set `exists: False` and expect no delivered credit.
         "clips": [
             {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx_audio_in",
              "recipe": "distilled_native", "quant": "Q2_K", "use_lora": False,
-             "render_canvas": "512x288", "vram_peak_mb": 13900},
-            {"shot_id": "s2", "role": "announcer_visual", "engine_id": "still_pan"},
+             "render_canvas": "512x288", "vram_peak_mb": 13900, "exists": True},
+            {"shot_id": "s2", "role": "announcer_visual", "engine_id": "still_pan",
+             "exists": True},
         ],
     }
 
@@ -64,14 +74,23 @@ def test_payload_empty_manifest():
     assert payload["by_role"] == {}
 
 
-def test_build_clip_manifest_threads_recipe_receipt():
+def test_build_clip_manifest_threads_recipe_receipt(tmp_path):
     # the recipe receipt rides engine -> canonical clip -> manifest row.
+    # REAL FILES ON DISK, not `path: ""` (2026-08-26). `build_clip_manifest`
+    # sets `exists = bool(path) and os.path.isfile(path)`, and since the
+    # sanctioned-gap work only `exists` rows populate delivered-engine
+    # accounting -- a beat that produced no clip must not be billed as motion
+    # somebody rendered. This test is about a DELIVERED clip's recipe receipt,
+    # so its fixture now describes one. The empty path was incidental
+    # scaffolding, never the subject.
+    _c1 = tmp_path / "s1.mp4"
+    _c1.write_bytes(b"placeholder clip")
     result = {
         "ledger": {"video": {"shots": [
             {"shot_id": "s1", "role": "music_visual",
              "target_frame_count": 100, "engine_id": "ltx_audio_in"}]},
             "lines": []},
-        "clips": {"s1": {"type": "video", "path": "", "engine_id": "ltx_audio_in",
+        "clips": {"s1": {"type": "video", "path": str(_c1), "engine_id": "ltx_audio_in",
                          "frame_count": 100, "recipe": "sharp_lora",
                          "quant": "Q3_K_M", "use_lora": True,
                          "render_canvas": "512x288", "vram_peak_mb": 15500}},
@@ -96,7 +115,12 @@ def test_build_clip_manifest_threads_recipe_receipt():
 # and then verifies it, which is this build's most reliable blind spot.
 # --------------------------------------------------------------------------- #
 def _clip(shot_id, engine_id, **over):
-    row = {"shot_id": shot_id, "role": "music_visual", "engine_id": engine_id}
+    # `exists: True` by default (2026-08-26): every roll-up fixture in this file
+    # describes a beat that actually rendered, and since the sanctioned-gap work
+    # only `exists` rows populate delivered-engine accounting. `**over` still
+    # wins, so a test that wants a gap row can pass `exists=False`.
+    row = {"shot_id": shot_id, "role": "music_visual", "engine_id": engine_id,
+           "exists": True}
     row.update(over)
     return row
 
@@ -331,9 +355,20 @@ def test_a_pre_rollup_ledger_reads_exactly_as_before():
         ("music_visual", "ltx_video", "text-to-video")]
 
 
-def test_the_whole_chain_carries_a_second_clip_on_one_engine():
+def test_the_whole_chain_carries_a_second_clip_on_one_engine(tmp_path):
     """engine -> canonical clip -> build_clip_manifest -> payload -> the card,
     with TWO clips on ONE engine: the case the shipped fixture never had."""
+    # REAL FILES ON DISK, not `path: ""` (2026-08-26). `build_clip_manifest`
+    # sets `exists = bool(path) and os.path.isfile(path)`, and since the
+    # sanctioned-gap work only `exists` rows populate delivered-engine
+    # accounting -- a beat that produced no clip must not be billed as motion
+    # somebody rendered. This test is about a DELIVERED clip's recipe receipt,
+    # so its fixture now describes one. The empty path was incidental
+    # scaffolding, never the subject.
+    _c1 = tmp_path / "s1.mp4"
+    _c1.write_bytes(b"placeholder clip")
+    _c2 = tmp_path / "s2.mp4"
+    _c2.write_bytes(b"placeholder clip")
     result = {
         "ledger": {"video": {"shots": [
             {"shot_id": "s1", "role": "music_visual",
@@ -342,10 +377,10 @@ def test_the_whole_chain_carries_a_second_clip_on_one_engine():
              "target_frame_count": 97, "engine_id": "ltx_8gb"}]},
             "lines": []},
         "clips": {
-            "s1": {"type": "video", "path": "", "engine_id": "ltx_8gb",
+            "s1": {"type": "video", "path": str(_c1), "engine_id": "ltx_8gb",
                    "frame_count": 97, "recipe": "RECIPE_LTX8_I2V_v2",
                    "render_canvas": "512x288", "vram_peak_mb": 8278},
-            "s2": {"type": "video", "path": "", "engine_id": "ltx_8gb",
+            "s2": {"type": "video", "path": str(_c2), "engine_id": "ltx_8gb",
                    "frame_count": 97, "recipe": "RECIPE_LTX8_I2V_v2",
                    "render_canvas": "832x480", "vram_peak_mb": 16086}},
         "trace": [],

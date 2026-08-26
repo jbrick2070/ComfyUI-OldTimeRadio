@@ -486,15 +486,45 @@ def get_open_subject(role: str, synthetic: bool, meta: Any = None,
 STILL_FRAMING_OPEN = "full-frame macro, centered subject"
 STILL_FRAMING_PORTRAIT = ("three-quarter framing, full head and shoulders with "
                           "clear headroom above, face unobstructed")
-#: Scene-BEAT framing (person beats, 2026-06-16 framing fix): the old scene path
-#: reused STILL_FRAMING_OPEN ("full-frame macro") which has NO headroom directive
-#: -> LTX i2v inherits the tight still and crops heads. Positive-only (FLUX plants
-#: negated tokens -- the c01 lesson); keeps the operator's wider three-quarter
-#: look, just guarantees the whole head + headroom. scene_open (the radio-set
-#: object beat) KEEPS the macro -- no person, no head to frame.
-STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, people shown with "
-                            "full heads and clear headroom inside frame, faces "
-                            "unobstructed, balanced composition")
+#: Scene-BEAT framing -- the CABINET beat (announcer_visual / music_visual).
+#:
+#: Written 2026-06-16 as the fix for PERSON beats: the scene path reused
+#: STILL_FRAMING_OPEN ("full-frame macro"), which has NO headroom directive, so
+#: LTX i2v inherited the tight still and cropped heads. The wording that fix
+#: chose -- "people shown with full heads and clear headroom inside frame, faces
+#: unobstructed" -- was correct for what scene_beat MEANT that week.
+#:
+#: It stopped meaning that four days later and the string was never revisited.
+#: BUG 1 (2026-06-20) split character beats onto their own kind:
+#: otr_meta_brief_image_prompt.py sends any CHARACTER_BEARING_ROLES line to
+#: kind="scene_character" and EVERYTHING ELSE to kind="scene_beat", and
+#: otr_shot_lock.py scopes CHARACTER_BEARING_ROLES to character_video alone. So
+#: scene_beat today is announcer_visual or music_visual ONLY -- the radio set
+#: itself, the subject get_open_subject calls FACELESS BY CONTRACT one docstring
+#: above. For two months this branch has been ordering unobstructed human faces
+#: into a shot with nobody in it.
+#:
+#: The cost was measured, not theorised: the 2026-08-26 sweep
+#: (docs/2026-08-26-ideogram4-card-refusal-evidence.md, PBUG-20260826-01)
+#: refused 6 of 8 music-beat stills on ideogram4_local, and the refused prompt
+#: carries this constant verbatim -- a request for faces was one of the three
+#: things handed to the engine worst equipped to take it. The operator's rule:
+#: only the audio-in VIDEO lanes (LTX AUDIO IN, HuMo) require faces; every other
+#: still is generalised radio and needs none.
+#:
+#: What the 06-16 fix was MECHANICALLY for still holds and is kept: a directive
+#: that the whole subject sits inside the frame with margin around it, so i2v
+#: does not inherit a crop. Only the human vocabulary goes. Positive-only (FLUX
+#: plants negated tokens -- the c01 lesson), so this describes the object rather
+#: than declaring an absence of people. scene_open KEEPS the tighter macro; the
+#: two kinds stay distinct, which is the whole reason scene_beat has its own
+#: constant. People still belong in the OTHER branches: a still_flat character
+#: beat is kind="scene_character" -> STILL_FRAMING_SCENE_CHARACTER, and
+#: STILL_FRAMING_PORTRAIT is untouched. "No faces here" is not "no people
+#: anywhere" -- only the cabinet loses them.
+STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, the subject shown "
+                            "whole with clear space around it inside frame, "
+                            "balanced composition")
 #: Scene-CHARACTER framing (BUG 1, 2026-06-20 operator directive): the LANDSCAPE
 #: still-only character beat (still_flat / still_pan / ltx_video on a character
 #: line). Leads with the CHARACTER (compose_still_prompt subject = appearance) in

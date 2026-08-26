@@ -250,6 +250,59 @@ class TestComposeStillPrompt:
         bare = helpers.compose_still_prompt(_meta_ok(), kind="scene_character")
         assert bare and "character" in bare.lower()
 
+    #: The human vocabulary a CABINET still must not carry, and the CHARACTER
+    #: stills must. Substrings, not words, so "faces"/"headroom" are caught by
+    #: "face"/"head" without a second entry each.
+    _PERSON_VOCABULARY = ("face", "head", "people", "person", "shoulders")
+
+    def test_scene_beat_is_a_cabinet_shot_and_asks_for_nobody(self):
+        """2026-08-26: scene_beat has meant announcer_visual / music_visual ONLY
+        since BUG 1 split character beats onto kind=scene_character (2026-06-20),
+        and get_open_subject calls that subject FACELESS BY CONTRACT. The framing
+        constant kept the pre-split wording for two months and went on ordering
+        "people shown with full heads ... faces unobstructed" into a shot of a
+        radio set -- which the ideogram4_local sweep then refused 6 stills out of
+        8 (docs/2026-08-26-ideogram4-card-refusal-evidence.md, PBUG-20260826-01).
+
+        Checked on BOTH scene_beat roles, because the two reach different
+        get_open_subject templates and a regression could land in either."""
+        for role in ("announcer_visual", "music_visual"):
+            p = helpers.compose_still_prompt(
+                _meta_ok(), kind="scene_beat", role=role, beat_id="b001").lower()
+            leaks = [w for w in self._PERSON_VOCABULARY if w in p]
+            assert not leaks, (
+                "a scene_beat (cabinet) still asked for %s -- nobody is in this "
+                "shot: role=%s prompt=%r" % (leaks, role, p))
+            # Still a FRAMING directive, not a hole: the 2026-06-16 fix existed
+            # so i2v would not inherit a crop, and that mechanical job survives
+            # the rewording even though the human vocabulary does not.
+            assert helpers.STILL_FRAMING_SCENE_BEAT in p
+            assert "inside frame" in p and "three-quarter" in p
+
+    def test_the_character_kinds_still_ask_for_a_person(self):
+        """The TRAP the cabinet fix must not spring: "no faces on a scene_beat"
+        is NOT "no people anywhere". A still_flat CHARACTER beat is a different
+        kind on a different branch and still needs its character legible, and the
+        portrait branch is untouched. If a future tidy-up hoists the cabinet
+        wording onto these, this is what names it."""
+        char = {"portrait_prompt": "a weathered engineer, kind eyes"}
+        for kind in ("scene_character", "portrait"):
+            p = helpers.compose_still_prompt(
+                _meta_ok(), kind=kind, role="character_video",
+                beat_id="b002", char_entry=char).lower()
+            assert "face" in p and "head" in p, (
+                "%s lost its person framing: %r" % (kind, p))
+        # And the two branches are still the constants they were, not the
+        # cabinet's -- equality, so a copy-paste of the new text is caught.
+        sc = helpers.compose_still_prompt(
+            _meta_ok(), kind="scene_character", char_entry=char)
+        po = helpers.compose_still_prompt(
+            _meta_ok(), kind="portrait", char_entry=char)
+        assert helpers.STILL_FRAMING_SCENE_CHARACTER in sc
+        assert helpers.STILL_FRAMING_PORTRAIT in po
+        assert helpers.STILL_FRAMING_SCENE_BEAT not in sc
+        assert helpers.STILL_FRAMING_SCENE_BEAT not in po
+
 
 # ---------------------------------------------------------------------------
 # 4. ST-2: the versioned object payload (emission; W1 seam)

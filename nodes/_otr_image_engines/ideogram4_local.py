@@ -21,6 +21,29 @@ card at the right dimensions with host status SUCCESS. Rebuilding the same lines
 in the vendor's three-key caption schema took that to 0 of 6. So the adapter
 always emits the schema; no request shape reaches the model as raw prose.
 
+This is also why this engine is the ONLY one that owes a translation layer. The
+other six image adapters take OTR's prose verbatim, and that is correct for
+them; nothing here argues they should change.
+
+THE LENS ROUTES ON METADATA, NOT ON PROSE TEXT (2026-08-26)
+-----------------------------------------------------------
+Until this date the caption transform chose its route by searching the prose for
+two literal anchors. Both are minted by ONE composer entry point,
+``otr_meta_brief_image_prompt.compose_still_word_prompt``, which serves ONE lane
+-- ``still_word``. Every other still lane (``still_flat``, ``still_pan``,
+``still_motion``) hands this adapter a prose SCENE that matches neither anchor,
+so all of them landed in the same unrouted fallthrough -- the one whose own
+docstring conceded that raw prose is what this model refuses. The lens was
+routing blind on three lanes out of four.
+
+It did not have to be. The dispatcher has been putting ``kind``, ``role``,
+``beat_id`` and ``char_id`` on every image request since the still spine was
+built (``otr_image_gen_dispatcher``); this adapter simply never read them. It
+reads ``kind`` and ``role`` now, and an object kind the table does not know
+FAILS LOUD rather than sliding into the scene route -- a silent misroute is the
+exact defect being repaired here, and leaving the door open for the next new
+kind would be choosing the same bug a second time.
+
 THE PROHIBITION TRAP (Bug Bible 12.126)
 ---------------------------------------
 The official topology wires the guider's negative from ``ConditioningZeroOut`` of
@@ -130,6 +153,45 @@ _PROHIBITION_RE = re.compile(
 #: tests/test_still_word.py), which is what makes this extraction safe.
 _WORD_RE = re.compile(r'a title card displaying the words "([^"]*)"')
 _TITLE_RE = re.compile(r'an abstract picture evoking "([^"]*)"')
+
+#: The four caption routes. The first two are decided by the composer's anchors
+#: ABOVE -- evidence carried in the prose itself -- and the last two by the
+#: request's object ``kind``, which the dispatcher has always supplied.
+ROUTE_WORD = "word"
+ROUTE_TITLE = "title"
+ROUTE_PORTRAIT = "portrait"
+ROUTE_SCENE = "scene"
+
+#: THE LIVE OBJECT-KIND VOCABULARY, mapped EXPLICITLY -- every kind names its
+#: route, so adding one upstream becomes a loud failure here instead of a silent
+#: demotion into the scene caption.
+#:
+#: Six of the seven are the closed enum ``VALID_KINDS`` in
+#: ``nodes/_otr_shared/still_plan_helpers.py``; the seventh is
+#: ``_otr_video_engines.coverage_plan.JUMP_STILL_KIND``, which is deliberately
+#: NOT a ``scene_*`` token so segment stills stay invisible to the beat-indexed
+#: consumers. The literals are REPEATED rather than imported because this module
+#: is cold-import clean (V-12) and reaching into the video package would run its
+#: self-registration at image-engine import time.
+#: ``test_the_kind_table_covers_the_live_vocabulary`` pays that import cost in
+#: the suite instead, and fails the moment the two definitions drift apart.
+OBJECT_KIND_ROUTES = {
+    "portrait": ROUTE_PORTRAIT,
+    "scene_open": ROUTE_SCENE,
+    "scene_beat": ROUTE_SCENE,
+    "scene_character": ROUTE_SCENE,
+    "mesh_fodder": ROUTE_SCENE,
+    "scene_background_plate": ROUTE_SCENE,
+    "jump_segment": ROUTE_SCENE,
+}
+
+#: AN ABSENT KIND IS NOT AN UNKNOWN KIND. ``build_caption(prose, w, h)`` remains
+#: a valid positional call -- the refusal repro script and the caption tests use
+#: it that way, and the dispatcher itself defaults a kind-less object to
+#: ``portrait`` long before the request is built. A caller that hands over no
+#: metadata gets the scene route, which is precisely where it already was. Only
+#: a NON-EMPTY kind outside the table above is a caller bug.
+KIND_UNSPECIFIED = ""
 
 #: Refusal card statistics, DERIVED from captured artifacts (never guessed):
 #: refusals measured min 68-87 / std 9.9-10.7; real renders min 0-1 / std 27-41.
@@ -243,7 +305,81 @@ def _tidy(text: str) -> str:
     return text.strip().strip(",;:").strip()
 
 
-def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
+def _route_for_kind(kind: str, role: str) -> str:
+    """The object route for one request's ``kind``. Fails loud on an unknown.
+
+    ``role`` is carried here only to NAME THE LANE in that failure. It is
+    deliberately not a routing key: the three live roles (``announcer_visual``,
+    ``music_visual``, ``character_video``) never disagree with ``kind`` about
+    which route applies, and standing up a second, weaker authority over the
+    same decision is how two routers drift apart. What an operator actually
+    needs when this raises is which lane minted the row, and that is what
+    ``role`` supplies.
+    """
+    token = str(kind or "")
+    if token == KIND_UNSPECIFIED:
+        return ROUTE_SCENE
+    try:
+        return OBJECT_KIND_ROUTES[token]
+    except KeyError:
+        raise ValueError(
+            "ideogram4_local: unknown still kind %r (role %r). Every object "
+            "kind must name its caption route in OBJECT_KIND_ROUTES; the "
+            "mapped kinds are %s. NO FALLBACK -- routing a kind nobody mapped "
+            "into the scene caption is the silent misroute this table exists "
+            "to replace." % (token, str(role or ""),
+                             ", ".join(sorted(OBJECT_KIND_ROUTES)))
+        ) from None
+
+
+def caption_route(prose: str, *, kind: str = "", role: str = "") -> str:
+    """Which of the four routes this request takes. Pure.
+
+    THE SINGLE AUTHORITY: :func:`build_caption` calls exactly this, so a test
+    that pins a lane's route is pinning the real decision rather than a parallel
+    copy of the priority order.
+
+    Priority is WORD -> TITLE -> PORTRAIT -> SCENE. The two prose anchors outrank
+    ``kind`` because they are the stronger evidence: a word card's ledger row
+    wears the shared cheap-family ``scene_character`` kind -- it inherits face
+    framing while actually minting typography from the spoken line -- so routing
+    on kind first would send every word card to the scene caption and ship cards
+    with no words on them.
+    """
+    # Resolved FIRST, and its result often discarded, ON PURPOSE: an unmapped
+    # kind then fails on every lane rather than only on the two that consult it.
+    # A hole in the table is a hole whether or not this particular prose happened
+    # to carry a composer anchor, and a hole that surfaces on only some lanes is
+    # the kind that ships.
+    object_route = _route_for_kind(kind, role)
+    if _WORD_RE.search(prose or ""):
+        return ROUTE_WORD
+    if _TITLE_RE.search(prose or ""):
+        return ROUTE_TITLE
+    return object_route
+
+
+def _wrapped_caption(aspect: str, description: str) -> dict:
+    """The minimal caption: the vendor's keys, and nothing invented.
+
+    ``background`` IS EMPTY ON PURPOSE, and that is the second half of the
+    2026-08-26 fix. The old fallthrough put the IDENTICAL string into
+    ``high_level_description`` and ``background`` -- the input pasted into two
+    fields, which is not a deconstruction and merely told the model the same
+    thing twice. The honest alternative is not a richer guess: the composer emits
+    a comma-joined five-layer string behind a style prefix, which is a
+    convention, not a grammar, so any attempt to re-extract subject / setting /
+    elements from it mis-fires. Leaving the slot empty invents no setting.
+    """
+    return {
+        "aspect_ratio": aspect,
+        "high_level_description": description,
+        "compositional_deconstruction": {"background": "", "elements": []},
+    }
+
+
+def build_caption(prose: str, width: int = 0, height: int = 0, *,
+                  kind: str = "", role: str = "") -> dict:
     """OTR's composed prose -> the vendor's three-key caption schema.
 
     ORDER IS LOAD-BEARING: the quoted card text is extracted and removed BEFORE
@@ -252,23 +388,36 @@ def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
     guard phrase -- a card reading "No captions, no excuses." is SCRIPT, and
     script is never edited.
 
-    Three routes, and none of them passes prose through raw:
-      WORD  -> the quoted line becomes the single text element;
-      TITLE -> ``elements: []``, because the music card is contractually
-               WORDLESS and its own guard would otherwise ask for words;
-      other -> the prose is WRAPPED in the schema with no text element, since
-               raw prose is what this model refuses.
+    Four routes (see :func:`caption_route` for the priority and why), and none of
+    them passes prose through raw:
+      WORD     -> the quoted line becomes the single text element;
+      TITLE    -> ``elements: []``, because the music card is contractually
+                  WORDLESS and its own guard would otherwise ask for words;
+      PORTRAIT -> the request's kind says a face, wrapped in the schema;
+      SCENE    -> every other mapped kind, and a caller that supplied none.
+
+    PORTRAIT AND SCENE EMIT THE SAME MINIMAL SHAPE, DELIBERATELY. The vendor
+    schema on disk carries exactly ``background`` and ``elements`` under the
+    deconstruction, the only element type ever observed in it is ``text``, and
+    there is no portrait-specific key to fill. Writing one would be inventing
+    detail this adapter was never handed. What splitting the route buys is that
+    the choice is now RECORDED and auditable, and that a kind nobody mapped can
+    no longer reach either route by accident.
     """
     aspect = canonical_aspect(width, height)
-    word = _WORD_RE.search(prose)
-    title = _TITLE_RE.search(prose)
+    route = caption_route(prose, kind=kind, role=role)
 
     def _atmosphere(match) -> str:
         rest = prose[:match.start()] + prose[match.end():]
         rest = _PROHIBITION_RE.sub("", rest)
         return _tidy(rest)
 
-    if word:
+    # The anchor is re-searched rather than threaded out of `caption_route`,
+    # because only the two anchor routes need the capture group and the route
+    # decision must live in exactly one place. Re-running one short regex on one
+    # prompt per still is not a cost worth a second copy of the priority order.
+    if route == ROUTE_WORD:
+        word = _WORD_RE.search(prose)
         card = word.group(1)
         atmosphere = _atmosphere(word)
         return {
@@ -290,7 +439,8 @@ def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
                 }],
             },
         }
-    if title:
+    if route == ROUTE_TITLE:
+        title = _TITLE_RE.search(prose)
         evoked = title.group(1)
         atmosphere = _atmosphere(title)
         return {
@@ -303,17 +453,21 @@ def build_caption(prose: str, width: int = 0, height: int = 0) -> dict:
             "compositional_deconstruction": {
                 "background": atmosphere, "elements": []},
         }
-    body = _tidy(_PROHIBITION_RE.sub("", prose))
-    return {
-        "aspect_ratio": aspect,
-        "high_level_description": body,
-        "compositional_deconstruction": {"background": body, "elements": []},
-    }
+    # PORTRAIT and SCENE. Both wrap the scrubbed prose in the vendor shape; the
+    # difference between them is the recorded routing decision above, not an
+    # invented caption. See :func:`build_caption`'s docstring.
+    return _wrapped_caption(aspect, _tidy(_PROHIBITION_RE.sub("", prose)))
 
 
-def caption_json(prose: str, width: int = 0, height: int = 0) -> str:
-    """The caption as the SINGLE-LINE MINIFIED JSON the schema specifies."""
-    return json.dumps(build_caption(prose, width, height),
+def caption_json(prose: str, width: int = 0, height: int = 0, *,
+                 kind: str = "", role: str = "") -> str:
+    """The caption as the SINGLE-LINE MINIFIED JSON the schema specifies.
+
+    The metadata is threaded straight through: changing only
+    :func:`build_caption`'s signature would leave the lens dead, since this is
+    what ``_params`` actually calls.
+    """
+    return json.dumps(build_caption(prose, width, height, kind=kind, role=role),
                       ensure_ascii=False, separators=(",", ":"))
 
 
@@ -356,7 +510,16 @@ class Ideogram4LocalEngine:
     #: Base version. `engine_version` is a PROPERTY below so that repointing any
     #: weight env var changes the still cache key -- otherwise a quant swap would
     #: silently serve stale cached stills.
-    base_engine_version = "1"
+    #:
+    #: BUMPED "1" -> "2" ON 2026-08-26 for the metadata routing above, and the
+    #: bump is REQUIRED rather than bookkeeping. The dispatcher's still cache key
+    #: is ``(role, object_id, prompt_hash, seed, engine_id, engine_version)``,
+    #: and ``prompt_hash`` is computed from OTR's PROSE before this adapter ever
+    #: runs -- so a change that alters only the caption this adapter builds is
+    #: invisible to every other term. Without the bump, every still minted under
+    #: the old blind fallthrough would be served from cache forever and the fix
+    #: would never reach a rendered frame.
+    base_engine_version = "2"
 
     #: Terminal graph node: its IMAGE output is the still.
     _TERMINAL = "decode"
@@ -421,7 +584,13 @@ class Ideogram4LocalEngine:
         return {
             "cond_unet": cond, "uncond_unet": uncond,
             "clip_name": clip, "vae_name": vae,
-            "prompt": caption_json(str(get("prompt") or ""), width, height),
+            # kind/role reach the caption transform HERE or nowhere: the
+            # dispatcher has put them on every request since the still spine was
+            # built, and this line reading only `prompt` is what left the lens
+            # routing blind on three of the four still lanes.
+            "prompt": caption_json(str(get("prompt") or ""), width, height,
+                                   kind=str(get("kind") or ""),
+                                   role=str(get("role") or "")),
             "seed": int(get("seed") or 0),
             "width": width, "height": height,
             "steps": STEPS, "mu": MU, "std": STD, "cfg": CFG,

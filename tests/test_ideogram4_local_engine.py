@@ -23,6 +23,8 @@ from nodes._otr_image_engines import registry as ireg
 from nodes._otr_image_engines import ideogram4_local as ideo
 from nodes import _otr_visual_styles as vs
 from nodes.otr_meta_brief_image_prompt import compose_still_word_prompt
+from nodes._otr_shared import still_plan_helpers as sp
+from nodes._otr_video_engines import coverage_plan as cp
 
 
 ALL_PACKS = ("anime", "archival_documentary", "cartoon", "paper_origami",
@@ -50,6 +52,18 @@ def _styled_prose(pack, role, text):
             "story_brief_terms": {"setting": ["a dock"], "atmosphere": ["tense"]}}
     line = {"line_id": "b1", "speaker_role": "character", "text": text}
     return vs.prefix_style_cue(style, compose_still_word_prompt(meta, role, line))
+
+
+def _scene_prose(pack="sci_fi_radio"):
+    """A composed SCENE as the three non-`still_word` lanes hand it over: a
+    comma-joined description behind the same front-anchored style cue. It
+    matches NEITHER composer anchor -- which is exactly why routing on prose
+    text alone left `still_flat` / `still_pan` / `still_motion` unrouted."""
+    style = vs.resolve_visual_style(pack)
+    return vs.prefix_style_cue(
+        style,
+        "a weathered spacer at a cramped orbital console, worn dials glowing, "
+        "one hand raised, a low tense hum, amber key light")
 
 
 # --------------------------------------------------------------------------- #
@@ -410,3 +424,198 @@ def test_no_control_characters_reach_the_caption_on_any_route():
         controls = sorted({c for c in blob if ord(c) < 32})
         assert not controls, (
             "caption_json(%r) carries control character(s) %r" % (probe, controls))
+
+
+# --------------------------------------------------------------------------- #
+# THE LENS: the caption transform routes on the request's METADATA
+#
+# `ideogram4_local` is the only image engine that TRANSFORMS its prompt, so it
+# is the only one that owes a translation layer. Until 2026-08-26 that layer
+# routed by searching the prose for two literal anchors, and both anchors are
+# minted by ONE composer entry (`compose_still_word_prompt`) serving ONE lane.
+# Every other still lane matched neither and fell into the unrouted fallthrough
+# -- the branch whose own docstring conceded that raw prose is what this model
+# refuses. The dispatcher was already handing over `kind` and `role`
+# (otr_image_gen_dispatcher, the request dict); the adapter never read them.
+# --------------------------------------------------------------------------- #
+
+#: Every live still kind and the route it must take. Written out one by one
+#: rather than derived, so a kind silently changing route is a diff a reader
+#: sees rather than a formula that quietly still passes.
+KIND_ROUTE_EXPECTATIONS = (
+    (sp.KIND_PORTRAIT, ideo.ROUTE_PORTRAIT),
+    (sp.KIND_SCENE_OPEN, ideo.ROUTE_SCENE),
+    (sp.KIND_SCENE_BEAT, ideo.ROUTE_SCENE),
+    (sp.KIND_SCENE_CHARACTER, ideo.ROUTE_SCENE),
+    (sp.KIND_MESH_FODDER, ideo.ROUTE_SCENE),
+    (sp.KIND_SCENE_BACKGROUND_PLATE, ideo.ROUTE_SCENE),
+    (cp.JUMP_STILL_KIND, ideo.ROUTE_SCENE),
+)
+
+
+def test_the_kind_table_covers_the_live_vocabulary():
+    """The routing table repeats its literals instead of importing them, because
+    the engine module is cold-import clean (V-12) and the video package
+    self-registers on import. This test pays that import cost HERE instead, and
+    is the thing that fails when the two definitions drift.
+
+    Six kinds are the closed enum in `still_plan_helpers`; the seventh is
+    `coverage_plan.JUMP_STILL_KIND`, deliberately not a `scene_*` token so
+    segment stills stay invisible to the beat-indexed consumers."""
+    live = set(sp.VALID_KINDS) | {cp.JUMP_STILL_KIND}
+    assert set(ideo.OBJECT_KIND_ROUTES) == live, (
+        "table %r vs live vocabulary %r"
+        % (sorted(ideo.OBJECT_KIND_ROUTES), sorted(live)))
+    # ...and the expectations above are exhaustive over that same vocabulary.
+    assert {k for k, _route in KIND_ROUTE_EXPECTATIONS} == live
+
+
+@pytest.mark.parametrize("kind,expected", KIND_ROUTE_EXPECTATIONS)
+def test_every_live_still_kind_takes_an_explicitly_mapped_route(kind, expected):
+    """One route assertion per object kind. Scene prose carries neither composer
+    anchor, so this is the decision `kind` alone is making."""
+    assert ideo.caption_route(_scene_prose(), kind=kind) == expected
+
+
+def test_a_portrait_request_reaches_the_portrait_route_at_all():
+    """It could not before: with no metadata read, a portrait was
+    indistinguishable from a scene and both landed in the same fallthrough.
+    `ideogram4_local` returns a safety placeholder for a person close-up (it
+    killed a live leg on 2026-08-22), so knowing a request IS a portrait is the
+    prerequisite for ever treating one differently."""
+    cap = ideo.build_caption(_scene_prose(), 1472, 832,
+                             kind=sp.KIND_PORTRAIT, role="character_video")
+    assert ideo.caption_route(_scene_prose(), kind=sp.KIND_PORTRAIT) == \
+        ideo.ROUTE_PORTRAIT
+    assert list(cap) == ["aspect_ratio", "high_level_description",
+                         "compositional_deconstruction"]
+
+
+def test_an_unmapped_kind_fails_loudly_and_names_the_lane():
+    """NO FALLBACK. A kind nobody routed must not slide into the scene caption --
+    that silent misroute is the whole defect being repaired, and letting the
+    next new kind repeat it would be choosing the same bug twice. The message
+    carries the role because that is how an operator finds which lane minted
+    the row."""
+    with pytest.raises(ValueError) as excinfo:
+        ideo.build_caption(_scene_prose(), 1472, 832,
+                           kind="scene_montage", role="music_visual")
+    message = str(excinfo.value)
+    assert "scene_montage" in message
+    assert "music_visual" in message
+    # the known vocabulary is listed, so the reader is told what IS mapped
+    assert sp.KIND_SCENE_BEAT in message
+
+
+def test_an_unmapped_kind_fails_on_the_word_lane_too():
+    """The kind is resolved BEFORE the prose anchors are consulted, on purpose.
+    A hole in the table is a hole whether or not this particular prose happened
+    to carry a composer anchor, and a hole that only surfaces on some lanes is
+    the kind that ships."""
+    word = _styled_prose("anime", "character_video", "Hold the line.")
+    with pytest.raises(ValueError):
+        ideo.build_caption(word, 1472, 832, kind="scene_montage")
+
+
+def test_an_absent_kind_is_the_scene_route_and_never_an_error():
+    """An ABSENT kind is not an unknown kind. `build_caption(prose, w, h)` stays
+    a valid positional call -- the refusal repro script and most of this file
+    call it that way -- and a caller with no metadata gets the route it already
+    had."""
+    prose = _scene_prose()
+    assert ideo.caption_route(prose) == ideo.ROUTE_SCENE
+    assert ideo.caption_route(prose, kind="", role="") == ideo.ROUTE_SCENE
+    cap = ideo.build_caption(prose, 1472, 832)          # positional, no metadata
+    assert cap["compositional_deconstruction"]["elements"] == []
+
+
+def test_the_word_anchor_outranks_the_kind_word_cards_actually_wear():
+    """THE REASON THE PROSE ANCHORS KEEP PRIORITY. A word card's ledger row wears
+    the shared cheap-family `scene_character` kind -- it inherits face framing
+    while actually minting typography from the spoken line. Routing on kind
+    first would send every word card to the scene caption and ship cards with no
+    words on them."""
+    text = "I've got our chats recorded, Marshal."
+    prose = _styled_prose("sci_fi_radio", "character_video", text)
+    assert ideo.caption_route(prose, kind=sp.KIND_SCENE_CHARACTER,
+                              role="character_video") == ideo.ROUTE_WORD
+    cap = ideo.build_caption(prose, 1472, 832, kind=sp.KIND_SCENE_CHARACTER,
+                             role="character_video")
+    elements = cap["compositional_deconstruction"]["elements"]
+    assert len(elements) == 1 and elements[0]["text"] == text
+
+
+def test_the_title_anchor_outranks_the_object_kind_as_well():
+    """Same rule on the music card: it is contractually WORDLESS and its subject
+    is the episode title, whatever kind its row happens to carry."""
+    prose = _styled_prose("anime", "music_visual", "")
+    assert ideo.caption_route(prose, kind=sp.KIND_SCENE_BEAT,
+                              role="music_visual") == ideo.ROUTE_TITLE
+    cap = ideo.build_caption(prose, 1472, 832, kind=sp.KIND_SCENE_BEAT,
+                             role="music_visual")
+    assert "Phonograph" in cap["high_level_description"]
+    assert cap["compositional_deconstruction"]["elements"] == []
+
+
+@pytest.mark.parametrize("kind", (sp.KIND_PORTRAIT, sp.KIND_SCENE_BEAT,
+                                  sp.KIND_SCENE_BACKGROUND_PLATE,
+                                  cp.JUMP_STILL_KIND))
+def test_the_wrapped_routes_stop_pasting_the_input_into_two_fields(kind):
+    """BUG 2. The fallthrough used to put the IDENTICAL string into
+    `high_level_description` AND `compositional_deconstruction.background` --
+    the input pasted twice, which is not a deconstruction and merely told the
+    model the same thing over again.
+
+    The fix is an EMPTY background, not a richer guess: the composer emits a
+    comma-joined five-layer string behind a style prefix, which is a convention
+    and not a grammar, so re-extracting a setting from it would mis-fire and
+    invent one. Empty invents nothing."""
+    cap = ideo.build_caption(_scene_prose(), 1472, 832, kind=kind)
+    deconstruction = cap["compositional_deconstruction"]
+    description = cap["high_level_description"]
+    assert description, "the scrubbed prose must still reach the model"
+    assert deconstruction["background"] == ""
+    assert deconstruction["background"] != description, kind
+    assert deconstruction["elements"] == []
+    # the vendor shape stays minimal -- a FOREIGN key is not ignored by this
+    # model, it is rendered onto the card
+    assert set(deconstruction) == {"background", "elements"}
+
+
+def test_params_threads_the_request_kind_and_role_into_the_caption():
+    """Changing only `build_caption` would leave the lens dead: `_params` is what
+    the render path calls, and it read only `prompt`. An unmapped kind reaching
+    the transform through `_params` is the proof the metadata now travels."""
+    engine = _engine()
+    with pytest.raises(ValueError) as excinfo:
+        engine._params({"prompt": _scene_prose(), "seed": 1,
+                        "w": 1472, "h": 832, "object_id": "still_b1",
+                        "kind": "scene_montage", "role": "music_visual"})
+    assert "scene_montage" in str(excinfo.value)
+    assert "music_visual" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("kind,_expected", KIND_ROUTE_EXPECTATIONS)
+def test_params_builds_a_caption_for_every_live_kind(kind, _expected):
+    """The other half: every kind the dispatcher can actually send must survive
+    the round trip and arrive as minified schema, never raw prose."""
+    params = _engine()._params({"prompt": _scene_prose(), "seed": 1,
+                                "w": 1472, "h": 832, "object_id": "still_b1",
+                                "kind": kind, "role": "character_video"})
+    caption = json.loads(params["prompt"])
+    assert list(caption) == ["aspect_ratio", "high_level_description",
+                             "compositional_deconstruction"]
+    assert "\n" not in params["prompt"]
+
+
+def test_the_base_engine_version_moved_so_stale_stills_cannot_be_served():
+    """REQUIRED by the routing change, not bookkeeping. The dispatcher's still
+    cache key is `(role, object_id, prompt_hash, seed, engine_id,
+    engine_version)`, and `prompt_hash` is computed from OTR's PROSE before this
+    adapter ever runs -- so a change that alters only the caption this adapter
+    builds is invisible to every other term. Without the bump, every still
+    minted under the old blind fallthrough would be served from cache forever
+    and the fix would never reach a rendered frame."""
+    engine = _engine()
+    assert engine.base_engine_version == "2"
+    assert engine.engine_version.startswith("2.")
