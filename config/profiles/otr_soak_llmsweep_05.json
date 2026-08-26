@@ -13,7 +13,7 @@
     "character_visual": "still_pan",
     "announcer_image": "flux2_klein",
     "music_image": "lumina_image",
-    "character_image": "ideogram4_local"
+    "character_image": "z_image_turbo"
   },
   "slot_overrides": {
     "voice_bank": "default",

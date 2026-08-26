@@ -12,7 +12,7 @@
     "music_visual": "still_flat",
     "character_visual": "still_motion",
     "announcer_image": "lumina_image",
-    "music_image": "ideogram4_local",
+    "music_image": "flux_gen1",
     "character_image": "z_image_turbo"
   },
   "slot_overrides": {
