@@ -60,12 +60,14 @@ def test_existing_rows_default_to_prompt_profile_modern() -> None:
     """
     # 2026-05-23: catalog pruned -- the two WARN-tier 12B community
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
-    # removed. These four are the survivors.
+    # removed.
+    # 2026-08-25: Qwen2.5-14B-Instruct pruned too (last WARN-tier row, and
+    # the only curated row with no weights on disk). These three are the
+    # surviving pre-D1a rows.
     PRE_D1A_REPO_IDS = {
         "mistralai/Mistral-Nemo-Instruct-2407",
         "google/gemma-4-E2B-it",
         "google/gemma-4-E4B-it",
-        "Qwen/Qwen2.5-14B-Instruct",
     }
     rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
     failures: list[str] = []

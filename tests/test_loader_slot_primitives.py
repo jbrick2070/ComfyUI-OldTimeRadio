@@ -173,10 +173,59 @@ def test_check_vram_fit_special_table_overrides_curated_lookup():
 
 
 def test_check_vram_fit_warn_for_curated_warn_tier():
-    """Qwen2.5-14B is curated WARN-tier."""
-    v = catalog.check_vram_fit("Qwen/Qwen2.5-14B-Instruct", 8192)
-    assert v.tier == "WARN"
-    assert v.soak_tested is False
+    """check_vram_fit reports WARN for a curated WARN-tier row.
+
+    2026-08-25: this used to read the live Qwen2.5-14B row, which was the
+    last WARN-tier entry in the catalog until it was pruned. The WARN
+    MECHANISM is still worth covering, so the row is now synthetic --
+    otherwise removing the last WARN model would have silently deleted the
+    only test of what WARN does, which is the vacuity class this repo has
+    already been bitten by twice.
+    """
+    import nodes._otr_model_catalog as c
+
+    fake_warn = catalog.CuratedModel(
+        repo_id="test-only/warn-tier-row",
+        requires_auth=False,
+        loader_backend="transformers_safetensors",
+        vram_fit_tier="WARN",
+        approx_safetensors_gb=28.0,
+        notes="test-only WARN row",
+    )
+    original_curated = c.CURATED_LLM_MODELS
+    c.CURATED_LLM_MODELS = original_curated + (fake_warn,)
+    try:
+        v = catalog.check_vram_fit("test-only/warn-tier-row", 8192)
+        assert v.tier == "WARN"
+        assert v.soak_tested is False
+    finally:
+        c.CURATED_LLM_MODELS = original_curated
+
+
+def test_every_curated_local_row_is_pass_tier():
+    """Operator ruling 2026-08-25: only easy-to-load LLMs ship.
+
+    "If it doesn't fit nicely or requires Ollama rip it from the dropdown
+    and blast radius." A WARN row is by definition one that is NOT
+    soak-tested to fit -- Qwen2.5-14B's own note conceded it needed
+    "quantization or offload to fit 16 GB" and was for "users with bigger
+    rigs". Shipping one in the dropdown promises a load that may not
+    happen on the 16 GB target card.
+
+    This is the gate that keeps the ruling from decaying: a new WARN (or
+    UNKNOWN/FAIL) row fails HERE, by name, instead of failing in front of
+    an operator mid-render.
+    """
+    offenders = [
+        f"{row.repo_id} (tier={row.vram_fit_tier})"
+        for row in catalog.CURATED_LLM_MODELS
+        if row.vram_fit_tier != "PASS"
+    ]
+    assert not offenders, (
+        "curated rows must be PASS-tier (operator 2026-08-25, "
+        "'I only want easy to load LLMs'); offenders: "
+        + ", ".join(offenders)
+    )
 
 
 def test_check_vram_fit_unknown_for_arbitrary_uncurated():

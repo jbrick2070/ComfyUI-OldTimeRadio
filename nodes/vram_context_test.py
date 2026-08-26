@@ -64,13 +64,17 @@ _FILLER_PARAGRAPH = (
 # Same model-id list the LLMScriptWriter dropdown exposes. Kept in sync
 # manually -- if the orchestrator dropdown gains/loses entries, mirror
 # them here so the test surface matches the production surface.
+# 2026-08-25: re-synced. This list had drifted badly -- it still named
+# Captain-Eris and MN-12B-Mag-Mell, pruned from the catalog on 2026-05-23,
+# and Qwen2.5-14B, pruned 2026-08-25. Three of its six entries were models
+# the catalog no longer offered, which is what "kept in sync manually"
+# decays into. The probe surface now matches the real curated local rows.
 _LLM_MODEL_CHOICES = [
     "mistralai/Mistral-Nemo-Instruct-2407",
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
-    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
+    "google/gemma-4-12b-it",
+    "google/gemma-2-2b-it",
 ]
 
 # Default prompt-length probe set. Comma-separated for the widget so the

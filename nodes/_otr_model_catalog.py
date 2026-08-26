@@ -216,22 +216,20 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license="gated_terms",
         license_audit_status="research_lane",
     ),
-    CuratedModel(
-        repo_id="Qwen/Qwen2.5-14B-Instruct",
-        requires_auth=False,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="WARN",
-        approx_safetensors_gb=28.0,
-        notes="Ungated; 14B safetensors needs quantization or offload to fit "
-        "16 GB -- not soak-tested as PASS yet. Available for users with bigger "
-        "rigs; NOT advertised in gated-error recovery hint.",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-    ),
+    # 2026-08-25: catalog pruned -- Qwen/Qwen2.5-14B-Instruct removed
+    # (operator: "if it doesn't fit nicely or requires Ollama rip it from
+    # the dropdown and blast radius"; "I only want easy to load LLMs").
+    # It was the LAST WARN-tier row and the only curated row with no
+    # weights on disk, so it was a dropdown entry that could not have
+    # loaded if anyone picked it. Its own note conceded the case: 28 GB of
+    # safetensors "needs quantization or offload to fit 16 GB -- not
+    # soak-tested as PASS yet. Available for users with bigger rigs."
+    # A dropdown row is a promise the model will load; that one could not
+    # keep it on this hardware. Nothing required Ollama -- the GGUF lane is
+    # in-process llama-cpp-python -- so that half of the sweep had no
+    # targets. See docs/LLM_PREFLIGHT_GUIDE.md for the seven gates a new
+    # row must clear, and test_every_curated_local_row_is_pass_tier for the
+    # invariant that keeps a WARN row from returning silently.
     # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
     # removed. The curated set now also includes the official Gemma 4 12B HF
@@ -1424,9 +1422,11 @@ CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
     "google/gemma-4-12b-it": 8192,
-    "Qwen/Qwen2.5-14B-Instruct": 8192,
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B": 8192,
-    "inflatebot/MN-12B-Mag-Mell-R1": 8192,
+    # 2026-08-25: the Qwen2.5-14B, Captain-Eris and MN-12B-Mag-Mell entries
+    # were removed with (or after) their catalog rows. An override for a
+    # repo_id no curated row can name is unreachable -- resolve_context_cap
+    # only ever reaches this dict via .get(model_id) for a real selection --
+    # so a stale key is dead weight that reads like a supported model.
 }
 
 

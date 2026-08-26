@@ -548,9 +548,29 @@ def test_resolve_context_cap_warn_tier_override_not_authoritative(empty_hub_root
     """A WARN-tier catalog row's override is NOT soak-tested, so it stays on the
     clamped path even though it sits in CURATED_CONTEXT_OVERRIDES -- the
     authoritative branch is gated on the real vram_fit_tier=='PASS', not merely
-    on the presence of an override entry."""
+    on the presence of an override entry.
+
+    2026-08-25: was pinned to the live Qwen2.5-14B row, the catalog's last
+    WARN-tier entry, pruned that day. The row and its override entry are now
+    synthetic so the BRANCH stays covered -- deleting this test along with the
+    model would have removed the only proof that an override alone cannot
+    promote a non-soak-tested row to authoritative.
+    """
+    import nodes._otr_model_catalog as c
+
+    warn_id = "test-only/warn-tier-context-row"
+    fake_warn = catalog.CuratedModel(
+        repo_id=warn_id,
+        requires_auth=False,
+        loader_backend="transformers_safetensors",
+        vram_fit_tier="WARN",
+        approx_safetensors_gb=28.0,
+        notes="test-only WARN row",
+    )
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    v = catalog.resolve_context_cap("Qwen/Qwen2.5-14B-Instruct", hub_root=empty_hub_root)
+    monkeypatch.setattr(c, "CURATED_LLM_MODELS", c.CURATED_LLM_MODELS + (fake_warn,))
+    monkeypatch.setitem(c.CURATED_CONTEXT_OVERRIDES, warn_id, 8192)
+    v = catalog.resolve_context_cap(warn_id, hub_root=empty_hub_root)
     assert v.tier == "PASS"
     assert "authoritative" not in v.source
     assert "clamped" in v.source
@@ -700,8 +720,8 @@ _LOCAL_ROW_CASES = [
     ("google/gemma-2-2b-it", False),
     ("mistralai/Mistral-Nemo-Instruct-2407", True),
     ("mistralai/Mistral-Nemo-Instruct-2407", False),
-    ("Qwen/Qwen2.5-14B-Instruct", True),
-    ("Qwen/Qwen2.5-14B-Instruct", False),
+    # Qwen2.5-14B pruned from the catalog 2026-08-25; a parametrized case
+    # naming a repo_id no curated row carries would assert nothing.
 ]
 
 

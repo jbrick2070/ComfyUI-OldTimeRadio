@@ -738,6 +738,54 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## ONLY EASY-TO-LOAD LLMs SHIP (operator ruling 2026-08-25 -- hard)
+
+Operator, in his words: *"if it doesn't fit nicely or requires Ollama rip it
+from the dropdown and blast radius"*, and *"clean sweep I only want easy to
+load LLMs"*. Also, on where weights live: *"all models should live out here
+`C:\ComfyUI-Models`"*.
+
+**THE RULE:** a curated LLM row must be `vram_fit_tier="PASS"` and its weights
+must be materialized on disk. A row that needs offload, is "for bigger rigs",
+or is not soak-tested does not go in front of an operator. A dropdown entry is
+a PROMISE that the model will load; a WARN row cannot keep it on the 16 GB
+target card.
+
+**EXECUTED 2026-08-25.** `Qwen/Qwen2.5-14B-Instruct` was ripped from the
+catalog and its blast radius (context override, two probe model lists, three
+test files, the license audit target + its audit file). It was the LAST
+WARN-tier row AND the only curated row with no weights on disk -- a dropdown
+entry that could not have loaded if anyone had picked it, failing silently
+until a render died. Its own note conceded the case: 28 GB of safetensors
+*"needs quantization or offload to fit 16 GB -- not soak-tested as PASS yet.
+Available for users with bigger rigs."* Three dead context-override keys for
+already-pruned models went with it. Precedent: the same operation on 2026-05-23
+pruned two community WARN-tier 12B rows.
+
+**THE OLLAMA HALF HAD ZERO TARGETS, and that is worth recording so nobody
+re-hunts it.** Nothing in OTR uses Ollama. The GGUF lane is IN-PROCESS
+llama-cpp-python -- `nodes/_otr_gguf_backend.py` states it opens no port and
+does not call Ollama. There is no daemon, no sidecar, no HTTP hop to remove.
+
+**DO NOT READ A >16 GB DISK SIZE AS "DOES NOT FIT".** `approx_safetensors_gb`
+is the DOWNLOAD size, not the VRAM resident size -- the field's own comment
+says so. Mistral-Nemo (24 GB) and gemma-4-12b (23.9 GB) are the SHIPPED
+production writers and load fine under the canonical's `bnb_nf4` 4-bit path.
+A naive "remove everything over 16 GB" sweep would delete the writers this
+project runs on. Judge by `vram_fit_tier`, never by the size field.
+
+**THE GATE THAT KEEPS THIS FROM DECAYING:**
+`tests/test_loader_slot_primitives.py::test_every_curated_local_row_is_pass_tier`
+fails by name on any new non-PASS row. The WARN mechanism itself is still
+covered, by SYNTHETIC rows -- removing the last real WARN model must not
+silently delete the only test of what WARN does, which is the vacuity class
+this repo has been bitten by twice.
+
+**The preflight contract for adding your own model is
+`docs/LLM_PREFLIGHT_GUIDE.md`** (seven gates; gate 5, constrained JSON, is the
+one that actually fails). Operator: *"there should be an LLM preflight guide --
+preflight guides for adding all your own components."*
+
 ## OPERATOR RULINGS 2026-08-15 (hard -- these settle three OWED decisions)
 
 **THE EPISODE SHAPE IS A REQUEST, TOP TO BOTTOM. NOT THE BEATS, NOT THE ACTS.**

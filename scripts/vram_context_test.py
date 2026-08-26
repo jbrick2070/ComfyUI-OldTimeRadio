@@ -41,11 +41,10 @@ MODELS = [
     "mistralai/Mistral-Nemo-Instruct-2407",
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
-    # Qwen / EXPERIMENTAL skipped by default to keep runtime tractable;
-    # uncomment to include in a longer measurement run.
-    # "Qwen/Qwen2.5-14B-Instruct",
-    # "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-    # "inflatebot/MN-12B-Mag-Mell-R1",
+    # 2026-08-25: the three commented-out rows here (Qwen2.5-14B,
+    # Captain-Eris, MN-12B-Mag-Mell) were deleted rather than left as
+    # "uncomment to include" -- all three are gone from the catalog, so
+    # uncommenting one would only produce an unresolvable repo_id.
 ]
 
 # Prompt lengths to probe (in tokens). Each step doubles roughly so
