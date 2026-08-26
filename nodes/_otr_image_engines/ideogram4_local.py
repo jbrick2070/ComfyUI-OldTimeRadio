@@ -135,6 +135,16 @@ _CANVAS_FLOOR = 256
 #: "type so large the model adds page furniture".
 TEXT_BBOX = [200, 60, 700, 940]
 
+#: The music card's OBJECT bbox, and note the ORDER IS DIFFERENT from
+#: ``TEXT_BBOX`` above: an ``obj`` element is ``[x, y, w, h]`` while a ``text``
+#: element is ``[y1, x1, y2, x2]`` (template caption contract, read 2026-08-21).
+#: Getting that backwards misplaces the subject silently instead of failing.
+#:
+#: Wide, centred, and generous on purpose. This exists to give the model ONE
+#: concrete thing to place on a card that may carry no words -- not to compose
+#: the shot. A tight box would turn a mood still into a product photograph.
+MUSIC_OBJECT_BBOX = [180, 240, 640, 520]
+
 #: Ratios the caption schema was trained on. Exact reduction is wrong here --
 #: 1472x832 reduces to 23:13, which is not one of them.
 _STANDARD_RATIOS = ((1, 1), (16, 9), (9, 16), (4, 3), (3, 4), (3, 2), (2, 3),
@@ -448,10 +458,53 @@ def build_caption(prose: str, width: int = 0, height: int = 0, *,
             # The captured title is the SUBJECT. Dropping it would render an
             # unrelated abstract image.
             "high_level_description": _tidy(
-                f"An abstract picture evoking '{evoked}', a purely pictorial "
-                f"composition of shape, colour and texture, {atmosphere}"),
+                f"A vintage tabletop radio receiver, its dial lit, standing in "
+                f"a composition evoking '{evoked}', {atmosphere}"),
             "compositional_deconstruction": {
-                "background": atmosphere, "elements": []},
+                "background": atmosphere,
+                # ONE OBJECT ELEMENT, AND NO TEXT ELEMENT (2026-08-26).
+                #
+                # THIS ROUTE IS THE MUSIC CARD, and only the music card: the
+                # anchor phrase `_TITLE_RE` matches is minted at exactly ONE
+                # site, `otr_meta_brief_image_prompt.py:1240`, inside
+                # `if _role == _STILL_WORD_MUSIC_ROLE`. So no role check is
+                # needed here and no route has to be inserted ahead of this one.
+                #
+                # WHY IT CHANGED. Measured on a live leg, 2026-08-26: this
+                # engine rendered 6 of 8 stills in one episode -- every card
+                # carrying words -- and REFUSED both music bookends, on
+                # different seeds, at min 78/80 std 10.5 against a real card's
+                # min~0 std 27-41. The captions were verified free of control
+                # characters, face language, prohibition clauses and duplicated
+                # fields, so none of the defects fixed earlier that day
+                # explained it. The one structural difference left was
+                # `elements: []`.
+                #
+                # A display-typography model handed an abstract with nothing to
+                # anchor on is being asked for the one thing it is not for. The
+                # music card is contractually WORDLESS (operator 2026-07-04), so
+                # it cannot be given lettering -- but the vendor schema's OTHER
+                # element type costs no words at all. One `obj` gives the model
+                # a concrete subject to place while the mood still comes from
+                # `background`.
+                #
+                # BBOX ORDER IS PER-TYPE AND GETTING IT BACKWARDS FAILS SILENTLY
+                # (r2 2026-08-21): an `obj` bbox is [x, y, w, h]; a `text` bbox
+                # is [y1, x1, y2, x2]. This is an obj, so x first. It is left
+                # deliberately WIDE and centred rather than tight -- the point is
+                # to anchor the composition, not to lock it, and the mood image
+                # should still be free to be a mood image.
+                #
+                # The operator's ruling that made this necessary: ideogram must
+                # stay selectable for the music role and must PRODUCE AN OUTPUT.
+                # *"It could be a horrible card but it needs to produce an
+                # output."* A refusal is the one result that is not allowed.
+                "elements": [{
+                    "type": "obj",
+                    "bbox": list(MUSIC_OBJECT_BBOX),
+                    "desc": ("a period tabletop radio receiver, warm dial glow, "
+                             "the single concrete subject of the frame"),
+                }]},
         }
     # PORTRAIT and SCENE. Both wrap the scrubbed prose in the vendor shape; the
     # difference between them is the recorded routing decision above, not an

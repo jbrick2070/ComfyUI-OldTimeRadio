@@ -83,11 +83,35 @@ def test_word_route_survives_the_style_prefix_on_every_pack(pack):
 
 @pytest.mark.parametrize("pack", ALL_PACKS)
 def test_music_cards_carry_no_text_element_and_keep_their_subject(pack):
-    """The music card is contractually WORDLESS, so it gets `elements: []` --
-    and the evoked title must still reach `high_level_description`, or the model
-    renders an abstract image of nothing in particular."""
+    """The music card is contractually WORDLESS -- and the evoked title must
+    still reach `high_level_description`, or the model renders an abstract image
+    of nothing in particular.
+
+    THE ASSERTION MOVED, THE CONTRACT DID NOT (2026-08-26). This used to say
+    `elements == []`, which is STRICTER than the rule the test's own name
+    states: the card must carry no TEXT element. Emptiness was an incidental
+    way of expressing that, and it stopped being true when the music card
+    gained one `type: "obj"` anchor.
+
+    WHY IT GAINED ONE. Measured on a live leg: this engine rendered 6 of 8
+    stills in one episode -- every card carrying words -- and refused BOTH
+    wordless music bookends on different seeds (min 78/80, std 10.5, against a
+    real card's min~0 std 27-41), on captions verified free of control
+    characters, face language, prohibitions and duplicated fields. The only
+    structural difference left was `elements: []`. A display-typography model
+    given nothing to anchor on is being asked for the one thing it is not for.
+    The operator's ruling is that ideogram stays selectable for the music role
+    and must PRODUCE AN OUTPUT, so the card gets a concrete OBJECT instead of
+    lettering it is contractually forbidden.
+
+    So the assertion is now the NAME's rule, stated directly and made stronger
+    in the dimension that matters: no `text` element may EVER appear here, and
+    the object anchor is pinned so it cannot silently become one.
+    """
     cap = ideo.build_caption(_styled_prose(pack, "music_visual", ""), 1472, 832)
-    assert cap["compositional_deconstruction"]["elements"] == [], pack
+    els = cap["compositional_deconstruction"]["elements"]
+    assert all(e["type"] != "text" for e in els), (pack, els)
+    assert [e["type"] for e in els] == ["obj"], (pack, els)
     assert "Phonograph" in cap["high_level_description"], pack
 
 
@@ -554,7 +578,10 @@ def test_the_title_anchor_outranks_the_object_kind_as_well():
     cap = ideo.build_caption(prose, 1472, 832, kind=sp.KIND_SCENE_BEAT,
                              role="music_visual")
     assert "Phonograph" in cap["high_level_description"]
-    assert cap["compositional_deconstruction"]["elements"] == []
+    # No TEXT element, ever -- see the music-card test above for why this is no
+    # longer spelled `== []`.
+    els = cap["compositional_deconstruction"]["elements"]
+    assert all(e["type"] != "text" for e in els), els
 
 
 @pytest.mark.parametrize("kind", (sp.KIND_PORTRAIT, sp.KIND_SCENE_BEAT,
@@ -619,3 +646,31 @@ def test_the_base_engine_version_moved_so_stale_stills_cannot_be_served():
     engine = _engine()
     assert engine.base_engine_version == "2"
     assert engine.engine_version.startswith("2.")
+
+
+def test_the_music_card_anchor_is_an_object_and_never_lettering():
+    """THE NEW GUARANTEE, pinned on its own so it cannot erode.
+
+    The music bookend may not carry words (operator 2026-07-04), and this engine
+    refuses a card with nothing to anchor on (measured 2026-08-26). Both hold at
+    once only if the anchor is an OBJECT. If someone later "helpfully" turns it
+    into a text element to stop a refusal, the wordless contract breaks silently
+    and the card starts spelling the episode title on screen.
+
+    The bbox order is also pinned. An `obj` bbox is [x, y, w, h] while a `text`
+    bbox is [y1, x1, y2, x2]; getting that backwards misplaces the subject
+    instead of failing, so it is asserted rather than trusted.
+    """
+    cap = ideo.build_caption(
+        _styled_prose("sci_fi_radio", "music_visual", ""), 1472, 832,
+        kind=sp.KIND_SCENE_BEAT, role="music_visual")
+    els = cap["compositional_deconstruction"]["elements"]
+    assert len(els) == 1 and els[0]["type"] == "obj", els
+    assert "text" not in els[0], "an obj element must carry no text field"
+    assert els[0]["bbox"] == list(ideo.MUSIC_OBJECT_BBOX)
+    assert ideo.MUSIC_OBJECT_BBOX is not ideo.TEXT_BBOX
+    # and the whole caption still carries no lettering instruction anywhere
+    import json as _json
+    blob = _json.dumps(cap, ensure_ascii=False).lower()
+    for banned in ("the words", "lettering reading", "spelled exactly"):
+        assert banned not in blob, banned
