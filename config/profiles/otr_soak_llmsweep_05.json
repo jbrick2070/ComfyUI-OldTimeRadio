@@ -86,7 +86,7 @@
     "env": {}
   },
   "upscale_stage": {
-    "engine": "spandrel_esrgan",
+    "engine": "off",
     "device": "cuda"
   }
 }

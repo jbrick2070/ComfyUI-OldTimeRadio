@@ -68,11 +68,11 @@ import json
 import pathlib
 import subprocess
 import sys
+import time
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent
 RUNNER = HERE / "otr_canonical_api_run.py"
-MATRIX_FILE = HERE / "_llm_sweep_matrix.json"
 RECEIPT = REPO / "docs" / "2026-08-25-llm-image-upscale-sweep-receipt.json"
 
 if str(REPO) not in sys.path:
@@ -80,11 +80,106 @@ if str(REPO) not in sys.path:
 
 BANK = "scifi_news_pro"
 VISUAL_STYLE = "sci_fi_radio"
-DEFAULT_TIMEOUT = 2400  # seconds; one-act stills-only legs are cheap
+
+#: SECONDS. Raised 2400 -> 7200 on 2026-08-25 after two legs were reported
+#: FAIL purely because this budget expired, one of which had not started.
+#:
+#: TWO THINGS THIS NUMBER HAS TO ABSORB, and the first one is not obvious:
+#:
+#: 1. ComfyUI SERIALIZES prompts. Each leg POSTs its prompt and immediately
+#:    starts its own clock, but the server runs one prompt at a time -- so a
+#:    leg queued behind a slow predecessor burns its entire budget sitting in
+#:    `queue_pending` having rendered nothing. Leg 4 of the first run "failed"
+#:    in exactly this way: 40 minutes of pure queue wait, zero work done, and
+#:    the receipt called it a failure. A per-leg timeout is really a
+#:    QUEUE-WAIT + RENDER budget unless the driver waits for the queue to
+#:    drain first, which is what `_wait_for_idle_queue` below now does.
+#: 2. `spandrel_esrgan` costs 3-4 minutes PER SEGMENT (18+ segments on a
+#:    one-act episode). See docs/SOAK_LEG_GUIDE.md section 8A.
+DEFAULT_TIMEOUT = 7200
+
+#: Poll the server's queue before submitting, so a leg's timeout measures its
+#: OWN render rather than its predecessor's. Cheap: one HTTP GET every 15s.
+COMFY_URL = "http://127.0.0.1:8000"
+QUEUE_POLL_S = 15
+QUEUE_DRAIN_MAX_S = 10800
+
+
+def _wait_for_idle_queue(*, max_wait_s: int = QUEUE_DRAIN_MAX_S) -> bool:
+    """Block until the ComfyUI queue is empty, so this leg's clock is its own.
+
+    Returns True when the queue drained, False on timeout/unreachable. Never
+    raises: a driver that dies because a status probe failed is worse than one
+    that submits slightly early.
+    """
+    import urllib.request
+
+    deadline = time.monotonic() + max_wait_s
+    announced = False
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(f"{COMFY_URL}/queue", timeout=10) as r:
+                q = json.load(r)
+            busy = len(q.get("queue_running") or []) + len(q.get("queue_pending") or [])
+            if busy == 0:
+                return True
+            if not announced:
+                print(f"[llmsweep]   waiting for queue to drain ({busy} ahead)",
+                      flush=True)
+                announced = True
+        except Exception:
+            return False  # unreachable: let the leg try and fail honestly
+        time.sleep(QUEUE_POLL_S)
+    return False
+
+
+#: The 7 curated LOCAL LLM rows, in catalog order. Full dropdown labels
+#: (size suffix included) -- validate_model_id resolves them.
+LLM_ROWS = (
+    "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
+    "google/gemma-4-E2B-it (3.0 GB)",
+    "google/gemma-4-E4B-it (4.5 GB)",
+    "google/gemma-4-12b-it (11.9 GB)",
+    "unsloth/gemma-4-12b-it-GGUF (17.4 GB)",
+    "unsloth/Qwen3-8B-GGUF (10.3 GB)",
+    "google/gemma-2-2b-it (2.6 GB)",
+)
+STILL_ENGINES = ("still_flat", "still_motion", "still_pan", "still_word")
+IMAGE_ENGINES = ("z_image_turbo", "flux_gen1", "flux2_klein",
+                 "lumina_image", "ideogram4_local")
+ROLES = ("announcer", "music", "character")
+
+#: Which leg carries the upscaler. Exactly ONE, deliberately -- see
+#: DEFAULT_TIMEOUT note 2 and docs/SOAK_LEG_GUIDE.md section 8A.
+UPSCALE_LEG = 7
 
 
 def load_matrix() -> list[dict]:
-    return json.loads(MATRIX_FILE.read_text(encoding="utf-8"))
+    """Derive the leg matrix. COMPUTED, not read from a sidecar file.
+
+    It used to live in `scripts/_llm_sweep_matrix.json`, which `.gitignore`
+    excludes as a scratch file (`scripts/_*.json`) -- so the committed script
+    could not actually run from a fresh clone. The matrix is fully
+    deterministic, so it belongs in the code that uses it.
+
+    Leg N: creative = row N, technical = row N+1 (mod 7), so every row plays
+    BOTH slots exactly once across the sweep. Stills and images rotate so no
+    leg repeats an engine across its three roles.
+    """
+    legs = []
+    for i in range(len(LLM_ROWS)):
+        legs.append({
+            "index": i + 1,
+            "creative": LLM_ROWS[i],
+            "technical": LLM_ROWS[(i + 1) % len(LLM_ROWS)],
+            "stills": {ROLES[r]: STILL_ENGINES[(i * 3 + r) % len(STILL_ENGINES)]
+                       for r in range(3)},
+            "images": {ROLES[r]: IMAGE_ENGINES[(i * 3 + r) % len(IMAGE_ENGINES)]
+                       for r in range(3)},
+            "upscale_engine": ("spandrel_esrgan" if i + 1 == UPSCALE_LEG
+                               else "off"),
+        })
+    return legs
 
 
 def leg(entry: dict, *, timeout: int, dry_run: bool) -> dict:
@@ -119,6 +214,10 @@ def leg(entry: dict, *, timeout: int, dry_run: bool) -> dict:
         # rule exists to catch. Never trust dry_run alone as a verdict.)
         cmd += ["--dry-run", "--offline-schemas"]
     print(f"[llmsweep] leg {idx} START {stamp} {leg_label}", flush=True)
+    if not dry_run:
+        # Make this leg's timeout measure ITS OWN render, not the queue
+        # wait behind a slower predecessor (see DEFAULT_TIMEOUT note 1).
+        _wait_for_idle_queue()
     print(f"[llmsweep]   cmd: {' '.join(cmd)}", flush=True)
     started = datetime.datetime.now()
     try:

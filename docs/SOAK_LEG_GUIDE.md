@@ -168,6 +168,35 @@ soak profile must be added there too**, or `build_variants.py --check` never
 notices it and it also never *accidentally* ships as a user-facing variant
 (the exclusion is what keeps it out, not an oversight).
 
+## 8A. UPSCALE IS THE DOMINANT COST OF A SOAK LEG -- budget for it or leave it off
+
+**Measured 2026-08-25, the hard way.** The canonical ships
+`OTR_SilentComposite.upscale_engine = 'off'`, and normal production episodes
+publish in **~10-20 minutes**. The same one-act episode with
+`upscale_stage.engine = spandrel_esrgan` took **over 105 minutes** and was
+still going -- roughly **3-4 minutes per segment across 18+ segments** for a
+single 4,040-frame episode. Turning the upscaler on is not a small delta; it
+is the difference between a leg and an evening.
+
+**Practical rule: do NOT put `spandrel_esrgan` on more than one leg of a
+multi-leg sweep**, and prefer the shortest possible episode for that one leg.
+A sweep that alternates it across half its legs (as the 2026-08-25 LLM sweep
+did) spends most of its wall-clock in Real-ESRGAN and starves every other
+axis it was built to measure.
+
+**OPEN OPTIMISATION, operator-observed 2026-08-25** (*"spending an hour
+upscaling stills"*), recorded here because it is a real finding and not yet
+acted on: on a `still_*` lane a beat is ONE still image held or panned across
+hundreds of frames, but the upscale runs on the DECODED VIDEO SEGMENT, so
+Real-ESRGAN re-upscales the same picture once per frame. There is already a
+fast path that skips the model (`nodes/otr_silent_composite.py:881` --
+`engine is None or engine.name == "off" or not sharpen`), but every segment in
+the measured leg took the MODEL PATH, i.e. still-lane segments are being
+treated as sharpened real-clip footage. Upscaling the SOURCE STILL once,
+before the segment is encoded, would produce equivalent output for a small
+fraction of the work on exactly the lanes a soak uses most. Not yet designed;
+needs its own investigation before anyone changes the composite.
+
 ## 9. Always validate offline before booking a GPU leg
 
 `--dry-run` REQUIRES `--offline-schemas` alongside it, or the "dry" run still
