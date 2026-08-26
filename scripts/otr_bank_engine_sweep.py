@@ -94,6 +94,32 @@ BANKS = (
 #: ideogram4_local / z_image_turbo over still_word / still_flat / still_motion.
 PROFILES = ("otr_soak_llmsweep_01", "otr_soak_llmsweep_02")
 
+#: THE VIDEO LANES THAT RUN ON THE DEFAULT BOOT (`--lanes video`), smallest
+#: model first so a night that runs short still covers the most engines.
+#:
+#: WHY ONLY THESE EIGHT: a profile's `launch.env` is a BOOT contract, not a
+#: per-leg switch, so a lane whose shipping profile asks for a different boot
+#: cannot share this server. Deliberately EXCLUDED and owed a separate boot:
+#:   * humo / humo_14B_169 / humo_1.7B / humo_1.7B_169 -- want
+#:     OTR_HEADLESS_RESERVE_VRAM_GB=2.921 + OTR_HEADLESS_DISABLE_PINNED=1
+#:   * ltx_audio_in -- wants OTR_HEADLESS_DISABLE_PINNED=1 (no reserve); it
+#:     cleared the 14.5 GiB gate by ~35 MB on a stock boot, which is why it
+#:     keeps the diet
+#:   * minimax_h3_video / minimax_h3_audio_in -- the only lanes the ENGINE
+#:     itself refuses to share a boot with: `compatible_boot_contracts = ("h3",)`
+#: Cloud lanes (word_razzle, cloud_*, google_*) are excluded outright: the
+#: render happens provider-side, so they prove nothing about a local model.
+VIDEO_LANES = (
+    ("otr_w45_ltx_8gb", "ltx_8gb"),
+    ("otr_w45_wan_ti2v", "wan_ti2v"),
+    ("otr_w45_fastwan", "fastwan_8gb"),
+    ("otr_w45_mesh_stage", "mesh_stage"),
+    ("otr_ghost_signal_v3_haunted", "animatediff15_v3_haunted_video"),
+    ("otr_w45_ltx_video", "ltx_video"),
+    ("otr_ltx25_high_video", "ltx25_video"),
+    ("otr_w45_wan_i2v", "wan_i2v"),
+)
+
 #: SECONDS. Inherited from otr_llm_image_upscale_sweep.py, which raised it to
 #: 7200 after legs were reported FAIL purely because the budget expired. This
 #: number absorbs a full one-act render; the queue wait is handled separately
@@ -134,16 +160,32 @@ def _wait_for_idle_queue(*, max_wait_s: int = QUEUE_DRAIN_MAX_S) -> bool:
     return False
 
 
-def load_matrix() -> "list[dict]":
+def load_matrix(lanes: str = "image") -> "list[dict]":
     """Derive the leg matrix. COMPUTED, not read from a sidecar file.
 
     `.gitignore` excludes `scripts/_*.json` as scratch, so a matrix stored
     there could not run from a fresh clone -- the reason the sibling sweep
     driver moved its matrix into code. This one is deterministic too, so it
     belongs beside the code that uses it.
+
+    `image` walks every bank against both engine profiles. `video` walks the
+    default-boot video lanes, ROTATING the bank so the video sweep broadens
+    bank coverage rather than re-proving one lane eight times.
     """
     legs = []
     index = 0
+    if lanes == "video":
+        for profile, engine in VIDEO_LANES:
+            bank, style = BANKS[index % len(BANKS)]
+            index += 1
+            legs.append({
+                "index": index,
+                "bank": bank,
+                "visual_style": style,
+                "profile": profile,
+                "video_engine": engine,
+            })
+        return legs
     for bank, style in BANKS:
         for profile in PROFILES:
             index += 1
@@ -152,6 +194,7 @@ def load_matrix() -> "list[dict]":
                 "bank": bank,
                 "visual_style": style,
                 "profile": profile,
+                "video_engine": "",
             })
     return legs
 
@@ -161,7 +204,9 @@ def leg(entry: dict, *, timeout: int, dry_run: bool) -> dict:
     bank = entry["bank"]
     profile = entry["profile"]
     stamp = datetime.datetime.now().strftime("%H%M%S")
-    leg_label = f"BANKSWEEP{idx:02d} bank={bank} profile={profile} c=t=E2B"
+    engine = entry.get("video_engine") or ""
+    leg_label = (f"BANKSWEEP{idx:02d} bank={bank} profile={profile} c=t=E2B"
+                 + (f" video={engine}" if engine else ""))
     cmd = [
         sys.executable, str(RUNNER),
         "--act-count", "1",
@@ -207,7 +252,7 @@ def leg(entry: dict, *, timeout: int, dry_run: bool) -> dict:
     return {
         "leg": idx, "leg_label": leg_label,
         "bank": bank, "visual_style": entry["visual_style"],
-        "profile": profile,
+        "profile": profile, "video_engine": engine,
         "creative_model": E2B, "technical_model": E2B,
         "ok": ok, "rc": rc, "minutes": round(elapsed, 1),
         "stdout_tail": out[-4000:] if not ok else "",
@@ -221,20 +266,34 @@ def main(argv=None) -> int:
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     ap.add_argument("--dry-run", action="store_true",
                     help="build and dump each prompt without POSTing")
+    ap.add_argument("--lanes", choices=("image", "video"), default="image",
+                    help="image: every bank x both engine profiles (stills). "
+                         "video: the default-boot video lanes, bank rotated. "
+                         "humo / ltx_audio_in / minimax_h3 are NOT here -- "
+                         "their profiles request a different server boot.")
     args = ap.parse_args(argv)
 
-    matrix = load_matrix()
+    matrix = load_matrix(args.lanes)
     if args.legs:
         wanted = {int(x) for x in args.legs.split(",")}
         matrix = [m for m in matrix if m["index"] in wanted]
 
+    # One receipt per LANE MODE. Sharing a path would let the video sweep
+    # clobber the image sweep's record, which is the same way the sibling
+    # driver's receipt was destroyed by a later run of itself -- the reason
+    # docs/2026-08-25-leg1-dossier-failure-evidence.md had to be recovered
+    # from a server log at all.
+    receipt = (RECEIPT if args.lanes == "image"
+               else RECEIPT.with_name(RECEIPT.name.replace(
+                   "-sweep-receipt.json", "-video-sweep-receipt.json")))
     results = []
     for entry in matrix:
         results.append(leg(entry, timeout=args.timeout, dry_run=args.dry_run))
-        RECEIPT.write_text(json.dumps({
+        receipt.write_text(json.dumps({
             "generated_at": datetime.datetime.now().isoformat(),
             "model_under_test": E2B,
             "slots": "creative AND technical (both)",
+            "lanes": args.lanes,
             "legs_run": len(results),
             "legs_total": len(matrix),
             "pass": sum(1 for x in results if x["ok"]),
@@ -244,7 +303,7 @@ def main(argv=None) -> int:
 
     passed = sum(1 for r in results if r["ok"])
     print(f"[banksweep] DONE {passed}/{len(results)} passed. "
-          f"Receipt: {RECEIPT}", flush=True)
+          f"Receipt: {receipt}", flush=True)
     return 0 if passed == len(results) else 1
 
 

@@ -157,7 +157,8 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     if args.profile and args.profile.lower() != "none":
         workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
         applied.append(f"profile={args.profile}")
-        checked = _assert_profile_models_present(args.profile, schemas)
+        checked = _assert_profile_models_present(
+            args.profile, schemas, offline=bool(args.offline_schemas))
         if checked:
             print("[canonical-api] preflight: %d required model(s) visible to "
                   "the server: %s" % (len(checked), ", ".join(checked)),
@@ -236,7 +237,7 @@ def classify_timeout(running: int, pending: int) -> str:
     return "not_running"
 
 
-def _assert_profile_models_present(profile_name, schemas) -> list:
+def _assert_profile_models_present(profile_name, schemas, offline=False) -> list:
     """Refuse in SECONDS what would otherwise fail seven minutes into a render.
 
     On 2026-08-22 a Ghost domain-adapter leg ran the script pass, the whole
@@ -286,7 +287,30 @@ def _assert_profile_models_present(profile_name, schemas) -> list:
     ungateable = [n for n in required if not _is_weight_filename(n)]
     visible = _server_visible_model_names(schemas)
     missing = [name for name in gateable if name not in visible]
-    if missing:
+    if missing and offline:
+        # OFFLINE SCHEMAS ARE NOT A SERVER, so this gate cannot fire here --
+        # the same rule the filename/logical-id split above is built on: "a
+        # gate that cannot verify a claim must not pretend it refuted it."
+        # `build_offline_schemas()` synthesizes widget choices from the node
+        # classes; it never had `--extra-model-paths-config` applied, so its
+        # model lists reflect THIS process's folder_paths, not the roots the
+        # real server booted with. Refusing on that evidence blocks a profile
+        # whose weights are on disk and visible to the server that will
+        # actually run it.
+        #
+        # NOT THEORETICAL (2026-08-26): `otr_ghost_signal_v3_haunted` was
+        # reported FAIL by a `--dry-run --offline-schemas` validation sweep --
+        # all three names, including two sitting under roots the yaml DOES
+        # name -- and passed preflight cleanly against the live server
+        # moments later. The old message asserted "the running server cannot
+        # see", a claim it had not checked and, offline, could not.
+        print(
+            "[canonical-api] preflight: %d filename requirement(s) NOT checked "
+            "-- %s. --offline-schemas has no server and no model-paths config, "
+            "so absence here is not evidence of absence on disk. Re-run without "
+            "--offline-schemas to gate these against the real server."
+            % (len(missing), ", ".join(missing)), flush=True)
+    elif missing:
         raise SystemExit(
             "[canonical-api] PREFLIGHT FAIL: profile %r requires model file(s) "
             "the running server cannot see: %s.\nThe weight may be on disk "
@@ -302,7 +326,11 @@ def _assert_profile_models_present(profile_name, schemas) -> list:
             "speak to them; the engine's own assert_usable remains the gate for "
             "these. Declare a weight FILENAME to get it checked here."
             % (len(ungateable), ", ".join(ungateable)), flush=True)
-    return list(gateable)
+    # The return value is "what this gate actually VERIFIED", and the caller
+    # prints it as "visible to the server". Offline there is no server and
+    # nothing was verified, so claiming otherwise would contradict the notice
+    # printed above it in the same run.
+    return [] if offline else list(gateable)
 
 
 def main(argv: list[str] | None = None) -> int:

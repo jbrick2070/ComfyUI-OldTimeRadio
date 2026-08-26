@@ -149,3 +149,44 @@ def test_the_gate_still_enforces_something_repo_wide():
     assert len(enforced) >= 5, (
         f"only {len(enforced)} requirement(s) repo-wide are enforced. The "
         f"preflight gate is effectively OFF -- suspect _is_weight_filename.")
+
+
+# --------------------------------------------------------------------------- #
+# RULE 3, added 2026-08-26: OFFLINE SCHEMAS ARE NOT A SERVER.
+# Same principle as rule 1 above, applied to the axis it originally missed.
+# --------------------------------------------------------------------------- #
+
+def test_offline_schemas_report_a_missing_weight_instead_of_refusing(capsys):
+    """`--offline-schemas` has no server and no `--extra-model-paths-config`,
+    so its model lists reflect the CALLING process's folder_paths, not the
+    roots the real server booted with. Refusing on that evidence blocks a
+    profile whose weights are on disk.
+
+    Caught live: a `--dry-run --offline-schemas` validation sweep reported
+    `otr_ghost_signal_v3_haunted` FAIL on all three of its weights -- two of
+    which sit under roots the headless yaml explicitly names -- and the same
+    profile passed preflight against the running server moments later. The
+    message even asserted "the running server cannot see", a claim it had not
+    made and, offline, could not make.
+    """
+    g = _gate()
+    empty_schemas: dict = {}
+    checked = g._assert_profile_models_present(
+        "otr_ghost_signal_v3_haunted", empty_schemas, offline=True)
+    out = capsys.readouterr().out
+    assert "NOT checked" in out, "offline preflight must say it did not check"
+    assert "not evidence of absence" in out
+    assert checked == [], (
+        "offline verified nothing, so it must not report names as 'visible to "
+        "the server' -- that contradicts the notice printed beside it")
+
+
+def test_the_live_gate_still_refuses_a_missing_weight():
+    """The offline carve-out must not disarm the real gate. With `offline`
+    False and a schema set that lists nothing, a declared weight filename is
+    genuinely unseeable and must still stop the run in seconds."""
+    g = _gate()
+    with pytest.raises(SystemExit) as exc:
+        g._assert_profile_models_present(
+            "otr_ghost_signal_v3_haunted", {}, offline=False)
+    assert "PREFLIGHT FAIL" in str(exc.value)
