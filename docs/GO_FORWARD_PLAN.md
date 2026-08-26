@@ -593,26 +593,29 @@ The arc found a new race in each of the first two cuts of the same fix, so
 choice with more than one defensible answer, which per CLAUDE.md means a full
 arc BEFORE code, not after.
 
-- **THE GENERATION DEADLINE DOES NOT COVER THE GGUF LANE.** Landed: a
-  `_DeadlineStoppingCriteria` wired into both user-facing transformers
-  closures (`make_generate_fn`, `make_polish_generate_fn`), so an abandoned
-  worker's remaining lifetime is ~1 token instead of its full
-  `max_new_tokens` budget, and a deadline hit RAISES
-  `GenerationDeadlineExceededError` rather than returning truncated text as
-  a silent success. **Not covered:** `make_generate_fn` returns
-  `make_gguf_generate_fn`'s closure early, before any deadline guard is
-  built, and `llama-cpp-python`'s `create_chat_completion` has no per-token
-  Python stopping-criteria hook the way transformers does -- so a
-  GGUF-backed abandoned worker still runs to completion. Both
-  `_run_with_timeout` callers (NewsCuration, NewsCurationDeep) accept and
-  forward a GGUF `load_config`, so the PATH exists today.
-  **VERIFY FIRST, it may be live rather than theoretical:** check whether
-  the current production technical-slot catalog row is `gguf_native`; if it
-  is, this gap is being hit on every timeout, not hypothetically. The fix
-  shape is streaming + stopping between chunks -- a materially different
-  mechanism from a `StoppingCriteria`, which is exactly why it was not
-  written on assumption. In-code scoping note lives above
-  `_GENERATION_DEADLINE` in `nodes/_otr_model_loader.py`.
+- **THE GENERATION DEADLINE NOW COVERS THE GGUF LANE -- CLOSED 2026-08-25
+  (evening).** Left this row in place rather than deleting it, because the
+  DEFERRAL'S OWN SEVERITY CALL WAS WRONG and that is the reusable part. It
+  said "VERIFY FIRST, it may be live rather than theoretical: check whether
+  the current production technical-slot catalog row is `gguf_native`". That
+  check was run and answered NO -- the canonical technical slot resolves to
+  the transformers `google/gemma-4-12b-it` row -- and the honest-looking
+  conclusion "latent, not live" was WRONG, because it asked only about the
+  UNPROFILED canonical run. **Six committed `status="shipping"` profiles
+  (`otr_g4_fastwan`, `_humo`, `_ltx_8gb`, `_ltx_audio_in`, `_ltx_video`,
+  `_wan_ti2v`) pin `technical_model` to `unsloth/gemma-4-12b-it-GGUF`, and
+  profile `status` is validated but is NOT an application gate** -- so real
+  shipping runs were hitting the uncovered lane the whole time. *A
+  reachability question answered against the default path only is not
+  answered.*
+  Shipped: deadline-conditional streaming in `_otr_gguf_backend` (no
+  deadline -> the identical non-streaming call, `stream` absent entirely;
+  a deadline -> stream and stop between chunks), plus ONE shared absolute
+  `time.monotonic()` deadline computed BEFORE worker submission, a pre-call
+  admission check, a parent recheck after `future.result()`, and the legacy
+  `GemmaHeartbeatStreamer` migrated to the same clock. Receipts in
+  `docs/PROD_BUG_LOG.md` (PBUG-20260825-04, deferral 1) and
+  `kibitz-runs/2026-08-25-gguf-deadline/`.
 
 - **THE ORPHAN-OCCUPANCY REGISTRY -- still deferred, now on its third
   independent confirmation.** `has_local_resident_llm()` reports "nothing

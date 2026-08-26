@@ -528,7 +528,7 @@ def test_deadline_criteria_false_when_no_deadline_set():
 
 
 def test_deadline_criteria_true_once_past_deadline():
-    ml.set_generation_deadline(time.time() - 1.0)  # already in the past
+    ml.set_generation_deadline(time.monotonic() - 1.0)  # already in the past
     crit = ml._DeadlineStoppingCriteria()
     try:
         assert crit(input_ids=None, scores=None) is True
@@ -538,7 +538,7 @@ def test_deadline_criteria_true_once_past_deadline():
 
 
 def test_deadline_criteria_false_before_deadline():
-    ml.set_generation_deadline(time.time() + 60.0)  # far in the future
+    ml.set_generation_deadline(time.monotonic() + 60.0)  # far in the future
     crit = ml._DeadlineStoppingCriteria()
     try:
         assert crit(input_ids=None, scores=None) is False
@@ -553,7 +553,7 @@ def test_deadline_criteria_latches_even_after_the_deadline_is_cleared():
     something clears the thread-local deadline mid-generate (which does
     not happen in production, but the LATCH -- not the live deadline value
     -- is what generate()'s loop must see from here on)."""
-    ml.set_generation_deadline(time.time() - 1.0)
+    ml.set_generation_deadline(time.monotonic() - 1.0)
     crit = ml._DeadlineStoppingCriteria()
     assert crit(input_ids=None, scores=None) is True
     ml.set_generation_deadline(None)
@@ -574,7 +574,7 @@ def test_deadline_is_per_thread_not_global():
         crit = ml._DeadlineStoppingCriteria()
         results["other"] = crit(input_ids=None, scores=None)
 
-    ml.set_generation_deadline(time.time() - 1.0)  # expired, on THIS thread
+    ml.set_generation_deadline(time.monotonic() - 1.0)  # expired, on THIS thread
     try:
         t = threading.Thread(target=other_thread)
         t.start()
@@ -620,8 +620,27 @@ def test_run_with_timeout_sets_and_clears_the_loader_deadline():
     and clear it (None) in that worker's own finally, so the deadline
     cannot outlive the call that set it."""
     src = inspect.getsource(so._run_with_timeout)
-    assert "set_generation_deadline(_TIMEOUT_CTX.deadline)" in src
+    assert "set_generation_deadline(deadline)" in src
     assert "set_generation_deadline(None)" in src
+    # 2026-08-25: this used to pin the literal
+    # `set_generation_deadline(_TIMEOUT_CTX.deadline)`, which derived the
+    # loader deadline from the legacy streamer context INSIDE the worker.
+    # There is now ONE absolute deadline computed BEFORE submit and shared by
+    # the worker and the parent, because the old shape let the worker's
+    # deadline outlive the parent's timeout by the executor's scheduling
+    # delay. Pin the new invariants so that skew cannot come back:
+    assert "time.monotonic() + timeout_sec" in src, (
+        "the deadline must be monotonic and computed from the budget once; "
+        "an epoch clock can step and a per-worker recomputation reintroduces "
+        "the parent/worker skew"
+    )
+    assert "deadline - time.monotonic()" in src, (
+        "the parent must wait only the REMAINING duration, not a fresh full "
+        "timeout_sec measured from after the worker was scheduled"
+    )
+    assert src.index("deadline = time.monotonic()") < src.index("executor.submit"), (
+        "the shared deadline must be computed BEFORE the worker is submitted"
+    )
 
 
 def test_ast_confirms_deadline_clear_is_in_a_finally_block():
@@ -733,7 +752,7 @@ def _make_cache_entry(model):
 
 
 def test_make_generate_fn_raises_deadline_exceeded_instead_of_returning_text():
-    ml.set_generation_deadline(time.time() - 1.0)  # already expired
+    ml.set_generation_deadline(time.monotonic() - 1.0)  # already expired
     try:
         generate = ml.make_generate_fn(_make_cache_entry(_DeadlineHittingModel()))
         with pytest.raises(ml.GenerationDeadlineExceededError) as caught:
@@ -777,7 +796,7 @@ def test_make_generate_fn_is_unaffected_with_no_deadline_set():
 
 
 def test_make_polish_generate_fn_raises_deadline_exceeded_instead_of_returning_text():
-    ml.set_generation_deadline(time.time() - 1.0)
+    ml.set_generation_deadline(time.monotonic() - 1.0)
     try:
         polish = ml.make_polish_generate_fn(
             _make_cache_entry(_DeadlineHittingModel()),

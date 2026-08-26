@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -113,6 +114,52 @@ class GGUFNativeConfigError(GGUFNativeError):
 
 class GGUFNativeCallFailedError(GGUFNativeError):
     """The native GGUF call failed."""
+
+
+class _DeadlineSupportUnavailable(GGUFNativeError):
+    """Never raised. Used as an ``except`` target when the loader's deadline
+    machinery could not be imported, so the surrounding ``except`` clause is
+    a guaranteed no-match instead of a conditional expression."""
+
+
+def _registered_generation_deadline():
+    """``(loader_module, deadline)`` for THIS thread, or ``(None, None)``.
+
+    Call-time import ON PURPOSE. ``_otr_model_loader`` imports this backend
+    lazily inside its factories, never at module scope, so importing it back
+    at call time cannot cycle: on loader-dispatched paths the loader is
+    already initialized, and a direct backend consumer can initialize the
+    loader without it re-importing us during that import.
+
+    The deadline STATE stays owned by the loader rather than moving to a leaf
+    module: this repo supports both the ``nodes.x`` and bare ``x`` import
+    forms, so a leaf could be instantiated twice and yield two thread-locals
+    (and two identities for the exception), which would silently break the
+    ``except`` by type in ``_run_with_timeout``.
+    """
+    try:
+        from . import _otr_model_loader as _loader
+    except ImportError:
+        # ImportError ONLY. The matching setter in story_orchestrator is
+        # explicitly fail-loud ("a guard whose install can silently no-op is
+        # worse than none"); a getter that swallowed every exception would be
+        # the opposite shape and could turn a real fault into a silently
+        # un-deadlined call.
+        return None, None
+    try:
+        return _loader, _loader.get_generation_deadline()
+    except AttributeError:
+        return None, None
+
+
+def _deadline_exception_type(loader_module):
+    """The loader's deadline exception, or a never-raised stand-in."""
+    if loader_module is None:
+        return _DeadlineSupportUnavailable
+    return getattr(
+        loader_module, "GenerationDeadlineExceededError",
+        _DeadlineSupportUnavailable,
+    )
 
 
 class GGUFRegistryError(GGUFNativeError):
@@ -1324,13 +1371,48 @@ class GGUFNativeBackend:
         if rf is not None:
             kwargs["response_format"] = rf
         _row_id = model.get("model_id") if isinstance(model, dict) else None
+        # DEADLINE-CONDITIONAL STREAMING (2026-08-25, closes the
+        # PBUG-20260825-04 GGUF deferral). With NO deadline registered this
+        # takes the identical non-streaming call it always has -- same kwargs,
+        # no `stream` key -- so every ordinary GGUF call is unchanged. With a
+        # deadline registered (only _run_with_timeout sets one, and
+        # threading.local values never propagate across threads) it streams so
+        # an abandoned worker can be stopped between chunks. create_chat_completion
+        # accepts no `stopping_criteria` and forwards none, so streaming is the
+        # only cooperative-cancellation hook the chat API actually offers.
+        _deadline_mod, _deadline = _registered_generation_deadline()
+        if _deadline is not None and time.monotonic() > _deadline:
+            # Do not start a doomed call. This is the check that pays: the
+            # budget is usually spent on the model LOAD upstream, not here.
+            raise _deadline_mod.GenerationDeadlineExceededError(
+                f"Native GGUF generation for {_row_id or ROW_ID} not started: "
+                f"the generation deadline had already passed"
+            )
+        _DeadlineExc = _deadline_exception_type(_deadline_mod)
         try:
-            result = llm.create_chat_completion(**kwargs)
+            if _deadline is None:
+                result = llm.create_chat_completion(**kwargs)
+            else:
+                result = self._stream_until_deadline(
+                    llm, kwargs, _deadline, _DeadlineExc,
+                    row_id=_row_id or ROW_ID,
+                )
+        except _DeadlineExc:
+            # Must escape the broad wrapper below intact: _run_with_timeout
+            # catches this BY TYPE, and relabelling it GGUFNativeCallFailedError
+            # would route an abandoned generation into the ordinary
+            # reroll/failure path instead of timeout recovery.
+            raise
         except Exception as exc:  # noqa: BLE001
             raise GGUFNativeCallFailedError(
                 f"Native GGUF call failed for {_row_id or ROW_ID}: "
                 f"{type(exc).__name__}: {exc}"
             ) from exc
+        if _deadline is not None and time.monotonic() > _deadline:
+            raise _deadline_mod.GenerationDeadlineExceededError(
+                f"Native GGUF generation for {_row_id or ROW_ID} completed "
+                f"after its deadline; result discarded rather than returned late"
+            )
         text = self._extract_text(
             result, fail_on_output_limit=fail_on_output_limit,
         )
@@ -1360,6 +1442,81 @@ class GGUFNativeBackend:
                 close()
             except Exception as exc:  # noqa: BLE001
                 log.debug("[GGUFNative] close() failed: %s", exc)
+
+    @staticmethod
+    def _stream_until_deadline(llm, kwargs, deadline, deadline_exc, *, row_id):
+        """Run one chat completion as a stream, stopping between chunks.
+
+        Returns a dict in the SAME minimal shape ``_extract_text`` consumes,
+        so the caller's extraction, output-limit gate and think-strip stay on
+        one code path for both streaming and non-streaming calls.
+
+        Everything that shapes the OUTPUT -- the chat template, the
+        ``response_format`` grammar, sampling, seed and the merged stop list --
+        is built by llama-cpp's chat handler and forwarded identically in both
+        modes, so only assembly and cancellation are new here.
+
+        KNOWN, DELIBERATE DIFFERENCE (llama-cpp 0.3.33): with MULTIPLE stop
+        strings the non-streaming path returns the first match in configured
+        LIST ORDER while the streaming flush returns the EARLIEST OCCURRENCE
+        in the text. Same text in the overwhelming case, and only reachable
+        under a registered deadline; recorded rather than papered over.
+        """
+        def _expired() -> bool:
+            return time.monotonic() > deadline
+
+        stream = llm.create_chat_completion(**{**kwargs, "stream": True})
+        pieces: list[str] = []
+        finish_reason = None
+        try:
+            for chunk in stream:
+                # Check AFTER each advance: the generator only yields once
+                # the next token exists, so this is the cooperative
+                # cancellation point. Bound: one token, not the whole budget.
+                if _expired():
+                    # NOT generated_tokens=: len(pieces) counts CONTENT
+                    # CHUNKS, and a chunk is not a token. The transformers
+                    # sibling passes a real len(generated_ids); claiming the
+                    # same field with a different unit would make the two
+                    # lanes' evidence silently incomparable. Nothing reads
+                    # the field here, so the count goes in the message where
+                    # its unit is stated.
+                    raise deadline_exc(
+                        f"Native GGUF generation for {row_id} was abandoned "
+                        f"mid-stream at its deadline after "
+                        f"{len(pieces)} content chunk(s)"
+                    )
+                choices = chunk.get("choices") if isinstance(chunk, dict) else None
+                if not choices:
+                    continue
+                choice = choices[0]
+                if choice.get("index") not in (0, None):
+                    continue
+                delta = choice.get("delta") or {}
+                content = delta.get("content")
+                if isinstance(content, str):
+                    pieces.append(content)
+                if choice.get("finish_reason") is not None:
+                    finish_reason = choice.get("finish_reason")
+                # Do NOT break on the terminal chunk: llama-cpp performs its
+                # own post-yield bookkeeping after the final yield, and
+                # abandoning the generator early skips it.
+        finally:
+            # Release the iterator whether we finished or bailed. An
+            # abandoned generator would otherwise keep the llama context
+            # busy for the next caller on this cached model.
+            close = getattr(stream, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("[GGUFNative] stream close() failed: %s", exc)
+        return {
+            "choices": [{
+                "finish_reason": finish_reason,
+                "message": {"content": "".join(pieces)},
+            }],
+        }
 
     @staticmethod
     def _extract_text(

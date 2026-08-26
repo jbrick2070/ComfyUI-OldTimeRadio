@@ -90,6 +90,11 @@ __all__ = [
     "make_polish_generate_fn",
     "ModelLoaderError",
     "GenerationDeadlineExceededError",
+    # The deadline API is public because the GGUF backend consumes it from
+    # another module -- it is a cross-module contract, not an internal.
+    "set_generation_deadline",
+    "get_generation_deadline",
+    "generation_deadline_expired",
     "LLM_CACHE",
 ]
 
@@ -255,8 +260,13 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # story_orchestrator (this file is the transport every caller already goes
 # through; per this file's own docstring it is meant to absorb shared
 # behavior as the legacy orchestrator's internals are phased out, not reach
-# back into them). _run_with_timeout calls set_generation_deadline() before
-# submitting its worker and clears it in the worker's own finally; both
+# back into them). _run_with_timeout COMPUTES one absolute monotonic deadline
+# BEFORE submitting its worker, the worker INSTALLS that same value and clears
+# it in its own finally, and the parent waits only the remaining duration.
+# (Corrected 2026-08-25: this comment used to say the deadline was set before
+# submission, while the code computed it inside the worker -- so the worker's
+# deadline outlived the parent's timeout by the scheduling delay. One shared
+# value removes the skew and makes this sentence true.) Both
 # user-facing transformers generate closures (make_generate_fn,
 # make_polish_generate_fn) check it via _DeadlineStoppingCriteria, cutting
 # an abandoned worker's remaining lifetime to ~1 token instead of the full
@@ -265,18 +275,28 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # degeneracy guard for the same reason -- is not wired in: one warmup
 # token adds negligible orphan lifetime, not worth a third criterion.)
 #
-# SCOPED, NOT UNIVERSAL (r3 kibitz finding, Codex): make_generate_fn's GGUF
-# lane returns make_gguf_generate_fn's closure early, before ever
-# constructing a deadline guard -- llama-cpp-python's create_chat_completion
-# has no per-token Python stopping-criteria hook the way transformers does,
-# so this deadline mechanism does not reach a GGUF-backed model even when
-# NewsCuration/NewsCurationDeep are configured with a GGUF load_config (both
-# accept one). A GGUF-backed abandoned worker still runs to completion on
-# its own budget. Threading a deadline through the GGUF lane needs its own
-# design (llama-cpp supports streaming; stopping between chunks would work,
-# but is a materially different mechanism from a StoppingCriteria) and is
-# deliberately DEFERRED, not fixed here -- see PBUG-20260825-04 in
-# docs/PROD_BUG_LOG.md for the scoping.
+# THE GGUF LANE IS NOW COVERED TOO (2026-08-25, closing the PBUG-20260825-04
+# deferral). It could not use a StoppingCriteria: llama-cpp-python's
+# create_chat_completion accepts no `stopping_criteria` and does not forward
+# one (verified against installed 0.3.33), so the GGUF lane instead takes
+# DEADLINE-CONDITIONAL STREAMING inside _otr_gguf_backend -- with no deadline
+# registered it makes the exact same non-streaming call it always did, and
+# with one it streams and stops between chunks. The backend call-time imports
+# get_generation_deadline() from here; the state stays owned in this module.
+#
+# WHY IT STOPPED BEING THEORETICAL: six committed status="shipping" profiles
+# (otr_g4_fastwan/_humo/_ltx_8gb/_ltx_audio_in/_ltx_video/_wan_ti2v) pin
+# technical_model to unsloth/gemma-4-12b-it-GGUF, and profile status is
+# validated but is NOT an application gate -- so real shipping runs reach this
+# lane. The default unprofiled canonical run does not (its technical slot is
+# the transformers gemma-4-12b row), which is why this looked latent at first.
+#
+# WHAT A DEADLINE STILL CANNOT INTERRUPT, on EITHER lane: prompt evaluation.
+# The criterion/stream is only consulted per GENERATED token. It also cannot
+# interrupt the model LOAD -- which is why the worker checks for an
+# already-expired deadline BEFORE calling fn() at all (story_orchestrator),
+# since request_slot runs inside the timed worker and a cold ~12 GB GGUF load
+# is the realistic way to blow a 65 s budget.
 #
 # LATCH, don't raise mid-decode -- mirrors the established pattern in
 # _otr_decode_guard.py's degeneracy criterion: raising from inside a
@@ -293,9 +313,37 @@ _GENERATION_DEADLINE = threading.local()
 
 
 def set_generation_deadline(deadline: float | None) -> None:
-    """Set (or clear, with ``None``) a wall-clock deadline for THIS
-    thread's subsequent ``model.generate()`` calls in this file."""
+    """Set (or clear, with ``None``) a deadline for THIS thread's
+    subsequent generation calls.
+
+    ``deadline`` is a ``time.monotonic()`` value, NOT ``time.time()``.
+    Changed 2026-08-25: an epoch clock is not monotonic, so an NTP step or
+    a DST-adjacent correction could move a live deadline backwards (expire
+    instantly) or forwards (never expire). Every producer and consumer of
+    this value reads ``time.monotonic()`` -- see get_generation_deadline().
+    """
     _GENERATION_DEADLINE.value = deadline
+
+
+def get_generation_deadline() -> float | None:
+    """This thread's registered ``time.monotonic()`` deadline, or None.
+
+    Public because the GGUF backend needs it and cannot inherit a
+    transformers ``StoppingCriteria``. It call-time imports this getter
+    rather than the thread-local itself, and the state deliberately stays
+    OWNED HERE rather than moving to a leaf module: this repo supports both
+    the ``nodes.x`` and bare ``x`` import forms, so a leaf holding the state
+    could be instantiated twice, yielding two thread-locals and (if the
+    exception moved too) two class identities for
+    ``GenerationDeadlineExceededError``. One owner, one identity.
+    """
+    return getattr(_GENERATION_DEADLINE, "value", None)
+
+
+def generation_deadline_expired() -> bool:
+    """True iff a deadline is registered for this thread AND it has passed."""
+    deadline = get_generation_deadline()
+    return deadline is not None and time.monotonic() > deadline
 
 
 class _DeadlineStoppingCriteria:
@@ -316,8 +364,8 @@ class _DeadlineStoppingCriteria:
     def __call__(self, input_ids, scores, **kwargs) -> bool:
         if self.hit:
             return True
-        deadline = getattr(_GENERATION_DEADLINE, "value", None)
-        if deadline is not None and time.time() > deadline:
+        # monotonic, not time.time() -- see set_generation_deadline().
+        if generation_deadline_expired():
             self.hit = True
         return self.hit
 

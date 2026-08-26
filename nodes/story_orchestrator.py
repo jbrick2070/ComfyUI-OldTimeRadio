@@ -159,22 +159,43 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     from . import _otr_model_loader as _otr_loader_mod
     vram_reset_peak(phase_label)
 
+    # ONE absolute deadline, computed BEFORE submit and shared by the worker
+    # and the parent. Previously the worker computed its own
+    # `time.time() + timeout_sec` AFTER being scheduled, while the parent's
+    # future.result(timeout=timeout_sec) started counting at submission -- so
+    # the worker's deadline outlived the parent's timeout by however long the
+    # executor took to start it, and an abandoned worker got a grace period
+    # nobody intended. monotonic, not time.time(): an epoch clock can step.
+    deadline = time.monotonic() + timeout_sec
+
     def _worker():
-        _TIMEOUT_CTX.deadline = time.time() + timeout_sec
-        # _TIMEOUT_CTX only feeds GemmaHeartbeatStreamer, a legacy streamer
-        # this phase's shared make_generate_fn transport never uses -- so
-        # an abandoned worker used to run to its FULL max_new_tokens budget
-        # with nothing checking whether anyone was still waiting. Also set
-        # the loader-owned deadline every model.generate() call in that
-        # shared transport DOES check, so this worker's own generation
-        # loop notices abandonment between tokens instead of running out
-        # the clock.
+        # _TIMEOUT_CTX feeds GemmaHeartbeatStreamer (a legacy streamer this
+        # phase's shared make_generate_fn transport never uses). The
+        # loader-owned deadline is what the real transports check: the
+        # transformers closures via _DeadlineStoppingCriteria, and the GGUF
+        # backend via get_generation_deadline() + conditional streaming.
+        # Both now read the SAME monotonic value installed here.
         #
         # Not best-effort: a guard whose install can silently no-op is
         # worse than none (it claims protection that is not there), so a
         # failure here fails the call loudly rather than swallowing it.
-        _otr_loader_mod.set_generation_deadline(_TIMEOUT_CTX.deadline)
+        #
+        # Installation moved INSIDE the try so the finally owns cleanup for
+        # everything it sets -- previously an exception between the two
+        # assignments could leave one installed with no owner.
         try:
+            _TIMEOUT_CTX.deadline = deadline
+            _otr_loader_mod.set_generation_deadline(deadline)
+            # A worker scheduled AFTER the budget already expired must not
+            # start at all. This is the check that covers the dominant
+            # overrun case: request_slot (a cold model load, tens of seconds
+            # for a ~12 GB GGUF) runs inside fn(), and NO deadline mechanism
+            # on any lane can interrupt a load once it is under way.
+            if time.monotonic() > deadline:
+                raise _otr_loader_mod.GenerationDeadlineExceededError(
+                    f"{phase_label}: {timeout_sec}s budget already expired "
+                    f"before the worker was scheduled; refusing to start"
+                )
             return fn()
         finally:
             if hasattr(_TIMEOUT_CTX, "deadline"):
@@ -186,7 +207,24 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     try:
         future = executor.submit(_worker)
         try:
-            res = future.result(timeout=timeout_sec)
+            res = future.result(
+                timeout=max(0.0, deadline - time.monotonic()),
+            )
+            # LATE-RESULT RECHECK. Future.result() returns a finished future
+            # whenever it is finished when the waiter reacquires the
+            # condition; it performs no independent elapsed-time postcheck
+            # (CPython concurrent/futures/_base.py). So a worker that
+            # finished AFTER the absolute deadline but before we observed it
+            # would otherwise be accepted as a clean success -- no cache
+            # invalidation, no workflow pause. That is the same
+            # accepted-but-wrong-artifact class PBUG-20260825-04 fixed inside
+            # the transformers closure, and it is transport-agnostic, so it
+            # belongs HERE rather than being re-solved per lane.
+            if time.monotonic() > deadline:
+                raise _otr_loader_mod.GenerationDeadlineExceededError(
+                    f"{phase_label}: worker returned after the {timeout_sec}s "
+                    f"budget expired; result discarded rather than accepted late"
+                )
             vram_snapshot(phase_label)
             return res
         except (FuturesTimeout, _otr_loader_mod.GenerationDeadlineExceededError) as _timeout_exc:
@@ -2007,8 +2045,15 @@ class GemmaHeartbeatStreamer(BaseStreamer):
 
     def put(self, value):
         """Processes a new batch of tokens incrementally."""
-        # Check strict streaming timeout
-        if hasattr(_TIMEOUT_CTX, "deadline") and time.time() > _TIMEOUT_CTX.deadline:
+        # Check strict streaming timeout.
+        # MUST be time.monotonic(): _run_with_timeout stores a monotonic
+        # deadline in _TIMEOUT_CTX as of 2026-08-25. Comparing a monotonic
+        # deadline against time.time() would make this expire on its FIRST
+        # token on any box whose uptime is less than its epoch time -- i.e.
+        # always -- silently converting every streamed generation into a
+        # TimeoutError. Both clocks must match; they are not interchangeable.
+        if (hasattr(_TIMEOUT_CTX, "deadline")
+                and time.monotonic() > _TIMEOUT_CTX.deadline):
             raise TimeoutError("Streaming deadline exceeded - gracefully aborting generator")
 
         # Standard console output

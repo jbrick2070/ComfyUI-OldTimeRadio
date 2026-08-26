@@ -6615,18 +6615,31 @@ EXPECTED result, not a regression signal.
   unable to catch the respective classes of defect they found.
 - KNOWN, DELIBERATELY DEFERRED (not fixed this session -- named here so
   neither is mistaken for closed):
-  1. The generation-deadline fix (item 4) is SCOPED to the transformers
-     local lane. `make_generate_fn`'s GGUF branch returns
-     `make_gguf_generate_fn`'s closure before any deadline guard is
-     constructed; `llama-cpp-python`'s `create_chat_completion` has no
-     per-token Python stopping-criteria hook the way transformers does, so
-     an abandoned worker on a GGUF-backed model (NewsCuration/
-     NewsCurationDeep both accept a GGUF `load_config`) still runs to its
-     full budget. Closing this needs its own design (llama-cpp supports
-     streaming; stopping between chunks would work, but is a materially
-     different mechanism) -- found by r3 kibitz (Codex), not implemented
-     this session; see `nodes/_otr_model_loader.py`'s module comment above
-     `_GENERATION_DEADLINE` for the in-code scoping note.
+  1. ~~The generation-deadline fix (item 4) is SCOPED to the transformers
+     local lane.~~ **CLOSED 2026-08-25 (evening).** The GGUF lane is now
+     covered by DEADLINE-CONDITIONAL STREAMING: with no deadline registered
+     the backend makes the identical non-streaming `create_chat_completion`
+     call it always did (`stream` absent, not False), and with one it
+     streams and stops between chunks. `create_chat_completion` still has no
+     `stopping_criteria` -- verified against installed llama_cpp 0.3.33 --
+     so streaming is the only cooperative-cancellation hook the chat API
+     offers. Also landed with it: ONE shared absolute `time.monotonic()`
+     deadline computed BEFORE worker submission (the worker used to compute
+     its own AFTER being scheduled, so its deadline outlived the parent's
+     timeout by the scheduling delay), a pre-call admission check that stops
+     a doomed call before the model load, a parent recheck after
+     `future.result()` (which performs no elapsed-time postcheck of its
+     own), and the legacy `GemmaHeartbeatStreamer` migrated to the same
+     clock. **SEVERITY WAS UNDERSTATED WHEN THIS WAS DEFERRED:** it was
+     assumed latent because the canonical technical slot is the transformers
+     gemma row, but SIX committed `status="shipping"` profiles
+     (`otr_g4_fastwan/_humo/_ltx_8gb/_ltx_audio_in/_ltx_video/_wan_ti2v`)
+     pin `technical_model` to `unsloth/gemma-4-12b-it-GGUF`, and profile
+     status is validated but is not an application gate -- so real shipping
+     runs reached the uncovered lane. Coverage:
+     `tests/test_gguf_generation_deadline.py` (18 behavioural tests, fake
+     llm -- no llama-cpp, no CUDA). Arc: r1 Codex+Fable, r2 Codex, r3
+     Codex+Cursor+Sonnet.
   2. The full orphan-OCCUPANCY registry (a process-global, lock-protected
      registry of in-flight generations, with fail-fast admission on
      `request_slot` and `has_local_resident_llm()` reading real occupancy
