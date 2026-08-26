@@ -6980,8 +6980,17 @@ EXPECTED result, not a regression signal.
   passed on 01 and failed on 02) and the LLM did not matter (the same 2B model
   drove both slots on every leg). It is the engine.
 - root cause: `ideogram4_local` returns a near-uniform mid-gray placeholder for
-  MUSIC beats, which are the title cards carrying rendered TEXT -- the one
-  thing separating them from the scene beats it mints without complaint. Six
+  MUSIC beats. **CORRECTED 2026-08-26 (operator-prompted): an earlier revision
+  of this entry called those beats "title cards carrying rendered TEXT". That
+  was WRONG -- inferred from the beat NAME, never read from the prompt.** The
+  refused prompt is a PROSE SCENE ("a vintage tabletop tube radio receiver
+  glowing warmly, aged vacuum tubes and worn dials, a dusty archive room ...
+  faces unobstructed") and it ends with an explicit `no on-screen text`. So the
+  engine got a PROSE shape -- which `docs/2026-08-21-ideogram4-verdict.md`
+  ROUND 4 proves is the variable it refuses on -- plus a request for FACES,
+  plus a ban on the typography it is genuinely best at. The mechanism and the
+  numbers below are unaffected; the remedy space is not, since a CARD-shaped
+  prompt for this engine was never considered. Six
   refusal events, all on `still_music_opening_001` / `still_music_closing_001`,
   measuring min 78-87 and std 10.2-10.5 against the detector's stated
   reference for a real card (min~0, std~27-41). That clustering across six

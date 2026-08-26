@@ -78,9 +78,33 @@ seed: 3356364758
 ```
 
 The engine's own message attributes it to the card: *"The card text or its
-styling was refused by the model, not by OTR."* Music beats are title cards
-carrying rendered TEXT, which is the one thing distinguishing them from the
-scene beats this engine mints without complaint.
+styling was refused by the model, not by OTR."*
+
+**CORRECTION, 2026-08-26, operator-prompted.** An earlier revision of this file
+claimed music beats are "title cards carrying rendered TEXT". **That is WRONG,
+and it was inferred from the beat NAME rather than read from the prompt.** The
+refused prompt is a PROSE SCENE description and it explicitly forbids text:
+
+```
+archival documentary. a vintage tabletop tube radio receiver glowing warmly,
+aged vacuum tubes and worn dials, a dusty archive room, a theater projection
+area, cinematic three-quarter framing, people shown with full heads and clear
+headroom inside frame, faces unobstructed, balanced composition, ...
+sepia tones, aged paper, archival documentary still, ... no on-screen text
+```
+
+So the engine was handed the three things it is worst at, at once: a PROSE
+shape (which `docs/2026-08-21-ideogram4-verdict.md` ROUND 4 proves is what it
+refuses -- shape, not content), a request for FACES, and an explicit
+`no on-screen text` instruction that forbids the typography this engine is
+better at than anything else shipped. A 75% refusal rate against that is not
+surprising.
+
+That correction does not change the PBUG's mechanism or its numbers -- the
+sanctioned-gap contradiction and the 6/2 refusal split stand. It changes the
+REMEDY space: the option nobody had considered is to give this engine a
+CARD-shaped prompt when it holds the music slot, rather than benching it or
+restricting it to scenes.
 
 ## The contradiction that turns a missing picture into a dead episode
 
