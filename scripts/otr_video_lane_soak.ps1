@@ -145,6 +145,17 @@ function Stop-OtrServer {
         Write-Host "[videosoak]   killing OTR PID $($p.ProcessId)"
         try { Stop-Process -Id $p.ProcessId -Force -Confirm:$false -ErrorAction Stop } catch {}
     }
+    # The cmd.exe LAUNCHER WRAPPER outlives its python child, and it carries
+    # the previous boot's log path and environment. Observed 2026-08-26: a
+    # wrapper created at 00:25 was still resident at 03:05 owning the boot
+    # started at 02:42, so the new server's output was still being appended to
+    # the FIRST boot's log file. Harmless for a default boot, misleading for a
+    # clamped one -- kill the wrapper too so each group starts genuinely clean.
+    foreach ($c in (Get-CimInstance Win32_Process -Filter "Name='cmd.exe'" |
+                    Where-Object { $_.CommandLine -match 'otr_soak_server_launch' })) {
+        Write-Host "[videosoak]   killing stale launcher cmd PID $($c.ProcessId)"
+        try { Stop-Process -Id $c.ProcessId -Force -Confirm:$false -ErrorAction Stop } catch {}
+    }
     # Anything still holding :8000 the CommandLine match missed -- a
     # half-booted server reports a BLANK .Path, so the port is the backstop.
     foreach ($c in (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)) {
@@ -195,7 +206,34 @@ function Start-OtrServer {
         $listen = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
         if ($listen) {
             Start-Sleep -Seconds 5   # let node registration finish
-            Write-Host "[videosoak]   server UP (group $GroupId), log $log"
+            # PROVE THE CLAMPS REACHED THE PROCESS THAT IS ACTUALLY SERVING.
+            #
+            # The whole reason these groups exist is that --reserve-vram and
+            # --disable-pinned-memory are START-UP flags. Setting the env var
+            # and seeing a server come up does NOT establish that the flag
+            # arrived: the launcher could have raced a survivor that already
+            # held :8000, and every leg in the group would then be measured on
+            # a boot it did not ask for and still report PASS. Read the flags
+            # off the LIVE command line -- the same discipline boot_contracts
+            # uses when it checks comfy.cli_args on the running server instead
+            # of the profile text, because a check that reads the same config
+            # the launcher was meant to honour cannot tell "applied" from
+            # "written down".
+            $srv = Get-CimInstance Win32_Process -Filter "ProcessId=$($listen[0].OwningProcess)" -ErrorAction SilentlyContinue
+            $cl = if ($srv) { $srv.CommandLine } else { "" }
+            $wantReserve = $BootEnv.ContainsKey("OTR_HEADLESS_RESERVE_VRAM_GB")
+            $wantPinned  = $BootEnv.ContainsKey("OTR_HEADLESS_DISABLE_PINNED")
+            $gotReserve  = $cl -match '--reserve-vram'
+            $gotPinned   = $cl -match '--disable-pinned-memory'
+            if ($wantReserve -ne $gotReserve -or $wantPinned -ne $gotPinned) {
+                Write-Host ("[videosoak]   BOOT CONTRACT MISMATCH for group {0}: " +
+                            "reserve want={1} got={2}; pinned want={3} got={4}" -f `
+                            $GroupId, $wantReserve, $gotReserve, $wantPinned, $gotPinned)
+                Write-Host "[videosoak]   serving PID $($listen[0].OwningProcess) cmdline: $cl"
+                return $false
+            }
+            Write-Host ("[videosoak]   server UP (group {0}), boot contract verified " +
+                        "(reserve={1} pinned={2}), log {3}" -f $GroupId, $gotReserve, $gotPinned, $log)
             return $true
         }
     }
@@ -239,6 +277,31 @@ if ($selected.Count -eq 0) {
     exit 2
 }
 Write-Host "[videosoak] groups selected: $($selected -join ', ') ($(($selected | ForEach-Object { $BOOT_GROUPS[$_].lanes.Count } | Measure-Object -Sum).Sum) lane(s) total)"
+
+# CARRY FORWARD RESULTS FOR GROUPS THIS RUN IS NOT RUNNING.
+# The receipt is the record, and a `-Groups B,C,D` continuation must not erase
+# the group A rows a previous invocation already earned -- the sibling sweep's
+# receipt was destroyed exactly that way (by a later --dry-run of its own
+# driver), which is why a live failure had to be reconstructed from a server
+# log afterwards. Rows for groups being re-run ARE dropped, so a rerun
+# replaces its own results rather than doubling them.
+if (Test-Path $RECEIPT) {
+    try {
+        $prior = Get-Content $RECEIPT -Raw | ConvertFrom-Json
+        $kept = @($prior.results | Where-Object { $selected -notcontains $_.group })
+        if ($kept.Count -gt 0) {
+            $script:Results = @($kept | ForEach-Object {
+                $h = [ordered]@{}
+                $_.PSObject.Properties | ForEach-Object { $h[$_.Name] = $_.Value }
+                $h
+            })
+            $legIndex = ($script:Results | ForEach-Object { [int]$_.leg } | Measure-Object -Maximum).Maximum
+            Write-Host "[videosoak] carried forward $($kept.Count) prior leg(s) from group(s): $((@($kept | ForEach-Object { $_.group }) | Sort-Object -Unique) -join ', ')"
+        }
+    } catch {
+        Write-Host "[videosoak] prior receipt unreadable, starting fresh: $($_.Exception.Message)"
+    }
+}
 
 foreach ($gid in $BOOT_GROUPS.Keys) {
     if ($wanted -notcontains $gid) { continue }

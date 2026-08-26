@@ -6959,3 +6959,69 @@ EXPECTED result, not a regression signal.
   project with a typed-repair ladder has this failure mode available to it.
   Not yet checked against `otr_coverage_index.yaml` + `BUG_BIBLE.yaml`.
 - status: OPEN
+
+## PBUG-20260826-01 -- `ideogram4_local` refuses CARD beats 75% of the time, and the sanctioned gap it leaves kills the episode 10 minutes later
+- surfaced: LIVE headless sweep, 2026-08-26 --
+  `scripts/otr_bank_engine_sweep.py`, 8 one-act legs,
+  `google/gemma-4-E2B-it (3.0 GB)` in BOTH writer slots. 4 PASS / 4 FAIL.
+  Full evidence preserved at
+  `docs/2026-08-26-ideogram4-card-refusal-evidence.md` (copied out of the
+  server log because the launcher ROTATES that log on every reboot); receipt
+  at `docs/2026-08-26-bank-engine-e2b-sweep-receipt.json`.
+- symptom: `RenderError: still-spine handoff missing materialized scene still
+  for shot shot_music_opening_001 beat music_opening_001 engine still_flat`,
+  raised from `render_driver.validate_and_repair_still_spine`, roughly 10-11
+  minutes into an ~11 minute leg -- after the script, the voices, the audio
+  mux and every other still had been paid for.
+- what the sweep isolates, and it is the useful part: the 4 failures split
+  along EXACTLY ONE axis. Profile 01 and profile 02 differ only in which image
+  engines the three role dropdowns name. All four profile-01 legs published;
+  all four profile-02 legs died. The bank did not matter (all four banks
+  passed on 01 and failed on 02) and the LLM did not matter (the same 2B model
+  drove both slots on every leg). It is the engine.
+- root cause: `ideogram4_local` returns a near-uniform mid-gray placeholder for
+  MUSIC beats, which are the title cards carrying rendered TEXT -- the one
+  thing separating them from the scene beats it mints without complaint. Six
+  refusal events, all on `still_music_opening_001` / `still_music_closing_001`,
+  measuring min 78-87 and std 10.2-10.5 against the detector's stated
+  reference for a real card (min~0, std~27-41). That clustering across six
+  independent seeds and four banks is what makes it one reproducible output
+  shape rather than six bad draws. Per-engine over the whole sweep:
+  flux2_klein 35/0, z_image_turbo 32/0, flux_gen1 16/0, lumina_image 8/0
+  (91 mints, zero refusals) versus ideogram4_local 2 mints / 6 refusals.
+  NOT seed-deterministic -- it did mint 2 cards -- so a reseed would sometimes
+  work; at 25% it will usually not.
+- the actual defect is a CONTRACT DISAGREEMENT, not the refusal: two
+  components hold opposite views of whether a sanctioned gap is survivable.
+  `OTR_ImageGenDispatcher` records the refusal and states "The episode
+  CONTINUES with no still for this object ... (operator 2026-08-22)"; then
+  `validate_and_repair_still_spine` refuses to render the beat that gap
+  belongs to. The gap is sanctioned where it is CREATED and fatal where it is
+  CONSUMED. Either half is defensible alone; together they guarantee that
+  every sanctioned refusal becomes a dead episode, and that the death arrives
+  as late and as expensively as possible.
+- fix: NOT LANDED, and deliberately not attempted in this session. This is the
+  open sanctioned-gap item, which already carries an r1 judgment at
+  `kibitz-runs/2026-08-25-model-refusal-required-still/r1/judgment.md` and one
+  OPERATOR QUESTION still outstanding (what an all-refused episode should do).
+  It wants its own arc. What this entry adds that the judgment did not have is
+  the FREQUENCY: the design cannot be tuned for a rare edge case, because it
+  is not one -- it is one engine failing three quarters of the time on one
+  beat type.
+- verify idea: two separable machine checks. (1) CONTRACT: assert that the set
+  of objects the dispatcher is willing to skip is a SUBSET of the set
+  `validate_and_repair_still_spine` is willing to render without -- today
+  those two sets are provably disjoint for music beats, and no test says so.
+  (2) ENGINE: render a card-style prompt through each registered local image
+  engine and assert the returned frame clears the refusal detector's own
+  threshold (std > ~20). That second one would have flagged
+  `ideogram4_local` as card-incapable without spending 45 minutes of GPU on
+  four doomed legs.
+- bible-worthy: yes, and the reusable rule is the contract half, not the
+  engine half. "A failure one layer is configured to tolerate must be a
+  failure the next layer down is configured to accept" -- when the producer's
+  skip-list and the consumer's required-list are maintained separately, they
+  drift, and the drift surfaces as a late crash on the most expensive
+  possible path rather than as an early refusal. Not yet checked against
+  `otr_coverage_index.yaml` + `BUG_BIBLE.yaml`.
+- status: OPEN
