@@ -1,5 +1,63 @@
 # PROBLEM STATEMENT -- small LLMs cannot hold JSON syntax on `scifi_news_pro`, and the fix already exists in deleted code
 
+> ## CORRECTED 2026-08-25 AFTER r1 (Cursor). READ THIS BOX BEFORE THE BODY.
+>
+> The r1 panel confirmed the ORPHANED-HOOK diagnosis but **rejected grammar
+> binding as the headline fix**, and caught four errors below. The body is
+> kept as written so the reasoning is auditable; these corrections win.
+>
+> 1. **THE HEADLINE FIX IS WRONG.** Cursor: *"It will parse. That is not the
+>    same as the lane working."* Under LMFE the legal minimum for `DossierLLM`
+>    is one fact plus three empty buckets, `facts_to_keep` is NEVER
+>    source-checked, and a 2B model's highest-probability constrained
+>    completion sits near that floor. Grammar would convert tonight's LOUD
+>    failure into a SILENT hollow dossier -- a green parse hiding a useless
+>    extraction. That is worse, not better.
+> 2. **THE OPERATOR'S OWN IDEA IS THE RECOMMENDED FIX** (his words: *"can't we
+>    just say write this text, and the Python puts it right in the JSON"*).
+>    Cursor's MUST-FIX #2: *"Adopt Python-assembled extract for P0 (and
+>    news_read), not grammar-as-the-fix. Model writes labeled lists / prose;
+>    Python constructs `DossierLLM` / `NewsCloseRead`. Keep pydantic +
+>    `_filter_dossier_entities` + news-read post_validator. One contract for
+>    small and big."* That is the operator's stated preference (work for BOTH
+>    sizes) and it removes the JSON-packaging burden from the model entirely.
+> 3. **"IT FAILED AT `json.loads`" IS WRONG** (section 2 below). `json.loads`
+>    never runs. `parse_first_json_object` raises when
+>    `extract_first_json_block` returns empty, with position **hardcoded to 0**
+>    (`nodes/_otr_json.py:81-96`). So "line 1 column 1 (char 0)" is a SENTINEL,
+>    not a location -- it does NOT mean the break is past the logged head. It
+>    means "no complete top-level object": incomplete JSON, a malformed fenced
+>    block (the fence path fail-closes and does not fall through), a top-level
+>    array, or empty output all produce that identical string.
+> 4. **"THE PRO LANE IS MAXIMALLY LENIENT ABOUT CONTENT" IS OVERCLAIMED.** Only
+>    P0's post_validator is a no-op. `_make_news_read_validator`,
+>    `_make_casting_validator` and `_make_pitch_validator` are real content
+>    gates that a 2B model will still fail AFTER syntax is fixed. Even P0 is
+>    not parse-then-accept: `facts_to_keep min_length=1` and the nonblank
+>    `@field_validator` are invisible to any grammar.
+> 5. **MY CITED EVIDENCE WAS DESTROYED, BY ME.** Section 7 cites
+>    `docs/2026-08-25-llm-image-upscale-sweep-receipt.json`, which now shows
+>    7 passed / 0 failed at 0.1 min per leg -- because a later `--dry-run` of
+>    the same driver OVERWROTE it. The real failure record is preserved at
+>    **`docs/2026-08-25-leg1-dossier-failure-evidence.md`**, extracted from
+>    the surviving server log. Nothing may be promoted to `PROD_BUG_LOG.md` or
+>    the Bible from the receipt.
+> 6. **`_counting` OPACITY IS CROSS-BANK**, not news_pro-only: the same
+>    attribute-stripping wrapper exists in `_otr_shakespeare_sources.py`,
+>    `_otr_media_archive_interpreter.py`, `_otr_public_domain_sources.py` and
+>    `news_interpreter.py`. Fix the pattern, not one function.
+> 7. **DO NOT BLANKET-BIND** inside `structured_call`. Cursor enumerated ~10
+>    caller schemas that are LMFE-hostile (unbounded strings with
+>    `max_new_tokens=None`, models whose legal minimum is empty/default,
+>    ledger-clean `max_length` fields where a ValidationError-plus-repair would
+>    become a hard mid-sentence clip). Allowlist, dossier first, if at all.
+> 8. **GGUF IS A WEAKER CONSTRAINT, NOT AN EQUIVALENT ONE.** The backend
+>    downgrades `json_schema` to llama-cpp `{type: json_object, schema: ...}`;
+>    `$defs`/`$ref` handling is lossy and `strict` may be ignored. Small GGUF
+>    rows can still emit `{}`. Keep the post-hoc ladder.
+> 9. **SECTION 6 (upscale) IS CUT FROM THIS ARC** -- different pipeline,
+>    different risk, different proof. It shipped separately as its own change.
+
 **Written 2026-08-25 from a live failure.** Operator's two ideas that night --
 *"look at that old dead scifi news code to help tech llm repair so we get a
 clean ledger"* and the upscale idea (separate, section 6) -- both landed. The

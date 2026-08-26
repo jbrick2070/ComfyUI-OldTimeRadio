@@ -1021,6 +1021,33 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
     src_frame_bytes = int(src_w) * int(src_h) * 3
     frames_written = 0
     error_raised = False
+    # HELD-FRAME MEMOIZATION (operator, 2026-08-25: "if the upscaler were smart
+    # that this is the same frame I'm not gonna waste tokens on it, just reuse
+    # the last upscaled frame").
+    #
+    # WHY THIS IS BIT-EXACT AND NOT AN APPROXIMATION. The engine is a plain
+    # deterministic conv net run under `torch.inference_mode()` with the
+    # descriptor in `.eval()` (eng_spandrel_esrgan.py:311, :352) -- no dropout,
+    # no sampling, no state carried between calls -- and `_fit_and_pad_bhwc` is
+    # pure geometry. Identical input bytes therefore produce identical output
+    # bytes, so reusing the previous result is memoization, not an
+    # approximation: it cannot change one byte of the encoded segment, only
+    # skip work that would recompute the same answer.
+    #
+    # WHY A ONE-SLOT CACHE IS THE RIGHT SIZE. On a `still_*` lane a beat is ONE
+    # image held across the whole segment, so consecutive frames are identical
+    # and a single previous-frame slot captures the entire win (hundreds of
+    # model calls per segment collapse to one). On a genuinely moving lane
+    # every frame differs, the slot never hits, and the only cost paid is the
+    # comparison below.
+    #
+    # WHY A DIRECT BYTES COMPARE RATHER THAN A HASH: `bytes.__eq__` is memcmp,
+    # it is faster than hashing 3.7 MB, and it has NO collision risk at all --
+    # a hash collision here would silently emit the wrong picture, which is a
+    # worse failure than the cost it would save.
+    prev_in_bytes = None
+    prev_out_bytes = None
+    frames_reused = 0
     try:
         while frames_written < int(n_frames):
             want = min(BATCH, int(n_frames) - frames_written)
@@ -1030,6 +1057,14 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                     "decoder EOF before n_frames satisfied "
                     "(%d/%d) src=%r" % (frames_written, int(n_frames), src))
             got = len(buf) // src_frame_bytes
+            # Guarded on got == 1: with BATCH > 1 a buffer holds several frames
+            # and equality would only mean "this RUN of frames repeats", so the
+            # cached output would be right by luck rather than by construction.
+            if got == 1 and prev_in_bytes is not None and buf == prev_in_bytes:
+                enc.stdin.write(prev_out_bytes)
+                frames_written += got
+                frames_reused += got
+                continue
             arr = np.frombuffer(buf, dtype=np.uint8).copy()
             arr = arr.reshape((got, int(src_h), int(src_w), 3))
             # engine.device (Antigravity r3 MF-3) -- public property, never
@@ -1043,9 +1078,25 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
             # .contiguous() before .numpy() -- non-contiguous tensors after a
             # permute would raise or corrupt strides (Antigravity r4 MF-2).
             out_u8 = (out_bhwc.clamp(0, 1) * 255.0).byte().contiguous().cpu().numpy()
-            enc.stdin.write(out_u8.tobytes())
+            out_bytes = out_u8.tobytes()
+            enc.stdin.write(out_bytes)
+            if got == 1:
+                prev_in_bytes = buf
+                prev_out_bytes = out_bytes
             frames_written += got
         enc.stdin.close()
+        # OBSERVABILITY, deliberately unconditional for the model path. This
+        # file already carries the lesson that an upscale stage which logs
+        # nothing leaves a green leg with zero evidence either way (see the
+        # 2026-08-09 note on the fast path); a cache that silently did nothing
+        # would be exactly that failure again, one layer down.
+        if frames_reused:
+            log.info(
+                "[OTR_SilentComposite] upscale HELD-FRAME REUSE for %s: "
+                "%d/%d frame(s) served from the previous result "
+                "(%d model call(s) run)",
+                os.path.basename(seg_path), frames_reused, int(n_frames),
+                int(n_frames) - frames_reused)
         # Check return codes and read stderr WHILE handles are open (path-based
         # so the offset issue can't bite -- Antigravity r3 MF-2 + r4 MF-1).
         try:
