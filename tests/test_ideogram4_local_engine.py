@@ -327,3 +327,86 @@ def test_the_artifact_list_is_resolved_once_per_params_build(monkeypatch):
     _engine()._params({"prompt": 'a title card displaying the words "Hi."',
                        "seed": 1, "w": 1472, "h": 832, "object_id": "o"})
     assert len(calls) == 1, f"resolved {len(calls)} times"
+
+
+# --------------------------------------------------------------------------- #
+# PBUG: the punctuation tidier was injecting a CONTROL CHARACTER
+# --------------------------------------------------------------------------- #
+
+def test_tidy_preserves_punctuation_instead_of_injecting_a_control_character():
+    """THE BUG THIS PINS, found by an r2 review pass on 2026-08-26.
+
+    `_tidy`'s two punctuation rules capture a group and were meant to put it
+    back with the `\1` backreference. What was actually stored in both
+    replacement literals was a bare **U+0001**, so every match DELETED the
+    captured punctuation and injected a C0 control character in its place.
+
+    Measured before the fix::
+
+        "a warm revelation., sepia tones" -> "a warm revelation\x01 sepia tones"
+
+    That mattered because the refused prompt from the 2026-08-26 sweep ends in
+    exactly that shape (`...revelation., sepia tones`), so the JSON caption
+    handed to Ideogram carried a control character inside it. A control
+    character in a structured caption is a plausible refusal driver on its own,
+    and it reached the model on EVERY route, not just the scene fallthrough.
+
+    Asserted as a PROPERTY -- no C0 control characters survive `_tidy` -- rather
+    than as one golden string, so the guard cannot be satisfied by fixing only
+    the one input that was noticed.
+    """
+    cases = [
+        "a warm revelation., sepia tones",
+        "anime style. , huge high-contrast",
+        "a dusty archive room ,a glowing radio",
+        "one clause; , another",
+        "a label: , a value",
+    ]
+    for raw in cases:
+        out = ideo._tidy(raw)
+        controls = sorted({c for c in out if ord(c) < 32})
+        assert not controls, (
+            "_tidy(%r) -> %r injected control character(s) %r -- the "
+            "replacement literal is not the \1 backreference"
+            % (raw, out, controls))
+
+    # and the punctuation is genuinely KEPT, not merely non-control
+    assert ideo._tidy("a warm revelation., sepia tones") ==         "a warm revelation. sepia tones"
+    assert ideo._tidy("anime style. , huge high-contrast") ==         "anime style. huge high-contrast"
+
+
+def test_tidy_does_not_weld_two_words_together_at_the_style_seam():
+    """THE SECOND HALF, caught in review after the control-character fix.
+
+    Restoring the backreference alone gives ``r"\\1"``, which consumes the
+    whitespace the comma was carrying: "anime style. ,huge contrast" closes up
+    to "anime style.huge contrast" -- two words welded into one token. So the
+    rule eats the trailing whitespace deliberately and re-emits a single space.
+
+    "cartoon style. , a man" is the REAL seam this function exists for: it is
+    what the style prefix produces once the card clause is cut out of the
+    middle of the comma-joined string. Pinned by name rather than left to a
+    synthetic case.
+    """
+    assert ideo._tidy("anime style. ,huge contrast") == "anime style. huge contrast"
+    assert ideo._tidy("cartoon style. , a man") == "cartoon style. a man"
+    for raw in ("anime style. ,huge", "cartoon style. , a man",
+                "a warm revelation., sepia", "one clause; , another",
+                "a label: , a value"):
+        assert "  " not in ideo._tidy(raw), (
+            "_tidy(%r) -> %r left doubled whitespace" % (raw, ideo._tidy(raw)))
+
+
+def test_no_control_characters_reach_the_caption_on_any_route():
+    """The property that actually matters: whatever route runs, the JSON the
+    model receives is free of C0 controls. `_tidy` feeds all three routes, so a
+    regression there is invisible until a model declines the card."""
+    prose = ("a title card displaying the words \"HOLD THE LINE\", a dusty "
+             "archive room ,warm revelation., sepia tones")
+    for probe in (prose,
+                  'an abstract picture evoking "Signal Lost", a room ,dusk.',
+                  "a vintage tube radio glowing warmly, worn dials ,dusk."):
+        blob = ideo.caption_json(probe, 1920, 1080)
+        controls = sorted({c for c in blob if ord(c) < 32})
+        assert not controls, (
+            "caption_json(%r) carries control character(s) %r" % (probe, controls))

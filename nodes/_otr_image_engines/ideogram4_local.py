@@ -220,11 +220,24 @@ def _tidy(text: str) -> str:
     fragment starts with a comma, giving `anime style. , huge high-contrast`.
     Every token is positive conditioning here, so stray punctuation is not
     merely untidy -- it is noise the encoder reads.
+
+    BOTH CAPTURING RULES BELOW USED TO REPLACE WITH A BARE U+0001 INSTEAD OF
+    THE ``\\1`` BACKREFERENCE (found 2026-08-26). Every match therefore DELETED
+    the captured punctuation and injected a C0 control character into the
+    prompt -- `"a warm revelation., sepia"` became
+    `"a warm revelation\\x01 sepia"`. It reached the model on EVERY route, and
+    the prompt refused six times in the 2026-08-26 sweep ends in exactly that
+    shape. Pinned by
+    ``test_tidy_preserves_punctuation_instead_of_injecting_a_control_character``.
+
+    The first rule also EATS the following whitespace on purpose and re-emits a
+    single space, because `"style. ,huge"` would otherwise close up to
+    `"style.huge"` and weld two words together.
     """
     text = re.sub(r"\s{2,}", " ", text)
-    text = re.sub(r"([.;:])\s*,", r"", text)     # "style. ," -> "style."
+    text = re.sub(r"([.;:])\s*,\s*", r"\1 ", text)  # "style. ,huge" -> "style. huge"
     text = re.sub(r",\s*,+", ",", text)            # ", ,"       -> ","
-    text = re.sub(r"\s+([,.;:])", r"", text)     # " ,"        -> ","
+    text = re.sub(r"\s+([,.;:])", r"\1", text)     # " ,"        -> ","
     # Strip dangling separators at BOTH ends: an empty atmosphere leaves the
     # composed sentence opening with "; " or closing with ",".
     return text.strip().strip(",;:").strip()
