@@ -27,7 +27,90 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> NEXT ITEM: RE-TRIAGE OWED -- both prior top-of-queue items were already closed <<<
+### >>> NEXT ITEM: THE LOCAL-LLM ACCEPTANCE SWEEP (operator directive 2026-08-25) <<<
+
+**THE RE-TRIAGE THE PREVIOUS BANNER DEMANDED WAS DONE 2026-08-25 (late). Its
+result is below; the old banner text follows underneath, unedited.**
+
+**Runway row 2 (LEMMY Phases 2-4 + "its three live PBUGs") IS MOSTLY CLOSED and
+the row is STALE.** Checked against the real tree, not the banner:
+* **PBUG-20260811-01 -- CLOSED 2026-08-16, MIS-ATTRIBUTED.** The cameo never
+  killed the writer; `lemmy_force` was INERT on that lane at the repro commit.
+  Row 2's clause 5 asks to "resolve the fable2 BAD_LINE interaction" -- a bug
+  closed as never having been about the cameo. **Withdrawn premise.**
+* **PBUG-20260811-03 -- CLOSED 2026-08-18**, fixed and live-proven on a
+  forced-cameo leg (`da44f642` + `7faf3bf7`).
+* **PBUG-20260811-02 -- the ONLY one still OPEN.** Root cause established, the
+  repair is WRITTEN, and it is not a coding item: it needs a canonical
+  `fastwan_8gb` leg with 60-SECOND opening AND closing cues (long enough to
+  chunk at `_MUSIC_MAX_CHUNK_DUR_S = 22.0`). **That is a RENDER window, not a
+  coder slot.**
+* **Clause 4 is moot** -- `scifi_news` no longer exists (live banks are
+  media_archive, original, scifi_news_pro, public_domain, shakespeare,
+  custom_source_bank).
+* **"Phases 2-4" are STILL undefined anywhere in the repo** -- the phase
+  numbering lives only in a gitignored `kibitz-runs/` directory. Per
+  `docs/2026-08-16-lemmy-open-changes-PROBLEM-STATEMENT.md`, the six row-2
+  exit clauses are the only readable statement of intent. **Asking a window to
+  "complete Phases 2-4" is not an actionable exit condition** -- retire the
+  numbering or recover it, but do not let it keep sending windows in circles.
+
+**THE OPERATOR REDIRECTED THE WINDOW MID-SESSION, and these are his words:**
+*"when all this LLM coding is done we should look and do more coding and retest
+all local LLMs on a 1 runthrough that should catch it"*; *"if it doesn't fit
+nicely or requires Ollama rip it from the dropdown and blast radius"*; *"clean
+sweep I only want easy to load LLMs"*; *"there should be an LLM preflight guide
+-- preflight guides for adding all your own components"*; *"all models should
+live out here `C:\ComfyUI-Models`"*; and *"all LLMs should either be able to
+play creative or technical equally. If they're not, and they were not tested or
+not implemented, and they serve no worth, we should rip them out."*
+
+**ALREADY DONE (pushed, green, lockstep-verified):** the clean sweep itself
+(`Qwen/Qwen2.5-14B-Instruct` ripped with its blast radius), the PASS-tier
+invariant gate, `docs/LLM_PREFLIGHT_GUIDE.md`, and the `Q6_K` dropdown removal.
+The ruling is recorded in `docs/OTR_STANDING_RULINGS.md` ("ONLY EASY-TO-LOAD
+LLMs SHIP"). All 7 surviving local rows are verified present on disk.
+
+**STILL OPEN -- THE SWEEP ITSELF. Design is done (11-agent fan-out, 2026-08-25),
+build is not.** The honest shape, which is NOT one render:
+* **7 local rows / 2 model slots = 4 canonical legs MINIMUM**, plus a **Leg 0**
+  in-process preflight (no ComfyUI; `request_slot` -> ~40-token generate ->
+  `_self_unload` per row, with `reset_peak_memory_stats()` around each). Leg 0
+  is one command, ~15-20 min, and is what fails loudly on a dead row -- but a
+  leg that never reaches `otr/obs/` did not pass, so the 4 canonical legs are
+  the real proof.
+* **Every leg must PIN `--source-bank` to the scifi lane.** Canonical ships
+  `'roll (any eligible bank)'`, and `_otr_scifi_news_pro.py` is the only runner
+  code-verified to drive BOTH slots. Unpinned, a leg can land on a lane that
+  never touches the technical slot and the sweep proves nothing about that row.
+* **`gguf_quant` is ONE per-run widget**, and `unsloth/Qwen3-8B-GGUF` ships
+  only `Q4_K_M` -- so any leg carrying it runs Q4_K_M.
+* **A KNOWN FALSE-GREEN TO DESIGN AROUND:** `meta.slot_calls_by_slot` is
+  incremented ONLY inside `_SlotScheduler._account_and_get_entry`
+  (`OTR_LedgerScriptWriter.py:627`). SIX `request_slot` sites live outside it
+  (`story_orchestrator.py:1224`/`:1351`, `otr_shot_lock.py:1002`,
+  `OTR_LedgerFreezeCascade.py:282`, `OTR_LedgerScriptWriter.py:4393`,
+  `_otr_motion_clause.py:361`). The counter proves IN-WRITER generation only;
+  reading it as full-row exercise is a false green.
+* **The operator's creative/technical parity rule is the sweep's acceptance
+  criterion.** Structurally both slots already build from the IDENTICAL
+  `dropdown_choices()` list, so no row is slot-restricted; what is unproven is
+  whether each row can actually do the TECHNICAL job (constrained JSON / GBNF).
+  A row that cannot do both, and was never tested or implemented, is a RIP
+  candidate under his rule -- but rip only on a measured failure, never on
+  assumption.
+* **A negative probe worth running deliberately:** the gemma GGUF row at
+  `Q8_0` / `n_ctx=4096` needs ~14.70 GiB FREE against a 15.92 GiB card with
+  ComfyUI resident, and `_otr_gguf_backend.py` compares against
+  `mem_get_info()` FREE with "NO silent context downgrade". Either outcome is
+  informative; record both.
+
+**Full design (coverage matrix, per-row assertions, skip-reporting rules, risks)
+is in the 2026-08-25 workflow result; re-derive from this row if it is lost.**
+
+---
+
+### >>> SUPERSEDED BANNER (kept verbatim -- its re-triage instruction was carried out above) <<<
 
 **Found 2026-08-25, before re-coding what this banner used to name.** The
 `scifi_news_pro` Class A/B item (was here) and the loop PATH-inheritance

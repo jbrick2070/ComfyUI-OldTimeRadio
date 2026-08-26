@@ -2716,11 +2716,26 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                                 "downgrade: a window that does not fit "
                                 "free VRAM fails loud."},
                 ),
+                # 2026-08-25: Q6_K REMOVED from the operator-facing choices
+                # (operator: "if it doesn't fit nicely ... rip it from the
+                # dropdown"). Selecting it was a GUARANTEED failure: it is
+                # unpinned in GGUF_ARTIFACTS -- ("...Q6_K.gguf", None, None) --
+                # and since A6 (2026-07-27) an unpinned quant is REFUSED at
+                # load, so the only reachable outcome was a raise. No Q6_K
+                # artifact has ever been on this box either.
+                # The table entry and _GGUF_QUANTS deliberately KEEP Q6_K: it
+                # is the live fixture that proves the unpinned-refusal path
+                # (tests/test_gguf_registry.py, tests/test_llm_runtime_policy.py).
+                # Deleting it would have removed the operator's guaranteed
+                # failure AND the only proof that the guard works. Re-add it
+                # here the day it is on disk and pinned BY MEASUREMENT.
                 "gguf_quant": (
-                    ["Q8_0", "Q6_K", "Q4_K_M"],
+                    ["Q8_0", "Q4_K_M"],
                     {"default": "Q8_0",
                      "tooltip": "GGUF artifact quant (filename + expected "
-                                "size come from the artifact table)."},
+                                "size come from the artifact table). Only "
+                                "PINNED quants are offered -- an unpinned "
+                                "artifact is refused at load."},
                 ),
                 # S5 gate_in (2026-07-10, validation-order fix): the
                 # OTR_WorkflowValidator report gates the WRITER now (link
