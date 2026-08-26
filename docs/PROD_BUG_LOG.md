@@ -7034,3 +7034,62 @@ EXPECTED result, not a regression signal.
   possible path rather than as an early refusal. Not yet checked against
   `otr_coverage_index.yaml` + `BUG_BIBLE.yaml`.
 - status: OPEN
+
+## PBUG-20260826-02 -- one switch did two jobs, and 71 of 75 character stills lost their face anchor
+- surfaced: measured across 17 episodes rendered 2026-08-26. **75
+  `scene_character` stills; 4 anchored, 71 not.** Live published artifacts ->
+  admission rule satisfied. The symptom the operator would see is a
+  character's face changing between beats of the same episode -- a
+  CORRECTNESS defect, explicitly still in scope under the 2026-08-04
+  "story quality is done" directive, which exempts gender/voice/face faults.
+- symptom: within one episode, the same character is drawn with a different
+  face in every beat. No error, no warning, no failed leg -- the episode
+  publishes clean and simply looks wrong.
+- root cause, and it is a two-commit interaction 17 days apart:
+  * `89e82181` (2026-08-05) gave every beat of one character a stable face by
+    deriving its seed from that character's PORTRAIT PROMPT hash.
+  * `a88cede5` (2026-08-22) then let a video lane's `still_plan` suppress
+    MINTING the portrait. That was CORRECT for pixels -- an unused portrait
+    had killed a live leg on an engine that refuses face close-ups -- but the
+    same switch also emptied the hash the seed reads. One switch was doing two
+    jobs: "do not spend a render on a portrait" and "do not anchor the face".
+  * The only anchored episode ran the one lane whose plan has no portrait row
+    at all, so no exemption applied. Every other lane -- including
+    `still_flat`, which `workflows/otr_canonical.json` renders production
+    with -- had lost it.
+- the trap inside the fix, worth more than the fix: the obvious repair is to
+  transport the producer's portrait-prompt HASH. **That is wrong, and four
+  independent readings asserted it was "byte-for-byte identical" before one
+  reviewer read the recomputation and refuted it.** The dispatcher MUTATES the
+  prompt (safety clause -> style front-anchor -> banana) and RE-HASHES it, so
+  the value on the portrait row is not the value the producer computed.
+  Transporting the raw hash would have moved every face exactly once and
+  looked fixed.
+- fix: LANDED `bd1aa021`. The producer transports the portrait prompt TEXT;
+  the dispatcher re-derives the basis through its own normalize-then-hash
+  chain, so the basis is computed in exactly ONE place. Lanes now DECLARE
+  identity through a new `StillPlanRow.identity` field defaulting to
+  `portrait_seed`, so a lane written tomorrow is anchored for free and
+  forgetting fails safe; `still_word` declares `none` on its own copy of the
+  plan tuple rather than mutating the shared one -- writing it in place would
+  have stripped the anchor from the three cinematic lanes carrying the
+  measured 71.
+- verify: `tests/test_identity_anchor_transport.py`, 12 tests. The keystone is
+  `test_the_producer_hash_is_NOT_the_hash_the_seed_consumes`, which asserts
+  the two values genuinely DIFFER -- the equality check that would have caught
+  the wrong fix in milliseconds. Also pinned: the producer stamps no
+  hash-shaped field at all, the dispatcher derives through the shared
+  normalizer, and `still_word` declares `none` without touching its three
+  siblings.
+- bible-worthy: yes. The reusable rule is not about faces: **"a switch that
+  suppresses WORK must not also suppress the DERIVED VALUE that work happened
+  to carry."** When an optimisation removes a render, audit every field that
+  render was incidentally the source of -- this is the same shape as the
+  ledger-completeness rule for a ripped LLM pass, arriving through a
+  performance change instead of a deletion. Second, narrower rule: **an
+  identity basis must be derived in exactly one place**, because two copies of
+  a normalize-then-hash chain drift and the symptom is faces moving. Not yet
+  checked against `otr_coverage_index.yaml` + `BUG_BIBLE.yaml`.
+- status: FIXED, suite-proven (12136 passed). NOT yet proven on a live leg --
+  the canonical run that confirms `identity_seed_basis` is populated and faces
+  hold across beats is the outstanding receipt.
