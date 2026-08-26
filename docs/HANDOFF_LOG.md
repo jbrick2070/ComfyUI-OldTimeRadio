@@ -1,3 +1,140 @@
+## 2026-08-25 -- HEAD 56cb0a1a +handoff (v2.0-alpha) -- CODER (three 4060 crash reports closed; the orphan-lifecycle fix took THREE rounds because each cut had a new race; Bible 12.134; 5 commits)
+
+Did: worked the crash reports the operator pasted from an 8 GB RTX 4060, not
+  the banner at the top of the plan. Three PBUGs, and the third one is the
+  story.
+  THE TWO EASY ONES FIRST. `PBUG-20260825-02`: `cast_lock.py`'s
+  `_assign_bark_announcer` had a bare `from config import cast_pools`, which
+  only resolves when the repo root is on `sys.path` -- true under pytest and
+  the API script, false in real ComfyUI Desktop, so the node died on the
+  operator's box and passed here. Fixed with the two-tier guarded pattern
+  already used at ten other sites in the same file (`be0ab7fb`).
+  `PBUG-20260825-03`: `_plan_max_memory`'s VRAM budgets were every one of them
+  sized for a 4-BIT footprint, from back when a tagged model_id was ALWAYS
+  quantized. `quant_policy="none"` postdates them and was never threaded back
+  in, so an unquantized bf16 load got capped at the 4-bit number and
+  `device_map="auto"` silently CPU-offloaded the remainder. The operator's own
+  report is what made it findable -- a 3-4B E2B model running SLOWER than a 12B
+  NF4 model on the same card is exactly what partial offload looks like
+  (`2c524732`).
+  THE THIRD ONE: BUG-LOCAL-098 fired loud on a real render -- "NF4 quantized
+  load did not materialize" -- on a load whose own structural counters were all
+  correct (`linear4bit_count=592`, `is_loaded_in_4bit=True`). The number it
+  gated on was `torch.cuda.memory_allocated()` sampled before/after, a
+  PROCESS-WIDE counter, and an abandoned worker from an earlier timed-out
+  NewsCuration phase was freeing tensors concurrently. **The guard was reading
+  the wrong instrument, not mis-thresholding the right one.** Replaced with a
+  model-local scan (walk `named_modules()`, read each `Linear4bit`'s own
+  `.weight.device`); the global figure stays as explicitly-labelled telemetry
+  no branch reads (`063fcfc3`).
+  AGY WAS ALSO ON THIS ONE, LOCALLY, AND ITS DIAGNOSIS WAS WRONG. It read the
+  tripwire as a false positive caused by ComfyUI's aimdo/DynamicVRAM manager
+  "hiding" allocations and proposed relaxing the check. Disproved with direct
+  evidence rather than argument: the 5080 runs the IDENTICAL aimdo stack and
+  has never tripped it across dozens of loads. The operator then routed it here
+  ("you make the best edits to the repo, I'll ask agy to pull a fresh copy").
+  Recorded because "relax the guard" is the tempting wrong answer to every
+  loud-but-correct tripwire.
+  THEN THE PART THAT ACTUALLY COST THE EVENING. Behind the tripwire sat a real
+  race: `request_slot`'s cache store published UNCONDITIONALLY once a load
+  returned, so an abandoned worker's late-arriving load could land in
+  `LLM_CACHE` after the main thread had already invalidated -- and a completely
+  unrelated LATER caller could then take a cache HIT on a model the orphan was
+  still generating with on another thread. Not VRAM contention: two threads
+  mutating one model's generation state. **Fable found this cold in r1; neither
+  mechanical reviewer did.** Three cuts were needed and the panel broke the
+  first two:
+  - r2 (codex) -- my epoch counter invalidated a request's OWN wanted store on
+    every ordinary model switch, because `request_slot` tears down its own
+    prior resident model mid-call and a raw "bump on every clear" cannot tell
+    that self-inflicted bump from an external one. Every model switch would
+    have silently stopped caching.
+  - r3 (codex) -- the r2 fix's "re-baseline on my own teardown's return" was
+    itself exploitable: the DECISION to self-unload comes from an unlocked read
+    a few lines earlier, so an external invalidation racing into that gap let
+    an already-orphaned call adopt a fresh epoch and publish anyway --
+    laundering someone else's invalidation into a legitimate-looking one and
+    reopening the exact bug. Also caught the cache-HIT lookup being several
+    unlocked reads, which could return `None` against a documented dict
+    contract.
+  - r4 (cursor) -- the load-FAILURE cleanup still called the unconditional
+    `unload_llm()`. Since `load_llm()` can run long enough for a DIFFERENT
+    caller to publish, a call whose own load failed could tear down that
+    caller's live model. Same bug class, failure path instead of success path.
+  Final shape (`fb67d059`): `_self_unload` is the ONLY self-teardown
+  `request_slot` makes, and it atomically CLAIMS ownership of its epoch before
+  touching `LLM_CACHE` or the GPU -- a stale claim is a total no-op returning
+  the caller's original epoch unchanged. `_detach_and_invalidate_locked`,
+  `_try_cache_hit_locked` and `_publish_cache_entry_if_current` each do their
+  whole job in one critical section. The source pin now AST-walks `request_slot`
+  and FORBIDS any raw `unload_llm(` anywhere in its body -- counting the good
+  sites is what let r4's gap survive r3.
+  ALSO LANDED: a generation deadline so an abandoned worker's remaining life is
+  ~1 token instead of its full `max_new_tokens` budget. It LATCHES and raises
+  `GenerationDeadlineExceededError` rather than returning truncated text --
+  without that, a deadline hit beating `future.result(timeout=)` would have
+  surfaced as a clean-looking SUCCESS carrying a truncated artifact.
+  `_run_with_timeout` catches it in the SAME clause as its own `FuturesTimeout`.
+  Plus three propagation-guard sites (cursor found the third, one level up in
+  `OTR_LedgerScriptWriter._fetch_rss_seed_or_die`, recasting a genuine workflow
+  pause as a generic RSS failure).
+  TESTS REWRITTEN, NOT JUST ADDED. r3 correctly called the first cut's
+  source-string pins unable to catch either defect it found. The file now
+  carries Event-based concurrency races, direct exercise of the ownership claim
+  (with a NEGATIVE CONTROL proving a stale claim is still rejected), a
+  fake-model harness proving the deadline RAISES instead of returning text, and
+  a full `request_slot()`-level reproduction of the load-failure-vs-foreign-
+  entry race. Both r4 fixes verified non-vacuous by reverting and re-running.
+  BIBLE 12.134 PROMOTED (survival-guide `6633ef6`, 312 -> 313): *a
+  process-global measurement cannot prove a component fact.* Checked
+  `otr_coverage_index.yaml` and the Bible first -- `12.46` covers the orphan
+  thread PINNING VRAM, which is the adjacent-but-different half. Found and
+  fixed a pre-existing defect while there: one index record carried an unquoted
+  `Root cause: ` colon-space, so the index -- which exists to be machine-
+  readable so the 4M-token scrape is never repaid -- did not parse AT ALL.
+  Quoted; 429 records load now, header re-synced.
+Current step: all three 4060 PBUGs are fixed and pushed; `2.0.0-alpha.9` is
+  published to the registry. The orphan work left TWO DELIBERATE DEFERRALS,
+  both now filed in the plan under "The orphan-lifecycle pair" and both marked
+  DESIGN, not mechanical.
+Next: (1) VERIFY BEFORE ASSUMING THEORETICAL -- check whether the production
+  technical-slot catalog row is `gguf_native`. The generation deadline does NOT
+  reach the GGUF lane (llama-cpp has no per-token stopping hook), and both
+  `_run_with_timeout` callers already accept a GGUF `load_config`, so if that
+  row is GGUF the gap is being hit on every timeout rather than hypothetically.
+  (2) The orphan-occupancy registry stays deferred on its third independent
+  confirmation -- `has_local_resident_llm()` still reports "nothing resident"
+  while an orphan holds the GPU, and `otr_shot_lock.py:1781` /
+  `otr_video_render_batch.py:289` both trust it. (3) NOTHING FROM THIS SESSION
+  HAS RUN ON A GPU. Every fix is pure Python cache/threading bookkeeping with
+  no tensor or node-contract surface, fully covered by non-CUDA tests -- but a
+  canonical leg reaching `obs_publish OK` would prove ordinary slot/policy
+  switches still cache, which is the r2 defect's blast radius.
+Models: rung 5 (Sonnet 5, this window) drove and judged throughout. FULL FOUR-
+  ROUND ARC, and the roster is mixed rather than uniform -- state it as run:
+  r1 = codex + cursor via `kibitz.py`, PLUS an independent Fable cold-take
+  launched in parallel (Fable is not a kibitz CLI lane); r2 = codex only;
+  r3 = codex only; r4 = cursor only. Artifacts in
+  `kibitz-runs/2026-08-25-orphan-lifecycle/r{1,2,3,4}/` with a driver anchor and
+  a judgment per round. The panel earned every call: Fable found the whole
+  cache-publish hazard cold, codex broke my own fix twice, cursor broke it a
+  third time and independently confirmed no node/workflow surface was touched.
+Suite: 12258 passed / 120 skipped / 1 xfailed, EXIT=0 (364 s). Bible 22 passed /
+  26 skipped / 3 xfailed, 313 entries. `workflows/otr_canonical.json` NOT
+  touched this session -- no node, `INPUT_TYPES`, or `widgets_values` change,
+  so no widget audit was owed.
+Box state: NOT CLEAN and NOT MINE. A ComfyUI server is RESIDENT on port 8000
+  (PIDs 16660 and 58112, from `ComfyUI-Installs\ComfyUI\ComfyUI\main.py`), GPU
+  at 2539 MiB / 14% -- near desktop baseline, so idle-resident and holding no
+  model. This window never booted a server; it ran pytest only. Left alone
+  deliberately: the operator was actively driving ComfyUI while the 4060 reports
+  were coming in. Reset per CLAUDE.md section 4 before any headless run.
+Commits: `be0ab7fb`, `2c524732`, `063fcfc3`, `fb67d059`, `56cb0a1a` on
+  v2.0-alpha; `6633ef6` on the survival-guide repo (Bible 12.134). The sha in
+  the heading above is the last CODE head -- once this entry lands it is the
+  SECOND-TO-LAST sha on the branch, and the last is this handoff commit. See
+  the kickoff line for the real post-handoff head.
+
 ## 2026-08-24 -- HEAD a39875f8 +handoff (v2.0-alpha) -- CODER (scifi_news_pro Class A fixed and LIVE-PROVEN; a regression I shipped and a live leg caught; Bible 12.133; plan pruned to open work; 4 commits)
 
 Did: closed PBUG-20260824-01 Class A, broke it once on the way, and let the GPU
