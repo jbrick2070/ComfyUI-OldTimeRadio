@@ -156,15 +156,30 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     Re-raises any exception fn raised.
     """
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+    from . import _otr_model_loader as _otr_loader_mod
     vram_reset_peak(phase_label)
 
     def _worker():
         _TIMEOUT_CTX.deadline = time.time() + timeout_sec
+        # _TIMEOUT_CTX only feeds GemmaHeartbeatStreamer, a legacy streamer
+        # this phase's shared make_generate_fn transport never uses -- so
+        # an abandoned worker used to run to its FULL max_new_tokens budget
+        # with nothing checking whether anyone was still waiting. Also set
+        # the loader-owned deadline every model.generate() call in that
+        # shared transport DOES check, so this worker's own generation
+        # loop notices abandonment between tokens instead of running out
+        # the clock.
+        #
+        # Not best-effort: a guard whose install can silently no-op is
+        # worse than none (it claims protection that is not there), so a
+        # failure here fails the call loudly rather than swallowing it.
+        _otr_loader_mod.set_generation_deadline(_TIMEOUT_CTX.deadline)
         try:
             return fn()
         finally:
             if hasattr(_TIMEOUT_CTX, "deadline"):
                 del _TIMEOUT_CTX.deadline
+            _otr_loader_mod.set_generation_deadline(None)
 
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"otr-{phase_label}")
 
@@ -174,10 +189,17 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
             res = future.result(timeout=timeout_sec)
             vram_snapshot(phase_label)
             return res
-        except FuturesTimeout:
+        except (FuturesTimeout, _otr_loader_mod.GenerationDeadlineExceededError) as _timeout_exc:
+            # GenerationDeadlineExceededError means the worker's own
+            # generate() call noticed the deadline and raised instead of
+            # returning truncated text -- see PBUG-20260825-04. Routed
+            # through the exact same recovery path as FuturesTimeout so a
+            # deadline hit landing right before/after this future.result()
+            # call can never look like a clean (but truncated) success.
             _runtime_log(f"TIMEOUT: {phase_label} exceeded {timeout_sec}s wall-clock budget")
-            log.warning("[Timeout] %s phase exceeded %ds - abandoning and falling back",
-                        phase_label, timeout_sec)
+            log.warning("[Timeout] %s phase exceeded %ds - halting the "
+                        "workflow (%s)",
+                        phase_label, timeout_sec, type(_timeout_exc).__name__)
             vram_snapshot(f"{phase_label}_timeout")
 
             # BUG-LOCAL-111 + BUG-LOCAL-228 fix: timeout-recovery cache
@@ -212,7 +234,6 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
                 # touching the GPU; the orphan thread holds the model
                 # in its stack frame and exits naturally.
                 # See BUG-LOCAL-228.
-                from . import _otr_model_loader as _otr_loader_mod
                 _otr_loader_mod.invalidate_cache_no_gpu_teardown()
                 _runtime_log(
                     f"TIMEOUT_RECOVERY: LLM_CACHE invalidated (GPU "
@@ -239,7 +260,7 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
                 f"CUDA kernels. Re-run the workflow; the cache "
                 f"invalidation above guarantees the next attempt "
                 f"loads fresh."
-            )
+            ) from _timeout_exc
     finally:
         # Don't wait for the orphaned worker - let it drain in the background.
         # Combined with the cache invalidation above, the orphan completes
@@ -1177,11 +1198,15 @@ def _llm_rank_news_candidates(
         # normal conditions it returns in 5-15 sec. The 65s budget is a
         # ceiling, not a target -- it bounds the worst-case where prompt
         # processing on a cold cache or a 12B model takes longer than
-        # expected. On timeout, _run_with_timeout raises _LLMTimeout and
-        # the outer except block below falls back to shuffle order, so
-        # the run continues without LLM ranking. The cache-invalidation
-        # we added in BUG-LOCAL-111 (commit 27e54e9) also fires here so
-        # the orphan worker doesn't poison the next phase's CUDA state.
+        # expected. On timeout, _run_with_timeout raises
+        # _LLMTimeoutWorkflowPause, caught below by its own dedicated
+        # `except _LLMTimeoutWorkflowPause: raise` BEFORE the broad
+        # except -- it halts the workflow rather than falling back to
+        # shuffle order (PBUG-20260825-04: silently falling back here let
+        # the main thread start ANOTHER LLM load while this phase's orphan
+        # worker was still alive on GPU). The cache-invalidation we added
+        # in BUG-LOCAL-111 (commit 27e54e9) also fires here so the orphan
+        # worker doesn't poison the next phase's CUDA state.
         def _do_rank_call():
             # 2026-04-29 fix: transformers rejects temperature=0.0 with
             # "must be strictly positive". For greedy-deterministic
@@ -1279,10 +1304,13 @@ def _llm_rerank_with_bodies(
     only -- ~160 chars each. This pass feeds the LLM the first ~800
     chars of each candidate's actual article body so the pick is based
     on narrative bones, not the catchy title. Returns the input list
-    re-ordered (best first). On ANY failure (timeout, parse error, LLM
-    unavailable) returns the input list unchanged so the caller's
-    normal fallback walk still works. Body re-rank is an enhancement,
-    never a blocker.
+    re-ordered (best first). On a non-timeout failure (parse error, LLM
+    unavailable) returns the input list unchanged so the caller's normal
+    fallback walk still works -- body re-rank is an enhancement, never a
+    blocker. On a WALL-CLOCK TIMEOUT specifically, `_LLMTimeoutWorkflowPause`
+    is re-raised rather than swallowed into that fallback (PBUG-20260825-04:
+    silently falling back here let the main thread start ANOTHER LLM load
+    while this phase's orphan worker was still alive on GPU).
 
     Designed to fit inside the 65-second news-curation wall-clock
     budget alongside Phase 1: Phase 1 ~10-15s + parallel body-fetch

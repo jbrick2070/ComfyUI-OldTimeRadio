@@ -158,9 +158,24 @@ def test_llm_timeout_workflow_pause_is_not_swallowed_by_news_curation():
     import ast
     import inspect
 
-    src = inspect.getsource(so)
-    tree = ast.parse(src)
+    checked = _count_pause_before_broad_except(inspect.getsource(so))
+    assert checked == 2, (
+        f"expected exactly 2 try/except blocks pairing "
+        f"_LLMTimeoutWorkflowPause with a broad Exception handler "
+        f"(NewsCuration + NewsCurationDeep); found {checked}. If this "
+        f"count changed intentionally (a helper added or removed), update "
+        f"this test's expectation in the same change."
+    )
 
+
+def _count_pause_before_broad_except(src: str) -> int:
+    """How many try/except blocks in ``src`` catch
+    ``_LLMTimeoutWorkflowPause`` (bare or ``module.``-qualified) BEFORE a
+    broad ``except Exception``, and actually re-raise rather than swallow
+    it. Shared by both propagation-guard tests below."""
+    import ast
+
+    tree = ast.parse(src)
     checked = 0
     for node in ast.walk(tree):
         if not isinstance(node, ast.Try):
@@ -192,11 +207,29 @@ def test_llm_timeout_workflow_pause_is_not_swallowed_by_news_curation():
             "the _LLMTimeoutWorkflowPause handler must re-raise, not "
             "swallow the pause"
         )
+    return checked
 
-    assert checked == 2, (
-        f"expected exactly 2 try/except blocks pairing "
-        f"_LLMTimeoutWorkflowPause with a broad Exception handler "
-        f"(NewsCuration + NewsCurationDeep); found {checked}. If this "
-        f"count changed intentionally (a helper added or removed), update "
-        f"this test's expectation in the same change."
+
+def test_llm_timeout_workflow_pause_is_not_swallowed_by_rss_seed_fetch():
+    """PBUG-20260825-04 follow-up, found by kibitz r1 (cursor lane) on the
+    orphan-lifecycle design round: the propagation fix above lets the pause
+    escape NewsCuration/NewsCurationDeep correctly, but ONE LEVEL UP,
+    ``OTR_LedgerScriptWriter._fetch_rss_seed_or_die`` (the real caller,
+    via ``_otr_source_payload.py``'s science_rss wrapper -- which has no
+    try/except of its own) caught it via its own broad ``except
+    Exception`` and recast it as a generic 'RSS fetch failed' RuntimeError,
+    erasing the type before it ever reached a node boundary. Same fix,
+    same pattern, one more call-chain level.
+    """
+    from nodes import OTR_LedgerScriptWriter as writer
+    import inspect
+
+    checked = _count_pause_before_broad_except(
+        inspect.getsource(writer._fetch_rss_seed_or_die)
+    )
+    assert checked == 1, (
+        "_fetch_rss_seed_or_die must catch _LLMTimeoutWorkflowPause and "
+        "re-raise it before its broad except Exception -- otherwise the "
+        "pause dies here and never reaches the node boundary regardless "
+        "of the story_orchestrator-level fix"
     )

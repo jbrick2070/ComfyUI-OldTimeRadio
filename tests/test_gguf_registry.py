@@ -582,11 +582,19 @@ def test_reuse_hit_and_reload_on_n_ctx_change(monkeypatch, clean_cache):
     loader = clean_cache
     backend = _FakeBackend()
     unloads = {"n": 0}
+    # request_slot's self-triggered transitions route through the
+    # ownership-checked _self_unload (PBUG-20260825-04 r3), not the public
+    # unconditional unload_llm() -- monkeypatch the real call target.
+    original_self_unload = loader._self_unload
+
+    def counting_self_unload(my_epoch, *, slot):
+        unloads["n"] += 1
+        return original_self_unload(my_epoch, slot=slot)
+
     monkeypatch.setattr(
         "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend,
     )
-    monkeypatch.setattr(loader, "unload_llm",
-                        lambda: unloads.__setitem__("n", unloads["n"] + 1))
+    monkeypatch.setattr(loader, "_self_unload", counting_self_unload)
     lc1 = _lc(GEMMA, 4096)
     loader.request_slot("technical", GEMMA, policy=BASELINE_POLICY, load_config=lc1)
     # Same load identity -> cache HIT, no second load.
@@ -603,10 +611,18 @@ def test_gemma_qwen_gemma_close_order(monkeypatch, clean_cache):
     loader = clean_cache
     backend = _FakeBackend()
     order = []
+    # See test_reuse_hit_and_reload_on_n_ctx_change: the real call target
+    # for request_slot's self-triggered transitions is _self_unload.
+    original_self_unload = loader._self_unload
+
+    def counting_self_unload(my_epoch, *, slot):
+        order.append("unload")
+        return original_self_unload(my_epoch, slot=slot)
+
     monkeypatch.setattr(
         "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend,
     )
-    monkeypatch.setattr(loader, "unload_llm", lambda: order.append("unload"))
+    monkeypatch.setattr(loader, "_self_unload", counting_self_unload)
     loader.request_slot("technical", GEMMA, policy=BASELINE_POLICY,
                         load_config=_lc(GEMMA, 4096))
     loader.request_slot("technical", QWEN, policy=_qwen_policy(),

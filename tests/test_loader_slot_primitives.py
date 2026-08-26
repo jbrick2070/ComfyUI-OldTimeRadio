@@ -500,21 +500,73 @@ def test_request_slot_same_model_returns_cached_entry(monkeypatch):
 
 
 def test_request_slot_different_model_triggers_full_teardown(monkeypatch):
-    """Slot 1 != Slot 2 must call unload_llm exactly once between loads."""
+    """Slot 1 != Slot 2 must call its self-teardown exactly once between
+    loads. request_slot's own self-triggered transitions route through
+    _self_unload (an ownership-checked claim, PBUG-20260825-04 r3) rather
+    than the public, unconditional unload_llm() -- monkeypatch the real
+    call target."""
     unload_calls: list[int] = []
-    original_unload = loader.unload_llm
+    original_self_unload = loader._self_unload
 
-    def counting_unload():
+    def counting_self_unload(my_epoch, *, slot):
         unload_calls.append(1)
-        original_unload()
+        return original_self_unload(my_epoch, slot=slot)
 
-    monkeypatch.setattr(loader, "unload_llm", counting_unload)
+    monkeypatch.setattr(loader, "_self_unload", counting_self_unload)
 
     loader.request_slot("creative", catalog.DEFAULT_LLM)
     assert len(unload_calls) == 0  # first load has no prior resident
     loader.request_slot("technical", catalog.TEST_TECHNICAL_LLM)
     assert len(unload_calls) == 1  # transition unloaded once
     assert loader.LLM_CACHE["model_id"] == catalog.TEST_TECHNICAL_LLM
+
+
+def test_load_failure_cleanup_does_not_tear_down_a_foreign_live_entry(monkeypatch):
+    """r4 kibitz finding (Cursor): request_slot's load-failure except block
+    used to call the raw, UNCONDITIONAL unload_llm() to drop orphan VRAM
+    before a retry (Sprint H iter 3). Because it is unconditional, a
+    slow/abandoned call whose OWN load later fails could tear down --
+    model.to("cpu"), epoch bump -- a completely DIFFERENT, legitimate
+    caller's model that got published in the meantime, purely because this
+    call's own (unrelated) load happened to fail. Reproduced here
+    single-threaded: while the failing call's load_llm() is "running", a
+    third party invalidates and publishes its own fresh entry; the failing
+    call's except-block cleanup must leave that foreign entry untouched."""
+    # Establish a resident model so the failing call's own Step 8 has
+    # something to (successfully) self-unload before its load_llm() runs.
+    loader.request_slot("technical", catalog.TEST_TECHNICAL_LLM)
+
+    foreign_entry = {"marker": "foreign-live-model"}
+
+    def _failing_load_llm(model_id, **kwargs):
+        # Simulates a THIRD PARTY publishing its own fresh, unrelated
+        # entry WHILE this call's load is in flight -- e.g. a genuinely
+        # concurrent request_slot call on another thread, or (as in the
+        # live PBUG-20260825-04 incident) a prior orphan's own timeout
+        # handler invalidating and a later prompt's request_slot
+        # succeeding before this call's failing load unwinds.
+        loader.invalidate_cache_no_gpu_teardown()
+        loader._publish_cache_entry_if_current(
+            loader._current_cache_epoch(), {
+                "model_id": "test/foreign-model",
+                "slot": "technical",
+                "cache_entry": foreign_entry,
+                "policy_key": "foreign-policy",
+            },
+        )
+        raise RuntimeError("simulated load failure")
+
+    monkeypatch.setattr(loader, "load_llm", _failing_load_llm)
+
+    with pytest.raises(RuntimeError, match="simulated load failure"):
+        loader.request_slot("creative", catalog.DEFAULT_LLM)
+
+    assert loader.LLM_CACHE.get("cache_entry") is foreign_entry, (
+        "a different, legitimate caller's freshly-published model must "
+        "survive an unrelated, later-failing call's cleanup -- tearing it "
+        "down here is exactly the r4 regression"
+    )
+    assert loader.LLM_CACHE.get("model_id") == "test/foreign-model"
 
 
 def test_request_slot_oversized_fails_before_download(monkeypatch):

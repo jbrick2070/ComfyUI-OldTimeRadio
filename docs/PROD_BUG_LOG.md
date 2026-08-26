@@ -6511,31 +6511,148 @@ EXPECTED result, not a regression signal.
   before failing the episode. `vram_delta=-0.00GiB` on the failing load is
   the tell: the "loaded" model consumed essentially no additional VRAM,
   meaning nothing was actually resident despite `is_loaded_in_4bit=True`.
-- root cause: NOT YET CONFIRMED BY CODE READ -- this entry records the live
-  occurrence, not a diagnosis. The timing is suggestive (two orphan-GPU-
-  worker warnings immediately preceding the failing reload sequence) but the
-  causal link between the NewsCuration timeout's orphan worker and the
-  Selector's own load_llm retry has not been traced. The existing tripwire
-  comment (`_otr_model_loader.py:439-450`, BUG-LOCAL-098's original note)
-  already names the general mechanism -- "transformers mutates internal
-  flags during from_pretrained; a reused instance silently skips
-  quantization on the second call" -- and the loader already instantiates a
-  FRESH `BitsAndBytesConfig` per call specifically to prevent that. That
-  this still fired means either (a) the fresh-config fix does not cover
-  every path that re-enters `load_llm` for the same model_id in rapid
-  succession, or (b) a genuinely orphaned CUDA context (from the timed-out
-  NewsCuration worker) left the device in a state the fresh config can't
-  route around. Needs its own read of `_otr_scifi_news_pro.py`'s
-  NewsCuration/NewsCurationDeep timeout handling before either is confirmed.
-- fix: NONE YET -- explicitly deferred per operator instruction this
-  session. The documented workaround (restart ComfyUI Desktop, re-queue)
-  already exists in the tripwire's own error message and is presumably
-  sufficient for now.
-- confidence: MEDIUM on the symptom (directly observed, real traceback),
-  LOW on root cause (timing-correlated hypothesis only, not traced).
-- bible-worthy: NOT YET -- admissible as a live PROD_BUG_LOG entry (the
-  admission rule's bar), but promotion needs the actual root cause, which
-  this session did not chase.
+- root cause, UPDATED after this session's follow-on investigation: the
+  tripwire's own signal was unsound, independent of whether the underlying
+  quantized load actually materialized. `vram_delta` compared
+  `torch.cuda.memory_allocated()` before/after the load -- a PROCESS-WIDE
+  counter. The log excerpt above shows the failing load landing immediately
+  after two orphan-GPU-worker warnings (NewsCuration/NewsCurationDeep both
+  timed out and `_run_with_timeout` explicitly left their worker threads
+  "draining in the background" rather than killing them, since Gemma
+  generation is not cancellable mid-token). An orphan worker freeing tensors
+  or otherwise moving the process-wide allocator total at the same moment
+  the Selector's own load measures its before/after delta can produce
+  exactly this symptom -- a near-zero or negative delta on a load that in
+  fact materialized fine, because the number being read was never
+  model-local to begin with. This is a PLAUSIBLE, mechanism-consistent
+  explanation for this specific incident, not a forensic trace of this exact
+  timestamped run (the orphan worker's own logs were not captured
+  separately) -- but it is no longer a bare timing correlation: it is the
+  same bug class this session confirmed and fixed by direct code read
+  (below), reproduced with real (non-CUDA) tests.
+- fix, LANDED this session across two rounds of the same PBUG:
+  1. The tripwire's signal itself: replaced the process-global VRAM-delta
+     read with `_bug098_scan_linear4bit_devices()`, a MODEL-LOCAL check --
+     walk `model.named_modules()`, confirm every `bitsandbytes.Linear4bit`
+     module's own `.weight.device` is actually CUDA. This can no longer be
+     fooled by unrelated concurrent GPU activity from an orphan worker;
+     `vram_delta` is retained in the error message as telemetry only.
+  2. Three propagation-guard sites (`story_orchestrator.py` x2,
+     `OTR_LedgerScriptWriter._fetch_rss_seed_or_die` x1) so a genuine
+     `_LLMTimeoutWorkflowPause` from an orphaned worker can no longer be
+     silently caught and recast as an unrelated generic failure -- this
+     closes the SAME-PROMPT incident structurally.
+  3. `_CACHE_EPOCH`: `request_slot`'s cache-store sites no longer publish
+     an abandoned call's late-arriving `cache_entry` after the main thread
+     has invalidated and moved on -- closing the CROSS-PROMPT window where
+     a later, unrelated caller could take a cache hit on a model an orphan
+     is still actively generating with. This went through TWO corrections
+     across two kibitz rounds reviewing the finished diff (both found by
+     Codex, both verified against the real files before being accepted):
+     - r2: the first cut had `request_slot` re-baseline UNCONDITIONALLY on
+       every self-triggered teardown's return value -- which broke every
+       ORDINARY model switch, since request_slot tears its own prior
+       resident model down before loading the replacement, in the same
+       call whose store follows a few lines later, and a raw "bump on
+       every clear" counter cannot tell that self-inflicted bump apart
+       from an external one.
+     - r3: the r2 fix's own "re-baseline on my own teardown's return"
+       shape was ITSELF exploitable -- request_slot DECIDES to
+       self-unload from an unlocked read a few lines before the actual
+       call; if an external invalidation races into that exact gap, the
+       call's snapshot is already stale by the time it reaches its own
+       teardown, but the unconditional re-baseline would still adopt a
+       fresh epoch, laundering the external invalidation into a
+       legitimate-looking self-triggered one and reopening the exact
+       publish-after-abandonment bug this fix exists to close. Final
+       fix: `_self_unload()` (the ONLY call request_slot's own control
+       flow makes for this now -- the public `unload_llm()` stays
+       unconditional, reserved for external callers) atomically claims
+       ownership of the caller's epoch snapshot BEFORE touching LLM_CACHE
+       or the GPU; a stale claim is a complete no-op, returning the
+       caller's original (now provably stale) epoch unchanged rather than
+       adopting a new one.
+     r3 also found the cache-HIT lookup (Step 2 / the GGUF-branch reuse
+     check) was several unlocked reads followed by a return, letting an
+     invalidation land mid-check and produce either `None` (violating
+     request_slot's documented dict-return contract) or a hit against an
+     entry that no longer exists -- fixed with `_try_cache_hit_locked()`,
+     the entire check-and-return under one lock acquisition.
+  4. A generation deadline (`_DeadlineStoppingCriteria`, loader-owned,
+     wired into the two user-facing TRANSFORMERS `model.generate()`
+     closures, `make_generate_fn` and `make_polish_generate_fn`):
+     shrinks an abandoned worker's remaining lifetime from a full
+     `max_new_tokens` budget to roughly one token, latching and raising
+     `GenerationDeadlineExceededError` (never returning truncated text as
+     a silent success) so `_run_with_timeout` routes a deadline hit
+     through the identical recovery path as its own `FuturesTimeout`.
+     (`load_llm`'s own internal 1-token CUDA warmup generate() call is
+     deliberately exempt, same as it already was from the sibling
+     degeneracy guard -- negligible orphan lifetime, not worth a third
+     criterion.)
+  5. r4 kibitz (Cursor) found the ownership fix from item 3 had one gap
+     left: request_slot's load-FAILURE cleanup (`except Exception:
+     unload_llm(); raise`, both the transformers and the previously-
+     unguarded GGUF branch) still called the raw, unconditional
+     `unload_llm()`. Since a slow/abandoned call's `load_llm()` can run
+     long enough for a genuinely different, legitimate caller to publish a
+     fresh resident model in the meantime, this let a call whose OWN load
+     later failed tear down or epoch-bump that unrelated caller's live
+     model purely because of its own, unrelated failure. Fixed with the
+     same `_self_unload` ownership claim as every other self-triggered
+     teardown; the source pin now AST-walks `request_slot` and forbids ANY
+     raw `unload_llm(` call anywhere in its body, not just counting the
+     known-good sites. Also closed `has_local_resident_llm()`'s unlocked
+     read (a cheap torn-read window between `_detach_and_invalidate_
+     locked`'s clear() and update(), not the deferred occupancy question
+     below).
+  All fixes' tests were rewritten from source-string pins to real
+  behavioral coverage (Event-based concurrency races, direct exercise of
+  the ownership-claim and cache-hit-atomicity functions, a fake-model
+  harness proving the deadline raise fires instead of a truncated return, a
+  full request_slot()-level reproduction of the load-failure-vs-foreign-
+  entry race) after r3/r4 review flagged the original source-only tests as
+  unable to catch the respective classes of defect they found.
+- KNOWN, DELIBERATELY DEFERRED (not fixed this session -- named here so
+  neither is mistaken for closed):
+  1. The generation-deadline fix (item 4) is SCOPED to the transformers
+     local lane. `make_generate_fn`'s GGUF branch returns
+     `make_gguf_generate_fn`'s closure before any deadline guard is
+     constructed; `llama-cpp-python`'s `create_chat_completion` has no
+     per-token Python stopping-criteria hook the way transformers does, so
+     an abandoned worker on a GGUF-backed model (NewsCuration/
+     NewsCurationDeep both accept a GGUF `load_config`) still runs to its
+     full budget. Closing this needs its own design (llama-cpp supports
+     streaming; stopping between chunks would work, but is a materially
+     different mechanism) -- found by r3 kibitz (Codex), not implemented
+     this session; see `nodes/_otr_model_loader.py`'s module comment above
+     `_GENERATION_DEADLINE` for the in-code scoping note.
+  2. The full orphan-OCCUPANCY registry (a process-global, lock-protected
+     registry of in-flight generations, with fail-fast admission on
+     `request_slot` and `has_local_resident_llm()` reading real occupancy
+     instead of just LLM_CACHE's cleared-or-not dict state) remains
+     deferred -- unanimous across the r1 Codex + Cursor kibitz round and
+     an independent Fable review, and reaffirmed by r3: `has_local_
+     resident_llm()` still reports "nothing resident" the instant a
+     timeout invalidates the cache dict, even though the orphan worker may
+     still be actively running CUDA kernels on the model that dict entry
+     described -- `otr_shot_lock.py` and `otr_video_render_batch.py` both
+     trust that signal before proceeding with visual/video work. The four
+     fixes above close the concrete cache-bookkeeping windows this
+     incident's mechanism actually depends on; they do NOT make orphan
+     GPU occupancy visible to a downstream visual stage. That is a
+     genuinely separate, larger design (a registry, not a counter) and
+     deserves its own dedicated session rather than being folded into this
+     PBUG's scope.
+- confidence: MEDIUM-HIGH on the symptom (directly observed, real
+  traceback) and on the fix set (each closes a directly-confirmed code-level
+  race, covered by non-vacuous tests -- reverted and re-tested); MEDIUM on
+  root cause for THIS SPECIFIC incident (mechanism-consistent and no longer
+  a bare timing coincidence, but not a forensic trace of this exact run).
+- bible-worthy: the landed fixes are candidates for promotion once this
+  incident class stays quiet across further live legs; not promoted yet --
+  the admission rule's bar for Bible promotion is a repeatable, PRODUCTION-
+  verified recurrence, which this entry does not yet have post-fix.
 - NOTE ON PROCESS: "BUG-LOCAL-098" has been referenced in
   `nodes/_otr_model_loader.py` and `nodes/story_orchestrator.py` comments
   for some time (its own fresh-BitsAndBytesConfig fix, and this detection

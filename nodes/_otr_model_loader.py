@@ -15,8 +15,9 @@ Public surface:
         quantized, budget_profile, context_cap}. Wraps _load_llm's tuple
         return into the dict shape documented by _otr_outline.py.
 
-    unload_llm() -> None
-        Re-export of _unload_llm. Frees VRAM globally.
+    unload_llm() -> int
+        Re-export of _unload_llm. Frees VRAM globally. Returns the new
+        cache epoch (see _CACHE_EPOCH_LOCK); most callers ignore it.
 
     unload_llm_if_local_resident() -> bool
         Handoff helper: skips the full torch/CUDA teardown when the writer
@@ -40,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -87,6 +89,7 @@ __all__ = [
     "make_generate_fn",
     "make_polish_generate_fn",
     "ModelLoaderError",
+    "GenerationDeadlineExceededError",
     "LLM_CACHE",
 ]
 
@@ -107,6 +110,217 @@ LLM_CACHE: dict[str, Any] = {
     "slot": None,
     "cache_entry": None,
 }
+
+# PBUG-20260825-04 (orphan-lifecycle window): request_slot's own Step-9
+# cache store (below, "cache (policy-keyed, S1)") writes UNCONDITIONALLY
+# once load_llm() returns -- with no check for whether the CALLER is still
+# wanted. story_orchestrator._run_with_timeout abandons a worker thread on
+# a wall-clock timeout (generation is not cancellable mid-token) and
+# invalidates LLM_CACHE via invalidate_cache_no_gpu_teardown() -- but if
+# the abandoned worker's OWN load_llm() call then finishes successfully
+# (weights materialize fine, the tripwire passes), its Step-9 write lands
+# in the dict AFTER the invalidation, unguarded, and a completely
+# unrelated LATER request_slot call can then take a cache HIT on that
+# entry and start ITS OWN generate() on the SAME model object the orphan is
+# still actively generating with in another thread. That is not VRAM
+# contention -- it is two threads mutating one model's generation/KV-cache
+# state concurrently.
+#
+# _CACHE_EPOCH closes that specific window without the larger
+# orphan-occupancy registry (deferred to a dedicated session -- see
+# docs/PROD_BUG_LOG.md PBUG-20260825-04). Every invalidation path bumps the
+# epoch; request_slot snapshots it on entry and only performs the Step-9
+# store if the epoch is UNCHANGED. An abandoned call's late write is then
+# silently skipped -- its caller is gone, the entry dies with the orphan's
+# own stack frame, exactly as it already does today for everything except
+# this one unconditional dict write.
+#
+# OWNERSHIP, not just a counter: request_slot can invalidate the cache
+# ITSELF, mid-call, as ordinary control flow -- a GGUF load-config change
+# or a cross-model slot transition both tear down the old resident model
+# before loading the replacement, in the SAME call whose Step-9 store
+# follows a few lines later. The DECISION to self-unload is made from an
+# unlocked read a few lines before the actual teardown call ("a different
+# model is resident"); if an external invalidation races into that exact
+# gap, the self-unload still runs, so its own resulting bump must NOT be
+# blindly adopted as if it were legitimately this call's own. The claim is
+# therefore CONDITIONAL, atomically: only bump and hand back a new epoch if
+# the caller's snapshot was STILL current at the exact moment of the
+# attempt; otherwise, no-op entirely (no GPU touch, no LLM_CACHE mutation,
+# no epoch adoption) and let the caller keep its now-provably-stale
+# snapshot, so its eventual store correctly fails instead of laundering
+# someone else's invalidation into a legitimate-looking self-triggered one.
+# See _self_unload / _detach_and_invalidate_locked's ``expected_epoch`` gate
+# below -- request_slot must never call the raw, unconditional unload_llm()
+# for ANY of its own self-triggered teardowns, success path or failure-path
+# cleanup alike.
+#
+# Atomicity: the clear+bump and the check+publish must never be observably
+# separate operations, or a concurrent invalidation can land between
+# "epoch still matches" and "write the entry" and still let a stale entry
+# through. Every mutation of _CACHE_EPOCH or the LLM_CACHE identity fields
+# goes through the helpers below, all sharing one lock.
+_CACHE_EPOCH_LOCK = threading.Lock()
+_CACHE_EPOCH: int = 0
+
+
+def _current_cache_epoch() -> int:
+    with _CACHE_EPOCH_LOCK:
+        return _CACHE_EPOCH
+
+
+def _detach_and_invalidate_locked(
+    expected_epoch: int | None = None,
+) -> tuple[dict | None, int | None]:
+    """Atomically capture the resident cache_entry, clear LLM_CACHE's
+    identity fields, and bump the epoch -- all under one lock acquisition,
+    so no concurrent publish/read can observe the clear and the bump as
+    separate steps.
+
+    With ``expected_epoch=None`` (the unconditional case: ``unload_llm``'s
+    and ``invalidate_cache_no_gpu_teardown``'s ordinary external-caller
+    behavior), always proceeds and returns ``(detached_entry, new_epoch)``.
+
+    With ``expected_epoch`` given (request_slot's own self-triggered
+    teardown, via ``_self_unload``), proceeds ONLY if the live epoch still
+    equals it; otherwise this is a complete no-op and returns
+    ``(None, None)`` -- the caller has been externally invalidated since it
+    last checked and must not claim ownership of a bump it did not itself
+    (legitimately) cause.
+    """
+    global _CACHE_EPOCH
+    with _CACHE_EPOCH_LOCK:
+        if expected_epoch is not None and _CACHE_EPOCH != expected_epoch:
+            return None, None
+        entry = LLM_CACHE.get("cache_entry")
+        LLM_CACHE.clear()
+        LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
+        _CACHE_EPOCH += 1
+        return entry, _CACHE_EPOCH
+
+
+def _try_cache_hit_locked(
+    normalized: str, slot: str, *,
+    gguf_key: str | None = None, policy_key: str | None = None,
+) -> dict | None:
+    """Atomically check a cache-hit predicate and capture+return the
+    matching entry (also stamping ``slot``) under the same lock -- a
+    separate check-then-return would let an invalidation land between the
+    predicate passing and the return, producing either a ``None`` where
+    request_slot's contract promises a dict, or a hit against an entry
+    that no longer exists. Pass exactly one of ``gguf_key``/``policy_key``
+    to select which identity dimension gates the hit. Returns ``None`` on
+    any miss; the caller is responsible for its own (unlocked, advisory)
+    miss-reason logging afterward.
+    """
+    with _CACHE_EPOCH_LOCK:
+        if (
+            LLM_CACHE.get("model_id") != normalized
+            or LLM_CACHE.get("cache_entry") is None
+        ):
+            return None
+        if gguf_key is not None and LLM_CACHE.get("gguf_load_key") != gguf_key:
+            return None
+        if policy_key is not None and LLM_CACHE.get("policy_key") != policy_key:
+            return None
+        LLM_CACHE["slot"] = slot
+        return LLM_CACHE["cache_entry"]
+
+
+def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
+    """Publish ``fields`` into LLM_CACHE iff the epoch is still
+    ``expected_epoch``, atomically with the read -- the check and the
+    write happen under the same lock a concurrent invalidation also uses,
+    closing the gap a separate check-then-write would leave open. Returns
+    whether the publish happened; the caller logs on False."""
+    with _CACHE_EPOCH_LOCK:
+        if _CACHE_EPOCH != expected_epoch:
+            return False
+        LLM_CACHE.update(fields)
+        return True
+
+
+# 2026-08-25 (orphan-lifecycle round, Fable's cold-take finding): the codebase
+# already has a working per-token deadline check --
+# story_orchestrator.GemmaHeartbeatStreamer.put() raises TimeoutError once a
+# thread-local deadline has passed -- but it lives on a DIFFERENT, legacy
+# streamer that make_generate_fn's shared TRANSFORMERS transport (below)
+# never wired in. NewsCuration/NewsCurationDeep (the two _run_with_timeout-
+# bound phases) go through make_generate_fn, so on the transformers lane an
+# abandoned worker previously ran to its FULL max_new_tokens budget before
+# its thread could unwind -- minutes, at slow token rates, of extra orphan
+# lifetime with nothing checking whether anyone was still waiting.
+#
+# This is the shared-layer equivalent, owned here rather than imported from
+# story_orchestrator (this file is the transport every caller already goes
+# through; per this file's own docstring it is meant to absorb shared
+# behavior as the legacy orchestrator's internals are phased out, not reach
+# back into them). _run_with_timeout calls set_generation_deadline() before
+# submitting its worker and clears it in the worker's own finally; both
+# user-facing transformers generate closures (make_generate_fn,
+# make_polish_generate_fn) check it via _DeadlineStoppingCriteria, cutting
+# an abandoned worker's remaining lifetime to ~1 token instead of the full
+# budget. (load_llm's own internal CUDA-warmup model.generate() call --
+# max_new_tokens=1, do_sample=False, already exempt from the sibling
+# degeneracy guard for the same reason -- is not wired in: one warmup
+# token adds negligible orphan lifetime, not worth a third criterion.)
+#
+# SCOPED, NOT UNIVERSAL (r3 kibitz finding, Codex): make_generate_fn's GGUF
+# lane returns make_gguf_generate_fn's closure early, before ever
+# constructing a deadline guard -- llama-cpp-python's create_chat_completion
+# has no per-token Python stopping-criteria hook the way transformers does,
+# so this deadline mechanism does not reach a GGUF-backed model even when
+# NewsCuration/NewsCurationDeep are configured with a GGUF load_config (both
+# accept one). A GGUF-backed abandoned worker still runs to completion on
+# its own budget. Threading a deadline through the GGUF lane needs its own
+# design (llama-cpp supports streaming; stopping between chunks would work,
+# but is a materially different mechanism from a StoppingCriteria) and is
+# deliberately DEFERRED, not fixed here -- see PBUG-20260825-04 in
+# docs/PROD_BUG_LOG.md for the scoping.
+#
+# LATCH, don't raise mid-decode -- mirrors the established pattern in
+# _otr_decode_guard.py's degeneracy criterion: raising from inside a
+# StoppingCriteria skips Transformers' own generate()
+# cleanup and arrives at the caller unclassified. So the criterion sets
+# ``.hit`` and returns True, letting generate() return normally -- but both
+# generate() call sites below then check ``.hit`` and RAISE
+# GenerationDeadlineExceededError instead of returning the truncated text as
+# a normal result. Without that check, a deadline hit that lands just before
+# _run_with_timeout's own future.result(timeout=...) fires would let the
+# truncated output race through as a silent SUCCESS -- no cache
+# invalidation, no _LLMTimeoutWorkflowPause, an accepted-but-wrong artifact.
+_GENERATION_DEADLINE = threading.local()
+
+
+def set_generation_deadline(deadline: float | None) -> None:
+    """Set (or clear, with ``None``) a wall-clock deadline for THIS
+    thread's subsequent ``model.generate()`` calls in this file."""
+    _GENERATION_DEADLINE.value = deadline
+
+
+class _DeadlineStoppingCriteria:
+    """transformers ``StoppingCriteria``: stop once this thread's
+    registered deadline (if any) has passed. See the module comment above
+    ``set_generation_deadline`` for why this exists.
+
+    Returns a scalar ``bool``, matching ``_otr_decode_guard``'s degeneracy
+    criterion (the sibling this file installs alongside it at every local
+    ``generate()`` call) rather than a batch-shaped tensor -- consistency
+    with the one other criterion in this codebase's StoppingCriteriaList,
+    not a new contract for just this one.
+    """
+
+    def __init__(self) -> None:
+        self.hit = False
+
+    def __call__(self, input_ids, scores, **kwargs) -> bool:
+        if self.hit:
+            return True
+        deadline = getattr(_GENERATION_DEADLINE, "value", None)
+        if deadline is not None and time.time() > deadline:
+            self.hit = True
+        return self.hit
+
 
 _REMOTE_CACHE_PROVIDERS = frozenset({"openrouter", "comfy_credits", "google_api"})
 
@@ -132,6 +346,27 @@ class ModelLoaderError(RuntimeError):
     Wraps lower-level exceptions from the legacy _load_llm path so
     callers get a stable exception type to catch.
     """
+
+
+class GenerationDeadlineExceededError(ModelLoaderError):
+    """A model.generate() call was cut short by set_generation_deadline().
+
+    Raised AFTER generate() returns -- _DeadlineStoppingCriteria latches
+    rather than raising mid-decode, same reason as the degeneracy guard.
+    _run_with_timeout is the intended catcher: it routes this the same way
+    it routes its own FuturesTimeout (cache invalidation + a workflow-pause
+    raise), so a deadline hit can never surface as a truncated "successful"
+    result to a caller that never asked for one. Not a capacity/rerollable
+    error -- deliberately NOT a _CapacityError subclass -- because the
+    retry ladder must not treat a deadline-abandoned generation as an
+    ordinary "reroll and try again" case.
+    """
+
+    def __init__(
+        self, message: str, *, generated_tokens: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.generated_tokens = generated_tokens
 
 
 _GEMMA4_UNIFIED_MODEL_IDS = frozenset({"google/gemma-4-12b-it"})
@@ -818,8 +1053,11 @@ def load_llm(
         ) from exc
 
 
-def unload_llm() -> None:
-    """Full VRAM teardown for cross-model slot transitions.
+def _teardown_gpu_for_entry(entry: dict | None) -> None:
+    """Physical GPU teardown for a detached cache entry (or a no-op for
+    ``None``). Shared by ``unload_llm`` (unconditional) and request_slot's
+    ownership-checked ``_self_unload`` (conditional) -- both need the exact
+    same teardown sequence once they have actually decided to run it.
 
     Canonical sequence (matches reference_chained_backend_teardown):
         1. model.to("cpu")           -- move weights off the GPU.
@@ -834,24 +1072,11 @@ def unload_llm() -> None:
                                         when the byte budget fits.
         6. torch.cuda.synchronize()  -- let in-flight ops finish.
 
-    Also tears down story_orchestrator's legacy LLM stack as a
-    best-effort fallback. The orchestrator's `_LLM_CACHE` dict + its
-    `_load_llm` body remain alive as the underlying implementation
-    layer (this loader's `load_llm` still delegates back to them);
-    the teardown ensures both surfaces are quiesced together. Never
-    raises -- a teardown failure should NOT propagate as a node error.
-
-    S30 B4b: the three production importers (batch_bark_generator,
-    _otr_bark_lib, scene_sequencer) now import this `unload_llm`
-    directly rather than the orchestrator's `_unload_llm` (the
-    audit-miss BUG-LOCAL-226 fix). Story orchestrator's
-    `_generate_with_llm` also routes through `request_slot("technical",
-    ...)` to acquire its cache_entry; the RSS news path no longer
-    holds a parallel reference to the legacy cache.
+    Never raises -- a teardown failure should NOT propagate as a node
+    error.
     """
     import gc
 
-    entry = LLM_CACHE.get("cache_entry")
     if entry is not None:
         if entry.get("provider") == "gguf_native":
             try:
@@ -869,13 +1094,7 @@ def unload_llm() -> None:
                 model.to("cpu")
             except Exception as exc:  # noqa: BLE001
                 log.debug("[OTR_ModelLoader] model.to(cpu) failed: %s", exc)
-    # B1d: clear + update IN PLACE. Rebinding (LLM_CACHE = {...}) leaves
-    # any `from _otr_model_loader import LLM_CACHE` consumer holding a
-    # stale dict reference, which silently breaks slot transitions. The
-    # `global` keyword is unnecessary now; we only mutate the dict.
-    LLM_CACHE.clear()
-    LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
-
+    del entry
     gc.collect()
 
     try:
@@ -895,19 +1114,62 @@ def unload_llm() -> None:
         pass
 
 
+def unload_llm() -> int:
+    """Full, UNCONDITIONAL VRAM teardown for cross-model slot transitions.
+
+    Returns the new cache epoch (see _CACHE_EPOCH_LOCK); most external
+    callers ignore it. This is the authoritative-invalidator shape used by
+    every caller OUTSIDE request_slot's own control flow (cast_lock.py,
+    _otr_bark_lib.py, _otr_model_runtime.py, _otr_vram_levers.py) -- always
+    tears down whatever is currently resident and always bumps. NOT used
+    by request_slot's own self-triggered transitions; see ``_self_unload``
+    for why those need a conditional (ownership-checked) claim instead.
+
+    Also tears down story_orchestrator's legacy LLM stack as a
+    best-effort fallback. The orchestrator's `_LLM_CACHE` dict + its
+    `_load_llm` body remain alive as the underlying implementation
+    layer (this loader's `load_llm` still delegates back to them);
+    the teardown ensures both surfaces are quiesced together.
+
+    S30 B4b: the three production importers (batch_bark_generator,
+    _otr_bark_lib, scene_sequencer) now import this `unload_llm`
+    directly rather than the orchestrator's `_unload_llm` (the
+    audit-miss BUG-LOCAL-226 fix). Story orchestrator's
+    `_generate_with_llm` also routes through `request_slot("technical",
+    ...)` to acquire its cache_entry; the RSS news path no longer
+    holds a parallel reference to the legacy cache.
+    """
+    entry, new_epoch = _detach_and_invalidate_locked()
+    _teardown_gpu_for_entry(entry)
+    return new_epoch
+
+
 def has_local_resident_llm() -> bool:
     """True when the singleton cache currently owns a local LLM resource.
 
     Remote OpenRouter / Comfy Credits requests deliberately do not populate
     ``LLM_CACHE``. If a provider-tagged remote entry is ever present, it still
     carries no weights and must not trigger the local torch/CUDA teardown path.
+
+    This does NOT make orphan GPU occupancy visible -- it still reads
+    "nothing resident" the instant a timeout invalidates the cache dict,
+    even if the orphan worker is still actively on GPU. That is the
+    deferred orphan-occupancy registry (PBUG-20260825-04), not this
+    function's job. What this DOES fix (r4 kibitz, Cursor): the read is
+    now inside ``_CACHE_EPOCH_LOCK`` -- ``_detach_and_invalidate_locked``'s
+    clear() and update() are two separate statements even though both run
+    under the lock, so an unlocked read here could still observe a
+    momentarily-cleared dict mid-invalidation. Reading under the same lock
+    closes that torn-read window without touching the larger deferred
+    question.
     """
-    entry = LLM_CACHE.get("cache_entry")
-    if entry is None:
-        return False
-    if isinstance(entry, dict) and entry.get("provider") in _REMOTE_CACHE_PROVIDERS:
-        return False
-    return True
+    with _CACHE_EPOCH_LOCK:
+        entry = LLM_CACHE.get("cache_entry")
+        if entry is None:
+            return False
+        if isinstance(entry, dict) and entry.get("provider") in _REMOTE_CACHE_PROVIDERS:
+            return False
+        return True
 
 
 def unload_llm_if_local_resident() -> bool:
@@ -925,8 +1187,13 @@ def unload_llm_if_local_resident() -> bool:
 
 
 
-def invalidate_cache_no_gpu_teardown() -> None:
+def invalidate_cache_no_gpu_teardown() -> int:
     """Clear LLM_CACHE dict references WITHOUT touching the GPU.
+
+    Returns the new cache epoch (see _CACHE_EPOCH_LOCK); most callers
+    (this is the EXTERNAL-invalidation path, called by
+    story_orchestrator._run_with_timeout on an orphaned worker, never by
+    request_slot's own control flow) ignore it.
 
     Use case: timeout recovery when an orphan worker thread may
     still be executing CUDA kernels on the cached model. Calling
@@ -953,8 +1220,8 @@ def invalidate_cache_no_gpu_teardown() -> None:
     dict-invalidation-only (safe). S31 B4 reverts to safe semantics
     via this helper. See BUG-LOCAL-228 for the regression log.
     """
-    LLM_CACHE.clear()
-    LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
+    _entry, new_epoch = _detach_and_invalidate_locked()
+    return new_epoch
 
 
 def _assert_policy_admits_vram(
@@ -1023,6 +1290,41 @@ def _assert_policy_admits_vram(
         )
 
 
+def _self_unload(my_epoch: int, *, slot: str) -> int:
+    """request_slot's own "tear down the resident model before loading a
+    different one" step, for all 4 self-triggered transition branches
+    (GGUF load-config change, GGUF slot transition, transformers policy
+    change, transformers slot transition).
+
+    The DECISION to call this is made from an unlocked read a few lines
+    earlier ("a different model is resident") -- if an external
+    invalidation (a timeout handler, or an unrelated caller elsewhere)
+    races into the gap between that read and this actual call, ``my_epoch``
+    is already stale by the time this runs, even though the decision to
+    self-unload was made before that. Atomically claims ownership of
+    ``my_epoch`` before touching anything: if it still holds, tears the
+    resident model down and returns the epoch THIS call's own bump
+    produced (legitimate to adopt -- it was this call's own doing). If it
+    no longer holds, this is a no-op (no GPU touch, no LLM_CACHE mutation)
+    and returns ``my_epoch`` UNCHANGED -- the caller must not adopt a new
+    epoch it did not itself cause, or it launders an external invalidation
+    into a legitimate-looking self-triggered one and its eventual cache
+    store wrongly succeeds.
+    """
+    entry, new_epoch = _detach_and_invalidate_locked(expected_epoch=my_epoch)
+    if new_epoch is None:
+        log.warning(
+            "[Selector] slot=%s self-triggered teardown found its epoch "
+            "snapshot already stale (an external invalidation raced ahead "
+            "of it) -- not claiming a new epoch; this call's eventual "
+            "cache store will correctly be skipped",
+            slot,
+        )
+        return my_epoch
+    _teardown_gpu_for_entry(entry)
+    return new_epoch
+
+
 def request_slot(
     slot: str, model_id: str, policy: Any = None, load_config: Any = None,
 ) -> dict[str, Any]:
@@ -1055,7 +1357,7 @@ def request_slot(
       7. auto_download_if_missing -- gated/disk-space pre-flight +
          snapshot_download. Local-cache short-circuit fires inside the
          catalog helper.
-      8. unload_llm() (only if a different model was resident), then
+      8. _self_unload() (only if a different model was resident), then
          load_llm(model_id, context_cap=ctx_verdict.value) -- skips the
          second catalog walk by forwarding the resolved cap.
       9. Cache the entry under (slot, model_id).
@@ -1079,6 +1381,14 @@ def request_slot(
     if policy is None:
         log.info("[Selector] slot=%s policy=None -> nv50 BASELINE", slot)
     _policy = policy if policy is not None else BASELINE_POLICY
+
+    # Snapshot BEFORE any local work. If this call is abandoned (its owning
+    # _run_with_timeout gives up and invalidates LLM_CACHE) but its own
+    # load_llm()/backend.load() call later succeeds anyway, the epoch will
+    # have moved on by the time it reaches its own cache store below -- see
+    # the _CACHE_EPOCH docstring for why this write must then be skipped
+    # rather than silently adopted by a later, unrelated caller.
+    _my_cache_epoch = _current_cache_epoch()
 
     # Step 1: normalize.
     normalized = _otr_catalog.validate_model_id(model_id)
@@ -1160,38 +1470,69 @@ def request_slot(
             load_config.reuse_key() if load_config is not None
             else _policy.cache_key()
         )
+        # A resident model only counts as a hit when it was loaded under the
+        # SAME load identity. Silent stale reuse is the bug class this
+        # campaign kills. The whole check-then-return is one atomic locked
+        # read (_try_cache_hit_locked) -- a separate check-then-return would
+        # let an invalidation land between the predicate passing and the
+        # return, producing a hit against an entry that no longer exists.
+        _hit = _try_cache_hit_locked(normalized, slot, gguf_key=_gguf_key)
+        if _hit is not None:
+            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+            return _hit  # type: ignore[return-value]
         if (
             LLM_CACHE.get("model_id") == normalized
             and LLM_CACHE.get("cache_entry") is not None
         ):
-            # A resident model only counts as a hit when it was loaded under
-            # the SAME load identity. Silent stale reuse is the bug class this
-            # campaign kills.
-            if LLM_CACHE.get("gguf_load_key") == _gguf_key:
-                log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
-                LLM_CACHE["slot"] = slot
-                return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
             log.info(
                 "[Selector] gguf load-config change for %s (%s -> %s): "
                 "full teardown",
                 normalized, LLM_CACHE.get("gguf_load_key"), _gguf_key,
             )
-            unload_llm()
+            _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
         if LLM_CACHE.get("model_id") not in (None, normalized):
             log.info(
                 "[Selector] slot transition: %s -> %s (full teardown)",
                 LLM_CACHE.get("model_id"),
                 normalized,
             )
-            unload_llm()
-        cache_entry = get_backend_for_row(_virtual_row).load(
-            normalized, _virtual_row, policy=_policy, load_config=load_config,
-        )
-        LLM_CACHE["model_id"] = normalized
-        LLM_CACHE["slot"] = slot
-        LLM_CACHE["cache_entry"] = cache_entry
-        LLM_CACHE["policy_key"] = _policy.cache_key()
-        LLM_CACHE["gguf_load_key"] = _gguf_key
+            _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
+        # r4 kibitz finding (Cursor): the transformers load below is
+        # wrapped in try/_self_unload so a load failure after partial GPU
+        # allocation doesn't strand orphan VRAM for a cache-miss retry to
+        # pile a second copy on top of (Sprint H iter 3); this GGUF load
+        # was not, pre-existing this session. Same shape, same reasoning.
+        try:
+            cache_entry = get_backend_for_row(_virtual_row).load(
+                normalized, _virtual_row, policy=_policy, load_config=load_config,
+            )
+        except Exception:
+            log.warning(
+                "[Selector] GGUF backend.load() raised for %s; running "
+                "self-unload to drop any orphan VRAM before retry",
+                normalized,
+            )
+            try:
+                _self_unload(_my_cache_epoch, slot=slot)
+            except Exception:  # noqa: BLE001
+                log.exception("[Selector] self-unload also raised; continuing")
+            raise
+        _published = _publish_cache_entry_if_current(_my_cache_epoch, {
+            "model_id": normalized,
+            "slot": slot,
+            "cache_entry": cache_entry,
+            "policy_key": _policy.cache_key(),
+            "gguf_load_key": _gguf_key,
+        })
+        if not _published:
+            log.warning(
+                "[Selector] slot=%s GGUF load for %s completed after this "
+                "call was abandoned (cache epoch advanced) -- NOT adopting "
+                "into LLM_CACHE; a later caller would otherwise take a "
+                "cache hit on a model this orphaned call may still be "
+                "using",
+                slot, normalized,
+            )
         return cache_entry
 
     # Capability-gate architecture support before cache/download work. A stale
@@ -1201,16 +1542,18 @@ def request_slot(
 
     # Step 2: cache hit on the same model id (regardless of slot) -- policy
     # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
+    # Atomic locked check-and-return (_try_cache_hit_locked) -- see the GGUF
+    # branch above for why a separate check-then-return is not safe here.
+    _hit = _try_cache_hit_locked(normalized, slot, policy_key=_policy.cache_key())
+    if _hit is not None:
+        log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+        return _hit  # type: ignore[return-value]
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
-        if LLM_CACHE.get("policy_key") == _policy.cache_key():
-            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
-            LLM_CACHE["slot"] = slot
-            return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
         log.info(
             "[Selector] policy change for %s (%s -> %s): full teardown",
             normalized, LLM_CACHE.get("policy_key"), _policy.cache_key(),
         )
-        unload_llm()
+        _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
 
     # Steps 3-6 ran above, before the cache reads -- see the hoist comment.
 
@@ -1237,42 +1580,66 @@ def request_slot(
             LLM_CACHE.get("model_id"),
             normalized,
         )
-        unload_llm()
+        _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
 
     # Sprint H iter 3 (2026-05-17): orphan-model guard. load_llm may
     # raise AFTER AutoModelForCausalLM.from_pretrained successfully
     # allocates the weights on GPU (e.g. BNB quantization, warmup pass,
-    # tripwire). If we re-raise without cleaning up, the LLM_CACHE is
-    # never populated (line 744+ is bypassed) AND the orphan model
-    # remains resident on GPU. The next request_slot call cache-misses
-    # and a SECOND copy gets loaded on top -- producing the
-    # "Currently allocated 29.97 GiB" OOM on the retry inside
-    # _otr_style_picker._run_inventor's 3-attempt loop. Wrap with
-    # try/except + unload_llm() to guarantee the retry starts from a
-    # clean slate. unload_llm()'s entry-is-None branch is a safe no-op
-    # for the dict update; the empty_cache + ipc_collect + synchronize
-    # still fire and drop the orphan.
+    # tripwire). load_llm's OWN inner failure handler already cleans up
+    # the local model reference IT was building (see its layer-2 comment);
+    # this outer handler is about LLM_CACHE's bookkeeping -- so the retry
+    # starts from a clean slate instead of cache-missing and loading a
+    # SECOND copy on top of whatever is resident (the "Currently allocated
+    # 29.97 GiB" OOM on the retry inside _otr_style_picker._run_inventor's
+    # 3-attempt loop).
+    #
+    # r4 kibitz finding (Cursor): calling the UNCONDITIONAL unload_llm()
+    # here (rather than the ownership-checked _self_unload every OTHER
+    # self-triggered teardown in this function uses) reopens the exact
+    # class of bug r3 just closed, on the failure path instead of the
+    # success path. `load_llm()` for a slow/abandoned call can take long
+    # enough that a completely different, legitimate caller publishes a
+    # fresh resident model in the meantime; an unconditional unload_llm()
+    # here would tear THAT model down -- possibly while it is actively in
+    # use elsewhere -- and bump the epoch out from under its owner, purely
+    # because THIS call's own (unrelated) load happened to fail. Routing
+    # through _self_unload makes this a no-op unless _my_cache_epoch is
+    # still current, i.e. unless this call still owns whatever is resident.
     try:
         cache_entry = load_llm(
             normalized, context_cap=ctx_verdict.value, policy=_policy,
         )
     except Exception:
         log.warning(
-            "[Selector] load_llm raised for %s; running unload_llm() "
+            "[Selector] load_llm raised for %s; running self-unload "
             "to drop any orphan VRAM before retry",
             normalized,
         )
         try:
-            unload_llm()
+            _self_unload(_my_cache_epoch, slot=slot)
         except Exception:  # noqa: BLE001
-            log.exception("[Selector] unload_llm() also raised; continuing")
+            log.exception("[Selector] self-unload also raised; continuing")
         raise
 
-    # Step 9: cache (policy-keyed, S1).
-    LLM_CACHE["model_id"] = normalized
-    LLM_CACHE["slot"] = slot
-    LLM_CACHE["cache_entry"] = cache_entry
-    LLM_CACHE["policy_key"] = _policy.cache_key()
+    # Step 9: cache (policy-keyed, S1). Epoch-guarded -- see the
+    # _CACHE_EPOCH docstring: an abandoned call whose load_llm() completes
+    # after its owning timeout gave up must NOT publish its cache_entry for
+    # a later, unrelated caller to adopt and start a second concurrent
+    # generate() on the same model object.
+    _published = _publish_cache_entry_if_current(_my_cache_epoch, {
+        "model_id": normalized,
+        "slot": slot,
+        "cache_entry": cache_entry,
+        "policy_key": _policy.cache_key(),
+    })
+    if not _published:
+        log.warning(
+            "[Selector] slot=%s load for %s completed after this call was "
+            "abandoned (cache epoch advanced) -- NOT adopting into "
+            "LLM_CACHE; a later caller would otherwise take a cache hit on "
+            "a model this orphaned call may still be using",
+            slot, normalized,
+        )
     return cache_entry
 
 
@@ -1420,6 +1787,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 make_degeneracy_criterion,
             )
         _guard = make_degeneracy_criterion(inputs["input_ids"].shape[1])
+        _deadline_guard = _DeadlineStoppingCriteria()
 
         with torch.no_grad():
             out = model.generate(
@@ -1429,7 +1797,8 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 top_p=0.92,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
-                stopping_criteria=StoppingCriteriaList([_guard]),
+                stopping_criteria=StoppingCriteriaList(
+                    [_guard, _deadline_guard]),
                 # Read-only live heartbeat (2026-08-13). A reserve-remaining
                 # pass can legitimately be handed >14k output tokens, and with
                 # no streamer that is a silent twenty-minute wait whose only
@@ -1441,6 +1810,23 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         # Strip prompt prefix from decoded output.
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
+        if _deadline_guard.hit:
+            # Checked FIRST: a deadline hit means this call's owning
+            # _run_with_timeout has (or is about to have) given up on it --
+            # raising here rather than returning text is what stops a
+            # truncated result from racing through as a silent success.
+            # See GenerationDeadlineExceededError's docstring.
+            log.warning(
+                "[OTR.llm] generation deadline exceeded after %s of a "
+                "%s-token allowance -- raising instead of returning "
+                "truncated text (PBUG-20260825-04)",
+                len(generated_ids), effective_max_new_tokens,
+            )
+            raise GenerationDeadlineExceededError(
+                "generation was cut short by its caller's wall-clock "
+                "deadline; the caller has abandoned this call",
+                generated_tokens=len(generated_ids),
+            )
         if getattr(_guard, "hit", False):
             # Classified BEFORE the output-limit check below, for the same
             # reason the writer classifies degeneracy first: a halted decode
@@ -1599,6 +1985,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 make_degeneracy_criterion,
             )
         _guard = make_degeneracy_criterion(inputs["input_ids"].shape[1])
+        _deadline_guard = _DeadlineStoppingCriteria()
 
         with torch.no_grad():
             out = model.generate(
@@ -1608,13 +1995,26 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 top_p=_POLISH_TOP_P,
                 max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
-                stopping_criteria=StoppingCriteriaList([_guard]),
+                stopping_criteria=StoppingCriteriaList(
+                    [_guard, _deadline_guard]),
                 streamer=_OTRHB.make_streamer(
                     tokenizer,
                     f"polish:{cache_entry.get('model_id', '<unknown>')}"),
             )
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
+        if _deadline_guard.hit:
+            log.warning(
+                "[OTR.llm] polish generation deadline exceeded after %s of "
+                "a %s-token allowance -- raising instead of returning "
+                "truncated text (PBUG-20260825-04)",
+                len(generated_ids), effective_max_new_tokens,
+            )
+            raise GenerationDeadlineExceededError(
+                "polish generation was cut short by its caller's "
+                "wall-clock deadline; the caller has abandoned this call",
+                generated_tokens=len(generated_ids),
+            )
         if getattr(_guard, "hit", False):
             telemetry = _guard.telemetry()
             log.error(

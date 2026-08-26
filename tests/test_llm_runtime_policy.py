@@ -128,13 +128,19 @@ def test_request_slot_cache_is_policy_keyed(monkeypatch, clean_llm_cache):
                 "device": "cuda", "quantized": True, "context_cap": 8192}
 
     unloads = {"n": 0}
+    # request_slot's self-triggered transitions route through the
+    # ownership-checked _self_unload (PBUG-20260825-04 r3), not the public
+    # unconditional unload_llm() -- monkeypatch the real call target, and
+    # forward to the real implementation so its epoch bookkeeping (which
+    # the subsequent Step-9 store depends on) stays correct.
+    _original_self_unload = ml._self_unload
 
-    def _fake_unload():
+    def _counting_self_unload(my_epoch, *, slot):
         unloads["n"] += 1
-        ml.LLM_CACHE.clear()
+        return _original_self_unload(my_epoch, slot=slot)
 
     monkeypatch.setattr(ml, "load_llm", _fake_load_llm)
-    monkeypatch.setattr(ml, "unload_llm", _fake_unload)
+    monkeypatch.setattr(ml, "_self_unload", _counting_self_unload)
 
     base = lp.LLMRuntimePolicy()
     ml.request_slot("creative", "stub/model", policy=base)

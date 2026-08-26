@@ -1373,10 +1373,10 @@ def _fetch_rss_seed_or_die(
     the cast LLM never sees today.
     """
     try:
-        try:
-            from . import story_orchestrator as _so
-        except ImportError:
-            import story_orchestrator as _so  # type: ignore
+        from . import story_orchestrator as _so
+    except ImportError:
+        import story_orchestrator as _so  # type: ignore
+    try:
         news = _so._fetch_science_news(
             max_feeds=10, model_id=model_id,
             optimization_profile="Standard",
@@ -1438,6 +1438,20 @@ def _fetch_rss_seed_or_die(
                 "selected_at": datetime.now().isoformat(timespec="seconds"),
             })
         return payload
+    except _so._LLMTimeoutWorkflowPause:
+        # 2026-08-25 (PBUG-20260825-04 follow-up): this subtype's own
+        # docstring says a timed-out LLM phase must halt the queue so the
+        # next stage never races the orphan worker's still-running CUDA
+        # kernels -- but the broad `except Exception` below used to catch
+        # it here too, one level above story_orchestrator's own two
+        # NewsCuration/NewsCurationDeep call sites (already fixed), and
+        # recast it as a generic "RSS fetch failed" RuntimeError. That
+        # erased the exception's TYPE, so the pause never actually reached
+        # the node boundary in the real call chain
+        # (_fetch_rss_seed_or_die -> _otr_source_payload's science_rss
+        # wrapper, which has no try/except of its own). Re-raise
+        # unconditionally so it keeps propagating.
+        raise
     except Exception as exc:
         # Loud raise: the writer requires a real seed to function. The
         # workflow can override via custom_premise if RSS is unavailable.
