@@ -46,6 +46,19 @@ not a one-off. The CURRENT RUNWAY table below (operator-ordered 2026-08-13)
 is the next candidate; spot-check row 2 (LEMMY Phases 2-4) against the real
 files before starting it, the same way this catch was made.
 
+**WHAT THE 2026-08-25 EVENING WINDOW ACTUALLY DID, so the next window does not
+re-triage it:** it worked the 4060 crash reports the operator pasted, not this
+banner. Four commits, all pushed and lockstep-verified:
+`be0ab7fb` (cast_lock's unguarded `config` import, PBUG-20260825-02),
+`2c524732` (unquantized loads inheriting a 4-bit-sized VRAM cap,
+PBUG-20260825-03), `063fcfc3` + `fb67d059` (PBUG-20260825-04, the
+BUG-LOCAL-098 tripwire and the orphan-lifecycle races behind it), plus the
+`2.0.0-alpha.9` registry release. The orphan work left TWO deliberate
+deferrals, both now filed under OPEN BUGS as "The orphan-lifecycle pair" --
+read that row before touching `_otr_model_loader.py`'s cache lifecycle, since
+three successive review rounds each found a new race in the previous cut of
+the same fix.
+
 ## HOW TO READ THIS FILE (three files since 2026-08-23)
 
 **THE PLAN IS THIS FILE AND IT IS ONLY OPEN WORK.** Operator: *"go forward
@@ -488,6 +501,55 @@ these rows exist so a window working THIS list actually sees them.
   structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do not
   raise the minimum word target as a capacity workaround.
 
+### The orphan-lifecycle pair (deferred 2026-08-25, both DESIGN items, neither a grep-and-fix)
+
+Both fall out of PBUG-20260825-04, whose four landed fixes shipped in
+`fb67d059` after a full kibitz r1-r4 arc (Codex r2/r3, Cursor r4, Fable r1).
+The arc found a new race in each of the first two cuts of the same fix, so
+**do not treat either item below as mechanical** -- each is a genuine design
+choice with more than one defensible answer, which per CLAUDE.md means a full
+arc BEFORE code, not after.
+
+- **THE GENERATION DEADLINE DOES NOT COVER THE GGUF LANE.** Landed: a
+  `_DeadlineStoppingCriteria` wired into both user-facing transformers
+  closures (`make_generate_fn`, `make_polish_generate_fn`), so an abandoned
+  worker's remaining lifetime is ~1 token instead of its full
+  `max_new_tokens` budget, and a deadline hit RAISES
+  `GenerationDeadlineExceededError` rather than returning truncated text as
+  a silent success. **Not covered:** `make_generate_fn` returns
+  `make_gguf_generate_fn`'s closure early, before any deadline guard is
+  built, and `llama-cpp-python`'s `create_chat_completion` has no per-token
+  Python stopping-criteria hook the way transformers does -- so a
+  GGUF-backed abandoned worker still runs to completion. Both
+  `_run_with_timeout` callers (NewsCuration, NewsCurationDeep) accept and
+  forward a GGUF `load_config`, so the PATH exists today.
+  **VERIFY FIRST, it may be live rather than theoretical:** check whether
+  the current production technical-slot catalog row is `gguf_native`; if it
+  is, this gap is being hit on every timeout, not hypothetically. The fix
+  shape is streaming + stopping between chunks -- a materially different
+  mechanism from a `StoppingCriteria`, which is exactly why it was not
+  written on assumption. In-code scoping note lives above
+  `_GENERATION_DEADLINE` in `nodes/_otr_model_loader.py`.
+
+- **THE ORPHAN-OCCUPANCY REGISTRY -- still deferred, now on its third
+  independent confirmation.** `has_local_resident_llm()` reports "nothing
+  resident" the instant a timeout invalidates the cache dict, even while the
+  orphan worker is still actively running CUDA kernels on the model that
+  entry described. `nodes/otr_shot_lock.py:1781` and
+  `nodes/otr_video_render_batch.py:289` both trust that signal before
+  starting visual/video work. The r1 panel (Codex + Cursor + Fable) deferred
+  this unanimously; r3 and r4 each re-raised it and each time it was
+  re-confirmed as correctly out of scope for the cache-bookkeeping fixes.
+  Shape: a process-global, lock-protected registry of in-flight generations,
+  registered before invalidation and cleared via `Future.add_done_callback`,
+  with fail-fast admission on `request_slot` and the visual-entry guards
+  reading real occupancy instead of the dict's cleared-or-not state.
+  **What this session's fixes did and did not buy:** they close the concrete
+  cache-bookkeeping windows (no abandoned publish, no laundered
+  invalidation, no torn read, no unconditional teardown of a foreign live
+  entry); they do NOT make orphan GPU occupancy visible to a downstream
+  visual stage. That remains exactly as exposed as before.
+
 ### The 8 GB / profile cluster
 
 - **WAN 8-GB low-VRAM launch contract -- CODE-COMPLETE and PROOF-INCOMPLETE. It is
@@ -777,6 +839,28 @@ it, tombstone it.
 | **`PBUG-20260823-01` (preflight gate vocabulary collision)** | **PENDING single-entry promotion** per the 08-07 amendment: live-verified, fixed `b11a4269`, automatable coverage already in-repo (`tests/test_preflight_required_models_are_gateable.py`). Candidate rule: a gate must never treat "absent from an enumeration that could not contain it" as refutation. Check `otr_coverage_index.yaml` + Bible for overlap, then Three-File Contract in ONE survival-guide commit |
 | **`PBUG-20260823-02` (watcher timeout worded as render death)** | **PENDING single-entry promotion**: live-verified on the exposing leg, fixed `cebe7c75`, coverage `tests/test_canonical_runner_timeout_is_not_a_death.py`. Candidate rule: a watcher's timeout is a fact about the WATCHER, never worded as a fact about the work. Same overlap check first |
 | **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
+
+**PROMOTED 2026-08-25 (evening): Bible `12.134`, survival-guide `6633ef6`, count
+312 -> 313** (README bumped in all three places, coverage-index row added, Bible
+regression re-run green 22/26/3). Source: **PBUG-20260825-04**, the
+BUG-LOCAL-098 tripwire firing loud on a 4060 load that had in fact succeeded --
+admissible because it surfaced as a real production traceback, promotable
+because the fix is verified and its coverage is automatable
+(`tests/test_bug098_orphan_race.py`). The reusable half is deliberately NOT
+"the threshold was wrong": the guard sampled `torch.cuda.memory_allocated()`,
+a PROCESS-WIDE counter, and reported the delta as one model's footprint, so an
+abandoned worker freeing tensors concurrently drove it negative. *A diagnostic
+that gates on a shared, process-wide quantity cannot make a claim about one
+component of that process* -- and the tell is that the check LOOKS
+model-scoped because it brackets one model's load. Checked against
+`otr_coverage_index.yaml` and the Bible first: `12.46` covers the orphan
+thread PINNING VRAM, which is the adjacent-but-different half, so this is a
+genuine gap rather than a second entry for a covered class.
+**Also fixed in the same commit:** `otr_coverage_index.yaml` had a
+pre-existing unquoted `Root cause: ` colon-space on one record, so the index
+-- whose entire purpose is to be machine-readable so the 4M-token scrape is
+never repaid -- did not parse at all. Quoted; it now loads (429 records) and
+its header metadata is re-synced to the Bible HEAD.
 
 **PROMOTED 2026-08-18 (evening): Bible `12.114`, survival-guide `b9aada7e`, count
 292 -> 293** (README bumped in all three places, coverage-index row added, Bible
