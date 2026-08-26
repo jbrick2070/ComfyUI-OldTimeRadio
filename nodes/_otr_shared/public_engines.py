@@ -375,6 +375,21 @@ RETIRED_ENGINE_IDS = frozenset({
     "trellis_talk",
     "triposr",
     "still_parallax",
+    # THE 14B LOCAL WAN i2v LANE, RETIRED 2026-08-26 (operator: "rip the large
+    # wan we don't need"). It did not fit the card and never could: the UNet is
+    # 13.31 GiB and its fp8 text encoder another 6.27, so 19.82 GiB of weights
+    # against a 14.5 GiB target. It only ran by offloading continuously -- a
+    # measured 120-minute TIMEOUT with the render still alive, against 48.5
+    # minutes for the 5B `wan_ti2v` that replaces it and 24.8 for
+    # `fastwan_8gb`. The lane TYPE survives on-card; only the oversized weights
+    # are gone.
+    #
+    # The PUBLIC alias rows in this module (`wan22_high_i2v` at :50 and the
+    # legacy `wan21_high_i2v` at :192) deliberately STAY pointing at this id --
+    # they are what routes an old saved graph INTO this named refusal instead
+    # of letting it fall through to the generic "no engine named ..." message,
+    # which reads as a broken install rather than a retirement.
+    "wan_i2v",
 })
 
 

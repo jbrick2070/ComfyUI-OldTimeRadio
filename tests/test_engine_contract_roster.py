@@ -156,14 +156,21 @@ def test_the_local_ladders_match_their_adapters_named_constants():
     from nodes._otr_video_engines import eng_ltx_8gb as _l8
     from nodes._otr_video_engines import eng_ltx_av as _lav
     from nodes._otr_video_engines import eng_ltx_video as _lv
-    from nodes._otr_video_engines import eng_wan_i2v as _wi
     from nodes._otr_video_engines import eng_wan_ti2v as _wt
+    # The `wan_i2v` line -- Wan 2.2 **14B** I2V, pinned against that adapter's
+    # own `_WAN_MIN_FRAMES` / `_WAN_MAX_FRAMES` -- went with that engine's
+    # retirement on 2026-08-26 (it never fit the box's 14.5 GiB envelope).
+    # Nothing is orphaned by the removal: those two constants were ITS module's
+    # and left with it. Deliberately NOT retargeted at `wan_ti2v` below -- the
+    # 5B TI2V is a DIFFERENT checkpoint with its own `_TI2V_*` ladder, and this
+    # test's entire job is to pin each adapter to the constants IT declares.
+    # Pointing a 14B assertion at the 5B is how this file would go green while
+    # asserting a number no engine holds.
 
     def bounds(engine_name):
         c = fc.frame_contract_for(vreg.get_engine(engine_name))
         return (c.min_frames, c.max_frames)
 
-    assert bounds("wan_i2v") == (_wi._WAN_MIN_FRAMES, _wi._WAN_MAX_FRAMES)
     assert bounds("wan_ti2v") == (_wt._TI2V_MIN_FRAMES, _wt._TI2V_MAX_FRAMES)
     # `humo` is the 14B PORTRAIT route, so its ceiling is the shared 14B cap --
     # not `_HUMO_MAX_FRAMES`, which is the ladder the lighter 1.7B tiers keep.

@@ -209,7 +209,15 @@ def test_motion_classification_from_registry():
     # genuine moving lanes require motion; stills + viz_green are exempt
     assert co.motion_required_for_engine("ltx_video") is True
     assert co.motion_required_for_engine("humo_1.7B") is True
-    assert co.motion_required_for_engine("wan_i2v") is True
+    # This row read `wan_i2v` (Wan 2.2 14B I2V) until that engine retired on
+    # 2026-08-26. It is here to keep the image_to_video FAMILY represented --
+    # the family, not the checkpoint, is what MOTION_FAMILIES classifies, and
+    # with the 14B gone this assertion would otherwise have no image_to_video
+    # lane at all. `wan_ti2v` is the Wan 2.2 **5B** TI2V, a different model on a
+    # different contract, and it earns the row on its own verified merit:
+    # registered, family == "image_to_video", so motion IS required of it. The
+    # 14B's own numbers were never carried across -- only the family claim.
+    assert co.motion_required_for_engine("wan_ti2v") is True
     assert co.motion_required_for_engine("still_flat") is False
     assert co.motion_required_for_engine("still_motion") is False
     assert co.motion_required_for_engine("viz_green") is False

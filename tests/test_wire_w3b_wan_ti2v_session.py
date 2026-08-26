@@ -147,10 +147,12 @@ def test_wan_ti2v_can_name_its_own_handles():
 
 
 def test_the_identity_carries_BOTH_loader_modes(monkeypatch):
-    """Unlike wan_i2v this adapter really has two, and their node schemas
-    DIFFER (CLIPLoaderGGUF takes no ``device``). A beat that switched either
-    class mid-way would be reusing a handle its own graph no longer knows how
-    to have produced -- so BOTH have to move the identity, not just the UNET's.
+    """Unlike the retired 14B wan_i2v (removed 2026-08-26 -- the comparison is
+    kept because it is WHY this adapter is built the way it is, not a live
+    sibling) this adapter really has two, and their node schemas DIFFER
+    (CLIPLoaderGGUF takes no ``device``). A beat that switched either class
+    mid-way would be reusing a handle its own graph no longer knows how to have
+    produced -- so BOTH have to move the identity, not just the UNET's.
     """
     eng = WanTi2vEngine()
     monkeypatch.setenv("OTR_WAN_TI2V_LOADER", "safetensors")
@@ -432,8 +434,11 @@ def test_a_DECODE_THAT_COMES_UP_SHORT_is_refused_rather_than_padded(
 def test_the_receipt_SURVIVES_canonicalisation_into_the_manifest_dict(
         wired, monkeypatch):
     """A field the engine returns and ``_clip_from_raw`` drops is a field the
-    grader never sees. Both WAN adapters share that method, which is why the
-    passthrough lives there and not in each adapter."""
+    grader never sees. That method is SHARED -- it lives on WanInitImageMixin,
+    which is why the passthrough is written there once and not in each adapter.
+    It read "both WAN adapters" until the 14B wan_i2v retired on 2026-08-26; the
+    reason is unchanged, only the roster is, since the mixin still has other
+    tenants."""
     eng, _counts, tmp_path = wired
     # A beat the engine CAN render natively: the receipt must still carry the
     # fields, and now they say "none"/equal, which is the only honest answer
@@ -447,17 +452,25 @@ def test_the_receipt_SURVIVES_canonicalisation_into_the_manifest_dict(
         "are what prove a clip is real rather than padded")
 
 
-def test_BOTH_wan_adapters_ANSWER_the_extension_question():
-    """An ABSENT field is indistinguishable from an unanswered one. wan_i2v has
-    never extended, but a family where one adapter declares "none" and its
-    sibling declares nothing gives the grader no lane it can trust."""
-    from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
+def test_the_WAN_ADAPTER_ANSWERS_the_extension_question():
+    """An ABSENT field is indistinguishable from an unanswered one, which is why
+    the passthrough lives once in ``WanInitImageMixin._clip_from_raw`` instead of
+    being copied into each adapter -- a passthrough written twice is one that
+    drifts once. A raw dict that already carries the two fields has to reach the
+    manifest still carrying them.
+
+    This read "BOTH wan adapters" and looped over ``wan_i2v`` as well until
+    2026-08-26, when the Wan 2.2 14B retired for not fitting the box's 14.5 GiB
+    envelope. Only its ROW was dropped; the assertion itself is untouched and no
+    coverage went with it, because what is under test was never the 14B's
+    property -- it belongs to the shared mixin, which still serves this adapter
+    here and ``_MiniMaxH3Base`` outside this file (both inherit the method
+    verbatim; Ltx8gbEngine overrides it and carries its own coverage)."""
     raw = {"out_path": "x.mp4", "frame_count": 33,
            "native_frame_count": 33, "extension_mode": "none"}
-    for eng in (WanTi2vEngine(), WanI2VEngine()):
-        clip = eng.canonicalize(raw, {"shot_id": "s"}, {})
-        assert clip["native_frame_count"] == 33
-        assert clip["extension_mode"] == "none"
+    clip = WanTi2vEngine().canonicalize(raw, {"shot_id": "s"}, {})
+    assert clip["native_frame_count"] == 33
+    assert clip["extension_mode"] == "none"
 
 
 # ---------------------------------------------------------------------------

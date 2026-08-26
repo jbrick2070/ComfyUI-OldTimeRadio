@@ -85,7 +85,6 @@ without that map would play ~4% short.
 | viz_green | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | viz_mxc_cpu | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | viz_mxc_mandala | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
-| wan_i2v | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | strict_first_frame | yes |
 | wan_ti2v | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 17-177 step 4 | 0.68-7.08 s | 25 | strict_first_frame | yes |
 | word_razzle | provider | image_to_video | wide | env OTR_CLOUD_PIXVERSE_QUALITY, default 1080p | menu: 125, 200 | menu: 5, 8 s | 25 | soft_reference | yes |
 
@@ -121,7 +120,6 @@ without that map would play ~4% short.
 | viz_green | audio_ref | no text input |
 | viz_mxc_cpu | - | no text input |
 | viz_mxc_mandala | - | no text input |
-| wan_i2v | init_image | text_prompt OPTIONAL (sent when present) |
 | wan_ti2v | init_image | text_prompt OPTIONAL (sent when present) |
 | word_razzle | init_image, text_prompt | text_prompt REQUIRED |
 
@@ -161,7 +159,6 @@ the engine's own `aspect` column above.
 | viz_green | none |
 | viz_mxc_cpu | none |
 | viz_mxc_mandala | none |
-| wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | wan_ti2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | word_razzle | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 
@@ -203,7 +200,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | viz_green | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_cpu | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_mandala | 1472x832 | shared landscape (by design for this family) |
-| wan_i2v | 832x480 | declared |
 | wan_ti2v | 832x480 | declared |
 | word_razzle | 1472x832 | SHARED LANDSCAPE DEFAULT (unclaimed) |
 
@@ -249,7 +245,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | viz_green | single | 1: 442 | 442 | 442 | 0 |
 | viz_mxc_cpu | single | 1: 442 | 442 | 442 | 0 |
 | viz_mxc_mandala | single | 1: 442 | 442 | 442 | 0 |
-| wan_i2v | chain | 3: 177, 177, 93 | 447 | 442 | 0 |
 | wan_ti2v | chain | 3: 177, 177, 93 | 447 | 442 | 0 |
 | word_razzle | jump | 3: 200, 125, 125 | 450 | 442 | 2 |
 
@@ -292,13 +287,12 @@ and it read exactly like a measured number until someone looked.
 | viz_green | - | contract max | **MISSING: docs/2026-06-18-coverage-arch-wiring** |
 | viz_mxc_cpu | - | contract max | none cited |
 | viz_mxc_mandala | - | contract max | **MISSING: docs/2026-06-30-viz-rainbow** |
-| wan_i2v | - | contract max | docs/2026-07-25-still-plans-locked-build-spec.md, docs/evidence |
 | wan_ti2v | - | contract max | none cited |
 | word_razzle | - | contract max | none cited |
 
 ## Counts
 
-* registered engine names: **31**
+* registered engine names: **30**
 * provider-side: **8**
-* local: **23**
-* can chain (strict_first_frame): **7**
+* local: **22**
+* can chain (strict_first_frame): **6**

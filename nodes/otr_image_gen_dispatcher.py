@@ -32,6 +32,7 @@ import logging
 import os
 import re as _re
 import time
+from typing import NamedTuple
 
 log = logging.getLogger("OTR")
 
@@ -956,6 +957,77 @@ def merge_jump_still_requests(ledger, objects, required_scene_targets):
     return merged_objects, merged_targets, report
 
 
+class _NormalizedPrompt(NamedTuple):
+    """One prompt after the dispatcher's canonical mutation chain.
+
+    ``pre_banana_hash`` and ``prompt_hash`` are DIFFERENT ON PURPOSE and both
+    are load-bearing: the object write-back records the post-style/pre-banana
+    text, while the ledger row and the cache key record the text actually
+    rendered. Collapsing them is the obvious refactor and it is wrong.
+    """
+
+    text: str
+    styled: bool
+    pre_banana_hash: str
+    banana_result: object
+    banana_receipt: object
+    prompt_hash: str
+
+
+def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
+                                source="") -> _NormalizedPrompt:
+    """THE canonical prompt normalization, factored so it has exactly ONE copy.
+
+    WHY THIS IS A FUNCTION (2026-08-26). The seed that keeps a character's face
+    stable across beats is derived from the character's PORTRAIT prompt hash --
+    and that hash is the one computed HERE, after the safety clause, the style
+    front-anchor and the banana transform, not the raw hash the producer
+    stamped upstream (`otr_meta_brief_image_prompt.py`). A design that
+    transported the producer's raw hash would have moved every face exactly
+    once; it was caught in review before it shipped.
+
+    So when a lane declares it needs identity but mints no portrait pixels, the
+    basis must be derived by running the portrait's PROMPT TEXT through this
+    same chain. That is only safe if there is ONE chain. A second copy in the
+    producer would drift -- silently, and the symptom would be faces moving --
+    which is why the dispatch loop below calls this too rather than keeping its
+    own inline copy.
+
+    Pure over its inputs. The caller owns the side effects the loop needs (the
+    object write-back and the banana substitution counter), because a virtual
+    portrait that is never rendered must NOT contribute to a rendered-work
+    metric.
+    """
+    prompt = append_visual_safety_clause(str(raw_prompt or ""))
+    _pre_style = prompt
+    if vstyle is not None:
+        # Imported HERE, with the same package/flat fallback the dispatch loop
+        # uses, because `_otr_visual_styles` is not a module-level import in
+        # this file -- the loop imports it inside a try/except so a style that
+        # will not resolve cannot kill a render. A module-scope reference here
+        # raises NameError on every styled object, which is exactly what it did
+        # the first time this helper was written.
+        try:
+            from ._otr_visual_styles import prefix_style_cue  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_visual_styles import prefix_style_cue  # type: ignore
+        prompt = prefix_style_cue(vstyle, prompt)
+    styled = prompt != _pre_style
+    # The write-back hash: post-style, PRE-banana. See the NamedTuple docstring.
+    pre_banana_hash = _prompt_content_hash(prompt) if styled else ""
+    if banana_on:
+        bres = _banana.apply(
+            prompt, variety_key=banana_key,
+            shield_quoted_card_text=(str(source or "") == "still_word"))
+        prompt = bres.text
+        receipt = _banana.receipt_keys(bres)
+    else:
+        bres = None
+        receipt = _banana.off_receipt(prompt, variety_key=banana_key)
+    return _NormalizedPrompt(prompt, styled, pre_banana_hash, bres, receipt,
+                             _prompt_content_hash(prompt))
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
@@ -1169,18 +1241,25 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # family propagate onto the row for operator QA.
         lettering_style = str(obj.get("lettering_style") or "")
         backdrop_family = str(obj.get("backdrop_family") or "")
-        prompt = append_visual_safety_clause(str(obj.get("prompt") or ""))
+        # THE canonical mutation chain (safety clause -> style front-anchor ->
+        # banana -> hash) now lives in ONE place, `normalize_prompt_for_render`
+        # above, because the identity-seed basis has to be derived through the
+        # exact same chain for a lane that mints no portrait pixels. Read that
+        # function's docstring before changing anything here: a second copy of
+        # this chain drifts, and the symptom of drift is faces moving.
+        #
         # STYLE, FRONT-ANCHORED (ONE STYLE AUTHORITY). Additive only, and
         # positional rather than membership-based on purpose: finish_visual_prompt
         # already appends the style TAIL, so an "is it present" test would find
         # it and skip exactly the prompts that fractured. Runs BEFORE the banana
-        # transform and the content hash below, so the stored hash describes the
+        # transform and the content hash, so the stored hash describes the
         # text actually rendered. Portraits are deliberately included -- the
         # measured fracture propagated FROM a portrait via reference_latent.
-        _pre_style = prompt
-        if _vstyle is not None:
-            prompt = prefix_style_cue(_vstyle, prompt)
-        _styled_now = prompt != _pre_style
+        _norm = normalize_prompt_for_render(
+            obj.get("prompt"), vstyle=_vstyle, banana_on=_banana_on,
+            banana_key=_banana_key, source=source)
+        prompt = _norm.text
+        _styled_now = _norm.styled
         # THE NEGATIVE FOR THIS ROW, resolved once and recorded (operator
         # 2026-08-17: "lock them in the ledger"). Composed, never precedence --
         # the pack half is about STYLE and the object half (radio_host_negative)
@@ -1205,30 +1284,29 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             # report. The dispatch cache key is recomputed from prompt TEXT
             # below and never trusts this field, but leaving it describing
             # pre-style text would make the ledger contradict itself.
-            obj["prompt_hash"] = _prompt_content_hash(prompt)
-        # Banana transform BEFORE the content hash, so flipping the switch
-        # re-mints every cached still instead of serving a stale gun.
+            # POST-STYLE, PRE-BANANA -- a different hash from `prompt_hash`.
+            obj["prompt_hash"] = _norm.pre_banana_hash
+        # Banana ran BEFORE the content hash inside the helper, so flipping the
+        # switch re-mints every cached still instead of serving a stale gun.
         #
-        # Quote shielding is SCOPED to card prompts, and this row is the only
-        # place that knows which is which. `source` is stamped at COMPOSITION
+        # Quote shielding is SCOPED to card prompts, and `source` is the
+        # discriminator the helper is handed. `source` is stamped at COMPOSITION
         # (derive_image_prompts writes "still_word" on the card objects), which
-        # is why it -- and not `kind` or `role` -- is the discriminator: a
-        # card's `kind` is inherited from the scene target it replaced, and its
-        # `role` can drift under OTR_FORCE_ENGINE_MAP between derive and
-        # dispatch. On a card the quoted span is script (rendered as picture
-        # text in word mode; spoken and shown in the credits in music mode);
-        # everywhere else a quote is decoration, and shielding it let a
-        # writer-styled `a man carrying a "revolver"` survive untransformed.
-        if _banana_on:
-            _bres = _banana.apply(
-                prompt, variety_key=_banana_key,
-                shield_quoted_card_text=(source == "still_word"))
-            prompt = _bres.text
-            _banana_candidate_subs += _bres.substitutions
-            banana_rcpt = _banana.receipt_keys(_bres)
-        else:
-            banana_rcpt = _banana.off_receipt(prompt, variety_key=_banana_key)
-        prompt_hash = _prompt_content_hash(prompt)
+        # is why it -- and not `kind` or `role` -- is used: a card's `kind` is
+        # inherited from the scene target it replaced, and its `role` can drift
+        # under OTR_FORCE_ENGINE_MAP between derive and dispatch. On a card the
+        # quoted span is script (rendered as picture text in word mode; spoken
+        # and shown in the credits in music mode); everywhere else a quote is
+        # decoration, and shielding it let a writer-styled
+        # `a man carrying a "revolver"` survive untransformed.
+        #
+        # The substitution COUNTER stays here, in the loop, and is fed only by
+        # really-dispatched objects: a virtual identity-basis normalization must
+        # never inflate a rendered-work metric.
+        if _norm.banana_result is not None:
+            _banana_candidate_subs += _norm.banana_result.substitutions
+        banana_rcpt = _norm.banana_receipt
+        prompt_hash = _norm.prompt_hash
         obj_w = int(obj.get("w") or 0)
         obj_h = int(obj.get("h") or 0)
         if not oid:
@@ -1327,14 +1405,50 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                  and str(r.get("object_id") or "") == char_id),
                 None,
             )
-            if portrait_row is None:
-                report.append(
-                    f"{oid}: no portrait row for char_id {char_id!r} -- still "
-                    f"has NO identity anchor (LOUD)")
-                log.warning(
-                    "[OTR_ImageGenDispatcher] %s: no portrait row for char_id "
-                    "%r; scene still gets no identity anchor", oid, char_id)
         anchor_hash = str((portrait_row or {}).get("portrait_content_hash") or "")
+
+        # THE IDENTITY BASIS -- the hash the seed derives a character's face
+        # from. Prefer the real portrait row; otherwise derive it from the
+        # portrait PROMPT TEXT the producer transported.
+        #
+        # It MUST go through `normalize_prompt_for_render`, the same chain the
+        # dispatch loop runs, because the hash on a portrait row is computed
+        # AFTER the safety clause, the style front-anchor and the banana
+        # transform -- not from the raw text. An earlier cut of this fix
+        # transported the producer's RAW hash and would have moved every face
+        # exactly once; that is why there is one shared normalizer and why the
+        # keystone test asserts virtual == rendered.
+        #
+        # Costs no render: portrait PIXELS stay suppressed by the lane's
+        # `required="never"`. Only the text is hashed.
+        _identity = str(obj.get("identity") or "")
+        identity_basis = str((portrait_row or {}).get("prompt_hash") or "")
+        if (not identity_basis and _identity != "none"
+                and obj.get("identity_prompt")):
+            identity_basis = normalize_prompt_for_render(
+                obj.get("identity_prompt"), vstyle=_vstyle,
+                banana_on=_banana_on, banana_key=_banana_key,
+                source=str(obj.get("identity_prompt_source") or ""),
+            ).prompt_hash
+        # RE-KEYED 2026-08-26. This used to fire on "no portrait row", which
+        # after the portrait-free lanes shipped is the NORMAL state on every
+        # still lane -- it would cry wolf ~5x per healthy episode while the
+        # seed was correctly anchored. The real defect is an empty BASIS on an
+        # object whose lane asked for a face. jump_segment keeps its own
+        # missing-portrait signal below; it deliberately does NOT share the
+        # scene_character seed.
+        if (kind == "scene_character" and char_id
+                and _identity != "none" and not identity_basis):
+            report.append(
+                f"{oid}: no identity basis for char_id {char_id!r} -- face "
+                f"will drift across this character's beats (LOUD)")
+            log.warning(
+                "[OTR_ImageGenDispatcher] %s: no identity basis for char_id "
+                "%r; this character's face is not anchored", oid, char_id)
+        elif portrait_row is None and kind == _cp.JUMP_STILL_KIND and char_id:
+            report.append(
+                f"{oid}: no portrait row for char_id {char_id!r} -- jump still "
+                f"has no reference (LOUD)")
 
         # Resolve the reference PNG HERE -- before the cache key, not after it.
         # The cache-HIT branch below `continue`s, so a reference resolved later
@@ -1368,8 +1482,14 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
 
         seed, anchor_mode = resolve_seed_and_mode(
             seed_cfg, oid, prompt_hash, kind=kind, char_id=char_id,
-            portrait_prompt_hash=str((portrait_row or {}).get("prompt_hash") or ""),
+            portrait_prompt_hash=identity_basis,
         )
+        # Captured BEFORE any later override: `mode="fixed"` exits the resolver
+        # early, the kill switch bypasses the identity branch, and a real
+        # reference rewrites anchor_mode to "reference_latent" a few lines down.
+        # The receipt must record whether the basis actually PARTICIPATED in the
+        # seed, not merely whether one was available.
+        seed_basis_used = identity_basis if anchor_mode == "seed" else ""
         if reference_image:
             # A reference was truly consumed, so the face it carries is part of
             # this request's identity. Only then -- an unanchored mint keeps its
@@ -1414,6 +1534,13 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     # character or a previous revision.
                     "derived_from_portrait_hash": anchor_hash,
                     "portrait_anchor_mode": anchor_mode,
+                    # The identity-seed BASIS, unconditional for the
+                    # same stale-inheritance reason. Distinct from
+                    # derived_from_portrait_hash, which is the rendered
+                    # PIXEL hash -- a lane can be seed-anchored with no
+                    # portrait pixels at all, and that pair is how an
+                    # audit tells the two apart.
+                    "identity_seed_basis": seed_basis_used,
                 })
                 # Banana receipt, UNCONDITIONALLY, for the same reason as the
                 # anchor stamp above: this row is a copy of an older one, and a
@@ -1641,6 +1768,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "prompt_hash": prompt_hash, "provenance": {"source": obj.get("source", "")},
             "derived_from_portrait_hash": anchor_hash,
             "portrait_anchor_mode": anchor_mode,
+            "identity_seed_basis": seed_basis_used,
         }
         # Banana receipt (six keys), on the fresh-generation row exactly as on
         # the cache-hit row -- both are the durable ledger record.

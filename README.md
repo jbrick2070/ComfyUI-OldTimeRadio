@@ -215,7 +215,6 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB @ 480x832x97 | no | no | yes |
 | `ltx23_high_video (16:9)` | 13.3 GiB @ 1024x576x169 | no | no | yes |
 | `wan22_high_fast (16:9)` | 12.8 GiB measured 2026-08-22 | no | maybe | yes |
-| `wan22_high_i2v (16:9)` | 13.9 GiB @ f33 | no | no | yes |
 | `ltx25_high_video (16:9)` | **14.48 GiB measured** | no | no | **5080-only** |
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |

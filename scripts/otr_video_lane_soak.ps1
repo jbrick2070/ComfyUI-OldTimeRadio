@@ -74,7 +74,7 @@ $BOOT_GROUPS = [ordered]@{
         lanes  = @(
             "otr_w45_ltx_8gb", "otr_w45_wan_ti2v", "otr_w45_fastwan",
             "otr_w45_mesh_stage", "otr_ghost_signal_v3_haunted",
-            "otr_w45_ltx_video", "otr_ltx25_high_video", "otr_w45_wan_i2v"
+            "otr_w45_ltx_video", "otr_ltx25_high_video"
         )
     }
     B = @{
@@ -295,7 +295,13 @@ if (Test-Path $RECEIPT) {
                 $_.PSObject.Properties | ForEach-Object { $h[$_.Name] = $_.Value }
                 $h
             })
-            $legIndex = ($script:Results | ForEach-Object { [int]$_.leg } | Measure-Object -Maximum).Maximum
+            # [int] IS LOAD-BEARING: Measure-Object returns a DOUBLE, and the
+            # "{0:d2}" leg-number format is a .NET DECIMAL specifier that only
+            # accepts integral types -- on a Double it throws
+            # "Format specifier was invalid", which silently cost the leg log
+            # path and the leg label on the first carried-forward run.
+            $legIndex = [int](($script:Results | ForEach-Object { [int]$_.leg } |
+                               Measure-Object -Maximum).Maximum)
             Write-Host "[videosoak] carried forward $($kept.Count) prior leg(s) from group(s): $((@($kept | ForEach-Object { $_.group }) | Sort-Object -Unique) -join ', ')"
         }
     } catch {

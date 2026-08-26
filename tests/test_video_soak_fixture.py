@@ -42,9 +42,24 @@ def test_clean_fixture_is_40_beats_all_roles_no_char3d():
     # rip-sfx-broll (2026-07-01): the rotation covers the 3 surviving roles.
     assert roles == {"announcer_visual", "music_visual", "character_video"}
     families = {s["family"] for s in shots}
-    for fam in ("audio_driven_face", "image_to_video",
-                "text_to_video", "static_image_gen", "static_motion"):
+    # `image_to_video` STAYS in this list across the 2026-08-26 Wan 2.2 14B
+    # retirement. `wan_i2v` was the only image_to_video engine in the soak's
+    # (role, engine, family) rotation, so retiring it emptied the seat -- and
+    # letting the seat stay empty would have quietly stopped the soak walking a
+    # family that is still live on five engines (mesh_stage, ltx_8gb,
+    # fastwan_8gb, wan_ti2v, minimax_h3_video). The row was re-seated with the
+    # 5B `wan_ti2v`, which declares character_video and resolves to
+    # image_to_video, in scripts/otr_video_soak.py and render_driver._PROFILES
+    # together. This assertion is what makes an empty seat fail loudly instead
+    # of shrinking the rotation in silence.
+    for fam in ("audio_driven_face", "text_to_video", "image_to_video",
+                "static_image_gen", "static_motion"):
         assert fam in families
+    # The other half of that guard: the rotation is EXACTLY those five families.
+    # Without this the loop above would keep passing if a profile row were
+    # dropped and its family quietly replaced by something unlisted.
+    assert families == {"audio_driven_face", "text_to_video", "image_to_video",
+                        "static_image_gen", "static_motion"}
     # NO forced-OOM stub on the clean fixture; no trail stamped anywhere.
     # (Filter by ENGINE ID, not family: the stub was rebased onto the LIVE
     # audio_driven_face family on 2026-08-23 -- humo's -- so a family filter

@@ -13,19 +13,30 @@ CAPABILITIES key has a REGISTERED engine) holds.
 from __future__ import annotations
 
 from nodes._otr_video_engines import registry as vreg
-from nodes._otr_video_engines import eng_wan_i2v  # noqa: F401  (register adapter)
 from nodes._otr_video_engines import eng_wan_ti2v  # noqa: F401  (register adapter)
 
 
-def test_wan_i2v_model_requirement_is_wan22_not_stale_wan21():
-    reqs = vreg.CAPABILITIES["wan_i2v"]["model_requirements"]
-    assert reqs == ["wan2.2-i2v"]
-    assert "wan2.1-i2v" not in reqs
+def test_retired_wan_i2v_has_no_capability_row_and_no_engine():
+    """wan_i2v RETIRED 2026-08-26 (19.82 GiB of weights vs a 14.5 GiB target).
+
+    The registry-consistency invariant cuts BOTH ways: a row without an engine
+    is a bug, and so is a row for an engine that no longer exists. This is the
+    same assertion the deleted `test_wan_i2v_row_still_consistent_with_registry`
+    made, inverted -- so the invariant keeps a test after the rip instead of
+    losing one.
+    """
+    assert "wan_i2v" not in vreg.CAPABILITIES
+    assert "wan_i2v" not in vreg.all_engine_names()
 
 
-def test_wan_i2v_row_still_consistent_with_registry():
-    # The S1/S5 edit must not break the every-row-has-an-engine invariant.
-    assert "wan_i2v" in vreg.all_engine_names()
+def test_retired_wan_i2v_is_a_named_tombstone_not_an_unknown_engine():
+    """A saved graph naming the 14B must get the RETIRED diagnosis, never the
+    generic unregistered-engine refusal -- "not registered" reads as a broken
+    install, which is exactly what the tombstone list exists to prevent."""
+    from nodes._otr_shared import public_engines as _pe
+    assert "wan_i2v" in _pe.RETIRED_ENGINE_IDS
+    # the two PUBLIC aliases must still route INTO that refusal
+    assert _pe._PUBLIC_ENGINES.get("wan22_high_i2v") == "wan_i2v"
 
 
 def test_wan_ti2v_row_present_and_registered():

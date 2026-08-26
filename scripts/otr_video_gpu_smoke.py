@@ -1,5 +1,10 @@
-"""Operator GPU-smoke probe for the parked video engines (humo /
-ltx_video / wan_i2v) -- READY-to-run, never a fake pass.
+"""Operator GPU-smoke probe for the parked video engines (humo / ltx_video)
+-- READY-to-run, never a fake pass.
+
+TWO, not three: the third slot was the local Wan 14B, retired 2026-08-26 for
+not fitting the 14.5 GiB envelope. It is NOT replaced by `wan_ti2v` here --
+the 5B is a shipping lane, not a parked one, so it has no business in a
+parked-engine probe. This list must keep matching ``ENGINES`` below.
 
 The heavy engines ship default-OFF / dark: their CPU adapters (assert_usable,
 the pure request build, canonicalize) are done, but the in-process / sidecar
@@ -36,7 +41,6 @@ from nodes._otr_video_engines import registry as _vreg        # noqa: E402
 # Register every engine + the cheap-family radio floor.
 from nodes._otr_video_engines import eng_humo                 # noqa: E402,F401
 from nodes._otr_video_engines import eng_ltx_video            # noqa: E402,F401
-from nodes._otr_video_engines import eng_wan_i2v              # noqa: E402,F401
 from nodes._otr_video_engines import cheap_families           # noqa: E402,F401
 
 #: Per-engine operator metadata (install hint + whether Sage matters). No flag
@@ -53,10 +57,6 @@ ENGINES = {
         "kind": "in-process",
         "install": "LTX-Video wrapper + ckpt; set OTR_LTX_VIDEO_CKPT",
         "sage": "MUST be clear (BUG-070 int8-PV abort)"},
-    "wan_i2v": {
-        "kind": "in-process (sidecar under Sage)",
-        "install": "Wan 2.2 I2V wrapper + ckpt; set OTR_WAN_I2V_CKPT",
-        "sage": "escalates to a cu128 sidecar"},
 }
 
 

@@ -1,10 +1,10 @@
-"""A-S5 / CW-6 CPU tests -- the in-process motion adapters (ltx_video + wan_i2v).
+"""A-S5 / CW-6 CPU tests -- the in-process motion adapters (ltx_video; wan_i2v RETIRED 2026-08-26).
 
 LTX-Video (text->video) and Wan 2.2 (image->video) run IN-PROCESS in the main
 cu130 venv (their wrappers are absent in the pytest sandbox), so every test here
 exercises the COLD path: the adapters are registered + dark + gated, fail closed
 without the flag / install, ltx_video fails closed when SageAttention is resident
-(BUG-070), wan_i2v escalates to a sidecar when Sage is resident, the init_image
+(BUG-070), the init_image
 aspect plan never stretches, the AS-3 lease is taken + released, and the pure
 request / clip helpers are deterministic. The live load + the VRAM<=14.5 GB
 boundary + render-twice pixels are the GPU smoke (operator), NOT covered here.
@@ -24,7 +24,7 @@ from nodes._otr_video_engines import motion_common as mc
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import schemas as sc
 from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
-from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
+from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -48,22 +48,6 @@ def test_ltx_video_registered_and_dark():
     assert "ltx_video" in vreg.all_engine_names()   # in the full static dropdown
 
 
-def test_wan_i2v_registered_and_dark():
-    assert vreg.is_registered("wan_i2v")
-    eng = vreg.get_engine("wan_i2v")
-    assert isinstance(eng, WanI2VEngine)
-    assert eng.family == "image_to_video" and eng.family in sc.FAMILIES
-    assert eng.default_roles == ()
-    assert eng.requires_flag is None               # registry IS the menu (no flag gate)
-    assert eng.required_inputs == ("init_image",)
-    assert eng.declared_isolation == mc.ISOLATION_SIDECAR_OPTIONAL
-    assert eng.binds_seed is True
-    assert "wan_i2v" in vreg.all_engine_names()
-
-
-# --------------------------------------------------------------------------- #
-# Registry gating (dark until the opt-in flag) + role membership
-# --------------------------------------------------------------------------- #
 def test_registry_ltx_selectable_no_flag(monkeypatch):
     # 2026-06-17: ltx_video claims no DEFAULT role (announcer + music moved to
     # ltx_audio_in). Registry IS the menu: it is SELECTABLE for all its roles with
@@ -73,15 +57,6 @@ def test_registry_ltx_selectable_no_flag(monkeypatch):
         assert vreg.assert_usable("ltx_video", role) == "ltx_video"
 
 
-def test_registry_wan_selectable_no_flag(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_WAN_I2V", raising=False)
-    for role in ("music_visual", "character_video"):
-        assert vreg.assert_usable("wan_i2v", role) == "wan_i2v"
-
-
-# --------------------------------------------------------------------------- #
-# Shared role_compat filter (AS-1)
-# --------------------------------------------------------------------------- #
 def test_ltx_role_fit_text_to_video():
     eng = vreg.get_engine("ltx_video")
     desc = {"engine_id": "ltx_video", "roles": eng.roles,
@@ -94,21 +69,6 @@ def test_ltx_role_fit_text_to_video():
     assert rc.filter_engines_for_role("announcer_visual", [desc]) == ["ltx_video"]
 
 
-def test_wan_role_fit_image_to_video_needs_init_image():
-    eng = vreg.get_engine("wan_i2v")
-    desc = {"engine_id": "wan_i2v", "roles": eng.roles,
-            "required_inputs": eng.required_inputs}
-    for role in ("music_visual", "character_video", "announcer_visual"):
-        assert rc.engine_fits_role(desc, role) is True
-    assert rc.filter_engines_for_role("character_video", [desc]) == ["wan_i2v"]
-    # A dead role token raises through the shared filter (rip-sfx-broll).
-    with pytest.raises(rc.RoleCompatError):
-        rc.engine_fits_role(desc, "retired_role_b")
-
-
-# --------------------------------------------------------------------------- #
-# Fail-closed usability ladders (no heavy import; CPU box)
-# --------------------------------------------------------------------------- #
 def test_ltx_assert_usable_sage_then_install(monkeypatch):
     eng = vreg.get_engine("ltx_video")
     # No flag gate (registry IS the menu). The first gate is the SageAttention
@@ -131,22 +91,6 @@ def test_ltx_assert_usable_sage_then_install(monkeypatch):
     assert e3.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
 
 
-def test_wan_assert_usable_install_tolerates_sage(monkeypatch):
-    eng = vreg.get_engine("wan_i2v")
-    # No flag gate (registry IS the menu). Sage resident + ckpt absent ->
-    # MISSING_MODEL (NOT INCOMPATIBLE_PROFILE: wan tolerates Sage by escaping to
-    # a sidecar).
-    monkeypatch.setitem(sys.modules, "sageattention",
-                        types.ModuleType("sageattention"))
-    monkeypatch.setenv("OTR_WAN_I2V_CKPT", str(REPO_ROOT / "_no_ckpt.safetensors"))
-    with pytest.raises(vreg.EngineUnusable) as e2:
-        eng.assert_usable(host_caps={}, profile={})
-    assert e2.value.reason == vreg.EngineUsabilityReason.MISSING_MODEL
-
-
-# --------------------------------------------------------------------------- #
-# BUG-070 SageAttention gate + isolation resolution
-# --------------------------------------------------------------------------- #
 def test_sage_gate_helper_pure():
     mc.assert_sage_not_patched("ltx_video", "text_to_video", modules={}, env={})
     with pytest.raises(vreg.EngineUnusable) as ei:
@@ -158,21 +102,6 @@ def test_sage_gate_helper_pure():
     assert mc.sageattention_patched(modules={}, env={}) is False
 
 
-def test_wan_resolve_isolation_escalates_on_sage(monkeypatch):
-    eng = vreg.get_engine("wan_i2v")
-    monkeypatch.delitem(sys.modules, "sageattention", raising=False)
-    monkeypatch.delenv("OTR_SAGEATTENTION_PATCHED", raising=False)
-    assert eng.resolve_isolation() == mc.ISOLATION_IN_PROCESS
-    monkeypatch.setitem(sys.modules, "sageattention",
-                        types.ModuleType("sageattention"))
-    assert eng.resolve_isolation() == mc.ISOLATION_SIDECAR_REQUIRED
-    # An in_process engine (ltx) never escalates, even with Sage resident.
-    assert mc.resolve_isolation(mc.ISOLATION_IN_PROCESS, True) == mc.ISOLATION_IN_PROCESS
-
-
-# --------------------------------------------------------------------------- #
-# init_image aspect: single uniform scale, never a silent stretch (N9)
-# --------------------------------------------------------------------------- #
 def test_aspect_transform_uniform_no_stretch():
     plan = mc.resolve_aspect_transform(480, 832, 1280, 720, "pad")   # portrait->landscape
     sx = plan["scaled_w"] / plan["src_w"]
@@ -189,22 +118,6 @@ def test_aspect_transform_uniform_no_stretch():
             {"src_w": 480, "src_h": 832, "scaled_w": 1280, "scaled_h": 720})
 
 
-def test_wan_aspect_plan_from_request():
-    eng = vreg.get_engine("wan_i2v")
-    req = {"asset_refs": {"init_image": "C:/p.png"}, "init_w": 480, "init_h": 832,
-           "canvas": {"w": 1280, "h": 720, "aspect_policy": "pad"}}
-    plan = eng._aspect_plan(req)
-    assert plan is not None
-    assert abs(plan["scaled_w"] / plan["src_w"]
-               - plan["scaled_h"] / plan["src_h"]) < 0.01
-    assert eng._aspect_plan({"canvas": {"w": 0, "h": 0}}) is None      # unsized -> None
-    with pytest.raises(ValueError):
-        eng._aspect_plan({"canvas": {"aspect_policy": "stretch"}})     # bad token
-
-
-# --------------------------------------------------------------------------- #
-# AS-3 shared lease: prepare takes it; a load failure must not strand it
-# --------------------------------------------------------------------------- #
 def test_ltx_prepare_releases_lease_on_load_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_GPU_LEASE_DIR", str(tmp_path))
     # No ComfyUI node classes registered -> load() resolves the GGUF graph
@@ -220,19 +133,9 @@ def test_ltx_prepare_releases_lease_on_load_failure(monkeypatch, tmp_path):
     assert not gr.is_held()                       # lease released, never stranded
 
 
-def test_wan_prepare_releases_lease_on_load_failure(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_GPU_LEASE_DIR", str(tmp_path))
-    monkeypatch.setenv("OTR_WAN_I2V_CKPT", str(tmp_path / "_no_ckpt.safetensors"))
-    eng = WanI2VEngine()
-    assert not gr.is_held()
-    with pytest.raises(RuntimeError):
-        eng.prepare(host_caps={}, profile={}, session_ctx={})
-    assert not gr.is_held()
-
-
 def test_teardown_idempotent_no_lease(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_GPU_LEASE_DIR", str(tmp_path))
-    for cls in (LtxVideoEngine, WanI2VEngine):
+    for cls in (LtxVideoEngine, WanTi2vEngine):
         eng = cls()
         eng.unload()                              # no residency -> no crash
         eng.teardown(None)                        # no lease -> no raise
@@ -256,20 +159,8 @@ def test_ltx_build_render_request_deterministic():
         eng._build_render_request(req2) != a       # seed routes deterministically
 
 
-def test_wan_build_render_request_deterministic():
-    eng = vreg.get_engine("wan_i2v")
-    req = {"asset_refs": {"init_image": "C:/p.png"}, "init_w": 480, "init_h": 832,
-           "canvas": {"w": 832, "h": 480, "aspect_policy": "pad"},
-           "timing": {"target_frame_count": 33}, "seed_bundle": {"request_seed": 3}}
-    a, b = eng._build_render_request(req), eng._build_render_request(req)
-    assert a == b
-    assert a["init_image"] == "C:/p.png" and a["seed"] == 3 and a["fps"] == 25
-    assert a["target_frame_count"] == 33 and a["aspect_plan"] is not None
-    assert eng._build_render_request(dict(req, seed_bundle={"request_seed": 99})) != a
-
-
 def test_canonicalize_silent_bt709():
-    for name in ("ltx_video", "wan_i2v"):
+    for name in ("ltx_video", "wan_ti2v"):
         eng = vreg.get_engine(name)
         clip = eng.canonicalize({"out_path": "C:/o.mp4", "frame_count": 40},
                                 {"shot_id": "s1"}, {})
@@ -288,7 +179,7 @@ def test_cold_import_motion_adapters_no_heavy_libs():
     code = (
         "import sys;"
         "import nodes._otr_video_engines.eng_ltx_video;"
-        "import nodes._otr_video_engines.eng_wan_i2v;"
+        "import nodes._otr_video_engines.eng_wan_ti2v;"
         "import nodes._otr_video_engines.motion_common;"
         "heavy=[m for m in ('torch','transformers','diffusers') if m in sys.modules];"
         "print('HEAVY', heavy);"
@@ -300,7 +191,7 @@ def test_cold_import_motion_adapters_no_heavy_libs():
 
 
 def test_new_motion_source_is_ascii_no_em_dash():
-    for name in ("motion_common.py", "eng_ltx_video.py", "eng_wan_i2v.py"):
+    for name in ("motion_common.py", "eng_ltx_video.py", "eng_wan_ti2v.py"):
         src_path = REPO_ROOT / "nodes" / "_otr_video_engines" / name
         src = src_path.read_text(encoding="utf-8")
         assert "—" not in src, f"em-dash forbidden in {name} (CLAUDE.md)"

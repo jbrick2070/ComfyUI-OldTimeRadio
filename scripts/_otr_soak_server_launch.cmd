@@ -9,7 +9,8 @@ rem              so %2 arrived as "HUMO" and the else-branch enabled HuMo
 rem              (2026-06-10 marathon catch).
 rem   HUMO       explicit legacy HuMo lane for bakeoffs/single-engine probes.
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
-rem   WAN        Wan i2v opt-in ON, HuMo OFF
+rem   WAN        Wan TI2V-5B opt-in ON, HuMo OFF (the 14B i2v lane was
+rem              RETIRED 2026-08-26 -- it never fit the card)
 set HF_HOME=C:\ComfyUI-Models\huggingface
 rem UTF-8 stdio (2026-06-12): a detached cmd inherits the cp1252 console codec,
 rem so ComfyUI's logger crashes the instant OTR prestartup prints an emoji
@@ -117,16 +118,20 @@ if /i "%2"=="FLOOR" (
   echo [launch] LTX lane: Sage-free boot, OTR_ENABLE_LTX_VIDEO=1, OTR_ENABLE_LTX_AV=1, HuMo OFF
 ) else if /i "%2"=="WAN" (
   set OTR_ENABLE_HUMO=
-  set OTR_ENABLE_WAN_I2V=1
-  set OTR_WAN_I2V_CKPT=C:\ComfyUI-Models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
-  rem GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B engine. Enabling
-  rem BOTH Wan engines is what the full --acceptance sweep preflight requires
-  rem (M3: every registered core Wan engine's enable flag must be 1). The 5B
+  rem GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B engine. The 5B
   rem REQUIRES the Wan2.2 VAE (M8), not the 2.1 VAE.
+  rem
+  rem THE 14B i2v HALF OF THIS TOKEN IS GONE (2026-08-26). It set
+  rem OTR_ENABLE_WAN_I2V + OTR_WAN_I2V_CKPT for an engine that could not fit the
+  rem card: 19.82 GiB of weights against a 14.5 GiB target, which is why it
+  rem timed out at 120 minutes while this 5B lane finished in 48. The engine is
+  rem retired and tombstoned; the token now enables the ONE Wan lane that runs.
+  rem The old M3 preflight note ("every registered core Wan engine's enable flag
+  rem must be 1") is satisfied by that one engine now, not two.
   set OTR_ENABLE_WAN_TI2V=1
   set OTR_WAN_TI2V_CKPT=C:\ComfyUI-Models\diffusion_models\Wan2.2-TI2V-5B-Q5_K_M.gguf
   set OTR_WAN_TI2V_VAE_NAME=wan2.2_vae.safetensors
-  echo [launch] WAN lane: OTR_ENABLE_WAN_I2V=1 + OTR_ENABLE_WAN_TI2V=1, HuMo OFF
+  echo [launch] WAN lane: OTR_ENABLE_WAN_TI2V=1, HuMo OFF
 ) else (
   set OTR_ENABLE_HUMO=
   echo [launch] heavy engines OFF ^(default no-lane^)

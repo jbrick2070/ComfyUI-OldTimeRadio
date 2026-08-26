@@ -45,10 +45,18 @@ def test_serves_the_image_init_roles():
     assert set(eng.roles) == set(ROLES)
 
 
-def test_distinct_from_wan_i2v_not_a_subclass():
-    # Shares only the pure mixin -- it must NOT be a WanI2VEngine subclass.
-    from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
-    assert not issubclass(WanTi2vEngine, WanI2VEngine)
+# RETIRED 2026-08-26 with the engine it compared against.
+# ``test_distinct_from_wan_i2v_not_a_subclass`` asserted that WanTi2vEngine is
+# NOT a subclass of the Wan 2.2 14B ``WanI2VEngine`` -- that the two adapters
+# shared only the pure mixin. The 14B was removed because it never fit the box's
+# 14.5 GiB VRAM envelope, so ``eng_wan_i2v`` is gone and the comparison has no
+# second side left. Deleted rather than repointed at the 5B: the guard's entire
+# content WAS the relationship between two classes, and asserting that a class
+# is not a subclass of itself would prove nothing while looking green.
+# Nothing is orphaned. This adapter's own contract -- registration and identity,
+# roles, loader-mode inference, the 5B node candidates, the graph wiring, the
+# Wan2.2-VAE guard and the assert_usable ladder -- is pinned DIRECTLY by the
+# tests above and below, never by contrast with the 14B.
 
 
 # --------------------------------------------------------------------------- #

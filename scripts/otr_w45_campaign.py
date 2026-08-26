@@ -62,7 +62,7 @@ LOCK = REPO / "tmp" / "_w45_campaign.lock"
 # "every local video engine". There are NINETEEN registered local engines. The
 # thirteen it silently skipped were humo_1.7B, humo_1.7B_169, humo_14B_169,
 # mesh_stage, still_flat, still_motion, still_pan, still_word, viz_camera,
-# viz_green, viz_mxc_cpu, viz_mxc_mandala and wan_i2v -- so "6/6 engines passed"
+# viz_green, viz_mxc_cpu, viz_mxc_mandala -- so "6/6 engines passed"
 # read as total coverage and was a third of it.
 #
 # A hand-list drifts the moment an engine is added; the registry cannot, because
@@ -107,7 +107,7 @@ LEG_ORDER = (
     "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     "mesh_stage", "ltx_8gb", "fastwan_8gb", "ltx_video", "ltx_audio_in",
     "humo_1.7B", "humo_1.7B_169", "humo", "humo_14B_169",
-    "wan_i2v", "wan_ti2v",
+    "wan_ti2v",
     # THE TWO H3 LANES RUN LAST, AND THEY NEED A DIFFERENT BOOT (lanes 19/20,
     # 2026-08-12). Last because they are by far the slowest -- ~240 s for a
     # single 5 s beat, against ~22 s for ltx_8gb -- so on the
@@ -116,7 +116,7 @@ LEG_ORDER = (
     # **THEY CANNOT SHARE THIS CAMPAIGN'S SERVER WITH THE HEAVY LANES.** Both
     # REQUIRE the named `h3` boot contract, whose `--reserve-vram 12` is what
     # forces a 21 GB DiT to stream on a 16 GB card -- and reserving 12 GiB away
-    # from model loading would starve `wan_i2v` (13.9 GiB warm) and the HuMo
+    # from model loading would starve the HuMo
     # tiers on the same server. A contract is a BOOT fact and boot facts cannot
     # be fixed at render time.
     #

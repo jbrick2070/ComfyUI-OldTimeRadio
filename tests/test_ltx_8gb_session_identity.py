@@ -162,7 +162,7 @@ _ENGINES_WITH_A_SESSION = {
     # strengths can never let one arm reuse another arm's patched model.
     "animatediff15_v3_haunted_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
-    "wan_i2v",                 # WIRE-W3a, 2026-07-29
+    "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29
     "fastwan_8gb",             # 2026-08-01 -- inherits WanTi2vEngine's, and its
                                # LoRA rides it for free: _wan_session_receipts is
@@ -220,7 +220,7 @@ def test_CONTROL_the_rollout_is_a_NAMED_LIST_and_this_is_the_list():
     it -- without saying so here.
 
     This used to assert that ``wan_ti2v`` alone stayed silent, which made it a
-    control over exactly one engine: ``wan_i2v`` gained an identity at WIRE-W3a
+    control over exactly one engine: ``wan_ti2v`` gained an identity at WIRE-W3a
     and no test in this file noticed. Asserting the whole SET is the control
     that was meant, and it fails in both directions.
     """

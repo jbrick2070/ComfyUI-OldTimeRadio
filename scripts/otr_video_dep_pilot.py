@@ -140,21 +140,6 @@ PROBE_ENGINES = {
             "roles, audio byte-identical, render time + the near-zero VRAM floor"
         ),
     },
-    "wan_i2v": {
-        "lib_module": "wan",
-        "adapter_class": "WanI2VEngine",
-        "forward": "render_clip",
-        "assumed_call": (
-            "in-process by default (sidecar_optional -> sidecar when SageAttention "
-            "is resident): drive the installed Wan 2.2 i2v wrapper (two-expert "
-            "HIGH/LOW MoE + lightx2v/SVI_v2_PRO/distill LoRAs + ModelSamplingSD3 "
-            "sigma-split); the init_image is padded/cropped into the canvas, never "
-            "stretched.  # TODO-for-GPU-smoke: clear the KJNodes pin audit (gate F: "
-            "numpy<2 / transformers<=4.51.3), confirm the wrapper expert-pair / "
-            "LoRA-order / sigma-split via assert_usable, and render-twice "
-            "determinism on sm_120"
-        ),
-    },
     # GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B sibling. Same
     # in-process / sidecar_optional model, but the 5B graph (Wan22ImageToVideoLatent
     # + the Wan2.2 VAE, M8) and a GGUF UNET loader. Its 5B core node class was

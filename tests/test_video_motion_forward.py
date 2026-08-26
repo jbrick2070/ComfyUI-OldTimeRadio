@@ -18,7 +18,7 @@ import pytest
 
 from nodes._otr_video_engines import wrapper_bridge as wb
 from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
-from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
+from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None
@@ -184,27 +184,6 @@ def test_ltx_sampler_default_is_distilled(monkeypatch):
     assert LtxVideoEngine._sampler_mode() == "distilled"
 
 
-def test_wan_graph_topology():
-    eng = WanI2VEngine()
-    cand = eng._node_candidates()
-    assert cand["wan"] == ("WanImageToVideo",)
-    plan = eng._build_render_request(
-        {"asset_refs": {"init_image": "p"}, "init_w": 480, "init_h": 832,
-         "canvas": {"w": 832, "h": 480, "aspect_policy": "pad"},
-         "timing": {"target_frame_count": 33}, "seed_bundle": {"request_seed": 5}})
-    g = eng._build_graph({"text_prompt": "move"}, "p.png", plan, 33, 832, 480)
-    wan = g["wan"]["inputs"]
-    assert wan["start_image"] == wb.Wire("loadimage", 0)
-    assert wan["length"] == 33 and wan["positive"] == wb.Wire("pos", 0)
-    # ModelSamplingSD3 sits between the UNET loader and the sampler (sigma shift).
-    assert g["modelsampling"]["inputs"]["model"] == wb.Wire("unet", 0)
-    assert cand["modelsampling"] == ("ModelSamplingSD3",)
-    ks = g["ksampler"]["inputs"]
-    assert ks["model"] == wb.Wire("modelsampling", 0)
-    assert ks["latent_image"] == wb.Wire("wan", 2)
-
-
-# --- fail-closed (NAMED) --------------------------------------------------- #
 def test_ltx_load_fails_closed_named(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_LTX_VIDEO", "1")
     # No ComfyUI node classes registered -> load() resolves the GGUF graph
@@ -216,7 +195,7 @@ def test_ltx_load_fails_closed_named(monkeypatch):
 
 
 def test_wan_render_requires_init_image():
-    eng = WanI2VEngine()
+    eng = WanTi2vEngine()
     eng._classes = {"vaedecode": object}            # non-empty so resolution skipped
     req = {"asset_refs": {}, "timing": {"target_frame_count": 33},
            "seed_bundle": {"request_seed": 1}}
@@ -334,36 +313,3 @@ def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch):
         p.unlink(missing_ok=True)
 
 
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_wan_render_clip_to_silent_mp4(tmp_path, monkeypatch):
-    np = pytest.importorskip("numpy")
-    Image = pytest.importorskip("PIL.Image")
-    in_dir = tmp_path / "in"
-    in_dir.mkdir()
-    src = tmp_path / "src"
-    src.mkdir()
-    # A REAL png: S10 requires Pillow to materialize the init into the canvas;
-    # an unreadable source now fails LOUD instead of silently staging raw.
-    Image.new("RGB", (480, 832), (120, 60, 30)).save(src / "p.png")
-    monkeypatch.setattr(wb, "comfy_input_dir", lambda: str(in_dir))
-    eng = WanI2VEngine()
-    eng._classes = _wan_fakes(np, n=4)
-    req = {"shot_id": "s1", "asset_refs": {"init_image": str(src / "p.png")},
-           "text_prompt": "subtle motion", "init_w": 480, "init_h": 832,
-           "canvas": {"w": 832, "h": 480, "aspect_policy": "pad"},
-           "timing": {"target_frame_count": 33}, "seed_bundle": {"request_seed": 3}}
-    prepared = {"patchers": []}
-    clip = eng.canonicalize(eng.render_clip(req, prepared), req, {})
-    p = pathlib.Path(clip["path"])
-    try:
-        assert p.exists() and clip["frame_count"] == 4
-        assert clip["engine_id"] == "wan_i2v" and clip["has_audio"] is False
-        # S7: staged under a per-shot/seed name, not the fixed otr_wan_init_WxH.
-        assert (in_dir / "otr_wan_init_s1_s3_832x480.png").exists()
-        assert len(prepared["patchers"]) == 1            # unet MODEL retained
-    finally:
-        p.unlink(missing_ok=True)
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-v"]))

@@ -44,9 +44,19 @@ def test_formerly_hidden_engines_are_now_selectable():
     # Engines the old gate HID (untested-but-registered) are now in the dropdown --
     # registry IS the menu. (still_parallax UNREGISTERED 2026-06-30, item 2
     # rip-out -- no longer expected here.)
+    #
+    # `wan_i2v` was the other exemplar here until the 2026-08-26 large-Wan rip
+    # (operator: "rip the large wan we don't need") unregistered it: 19.82 GiB
+    # of weights against a 14.5 GiB target. It moves to the NEGATIVE side of
+    # this test with still_parallax rather than being retargeted at the 5B
+    # `wan_ti2v` -- that is a different model with a different contract, and
+    # asserting it here would only re-state coverage the 5B already has in
+    # test_video_combo_is_the_full_registry_plus_sentinel above. `still_motion`
+    # carries the original point on its own: registry IS the menu.
     video = {vd._engine_id_from_pick(c) for c in vd._video_model_combo()}
-    assert {"wan_i2v", "still_motion"} <= video
+    assert {"still_motion"} <= video
     assert "still_parallax" not in video
+    assert "wan_i2v" not in video
     image = set(idr._image_model_combo())
     assert "z_image_turbo" in image
 

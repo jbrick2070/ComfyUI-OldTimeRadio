@@ -66,9 +66,16 @@ def mapping():
 
 def _registry_engine_ids():
     from nodes._otr_video_engines import registry as vreg
+    # These imports exist only to POPULATE the registry before it is read.
+    # `eng_wan_i2v` left the list with the Wan 2.2 14B I2V retirement
+    # (2026-08-26) -- the module is gone, so the import was a hard
+    # ImportError, not a missing id. Nothing is orphaned: every engine this
+    # sweep needs to see is still registered by the remaining modules, and
+    # `cloud_wan_i2v*` (a SEPARATE cloud lane whose id merely contains the
+    # substring) comes in through `eng_cloud_video`.
     from nodes._otr_video_engines import (  # noqa: F401
         cheap_families, eng_cloud_video, eng_humo,
-        eng_ltx_video, eng_wan_i2v,
+        eng_ltx_video,
     )
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401

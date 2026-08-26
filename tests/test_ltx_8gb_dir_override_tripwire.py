@@ -368,14 +368,14 @@ def test_CONTROL_wan_resolve_model_file_still_lets_a_DIR_win(
     those fixtures rely on. Fixing Wan's copy of this lie needs its fixtures
     migrated first; that is a separate chunk, and this control is what keeps
     it separate."""
-    from nodes._otr_video_engines.eng_wan_i2v import WanI2VEngine
+    from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
 
     d = tmp_path / "vae_dir"
     d.mkdir()
     (d / "some_vae.safetensors").write_bytes(b"v")
     monkeypatch.setenv("OTR_WAN_I2V_VAE_DIR", str(d))
 
-    wan = WanI2VEngine()
+    wan = WanTi2vEngine()
     wan._comfy_root = lambda: str(tmp_path / "nowhere")
     assert wan._resolve_model_file(
         ("vae",), "some_vae.safetensors",

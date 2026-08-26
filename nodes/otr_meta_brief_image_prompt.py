@@ -793,6 +793,81 @@ def _portrait_free_roles_from_policy(policy_json):
     return roles
 
 
+def _identity_roles_from_policy(policy_json):
+    """Roles whose paired VIDEO lane declares its character stills need a FACE.
+
+    The SIXTH member of the lane-derived role-set family, and the one that fixes
+    the split this family created. ``_portrait_free_roles_from_policy`` above
+    reads ``kind="portrait" required="never"`` and skips minting the portrait --
+    correct, and it fixed a real live failure. But the portrait was doing TWO
+    jobs: the video lane's init image, and the seed basis that gives every beat
+    of one character the SAME FACE (commit 89e82181). Letting one consumer's
+    PIXEL decision also decide IDENTITY silently un-shipped the other, and 71 of
+    75 character stills rendered unanchored on 2026-08-26 as a result.
+
+    So identity is now its own declaration on the same row family:
+    ``StillPlanRow.identity`` is ``portrait_seed`` (the DEFAULT) or ``none``.
+    A lane that mints no portrait pixels still gets a stable face, because the
+    basis is a TEXT hash and costs no render.
+
+    Returns ``{role: token}``. A role whose engine is unknown, unregistered, or
+    planless is ABSENT from the map, and the caller treats absence as the
+    default -- the safe direction, exactly as this family's other members do.
+    """
+    out = {}
+    try:
+        pol = json.loads(policy_json or "{}")
+    except (ValueError, TypeError):
+        return out
+    if not isinstance(pol, dict):
+        return out
+    vm = pol.get("video_models")
+    if not isinstance(vm, dict):
+        return out
+    try:
+        try:
+            from ._otr_shared import role_slots as _rs  # type: ignore
+            from ._otr_shared import still_plan_helpers as _sp  # type: ignore
+            from ._otr_video_engines import registry as _vreg  # type: ignore
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared import role_slots as _rs  # type: ignore
+            from _otr_shared import still_plan_helpers as _sp  # type: ignore
+            from _otr_video_engines import registry as _vreg  # type: ignore
+    except Exception:  # noqa: BLE001 -- never block prompts on a resolver import
+        return out
+    for role in _rs.ROLE_TO_VIDEO_SLOT:
+        try:
+            eng_id = _effective_prompt_engine_for_role(vm, role)
+            if not eng_id or not _vreg.is_registered(eng_id):
+                continue
+            plan = getattr(_vreg.get_engine(eng_id), "still_plan", None) or ()
+            for row in plan:
+                if str(getattr(row, "kind", "")) == _sp.KIND_SCENE_CHARACTER:
+                    out[role] = str(getattr(row, "identity", "")
+                                    or _sp.IDENTITY_PORTRAIT_SEED)
+                    break
+        except _RouteFreezeError:
+            raise          # a malformed routing environment is TERMINAL
+        except Exception:  # noqa: BLE001 -- a bad slot never blocks prompts
+            continue
+    return out
+
+
+def _identity_token_for_role(identity_roles, role):
+    """The identity token for one role, defaulting SAFE.
+
+    Absence means "the lane did not say", and the whole point of the default
+    direction is that not saying gets you a stable face for free. Only an
+    explicit ``none`` turns it off.
+    """
+    try:
+        from ._otr_shared import still_plan_helpers as _sp  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import still_plan_helpers as _sp  # type: ignore
+    token = str((identity_roles or {}).get(str(role or "")) or "")
+    return token if token in _sp.VALID_IDENTITY else _sp.IDENTITY_PORTRAIT_SEED
+
+
 def _still_word_roles_from_policy(policy_json):
     """The set of image-prompt roles whose paired VIDEO engine is ``still_word``.
 
@@ -1806,7 +1881,7 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                          fps: int = 25, still_aspects=None,
                          mesh_fodder_roles=None, talking_roles=None,
                          still_word_roles=None, video_models=None,
-                         portrait_free_roles=None):
+                         portrait_free_roles=None, identity_roles=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -2010,6 +2085,11 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
     _role_aspects = still_aspects or {}
     objects: list = []
     _portrait_free = set(portrait_free_roles or ())
+    # `_role` is POPPED below, so capture the map first -- the identity
+    # transport further down needs each character's role to ask the lane
+    # what that role declared, and by then the key is gone.
+    _role_for_cid = {c: str(i.get("_role") or "character_video")
+                     for c, i in out.items()}
     for cid, pinfo in out.items():
         _role = pinfo.pop("_role", "character_video")
         # The VIDEO lane declared it never needs a portrait (StillPlanRow
@@ -2300,6 +2380,34 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             }
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
+                # IDENTITY TRANSPORT (2026-08-26). A scene_character still seeds
+                # from the CHARACTER'S PORTRAIT prompt so every beat of that
+                # character draws one face (commit 89e82181). When the video lane
+                # declares it never needs portrait PIXELS the portrait object is
+                # skipped above (:2012-2022) -- correctly, that is a88cede5's fix
+                # -- but the prompt itself was still COMPOSED into `out[cid]` and
+                # then discarded, taking the seed basis with it. 71 of 75
+                # character stills rendered unanchored on 2026-08-26 because of
+                # that.
+                #
+                # So carry the TEXT, not a hash. The dispatcher must re-derive
+                # the basis through its OWN normalize-then-hash chain
+                # (`otr_image_gen_dispatcher.normalize_prompt_for_render`),
+                # because the hash the seed consumes is computed AFTER the
+                # safety clause, the style front-anchor and the banana
+                # transform. Hashing here would produce a different number and
+                # move every face exactly once.
+                #
+                # `identity` is the LANE's declaration, transported per object:
+                # an ABSENT field cannot be told apart from an explicit "none",
+                # and the dispatcher needs that distinction to know whether a
+                # missing basis is a defect or the lane's stated intent.
+                _pinfo = out.get(_cid) or {}
+                _obj["identity"] = _identity_token_for_role(
+                    identity_roles, _role_for_cid.get(_cid, ""))
+                if _obj["identity"] != "none" and _pinfo.get("prompt"):
+                    _obj["identity_prompt"] = _pinfo["prompt"]
+                    _obj["identity_prompt_source"] = _pinfo.get("source", "")
             objects.append(_obj)
     required_scene_targets = []
     _required_fodder_roles = set(mesh_fodder_roles or ())
@@ -2427,7 +2535,8 @@ class OTRMetaBriefImagePromptGen:
             video_models=video_models,
             portrait_free_roles=_portrait_free_roles_from_policy(
                 image_policy_json),
-        )  # aspects + mesh-fodder + talking + still_word roles + video_models ride in image_policy_json
+            identity_roles=_identity_roles_from_policy(image_policy_json),
+        )  # aspects + mesh-fodder + talking + still_word + identity roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 
         objs = payload.get("objects") or []

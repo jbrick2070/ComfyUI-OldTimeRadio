@@ -286,6 +286,10 @@ manifest = {
     # lane and an unguarded lane that looks guarded. A lane leaves this table
     # in the same commit that qualifies its cost row through OTR's real
     # prepare() + render_clip() lifecycle -- never from lab numbers alone.
+    # wan_i2v RETIRED 2026-08-26: an unenforced-admission entry names a
+    # LIVE lane (gate G4 asserts every key is registered), so its row is
+    # gone from here. Its historical EVIDENCE rows above are untouched --
+    # those record runs that really happened.
     "admission_unenforced": {
         # GHOST SIGNAL (2026-08-22). Unlike every row below it, this lane is not
         # unenforced because a measurement is MISSING and owed -- it is
@@ -320,10 +324,6 @@ manifest = {
             "so deleting it would change nothing -- and would go silently "
             "stale if recalibrated apart from wan_ti2v. It was the second leg "
             "the ungated STATIC path refused on 2026-08-13. Owned by lane 6."),
-        "wan_i2v": (
-            "admission NOT enforced: single-clip renders on this lane get no "
-            "check before or after. Only f33 at 832x480 has warm evidence, "
-            "so no envelope covers the f177 ceiling it declares."),
         "humo": (
             "admission NOT enforced: no cost row and no envelope key. "
             "Evidence is portrait 480x832x97 only, on two boot lanes with a "

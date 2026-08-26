@@ -16,7 +16,7 @@ import pytest
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register)
 from nodes._otr_video_engines import eng_humo         # noqa: F401 (register humo)
 from nodes._otr_video_engines import eng_ltx_video      # noqa: F401 (register)
-from nodes._otr_video_engines import eng_wan_i2v        # noqa: F401 (register)
+from nodes._otr_video_engines import eng_wan_ti2v       # noqa: F401 (register)
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_shared import retry_taxonomy as rt

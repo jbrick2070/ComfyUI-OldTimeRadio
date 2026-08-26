@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """The retired-engine migration policy, EXERCISED at all five boundaries.
 
-A user-saved workflow or an external API client may still name one of the five
-engine ids retired by the 2026-08-06 SFX rip. The contract
+A user-saved workflow or an external API client may still name any of the
+engine ids retired since the 2026-08-06 SFX rip (the set has grown with each
+later retirement -- see the count guard below). The contract
 (docs/2026-08-06-BUILD-SPEC-rip-sfx.md section 10): a stale selection fails
 with a NAMED :class:`RetiredEngineError` -- ONE type, ONE ``reason_code``
 spelling, ONE message shape -- and never silently resolves to another engine.
 
-The five ingress boundaries, each parameterized over all five ids:
+The five ingress boundaries, each parameterized over EVERY retired id:
 
   1. the director's ``_resolve_and_validate`` (saved node / custom json),
   2. ``parse_engine_override`` (the OTR_FORCE_ENGINE_MAP force map),
@@ -41,12 +42,18 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_fifteen_known_ids():
+def test_the_retired_set_is_exactly_the_sixteen_known_ids():
     # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
-    # retirement (lean-mean order 4), and five from the 2026-08-23 Ghost
-    # narrowing (operator: "delete any animatediff that are not haunted").
+    # retirement (lean-mean order 4), five from the 2026-08-23 Ghost narrowing
+    # (operator: "delete any animatediff that are not haunted"), and one from
+    # the 2026-08-26 large-Wan rip (operator: "rip the large wan we don't
+    # need") -- the 14B `wan_i2v` lane, whose 19.82 GiB of weights never fit
+    # the 14.5 GiB target and only ran by offloading continuously.
     # EXACT on purpose: the set is append-only, and an id appearing here that no
-    # ruling added -- or one vanishing -- must fail the suite, not drift.
+    # ruling added -- or one vanishing -- must fail the suite, not drift. When a
+    # retirement lands, the COUNT in this test's NAME moves with the set; a
+    # guard whose name says fifteen while it asserts sixteen has stopped being
+    # a guard and started being a comment.
     assert RETIRED_ENGINE_IDS == frozenset({
         "animatediff15_video",
         "animatediff15_v2_video",
@@ -63,8 +70,12 @@ def test_the_retired_set_is_exactly_the_fifteen_known_ids():
         "trellis_talk",
         "triposr",
         "still_parallax",
+        "wan_i2v",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
+    assert len(RETIRED_ENGINE_IDS) == 16, (
+        "the count in this test's name is part of the guard -- rename it in "
+        "the same edit that grows the set")
 
 
 @pytest.mark.parametrize("engine_id", RETIRED)

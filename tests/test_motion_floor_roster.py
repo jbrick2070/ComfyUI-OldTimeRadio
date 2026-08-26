@@ -112,11 +112,23 @@ def test_the_operators_own_example_is_the_shipped_arithmetic():
 def test_a_heavy_local_lane_renders_its_own_minimum_rather_than_holding():
     """The same sentence on the lane it actually costs GPU time: HuMo's floor
     is 33 frames (1.3 s at 25 fps), and a 1 s beat pays for all 33."""
-    for name in ("humo", "wan_i2v"):
-        contract = _contract(name)
-        assert int(contract.min_frames) == 33
-        plan = cp.partition_beat(SHORT_BEAT, contract)
-        assert [s.render_frames for s in plan.segments] == [33]
+    # Each lane pays ITS OWN floor -- humo 33, wan_ti2v 17. Hardcoding one
+    # number was only ever right because the two lanes this once listed
+    # (humo + the retired 14B wan_i2v) happened to share 33; asserting the
+    # engine's declared minimum is what the test name actually claims.
+    # Only a lane whose floor EXCEEDS the beat can demonstrate "pays for all
+    # 33" -- wan_ti2v's floor is 17, under this 25-frame beat, so it renders 25
+    # and proves nothing here. It was only ever valid alongside humo because
+    # the retired 14B wan_i2v also floored at 33.
+    billed = [(n, int(_contract(n).min_frames)) for n in ("humo", "wan_ti2v")]
+    over = [(n, f) for n, f in billed if f > SHORT_BEAT]
+    assert over, (
+        "no lane in the roster floors above a %d-frame beat -- this gate has "
+        "gone vacuous: %s" % (SHORT_BEAT, billed))
+    for name, floor in over:
+        plan = cp.partition_beat(SHORT_BEAT, _contract(name))
+        assert [s.render_frames for s in plan.segments] == [floor], (
+            f"{name} did not render its own {floor}-frame minimum")
         assert plan.total_visible_frames == SHORT_BEAT
 
 

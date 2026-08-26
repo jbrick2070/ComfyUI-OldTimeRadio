@@ -132,16 +132,51 @@ VALID_STYLE_TAIL_POLICIES = frozenset((
     STYLE_TAIL_MINIMAL_CLEAN,
 ))
 
+#: Does this row's subject need a STABLE FACE across the episode's beats?
+#:
+#: THE LANE DECIDES WHETHER PIXELS ARE MINTED. IT DOES NOT DECIDE WHETHER THE
+#: CHARACTER HAS AN IDENTITY. Splitting those two questions is the whole point
+#: of this field, and it exists because they were once the same switch:
+#: commit 89e82181 (2026-08-05) gave every beat of a character the same seed by
+#: deriving it from that character's PORTRAIT prompt hash; commit a88cede5
+#: (2026-08-22) then let a lane's ``kind="portrait" required="never"`` suppress
+#: minting the portrait at all -- correctly, for PIXELS, since an unused
+#: portrait had killed a live leg -- and silently emptied the hash the seed
+#: needs. Measured 2026-08-26: 75 scene_character stills, 4 anchored, 71 not.
+#:
+#: ``portrait_seed`` is the DEFAULT and that direction is deliberate. Identity
+#: costs no render (the basis is a text hash, and the portrait pixels stay
+#: suppressed by ``required``), so a lane that forgets to declare gets a stable
+#: face for free. Defaulting the other way would re-create the 2026-08-22 bug
+#: for every lane written from here on.
+#:
+#: ``none`` is for a row whose subject is not a face at all -- the still_word
+#: word-card being the case in hand: its ``scene_character`` row inherits face
+#: framing from the shared cheap-family plan but it actually mints typography
+#: from the spoken line, so an identity anchor would be meaningless there.
+IDENTITY_PORTRAIT_SEED = "portrait_seed"
+IDENTITY_NONE = "none"
+
+VALID_IDENTITY = frozenset((
+    IDENTITY_PORTRAIT_SEED,
+    IDENTITY_NONE,
+))
+
 
 # ---------------------------------------------------------------------------
 # The row itself. A plain namedtuple so a class-body construction cannot
 # raise -- the audit is what fails closed on invalid data (spec section 6:
 # "Validation is a POST-REGISTRATION AUDIT, never decorator-time").
 # ---------------------------------------------------------------------------
+#: ``identity`` carries a DEFAULT so none of the shipped adapters have to
+#: change to keep working, and so a lane written tomorrow that says nothing
+#: still gets a stable face. Positional construction is unaffected: the field
+#: is LAST, so every existing 7-argument StillPlanRow(...) call is untouched.
 StillPlanRow = namedtuple(
     "StillPlanRow",
     ("kind", "cardinality", "target_class", "aspect", "required",
-     "framing_geometry", "style_tail_policy"),
+     "framing_geometry", "style_tail_policy", "identity"),
+    defaults=(IDENTITY_PORTRAIT_SEED,),
 )
 
 
@@ -210,7 +245,8 @@ def validate_still_plan_row(row):
             ("target_class", VALID_TARGET_CLASSES),
             ("aspect", VALID_ASPECTS),
             ("required", VALID_REQUIRED),
-            ("style_tail_policy", VALID_STYLE_TAIL_POLICIES)):
+            ("style_tail_policy", VALID_STYLE_TAIL_POLICIES),
+            ("identity", VALID_IDENTITY)):
         value = getattr(row, field_name, None) if hasattr(row, field_name) \
             else row[StillPlanRow._fields.index(field_name)]
         if value not in valid_set:
@@ -298,6 +334,9 @@ __all__ = [
     "STYLE_TAIL_FULL",
     "STYLE_TAIL_MINIMAL_CLEAN",
     "VALID_STYLE_TAIL_POLICIES",
+    "IDENTITY_PORTRAIT_SEED",
+    "IDENTITY_NONE",
+    "VALID_IDENTITY",
     "resolve_row_aspect",
     "validate_still_plan_row",
     "validate_still_plan",

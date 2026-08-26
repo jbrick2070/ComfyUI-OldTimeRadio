@@ -69,6 +69,28 @@ _CHEAP_FAMILY_STILL_PLAN = (
                  style_tail_policy="full"),
 )
 
+#: still_word's OWN plan -- derived from the shared one, never a mutation of it.
+#:
+#: WHY A DERIVED COPY AND NOT AN EDIT (2026-08-26, and this is a ship-blocker
+#: caught in review). `_CHEAP_FAMILY_STILL_PLAN` is the SAME tuple object on
+#: still_motion, still_pan, still_flat AND still_word. Setting
+#: ``identity="none"`` on its ``scene_character`` row in place would strip the
+#: face anchor from the three CINEMATIC cheap lanes as well -- and those are
+#: exactly the lanes carrying the 71 unanchored faces measured 2026-08-26, with
+#: still_flat being what `workflows/otr_canonical.json` renders production with.
+#: The fix would have shipped green and left production broken.
+#:
+#: still_word is the one member that genuinely owes no identity: its
+#: ``scene_character`` row inherits face framing from the shared plan, but the
+#: lane actually mints TYPOGRAPHY from the spoken line
+#: (`otr_meta_brief_image_prompt.compose_still_word_prompt`), so the inherited
+#: face framing was always a misdeclaration. Declaring ``identity="none"`` here
+#: states the truth that row never told.
+_STILL_WORD_STILL_PLAN = tuple(
+    row._replace(identity="none") if row.kind == "scene_character" else row
+    for row in _CHEAP_FAMILY_STILL_PLAN
+)
+
 
 class _CheapFamilyBase:
     """Shared shell for a cheap, no-heavy-engine video family. Render lifecycle
@@ -534,8 +556,9 @@ class StillWordFamily(_CheapFamilyBase):
     (``default_roles=()``)."""
     name = "still_word"
     family = "static_image_gen"
-    #: S1 per-model still plan (Shape A).
-    still_plan = _CHEAP_FAMILY_STILL_PLAN
+    #: S1 per-model still plan (Shape A) -- the WORD-CARD fork, not the shared
+    #: tuple. See _STILL_WORD_STILL_PLAN for why still_word alone differs.
+    still_plan = _STILL_WORD_STILL_PLAN
     roles = ("announcer_visual", "music_visual", "character_video")
     default_roles = ()              # selectable peer; never an auto-default
     required_inputs = ("text_prompt",)

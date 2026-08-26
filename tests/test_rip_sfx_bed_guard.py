@@ -24,6 +24,8 @@ import inspect
 import os
 import pathlib
 
+import pytest
+
 import nodes._otr_video_engines  # noqa: F401  -- populate the registry
 from nodes import otr_master_audio_mux as MUX
 from nodes import _otr_story_brief_helpers as BRIEF
@@ -32,6 +34,9 @@ from nodes._otr_shared.public_engines import (
     _LEGACY_ENGINE_ALIASES,
     _PUBLIC_ENGINES,
     RETIRED_ENGINE_IDS,
+    RetiredEngineError,
+    check_retired_engine,
+    resolve_engine_id,
 )
 from nodes._otr_video_engines import eng_cloud_video as ECV
 from nodes._otr_video_engines import render_driver as RD
@@ -42,8 +47,9 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 #: The retired engine ids, restated here INDEPENDENTLY of public_engines so a
 #: weakened RETIRED_ENGINE_IDS cannot weaken this guard. Five from the
 #: 2026-08-06 SFX-bed rip; five more from the 2026-08-23 dormant-3D retirement
-#: (lean-mean order 4). Growing this set is deliberate and append-only, exactly
-#: like the production set it mirrors.
+#: (lean-mean order 4); five from the 2026-08-23 Ghost narrowing; and the 14B
+#: `wan_i2v` lane from the 2026-08-26 large-Wan rip. Growing this set is
+#: deliberate and append-only, exactly like the production set it mirrors.
 _RETIRED_IDS = frozenset({
     # The Ghost narrowing, 2026-08-23 ("delete any animatediff that are not
     # haunted"). Listed here because this guard asserts the WHOLE retired set is
@@ -64,6 +70,12 @@ _RETIRED_IDS = frozenset({
     "trellis_talk",
     "triposr",
     "still_parallax",
+    # The 14B local Wan i2v lane, RETIRED 2026-08-26 (operator: "rip the large
+    # wan we don't need"). 19.82 GiB of weights against a 14.5 GiB target -- it
+    # only ever ran by offloading continuously. NOT the same lane as the 5B
+    # `wan_ti2v`, which is live and stays live; the ids are one letter apart and
+    # that is the whole hazard.
+    "wan_i2v",
 })
 
 #: Deleted symbols per module -- the CLOSED set. A symbol reappearing on its
@@ -122,14 +134,39 @@ def test_no_registered_engine_declares_wants_provider_sfx():
 
 
 def test_the_retired_ids_are_not_registered_or_aliased():
+    """No retired id is registered, and no name may LAUNDER one into a live
+    engine -- but a name may deliberately point AT one as a tombstone.
+
+    The property this guard actually protects is "a stale selection must never
+    silently work". Until 2026-08-26 that was enforced with a blunt rule: no
+    table value may be a retired id at all. The large-Wan rip made that rule
+    false on purpose. `wan22_high_i2v` and the legacy `wan21_high_i2v` KEEP
+    pointing at the retired `wan_i2v` so an old saved graph lands on the named
+    ``RetiredEngineError`` -- "this engine is retired" -- instead of falling
+    through to the generic "no engine named ..." message, which reads to a user
+    as a broken install rather than a retirement.
+
+    So the value side is checked for the real thing rather than for absence: a
+    row that resolves to a retired id must resolve to THAT id (never sideways
+    into a live engine) and must raise at the boundary. The key side is
+    unchanged and stays absolute -- a retired id may never be a table key,
+    because that is the shape that would map a retired selection away to
+    something that renders.
+    """
     assert RETIRED_ENGINE_IDS == _RETIRED_IDS
     live = set(vreg.all_engine_names()) | set(vreg.CAPABILITIES)
     assert not (live & _RETIRED_IDS), sorted(live & _RETIRED_IDS)
-    # never ALIASED either: no public menu id and no legacy alias may resolve
-    # to (or from) a retired id.
     for table in (_PUBLIC_ENGINES, _LEGACY_ENGINE_ALIASES):
+        # never a KEY: nothing may resolve a retired id away to a live engine.
         assert not (set(table) & _RETIRED_IDS), table
-        assert not (set(table.values()) & _RETIRED_IDS), table
+        # a row pointing AT a retired id is a tombstone, and must behave as one.
+        for name, internal in table.items():
+            if internal not in _RETIRED_IDS:
+                continue
+            assert resolve_engine_id(name) == internal, (name, internal)
+            assert resolve_engine_id(name + " (16:9)") == internal, name
+            with pytest.raises(RetiredEngineError):
+                check_retired_engine(resolve_engine_id(name))
 
 
 def test_the_sfx_engine_module_is_gone():

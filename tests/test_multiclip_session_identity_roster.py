@@ -194,7 +194,14 @@ def test_this_gate_is_not_vacuous():
         "live roster and CAPABILITIES disagree: only-live=%s only-declared=%s"
         % (sorted(set(names) - set(vreg.CAPABILITIES)),
            sorted(set(vreg.CAPABILITIES) - set(names))))
-    for anchor in ("humo", "ltx_video", "ltx_8gb", "wan_ti2v", "wan_i2v",
+    # `wan_i2v` (the Wan 2.2 14B) was an anchor here until it was retired
+    # 2026-08-26 for not fitting the 14.5 GiB envelope. Requiring it in the live
+    # roster now asserts a falsehood, so the row is REMOVED rather than pointed
+    # at `wan_ti2v` -- the 5B TI2V lane is a different model and already anchors
+    # itself on the line above. Nothing is orphaned: the retirement is asserted
+    # positively three lines down, where RETIRED_ENGINE_IDS must not intersect
+    # the live roster, which is the stronger of the two checks anyway.
+    for anchor in ("humo", "ltx_video", "ltx_8gb", "wan_ti2v",
                    "fastwan_8gb", "viz_green", "still_flat"):
         assert anchor in names, anchor
     from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
@@ -207,12 +214,18 @@ def test_this_gate_is_not_vacuous():
 
 
 def test_the_engines_that_forced_this_gate_are_still_covered_by_it():
-    """`ltx_video` is the engine that failed live; `ltx_8gb`, `humo`, `wan_i2v`
-    and `wan_ti2v` are four that already had an identity. If a contract change
+    """`ltx_video` is the engine that failed live; `ltx_8gb`, `humo` and
+    `wan_ti2v` are three that already had an identity. If a contract change
     ever drops one of them out of scope, this says so rather than letting the
-    gate quietly stop watching it."""
-    for name in ("ltx_video", "ltx_audio_in", "ltx_8gb", "humo",
-                 "wan_i2v", "wan_ti2v"):
+    gate quietly stop watching it.
+
+    `wan_i2v` was a fourth until the 14B was retired 2026-08-26. Its row is
+    dropped rather than retargeted -- `wan_ti2v` is a different model and is
+    already listed on its own account -- and it cost nothing to drop, because
+    the `continue` guard below had silently stopped billing the row the moment
+    the engine left the registry.
+    """
+    for name in ("ltx_video", "ltx_audio_in", "ltx_8gb", "humo", "wan_ti2v"):
         if name not in vreg.all_engine_names():
             continue
         assert name in IN_SCOPE, (
@@ -411,7 +424,14 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
     assert "word_razzle" in CLOUD_SPLITTERS, (
         "word_razzle is a CLOUD i2v engine that the 45-word campaign wrongly "
         "carried in its local roster; it belongs in this set")
-    for name in ("ltx_video", "ltx_audio_in", "humo", "wan_i2v"):
+    # This row guards the SUBSTRING hazard: `cloud_wan_i2v` is a legitimate
+    # member of the gap above, and a local Wan lane sharing most of that name
+    # must never be swept in with it. The local lane named here was `wan_i2v`
+    # until the 14B was retired 2026-08-26; `wan_ti2v` takes its place because
+    # the hazard is unchanged and the property was checked rather than assumed
+    # -- the 5B declares `sidecar_optional` isolation, so `_holds_local_handles`
+    # answers True for it and it lands in IN_SCOPE, never in CLOUD_SPLITTERS.
+    for name in ("ltx_video", "ltx_audio_in", "humo", "wan_ti2v"):
         assert name not in CLOUD_SPLITTERS, (
             "%s holds local handles and must never appear in the cloud gap"
             % name)

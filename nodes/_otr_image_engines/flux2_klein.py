@@ -122,7 +122,7 @@ style_token_position: **APPEND, and it is now evidence-backed rather than
 drafted.** BFL documents front-to-back token weighting with priority
 subject > action > style > context, and style-first demonstrably makes style
 dominate while the subject drifts. That is the same mechanism recorded on
-``eng_wan_i2v.PROMPT_STYLE_NOTES`` (Wan's subject-first training) and the same
+``eng_wan_ti2v.PROMPT_STYLE_NOTES`` (Wan's subject-first training) and the same
 reason the LTX camera-first guidance was rejected there -- three engines now, one
 mechanism. Keep the A/B anyway, per the gate.
 

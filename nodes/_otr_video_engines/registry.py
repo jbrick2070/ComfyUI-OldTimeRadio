@@ -414,12 +414,6 @@ CAPABILITIES = {
     # placeholder that exists on no box -- it is now the installed artifact,
     # eng_wan_i2v._I2V_DEFAULT_UNET, under diffusion_models. The public menu id
     # states 2.2 for the same reason this row does.
-    "wan_i2v": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["wan2.2-i2v"]},
     # S2 (GO_FORWARD 4A): the 8GB-tier Wan2.2 TI2V-5B sibling. model_requirements
     # is the real 5B asset id. Apache-2.0 (commercial-clean); built 2026-06-14
     # after the live /object_info node-class capture (the registry-consistency

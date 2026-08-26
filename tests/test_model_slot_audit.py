@@ -152,14 +152,6 @@ def test_requested_local_smoke_candidate_contracts_are_inspected(monkeypatch):
     assert dia.missing_ref_fallback is None
     assert dia.sample_rate == 44100
 
-    wan_i2v = video_registry.get_engine("wan_i2v")
-    assert wan_i2v.family == "image_to_video"
-    assert wan_i2v.required_inputs == ("init_image",)
-    assert wan_i2v.default_roles == ()
-    assert wan_i2v._node_candidates()["wan"] == ("WanImageToVideo",)
-    assert wan_i2v._loader_names()["clip"] == "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-    assert wan_i2v._loader_names()["vae"] == "wan_2.1_vae.safetensors"
-
     for env in ("OTR_WAN_TI2V_SAMPLER", "OTR_WAN_TI2V_SCHEDULER"):
         monkeypatch.delenv(env, raising=False)
     wan_ti2v = video_registry.get_engine("wan_ti2v")

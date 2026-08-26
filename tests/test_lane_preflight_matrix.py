@@ -72,7 +72,7 @@ SAGE_SENSITIVE = frozenset({
 #: Method names that resolve a lane's PRIMARY weight. G1 reads these, not the
 #: whole module: a module can mention `folder_paths` in an unrelated helper
 #: while its checkpoint resolver is still a bare hardcoded path -- which is
-#: exactly how wan_i2v shipped dead (lesson L1).
+#: exactly how wan_ti2v shipped dead (lesson L1).
 WEIGHT_RESOLVER_METHODS = (
     "_installed", "_ckpt_path", "_weight_paths", "_unet_path",
     "_primary_weight_path", "_model_paths",
@@ -174,12 +174,12 @@ for _lane in _STILL_LANES + _PROCEDURAL_LANES:
 # then, the suite fails and says so.
 # ---------------------------------------------------------------------------
 EXPECTED_RED: dict = {
-    # LANE 1 CLOSED 2026-08-11 -- wan_i2v's G1 and G2 rows left this table when
+    # LANE 1 CLOSED 2026-08-11 -- wan_ti2v's G1 and G2 rows left this table when
     # the lane went green. The defects were: a hardcoded
     # models/checkpoints/wan2.2-i2v.safetensors default with a bare
     # os.path.exists that never consulted folder_paths (S8b-1 / lesson L1), and
     # an undeclared render_canvas that let the lane fall through to 1472x832
-    # (S1 / lesson L2). Both are now pinned by tests/test_wan_i2v.py.
+    # (S1 / lesson L2). Both are now pinned by tests/test_wan_ti2v.py.
     # LANE 2 CLOSED 2026-08-11 -- humo_14B_169's G2 row left this table. The
     # defect was S8b-4: the request was rewritten to 1472x832 while the graph
     # rendered 832x480 (3.07x), and OTR_HUMO_WIDTH/HEIGHT could move it again,
@@ -225,7 +225,7 @@ EXPECTED_RED: dict = {
     # the render died mid-beat after the checkpoint was paid for -- there is now
     # a node gate in `assert_usable`, ordered before weight resolution, reading
     # the ACTIVE candidate set and collecting every miss. And lesson L1, the
-    # wan_i2v killer: `_ckpt_path` walked a hardcoded models/checkpoints plus an
+    # wan_ti2v killer: `_ckpt_path` walked a hardcoded models/checkpoints plus an
     # HF_HOME sibling and never consulted `folder_paths`, so a checkpoint
     # registered through extra_model_paths.yaml was invisible on the runtime and
     # one installed under this box's real models root was invisible off it. It
@@ -477,7 +477,7 @@ def gate_g1_weights(name, eng):
               + _defining_module_source(eng, "_weight_paths")):
         bad.append(
             "its weight resolver never reaches folder_paths: it resolves a "
-            "hardcoded default directly, which is the wan_i2v killer "
+            "hardcoded default directly, which is the wan_ti2v killer "
             "(lesson L1)")
     au = _method_source(eng, "assert_usable")
     if not au.strip():
@@ -1311,9 +1311,16 @@ def test_legacy_aliases_resolve_and_never_appear_in_the_menu():
     for legacy, internal in pub._LEGACY_ENGINE_ALIASES.items():
         assert pub.resolve_engine_id(legacy) == internal, (
             "legacy alias %r does not resolve to %r" % (legacy, internal))
-        assert internal in live, (
-            "legacy alias %r points at %r, which is not registered"
-            % (legacy, internal))
+        # A legacy alias may point at a REGISTERED engine, or -- since the
+        # retirement mechanism shipped -- at a RETIRED one. The second case is
+        # deliberate and is the whole reason the alias rows survive a rip: they
+        # are what routes an old saved graph INTO the named retirement refusal
+        # instead of the generic "no engine named ..." message, which reads as a
+        # broken install rather than a decision. wan21_high_i2v/wan22_high_i2v
+        # became the first such pair when wan_i2v was retired 2026-08-26.
+        assert internal in live or internal in pub.RETIRED_ENGINE_IDS, (
+            "legacy alias %r points at %r, which is neither registered nor "
+            "retired -- it resolves to nothing at all" % (legacy, internal))
         assert legacy not in menu, (
             "legacy alias %r appears as a live menu option" % (legacy,))
 

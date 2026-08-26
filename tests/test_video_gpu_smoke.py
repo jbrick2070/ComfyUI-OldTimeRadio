@@ -26,8 +26,11 @@ def _load():
 
 
 SMK = _load()
-_FLAGS = ["OTR_ENABLE_HUMO", "OTR_ENABLE_LTX_VIDEO",
-          "OTR_ENABLE_WAN_I2V"]
+#: The opt-in flags the probe's engines still read. OTR_ENABLE_WAN_I2V left this
+#: list with the Wan 2.2 14B I2V retirement (2026-08-26) -- the flag now gates
+#: nothing, so clearing it proved nothing. The remaining two are the probe's
+#: whole ENGINES table, which is what the sweeps below walk.
+_FLAGS = ["OTR_ENABLE_HUMO", "OTR_ENABLE_LTX_VIDEO"]
 
 
 @pytest.fixture(autouse=True)
@@ -65,15 +68,35 @@ def test_assert_usable_advances_to_missing_model_with_flag_on(monkeypatch):
 # --------------------------------------------------------------------------- #
 # NO FALLBACKS (2026-07-02): no chain check, no restamp demo -- for ANY engine
 # --------------------------------------------------------------------------- #
+#: The probe's in-process engines, which is exactly ``SMK.ENGINES``. The third
+#: member was `wan_i2v` (Wan 2.2 14B I2V) until its retirement on 2026-08-26;
+#: the probe row went with the adapter, so a sweep still naming it would only be
+#: proving a KeyError. NOT replaced by `wan_ti2v` -- the 5B TI2V was never in
+#: this probe's table and giving it a row here would assert readiness metadata
+#: (install hint, Sage verdict) nobody wrote for it.
+_PROBE_ENGINES = ("humo", "ltx_video")
+
+
+def test_the_probe_table_is_exactly_the_engines_these_sweeps_walk():
+    """The tripwire under the two sweeps below.
+
+    They iterate a LITERAL tuple, so an engine added to (or dropped from) the
+    probe would silently go unswept while both sweeps stayed green -- which is
+    how a hand-kept list rots. Comparing against the probe's own table makes
+    that a named failure here instead.
+    """
+    assert sorted(SMK.ENGINES) == sorted(_PROBE_ENGINES)
+
+
 def test_no_fallback_chain_check_or_demo_for_any_engine():
-    for engine in ("humo", "ltx_video", "wan_i2v"):
+    for engine in _PROBE_ENGINES:
         r = SMK.run_smoke(engine)
         assert [c for c in r["checks"] if c["name"] == "fallback_chain"] == []
         assert "fallback_demo" not in r
 
 
 def test_request_build_runs_for_each_engine():
-    for engine in ("humo", "ltx_video", "wan_i2v"):
+    for engine in _PROBE_ENGINES:
         r = SMK.run_smoke(engine)
         assert _check(r, "request_build")["ok"] is True
 
@@ -111,7 +134,12 @@ def test_main_json_mode_runs_all(capsys):
     rc = SMK.main(["--engine", "all", "--json"])
     out = capsys.readouterr().out
     assert rc == 1                                 # nothing installed on this box
-    assert '"engine": "humo"' in out and '"engine": "wan_i2v"' in out
+    # `--engine all` must emit EVERY row of the probe table, not just the first.
+    # The second name here was `wan_i2v` until the 14B retired (2026-08-26);
+    # `ltx_video` is the other surviving in-process row, so the "more than one
+    # report" property this line exists to hold is unchanged.
+    for engine in _PROBE_ENGINES:
+        assert '"engine": "%s"' % engine in out
 
 
 def test_smoke_source_is_ascii_no_em_dash():

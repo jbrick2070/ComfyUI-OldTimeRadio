@@ -101,7 +101,7 @@ this one did not, because FastWan is a DMD-distilled LoRA over the same Wan 2.2
 TI2V-5B base as ``wan_ti2v`` and there is no separate published prompting guidance
 for the distillation. What carries over, and what does not:
   * CARRIES OVER: the subject-first MECHANISM recorded on
-    ``eng_wan_i2v.PROMPT_STYLE_NOTES`` -- Wan 2.2 captions were subject-first in
+    ``eng_wan_ti2v.PROMPT_STYLE_NOTES`` -- Wan 2.2 captions were subject-first in
     training and the weights favour early tokens. Same base weights, so the same
     mechanism applies, and the directive's "Name the subject, then..." rests on it.
   * DOES NOT CARRY OVER: everything about the guidance regime. Published Wan

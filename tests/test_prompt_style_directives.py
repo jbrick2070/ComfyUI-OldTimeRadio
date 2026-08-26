@@ -45,7 +45,10 @@ _OWNERS = {
     "lumina_image": "nodes/_otr_image_engines/lumina_image.py",
     "ltx_video": "nodes/_otr_video_engines/eng_ltx_video.py",
     "ltx_av": "nodes/_otr_video_engines/eng_ltx_av.py",
-    "wan_i2v": "nodes/_otr_video_engines/eng_wan_i2v.py",
+    # `wan_i2v` left this map when the local 14B was retired (2026-08-26). Its
+    # directive was never shared -- `eng_wan_ti2v` carries its own, written
+    # against Wan 2.2's subject-first captions, so the 5B row below is the whole
+    # Wan family now and nothing was orphaned by the removal.
     "wan_ti2v": "nodes/_otr_video_engines/eng_wan_ti2v.py",
     "fastwan_8gb": "nodes/_otr_video_engines/eng_fastwan_8gb.py",
     "humo": "nodes/_otr_video_engines/eng_humo.py",
@@ -371,16 +374,22 @@ def test_the_owner_map_still_points_at_real_files():
     NOT gated and sits live in the menu), `hidream_i1` and `sd35_large` (both
     default-OFF opt-ins). **The operator closed that scope call on 2026-08-17 and
     supplied all three directives himself**, drafted from public docs and then
-    validated in a v2 pass, so the map is now THIRTEEN. His three are stored
+    validated in a v2 pass, taking the map to THIRTEEN. His three are stored
     verbatim; the original ten remain driver-derived. Neither set is measured.
+
+    **TWELVE since 2026-08-26**, when the local Wan 14B (`wan_i2v`) was retired
+    on the operator's call -- it does not fit this card's 14.5 GiB envelope and
+    `wan_ti2v` (the 5B) covers the lane. Its directive was its own, not shared
+    with the 5B, so removing the row orphaned nothing.
     """
     for slug, rel_path in sorted(_OWNERS.items()):
         assert (_REPO / rel_path).is_file(), (
             "%s: %s no longer exists -- the overlay moved or the engine was "
             "renamed, and this map is now lying" % (slug, rel_path))
-    assert len(_OWNERS) == 13, (
-        "this map has %d. It was TEN (the RESEARCH doc's blocks) until the "
-        "operator's 2026-08-17 scope call added flux2_klein, hidream_i1 and "
-        "sd35_large. Adding or removing one is a deliberate act, so update this "
+    assert len(_OWNERS) == 12, (
+        "this map has %d. It was TEN (the RESEARCH doc's blocks), then THIRTEEN "
+        "after the operator's 2026-08-17 scope call added flux2_klein, "
+        "hidream_i1 and sd35_large, then TWELVE when wan_i2v was retired on "
+        "2026-08-26. Adding or removing one is a deliberate act, so update this "
         "count in the same commit -- this assertion firing is the guard working, "
         "not a bug." % len(_OWNERS))

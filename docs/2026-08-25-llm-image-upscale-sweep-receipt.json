@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-08-25T22:24:17.570564",
+  "bank": "scifi_news_pro",
+  "visual_style": "sci_fi_radio",
+  "legs_run": 7,
+  "legs_total": 7,
+  "pass": 7,
+  "fail": 0,
+  "results": [
+    {
+      "leg": 1,
+      "leg_label": "LLMSWEEP01 c=mistralai/Mistral-Nemo-Instruct-2407 t=google/gemma-4-E2B-it upscale=off",
+      "profile": "otr_soak_llmsweep_01",
+      "creative_model": "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
+      "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
+      "stills": {
+        "announcer": "still_flat",
+        "music": "still_motion",
+        "character": "still_pan"
+      },
+      "images": {
+        "announcer": "z_image_turbo",
+        "music": "flux_gen1",
+        "character": "flux2_klein"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 2,
+      "leg_label": "LLMSWEEP02 c=google/gemma-4-E2B-it t=google/gemma-4-E4B-it upscale=off",
+      "profile": "otr_soak_llmsweep_02",
+      "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
+      "technical_model": "google/gemma-4-E4B-it (4.5 GB)",
+      "stills": {
+        "announcer": "still_word",
+        "music": "still_flat",
+        "character": "still_motion"
+      },
+      "images": {
+        "announcer": "lumina_image",
+        "music": "ideogram4_local",
+        "character": "z_image_turbo"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 3,
+      "leg_label": "LLMSWEEP03 c=google/gemma-4-E4B-it t=google/gemma-4-12b-it upscale=off",
+      "profile": "otr_soak_llmsweep_03",
+      "creative_model": "google/gemma-4-E4B-it (4.5 GB)",
+      "technical_model": "google/gemma-4-12b-it (11.9 GB)",
+      "stills": {
+        "announcer": "still_pan",
+        "music": "still_word",
+        "character": "still_flat"
+      },
+      "images": {
+        "announcer": "flux_gen1",
+        "music": "flux2_klein",
+        "character": "lumina_image"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 4,
+      "leg_label": "LLMSWEEP04 c=google/gemma-4-12b-it t=unsloth/gemma-4-12b-it-GGUF upscale=off",
+      "profile": "otr_soak_llmsweep_04",
+      "creative_model": "google/gemma-4-12b-it (11.9 GB)",
+      "technical_model": "unsloth/gemma-4-12b-it-GGUF (17.4 GB)",
+      "stills": {
+        "announcer": "still_motion",
+        "music": "still_pan",
+        "character": "still_word"
+      },
+      "images": {
+        "announcer": "ideogram4_local",
+        "music": "z_image_turbo",
+        "character": "flux_gen1"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 5,
+      "leg_label": "LLMSWEEP05 c=unsloth/gemma-4-12b-it-GGUF t=unsloth/Qwen3-8B-GGUF upscale=off",
+      "profile": "otr_soak_llmsweep_05",
+      "creative_model": "unsloth/gemma-4-12b-it-GGUF (17.4 GB)",
+      "technical_model": "unsloth/Qwen3-8B-GGUF (10.3 GB)",
+      "stills": {
+        "announcer": "still_flat",
+        "music": "still_motion",
+        "character": "still_pan"
+      },
+      "images": {
+        "announcer": "flux2_klein",
+        "music": "lumina_image",
+        "character": "ideogram4_local"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 6,
+      "leg_label": "LLMSWEEP06 c=unsloth/Qwen3-8B-GGUF t=google/gemma-2-2b-it upscale=off",
+      "profile": "otr_soak_llmsweep_06",
+      "creative_model": "unsloth/Qwen3-8B-GGUF (10.3 GB)",
+      "technical_model": "google/gemma-2-2b-it (2.6 GB)",
+      "stills": {
+        "announcer": "still_word",
+        "music": "still_flat",
+        "character": "still_motion"
+      },
+      "images": {
+        "announcer": "z_image_turbo",
+        "music": "flux_gen1",
+        "character": "flux2_klein"
+      },
+      "upscale_engine": "off",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    },
+    {
+      "leg": 7,
+      "leg_label": "LLMSWEEP07 c=google/gemma-2-2b-it t=mistralai/Mistral-Nemo-Instruct-2407 upscale=spandrel_esrgan",
+      "profile": "otr_soak_llmsweep_07",
+      "creative_model": "google/gemma-2-2b-it (2.6 GB)",
+      "technical_model": "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
+      "stills": {
+        "announcer": "still_pan",
+        "music": "still_word",
+        "character": "still_flat"
+      },
+      "images": {
+        "announcer": "lumina_image",
+        "music": "ideogram4_local",
+        "character": "z_image_turbo"
+      },
+      "upscale_engine": "spandrel_esrgan",
+      "ok": true,
+      "rc": 0,
+      "minutes": 0.1,
+      "stdout_tail": ""
+    }
+  ]
+}

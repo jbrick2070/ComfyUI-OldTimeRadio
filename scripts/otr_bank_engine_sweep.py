@@ -105,6 +105,8 @@ PROFILES = ("otr_soak_llmsweep_01", "otr_soak_llmsweep_02")
 #:   * ltx_audio_in -- wants OTR_HEADLESS_DISABLE_PINNED=1 (no reserve); it
 #:     cleared the 14.5 GiB gate by ~35 MB on a stock boot, which is why it
 #:     keeps the diet
+#: wan_i2v was RETIRED 2026-08-26 (19.82 GiB of weights vs a 14.5 GiB
+#: target); the lane type survives on-card as wan_ti2v.
 #:   * minimax_h3_video / minimax_h3_audio_in -- the only lanes the ENGINE
 #:     itself refuses to share a boot with: `compatible_boot_contracts = ("h3",)`
 #: Cloud lanes (word_razzle, cloud_*, google_*) are excluded outright: the
@@ -117,7 +119,6 @@ VIDEO_LANES = (
     ("otr_ghost_signal_v3_haunted", "animatediff15_v3_haunted_video"),
     ("otr_w45_ltx_video", "ltx_video"),
     ("otr_ltx25_high_video", "ltx25_video"),
-    ("otr_w45_wan_i2v", "wan_i2v"),
 )
 
 #: SECONDS. Inherited from otr_llm_image_upscale_sweep.py, which raised it to

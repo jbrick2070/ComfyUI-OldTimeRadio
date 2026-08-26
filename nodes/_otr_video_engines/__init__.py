@@ -57,12 +57,14 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# M2 / A-S5: register the in-process motion engines -- ltx_video (text->video)
-# and wan_i2v (image->video). Both are DEFAULT-OFF / dark (empty default_roles +
-# gated behind OTR_ENABLE_LTX_VIDEO / OTR_ENABLE_WAN_I2V) so they show in the
-# static per-role dropdown (V-6) but are never a default and fail closed until
-# the operator enables them AND the wrapper + checkpoints are installed/verified
-# on the GPU box. Cold-import clean (lazy LTX/Wan wrapper + torch inside
+# M2 / A-S5: register the in-process motion engine ltx_video (text->video).
+# This block registered TWO engines until 2026-08-26 -- wan_i2v (image->video)
+# was the other, and its retirement note is below. ltx_video is DEFAULT-OFF /
+# dark (empty default_roles + gated behind OTR_ENABLE_LTX_VIDEO) so it shows in
+# the static per-role dropdown (V-6) but is never a default and fails closed
+# until the operator enables it AND the wrapper + checkpoints are
+# installed/verified on the GPU box. Cold-import clean (lazy LTX wrapper +
+# torch inside
 # load/render_clip, never here), so this import pulls in nothing heavy (invariant
 # V-12, the cold-import test). Guarded so a packaging quirk never breaks the
 # namespace import.
@@ -71,10 +73,11 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-try:  # pragma: no cover - trivial guard
-    from . import eng_wan_i2v as _eng_wan_i2v  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
+# wan_i2v RETIRED 2026-08-26 -- 19.82 GiB of weights against a 14.5 GiB
+# target; it only ran by offloading (120 min TIMEOUT vs 48.5 for the 5B
+# wan_ti2v that replaces it). Tombstoned in
+# _otr_shared/public_engines.RETIRED_ENGINE_IDS so a saved graph naming it
+# gets a NAMED retirement refusal, not "no such engine".
 
 # GO_FORWARD 4A (2026-06-14): register the Wan2.2 TI2V-5B 8GB-tier engine. Like
 # wan_i2v it is DEFAULT-OFF / dark (empty default_roles + gated behind

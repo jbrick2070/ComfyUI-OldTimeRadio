@@ -554,7 +554,7 @@ _ISOLATION_CLEAN_CONFIGS = (
 #: rather than only under a specific engine. Chosen over the full 31 to
 #: keep wall-clock inside a normal test budget; the invariant is universal
 #: so a small representative sample is diagnostic.
-_ISOLATION_MUTATION_ENGINES = ("wan_i2v", "mesh_stage", "viz_camera")
+_ISOLATION_MUTATION_ENGINES = ("wan_ti2v", "mesh_stage", "viz_camera")
 
 
 def _cfg_env_by_label(label):
@@ -647,7 +647,7 @@ def test_mixed_engine_policy_per_role_isolation():
     the fixture. Concretely: with
     ``announcer_video_model=cloud_kling_avatar``,
     ``music_video_model=google_veo_video``,
-    ``character_video_model=wan_i2v`` under the default env, the
+    ``character_video_model=wan_ti2v`` under the default env, the
     ``render_decisions[role]`` and ``materialized.effective_engine[role]``
     for each role MUST match those roles' single-engine baselines from
     the fixture's ``default`` configuration.
@@ -666,11 +666,11 @@ def test_mixed_engine_policy_per_role_isolation():
     #  - cloud_kling_avatar   (audio-driven-face, PARTNER side -> not
     #                          eligible for the local radio-host redirect)
     #  - google_veo_video     (partner text-to-video)
-    #  - wan_i2v              (local image-to-video, not a HuMo family)
+    #  - wan_ti2v             (local image-to-video, not a HuMo family)
     role_engine = {
         "announcer_visual": "cloud_kling_avatar",
         "music_visual":     "google_veo_video",
-        "character_video":  "wan_i2v",
+        "character_video":  "wan_ti2v",
     }
     vm = {
         _role_slots.ROLE_TO_VIDEO_SLOT[role]:

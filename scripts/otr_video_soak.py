@@ -50,7 +50,12 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
-    ("character_video", "wan_i2v", "image_to_video"),
+    # The image_to_video seat -- `wan_i2v` until the 14B was retired on
+    # 2026-08-26, `wan_ti2v` (the 5B) after. KEEP THIS TUPLE IDENTICAL to
+    # `render_driver._PROFILES`: the GPU soak must walk the same shape the CPU
+    # harness proves, so a row removed from one and not the other is a silent
+    # divergence.
+    ("character_video", "wan_ti2v", "image_to_video"),
     ("character_video", "still_motion", "static_motion"),
     ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),

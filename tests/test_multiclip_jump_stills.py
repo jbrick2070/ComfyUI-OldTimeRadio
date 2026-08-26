@@ -41,7 +41,20 @@ CHAIN_CONTRACT = fc.FrameContract(
     continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
 
-def _use_contract(monkeypatch, contract, engine_id="wan_i2v"):
+#: The carrier lane for these fixtures. It is a STAND-IN, not a subject: every
+#: test below overrides its frame contract outright, so the only properties
+#: actually leaned on are that the id is registered and that its lane consumes
+#: a scene still (`_lane_consumes_a_still` -> True, via a required `init_image`).
+#: This was `wan_i2v` -- the Wan 2.2 14B -- until that engine was retired
+#: 2026-08-26 for not fitting the 14.5 GiB envelope. `wan_ti2v` (the 5B TI2V
+#: lane) inherits the seat because it was verified to hold BOTH of those
+#: properties, not because the names look alike: it is a different model with
+#: different loaders and a different frame floor, and none of that reaches these
+#: tests because the contract is monkeypatched over it either way.
+CARRIER_ENGINE = "wan_ti2v"
+
+
+def _use_contract(monkeypatch, contract, engine_id=CARRIER_ENGINE):
     engine = vreg.get_engine(engine_id)
     monkeypatch.setattr(engine, "frame_contract", lambda: contract,
                         raising=False)
@@ -58,7 +71,7 @@ def _budget(beats, frames=50):
             "warnings": []}
 
 
-def _policy(engine="wan_i2v"):
+def _policy(engine=CARRIER_ENGINE):
     return {
         "policy_version": 2,
         "video_models": {
@@ -89,7 +102,7 @@ def test_a_jump_owes_one_still_per_segment_after_the_first():
     plan = cp.partition_beat(99, JUMP_CONTRACT)
     assert plan.join_mode == cp.JOIN_JUMP and plan.segment_count == 3
     rows = cp.jump_still_requests(plan, "b001", role="character_video",
-                                  engine_id="wan_i2v", char_id="c1")
+                                  engine_id=CARRIER_ENGINE, char_id="c1")
     # Segment 0 uses the beat's OWN still, which already exists and is already
     # validated -- minting a second one for it would orphan the first.
     assert [row["segment_index"] for row in rows] == [1, 2]
@@ -97,7 +110,7 @@ def test_a_jump_owes_one_still_per_segment_after_the_first():
                                                   "jumpstill_b001_s2"]
     assert all(row["kind"] == cp.JUMP_STILL_KIND for row in rows)
     assert all(row["beat_id"] == "b001" for row in rows)
-    assert all(row["engine_id"] == "wan_i2v" for row in rows)
+    assert all(row["engine_id"] == CARRIER_ENGINE for row in rows)
     assert all(row["char_id"] == "c1" for row in rows)
 
 
@@ -144,16 +157,51 @@ def test_a_chained_beat_gets_no_stamp_at_all(monkeypatch):
 
 
 def test_chunk_4_is_behaviour_inert_today():
-    """Every adapter is still single_only, so no beat owes a segment still.
+    """A beat that FITS its lane's cap owes no segment stills.
 
-    If this fails, an adapter opted in to multi-clip without its own live
-    proof -- exactly what the per-adapter declaration exists to prevent, and it
-    must surface here rather than on a render.
+    THE STATED REASON HERE WAS STALE AND HAD TO BE CORRECTED (2026-08-26).
+    It read "every adapter is still single_only", which was true when chunk 4
+    landed and false from chunk 7a onward -- that chunk gave all the adapters
+    real ladders and deleted the opt-in. What actually holds is narrower and is
+    what the fixture really exercises: `_budget` asks for 50 frames, which sits
+    inside the carrier lane's cap, so the partitioner returns ONE segment and a
+    single-clip beat owes nothing.
+
+    The correction was forced by the retirement, which retargeted this fixture
+    from the 14B onto the 5B. Both lanes plan a 50-frame beat to ONE segment
+    (max_frames=177, quantum 4, strict_first_frame on each), so the retarget
+    changed no behaviour here -- it is the same single-segment planning path.
+
+    THE STAMP-ABSENCE ASSERTION ALONE CANNOT CATCH A SPLIT, which is why the
+    segment_count assertion below it exists (added 2026-08-26 after an
+    adversarial review). `wan_ti2v` declares continuity=strict_first_frame, so a
+    split on this lane becomes a CHAIN, and a chained beat stamps no jump-still
+    requests at all -- that is exactly what
+    `test_a_chained_beat_gets_no_stamp_at_all` pins. Measured: narrowing the
+    carrier to max_frames=25 split this beat into THREE chained segments and the
+    stamp-absence assertion still returned True. So absence of the stamp proves
+    "no jump cut", never "no split"; only the plan itself proves that.
+
+    If this fails: either a beat inside its lane's cap was partitioned anyway
+    (segment_count), or a beat that owes no segment stills was stamped with them
+    (jump_still_requests).
+
+    ONE PROPERTY THE CARRIER HAS AND THE 14B DID NOT: `wan_ti2v` is in
+    `frame_contract.PLANNING_CAP_ENGINES`, so its effective contract is
+    narrowable by `policy["max_render_frames"]`. These fixtures deliberately
+    leave that key unset, which is why declared == effective here.
     """
     beats = _beats(n=3)
     _groups, shots = sl.build_execution_plan(beats, _budget(beats), {},
                                              _policy())
     assert all("jump_still_requests" not in shot for shot in shots)
+    plan = cp.CoveragePlan.from_dict(shots[0]["coverage_plan"])
+    assert not plan.is_multi_clip and plan.segment_count == 1, (
+        "a 50-frame beat sits inside the carrier's %d-frame cap and must plan "
+        "ONE segment; got %d. The stamp-absence assertion above cannot see "
+        "this -- a chained split stamps nothing either."
+        % (vreg.get_engine(CARRIER_ENGINE).frame_contract.max_frames,
+           plan.segment_count))
 
 
 # ---------------------------------------------------------------------------
@@ -176,13 +224,14 @@ def _targets(beat="b001", role="character_video", kind="scene_beat"):
 def _requests(beat="b001", segments=(1,), role="character_video"):
     return [{"object_id": cp.jump_still_object_id(beat, index),
              "kind": cp.JUMP_STILL_KIND, "beat_id": beat,
-             "segment_index": index, "role": role, "engine_id": "wan_i2v"}
+             "segment_index": index, "role": role,
+             "engine_id": CARRIER_ENGINE}
             for index in segments]
 
 
 def _request_ledger(beat="b001", segments=(1,), role="character_video"):
     return {"video": {"shots": [{
-        "shot_id": "shot_%s" % beat, "role": role, "engine_id": "wan_i2v",
+        "shot_id": "shot_%s" % beat, "role": role, "engine_id": CARRIER_ENGINE,
         "source_line_ids": [beat],
         "jump_still_requests": _requests(beat, segments, role),
     }]}}

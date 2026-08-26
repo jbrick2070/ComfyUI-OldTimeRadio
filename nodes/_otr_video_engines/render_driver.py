@@ -68,7 +68,10 @@ ENGINE_FAMILY = {
     "still_motion": "static_motion",
     # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out) -- removed here too.
     "ltx_video": "text_to_video",
-    "wan_i2v": "image_to_video", "mesh_stage": "image_to_video",
+    # wan_i2v RETIRED 2026-08-26 and removed HERE too: engine_family()
+    # consults this static map BEFORE the live registry, so a stale row
+    # keeps answering "image_to_video" forever with no error path at all.
+    "mesh_stage": "image_to_video",
     # "abstract" + "station_card" entries REMOVED 2026-06-30 (C0, engines retired);
     # the "abstract" FAMILY name survives (viz_green) + is the engine_family() default.
     "viz_green": "abstract", "still_pan": "static_image_gen",   # renamed from "visualizer" 2026-06-30, item 2
@@ -93,7 +96,15 @@ ENGINE_FAMILY = {
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
     ("music_visual", "ltx_video", "text_to_video"),
-    ("character_video", "wan_i2v", "image_to_video"),
+    # The image_to_video seat. It was `wan_i2v` until the 14B was retired on
+    # 2026-08-26; `wan_ti2v` (the 5B) takes it rather than the row being
+    # dropped, because dropping it would leave the soak walking NO
+    # image_to_video lane at all -- a live family with several engines
+    # (mesh_stage, ltx_8gb, fastwan_8gb, wan_ti2v, minimax_h3_video) would
+    # have gone unexercised, and the fixture exists precisely to walk one row
+    # per family. The 5B declares character_video and resolves to
+    # image_to_video, so the shape is preserved exactly.
+    ("character_video", "wan_ti2v", "image_to_video"),
     ("character_video", "still_motion", "static_motion"),
     ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),

@@ -18,9 +18,9 @@ different questions about the same state.
 * ``render_driver.jump_segment_still_path`` demanded one for EVERY segment >= 1
   regardless, and raised "NO FALLBACK" when it was missing.
 
-Result: an ordinary 8-second beat on any of the four chain-capable local
-engines, and every HuMo beat past its cap, died building the request for
-segment 1 -- after segment 0 had already rendered on the GPU.
+Result: an ordinary 8-second beat on any of the chain-capable local engines,
+and every HuMo beat past its cap, died building the request for segment 1 --
+after segment 0 had already rendered on the GPU.
 
 These tests use REAL registered engines and REAL declared ladders. No stubs, no
 monkeypatched contracts. That is the whole point: the stubs all passed.
@@ -56,7 +56,12 @@ def _shot_for(engine, frames, role="character_video"):
 # The chain lanes: a successor owns NO still and must not be asked for one
 # ---------------------------------------------------------------------------
 
-CHAIN_ENGINES = ["wan_i2v", "wan_ti2v", "ltx_8gb", "ltx_video"]
+#: The Wan 2.2 14B i2v lane (`wan_i2v`) was a fourth member until it was
+#: retired 2026-08-26 for not fitting the 14.5 GiB envelope. Its row is DROPPED
+#: rather than retargeted at `wan_ti2v`: the 5B TI2V lane is a different model
+#: with its own loaders and its own frame floor, and it was already carrying its
+#: own row here, so nothing this parametrization proved went unowned.
+CHAIN_ENGINES = ["wan_ti2v", "ltx_8gb", "ltx_video"]
 
 
 @pytest.mark.parametrize("engine", CHAIN_ENGINES)
