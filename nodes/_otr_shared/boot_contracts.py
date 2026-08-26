@@ -336,19 +336,77 @@ def compatible_contracts_for_engine(engine) -> tuple:
     return tuple(declared)
 
 
+def contract_from_running_server():
+    """The contract name this process was ACTUALLY booted for, or ``None``.
+
+    Matches the live ``comfy.cli_args`` state against the contract table on the
+    knobs a contract can pin. ``None`` in a contract means "does not constrain
+    that knob", so it matches anything -- only a stated value has to agree.
+    Returns ``None`` off a ComfyUI server, or when the observed state matches no
+    contract. Never raises.
+
+    ``DEFAULT`` is checked LAST. It constrains nothing, so it matches every
+    server and would shadow a real diet boot if it were tried first.
+    """
+    state = running_server_boot_state()
+    if not state.get("available"):
+        return None
+    for name in sorted(BOOT_CONTRACTS, key=lambda n: (n == DEFAULT, n)):
+        spec = BOOT_CONTRACTS[name]
+        if all(spec[k] is None or state.get(k) == spec[k]
+               for k in ("reserve_vram_gb", "disable_pinned_memory")):
+            return name
+    return None
+
+
 def check_engine_against_profile(engine, profile) -> list:
     """Every reason this engine may not run on this profile's boot, as
-    sentences. Empty = compatible. Pure: no server, no CUDA, no imports."""
+    sentences. Empty = compatible.
+
+    NOT pure any more, and only on the branch that would otherwise REFUSE
+    (2026-08-26). A production episode leg is submitted to an already-booted
+    server, and ``render_driver.build_episode_render_policy`` builds the profile
+    every adapter sees from the ledger's ``video`` section -- four keys, no
+    ``launch``. So on a real leg ``contract_for_profile`` ALWAYS answers
+    ``default``, whatever the profile JSON declared and however the server was
+    actually started.
+
+    That silently bricked every lane declaring a non-default contract: the
+    2026-08-26 soak booted MiniMax H3 correctly with ``--reserve-vram 12
+    --disable-pinned-memory`` and the adapter still rejected itself as
+    INCOMPATIBLE_PROFILE, 9.6 minutes in, having never reached H3 sampling. The
+    weights, the graph and the VRAM envelope were never the problem; the
+    contract identity was dropped in transport.
+
+    So when the profile names NO contract and the engine cannot run the default,
+    ask the SERVER what it was really started with before refusing. That is
+    strictly more truthful than trusting a dict that lost the answer -- it is
+    the same "applied, not written down" reasoning ``assert_running_server``
+    already applies one check later.
+
+    DELIBERATELY NARROW. The probe runs only when the profile is silent AND the
+    engine would otherwise be rejected, so a lane that already passes on
+    ``default`` keeps its exact behaviour and never gains a server dependency.
+    An engine on the wrong boot still refuses -- H3 on a stock server is still
+    INCOMPATIBLE, which is the guard doing its job.
+    """
     name = contract_for_profile(profile)
     if not known_contract(name):
         return ["profile selects unknown boot contract %r; known contracts are "
                 "%s" % (name, ", ".join(sorted(BOOT_CONTRACTS)))]
     allowed = compatible_contracts_for_engine(engine)
-    if name not in allowed:
-        return ["engine %r is proven on boot contract(s) %s, and this profile "
-                "selects %r" % (getattr(engine, "name", "?"),
-                                ", ".join(allowed), name)]
-    return []
+    if name in allowed:
+        return []
+    declared = ((profile or {}).get("launch") or {}).get("boot_contract")
+    if not declared:
+        observed = contract_from_running_server()
+        if observed in allowed:
+            return []
+        if observed and observed != name:
+            name = observed
+    return ["engine %r is proven on boot contract(s) %s, and this profile "
+            "selects %r" % (getattr(engine, "name", "?"),
+                            ", ".join(allowed), name)]
 
 
 __all__ = [

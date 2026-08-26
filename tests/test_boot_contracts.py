@@ -563,3 +563,103 @@ def test_a_lora_free_tier_is_not_credited_with_a_lora():
             "%s is expected to run LoRA-free; if that changed, this test is the "
             "wrong shape, not the engine" % tier)
         assert not engine._clip_telemetry(832, 480)["use_lora"]
+
+
+# --------------------------------------------------------------------------- #
+# PBUG: the boot contract was dropped in transport, so H3 refused ITSELF
+# --------------------------------------------------------------------------- #
+
+def _stripped_policy():
+    """Exactly what every adapter receives on a REAL episode leg."""
+    from nodes._otr_video_engines import render_driver as rd
+    return rd.build_episode_render_policy(
+        {"device_policy": "cuda", "dtype_policy": "fp8_ok"})
+
+
+def test_the_policy_every_adapter_receives_carries_no_boot_contract():
+    """THE TRANSPORT DEFECT ITSELF, pinned so the diagnosis cannot rot.
+
+    `build_episode_render_policy` returns four keys and no `launch`, so
+    `contract_for_profile` answers `default` on every production leg no matter
+    what the profile JSON declared or how the server was actually started. This
+    is the fact the fix below exists to work around; if it ever stops being
+    true -- because the contract starts riding the ledger the way
+    `max_render_frames` does -- the fallback becomes dead code and should go.
+    """
+    policy = _stripped_policy()
+    assert "launch" not in policy
+    assert bc.contract_for_profile(policy) == bc.DEFAULT
+
+
+def test_h3_stops_refusing_itself_when_the_server_really_is_booted_for_h3(monkeypatch):
+    """THE LIVE FAILURE, 2026-08-26. The soak booted MiniMax H3 correctly with
+    `--reserve-vram 12 --disable-pinned-memory`, and the adapter rejected itself
+    as INCOMPATIBLE_PROFILE 9.6 minutes in, having never reached H3 sampling.
+
+    The profile is silent (see the test above), so the check asks the SERVER
+    what it was really started with before refusing.
+    """
+    from nodes._otr_video_engines import registry as vreg
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": 12.0,
+        "disable_pinned_memory": True})
+    assert bc.contract_from_running_server() == bc.H3
+    h3 = vreg.get_engine("minimax_h3_video")
+    assert bc.check_engine_against_profile(h3, _stripped_policy()) == []
+
+
+def test_h3_still_refuses_on_a_stock_boot(monkeypatch):
+    """THE GUARD MUST STILL GUARD. Probing the server is not a licence to pass:
+    H3 on a server that was NOT booted for it is exactly the case the contract
+    exists to catch, and it must still refuse."""
+    from nodes._otr_video_engines import registry as vreg
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": None,
+        "disable_pinned_memory": False})
+    assert bc.contract_from_running_server() == bc.DEFAULT
+    h3 = vreg.get_engine("minimax_h3_video")
+    assert bc.check_engine_against_profile(h3, _stripped_policy()) != []
+
+
+def test_an_explicit_declaration_always_wins_over_the_probe(monkeypatch):
+    """A profile that NAMES a contract is answered from the profile, never from
+    the server. Otherwise a deliberate `default` pin would be silently upgraded
+    by whatever the box happened to be booted with."""
+    from nodes._otr_video_engines import registry as vreg
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": 12.0,
+        "disable_pinned_memory": True})
+    h3 = vreg.get_engine("minimax_h3_video")
+    assert bc.check_engine_against_profile(
+        h3, {"launch": {"boot_contract": "default"}}) != []
+
+
+def test_a_lane_that_already_passed_on_default_is_untouched(monkeypatch):
+    """THE BLAST-RADIUS FENCE. The probe runs ONLY when the engine would
+    otherwise be refused, so a lane compatible with `default` keeps its exact
+    behaviour and never gains a dependency on the server's boot flags -- even
+    when the box is booted for something else entirely."""
+    from nodes._otr_video_engines import registry as vreg
+    humo = vreg.get_engine("humo")
+    assert bc.check_engine_against_profile(humo, _stripped_policy()) == []
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": 12.0,
+        "disable_pinned_memory": True})
+    assert bc.check_engine_against_profile(humo, _stripped_policy()) == []
+
+
+def test_the_probe_is_silent_off_a_comfy_server():
+    """The CPU suite has no `comfy.cli_args`. The probe must answer None rather
+    than guessing, which is what keeps every other test in this file
+    deterministic."""
+    assert bc.contract_from_running_server() is None
+
+
+def test_default_never_shadows_a_real_diet_boot(monkeypatch):
+    """`default` constrains nothing, so it matches EVERY server. It is checked
+    last on purpose -- tried first it would claim an h3 or humo_diet boot as
+    `default` and the fix would silently do nothing."""
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True, "reserve_vram_gb": 2.921,
+        "disable_pinned_memory": True})
+    assert bc.contract_from_running_server() == bc.HUMO_DIET
