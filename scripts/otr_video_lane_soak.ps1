@@ -68,7 +68,7 @@ $BANKS = @(
 
 # Smallest model first inside each group, so a night that runs short still
 # covers the most distinct engines.
-$GROUPS = [ordered]@{
+$BOOT_GROUPS = [ordered]@{
     A = @{
         env    = @{}
         lanes  = @(
@@ -106,7 +106,14 @@ function Write-Receipt {
         fail             = @($script:Results | Where-Object { -not $_.ok }).Count
         results          = $script:Results
     }
-    $payload | ConvertTo-Json -Depth 6 | Out-File -FilePath $RECEIPT -Encoding utf8
+    # UTF-8 WITHOUT BOM, and it has to be written this way deliberately.
+    # `Out-File -Encoding utf8` on Windows PowerShell 5.1 emits a BOM, which
+    # makes the receipt unreadable by the very idiom its sibling receipts are
+    # read with: `json.load(open(p, encoding="utf-8"))` raises
+    # "Unexpected UTF-8 BOM (decode using utf-8-sig)". Verified against the
+    # first receipt this script wrote. Project rule is UTF-8, no BOM, always.
+    $json = $payload | ConvertTo-Json -Depth 6
+    [System.IO.File]::WriteAllText($RECEIPT, $json, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Stop-OtrServer {
@@ -208,12 +215,34 @@ function Wait-QueueIdle {
     return $false
 }
 
-$wanted = $Groups.Split(",") | ForEach-Object { $_.Trim().ToUpper() }
+$wanted = @($Groups -split "," | ForEach-Object { $_.Trim().ToUpper() } |
+            Where-Object { $_ })
 $legIndex = 0
 
-foreach ($gid in $GROUPS.Keys) {
+# A SWEEP THAT SELECTS NOTHING MUST NOT REPORT SUCCESS.
+#
+# This guard exists because the first run of this script did exactly that:
+# "[videosoak] DONE 0/0 passed", exit 0, GPU idle all night, and the log said
+# nothing was wrong. The cause was a PowerShell trap worth naming -- VARIABLE
+# NAMES ARE CASE-INSENSITIVE, so the boot-group table `$GROUPS` and the
+# `-Groups` parameter were ONE variable. The table overwrote the parameter,
+# `$Groups.Split(",")` then failed on an OrderedDictionary, `$wanted` came out
+# null, and `-notcontains` was therefore true for every group, skipping all of
+# them. The table is `$BOOT_GROUPS` now, but a rename alone would leave the
+# silent-no-op shape intact for the next mistake to fall into, so the run
+# refuses instead.
+$selected = @($BOOT_GROUPS.Keys | Where-Object { $wanted -contains $_ })
+if ($selected.Count -eq 0) {
+    Write-Host "[videosoak] REFUSING: -Groups '$Groups' selected no boot group."
+    Write-Host "[videosoak] known groups: $(($BOOT_GROUPS.Keys) -join ', ')"
+    Write-Host "[videosoak] parsed filter: '$($wanted -join "', '")'"
+    exit 2
+}
+Write-Host "[videosoak] groups selected: $($selected -join ', ') ($(($selected | ForEach-Object { $BOOT_GROUPS[$_].lanes.Count } | Measure-Object -Sum).Sum) lane(s) total)"
+
+foreach ($gid in $BOOT_GROUPS.Keys) {
     if ($wanted -notcontains $gid) { continue }
-    $g = $GROUPS[$gid]
+    $g = $BOOT_GROUPS[$gid]
     Write-Host "[videosoak] === BOOT GROUP $gid ($($g.lanes.Count) lane(s)) ==="
     Stop-OtrServer | Out-Null
     if (-not (Start-OtrServer -BootEnv $g.env -GroupId $gid)) {
@@ -238,13 +267,20 @@ foreach ($gid in $GROUPS.Keys) {
         Wait-QueueIdle | Out-Null
         $started = Get-Date
         $legLog = Join-Path $REPO ("tmp\otr_videosoak_leg{0:d2}.log" -f $legIndex)
-        & $VENV $RUNNER --act-count 1 --source-bank $slot.bank `
+        # `*> $legLog` writes UTF-16 on PowerShell 5.1, which makes every leg
+        # log un-greppable by ordinary tooling (a plain `grep RESULT` finds
+        # nothing on a leg that plainly succeeded) and breaks the project's
+        # UTF-8-no-BOM rule. Capture the streams and write them ourselves.
+        $legOut = & $VENV $RUNNER --act-count 1 --source-bank $slot.bank `
             --visual-style $slot.style --profile $lane `
             --creative-model $E2B --technical-model $E2B `
-            --timeout $TimeoutSeconds *> $legLog
+            --timeout $TimeoutSeconds 2>&1 | Out-String
         $rc = $LASTEXITCODE
+        [System.IO.File]::WriteAllText($legLog, $legOut, (New-Object System.Text.UTF8Encoding($false)))
         $elapsed = ((Get-Date) - $started).TotalMinutes
-        $ok = (Select-String -Path $legLog -Pattern "RESULT SUCCESS" -SimpleMatch -Quiet) -eq $true
+        # Judge the captured text, not a re-read of the file: one less place
+        # for an encoding round-trip to change the answer.
+        $ok = $legOut -match "RESULT SUCCESS"
         Write-Host ("[videosoak] leg {0} {1} {2:N1} min rc={3}" -f $legIndex, $(if ($ok) { "PASS" } else { "FAIL" }), $elapsed, $rc)
         $script:Results += [ordered]@{
             leg = $legIndex; group = $gid; profile = $lane
