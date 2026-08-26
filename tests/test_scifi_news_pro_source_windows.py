@@ -17,6 +17,34 @@ from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 from nodes import production_ledger as PL  # noqa: E402
 
 
+def _dossier_sections(payload: dict) -> str:
+    """Render a dossier payload as the LABELLED SECTIONS P0 now speaks.
+
+    The dossier seam stopped asking for JSON on 2026-08-25: a local 2-4B
+    technical model failed all three ladder rungs emitting an unclosed JSON
+    object, so the model now writes bullets and Python assembles the object
+    (nodes/_otr_scifi_news_pro.py::parse_dossier_sections). These fixtures
+    previously handed the runner `json.dumps(...)`, which the section parser
+    correctly finds no headers in -- so they stopped simulating anything the
+    production path accepts. Same payloads, current transport.
+    """
+    ents = payload.get("named_entities") or {}
+    blocks = [
+        ("FACTS", payload.get("facts_to_keep") or []),
+        ("NUMBERS", payload.get("allowed_numbers") or []),
+        ("PEOPLE", ents.get("people") or []),
+        ("PLACES", ents.get("places") or []),
+        ("THINGS", ents.get("things") or []),
+        ("VECTORS", payload.get("dramatizable_vectors") or []),
+    ]
+    out = []
+    for header, items in blocks:
+        out.append(f"{header}:")
+        out.extend(f"- {item}" for item in items)
+    return chr(10).join(out) + chr(10)
+
+
+
 PACK_PATH = (
     REPO_ROOT
     / "nodes"
@@ -394,7 +422,7 @@ def test_no_dossier_list_refuses_what_the_merge_would_have_trimmed(
 
 def test_blank_dossier_fact_opens_structural_repair_before_merge():
     responses = iter([
-        json.dumps({
+        _dossier_sections({
             "facts_to_keep": ["   "],
             "allowed_numbers": [],
             "named_entities": {
@@ -404,7 +432,7 @@ def test_blank_dossier_fact_opens_structural_repair_before_merge():
             },
             "dramatizable_vectors": [],
         }),
-        json.dumps({
+        _dossier_sections({
             "facts_to_keep": ["The source contains a complete signal."],
             "allowed_numbers": [],
             "named_entities": {
@@ -457,7 +485,7 @@ def _run_until_treatment(
         digest = user.split("SCIENCE STORY:\n", 1)[1]
         technical_digests.append(digest)
         is_tail = "TAIL_SENTINEL" in digest
-        return json.dumps({
+        return _dossier_sections({
             "facts_to_keep": [
                 "tail fact from final source window"
                 if is_tail
@@ -674,7 +702,7 @@ def test_runner_restamps_coverage_after_assembly_rebind(
     def technical_fn(messages, *, temperature, max_new_tokens):
         del temperature, max_new_tokens
         dossier_calls["count"] += 1
-        return json.dumps({
+        return _dossier_sections({
             "facts_to_keep": [f"fact {dossier_calls['count']}"],
             "allowed_numbers": [],
             "named_entities": {

@@ -679,6 +679,7 @@ def invoke_structured_slot(
     *,
     temperature: float,
     max_new_tokens: int | None,
+    force_json_object: bool = True,
 ) -> str:
     """Call the slot fn with the standard structured-pass signature.
 
@@ -693,8 +694,17 @@ def invoke_structured_slot(
     wiring change only -- the prompt, schema, and fail-closed ladder are
     unchanged, and the local path is byte-identical.
     """
+    # force_json_object=False is how a TEXT pass opts out (2026-08-25). A
+    # `gguf_native` or OpenRouter row carries `_otr_supports_json_object`, and
+    # on the GGUF backend that kwarg installs a real JSON grammar on the
+    # decode -- so a labelled-section prompt would be sampled under a
+    # constraint that forbids the very format it asks for. The transformers
+    # rows in tonight's failure never carried the marker, which is why the
+    # live bug is fixed either way; this closes the same hole for the model
+    # classes the fix was NOT tested against.
     if (
-        (
+        force_json_object
+        and (
             getattr(slot_fn, "_otr_supports_json_object", False)
             # Compat fallback: older/direct OpenRouter fns predate the
             # _otr_supports_json_object marker but still force json_object.
@@ -830,8 +840,24 @@ def _parse_and_validate(
     raw: str,
     schema: type[T],
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    text_parser: Optional[Callable[[str], Any]] = None,
 ) -> T:
-    """Parse and validate one structured response without rewriting prose."""
+    """Parse and validate one structured response without rewriting prose.
+
+    ``text_parser`` (2026-08-25) lets a caller supply its own raw-text ->
+    dict step in place of JSON extraction, for a pass whose reply is a
+    LABELLED-SECTION document rather than a JSON object. Everything after the
+    parse is unchanged -- the same schema, the same tolerant validation, the
+    same post_validator, the same ladder around it -- so a text pass keeps
+    every guarantee a JSON pass has EXCEPT the requirement that a small model
+    balance braces. Default ``None`` keeps every existing caller byte-identical.
+    """
+    if text_parser is not None:
+        return validate_tolerant_data(
+            text_parser(raw or ""),
+            schema,
+            post_validator=post_validator,
+        )
     return parse_validate_tolerant(
         raw,
         schema,
@@ -863,6 +889,7 @@ def structured_call(
     repair_ledger_builder: Optional[RepairLedgerBuilder] = None,
     repair_context_max_bytes: int = _DEFAULT_REPAIR_CONTEXT_MAX_BYTES,
     max_repair_attempts: int = _DEFAULT_MAX_REPAIR_ATTEMPTS,
+    text_parser: Optional[Callable[[str], Any]] = None,
 ) -> T:
     """Run a structured-JSON LLM call through the shared retry ladder.
 
@@ -1010,7 +1037,12 @@ def structured_call(
         else default_repair_prompt_factory
     )
 
-    contract_prompt = _prompt_with_schema_contract(prompt, schema)
+    # A text pass owns its own format instruction in the pack seam; injecting
+    # the JSON schema shape on top of it would tell the model to do BOTH and
+    # is exactly how a labelled-section reply turns back into broken JSON.
+    contract_prompt = (
+        prompt if text_parser is not None
+        else _prompt_with_schema_contract(prompt, schema))
     base_messages = _prompt_to_messages(contract_prompt)
     last_error: Optional[BaseException] = None
     last_raw: str = ""
@@ -1043,11 +1075,13 @@ def structured_call(
                 slot_fn, base_messages,
                 temperature=base_temperature,
                 max_new_tokens=max_new_tokens,
+                force_json_object=text_parser is None,
             )
             result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
+                text_parser,
             )
             notify_attempt(None)
             return result
@@ -1101,11 +1135,13 @@ def structured_call(
                 slot_fn, base_messages,
                 temperature=structural_retry_temperature,
                 max_new_tokens=max_new_tokens,
+                force_json_object=text_parser is None,
             )
             result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
+                text_parser,
             )
             notify_attempt(None)
             return result
@@ -1179,18 +1215,21 @@ def structured_call(
                 contract_prompt, repair_prompt,
             )
             repair_messages = _prompt_to_messages(
-                _prompt_with_schema_contract(repair_prompt, schema)
+                repair_prompt if text_parser is not None
+                else _prompt_with_schema_contract(repair_prompt, schema)
             )
             last_raw = ""
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,
                 temperature=_REPAIR_TEMPERATURE,
                 max_new_tokens=max_new_tokens,
+                force_json_object=text_parser is None,
             )
             result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
+                text_parser,
             )
             notify_attempt(None)
             return result
@@ -1245,11 +1284,13 @@ def structured_call(
                 slot_fn, repair_messages,
                 temperature=retry_temperature,
                 max_new_tokens=max_new_tokens,
+                force_json_object=text_parser is None,
             )
             result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
+                text_parser,
             )
             notify_attempt(None)
             return result
@@ -1292,7 +1333,8 @@ def structured_call(
             contract_prompt, repair_prompt,
         )
         repair_messages = _prompt_to_messages(
-            _prompt_with_schema_contract(repair_prompt, schema)
+            repair_prompt if text_parser is not None
+            else _prompt_with_schema_contract(repair_prompt, schema)
         )
         rendered_bytes = len(
             _prompt_to_text(repair_messages).encode("utf-8")
@@ -1316,11 +1358,13 @@ def structured_call(
                 repair_messages,
                 temperature=_REPAIR_TEMPERATURE,
                 max_new_tokens=max_new_tokens,
+                force_json_object=text_parser is None,
             )
             result = _parse_and_validate(
                 last_raw,
                 schema,
                 post_validator,
+                text_parser,
             )
             notify_attempt(None)
             return result

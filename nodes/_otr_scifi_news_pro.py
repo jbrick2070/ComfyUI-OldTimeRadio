@@ -1610,9 +1610,244 @@ def _extract_complete_source_dossier(
     )
 
 
+#: LABELLED-SECTION EXTRACTION (2026-08-25). Section header -> where its bullet
+#: items land in DossierLLM. A tuple means a nested bucket under named_entities.
+#:
+#: WHY THIS EXISTS. P0 used to ask a small local model to emit one nested JSON
+#: object. gemma-4-E2B-it failed ALL THREE ladder rungs on a live leg with the
+#: same error each time -- "no decodable top-level JSON object found" -- after
+#: stopping at 503 tokens of a 700-token budget, i.e. it believed it had
+#: finished while the object was still unclosed. Evidence:
+#: docs/2026-08-25-leg1-dossier-failure-evidence.md.
+#:
+#: WHY NOT GRAMMAR-CONSTRAINED DECODING, which was the obvious fix and was
+#: REJECTED at r1: under a grammar the legal minimum for DossierLLM is one fact
+#: plus three empty buckets, and `facts_to_keep` is never source-checked -- so a
+#: 2B model's highest-probability constrained completion sits near that floor.
+#: Grammar would have converted a LOUD failure into a SILENT hollow dossier.
+#: Syntax is not the same as usefulness.
+#:
+#: WHY LINES. Nesting is the thing a small model cannot hold; a flat bulleted
+#: list under a header is not. Python owns the assembly, so the model is never
+#: asked to balance a brace. Operator's own framing: "can't we just say write
+#: this text, and the Python puts it right in the JSON." ONE contract for small
+#: and big models rather than a small-model fallback lane.
+_DOSSIER_SECTION_MAP: "dict[str, Any]" = {
+    "FACTS": "facts_to_keep",
+    "NUMBERS": "allowed_numbers",
+    "PEOPLE": ("named_entities", "people"),
+    "PLACES": ("named_entities", "places"),
+    "THINGS": ("named_entities", "things"),
+    "VECTORS": "dramatizable_vectors",
+}
+
+#: Leading bullet/enumeration marks stripped from an item line. Deliberately
+#: generous: which glyph a model reaches for is style, not meaning.
+#: A bullet marker AND the whitespace after it. The trailing \s+ is
+#: load-bearing: without it `**FACTS:**` reads as a bullet (`*`) followed by
+#: `*FACTS:**`, and an emphasised header would be eaten as an item.
+_DOSSIER_BULLET_RE = re.compile(r"^\s*(?:\*(?!\*)|[-•–—+]|\d+[.)])\s+")
+_DOSSIER_FENCE_RE = re.compile(r"^\s*```[a-zA-Z0-9_-]*\s*$")
+#: A header line: the label, optionally colon-terminated, optionally wrapped in
+#: markdown emphasis or heading marks.
+#: The colon may sit INSIDE the emphasis (`**FACTS:**`) or outside it
+#: (`**FACTS**:`); both are shapes models emit unprompted, so allow an optional
+#: colon on either side of the closing marks rather than only after them.
+#: A header line, optionally followed by INLINE content after the colon.
+#: Group 1 is the label; group 2 is whatever followed on the same line.
+#: `(\([^)]*\))?` absorbs a parenthetical the model adds unprompted --
+#: "FACTS (6):" -- which otherwise fails the label charset and silently
+#: discards every bullet beneath it. Both shapes were found by review, both
+#: reproduced, and both cost a whole ladder attempt on a section the model
+#: had actually written correctly.
+_DOSSIER_HEADER_RE = re.compile(
+    # The label is GREEDY. It was `{3,20}?` while the pattern ended in `$`,
+    # where the anchor forced full consumption anyway. Adding the inline
+    # capture `(.*)$` gave the lazy quantifier somewhere to dump the rest, so
+    # `FACTS:` began matching as label `FAC` + inline `TS:` -- silently
+    # unmatching EVERY header. Greedy stops at the colon on its own, because
+    # `:` is not in the label charset.
+    # group 1 = label, group 2 = the colon (or empty), group 3 = inline tail.
+    # `(?:[/|,][A-Za-z_ /|,]{0,30})?` absorbs a QUALIFIER the model adds to a
+    # header -- "PEOPLE / CHARACTERS:" -- which otherwise left "/ CHARACTERS:"
+    # as group 3 and filed it as a PERSON.
+    # group 1 = label, group 2 = the colon (or empty), group 3 = inline tail.
+    # The qualifier class covers `/ | , -` and bracketed asides, because a
+    # model writes "PEOPLE - KEY ROLES:" and "PEOPLE [main]:" as readily as
+    # "PEOPLE:". Missing `-` was MF-2: the header never matched, the whole
+    # section stayed closed, and its people were appended to FACTS.
+    r"^\s*#{0,6}\s*[*_]{0,2}\s*([A-Za-z_ ]{3,20})"
+    r"\s*(?:[-/|,][A-Za-z_ /|,-]{0,30})?"
+    r"\s*(?:[\(\[][^)\]]*[\)\]])?"
+    r"\s*(:?)\s*[*_]{0,2}\s*:?\s*(.*)$")
+
+#: An inline tail that is ITSELF just a bare word-and-colon ("PEOPLE: ROLES:")
+#: is a second header fragment, not content. Storing it filed "ROLES:" as a
+#: person (MF-3).
+_DOSSIER_HEADER_FRAGMENT_RE = re.compile(r"^[A-Za-z_ ]{1,20}:$")
+
+
+def _dossier_add(out: "dict[str, Any]", target: "Any", item: str) -> None:
+    """Append one item to a flat or nested bucket. ONE append path so the
+    header-inline and bullet routes cannot drift apart."""
+    if isinstance(target, tuple):
+        out[target[0]][target[1]].append(item)
+    else:
+        out[target].append(item)
+
+
+def parse_dossier_sections(raw: str) -> "dict[str, Any]":
+    """Build a DossierLLM-shaped dict from a labelled-section reply.
+
+    TOLERANT BY DESIGN, and never raises. Unknown headers, prose outside any
+    section, markdown fences, blank lines and stray emphasis are ignored;
+    whichever buckets were populated are returned. Emptiness is NOT decided
+    here -- `DossierLLM.facts_to_keep` carries `min_length=1`, so an extraction
+    that found no facts still fails validation and still earns a ladder retry.
+    Swallowing that decision here would turn a real miss into a silent empty
+    dossier, which is precisely the failure mode that ruled grammar out.
+
+    Duplicate headers ACCUMULATE rather than overwrite: a model that emits
+    FACTS twice meant to add facts, and dropping the first block would discard
+    real extraction.
+    """
+    out: "dict[str, Any]" = {
+        "facts_to_keep": [],
+        "allowed_numbers": [],
+        "named_entities": {"people": [], "places": [], "things": []},
+        "dramatizable_vectors": [],
+    }
+    current: "Any" = None
+    for line in (raw or "").splitlines():
+        if _DOSSIER_FENCE_RE.match(line):
+            continue
+        # BULLETS ARE TESTED FIRST, and the order is the whole trick. The
+        # header pattern is deliberately permissive (models wrap headers in
+        # #, *, _ and stray colons), permissive enough that `* a fact` also
+        # matches it -- so testing headers first silently ate every
+        # star-bulleted item as an unknown header. Caught by
+        # test_tolerates_the_decoration_models_actually_emit.
+        is_bullet = bool(_DOSSIER_BULLET_RE.match(line))
+        header = None if is_bullet else _DOSSIER_HEADER_RE.match(line)
+        # A NUMBERED HEADER ("1. FACTS:") looks like a bullet to the test
+        # above, so it lost its header status and every item beneath it was
+        # dropped. If a bullet-shaped line is really a KNOWN section header,
+        # it is a header. Checked only for known labels so an ordinary
+        # numbered fact ("1. the system is portable") stays an item.
+        if is_bullet:
+            stripped = _DOSSIER_BULLET_RE.sub("", line)
+            candidate = _DOSSIER_HEADER_RE.match(stripped)
+            if candidate and candidate.group(2) and (
+                candidate.group(1).strip().upper().replace(" ", "")
+                in _DOSSIER_SECTION_MAP
+            ):
+                header = candidate
+        if header:
+            key = header.group(1).strip().upper().replace(" ", "")
+            has_colon = bool(header.group(2))
+            inline = (header.group(3) or "").strip().strip("*_ ").strip()
+            known = key in _DOSSIER_SECTION_MAP
+            # A COLON IS WHAT MAKES A LINE A HEADER. Without one, only a bare
+            # known label counts ("## FACTS").
+            #
+            # This is the guard that stops a WRAPPED FACT from destroying the
+            # rest of its section: a continuation line like "onto a second
+            # line" matches the (deliberately permissive) label pattern, and
+            # before this it was read as an unknown header, which set
+            # current=None and silently discarded every remaining item.
+            if not has_colon and (not known or inline):
+                pass  # not a header -- fall through and treat as an item
+            elif known:
+                current = _DOSSIER_SECTION_MAP[key]
+                # INLINE CONTENT: "FACTS: a single inline fact" is a header
+                # AND its only item. Dropping the tail loses a supplied fact.
+                #
+                # Strip a bullet the model put after the colon ("FACTS: - a
+                # fact"), which was being stored WITH its "- " (MF-4); and
+                # drop a bare second header fragment ("PEOPLE: ROLES:"), which
+                # was being filed as a person (MF-3).
+                inline = _DOSSIER_BULLET_RE.sub("", inline).strip()
+                if inline and not _DOSSIER_HEADER_FRAGMENT_RE.match(inline):
+                    _dossier_add(out, current, inline)
+                continue
+            elif not inline:
+                # A BARE unknown header ("SUMMARY:") ENDS the current section
+                # rather than silently appending someone else's items to it.
+                current = None
+                continue
+            # AN UNKNOWN LABEL THAT CARRIES CONTENT IS CONTENT (MF-1).
+            # "Source: Nature" and "The system: a portable scanner" are facts
+            # that happen to contain a colon. Treating them as headers closed
+            # the section and silently discarded every remaining item -- the
+            # most destructive shape found, and the likeliest to occur, since
+            # a colon inside a fact is ordinary English. Only a bare
+            # `Word:` with nothing after it reads as a section break.
+        if current is None:
+            continue
+        item = _DOSSIER_BULLET_RE.sub("", line).strip()
+        # Strip surrounding markdown emphasis and stray quoting, which models
+        # add as decoration and which would otherwise become part of the fact.
+        item = item.strip("*_ ").strip()
+        if len(item) >= 2 and item[0] == item[-1] and item[0] in "\"'":
+            item = item[1:-1].strip()
+        if not item:
+            continue
+        _dossier_add(out, current, item)
+    return out
+
+
+def _dossier_section_repair(*, original_prompt, failed_output, error):
+    """Repair prompt for the dossier pass, in ITS OWN format.
+
+    The shared `make_dispatching_repair_factory()` prompts all say "Return ONE
+    valid JSON object, no Markdown, no prose"
+    (`nodes/_otr_repair_prompts.py:106,129,188`). That directive is correct for
+    the eleven callers that DO speak JSON and actively wrong here: it would
+    steer the model back to balancing braces on the one extra chance a
+    marginal small model gets -- undoing this pass's whole reason for
+    existing. Those shared prompts are left untouched precisely because they
+    are shared; this pass supplies its own instead.
+
+    THE REPAIR RUNG MUST STILL SEE THE SOURCE. The first cut of this function
+    sent only the failed reply, which asked the model to redo a SOURCE
+    EXTRACTION with the source removed -- a blind rung that could only
+    hallucinate or repeat itself, on the last attempt before the lane dies.
+    The digest is recovered from the ORIGINAL PROMPT rather than closed over,
+    so this stays a plain RepairPromptFactory and cannot drift out of sync
+    with what the first attempt actually saw.
+    """
+    reason = str(error) or error.__class__.__name__
+    digest = ""
+    for row in (original_prompt or []):
+        if not isinstance(row, dict):
+            continue
+        content = str(row.get("content") or "")
+        if "SCIENCE STORY:" in content:
+            digest = content.split("SCIENCE STORY:", 1)[1].strip()
+            break
+    return [
+        {"role": "system",
+         "content": (
+             "Your previous reply could not be used: " + reason[:300] + "\n\n"
+             "Reply again using LABELLED SECTIONS ONLY -- no JSON, no fences, "
+             "no prose. Exactly these six headers, each on its own line, each "
+             "followed by one item per line starting with '- ':\n"
+             "FACTS:\nNUMBERS:\nPEOPLE:\nPLACES:\nTHINGS:\nVECTORS:\n\n"
+             "FACTS must contain at least one non-empty item grounded in the "
+             "source. Copy, never invent."
+         )},
+        {"role": "user",
+         "content": (
+             ("SCIENCE STORY:\n" + digest + "\n\n") if digest else ""
+         ) + "Your previous reply, which could not be used:\n"
+             + (failed_output or "")[:2000]},
+    ]
+
+
 def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
     try:
-        # LLM slot: technical -- P0 dossier (structured JSON extraction).
+        # LLM slot: technical -- P0 dossier (LABELLED-SECTION extraction;
+        # Python assembles the object, see parse_dossier_sections above).
         return structured_call(
             prompt=[
                 {"role": "system",
@@ -1623,10 +1858,17 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
             slot_fn=technical_fn,
             base_temperature=_TEMP["dossier"],
             structural_retry_temperature=_TEMP["dossier"] / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
+            # NOT make_dispatching_repair_factory(): its typed prompts all
+            # demand "ONE valid JSON object" -- see _dossier_section_repair.
+            repair_prompt_factory=_dossier_section_repair,
             post_validator=_make_dossier_validator(digest),
             max_new_tokens=_MAX_NEW_TOKENS["dossier"],
             helper_name="scifi_news_pro_dossier",
+            # Python assembles the object; the model only writes labelled
+            # bullets. Everything else about this call -- schema, tolerant
+            # validation, post_validator, the 3-rung ladder, the typed repair
+            # -- is unchanged.
+            text_parser=parse_dossier_sections,
         )
     except StructuredCallFailedError as exc:
         raise NewsProDossierError(

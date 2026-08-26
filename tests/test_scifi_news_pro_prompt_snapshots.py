@@ -34,7 +34,8 @@ def test_exact_six_model_seams(stages):
 @pytest.mark.parametrize(
     "seam",
     [
-        "scifi_news_pro_dossier_system",
+        # scifi_news_pro_dossier_system is DELIBERATELY ABSENT as of
+        # 2026-08-25 -- see test_dossier_seam_requests_labelled_sections below.
         "scifi_news_pro_pitch_system",
         "scifi_news_pro_treatment_system",
         "scifi_news_pro_news_read_system",
@@ -43,6 +44,26 @@ def test_exact_six_model_seams(stages):
 )
 def test_structured_seams_request_one_json_artifact(stages, seam):
     assert "return one json object only" in stages[seam].lower()
+
+
+def test_dossier_seam_requests_labelled_sections_not_json(stages):
+    """P0 is the ONE structured seam that does not ask for JSON.
+
+    A local 2-4B technical model failed all three ladder rungs emitting an
+    unclosed JSON object (evidence:
+    docs/2026-08-25-leg1-dossier-failure-evidence.md). Nesting is what a small
+    model cannot hold, so this seam asks for labelled bullet sections and
+    Python assembles the object -- same schema, same validation, same ladder.
+    The seam is exempted from the sibling JSON invariant ABOVE rather than
+    silently failing it, so the exemption is visible and deliberate.
+    """
+    prompt = stages["scifi_news_pro_dossier_system"]
+    lowered = prompt.lower()
+    assert "return one json object only" not in lowered
+    assert "labelled sections" in lowered
+    for header in ("FACTS:", "NUMBERS:", "PEOPLE:",
+                   "PLACES:", "THINGS:", "VECTORS:"):
+        assert header in prompt, f"dossier seam lost the {header} header"
 
 
 def test_script_seam_owns_complete_plain_text_grammar(stages):
