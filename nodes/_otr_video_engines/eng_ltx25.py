@@ -1953,6 +1953,114 @@ class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
     default_roles = ()
 
 
+# ---------------------------------------------------------------------------
+# THE JOINT-AV POSITIVE FINISHER (2026-08-26)
+# ---------------------------------------------------------------------------
+#
+# LTX 2.5 conditions the PICTURE and the AUDIO from ONE shared positive string:
+# `_build_graph` hands `plan["text_prompt"]` to a single CLIPTextEncode and the
+# guider samples both halves of the joint latent from it. There is no second
+# audio-prompt channel to write to, so the only place to ask for sound is the
+# end of the visual prompt.
+#
+# THE SHAPE IS THE LAB'S, NOT AN INVENTION. The VRAM lab's Golden Action Foley
+# recipe (`vram-recipe-lab`, LTX_2_5_ON_16GB.md:183-195) proved this pattern on
+# a live render: one string naming a VISIBLE event, the MATCHED sound that event
+# makes, then an explicit refusal of speech -- "No speech, no voices, pure
+# action." The lab rated foley and score the model's strong suit precisely
+# because it scores the scene it is already drawing. This generalises that.
+#
+# WHY THE SOUND STAYS TIED TO "the visible action". The picture reads these same
+# tokens. Ask for "instrumental score" on its own and the model is entitled to
+# draw an orchestra; naming the sound as a property of the action already on
+# screen is what stops the audio request becoming a second subject.
+#
+# `ltx25_video` is deliberately absent: it DISCARDS the audio latent, so an
+# audio clause there would steer the picture for a track nobody keeps.
+
+#: The lanes that KEEP the model's own audio. Exact internal ids -- never a
+#: prefix match, because ``ltx25_video`` shares the prefix and must not finish.
+_JOINT_AV_ENGINES = ("ltx25_foley_plus", "ltx25_mime")
+
+_FOLEY_SUFFIX = ("matched environmental foley for the visible action, ambient "
+                 "room tone. No speech, no voices, pure action.")
+
+#: The mime tail, shared by both mood shapes so the two cannot drift apart.
+_MIME_TAIL = ("instrumental scene score and non-speech ambience matching the "
+              "visible action. No speech, no voices.")
+
+#: What leads the mime tail when the brief carried no mood.
+_MIME_DEFAULT_LEAD = "scene-appropriate"
+
+#: Three, mirroring ``_otr_music_prompt``'s own ``music_mood_terms[:3]`` -- one
+#: brief field should not be read two different ways by two consumers.
+_MIME_MAX_MOOD_TERMS = 3
+
+
+def _normalize_mood_terms(music_mood_terms):
+    """First-seen unique, stripped, non-blank mood terms, capped at three.
+
+    A NON-LIST yields none, deliberately, and that includes a bare string: the
+    brief declares ``music_mood_terms: list[str]``
+    (``_otr_story_brief.py:147``), so a string here is a caller handing over the
+    wrong thing, and treating it as one long mood is worse than ignoring it.
+    Pure.
+    """
+    if not isinstance(music_mood_terms, list):
+        return []
+    out = []
+    for term in music_mood_terms:
+        if not isinstance(term, str):
+            continue
+        cleaned = term.strip()
+        if cleaned and cleaned not in out:
+            out.append(cleaned)
+            if len(out) >= _MIME_MAX_MOOD_TERMS:
+                break
+    return out
+
+
+def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
+    """Append this lane's audio requirement to an already-composed positive.
+
+    FINISHES, never replaces: the caller's visual core is preserved verbatim and
+    the suffix appended, so every engine's own prompt dialect, style cue and era
+    tail survive untouched. Idempotent -- a positive already ending in its
+    suffix comes back unchanged, so a second call cannot stack the tail.
+
+    Takes NO dialogue argument, and that is the point. These lanes GENERATE
+    audio but are not audio-IN lanes: nothing spoken may reach them, and the
+    suffix forbids voices outright.
+
+    Returns ``positive`` unchanged for every engine outside
+    ``_JOINT_AV_ENGINES``. Raises ``ValueError`` naming the engine when a
+    Foley/Mime positive is blank -- the audio half would then be conditioned on
+    nothing at all, which is a silent bad render rather than a loud one.
+    Pure; stdlib only, so it imports cold on a CPU-only process.
+    """
+    eid = str(engine_id or "")
+    if eid not in _JOINT_AV_ENGINES:
+        return positive
+    if not str(positive or "").strip():
+        raise ValueError(
+            "OTR_ltx25: %s was handed a blank positive prompt. LTX 2.5 "
+            "conditions the picture AND the generated audio from this one "
+            "string, so there would be nothing for the foley or the score to "
+            "match." % eid)
+    if eid == "ltx25_foley_plus":
+        suffix = _FOLEY_SUFFIX
+    else:
+        moods = _normalize_mood_terms(music_mood_terms)
+        lead = ", ".join(moods) if moods else _MIME_DEFAULT_LEAD
+        suffix = "%s %s" % (lead, _MIME_TAIL)
+    core = positive.rstrip()
+    if core.endswith(suffix):
+        return positive
+    core = core.rstrip(" ,.;:")
+    return core + ", " + suffix
+
+
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
-           "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY"]
+           "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
+           "finish_joint_av_positive"]

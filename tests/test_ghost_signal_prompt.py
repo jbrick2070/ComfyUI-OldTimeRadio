@@ -583,6 +583,15 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     ltx_tuple_line = [ln for ln in src.splitlines()
                       if '"ltx_video", "ltx25_video"' in ln][0]
     assert "animatediff15_v3_haunted_video" not in ltx_tuple_line
+    # THE TWO JOINT-AV LANES ARE ON THE ALLOWLIST ON PURPOSE (2026-08-26).
+    # They render the LTX 2.5 picture graph, so they compose scene prompts the
+    # same way; without them a foley/mime announcer or music open matched no
+    # branch at all and shipped build_request's hardcoded radio-studio default.
+    # Pinned here so the pair cannot be dropped while this guard still passes.
+    for joint_av in ('"ltx25_foley_plus"', '"ltx25_mime"'):
+        assert joint_av in src, joint_av
+    # ...and Ghost is still not one of them, on any line of the tuple.
+    assert "animatediff15_v3_haunted_video" not in src
 
 
 def test_an_all_ghost_policy_spends_no_writer_llm_call():

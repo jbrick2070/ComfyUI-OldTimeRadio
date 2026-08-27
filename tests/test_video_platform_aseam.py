@@ -628,11 +628,21 @@ def test_shotlock_end_to_end_stamps_video_section():
         ],
         "meta": {"story_brief_terms": {"setting": ["a station"]}},
     }
+    # PRODUCTION-SHAPED, not blank (2026-08-26). The slots used to be "";
+    # OTR_VideoDirector fails loud on an empty slot, so that was never a policy
+    # this node could receive, and since the prompt policy reads the character
+    # engine to decide whether the lane may carry the spoken line, a blank
+    # character slot is now refused by name rather than silently guessed at.
     policy = json.dumps({
         "policy_version": 2,
-        "video_models": {"announcer_video_model": {"engine_id": "", "custom": False},
-                         "music_video_model": {"engine_id": "", "custom": False},
-                         "character_video_model": {"engine_id": "", "custom": False}},
+        "video_models": {
+            "announcer_video_model": {"engine_id": "ltx_video", "custom": False},
+            "music_video_model": {"engine_id": "ltx_video", "custom": False},
+            # ltx_video rather than a HuMo: this fixture carries no portrait
+            # index and no audio_ref, and the cast-time preflight rightly
+            # refuses an audio_driven_face request that cannot be satisfied.
+            # The prompt-only lane is what this structural test needs.
+            "character_video_model": {"engine_id": "ltx_video", "custom": False}},
         "canvas": {"w": 832, "h": 480, "fps": 25},
     })
     patched, rev, report, done, episode_id = OTRShotLock().lock(

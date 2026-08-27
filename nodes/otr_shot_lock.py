@@ -698,6 +698,133 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
 _DIRECTIVE_KEYS = ("expression", "motion", "camera")
 
 
+def _policy_engine_for_role(policy, role) -> str:
+    """The engine that will actually render ``role``, read from a video policy.
+
+    THE FROZEN ROUTE FIRST (chunk 1b): a nonblank
+    ``effective_video_models[role]`` is what OTR_VideoDirector stamped after
+    every redirect, so it is what renders. Absent -- a pre-1b policy or a
+    hand-built fixture -- this falls back to the PICKED slot map, exactly as
+    before.
+
+    Extracted 2026-08-26 so ``derive_creative_directives`` and
+    ``build_execution_plan`` cannot answer "which engine" differently for the
+    same beat. The prompt policy and the shot row have to agree, or a lane
+    renders a prompt written for a different engine.
+
+    Deliberately NOT ``_effective_engine_for_role`` -- that re-enters the
+    route-freeze authority, and a read must not freeze route state -- and
+    deliberately NOT ``resolve_engine_id``: VideoDirector is the one
+    public-alias normalisation boundary, and downstream policy reads frozen
+    internal ids. Pure.
+    """
+    policy = policy or {}
+    effective_video = policy.get("effective_video_models") or {}
+    if effective_video:
+        frozen = str(effective_video.get(role) or "")
+        if frozen:
+            return frozen
+    return _role_slots.engine_id_for_role(policy.get("video_models") or {},
+                                          role)
+
+
+def _lane_preserves_dialogue(engine_id, role) -> bool:
+    """True iff this lane's prompt may carry the beat's literal spoken line.
+
+    TRUE for the AUDIO-IN families -- those engines are DRIVEN by the audio and
+    the line is the thing they lip-sync to -- and for ``still_word``, the one
+    non-audio lane that keeps the words on purpose, because it renders them
+    into the picture as a word card.
+
+    FALSE for every other character lane. An ordinary video engine handed a
+    line of dialogue cannot speak it, so it does the only thing it can: it
+    draws a mouth in motion. That is the H3 Caretaker defect -- a silent lane
+    pantomiming speech it was never able to deliver.
+
+    THIS IS NOT AN ADMISSION GATE. It refuses nothing an operator picked, and
+    every registered engine passes it; models stay in the dropdown and a bad
+    pick fails at render time on its own (operator, 2026-08-26). What it
+    refuses is to CLASSIFY an engine it cannot identify, because that guess is
+    silent in both directions: read an unknown lane as non-audio and a genuine
+    lip-sync engine loses the line it needed; read it as audio-in and a silent
+    lane goes on mouthing.
+    """
+    eid = str(engine_id or "")
+    if not eid:
+        raise ValueError(
+            "OTR_ShotLock: the video policy names no engine for role %r, so "
+            "the prompt policy cannot tell whether this lane is driven by the "
+            "dialogue (audio-in, which needs the spoken line) or renders it "
+            "silently (which must never receive it). Pick an engine for %r."
+            % (role, role))
+    try:
+        from ._otr_video_engines import registry as _registry  # type: ignore
+        from ._otr_video_engines import mouth_policy as _mouth  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_video_engines import registry as _registry  # type: ignore
+        from _otr_video_engines import mouth_policy as _mouth  # type: ignore
+    lookup = eid
+    if not _registry.is_registered(lookup):
+        # A PUBLIC MENU ID resolves; a typo does not. VideoDirector normalises
+        # the ids it stamps, but a hand-written `video_policy_json` can carry
+        # the menu name (`ltx25_high_foley_plus`), and refusing that would fail
+        # a policy the operator could legitimately write. Resolving HERE is a
+        # read for CLASSIFICATION ONLY -- the resolved name never becomes the
+        # engine, never reaches the shot row, and never re-freezes the route.
+        try:
+            from ._otr_shared.public_engines import resolve_engine_id
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared.public_engines import resolve_engine_id
+        lookup = str(resolve_engine_id(eid) or "")
+    if not lookup or not _registry.is_registered(lookup):
+        raise ValueError(
+            "OTR_ShotLock: role %r is routed to %r, which is not a registered "
+            "video engine and does not resolve to one. The prompt policy reads "
+            "the engine's FAMILY to decide whether this lane receives the "
+            "spoken line, and an unknown engine would silently classify itself "
+            "as non-audio and lose it." % (role, eid))
+    # REGISTRATION BEFORE FAMILY, and the order is the whole point: the family
+    # helpers answer "abstract" for an unknown id, and "abstract" is not in
+    # AUDIO_IN_FAMILIES, so an unregistered engine would classify itself as a
+    # silent lane without a word in the log.
+    family = str(getattr(_registry.get_engine(lookup), "family", "") or "")
+    return family in _mouth.AUDIO_IN_FAMILIES or lookup == "still_word"
+
+
+def _word_tokens(text) -> list:
+    """Lowercased whole-word tokens. Punctuation and spacing are not evidence."""
+    return re.findall(r"[a-z0-9']+", str(text or "").lower())
+
+
+def _repeats_the_line(field, line_tokens) -> bool:
+    """True iff ``field`` contains the beat's whole line as a CONTIGUOUS run.
+
+    CONTIGUOUS, and by whole-word TOKEN rather than by substring, for two
+    reasons that both bit earlier drafts of this filter: a substring test makes
+    the line "Yes." match the word "eyes" inside a perfectly good expression,
+    and an any-token test makes any field sharing two common words with the
+    line look like a quotation. An empty line matches nothing.
+    """
+    if not line_tokens:
+        return False
+    tokens = _word_tokens(field)
+    span = len(line_tokens)
+    if span > len(tokens):
+        return False
+    return any(tokens[i:i + span] == line_tokens
+               for i in range(len(tokens) - span + 1))
+
+
+#: What a non-audio lane gets when the writer returns nothing usable for a
+#: field. Deliberately plain: a fallback keeps the beat renderable and
+#: photographable, it does not invent a performance nobody authored.
+_NONVERBAL_FALLBACKS = {
+    "expression": "restrained visible reaction",
+    "motion": "subtle natural body motion",
+    "camera": "stable mid-shot",
+}
+
+
 def _deterministic_template(appearance: str, setting: str, beat_text: str) -> str:
     """The collapse-guard fallback prompt (BUG-046: never an empty/generic
     prompt into a render). Deterministic in its inputs."""
@@ -791,6 +918,50 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
     return "\n".join(lines)
 
 
+def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
+                                  setting: str) -> str:
+    """The batch derivation prompt for a lane that CANNOT speak.
+
+    The literal line is still handed to the model, and that is deliberate: it
+    is the only way to know what the moment IS, so the acting can be inferred
+    from it. What changes is what is asked BACK -- the visible performance,
+    never the words. Whatever comes back is filtered against the line anyway
+    (``_repeats_the_line``), because an instruction is not an enforcement.
+    """
+    del meta  # symmetry with _build_batch_prompt; the brief tails append later
+    lines = [
+        "You are a film director working on a SILENT shot. For EACH beat "
+        "below you are given the line the character speaks, as CONTEXT ONLY -- "
+        "the camera records no sound and the actor must NOT be shown speaking "
+        "it. Give the visible PERFORMANCE instead: a restrained facial "
+        "expression, a visible body action or motion, and a camera direction. "
+        "Reply ONLY with a JSON list of objects "
+        '{"beat_id","expression","motion","camera"}.',
+        # Same finisher contract as the spoken path: the era/style tails are
+        # APPENDED later and must not be duplicated here.
+        "Do not include film-stock, film-grain, or lighting-style terms; "
+        "they are appended automatically later.",
+        "NEVER quote or paraphrase the line itself. Do NOT write a "
+        "text_prompt field. Do NOT describe speaking, talking, dialogue, "
+        "lip-sync, mouth movement, an open mouth, subtitles, captions, or any "
+        "visible text or lettering.",
+        "Describe the named character as the VISIBLE subject; never describe "
+        "scenery or props without the character.",
+        f"Setting: {setting}",
+        "Beats:",
+    ]
+    for b in batch:
+        appearance = _appearance_for_char(ledger, b["char_id"])
+        lines.append(
+            json.dumps({
+                "beat_id": b["beat_id"],
+                "character": appearance[:160],
+                "line_context_do_not_quote": b["text"][:240],
+            }, ensure_ascii=True)
+        )
+    return "\n".join(lines)
+
+
 def derive_creative_directives(
     beats: list,
     meta: dict,
@@ -849,6 +1020,21 @@ def derive_creative_directives(
     if not char_beats:
         return {}, warnings
 
+    # THE PROMPT POLICY SEAM (2026-08-26). Whether a lane may receive the
+    # spoken line is a property of the ENGINE, never of the beat's text, so it
+    # is resolved ONCE per role from the same policy ``build_execution_plan``
+    # reads -- one resolution, two consumers, no divergence.
+    #
+    # A caller with NO policy at all keeps the historical behaviour. There is
+    # nothing to classify from, and defaulting a policy-free legacy call to
+    # "strip the dialogue" would silently change every one of them. Production
+    # always passes one (``lock()`` calls this with ``video_policy=policy``).
+    preserves_dialogue_for_role = {}
+    if video_policy is not None:
+        for _role in sorted({b["role"] for b in char_beats}):
+            preserves_dialogue_for_role[_role] = _lane_preserves_dialogue(
+                _policy_engine_for_role(video_policy, _role), _role)
+
     if llm_fn is None:
         llm_fn = _resolve_writer_llm(meta, warnings)
 
@@ -861,8 +1047,16 @@ def derive_creative_directives(
         batch = char_beats[start:start + max(1, int(batch_size))]
         expected = [b["beat_id"] for b in batch]
         directives: dict = {}
+        # One role per batch in practice (CHARACTER_BEARING_ROLES has a single
+        # member), so the batch's policy is the first beat's policy; the
+        # per-beat composition below still consults each beat's own role.
+        batch_preserves_dialogue = preserves_dialogue_for_role.get(
+            batch[0]["role"], True)
         if llm_fn is not None:
-            prompt = _build_batch_prompt(batch, meta, ledger, setting)
+            prompt = (_build_batch_prompt(batch, meta, ledger, setting)
+                      if batch_preserves_dialogue
+                      else _build_nonverbal_batch_prompt(
+                          batch, meta, ledger, setting))
             for attempt in range(max_reseed + 1):
                 try:
                     raw = llm_fn(prompt)
@@ -883,9 +1077,49 @@ def derive_creative_directives(
         for b in batch:
             appearance = _appearance_for_char(ledger, b["char_id"])
             d = directives.get(b["beat_id"]) or {}
-            llm_text = d.get("text_prompt", "")
+            # A lane that cannot speak never receives the words -- not the
+            # line, and not an authored text_prompt that might have quoted it.
+            nonverbal = not preserves_dialogue_for_role.get(b["role"], True)
+            llm_text = "" if nonverbal else d.get("text_prompt", "")
             has_directives = any(d.get(k) for k in _DIRECTIVE_KEYS)
-            if llm_text:
+            if nonverbal:
+                # THE SILENT CHARACTER LANE (2026-08-26). Expression, motion
+                # and camera only: no beat text, and no `_subject_anchor` --
+                # that anchor opens with "speaking to camera", which is the
+                # instruction that made H3's Caretaker mouth a line it had no
+                # way to voice.
+                line_tokens = _word_tokens(b["text"])
+                kept = {}
+                for key in _DIRECTIVE_KEYS:
+                    value = str(d.get(key) or "").strip()
+                    if value and _repeats_the_line(value, line_tokens):
+                        warnings.append(
+                            "beat %s: the writer put the spoken line back into "
+                            "%r on a silent lane; dropped (the lane cannot "
+                            "deliver it)" % (b["beat_id"], key))
+                        value = ""
+                    kept[key] = value
+                if any(kept.values()):
+                    source = "llm"
+                elif llm_fn is not None:
+                    source = "template_after_llm_miss"
+                    warnings.append(
+                        "writer LLM produced no usable nonverbal directive for "
+                        "beat %s after %d reseeds; using the deterministic "
+                        "acting fallbacks" % (b["beat_id"], max_reseed))
+                else:
+                    # No writer LLM configured: the fallbacks ARE the primary
+                    # local lane here, exactly as the template is on the
+                    # spoken path.
+                    source = "template"
+                d = dict(kept)
+                text_prompt = ", ".join(p for p in (
+                    appearance, setting,
+                    kept["expression"] or _NONVERBAL_FALLBACKS["expression"],
+                    kept["motion"] or _NONVERBAL_FALLBACKS["motion"],
+                    kept["camera"] or _NONVERBAL_FALLBACKS["camera"],
+                ) if p)
+            elif llm_text:
                 text_prompt = llm_text
                 source = "llm"
             elif has_directives:
@@ -916,7 +1150,12 @@ def derive_creative_directives(
             # authored non-empty visual prompt. The subject anchor remains
             # prompt composition: it leads every talking-head path (LLM,
             # composed, template) with face/framing context.
-            text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
+            # ...on the SPOKEN paths only. The anchor's first clause is
+            # "face visible, speaking to camera", which is a speaking
+            # instruction; a silent lane composed its own subject above and
+            # must not be handed one.
+            if not nonverbal:
+                text_prompt = f"{_subject_anchor(appearance)}, {text_prompt}"
             # FINISH the prompt (gap-audit F3, 2026-06-10): era tail (brief
             # atmosphere/palette/lighting) + the film style tail, restored
             # from the deleted legacy composer. MUST run before
@@ -2078,7 +2317,6 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     driver-channel directive, never a cache/mesh key). Returns ``(groups,
     shots)`` after ``resolver.validate_execution_groups``.
     """
-    video_models = (policy or {}).get("video_models") or {}
     #: THE TIER RENDER-LENGTH CEILING (B3, 2026-07-26). Read ONCE here, off the
     #: same ``policy`` object ``lock()`` stamps onto the ledger, and handed to
     #: every ``_stamp_coverage_plan`` call. For the engines in
@@ -2087,14 +2325,9 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     #: stays an adapter-side native cap, which is what keeps the 8GB WAN tier's
     #: 17-frame contract from becoming 17-frame BEATS.
     max_render_frames = _planning_ceiling(policy)
-    #: THE FROZEN ROUTE (2026-07-25, multi-clip coverage chunk 1b), stamped by
-    #: OTR_VideoDirector. Absent on a pre-1b policy or a hand-built fixture, in
-    #: which case this falls back to the PICKED slot map exactly as before.
-    effective_video = (policy or {}).get("effective_video_models") or {}
-
     def engine_for(role):
-        # Route-A: dedicated per-role video slot only (empty resolves empty / fails loud)
-        # (ONE shared map; nodes/_otr_shared/role_slots.py).
+        # Route-A: dedicated per-role video slot only (empty resolves empty /
+        # fails loud) (ONE shared map; nodes/_otr_shared/role_slots.py).
         #
         # EFFECTIVE FROM BIRTH (chunk 1b). Every consumer of this function --
         # the execution GROUPS, the cast-time preflight, and the shot ROWS --
@@ -2103,11 +2336,14 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         # re-derived the effective one through its own private mirror, so a
         # redirected bookend was validated as one engine and stamped as
         # another. One resolution, three consumers, no divergence.
-        if effective_video:
-            frozen = str(effective_video.get(role) or "")
-            if frozen:
-                return frozen
-        return _role_slots.engine_id_for_role(video_models, role)
+        #
+        # THE RESOLUTION ITSELF MOVED OUT (2026-08-26) to
+        # ``_policy_engine_for_role``, because the PROMPT policy needs the same
+        # answer: ``derive_creative_directives`` decides whether a lane may
+        # carry the spoken line, and deciding that against a different engine
+        # than the one this function stamps is how a lane gets a prompt written
+        # for somebody else's adapter. Four consumers now, still one resolution.
+        return _policy_engine_for_role(policy, role)
 
     roles_present = []
     for b in beats:

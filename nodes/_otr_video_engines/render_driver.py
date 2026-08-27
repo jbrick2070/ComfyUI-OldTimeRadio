@@ -3088,7 +3088,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
-    if ((_engine_id in ("ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in")
+    if ((_engine_id in ("ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in",
+                        # THE TWO LANES THAT KEEP THE MODEL'S OWN AUDIO
+                        # (2026-08-26). They ARE the LTX 2.5 picture graph, so
+                        # they compose scene prompts exactly like ltx25_video.
+                        # Omitted, they matched no branch at all: `roles =
+                        # ROLES` makes them legal on the announcer and music
+                        # bookends, those roles arrive with `text_prompt`
+                        # cleared, and `_is_char_face_beat` is False -- so the
+                        # beat shipped `build_request`'s hardcoded "a 1940s
+                        # radio studio" default with `prompt_source` never
+                        # stamped. That is the exact degrade
+                        # `test_ltx25_HQ_open_keeps_the_role_motion_prompt`
+                        # was written to stop for `ltx25_video`.
+                        "ltx25_foley_plus", "ltx25_mime")
             or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat
@@ -3315,6 +3328,69 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             req["text_prompt"] = scene_prompt
             _stamp_prompt_meta(req, "brief+beat", scene_prompt,
                                beat=_beat_id_for_shot(shot))
+    # THE JOINT-AV AUDIO REQUIREMENT (2026-08-26). `ltx25_foley_plus` and
+    # `ltx25_mime` KEEP the audio LTX 2.5 generates alongside the picture, and
+    # BOTH halves are conditioned on this one positive string -- so a prompt
+    # that never mentions sound leaves the model to score the scene from
+    # whatever it guesses. Neither lane is audio-IN: no dialogue reaches here,
+    # and the suffix forbids voices outright.
+    #
+    # WHY THIS SEAM. Every branch above writes its result under a different
+    # local name (`_g_positive`, `text_prompt`, `_cf_fallback`,
+    # `_default_prompt`, `_override`, `scene_prompt`) but all of them assign
+    # into `req["text_prompt"]`. That key is the ONE place they converge, and
+    # this is the last point before the banana route, so the finisher runs
+    # exactly once over whatever actually won.
+    _jav_engine = str(shot.get("engine_id") or "")
+    if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
+        try:
+            from .._otr_brief_reader import _read_brief_field
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_brief_reader import _read_brief_field  # type: ignore
+        try:
+            from .eng_ltx25 import finish_joint_av_positive
+        except ImportError:  # pragma: no cover -- flat test imports
+            from eng_ltx25 import finish_joint_av_positive  # type: ignore
+        # Mime scores the scene, so it reads the brief's OWN mood terms. No
+        # cascade into atmosphere or script text: `_otr_music_prompt` already
+        # owns that fallback ladder for the music bookends, and a second,
+        # slightly different ladder here is how two consumers of one brief
+        # field quietly drift apart.
+        _jav_moods = (
+            _read_brief_field((ledger or {}).get("meta") or {},
+                              "music_mood_terms", default=[])
+            if _jav_engine == "ltx25_mime" else [])
+        _jav_before = str(req.get("text_prompt") or "")
+        _jav_after = finish_joint_av_positive(
+            _jav_engine, _jav_before, music_mood_terms=_jav_moods)
+        if _jav_after != _jav_before:
+            req["text_prompt"] = _jav_after
+            # THE TAIL IS MANDATORY, so it may not be capped. The 188-char
+            # scene branch publishes a budget for the banana re-cap and the
+            # non-speech sentence lands PAST it, so `_banana_cap` would trim
+            # exactly the clause that stops the model generating voices.
+            # Clearing both fields is what makes it survive -- a protected
+            # clause would not, because the funnel protects ONE and the scene
+            # branch already spent it.
+            _prompt_char_budget = None
+            _prompt_protected_clause = None
+            # Restamp the digest and length ONLY, following the banana
+            # precedent below. `_stamp_prompt_meta` would overwrite
+            # prompt_source/prompt_subsource, and the composing branch's
+            # provenance is the truth about where this prompt came from: the
+            # audio tail finishes it, it does not author it. Without this the
+            # receipt would describe the pre-tail text while a different
+            # string rendered -- and evidence here is cited by hash.
+            _jav_obs = req.setdefault("observability", {})
+            _jav_obs["prompt_sha8"] = hashlib.sha256(
+                _jav_after.encode("utf-8")).hexdigest()[:8]
+            _jav_obs["prompt_chars"] = len(_jav_after)
+            _jav_obs["joint_av_prompt"] = "finished"
+            _LOG.info(
+                "[OTR.render_driver] JOINT-AV: %s beat %s positive finished "
+                "with its audio requirement (%d -> %d chars)",
+                _jav_engine, _beat_id_for_shot(shot),
+                len(_jav_before), len(_jav_after))
     _apply_visual_safety_prompt(req, shot)
     # THE BANANA ROUTE (docs/2026-08-06-BUILD-SPEC-banana-route.md) -- the
     # PINNED ordering (QA ruling 4): safety hook above -> banana transform ->
@@ -4987,7 +5063,13 @@ def apply_engine_override(ledger):
 #: the prompt-only ltx_video, the LTX 2.5 HQ I2V lane, and the additive LTX-AV
 #: audio lane.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx25_video", "ltx_audio_in"})
+    {"ltx_video", "ltx25_video", "ltx_audio_in",
+     # The foley and mime lanes (2026-08-26) render the LTX 2.5 picture graph
+     # unchanged -- only the audio latent's fate differs -- so an open that
+     # renders on one is every bit as real an LTX open as `ltx25_video`.
+     # Omitting them would report a healthy open as a procgen soft-open and,
+     # under OTR_LTX_OPEN_STRICT=1, fail a build that did nothing wrong.
+     "ltx25_foley_plus", "ltx25_mime"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})
