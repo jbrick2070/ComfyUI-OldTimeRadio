@@ -1,3 +1,98 @@
+## 2026-08-26 -- HEAD a7675d37 +handoff (v2.0-alpha) -- CODER (LTX 2.5 foley bed AND mime built, green and pushed; VRAM question closed on a live leg; 3 commits)
+
+Did: built both Chunk B lanes in one change and proved the load-bearing number
+  live.
+  THE FOLEY BED AND MIME, BOTH (`5190f5d3`). `ltx25_foley_plus` mixes the
+  model's own audio UNDER the master at 0.20/0.80; `ltx25_mime` is the same
+  mechanism at 1.00/0.00. The operator overrode the spec's mime deferral
+  mid-build ("foley and mime we need this feature for both"), which turned one
+  scalar into a master-gain ENVELOPE: foley_plus floors the WHOLE timeline
+  (RULING 1 -- a beat with no bed must not get louder), mime zeroes only its
+  OWN beats (RULING 4 -- role-wide, but one shared master WAV). New module
+  `_otr_video_engines/foley_stems.py` owns the stem format, the gain table, the
+  cut and the mix, because three stages touch a stem and the format is the
+  contract between them.
+  THE DECODE IS A SECOND GRAPH, AND THAT IS THE WHOLE DESIGN. Wiring
+  `LTXVAudioVAEDecode` into the render graph would keep the audio VAE resident
+  through sampling against ~150 MiB of headroom. Instead the latent is cloned
+  to CPU inside `_on_graph_result` -- while the node is still alive, because
+  `free_after_use` drops `refine_separate` immediately after -- and decoded
+  only after `reclaim_idle_models`.
+  MEASURED LIVE, AND IT IS NOT CLOSE. 13 beats on the canonical graph:
+  `decode_peak_mb` 2883-3269 MiB (avg ~3090) against the 14848 MiB stop, ~21%
+  of the ceiling. Every stem exactly `186240 = 97 x 1920` samples on a
+  runtime-read 48000 Hz rate, written durably to `<ep>/audio/foley/`. One log
+  line as the receipt:
+  `[OTR video] ltx25_foley_plus FOLEY decode: 186240 sample(s) x2ch @48000 Hz
+  (3.880 s over 97 frame(s)) decode_peak_mb=3269 elapsed_s=1.780`
+  THE OPERATOR MADE THE ONE CALL THE SPEC FORBADE THE IMPLEMENTER TO MAKE.
+  Both QA gates refused to let the driver pick between reusing the retired
+  `clip_manifest_json` connector and adding a new one; he chose (b), a new
+  connector. `tests/test_rip_sfx_bed_guard.py` therefore needed NO edit at all
+  -- the tripwire still reads "accepted, hashed, unused" and means it. Recorded
+  as RULING 5; the mime override is RULING 6.
+  SONNET QA, AND A LESSON ABOUT SCOPING IT. The first pass, aimed at a
+  4244-line diff with five broad hunt areas, ran an hour and produced nothing.
+  Killed and re-scoped to NINE NAMED FUNCTIONS with the riskiest flagged first:
+  it returned in under two minutes and found a real defect -- a comment
+  asserting `master * 0.80` that the mime generalization had made false (it is
+  1.0 on the stamp-only path). Fixed in `6b79092c`. Naming what gets reviewed
+  is the driver's job, not the panel's.
+  ALSO FOUND, NOT FIXED: the Cockney bleed the operator reported
+  ("everyone starts talking like lemmy"). Root cause is
+  `_otr_dialogue_policy.py:6-10` -- the accent rule is appended to the whole
+  system prompt and its first sentence names nobody, so the writer applies it
+  scene-wide. Left for the Codex window per instruction; the root cause is in
+  GO_FORWARD so it is not re-derived.
+Current step: the foley/mime CODE is done and pushed. What remains of that row
+  is a RENDER item -- the running leg's mix/publish tail, a mime leg, and the
+  listening test on the REFINED stage-2 latent, which the lab never heard (it
+  heard the single-stage graph). The next CODER item is the scene/portrait
+  `elements: []` row, and it is flagged in GO_FORWARD as a DESIGN fork needing
+  the arc BEFORE code: the lens has no subject field, and this repo already
+  wrote off extracting one from the prose.
+Next: a RENDER window finishes qualification (watch `foley_bed=mixed`,
+  `foley_loudness=`, `obs_publish OK`, and `foley_muted_s=` on the mime leg).
+  A CODER window takes the `elements: []` row and runs the arc first. The
+  Cockney row is CODEX'S and must not be taken; its snapshot at
+  `C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`
+  must not be deleted.
+Models: rung 5 (Opus) drove and judged throughout; rung 4 (Sonnet 5) took the
+  post-coding QA on the frozen diff. NO kibitz arc was run and none was owed --
+  the design was already panelled through four rounds (Codex + Cursor,
+  2026-08-26), so the remaining chunks took the diff-level gate per the routing.
+  This is a DIFF-LEVEL GATE, not an arc, and is not to be read as one. The one
+  design fork that DID surface mid-session (scene/portrait `elements: []`) was
+  NOT swung at -- it is flagged for the arc instead.
+Box: a headless server is RESIDENT on port 8000 (pid 17280) and a foley leg was
+  STILL RENDERING at handoff (13 beats in, ~85 min elapsed, prompt
+  `af1f0bb8-29ce-4eec-8698-dee912344c9f`). VRAM is NOT at baseline. The next
+  window inherits a busy box: do not boot a second server, and do not reset
+  until this leg finishes or is deliberately killed. Server log
+  `tmp/foley_leg_server.log`; driver log in the session scratchpad.
+  IT WAS BOOTED WITHOUT `--reserve-vram` DELIBERATELY. The server that was on
+  :8000 before had `--reserve-vram 12`, which on a 16.3 GiB card makes the
+  loader demand model + 12 GiB free -- LTX 2.5 can never stay resident, and
+  `decode_peak_mb` would have been a measurement of a thrashing loader. If a
+  future leg reports absurd VRAM, check that flag first.
+Suite: 12255 passed / 121 skipped / 1 xfailed, 0 failed (full, at `6b79092c`).
+  After the profile/variant commit: targeted 202 passed / 1 skipped, and
+  `build_variants.py --check` 60 variants / 0 failures. The full suite was NOT
+  re-run after `a7675d37` -- the model-inventory window was actively committing
+  and a tree moving under a 7-minute run is the torn-read failure mode. Bug
+  Bible 22 passed / 0 failed at `2b4c335`, 314 entries.
+Bible: no new entry owed. The Cockney bleed is operator-verified on published
+  episodes but is NOT FIXED yet, so it does not qualify for promotion -- a
+  Bible entry needs a fix and an automatable verify condition. Promote it when
+  Codex lands the fix.
+Commits: `5190f5d3` (both lanes + canonical JSON), `6b79092c` (the QA finding),
+  `a7675d37` (profiles + 120 variant files). The sha above is the last CODE
+  head; it is the second-to-last on the branch once this handoff lands, and the
+  last is this handoff commit. Two commits by the model-inventory window
+  (`b2172619`, `e69375fe`) sit between them -- that window shares this clone,
+  which is why its uncommitted files were visible here. Its work was never
+  staged or swept: every commit above was made by explicit pathspec.
+
 ## 2026-08-26 -- HEAD 8d71a3bd +handoff (v2.0-alpha) -- CODER (ideogram refusals root-caused and fixed live, H3 reached sampling for the first time ever, foley bed designed through 4 rounds + QA; 7 commits)
 
 Did: four real bugs, every one invisible from the logs, plus a converged design.

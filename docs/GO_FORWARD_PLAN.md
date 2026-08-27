@@ -27,9 +27,41 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> NEXT ITEM: THE LTX 2.5 FOLEY BED (operator directive 2026-08-26) <<<
+### >>> NEXT ITEM: QUALIFY THE LTX 2.5 FOLEY BED + MIME -- A RENDER WINDOW <<<
 
-**DESIGN IS DONE AND CONVERGED. This is a CODING item, not a design one.**
+**THE CODE IS BUILT, GREEN AND PUSHED (2026-08-26, `a7675d37`). THIS IS NO
+LONGER A CODER ITEM.** What is left is a live leg and a pair of ears, which is
+a RENDER window's job. A coder window taking this row should skip to the next
+one unless it is also driving the GPU.
+
+**WHAT IS ALREADY MEASURED, so it is not re-measured:** a live canonical leg on
+`otr_ltx25_high_foley_plus` decoded 12 beats at
+`decode_peak_mb` **2883-3269 MiB (avg ~3090)** against the 14.5 GiB
+(14848 MiB) stop. Every stem came out at exactly `186240 = 97 x 1920` samples
+on a runtime-read 48000 Hz rate. **The two-pass split is proven and the VRAM
+question is CLOSED** -- the audio decode costs ~21% of the ceiling, in
+isolation, after `reclaim_idle_models`. Do not re-open it.
+
+**WHAT IS STILL OWED, and it is the whole remaining exit:**
+* the FOLEY leg's own tail -- `foley_bed=mixed beats=N/N lanes=...`,
+  `foley_loudness=...`, and `obs_publish OK`. The leg was still rendering at
+  handoff (see HANDOFF_LOG for its state);
+* a MIME leg on `otr_ltx25_high_mime`. That profile pins mime on the CHARACTER
+  role ONLY and leaves announcer/music on the SILENT lane deliberately: mime
+  zeroes the master over its own beats, so it needs speaking neighbours in the
+  same master WAV to be measured against. All three roles on mime would silence
+  the episode and prove nothing. Watch for `foley_muted_s=`;
+* `ltx25_video` proven STILL silent on the same HEAD;
+* **the listening test, which no receipt can stand in for.** The lab heard LTX
+  foley and rated it the model's strong suit -- but off a SINGLE-STAGE graph.
+  These lanes harvest the REFINED stage-2 latent, which nobody has heard. If it
+  disappoints, harvesting stage one's `separate` slot 1 instead is a one-line
+  change and the rest of the path is identical.
+
+**Below is the original coding brief, kept because it records WHY the build is
+shaped the way it is.** It is history now, not instructions.
+
+**DESIGN IS DONE AND CONVERGED. This was a CODING item, not a design one.**
 Four rounds, Codex + Cursor, artifacts in `kibitz-runs/2026-08-26-foley-bed/`
 (gitignored -- read them off disk, they do not travel).
 
@@ -112,6 +144,40 @@ delivery gain (`otr_master_audio_mux.py`), and three appended links in
 
 ---
 
+### >>> OPEN (CODEX'S LANE -- DO NOT TAKE IT): COCKNEY BLEEDS ONTO THE WHOLE CAST <<<
+
+**Operator-observed on published episodes, 2026-08-26:** *"when lemmy is in the
+scene everyone starts talking like lemmy with a cockney speech, not just
+lemmy."*
+
+**ROOT-CAUSED, and the fix is a scoping change rather than a rewrite.**
+`nodes/_otr_dialogue_policy.py:6-10`. `append_dialogue_policy()` appends
+`_COCKNEY_ORTHOGRAPHY_RULE` to the WHOLE system prompt whenever
+`roster_has_lemmy()` is true, and the rule's first sentence is unscoped:
+*"Convey the Cockney accent through phrasing, idiom, cadence, and rhythm."*
+Nothing in it names LEMMY, so the writer reads it as a scene-wide instruction
+and re-registers the entire cast.
+
+The irony worth preserving: the rule's real job is its SECOND sentence -- use
+standard English spelling, no phonetic misspellings -- which is doing exactly
+what it should. The first sentence was meant as context for it and became an
+accent order. `roster_has_lemmy()` gates WHETHER the rule is added; nothing
+gates WHO it applies to.
+
+So the fix is to make LEMMY the grammatical subject of the accent sentence and
+leave the orthography sentence global (phonetic spelling is unwanted from
+anyone). It is NOT a prose-quality item -- a character's voice contradicting
+the source is a correctness defect, and the 2026-08-04 "story quality is done"
+ruling explicitly leaves that class open.
+
+**DO NOT TAKE THIS ROW.** The operator assigned the non-audio dialogue-prompt
+work to the Codex window (snapshot
+`C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`,
+which must not be deleted). This row exists so the root cause is not
+re-derived.
+
+---
+
 ### >>> THEN: SCENE + PORTRAIT ROUTES STILL SEND `elements: []` <<<
 
 **Same defect as the ideogram music card, already proven, still live on the
@@ -124,6 +190,25 @@ because inventing content is the one thing the lens may not do.
 
 Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
 PBUG-20260826-01.
+
+**THIS IS A DESIGN ITEM, NOT A GREP-AND-FIX -- checked 2026-08-26 before
+swinging at it.** The lens receives only three things: the prose, `kind` and
+`role` (`ideogram4_local.py:644`). There is no subject field to derive an
+anchor from. And this repo has ALREADY ruled on extracting one from the prose:
+`_wrapped_caption` (`ideogram4_local.py:372`) says the composer emits *"a
+comma-joined five-layer string behind a style prefix, which is a convention,
+not a grammar, so any attempt to re-extract subject / setting / elements from
+it mis-fires."*
+
+So there are two defensible answers and they are not equal:
+* **(a)** extract a subject noun from the prose -- lens-local and small, but it
+  is the option the codebase already tried and wrote off, and a wrong noun
+  INVENTS CONTENT, which the row above forbids in as many words;
+* **(b)** a new metadata channel so the producer hands the lens a real subject
+  -- more wiring, but the anchor is derived rather than guessed.
+
+Per the review routing, a fork with two defensible answers gets the arc BEFORE
+code. **Run it; do not swing.**
 
 ---
 
