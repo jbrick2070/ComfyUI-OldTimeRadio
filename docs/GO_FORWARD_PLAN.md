@@ -27,6 +27,83 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
+### >>> NEXT ITEM: THE LTX 2.5 FOLEY BED (operator directive 2026-08-26) <<<
+
+**DESIGN IS DONE AND CONVERGED. This is a CODING item, not a design one.**
+Four rounds, Codex + Cursor, artifacts in `kibitz-runs/2026-08-26-foley-bed/`
+(gitignored -- read them off disk, they do not travel).
+
+* **THE SPEC:** `kibitz-runs/2026-08-26-foley-bed/r4/final.md`. It is
+  CUMULATIVE -- the r1 body, then r2/r3/r4 amendment sections that OVERRIDE
+  earlier text wherever they disagree. Read it whole before typing.
+* **THE RULINGS:** `docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md` (committed).
+  Four of them, all binding, none for the panel to relitigate.
+
+**WHAT IT IS.** LTX 2.5 already generates its own audio -- footsteps, room
+tone, a score -- while rendering the picture, and the adapter throws it away at
+`LTXVSeparateAVLatent` (`eng_ltx25.py:6`). This keeps it and mixes it under the
+episode master at a fixed **0.20 foley / 0.80 master**. A second lane, **mime**,
+is the SAME mechanism at **1.00/0.00**.
+
+**THE WORD THAT MUST NOT BE CONFUSED.** The **SFX bed** was a different feature
+(separately GENERATED effects from a dedicated model), **ripped 2026-08-06 and
+permanently dead**. The **FOLEY bed** is the video model's own output. Naming
+anything `sfx_*` is a defect -- `tests/test_rip_sfx_bed_guard.py` guards it.
+
+**WHAT THE ARC ALREADY CAUGHT, so it is not re-learned on the GPU:**
+* **A VRAM blocker with 0.02 GiB of headroom.** Wiring the decode into the same
+  graph makes the audio VAE a second consumer, so `free_after_use` can no
+  longer drop it before sampling. **Two passes**: harvest the latent, reclaim,
+  then a second tiny graph.
+* **The audio latent is DESTROYED before a second pass could reach it** --
+  `wrapper_bridge` keeps only `{"unet","modality","decode"}`. Needs two new
+  parent hooks, both no-ops on the silent lane.
+* **The canonical workflow JSON DOES change** -- `OTR_EpisodeAssembler` has no
+  way to know it is on a foley route. Append `video_policy_json`, wire node 87
+  -> node 7. Append-only (BUG-LOCAL-097), same change as the code (section 0).
+* **A stem written to tmp is deleted before the mux reads it** -- `mux()`
+  sweeps `_shared/tmp`. Write straight to `otr/episodes/<ep>/audio/`.
+* **`tests/test_rip_sfx_bed_guard.py:262-271` fails on first compile** unless
+  rewritten in the same change (it requires the connector tooltip to say
+  "retired").
+
+**EXIT:** a live canonical leg published to `otr/obs/` with `obs_publish OK`,
+the foley proven decoded and mixed (not adapter self-report), loudness and peak
+receipts, and `ltx25_video` proven still silent. Measure audio-decode VRAM on
+the two-stage graph BEFORE registering -- over 14.5 GiB is an operator stop.
+
+---
+
+### >>> THEN: SCENE + PORTRAIT ROUTES STILL SEND `elements: []` <<<
+
+**Same defect as the ideogram music card, already proven, still live on the
+three lanes production renders with.** Fixed for the TITLE/music route on
+2026-08-26 (`ae7e7b6a`) and proven by two published episodes; the SCENE and
+PORTRAIT routes were left untouched and still emit an empty elements list,
+which is what made ideogram refuse. Each needs an anchor derived from **its
+own** subject -- a scene's subject, a character's face -- never a pasted radio,
+because inventing content is the one thing the lens may not do.
+
+Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
+PBUG-20260826-01.
+
+---
+
+### >>> ALSO OPEN: THE SANCTIONED-GAP CONTROL PATH <<<
+
+**Live-proven necessary on 2026-08-26.** Ideogram is not seed-deterministic:
+after the music-card fix it went from refusing every music card to **6 of 7**,
+and that ONE refusal still killed a 30-minute episode at the still-spine gate.
+No amount of prompt work takes a stochastic refusal to zero.
+
+The dispatcher already says "the episode continues" and the composite already
+floors an `exists=False` row -- **nothing in between mints that row**. Spec and
+r1 judgment: `kibitz-runs/2026-08-25-model-refusal-required-still/`.
+Accounting for it landed 2026-08-26 (`a2837b05`) and is deliberately inert
+until this exists.
+
+---
+
 ### >>> NEXT ITEM: THE LOCAL-LLM ACCEPTANCE SWEEP (operator directive 2026-08-25) <<<
 
 **THE RE-TRIAGE THE PREVIOUS BANNER DEMANDED WAS DONE 2026-08-25 (late). Its

@@ -99,27 +99,120 @@ delivered a mean `-9.87 LUFS (std 0.41)`, ~4 dB hot, so every episode was
 attenuated at playback while the limiting used to buy that loudness stayed in
 the audio. Do not master hot.
 
-## STILL OPEN -- for the design arc
+## RULING 3 -- THE DEFAULTS THE ARC LOCKED (r4, and they were FORCED)
 
-1. **Where it mixes.** `OTR_MasterAudioMux` (after video, master already
-   frozen -- the ordering never bites) versus earlier at SceneSequencer.
-2. **Timing mismatch.** Foley is generated per-clip at the clip's own length;
-   TTS timing is frozen before video renders. What happens when they disagree
-   -- trim, loop, pad, or refuse?
-3. **Beats with no foley.** Still lanes (`still_flat`, `still_pan`, ...)
-   generate no model audio. Silence under those beats, or bed continuity
-   carried from the neighbouring clip?
-4. **Engine shape.** `ltx25_foley_plus` as its OWN internal engine (lesson L5:
-   two public ids on one internal id collapses `_INTERNAL_TO_PUBLIC` and trips
-   the bijection assert AT IMPORT) versus a capability flag on `ltx25_video`.
+These read as open choices until the arc grounded them. They are not choices:
+`EpisodeAssembler` folds themes and cues into ONE WAV
+(`scene_sequencer.py:1408-1425`) and the sequencer lays room tone at intensity
+0.01 (`:1165-1180`). **No separate voice/music stems exist.** So there is no
+mechanism to hold music at 1.0 while ducking dialogue.
 
-## WHAT IS NOT BLOCKED
+* **The FULL master is `* 0.80`** -- dialogue + room tone + themes + music
+  together. A 20% attenuation of music under a foley bed is a normal mixing
+  consequence, not a blocker. The driver's *"if music must stay at 1.0 this
+  build cannot start"* was an overstatement and is withdrawn.
+* **LTX foley STACKS with the existing 0.01 room-tone bed.** Accepted
+  explicitly rather than left implicit.
+* **0.20 stays the speech floor**, including in the later ledger-driven build.
+
+### The four questions this file opened, all answered by the arc
+
+1. **Where it mixes** -> `OTR_MasterAudioMux` ONLY. The sequencer cannot see
+   foley: `_master_loudness` runs in `OTR_EpisodeAssembler.assemble`
+   (`scene_sequencer.py:1472`), FOUR stages before video exists.
+2. **Timing mismatch** -> the engine emits an UNTRIMMED rung-length stem; a
+   sibling of `assemble_beat_segments` applies `(drop_head, keep_frames)` in
+   sample space inside `render_beat_coverage`. Trim, then silence-pad to the
+   slot. **Never loop, never clone-hold.**
+3. **Beats with no foley** -> SILENCE. Carrying a neighbour's stem would place
+   picture-conditioned audio under a different picture.
+4. **Engine shape** -> its OWN internal engine (`ltx25_foley_plus`), 1:1 with
+   `ltx25_high_foley_plus`, per lesson L5.
+
+## WHAT IS NOT BLOCKED -- corrected twice by the arc
 
 The 2026-08-19 standing ruling says *"Chunk B (the foley bed) remains BLOCKED
-on execution order."* That blocker is real for **mime** -- where the clip's
-audio REPLACES the beat audio and therefore must exist before the master
-freezes. It does NOT bite the foley bed: a bed mixed UNDER an already-frozen
-master happens at `OTR_MasterAudioMux`, which runs AFTER video. The
-`clip_manifest_json` connector is still physically wired on the canonical
-graph and still hashed by `IS_CHANGED` -- only the compiler behind it was
-deleted -- so no workflow JSON surgery is needed to reach the mux.
+on execution order."* That blocker was real only for the ORIGINAL mime design,
+where the clip's audio REPLACES the beat audio and therefore had to exist
+before the master froze. It does not bite a bed mixed UNDER the master at
+`OTR_MasterAudioMux`, which runs after video -- and Ruling 4 below removes it
+for mime too, by generating the TTS and discarding it.
+
+**TWO DRIVER CLAIMS IN THIS SECTION WERE WRONG AND ARE CORRECTED:**
+
+* *"no workflow JSON surgery is needed"* -- **FALSE.** `OTR_EpisodeAssembler`
+  (node 7, order 12) has no way to know it is on a foley route: ShotLock
+  (node 90, order 14) is the first writer of per-shot `engine_id`, and
+  `OTR_VideoDirector` (node 87) is not wired into its `INPUT_TYPES`. An
+  optional `video_policy_json` must be APPENDED to that node and node 87 wired
+  to node 7 in `workflows/otr_canonical.json`, in the same change as the code
+  (CLAUDE.md section 0), append-only (BUG-LOCAL-097).
+* *"the connector is still wired so the mux is reachable"* -- true, but
+  incomplete: `tests/test_rip_sfx_bed_guard.py:262-271` requires that
+  connector's tooltip to say **"retired"**. Shipping a live mix without
+  rewriting that test fails CI on the first compile.
+
+---
+
+## RULING 4 -- MIME SHIPS AS GENERATE-AND-DISCARD. This SUPERSEDES 2026-08-10.
+
+Operator, 2026-08-26: *"in the MIME, you are going to ignore whatever generated
+music. So we're gonna waste some music. I get it. It's not gonna be used. But
+we'll just render it anyway to make things simpler."*
+
+**Mime is `foley 1.00 / master 0.00`, role-wide, on the same mechanism as
+`foley_plus`.** The TTS and the music cue for a mime beat ARE generated and
+then mixed to zero. The waste is accepted deliberately.
+
+### What this buys, and why it is worth the waste
+
+`docs/2026-08-10-DESIGN-BRIEF-mime-overrule.md` required that a mime lane
+generate **no** TTS or music. That constraint is what forced everything else in
+that brief: audio for a mime beat had to exist BEFORE the master froze, which
+required a new pre-audio owner node (`OTR_MimePlanRender`), an
+execution-order inversion, and a per-beat ownership ledger.
+
+**Generate-and-discard deletes all of it.** Nothing has to happen before the
+freeze, because nothing is being replaced -- the master is simply attenuated to
+zero in that window at mux time, exactly as `foley_plus` attenuates it to 0.80.
+Same pipeline, same code path, one different constant.
+
+Cost: a few seconds of unused TTS per mime beat plus one unheard music cue. On
+a one-act that is noise. Against deleting a whole node and an ordering rework,
+the trade is obvious.
+
+### THIS IS A DELIBERATE OVERRIDE, NOT AN OVERSIGHT
+
+**The 2026-08-10 "mime generates no TTS" requirement is SUPERSEDED for this
+build.** That spec is not wrong -- it solved a harder problem than the operator
+needs solved. Recorded explicitly so a future window does not read the older
+brief, conclude the rule was forgotten, and rebuild `OTR_MimePlanRender`.
+
+`kibitz-runs/2026-08-26-foley-bed` r1 CUT mime for two reasons. Only one of
+them survives this ruling:
+* **"multiplying TTS by zero does not satisfy no-TTS"** -- RESOLVED by this
+  ruling. The requirement itself is withdrawn.
+* **Role-wide scope** -- STANDS, and is now the accepted shape: engines are
+  role-wide director dropdowns, so `ltx25_high_mime` in a role means EVERY beat
+  of that role in the episode is a silent performance carrying the video's own
+  score. That is a scored-film lane, and it is what the operator is choosing.
+  Per-beat mime-cast remains out of scope and would still need the 08-10 node.
+
+### The one real edge case, and it is small
+
+The master is ONE continuous WAV, so zeroing a beat's window cuts whatever else
+occupies those samples -- including a theme or cue that spans the beat
+boundary. A cue crossing the seam into a mime beat stops mid-phrase rather than
+resolving. Equal-power crossfades already exist at
+`scene_sequencer.py:1435-1444`; a short splice at mime-window edges is the fix
+if it audibly clicks. **Polish, not a blocker** -- and explicitly NOT required
+for the first build.
+
+### What the driver got wrong, recorded so the correction sticks
+
+The driver reported that mime at 1.00/0.00 "zeros the music" as though it were
+a defect needing an operator decision. **It is the intended behaviour** -- the
+video brings its own score, so OTR's music is supposed to be off. Likewise
+"if music must stay at 1.0 this build cannot start" overstated a 20%
+attenuation under `foley_plus` into a blocker. Both framings were wrong and the
+operator corrected them.
