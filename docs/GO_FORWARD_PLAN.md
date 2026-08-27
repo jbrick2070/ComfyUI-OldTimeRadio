@@ -27,7 +27,73 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> NEXT ITEM: QUALIFY THE LTX 2.5 FOLEY BED + MIME -- A RENDER WINDOW <<<
+### >>> TAKE THIS FIRST: COCKNEY BLEED -- CODE-READY, JUST WRITE IT <<<
+
+**THE DESIGN IS DONE AND THE PLAN IS BUILD-READY. A CODER WINDOW OPENS THE PLAN
+AND TYPES.** No arc to run, no root cause to re-derive, no decision left. This
+row is at the top because it is the only open item where a coder can start
+producing code in the first minute of the window.
+
+* **The plan:** `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`
+* **The judgment:** `kibitz-runs/2026-08-27-cockney-bleed-root-fix/r4/judgment.md`
+* Design commit `f92530e2`, grounded on `6ae235a2`. **No production code and no
+  workflow JSON were changed** -- the plan is documentation only, so the coder
+  writes every line of the fix.
+
+**PROVENANCE, stated exactly.** Codex was the grounded panelist and sole judge.
+Exactly TWO external reviewers per round -- Cursor plus a rotating Gemini/Claude
+seat. R1-R4 converged, and every reviewer claim was checked against the
+repository. That is a full four-round arc; do not re-open it.
+
+**WHAT THE FIX IS, in one sentence:** replace ROSTER semantics with
+ACTIVE-OUTPUT semantics -- the Cockney rule currently fires whenever Lemmy is
+anywhere in the cast, so it reads as a scene-wide accent order and re-registers
+the whole ensemble. It must be scoped to the ACTIVE SPEAKER.
+
+**THE ACCEPTANCE CONTRACT the plan locks (P0), abbreviated:** a per-line request
+whose speaker is not Lemmy receives NO Cockney text even when `allowed_people`
+contains him; a Lemmy line receives a Lemmy-only rule plus the existing
+standard-English orthography rule; an exchange with no Lemmy slot receives no
+policy at all; a MIXED exchange gets a rule whose grammatical subject is Lemmy
+and which explicitly requires every other character to keep their own register;
+the scoping survives line retries and exchange repair; **no-Lemmy prompt
+assembly stays BYTE-IDENTICAL**; `scifi_news_pro` is untouched; and no node
+schema, widget, link or workflow value changes.
+
+**IT IS A CORRECTNESS DEFECT, NOT PROSE QUALITY.** A character's voice
+contradicting the source is exactly the class the 2026-08-04 "story quality is
+done" ruling leaves open. Operator, on published episodes: *"when lemmy is in
+the scene everyone starts talking like lemmy with a cockney speech, not just
+lemmy."*
+
+The plan carries its own caller/test update list (P2), executable regression
+coverage (P3), a build-breaker audit (P4) and the verification sequence (P5).
+Follow them; they are the reason this row is cheap.
+
+---
+
+### >>> NEXT: QUALIFY THE LTX 2.5 FOLEY BED + MIME -- A RENDER WINDOW <<<
+
+**FOLEY IS QUALIFIED AS OF 2026-08-27. MIME AND THE LISTENING TEST ARE NOT.**
+A live canonical leg on `otr_ltx25_high_foley_plus` ran 3h19m09s and published
+`signal_lost_ink_and_martyrdom_20260827_071626` to `otr/obs/`:
+`RESULT SUCCESS`, `obs_publish OK`,
+`foley_bed=mixed beats=12/13 lanes=ltx25_foley_plus:12 master_gain=0.80`,
+`foley_loudness=lufs measured=-12.29 -> target=-14.0 gain_db=-1.71
+peak_dbfs=-3.52`, and -- the line that matters --
+`foley_unpositioned=1 (no master-mix slot; normal for music_inter bridges)`,
+which is PBUG-20260826-02's killer beat being skipped instead of killing the
+episode. 37 decodes, zero fatal markers.
+
+**WHAT IS STILL OWED:** the MIME leg (running at time of writing), and **the
+listening test, which no receipt can stand in for** -- `foley_bed=mixed` proves
+the bed was decoded, placed and levelled, not that it sounds right under the
+dialogue.
+
+**A TERMINAL-NODE FAULT NO LONGER COSTS A WHOLE RENDER.**
+`scripts/otr_replay_foley_mix.py <episode_dir> [--inject-unpositioned]` replays
+the foley mix from disk artifacts in about two seconds. Use it before spending
+three hours.
 
 **THE CODE IS BUILT, GREEN AND PUSHED (2026-08-26, `a7675d37`). THIS IS NO
 LONGER A CODER ITEM.** What is left is a live leg and a pair of ears, which is
@@ -144,7 +210,7 @@ delivery gain (`otr_master_audio_mux.py`), and three appended links in
 
 ---
 
-### >>> OPEN (CODEX'S LANE -- DO NOT TAKE IT): COCKNEY BLEEDS ONTO THE WHOLE CAST <<<
+### >>> BACKGROUND ONLY: COCKNEY BLEED -- THE ROOT CAUSE, KEPT FOR THE READER <<<
 
 **Operator-observed on published episodes, 2026-08-26:** *"when lemmy is in the
 scene everyone starts talking like lemmy with a cockney speech, not just
@@ -170,8 +236,12 @@ anyone). It is NOT a prose-quality item -- a character's voice contradicting
 the source is a correctness defect, and the 2026-08-04 "story quality is done"
 ruling explicitly leaves that class open.
 
-**DO NOT TAKE THIS ROW.** This row exists so the root cause is not re-derived.
-It is the LEMMY ACCENT BLEED and nothing else.
+**THIS ROW IS NO LONGER THE WORK -- IT IS THE EXPLANATION.** The fix is
+CODE-READY at the TOP of this file
+(`docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`, design commit `f92530e2`).
+Take it from there; this section survives only so the reader understands WHY the
+scoping is wrong without re-deriving it. It is the LEMMY ACCENT BLEED and
+nothing else.
 
 **The non-audio dialogue-prompt work it used to point at is SHIPPED** (2026-08-27,
 `e923a9f3`) -- a different defect that merely shared the word "dialogue". Its
