@@ -3084,7 +3084,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # default for text engines. Precedence: M4 creative prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
-    _engine_id = str(shot.get("engine_id") or "")
+    # RESOLVED ONCE, HERE, FOR EVERY MEMBERSHIP TEST BELOW (2026-08-27). All
+    # four consumers -- strict-text-only, the two Google sets and the LTX scene
+    # allowlist -- compare against INTERNAL ids, so a shot row carrying a public
+    # menu string matched none of them: the beat skipped scene composition
+    # entirely and shipped `build_request`'s hardcoded "a 1940s radio studio"
+    # with `prompt_source` never stamped, which is the exact degrade this
+    # change exists to close. Resolution is for the COMPARISONS only --
+    # `shot["engine_id"]` is not rewritten and dispatch still uses what
+    # ShotLock stamped. `foley_stems.is_foley_route` resolves before comparing
+    # for the same reason and says so.
+    try:
+        from .._otr_shared.public_engines import resolve_engine_id as _rid
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.public_engines import resolve_engine_id as _rid  # type: ignore
+    _engine_id = str(_rid(str(shot.get("engine_id") or "")) or "")
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
@@ -3341,7 +3355,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # into `req["text_prompt"]`. That key is the ONE place they converge, and
     # this is the last point before the banana route, so the finisher runs
     # exactly once over whatever actually won.
-    _jav_engine = str(shot.get("engine_id") or "")
+    # Reuses the id resolved once above -- one normalisation for the whole
+    # request builder, not a second copy of the same map.
+    _jav_engine = _engine_id
     if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
         try:
             from .._otr_brief_reader import _read_brief_field
@@ -3363,17 +3379,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _jav_before = str(req.get("text_prompt") or "")
         _jav_after = finish_joint_av_positive(
             _jav_engine, _jav_before, music_mood_terms=_jav_moods)
+        # THE PROTECTION IS UNCONDITIONAL, THE MUTATION IS NOT (2026-08-27,
+        # found independently by two panel lanes). These two lines used to sit
+        # inside the `!=` branch below, so a prompt that ALREADY carried its
+        # suffix -- an idempotent re-entry, or a pre-finished fixture -- took
+        # the no-change path and left the scene branch's published 188-char
+        # budget standing. The banana re-cap would then trim the prompt back to
+        # 188 and throw away the mandatory non-speech tail, which is the one
+        # clause the whole seam exists to protect. A lane that keeps its audio
+        # owes that tail whether or not THIS call is what appended it.
+        _prompt_char_budget = None
+        _prompt_protected_clause = None
+        _jav_obs = req.setdefault("observability", {})
+        _jav_obs["joint_av_prompt"] = "finished"
         if _jav_after != _jav_before:
             req["text_prompt"] = _jav_after
-            # THE TAIL IS MANDATORY, so it may not be capped. The 188-char
-            # scene branch publishes a budget for the banana re-cap and the
-            # non-speech sentence lands PAST it, so `_banana_cap` would trim
-            # exactly the clause that stops the model generating voices.
-            # Clearing both fields is what makes it survive -- a protected
-            # clause would not, because the funnel protects ONE and the scene
-            # branch already spent it.
-            _prompt_char_budget = None
-            _prompt_protected_clause = None
             # Restamp the digest and length ONLY, following the banana
             # precedent below. `_stamp_prompt_meta` would overwrite
             # prompt_source/prompt_subsource, and the composing branch's
@@ -3381,11 +3401,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # audio tail finishes it, it does not author it. Without this the
             # receipt would describe the pre-tail text while a different
             # string rendered -- and evidence here is cited by hash.
-            _jav_obs = req.setdefault("observability", {})
             _jav_obs["prompt_sha8"] = hashlib.sha256(
                 _jav_after.encode("utf-8")).hexdigest()[:8]
             _jav_obs["prompt_chars"] = len(_jav_after)
-            _jav_obs["joint_av_prompt"] = "finished"
             _LOG.info(
                 "[OTR.render_driver] JOINT-AV: %s beat %s positive finished "
                 "with its audio requirement (%d -> %d chars)",

@@ -227,6 +227,79 @@ def test_a_field_that_quotes_the_whole_line_is_dropped():
     assert "steps forward" in c["text_prompt"]
 
 
+_LONG_LINE = (
+    "You have to listen to me because the caretaker never left this building "
+    "and every night since the war he has walked the third floor corridor "
+    "counting the doors one by one and marking them in a ledger nobody has "
+    "ever been allowed to read, and I have seen that ledger with my own eyes.")
+
+
+def test_a_quote_of_the_shown_context_is_caught_on_a_long_line():
+    """THE FILTER MUST COMPARE WHAT THE MODEL WAS ACTUALLY SHOWN.
+
+    M4 receives a capped slice of the line. When the filter tokenised the FULL
+    line instead, a model that quoted back exactly the slice it had been given
+    produced a sequence that was NOT the complete line -- so the filter never
+    matched and the dialogue sailed into a silent lane's prompt with no
+    warning. Measured on the real corpus: 295 of 7096 ledger lines are over the
+    cap, across 111 episodes, so this is a live path and not a curiosity.
+    """
+    assert len(_LONG_LINE) > sl._M4_LINE_CONTEXT_CHARS
+    shown = sl._line_context(_LONG_LINE)
+    led = _ledger()
+    creative, warns = sl.derive_creative_directives(
+        _beats(_LONG_LINE), led["meta"], led,
+        llm_fn=_directive_llm(expression=shown),
+        video_policy=_policy("minimax_h3_video"))
+    prompt = creative["b1"]["text_prompt"]
+    assert shown[:80] not in prompt
+    assert "restrained visible reaction" in prompt          # fell back
+    assert any("spoken line back into" in w for w in warns)
+
+
+def test_the_model_is_shown_exactly_what_the_filter_compares():
+    """One value, two consumers. If these ever diverge the filter is hunting a
+    sequence the model was never in a position to emit."""
+    led = _ledger()
+    seen = []
+    sl.derive_creative_directives(
+        _beats(_LONG_LINE), led["meta"], led, llm_fn=_capturing_llm(seen),
+        video_policy=_policy("minimax_h3_video"))
+    shown = sl._line_context(_LONG_LINE)
+    assert shown in seen[0]
+    assert _LONG_LINE not in seen[0]        # the raw line is never sent whole
+
+
+def test_the_line_context_cuts_on_a_word_boundary():
+    ctx = sl._line_context(_LONG_LINE)
+    assert len(ctx) <= sl._M4_LINE_CONTEXT_CHARS
+    assert _LONG_LINE.startswith(ctx)
+    assert not ctx.endswith(" ")
+    # a whole final token, never a half-word the filter could not match
+    assert _LONG_LINE[len(ctx)] in (" ", "") or ctx == _LONG_LINE
+
+
+def test_a_short_line_is_passed_through_untouched():
+    assert sl._line_context(_LINE) == _LINE
+    assert sl._line_context("") == ""
+    assert sl._line_context(None) == ""
+
+
+def test_a_non_latin_line_is_still_filtered():
+    """The ASCII-only tokenizer produced NO tokens for a wholly non-Latin
+    line, so the filter answered False for an exact quotation -- silently inert
+    on exactly the material the adaptation lanes carry in the author's own
+    language."""
+    cyrillic = "Мы должны уйти"
+    assert sl._word_tokens(cyrillic), "non-Latin line produced no tokens"
+    led = _ledger()
+    c = sl.derive_creative_directives(
+        _beats(cyrillic), led["meta"], led,
+        llm_fn=_directive_llm(expression=cyrillic),
+        video_policy=_policy("minimax_h3_video"))[0]["b1"]
+    assert cyrillic not in c["text_prompt"]
+
+
 def test_yes_does_not_match_inside_eyes():
     """The filter compares whole-word TOKENS. A substring test would delete a
     perfectly good expression because the line happened to be 'Yes.'"""
@@ -448,6 +521,59 @@ def test_the_non_speech_tail_is_last(engine, tail):
     assert ltx25.finish_joint_av_positive(engine, _CORE).endswith(tail)
 
 
+def test_a_curly_apostrophe_tokenises_like_an_ascii_one():
+    """Gutenberg and the adaptation lanes are full of U+2019. Without folding,
+    "I<U+2019>ll" splits into "i" + "ll" while "I'll" stays one token, so the
+    same words spelled two ways would not compare equal and an exact quote
+    would slip the filter."""
+    assert sl._word_tokens("I’ll go") == sl._word_tokens("I'll go")
+    led = _ledger()
+    line = "I’ll never tell them"
+    c = sl.derive_creative_directives(
+        _beats(line), led["meta"], led,
+        llm_fn=_directive_llm(expression="I'll never tell them"),
+        video_policy=_policy("minimax_h3_video"))[0]["b1"]
+    assert "never tell them" not in c["text_prompt"]
+
+
+def test_a_non_latin_line_reaches_the_writer_unescaped():
+    """The shared-value invariant has to hold in the PROMPT, not just in
+    Python: escaped as \\uXXXX the model is shown something the filter, which
+    tokenises the decoded string, could never match."""
+    led = _ledger()
+    seen = []
+    cyrillic = "Мы должны уйти сейчас"
+    sl.derive_creative_directives(
+        _beats(cyrillic), led["meta"], led, llm_fn=_capturing_llm(seen),
+        video_policy=_policy("minimax_h3_video"))
+    assert cyrillic in seen[0], "the line was escaped before the model saw it"
+
+
+@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+@pytest.mark.parametrize("trailing", [".", ", ", " ,", ";", ":", ".."])
+def test_stray_punctuation_after_the_suffix_does_not_stack_it(engine, trailing):
+    """A prompt already carrying its suffix must not collect a second copy,
+    even with stray punctuation after it.
+
+    The obvious repair -- strip the core's punctuation and THEN test endswith
+    -- is wrong, and was proposed as the fix: every suffix ends in a period of
+    its own, so stripping the core removes it and an ordinary finished prompt
+    fails the test. That would have turned this narrow edge into a defect on
+    the common path.
+    """
+    once = ltx25.finish_joint_av_positive(engine, _CORE)
+    again = ltx25.finish_joint_av_positive(engine, once + trailing)
+    assert again.count("No speech") == 1, again
+
+
+def test_the_ordinary_idempotent_case_still_holds():
+    """The guard above must not have broken the common path it protects."""
+    for engine in ("ltx25_foley_plus", "ltx25_mime"):
+        once = ltx25.finish_joint_av_positive(engine, _CORE)
+        assert ltx25.finish_joint_av_positive(engine, once) == once
+        assert once.count("No speech") == 1
+
+
 def test_the_helper_has_no_dialogue_argument():
     import inspect
     params = inspect.signature(ltx25.finish_joint_av_positive).parameters
@@ -579,6 +705,59 @@ def test_the_mandatory_tail_is_never_trimmed_by_a_prompt_budget(_text_only_lane)
     prompt = req["text_prompt"]
     assert len(prompt) > 188, len(prompt)      # past the scene branch's budget
     assert prompt.endswith(_FOLEY), prompt[-140:]
+
+
+def test_an_already_finished_prompt_still_gets_its_budget_cleared(
+        monkeypatch, _text_only_lane):
+    """THE PROTECTION IS UNCONDITIONAL, THE MUTATION IS NOT.
+
+    Clearing the prompt budget used to sit inside the "did the text change"
+    branch, so a prompt that ALREADY carried its suffix took the no-change path
+    and left the scene branch's published budget standing -- and the banana
+    re-cap would then trim away the mandatory non-speech tail, the one clause
+    this seam exists to protect. A lane that keeps its audio owes that tail
+    whether or not this call is what appended it.
+    """
+    monkeypatch.setenv("OTR_LTX_RADIO_PROMPT",
+                       "a quiet console at midnight, " + _FOLEY)
+    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+                                     _open_ledger())
+    assert req["text_prompt"].count("pure action.") == 1     # not stacked
+    assert req["observability"]["joint_av_prompt"] == "finished"
+    assert req["text_prompt"].endswith(_FOLEY)
+
+
+def test_a_public_menu_id_on_the_shot_row_still_gets_finished(_text_only_lane):
+    """`is_foley_route` resolves ids before comparing, for the stated reason
+    that a policy can hold a public menu string. The finisher compares the same
+    way, or a beat that really is on the route silently skips its audio
+    requirement."""
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    assert resolve_engine_id("ltx25_high_foley_plus") == "ltx25_foley_plus"
+    shot = _open_shot("ltx25_high_foley_plus")
+    req = rd.build_request_from_shot(shot, _open_ledger())
+    prompt = req["text_prompt"]
+    assert req["observability"].get("joint_av_prompt") == "finished"
+    assert prompt.endswith(_FOLEY)
+    # THE ASSERTIONS ABOVE ARE NOT SUFFICIENT ON THEIR OWN, and an earlier cut
+    # of this test proved it: with the id unresolved at the SCENE allowlist the
+    # beat kept build_request's hardcoded default and then had the suffix
+    # appended, so `endswith` and the receipt both passed while the prompt was
+    # the exact degrade this change exists to close. Pin the composition too.
+    assert "a 1940s radio studio" not in prompt
+    assert req["observability"]["prompt_source"] == "motion_role"
+    # the row itself is NOT rewritten -- resolution was for the comparison only
+    assert shot["engine_id"] == "ltx25_high_foley_plus"
+
+
+def test_a_public_menu_mime_id_is_also_finished(_text_only_lane):
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    assert resolve_engine_id("ltx25_high_mime") == "ltx25_mime"
+    req = rd.build_request_from_shot(_open_shot("ltx25_high_mime"),
+                                     _open_ledger())
+    assert "a 1940s radio studio" not in req["text_prompt"]
+    assert req["text_prompt"].endswith(_MIME_TAIL)
+    assert req["observability"]["prompt_source"] == "motion_role"
 
 
 def test_the_composing_branchs_provenance_survives_the_finisher(_text_only_lane):

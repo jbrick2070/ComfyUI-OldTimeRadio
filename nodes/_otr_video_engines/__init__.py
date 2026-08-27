@@ -169,17 +169,21 @@ except Exception:  # noqa: BLE001
 # A NORMAL selectable row (requires_flag=None, empty default_roles); it fails
 # CLOSED until the Q3 DiT, the Gemma-4 encoder and BOTH VAEs are on disk.
 #
-# TWO registrations out of eng_ltx25 since 2026-08-26: `ltx25_video` and
-# `ltx25_foley_plus`. The foley lane is the same graph keeping the audio the
-# silent lane throws away, mixed UNDER the master at OTR_MasterAudioMux -- which
-# runs AFTER video, so the execution-order inversion this comment used to cite
-# as the blocker was never needed for a bed. It was needed for a lane whose
-# audio REPLACES the beat audio, which is `ltx25_mime`, and mime is still not
-# here: it wants a per-window master gain rather than the global 0.80, so it
-# lands with its own pass. Its id stays RESERVED in
-# eng_ltx25.LTX25_RESERVED_SIBLING_IDS so nobody spends it, and it stays out of
-# the menu, per the operator (2026-08-19): a dropdown row that cannot make an
-# episode is worse than a missing one.
+# THREE registrations out of eng_ltx25 since 2026-08-26: `ltx25_video`,
+# `ltx25_foley_plus` and `ltx25_mime`. The foley lane is the same graph keeping
+# the audio the silent lane throws away, mixed UNDER the master at
+# OTR_MasterAudioMux -- which runs AFTER video, so the execution-order inversion
+# this comment used to cite as the blocker was never needed for a bed. It was
+# needed for a lane whose audio REPLACES the beat audio, which is `ltx25_mime`.
+#
+# MIME IS HERE. This comment said it was still reserved and out of the menu
+# until 2026-08-27, and that was stale from the day it was written: the operator
+# overrode the deferral mid-build ("foley and mime we need this feature for
+# both"), so mime shipped in the SAME change as foley with a per-window master
+# gain instead of the global 0.80. `LTX25_RESERVED_SIBLING_IDS` is now empty --
+# nothing is reserved. The 2026-08-19 rule it cited still stands on its own
+# terms (a dropdown row that cannot make an episode is worse than a missing
+# one); mime simply is not such a row any more.
 #
 # Cold-import clean (V-12: torch and every LTX node class are lazy inside
 # load/render_clip). Guarded so a packaging quirk never breaks the namespace

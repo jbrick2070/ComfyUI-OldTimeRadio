@@ -26,13 +26,15 @@ So there are now exactly two seams, ``_on_graph_result`` and
 smallest pair that lets the sibling avoid copying either ``_build_graph`` or the
 200-line ``render_clip``.
 
-``ltx25_mime`` IS STILL RESERVED AND STILL UNREGISTERED. It is the SAME
-mechanism at 1.00 / 0.00 (the operator ruled it back in on 2026-08-26 as
-generate-and-discard), but a per-window master gain is a different fork from the
-global 0.80 this file ships, so it gets its own pass rather than being smuggled
-in here. Its id stays in ``LTX25_RESERVED_SIBLING_IDS`` so nobody spends it, and
-it stays out of the menu: a row that cannot make an episode is worse than a
-missing one. Per lesson L5 these are separate INTERNAL engines, never one id
+``ltx25_mime`` IS REGISTERED AND PUBLIC -- this paragraph said the opposite
+until 2026-08-27 and was wrong from the moment the lane shipped. It is the SAME
+mechanism at 1.00 / 0.00 (generate-and-discard), and the operator overrode the
+spec's deferral mid-build ("foley and mime we need this feature for both"), so
+both lanes landed in ONE change: ``@register class Ltx25MimeEngine`` below,
+public id ``ltx25_high_mime``, and ``LTX25_RESERVED_SIBLING_IDS`` is now empty
+because nothing is reserved any more. Two panel lanes flagged this text
+independently, which is what a stale comment costs: the next integrator reads
+top-down and leaves mime off an allowlist it belongs on. Per lesson L5 these are separate INTERNAL engines, never one id
 with a switch -- two public ids on one internal id collapses
 ``_INTERNAL_TO_PUBLIC`` and trips the bijection assert AT IMPORT, which empties
 most of the ComfyUI menu.
@@ -1648,9 +1650,11 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     WHAT THIS LANE DOES *NOT* DO. It does not touch the mp4, which stays silent
     and still proves it with ffprobe; ``has_audio`` stays False and invariant
     V-1 is unchanged. Mime (the same mechanism at 1.00 / 0.00, generate-and-
-    discard) is the NEXT item and is deliberately not smuggled in here: a
-    per-window master gain is a different fork from a global 0.80, and
-    ``ltx25_mime`` stays reserved and unregistered until it gets its own pass.
+    discard) SHIPPED ALONGSIDE THIS LANE rather than after it -- the operator
+    overrode the deferral mid-build -- so ``Ltx25MimeEngine`` below is
+    registered and public. This paragraph claimed the opposite until
+    2026-08-27; a per-window master gain really is a different fork from the
+    global 0.80, which is why it is a subclass and not a flag.
     """
 
     name = "ltx25_foley_plus"
@@ -2054,10 +2058,21 @@ def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
         lead = ", ".join(moods) if moods else _MIME_DEFAULT_LEAD
         suffix = "%s %s" % (lead, _MIME_TAIL)
     core = positive.rstrip()
-    if core.endswith(suffix):
+    # ALREADY FINISHED? Compare with trailing punctuation normalised on BOTH
+    # SIDES (2026-08-27). Each suffix ends in a period of its OWN, so a prompt
+    # that legitimately ends in one is caught by the first test; the second
+    # catches a prompt carrying stray punctuation AFTER the suffix, which the
+    # first cannot see.
+    #
+    # The obvious-looking repair -- strip the core first, then test -- is WRONG
+    # and was proposed as the fix by a panel lane: stripping the core removes
+    # the suffix's own period, so an already-finished prompt fails the test and
+    # collects a SECOND copy of the suffix. That would have turned a narrow
+    # edge case into a defect on the common path.
+    trimmed = core.rstrip(" ,.;:")
+    if core.endswith(suffix) or trimmed.endswith(suffix.rstrip(" ,.;:")):
         return positive
-    core = core.rstrip(" ,.;:")
-    return core + ", " + suffix
+    return (trimmed + ", " + suffix) if trimmed else suffix
 
 
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",

@@ -791,9 +791,53 @@ def _lane_preserves_dialogue(engine_id, role) -> bool:
     return family in _mouth.AUDIO_IN_FAMILIES or lookup == "still_word"
 
 
+#: How much of the spoken line M4 is shown as CONTEXT on a silent lane.
+_M4_LINE_CONTEXT_CHARS = 240
+
+
+def _line_context(text) -> str:
+    """The capped slice of the spoken line a silent lane's writer is shown.
+
+    ONE VALUE, TWO CONSUMERS, AND THAT IS THE WHOLE POINT (2026-08-27). The M4
+    payload used to send ``b["text"][:240]`` while the literal-line filter
+    tokenised the FULL line. On any line longer than the cap the model could
+    quote back, verbatim, exactly what it had been shown -- and the filter,
+    hunting the COMPLETE line's token run, would not match it. The quote sailed
+    into the prompt with no warning at all.
+
+    Not theoretical: measured over the real corpus, 295 of 7096 ledger lines
+    are over the cap, across 111 episodes. Found by the Codex panel lane and
+    reproduced before it was believed.
+
+    Cut on a word boundary, so the last token is whole -- a half-word is a
+    token the filter could never match anyway.
+    """
+    raw = str(text or "")
+    if len(raw) <= _M4_LINE_CONTEXT_CHARS:
+        return raw
+    cut = raw[:_M4_LINE_CONTEXT_CHARS]
+    head, sep, _tail = cut.rpartition(" ")
+    return head if sep else cut
+
+
 def _word_tokens(text) -> list:
-    """Lowercased whole-word tokens. Punctuation and spacing are not evidence."""
-    return re.findall(r"[a-z0-9']+", str(text or "").lower())
+    """Casefolded whole-word tokens. Punctuation and spacing are not evidence.
+
+    UNICODE-AWARE, not ASCII (2026-08-27). ``[a-z0-9']`` produced NO tokens at
+    all for a wholly non-Latin line, which made ``_repeats_the_line`` answer
+    False for an exact quotation -- the filter was silently inert on exactly
+    the material the adaptation lanes carry in the author's own language.
+    ``casefold`` rather than ``lower`` for the same reason.
+    """
+    #: Typographic apostrophes fold to the ASCII one FIRST. Public-domain and
+    #: Gutenberg source text is full of U+2019, and without this "I<U+2019>ll"
+    #: tokenises as "i" + "ll" while an ASCII "I'll" stays one token -- so the
+    #: same words spelled two ways would not compare equal. Same defect class
+    #: as the ASCII-only pattern this replaced.
+    folded = str(text or "").casefold()
+    for _curly in ("’", "‘", "‚", "‛", "ʼ"):
+        folded = folded.replace(_curly, "'")
+    return re.findall(r"[^\W_]+(?:'[^\W_]+)*", folded, re.UNICODE)
 
 
 def _repeats_the_line(field, line_tokens) -> bool:
@@ -956,8 +1000,17 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
             json.dumps({
                 "beat_id": b["beat_id"],
                 "character": appearance[:160],
-                "line_context_do_not_quote": b["text"][:240],
-            }, ensure_ascii=True)
+                # The SAME capped value the filter compares against; see
+                # `_line_context`. Sending one slice and filtering on another
+                # is how an exact quote of the shown context got through.
+                "line_context_do_not_quote": _line_context(b["text"]),
+                # ensure_ascii FALSE, unlike the spoken-path builder above, and
+                # that is the point of "one value, two consumers": escaped as
+                # \uXXXX the model is shown something the filter -- which
+                # tokenises the DECODED string -- could never match, so the
+                # shared-value invariant would hold in Python and be false in
+                # the only place it matters.
+            }, ensure_ascii=False)
         )
     return "\n".join(lines)
 
@@ -1088,7 +1141,10 @@ def derive_creative_directives(
                 # that anchor opens with "speaking to camera", which is the
                 # instruction that made H3's Caretaker mouth a line it had no
                 # way to voice.
-                line_tokens = _word_tokens(b["text"])
+                # The capped context, NOT the raw line -- the model can only
+                # quote what it was shown, and comparing against a longer
+                # sequence than it ever saw is a filter that cannot fire.
+                line_tokens = _word_tokens(_line_context(b["text"]))
                 kept = {}
                 for key in _DIRECTIVE_KEYS:
                     value = str(d.get(key) or "").strip()
