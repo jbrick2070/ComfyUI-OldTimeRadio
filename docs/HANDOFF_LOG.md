@@ -1,3 +1,124 @@
+## 2026-08-27 -- HEAD ae7c9d37 +handoff (v2.0-alpha) -- CODER (silent lanes stop mouthing dialogue; a panel found the leak my tests were hiding; foley QUALIFIED; 8 commits)
+
+**THE BOX IS BUSY AND THAT IS DELIBERATE. DO NOT RESET IT.** A background chain
+is rendering MIME now (15 foley decodes, GPU ~14.1 GB, zero fatal markers) and
+launches the H3 1-act leg after it, unattended. The operator asked for a coder
+prompt precisely so he can code while the GPU works. **The next CODER window
+takes the Cockney row and does not touch port 8000.** The handoff rule against
+wrapping up with tasks in flight is satisfied by reporting them, not by killing
+a qualification leg that has already cost three hours.
+
+Did: shipped the non-audio prompt-policy fix, then had a panel take it apart.
+  THE DEFECT. `otr_shot_lock.py` prepended `_subject_anchor`'s literal "face
+  visible, speaking to camera" AND the beat's spoken line to EVERY
+  character-bearing beat with no check on the routed engine. `minimax_h3_video`
+  decodes no audio, so it drew a mouth in motion. Every beat of published
+  `signal_lost_the_caretakers_clause_20260826_155835` ran on that lane. Filed as
+  PBUG-20260827-01, promoted to Bible **12.136** (314 -> 315) with its coverage
+  index row. It is NOT lip-sync to the TTS -- that lane never receives the WAV.
+  THE FIX (`e923a9f3`). One resolution, four consumers: `_policy_engine_for_role`
+  is shared with `build_execution_plan`, so prompt policy and shot row cannot
+  disagree about which engine renders. Audio-in families and `still_word` keep
+  dialogue byte-for-byte; every other character lane gets nonverbal
+  expression/motion/camera with the line private to M4.
+  **THE CONTRACT NAMED A FAMILY THAT DOES NOT EXIST.** It ordered a gate on
+  registry family `character_video`. That is a ROLE, not a family -- every
+  character engine is image_to_video / audio_driven_face / static_image_gen /
+  etc. -- so the gate would have raised on 100% of character beats including the
+  H3 lane the fix exists to prove. Caught pre-code. The operator then struck the
+  rest of it: *"we dont hide models behind any gates, they appear in the dropdown
+  and if they fail they fail, no fallbacks."*
+  A SECOND DEFECT FELL OUT OF THE WIRING: `ltx25_foley_plus` / `ltx25_mime`
+  matched NO prompt branch at all, so a foley or mime OPEN shipped
+  `build_request`'s hardcoded "a 1940s radio studio" with `prompt_source` never
+  stamped. Both joined the scene allowlist and `_LTX_OPEN_ENGINES`.
+  **THE PANEL FOUND A REAL LEAK AND ONE OF MY OWN TESTS WAS HIDING IT**
+  (`6ae235a2`). Codex: M4 was shown `line[:240]` while the filter tokenised the
+  FULL line, so a writer quoting back verbatim what it was shown slipped
+  through. Reproduced, then measured -- **295 of 7096 ledger lines over the cap
+  across 111 episodes**. Cursor then caught that
+  `test_a_public_menu_id_on_the_shot_row_still_gets_finished` PASSED while the
+  prompt was the hardcoded radio-studio default, because the scene allowlist
+  still compared the raw id. Verified by execution, not reading.
+  ALSO: budget protection and the joint-AV receipt made unconditional;
+  idempotence normalised on both sides; Unicode tokenisation with curly
+  apostrophes folded; three stale comments claiming `ltx25_mime` is unregistered.
+  **FOLEY IS QUALIFIED.** A live canonical leg ran 3h19m09s and published
+  `signal_lost_ink_and_martyrdom_20260827_071626` to `otr/obs/`: `RESULT
+  SUCCESS`, `obs_publish OK`, `foley_bed=mixed beats=12/13
+  lanes=ltx25_foley_plus:12 master_gain=0.80`, `foley_loudness=lufs
+  measured=-12.29 -> target=-14.0 gain_db=-1.71 peak_dbfs=-3.52`, and
+  `foley_unpositioned=1 (no master-mix slot; normal for music_inter bridges)` --
+  PBUG-20260826-02's killer beat skipped instead of killing the episode.
+  ALSO FIXED, inherited and red at `ba50e7b4`: four hand-kept `.env.json`
+  `master_hash` values describing graphs that no longer existed (`571c1fa3`),
+  proven pre-existing on a pristine detached worktree before being touched.
+
+Learned: (1) **VERIFY A CONTRACT'S NOUNS AGAINST THE REGISTRY BEFORE CODING.** A
+  four-round converged spec named a family that has never existed. The reviewers
+  who caught it were the ones asked a specific falsifiable question, not the ones
+  asked to review broadly. (2) **A GREEN TEST IS NOT A COVERED CASE.** Mine
+  asserted `endswith(suffix)` and a receipt key, both true while the prompt was
+  the exact degrade being fixed. Pin the COMPOSITION, not just the tail.
+  (3) **A monitor that cries wolf is a monitor you stop reading.** v1 of the
+  foley babysitter grepped for `Traceback` and false-alarmed on poll 1 -- ComfyUI
+  prints 12 benign boot warnings, and they were in the FAILED log too, so they
+  distinguish nothing. Not every `[ERROR]` is fatal either: `[ledger_clean]` logs
+  ERROR and says in the same line that a render is never killed for it. v2 keys
+  on `!!! Exception during processing !!!` and on "finished but never published",
+  and was self-tested against a known-bad and a known-good log before being
+  trusted. (4) **The conftest suppresses pytest's summary on a failing run** --
+  import the test module and call the function directly. (5) A bare `Director` in
+  a comment fails the legacy audit; write `OTR_VideoDirector`.
+
+Proof: full suite **12357 passed / 121 skipped / 1 xfailed** (512.88 s, EXIT=0,
+  no known-fail-guard block) -- fully green, which it was NOT at `ba50e7b4`.
+  Bible **22 / 26 / 3**, 315 entries, Bible repo at `91e4ceaf`.
+  `build_variants --check` **60 / 0**. Canonical workflow BYTE-IDENTICAL, 23
+  nodes / 60 links, 23/23 audited against live INPUT_TYPES. Focused tests
+  59 -> 82. `resolve_engine_id` verified IDENTITY on all 32 registered engines,
+  so the new resolve cannot alter any existing lane. AST/BOM/zero-byte clean;
+  HEAD == origin; untracked `uv.lock` preserved throughout.
+
+Models: rung 5 (Opus) drove and judged. Rung 4 (Sonnet 5) took three scoped
+  passes -- pre-code grounding, frozen-diff QA (blockers: none), and a merged-HEAD
+  interaction QA against another window's `499312bb` (no interaction defects).
+  Then a **SCOPED r3 -> r4 Kibitz campaign, NOT a full arc** -- scope receipt at
+  `kibitz-runs/2026-08-27-nonaudio-prompt-fix/scope_receipt.md`, r1 and r2
+  deliberately omitted because the design had already converged in the 08-26
+  campaign and the code was shipped. Six external calls, half a full arc, and it
+  is described that way everywhere. Lanes: Codex `gpt-5.6-sol`, Antigravity
+  Gemini 3.7 Flash (High), Cursor Grok 4.6 High; pins verified current at start.
+  **Two panel remedies were REJECTED with reasons on the record**, including one
+  that would have appended a SECOND suffix to every already-finished prompt.
+  A correction is recorded in `r3/judgment.md`: it originally said Cursor did not
+  return -- Cursor landed two minutes after synthesis, and all three lanes did
+  return.
+
+Commits: `e923a9f3` (prompt policy + 59 tests), `571c1fa3` (four env
+  master_hash), `b6b4b997` + `b055346f` + `b1c18d78` (plan/handoff, the H3
+  command and label, the dead "wait for foley" row), `6ae235a2` (panel fixes,
+  82 tests, `scripts/otr_replay_foley_mix.py`), `2eff355e` (Cockney to the top),
+  `ae7c9d37` (PBUG-20260827-01 + 143 lines archived). Bible repo: `7719ab26`,
+  `91e4ceaf`. The handoff commit lands ON TOP of these -- the sha in the heading
+  is the SECOND-TO-LAST on the branch; the last is this handoff. See the kickoff
+  line for the real head.
+
+Current step: **Cockney bleed is TOP of the queue and CODE-READY** -- plan at
+  `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`, design commit `f92530e2`,
+  documentation-only so the coder writes every line. Seven open rows remain after
+  143 lines of closed work went to the archive verbatim.
+
+Next: take Cockney. It needs no arc and no GPU. **Do not touch port 8000** --
+  mime is rendering and H3 follows. Two things stay owed and neither is the next
+  window's unless it is also driving the box: the **listening test** on the
+  published foley episode (no receipt substitutes for ears), and the **live H3
+  acceptance proof**, whose paste-ready command and exact dropdown label are in
+  the plan. Also filed for whoever owns the ledger: **`PBUG-20260826-02` is used
+  TWICE** (stills face-anchor `bd1aa021`, foley bridge `499312bb`) -- not
+  renumbered unilaterally because both ids are already cited in commits, the
+  Bible index and GO_FORWARD.
+
 ## 2026-08-27 -- HEAD 571c1fa3 (v2.0-alpha) -- CODER (silent lanes stop mouthing dialogue; 2 commits; live H3 proof still owed)
 
 Did: shipped the converged non-audio prompt-policy fix, and fixed a second
