@@ -190,10 +190,23 @@ A vanilla canonical run does NOT prove it -- the canonical defaults to the
 still floor, so no character beat reaches H3 at all. The leg has to select
 `minimax_h3_video` deliberately.
 
+**THE COMMAND IS READY -- do not improvise a harness.**
+`scripts/otr_headless_canonical.ps1` is the sanctioned wrapper: it resets
+selectively, boots the UTF-8 launcher, and ALWAYS loads the real canonical.
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile none -Acts 2 -Set "OTR_VideoDirector.character_video_model=h3_low_video (16:9)"
+```
+
+**`h3_low_video (16:9)` is the EXACT dropdown label** (public id `h3_low_video`
+-> internal `minimax_h3_video`), verified against the live
+`OTR_VideoDirector.INPUT_TYPES()` on 2026-08-27; the sibling labels are
+`ltx25_high_foley_plus (16:9)` and `ltx25_high_mime (16:9)`. Pin per leg with
+the label -- never by editing a profile.
+
 * Reset per `CLAUDE.md` section 4 (selective kill by CommandLine, port 8000
-  empty, GPU back to ~1.5 GB) and boot via the UTF-8 launcher.
-* Load the real `workflows/otr_canonical.json`. Select `minimax_h3_video`
-  through the Director pick or the `OTR_FORCE_ENGINE_MAP` runtime override.
+  empty, GPU back to ~1.5 GB); the wrapper does this, but verify it happened.
 * **A FRESH EPISODE ID IS MANDATORY.** `request_hash` excludes prompt bytes, so
   an existing clip is cache-eligible and an old SPEAKING clip would be reused
   -- a false pass that looks exactly like a real one.
