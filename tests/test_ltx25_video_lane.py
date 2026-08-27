@@ -40,6 +40,8 @@ from nodes._otr_video_engines.frame_contract import (
 
 
 ENGINE = "ltx25_video"
+#: Its foley sibling: the SAME graph, keeping the audio this lane discards.
+FOLEY = "ltx25_foley_plus"
 
 
 @pytest.fixture()
@@ -97,19 +99,229 @@ def test_acceptance_API_places_HQ_in_all_three_role_slots():
         "character_video_model")] == ["ltx25_high_video (16:9)"] * 3
 
 
-def test_the_two_sibling_lanes_are_reserved_but_NOT_registered():
-    """THE CONSTRUCTION-SITE RULE (operator, 2026-08-19). Chunk B is blocked on
-    an execution-order change, so `mime` and `foley_plus` cannot render. A
-    dropdown row that cannot make an episode is worse than a missing one -- and
-    the names are still spoken for, so nobody spends them on something else."""
+def test_nothing_is_reserved_any_more_and_the_RULE_still_stands():
+    """THE CONSTRUCTION-SITE RULE (operator, 2026-08-19) -- now with nothing
+    left to hold back.
+
+    This test named BOTH Chunk B siblings when it was written. Both shipped on
+    2026-08-26 (operator: "foley and mime, we need this feature for both"), so
+    the reserved tuple is empty -- and the rule it encodes is unchanged and
+    still tested: an id named in that tuple is spoken for and must NOT be
+    registered until it can actually render an episode.
+
+    An EMPTY tuple is a statement, not a leftover. It says "nothing is
+    pending", which is different from the symbol having been deleted, and the
+    next LTX 2.5 sibling reserves its name there first."""
     reserved = set(eng_ltx25.LTX25_RESERVED_SIBLING_IDS)
-    assert reserved == {"ltx25_mime", "ltx25_foley_plus"}
+    assert reserved == set(), (
+        "something is reserved again -- if it can render, register it; if it "
+        "cannot, this test is the gate that says so: %s" % sorted(reserved))
     registered = set(vreg.all_engine_names())
     assert not (reserved & registered), (
-        "a Chunk B lane registered before its audio path exists: %s"
+        "a lane registered while still reserved: %s"
         % sorted(reserved & registered))
     for internal in reserved:
         assert internal not in pub._INTERNAL_TO_PUBLIC
+    # Both former reservations are now REAL, on their own internal engines.
+    assert {"ltx25_foley_plus", "ltx25_mime"} <= registered
+    assert pub._PUBLIC_ENGINES["ltx25_high_mime"] == "ltx25_mime"
+
+
+def test_the_foley_lane_is_registered_public_and_on_the_capability_roster():
+    """The three surfaces a lane needs, and `registry IS the menu` means all
+    three or none: a registered engine with no CAPABILITIES row is the roster
+    hole `audit_engine_roster` exists to catch, and a public id with no
+    internal engine empties the ComfyUI menu at import (lesson L5)."""
+    assert FOLEY in vreg.all_engine_names()
+    assert FOLEY in vreg.CAPABILITIES
+    audit = vreg.audit_engine_roster()
+    assert not audit["missing"], audit["missing"]
+    assert not audit["unexpected"], audit["unexpected"]
+    assert pub._PUBLIC_ENGINES["ltx25_high_foley_plus"] == FOLEY
+    assert pub._INTERNAL_TO_PUBLIC[FOLEY] == "ltx25_high_foley_plus"
+    assert pub.resolve_engine_id("ltx25_high_foley_plus (16:9)") == FOLEY
+    # The label is what the operator picks from, and this lane changes the
+    # WHOLE episode mix -- a label that only described the picture would hide
+    # the actual consequence of choosing it.
+    label = pub._PUBLIC_LABEL["ltx25_high_foley_plus"].lower()
+    assert "foley" in label and "0.20" in label
+
+
+def test_the_foley_lane_never_wears_the_ripped_beds_name():
+    """`sfx` is a TOMBSTONE, not a synonym (rip-sfx, 2026-08-06). Operator:
+    "sfx bed is different than foley bed, i won't get the two confused." An id
+    or a field here wearing that prefix would read as resurrecting the path he
+    deliberately killed.
+
+    CHECKED OVER IDENTIFIERS AND KEY-SHAPED LITERALS, NOT RAW TEXT. Prose is
+    exactly where the two features SHOULD be told apart, so a text scan would
+    forbid the one place the distinction belongs and prove nothing about the
+    code. This walks the AST of both foley modules instead: every name bound,
+    read or called, and every string literal short enough to be a key."""
+    import ast
+
+    from nodes._otr_video_engines import foley_stems as fs
+
+    assert "sfx" not in FOLEY
+    assert all("sfx" not in key for key in eng_ltx25.LTX25_FOLEY_RECEIPT_KEYS)
+
+    offenders = []
+    for module in (eng_ltx25, fs):
+        tree = ast.parse(inspect.getsource(module))
+        docstrings = {ast.get_docstring(n, clean=False)
+                      for n in ast.walk(tree)
+                      if isinstance(n, (ast.Module, ast.ClassDef,
+                                        ast.FunctionDef))}
+        for node in ast.walk(tree):
+            found = None
+            if isinstance(node, ast.Name):
+                found = node.id
+            elif isinstance(node, ast.Attribute):
+                found = node.attr
+            elif isinstance(node, ast.arg):
+                found = node.arg
+            elif isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                found = node.name
+            elif isinstance(node, ast.keyword):
+                found = node.arg or ""
+            elif (isinstance(node, ast.Constant)
+                  and isinstance(node.value, str)
+                  and " " not in node.value
+                  and node.value not in docstrings):
+                found = node.value
+            if found and "sfx" in found.lower():
+                offenders.append((module.__name__, found))
+    # The only legal mention is a POINTER AT THE TOMBSTONE -- the guard test's
+    # own filename -- never a field, an id, or a parameter.
+    assert [o for o in offenders
+            if o[1] != "tests/test_rip_sfx_bed_guard.py"] == [], offenders
+
+
+def test_the_foley_lane_inherits_the_picture_and_touches_nothing_about_it():
+    """The two lanes must render the SAME picture. The whole feature is "keep
+    the audio we already computed" -- a foley lane that also changed the recipe
+    would make every A/B between them meaningless, and the recipe is not on the
+    table (standing directive)."""
+    base = eng_ltx25.Ltx25VideoEngine()
+    foley = eng_ltx25.Ltx25FoleyPlusEngine()
+    plan = {"text_prompt": "probe", "seed": 42}
+    assert (foley._build_graph(plan, "still.png", 97, 832, 480)
+            == base._build_graph(plan, "still.png", 97, 832, 480))
+    for attr in ("family", "render_canvas", "target_fps", "frame_contract",
+                 "required_inputs", "still_plan", "default_roles"):
+        assert getattr(foley, attr) == getattr(base, attr), attr
+
+
+def test_the_audio_decoder_is_resolved_by_the_foley_lane_and_ONLY_by_it():
+    """V-1 for the silent lane, preflight for the foley one.
+
+    `ltx25_video` must not even RESOLVE the decoder; `ltx25_foley_plus` must,
+    because `assert_usable` walks exactly this dict -- so a box whose ComfyUI
+    predates nodes_lt_audio.py fails CLOSED by name at preflight instead of
+    twenty minutes into a render."""
+    base = set(c for cands in eng_ltx25.Ltx25VideoEngine()._node_candidates()
+               .values() for c in cands)
+    foley = eng_ltx25.Ltx25FoleyPlusEngine()._node_candidates()
+    flat = set(c for cands in foley.values() for c in cands)
+    assert "LTXVAudioVAEDecode" not in base
+    assert "LTXVAudioVAEDecode" in flat
+    assert foley["audio_decode"] == ("LTXVAudioVAEDecode",)
+    assert foley["audio_vae_loader"] == ("VAELoader",)
+
+
+def test_the_audio_decode_is_NOT_in_the_first_graph_because_of_02_GiB():
+    """THE VRAM CONTRACT, stated as a test because it is invisible in the code.
+
+    Adding LTXVAudioVAEDecode to `_build_graph` would make the audio VAE a
+    SECOND remaining consumer, so `free_after_use` could no longer drop it
+    before sampling -- against a measured 14.48 GiB peak and a 14.5 GiB clamp,
+    which is 0.02 GiB of headroom. The decode therefore runs in a SECOND graph,
+    after the DiT has been reclaimed."""
+    graph = eng_ltx25.Ltx25FoleyPlusEngine()._build_graph(
+        {"text_prompt": "probe", "seed": 42}, "still.png", 97, 832, 480)
+    assert "audio_decode" not in graph
+    assert "audio_vae_loader" not in graph
+    # And the picture decode still takes the VIDEO half only.
+    assert graph["decode"]["inputs"]["samples"].src == "refine_separate"
+    assert graph["decode"]["inputs"]["samples"].slot == 0
+
+
+def test_both_parent_seams_are_no_ops_on_the_silent_lane():
+    """The seams exist for the sibling and must cost the base lane NOTHING --
+    `ltx25_video` has to stay byte-identical in behaviour. `_after_video_graph`
+    returning {} is what makes render_clip's receipt literal unchanged."""
+    base = eng_ltx25.Ltx25VideoEngine()
+    assert base._on_graph_result("refine_separate", ({}, {})) is None
+    assert base._after_video_graph(
+        results={}, prepared={}, request={}, out_path="", frame_count=0) == {}
+
+
+def test_the_harvest_copies_the_latent_DICT_and_clears_it_per_render():
+    """A ComfyUI LATENT is a dict, not a tensor -- `.cpu()` on it raises and
+    would abort the parent's graph. And the slot is cleared at the start of
+    every render, so a latent left behind by a failed segment can never be
+    decoded under the NEXT segment's picture."""
+    foley = eng_ltx25.Ltx25FoleyPlusEngine()
+    marker = object()
+    foley._on_graph_result("refine_separate", ("video", {"samples": marker}))
+    assert foley._pending_audio_latent == {"samples": marker}
+    # A non-dict slot 1 is a NAMED refusal, never a decode of the wrong object.
+    with pytest.raises(TypeError):
+        foley._on_graph_result("refine_separate", ("video", ["not", "a", "dict"]))
+    foley._on_graph_result("refine_separate", ("video", {"samples": marker}))
+    foley._build_graph({"text_prompt": "p", "seed": 1}, "s.png", 97, 832, 480)
+    assert foley._pending_audio_latent is None
+    # Every other node is ignored.
+    foley._on_graph_result("decode", ({"samples": marker},))
+    assert foley._pending_audio_latent is None
+
+
+def test_a_foley_render_that_harvested_nothing_FAILS_rather_than_ships_silence():
+    """ABSENCE IS A FAILURE on this lane. A silent stem is indistinguishable
+    from a working one everywhere downstream, so the lane that exists to keep
+    the model's audio must refuse rather than deliver none."""
+    foley = eng_ltx25.Ltx25FoleyPlusEngine()
+    foley._pending_audio_latent = None
+    with pytest.raises(Exception) as excinfo:
+        foley._after_video_graph(results={}, prepared={}, request={},
+                                 out_path="x.mp4", frame_count=97)
+    assert "audio latent" in str(excinfo.value)
+
+
+def test_the_foley_receipts_survive_the_parents_closed_clip_dict():
+    """`_clip_from_raw` builds a CLOSED literal, so foley keys on `raw` die
+    there unless copied out. PRESENT-KEY-ONLY: a row that never had them must
+    not acquire six nulls, because absence is what tells the mux "no bed here"
+    and a null would read as a bed that failed to write."""
+    foley = eng_ltx25.Ltx25FoleyPlusEngine()
+    request = {"shot_id": "beat_001"}
+    bare = foley._clip_from_raw({"out_path": "a.mp4", "frame_count": 97},
+                                request)
+    assert not any(k in bare for k in eng_ltx25.LTX25_FOLEY_RECEIPT_KEYS)
+    assert bare["has_audio"] is False
+
+    rich = foley._clip_from_raw(
+        {"out_path": "a.mp4", "frame_count": 97,
+         "foley_path": "a_foley.wav", "foley_sha256": "b" * 64,
+         "foley_samples": 97 * 1920, "foley_sample_rate": 48000,
+         "foley_channels": 2, "foley_duration_s": 3.88}, request)
+    assert rich["foley_path"] == "a_foley.wav"
+    assert rich["foley_samples"] == 97 * 1920
+    # THE MP4 STAYS SILENT. The foley is a SIDECAR and invariant V-1 is
+    # untouched -- only OTR_MasterAudioMux ever puts audio into a video.
+    assert rich["has_audio"] is False
+
+
+def test_the_operator_ratio_is_a_ruling_and_has_exactly_one_owner():
+    """0.20/0.80 is an operator ruling, not a tunable, and it is defined ONCE
+    in `foley_stems` -- the engine, the manifest and the mux all import it. A
+    second copy is how two stages come to disagree about a mix."""
+    from nodes._otr_video_engines import foley_stems as fs
+    assert (eng_ltx25.LTX25_FOLEY_GAIN,
+            eng_ltx25.LTX25_MASTER_GAIN_UNDER_FOLEY) == (0.20, 0.80)
+    assert eng_ltx25.LTX25_FOLEY_GAIN is fs.FOLEY_GAIN
+    assert eng_ltx25.LTX25_MASTER_GAIN_UNDER_FOLEY is fs.MASTER_GAIN_UNDER_FOLEY
+    assert eng_ltx25.LTX25_FOLEY_RECEIPT_KEYS is fs.FOLEY_RECEIPT_KEYS
 
 
 # --------------------------------------------------------------------------

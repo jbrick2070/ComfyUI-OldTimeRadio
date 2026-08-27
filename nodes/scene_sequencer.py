@@ -68,6 +68,43 @@ def _stamp_master_audio_identity(ledger: dict, master_sha256: str) -> None:
     audio["ledger_frozen"] = True
 
 
+#: What the master WAV on disk actually IS. Stamped by the assembler on EVERY
+#: episode, read by ``OTR_MasterAudioMux``. See :func:`_stamp_master_wav_flavour`.
+MASTER_WAV_DELIVERY_LEVELLED = "delivery_levelled"
+MASTER_WAV_PRE_LOUDNESS = "pre_loudness"
+
+
+def _stamp_master_wav_flavour(ledger: dict, flavour: str) -> None:
+    """Record whether the master WAV still owes its delivery loudness pass.
+
+    THE STAMP IS A FACT ABOUT THE BYTES ON DISK; THE POLICY IS AN INFERENCE
+    ABOUT THAT FACT. Both this node and ``OTR_MasterAudioMux`` read the same
+    ``video_policy_json`` off the same OTR_VideoDirector output, so they
+    normally agree -- but a hand-edited graph that wires the policy to one and
+    not the other has two possible outcomes and only one is benign:
+
+    * assembler LEVELLED, mux mixes and levels -> the 0.20/0.80 balance is
+      struck against an already-levelled master. The delivery level is still
+      correct, because ``_master_loudness`` normalises TO a target rather than
+      applying a relative boost.
+    * assembler PRE-LOUDNESS, mux copies -> the episode ships roughly 4 dB
+      off, which is the exact error the -14 LUFS target was measured to fix,
+      and nothing anywhere says so.
+
+    This stamp exists for the second one: the mux takes the delivery gain
+    whenever it reads ``pre_loudness`` here, whatever it concluded from the
+    policy.
+
+    STAMPED ON EVERY ROUTE, not only the foley one. A stamp that appeared only
+    sometimes could not be trusted when absent, because absence would mean both
+    "already levelled" and "written by a build that predates the stamp".
+    """
+    audio = ledger.setdefault("audio", {})
+    if not isinstance(audio, dict):
+        raise TypeError("ledger.audio must be a dict")
+    audio["master_wav_flavour"] = str(flavour)
+
+
 def _reconcile_active_music_manifest(manifest: dict | None, *, source: str):
     """Persist manifest-backed ``music[]`` rows before timeline mutation.
 
@@ -1333,6 +1370,34 @@ class EpisodeAssembler:
                     "tooltip": "Cue manifest JSON from OTR_StableAudioTheme "
                                "(maps placement -> batch row)."
                 }),
+                # THE FOLEY ROUTE SIGNAL (the LTX 2.5 foley bed, 2026-08-26).
+                # APPENDED AT THE END, never inserted -- widgets_values is
+                # positional and inserting mid-list shifts every saved value
+                # (BUG-LOCAL-097).
+                #
+                # WHY THIS NODE NEEDS IT AT ALL, which is not obvious: this
+                # assembler runs at order 12 and the first writer of a per-shot
+                # engine_id is ShotLock at order 14, so there is no other way
+                # for it to know the episode is on a foley route. Without the
+                # signal the "skip the delivery gain" branch below is a silent
+                # no-op and the mux applies 0.80 to an already--14 LUFS master
+                # -- a double gain, on every foley episode, with nothing in any
+                # log to say so.
+                #
+                # ABSENT / EMPTY -> the historical path, byte for byte. Every
+                # non-foley episode behaves exactly as it did before.
+                "video_policy_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "Video policy JSON from OTR_VideoDirector. Read "
+                               "for ONE question: is any role on the LTX 2.5 "
+                               "foley lane? If so this node writes an "
+                               "UN-LEVELLED provisional master WAV and "
+                               "OTR_MasterAudioMux does the single delivery "
+                               "loudness pass after mixing the bed in. Empty "
+                               "-> today's behaviour, unchanged."
+                }),
             },
         }
 
@@ -1340,7 +1405,7 @@ class EpisodeAssembler:
                  music_cue_audio=None, music_cue_manifest_json="",
                  opening_theme_audio=None, closing_theme_audio=None,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
-                 crossfade_ms=500,
+                 crossfade_ms=500, video_policy_json="",
                  ):
 
 
@@ -1469,8 +1534,47 @@ class EpisodeAssembler:
         # is passed EXPLICITLY rather than left to the silent default -- the old
         # call site passed neither, which is how the ceiling became invisible.
         # Deterministic. Override the target with OTR_MASTER_TARGET_LUFS.
+        # ON A FOLEY ROUTE THE DELIVERY GAIN MOVES, IT DOES NOT DISAPPEAR --
+        # and getting that distinction wrong in either direction is a defect.
+        #
+        # The foley bed is mixed under this master at OTR_MasterAudioMux, four
+        # topological stages later. Levelling here AND mixing there would apply
+        # 0.80 to an already--14 LUFS master and 0.20 to un-levelled VAE audio,
+        # then a third gain over the result -- contradicting the operator's
+        # ruling that the ratio is set once and ONE delivery gain follows.
+        #
+        # BUT SIMPLY SKIPPING THE PASS WOULD BREAK TWO OTHER CONSUMERS. This
+        # node's episode_audio output fans out to OTR_SignalLostVideo (node 12)
+        # and OTR_SceneAwareScopes (node 94), and both receive the POST-LUFS
+        # tensor today; skipping would make procgen and the scopes hotter on
+        # foley episodes only, for no reason connected to the bed.
+        #
+        # So the pass still RUNS and the returned AUDIO stays byte-identical
+        # for those two. What changes is only which waveform is written to the
+        # WAV the mux later reads: the PRE-loudness one, snapshotted here. The
+        # mux mixes into that and performs the single delivery gain itself --
+        # unconditionally, even when every splat turns out to be silence, so a
+        # foley episode can never ship un-levelled.
+        _foley_route = False
+        try:
+            from ._otr_video_engines import foley_stems as _foley
+            _foley_route = _foley.is_foley_route(video_policy_json)
+        except Exception as _froute_exc:  # noqa: BLE001 -- never blocks audio
+            log.warning(
+                "[EpisodeAssembler] could not read the video policy (%s); "
+                "treating this as a non-foley episode", _froute_exc)
+        _provisional_waveform = (
+            episode_waveform.clone() if _foley_route
+            and hasattr(episode_waveform, "clone") else None)
         episode_waveform, _loud = _master_loudness(
             episode_waveform, ceiling_dbfs=-1.0, sample_rate=sample_rate)
+        if _provisional_waveform is not None:
+            log.info(
+                "[EpisodeAssembler] FOLEY ROUTE: the master WAV is written "
+                "PRE-loudness as a provisional stem; OTR_MasterAudioMux mixes "
+                "the foley bed under it and performs the single delivery "
+                "loudness pass. episode_audio (SignalLostVideo, scopes) still "
+                "carries the levelled tensor.")
         if _loud.get("mode") == "lufs":
             log.info(
                 "[EpisodeAssembler] Final loudness master: measured %.2f LUFS "
@@ -1525,7 +1629,12 @@ class EpisodeAssembler:
 
             # Save 16-bit PCM WAV (lossless; same format video_engine.py
             # uses for the tmp audio muxed into the procgen MP4).
-            _ew_np = episode_waveform.detach().cpu() if hasattr(episode_waveform, "detach") else episode_waveform
+            # THE ONE PLACE THE FOLEY ROUTE CHANGES WHAT LANDS ON DISK.
+            # Non-foley episodes write the levelled master exactly as before.
+            _wav_source = (_provisional_waveform
+                           if _provisional_waveform is not None
+                           else episode_waveform)
+            _ew_np = _wav_source.detach().cpu() if hasattr(_wav_source, "detach") else _wav_source
             import numpy as _np_wav
             _pcm16 = (_ew_np.numpy() * 32767).clip(-32768, 32767).astype(_np_wav.int16)
             # episode_waveform is (1, channels, samples) or (channels, samples)
@@ -1605,6 +1714,10 @@ class EpisodeAssembler:
                     if _master_wav_sha256:
                         _stamp_master_audio_identity(
                             _led, _master_wav_sha256)
+                    _stamp_master_wav_flavour(
+                        _led,
+                        MASTER_WAV_PRE_LOUDNESS if _provisional_waveform
+                        is not None else MASTER_WAV_DELIVERY_LEVELLED)
                     _OTRL.record_phase_ms(_led, "episode_assembler", _phase_ms)
                     # post_episode_assembler audio gate.
                     _ew_cpu = (

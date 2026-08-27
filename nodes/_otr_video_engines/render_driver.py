@@ -3727,6 +3727,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         from . import acceptance as _acceptance  # type: ignore
         from . import beat_session as _bs  # type: ignore
         from . import coverage_plan as _cp  # type: ignore
+        from . import foley_stems as _foley  # type: ignore
         from . import wan_shared as _ws  # type: ignore
         from . import wrapper_bridge as _wb2  # type: ignore
         from ._tmp import otr_engine_tmp_path as _tmp_path  # type: ignore
@@ -3734,6 +3735,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         import acceptance as _acceptance  # type: ignore
         import beat_session as _bs  # type: ignore
         import coverage_plan as _cp  # type: ignore
+        import foley_stems as _foley  # type: ignore
         import wan_shared as _ws  # type: ignore
         import wrapper_bridge as _wb2  # type: ignore
         from _tmp import otr_engine_tmp_path as _tmp_path  # type: ignore
@@ -3829,6 +3831,10 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     admission = _assert_beat_affordable(shot, prebuilt)
 
     rendered = []            # (path, drop_head, keep_frames) in play order
+    #: The same tuples for the FOLEY stems, in the same play order. Empty on
+    #: every silent lane, which is every lane but one; an all-or-nothing check
+    #: below refuses a beat that produced some stems and not others.
+    foley_rendered = []
     out_shot = dict(shot)
     attempts = []
     # The beat's PEAK, not its last segment's (2026-07-26 QA panel). Taking
@@ -3972,6 +3978,20 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                        - int(segment.drop_head)
                        - int(segment.trim_tail))
             rendered.append((path, int(segment.drop_head), visible))
+            # THE FOLEY STEM RIDES THE SAME TUPLE AS THE VIDEO IT BELONGS TO
+            # (the LTX 2.5 foley bed, 2026-08-26). Same path, same drop_head,
+            # same visible count -- because it IS the same cut, applied in
+            # sample space instead of frame space. Collected here rather than
+            # derived later so the two lists cannot fall out of order: a stem
+            # matched to the wrong segment is audio playing under a picture it
+            # was not generated for, which is the one thing this whole feature
+            # exists to avoid.
+            #
+            # Absent on every silent lane, which is the normal case.
+            _stem = str((clip or {}).get("foley_path") or "")
+            if _stem:
+                foley_rendered.append(
+                    (_stem, int(segment.drop_head), visible))
             segment_row = {
                 "segment_id": segment_id,
                 "beat_id": beat_key,
@@ -4022,6 +4042,31 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         rendered, _tmp_path("otr_beat_%s_" % beat_key, ".mp4"),
         expect_frames=int(plan.target_visible_frames),
         expect_fps=int((clip or {}).get("fps") or 25))
+    # THE FOLEY SIBLING OF THE ASSEMBLY ABOVE, and it runs on SINGLE-segment
+    # beats too. A one-segment plan still owes a tail trim whenever its length
+    # was rounded up to a legal rung, and routing only multi-segment beats
+    # through the cutter is how that surplus survives on exactly the beats
+    # nobody thinks to check. It is also why the engine emits an UNCUT stem:
+    # `drop_head` / `keep_frames` belong to this stage, in sample space, once.
+    #
+    # ALL OR NOTHING. A beat whose segments disagree about whether they carry
+    # foley is a producer fault, and "mix the rows that have one" would deliver
+    # a bed that cuts in and out mid-beat while every log stayed green.
+    foley_receipts = None
+    if foley_rendered:
+        if len(foley_rendered) != len(rendered):
+            raise RenderError(
+                "beat %s assembled %d video segment(s) but only %d foley "
+                "stem(s). NO PARTIAL BED -- a bed that appears under some "
+                "segments of one beat and not others is worse than none, and "
+                "every log would still read green"
+                % (beat_key, len(rendered), len(foley_rendered)))
+        foley_receipts = _foley.assemble_beat_foley_segments(
+            foley_rendered,
+            _foley.durable_foley_dir() / ("beat_%s_foley.wav" % beat_key),
+            expect_frames=int(plan.target_visible_frames),
+            fps=int((clip or {}).get("fps") or 25))
+
     beat_clip = dict(clip or {})
     beat_clip["path"] = assembled
     beat_clip["frame_count"] = int(plan.target_visible_frames)
@@ -4036,6 +4081,16 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # audio" checkable after the fact instead of merely intended: sum the
     # visible_frames and it must equal the beat's target.
     beat_clip["segments"] = segment_rows
+    # THE FOLEY RECEIPTS ARE BEAT-SCOPE AND MUST BE OVERWRITTEN, never
+    # inherited. `beat_clip` starts life as a copy of the LAST segment, so
+    # leaving these alone would hand the manifest that segment's 97-frame stem
+    # as if it were the whole beat's -- the identical trap the frame-accounting
+    # block below this one was written to close, one field group over.
+    if foley_receipts is not None:
+        beat_clip.update(foley_receipts)
+    else:
+        for _fkey in _foley.FOLEY_RECEIPT_KEYS:
+            beat_clip.pop(_fkey, None)
     # THE BEAT-SCOPE FRAME ACCOUNTING (2026-08-06).
     #
     # WRITTEN UNCONDITIONALLY, INCLUDING None. ``beat_clip`` starts life as
@@ -5327,6 +5382,16 @@ _CADENCE_DELIVERY_RECEIPT_KEYS = (
     "delivery_scale_mode",
 )
 
+#: THE FOLEY SIDECAR RECEIPTS (the LTX 2.5 foley bed, 2026-08-26). Imported
+#: from the module that owns the stem format rather than restated, so the
+#: engine, this manifest and the mux cannot come to disagree about which keys
+#: make a stem. A silent lane carries none of them and the copy below is
+#: present-key-only, so every existing row stays byte-identical.
+try:
+    from .foley_stems import FOLEY_RECEIPT_KEYS as _FOLEY_RECEIPT_KEYS
+except ImportError:  # pragma: no cover -- flat test imports
+    from foley_stems import FOLEY_RECEIPT_KEYS as _FOLEY_RECEIPT_KEYS
+
 
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
@@ -5447,6 +5512,24 @@ def build_clip_manifest(result, *, episode_id=""):
             # manifest carries them.
             **{k: clip[k] for k in _CADENCE_DELIVERY_RECEIPT_KEYS
                if k in clip},
+            # THE FOLEY SIDECAR, carried for the same reason and with the same
+            # care: the engine stamps these on the canonical clip and they die
+            # there unless the manifest carries them, and this is the channel
+            # OTR_MasterAudioMux reads the bed off. PRESENT-KEY-ONLY -- a
+            # silent row must not acquire six nulls, because absence is what
+            # tells the mux "this beat has no bed" and a null would read as a
+            # bed that failed to write.
+            **{k: clip[k] for k in _FOLEY_RECEIPT_KEYS if k in clip},
+            # WHICH CLOCK ``start_s`` ABOVE IS ON. Carried so the mux can
+            # PROVE a foley stem's placement instead of assuming it: the
+            # assembler rewrites the ledger's line rows from "scene_audio" to
+            # "master_mix" space once the themes are folded in, and splatting
+            # a bed at a scene-audio offset into a master-mix timeline puts
+            # every beat's audio under the wrong picture by the length of the
+            # opening theme. Present-key-only, so nothing that never declared
+            # a space acquires one.
+            **({"start_s_space": str(lines[bid]["start_s_space"])}
+               if bid in lines and lines[bid].get("start_s_space") else {}),
             # PRESENT ONLY WHEN THE COVERAGE ASSEMBLER MINTED THIS BEAT, and
             # that absence is information rather than noise: a beat with no
             # plan, or a plan owing no head/tail work, takes the historical

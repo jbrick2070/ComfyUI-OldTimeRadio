@@ -1,33 +1,41 @@
-"""LTX 2.5 Distilled -- the SILENT video lane (Chunk A of the 2026-08-19 split).
+"""LTX 2.5 Distilled -- the silent video lane, and the foley lane beside it.
 
-ONE lane, one class, one graph: the beat's own wide scene still drives a
-97-frame first stage at 832x480, the selected HQ stage doubles that latent and
-re-anchors the same still, and the only decode is 1664x960. The final model audio
-side is DISCARDED at ``LTXVSeparateAVLatent`` -- ``LTXVAudioVAEDecode`` is never
-wired -- so the clip is always silent and only ``OTR_MasterAudioMux`` ever adds
-audio (invariant V-1).
+ONE graph, two lanes. The beat's own wide scene still drives a 97-frame first
+stage at 832x480, the selected HQ stage doubles that latent and re-anchors the
+same still, and the only picture decode is 1664x960.
 
-WHY THIS IS ONE FLAT CLASS AND NOT A BASE WITH A SEAM. The operator's ruling,
-in his words, is that this is a construction site: *"you gotta close it until
-you can reopen the renovations"*, and *"you cant build the new wing unless you
-tear down the old one and build the foundation and the old wing connection
-branch."* The two sibling lanes this model will eventually carry -- ``mime``
-(the clip's own foley IS the beat audio) and ``foley_plus`` (a foley bed under
-the TTS) -- are Chunk B, and Chunk B is not deferred paperwork: it needs an
-EXECUTION-ORDER change, because video renders four topological stages after the
-master audio freezes (``OTR_EpisodeAssembler`` order 12, ``OTR_VideoRenderBatch``
-order 16). A subclass hook designed today would be a doorway into a wing with no
-foundation. So there is no hook. When the foundation exists, the sibling is a
-deliberate copy of this file and the differences are visible in it.
+* ``ltx25_video`` (Chunk A, 2026-08-19) DISCARDS the model's audio side at
+  ``LTXVSeparateAVLatent`` -- it never resolves ``LTXVAudioVAEDecode`` at all --
+  so the clip is silent and only ``OTR_MasterAudioMux`` ever adds audio.
+* ``ltx25_foley_plus`` (the foley bed, 2026-08-26) KEEPS it: the audio latent is
+  decoded to a WAV SIDECAR and mixed under the episode master at that same mux,
+  at a fixed 0.20 / 0.80. Its mp4 is still silent and still proves it, so
+  invariant V-1 is untouched -- the mux remains the only node that puts audio
+  into a video.
 
-THE TWO SIBLING LANES ARE RESERVED, NOT REGISTERED. ``ltx25_mime`` and
-``ltx25_foley_plus`` are the settled internal names, publicly
-``ltx25_high_mime`` and ``ltx25_high_foley_plus`` (GO_FORWARD, 2026-08-19).
-They appear here so nobody takes them, and they are deliberately absent from the
-registry: a menu row that cannot make an episode is worse than a missing one.
-Per lesson L5 they will be THREE internal engines, never one id with a switch --
-two public ids on one internal id collapses ``_INTERNAL_TO_PUBLIC`` and trips the
-bijection assert AT IMPORT, which empties most of the ComfyUI menu.
+THE FOUNDATION ARRIVED, SO THE SEAM DID TOO -- and this docstring used to say
+flatly that there is no hook. It was right to. The operator's construction-site
+ruling was *"you gotta close it until you can reopen the renovations"*, and the
+blocker was real: a lane whose audio REPLACES the beat audio must exist before
+the master freezes, and video renders four topological stages after that freeze
+(``OTR_EpisodeAssembler`` order 12, ``OTR_VideoRenderBatch`` order 16). A bed
+mixed UNDER the master at the mux does not need that inversion at all -- the mux
+runs after video -- which is what dissolved the blocker rather than solving it.
+So there are now exactly two seams, ``_on_graph_result`` and
+``_after_video_graph``, both no-ops on the silent lane, and they are the
+smallest pair that lets the sibling avoid copying either ``_build_graph`` or the
+200-line ``render_clip``.
+
+``ltx25_mime`` IS STILL RESERVED AND STILL UNREGISTERED. It is the SAME
+mechanism at 1.00 / 0.00 (the operator ruled it back in on 2026-08-26 as
+generate-and-discard), but a per-window master gain is a different fork from the
+global 0.80 this file ships, so it gets its own pass rather than being smuggled
+in here. Its id stays in ``LTX25_RESERVED_SIBLING_IDS`` so nobody spends it, and
+it stays out of the menu: a row that cannot make an episode is worse than a
+missing one. Per lesson L5 these are separate INTERNAL engines, never one id
+with a switch -- two public ids on one internal id collapses
+``_INTERNAL_TO_PUBLIC`` and trips the bijection assert AT IMPORT, which empties
+most of the ComfyUI menu.
 
 THE PUBLIC ID IS ``ltx25_high_video``, AND ``high`` WAS SETTLED BY A RULING
 RATHER THAN BY THE MEASUREMENT THAT WAS PLANNED. The convention is
@@ -73,18 +81,41 @@ from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_shared.role_compat import ROLES
 from . import motion_common as _MC
 from . import ltx25_recipe as R
+from .foley_stems import (
+    FOLEY_GAIN as LTX25_FOLEY_GAIN,
+    FOLEY_RECEIPT_KEYS as LTX25_FOLEY_RECEIPT_KEYS,
+    MASTER_GAIN_UNDER_FOLEY as LTX25_MASTER_GAIN_UNDER_FOLEY,
+    FoleyStemError,
+    samples_per_frame as foley_samples_per_frame,
+    sha256_of_file,
+    write_pcm16_wav,
+)
 from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
 _LOG = logging.getLogger("OTR.eng_ltx25")
 
-#: RESERVED, NOT REGISTERED -- see the module docstring. These are the settled
-#: internal ids for the two Chunk B lanes. Naming them here is the cheapest way
-#: to stop someone spending one of them on something else; registering them
-#: would put two rows in the operator's dropdown that cannot render, because the
-#: pre-freeze audio path they need does not exist yet.
-LTX25_RESERVED_SIBLING_IDS = ("ltx25_mime", "ltx25_foley_plus")
+#: THE FOLEY STEM FORMAT LIVES IN ``foley_stems``, NOT HERE, and that is the
+#: whole point of that module. Three stages touch a stem -- this engine WRITES
+#: one per rendered segment, the coverage assembler CUTS and concatenates them
+#: into one per beat, and ``OTR_MasterAudioMux`` READS and mixes the result --
+#: so the format is a contract between three files rather than a detail of this
+#: one. The constants come with it: ``FOLEY_GAIN`` / ``MASTER_GAIN_UNDER_FOLEY``
+#: are the operator's fixed 0.20/0.80 ruling, and a second copy of them here is
+#: exactly how two stages come to disagree about a mix. Cold-import clean --
+#: ``foley_stems`` is stdlib-only at module scope (V-12).
+
+#: EMPTY, AND DELIBERATELY KEPT. Both Chunk B siblings shipped on 2026-08-26 --
+#: ``ltx25_foley_plus`` and ``ltx25_mime`` are registered lanes now, so there is
+#: nothing left to reserve.
+#:
+#: The tuple stays because the CONTRACT it expresses is still live and still
+#: has a test: an id named here is spoken for and must not be registered until
+#: it can actually render an episode. The next LTX 2.5 sibling reserves its name
+#: here first. An empty tuple says "nothing is pending", which is a different
+#: and more useful statement than the symbol having been deleted.
+LTX25_RESERVED_SIBLING_IDS = ()
 
 # ---------------------------------------------------------------------------
 # Weight resolution (G1). Every artifact resolves through ComfyUI's
@@ -1122,6 +1153,39 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "temporal_overlap": R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP}},
         }
 
+    # ---- the two Chunk B seams (2026-08-26) ----
+    #
+    # THE MODULE DOCSTRING USED TO SAY THERE IS NO HOOK, and it was right to at
+    # the time: "a subclass hook designed today would be a doorway into a wing
+    # with no foundation". The foundation now exists (the foley bed mixes at
+    # ``OTR_MasterAudioMux``, which runs AFTER video), so these two exist -- and
+    # they are deliberately the SMALLEST pair that lets a sibling keep the
+    # model's own audio without copying either ``_build_graph`` or the
+    # 200-line ``render_clip``.
+    #
+    # BOTH ARE NO-OPS HERE. ``ltx25_video`` stays byte-identical in behaviour:
+    # the first returns nothing and the second returns an empty dict, so the
+    # silent lane's receipt literal is exactly what it always was.
+
+    def _on_graph_result(self, node_id, out):
+        """Called for EVERY executed node, while its output is still alive.
+
+        Pure side effect; the return value is ignored. A sibling lane that
+        needs an intermediate the graph is about to free copies it HERE --
+        see ``_harvest`` for why anywhere later is a use-after-free."""
+
+    def _after_video_graph(self, *, results, prepared, request, out_path,
+                           frame_count) -> dict:
+        """Extra receipt keys to fold into ``render_clip``'s return.
+
+        Runs after ``reclaim_idle_models`` has dropped the DiT and after
+        ``validate_silent_clip_contract`` has proved the mp4 -- which is the
+        first moment ``out_path`` and ``frame_count`` both exist, so a sibling
+        can prove its sidecar against the exact file it belongs to.
+
+        ``{}`` on the silent lane, and nothing about that lane changes."""
+        return {}
+
     # ---- render ----
     def render_clip(self, request, prepared):
         """Render ONE 97-frame clip and encode it to a SILENT bt709 mp4.
@@ -1291,6 +1355,17 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         def _harvest(node_id, out):
             if node_id in ("te", "neg"):
                 pending[node_id] = out
+            # SEAM 1 (the foley bed, 2026-08-26). A NO-OP on this lane.
+            #
+            # IT FIRES HERE AND NOWHERE LATER, AND THAT IS THE WHOLE POINT.
+            # ``run_graph`` calls ``on_result`` while the node's output is
+            # still in ``results``, and ``free_after_use`` deletes
+            # ``refine_separate`` the moment its last consumer has run -- it is
+            # not in ``keep``. A subclass that stashed a reference now and
+            # dereferenced it after ``reclaim_idle_models`` below would be
+            # reading freed VRAM, which is a crash or silent garbage rather
+            # than a saving. The foley lane copies to CPU inside this call.
+            self._on_graph_result(node_id, out)
 
         execution_records = []
         graph_started = time.perf_counter()
@@ -1388,7 +1463,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             _LOG.info("[%s] render-window VRAM peak: %d MB", self.name,
                       int(peak))
 
-        return {
+        raw = {
             "out_path": path, "frame_count": n, "vram_peak_mb": peak,
             "render_elapsed_s": render_elapsed_s,
             "recipe": R.LTX25_TWO_STAGE_RECIPE_ID,
@@ -1414,6 +1489,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "native_frame_count": n,
             "extension_mode": "none",
         }
+        # SEAM 2. Empty on this lane, so the dict above IS the return here.
+        raw.update(self._after_video_graph(
+            results=results, prepared=prepared, request=request,
+            out_path=path, frame_count=n))
+        return raw
 
     def canonicalize(self, raw, request, profile):
         """The silent CanonicalClip dict, with silence PROVED at the seam where
@@ -1529,4 +1609,350 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         }
 
 
-__all__ = ["Ltx25VideoEngine", "LTX25_RESERVED_SIBLING_IDS"]
+@register
+class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
+    """LTX 2.5 Distilled, KEEPING the audio the model already computed.
+
+    Identical picture to ``ltx25_video`` -- same locked recipe, same two-stage
+    graph, same 97-frame rung -- plus the one thing that lane throws away: the
+    audio latent at ``refine_separate`` slot 1. It is decoded to a WAV sidecar
+    and mixed UNDER the episode master at ``OTR_MasterAudioMux``, at the fixed
+    0.20 / 0.80 the operator ruled on 2026-08-26.
+
+    THIS IS NOT THE SFX BED AND THE TWO MUST NEVER BE CONFLATED. The SFX bed
+    was separately GENERATED effects from a dedicated model; it was ripped on
+    2026-08-06 and is staying dead. This is the video model's OWN output --
+    footsteps, room tone and a score computed for the exact picture it is
+    rendering, which is the whole reason a joint AV model earns its keep.
+    Operator: *"sfx bed is different than foley bed, i won't get the two
+    confused."* Every field here is ``foley_``; ``sfx_`` is guarded by
+    ``tests/test_rip_sfx_bed_guard.py``.
+
+    THE DECODE IS A SECOND GRAPH, AND THAT IS A VRAM CONTRACT RATHER THAN A
+    STYLE CHOICE. Wiring ``LTXVAudioVAEDecode`` into ``_build_graph`` would
+    make the audio VAE a SECOND remaining consumer, so ``free_after_use`` could
+    no longer drop it before sampling -- and the measured peak is 14.48 GiB
+    against a 14.5 GiB clamp, which is 0.02 GiB of headroom. So the latent is
+    copied to CPU as it lands, the video graph tears down completely, and only
+    then does a two-node graph (``VAELoader`` + ``LTXVAudioVAEDecode``) run.
+    The parent's ``_build_graph`` is UNTOUCHED, which is also what keeps
+    ``tests/test_ltx25_recipe_matches_lab_golden.py`` true.
+
+    THE STEM IS EXACTLY AS LONG AS THE MP4 BESIDE IT. The engine emits
+    ``frame_count`` frames of audio -- the same count as the file it just
+    wrote, after the parent's tail trim -- and nothing else. ``drop_head`` and
+    ``keep_frames`` on a CHAINED beat belong to the coverage assembler, which
+    applies them in sample space; doing it here as well would cut picture-
+    locked audio twice.
+
+    WHAT THIS LANE DOES *NOT* DO. It does not touch the mp4, which stays silent
+    and still proves it with ffprobe; ``has_audio`` stays False and invariant
+    V-1 is unchanged. Mime (the same mechanism at 1.00 / 0.00, generate-and-
+    discard) is the NEXT item and is deliberately not smuggled in here: a
+    per-window master gain is a different fork from a global 0.80, and
+    ``ltx25_mime`` stays reserved and unregistered until it gets its own pass.
+    """
+
+    name = "ltx25_foley_plus"
+    engine_version = "1"
+
+    #: SELECTABLE, NEVER A DEFAULT. Inherited from the parent and restated
+    #: because it matters more here: this lane changes the EPISODE MASTER, so
+    #: acquiring it by inheritance rather than by an operator choice would
+    #: quietly re-mix an episode nobody asked to re-mix.
+    default_roles = ()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        #: The CPU copy of ``refine_separate`` slot 1, harvested during the
+        #: video graph and CONSUMED (set back to None) by the decode below, so
+        #: a latent can never be spent twice or leak into the next segment.
+        self._pending_audio_latent = None
+
+    # ---- the extra classes this lane resolves ----
+    def _node_candidates(self):
+        """The parent's graph plus the two nodes the SECOND graph needs.
+
+        Declared here rather than resolved ad hoc inside the decode so
+        ``assert_usable`` gates on them at preflight, BY NAME, on a box whose
+        ComfyUI predates ``nodes_lt_audio.py`` -- the parent already walks this
+        dict and collects every miss. Harmless to the first graph: ``run_graph``
+        iterates the GRAPH and only ever looks classes up by id.
+        """
+        cands = dict(super()._node_candidates())
+        cands["audio_vae_loader"] = ("VAELoader",)
+        cands["audio_decode"] = ("LTXVAudioVAEDecode",)
+        return cands
+
+    def _build_graph(self, plan, image_name, length, width, height):
+        """The parent's graph, verbatim. The override exists ONLY to clear the
+        harvest slot at the start of every render, so a latent left behind by a
+        failed segment can never be decoded under the next segment's picture."""
+        self._pending_audio_latent = None
+        return super()._build_graph(plan, image_name, length, width, height)
+
+    # ---- seam 1: copy the audio latent while it is still alive ----
+    def _on_graph_result(self, node_id, out):
+        """Copy ``refine_separate`` slot 1 to CPU, IMMEDIATELY.
+
+        A ComfyUI LATENT is a DICT (``{"samples": tensor, ...}``, plus a
+        ``noise_mask`` when the sampler carried one), not a tensor -- calling
+        ``.cpu()`` on the dict would raise and abort the parent's graph. So the
+        dict is rebuilt with every tensor inside it detached and copied.
+
+        Copied rather than referenced because ``free_after_use`` deletes this
+        node the moment its last consumer has run: a reference read after
+        ``reclaim_idle_models`` is freed VRAM, which is a crash or silent
+        garbage rather than a saving.
+        """
+        if node_id != "refine_separate" or not out or len(out) < 2:
+            return
+        self._pending_audio_latent = self._latent_to_cpu(out[1])
+
+    @staticmethod
+    def _latent_to_cpu(latent):
+        """A CPU copy of one LATENT dict.
+
+        Nested tensors are left NESTED on purpose: ``LTXVAudioVAEDecode``
+        already resolves them (``if audio_latent.is_nested: ... unbind()[-1]``,
+        which takes the REFINED portion stage two concatenated), so unbinding
+        here would duplicate handling the installed node does better.
+        """
+        if not isinstance(latent, dict):
+            raise TypeError(
+                "ltx25_foley_plus expected a LATENT dict from "
+                "LTXVSeparateAVLatent slot 1 and got %r. NO GUESS -- decoding "
+                "the wrong object is how a lane ships noise as foley"
+                % (type(latent).__name__,))
+        out = {}
+        for key, val in latent.items():
+            if hasattr(val, "detach") and hasattr(val, "cpu"):
+                out[key] = val.detach().cpu().clone()
+            else:
+                out[key] = val
+        return out
+
+    # ---- seam 2: decode, conform to the mp4, write the durable stem ----
+    def _after_video_graph(self, *, results, prepared, request, out_path,
+                           frame_count):
+        from . import wrapper_bridge as _wb
+
+        latent = self._pending_audio_latent
+        self._pending_audio_latent = None      # consume: never spendable twice
+        if latent is None:
+            raise _wb.GraphExecutionError(
+                "%s finished its video graph without harvesting an audio "
+                "latent. NO FALLBACK -- this lane exists to keep the model's "
+                "own audio, and a silent stem is indistinguishable from a "
+                "working one everywhere downstream" % self.name)
+
+        classes = dict(getattr(self, "_classes", None)
+                       or _wb.resolve_graph_classes(self._node_candidates()))
+        # TWO NODES, AND THE LATENT ARRIVES AS AN EXTERNAL. ``external_results``
+        # is the only injection path into ``run_graph``, and an id present in
+        # BOTH the graph and the externals is a named error there rather than a
+        # silent precedence rule -- which is why nothing here produces
+        # ``audio_latent``.
+        graph = {
+            "audio_vae_loader": {"class": "audio_vae_loader", "inputs": {
+                "vae_name": self._audio_vae_name()}},
+            "audio_decode": {"class": "audio_decode", "inputs": {
+                "samples": _wb.Wire("audio_latent", 0),
+                "audio_vae": _wb.Wire("audio_vae_loader", 0)}},
+        }
+        probe = _MC.VramPeakProbe(interval_s=0.1).start()
+        started = time.perf_counter()
+        try:
+            decoded = _wb.run_graph(
+                graph, classes, terminal="audio_decode", free_after_use=True,
+                external_results={"audio_latent": (latent,)})[0]
+        finally:
+            decode_peak = probe.stop()
+            # The audio VAE is ~348 MiB and its decode runs with the DiT
+            # already gone, so this reclaim is hygiene rather than headroom --
+            # but it is the same discipline the video graph keeps, and a VAE
+            # left resident across a chained beat is 348 MiB of nothing.
+            _wb.reclaim_idle_models(reason="%s post-foley-decode" % self.name)
+        decode_elapsed_s = time.perf_counter() - started
+
+        stem_path, samples, channels, sample_rate = self._write_foley_stem(
+            decoded, out_path, int(frame_count))
+        duration_s = samples / float(sample_rate)
+        # THE VRAM RECEIPT IS THE POINT OF THIS LINE, not the elapsed time. The
+        # two-pass split exists to keep the audio VAE out of the sampling peak,
+        # and the number that proves it is the peak measured HERE, after
+        # teardown -- so it is logged on every beat rather than measured once.
+        _LOG.info(
+            "[OTR video] %s FOLEY decode: %d sample(s) x%dch @%d Hz "
+            "(%.3f s over %d frame(s)) decode_peak_mb=%s elapsed_s=%.3f -> %s",
+            self.name, samples, channels, sample_rate, duration_s,
+            int(frame_count), int(decode_peak) if decode_peak else "n/a",
+            decode_elapsed_s, os.path.basename(stem_path))
+        return {
+            "foley_path": stem_path,
+            "foley_sha256": sha256_of_file(stem_path),
+            "foley_samples": int(samples),
+            "foley_sample_rate": int(sample_rate),
+            "foley_channels": int(channels),
+            "foley_duration_s": float(duration_s),
+        }
+
+    def _write_foley_stem(self, decoded, out_path, frame_count):
+        """Conform the decoded AUDIO to exactly ``frame_count`` frames and write
+        it into the durable episode audio tree.
+
+        THE LENGTH CONTRACT, and everything downstream rests on it: the stem
+        carries ``frame_count * samples_per_frame`` samples -- the same picture
+        the mp4 shows, to the sample. A surplus is CUT (the parent's tail trim
+        already dropped those frames from the video); a shortfall under one
+        frame is silence-padded and SAID SO; anything larger is a refusal,
+        because a stem materially shorter than its picture means the decode
+        disagreed with the sampler about how long the clip is.
+
+        WRITTEN STRAIGHT TO THE DURABLE DIRECTORY, never to tmp.
+        ``persist_episode_clips`` moves only ``clip['path']`` and ``mux()``
+        sweeps ``_shared/tmp`` after muxing, so a stem staged in scratch is
+        deleted before the mux that needs it ever opens it.
+        """
+        import numpy as _np
+
+        from . import wrapper_bridge as _wb
+
+        if not isinstance(decoded, dict) or "waveform" not in decoded:
+            raise _wb.GraphExecutionError(
+                "%s: LTXVAudioVAEDecode returned %r rather than an AUDIO dict"
+                % (self.name, type(decoded).__name__))
+        sample_rate = int(decoded.get("sample_rate") or 0)
+        try:
+            spf = foley_samples_per_frame(sample_rate, self.target_fps)
+        except FoleyStemError as exc:
+            raise _wb.GraphExecutionError("%s: %s" % (self.name, exc)) from exc
+
+        wave = decoded["waveform"]
+        arr = (wave.detach().cpu().float().numpy() if hasattr(wave, "detach")
+               else _np.asarray(wave, dtype=_np.float32))
+        while arr.ndim > 2:            # (B, C, n) -> (C, n)
+            arr = arr[0]
+        if arr.ndim == 1:
+            arr = arr[None, :]
+
+        want = int(frame_count) * spf
+        have = int(arr.shape[-1])
+        if want <= 0:
+            raise _wb.GraphExecutionError(
+                "%s was asked to write a foley stem for a %d-frame clip"
+                % (self.name, int(frame_count)))
+        if have > want:
+            arr = arr[:, :want]
+        elif have < want:
+            short = want - have
+            if short > spf:
+                raise _wb.GraphExecutionError(
+                    "%s decoded %d audio sample(s) for a %d-frame clip that "
+                    "needs %d (%d short, over one whole frame of %d). NO "
+                    "FALLBACK -- padding that much silence would hide a decode "
+                    "that disagrees with the sampler about the clip's length"
+                    % (self.name, have, int(frame_count), want, short, spf))
+            _LOG.info(
+                "[OTR video] %s foley stem was %d sample(s) under one frame; "
+                "silence-padded to the picture length", self.name, short)
+            arr = _np.concatenate(
+                [arr, _np.zeros((arr.shape[0], short), dtype=arr.dtype)],
+                axis=-1)
+
+        dest = self._foley_dir() / (
+            os.path.splitext(os.path.basename(out_path))[0] + "_foley.wav")
+        samples, channels = write_pcm16_wav(dest, arr, sample_rate)
+        return str(dest), samples, channels, sample_rate
+
+    def _foley_dir(self):
+        """``<episode>/audio/foley/``, resolved by the one owner of that answer.
+
+        Delegated to ``foley_stems.durable_foley_dir`` rather than reimplemented
+        so the ENGINE writes its per-segment stems into exactly the directory
+        the coverage assembler later writes the beat stem into and the mux later
+        reads both out of. Its refusal is re-raised as a graph error because
+        that is the vocabulary this call site's caller speaks.
+        """
+        from . import foley_stems as _fs
+        from . import wrapper_bridge as _wb
+        try:
+            return _fs.durable_foley_dir()
+        except _fs.FoleyStemError as exc:
+            raise _wb.GraphExecutionError("%s: %s" % (self.name, exc)) from exc
+
+    # ---- the receipts survive the parent's closed dict ----
+    def _clip_from_raw(self, raw, request):
+        """The parent's silent clip row plus the foley receipts.
+
+        The parent builds a CLOSED literal, so ``foley_*`` keys on ``raw`` die
+        there unless they are copied out explicitly -- present-key-only, so a
+        row that never had them does not acquire six nulls.
+
+        ``has_audio`` STAYS FALSE and the mp4 stays silent. The foley is a
+        SIDECAR; invariant V-1 is unchanged, and ``OTR_MasterAudioMux`` is
+        still the only node that ever puts audio into a video.
+        """
+        clip = super()._clip_from_raw(raw, request)
+        raw = raw or {}
+        for key in LTX25_FOLEY_RECEIPT_KEYS:
+            if key in raw:
+                clip[key] = raw[key]
+        return clip
+
+
+@register
+class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
+    """LTX 2.5 Distilled as a SILENT PERFORMANCE carrying the video's own score.
+
+    THE SAME MECHANISM AS ``ltx25_foley_plus``, WITH ONE CONSTANT CHANGED.
+    Everything this class inherits is the point of it: the same picture, the
+    same harvest of the audio latent, the same second-pass decode, the same
+    durable stem, the same cut in the coverage assembler. What differs is
+    entirely at the mux, in a table -- 1.00 foley / 0.00 master instead of
+    0.20 / 0.80 -- which is why this class body is almost empty and should
+    stay that way.
+
+    THE TTS AND THE MUSIC CUE ARE STILL GENERATED, AND THEN MIXED TO ZERO.
+    That waste is deliberate. Operator, 2026-08-26: *"in the MIME, you are
+    going to ignore whatever generated music. So we're gonna waste some music.
+    I get it. It's not gonna be used. But we'll just render it anyway to make
+    things simpler."* It SUPERSEDES the 2026-08-10 design brief's requirement
+    that a mime lane generate no TTS at all -- and deleting that requirement
+    deletes everything it forced: a new pre-audio owner node
+    (``OTR_MimePlanRender``), an execution-order inversion, and a per-beat
+    ownership ledger. Nothing has to happen before the master freezes, because
+    nothing is being REPLACED. Cost: a few seconds of unheard TTS per mime beat
+    and one unheard cue.
+
+    THE ATTENUATION IS PER-WINDOW, AND THAT IS NOT AN OPTIMISATION. Engines are
+    ROLE-WIDE dropdowns, so ``ltx25_high_mime`` on ``character_video_model``
+    means every character beat of the episode is a silent performance -- while
+    the announcer and music roles still speak, out of the SAME single master
+    WAV. Zeroing that master globally would silence the whole episode. So mime
+    zeroes only its own beats' samples; see ``foley_stems.FOLEY_LANE_GAINS``.
+
+    THE ONE KNOWN EDGE CASE, and it is small. The master is one continuous WAV,
+    so zeroing a beat's window cuts whatever else occupies those samples --
+    including a theme or cue that spans the beat boundary. A cue crossing the
+    seam into a mime beat stops mid-phrase rather than resolving. Equal-power
+    crossfades already exist in the sequencer and a short splice at the window
+    edges is the fix IF it audibly clicks. Polish, and explicitly not required
+    for the first build.
+
+    PER-BEAT mime is still out of scope and still needs the 2026-08-10 node.
+    This lane is role-wide, which is the shape the operator chose.
+    """
+
+    name = "ltx25_mime"
+    engine_version = "1"
+
+    #: SELECTABLE, NEVER A DEFAULT -- and on this lane more emphatically than
+    #: on any other in the roster. Inheriting it would silence every beat of a
+    #: role nobody chose to mute.
+    default_roles = ()
+
+
+__all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
+           "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
+           "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY"]

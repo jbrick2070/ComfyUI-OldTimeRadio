@@ -72,6 +72,44 @@ the foley proven decoded and mixed (not adapter self-report), loudness and peak
 receipts, and `ltx25_video` proven still silent. Measure audio-decode VRAM on
 the two-stage graph BEFORE registering -- over 14.5 GiB is an operator stop.
 
+**STATUS 2026-08-26: THE CODE IS BUILT AND GREEN. THE EXIT IS NOT MET -- no
+live leg has run, so NOTHING here is qualified.**
+
+**BOTH LANES SHIPPED, NOT ONE.** The operator overrode the spec's mime
+deferral mid-build (*"foley and mime we need this feature for both"*), so
+`ltx25_foley_plus` (0.20 foley / 0.80 master, global) and `ltx25_mime`
+(1.00 / 0.00, per-window) are both registered and public. That is RULING 6 in
+`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`; the connector decision is
+RULING 5. **The `kibitz-runs/` spec still says "mime CUT" and "ONLY
+ltx25_foley_plus" -- it is superseded on that point and only that point.**
+
+Landed in one change: the two parent seams plus both lanes and the second-pass
+decode (`eng_ltx25.py`), the stem format, the lane gain table and the mix
+envelope (`_otr_video_engines/foley_stems.py`, new), the coverage cutter and
+manifest threading (`render_driver.py`), the pre-loudness provisional master
+and its ledger flavour stamp (`scene_sequencer.py`), the mix and the single
+delivery gain (`otr_master_audio_mux.py`), and three appended links in
+`workflows/otr_canonical.json`.
+
+**WHAT A RENDER WINDOW STILL OWES, and it is the whole exit condition:**
+* Pin a role to `ltx25_high_foley_plus (16:9)` and run ONE canonical leg; then
+  the same for `ltx25_high_mime (16:9)`. **Mime is ROLE-WIDE** -- every beat of
+  the chosen role goes silent -- so pick the role deliberately.
+* Read `decode_peak_mb` off the per-beat `FOLEY decode:` log line. That is the
+  audio-decode VRAM measurement, and it is logged on EVERY beat rather than
+  measured once. **Over 14.5 GiB is an operator stop.** Note the tighter
+  context: the G8 solo smoke measured the shared picture graph at 16152 MiB
+  in-pipeline on a 16303 MiB card -- about 150 MiB of headroom -- which is
+  exactly why the audio decode is a second graph that runs only after
+  `reclaim_idle_models`.
+* Prove the bed by LISTENING, and by the mux's `foley_bed=mixed beats=N/N
+  lanes=...` + `foley_loudness=...` (+ `foley_muted_s=...` on a mime leg)
+  receipt lines -- never by the adapter's self-report.
+* Prove `ltx25_video` is STILL silent on the same HEAD.
+* **The stage-2 foley QUALITY is still an assumption.** The lab's golden foley
+  recipe is single-stage; these lanes harvest the REFINED audio latent. Nobody
+  has heard it.
+
 ---
 
 ### >>> THEN: SCENE + PORTRAIT ROUTES STILL SEND `elements: []` <<<

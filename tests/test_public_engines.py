@@ -82,10 +82,28 @@ _TIER = {
     # -- 14.48 GiB lab-measured against a 14.5 GiB clamp is the most expensive
     # local lane in the roster.
     #
-    # ONE row, though the lane has two named siblings coming. `ltx25_high_mime`
-    # and `ltx25_high_foley_plus` are Chunk B, they map to their OWN internal
-    # engines when they exist, and they are absent here until they can render.
     "ltx25_high_video": "ltx25_video",
+    # The FOLEY BED, 2026-08-26 -- the second row on this lane, and it maps to
+    # its OWN internal engine exactly as the comment above promised it would.
+    # Same picture, same 14.48 GiB recipe, keeping the audio the silent lane
+    # discards; `high` is inherited rather than re-guessed because the audio
+    # decode runs after the DiT is reclaimed, on a 348 MiB VAE, and does not
+    # move the bucket.
+    #
+    # `foley_plus` and NOT `sfx`: the model's own generated audio mixed UNDER
+    # the TTS master (plus, not instead of). `sfx` names the separately
+    # generated effects bed that was ripped on 2026-08-06 and is staying dead.
+    #
+    # `ltx25_high_mime` is STILL absent and still spoken for. It is the same
+    # mechanism at 1.00/0.00 and needs a per-window master gain, so it lands
+    # with its own pass -- a public id for an unregistered internal engine
+    # would trip the bijection assert at IMPORT time.
+    "ltx25_high_foley_plus": "ltx25_foley_plus",
+    # MIME, 2026-08-26 -- the third row on this lane and the last of the three
+    # the comment above always said were coming. Same mechanism as foley_plus
+    # at 1.00 foley / 0.00 master, and its own internal engine, so the
+    # bijection holds three-for-three.
+    "ltx25_high_mime": "ltx25_mime",
 }
 
 #: Public rows whose INTERNAL engine is retired -- resolvable, never offerable.

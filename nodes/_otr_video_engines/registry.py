@@ -506,6 +506,42 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # ltx25_foley_plus (the foley bed, 2026-08-26): the SAME graph and the same
+    # five artifacts, KEEPING the audio the model already computed instead of
+    # discarding it. Every capability field is identical to its parent's on
+    # purpose -- the difference between the two lanes is one extra two-node
+    # decode after the DiT has been reclaimed, which changes nothing a preflight
+    # gate asks about. The audio VAE was already required above (the silent lane
+    # still MINTS an audio latent with it), so this lane adds no new fetch.
+    #
+    # This row is not decoration: audit_engine_roster compares CAPABILITIES
+    # against the live registry, and a registered engine with no row here is the
+    # roster hole that audit exists to catch.
+    "ltx25_foley_plus": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-q3-gguf",
+                               "gemma4-12b-ltx-2.5-proj-gguf",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # ltx25_mime (2026-08-26): the same graph and the same five artifacts
+    # again. Every capability field matches both siblings because the
+    # difference between all three lanes is what happens to the model's audio
+    # AFTER the render -- discarded, mixed under, or mixed over -- and none of
+    # that changes anything a preflight gate asks about.
+    "ltx25_mime": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-q3-gguf",
+                               "gemma4-12b-ltx-2.5-proj-gguf",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

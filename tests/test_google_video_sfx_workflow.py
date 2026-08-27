@@ -101,13 +101,27 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # drawn AFTER the procgen blend where an outline is not a no-op. Again a
     # NEW link id appended; nothing on the 85/92 side moves.
     #
-    # NOTE for whoever bumps this next -- this is the FIFTH time this one line
-    # has been amended for a link that has nothing to do with this test's
-    # subject. It pins the GLOBAL counter as a did-the-graph-change canary while
-    # every other assertion here is scoped to nodes 85 and 92. Retiring it in
+    # The LTX 2.5 FOLEY BED (2026-08-26) adds links 286-288: the video policy
+    # into the EpisodeAssembler and into this mux, and the clip manifest into
+    # this mux's NEW foley_receipts_json connector. This is the SIXTH amendment
+    # for a link that is not this test's subject -- and the first one that
+    # touches node 85 at all, so read the next paragraph before assuming it is
+    # the same kind of bump as the five before it.
+    #
+    # THE FOLEY RECEIPTS RIDE A NEW CONNECTOR, NOT THIS ONE, AND THAT WAS AN
+    # OPERATOR DECISION (RULING 5, docs/2026-08-26-foley-bed-OPERATOR-RULINGS).
+    # Reusing `clip_manifest_json` would have made this file's own subject --
+    # a retired connector that is accepted, hashed and unused -- quietly false.
+    # Every assertion below about link 278, its slot, and its fanout is
+    # therefore UNCHANGED and still asserting exactly what it always did. What
+    # changed is only what was APPENDED after it, which is the point of the
+    # canary: it fires on any graph edit, and the diff it forces you to look at
+    # is what proves the edit was additive.
+    #
+    # NOTE for whoever bumps this next -- retiring the global-counter line in
     # favour of the scoped assertions would be a deliberate contract change and
     # belongs in its own commit, not in passing.
-    assert wf["last_link_id"] == 285
+    assert wf["last_link_id"] == 288
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",
@@ -117,11 +131,13 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
         "fps",
         "ffmpeg",
         "output_path",
+        "video_policy_json",
+        "foley_receipts_json",
     ]
     assert [i.get("link") for i in n85["inputs"][:5]] == [274, 263, 249, 276, 278]
     assert n85["widgets_values"] == [25, "ffmpeg", ""]
     assert n92["outputs"][1]["name"] == "clip_manifest_json"
-    assert n92["outputs"][1]["links"] == [261, 271, 275, 278]
+    assert n92["outputs"][1]["links"] == [261, 271, 275, 278, 288]
     links = {l[0]: l for l in wf["links"]}
     assert links[278] == [278, 92, 1, 85, 4, "STRING"]
     assert links[261] == [261, 92, 1, 84, 2, "STRING"]

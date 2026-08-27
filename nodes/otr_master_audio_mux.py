@@ -28,6 +28,7 @@ render to prevent a copy; here it withholds the copy and keeps the render.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import shutil
 import subprocess
@@ -315,6 +316,218 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     return out_path, report
 
 
+def _quiet_file_sha256(path: str) -> str:
+    """SHA-256 of a file, or ``""`` if it cannot be read.
+
+    For cache keys only, and the empty string is a SAFE answer there: an
+    unreadable file makes the key differ from the next run's, which re-executes
+    the node. Never used to prove an identity -- that is
+    :func:`mux_master_audio`'s job and it raises."""
+    try:
+        digest = hashlib.sha256()
+        with open(path, "rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+    except (OSError, ValueError):
+        return ""
+
+
+def _foley_receipt_digest(receipts_json: str) -> str:
+    """A cache digest over the foley stems a manifest names.
+
+    Hashes each row's stem SHA **and the bytes on disk**, because those are two
+    different facts: the manifest can carry a stale SHA for a file that has been
+    rewritten, and it is the FILE the mix reads. Best-effort -- see
+    :func:`_quiet_file_sha256` for why an unreadable input is safe here.
+    """
+    import json
+
+    if not receipts_json:
+        return ""
+    try:
+        rows = (json.loads(receipts_json) or {}).get("clips") or []
+    except (TypeError, ValueError):
+        return ""
+    parts = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        path = str(row.get("foley_path") or "")
+        if not path:
+            continue
+        parts.append("%s:%s:%s" % (path, row.get("foley_sha256") or "",
+                                   _quiet_file_sha256(path)))
+    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest() \
+        if parts else ""
+
+
+def _master_wav_owes_a_delivery_gain(master_audio_path: str) -> bool:
+    """Has the master WAV still to receive its delivery loudness pass?
+
+    Read off the ledger stamp ``OTR_EpisodeAssembler`` writes on every episode
+    -- NOT inferred from the policy. The stamp is a fact about the bytes on
+    disk; the policy is an inference about that fact, and this node runs long
+    after the fact is settled. When the two disagree, the fact wins.
+
+    Absent stamp -> False, which is the historical behaviour: every master
+    written by a build older than the foley bed had its loudness applied
+    upstream. Best-effort throughout -- a receipt read must never block a
+    finished episode.
+    """
+    try:
+        from . import _otr_ledger as _OTRL
+        from .scene_sequencer import MASTER_WAV_PRE_LOUDNESS
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        try:
+            import _otr_ledger as _OTRL  # type: ignore
+            from scene_sequencer import MASTER_WAV_PRE_LOUDNESS  # type: ignore
+        except ImportError:
+            return False
+    try:
+        ledger_path = _OTRL.in_flight_ledger_path()
+        if ledger_path is None:
+            return False
+        ledger = _OTRL.load_ledger_safe(ledger_path) or {}
+        flavour = str((ledger.get("audio") or {}).get("master_wav_flavour")
+                      or "")
+    except Exception as exc:  # noqa: BLE001 -- a receipt read never blocks
+        log.warning("[OTR_MasterAudioMux] could not read the master WAV "
+                    "flavour stamp (%s); assuming it is already levelled", exc)
+        return False
+    return flavour == MASTER_WAV_PRE_LOUDNESS
+
+
+def _foley_route(video_policy_json: str) -> bool:
+    """Is any role on this episode rendering with the LTX 2.5 foley lane?
+
+    Delegated to ``foley_stems.is_foley_route`` -- the SAME function
+    ``OTR_EpisodeAssembler`` used to decide whether to write a provisional
+    master -- so on a correctly wired graph the two nodes read one source and
+    reach one answer.
+
+    THIS ALONE IS NOT THE GUARANTEE, and it would be an over-claim to say it
+    is: sharing a function makes the two nodes agree only while both are
+    actually HANDED the policy. What closes the gap is the ledger stamp --
+    see :func:`_master_wav_owes_a_delivery_gain`, whose answer is OR-ed with
+    this one at the call site.
+
+    Fail-soft to False: an unreadable policy means today's copy path, which is
+    what every non-foley episode already does.
+    """
+    if not video_policy_json:
+        return False
+    try:
+        from ._otr_video_engines import foley_stems as _fs
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        try:
+            from _otr_video_engines import foley_stems as _fs  # type: ignore
+        except ImportError:
+            log.warning("[OTR_MasterAudioMux] foley_stems is unavailable; "
+                        "this episode is muxed on the copy path")
+            return False
+    return bool(_fs.is_foley_route(video_policy_json))
+
+
+def _compile_foley_master(master_audio_path: str, receipts_json: str,
+                          fps: int, video_policy_json: str = ""):
+    """Mix the foley bed under the provisional master and LEVEL the result.
+
+    Returns ``(path_to_mixed_wav, report_lines)``.
+
+    THIS IS THE ONLY DELIVERY LOUDNESS PASS ON A FOLEY EPISODE, and it runs
+    even when the bed turns out to be entirely silent. ``OTR_EpisodeAssembler``
+    deliberately wrote its WAV PRE-loudness on this route so the ratio could be
+    set once here and one gain follow it; a route that declined to level would
+    ship the un-levelled provisional master as the deliverable. So: mix, then
+    ``_master_loudness`` exactly once, then freeze.
+
+    ``_master_loudness`` is REUSED rather than reimplemented -- it is the only
+    loudness algorithm in this repo, it is the one that produced the measured
+    -14 LUFS target, and a second implementation here would be a second
+    delivery level that drifts. Imported lazily: this module is stdlib-only at
+    the top and must stay cold-import clean.
+
+    A NEW FILE, NEVER AN OVERWRITE. ``<ep>_master.wav`` remains exactly what the
+    assembler wrote, so a failed mix leaves a re-runnable episode behind rather
+    than a half-mixed master with the original gone.
+    """
+    import json
+
+    try:
+        from ._otr_video_engines import foley_stems as _fs
+        from .scene_sequencer import _master_loudness
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_video_engines import foley_stems as _fs  # type: ignore
+        from scene_sequencer import _master_loudness  # type: ignore
+    import torch
+
+    rows = []
+    if receipts_json:
+        try:
+            rows = [r for r in ((json.loads(receipts_json) or {}).get("clips")
+                                or []) if isinstance(r, dict)]
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "this episode is on a foley route but its foley receipts are "
+                "not readable JSON (%s). NO SILENT COPY -- shipping the "
+                "un-levelled provisional master would be a quiet 20%% "
+                "loudness error nobody sees until playback" % exc)
+    bearing = [r for r in rows if r.get("foley_path")]
+
+    # RE-RAISED IN THIS NODE'S VOCABULARY. FoleyStemError is a RuntimeError,
+    # and mux()'s terminal handler catches (ValueError, OSError) -- so an
+    # unwrapped stem fault would skip the named "the render FAILED" path and
+    # surface as a bare traceback with no episode context attached.
+    try:
+        master, master_rate = _fs.read_pcm16_wav(master_audio_path)
+        mixed, stats = _fs.mix_foley_under_master(
+            master, master_rate, bearing, fps=int(fps),
+            lane_ids=_fs.route_lane_ids(video_policy_json))
+    except _fs.FoleyStemError as exc:
+        raise ValueError(
+            "the foley bed could not be mixed under %s: %s"
+            % (os.path.basename(master_audio_path), exc)) from exc
+
+    # (1, channels, n) is the shape _master_loudness is written against, and
+    # its legacy fallback path uses torch.tanh -- so hand it a real tensor
+    # rather than an array that only works down the LUFS branch.
+    levelled, loud = _master_loudness(
+        torch.from_numpy(mixed).unsqueeze(0), ceiling_dbfs=-1.0,
+        sample_rate=int(master_rate))
+    levelled = levelled.squeeze(0).detach().cpu().numpy()
+
+    root, _ext = os.path.splitext(master_audio_path)
+    mixed_path = root + "_foley.wav"
+    _fs.write_pcm16_wav(mixed_path, levelled, master_rate)
+
+    peak_dbfs = 20.0 * math.log10(max(float(abs(levelled).max()), 1e-9))
+    lanes = stats["lanes"]
+    report = [
+        "foley_bed=mixed beats=%d/%d lanes=%s master_gain=%.2f out=%s"
+        % (stats["placed"], len(bearing),
+           ",".join("%s:%d" % kv for kv in lanes.items()) or "none",
+           stats["global_master_gain"], os.path.basename(mixed_path)),
+        "foley_loudness=%s measured=%s -> target=%s gain_db=%s peak_dbfs=%.2f"
+        % (loud.get("mode"), loud.get("measured_lufs"),
+           loud.get("target_lufs"), loud.get("gain_db"), peak_dbfs),
+    ]
+    if stats["muted_samples"]:
+        # MIME MUTES REAL AUDIO ON PURPOSE, and a receipt that did not say how
+        # much would make an accidental mute indistinguishable from the
+        # intended one. Seconds, because samples mean nothing to a reader.
+        report.append("foley_muted_s=%.2f (mime windows; the TTS and cues "
+                      "there were generated and discarded)"
+                      % (stats["muted_samples"] / float(master_rate)))
+    if stats["skipped"]:
+        report.append("foley_skipped=%d (outside the master)"
+                      % stats["skipped"])
+    if stats["conform_notes"]:
+        report.append("foley_conformed=" + "; ".join(stats["conform_notes"]))
+    log.info("[OTR_MasterAudioMux] %s", " | ".join(report))
+    return mixed_path, report
+
+
 def _reresolve_master_audio(master_audio_path: str) -> str:
     """Rename-proof the master-audio path WITHOUT changing the audio source.
 
@@ -584,6 +797,42 @@ class OTRMasterAudioMux:
                     "default": "",
                     "tooltip": "Final mp4 path. Empty -> <output>/otr/episodes/<stem>_final.mp4.",
                 }),
+                # THE FOLEY BED'S TWO CONNECTORS (2026-08-26), APPENDED at the
+                # end and never inserted (BUG-LOCAL-097).
+                #
+                # WHY THESE ARE NEW INPUTS RATHER THAN A USE FOR
+                # ``clip_manifest_json`` ABOVE -- the operator decided this, and
+                # it is not a style preference. That connector is a deliberate
+                # tripwire: `tests/test_rip_sfx_bed_guard.py` asserts it is
+                # "accepted, hashed, unused" and its docstring says plainly
+                # "never invent a use". Driving the mix off it would satisfy the
+                # test's strings while making the test's own name and reasoning
+                # false. A dedicated input leaves that tripwire meaning exactly
+                # what it says, at the cost of one link on a graph that is being
+                # edited anyway.
+                #
+                # BOTH ARE READ, AND BOTH ARE NEEDED. The policy answers "is
+                # this a foley route?" -- the SAME question the assembler asked
+                # of the SAME JSON, so the WAV's flavour and this node's
+                # mix-or-copy decision cannot diverge. The receipts answer
+                # "which beats have a bed, and where does it go?". Deciding the
+                # route from the receipts alone would copy an un-levelled
+                # provisional master whenever a foley role rendered no beats.
+                "video_policy_json": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "Video policy JSON from OTR_VideoDirector. Read "
+                               "for ONE question: is any role on the LTX 2.5 "
+                               "foley lane? If so this node mixes the foley "
+                               "bed under the provisional master and performs "
+                               "the single delivery loudness pass.",
+                }),
+                "foley_receipts_json": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "Clip manifest carrying the per-beat foley "
+                               "receipts (foley_path / foley_sha256 / start_s). "
+                               "The bed the mix is built from. Ignored unless "
+                               "video_policy_json names a foley route.",
+                }),
             },
         }
 
@@ -742,6 +991,22 @@ class OTRMasterAudioMux:
         """
         manifest = str(kwargs.get("clip_manifest_json") or "")
         stem = _episode_stem(str(kwargs.get("silent_video_path") or ""))
+        # THE FOLEY BED IS PART OF THE OUTPUT, SO IT IS PART OF THE KEY. Two
+        # runs whose manifests match STRING-for-string can still owe different
+        # masters: a re-render writes new bytes to the same stem paths, and the
+        # provisional master WAV is rewritten at a fixed name every episode. A
+        # key that hashed only the JSON would serve the first run's mix for the
+        # second run's audio -- a cached node does not execute, and a mux that
+        # does not execute cannot re-mix.
+        #
+        # Both digests are best-effort by design: a file not yet on disk hashes
+        # to "", which makes the key DIFFER from the next run's and re-executes.
+        # The failure direction is "mux again", never "serve a stale mix".
+        foley_key = "\x1f".join([
+            str(kwargs.get("video_policy_json") or ""),
+            _foley_receipt_digest(str(kwargs.get("foley_receipts_json") or "")),
+            _quiet_file_sha256(str(kwargs.get("master_audio_path") or "")),
+        ])
         _, episode_dir = _inflight_episode_for_stem(stem)
         episode_id = episode_dir.name if episode_dir is not None else ""
         decision = _publication_decision(str(kwargs.get("silent_video_path") or ""))
@@ -749,12 +1014,14 @@ class OTRMasterAudioMux:
         # has no digest (there is no receipt to hash), and two different
         # blocking reasons must not collide into one cache entry.
         parts = (manifest, stem, episode_id, decision.reason,
-                 "1" if decision.publishable else "0", decision.digest)
+                 "1" if decision.publishable else "0", decision.digest,
+                 foley_key)
         return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
     def mux(self, silent_video_path, master_audio_path, audio_done="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
-            ffmpeg="ffmpeg", output_path=""):
+            ffmpeg="ffmpeg", output_path="", video_policy_json="",
+            foley_receipts_json=""):
         # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
         # still wired on the canonical graph and hashed by IS_CHANGED, but it
         # feeds nothing -- the SFX bed compiler it once armed is deleted.
@@ -778,11 +1045,41 @@ class OTRMasterAudioMux:
                 "archival final goes to %s instead",
                 output_path.strip(), decision.summary(), out,
             )
+        # THE FOLEY BED, MIXED BEFORE THE COPY AND NEVER INSIDE IT
+        # (2026-08-26). ``mux_master_audio`` below is UNCHANGED: it still
+        # copies with ``-c:a copy`` and still asserts the muxed audio's PCM
+        # SHA against the file it was handed. What changes on a foley route is
+        # only WHICH file that is -- a new, durable, fully levelled
+        # ``<ep>_master_foley.wav`` rather than the provisional master the
+        # assembler wrote. The copy discipline is intact; the identity target
+        # moved. ffmpeg never mixes anything.
+        foley_report = []
         try:
+            # INSIDE the try, so a foley failure takes the SAME terminal path
+            # every other failure here takes. This node is the publication
+            # boundary: an episode whose bed cannot be mixed is a failed
+            # render, not an episode that quietly ships the un-levelled
+            # provisional master with 20% of its loudness missing.
+            # TWO SOURCES FOR ONE DECISION, AND EITHER ONE IS ENOUGH. The
+            # POLICY says this episode's roles rendered foley; the STAMP says
+            # the WAV on disk has not been levelled yet. They agree on every
+            # graph that is wired correctly -- and when they do not, taking the
+            # OR is what stops an un-levelled episode shipping silently.
+            #
+            # No separate "level only" branch is needed for the stamp-only
+            # case: a foley master compiled from ZERO stems is
+            # `master * 0.80 + silence`, and a pure scale followed by
+            # normalise-to-target is exactly normalise-to-target.
+            if (_foley_route(video_policy_json)
+                    or _master_wav_owes_a_delivery_gain(master_audio_path)):
+                master_audio_path, foley_report = _compile_foley_master(
+                    master_audio_path, foley_receipts_json, int(fps),
+                    video_policy_json)
             final, report = mux_master_audio(
                 silent_video_path, master_audio_path, out, ffmpeg=ffmpeg, fps=int(fps),
                 declared_credits_tail_s=float(declared_credits_tail_s or 0.0),
             )
+            report.extend(foley_report)
             # PUBLICATION IS A SEPARATE DECISION FROM PRODUCTION. The archival
             # final above is written unconditionally -- it is finished work and
             # the operator keeps it. The OBS copy is the PUBLISHED deliverable,

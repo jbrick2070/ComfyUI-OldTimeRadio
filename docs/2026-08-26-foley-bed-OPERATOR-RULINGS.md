@@ -216,3 +216,78 @@ video brings its own score, so OTR's music is supposed to be off. Likewise
 "if music must stay at 1.0 this build cannot start" overstated a 20%
 attenuation under `foley_plus` into a blocker. Both framings were wrong and the
 operator corrected them.
+
+
+---
+
+## RULING 5 -- THE FOLEY RECEIPTS RIDE THEIR OWN CONNECTOR, NOT `clip_manifest_json`
+
+Asked 2026-08-26 at the start of the build, because the r4 spec and BOTH QA
+gates refused to let the implementer decide it: *"the implementer must not
+pick."* The operator picked **(b), a new dedicated connector.**
+
+**What was at stake.** `clip_manifest_json` on `OTR_MasterAudioMux` is a
+deliberately-placed tripwire from the SFX-bed rip.
+`tests/test_rip_sfx_bed_guard.py:262-271` requires it to exist, be
+connector-only, and *"say plainly that it is retired -- never invent a use"*,
+and asserts it is *"accepted, hashed, unused."* Driving the foley mix off that
+exact JSON is, precisely, inventing a use. Option (a) would have satisfied the
+test's literal string assertions while making its name, its docstring and its
+reasoning false -- which this repo treats as a defect, not a fix.
+
+**What shipped instead.** `OTR_MasterAudioMux` gained TWO appended optional
+inputs and the canonical graph gained three links:
+
+* `video_policy_json` (node 87 -> node 85) -- the SAME question, off the SAME
+  source, that `OTR_EpisodeAssembler` now asks (node 87 -> node 7).
+* `foley_receipts_json` (node 92 slot 1 -> node 85) -- the clip manifest,
+  carrying the per-beat `foley_path` / `foley_sha256` / `start_s`.
+
+`clip_manifest_json` and its link 278 are **completely untouched**: still
+wired, still hashed by `IS_CHANGED`, still unused, still saying "retired".
+`tests/test_rip_sfx_bed_guard.py` required no edit at all, which is the whole
+value of the option the operator chose.
+
+**Cost, as predicted:** one extra link on a JSON that was being edited for
+`video_policy_json` regardless.
+
+---
+
+## RULING 6 -- MIME SHIPS IN THE SAME CHANGE AS FOLEY. This OVERRIDES the spec.
+
+Operator, 2026-08-26, mid-build: *"foley and mime we need this feature for
+both."*
+
+**The r4 spec's final gate said the opposite** -- *"This build registers ONLY
+`ltx25_foley_plus` ... Mime's 1.00/0.00 envelope is the NEXT item, not this
+one"* -- on the reasoning that a per-window master gain is a new fork against
+the global `* 0.80` and deserves its own pass. **That deferral is withdrawn.**
+It was a scoping judgement, and scoping is the operator's call, not the
+panel's or the driver's.
+
+Recorded explicitly because the spec artifact in `kibitz-runs/` still says
+"mime CUT" in its title and "ONLY ltx25_foley_plus" in its last section. A
+future window reading that file alone would conclude mime was never built.
+**Both lanes are registered and public as of this change.**
+
+### What it cost, and the panel's reasoning was sound as far as it went
+
+The fork the gate flagged is real: the two lanes attenuate the master
+DIFFERENTLY, and one shared constant could not express both.
+
+* **`ltx25_foley_plus` is GLOBAL 0.80.** RULING 1 is explicit -- *"voice holds
+  0.80 whether or not a foley stem exists for that beat, so a beat without
+  foley does not get louder"* -- so it is a single scale across the whole
+  timeline, including beats that carry no bed at all.
+* **`ltx25_mime` is PER-WINDOW 0.00.** Engines are ROLE-WIDE dropdowns, so a
+  mime role still leaves the announcer and music roles speaking, and all of
+  them share ONE master WAV. A global zero would silence the episode; RULING 4
+  describes zeroing *"a beat's window"*.
+
+The resolution was not a special case but a generalisation: the mix carries a
+master-gain **envelope** rather than a scalar. It starts at the global gain and
+mime rows punch their own windows down to zero. Everything else -- the harvest,
+the second-pass decode, the durable stem, the cut in the coverage assembler,
+the splat -- is shared, which is what made adding the second lane cheap once
+the first existed. `Ltx25MimeEngine` is a subclass with a name and two
+constants; the constants live in `foley_stems.FOLEY_LANE_GAINS`.

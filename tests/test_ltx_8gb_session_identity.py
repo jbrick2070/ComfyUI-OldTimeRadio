@@ -212,6 +212,25 @@ _ENGINES_WITH_A_SESSION = {
     # even though the lane emits no audio, so a swapped audio VAE correctly
     # opens a new session.
     "ltx25_video",             # 2026-08-19, Chunk A
+    # THE FOLEY LANE, 2026-08-26. It joins by INHERITANCE rather than by
+    # arriving or being repaired -- the first of those in this set. It
+    # subclasses Ltx25VideoEngine and overrides neither `session_identity` nor
+    # `_weight_rows`, so it declares the same four-weight identity its parent
+    # does, and the roster gate admitted it the moment it registered.
+    #
+    # AND THE SHARED IDENTITY IS CORRECT HERE, which is worth stating because
+    # the H3 pair above is the opposite case. Lanes 19 and 20 must never be
+    # mistaken for one session because they load DIFFERENT weights. These two
+    # load exactly the same four artifacts and run exactly the same graph; the
+    # foley lane only keeps an output its parent discards, after the session's
+    # weights are already resolved. Two lanes with identical weights SHOULD
+    # share a session -- that is what the identity is for.
+    "ltx25_foley_plus",        # 2026-08-26, the foley bed
+    # MIME, 2026-08-26. Joins by inheritance for the same reason and with the
+    # same justification as its sibling directly above: identical weights,
+    # identical graph, identical session. All three LTX 2.5 lanes differ only
+    # in what happens to the model's audio AFTER the render.
+    "ltx25_mime",              # 2026-08-26, the mime lane
 }
 
 

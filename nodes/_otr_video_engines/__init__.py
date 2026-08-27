@@ -169,15 +169,17 @@ except Exception:  # noqa: BLE001
 # A NORMAL selectable row (requires_flag=None, empty default_roles); it fails
 # CLOSED until the Q3 DiT, the Gemma-4 encoder and BOTH VAEs are on disk.
 #
-# ONE registration out of eng_ltx25, and unlike lane 19's case that is not a
-# sequencing choice -- the other two lanes DO NOT EXIST YET. `ltx25_mime` and
-# `ltx25_foley_plus` need the model's own audio to enter the master BEFORE the
-# master freezes, and video renders four topological stages after that freeze
-# (OTR_EpisodeAssembler order 12 vs OTR_VideoRenderBatch order 16). That is
-# Chunk B: an execution-order change with its own arc. Their ids are RESERVED
-# in eng_ltx25.LTX25_RESERVED_SIBLING_IDS so nobody spends them, and they are
-# deliberately absent from the menu, per the operator (2026-08-19): a dropdown
-# row that cannot make an episode is worse than a missing one.
+# TWO registrations out of eng_ltx25 since 2026-08-26: `ltx25_video` and
+# `ltx25_foley_plus`. The foley lane is the same graph keeping the audio the
+# silent lane throws away, mixed UNDER the master at OTR_MasterAudioMux -- which
+# runs AFTER video, so the execution-order inversion this comment used to cite
+# as the blocker was never needed for a bed. It was needed for a lane whose
+# audio REPLACES the beat audio, which is `ltx25_mime`, and mime is still not
+# here: it wants a per-window master gain rather than the global 0.80, so it
+# lands with its own pass. Its id stays RESERVED in
+# eng_ltx25.LTX25_RESERVED_SIBLING_IDS so nobody spends it, and it stays out of
+# the menu, per the operator (2026-08-19): a dropdown row that cannot make an
+# episode is worse than a missing one.
 #
 # Cold-import clean (V-12: torch and every LTX node class are lazy inside
 # load/render_clip). Guarded so a packaging quirk never breaks the namespace

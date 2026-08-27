@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 95,
-  "last_link_id": 285,
+  "last_link_id": 288,
   "nodes": [
     {
       "id": 63,
@@ -859,6 +859,13 @@
           "shape": 7,
           "type": "STRING",
           "link": 283
+        },
+        {
+          "localized_name": "video_policy_json",
+          "name": "video_policy_json",
+          "shape": 7,
+          "type": "STRING",
+          "link": 286
         }
       ],
       "outputs": [
@@ -1826,6 +1833,20 @@
             "name": "output_path"
           },
           "link": null
+        },
+        {
+          "localized_name": "video_policy_json",
+          "name": "video_policy_json",
+          "shape": 7,
+          "type": "STRING",
+          "link": 287
+        },
+        {
+          "localized_name": "foley_receipts_json",
+          "name": "foley_receipts_json",
+          "shape": 7,
+          "type": "STRING",
+          "link": 288
         }
       ],
       "outputs": [
@@ -2155,7 +2176,9 @@
           "slot_index": 0,
           "links": [
             251,
-            270
+            270,
+            286,
+            287
           ]
         }
       ],
@@ -2702,7 +2725,8 @@
             261,
             271,
             275,
-            278
+            278,
+            288
           ]
         }
       ],
@@ -3489,6 +3513,30 @@
       1,
       86,
       8,
+      "STRING"
+    ],
+    [
+      286,
+      87,
+      0,
+      7,
+      9,
+      "STRING"
+    ],
+    [
+      287,
+      87,
+      0,
+      85,
+      8,
+      "STRING"
+    ],
+    [
+      288,
+      92,
+      1,
+      85,
+      9,
       "STRING"
     ]
   ],

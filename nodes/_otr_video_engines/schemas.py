@@ -284,6 +284,34 @@ class CanonicalClip(_Forbid):
     cadence_delivered_frame_count: Optional[int] = None
     cadence_tail_trim: Optional[int] = None
     model_frame_count: Optional[int] = None
+    #: THE FOLEY SIDECAR RECEIPTS (the LTX 2.5 foley bed, 2026-08-26). Declared
+    #: for the third time for the same reason as the two groups above: this
+    #: model is extra="forbid", so an enriched clip carrying them would be
+    #: REJECTED as unknown fields the day anything validates an adapter return
+    #: through it -- the schema that exists to protect receipts would be the
+    #: thing that dropped them.
+    #:
+    #: ``foley_path`` NAMES A SIDECAR WAV, NEVER AUDIO IN THE MP4.
+    #: ``has_audio`` above stays False on every foley row and the clip is still
+    #: ffprobe-proved silent: invariant V-1 is unchanged, and
+    #: ``OTR_MasterAudioMux`` is still the only node that may emit audio. What
+    #: these six add is a FILE BESIDE the clip, which that mux mixes under the
+    #: episode master at a fixed 0.20/0.80.
+    #:
+    #: ``foley_`` AND NEVER ``sfx_``. The SFX bed -- separately GENERATED
+    #: effects from a dedicated model -- was ripped on 2026-08-06 and is
+    #: staying dead; ``tests/test_rip_sfx_bed_guard.py`` guards that prefix.
+    #: This is the video model's OWN output. Two different features.
+    #:
+    #: ALL SIX OPTIONAL, AND ABSENCE IS LOAD-BEARING: every silent lane omits
+    #: them entirely, and every projection copies them present-key-only rather
+    #: than stamping six nulls onto rows that never made the declaration.
+    foley_path: Optional[str] = None
+    foley_sha256: Optional[str] = None
+    foley_samples: Optional[int] = None
+    foley_sample_rate: Optional[int] = None
+    foley_channels: Optional[int] = None
+    foley_duration_s: Optional[float] = None
 
 
 class AdapterDescriptor(_Forbid):

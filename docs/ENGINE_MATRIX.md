@@ -70,6 +70,8 @@ without that map would play ~4% short.
 | humo_1.7B | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_1.7B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
+| ltx25_foley_plus | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_mime | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
@@ -105,6 +107,8 @@ without that map would play ~4% short.
 | humo_1.7B | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_14B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
+| ltx25_foley_plus | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_mime | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
 | ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | ltx_audio_in | text_prompt, audio_ref, init_image | text_prompt REQUIRED |
@@ -144,6 +148,8 @@ the engine's own `aspect` column above.
 | humo_1.7B | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_14B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
+| ltx25_foley_plus | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_mime | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | ltx_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never; portrait/wide/when_engine_talking; portrait/inherit_engine/when_engine_talking |
@@ -185,6 +191,8 @@ means the adapter sizes itself and IGNORES the request canvas.
 | humo_1.7B | 480x832 | engine _native_dims |
 | humo_1.7B_169 | 832x480 | engine _native_dims |
 | humo_14B_169 | 832x480 | engine _native_dims |
+| ltx25_foley_plus | 832x480 | declared |
+| ltx25_mime | 832x480 | declared |
 | ltx25_video | 832x480 | declared |
 | ltx_8gb | 512x288 | declared |
 | ltx_audio_in | 1024x576 | declared |
@@ -230,6 +238,8 @@ JUMP plan on a still-consuming lane ever re-mints.
 | humo_1.7B | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_1.7B_169 | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
+| ltx25_foley_plus | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_mime | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_video | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
 | ltx_audio_in | single | 1: 449 | 449 | 442 | 0 |
@@ -272,6 +282,8 @@ and it read exactly like a measured number until someone looked.
 | humo_1.7B | - | contract max | docs/evidence |
 | humo_1.7B_169 | - | contract max | docs/evidence |
 | humo_14B_169 | 97 | safe_render_frames | docs/evidence |
+| ltx25_foley_plus | - | contract max | none cited |
+| ltx25_mime | - | contract max | none cited |
 | ltx25_video | - | contract max | none cited |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
@@ -292,7 +304,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **30**
+* registered engine names: **32**
 * provider-side: **8**
-* local: **22**
-* can chain (strict_first_frame): **6**
+* local: **24**
+* can chain (strict_first_frame): **8**

@@ -166,6 +166,32 @@ _PUBLIC_ENGINES = {
     # _INTERNAL_TO_PUBLIC and trips the bijection assert below AT IMPORT
     # (lesson L5). They are deliberately absent until they can render.
     "ltx25_high_video": "ltx25_video",
+    # THE FOLEY LANE, 2026-08-26. `high` for the same reason its sibling is:
+    # the picture is the identical 14.48 GiB two-stage Q3 recipe, 5080-only.
+    # The audio decode it adds runs AFTER the DiT is reclaimed, on a 348 MiB
+    # VAE, so it does not move the bucket -- which is precisely why the token
+    # is inherited rather than re-guessed.
+    #
+    # `foley_plus` and not `audio` or `sfx`: the model's OWN generated audio,
+    # mixed UNDER the TTS master (plus, not instead of). `sfx` would name the
+    # separately-generated effects bed that was ripped on 2026-08-06 and is
+    # staying dead -- a different feature the operator explicitly does not want
+    # confused with this one.
+    #
+    # `ltx25_high_mime` is still absent and still spoken for. It is the same
+    # mechanism at 1.00/0.00 and it needs a per-window master gain, so it lands
+    # with its own pass; adding a public id for an unregistered internal engine
+    # would trip the bijection assert below AT IMPORT.
+    "ltx25_high_foley_plus": "ltx25_foley_plus",
+    # MIME, 2026-08-26 -- the third and last row on this lane, and the same
+    # mechanism as its sibling at 1.00 foley / 0.00 master. Operator: "foley
+    # and mime, we need this feature for both."
+    #
+    # THREE public ids on THREE internal engines, exactly as lesson L5 requires
+    # and as the comment above this block promised. Two public ids on one
+    # internal id would collapse _INTERNAL_TO_PUBLIC and trip the bijection
+    # assert AT IMPORT, which empties most of the ComfyUI menu.
+    "ltx25_high_mime": "ltx25_mime",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -288,6 +314,26 @@ _PUBLIC_LABEL = {
         "LTX 2.5 Distilled Q3 HQ two-stage silent video - high VRAM "
         "(832x480 first stage, 1664x960 refined decode, 5080-only, one "
         "3.88 s rung)"),
+    # SAY WHAT IT CHANGES ABOUT THE EPISODE, because that is what the operator
+    # is choosing when he picks this row: it is not a picture option, it is a
+    # MIX decision that reaches the whole master. The ratio is in the label for
+    # the same reason -- 0.20/0.80 is an operator ruling, not a tunable, and a
+    # label that hid it would invite someone to go looking for the knob.
+    "ltx25_high_foley_plus": (
+        "LTX 2.5 Distilled Q3 HQ two-stage + FOLEY BED - high VRAM (same "
+        "picture as ltx25_high_video; keeps the model's own footsteps, room "
+        "tone and score and mixes them under the episode master at 0.20 foley "
+        "/ 0.80 master. Affects the WHOLE episode mix, music included)"),
+    # SAY THE CONSEQUENCE FIRST. This row is ROLE-WIDE like every engine
+    # dropdown, so picking it for a role makes EVERY beat of that role a silent
+    # performance -- which is a much larger decision than picking a picture
+    # option, and the label is where the operator finds that out.
+    "ltx25_high_mime": (
+        "LTX 2.5 Distilled Q3 HQ two-stage + MIME - high VRAM (same picture as "
+        "ltx25_high_video; the video's OWN score replaces the episode audio "
+        "over these beats at 1.00 foley / 0.00 master. ROLE-WIDE: every beat of "
+        "the chosen role becomes a silent performance. TTS and music are still "
+        "generated for those beats and then discarded)"),
     # GHOST SIGNAL (2026-08-22). A LABEL ONLY -- there is deliberately no
     # `_PUBLIC_ENGINES` self-alias, because the resolver already passes a bare
     # internal id through unchanged (the existing identity-engine precedent) and
