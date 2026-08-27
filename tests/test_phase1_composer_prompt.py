@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from nodes._otr_dialogue_policy import _COCKNEY_ORTHOGRAPHY_RULE
 from nodes._otr_line_composer import (
     LineCompositionFailedError,
     LineRequest,
@@ -201,3 +202,70 @@ def test_a_transport_failure_gets_a_reroll_and_no_invented_complaint():
     assert result.text == "The signal is steady."
     first, second = state["calls"]
     assert second == first, "a transport failure must not fabricate a complaint"
+
+
+# ---------------------------------------------------------------------------
+# Cockney policy scope -- the rule follows the ACTIVE SPEAKER, not the roster.
+#
+# `allowed_people` is the whole episode cast. It earns its keep as named-entity
+# grounding and transport cleanup, and it used to decide dialogue style as
+# well: with LEMMY anywhere in that cast, every line's system prompt carried
+# the Cockney rule, so the writer re-registered the entire ensemble. These
+# tests pin the boundary at the one speaker the call is actually writing.
+# ---------------------------------------------------------------------------
+
+
+def _system_of(creative, call_index=0):
+    """The system message of one recorded creative call."""
+    message = creative.state["calls"][call_index][0]
+    assert message["role"] == "system"
+    return message["content"]
+
+
+def test_a_non_lemmy_line_has_no_cockney_policy_with_lemmy_in_the_cast():
+    creative = _recording_creative("The signal is steady.")
+    compose_line(
+        creative_fn=creative,
+        req=_req(
+            speaker="ALICE VALE",
+            allowed_people=frozenset({"ALICE VALE", "LEMMY"}),
+        ),
+        max_attempts=1,
+    )
+
+    assert _COCKNEY_ORTHOGRAPHY_RULE not in _system_of(creative)
+
+
+def test_a_lemmy_line_gets_the_lemmy_scoped_rule_and_the_spelling_clause():
+    creative = _recording_creative("Right you are, then.")
+    compose_line(
+        creative_fn=creative,
+        req=_req(
+            speaker="LEMMY",
+            allowed_people=frozenset({"ALICE VALE", "LEMMY"}),
+        ),
+        max_attempts=1,
+    )
+
+    system = _system_of(creative)
+    assert _COCKNEY_ORTHOGRAPHY_RULE in system
+    assert "For LEMMY's spoken lines only" in system
+    assert "standard English spelling" in system
+
+
+def test_the_empty_line_retry_carries_the_same_speaker_scope():
+    """A correction retry must not quietly re-scope the accent policy."""
+    creative = _recording_creative("", "Right you are, then.")
+    result = compose_line(
+        creative_fn=creative,
+        req=_req(
+            speaker="LEMMY",
+            allowed_people=frozenset({"ALICE VALE", "LEMMY"}),
+        ),
+        max_attempts=2,
+    )
+
+    assert result.text == "Right you are, then."
+    first, second = _system_of(creative, 0), _system_of(creative, 1)
+    assert first == second
+    assert "For LEMMY's spoken lines only" in second

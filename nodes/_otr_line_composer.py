@@ -1047,8 +1047,10 @@ def compose_line_draft(
             source_bank_id=source_bank_id,
         )
     from ._otr_dialogue_policy import append_dialogue_policy
-    roster = list(req.allowed_people or ()) + [req.speaker]
-    system = append_dialogue_policy(system, roster)
+    # The policy follows the ONE speaker this call writes. `allowed_people`
+    # is the whole cast and still feeds named-entity grounding and transport
+    # cleanup -- it just no longer decides anyone's dialogue style.
+    system = append_dialogue_policy(system, active_speakers=(req.speaker,))
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": _build_user_prompt(req)},

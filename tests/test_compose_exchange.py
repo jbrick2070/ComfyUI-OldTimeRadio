@@ -25,6 +25,7 @@ import pytest
 # package, so import it the normal way (the staged file-path loader block
 # was removed on promotion per build4/WIRING_SPEC.md).
 from nodes import _otr_compose_exchange as ce
+from nodes._otr_dialogue_policy import _COCKNEY_ORTHOGRAPHY_RULE
 
 
 # ---------------------------------------------------------------------------
@@ -543,3 +544,162 @@ def test_prepass_multi_group_threads_prior_without_parse_drift():
         beats, {}, [], generate_fn=_fake_gen_valid, tier_a_check=_tier_ok,
     )
     assert set(out) == {"b001", "b002", "b003", "b004", "b005"}
+
+
+# ---------------------------------------------------------------------------
+# Cockney policy scope on the grouped path
+#
+# The exchange composer writes several speakers in ONE model call, which is
+# exactly where an unscoped accent order does the most damage: the rule went
+# over the whole group, and the accepted output then rode the rolling prior
+# context into later groups. The policy decision belongs to the speakers this
+# group actually voices -- never to the episode cast.
+# ---------------------------------------------------------------------------
+
+
+def _lemmy_group():
+    """A mixed two-slot group: LEMMY plus one other speaker."""
+    return [
+        ce.VoicedSlot(dialogue_slot_id="d001", speaker="LEMMY",
+                      intent="hand over a rumour nobody asked for"),
+        ce.VoicedSlot(dialogue_slot_id="d002", speaker="MARLOW",
+                      intent="take the rumour without thanking him"),
+    ]
+
+
+def _lemmy_contracts():
+    return {
+        "d001": ce.SlotContract(
+            dialogue_slot_id="d001", speaker="LEMMY",
+            line_job="trade the rumour for a favour owed",
+            hidden_pressure="he wants to be needed again",
+            concrete_detail_required=["the ledger"],
+            state_before="breezy", state_after="pleased", must_turn=False,
+        ),
+        "d002": ce.SlotContract(
+            dialogue_slot_id="d002", speaker="MARLOW",
+            line_job="accept the tip and give nothing back",
+            hidden_pressure="he suspected this already",
+            concrete_detail_required=["the fountain pen"],
+            state_before="guarded", state_after="certain", must_turn=True,
+        ),
+    }
+
+
+def _lemmy_cast():
+    class _C:
+        def __init__(self, name, persona):
+            self.name = name
+            self.persona = persona
+    return [
+        _C("LEMMY", "Cockney fixer. Knows a bloke who knows a bloke."),
+        _C("MARLOW", "Tired investigator. Clipped sentences. Trusts no one."),
+    ]
+
+
+def _lemmy_raw(slots):
+    """Well-formed raw output for the mixed LEMMY/MARLOW fixture."""
+    lines = {
+        "d001": "d001|LEMMY: Word is that ledger walked out on its own two feet.",
+        "d002": "d002|MARLOW: Words walk. Ledgers get carried.",
+    }
+    return "\n".join(lines[s.dialogue_slot_id] for s in slots)
+
+
+def _system_content(messages):
+    system = messages[0]
+    assert system["role"] == "system"
+    return system["content"]
+
+
+def test_exchange_without_lemmy_carries_no_cockney_policy():
+    messages = ce.build_exchange_prompt(_group(3), _contracts(), [], _cast())
+    assert _COCKNEY_ORTHOGRAPHY_RULE not in _system_content(messages)
+
+
+def test_mixed_exchange_scopes_the_cockney_rule_to_lemmy_alone():
+    slots = _lemmy_group()
+    messages = ce.build_exchange_prompt(
+        slots, _lemmy_contracts(), [], _lemmy_cast(),
+    )
+    system = _system_content(messages)
+    assert system.count(_COCKNEY_ORTHOGRAPHY_RULE) == 1
+    assert "For LEMMY's spoken lines only" in system
+    assert "Every other character must retain" in system
+
+
+def test_exchange_repair_keeps_the_identical_scoped_system_message():
+    """Repair rebuilds the prompt; the scope must survive the rebuild."""
+    slots = _lemmy_group()
+    gen = _CountingGen([_lemmy_raw(slots), _lemmy_raw(slots)])
+
+    state = {"calls": 0}
+
+    def tier_a(parsed, group):
+        state["calls"] += 1
+        if state["calls"] == 1:
+            return ce.TierAResult(ok=False, reasons=["d002 speaker mismatch"],
+                                  failing_slot_ids=["d002"])
+        return ce.TierAResult(ok=True)
+
+    res = ce.compose_exchange(
+        slots, _lemmy_contracts(), [], _lemmy_cast(),
+        generate_fn=gen, tier_a_check=tier_a,
+    )
+
+    assert res.status == "ok_repaired"
+    assert len(gen.calls) == 2
+    # Only the SYSTEM strings are compared: the repair pass deliberately
+    # changes the user message to carry the failure reasons.
+    first = gen.calls[0]["messages"][0]["content"]
+    second = gen.calls[1]["messages"][0]["content"]
+    assert first == second
+    assert "For LEMMY's spoken lines only" in second
+
+
+def _recording_gen_valid():
+    """`_fake_gen_valid` with a call recorder -- that fake stores nothing."""
+    calls = []
+
+    def generate(messages, *, temperature=0.0, max_new_tokens=0):
+        calls.append([dict(m) for m in messages])
+        return _fake_gen_valid(
+            messages, temperature=temperature, max_new_tokens=max_new_tokens,
+        )
+
+    generate.calls = calls
+    return generate
+
+
+def test_prepass_cast_containing_lemmy_leaves_a_non_lemmy_group_unscoped():
+    """Production hands the prepass cast DICTS, normalized to _CastShim.
+
+    A FORWARD scope invariant, and deliberately not a red/green proof: this
+    one passes against the old roster code too. The old detector understood
+    only str and dict, and `_normalize_cast` had already turned these rows
+    into `_CastShim` objects before the roster check ever saw them, so a
+    cast-only Lemmy was invisible on this path by accident rather than by
+    design. What killed the grouped defect is
+    `test_mixed_exchange_scopes_the_cockney_rule_to_lemmy_alone`; this test
+    exists so the accident becomes a contract nobody can undo by teaching a
+    future detector to read cast objects.
+    """
+    beats = [
+        _beat("b001", "d001", "REN"),
+        _beat("b002", "d002", "MAEVE"),
+    ]
+    cast = [
+        {"name": "REN", "persona": "Dock clerk who counts everything twice."},
+        {"name": "MAEVE", "persona": "Harbour pilot. Says less than she knows."},
+        {"name": "LEMMY", "persona": "Cockney fixer. Always somewhere nearby."},
+    ]
+    gen = _recording_gen_valid()
+
+    out = ce.run_exchange_prepass(
+        beats, {}, cast, generate_fn=gen, tier_a_check=_tier_ok,
+    )
+
+    assert set(out) == {"b001", "b002"}
+    assert gen.calls, "the prepass must have composed at least one group"
+    for messages in gen.calls:
+        assert _COCKNEY_ORTHOGRAPHY_RULE not in _system_content(messages)

@@ -389,8 +389,13 @@ def build_exchange_prompt(
     base = EXCHANGE_SYSTEM_PROMPT if system_prompt is None else system_prompt
     system = base + f"  - {grounding_clause}\n"
     from ._otr_dialogue_policy import append_dialogue_policy
-    roster_items = list(cast or []) + [slot.speaker for slot in beat_group]
-    system = append_dialogue_policy(system, roster_items)
+    # Only the speakers this exchange actually voices. `cast` stays where it
+    # belongs -- rendering voice guidance for those speakers in the user
+    # message -- and no longer votes on the accent policy.
+    system = append_dialogue_policy(
+        system,
+        active_speakers=tuple(slot.speaker for slot in beat_group),
+    )
 
     fmt = (
         "Output EXACTLY one line per slot id, in this order, nothing else:\n"
