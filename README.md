@@ -386,6 +386,7 @@ suite so the doc cannot drift from the code.
 | source banks / story | [`docs/SOURCE_BANK_PREFLIGHT.md`](docs/SOURCE_BANK_PREFLIGHT.md) | the roster/bijection suites it names |
 | LLMs (writer models) | [`docs/LLM_PREFLIGHT_GUIDE.md`](docs/LLM_PREFLIGHT_GUIDE.md) | seven gates before a row joins the dropdown |
 | driving a soak leg | [`docs/SOAK_LEG_GUIDE.md`](docs/SOAK_LEG_GUIDE.md) | not a preflight gate -- the widget map + sanctioned-lever rules for varying engines/models/upscalers across legs |
+| weights on disk | [`docs/MODEL_INVENTORY.md`](docs/MODEL_INVENTORY.md) | not a preflight gate -- the full model list under `C:\ComfyUI-Models`, what references each file, and the disk-reclaim analysis |
 
 The rule that binds them (operator, 2026-08-21): **every video lane obeys the
 per-role image-model dropdowns** -- the picture a `still_*` or motion lane holds

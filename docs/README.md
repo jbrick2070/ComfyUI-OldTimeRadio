@@ -34,6 +34,10 @@ throughout. Cite the generated matrix; do not copy it.
 - `model-license-*.md` plus `model-license-audit-targets.txt` - model license
   audit records used by tests.
 - `conventions.md` - naming and module-shape rules enforced by tests.
+- `MODEL_INVENTORY.md` - the full weight-file list under `C:\ComfyUI-Models`,
+  what references each file, and the disk-reclaim analysis. Regenerate it
+  when the models root changes materially; it exists so a space audit is
+  never re-derived from scratch.
 
 Historical sprint plans, dead smoke harness notes, and one-off setup experiments
 should not live here unless a current test, README, or operator handoff points to
