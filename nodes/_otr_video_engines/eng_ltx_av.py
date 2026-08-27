@@ -855,14 +855,21 @@ class _LtxAvBase(_MC.MotionEngineBase):
         if rcfg["two_stage"]:
             return self._build_graph_ia2v(plan, length, width, height,
                                           audio_name, image_name)
-        # MOTION BAKED IN (2026-08-27), in THIS lane's own dialect: the
-        # directive above keeps the speaking face framed and the mouth
-        # visible, and states requirements positively. So the movement added
-        # is shoulders-and-hands tied to the words -- body life that cannot
-        # turn the head away -- replacing a scene NOUN that named no motion.
+        # THE LAB-PROVEN ENVELOPE (2026-08-27), corrected from a first cut
+        # that added "hands moving with the words". LTX 2.3 IA2V is the
+        # EXPERIMENTAL lane here: the comparison shows visible articulation
+        # and a gradual camera push but carries NO explicit phoneme-sync
+        # verdict, and its recorded failure is the subject TURNING AWAY
+        # (`vram-recipe-lab/results/comparisons/ltx_audio_ia2v_official_template_20260821.md:33`).
+        # So the reviewed envelope is a single continuous medium-close take,
+        # frontal, with a slow push and nothing else -- broad hand acting is
+        # not evidenced on this lane and is the thing most likely to pull the
+        # face off axis. LTX's own guidance also asks for ONE take when
+        # dialogue must stay lip-synced in one framing, which this obeys.
         positive = plan.get("text_prompt") or (
-            "a vintage radio broadcast scene, the speaker face toward camera "
-            "with mouth clearly visible, hands moving with the words")
+            "one continuous medium-close shot of a vintage radio broadcast, "
+            "the speaker centred and frontal with mouth clearly visible, the "
+            "camera pushing in very slowly")
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]
@@ -1005,14 +1012,21 @@ class _LtxAvBase(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s (ia2v_canonical) requires an init image for EVERY beat"
                 % self.name)
-        # MOTION BAKED IN (2026-08-27), in THIS lane's own dialect: the
-        # directive above keeps the speaking face framed and the mouth
-        # visible, and states requirements positively. So the movement added
-        # is shoulders-and-hands tied to the words -- body life that cannot
-        # turn the head away -- replacing a scene NOUN that named no motion.
+        # THE LAB-PROVEN ENVELOPE (2026-08-27), corrected from a first cut
+        # that added "hands moving with the words". LTX 2.3 IA2V is the
+        # EXPERIMENTAL lane here: the comparison shows visible articulation
+        # and a gradual camera push but carries NO explicit phoneme-sync
+        # verdict, and its recorded failure is the subject TURNING AWAY
+        # (`vram-recipe-lab/results/comparisons/ltx_audio_ia2v_official_template_20260821.md:33`).
+        # So the reviewed envelope is a single continuous medium-close take,
+        # frontal, with a slow push and nothing else -- broad hand acting is
+        # not evidenced on this lane and is the thing most likely to pull the
+        # face off axis. LTX's own guidance also asks for ONE take when
+        # dialogue must stay lip-synced in one framing, which this obeys.
         positive = plan.get("text_prompt") or (
-            "a vintage radio broadcast scene, the speaker face toward camera "
-            "with mouth clearly visible, hands moving with the words")
+            "one continuous medium-close shot of a vintage radio broadcast, "
+            "the speaker centred and frontal with mouth clearly visible, the "
+            "camera pushing in very slowly")
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]

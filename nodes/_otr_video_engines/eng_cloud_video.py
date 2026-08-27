@@ -142,11 +142,23 @@ _KLING_MODE_ALIASES = {
 }
 _KLING_AVATAR_MARKER = (
     "Natural broadcast avatar delivery; lip sync leads all motion.")
+#: MOTION RAISED, LIP-SYNC PROTECTED (2026-08-27, operator: cloud lanes take
+#: better action, "just be sure audio-in mention the requirements for lip sync
+#: inc feeding dialogue and audio"). The lip-sync sentence LEADS and is
+#: strengthened to name BOTH inputs this lane is given -- the beat's audio and
+#: its spoken line -- because that pairing is the whole product here. What
+#: changed is the second half: "subtle facial expression ... small natural head
+#: movement. No exaggerated gestures" was the 2026-08-17 damping antipattern,
+#: and on a talking-head lane it bought nothing the framing rule does not
+#: already buy. The frame discipline (head and shoulders held, no camera shake,
+#: no reframing) is KEPT -- on an audio-driven face that is protection, not
+#: damping -- while expression and gesture are freed.
 _KLING_AVATAR_BASE_CLAUSE = (
     "Broadcast-style digital human delivery. Natural lip sync follows the "
-    "audio exactly. Keep the head and shoulders stable in frame with subtle "
-    "facial expression, gentle eye contact, and small natural head movement. "
-    "No exaggerated gestures, no camera shake, no sudden reframing. "
+    "supplied audio exactly and matches the spoken line word for word. Hold "
+    "the head and shoulders in frame, with vivid facial expression, live eye "
+    "contact, and hands and shoulders moving with the words. "
+    "No camera shake, no sudden reframing. "
     f"{_KLING_AVATAR_MARKER}")
 
 _SEEDANCE_MODEL_ALIASES = {
@@ -209,11 +221,20 @@ _WAN_MODEL_ALIASES = {
 _WAN_RESOLUTIONS = ("720P", "1080P")
 _WAN_SMOOTH_MARKER = (
     "Stable first-frame motion; preserve composition and move continuously.")
+#: MOTION RAISED, ARTIFACT GUARDS KEPT (2026-08-27). Only one word changed in
+#: substance: "slow" became purposeful subject movement. The long exclusion
+#: list stays exactly as it is -- whip pans, melting geometry, warped faces,
+#: drifting text and pillarbox bars are ARTIFACT guards on a cloud i2v model,
+#: not motion damping, and stripping them to chase movement would trade a
+#: still-looking render for a broken one. The distinction matters: "slow"
+#: describes how the SUBJECT moves; the exclusions describe how the CAMERA and
+#: the geometry must not fail.
 _WAN_SMOOTH_MOTION_CLAUSE = (
     "Generate one continuous shot from the first frame. Preserve the "
     "first-frame subject, composition, aspect ratio, lighting, and visual "
-    "style. Use slow, physically continuous motion with gentle parallax and "
-    "no cuts. No whip pans, handheld shake, sudden reframing, jump cuts, "
+    "style. The subject moves with clear purpose; keep the motion physically "
+    "continuous, with gentle parallax and no cuts. No whip pans, handheld "
+    "shake, sudden reframing, jump cuts, "
     "rapid zooms, melting geometry, warped faces, drifting text, black frames, "
     "or pillarbox bars. "
     f"{_WAN_SMOOTH_MARKER}")

@@ -828,14 +828,25 @@ class HuMoEngine(_MC.MotionEngineBase):
         names = self._loader_names()
         steps = self._steps()
         cfg = self._cfg()
-        # SPEC-EXACT DEFAULT (2026-08-27, motion bake-in). This engine's own
-        # directive says: keep it short, name the speaker and the framing,
-        # then STOP -- "Add no movement the beat does not state." So the
-        # default names speaker + framing and nothing else. The old tail
-        # "subtle facial motion" was prompt-invented movement (exactly what
-        # the spec forbids) AND a damping word; motion on this lane comes
-        # from the BEAT's own text, never from boilerplate.
-        positive = plan.get("text_prompt") or "a person speaking, face toward camera"
+        # THE LAB-PROVEN ENVELOPE (2026-08-27), not a guess. HuMo 14B FP8 is
+        # the highest-confidence lane in the local bake-off (3.88 s human PASS,
+        # `vram-recipe-lab/docs/HUMO_BAKEOFF.md:97`), and its demonstrated
+        # ceiling is ONE main motion plus ONE minor motion: a controlled lean
+        # or weight shift, a nod, and at most one small chest-level gesture,
+        # with the camera LOCKED. Beyond that -- walking, strong profile turns,
+        # active tracking, broad hand acting -- is outside anything reviewed
+        # here, and hands or props near the face are the first thing to break.
+        #
+        # So this default states the safe envelope explicitly rather than
+        # inviting the model to improvise: an under-specified talking head is
+        # what produced "subtle facial motion" and a still. When the beat DOES
+        # state movement, that text arrives as `text_prompt` and governs -- the
+        # directive's "add no movement the beat does not state" is preserved,
+        # because this string is only ever the no-beat-text floor.
+        positive = plan.get("text_prompt") or (
+            "a person speaking, medium-close and mostly frontal, mouth and jaw "
+            "fully visible, leaning slightly forward with one controlled head "
+            "nod, camera locked")
         negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
         W = _wb.Wire
         # The lightx2v distill LoRA is a 14B-shaped adapter: it is INCOMPATIBLE

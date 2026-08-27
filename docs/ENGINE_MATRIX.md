@@ -278,10 +278,10 @@ and it read exactly like a measured number until someone looked.
 | fastwan_8gb | - | contract max | docs/2026-07-31-arm-c-fastwan-BUILD-SPEC.md |
 | google_omni_video | - | contract max | none cited |
 | google_veo_video | - | contract max | none cited |
-| humo | 97 | safe_render_frames | docs/evidence |
-| humo_1.7B | - | contract max | docs/evidence |
-| humo_1.7B_169 | - | contract max | docs/evidence |
-| humo_14B_169 | 97 | safe_render_frames | docs/evidence |
+| humo | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_1.7B | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_1.7B_169 | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
 | ltx25_foley_plus | - | contract max | none cited |
 | ltx25_mime | - | contract max | none cited |
 | ltx25_video | - | contract max | none cited |
@@ -289,8 +289,8 @@ and it read exactly like a measured number until someone looked.
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | docs/evidence |
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
-| minimax_h3_audio_in | - | contract max | docs/H3_LICENSE_ATTESTATION.md, docs/evidence |
-| minimax_h3_video | - | contract max | docs/H3_LICENSE_ATTESTATION.md, docs/evidence |
+| minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
+| minimax_h3_video | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | still_flat | - | contract max | none cited |
 | still_motion | - | contract max | none cited |
 | still_pan | - | contract max | none cited |

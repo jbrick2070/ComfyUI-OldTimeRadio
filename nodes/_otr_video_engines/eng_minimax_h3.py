@@ -1112,14 +1112,22 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
         "h3": ("MiniMaxH3ReferenceToVideo",),
     }
 
-    #: One mouth-safe body clause added (2026-08-27, motion bake-in): the
-    #: lip anchor stays first and untouched -- this lane's product is the
-    #: sync -- and the added movement is shoulders/hands tied to the words,
-    #: which cannot pull the mouth off camera.
+    #: THE LAB-PROVEN ENVELOPE (2026-08-27), corrected from a first cut that
+    #: said "shoulders and hands moving with the words". Broad hand acting is
+    #: OUTSIDE what has been reviewed on this lane: H3 Ref2VA passed a human
+    #: check at 5.17 s on seed 43 while the IDENTICAL prompt on seed 42 failed
+    #: (`vram-recipe-lab/docs/ENVELOPE_LADDERS.md:30`), and the failure mode is
+    #: the jaw, chin and collar RESHAPING once the head approaches yaw. So the
+    #: demonstrated ceiling is one weight shift or forward lean plus a slight
+    #: head tilt -- and hands, which cross the face, are the first danger.
+    #:
+    #: The lip anchor stays first and untouched: `<Audio 1>` and `<Picture 1>`
+    #: are this model's own reference tokens, and the sync is the product.
+    #: Seed sensitivity is real here -- a single failed take is not a verdict.
     _DEFAULT_PROMPT = (
         "a medium close shot of <Picture 1> speaking directly to camera, lip "
-        "movements matching <Audio 1> precisely, shoulders and hands moving "
-        "with the words, warm cinematic light")
+        "movements matching <Audio 1> precisely, one slight forward weight "
+        "shift and a small head tilt, staying frontal, warm cinematic light")
 
     #: SAME ladder as lane 19 -- same model grid, same 24->25 conversion -- and
     #: a DIFFERENT continuity, which is the one contract decision this lane does
