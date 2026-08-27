@@ -1,3 +1,110 @@
+## 2026-08-27 (late) -- HEAD a6b10bbb +handoff (v2.0-alpha) -- CODER (foley and mime QUALIFIED by ear; motion baked in per lane; the foley bed is mixed and INAUDIBLE and that is now the top row; 6 commits)
+
+**THE BOX IS BUSY. DO NOT RESET IT BLIND.** An H3 acceptance leg is rendering
+UNATTENDED: server pid **9576 on port 51581**, log `tmp/h3_leg2_server.log`
+(mtime 15:23, stepping 1/20 on a beat), GPU ~7.2 GB. Its POLLER was killed when
+a background task stopped, so nothing is watching it -- the server will finish
+and publish (or not) on its own. Read that log before touching the box; if it
+has published, the H3 row below is closed.
+
+Did: shipped the motion bake-in, qualified two lanes by ear, and found the
+  defect that matters most.
+  **FOLEY AND MIME ARE BOTH QUALIFIED, AND MIME PASSED THE LISTENING TEST.**
+  `signal_lost_ink_and_martyrdom_20260827_071626` (foley, 3h19m09s,
+  `foley_bed=mixed beats=12/13 master_gain=0.80`, `foley_unpositioned=1` -- the
+  PBUG-20260826-02 bridge beat SKIPPED instead of killing the episode) and
+  `signal_lost_the_tongue_of_fire_20260827_103813` (mime, `beats=8/8
+  lanes=ltx25_mime:8 master_gain=1.00`, `foley_muted_s=103.20`). Operator on
+  mime: *"sounds great but could use more motion."*
+  **THE FOLEY BED IS INAUDIBLE AND IT IS NOW THE TOP ROW** (PBUG-20260827-03,
+  Bible `12.137`). Operator: *"I am not hearing any foley"*, then *"I think
+  foley is our biggest gap now."* MEASURED: the bed sits **37-58 dB under the
+  programme, median 45**; audible is 15-25. Cause: `FOLEY_LANE_GAINS` 0.20 is a
+  BARE MULTIPLIER on stems whose level is never measured, and LTX 2.5 emits
+  foley at **-30 to -55 dBFS RMS**. Ruled out with evidence: the mux ran, the
+  video DID generate audio, right engine. **The A/B that settles it: mime at
+  1.00 on equally quiet stems sounded great the same day.**
+  **THE FIX IS BLOCKED ON AN OPERATOR DECISION, NOT ON CODE.** No single larger
+  constant works (21.2 dB of stem spread), and the remedy both panel lanes
+  converged on -- reference the stem before applying the ratio -- is forbidden
+  by RULING 2 in the operator's own words. That ruling predates knowing the
+  stems arrive 30-55 dB down.
+  **MOTION BAKED IN PER LANE** (`65538f41`, `f46abe03`), after an audit found
+  the 2026-08-17 kinetic lesson never reached the cast: every character lane
+  shipped a default saying *subtle*, *restrained*, or nothing, and the LTX path
+  then appended *"stable centered subject"*. 8 of 12 beats on the qualified
+  foley episode rendered on that floor, so the floor WAS the picture
+  (PBUG-20260827-04, Bible `12.138`). Now per-engine dialect: HuMo gets speaker
+  + framing and NO kinetic boilerplate (its own directive forbids inventing
+  movement); H3 gets subject + one action and its speed as flowing prose; LTX
+  2.5 gets foley-bearing work so one string serves picture and both halves of
+  the joint latent; the M4 ASK is kinetic and scale-to-the-line, mirroring
+  `_otr_motion_clause`'s own amendment so the two cannot drift.
+  **THE OPERATOR'S OWN RESEARCH CORRECTED TWO OF MY GUESSES.** Human-reviewed
+  lab results (`LIPSYNC_MOTION_ENVELOPE.md`) set the audio-in ceiling at ONE
+  main motion plus ONE minor motion, never locomotion. I had given H3 audio-in
+  and LTX audio-in *"hands moving with the words"*; hands CROSS THE FACE, which
+  is the documented failure. Both pulled back.
+  **CLOUD DONE**: Kling leads with sync against BOTH the audio and the spoken
+  line, frees expression, keeps frame discipline; Wan gets purposeful motion
+  with every artifact guard kept verbatim.
+
+Learned: (1) **AUDIT A CONTRACT'S ADJECTIVES, NOT JUST ITS NOUNS.** The 08-26
+  speak-act contract specified `restrained / subtle / stable` floors NINE DAYS
+  after this repo proved, with operator sign-off, that damping words make
+  renders look like stills. A four-round arc and I both checked the nouns
+  (caught a registry family that does not exist) and neither checked the
+  adjectives. (2) **"Shipped and confirmed" is not "on".**
+  `OTR_LTX_MOTION_CLAUSE` was proven live once on 2026-08-17 and never
+  promoted; its consumer sits inside the LTX scene branch, so H3 could never
+  reach it even with the flag set. (3) **A green receipt can hide an inaudible
+  result** -- `foley_bed=mixed` is plumbing, and nothing measured the bed
+  AGAINST the programme, which is the only number that answers the question.
+  (4) An unquoted YAML scalar containing a colon-space is a mapping; it broke
+  BUG_BIBLE twice. Use block scalars for prose.
+
+Proof: suite **12381 passed / 121 skipped / 1 xfailed**, no known-fail guard.
+  Bible **22 / 26 / 3 at 317 entries** (`12.137`, `12.138` promoted; Bible repo
+  `9b019d6`). `ENGINE_MATRIX.md` regenerated -- it scrapes engine sources for
+  prompt evidence and its drift gate caught the stale defaults. AST/BOM clean;
+  HEAD == origin; untracked `uv.lock` preserved all day.
+
+Models: rung 5 (Opus) drove and judged; rung 4 (Sonnet 5) on the frozen motion
+  diff, which caught a REAL BLOCKER -- `engine_family` is keyed on internal ids,
+  so a row spelled `ltx23_low_audio_in` classified as `abstract` and would have
+  stripped the lip-sync framing from an audio-in lane; fixed at the root plus a
+  regression across all three spellings. Sonnet also caught that the first cut
+  was a PARTIAL slice of the operator's own scope doc. A 2-lane panel (Codex
+  `gpt-5.6-sol`, Cursor Grok 4.6 High) on the foley audibility question, r1 only
+  -- **a scoped single round, NOT an arc** -- which corrected two measurement
+  errors of mine (34 dB spread is really 21.2; "under the dialogue" is really
+  "under the full programme") and found the RULING 2 conflict I had missed.
+
+Commits: `65538f41` (motion per lane), `f46abe03` (audio-in envelope + cloud +
+  knobs problem statement), `a6b10bbb` (foley to the top row, PBUGs -03/-04),
+  plus `e923a9f3`/`571c1fa3`/`6ae235a2` earlier in the day. Bible: `07e8cde7`,
+  `9b019d6`. The handoff commit lands ON TOP of these -- the sha in the heading
+  is the SECOND-TO-LAST on the branch.
+
+Current step: **MAKE THE FOLEY BED AUDIBLE** is the top row and carries the
+  measurements, the ruled-out list, the blocked decision, and the free test to
+  run first.
+
+Next: run ONE foley leg on the new motion prompts
+  (`-Profile otr_ltx25_high_foley_plus -Acts 2`) BEFORE touching the gain,
+  because no episode has yet rendered with the motion bake-in and LTX 2.5 scores
+  the event it can SEE -- louder action may mean louder stems, which would fix
+  audibility without amending RULING 2. Then measure the raw stem RMS against
+  the -30/-55 dBFS baseline in PBUG-20260827-03; `scripts/otr_replay_foley_mix.py`
+  replays the mix in ~2 s. **Do not reset the box until the H3 leg above has
+  finished.** Also unanswered and filed:
+  `docs/2026-08-27-action-prompting/MOTION_KNOBS_PROBLEM_STATEMENT.md` -- LTX
+  2.5 has NO motion knobs (8 steps, CFG 1.0, and its CFG is a VRAM contract), so
+  if that lane is capped, motion-heavy beats belong on WAN and that is a routing
+  decision, not a prompt one. And **`PBUG-20260826-02` is still used TWICE** by
+  two windows; not renumbered unilaterally because both ids are cited in commits
+  and the Bible index.
+
 ## 2026-08-27 -- HEAD ae7c9d37 +handoff (v2.0-alpha) -- CODER (silent lanes stop mouthing dialogue; a panel found the leak my tests were hiding; foley QUALIFIED; 8 commits)
 
 **THE BOX IS BUSY AND THAT IS DELIBERATE. DO NOT RESET IT.** A background chain
