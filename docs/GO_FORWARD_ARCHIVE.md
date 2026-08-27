@@ -1453,3 +1453,65 @@ deferrals, both now filed under OPEN BUGS as "The orphan-lifecycle pair" --
 read that row before touching `_otr_model_loader.py`'s cache lifecycle, since
 three successive review rounds each found a new race in the previous cut of
 the same fix.
+
+---
+
+## COCKNEY BLEED -- the root cause, as the plan carried it (closed 2026-08-27)
+
+**CLOSED BY `a967b47c`.** Kept verbatim below because it is the explanation of
+WHY the scoping was wrong, and because it contains one sentence that turned out
+to be WRONG -- worth preserving rather than quietly deleting.
+
+**THE CORRECTION.** The block below ends by saying the fix is *"to make LEMMY
+the grammatical subject of the accent sentence and leave the orthography
+sentence global"*. The converged plan superseded that second half and the
+shipped code follows the plan, not this paragraph. "Global" was only ever meant
+to mean *global within a Lemmy-containing call* -- phonetic spelling is unwanted
+from anyone. Left literally, it would have kept appending orthography bytes to
+NON-Lemmy calls, which breaks the byte-identity half of the acceptance contract
+for exactly the lines the fix exists to leave alone. A non-Lemmy active set now
+receives ZERO policy bytes, and the orthography clause rides inside the single
+scoped block.
+
+Everything else in the block held up under the code: the two production callers,
+the subjectless first sentence, and the reading that `roster_has_lemmy()` gated
+WHETHER rather than WHO.
+
+### >>> BACKGROUND ONLY: COCKNEY BLEED -- THE ROOT CAUSE, KEPT FOR THE READER <<<
+
+**Operator-observed on published episodes, 2026-08-26:** *"when lemmy is in the
+scene everyone starts talking like lemmy with a cockney speech, not just
+lemmy."*
+
+**ROOT-CAUSED, and the fix is a scoping change rather than a rewrite.**
+`nodes/_otr_dialogue_policy.py:6-10`. `append_dialogue_policy()` appends
+`_COCKNEY_ORTHOGRAPHY_RULE` to the WHOLE system prompt whenever
+`roster_has_lemmy()` is true, and the rule's first sentence is unscoped:
+*"Convey the Cockney accent through phrasing, idiom, cadence, and rhythm."*
+Nothing in it names LEMMY, so the writer reads it as a scene-wide instruction
+and re-registers the entire cast.
+
+The irony worth preserving: the rule's real job is its SECOND sentence -- use
+standard English spelling, no phonetic misspellings -- which is doing exactly
+what it should. The first sentence was meant as context for it and became an
+accent order. `roster_has_lemmy()` gates WHETHER the rule is added; nothing
+gates WHO it applies to.
+
+So the fix is to make LEMMY the grammatical subject of the accent sentence and
+leave the orthography sentence global (phonetic spelling is unwanted from
+anyone). It is NOT a prose-quality item -- a character's voice contradicting
+the source is a correctness defect, and the 2026-08-04 "story quality is done"
+ruling explicitly leaves that class open.
+
+**THIS ROW IS NO LONGER THE WORK -- IT IS THE EXPLANATION.** The fix is
+CODE-READY at the TOP of this file
+(`docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`, design commit `f92530e2`).
+Take it from there; this section survives only so the reader understands WHY the
+scoping is wrong without re-deriving it. It is the LEMMY ACCENT BLEED and
+nothing else.
+
+**The non-audio dialogue-prompt work it used to point at is SHIPPED** (2026-08-27,
+`e923a9f3`) -- a different defect that merely shared the word "dialogue". Its
+snapshot `C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`
+must still not be deleted; what it now owes is the live proof in the row below,
+not more code.

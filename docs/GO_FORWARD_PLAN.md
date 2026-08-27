@@ -27,48 +27,32 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> TAKE THIS FIRST: COCKNEY BLEED -- CODE-READY, JUST WRITE IT <<<
+### >>> COCKNEY BLEED -- CODE SHIPPED, ONE LIVE LEG OWED <<<
 
-**THE DESIGN IS DONE AND THE PLAN IS BUILD-READY. A CODER WINDOW OPENS THE PLAN
-AND TYPES.** No arc to run, no root cause to re-derive, no decision left. This
-row is at the top because it is the only open item where a coder can start
-producing code in the first minute of the window.
+**THE CODE IS DONE AND PUSHED (`a967b47c`).** Roster semantics are gone: the
+Cockney rule is scoped to the ACTIVE SPEAKER -- `(req.speaker,)` per line,
+`tuple(slot.speaker for slot in beat_group)` per exchange -- the rule names
+LEMMY as its grammatical subject and fences every other character's register,
+and `append_dialogue_policy` refuses roster-shaped values instead of widening.
+Receipt: `PBUG-20260827-02` in `docs/PROD_BUG_LOG.md`. Suite 12377 passed /
+121 skipped / 1 xfailed; Bug Bible 22 passed; canonical workflow untouched and
+re-validated at 23 nodes / 60 links.
 
-* **The plan:** `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`
-* **The judgment:** `kibitz-runs/2026-08-27-cockney-bleed-root-fix/r4/judgment.md`
-* Design commit `f92530e2`, grounded on `6ae235a2`. **No production code and no
-  workflow JSON were changed** -- the plan is documentation only, so the coder
-  writes every line of the fix.
+**WHAT IS STILL OWED, and it is the only thing:** the live canonical leg. The
+5080 was rendering the mime + H3 chain for the whole coder window, so nothing
+has yet proven production reachability or given the operator a LISTENING gate.
+Run it from `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md` P5.3 exactly --
+`media_archive`, `lemmy_cameo=always include`, three acts, `-Port` omitted so
+the wrapper picks a free ephemeral port -- and require the applied-patch receipt
+to show both widgets before accepting the leg.
 
-**PROVENANCE, stated exactly.** Codex was the grounded panelist and sole judge.
-Exactly TWO external reviewers per round -- Cursor plus a rotating Gemini/Claude
-seat. R1-R4 converged, and every reviewer claim was checked against the
-repository. That is a full four-round arc; do not re-open it.
-
-**WHAT THE FIX IS, in one sentence:** replace ROSTER semantics with
-ACTIVE-OUTPUT semantics -- the Cockney rule currently fires whenever Lemmy is
-anywhere in the cast, so it reads as a scene-wide accent order and re-registers
-the whole ensemble. It must be scoped to the ACTIVE SPEAKER.
-
-**THE ACCEPTANCE CONTRACT the plan locks (P0), abbreviated:** a per-line request
-whose speaker is not Lemmy receives NO Cockney text even when `allowed_people`
-contains him; a Lemmy line receives a Lemmy-only rule plus the existing
-standard-English orthography rule; an exchange with no Lemmy slot receives no
-policy at all; a MIXED exchange gets a rule whose grammatical subject is Lemmy
-and which explicitly requires every other character to keep their own register;
-the scoping survives line retries and exchange repair; **no-Lemmy prompt
-assembly stays BYTE-IDENTICAL**; `scifi_news_pro` is untouched; and no node
-schema, widget, link or workflow value changes.
-
-**IT IS A CORRECTNESS DEFECT, NOT PROSE QUALITY.** A character's voice
-contradicting the source is exactly the class the 2026-08-04 "story quality is
-done" ruling leaves open. Operator, on published episodes: *"when lemmy is in
-the scene everyone starts talking like lemmy with a cockney speech, not just
-lemmy."*
-
-The plan carries its own caller/test update list (P2), executable regression
-coverage (P3), a build-breaker audit (P4) and the verification sequence (P5).
-Follow them; they are the reason this row is cheap.
+**DO NOT RE-DERIVE THE FIX AND DO NOT RE-OPEN THE ARC.** The captured-prompt
+tests are the deterministic scoping gate and they already pass; the live leg
+proves reachability and sound, which is a different claim. A small lexical
+sample can never prove bleed impossible and must not become a dialogue
+blacklist. If bleed somehow survives, P5.3 item 10 says where to look next --
+the labeled full-cast voice cards and the rolling prior context -- before
+anyone widens the patch.
 
 ---
 
@@ -95,47 +79,6 @@ dialogue.
 the foley mix from disk artifacts in about two seconds. Use it before spending
 three hours.
 
-
----
-
-### >>> BACKGROUND ONLY: COCKNEY BLEED -- THE ROOT CAUSE, KEPT FOR THE READER <<<
-
-**Operator-observed on published episodes, 2026-08-26:** *"when lemmy is in the
-scene everyone starts talking like lemmy with a cockney speech, not just
-lemmy."*
-
-**ROOT-CAUSED, and the fix is a scoping change rather than a rewrite.**
-`nodes/_otr_dialogue_policy.py:6-10`. `append_dialogue_policy()` appends
-`_COCKNEY_ORTHOGRAPHY_RULE` to the WHOLE system prompt whenever
-`roster_has_lemmy()` is true, and the rule's first sentence is unscoped:
-*"Convey the Cockney accent through phrasing, idiom, cadence, and rhythm."*
-Nothing in it names LEMMY, so the writer reads it as a scene-wide instruction
-and re-registers the entire cast.
-
-The irony worth preserving: the rule's real job is its SECOND sentence -- use
-standard English spelling, no phonetic misspellings -- which is doing exactly
-what it should. The first sentence was meant as context for it and became an
-accent order. `roster_has_lemmy()` gates WHETHER the rule is added; nothing
-gates WHO it applies to.
-
-So the fix is to make LEMMY the grammatical subject of the accent sentence and
-leave the orthography sentence global (phonetic spelling is unwanted from
-anyone). It is NOT a prose-quality item -- a character's voice contradicting
-the source is a correctness defect, and the 2026-08-04 "story quality is done"
-ruling explicitly leaves that class open.
-
-**THIS ROW IS NO LONGER THE WORK -- IT IS THE EXPLANATION.** The fix is
-CODE-READY at the TOP of this file
-(`docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md`, design commit `f92530e2`).
-Take it from there; this section survives only so the reader understands WHY the
-scoping is wrong without re-deriving it. It is the LEMMY ACCENT BLEED and
-nothing else.
-
-**The non-audio dialogue-prompt work it used to point at is SHIPPED** (2026-08-27,
-`e923a9f3`) -- a different defect that merely shared the word "dialogue". Its
-snapshot `C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`
-must still not be deleted; what it now owes is the live proof in the row below,
-not more code.
 
 ---
 

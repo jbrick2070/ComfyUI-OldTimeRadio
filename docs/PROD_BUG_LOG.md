@@ -7176,6 +7176,75 @@ EXPECTED result, not a regression signal.
   does the nearest thing it can rather than failing, so nothing errors and the
   defect ships looking like a different subsystem's fault.
 
+## PBUG-20260827-02 -- a membership test decided WHETHER to add an accent rule, and nothing decided WHOM it applied to
+
+- surfaced: operator-observed on published episodes, 2026-08-26 -- *"when lemmy
+  is in the scene everyone starts talking like lemmy with a cockney speech, not
+  just lemmy."* Confirmed from four shipped ledgers, not inferred:
+  `signal_lost_glass_shards_and_broken_promises_20260825_094527` (`original`,
+  Mistral Nemo, non-Lemmy QUINN STONE says "Bloomin' 'ell", "innit", "Blimey");
+  `signal_lost_the_cat_from_outer_space_reel_20260826_012848` (`media_archive`,
+  non-Lemmy MINDY SIMPSON says "ain't right", "playin' coy");
+  `signal_lost_framing_the_proof_20260826_024816` (`media_archive`, non-Lemmy
+  QUINN OKAFOR says "see?", "the whole shebang"). The `scifi_news_pro` control
+  `signal_lost_the_caretakers_clause_20260826_155835` is clean, because that
+  lane never routes through the affected helper.
+- symptom: with the Lemmy cameo anywhere in the cast, the WHOLE ensemble
+  re-registers into Cockney idiom. Nothing errors, every line is well-formed,
+  the voices are correctly cast, and the episode ships -- so it reads as a
+  writing-quality wobble rather than a defect with a line number.
+- root cause: `nodes/_otr_dialogue_policy.py`. `append_dialogue_policy()`
+  appended `_COCKNEY_ORTHOGRAPHY_RULE` to the entire system prompt whenever
+  `roster_has_lemmy()` was true of a ROSTER -- `allowed_people + [speaker]` on
+  the per-line path, `cast + group speakers` on the exchange path. Two separate
+  faults compounding: (1) a MEMBERSHIP test ("is Lemmy in this episode?") was
+  standing in for a SCOPE decision ("whose line is this?") -- the helper gated
+  WHETHER the rule was added and nothing gated WHO it covered; (2) the rule's
+  first sentence was a subjectless imperative, "Convey the Cockney accent
+  through phrasing, idiom, cadence, and rhythm", which a writer model reads as
+  a scene-wide direction. Its real job was always the SECOND sentence -- use
+  standard English spelling, no phonetic misspellings -- and that half was
+  working correctly the whole time. On the grouped path the damage compounded:
+  accepted output feeds the rolling prior context, so contaminated phrasing
+  echoed into later exchanges.
+- fix: `a967b47c`. ACTIVE-OUTPUT semantics replace roster semantics.
+  `roster_has_lemmy` is gone; `_active_speakers_have_lemmy(active_speakers)`
+  takes only the speakers THIS model call will voice -- `(req.speaker,)` on the
+  per-line path, `tuple(slot.speaker for slot in beat_group)` on the exchange
+  path. `append_dialogue_policy` is keyword-only for that category and raises
+  `TypeError` on a mapping, set, generator, scalar `str`/`bytes`, cast-row dict
+  or `_CastShim`, validating every element before matching any name so
+  `("LEMMY", wrong_object)` cannot hide behind a good first entry. The rule
+  itself now names LEMMY as its grammatical subject and adds an explicit fence:
+  every other character retains that character's own register. The orthography
+  clause stays inside the same block, which is correct -- it is global only
+  WITHIN a Lemmy-containing call, and a non-Lemmy call now receives zero policy
+  bytes, so no-Lemmy prompt assembly is byte-identical to before.
+  `allowed_people` and `cast` are untouched and still feed named-entity
+  grounding, transport cleanup and per-speaker voice guidance; they simply no
+  longer vote on dialogue style. `scifi_news_pro` is untouched. No node schema,
+  widget, link or workflow value changed.
+- verify idea: captured-prompt tests are the deterministic gate and they exist:
+  a non-Lemmy per-line request carrying LEMMY in `allowed_people` must contain
+  ZERO occurrences of the policy constant, and a mixed exchange must carry
+  exactly ONE occurrence naming LEMMY plus the other-character fence. Both
+  assertions were run RED against the unmodified implementation first and
+  failed, which is what distinguishes them from a tautology. **STILL OWED: the
+  live canonical leg** (`media_archive`, `lemmy_cameo=always include`, three
+  acts) proving production reachability and giving the operator a listening
+  gate -- the 5080 was rendering a mime/H3 chain for the whole of this window,
+  and a lexical sample could never prove bleed impossible anyway.
+- bible-worthy: candidate -- see `docs/GO_FORWARD_PLAN.md`. The reusable class
+  is a style/policy instruction whose GATE is a membership test over a
+  population while its SCOPE is left unwritten, delivered as a subjectless
+  imperative into a prompt that renders several subjects at once. Nearest
+  existing rule is `07.29` (shared prompt builder invoked with the wrong scope
+  profile), which is image-generation and does not name the gate-versus-scope
+  confusion or the missing grammatical subject.
+- status: OPEN -- code fixed and deterministically proven; live qualification owed.
+
+---
+
 ### NOTE FOR THE LEDGER: `PBUG-20260826-02` IS USED TWICE
 
 Two different defects carry that id -- the stills face-anchor loss (`bd1aa021`,
