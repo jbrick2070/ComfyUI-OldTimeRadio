@@ -170,11 +170,48 @@ anyone). It is NOT a prose-quality item -- a character's voice contradicting
 the source is a correctness defect, and the 2026-08-04 "story quality is done"
 ruling explicitly leaves that class open.
 
-**DO NOT TAKE THIS ROW.** The operator assigned the non-audio dialogue-prompt
-work to the Codex window (snapshot
-`C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`,
-which must not be deleted). This row exists so the root cause is not
-re-derived.
+**DO NOT TAKE THIS ROW.** This row exists so the root cause is not re-derived.
+It is the LEMMY ACCENT BLEED and nothing else.
+
+**The non-audio dialogue-prompt work it used to point at is SHIPPED** (2026-08-27,
+`e923a9f3`) -- a different defect that merely shared the word "dialogue". Its
+snapshot `C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`
+must still not be deleted; what it now owes is the live proof in the row below,
+not more code.
+
+---
+
+### >>> OWED: THE LIVE H3 ACCEPTANCE PROOF FOR THE PROMPT-POLICY FIX <<<
+
+**The code is shipped, green and pushed (`e923a9f3`, suite 12332/121/1). What
+is missing is the one thing CPU tests cannot supply: a published episode.**
+
+A vanilla canonical run does NOT prove it -- the canonical defaults to the
+still floor, so no character beat reaches H3 at all. The leg has to select
+`minimax_h3_video` deliberately.
+
+* Reset per `CLAUDE.md` section 4 (selective kill by CommandLine, port 8000
+  empty, GPU back to ~1.5 GB) and boot via the UTF-8 launcher.
+* Load the real `workflows/otr_canonical.json`. Select `minimax_h3_video`
+  through the Director pick or the `OTR_FORCE_ENGINE_MAP` runtime override.
+* **A FRESH EPISODE ID IS MANDATORY.** `request_hash` excludes prompt bytes, so
+  an existing clip is cache-eligible and an old SPEAKING clip would be reused
+  -- a false pass that looks exactly like a real one.
+* Publish to `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` and confirm the
+  asset on disk with a current timestamp plus `obs_publish OK`.
+* **Read the prompt receipt, which is the actual verdict:** nonverbal action
+  and camera PRESENT; the beat's exact dialogue and any speaking / lip-sync /
+  mouth anchor ABSENT.
+
+**The BEFORE sample already exists and must be preserved:**
+`signal_lost_the_caretakers_clause_20260826_155835` in `otr/obs/` -- every beat
+on `minimax_h3_video`, rendered before the fix. Do not overwrite it or reuse
+its episode identity; it is half of the A/B.
+
+**Blocked until the box frees.** The inherited foley qualification leg
+(PID 17280) held port 8000 through the whole coding window and is a separate
+untreated BEFORE sample for the foley work. Do not reset it; wait for its
+`foley_bed=mixed` / `obs_publish OK` tail, then take the box.
 
 ---
 

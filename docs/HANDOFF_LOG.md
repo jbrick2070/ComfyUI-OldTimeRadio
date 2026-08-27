@@ -1,3 +1,115 @@
+## 2026-08-27 -- HEAD 571c1fa3 (v2.0-alpha) -- CODER (silent lanes stop mouthing dialogue; 2 commits; live H3 proof still owed)
+
+Did: shipped the converged non-audio prompt-policy fix, and fixed a second
+  defect the wiring exposed.
+  THE BUG, AND IT IS A ROUTING ONE. `_subject_anchor` opens with "face
+  visible, speaking to camera", and `otr_shot_lock.py` prepended it -- plus the
+  beat's LITERAL line -- to EVERY character-bearing beat with no engine
+  capability check at all. `minimax_h3_video` decodes no audio, so the only
+  thing it could do with a line of dialogue was draw a mouth in motion. Every
+  beat of `signal_lost_the_caretakers_clause_20260826_155835` ran on that lane.
+  THE FIX (`e923a9f3`). `derive_creative_directives` now classifies the lane
+  from the SAME policy `build_execution_plan` reads -- the resolution was
+  extracted to `_policy_engine_for_role` and both call it, so the prompt and
+  the shot row cannot disagree about which engine renders. Audio-in families
+  and `still_word` keep their dialogue BYTE FOR BYTE; every other character
+  lane gets nonverbal expression/motion/camera, the line stays private to the
+  M4 context, and a contiguous whole-word-TOKEN filter stops a returned field
+  quoting it back. Token, not substring, because the line "Yes." matches
+  inside the word "eyes" and would have deleted a perfectly good expression.
+  THE CONTRACT NAMED A FAMILY THAT DOES NOT EXIST, and implementing it
+  literally would have bricked every render. It ordered a gate requiring
+  registry family `character_video`. `character_video` is a ROLE, not a family
+  -- it lives in each engine's `roles` tuple. The real families are
+  image_to_video / audio_driven_face / audio_conditioned_video / text_to_video
+  / static_image_gen / static_motion / abstract / character_3d, and EVERY
+  engine that renders character beats has one of those, so the gate would have
+  raised ValueError on 100% of character beats -- including the H3 lane the fix
+  exists to prove. Caught before a line was written, by the Sonnet pre-code
+  pass and independently by the driver.
+  AND THE OPERATOR STRUCK THE REST OF THE GATE MID-BUILD: "we dont hide models
+  behind any gates, they appear in the dropdown and if they fail they fail, no
+  fallbacks." The role-eligibility check (`registry.assert_usable`) was
+  dropped. What remains is NOT an admission gate -- every registered engine
+  passes, and a public menu id RESOLVES rather than being refused. It refuses
+  only to CLASSIFY an id it cannot identify, because the family helpers answer
+  "abstract" for an unknown engine, "abstract" is not an audio family, and the
+  lane would silently lose a line it may have needed. Recorded as a standing
+  rule: a guard is legitimate only when the alternative is a SILENT WRONG
+  RENDER, not when it merely pre-empts a visible failure.
+  A SECOND, UNRELATED DEFECT FELL OUT OF THE WIRING. `ltx25_foley_plus` and
+  `ltx25_mime` matched NO prompt branch whatsoever. `roles = ROLES` makes them
+  legal on the announcer and music bookends, those roles arrive with
+  `text_prompt` cleared, `_is_char_face_beat` is False, and neither id was on
+  the LTX scene allowlist -- so a foley or mime OPEN shipped `build_request`'s
+  hardcoded "a 1940s radio studio, on air sign illuminated" with
+  `prompt_source` never stamped. That is the exact degrade
+  `test_ltx25_HQ_open_keeps_the_role_motion_prompt` was written to stop for
+  `ltx25_video`. Both ids joined the allowlist and `_LTX_OPEN_ENGINES`.
+  THE JOINT-AV FINISHER. LTX 2.5 conditions picture AND audio from ONE positive
+  string; there is no second audio channel. `finish_joint_av_positive` appends
+  the lane's audio requirement to the composed positive at the one seam where
+  every branch has converged on `req["text_prompt"]`, then clears both
+  prompt-budget fields so the banana re-cap cannot trim the mandatory
+  "No speech, no voices" tail, and restamps sha8/chars ONLY -- the composing
+  branch's provenance is the truth about where the prompt came from. Shape
+  taken from the VRAM lab's Golden Action Foley recipe, not invented.
+  THE ENV RECIPES (`571c1fa3`). Two suite failures were RED AT HEAD before this
+  window touched anything -- proven by running them in a pristine detached
+  worktree at `ba50e7b4`, not argued. `a7675d37` regenerated all 60 variants so
+  canonical could pick up foley/mime, which restamped each variant validator's
+  `master_hash`; the four hand-kept `.env.json` copies did not follow, so every
+  one pinned a graph that no longer exists. Byte-replaced the four hashes in
+  place; nothing else in those files moved.
+
+Learned: (1) VERIFY A CONTRACT'S NOUNS AGAINST THE REGISTRY BEFORE CODING. A
+  four-round converged spec, four reviewers deep, still named a family that has
+  never existed. The reviewers who caught it were the ones asked a specific
+  falsifiable question ("is still_word's family actually character_video?"),
+  not the ones asked to review broadly. (2) SCOPE A REVIEWER TO NAMED
+  FUNCTIONS -- the same lesson as the foley window, and it held again: three
+  scoped passes returned in 6-11 minutes each, each with real findings.
+  (3) A CURSOR LANE CAN ANSWER A STALE PROMPT. The `agent --print` lane
+  returned a detailed, well-grounded review OF A DIFFERENT QUESTION carried
+  over from an earlier session: exit 0, 10 KB of output, entirely off-topic.
+  Judge a lane by whether it answered WHAT YOU ASKED, not by exit code or log
+  size. (4) The conftest suppresses pytest's summary on a failing run, so a
+  bare `AssertionError` tells you nothing -- import the test module and call
+  the function directly. (5) A bare `Director` in a code comment fails the
+  legacy audit; write `OTR_VideoDirector`. Cost one suite cycle.
+
+Proof: full suite **12332 passed / 121 skipped / 1 xfailed** (467 s, EXIT=0, no
+  known-fail-guard block) -- fully green, which it was NOT at `ba50e7b4`.
+  Bible **22 / 26 / 3** at its own origin/main. `build_variants --check`
+  **60 variants / 0 failures**. Canonical workflow BYTE-IDENTICAL to HEAD
+  (blob `097e390c`), **23 nodes / 60 links**, 23/23 nodes audited against live
+  INPUT_TYPES, 25 node classes registered. 59 new tests in
+  `tests/test_nonaudio_prompt_policy.py`. AST/BOM/zero-byte clean on every
+  touched file; `HEAD == origin/v2.0-alpha`. Untracked `uv.lock` preserved.
+  Review roster, stated exactly: Sonnet 5 pre-code (13 grounded questions),
+  Opus pre-code (8 adversarial questions -- it found the foley/mime no-branch
+  defect), Sonnet 5 on the frozen diff (BLOCKERS: none). A Cursor lane was
+  launched and did NOT review this work. NO kibitz arc: the design had already
+  converged in the `otr-speak-act-kibitz-20260826-2125` campaign, and this was
+  implementation of a settled contract.
+
+Next: **THE LIVE H3 ACCEPTANCE PROOF IS OWED AND WAS NOT RUN.** The inherited
+  foley qualification leg (PID 17280) held port 8000 for this window's whole
+  duration and is the untreated BEFORE sample -- it must not be disturbed or
+  overwritten. When it finishes and the box is released: reset per CLAUDE.md
+  section 4, boot via the UTF-8 launcher, load the real
+  `workflows/otr_canonical.json`, select `minimax_h3_video` through the
+  Director pick or `OTR_FORCE_ENGINE_MAP`, use a FRESH episode id (the
+  `request_hash` excludes prompt bytes, so an old speaking clip would be reused
+  and the pass would be false), publish to
+  `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs`, and read the prompt
+  receipt: nonverbal action PRESENT, the exact dialogue and any
+  speaking/lip/mouth anchor ABSENT. Foley and mime LIVE AUDIO qualification
+  remains the render window's separate obligation and cannot be claimed from
+  CPU tests. Also still open and untouched here: the Cockney-bleed row
+  (`_otr_dialogue_policy.py:6-10`, root-caused, another window's lane) and the
+  scene/portrait `elements: []` row.
+
 ## 2026-08-26 -- HEAD a7675d37 +handoff (v2.0-alpha) -- CODER (LTX 2.5 foley bed AND mime built, green and pushed; VRAM question closed on a live leg; 3 commits)
 
 Did: built both Chunk B lanes in one change and proved the load-bearing number
