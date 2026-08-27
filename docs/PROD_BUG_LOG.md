@@ -7254,3 +7254,68 @@ renumbered unilaterally, because both ids are already cited in commit messages,
 in the Bible coverage index and in `docs/GO_FORWARD_PLAN.md`; a silent
 renumber would break those citations. Whoever owns the ledger should pick one
 to re-id and update its references in the same change.
+
+## PBUG-20260827-03 -- the foley bed shipped mixed, levelled, green, and inaudible
+
+- surfaced: published episode `signal_lost_ink_and_martyrdom_20260827_071626`
+  (12 beats on `ltx25_foley_plus`), operator by ear 2026-08-27: *"I am not
+  hearing any foley."*
+- symptom: no audible bed. Every receipt green -- `foley_bed=mixed beats=12/13
+  lanes=ltx25_foley_plus:12 master_gain=0.80`, `foley_loudness=lufs
+  measured=-12.29 -> target=-14.0`.
+- root cause: `FOLEY_LANE_GAINS['ltx25_foley_plus'] = (0.20, 0.80)` is a BARE
+  MULTIPLIER on stems whose level is never measured. LTX 2.5 emits foley at
+  **-30 to -55 dBFS RMS**, so 0.20 subtracts a further 14 dB and the bed lands
+  **37-58 dB under the programme, median 45** (audible is 15-25 under).
+  Measured per beat; the two loudest stems still land 37-38 dB under.
+- ruled out, with evidence: the mux RAN (pre- and post-foley masters differ;
+  published mp4 carries AAC 48 kHz stereo); the video DID generate audio (every
+  stem carries signal, loudest peak -12.8 dBFS); right engine on all 12 beats.
+- the A/B that settles it: `ltx25_mime` at gain **1.00** on equally quiet stems
+  published the same day and the operator's verdict was *"sounds great"*. Same
+  engine, same mux, same stem levels -- only the gain differs.
+- fix: **NOT YET IMPLEMENTED.** Panel (Codex + Cursor) converged: no single
+  larger constant can work, because the stems span 21.2 dB RMS. The remedy is
+  to reference each stem before applying the ratio, which requires AMENDING
+  RULING 2 (`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`), whose text forbids
+  a per-stem normalization pass by name. That is an operator decision and is
+  the outstanding item.
+- verify idea: `scripts/otr_replay_foley_mix.py <episode_dir>` replays the mix
+  from disk in ~2 s. Success is per-beat RMS(bed in window) - RMS(programme in
+  window) landing in the intended band; extend the replay to print that column
+  and to write an audition WAV, because `foley_bed=mixed` is plumbing, not
+  audibility.
+- bible-worthy: YES, promoted as `12.137`.
+
+## PBUG-20260827-04 -- the prompts were asking for stillness, and a converged contract re-imported them
+
+- surfaced: operator on published episodes 2026-08-27: *"the action in those is
+  ho hum, I think we aren't prompting enough action"*, and *"no sense in
+  rendering a video that looks like a silly pan."*
+- symptom: renders inert on lanes demonstrably capable of motion.
+- root cause: damping adjectives in the authored prompts. Per-engine defaults
+  (`"a person speaking, subtle facial motion"`; `"subtle natural motion,
+  cinematic light"`; two lanes with no movement word at all), the ShotLock
+  nonverbal floor (`"restrained visible reaction, subtle natural body motion,
+  stable mid-shot"`), and an appended `"stable centered subject"`. **8 of 12
+  character beats on the qualified foley episode rendered on that floor**, so
+  the floor was the picture.
+- the uncomfortable half: this defect class was PROVEN and operator-confirmed on
+  2026-08-17 (`81f79412`, *"it seems like real moving animation"*), and the
+  2026-08-26 speak-act contract specified the damping fallbacks verbatim nine
+  days later. A four-round arc and the implementing driver both audited the
+  contract's NOUNS and neither audited its ADJECTIVES.
+- also found: `_otr_motion_clause.py` -- a complete per-beat kinetic system --
+  is opt-in `OTR_LTX_MOTION_CLAUSE`, **default OFF**, set in no profile or
+  launcher, and its consumer sits inside the LTX scene branch, so H3 and the
+  other character lanes could never reach it even with the flag on. "Shipped
+  and confirmed" never became "on".
+- fix: `65538f41` + `f46abe03`. Motion baked in per lane in each engine's own
+  dialect; the M4 ask is now kinetic and scale-to-the-line, mirroring the 08-17
+  amendment so the two cannot drift; audio-in lanes keep protective framing and
+  received the lab's human-reviewed envelope instead of the driver's guesses.
+- verify idea: grep every live engine default for damping adjectives (zero hits
+  outside audio-driven lanes -- holds at `f46abe03`), then a live leg whose
+  character beats visibly move. **The live half is still owed: no episode has
+  yet rendered with these defaults.**
+- bible-worthy: YES, promoted as `12.138`.

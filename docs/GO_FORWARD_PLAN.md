@@ -27,7 +27,62 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> COCKNEY BLEED -- CODE SHIPPED, A LIVE LEG AND A BIBLE ROW OWED <<<
+### >>> TAKE THIS FIRST: MAKE THE FOLEY BED AUDIBLE <<<
+
+**OPERATOR, 2026-08-27, after listening: *"I think foley is our biggest gap
+now."* That settles the order -- this row is above everything else.**
+
+**THE BED IS MIXED, LEVELLED, GREEN ON EVERY RECEIPT, AND INAUDIBLE.**
+PBUG-20260827-03, Bible `12.137`. Published episode
+`signal_lost_ink_and_martyrdom_20260827_071626`. Measured: the bed sits
+**37-58 dB under the programme, median 45** (audible is 15-25 under).
+
+**THE CAUSE, and it is one line of code.**
+`FOLEY_LANE_GAINS['ltx25_foley_plus'] = (0.20, 0.80)` in
+`nodes/_otr_video_engines/foley_stems.py` is a BARE MULTIPLIER on stems whose
+level is never measured. LTX 2.5 emits foley at **-30 to -55 dBFS RMS**, so
+0.20 subtracts another 14 dB from something already inaudible.
+
+**ALREADY RULED OUT, with evidence -- do not re-derive:** the mux ran (the two
+masters differ; the mp4 carries AAC 48 kHz stereo); the video DID generate audio
+(every stem carries signal, loudest peak -12.8 dBFS); it was the right engine on
+all 12 beats. **And the A/B that settles it: `ltx25_mime` at gain 1.00, on
+equally quiet stems, published the same day and the operator said *"sounds
+great."*** Same engine, same mux, same stem levels -- only the gain differs.
+
+**THE DECISION THAT BLOCKS THE FIX, AND IT IS THE OPERATOR'S.** A single larger
+constant CANNOT work: the stems span 21.2 dB RMS, so a value that lifts the
+quietest puts the loudest forward of the dialogue. Both panel lanes (Codex
+`gpt-5.6-sol`, Cursor Grok 4.6 High) converged on referencing each stem before
+applying the ratio -- which **RULING 2 forbids by name**
+(`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`: *"The foley stem gets no
+normalization pass of its own"*). That ruling was made before anyone knew the
+stems arrive 30-55 dB down. **Amend it or the bed stays inaudible; there is no
+third option that respects it as written.**
+
+**THE OPERATOR'S OWN HYPOTHESIS, WORTH TESTING FIRST BECAUSE IT IS FREE.**
+*"Shouldn't we be rendering a foley?"* -- the motion bake-in (`65538f41`,
+`f46abe03`) landed AFTER every episode rendered so far, and LTX 2.5 scores the
+event it can SEE. More visible action may produce LOUDER stems, which could
+raise the bed without touching RULING 2 at all. **One foley leg on the new
+prompts distinguishes the two causes**, and no episode has yet rendered with
+them.
+
+* Run it: `-Profile otr_ltx25_high_foley_plus -Acts 2`.
+* Then measure the stems, do not guess: compare raw stem RMS against the
+  -30/-55 dBFS baseline recorded in PBUG-20260827-03.
+* **The 2-second harness exists:** `scripts/otr_replay_foley_mix.py
+  <episode_dir> [--inject-unpositioned]` replays the mix from disk artifacts, so
+  a terminal-node fault never again costs a 3-hour render.
+
+**WHAT WOULD PROVE IT FIXED:** per-beat `RMS(bed in window) - RMS(programme in
+window)` inside the intended band, and an operator listening pass. Both panel
+lanes were explicit that `foley_bed=mixed` is PLUMBING, not audibility -- the
+receipt that hid this bug must not be the receipt that closes it.
+
+---
+
+### >>> THEN: COCKNEY BLEED -- CODE SHIPPED, A LIVE LEG AND A BIBLE ROW OWED <<<
 
 **THE CODE IS DONE AND PUSHED (`a967b47c`).** Roster semantics are gone: the
 Cockney rule is scoped to the ACTIVE SPEAKER -- `(req.speaker,)` per line,
