@@ -1,3 +1,97 @@
+## 2026-08-26 -- HEAD 8d71a3bd +handoff (v2.0-alpha) -- CODER (ideogram refusals root-caused and fixed live, H3 reached sampling for the first time ever, foley bed designed through 4 rounds + QA; 7 commits)
+
+Did: four real bugs, every one invisible from the logs, plus a converged design.
+  THE WAN 14B RIP AND ITS BLAST RADIUS. Retired `wan_i2v` (19.82 GiB against a
+  14.5 GiB envelope; 120-min timeout vs 48.5 for the 5B). The rip broke 116
+  tests across 17 files -- found ONLY by running the full suite; three
+  piecemeal file reruns had been hiding three quarters of it. One engine-to-
+  module map accounted for 79. Where an assertion existed because of a property
+  the 14B had, the row was DELETED rather than repointed at the 5B -- blind
+  repointing had already produced two tests that passed while asserting
+  something false (`bd1aa021`).
+  FACES STOPPED DRIFTING. 71 of 75 `scene_character` stills across 17 episodes
+  had lost their identity anchor: one switch was doing two jobs, from two
+  commits 17 days apart. The trap inside the fix is the reusable part and is
+  now Bible 12.135 -- transporting the producer's raw hash LOOKS equivalent and
+  is not, because the dispatcher mutates the prompt and re-hashes it. Four
+  independent readings asserted "byte-for-byte identical" before one reviewer
+  read the recomputation (`bd1aa021`, `a17d5610` = PBUG-20260826-02).
+  A CONTROL CHARACTER IN EVERY IDEOGRAM PROMPT. `_tidy`'s two capturing rules
+  had a bare U+0001 stored where the `` backreference belonged, so every
+  match DELETED the punctuation and injected a C0 control byte -- on every
+  route, in the exact shape of the prompt that kept refusing. The driver had
+  this same line in its own plan as a whitespace nit in the PATTERN and called
+  it tiny; the defect was in the REPLACEMENT, on both lines (`9a5c2772`).
+  A RADIO CABINET WAS BEING ASKED TO SHOW HUMAN FACES. `scene_beat` has meant
+  announcer/music ONLY since BUG 1 split character beats out on 2026-06-20, but
+  the framing constant kept asking for "people shown with full heads, faces
+  unobstructed" for two months after that stopped being true. Exactly one
+  branch changed; `scene_character` and `portrait` are byte-identical and now
+  equality-pinned against ever picking up the cabinet text (`a2837b05`).
+  IDEOGRAM, ROOT-CAUSED LIVE. All three fixes above landed and it STILL refused
+  the music card. The cause was structural: `elements: []`. The vendor schema
+  has a second element type (`"type": "obj"`) documented in an 08-21 review the
+  driver had read and skimmed past. Giving the card one object anchor -- no
+  words, so the wordless contract holds -- took music cards from 0-of-2 to
+  6-of-7 across three legs. TWO EPISODES PUBLISHED on the profile that went
+  0-for-4 in the morning sweep, on the weakest local writer AND the strongest
+  (`ae7e7b6a`).
+  H3 REACHED SAMPLING FOR THE FIRST TIME IN THIS REPO'S HISTORY. The lab's
+  diagnosis was right and I proved it in-process: `build_episode_render_policy`
+  returns four keys and no `launch`, so the boot contract was dropped in
+  TRANSPORT and every H3 leg self-rejected as INCOMPATIBLE_PROFILE without
+  touching a weight -- on a server booted correctly for it. Fixed narrowly: ask
+  the SERVER what it was started with, only when the profile is silent AND the
+  engine would otherwise refuse (`99a501a2`). Then a full episode published:
+  `signal_lost_the_caretakers_clause_20260826_155835`, 25 clips, 3:22 runtime,
+  3h32m wall clock, peak VRAM 7875 MB against the 14.5 GiB ceiling. H3 is
+  compute-bound, not memory-bound -- roughly 4-8 min/clip.
+  DRIVER ERRORS WORTH RECORDING, because the panel caught them and I did not:
+  a retry ladder that violated the shipped "ONE render per card, no re-roll"
+  rule; a claim that ideogram should lose the music role, which breaks the
+  operator's standing "every wanted lane stays selectable"; and TWICE
+  overstating a consequence as a blocker.
+Current step: the FOLEY BED is the top queue item and it is a CODING item --
+  design converged through r1-r4 (Codex + Cursor) plus a Sonnet QA gate. Spec:
+  `kibitz-runs/2026-08-26-foley-bed/r4/final.md` (gitignored, read off disk;
+  CUMULATIVE -- later amendment sections OVERRIDE earlier text). Rulings:
+  `docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md` (committed, four of them).
+  The arc caught, before a line was written: a VRAM blocker with 0.02 GiB of
+  headroom (same-graph decode pins the audio VAE through sampling); the audio
+  latent being DESTROYED by `wrapper_bridge` before a second pass could reach
+  it; a canonical JSON edit the draft wrongly said was unnecessary; a stem that
+  would be swept from tmp before the mux could read it; and a guard test that
+  fails on first compile. The QA gate then closed two more blockers and
+  verified every load-bearing citation in the spec (zero wrong).
+Next: code the foley bed in a FRESH window. ONE OPERATOR DECISION IS OPEN AND
+  MUST NOT BE DECIDED WHILE CODING -- `tests/test_rip_sfx_bed_guard.py:262-271`
+  says the `clip_manifest_json` connector must "never invent a use", and this
+  build's whole mux mechanism is to make that JSON drive the output. Either
+  rewrite that guard's PREMISE (not just its tooltip) or add a new dedicated
+  input; (b) is the more honest option and the JSON is being edited anyway.
+  Also open and evidenced: the SCENE + PORTRAIT caption routes still emit
+  `elements: []` -- the same defect the music card had, still live on the three
+  lanes production renders with; and the sanctioned-gap control path, which is
+  no longer theoretical (1 refusal in 7 still killed a 30-minute episode).
+Models: Opus 5 driving. Review routing per the GO_FORWARD REVIEW ROUTING block:
+  FULL four-round arc on the foley bed (r1-r4, Codex + Cursor, 8 external
+  calls) because it is a design fork; plus a Sonnet 5 QA gate on the finished
+  plan. The Wan-rip fallout and the ideogram music card took the diff-level
+  gate (adversarial verify per change) rather than fresh arcs, per the
+  already-panelled rule. The ideogram lens build itself ran r1-r4 (Codex +
+  Cursor) with a Sonnet blast-radius pass and a final Cursor + Antigravity diff
+  gate. NO partial campaign is reported here as a full arc.
+  Suite: 12192 passed / 119 skipped / 1 xfailed. Bug Bible: 314 entries
+  (12.135 added, coverage index row appended, Bible repo pushed `e2a23835`).
+  Box: server idle and resident, GPU at 1746 MiB baseline, queue empty.
+Commits: `bd1aa021`, `a17d5610`, `9a5c2772`, `a2837b05`, `fc2de0d5` (registry
+  2.0.0-alpha.10 -- NOTE it came back Flagged like alpha.9; two consecutive
+  flags now looks structural and needs the operator's account to ask
+  Comfy-Org), `212bcd8f`, `8d71a3bd`. Bible repo: `e2a23835`. The sha in the
+  heading above is the LAST CODE HEAD -- it is the second-to-last on the branch
+  once this handoff lands; the last is this handoff commit. Boot from the sha
+  in the kickoff line, which is read after the push.
+
 ## 2026-08-25 -- HEAD 56cb0a1a +handoff (v2.0-alpha) -- CODER (three 4060 crash reports closed; the orphan-lifecycle fix took THREE rounds because each cut had a new race; Bible 12.134; 5 commits)
 
 Did: worked the crash reports the operator pasted from an 8 GB RTX 4060, not
