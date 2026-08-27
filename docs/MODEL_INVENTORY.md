@@ -233,9 +233,14 @@ under the models root, largest first. Paths are relative to `C:\ComfyUI-Models`.
 | 0.00 | OTR | `huggingface/hub/models--google--gemma-2-2b-it/.no_exist/299a8560bedf22ed1c72a8a11e7dce4a7f9f51f8/model.safetensors` |
 ## Disk-reclaim pass, 2026-08-26
 
-C: was at 286 GB free (93% used). After this pass it is at **710 GB free (81% used)** --
-about **424 GB** recovered, measured as the free-space delta rather than as the sum of the
-`du` figures, because hardlinks and Windows' deferred deletes make that sum a poor estimate.
+C: was at 286 GB free (93% used) and is now at **710 GB free (81% used)**.
+
+**The itemized deletions below sum to about 290 GB, and that is the number this pass can
+honestly claim.** Free space rose by 424 GB, so roughly 134 GB came from somewhere else: a
+`df` taken immediately after the deletions read 501 GB free, and a later one -- with no
+action taken in between -- read 643 GB. NTFS reclaims large deletions lazily, so deferred
+completion is the likely explanation, but it was not proven and no attempt is made here to
+take credit for it. Trust the itemized table, not the delta.
 
 Operator scope, in his words: *"any models outside my models folder can be deleted -- all
 good models should be in my models folder, not a cache."* All three tiers below were
