@@ -167,37 +167,74 @@ published Caretaker episode named above.
 
 ---
 
-### >>> THEN: SCENE + PORTRAIT ROUTES STILL SEND `elements: []` <<<
+### >>> THEN: SCENE + PORTRAIT `elements: []` -- MEASURE IT BEFORE DESIGNING IT <<<
 
-**Same defect as the ideogram music card, already proven, still live on the
-three lanes production renders with.** Fixed for the TITLE/music route on
-2026-08-26 (`ae7e7b6a`) and proven by two published episodes; the SCENE and
-PORTRAIT routes were left untouched and still emit an empty elements list,
-which is what made ideogram refuse. Each needs an anchor derived from **its
-own** subject -- a scene's subject, a character's face -- never a pasted radio,
-because inventing content is the one thing the lens may not do.
+**THIS ROW USED TO ORDER A FULL ARC. IT NO LONGER DOES, because the premise it
+rested on was never measured.** Re-grounded 2026-08-27 against the evidence
+file, the PBUG and the canonical JSON, after the operator asked the reasonable
+question -- *"i am not aware of this bug, maybe it has been fixed, i wonder when
+it came up"* -- and the honest answer turned out to be worth the check.
 
-Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
-PBUG-20260826-01.
+**WHAT IS ACTUALLY MEASURED.** All SIX refusal events in
+`docs/2026-08-26-ideogram4-card-refusal-evidence.md` are the same beat type:
 
-**THIS IS A DESIGN ITEM, NOT A GREP-AND-FIX -- checked 2026-08-26 before
-swinging at it.** The lens receives only three things: the prose, `kind` and
-`role` (`ideogram4_local.py:644`). There is no subject field to derive an
-anchor from. And this repo has ALREADY ruled on extracting one from the prose:
+```
+ideogram4_local still_music_opening_001 min=79.0 std=10.5
+ideogram4_local still_music_closing_001 min=80.0 std=10.5
+ideogram4_local still_music_closing_001 min=78.0 std=10.2
+ideogram4_local still_music_opening_001 min=80.0 std=10.2
+ideogram4_local still_music_closing_001 min=80.0 std=10.3
+ideogram4_local still_music_opening_001 min=87.0 std=10.5
+```
+
+Zero SCENE refusals. Zero PORTRAIT refusals. **And the music route -- the only
+route that ever refused -- was FIXED on 2026-08-26 (`ae7e7b6a`) and proven on
+two published episodes with zero refusals, on the weakest writer and the
+strongest alike.**
+
+**WHERE THE SCENE/PORTRAIT CLAIM CAME FROM.** `ae7e7b6a`'s own message: the two
+routes are *"still `elements: []` and therefore still expected to refuse"*.
+**Expected to. Not observed to.** It is an inference from structural similarity
+to a route that has since been repaired, and it hardened into this row as
+though it were a finding.
+
+**TWO MORE CORRECTIONS TO WHAT THIS ROW USED TO SAY.**
+* *"the three lanes production renders with"* is wrong. `ideogram4_local`
+  appears **ZERO times** in `workflows/otr_canonical.json`; the canonical names
+  `z_image_turbo`, three times. The engine is OPT-IN by construction --
+  `default_roles = ()`, and its own comment says *"z_image_turbo stays the
+  shipped default; no model is 'primary'"*. It ran in the sweep only because
+  profile `otr_soak_llmsweep_02` selects it deliberately.
+* The other four local engines went **91 mints, zero refusals** across that same
+  sweep (flux2_klein 35/0, z_image_turbo 32/0, flux_gen1 16/0, lumina_image
+  8/0). Nothing about this is a general stills defect.
+
+**SO THE NEXT STEP IS A MEASUREMENT, NOT A PANEL. It is a RENDER item.**
+Re-run the image sweep's profile `otr_soak_llmsweep_02` against post-`ae7e7b6a`
+HEAD -- `scripts/otr_bank_engine_sweep.py`, image mode, which walks every bank
+against both engine profiles -- and read whether SCENE and PORTRAIT beats refuse
+at all now.
+* **If they refuse:** the fork below is real and gets the full arc, now with
+  numbers instead of an inference.
+* **If they do not:** this row collapses to a documentation correction and costs
+  nothing further. That is the likelier outcome and it is why no arc runs first.
+
+**THE FORK, PRESERVED FOR THE ARC THAT MAY NOT BE NEEDED.** The lens receives
+only three things -- the prose, `kind` and `role`
+(`ideogram4_local.py:644-646`). There is no subject field to derive an anchor
+from, and this repo has ALREADY ruled on extracting one from the prose:
 `_wrapped_caption` (`ideogram4_local.py:372`) says the composer emits *"a
-comma-joined five-layer string behind a style prefix, which is a convention,
-not a grammar, so any attempt to re-extract subject / setting / elements from
-it mis-fires."*
-
-So there are two defensible answers and they are not equal:
+comma-joined five-layer string behind a style prefix, which is a convention, not
+a grammar, so any attempt to re-extract subject / setting / elements from it
+mis-fires."* Two defensible answers, not equal:
 * **(a)** extract a subject noun from the prose -- lens-local and small, but it
   is the option the codebase already tried and wrote off, and a wrong noun
-  INVENTS CONTENT, which the row above forbids in as many words;
+  INVENTS CONTENT, which the source-fidelity rule forbids in as many words;
 * **(b)** a new metadata channel so the producer hands the lens a real subject
   -- more wiring, but the anchor is derived rather than guessed.
 
-Per the review routing, a fork with two defensible answers gets the arc BEFORE
-code. **Run it; do not swing.**
+Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
+PBUG-20260826-01.
 
 ---
 
