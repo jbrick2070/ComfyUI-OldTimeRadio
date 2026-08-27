@@ -547,7 +547,7 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
         global_master_gain = min(global_master_gain, FOLEY_LANE_GAINS[lane][1])
     envelope = np.full(length, global_master_gain, dtype=np.float32)
 
-    placed, skipped, notes, overrun = 0, 0, [], 0
+    placed, skipped, notes, overrun, unpositioned = 0, 0, [], 0, 0
     lanes_mixed = {}
     for row in rows:
         path = str((row or {}).get("foley_path") or "")
@@ -581,13 +581,39 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
                 % (os.path.basename(path), int(stem.shape[-1]), frames,
                    frames * step))
 
+        # A ROW WITH NO POSITION IS SKIPPED, NOT GUESSED AT AND NOT FATAL.
+        #
+        # THIS WAS A HARD FAILURE UNTIL A LIVE LEG KILLED AN EPISODE WITH IT
+        # (2026-08-26, 3h17m of render lost at the very last node). The guard's
+        # reasoning was right and is kept: position zero would stack every
+        # unplaced bed on top of the opening, so a position is never invented.
+        # What was wrong was treating "no position" as impossible.
+        #
+        # IT IS ROUTINE. A `music_inter` beat is a video-only bridge -- ledger
+        # b006 of that episode reads `start_s=None, dur_s=None, text=''`,
+        # "Bridge to the next phase with music only" -- and it occupies NO time
+        # in the master mix at all: its neighbours b005 (33.936 + 3.499) and
+        # b007 (37.435) are exactly contiguous. Such a beat still renders a
+        # picture, and on a foley lane it still produces a stem, but there is
+        # no window in the master WAV to splat that stem into.
+        #
+        # So skipping is the only honest answer -- and skipping is NOT
+        # guessing. It is LOUD and COUNTED (`unpositioned` rides the stats into
+        # the mux receipt) so that a lane quietly dropping half its beds is
+        # visible, which is the failure the hard raise was really guarding
+        # against.
+        raw_start = (row or {}).get("start_s")
         try:
-            start_s = float((row or {}).get("start_s"))
+            start_s = float(raw_start)
         except (TypeError, ValueError):
-            raise FoleyStemError(
-                "foley stem %r has no usable start_s, so there is nowhere to "
-                "put it. NO GUESS -- position zero would stack every bed on "
-                "top of the opening" % os.path.basename(path))
+            unpositioned += 1
+            _LOG.warning(
+                "[OTR foley] stem %s has no master-mix position "
+                "(start_s=%r) -- NOT mixed. A beat with no slot in the master "
+                "cannot carry a bed; this is normal for a music_inter bridge "
+                "and a fault for anything else",
+                os.path.basename(path), raw_start)
+            continue
         offset = int(round(start_s * float(fps))) * step
         if offset < 0 or offset >= length:
             skipped += 1
@@ -634,6 +660,10 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
     mixed = arr * envelope + bed
     stats = {
         "placed": placed, "skipped": skipped, "trimmed_samples": overrun,
+        # Beats that produced a stem but own no window in the master mix --
+        # a music_inter bridge is the normal case. Counted so a lane silently
+        # dropping beds is visible in the receipt rather than only in a log.
+        "unpositioned": unpositioned,
         "conform_notes": notes,
         "lanes": dict(sorted(lanes_mixed.items())),
         "global_master_gain": float(global_master_gain),

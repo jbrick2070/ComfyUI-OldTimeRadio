@@ -7093,3 +7093,46 @@ EXPECTED result, not a regression signal.
 - status: FIXED, suite-proven (12136 passed). NOT yet proven on a live leg --
   the canonical run that confirms `identity_seed_basis` is populated and faces
   hold across beats is the outstanding receipt.
+
+## PBUG-20260826-02 -- a music_inter bridge has NO master-mix slot, and the foley mix treated that as fatal
+
+- surfaced: live canonical leg, `otr_ltx25_high_foley_plus`, episode
+  `signal_lost_the_mysterious_prints_secret_20260826_215423`, 2026-08-26.
+- symptom: the episode rendered for **3h17m22s**, decoded 20 beats of foley
+  correctly, and then DIED AT THE TERMINAL NODE. Nothing published to
+  `otr/obs/`. `Prompt executed in 03:17:22` appears in the log immediately
+  after the traceback, so a reader skimming for that line would call it a
+  success.
+- error: `ValueError: the foley bed could not be mixed under
+  pending_20260826_214439_master.wav: foley stem
+  'otr_ltx25_foley_plus_kvirhz22_foley.wav' has no usable start_s, so there is
+  nowhere to put it` (`foley_stems.py:587` raising `FoleyStemError`, re-raised
+  by `otr_master_audio_mux.py:488`).
+- root cause: `mix_foley_under_master` assumed every foley-bearing manifest row
+  carries a `start_s`. It does not. A `music_inter` beat is a VIDEO-ONLY bridge
+  -- ledger `b006` read `start_s=None, dur_s=None, text=''`, beat_intent
+  "Bridge to the next phase with music only" -- and it occupies **no time at
+  all** in the master mix: its neighbours are exactly contiguous (`b005`
+  33.9364 + 3.4990 = 37.4354, and `b007` starts at 37.4354). It still renders a
+  picture, and on a foley lane it still produces a stem, so the mix was handed
+  a stem with nowhere to go.
+- WHY THE GUARD EXISTED, because it was half right and must not simply be
+  deleted: inventing a position would splat every unplaced bed at sample 0, on
+  top of the opening. That reasoning stands. What was wrong was treating "no
+  position" as impossible rather than routine.
+- fix: an unpositioned row is SKIPPED -- loudly, and COUNTED into
+  `stats["unpositioned"]`, which rides into the mux receipt as
+  `foley_unpositioned=N`. Skipping is not guessing. The count is the half the
+  raise was really protecting: a lane quietly dropping most of its beds stays
+  visible without being able to kill a finished episode.
+- covered by: `tests/test_ltx25_foley_bed.py::
+  test_an_UNPOSITIONED_beat_is_skipped_loudly_not_fatal` and
+  `::test_every_beat_unpositioned_still_delivers_a_master` (the degenerate case
+  -- nothing placeable must still deliver the master; the episode is not the
+  bed's hostage).
+- LESSON, and it generalises past foley: a terminal node is the most expensive
+  possible place to fail closed. A guard there inherits the entire render's
+  cost, so "refuse" must be reserved for what would corrupt the deliverable --
+  a mis-placed bed would have -- and everything survivable degrades with a
+  receipt instead. This one refused over a beat that was never supposed to
+  carry a bed.

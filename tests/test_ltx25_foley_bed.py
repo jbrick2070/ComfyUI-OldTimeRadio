@@ -350,6 +350,54 @@ def test_the_global_080_applies_to_beats_with_no_bed_at_all(tmp_path):
     assert np.allclose(mixed, 0.4, atol=1e-3)
 
 
+def test_an_UNPOSITIONED_beat_is_skipped_loudly_not_fatal(tmp_path):
+    """THE LIVE LEG THAT KILLED AN EPISODE (2026-08-26), pinned.
+
+    This raised FoleyStemError until a canonical leg died on it at the very
+    last node -- 3h17m of render lost, nothing published. A `music_inter` beat
+    is a video-only bridge: ledger b006 read `start_s=None, dur_s=None,
+    text=''`, and its neighbours b005 (33.936 + 3.499) and b007 (37.435) were
+    exactly contiguous, so it owned NO time in the master mix at all. It still
+    rendered a picture, and on a foley lane it still produced a stem.
+
+    A beat with no window cannot carry a bed. Skipping is the only honest
+    answer -- and skipping is NOT the position-guessing the old guard rightly
+    forbade. What the guard was really protecting against is a bed silently
+    vanishing, so the skip is LOUD and COUNTED instead."""
+    master = np.full((1, 100 * STEP), 0.5, dtype=np.float32)
+    placed_stem = _stem(tmp_path, "ok.wav", 10, 0.25, channels=1)
+    orphan = _stem(tmp_path, "orphan.wav", 10, 0.25, channels=1)
+    rows = [
+        _row(placed_stem, 0.0, 10),
+        # Exactly what build_clip_manifest emits for an unpositioned line.
+        {"foley_path": orphan, "start_s": None, "frame_count": 10,
+         "start_s_space": "master_mix", "engine_id": "ltx25_foley_plus"},
+    ]
+    mixed, stats = fs.mix_foley_under_master(master, RATE, rows, fps=FPS)
+
+    assert stats["placed"] == 1
+    assert stats["unpositioned"] == 1, (
+        "an unpositioned beat must be COUNTED -- a bed missing from half an "
+        "episode has to be visible in the receipt, not just a log line")
+    # The positioned bed still landed; the episode still ships.
+    assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.8 + 0.25 * 0.2, atol=1e-3)
+    assert np.allclose(mixed[:, 10 * STEP:], 0.5 * 0.8, atol=1e-3)
+
+
+def test_every_beat_unpositioned_still_delivers_a_master(tmp_path):
+    """The degenerate case must not become the old hard failure by another
+    route: if NOTHING can be placed, the master is still returned (scaled and
+    then normalised downstream), because the episode is not the bed's hostage."""
+    master = np.full((1, 50 * STEP), 0.5, dtype=np.float32)
+    orphan = _stem(tmp_path, "orphan.wav", 10, 0.25, channels=1)
+    mixed, stats = fs.mix_foley_under_master(
+        master, RATE,
+        [{"foley_path": orphan, "start_s": None, "frame_count": 10,
+          "engine_id": "ltx25_foley_plus"}], fps=FPS)
+    assert (stats["placed"], stats["unpositioned"]) == (0, 1)
+    assert np.allclose(mixed, 0.5 * 0.8, atol=1e-3)
+
+
 def test_a_stem_from_a_lane_with_no_gains_is_a_refusal(tmp_path):
     """Mixing a stem at gains chosen for a different lane is how a bed ends up
     over or under the dialogue it was balanced against. NO GUESS."""
