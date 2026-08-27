@@ -63,8 +63,20 @@ Current step: the FOLEY BED is the top queue item and it is a CODING item --
   would be swept from tmp before the mux could read it; and a guard test that
   fails on first compile. The QA gate then closed two more blockers and
   verified every load-bearing citation in the spec (zero wrong).
-Next: code the foley bed in a FRESH window. ONE OPERATOR DECISION IS OPEN AND
-  MUST NOT BE DECIDED WHILE CODING -- `tests/test_rip_sfx_bed_guard.py:262-271`
+Next: code the foley bed in a FRESH window. A FINAL CURSOR GATE ran after the
+  Sonnet QA and found five more, all folded into the spec's last section (which
+  WINS over anything earlier in that cumulative document): the spec's own
+  section 6 still said mime was CUT, contradicting the operator's committed
+  RULING 4 -- corrected to "deferred by scope, not cut by design", this build
+  registers only `ltx25_foley_plus`; the hook call site was named in two
+  different places and is now pinned to one (immediately after
+  `validate_silent_clip_contract`, `eng_ltx25.py:1385-1386`, the first moment
+  `frame_count` exists); and cloning the harvested latent must happen INSIDE
+  `_on_graph_result` while the node is alive, because stashing a GPU reference
+  across `_wb.reclaim_idle_models` is a use-after-free.
+  LAYER 1 (the engine) IS UNBLOCKED AND CAN START IMMEDIATELY. Only the
+  mux/workflow layer waits, and it waits on ONE OPERATOR DECISION THAT MUST NOT
+  BE DECIDED WHILE CODING -- `tests/test_rip_sfx_bed_guard.py:262-271`
   says the `clip_manifest_json` connector must "never invent a use", and this
   build's whole mux mechanism is to make that JSON drive the output. Either
   rewrite that guard's PREMISE (not just its tooltip) or add a new dedicated
