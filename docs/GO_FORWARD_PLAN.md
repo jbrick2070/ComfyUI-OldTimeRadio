@@ -221,10 +221,21 @@ the label -- never by editing a profile.
 on `minimax_h3_video`, rendered before the fix. Do not overwrite it or reuse
 its episode identity; it is half of the A/B.
 
-**Blocked until the box frees.** The inherited foley qualification leg
-(PID 17280) held port 8000 through the whole coding window and is a separate
-untreated BEFORE sample for the foley work. Do not reset it; wait for its
-`foley_bed=mixed` / `obs_publish OK` tail, then take the box.
+**THE BOX IS FREE, AND THE FOLEY RE-RUN OUTRANKS THIS ROW.** The foley
+qualification leg that held port 8000 all night DIED at its terminal node after
+3h17m22s and published nothing (PBUG-20260826-02, fixed in `499312bb`). Its two
+python processes from 21:43 are still resident holding port 8000 with the GPU
+already back to ~1.2 GB; whoever goes next resets them per `CLAUDE.md`
+section 4.
+
+**Order matters here.** Foley/mime qualification is the NEXT ITEM at the top of
+this file and its blocker was only just cleared, so the foley re-run takes the
+box first. This H3 row is a single leg and can follow it. Do NOT start both --
+two windows resetting one GPU is how each kills the other's leg.
+
+**There is no untreated foley BEFORE artifact to preserve** -- that leg never
+reached the mix. The H3 before/after A/B is unaffected: its BEFORE sample is the
+published Caretaker episode named above.
 
 ---
 
