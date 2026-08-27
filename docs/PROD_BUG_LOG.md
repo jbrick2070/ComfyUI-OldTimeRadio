@@ -7136,3 +7136,52 @@ EXPECTED result, not a regression signal.
   a mis-placed bed would have -- and everything survivable degrades with a
   receipt instead. This one refused over a beat that was never supposed to
   carry a bed.
+
+## PBUG-20260827-01 -- the prompt told a silent engine to speak, because nothing asked what the engine could do
+
+- surfaced: published episode `signal_lost_the_caretakers_clause_20260826_155835`
+  (every beat on `minimax_h3_video`), operator-observed 2026-08-26. Confirmed
+  from the shipped ledger, not inferred.
+- symptom: characters mouth their dialogue on a lane that decodes no audio. The
+  mouths track the real TTS closely enough to look like broken lip-sync, which
+  sends a reader hunting for an audio-routing fault that does not exist.
+- root cause: `otr_shot_lock.py` prepended `_subject_anchor(appearance)` -- whose
+  first clause is the literal string `"face visible, speaking to camera"` -- AND
+  the beat's literal spoken line to EVERY character-bearing beat, with **no
+  check on what the routed engine can actually do**. `minimax_h3_video` is
+  `image_to_video` and decodes nothing; handed a line of dialogue and an
+  instruction to speak, the only thing it can do is draw a mouth in motion. It
+  is not lip-sync to the WAV -- the lane never receives the WAV. H3 invents its
+  own utterance internally from the prompt text, which is why two performances
+  of the same words look uncannily aligned.
+- fix: `e923a9f3`. The lane is classified from the SAME policy
+  `build_execution_plan` reads (`_policy_engine_for_role`, one resolution, four
+  consumers). Audio-in families and `still_word` keep their dialogue
+  byte-for-byte; every other character lane gets nonverbal
+  expression/motion/camera, the line stays private to the M4 context, and a
+  contiguous whole-word-token filter rejects a field that quotes it back.
+  Hardened in `6ae235a2` after a Kibitz panel: the filter compared the FULL line
+  while M4 was shown only `line[:240]`, so on a longer line the writer could
+  quote back verbatim what it was shown and slip through -- reproduced, and
+  measured at **295 of 7096 ledger lines over the cap across 111 episodes**.
+- verify idea: a live canonical leg pinned to `h3_low_video (16:9)` on a FRESH
+  episode id (`request_hash` excludes prompt bytes, so an old speaking clip is
+  cache-eligible and would produce a false pass); inspect frames for a moving
+  mouth and the prompt receipt for the absence of the beat line and of any
+  speaking/lip/mouth anchor. **STILL OWED -- the tests prove prompt bytes, which
+  is a different claim from what the model draws.**
+- bible-worthy: YES, and promoted as `12.136`. The reusable class is a prompt
+  policy that is not a function of the routed engine's CAPABILITY: the composer
+  writes an instruction the backend physically cannot honour, and the backend
+  does the nearest thing it can rather than failing, so nothing errors and the
+  defect ships looking like a different subsystem's fault.
+
+### NOTE FOR THE LEDGER: `PBUG-20260826-02` IS USED TWICE
+
+Two different defects carry that id -- the stills face-anchor loss (`bd1aa021`,
+promoted as Bible `12.135`) and the foley `music_inter` bridge (`499312bb`).
+They were filed by different windows on the same day. Left as-is rather than
+renumbered unilaterally, because both ids are already cited in commit messages,
+in the Bible coverage index and in `docs/GO_FORWARD_PLAN.md`; a silent
+renumber would break those citations. Whoever owns the ledger should pick one
+to re-id and update its references in the same change.

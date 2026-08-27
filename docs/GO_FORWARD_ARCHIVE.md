@@ -1298,3 +1298,158 @@ that the process was alive.** Launching `scripts/otr_overnight_loop.sh` via
 works perfectly -- but every coreutil inside the supervisor silently returns
 nothing. The tell was a header reading `[] pass 1: launching bank gate (obs=)`
 instead of a real timestamp.
+
+
+## MOVED FROM GO_FORWARD_PLAN 2026-08-27 (verbatim, nothing edited)
+
+Removed from the forward plan because it is CLOSED or historical, not
+because it is unimportant. The plan is open work only; this is the record.
+
+### FOLEY/MIME row -- the 2026-08-26 build history and superseded exit text
+
+**THE CODE IS BUILT, GREEN AND PUSHED (2026-08-26, `a7675d37`). THIS IS NO
+LONGER A CODER ITEM.** What is left is a live leg and a pair of ears, which is
+a RENDER window's job. A coder window taking this row should skip to the next
+one unless it is also driving the GPU.
+
+**WHAT IS ALREADY MEASURED, so it is not re-measured:** a live canonical leg on
+`otr_ltx25_high_foley_plus` decoded 12 beats at
+`decode_peak_mb` **2883-3269 MiB (avg ~3090)** against the 14.5 GiB
+(14848 MiB) stop. Every stem came out at exactly `186240 = 97 x 1920` samples
+on a runtime-read 48000 Hz rate. **The two-pass split is proven and the VRAM
+question is CLOSED** -- the audio decode costs ~21% of the ceiling, in
+isolation, after `reclaim_idle_models`. Do not re-open it.
+
+**WHAT IS STILL OWED, and it is the whole remaining exit:**
+* the FOLEY leg's own tail -- `foley_bed=mixed beats=N/N lanes=...`,
+  `foley_loudness=...`, and `obs_publish OK`. The leg was still rendering at
+  handoff (see HANDOFF_LOG for its state);
+* a MIME leg on `otr_ltx25_high_mime`. That profile pins mime on the CHARACTER
+  role ONLY and leaves announcer/music on the SILENT lane deliberately: mime
+  zeroes the master over its own beats, so it needs speaking neighbours in the
+  same master WAV to be measured against. All three roles on mime would silence
+  the episode and prove nothing. Watch for `foley_muted_s=`;
+* `ltx25_video` proven STILL silent on the same HEAD;
+* **the listening test, which no receipt can stand in for.** The lab heard LTX
+  foley and rated it the model's strong suit -- but off a SINGLE-STAGE graph.
+  These lanes harvest the REFINED stage-2 latent, which nobody has heard. If it
+  disappoints, harvesting stage one's `separate` slot 1 instead is a one-line
+  change and the rest of the path is identical.
+
+**Below is the original coding brief, kept because it records WHY the build is
+shaped the way it is.** It is history now, not instructions.
+
+**DESIGN IS DONE AND CONVERGED. This was a CODING item, not a design one.**
+Four rounds, Codex + Cursor, artifacts in `kibitz-runs/2026-08-26-foley-bed/`
+(gitignored -- read them off disk, they do not travel).
+
+* **THE SPEC:** `kibitz-runs/2026-08-26-foley-bed/r4/final.md`. It is
+  CUMULATIVE -- the r1 body, then r2/r3/r4 amendment sections that OVERRIDE
+  earlier text wherever they disagree. Read it whole before typing.
+* **THE RULINGS:** `docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md` (committed).
+  Four of them, all binding, none for the panel to relitigate.
+
+**WHAT IT IS.** LTX 2.5 already generates its own audio -- footsteps, room
+tone, a score -- while rendering the picture, and the adapter throws it away at
+`LTXVSeparateAVLatent` (`eng_ltx25.py:6`). This keeps it and mixes it under the
+episode master at a fixed **0.20 foley / 0.80 master**. A second lane, **mime**,
+is the SAME mechanism at **1.00/0.00**.
+
+**THE WORD THAT MUST NOT BE CONFUSED.** The **SFX bed** was a different feature
+(separately GENERATED effects from a dedicated model), **ripped 2026-08-06 and
+permanently dead**. The **FOLEY bed** is the video model's own output. Naming
+anything `sfx_*` is a defect -- `tests/test_rip_sfx_bed_guard.py` guards it.
+
+**WHAT THE ARC ALREADY CAUGHT, so it is not re-learned on the GPU:**
+* **A VRAM blocker with 0.02 GiB of headroom.** Wiring the decode into the same
+  graph makes the audio VAE a second consumer, so `free_after_use` can no
+  longer drop it before sampling. **Two passes**: harvest the latent, reclaim,
+  then a second tiny graph.
+* **The audio latent is DESTROYED before a second pass could reach it** --
+  `wrapper_bridge` keeps only `{"unet","modality","decode"}`. Needs two new
+  parent hooks, both no-ops on the silent lane.
+* **The canonical workflow JSON DOES change** -- `OTR_EpisodeAssembler` has no
+  way to know it is on a foley route. Append `video_policy_json`, wire node 87
+  -> node 7. Append-only (BUG-LOCAL-097), same change as the code (section 0).
+* **A stem written to tmp is deleted before the mux reads it** -- `mux()`
+  sweeps `_shared/tmp`. Write straight to `otr/episodes/<ep>/audio/`.
+* **`tests/test_rip_sfx_bed_guard.py:262-271` fails on first compile** unless
+  rewritten in the same change (it requires the connector tooltip to say
+  "retired").
+
+**EXIT:** a live canonical leg published to `otr/obs/` with `obs_publish OK`,
+the foley proven decoded and mixed (not adapter self-report), loudness and peak
+receipts, and `ltx25_video` proven still silent. Measure audio-decode VRAM on
+the two-stage graph BEFORE registering -- over 14.5 GiB is an operator stop.
+
+**STATUS 2026-08-26: THE CODE IS BUILT AND GREEN. THE EXIT IS NOT MET -- no
+live leg has run, so NOTHING here is qualified.**
+
+**BOTH LANES SHIPPED, NOT ONE.** The operator overrode the spec's mime
+deferral mid-build (*"foley and mime we need this feature for both"*), so
+`ltx25_foley_plus` (0.20 foley / 0.80 master, global) and `ltx25_mime`
+(1.00 / 0.00, per-window) are both registered and public. That is RULING 6 in
+`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`; the connector decision is
+RULING 5. **The `kibitz-runs/` spec still says "mime CUT" and "ONLY
+ltx25_foley_plus" -- it is superseded on that point and only that point.**
+
+Landed in one change: the two parent seams plus both lanes and the second-pass
+decode (`eng_ltx25.py`), the stem format, the lane gain table and the mix
+envelope (`_otr_video_engines/foley_stems.py`, new), the coverage cutter and
+manifest threading (`render_driver.py`), the pre-loudness provisional master
+and its ledger flavour stamp (`scene_sequencer.py`), the mix and the single
+delivery gain (`otr_master_audio_mux.py`), and three appended links in
+`workflows/otr_canonical.json`.
+
+**WHAT A RENDER WINDOW STILL OWES, and it is the whole exit condition:**
+* Pin a role to `ltx25_high_foley_plus (16:9)` and run ONE canonical leg; then
+  the same for `ltx25_high_mime (16:9)`. **Mime is ROLE-WIDE** -- every beat of
+  the chosen role goes silent -- so pick the role deliberately.
+* Read `decode_peak_mb` off the per-beat `FOLEY decode:` log line. That is the
+  audio-decode VRAM measurement, and it is logged on EVERY beat rather than
+  measured once. **Over 14.5 GiB is an operator stop.** Note the tighter
+  context: the G8 solo smoke measured the shared picture graph at 16152 MiB
+  in-pipeline on a 16303 MiB card -- about 150 MiB of headroom -- which is
+  exactly why the audio decode is a second graph that runs only after
+  `reclaim_idle_models`.
+* Prove the bed by LISTENING, and by the mux's `foley_bed=mixed beats=N/N
+  lanes=...` + `foley_loudness=...` (+ `foley_muted_s=...` on a mime leg)
+  receipt lines -- never by the adapter's self-report.
+* Prove `ltx25_video` is STILL silent on the same HEAD.
+* **The stage-2 foley QUALITY is still an assumption.** The lab's golden foley
+  recipe is single-stage; these lanes harvest the REFINED audio latent. Nobody
+  has heard it.
+
+### SUPERSEDED BANNER -- its re-triage instruction was already carried out
+
+### >>> SUPERSEDED BANNER (kept verbatim -- its re-triage instruction was carried out above) <<<
+
+**Found 2026-08-25, before re-coding what this banner used to name.** The
+`scifi_news_pro` Class A/B item (was here) and the loop PATH-inheritance
+item (was right after it) were BOTH already fixed and committed hours
+earlier the same day -- Class B by `b19a11ef`, the PATH fix already sitting
+in `scripts/otr_overnight_loop.sh:26`. Neither banner was ever updated to
+say so. Full receipts moved verbatim to `docs/GO_FORWARD_ARCHIVE.md`
+(search "CLOSED 2026-08-25"); the scifi_news_pro closure is also in
+`docs/PROD_BUG_LOG.md` PBUG-20260824-01 (17 PASS / 0 FAIL, counted correctly
+from after both fixes landed).
+
+**Do not trust the rest of this file's OPEN sections at face value either
+without a quick grep-the-real-code check first** -- this is now a confirmed,
+repeatable failure mode for this file (two stale banners found in one pass),
+not a one-off. The CURRENT RUNWAY table below (operator-ordered 2026-08-13)
+is the next candidate; spot-check row 2 (LEMMY Phases 2-4) against the real
+files before starting it, the same way this catch was made.
+
+**WHAT THE 2026-08-25 EVENING WINDOW ACTUALLY DID, so the next window does not
+re-triage it:** it worked the 4060 crash reports the operator pasted, not this
+banner. Four commits, all pushed and lockstep-verified:
+`be0ab7fb` (cast_lock's unguarded `config` import, PBUG-20260825-02),
+`2c524732` (unquantized loads inheriting a 4-bit-sized VRAM cap,
+PBUG-20260825-03), `063fcfc3` + `fb67d059` (PBUG-20260825-04, the
+BUG-LOCAL-098 tripwire and the orphan-lifecycle races behind it), plus the
+`2.0.0-alpha.9` registry release. The orphan work left TWO deliberate
+deferrals, both now filed under OPEN BUGS as "The orphan-lifecycle pair" --
+read that row before touching `_otr_model_loader.py`'s cache lifecycle, since
+three successive review rounds each found a new race in the previous cut of
+the same fix.
