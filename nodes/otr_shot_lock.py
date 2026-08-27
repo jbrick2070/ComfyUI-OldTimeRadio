@@ -860,12 +860,18 @@ def _repeats_the_line(field, line_tokens) -> bool:
 
 
 #: What a non-audio lane gets when the writer returns nothing usable for a
-#: field. Deliberately plain: a fallback keeps the beat renderable and
-#: photographable, it does not invent a performance nobody authored.
+#: field. REWRITTEN 2026-08-27 (operator: *"no sense in rendering a video that
+#: looks like a silly pan"*). The first cut of these floors said "restrained",
+#: "subtle" and "stable" -- three damping words -- and 8 of 12 beats on the
+#: first qualified foley episode rendered on them, so the floors WERE the
+#: picture. A floor still must not invent a specific performance (it cannot
+#: know the line), but it can demand real movement in the abstract and let
+#: the model choose the verb; and the camera floor buys motion the subject
+#: fallback cannot -- a push-in reads as life even on a hesitant performer.
 _NONVERBAL_FALLBACKS = {
-    "expression": "restrained visible reaction",
-    "motion": "subtle natural body motion",
-    "camera": "stable mid-shot",
+    "expression": "a vivid, readable reaction",
+    "motion": "decisive full-body movement matched to the moment",
+    "camera": "mid-shot, slow push-in",
 }
 
 
@@ -973,14 +979,25 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     (``_repeats_the_line``), because an instruction is not an enforcement.
     """
     del meta  # symmetry with _build_batch_prompt; the brief tails append later
+    # THE ASK IS KINETIC AND LINE-DRIVEN (2026-08-27, operator: the action
+    # part of the prompt is inspired by the dialogue/story). The first cut
+    # asked for a "restrained facial expression", which told the writer to
+    # keep the body still -- on lanes whose entire value is motion. The
+    # scale-to-the-line language below is deliberately the same contract as
+    # `_otr_motion_clause.build_clause_messages` (its 2026-08-17 kinetic
+    # amendment), so the two derivation paths cannot drift apart in spirit.
     lines = [
         "You are a film director working on a SILENT shot. For EACH beat "
         "below you are given the line the character speaks, as CONTEXT ONLY -- "
         "the camera records no sound and the actor must NOT be shown speaking "
-        "it. Give the visible PERFORMANCE instead: a restrained facial "
-        "expression, a visible body action or motion, and a camera direction. "
-        "Reply ONLY with a JSON list of objects "
-        '{"beat_id","expression","motion","camera"}.',
+        "it. Give the visible PERFORMANCE the line implies instead: a vivid "
+        "facial expression, and the KINETIC body action the moment demands -- "
+        "what the body actually DOES, the motion vector, not a pose. SCALE "
+        "THE MOVEMENT TO THE LINE: a calm line earns small motion; an urgent, "
+        "angry or frightened line earns real movement (rises, strides, wheels "
+        "around, slams, recoils, grabs, points). Do not cap yourself at "
+        "fidgets. Then a camera direction. Reply ONLY with a JSON list of "
+        'objects {"beat_id","expression","motion","camera"}.',
         # Same finisher contract as the spoken path: the era/style tails are
         # APPENDED later and must not be duplicated here.
         "Do not include film-stock, film-grain, or lighting-style terms; "

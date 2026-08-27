@@ -1051,7 +1051,11 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         shift = cfg_knobs["shift"]
         sampler = cfg_knobs["sampler"]
         scheduler = cfg_knobs["scheduler"]
-        positive = get("text_prompt") or "subtle natural motion"
+        # MOTION BAKED IN (2026-08-27). Was "subtle natural motion" -- the
+        # exact damping instruction the 2026-08-17 kinetic amendment proved
+        # makes renders look like stills. Serves wan_ti2v and fastwan_8gb.
+        positive = get("text_prompt") or (
+            "the subject moving with clear intent, hands busy in the scene")
         negative = self._negative_prompt()               # frozen, fail-closed
         unet_inputs = self._unet_inputs(names)
         # CLIPLoaderGGUF takes clip_name + type ONLY (no `device` arg, verified vs

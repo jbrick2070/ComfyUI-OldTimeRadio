@@ -331,7 +331,14 @@ H3_RECIPE = {
 #: The recipe receipt stamped into every clip this lane emits.
 H3_RECIPE_RECEIPT = "minimax_h3_fl2va_int8_res_multistep_20step_v1"
 
-_H3_DEFAULT_PROMPT = "subtle natural motion, cinematic light"
+#: Written in THIS ENGINE'S OWN DIALECT (2026-08-27, motion bake-in): the
+#: directive above demands the subject, then ONE action and its speed, as
+#: flowing prose -- never a keyword list. The old value ("subtle natural
+#: motion, cinematic light") was a keyword list, carried the damping word
+#: "subtle", and named no action at all -- it violated the directive it sits
+#: forty lines under. No speech words: this default serves the SILENT lane.
+_H3_DEFAULT_PROMPT = ("the subject crosses the frame with steady purpose, "
+                      "one hand raised in emphasis")
 
 
 # ---------------------------------------------------------------------------
@@ -1105,9 +1112,14 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
         "h3": ("MiniMaxH3ReferenceToVideo",),
     }
 
+    #: One mouth-safe body clause added (2026-08-27, motion bake-in): the
+    #: lip anchor stays first and untouched -- this lane's product is the
+    #: sync -- and the added movement is shoulders/hands tied to the words,
+    #: which cannot pull the mouth off camera.
     _DEFAULT_PROMPT = (
         "a medium close shot of <Picture 1> speaking directly to camera, lip "
-        "movements matching <Audio 1> precisely, warm cinematic light")
+        "movements matching <Audio 1> precisely, shoulders and hands moving "
+        "with the words, warm cinematic light")
 
     #: SAME ladder as lane 19 -- same model grid, same 24->25 conversion -- and
     #: a DIFFERENT continuity, which is the one contract decision this lane does

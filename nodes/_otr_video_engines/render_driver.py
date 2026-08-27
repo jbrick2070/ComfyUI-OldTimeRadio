@@ -2719,7 +2719,22 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _shot_role = _gid[len("grp_"):]
     creative = shot.get("creative") or {}
     text_prompt = str(creative.get("text_prompt") or "")
-    _fam = engine_family(str(shot.get("engine_id") or ""), "")
+    # RESOLVED BEFORE CLASSIFIED (2026-08-27). `engine_family` is keyed on
+    # INTERNAL ids only, so a shot row carrying a public or legacy spelling
+    # -- `ltx23_low_audio_in`, `ltx23_16gb_audio_in`, both real registered
+    # aliases for `ltx_audio_in` -- fell through to its `"abstract"` default.
+    # That was survivable while `_fam` only picked fallback prompts; it is
+    # NOT survivable now that the LTX character append keys the lip-sync
+    # protection on it, because an audio-in lane misread as `abstract` would
+    # lose the steadying clause that keeps its mouth in frame. Resolution is
+    # for CLASSIFICATION only -- `shot["engine_id"]` is never rewritten and
+    # dispatch still uses what ShotLock stamped.
+    try:
+        from .._otr_shared.public_engines import resolve_engine_id as _fam_rid
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.public_engines import resolve_engine_id as _fam_rid  # type: ignore
+    _fam = engine_family(
+        str(_fam_rid(str(shot.get("engine_id") or "")) or ""), "")
     # ia2v TALKING register decision, computed ONCE per shot (kibitz r2: the
     # helper instantiates an engine to ask the recipe -- cheap today, but
     # three call sites x every shot invites a regression if the ctor ever
@@ -3024,9 +3039,23 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _beat_id_for_shot(shot), len(text_prompt), _style_cue)
         elif (str(shot.get("engine_id") or "").startswith("ltx")
                 and _shot_role not in ("announcer_visual", "music_visual")):
-            text_prompt = (text_prompt.rstrip().rstrip(",")
-                           + ", stable centered subject, full face clearly "
-                           "visible, generous headroom, comfortably composed")
+            # SPLIT BY WHAT THE LANE SELLS (2026-08-27, motion bake-in). The
+            # audio-in LTX lane keeps the steadying clause: its product is
+            # the lip-sync, and "stable centered" is protective framing for
+            # a mouth the audio is driving. The SILENT ltx25 lanes drop it:
+            # on a lane with no mouth to protect, "stable centered subject,
+            # comfortably composed" was an instruction to hold still -- the
+            # authored half of the silly pan. Face-visible and headroom stay
+            # everywhere (the round-5 b002 no-person catch is about framing,
+            # not stillness).
+            if _fam in ("audio_driven_face", "audio_conditioned_video"):
+                text_prompt = (text_prompt.rstrip().rstrip(",")
+                               + ", stable centered subject, full face clearly "
+                               "visible, generous headroom, comfortably composed")
+            else:
+                text_prompt = (text_prompt.rstrip().rstrip(",")
+                               + ", full face clearly visible, generous "
+                               "headroom, the subject in real motion")
         _pre_cue_chars = len(text_prompt)
         text_prompt = _prefix_video_style_cue(_vstyle, text_prompt)
         # A cue the branch legitimately PREFIXED is not charged against the

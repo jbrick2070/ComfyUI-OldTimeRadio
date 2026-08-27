@@ -1215,7 +1215,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
         cfg = self._resolve_render_config()
-        positive = get("text_prompt") or "subtle natural motion, cinematic light"
+        # MOTION BAKED IN (2026-08-27). Was "subtle natural motion, cinematic
+        # light" -- the damping instruction the 2026-08-17 kinetic amendment
+        # killed, still shipping here. This lane's dialect is its LTX parent's
+        # (see eng_ltx_video.PROMPT_STYLE_DIRECTIVE), so: a named action, and
+        # the light kept because this tier's prompt carries its own look.
+        positive = get("text_prompt") or (
+            "the subject moving with clear intent, hands busy in the scene, "
+            "cinematic light")
         negative = self._negative_for(get("negative_prompt"))
         graph = {
             "ckpt": {"class": "ckpt", "inputs": {"ckpt_name": self._ckpt_name()}},

@@ -828,7 +828,14 @@ class HuMoEngine(_MC.MotionEngineBase):
         names = self._loader_names()
         steps = self._steps()
         cfg = self._cfg()
-        positive = plan.get("text_prompt") or "a person speaking, subtle facial motion"
+        # SPEC-EXACT DEFAULT (2026-08-27, motion bake-in). This engine's own
+        # directive says: keep it short, name the speaker and the framing,
+        # then STOP -- "Add no movement the beat does not state." So the
+        # default names speaker + framing and nothing else. The old tail
+        # "subtle facial motion" was prompt-invented movement (exactly what
+        # the spec forbids) AND a damping word; motion on this lane comes
+        # from the BEAT's own text, never from boilerplate.
+        positive = plan.get("text_prompt") or "a person speaking, face toward camera"
         negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
         W = _wb.Wire
         # The lightx2v distill LoRA is a 14B-shaped adapter: it is INCOMPATIBLE

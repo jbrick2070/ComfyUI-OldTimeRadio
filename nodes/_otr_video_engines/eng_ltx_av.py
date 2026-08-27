@@ -855,7 +855,14 @@ class _LtxAvBase(_MC.MotionEngineBase):
         if rcfg["two_stage"]:
             return self._build_graph_ia2v(plan, length, width, height,
                                           audio_name, image_name)
-        positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
+        # MOTION BAKED IN (2026-08-27), in THIS lane's own dialect: the
+        # directive above keeps the speaking face framed and the mouth
+        # visible, and states requirements positively. So the movement added
+        # is shoulders-and-hands tied to the words -- body life that cannot
+        # turn the head away -- replacing a scene NOUN that named no motion.
+        positive = plan.get("text_prompt") or (
+            "a vintage radio broadcast scene, the speaker face toward camera "
+            "with mouth clearly visible, hands moving with the words")
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]
@@ -998,7 +1005,14 @@ class _LtxAvBase(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s (ia2v_canonical) requires an init image for EVERY beat"
                 % self.name)
-        positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
+        # MOTION BAKED IN (2026-08-27), in THIS lane's own dialect: the
+        # directive above keeps the speaking face framed and the mouth
+        # visible, and states requirements positively. So the movement added
+        # is shoulders-and-hands tied to the words -- body life that cannot
+        # turn the head away -- replacing a scene NOUN that named no motion.
+        positive = plan.get("text_prompt") or (
+            "a vintage radio broadcast scene, the speaker face toward camera "
+            "with mouth clearly visible, hands moving with the words")
         negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]

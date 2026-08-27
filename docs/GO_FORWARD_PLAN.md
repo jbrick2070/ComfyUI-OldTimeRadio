@@ -124,14 +124,21 @@ selectively, boots the UTF-8 launcher, and ALWAYS loads the real canonical.
 
 ```powershell
 cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile none -Acts 2 -Set "OTR_VideoDirector.character_video_model=h3_low_video (16:9)"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile otr_w45_minimax_h3_video -Acts 1
 ```
 
-**`h3_low_video (16:9)` is the EXACT dropdown label** (public id `h3_low_video`
--> internal `minimax_h3_video`), verified against the live
-`OTR_VideoDirector.INPUT_TYPES()` on 2026-08-27; the sibling labels are
-`ltx25_high_foley_plus (16:9)` and `ltx25_high_mime (16:9)`. Pin per leg with
-the label -- never by editing a profile.
+**CORRECTED 2026-08-27, after the wrong version of this command failed a live
+leg.** The first version here said to pin the engine with
+`-Set "OTR_VideoDirector.character_video_model=..."`. That is REFUSED by
+design: `patch_creative` whitelists CREATIVE widgets only (writers, seeds,
+banks), and the video-model widgets are MANAGED -- engine routing goes through
+a PROFILE (`scripts/otr_api.py:831`, `CREATIVE_WHITELIST`).
+`otr_w45_minimax_h3_video` is the sanctioned profile: all three roles on
+`h3_low_video` AND the h3 boot contract the engine ENFORCES
+(`--reserve-vram 12`, `--disable-pinned-memory`) -- a default boot would have
+been refused even if the patch had landed. Writers DO ride as `-Set`
+(whitelisted), e.g.
+`-Set "OTR_LedgerScriptWriter.technical_model=google/gemma-4-12b-it (11.9 GB)"`.
 
 * Reset per `CLAUDE.md` section 4 (selective kill by CommandLine, port 8000
   empty, GPU back to ~1.5 GB); the wrapper does this, but verify it happened.

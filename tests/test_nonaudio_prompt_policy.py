@@ -193,9 +193,9 @@ def test_the_exact_nonverbal_fallbacks():
         _beats(), led["meta"], led,
         llm_fn=_directive_llm(expression="", motion="", camera=""),
         video_policy=_policy("minimax_h3_video"))[0]["b1"]
-    assert "restrained visible reaction" in c["text_prompt"]
-    assert "subtle natural body motion" in c["text_prompt"]
-    assert "stable mid-shot" in c["text_prompt"]
+    assert "a vivid, readable reaction" in c["text_prompt"]
+    assert "decisive full-body movement" in c["text_prompt"]
+    assert "slow push-in" in c["text_prompt"]
 
 
 def test_the_composition_order_is_exact():
@@ -221,7 +221,7 @@ def test_a_field_that_quotes_the_whole_line_is_dropped():
         video_policy=_policy("minimax_h3_video"))
     c = creative["b1"]
     assert _LINE not in c["text_prompt"]
-    assert "restrained visible reaction" in c["text_prompt"]   # fell back
+    assert "a vivid, readable reaction" in c["text_prompt"]   # fell back
     assert any("spoken line back into" in w for w in warns)
     # the OTHER fields survived -- one bad field is not a collapsed beat
     assert "steps forward" in c["text_prompt"]
@@ -253,7 +253,7 @@ def test_a_quote_of_the_shown_context_is_caught_on_a_long_line():
         video_policy=_policy("minimax_h3_video"))
     prompt = creative["b1"]["text_prompt"]
     assert shown[:80] not in prompt
-    assert "restrained visible reaction" in prompt          # fell back
+    assert "a vivid, readable reaction" in prompt          # fell back
     assert any("spoken line back into" in w for w in warns)
 
 
@@ -659,6 +659,58 @@ def test_a_mime_open_reads_the_briefs_own_mood_terms(_text_only_lane):
 def test_a_mime_open_without_mood_terms_uses_the_default_lead(_text_only_lane):
     req = rd.build_request_from_shot(_open_shot("ltx25_mime"), _open_ledger())
     assert req["text_prompt"].endswith("scene-appropriate " + _MIME_TAIL)
+
+
+def test_a_silent_ltx25_character_beat_is_not_told_to_hold_still(
+        _text_only_lane):
+    """MOTION BAKE-IN (2026-08-27). The LTX character append used to say
+    "stable centered subject ... comfortably composed" on every ltx lane --
+    an instruction to hold still on lanes with no mouth to protect. Silent
+    ltx25 lanes now keep the framing safety (face visible, headroom) and ask
+    for motion; the AUDIO-IN ltx lane keeps the steadying clause, because
+    there the stability protects the lip-sync that lane sells."""
+    led = _ledger()
+    creative = sl.derive_creative_directives(
+        _beats(), led["meta"], led, llm_fn=_directive_llm(),
+        video_policy=_policy("ltx25_video"))[0]["b1"]
+    shot = {"shot_id": "shot_b1", "source_line_ids": ["b1"],
+            "role": "character_video", "engine_id": "ltx25_video",
+            "group_id": "grp_character_video", "target_frame_count": 50,
+            "creative": creative}
+    req = rd.build_request_from_shot(shot, {
+        "meta": led["meta"],
+        "lines": [{"line_id": "b1", "char_id": "c1",
+                   "speaker_role": "char_voice", "text": _LINE,
+                   "start_s": 0.0, "dur_s": 1.0}],
+        "images": {"images": [{"object_id": "still_b1", "kind": "scene_beat",
+                               "beat_id": "b1",
+                               "path": "X:/img/still_b1.png"}]},
+    })
+    prompt = req["text_prompt"]
+    assert "stable centered subject" not in prompt
+    assert "comfortably composed" not in prompt
+    assert "full face clearly visible" in prompt      # framing safety kept
+    assert "generous headroom" in prompt
+    assert "the subject in real motion" in prompt
+
+
+@pytest.mark.parametrize("spelling", ["ltx_audio_in", "ltx23_low_audio_in",
+                                      "ltx23_16gb_audio_in"])
+def test_an_audio_in_lane_keeps_its_framing_under_any_spelling(spelling):
+    """THE LIP-SYNC PROTECTION MUST NOT DEPEND ON HOW THE ID IS SPELLED.
+
+    `engine_family` is keyed on INTERNAL ids, so a shot row carrying the
+    public (`ltx23_low_audio_in`) or legacy (`ltx23_16gb_audio_in`) spelling
+    classified as `abstract` -- and once the LTX character append started
+    keying the steadying clause on family, an audio-in lane misread that way
+    would silently lose the framing that keeps its mouth in shot. Found by
+    review before it reached a render; the id is resolved before classifying.
+    """
+    from nodes._otr_video_engines.render_driver import engine_family
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    assert resolve_engine_id(spelling) == "ltx_audio_in"
+    assert engine_family(resolve_engine_id(spelling), "") == \
+        "audio_conditioned_video"
 
 
 def test_ltx25_video_is_not_touched_at_the_seam(_text_only_lane):

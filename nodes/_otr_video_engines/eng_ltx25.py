@@ -990,7 +990,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         W = _wb.Wire
 
-        positive = plan.get("text_prompt") or "a vintage radio broadcast scene"
+        # MOTION BAKED IN (2026-08-27). "a vintage radio broadcast scene" was
+        # a scene NOUN -- no verb anywhere -- so the model's cheapest answer
+        # was a pan across furniture. The default now names visible WORK, and
+        # the actions are chosen to be foley-bearing on purpose (dials,
+        # papers, switches make sound) so the same string serves the picture
+        # on ltx25_video and both halves of the joint latent on foley/mime.
+        positive = plan.get("text_prompt") or (
+            "a vintage radio broadcast scene in motion, an operator working "
+            "the console, hands turning dials and shuffling papers")
         seed = int(plan.get("seed", 0) or 0)
         fps = float(R.LTX25_FPS)
 
