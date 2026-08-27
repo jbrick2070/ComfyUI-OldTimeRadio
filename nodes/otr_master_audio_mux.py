@@ -1068,8 +1068,17 @@ class OTRMasterAudioMux:
             #
             # No separate "level only" branch is needed for the stamp-only
             # case: a foley master compiled from ZERO stems is
-            # `master * 0.80 + silence`, and a pure scale followed by
-            # normalise-to-target is exactly normalise-to-target.
+            # `master * <some constant> + silence`, and a pure scale followed
+            # by normalise-to-target is exactly normalise-to-target -- so the
+            # constant cannot reach the deliverable whatever it happens to be.
+            #
+            # THE CONSTANT IS DELIBERATELY NOT NAMED HERE. An earlier draft of
+            # this comment asserted 0.80, which was true when the master gain
+            # was one fixed number and became false the moment mime made it
+            # depend on which lanes the episode carries: on the stamp-only path
+            # there is no foley lane in the policy and no bearing row, so
+            # `global_master_gain` is 1.0, not 0.80. The invariance is the
+            # load-bearing part of this argument; the value never was.
             if (_foley_route(video_policy_json)
                     or _master_wav_owes_a_delivery_gain(master_audio_path)):
                 master_audio_path, foley_report = _compile_foley_master(
