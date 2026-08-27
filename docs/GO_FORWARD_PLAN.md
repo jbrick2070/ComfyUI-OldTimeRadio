@@ -266,6 +266,37 @@ untouched.
 (r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
 about this row is waiting on the operator.
 
+**r1 WAS WRITTEN 2026-08-25 AND THE TREE MOVED THE NEXT DAY. RE-GROUNDED
+2026-08-27 against HEAD -- do not hand r2 the stale finding list.** `a2837b05`
+landed on 2026-08-26 and added 85 lines to `otr_video_render_batch.py`, so one
+of r1's four findings is already closed and one of the survivors got SHARPER.
+
+| r1 finding | status at HEAD, verified by reading the file |
+|---|---|
+| 1. Nothing mints the `exists=False` row between a sanctioned dispatch and the spine | **STILL THE ROW.** This is the item itself. |
+| 2. The skip branch never reaches the renderer loop | **STILL OPEN**, unverified in this pass -- r2 grounds it. |
+| 3a. The manifest loop counts a gap as a delivered receipt (`:146-150`) | **ALREADY FIXED** by `a2837b05`. `_clip_delivered_motion(clip)` (`:134-153`, `exists` alone, deliberately) now routes an undelivered beat to `sanctioned_gap_shot_ids` at `:213` instead of minting a receipt for it. Do NOT re-fix this. |
+| 3b. `delivered_frames_ok` is True over an absent clip (`:750-770`) | **STILL LIVE**, and here is the exact mechanism: a gap has no `source == "clip"` segment, so `segs` is empty, `status` becomes `no_clip_segment` -- and `no_clip_segment` is the one status that flips NOTHING. `ok_all` is only cleared by `held_last_frame`, or by `not positioned and segs and delivered != tgt`, whose `segs` guard is falsy for exactly this case (`otr_silent_composite.py:766-769`). |
+| 4. An all-refused episode reports FAILURE (`clip_count > 0`) | **STILL LIVE, now at `otr_video_render_batch.py:640`** -- and `a2837b05` made it BITE rather than merely lurk. |
+
+**FINDING 4 DESERVES ITS OWN PARAGRAPH, because the fix for 3a is what armed
+it.** `clip_count` is `len(receipts)` (`:129`), and since `a2837b05` receipts
+correctly EXCLUDE sanctioned gaps. So an all-refused episode now has a genuinely
+empty receipt list and `"ok": manifest["clip_count"] > 0` genuinely evaluates
+False. Before that commit the gap rows were counted as receipts, so the same
+episode would have reported ok=True by ACCIDENT -- for the wrong reason, off a
+receipt that lied. **The correct accounting collides head-on with the 2026-08-27
+ruling that such an episode must publish**, which is not a regression in
+`a2837b05` but the point at which an existing contradiction became honest enough
+to see. r2 fixes the success predicate, NOT the accounting.
+
+**The payload-never-empty guarantee already anticipates this** and is worth
+reading before designing (`otr_video_render_batch.py:203-209`):
+`OTR_CreditsRoll._require` rejects `{}`/`[]`/`None`/`""`, so an all-gap episode
+returning an empty payload would convert a publishable degraded episode into a
+hard mux-time failure -- "the exact outcome the sanctioned gap exists to
+prevent", in the code's own words. Whoever writes r2 starts from there.
+
 ---
 
 ### >>> NEXT ITEM: THE LOCAL-LLM ACCEPTANCE SWEEP (operator directive 2026-08-25) <<<
