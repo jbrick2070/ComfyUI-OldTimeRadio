@@ -738,6 +738,41 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## AN ALL-REFUSED EPISODE STILL PUBLISHES (operator ruling 2026-08-27 -- hard)
+
+**THE QUESTION, and it was asked because a panel refused to answer it for him.**
+The r1 judgment at `kibitz-runs/2026-08-25-model-refusal-required-still/r1/`
+found that node 92's success check is `clip_count > 0`
+(`otr_video_render_batch.py:556-563`), so an episode in which EVERY required
+still was sanctioned-gapped would report FAILURE even though every individual
+gap had been handled exactly as the 2026-08-22 ruling requires. The panel wrote
+down its default-if-unruled and then explicitly declined to bake it in: *"This
+needs an explicit operator call, not a silently-baked-in assumption."*
+
+**THE RULING: it PUBLISHES.** Asked directly on 2026-08-27, the operator chose
+publish-anyway over fail-loud and over publish-but-mark-degraded. The episode
+reaches `otr/obs/` with floor segments where the stills would have been.
+
+**WHY IT IS CONSISTENT, so no window re-litigates it.** A sanctioned gap that
+must not kill the episode does not become permitted to kill it by arriving in
+quantity -- otherwise the 2026-08-22 ruling holds only until it is actually
+needed. It also follows the obs law directly: *"if I don't see it in obs and it
+took more than 5 minutes, it's a fail."* A leg that dies at the still-spine gate
+ten minutes into an eleven-minute run has already spent the script, the voices
+and the audio mux, and delivers nothing to look at. An episode of audio over
+floor frames is a worse-looking episode; a dead leg is not an episode.
+
+**WHAT THIS DOES NOT LICENSE.** It is not permission to hide the refusals. The
+ledger-completeness law is untouched: `required_scene_targets` still owes
+exactly one row per required target, `ok` or `sanctioned_gap` with its refusal
+evidence, and the reporting paths that currently launder a gap into an ordinary
+delivered receipt (`otr_video_render_batch.py:146-150`,
+`otr_silent_composite.py:750-770`) still have to read the status explicitly.
+Publishing an all-refused episode while REPORTING it as a clean render would be
+the defect this ruling exists to avoid, wearing the ruling as cover.
+
+**r2 IS UNBLOCKED.** The coding plan may now assume publish-on-all-refused.
+
 ## ONLY EASY-TO-LOAD LLMs SHIP (operator ruling 2026-08-25 -- hard)
 
 Operator, in his words: *"if it doesn't fit nicely or requires Ollama rip it

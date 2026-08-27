@@ -251,6 +251,21 @@ r1 judgment: `kibitz-runs/2026-08-25-model-refusal-required-still/`.
 Accounting for it landed 2026-08-26 (`a2837b05`) and is deliberately inert
 until this exists.
 
+**THE BLOCKER IS CLEARED -- r2 CAN RUN (2026-08-27).** r1 ended on one open
+item it refused to decide for the operator: what an episode should do when
+EVERY required still is sanctioned-gapped, given that node 92's success check
+is `clip_count > 0`. **Asked and ruled 2026-08-27: it PUBLISHES.** The full
+ruling, its reasoning and -- importantly -- what it does NOT license are in
+`docs/OTR_STANDING_RULINGS.md` under *"AN ALL-REFUSED EPISODE STILL PUBLISHES"*.
+Read it there before r2, because the ruling is narrower than its headline: it
+permits publishing an all-refused episode, it does NOT permit REPORTING one as
+a clean render, and the `required_scene_targets` ledger-completeness law is
+untouched.
+
+**Next step is r2, the coding plan**, per r1's own stated roster
+(r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
+about this row is waiting on the operator.
+
 ---
 
 ### >>> NEXT ITEM: THE LOCAL-LLM ACCEPTANCE SWEEP (operator directive 2026-08-25) <<<
