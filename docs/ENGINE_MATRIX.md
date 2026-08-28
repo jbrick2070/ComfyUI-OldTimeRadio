@@ -75,7 +75,7 @@ without that map would play ~4% short.
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
-| ltx_video | local | text_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
+| ltx_video | local | image_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | minimax_h3_audio_in | local | audio_conditioned_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | soft_reference | yes |
 | minimax_h3_video | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | strict_first_frame | yes |
@@ -112,7 +112,7 @@ without that map would play ~4% short.
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
 | ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | ltx_audio_in | text_prompt, audio_ref, init_image | text_prompt REQUIRED |
-| ltx_video | text_prompt | text_prompt REQUIRED |
+| ltx_video | text_prompt, init_image | text_prompt REQUIRED |
 | mesh_stage | init_image | no text input |
 | minimax_h3_audio_in | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | minimax_h3_video | init_image | text_prompt OPTIONAL (sent when present) |
@@ -153,7 +153,7 @@ the engine's own `aspect` column above.
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | ltx_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never; portrait/wide/when_engine_talking; portrait/inherit_engine/when_engine_talking |
-| ltx_video | scene_open/wide/when_ltx_i2v_enabled; scene_beat/wide/when_ltx_i2v_enabled; scene_character/wide/when_ltx_i2v_enabled; portrait/inherit_engine/never |
+| ltx_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | mesh_stage | mesh_fodder/wide/always; scene_background_plate/wide/always; portrait/inherit_engine/never |
 | minimax_h3_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | minimax_h3_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |

@@ -544,7 +544,6 @@ def test_special_cases_match_head():
 _ISOLATION_CLEAN_CONFIGS = (
     "default",
     "hosts_on",
-    "ltx_i2v_off",
     "ia2v_non_talking",
 )
 

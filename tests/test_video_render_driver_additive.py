@@ -624,7 +624,9 @@ def test_apply_engine_override_rewrites_by_role(monkeypatch):
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
     out = rd.apply_engine_override(led)
     assert out["video"]["shots"][0]["engine_id"] == "ltx_video"
-    assert out["video"]["shots"][0]["family"] == "text_to_video"
+    # image_to_video since 2026-08-28 -- the family override stamps what the
+    # engine class now declares.
+    assert out["video"]["shots"][0]["family"] == "image_to_video"
     # the other role is untouched
     assert out["video"]["shots"][1]["engine_id"] == "stub_fail"
 

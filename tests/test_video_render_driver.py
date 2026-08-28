@@ -111,7 +111,7 @@ def test_assert_soak_ok_rejects_violations(mutate):
         rd.assert_soak_ok(report)
 
 
-def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch):
+def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch, tmp_path):
     """ltx_video renders at the canvas it DECLARES while still_pan keeps the
     full 1472x832 landscape canvas.
 
@@ -127,13 +127,17 @@ def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch):
     """
     monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
-    # This test isolates canvas selection. Explicitly exercise LTX's documented
-    # text-only opt-out so the required-still contract is covered by its own
-    # regression rather than by an unrelated canvas fixture.
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+    # This test isolates canvas selection. The text-only opt-out is retired
+    # (2026-08-28) -- the lane requires a still, always -- so the fixture
+    # SUPPLIES one rather than dodging the requirement. The required-still
+    # contract keeps its own regression in test_video_motion.
+    still = tmp_path / "scene_b001.png"
+    still.write_bytes(bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)))
     ledger = {"video": {"video_revision": 1, "shots": []},
               "lines": [{"line_id": "b001", "start_s": 0.0, "dur_s": 2.0}],
-              "images": {"images": []}}
+              "images": {"images": [{"object_id": "scene_b001",
+                                     "kind": "scene_wide", "beat_id": "b001",
+                                     "path": str(still)}]}}
 
     def shot(engine, family):
         return {"shot_id": "shot_b001", "beat_id": "b001",
@@ -143,7 +147,7 @@ def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch):
 
     from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
     declared = tuple(LtxVideoEngine.render_canvas)
-    req_ltx = rd.build_request_from_shot(shot("ltx_video", "text_to_video"),
+    req_ltx = rd.build_request_from_shot(shot("ltx_video", "image_to_video"),
                                          ledger)
     assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == declared
     req_flux = rd.build_request_from_shot(shot("still_pan", "static_image_gen"),

@@ -34,15 +34,26 @@ _OK_META = {
 
 
 @pytest.fixture(autouse=True)
-def _prompt_only_lanes_disable_i2v(monkeypatch):
-    """Prompt-finishing tests do not mint image assets.
+def _prompt_only_lanes_get_a_still(monkeypatch, tmp_path):
+    """These tests exercise PROMPT COMPOSITION and mint no image assets.
 
-    The production LTX path is fail-closed when I2V is enabled and the
-    required scene still is absent. These tests exercise only prompt
-    composition, so they explicitly select the documented text-only lane.
-    The default-on missing-still contract is covered in test_video_motion.
+    The LTX lane is fail-closed on a missing scene still and there is no
+    longer a flag to switch that off (OTR_ENABLE_LTX_I2V retired 2026-08-28),
+    so instead of disabling the requirement this fixture SATISFIES it: the
+    still index answers with one real file for every beat. That is closer to
+    production than the old opt-out was -- these tests now run the same
+    scene-init path a real render takes.
     """
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
+    from nodes._otr_video_engines import render_driver as _rdrv
+    p = tmp_path / "stub_scene.png"
+    p.write_bytes(bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)))
+
+    class _AnyBeatHasAStill(dict):
+        def get(self, _key, _default=""):
+            return str(p)
+
+    monkeypatch.setattr(_rdrv, "_still_index",
+                        lambda _ledger: _AnyBeatHasAStill())
 
 
 def test_era_tail_default_when_brief_absent():
