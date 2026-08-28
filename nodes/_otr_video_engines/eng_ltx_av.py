@@ -448,6 +448,27 @@ IA2V_REFINE_SIGMAS = (0.85, 0.7250, 0.4219, 0.0)
 #: The canonical uses the ORIGINAL (non-1.1) distilled-lora-384 at HALF
 #: strength on the DEV unet: half-distilled keeps dev's audio coupling while
 #: buying most of the distilled speed.
+#:
+#: MEASURED 2026-08-27, AND IT IS NO LONGER A BELIEF. Official LTX 2.3 IA2V
+#: guidance says keep this LoRA at 1.0, so the deviation was worth testing
+#: rather than defending. A one-variable lab A/B ran it -- same portrait, same
+#: audio, same seed, same sigmas, same samplers, same 97 frames, LoRA strength
+#: the ONLY difference, both arms cold and unclamped on the full card:
+#:
+#:     arm A  strength 0.5 (this value)   190.7 s   PASS (cold)
+#:     arm B  strength 1.0 (official)     192.6 s   PASS (cold)
+#:
+#: Operator verdict by eye: **arm B is the bottom -- buggy, with noise.** So the
+#: official value is WORSE on this configuration, and 0.5 stays.
+#:
+#: Two details worth keeping. Speed is a WASH -- 1.9 s apart, under 1% -- so
+#: this value costs nothing in time and the choice is purely quality. And B's
+#: output file was 45% LARGER at identical resolution and frame count, which
+#: looked like it might mean more motion and turned out to be the noise; do not
+#: read file size as articulation on this lane.
+#:
+#: Recipes: vram-recipe-lab/recipes/ltx_ia2v_ab_{a_control,b_lora_1p0}.json
+#: Judging contract, written before the render: LTX23_IA2V_AB_JUDGING.md
 _IA2V_LORA_NAME = os.path.join(
     "ltxv", "ltx2", "ltx-2.3-22b-distilled-lora-384.safetensors")
 _IA2V_LORA_STRENGTH = 0.5
