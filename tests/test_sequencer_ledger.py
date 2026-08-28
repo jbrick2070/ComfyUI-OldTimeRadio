@@ -114,9 +114,6 @@ def patched_sequencer_env(tmp_path):
         "nodes.scene_sequencer._generate_room_tone",
         side_effect=_fake_room_tone,
     ), patch(
-        "nodes.scene_sequencer._generate_bark_for_line",
-        side_effect=_fake_bark_for_line,
-    ), patch(
         "nodes._otr_ledger.in_flight_ledger_path",
         side_effect=_fake_in_flight_path,
     ), patch(
@@ -390,20 +387,15 @@ def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
     # Three pre-rendered clips, three character lines -> all consumed.
     tts_audio = _make_audio(3)
 
-    # Wrap _generate_bark_for_line so we can assert it was NOT called.
-    bark_calls = {"n": 0}
-    real_fake = _seq_mod._generate_bark_for_line
-    def _counted_bark(*args, **kwargs):
-        bark_calls["n"] += 1
-        return real_fake(*args, **kwargs)
-
-    with patch.object(_seq_mod, "_generate_bark_for_line",
-                      side_effect=_counted_bark):
-        SceneSequencer().sequence(
-            script_json=script_json,
-
-            tts_audio_clips=tts_audio,
-        )
+    # This block used to wrap `_generate_bark_for_line` in a counter to prove
+    # it was NOT called. The function was DELETED 2026-08-28, so there is
+    # nothing left to call -- absence is a stronger guarantee than a counter,
+    # and the shortfall contract keeps its own direct test
+    # (test_sequencer_clip_shortfall_fails_loud).
+    SceneSequencer().sequence(
+        script_json=script_json,
+        tts_audio_clips=tts_audio,
+    )
 
     saved_led = patched_sequencer_env["led_disk"]
     by_id = {ln["line_id"]: ln for ln in saved_led["lines"]}
@@ -414,11 +406,8 @@ def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
     assert starts[1] > starts[0]
     assert starts[2] > starts[1]
 
-    # No inline-Bark fallback fired (all clips were consumed in order).
-    assert bark_calls["n"] == 0, (
-        f"inline-Bark fallback fired {bark_calls['n']} time(s); "
-        "expected 0 because all 3 character lines had pre-rendered clips"
-    )
+    # (The "no inline-Bark fallback fired" assertion retired with the function
+    # itself on 2026-08-28 -- there is no fallback left that could fire.)
 
 def test_sequencer_clip_shortfall_fails_loud(patched_sequencer_env):
     """NO-FALLBACK (2026-07-03): fewer pre-rendered voice clips than dialogue

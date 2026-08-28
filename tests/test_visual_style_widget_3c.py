@@ -1,11 +1,11 @@
 """tests/test_visual_style_widget_3c.py
 
 Multi-modal story schema STAGE 3 CHUNK 3C -- the `visual_style` selector
-widget on OTR_LedgerScriptWriter (workflow slot 23; the 2C playbook applied
+widget on OTR_LedgerScriptWriter (workflow slot 22; the 2C playbook applied
 per STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
 
 Pins:
-  1. Widget surface: visual_style stays pinned at slot 23; choices ==
+  1. Widget surface: visual_style stays pinned at slot 22; choices ==
      list_style_ids() exactly (registry order, all styles live); default
      sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
@@ -15,7 +15,7 @@ Pins:
      (non-runnable custom bank wins even when both are bad).
   4. _resolve_inputs carries visual_style as the authoritative value.
   5. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
-     slot 23 (shifted -1 by the 2026-08-14 removal of the `target_words`
+     slot 22 (shifted -1 by the 2026-08-14 removal of the `target_words`
      widget, on top of the -2 shift from the 2026-07-05 style-engine
      consolidation, which deleted the style / style_custom widgets).
      Later widgets append after it.
@@ -54,10 +54,10 @@ class TestWidgetSurface:
     def test_visual_style_positional_pin(self):
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[23] == "visual_style"
-        assert order[24] == "google_api_slot_a_model"
-        assert order[25] == "google_api_slot_b_model"
-        assert order[26] == "source_ref"
+        assert order[22] == "visual_style"
+        assert order[23] == "google_api_slot_a_model"
+        assert order[24] == "google_api_slot_b_model"
+        assert order[25] == "source_ref"
 
     def test_choices_are_the_roll_sentinel_then_the_registry(self):
         """2026-07-31: this dropdown owns the SECOND randomizer's command,
@@ -147,7 +147,7 @@ class TestHeadlessSurface:
         assert "visual_style" in pkg_wl
         assert "visual_style" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_23(self):
+    def test_patch_widget_by_name_lands_slot_22(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -169,12 +169,12 @@ class TestHeadlessSurface:
         # and the vector tops out at 33. schemas comes from the LIVE
         # INPUT_TYPES() above, so this already reflects the new vector --
         # only the pin needed updating.
-        assert len(node1["widgets_values"]) == 33
-        assert node1["widgets_values"][23] == "anime"
+        assert len(node1["widgets_values"]) == 32
+        assert node1["widgets_values"][22] == "anime"
         # 2026-08-15 (operator): canonical ships the bank roll sentinel. This is
         # the NEIGHBOUR check proving the visual_style patch landed at 23 and
         # left 22 alone, so it tracks canonical's saved value.
-        assert node1["widgets_values"][22] == "roll (any eligible bank)"
+        assert node1["widgets_values"][21] == "roll (any eligible bank)"
+        assert node1["widgets_values"][23] == "(select Google API model)"
         assert node1["widgets_values"][24] == "(select Google API model)"
-        assert node1["widgets_values"][25] == "(select Google API model)"
-        assert node1["widgets_values"][26] == ""
+        assert node1["widgets_values"][25] == ""

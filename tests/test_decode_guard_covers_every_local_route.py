@@ -48,9 +48,6 @@ KNOWN_EXEMPTIONS = {
     ("nodes/_otr_bark_lib.py", "_generate_single_line"): (
         "Bark TTS audio generation; bounded by semantic_min_eos_p"
     ),
-    ("nodes/scene_sequencer.py", "_generate_bark_for_line"): (
-        "Retired Bark helper; audio generation"
-    ),
     ("nodes/_otr_audio_engines/eng_musicgen.py", "generate_clip"): (
         "MusicGen audio generation; max_new_tokens derived from duration"
     ),

@@ -2,7 +2,8 @@
 OTR_AudioEnhance - Broadcast-quality spatial audio enhancement.
 
 Upscales mono TTS audio (typically 24kHz from Bark) to stereo at a target
-sample rate with faux-spatial widening, bass warmth, and peak normalization.
+sample rate with faux-spatial widening and bass warmth. It does NOT set
+the delivery level -- see the note in the step list below.
 
 Pipeline position:  SceneSequencer - AudioEnhance - EpisodeAssembler
 
@@ -13,7 +14,9 @@ Processing chain:
   4. High-frequency cleanup - gentle LPF at 16kHz kills Bark "chirp" artifacts
   5. Haas-effect spatial widening (delay one channel 0.2-0.8 ms)
   6. Mid-side stereo decorrelation for image width
-  7. Peak-normalize to target dBFS
+  (There is no normalisation step here. One used to be listed and it
+   never ran -- delivery level is set downstream, once, in LUFS by
+   scene_sequencer._master_loudness. Removed 2026-08-28.)
 
 All DSP is fully vectorized (no Python for-loops over samples).
 
@@ -105,13 +108,18 @@ def _stereo_decorrelate(waveform: torch.Tensor, amount: float = 0.15) -> torch.T
     return torch.cat([new_left, new_right], dim=1)
 
 
-def _normalize(waveform: torch.Tensor, target_dbfs: float = -1.0) -> torch.Tensor:
-    """Peak-normalize to target_dbfs.  -1.0 dBFS = tiny headroom."""
-    peak = waveform.abs().max()
-    if peak < 1e-8:
-        return waveform
-    target_linear = 10.0 ** (target_dbfs / 20.0)
-    return waveform * (target_linear / peak)
+# `_normalize()` (peak-normalise to a target dBFS) was REMOVED 2026-08-28.
+# It was DEFINED AND NEVER CALLED -- the only uncalled helper in this file,
+# while the other nine are all live -- and its widget went with it.
+#
+# It was not merely unused, it was SUPERSEDED. Delivery level is set once,
+# downstream, in LUFS by `scene_sequencer._master_loudness`. Peak and LUFS are
+# different questions (peak is energy, LUFS is perception) and this project
+# already chose LUFS and measured -14 as its target; the master mux says so in
+# its own words -- "a second implementation here would be a second delivery
+# level that drifts". This node had migrated from peak to LUFS and simply
+# never buried the corpse. Re-adding a peak normaliser here would compete with
+# the real one rather than restore a missing step.
 
 
 def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
@@ -314,16 +322,25 @@ class AudioEnhance:
                     "default": "off",
                     "tooltip": "Analog tape emulation intensity"
                 }),
-                "normalize_dbfs": ("FLOAT", {
-                    "default": -1.0, "min": -12.0, "max": 0.0, "step": 0.5,
-                    "tooltip": "Peak normalization target dBFS (-1.0 = broadcast)"
-                }),
+                # `normalize_dbfs` was REMOVED 2026-08-28. It was inert TWICE
+                # over: nothing read the parameter, AND `_normalize()` -- the
+                # peak-normaliser it would have driven -- was never called by
+                # this node at all (the only uncalled helper in the file).
+                #
+                # It was also REDUNDANT, which is why wiring it would have been
+                # the wrong fix. Delivery level is set exactly once, downstream,
+                # by `scene_sequencer._master_loudness` -- "the only loudness
+                # algorithm in this repo ... the one that produced the measured
+                # -14 LUFS target", in the master mux's own words, which go on:
+                # "a second implementation here would be a second delivery level
+                # that drifts". This node had migrated from PEAK to LUFS
+                # normalisation and simply never buried the corpse.
             },
         }
 
     def enhance(self, audio, target_sample_rate=48000, spatial_width=0.3,
                 haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
-                normalize_dbfs=-1.0, tape_emulation="off"):  # kept: normalize_dbfs is a widget INPUT, accepted by node contract; consumed by ComfyUI graph runtime not the body
+                tape_emulation="off"):
 
         # Schema l3 (2026-04-28): wall-clock for meta.phase_ms.audio_enhance.
         import time as _time

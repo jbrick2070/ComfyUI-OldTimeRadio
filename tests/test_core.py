@@ -120,19 +120,14 @@ class TestCleanTextForBark:
     def test_empty_string(self, clean_fn):
         assert clean_fn("").strip() == ""
 
-    def test_scene_sequencer_clean_matches_batcher(self):
-        """The canonical _otr_bark_lib cleaner and the SceneSequencer copy must
-        produce identical output for the same input (regex parity)."""
-        from nodes._otr_bark_lib import _clean_text_for_bark as lib_clean
-        from nodes.scene_sequencer import _clean_text_for_bark as ss_clean
-        probe = "[VOICE: X, male, 40s, calm, low] [whispers] Hello [laughs] world [shouts] stop."
-        lib = lib_clean(probe)
-        ss = ss_clean(probe)
-        assert lib == ss, (
-            f"_clean_text_for_bark output differs between modules:\n"
-            f"  _otr_bark_lib: {lib!r}\n"
-            f"  SceneSequencer:{ss!r}"
-        )
+    # `test_scene_sequencer_clean_matches_batcher` was REMOVED 2026-08-28
+    # with its subject. It asserted regex PARITY between _otr_bark_lib's
+    # cleaner and a DUPLICATE copy in scene_sequencer; that copy went with
+    # the retired inline-Bark fallback it privately served. Deleting the
+    # redundancy is what removed the need to check two copies agree -- the
+    # library's cleaner is now the only one, so there is nothing left for
+    # it to drift from. (Same shape as the _otr_voice_resolver precedent
+    # earlier the same day.)
 
     # -- BUG-LOCAL-101 paren-drop assertions ---------------------------------
     # Stage-direction parentheticals previously translated to Bark non-verbal

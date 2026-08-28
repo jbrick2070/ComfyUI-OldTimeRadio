@@ -722,16 +722,6 @@
             "name": "tape_emulation"
           },
           "link": null
-        },
-        {
-          "localized_name": "normalize_dbfs",
-          "name": "normalize_dbfs",
-          "shape": 7,
-          "type": "FLOAT",
-          "widget": {
-            "name": "normalize_dbfs"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -755,8 +745,7 @@
         0.8,
         0.15,
         16000,
-        "subtle",
-        -1
+        "subtle"
       ],
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
@@ -3469,7 +3458,7 @@
       63,
       0,
       1,
-      33,
+      32,
       "STRING"
     ],
     [

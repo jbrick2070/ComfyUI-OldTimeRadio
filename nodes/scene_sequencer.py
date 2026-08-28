@@ -136,26 +136,23 @@ def _reconcile_active_music_manifest(manifest: dict | None, *, source: str):
     return receipt
 
 
-def _move_to_device(obj, device):
-    """Recursively move tensors and numpy arrays to the target device.
-
-    BarkProcessor returns voice presets as a nested dict ('history_prompt')
-    containing numpy arrays for semantic/coarse/fine prompts. A flat
-    dict comprehension misses these - this walks the full tree.
-    """
-    if torch.is_tensor(obj):
-        return obj.to(device)
-    elif isinstance(obj, dict):
-        return {k: _move_to_device(v, device) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_move_to_device(v, device) for v in obj]
-    elif isinstance(obj, tuple):
-        return tuple(_move_to_device(v, device) for v in obj)
-    elif isinstance(obj, np.ndarray):
-        return torch.from_numpy(obj).to(device)
-    elif hasattr(obj, "to") and callable(obj.to):
-        return obj.to(device)
-    return obj
+# THE INLINE BARK FALLBACK AND ITS PRIVATE HELPER CHAIN WERE REMOVED
+# 2026-08-28. `_generate_bark_for_line` had no production caller -- the
+# only mention of it in `sequence()` is a comment saying the fallback is
+# retired, and the shortfall branch RAISES instead of calling it. Its
+# own docstring already said 'has no live caller in the sequencer'.
+#
+# The three helpers went with it because each had exactly ONE external
+# caller and it was this function (the other references were recursion
+# and a comment). They were NOT shared with the live path: the comment
+# claiming shared-helper status was about regex PARITY with independent
+# copies in `_otr_bark_lib.py`, and `eng_bark.py` imports from there,
+# never from here.
+#
+# THE NO-FALLBACK CONTRACT IS UNAFFECTED. It is proved by
+# test_sequencer_ledger.py::test_sequencer_clip_shortfall_fails_loud,
+# which asserts the ValueError against sequence() directly and never
+# touches the deleted function.
 
 
 # -----------------------------------------------------------------------------
@@ -610,192 +607,10 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 # fallback site (Gate 3 mirror).
 
 
-def _clean_text_for_bark(text):
-    """Clean and normalize dialogue text for Bark TTS.
-
-    Bark accepts a specific set of non-speech tokens in square brackets.
-    This function:
-      1. Strips structural tags that must never reach Bark ([VOICE:], [ENV:],
-         [SFX:], [MUSIC:], === scene headers ===)
-      2. Converts common parenthetical stage directions to Bark token equivalents
-      3. Converts asterisk actions (*laughs*) to Bark tokens
-      4. Preserves - music notation (Bark renders humming/singing)
-      5. Preserves valid Bark non-verbal tokens already in the text
-      6. Strips any remaining unrecognized square-bracket tags
-      7. Collapses whitespace
-
-    Bark's full supported token set (suno/bark v1):
-      [laughter]      sustained laughter
-      [laughs]        brief laugh
-      [sighs]         audible sigh
-      [music]         musical interlude / humming
-      [gasps]         sharp gasp
-      [clears throat] throat clear before speaking
-      [coughs]        cough
-      [pants]         breathless panting (exertion)
-      [sobs]          crying/sobbing
-      [grunts]        effort grunt
-      [groans]        pain or frustration groan
-      [whistles]      whistle
-      [sneezes]       sneeze
-    - text -         sung / hummed phrase
-
-    Tokens NOT supported by Bark (spoken as literal words - must be stripped):
-      [whispers] [shouts] [nervous laugh] etc.
-    """
-    import re
-
-    # -- Step 1: Strip structural / non-Bark tags -----------------------------
-    text = re.sub(r'\[VOICE:[^\]]*\]', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\[(?:ENV|SFX|MUSIC):[^\]]*\]', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'===.*?===', '', text)
-
-    # -- Step 2: Drop ALL parenthetical stage directions ----------------------
-    # BUG-LOCAL-101 (2026-04-28 PM): mirrors the change in
-    # _otr_bark_lib._clean_text_for_bark. The two functions must stay
-    # behaviorally identical (test_scene_sequencer_clean_matches_batcher).
-    # Parens get dropped wholesale rather than translated to Bark non-verbal
-    # tokens, because rendered tokens add unwanted breath/throat audio
-    # leading into dialogue (Stellar Shadows 2026-04-28: l004 "(panting)"
-    # produced "Let's work I guess..." in Whisper transcription).
-    text = re.sub(r'\([^)]{1,80}\)\s*', '', text)
-
-    # -- Step 3: Asterisk actions - Bark tokens -------------------------------
-    _ASTERISK_TO_BARK = [
-        ("laugh",   "[laughs]"),
-        ("chuckl",  "[laughs]"),
-        ("sigh",    "[sighs]"),
-        ("gasp",    "[gasps]"),
-        ("groan",   "[groans]"),
-        ("sob",     "[sobs]"),
-        ("cough",   "[coughs]"),
-        ("grunt",   "[grunts]"),
-    ]
-    def _translate_asterisk(m):
-        inner = m.group(1).lower().strip()
-        for stem, token in _ASTERISK_TO_BARK:
-            if stem in inner:
-                return token + " "
-        return ""
-
-    text = re.sub(r'\*([^*]{1,60})\*', _translate_asterisk, text)
-
-    # -- Step 4: Strip unrecognized bracket tags -------------------------------
-    _BARK_VALID_TOKENS = {
-        "[laughter]", "[laughs]", "[sighs]", "[music]", "[gasps]",
-        "[clears throat]", "[coughs]", "[pants]", "[sobs]", "[grunts]",
-        "[groans]", "[whistles]", "[sneezes]",
-    }
-    def _filter_bracket_tag(m):
-        inner = m.group(0)[1:-1].strip().lower()
-        inner = re.sub(r'\s+', ' ', inner)
-        tag = f"[{inner}]"
-        return tag if tag in _BARK_VALID_TOKENS else ""
-
-    text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)
-
-    # -- Step 5: Normalize whitespace -----------------------------------------
-    text = re.sub(r'  +', ' ', text).strip()
-    return text
 
 
-def _chunk_text_for_bark(text, max_len=180):
-    """Split text into Bark-friendly chunks at sentence boundaries."""
-    import re
-    if len(text) <= max_len:
-        return [text]
-
-    chunks = []
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    current = ""
-    for sentence in sentences:
-        if len(current) + len(sentence) + 1 > max_len and current:
-            chunks.append(current.strip())
-            current = sentence
-        else:
-            current = f"{current} {sentence}" if current else sentence
-    if current.strip():
-        chunks.append(current.strip())
-    return chunks if chunks else [text]
 
 
-def _generate_bark_for_line(text, voice_preset, temperature=0.7):
-    """Generate TTS audio for a single dialogue line using Bark.
-
-    RETIRED as a live path (no-fallback rip 2026-07-03): the sequencer no longer
-    inline-generates Bark on a clip-count shortfall (it fails loud instead). This
-    helper is retained only because its Bark-lib helper chain is shared; it has no
-    live caller in the sequencer. Returns (audio_np_1d, sample_rate).
-    """
-    import torch
-
-    # Clean the text: strip parenthetical directions, keep Bark-compatible tags
-    text = _clean_text_for_bark(text)
-    if not text:
-        # Nothing left after cleaning - return tiny silence
-        return np.zeros(2400, dtype=np.float32), 24000
-
-    # Import the shared Bark loader from the OTR bark library module
-    from ._otr_bark_lib import _load_bark
-
-    model, processor = _load_bark("suno/bark")
-    sample_rate = model.generation_config.sample_rate  # 24000
-
-    chunks = _chunk_text_for_bark(text)
-    all_audio = []
-    silence_pad = np.zeros(int(sample_rate * 0.08), dtype=np.float32)  # 80ms gap
-
-    # 2026-08-25: this function has no live caller (see the RETIRED docstring
-    # above), but it duplicates _otr_bark_lib._generate_single_line's device
-    # handling closely enough that leaving the old hardcoded-"cuda" version
-    # here would hand a future reviver the exact bug that was just fixed in
-    # the live path. Ask the model, same as there.
-    _dev = next(model.parameters()).device
-
-    for chunk in chunks:
-        inputs = processor(chunk, voice_preset=voice_preset)
-        # Recursively move ALL processor outputs to the model's device -
-        # including the nested 'history_prompt' dict with voice preset numpy
-        # arrays.
-        inputs = _move_to_device(inputs, _dev)
-
-        if "attention_mask" not in inputs and "input_ids" in inputs:
-            inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
-
-        assert inputs["input_ids"].device == _dev, (
-            f"input_ids on {inputs['input_ids'].device}, expected {_dev} "
-            "before generate"
-        )
-
-        _orig_tensor = torch.tensor
-        _orig_arange = torch.arange
-        def _tensor_on_dev(*args, **kwargs):
-            if "device" not in kwargs:
-                kwargs["device"] = _dev
-            return _orig_tensor(*args, **kwargs)
-        def _arange_on_dev(*args, **kwargs):
-            if "device" not in kwargs:
-                kwargs["device"] = _dev
-            return _orig_arange(*args, **kwargs)
-        torch.tensor = _tensor_on_dev
-        torch.arange = _arange_on_dev
-        try:
-            with torch.no_grad():
-                output = model.generate(
-                    **inputs,
-                    do_sample=True,
-                    temperature=temperature,
-                )
-        finally:
-            torch.tensor = _orig_tensor
-            torch.arange = _orig_arange
-
-        audio_np = output.cpu().numpy().squeeze()
-        all_audio.append(audio_np)
-        if len(chunks) > 1:
-            all_audio.append(silence_pad)
-
-    return np.concatenate(all_audio), sample_rate
 
 
 def _verify_bus_clip_counts(
