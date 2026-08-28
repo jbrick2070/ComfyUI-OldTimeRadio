@@ -423,3 +423,76 @@ def test_canonical_node_84_widget_shape_unchanged():
     assert len(wv) == 7, f"widget count drifted: {wv!r}"
     assert wv[5] == "off" and wv[6] == "cpu", (
         f"upscale widgets moved off positions 5/6: {wv!r}")
+
+
+# --------------------------------------------------------------------------- #
+# The resolver's WARN CAP (2026-08-28)
+#
+# Found un-pinned while verifying whether the two carried-forward
+# _resolve_model edge cases still reproduced. They did not -- but this guard,
+# which is the reason a broken folder_paths does not spam the log, had no test
+# of its own. Removing it would have failed nothing.
+# --------------------------------------------------------------------------- #
+
+def _exploding_folder_paths(monkeypatch, exc):
+    """Install a folder_paths whose get_folder_paths always raises ``exc``."""
+    import sys
+    import types
+
+    class _Exploding(types.ModuleType):
+        def get_folder_paths(self, _kind):
+            raise exc
+
+    monkeypatch.setitem(sys.modules, "folder_paths",
+                        _Exploding("folder_paths"))
+
+
+def test_a_broken_folder_paths_warns_ONCE_not_once_per_evaluation(monkeypatch):
+    """``model_fingerprint_parts`` calls the resolver from ``IS_CHANGED``,
+    which ComfyUI runs on EVERY prompt evaluation. Without the cap, a machine
+    with a persistently broken ``folder_paths`` would emit one warning per
+    evaluation, forever (Bug Bible 06.04)."""
+    from nodes._otr_upscale_engines import eng_spandrel_esrgan as M
+
+    _exploding_folder_paths(monkeypatch, RuntimeError("broken"))
+    M._RESOLVE_WARNED.clear()
+    try:
+        eng = M.SpandrelEsrgan()
+        for _ in range(6):
+            eng._resolve_model()          # must not raise; must fall back
+        assert len(M._RESOLVE_WARNED) == 1, (
+            "one distinct error type must warn once, not once per call: %r"
+            % (M._RESOLVE_WARNED,))
+    finally:
+        M._RESOLVE_WARNED.clear()
+
+
+def test_the_warn_set_cannot_grow_without_bound(monkeypatch):
+    """Keyed on the exception CLASS NAME so the set is naturally tiny, with a
+    hard clear at the cap in case a caller manufactures error types."""
+    from nodes._otr_upscale_engines import eng_spandrel_esrgan as M
+
+    M._RESOLVE_WARNED.clear()
+    try:
+        eng = M.SpandrelEsrgan()
+        for i in range(M._RESOLVE_WARNED_MAX + 5):
+            _exploding_folder_paths(
+                monkeypatch, type("Synthetic%d" % i, (RuntimeError,), {})())
+            eng._resolve_model()
+        assert len(M._RESOLVE_WARNED) <= M._RESOLVE_WARNED_MAX, (
+            "the warn set grew past its cap: %d" % len(M._RESOLVE_WARNED))
+    finally:
+        M._RESOLVE_WARNED.clear()
+
+
+def test_a_broken_folder_paths_still_RESOLVES_via_the_repo_fallback(monkeypatch):
+    """The point of surviving the exception: the checkpoint is still found."""
+    from nodes._otr_upscale_engines import eng_spandrel_esrgan as M
+
+    _exploding_folder_paths(monkeypatch, RuntimeError("broken"))
+    M._RESOLVE_WARNED.clear()
+    try:
+        candidates, _path = M.SpandrelEsrgan()._resolve_model()
+        assert candidates, "the repo-relative fallback produced no candidates"
+    finally:
+        M._RESOLVE_WARNED.clear()

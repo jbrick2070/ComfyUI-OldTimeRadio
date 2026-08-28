@@ -361,10 +361,32 @@ re-seated with `animatediff15_v3_haunted_video`). Full suite green. The
 operator's ruling is now simply how the lane works; there is no flag to
 retire and no text-only LTX path to reason about.
 
-### 1.5 NARROW LEARNED-UPSCALE HARDENING ONLY (lifted from the archived 2026-08-13 runway table, row 4)
+### 1.5 ~~NARROW LEARNED-UPSCALE HARDENING~~ -- CLOSED 2026-08-28: NEITHER EDGE CASE REPRODUCES
 
-Harden the two `SpandrelEsrgan._resolve_model` edge cases if still
-reproducible. The ruling attached to this row is lifted into Section 4: **the
+The row was conditional -- "harden the two `SpandrelEsrgan._resolve_model`
+edge cases **if still reproducible**" -- so the first step was the
+reproduction, not a fix. Both were attempted on the real module (CPU, no
+model load) and both behave correctly at HEAD:
+
+| edge case | result |
+|---|---|
+| `folder_paths.get_folder_paths` raises a non-ImportError | Resolver survives and falls back to the repo-relative dir. **One warning across five calls**, not five -- the `_RESOLVE_WARNED` cap works. |
+| An unreadable candidate (`PermissionError`) | **Propagates** rather than masquerading as absence, exactly as the docstring claims. Already pinned by `test_upscale_cache_fingerprint.py:243-249`. |
+| (checked while there) shallow checkout, <5 path parents | No `IndexError`; resolves. |
+
+The hardening this row asked for was done in earlier passes and the code
+documents it -- including an explicit note that a classification pass was
+written, found unreachable, and REMOVED rather than kept as reassuring dead
+code.
+
+**What the verification did surface, and it is now fixed:** the warn cap
+itself had NO test. Removing the guard that keeps a broken `folder_paths`
+from logging once per prompt evaluation (it is called from `IS_CHANGED`)
+would have failed nothing. Three tests added in
+`tests/test_upscale_cache_fingerprint.py`: warns once not once-per-call, the
+set stays bounded, and the repo fallback still resolves.
+
+The ruling attached to this row stands and is lifted into Section 4: **the
 multi-GPU learned-upscale stage itself is CLOSED and must not be reopened.**
 
 ### 1.6 OPEN DEFECTS THAT ARE CODING WORK (a leg may prove some of them later; none needs a leg to FIX)
