@@ -7386,3 +7386,67 @@ to re-id and update its references in the same change.
   fills it with whatever the picture suggests"*. Check
   `otr_coverage_index.yaml` before promoting; it is adjacent to but distinct
   from `12.137` (foley audibility) and `12.138` (damping adjectives).
+
+## PBUG-20260828-02 -- the video model READ THE PROMPT ALOUD: a mime beat said "Queen of the Fairies"
+
+- surfaced: published episode
+  `signal_lost_the_weaver_of_dreams_20260828_003427` (4 beats on
+  `ltx25_mime`), operator by ear 2026-08-28: *"it's mime, it should just be
+  foley sounds ... she is saying dialogue, how does she know this dialogue?
+  'Queen of the Fairies' she says"*.
+- symptom: a character on a SILENT-performance lane speaks intelligible
+  English that appears nowhere in the script. A second character on the same
+  episode also speaks; the operator's read was *"definitely sounds like TTS
+  muxed"*, which is what makes this expensive to diagnose -- it points at the
+  mixer, and the mixer is innocent.
+- THE MUX WAS EXONERATED BY MEASUREMENT, NOT ASSUMED. Normalized
+  cross-correlation of the published mp4 against the pre-foley TTS master, at
+  zero lag, all three files 66.3 s: **1.000 in the announcer window** (where
+  the TTS is meant to play) and **-0.001 / 0.002 / 0.003 / 0.014 in the four
+  mime windows**, while correlation against the foley mix is **1.000
+  everywhere**. The published audio IS the muted mix and the dialogue track is
+  genuinely absent. `foley_muted_s=31.12` did exactly its job.
+- root cause: on `ltx25_mime` / `ltx25_foley_plus` the picture and the audio
+  decode from ONE latent, so the positive prompt is also an audio script -- and
+  the prompt opened with the character's IDENTITY. `_ltx25_parts` ordered
+  `appearance` FIRST, and appearance is the ledger's `character_description`:
+  *"30s, Queen of the Fairies. Face: heart-shaped, high arched brows..."*. The
+  model read the title. BOTTOM's prompt opens *"40s, rustic weaver"* and
+  behaves the same way, which also proves the trigger is NOT capitalisation --
+  an early audit keyed on title-case scored "rustic weaver" clean while the
+  operator was hearing him.
+- `No speech, no voices.` WAS PRESENT on these exact beats, in the terminal
+  position the lab's known-good recipes use, and did not prevent it. Do not
+  "strengthen" it; that path is already a recorded wrong turn (more voice
+  tokens in the conditioning).
+- exposure: **51 of 51 joint-AV beats ever rendered, across 5 episodes**,
+  carried a speakable person-description in the prompt. Every one was handed
+  the same loaded gun; this is the episode where it was heard.
+- fix: identity is out of both joint-AV composers
+  (`_ltx25_parts(..., include_appearance=False)`) -- the conditioning still
+  already mints the face unobstructed, so the text was redundant as well as
+  harmful. The silent `ltx25_video` lane KEEPS its appearance: it discards the
+  audio latent and has no mouth to protect. Plus `_ltx25_legacy_joint_av`, so
+  the fallback path cannot reintroduce it (a real hole the r1 panel caught),
+  and `identity_leaks_in()` at the driver seam, which stamps
+  `joint_av_identity_leak` and logs LOUD for every path not yet imagined.
+- verify: the guard replayed over every joint-AV beat ever rendered flags
+  **13/13 as they shipped and 0/13 as they compose today**.
+- **STILL OWED, and it is the whole question:** a live leg proving the model
+  now stays quiet. The fix removes the nouns that WERE spoken; it does not
+  prove the model will not vocalise the setting, the motion clause, or the
+  sound names instead. A kibitz r1 panel (codex + antigravity) returned NO on
+  the first problem statement and reframed the goal correctly: this is not
+  "possible vs impossible" for a stochastic generator, it is a declared
+  TOLERANCE plus a CONTAINMENT. Panel-verified constraints on any future arm:
+  CFG is locked at 1.0 by the VRAM contract, the negative prompt is hard-coded
+  empty with a drift test, there is NO beat-level routing (engine choice is
+  role-wide), and the mixer cannot separate generated speech from generated
+  foley because they are the same stem -- so muting mime's audio would make it
+  topologically identical to `ltx25_video`.
+- bible-worthy: STRONG CANDIDATE, distinct from `12.137` (foley audibility)
+  and from PBUG-20260828-01 (an unnamed sound CATEGORY inviting voice). The
+  reusable class here is sharper: *on a joint audio-video model the prompt is
+  also an audio script, so any text placed in it may be SPOKEN -- and identity
+  text is doubly wrong because the conditioning image already carries it.*
+  Promote after the live proof, not before.

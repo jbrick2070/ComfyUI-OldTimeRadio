@@ -670,6 +670,119 @@ def test_the_receipt_records_WHICH_sounds_were_named(_text_only_lane):
         assert sound in req["text_prompt"]
 
 
+def test_a_joint_av_prompt_carries_NO_character_identity():
+    """THE MODEL SPEAKS ITS OWN PROMPT (proven live 2026-08-28).
+
+    On `signal_lost_the_weaver_of_dreams_20260828_003427` a mime beat rendered
+    a woman SAYING "Queen of the Fairies" aloud. Nobody wrote that line -- the
+    ledger's `character_description` opens with that title and `_ltx25_parts`
+    put `appearance` FIRST, so the joint audio-video latent read the identity
+    label out loud. The mux was proven innocent by correlation (1.000 against
+    the TTS master in the announcer window, ~0.00 in every mime window).
+
+    Identity is carried by the conditioning STILL, whose scene_character row
+    mints the face unobstructed, so this text was redundant as well as
+    harmful."""
+    inputs = {
+        "appearance": "30s, Queen of the Fairies. Face: heart-shaped",
+        "setting": "a moonlit bank of wild thyme",
+        "motion": "she lifts one hand toward him",
+        "camera": "static medium shot",
+    }
+    for engine in ("ltx25_foley_plus", "ltx25_mime"):
+        formatter = getattr(ltx25, "compose_" + engine.replace("ltx25_", "ltx25_"))
+        out = formatter(object(), inputs)
+        assert "Queen of the Fairies" not in out, (engine, out)
+        assert "heart-shaped" not in out, (engine, out)
+        # the ACTION survives -- this must not become a prompt-gutting fix
+        assert "lifts one hand" in out
+
+
+def test_the_joint_av_LEGACY_fallback_does_not_reintroduce_identity():
+    """THE HOLE THE FIRST FIX LEFT (kibitz r1, codex MUST-FIX 5).
+
+    Dropping `appearance` fixed the COMPOSED path. A beat whose only
+    structured leaf was appearance leaves an empty core, falls back to
+    `_ltx25_legacy`, and that returned `text_prompt` unfiltered -- with the
+    identity back in it."""
+    look = "30s, Queen of the Fairies. Face: heart-shaped"
+    inputs = {"appearance": look, "setting": "", "expression": "",
+              "motion": "", "camera": "",
+              "text_prompt": look + ", standing in a bower"}
+    for fn in (ltx25.compose_ltx25_mime, ltx25.compose_ltx25_foley_plus):
+        out = fn(object(), inputs)
+        assert "Queen of the Fairies" not in out, out
+        # THE LAW: what the writer authored survives; only the span our own
+        # composer injected is removed.
+        assert "standing in a bower" in out
+
+
+def test_the_legacy_fallback_returns_the_ORIGINAL_when_nothing_would_remain():
+    """A beat with no picture direction at all is worse than one that names a
+    face, so this refuses to invent. The runtime guard reports the residue."""
+    look = "30s, Queen of the Fairies. Face: heart-shaped"
+    inputs = {"appearance": look, "setting": "", "expression": "",
+              "motion": "", "camera": "", "text_prompt": look}
+    assert ltx25.compose_ltx25_mime(object(), inputs) == look
+
+
+def test_the_identity_guard_catches_the_REAL_shipped_prompt():
+    """Replayed against the actual published defect. A guard that cannot catch
+    the bug that motivated it is theatre.
+
+    `signal_lost_the_weaver_of_dreams_20260828_003427`, beat b003: the prompt
+    opened with TITANIA's character_description and the model said "Queen of
+    the Fairies" out loud."""
+    look = ("30s, Queen of the Fairies. Face: heart-shaped, high arched brows, "
+            "thin straight nose, sharp-pointed chin")
+    as_rendered = ("photorealistic Shakespearean. " + look +
+                   ", a moonlit bank, she lifts one hand, static shot")
+    leaks = ltx25.identity_leaks_in(as_rendered, appearance=look,
+                                    names=["TITANIA", "BOTTOM"])
+    assert leaks, "the guard missed the exact prompt that shipped the defect"
+    assert any("appearance" in x for x in leaks)
+
+
+def test_the_identity_guard_is_quiet_on_todays_prompt():
+    """The other half: it must not fire on what the lanes compose now, or it
+    is a guard nobody reads."""
+    inputs = {
+        "appearance": "30s, Queen of the Fairies. Face: heart-shaped",
+        "setting": "a moonlit bank of wild thyme",
+        "motion": "she lifts one hand toward him",
+        "camera": "static medium shot",
+    }
+    for engine, fn in (("ltx25_mime", ltx25.compose_ltx25_mime),
+                       ("ltx25_foley_plus", ltx25.compose_ltx25_foley_plus)):
+        prompt = ltx25.finish_joint_av_positive(engine, fn(object(), inputs))
+        assert not ltx25.identity_leaks_in(
+            prompt, appearance=inputs["appearance"],
+            names=["TITANIA", "BOTTOM"]), (engine, prompt)
+
+
+def test_a_cast_name_matches_WHOLE_WORDS_only():
+    """A bare substring pass flagged the cast name "LEAR" inside "clearly" --
+    and every prompt on this lane says "full face clearly visible", so it fired
+    on every beat of that episode. A guard that cries wolf gets ignored."""
+    prompt = ("a moonlit bank, full face clearly visible, generous headroom. "
+              "No speech, no voices.")
+    assert ltx25.identity_leaks_in(prompt, names=["LEAR"]) == []
+    # ...but a REAL occurrence still fires
+    assert ltx25.identity_leaks_in("LEAR stands in the storm", names=["LEAR"])
+
+
+def test_the_SILENT_ltx25_lane_keeps_its_identity():
+    """The contrast that proves the fix is scoped. `ltx25_video` discards its
+    audio latent entirely, so it has no mouth to protect and identity in the
+    text is pure benefit there."""
+    inputs = {
+        "appearance": "30s, Queen of the Fairies. Face: heart-shaped",
+        "motion": "she lifts one hand toward him",
+    }
+    out = ltx25.compose_ltx25_video(object(), inputs)
+    assert "Queen of the Fairies" in out
+
+
 def test_the_finisher_is_idempotent():
     once = ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE)
     twice = ltx25.finish_joint_av_positive("ltx25_foley_plus", once)

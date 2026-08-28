@@ -3500,10 +3500,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
         try:
             from .eng_ltx25 import (JOINT_AV_TERMINATOR,
-                                    finish_joint_av_positive, named_sounds_for)
+                                    finish_joint_av_positive,
+                                    identity_leaks_in, named_sounds_for)
         except ImportError:  # pragma: no cover -- flat test imports
             from eng_ltx25 import (  # type: ignore
-                JOINT_AV_TERMINATOR, finish_joint_av_positive, named_sounds_for)
+                JOINT_AV_TERMINATOR, finish_joint_av_positive,
+                identity_leaks_in, named_sounds_for)
         # NO MOOD READ ANY MORE (operator, 2026-08-28). Mime used to lead its
         # tail with the brief's music_mood_terms and ask for "instrumental
         # scene score" -- a CATEGORY, which is precisely the defect that made
@@ -3545,6 +3547,46 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "[OTR.render_driver] JOINT-AV: %s beat %s did NOT end with the "
                 "canonical audio terminator -- the lane keeps its audio and "
                 "owes that clause", _jav_engine, _beat_id_for_shot(shot))
+
+        # THE MODEL SPEAKS WHAT IT READS (2026-08-28, proven on a published
+        # episode: a mime beat said "Queen of the Fairies" aloud because that
+        # was the opening of her character_description). The two formatters no
+        # longer pass appearance through, so this guard exists for every OTHER
+        # path -- a setting naming a character's bower, a motion clause
+        # carrying a name, an operator override, a future formatter. It
+        # REPORTS: a wrong sound is a bad episode, a refused render is no
+        # episode, and episodes in obs are the operator's success signal.
+        try:
+            from ..otr_shot_lock import (  # type: ignore
+                _appearance_for_char as _jav_look_fn)
+        except ImportError:  # pragma: no cover -- flat test imports
+            try:
+                from otr_shot_lock import (  # type: ignore
+                    _appearance_for_char as _jav_look_fn)
+            except ImportError:
+                _jav_look_fn = None
+        _jav_look = ""
+        if _jav_look_fn is not None:
+            try:
+                _jav_look = str(_jav_look_fn(
+                    ledger, str(shot.get("char_id") or "")) or "")
+            except Exception:  # noqa: BLE001 -- a missing look is not fatal
+                _jav_look = ""
+        _jav_names = []
+        for _row in ((ledger or {}).get("cast") or []):
+            if isinstance(_row, dict):
+                _nm = str(_row.get("name") or "").strip()
+                if _nm:
+                    _jav_names.append(_nm)
+        _jav_leaks = identity_leaks_in(
+            _jav_after, appearance=_jav_look, names=_jav_names)
+        if _jav_leaks:
+            _jav_obs["joint_av_identity_leak"] = list(_jav_leaks)
+            _LOG.warning(
+                "[OTR.render_driver] JOINT-AV IDENTITY LEAK: %s beat %s -- %s. "
+                "This lane decodes audio from the same latent as the picture, "
+                "so text it reads can be SPOKEN.",
+                _jav_engine, _beat_id_for_shot(shot), "; ".join(_jav_leaks))
         if _jav_after != _jav_before:
             req["text_prompt"] = _jav_after
             # Restamp the digest and length ONLY, following the banana

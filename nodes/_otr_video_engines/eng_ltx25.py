@@ -2107,6 +2107,64 @@ _CUE_PATTERNS = {cue: re.compile(r"\b" + re.escape(cue))
 _FALLBACK_SOUNDS = ("cloth shifting as the body settles",)
 
 
+#: How long a shared span has to be before it counts as the identity text
+#: leaking rather than an ordinary word both strings happen to use. Six words
+#: is well past "a man in a coat" and well short of a real description.
+#: A regex word boundary, held in a named constant because an inline
+#: escape in this position was silently rewritten to a literal
+#: backspace byte by a shell heredoc, which turned the cast-name
+#: check into a pattern that could never match. One definition, one
+#: place to verify.
+_WORD_BOUNDARY = "\\b"
+
+_IDENTITY_SPAN_WORDS = 6
+
+
+def identity_leaks_in(positive, *, appearance="", names=()):
+    """Names/description fragments that reached a JOINT-AV prompt. Pure.
+
+    THE MODEL SPEAKS WHAT IT READS. On `ltx25_mime` / `ltx25_foley_plus` the
+    picture and the audio decode from ONE latent, so the positive prompt is
+    also an audio script -- proven live 2026-08-28, where a mime beat rendered
+    a woman SAYING "Queen of the Fairies" because her `character_description`
+    opened with that title. Identity belongs in the conditioning STILL, whose
+    scene_character row already mints the face unobstructed.
+
+    Returns a list of human-readable findings, empty when clean. Reports; never
+    raises and never rewrites the prompt -- the caller decides, and on this
+    project a refused render is worse than a wrong sound.
+
+    Matching is on a SHARED WORD SPAN, deliberately, not on capitalisation.
+    A corpus audit of every joint-AV beat ever rendered showed the shape of
+    the identity is irrelevant: "Queen of the Fairies" and "rustic weaver"
+    were equally spoken, and a capitalisation test scored the second one
+    clean. Length is the signal; case is not.
+    """
+    text = str(positive or "").lower()
+    if not text:
+        return []
+    found = []
+    for name in names or ():
+        nm = str(name or "").strip().lower()
+        # WHOLE WORDS ONLY, and this is not a nicety -- a bare substring pass
+        # flagged the cast name "LEAR" inside the word "clearly", which every
+        # prompt on this lane contains ("full face clearly visible"). A guard
+        # that cries wolf on every beat of an episode is a guard nobody reads.
+        # 3+ chars so an initial or a stray "a" cannot fire.
+        if len(nm) >= 3 and re.search(
+                _WORD_BOUNDARY + re.escape(nm) + _WORD_BOUNDARY, text):
+            found.append("cast name %r is in the prompt" % str(name))
+    look = str(appearance or "").strip().lower()
+    if look:
+        words = [w for w in look.replace(",", " ").split() if w]
+        for i in range(0, max(0, len(words) - _IDENTITY_SPAN_WORDS + 1)):
+            span = " ".join(words[i:i + _IDENTITY_SPAN_WORDS])
+            if span in text:
+                found.append("appearance text is in the prompt (%r...)" % span[:48])
+                break
+    return found
+
+
 def named_sounds_for(positive):
     """The sounds this action would actually make, most telling first.
 
@@ -2262,15 +2320,29 @@ _LTX25_FRAMING = ("full face clearly visible, generous headroom, "
 #: load-bearing half -- not by hiding the face from a picture that shows one.
 
 
-def _ltx25_parts(inputs):
+def _ltx25_parts(inputs, *, include_appearance=True):
     """Subject, setting, expression, motion, then camera LAST.
 
     Shared ASSEMBLY, never a shared prompt: it only orders the parts the
     operator's matrix names. A lane that wants to diverge entirely stops
     calling it. Returns "" when the row carries no structured leaves.
+
+    ``include_appearance=False`` DROPS the identity/appearance leaf, and it
+    exists for exactly one reason (2026-08-28, proven on a published episode):
+    on the JOINT-AV lanes the picture and the audio decode from ONE latent, so
+    the prompt is also an audio script, and the model SPEAKS the proper nouns
+    in it. `character_description` opens with a title -- "30s, Queen of the
+    Fairies", "40s, rustic weaver" -- and a mime beat rendered a woman saying
+    "Queen of the Fairies" aloud. Identity is already carried by the
+    conditioning STILL, whose scene_character row mints the face unobstructed,
+    so the text was redundant as well as harmful. The silent lane keeps its
+    appearance: it discards the audio latent and has no mouth to protect.
     """
+    keys = ("appearance", "setting", "expression", "motion")
+    if not include_appearance:
+        keys = keys[1:]
     parts = []
-    for key in ("appearance", "setting", "expression", "motion"):
+    for key in keys:
         value = str(inputs.get(key) or "").strip().strip(",")
         if value:
             parts.append(value)
@@ -2280,6 +2352,38 @@ def _ltx25_parts(inputs):
     if camera:
         parts.append(camera)          # camera AFTER the subject action
     return ", ".join(parts)
+
+
+def _ltx25_legacy_joint_av(inputs):
+    """The legacy fallback for a lane that DECODES AUDIO FROM THE PROMPT.
+
+    `_ltx25_legacy` returns the authored `text_prompt` verbatim, which is
+    right for a silent lane and wrong for a joint-AV one: on those lanes the
+    prompt is also an audio script, and a beat with no structured action falls
+    back to a string that still carries the character's identity -- the exact
+    text a published mime beat SPOKE ALOUD ("Queen of the Fairies").
+
+    THE LAW ALLOWS THIS AND WOULD FORBID THE OBVIOUS ALTERNATIVE.
+    `otr_shot_lock` forbids a Python vocabulary or token-overlap judge
+    REPLACING an authored non-empty visual prompt. So this makes no judgement
+    about words: it removes exactly one span, the `appearance` string our own
+    composer injected, whose bytes we already hold. Everything the writer
+    authored survives. If removing it would leave nothing, the original is
+    returned UNCHANGED -- a beat with no picture direction at all is worse
+    than a beat that names a face -- and the driver's `identity_leaks_in`
+    guard reports the residue rather than this function silently inventing
+    something. Pure.
+    """
+    raw = str(inputs.get("text_prompt") or "")
+    look = str(inputs.get("appearance") or "").strip().strip(",")
+    if not raw or not look:
+        return raw
+    trimmed = raw.replace(look, "").strip()
+    # tidy only the punctuation the removal itself orphaned
+    trimmed = trimmed.lstrip(" ,.;:").strip()
+    while ", ," in trimmed:
+        trimmed = trimmed.replace(", ,", ",")
+    return trimmed if trimmed else raw
 
 
 def _ltx25_legacy(inputs):
@@ -2313,6 +2417,10 @@ def compose_ltx25_foley_plus(self, inputs):
     the full silent motion budget. What makes it different is that the picture
     has to EARN the bed: hands on dials, papers, switches, footfalls.
 
+    NO IDENTITY WALL. This lane composes with ``include_appearance=False``:
+    the joint latent SPEAKS proper nouns out of the prompt, and identity is
+    already fixed by the conditioning still. See ``_ltx25_parts``.
+
     IT WRITES NO AUDIO INSTRUCTION. ``finish_joint_av_positive`` is the sole
     owner of this lane's audio tail and appends it once, downstream. Its
     idempotency now keys on ``JOINT_AV_TERMINATOR`` -- a constant built from the
@@ -2323,15 +2431,19 @@ def compose_ltx25_foley_plus(self, inputs):
     leaving two audio clauses instead of one. The phrasing below stays visual
     for that reason.
     """
-    core = _ltx25_parts(inputs)
+    core = _ltx25_parts(inputs, include_appearance=False)
     if not core:
-        return _ltx25_legacy(inputs)
+        return _ltx25_legacy_joint_av(inputs)
     return ("%s, working the objects within reach so every movement has a "
             "visible source, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
 
 
 def compose_ltx25_mime(self, inputs):
     """``ltx25_mime`` -- expressive silent action with a clear endpoint.
+
+    NO IDENTITY WALL, for the same reason as its foley sibling -- this lane
+    rendered a woman saying "Queen of the Fairies" out loud because her
+    `character_description` began with that title. See ``_ltx25_parts``.
 
     **NOT an audio-in lane either.** The performance carries the beat with no
     speech at all, so the action reads larger than its siblings and lands on a
@@ -2346,9 +2458,9 @@ def compose_ltx25_mime(self, inputs):
     plays larger and holds its endpoint, which is what the two formatters
     genuinely differ on.
     """
-    core = _ltx25_parts(inputs)
+    core = _ltx25_parts(inputs, include_appearance=False)
     if not core:
-        return _ltx25_legacy(inputs)
+        return _ltx25_legacy_joint_av(inputs)
     return ("%s, the gesture played out fully and carried to a clear held "
             "endpoint, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
 
@@ -2366,4 +2478,5 @@ __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
            "finish_joint_av_positive", "build_joint_av_suffix",
-           "named_sounds_for", "JOINT_AV_TERMINATOR"]
+           "named_sounds_for", "JOINT_AV_TERMINATOR",
+           "identity_leaks_in"]
