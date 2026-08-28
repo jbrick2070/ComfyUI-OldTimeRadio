@@ -46,7 +46,6 @@ Public surface
                               (commit 3 lands the writer wiring).
   DEFAULT_DECODER_PROFILE  -- "default_v1".
   build_source_wrapper(...)           -- inert-source prompt wrapper.
-  compute_cache_key(...)              -- sha256 over the cache axes.
   extract_json_block(raw)             -- fence-tolerant JSON extractor.
   build_news_briefs(generate_fn, ...) -- end-to-end caller.
 """
@@ -240,33 +239,11 @@ def build_source_wrapper(
 # ---------------------------------------------------------------------------
 
 
-def compute_cache_key(
-    *,
-    source_hash: str,
-    prompt_version: str,
-    schema_version: str,
-    model_id: str,
-    decoder_profile: str,
-    seed: int,
-) -> str:
-    """Cache key for ledger.meta.news lookup.
-
-    Stored at ``ledger.meta.news.cache_key``. Lookup hits only when
-    every field matches. Any change to article body (-> source_hash),
-    prompt version, schema, model, decoder profile, or seed forces
-    regeneration.
-
-    Per ADR section 3.3.
-    """
-    joined = "|".join((
-        source_hash or "",
-        prompt_version or "",
-        schema_version or "",
-        model_id or "",
-        decoder_profile or "",
-        str(int(seed)),
-    ))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+# `compute_cache_key()` was REMOVED 2026-08-28 (dead-code audit). It was
+# definition-only: nothing called it, and its docstring's claim that the
+# result is stored at `ledger.meta.news.cache_key` was not true of any
+# live path. Removing an uncalled function cannot change behaviour; a
+# future cache key is written where its consumer lives.
 
 
 # ---------------------------------------------------------------------------

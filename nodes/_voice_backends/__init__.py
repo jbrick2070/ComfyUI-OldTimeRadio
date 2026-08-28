@@ -18,7 +18,9 @@ Public surface
     register(engine, factory) -- add an engine to the registry
     get_factory(engine)     -- look up a registered factory
     available_engines()     -- list of registered engine names
-    KNOWN_ENGINES           -- mirrors _otr_voice_resolver.KNOWN_ENGINES
+    KNOWN_ENGINES           -- the engine-name set (SOLE owner since the
+                               _otr_voice_resolver duplicate was removed
+                               2026-08-28)
                                 so callers don't need both imports
 
 The bundled drivers (bark, kokoro) self-register via lazy
@@ -33,7 +35,8 @@ from nodes._voice_backends._protocol import VoiceBackend
 
 
 # Mirror the resolver's known-engine set so callers using just this
-# package don't have to also import nodes._otr_voice_resolver.
+# package own the engine-name set outright (the _otr_voice_resolver copy
+# was removed 2026-08-28 as a parser-only module with no consumer).
 KNOWN_ENGINES: set[str] = {"bark", "kokoro", "cosyvoice", "xtts", "piper"}
 
 

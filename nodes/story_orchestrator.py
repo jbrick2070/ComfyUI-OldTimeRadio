@@ -2294,96 +2294,14 @@ _CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"
 # NODE 1: SCRIPT WRITER
 # -----------------------------------------------------------------------------
 
-# Path to the SIGNAL LOST canon file. Read at write_script time (not at
-# module load) so editing the canon between runs takes effect on the
-# next render without restarting ComfyUI.
-_CANON_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "docs", "OTR-CANON.md",
-)
-
-
-def _load_canon_for_writer(skip: bool = False, compact: bool = False) -> str:
-    """Build a writer-prompt canon block from OTR-CANON.md.
-
-    Pulls the writer-relevant sections (Tonal canon, Period rules,
-    Recurring motifs, Used premises/twists/motifs) and wraps them in
-    an XML-flavored block. The original consumer (SCAFFOLDING_PREAMBLE)
-    was deleted in Sprint C C2b as orphan code; this function is itself
-    orphan-pending-Sprint-G-audit. Returns the empty string on:
-      - skip=True (legacy small-model collapse guard, kept for back-compat)
-      - missing file (logs warning, never fatal)
-      - parse error (logs warning, never fatal)
-
-    `compact=True` returns a shrunk-down period+tonal anchor that
-    still fits comfortably in a small-model's context (Gemma-4 E2B,
-    ~2B effective). Drops the "Used premises / twists / motifs"
-    sections (they exist for de-duplication, not period anchoring)
-    and the prose-heavy "Tonal canon" / "Recurring motifs" sections.
-    Keeps only "Period rules" -- the part that actually moves the
-    needle on small-model anachronism leakage (BUG-LOCAL-114-class
-    issues caught by the critic's A15-A19 rules).
-
-    The returned block has NO `{placeholders}` so `.format()` on the
-    full system prompt won't choke on canon content.
-    """
-    if skip:
-        return ""
-    try:
-        if not os.path.exists(_CANON_PATH):
-            log.warning("[Canon] OTR-CANON.md missing at %s - skipping", _CANON_PATH)
-            return ""
-        with open(_CANON_PATH, "r", encoding="utf-8") as _f:
-            text = _f.read()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("[Canon] read failed (%s) - skipping", exc)
-        return ""
-    # Pull only the sections the writer needs. Order matters (rules
-    # before "do not repeat" list).
-    # Compact mode keeps ONLY the section that gives small-model
-    # writers a real period anchor (Gemma-4 E2B-class). Larger models
-    # get the full canon including motifs + de-dup hints.
-    if compact:
-        keep_headers = ("## Period rules",)
-    else:
-        keep_headers = (
-            "## Tonal canon",
-            "## Period rules",
-            "## Recurring motifs",
-            "## Used premises (auto-updated)",
-            "## Used twists (auto-updated)",
-            "## Used motifs (auto-updated)",
-        )
-    parts: list[str] = []
-    for header in keep_headers:
-        idx = text.find(header)
-        if idx < 0:
-            continue
-        # Find the next "## " heading (or end of file)
-        next_idx = text.find("\n## ", idx + len(header))
-        if next_idx < 0:
-            section = text[idx:]
-        else:
-            section = text[idx:next_idx]
-        # Strip trailing blank lines
-        parts.append(section.rstrip())
-    if not parts:
-        return ""
-    body = "\n\n".join(parts)
-    # Escape literal braces so .format() doesn't try to interpolate
-    # any "{...}" tokens that may appear in canon prose.
-    body = body.replace("{", "{{").replace("}", "}}")
-    block = (
-        "<canon>\n"
-        "The following is established SIGNAL LOST canon. Honour it. Do not\n"
-        "contradict the tonal rules, period rules, or recurring motifs.\n"
-        "Avoid repeating any premise, twist, or motif listed under\n"
-        "\"Used ... (auto-updated)\" -- pick a fresh angle for this\n"
-        "episode.\n\n"
-        f"{body}\n"
-        "</canon>\n\n"
-    )
-    return block
+# THE CANON LOADER WAS REMOVED 2026-08-28 (dead-code audit).
+#
+# `_CANON_PATH` and `_load_canon_for_writer()` had NO caller. The
+# function's own docstring recorded that its consumer had already been
+# deleted and marked itself orphan-pending-audit; this is that audit. The
+# canon file itself (docs/OTR-CANON.md) is untouched -- only the unused
+# loader is gone, so re-wiring it later means writing a caller, not
+# recovering a file.
 
 
 # ============================================================================

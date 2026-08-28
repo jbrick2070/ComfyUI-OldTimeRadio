@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_voice_resolver import KNOWN_ENGINES as RESOLVER_KNOWN_ENGINES
 from nodes._voice_backends import (
     KNOWN_ENGINES,
     VoiceBackend,
@@ -27,10 +26,12 @@ from nodes._voice_backends._protocol import VoiceBackend as ProtocolVoiceBackend
 # ---------- registry shape ----------------------------------------------
 
 
-def test_known_engines_mirrors_resolver_set():
-    """The registry's KNOWN_ENGINES set should mirror the resolver's
-    so callers don't have to import both modules."""
-    assert KNOWN_ENGINES == RESOLVER_KNOWN_ENGINES
+# `test_known_engines_mirrors_resolver_set` was REMOVED 2026-08-28 with the
+# module it compared against. It asserted that the registry's KNOWN_ENGINES
+# mirrored a SECOND copy of the same set in `_otr_voice_resolver`, which was a
+# parser-only module with no production consumer. Deleting the duplicate is
+# what removed the need to check that two copies agree -- the registry's set is
+# now the only one, so there is nothing left for it to drift from.
 
 
 def test_protocol_is_runtime_checkable():
