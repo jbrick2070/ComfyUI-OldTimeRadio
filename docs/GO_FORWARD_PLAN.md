@@ -167,12 +167,56 @@ permits publishing an all-refused episode, it does NOT permit REPORTING one as
 a clean render, and the `required_scene_targets` ledger-completeness law is
 untouched.
 
-**STATE 2026-08-28: r2 plan IS WRITTEN and the panel has REPORTED.** The
-plan: `docs/2026-08-28-sanctioned-gap-r2/CODING_PLAN.md` (five changes C1-C5
-in dependency order, every cite re-pinned at HEAD `aa4f4b1d`). Reviews:
-`kibitz-runs/2026-08-28-sanctioned-gap-r2/r2/` (codex + antigravity +
-cursor, the operator's best-of-3). Next action: the driver grounds the three
-reviews, writes `final.md`, and codes what survives.
+**STATE 2026-08-28: r2 JUDGED. The panel killed a build-breaker and the plan
+is now C0-C7, ready to code.** Panel: Codex `gpt-5.6-sol` + Antigravity
+`Gemini 3.7 Flash (High)` + Cursor `grok-4.6-high` (operator's best-of-3).
+**All three returned NO on the same finding, verified by the driver against
+the files:** `validate_and_repair_still_spine(ledger)` runs at
+`otr_video_render_batch.py:533`, ONE LINE BEFORE `run_real_episode` at `:535`
+-- so a refused beat kills the episode before any downstream change could
+execute. The r2 plan changed five things below a gate that raises first.
+
+**Judgment + hardened plan: `kibitz-runs/2026-08-28-sanctioned-gap-r2/r2/final.md`
+(gitignored -- the structure is reproduced here so it survives).** THE EIGHT
+CHANGES, in dependency order, coded in four commit chunks:
+
+* **C0 (NEW -- everything else is dead code without it).** The spine
+  validator accepts a `sanctioned_gap` receipt row: skip materialize, do not
+  raise (`render_driver.py:1143-1150`), do not append a fake validated path,
+  do not let `:1219-1227` copy a historical path onto the gap row. Same skip
+  for jump-segment (`:1176-1183`) and HuMo-portrait (`:1205-1209`).
+* **C1.** The dispatcher stamps the receipt with **THREE outcomes, not two**
+  -- only `reason == "model_refusal"` is tolerated today
+  (`otr_image_gen_dispatcher.py:1868-1878`); `no_engine` / `dead_path` /
+  `prompt_path_guard` must keep raising. Schema: identity keys + `status` +
+  evidence `{reason, engine_id, seed, prompt, prompt_hash, detail,
+  image_revision}`; ok rows gain `status:"ok"` so absence is never the
+  signal. `_still_index` AND the spine must both ignore image rows whose
+  object_id is a this-dispatch gap.
+* **C2.** Skip in the **`run_episode` loop** (`:4636-4669`), NOT the request
+  builder -- `build_request_from_shot` returns a request, not a shot, and on
+  the cheap families a missing still does not even raise there. Append the
+  original ShotLock shot to `new_shots`; do not invent `exists` on shots.
+* **C3.** `build_clip_manifest` projects the marker onto the manifest CLIP
+  row -- `timeline_quality_report` indexes `manifest["clips"]` and never sees
+  `video.shots`.
+* **C4.** The predicate computed over `manifest["clips"]`:
+  `ok = n > 0 and unsanctioned == 0`, `degraded = sanctioned > 0`. (The r2
+  draft used an undefined `total` and read a counter built AFTER the report.)
+* **C5.** **Was wrongly marked out-of-scope.** `_build_render_engines_payload`
+  (`:212-223`) counts EVERY `exists=False` as a sanctioned gap with no
+  evidence test -- correct only while no gap row can arrive. After C2 it
+  would report a crashed all-missing render as publishable-degraded.
+* **C6.** Downstream: credits `or` fallback (`otr_credits_roll.py:319`),
+  `check_ltx_open_health` strict mode, the acceptance grader's
+  `RULE_MISSING_CLIP`.
+* **C7.** End-to-end through the REAL spine + composite. **Expect a hole:**
+  all-gap with empty `new_shots` makes `assemble_silent_timeline` raise
+  `"manifest has no renderable beats"` -- that hole IS the work.
+
+**Commit chunks:** (1a) C0+C1 together -- C0 has nothing to read without C1;
+(1b) C2; (1c) C3+C4+C5; (1d) C6+C7. Each chunk = focused tests + full suite +
+push, so the tree is never half-migrated.
 
 **The original next step was r2, the coding plan**, per r1's own stated roster
 (r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
