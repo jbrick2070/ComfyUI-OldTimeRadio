@@ -451,36 +451,31 @@ Everything below was verified against the real files on 2026-08-04, is
 non-GPU, and is provable by the suite alone. Work them in order; each ends
 green and pushed on its own.
 
-### 6. A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD
+### 6. ~~A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD~~ -- FIXED 2026-08-28
 
-`find_scene_coherence_issues` reads `lines[].scene_id`; the `scifi_news` lane
-writes `beats[].scene_id`. 55 ledgers assert the check, 0 carry the field, 55
-pass. Nothing in `nodes/` writes `lines[].scene_id` on ANY lane -- the check
-never had a producer.
+**The join and the vacuity refusal are done.** `find_scene_coherence_issues`
+(`nodes/_otr_scene_guard.py`) now joins `beat_id -> beats[].scene_id`, the
+join the schema actually has -- `lines[].scene_id` is confirmed dead, no
+writer has ever populated it. `_check_g15_scene_coherence`
+(`nodes/_otr_ledger_freeze.py`) writes the full `{required, checked, verdict,
+issues}` shape into `report.info`, and an armed gate that examines zero real
+linkages now fails loud instead of passing silently -- distinguished from a
+ledger with no scenes at all, which stays a legitimate clean skip (a
+pre-existing, different state; conflating the two would have been a wider
+behavior change than asked). Commit `e2807dcc`, reviewed via scoped kibitz r2
+(codex, 6 MUST-FIX, all grounded and folded in --
+`kibitz-runs/2026-08-28-scene-coherence-vacuity/`), 28 tests including a
+named regression guard, full suite 12374/121/1, 0 regressions, HEAD == origin
+verified.
 
-Join per line: `beat_id` -> beat -> `scene_id` -> declared scene. Add a **VACUITY
-refusal** (an armed gate that examined zero linkages FAILS -- that is how this
-survived 55 episodes). **Split request from verdict:** keep a
-configuration-derived `scene_coherence_required` and write
-`{required, checked, verdict, issues}` into `report.info` -- `run_gap_audit` is
-READ-ONLY (`_otr_ledger_freeze.py:664-698`), so the gate must not mutate the
-ledger; the phase wrappers already persist the report. Measure OFFLINE over the
-published corpus first, then arm in ONE change -- no intermediate flag-off ship.
-**CORRECTED 2026-08-23 -- this row's premise moved under it.** It used to say
-"replace the stale hard-coded bank list at `tests/test_scene_guard_v4.py:89-99`
-with registry-derived coverage (it omits `scifi_news`, the one bank that enables
-the flag)". Both halves are now false: **`scifi_news` NO LONGER EXISTS** (the
-live banks are media_archive, original, scifi_news_pro, public_domain,
-shakespeare, custom_source_bank, and that test's list is exactly the first five),
-and **NO bank sets `defaults.scene_coherence_check` at all** -- the writer reads
-it at `OTR_LedgerScriptWriter.py:3176` and nothing supplies it. So the gate is
-not merely inert on current banks; it has no consumer anywhere. What survives is
-the DESIGN above (the join, the vacuity refusal, request-vs-verdict) and the
-lesson beneath it. Whoever arms this decides first whether any bank should.
-
-**The vacuity class is now proven twice** -- this gate, and the freeze test at
-`test_g9_sfw_ship_stop.py` that filtered on a retired code prefix (fixed
-`4506b1ed`). Any NEW armed gate ships with a vacuity assertion.
+**STILL OWED, and it is the ONLY thing left on this item:** whether any bank
+should actually ARM `defaults.scene_coherence_check`. Nothing does today --
+the fix changes a function with zero live callers in current production, by
+design, so this shipped at zero risk. GO_FORWARD's original text said
+"measure OFFLINE over the published corpus first, then arm in ONE change" --
+that measurement was never attempted tonight and stays open. Whoever picks
+this up next decides first whether any bank should arm it at all before
+running that measurement.
 
 ### 7. CHARACTER GENDER IS ROLLED ON PROSE LANES -- Scrooge shipped female (spec REWRITE owed; r2 and r3 both returned NO)
 
