@@ -480,7 +480,8 @@ def test_cap_postcondition_holds_for_direct_callers():
 # --------------------------------------------------------------------------- #
 
 _IA2V_CLAUSE = ("is talking to the viewer, lips opening and closing naturally "
-                "in sync with the speech, subtle head and hand gestures. "
+                "in sync with the speech, the jaw moving with the words, "
+                "small head motion and natural blinks. "
                 "Static camera.")
 _DRIFT_CLAUSE = "slow cinematic camera drift"
 

@@ -1389,12 +1389,22 @@ _IA2V_TALKING_PROMPT_ANNOUNCER = (
     "glancing subtly as it speaks. The radio sits still; static camera, "
     "warm dramatic lighting.")
 #: Character-beat talking clause (appended to a COMPACT identity fragment;
-#: the 900-char M4 identity/scene wall drowned the speech tokens). Mirrors
-#: the canonical token pattern ("talking to the viewer ... opening and
-#: closing naturally in sync with the speech").
+#: the 900-char shared prompt drowned the speech tokens). Mirrors the
+#: canonical token pattern ("talking to the viewer ... opening and closing
+#: naturally in sync with the speech") -- that half is P8-proven and is
+#: reproduced VERBATIM; a paraphrase scored 1.72 against 3.32.
+#:
+#: THE TAIL WAS CORRECTED 2026-08-27. It read "subtle head and hand
+#: gestures": "subtle" is the damping word PBUG-20260827-04 banned, and
+#: hand acting is what LIPSYNC_MOTION_ENVELOPE retired for this family
+#: because hands cross the face. It now names the JAW and BLINKS, per the
+#: operator LTX 2.5 lip-sync reference -- a face that never blinks reads as
+#: a still even while the mouth moves. Hands are not mentioned either way;
+#: "no hands" would put hands back in the conditioning.
 _IA2V_TALKING_CLAUSE_CHARACTER = (
     "is talking to the viewer, lips opening and closing naturally in sync "
-    "with the speech, subtle head and hand gestures. Static camera.")
+    "with the speech, the jaw moving with the words, small head motion "
+    "and natural blinks. Static camera.")
 
 
 def _style_authority():
