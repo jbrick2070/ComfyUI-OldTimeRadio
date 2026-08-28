@@ -159,6 +159,28 @@ it is not split across sections.
 
 ### 1.3 CHARACTER GENDER LADDER -- the SPEC REWRITE (fold r2 + r3, then r3 again; NOT r4)
 
+**TWO OPERATOR RULINGS, 2026-08-28, and they reshape the spec:**
+
+* **Shakespeare: fill ONLY the 32 `unknown` roster rows.** KNOWN rows from the
+  parsed dramatis personae stay untouchable; the ladder's lower tiers may fill
+  the blanks. (Section 3 question B is ANSWERED -- remove it on next tidy.)
+* **THE WEB-SEARCH TIER IS REPLACED, not plumbed.** Operator's design, his
+  words: *"just have the LLM decide -- ask what the likely gender of this
+  person name is, have the LLM decide, and keep that in an index of names."*
+  So tier 3 becomes an LLM VERDICT ON THE NAME (the model already knows
+  Scrooge and Marley from training -- no live search needed), cached in a
+  PERSISTENT name index so each name is asked once, ever. Tier 4
+  name-frequency stays as the deterministic floor beneath it, keeping the
+  ladder TOTAL when the LLM call fails. This dissolves both review rounds'
+  biggest must-fix (the silent no-op web call): there is no web call. On his
+  "is it not easy to query a search engine?" -- keyless search-engine querying
+  is the fragile part (scraping is blocked/ToS; keyless APIs are thin); the
+  RSS precedent covers feeds because feeds are MEANT to be fetched. The
+  LLM-ask design avoids the whole problem, offline-first.
+  The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING
+  by the standing ruling -- their characters do not exist, so no lookup of
+  any kind applies.
+
 Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
 `HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
 MIRANDA are all correct.
@@ -867,8 +889,9 @@ stated where a default exists; silence keeps the default.
   this up next decides first whether any bank should arm it at all before
   running that measurement. (The measurement itself is no-render work once
   ruled.)
-* **(B) May gender-ladder tiers 3-4 fill ONLY Shakespeare's 32 `unknown` roster
-  rows** (KNOWN rows stay untouchable)? Detail: Section 1.3, final paragraph.
+* **(B) ANSWERED 2026-08-28: YES -- fill only the unknowns.** KNOWN rows stay
+  untouchable. Ruling recorded at the top of Section 1.3 together with the
+  web-tier replacement (LLM decides, cached name index).
 * **(C) LEMMY "Phases 2-4": retire the numbering or recover it.** The phase
   numbering lives only in a gitignored `kibitz-runs/` directory; asking a
   window to "complete Phases 2-4" is not an actionable exit condition. Detail:
