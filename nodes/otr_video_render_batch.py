@@ -333,49 +333,6 @@ def _stamp_audio_motion_profiles(amp_rows):
         log.warning("[OTR_VideoRenderBatch] audio_motion stamp skipped: %s", exc)
 
 
-def _ghost_prompt_owns_motion(shot) -> bool:
-    """True when this shot's lane declares the Ghost prompt capability.
-
-    Those shots carry their motion in an authored drawable leaf stamped at
-    ShotLock, so the optional motion-clause pass has nothing to add and its
-    result would simply be ignored -- while its request would carry the raw
-    dialogue and the cast's real names, which is precisely the boundary Prompt
-    v2 exists to hold. A CAPABILITY read, never an engine-name list.
-    """
-    engine_id = str((shot or {}).get("engine_id") or "")
-    if not engine_id:
-        return False
-    try:
-        from ._otr_video_engines.registry import get_engine, is_registered  # type: ignore
-        from ._otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
-    except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_video_engines.registry import get_engine, is_registered  # type: ignore
-        from _otr_video_engines import ghost_signal_prompt as _gsp  # type: ignore
-    if not is_registered(engine_id):
-        return False
-    return (getattr(get_engine(engine_id), "prompt_profile", None)
-            == _gsp.GHOST_PROMPT_PROFILE)
-
-
-def _assert_writer_released() -> None:
-    """Release any local writer LLM and prove it is gone. LOUD, never silent."""
-    try:
-        from ._otr_model_loader import (  # type: ignore
-            has_local_resident_llm, unload_llm_if_local_resident)
-    except ImportError:  # pragma: no cover -- flat test imports
-        try:
-            from _otr_model_loader import (  # type: ignore
-                has_local_resident_llm, unload_llm_if_local_resident)
-        except ImportError:
-            return
-    unload_llm_if_local_resident()
-    if has_local_resident_llm():
-        raise RuntimeError(
-            "[OTR_VideoRenderBatch] a local writer LLM is STILL resident after "
-            "the motion-clause pass -- refusing to enter run_real_episode "
-            "holding writer weights")
-
-
 class OTRVideoRenderBatch:
     """Registered as ``OTR_VideoRenderBatch``. Walks the model-agnostic render
     loop in-process (NODE_CLASS_MAPPINGS populated). OUTPUT_NODE so it can be the
@@ -575,44 +532,6 @@ class OTRVideoRenderBatch:
         else:
             _rd.validate_and_repair_still_spine(ledger)
         manifest_episode_id = episode_id
-        # Per-beat motion clause (opt-in OTR_LTX_MOTION_CLAUSE=1; default OFF -> no-op,
-        # byte-identical). Pre-render pass: fills ledger['video']['shots'][i]
-        # ['motion_clause'] from each beat's dialogue + cast; render reads it read-only.
-        _mc_enabled = False
-        try:
-            from ._otr_motion_clause import (  # type: ignore
-                enabled as _mc_on, generate_motion_clauses as _mc_gen,
-                make_writer_generate_fn as _mc_fn, make_name_resolver as _mc_names)
-            _mc_enabled = _mc_on()
-            if _mc_enabled:
-                # THE FACTORY IS PASSED UNINVOKED. `_mc_fn()` loads a writer;
-                # calling it here would load one for an all-Ghost episode in
-                # which every shot is skipped and no clause is ever asked for.
-                _mc_counts = _mc_gen(
-                    ledger,
-                    generate_fn_factory=_mc_fn,
-                    skip_shot=_ghost_prompt_owns_motion,
-                    name_resolver=_mc_names(ledger))
-                log.warning("[OTR_VideoRenderBatch] motion_clause: %s",
-                            _mc_counts)
-        except Exception as exc:  # noqa: BLE001 -- never break the render
-            log.warning("[OTR_VideoRenderBatch] motion_clause skipped: %s", exc)
-        # OUTSIDE THE CATCH-ALL, AND THAT PLACEMENT IS THE WHOLE POINT.
-        #
-        # This started life as a `finally:` INSIDE the try above, which put the
-        # release assertion under an `except Exception` whose entire job is to
-        # never break the render. A writer that failed to release would have
-        # been logged as "motion_clause skipped", and the episode would have
-        # walked into `run_real_episode` holding writer weights on a 16 GB card
-        # -- the exact failure the assertion exists to prevent, wearing the
-        # costume of a handled warning. A guard inside the thing that swallows
-        # guards is not a guard.
-        #
-        # Gated on `_mc_enabled` rather than run unconditionally: this pass is
-        # opt-in and OFF in production, and a release on a path that never
-        # loaded anything would be evicting a model some earlier phase owns.
-        if _mc_enabled:
-            _assert_writer_released()
         ep = _rd.run_real_episode(ledger,
                                   master_audio_path=str(master_audio_path or ""))
         # CLIP-FILL Piece 4: move each rendered per-beat clip out of the

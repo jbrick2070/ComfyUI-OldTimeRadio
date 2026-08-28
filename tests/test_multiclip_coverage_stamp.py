@@ -385,20 +385,6 @@ def test_the_whole_video_section_validates_end_to_end():
     assert len(section.execution_groups) == len(groups)
 
 
-def test_the_motion_clause_pass_output_is_accepted_too():
-    """motion_clause is stamped onto the same row by a LATER pass. Ask that
-    pass's own producer for the object rather than transcribing one."""
-    from nodes import _otr_motion_clause as mc
-    from nodes._otr_video_engines.schemas import ShotRow
-
-    clause = mc._clause_obj("", model=mc.GENERATED_MODEL_UNSET, fallback=True,
-                            char_id="c1", beat_id="b001", dialogue="hello")
-    assert isinstance(clause, dict) and clause
-    row = dict(_real_rows()[0])
-    row["motion_clause"] = clause
-    assert ShotRow(**row).motion_clause == clause
-
-
 def test_shotrow_covers_every_key_the_producers_stamp():
     """Mechanical drift guard. B4's field list was derived from the producers
     rather than from the bug report -- which named a beat_id no producer

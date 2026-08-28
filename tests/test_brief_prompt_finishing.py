@@ -420,27 +420,3 @@ def test_no_text_clause_is_counted_before_the_trim_decision():
         assert out.endswith(NO_TEXT_CLAUSE), (pad, out[-30:])
 
 
-def test_a_motion_clause_and_its_steer_both_survive_the_188_budget():
-    """Swept, because the danger band is narrow and a single fixture misses it.
-
-    Pins BOTH halves of the 2026-08-17 composition fix: the story core bids
-    against the clause's real length (so the clause is never truncated), and the
-    core budget is CLAMPED to its default (so a SHORT clause cannot hand the core
-    extra room and overflow the cap from the other direction).
-    """
-    from nodes._otr_story_brief_helpers import (
-        finish_visual_prompt, get_story_brief_ltx,
-    )
-    from nodes._otr_video_engines.render_driver import _MC_JOINER_SLACK
-
-    src = "Mara wheels around and slams the switchboard hard with an open hand " * 4
-    for length in range(40, 131):
-        clause = src[:length].rstrip()
-        core = get_story_brief_ltx(
-            _OK_META, max_chars=max(40, min(90, 188 - length - _MC_JOINER_SLACK)))
-        out = finish_visual_prompt(
-            _OK_META, f"{core}, {clause}, no on-screen text",
-            max_chars=188, style_tail=False, era_profile="still")
-        assert clause in out, ("clause truncated at %d: %r" % (length, out[-40:]))
-        assert out.endswith("no on-screen text"), (length, out[-30:])
-        assert len(out) <= 188, (length, len(out))

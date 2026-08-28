@@ -15,7 +15,6 @@ import copy
 import pytest
 
 import nodes._otr_video_engines  # noqa: F401 -- populate the registry
-from nodes import _otr_motion_clause as mc
 from nodes import otr_shot_lock as sl
 from nodes._otr_video_engines import ghost_signal_author as gsa
 from nodes._otr_video_engines import ghost_signal_prompt as gsp
@@ -406,74 +405,6 @@ def _mc_ledger(engines):
                   for i in range(1, len(engines) + 1)]}
 
 
-def test_an_all_ghost_episode_never_invokes_the_writer_factory(monkeypatch):
-    monkeypatch.setenv(mc.FLAG_ENV, "1")
-    calls = []
-
-    def _factory():
-        calls.append(1)
-        return lambda *a, **k: "turns slowly toward the light"
-
-    from nodes.otr_video_render_batch import _ghost_prompt_owns_motion
-    ledger = _mc_ledger([GHOST, GHOST, GHOST])
-    counts = mc.generate_motion_clauses(
-        ledger, generate_fn_factory=_factory,
-        skip_shot=_ghost_prompt_owns_motion)
-    assert calls == []
-    assert counts["skipped"] == 3
-    assert all("motion_clause" not in s
-               for s in ledger["video"]["shots"])
-
-
-def test_a_mixed_episode_loads_the_writer_once_for_the_eligible_row(monkeypatch):
-    monkeypatch.setenv(mc.FLAG_ENV, "1")
-    calls = []
-
-    def _factory():
-        calls.append(1)
-        return lambda *a, **k: "leans in and turns the lamp away slowly"
-
-    from nodes.otr_video_render_batch import _ghost_prompt_owns_motion
-    ledger = _mc_ledger([GHOST, NON_GHOST, GHOST, NON_GHOST])
-    counts = mc.generate_motion_clauses(
-        ledger, generate_fn_factory=_factory,
-        skip_shot=_ghost_prompt_owns_motion)
-    assert len(calls) == 1
-    assert counts["skipped"] == 2
-    shots = ledger["video"]["shots"]
-    assert "motion_clause" not in shots[0]
-    assert "motion_clause" in shots[1]
-
-
-def test_the_legacy_generate_fn_surface_still_works(monkeypatch):
-    monkeypatch.setenv(mc.FLAG_ENV, "1")
-    ledger = _mc_ledger([NON_GHOST])
-    counts = mc.generate_motion_clauses(
-        ledger, generate_fn=lambda *a, **k: "leans in and turns the lamp away")
-    assert counts["skipped"] == 0
-    assert "motion_clause" in ledger["video"]["shots"][0]
-
-
-def test_node_92_asserts_the_writer_is_released(monkeypatch):
-    from nodes import otr_video_render_batch as node92
-    import nodes._otr_model_loader as ml
-    monkeypatch.setattr(ml, "unload_llm_if_local_resident", lambda: False)
-    monkeypatch.setattr(ml, "has_local_resident_llm", lambda: True)
-    with pytest.raises(RuntimeError, match="STILL resident"):
-        node92._assert_writer_released()
-    monkeypatch.setattr(ml, "has_local_resident_llm", lambda: False)
-    node92._assert_writer_released()
-
-
-def test_the_ghost_skip_predicate_reads_the_capability_not_a_name():
-    from nodes.otr_video_render_batch import _ghost_prompt_owns_motion
-    for engine in (GHOST,):
-        assert _ghost_prompt_owns_motion({"engine_id": engine}), engine
-    assert not _ghost_prompt_owns_motion({"engine_id": NON_GHOST})
-    assert not _ghost_prompt_owns_motion({"engine_id": ""})
-    assert not _ghost_prompt_owns_motion({"engine_id": "not_a_real_engine"})
-
-
 # --------------------------------------------------------------------------- #
 # 7. One beat, one clip, one prompt -- and no workflow change.
 # --------------------------------------------------------------------------- #
@@ -516,60 +447,6 @@ def _calls_named(node, name):
             and n.func.id == name]
 
 
-def test_the_writer_release_is_not_inside_a_catch_all():
-    """A guard inside the thing that swallows guards is not a guard.
-
-    The release assertion first shipped as a `finally:` INSIDE node 92's
-    `except Exception -- never break the render`, so a writer that failed to
-    release would have been logged as "motion_clause skipped" and the episode
-    would have walked into `run_real_episode` holding writer weights. The
-    suite was green through that, which is why this test is structural.
-    """
-    import ast
-    import inspect
-    from nodes import otr_video_render_batch as node92
-
-    tree = ast.parse(inspect.getsource(node92))
-    assert _calls_named(tree, "_assert_writer_released"), \
-        "the release assertion is gone entirely"
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Try):
-            continue
-        broad = any(
-            handler.type is None
-            or (isinstance(handler.type, ast.Name)
-                and handler.type.id in ("Exception", "BaseException"))
-            for handler in node.handlers)
-        if not broad:
-            continue
-        for branch in (node.body, node.handlers, node.finalbody):
-            for stmt in branch:
-                assert not _calls_named(stmt, "_assert_writer_released"), (
-                    "the writer-release assertion sits inside a try whose "
-                    "except swallows Exception -- it would be logged as a "
-                    "handled warning and the render would continue")
-
-
-def test_an_unload_that_raises_still_proves_the_writer_is_gone(monkeypatch):
-    """The raising case is the one MOST likely to have left weights resident."""
-    import nodes._otr_model_loader as ml
-
-    def _boom():
-        raise RuntimeError("teardown exploded")
-
-    monkeypatch.setattr(ml, "unload_llm_if_local_resident", _boom)
-    monkeypatch.setattr(ml, "has_local_resident_llm", lambda: True)
-    warnings = []
-    with pytest.raises(RuntimeError, match="STILL resident"):
-        sl._ghost_unload_writer(warnings)
-    assert any("unload raised" in w for w in warnings)
-
-    monkeypatch.setattr(ml, "has_local_resident_llm", lambda: False)
-    warnings = []
-    sl._ghost_unload_writer(warnings)          # reported, and genuinely gone
-    assert any("unload raised" in w for w in warnings)
-
-
 def test_a_deterministic_leaf_never_collides_with_a_replayed_one():
     """Uniqueness is a property of the EPISODE, not of one authoring call."""
     specs = _plan()[1]
@@ -587,9 +464,3 @@ def test_a_deterministic_leaf_never_collides_with_a_replayed_one():
     assert len(set(rest.values())) == len(rest)
 
 
-def test_the_lazy_writer_load_appears_exactly_once():
-    """It was duplicated once by a patch whose OLD text was inside its NEW."""
-    import inspect
-    src = inspect.getsource(mc.generate_motion_clauses)
-    assert src.count("generate_fn = generate_fn_factory()") == 1
-    assert src.count("factory_pending = False") == 1

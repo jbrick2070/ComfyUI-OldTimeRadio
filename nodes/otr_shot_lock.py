@@ -141,16 +141,12 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
     if not base:
         name = entry.get("name")
         base = str(name) if name else ""
-    # Outfit LOCK (opt-in OTR_OUTFIT_LOCK=1; default OFF -> base unchanged). The writer's
-    # description carries no clothing, so FLUX drifts the outfit per beat. When ON, the
-    # wardrobe is LLM-generated from the character + story brief and locked per character.
-    # Import is guarded (a missing module never breaks appearance), but a WardrobeError is
-    # allowed to propagate LOUD by design (operator: no silent generic fallback).
-    try:
-        from ._otr_wardrobe import apply_wardrobe
-    except Exception:  # noqa: BLE001 -- module absent -> no wardrobe, appearance unchanged
-        return base
-    base = apply_wardrobe(base, char_id, ledger)
+    # The opt-in outfit LOCK was ripped 2026-08-27 (operator: "outfits yeah i
+    # didnt even know we had outfits"). It was `OTR_OUTFIT_LOCK`, default OFF
+    # and set by no profile or launcher, so it never once ran -- and its call
+    # site was already guarded to return this same `base` untouched whenever
+    # the module was absent. Removing it is byte-identical by that guard's own
+    # design; appearance has always been exactly what the writer described.
     return base
 
 
@@ -984,7 +980,7 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     # asked for a "restrained facial expression", which told the writer to
     # keep the body still -- on lanes whose entire value is motion. The
     # scale-to-the-line language below is deliberately the same contract as
-    # `_otr_motion_clause.build_clause_messages` (its 2026-08-17 kinetic
+    # the ripped `_otr_motion_clause.build_clause_messages` (its kinetic
     # amendment), so the two derivation paths cannot drift apart in spirit.
     lines = [
         "You are a film director working on a SILENT shot. For EACH beat "

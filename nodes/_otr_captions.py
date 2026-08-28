@@ -30,9 +30,9 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
     reason the ledger keeps the line as written rather than stripping it
     upstream. It feeds (a) the still-image prompt
     (``otr_meta_brief_image_prompt.py:1313``), (b) the MOTION CLAUSE that
-    directs i2v video -- ``_otr_motion_clause._line_text_index`` reads raw
+    directs i2v video -- the ripped ``_otr_motion_clause`` pass read raw
     ``lines[].text`` and hands it to ``build_clause_messages``, under the
-    standing operator directive recorded at ``_otr_motion_clause.py:47``
+    standing operator directive (recorded in that ripped module, and kept
     ("the line drives the motion") -- and (c) the HUD / full-script print
     (``video_engine.py:1311`` and ``:1962``). Stripping direction out of
     ``lines[].text`` would quietly degrade stills AND motion, so it stays.

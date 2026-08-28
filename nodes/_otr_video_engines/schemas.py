@@ -423,6 +423,10 @@ class ShotRow(_Forbid):
     #: for a lane that actually consumes a still. Empty == none owed.
     jump_still_requests: list[dict] = Field(default_factory=list)
     #: The per-beat motion clause object (text/model/fallback/source_hash).
+    #: LEGACY-ONLY as of 2026-08-27. The opt-in pass that wrote this was
+    #: ripped (it was default OFF and set by no profile, so no shipped ledger
+    #: outside a deliberate experiment carries it). The field is KEPT so an old
+    #: ledger that does carry it still validates; nothing writes or reads it.
     motion_clause: Optional[dict] = None
     #: Whether this shot's engine has a render ceiling a beat can OVERFLOW, as
     #: ``frame_contract.can_split`` answered it AT FREEZE TIME (no-mirror 7.3).

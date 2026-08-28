@@ -363,7 +363,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: Prompt v2 (2026-08-22) that authority is the DRAWABLE LEAF stamped on the
     #: durable row by ShotLock -- one authored visual per beat, carrying the
     #: movement -- and this lane is explicitly excluded from the optional
-    #: `_otr_motion_clause` pass, whose result it would ignore. Declared rather
+    #: ripped `_otr_motion_clause` pass, whose result it ignored. Declared rather
     #: than inferred because G3.7 asks the lane, not the reader.
     motion_source = "ledger_ghost_drawable_beat"
 
