@@ -93,22 +93,27 @@ All of this is provable by the suite, a scoped review, or an offline read.
 One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
-**THE CODING ORDER (2026-08-28, operator-set: the 4060 frictionless test is
-what he is excited about; everything else serves it or follows it):**
+**THE CODING ORDER (2026-08-28, operator-set and REORDERED the same day on
+his instruction: the 4060 set moves LAST -- "I don't want to test [the] 4060
+until we are done with all other bugs." The 4060 test is the CAPSTONE: it
+runs once, on a tree with every other bug already closed, so the frictionless
+verdict is not polluted by known-open defects):**
 
 1. **Judge the sanctioned-gap r2 panel and CODE it** (1.1 -- plan written,
    all three reviews returned, awaiting the driver's judgment). Closes the
    control path AND the only surviving LEMMY-era PBUG (-02).
-2. **The 4060 frictionless set** (1.0 below) -- small, verified, and the
-   gate on the registry republish he will trigger.
-3. **Spandrel `_resolve_model` hardening** (1.5) -- repro first; fix only if
+2. **Spandrel `_resolve_model` hardening** (1.5) -- repro first; fix only if
    reproducible; one finished-diff review.
-4. **Gender-ladder SPEC REWRITE** (1.3 -- now fully unblocked: both operator
+3. **Gender-ladder SPEC REWRITE** (1.3 -- now fully unblocked: both operator
    rulings recorded at its head).
-5. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process, no ComfyUI).
+4. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process, no ComfyUI).
+5. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
+   republish sequence it gates: operator's node-delete click -> version bump
+   + kokoro in pyproject in ONE commit -> clean publish -> the 4060 template
+   test.
 6. Handoff bookkeeping.
 
-### 1.0 THE 4060 FRICTIONLESS SET (operator priority -- the path to "download the template, click run" on his 4060)
+### 1.0 THE 4060 FRICTIONLESS SET (the CAPSTONE -- runs LAST, after every other bug closes; the path to "download the template, click run" on his 4060)
 
 Four small items, all verified against the tree on 2026-08-28, plus one trap:
 
