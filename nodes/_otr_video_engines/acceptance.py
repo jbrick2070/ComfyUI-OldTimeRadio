@@ -29,6 +29,7 @@ Pure and stdlib-only. UTF-8, no BOM, ASCII-only.
 from __future__ import annotations
 
 
+
 #: One acceptance failure. Plain dicts rather than a class so the findings
 #: survive JSON round-trip into a receipt without a codec.
 def _finding(rule, shot_id, detail):
@@ -524,6 +525,21 @@ def grade_delivered(ledger, manifest):
         if not target:
             continue                       # renders nothing; owes nothing
         row = rows.get(shot_id)
+        if row is not None and str(row.get("status") or "") == "sanctioned_gap":
+            # C6 (2026-08-28): a SANCTIONED gap is not a missing clip.
+            #
+            # The status string is compared LITERALLY rather than through
+            # ``_otr_shared.still_receipt``, because this module is required to
+            # import nothing but ``__future__`` -- a ratified rule with its own
+            # structural test, so that the grader CANNOT consult live routing
+            # state. Reading a field off the manifest row it was handed is
+            # exactly what it is allowed to do; importing the constant is not.
+            # The image model refused this beat's required still and the
+            # operator's ruling is that the episode continues without it. A
+            # checker that reports the sanctioned outcome as a defect is a
+            # checker that gets ignored -- and an ignored grader catches
+            # nothing at all. The UNsanctioned absence below still reports.
+            continue
         if row is None or not row.get("exists"):
             findings.append(_finding(
                 RULE_MISSING_CLIP, shot_id,

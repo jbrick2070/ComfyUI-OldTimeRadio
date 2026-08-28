@@ -208,7 +208,13 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     by_role: dict[str, dict[str, int]] = {}
     per_clip: list = []
     receipts_by_engine: dict[str, list] = {}
+    # Siblings are imported inside the function here, matching this module's
+    # own import-isolation idiom.
+    from ._otr_shared import still_receipt as _receipt
     sanctioned_gap_shot_ids: list = []
+    # Undelivered WITHOUT a sanction: a real fault, kept apart so the success
+    # predicate can tell a refused beat from a broken one.
+    unsanctioned_gap_shot_ids: list = []
     for clip in (manifest or {}).get("clips") or []:
         if not _clip_delivered_motion(clip):
             # The beat is a real fact about the episode, so it leaves this loop
@@ -219,7 +225,22 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # name here is the precise move that produced the wrong receipt.
             # The plan stays recoverable from the ledger's own video section,
             # which is where a plan belongs; a receipt records delivery.
-            sanctioned_gap_shot_ids.append(str(clip.get("shot_id") or "?"))
+            # C5 (2026-08-28): AN ABSENCE IS NOT A SANCTION.
+            #
+            # This branch used to sweep EVERY undelivered row into the
+            # sanctioned-gap list, which was correct only while no gap row
+            # could arrive -- nothing upstream could mint one, so the only way
+            # to land here was this accounting's own path. Now that a refusal
+            # mints an explicit status, three different things reach this
+            # branch: a model refusal (sanctioned), a vanished clip, and a
+            # render that never ran. Counting them alike would let a crashed
+            # episode report itself publishable-degraded, which is precisely
+            # the laundering this control path exists to prevent.
+            if _receipt.is_sanctioned_gap(clip):
+                sanctioned_gap_shot_ids.append(str(clip.get("shot_id") or "?"))
+            else:
+                unsanctioned_gap_shot_ids.append(
+                    str(clip.get("shot_id") or "?"))
             continue
         role = str(clip.get("role") or "?")
         eng = str(clip.get("engine_id") or "?")
@@ -268,6 +289,8 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
         # auditing a refusal needs to tell those apart.
         "sanctioned_gap_count": len(sanctioned_gap_shot_ids),
         "sanctioned_gap_shot_ids": sanctioned_gap_shot_ids,
+        "unsanctioned_gap_count": len(unsanctioned_gap_shot_ids),
+        "unsanctioned_gap_shot_ids": unsanctioned_gap_shot_ids,
     }
 
 
@@ -555,8 +578,31 @@ class OTRVideoRenderBatch:
             log.warning("[OTR_VideoRenderBatch] LTX prompt diversity FAILED: "
                         "%s brief-composed prompts all identical (%s)",
                         diversity.get("n"), diversity.get("sha8s"))
+        # C4 (2026-08-28): SUCCESS IS "EVERY BEAT IS ACCOUNTED FOR", not
+        # "at least one clip exists".
+        #
+        # The old predicate could not express the operator's 2026-08-27 ruling
+        # that an all-refused episode still PUBLISHES: with every beat
+        # sanctioned, ``clip_count`` is legitimately 0 and the episode reported
+        # FAILURE. Nor could it catch the opposite error -- a render that
+        # delivered one clip and silently lost eight others passed, because one
+        # was more than none.
+        #
+        # Both are the same missing idea: a beat is accounted for when it was
+        # DELIVERED or when its absence was SANCTIONED. Anything else is an
+        # unexplained hole and the episode is not ok. ``degraded`` then carries
+        # the ruling's other half -- publishable, but never reported clean.
+        from ._otr_shared import still_receipt as _receipt
+        _clips = manifest.get("clips") or []
+        _sanctioned = sum(1 for c in _clips if _receipt.is_sanctioned_gap(c))
+        _delivered_n = sum(1 for c in _clips if (c or {}).get("exists"))
+        _unaccounted = len(_clips) - _delivered_n - _sanctioned
         report = {
-            "ok": manifest["clip_count"] > 0, "mode": "episode",
+            "ok": bool(_clips) and _unaccounted == 0,
+            "degraded": _sanctioned > 0,
+            "sanctioned_gap_count": _sanctioned,
+            "unaccounted_beat_count": _unaccounted,
+            "mode": "episode",
             "episode_id": manifest_episode_id, "n_beats": manifest["n_beats"],
             "clip_count": manifest["clip_count"],
             "engine_histogram": manifest["engine_histogram"],

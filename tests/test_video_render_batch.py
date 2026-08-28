@@ -46,7 +46,12 @@ from nodes import otr_credits_roll as cr  # noqa: E402
 #: ledger that never looked", which is the distinction the whole receipt is for.
 _PAYLOAD_KEYS = {"histogram", "video_revision", "by_role", "vram_peak_mb",
                  "per_clip", "by_engine", "sanctioned_gap_count",
-                 "sanctioned_gap_shot_ids"}
+                 "sanctioned_gap_shot_ids",
+                 # Added 2026-08-28 with the sanction/absence split: an
+                 # undelivered beat with no sanction is a FAULT and is
+                 # reported under its own name, never folded into the gap
+                 # count.
+                 "unsanctioned_gap_count", "unsanctioned_gap_shot_ids"}
 
 
 def _delivered(shot_id, engine_id, role="character_visual", **over):
@@ -60,9 +65,29 @@ def _delivered(shot_id, engine_id, role="character_visual", **over):
 
 def _gap(shot_id, engine_id, role="character_visual", **over):
     """A SANCTIONED GAP row: the beat was planned and its engine named, and
-    nothing was rendered. ``build_clip_manifest`` stamps exactly this -- the
-    planned ``engine_id`` survives on the row, which is precisely why the
-    accounting cannot read the row's engine as evidence of delivery."""
+    the image model REFUSED its required still, so nothing was rendered.
+    ``build_clip_manifest`` stamps exactly this -- the planned ``engine_id``
+    survives on the row, which is precisely why the accounting cannot read the
+    row's engine as evidence of delivery.
+
+    ``status`` IS THE SANCTION, and it is why this fixture changed on
+    2026-08-28. It used to be an absent row with no status, because at that
+    time absence was the only way a gap could exist and the accounting inferred
+    the sanction from it. Once a refusal could mint an explicit row, that
+    inference became a bug: a vanished clip and a refused one are both absent,
+    and treating them alike would let a crashed render publish as degraded.
+    A gap now DECLARES itself -- see ``_absent_unsanctioned`` for the other
+    kind, which must never be counted as a gap.
+    """
+    row = {"shot_id": shot_id, "role": role, "engine_id": engine_id,
+           "path": "", "exists": False, "status": "sanctioned_gap"}
+    row.update(over)
+    return row
+
+
+def _absent_unsanctioned(shot_id, engine_id, role="character_visual", **over):
+    """An undelivered row with NO sanction -- a vanished clip or a render that
+    never ran. The distinction this whole receipt exists to make."""
     row = {"shot_id": shot_id, "role": role, "engine_id": engine_id,
            "path": "", "exists": False}
     row.update(over)
@@ -261,3 +286,33 @@ def test_the_cadence_receipts_still_ride_a_delivered_row():
     row = p["per_clip"][0]
     assert row["cadence_mode"] == "native" and row["cadence_tail_trim"] == 2
     assert "cadence_source_frame_count" not in row
+
+
+# --------------------------------------------------------------------------- #
+# C5: a sanction and an absence are different facts (2026-08-28)
+# --------------------------------------------------------------------------- #
+
+def test_an_unsanctioned_absent_clip_is_NOT_counted_as_a_sanctioned_gap():
+    """The guard rail on the whole control path.
+
+    If this ever fails, a crashed render is being reported as a publishable
+    degraded episode -- the exact laundering the 2026-08-28 review panel
+    caught in the first draft of this work.
+    """
+    payload = _payload(_delivered("s1", "ltx_video"),
+                       _absent_unsanctioned("s2", "ltx_video"))
+    assert payload["sanctioned_gap_count"] == 0
+    assert payload["unsanctioned_gap_count"] == 1
+    assert payload["unsanctioned_gap_shot_ids"] == ["s2"]
+
+
+def test_the_two_kinds_of_absence_are_counted_apart():
+    payload = _payload(_delivered("s1", "ltx_video"),
+                       _gap("s2", "ltx_video"),
+                       _absent_unsanctioned("s3", "ltx_video"))
+    assert payload["sanctioned_gap_count"] == 1
+    assert payload["sanctioned_gap_shot_ids"] == ["s2"]
+    assert payload["unsanctioned_gap_count"] == 1
+    assert payload["unsanctioned_gap_shot_ids"] == ["s3"]
+    # And neither is ever mistaken for a delivery.
+    assert list(payload["per_clip"]) == ["s1"] or len(payload["per_clip"]) == 1

@@ -316,7 +316,17 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     sysd = _sys_specs()
     frames = manifest.get("total_target_frames")
     fps = manifest.get("fps")
-    clip_count = manifest.get("clip_count") or len(manifest.get("clips") or [])
+    # C6 (2026-08-28): KEY PRESENCE, NOT TRUTHINESS.
+    #
+    # ``or`` treats a legitimate ZERO as "absent" and falls through to the row
+    # count -- so an all-refused episode, whose ``clip_count`` is honestly 0,
+    # would print "N clips" on its own credits card, counting beats that were
+    # never rendered. The fallback exists for OLD manifests that predate the
+    # key, so it must test for the key rather than for a truthy value.
+    if "clip_count" in (manifest or {}):
+        clip_count = manifest.get("clip_count")
+    else:
+        clip_count = len(manifest.get("clips") or [])
     seed = (meta.get("cast_contract") or {}).get("cast_seed",
                                                  meta.get("episode_seed"))
     if seed is None:

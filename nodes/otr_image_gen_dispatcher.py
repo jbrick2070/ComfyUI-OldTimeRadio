@@ -39,6 +39,7 @@ log = logging.getLogger("OTR")
 from ._otr_shared import gpu_residency as _lease
 from ._otr_shared import portrait_ledger as _pl
 from ._otr_shared import role_slots as _role_slots
+from ._otr_shared import still_receipt as _receipt
 # Cold-import clean: route_freeze is stdlib-only at module scope.
 from ._otr_shared.route_freeze import RouteFreezeError as _RouteFreezeError
 from ._otr_story_brief_helpers import (
@@ -1829,17 +1830,36 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             str(row.get("object_id") or "")
             for row in ep_rows if isinstance(row, dict)
         }
+        # Identity keys for a refused target: the gap row must carry the same
+        # kind/role/beat_id an ``ok`` row would, and the missing-target record
+        # does not keep them.
+        targets_by_object = {
+            str(tgt["object_id"]): tgt for tgt in required_scene_targets
+            if isinstance(tgt, dict) and tgt.get("object_id")}
         missing_targets = []
         for target in required_scene_targets:
             oid = str(target["object_id"])
             row = rows_by_object.get(oid)
             path = str((row or {}).get("path") or "")
-            if not row or not path or not os.path.isfile(path):
+            # THE FRESHNESS TEST BELONGS ON BOTH BRANCHES (2026-08-28). It used
+            # to run only inside the missing branch, to label a status -- so an
+            # INHERITED row whose file still happened to exist on disk took the
+            # success path and was stamped a CURRENT receipt, even when this
+            # dispatch's request for that very target had been refused. The
+            # stale row masked the fresh refusal, and every reader downstream
+            # believed a still existed for a beat that never got one. Cache
+            # reuse is unaffected: a cache HIT appends its row to ``ep_rows``
+            # (see the reuse branch above), so a legitimately reused image is
+            # in ``this_dispatch_ids`` like any freshly rendered one.
+            stale = oid not in this_dispatch_ids
+            if not row or not path or not os.path.isfile(path) or stale:
                 # ONE deterministic status per target, so logs and tests can
                 # assert on it instead of parsing a sentence.
                 if not row:
                     status = "no_row"
-                elif oid not in this_dispatch_ids:
+                elif stale:
+                    # Covers both the file-absent and the file-PRESENT stale
+                    # row; the latter is the mask described above.
                     status = "historical_row_only"
                 else:
                     # Row was appended this dispatch but its file is empty or
@@ -1852,6 +1872,11 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 continue
             required_target_receipt.append({
                 "object_id": oid,
+                # DECLARED, never inferred (2026-08-28). Every row says what it
+                # is, so no reader downstream has to conclude "no path, so it
+                # must have been refused" -- an inference that cannot tell a
+                # sanctioned refusal from a crashed render.
+                "status": _receipt.STATUS_OK,
                 "kind": str(target.get("kind") or ""),
                 "role": str(target.get("role") or ""),
                 "beat_id": str(target.get("beat_id") or ""),
@@ -1872,7 +1897,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # is substituted and nothing is silent.
         refused_targets = [
             m for m in missing_targets
-            if str(((m.get("evidence") or {}).get("reason") or "")) == "model_refusal"]
+            if str(((m.get("evidence") or {}).get("reason") or ""))
+            == _receipt.SANCTIONABLE_SKIP_REASON]
         if refused_targets:
             missing_targets = [m for m in missing_targets
                                if m not in refused_targets]
@@ -1884,6 +1910,40 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "(engine=%s seed=%s). prompt=%r",
                     miss.get("object_id"), ev.get("engine_id"), ev.get("seed"),
                     ev.get("prompt"))
+                # THE ROW THE WHOLE CONTROL PATH WAS MISSING (2026-08-28).
+                # Until now a tolerated refusal was logged and then dropped:
+                # ``skip_evidence_by_oid`` is function-local and dies with this
+                # call, and the target never entered the receipt. So the ledger
+                # recorded a refusal NOWHERE, the still-spine validator later
+                # found no materialized still and killed the episode, and a
+                # 30-minute render died for a blemish the operator had already
+                # ruled survivable. The row below is the evidence every reader
+                # downstream needs, and it is stamped at the one place that
+                # actually knows the refusal happened.
+                #
+                # NO PATH AND NO CONTENT HASH, deliberately: nothing was
+                # produced, and a gap row carrying a path would let a reader
+                # believe an image exists. The identity keys match an ``ok``
+                # row exactly so the two join on the same fields.
+                gap_target = targets_by_object.get(miss.get("object_id")) or {}
+                required_target_receipt.append({
+                    "object_id": str(miss.get("object_id") or ""),
+                    "status": _receipt.STATUS_SANCTIONED_GAP,
+                    "kind": str(gap_target.get("kind") or ""),
+                    "role": str(gap_target.get("role") or ev.get("role") or ""),
+                    "beat_id": str(gap_target.get("beat_id") or ""),
+                    "reason": str(ev.get("reason") or ""),
+                    "engine_id": str(ev.get("engine_id") or ""),
+                    "seed": ev.get("seed"),
+                    # The FULL prompt is kept, not just its hash: it is the
+                    # 2026-08-22 refusal diagnostic and the existing refusal
+                    # tests assert on it. The hash rides along for cheap
+                    # equality checks against the request that was sent.
+                    "prompt": ev.get("prompt"),
+                    "prompt_hash": ev.get("prompt_hash"),
+                    "detail": str(ev.get("detail") or ev.get("excerpt") or ""),
+                    "image_revision": rev,
+                })
         if missing_targets:
             # THE RAISE CARRIES ITS OWN EVIDENCE (2026-08-04). It used to report
             # only the object ids, while the reason sat in ``warnings`` -- which

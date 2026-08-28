@@ -33,6 +33,7 @@ import tempfile
 import time
 
 from .._otr_shared import retry_taxonomy as _rt
+from .._otr_shared import still_receipt as _receipt
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
 from .._otr_speaker_role import (
     SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
@@ -823,6 +824,55 @@ def _still_spine_manifest_object_ids(images):
     }
 
 
+def sanctioned_gap_beat_ids(ledger):
+    """Beat ids whose required still was REFUSED by the image model.
+
+    ONE PREDICATE, TWO CALL SITES (2026-08-28). The still-spine validator uses
+    it to decline to raise, and ``run_episode`` uses it to decline to render.
+    Those two decisions must never disagree: a beat the validator waves
+    through but the loop still tries to render would die in
+    ``cheap_families.render_clip`` on the same missing file, one layer later
+    and with a worse message.
+
+    Read from the RECEIPT, never from the absence of an image row. A beat with
+    no still and no gap row is an unexplained absence and must keep failing --
+    that distinction is the entire point of the sanctioned-gap work, and
+    inferring a gap from absence is the defect the 2026-08-28 review panel
+    caught in the first draft.
+
+    WHOLE-SHOT RULE: one refused target gaps its whole beat. A beat can own a
+    scene still plus several jump-segment stills; rendering it with some of
+    them missing would produce a clip that silently drops coverage, so the
+    beat is floored in full instead.
+    """
+    receipt = ((ledger.get("images") or {}).get("required_scene_targets"))
+    if not isinstance(receipt, list):
+        return set()
+    return {
+        str(row.get("beat_id") or "")
+        for row in receipt
+        if _receipt.is_sanctioned_gap(row) and row.get("beat_id")
+    }
+
+
+def sanctioned_gap_object_ids(ledger):
+    """Object ids of refused targets -- used to IGNORE stale image rows.
+
+    A refusal leaves no new file, but a PRIOR revision's file for the same
+    object can still be sitting on disk and in ``ledger["images"]["images"]``.
+    Without this, ``_still_spine_row_for_beat`` would hand back that stale row
+    and the spine would validate a still this dispatch never produced.
+    """
+    receipt = ((ledger.get("images") or {}).get("required_scene_targets"))
+    if not isinstance(receipt, list):
+        return set()
+    return {
+        str(row.get("object_id") or "")
+        for row in receipt
+        if _receipt.is_sanctioned_gap(row) and row.get("object_id")
+    }
+
+
 def _still_spine_requires_scene(shot, engine_id, family):
     # CORRECTED 2026-08-12 (lane 20 QA). An earlier draft of this comment said
     # `minimax_h3_audio_in` was "deliberately NOT in this list" and therefore
@@ -1084,7 +1134,25 @@ def validate_and_repair_still_spine(ledger):
     rows = _still_spine_image_rows(ledger)
     shots = [shot for shot in ((ledger.get("video") or {}).get("shots") or [])
              if isinstance(shot, dict)]
+    # Drop image rows for REFUSED objects before any lookup: a prior
+    # revision's file for the same object can still be on disk, and
+    # ``_still_spine_row_for_beat`` is last-row-wins with no notion of status,
+    # so a stale row would otherwise validate a still this dispatch never
+    # produced. Computed here because ``rows`` feeds every lookup below.
+    _gap_objects_early = sanctioned_gap_object_ids(ledger)
+    if _gap_objects_early:
+        rows = [r for r in rows
+                if str((r or {}).get("object_id") or "")
+                not in _gap_objects_early]
     manifest_ids = _still_spine_manifest_object_ids(images)
+    # SANCTIONED GAPS ARE NOT MISSING STILLS (2026-08-28). A model refusal is
+    # recorded in the receipt as an explicit gap row, and the operator's
+    # 2026-08-22 ruling says the episode continues without that card. Before
+    # this, the refusal reached here as an ABSENCE and the per-shot raises
+    # below killed the whole episode -- which is how a 30-minute render died
+    # for one declined image. These beats are skipped here and skipped again
+    # in ``run_episode``; nothing is substituted and nothing is silent.
+    gap_beats = sanctioned_gap_beat_ids(ledger)
     # Audio-reactive visualizers and portrait-only face lanes deliberately do
     # not consume scene stills.  Their image phase can therefore have no
     # required_scene_targets receipt at all.  Require the producer-owned target
@@ -1121,6 +1189,20 @@ def validate_and_repair_still_spine(ledger):
             engine_id and _vreg.is_registered(engine_id)
             and getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder", False)
         )
+        if beat_id in gap_beats:
+            # Skipped WHOLE, before any materialize attempt: the mesh, scene
+            # and jump-segment checks below all raise on an absent file, and
+            # this beat is absent by sanction rather than by fault. It is not
+            # appended to ``validated`` either -- it delivered nothing, and a
+            # validation record claiming otherwise would be the same lie the
+            # gap row exists to prevent.
+            _LOG.warning(
+                "[OTR.render_driver] SANCTIONED GAP beat %s (shot %s): the "
+                "image model "
+                "refused its required still; the still spine accepts this "
+                "and the beat will be floored rather than rendered.",
+                beat_id, shot.get("shot_id"))
+            continue
         scene_row = _still_spine_row_for_beat(rows, beat_id)
         if requires_mesh:
             fodder_row = _still_spine_row_for_mesh(rows, beat_id, char_id)
@@ -4589,7 +4671,37 @@ def run_episode(ledger, *, oom_shot_id=None,
                          engine_id, _exc)
 
     try:
+        # Beats whose required still the image model REFUSED. Read once, not
+        # per beat: the receipt is frozen by the time the render starts.
+        _gap_beats = sanctioned_gap_beat_ids(ledger)
         for shot in section["shots"]:
+            # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
+            #
+            # HERE is load-bearing. The obvious place looks like the request
+            # builder, but ``build_request_from_shot`` returns a REQUEST, not a
+            # shot, and on the cheap families a missing still does not even
+            # raise there -- it logs and sets ``init_image=""``, and the raise
+            # lands later in ``cheap_families.render_clip``. Skipping at the
+            # top of the loop is the only point that precedes BOTH the engine
+            # scope and every raise site, so a beat nobody will render also
+            # never loads an engine's weights.
+            #
+            # The ORIGINAL ShotLock shot is kept, not a synthesized stand-in:
+            # the beat is a real fact about the episode and it keeps its id,
+            # role, family, position and frame budget. What it does not get is
+            # a clip -- ``build_clip_manifest`` derives existence from the clip
+            # file, so the manifest row comes out absent on its own, and the
+            # composite's existing floor-fill covers the hole. Nothing is
+            # substituted and nothing is silent: the gap row in the receipt is
+            # the record, and the warning below is the log.
+            if str(shot.get("beat_id") or "") in _gap_beats:
+                _LOG.warning(
+                    "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
+                    "rendered -- the image model refused its required still. "
+                    "The beat keeps its place in the timeline and is floored.",
+                    shot.get("shot_id"), shot.get("beat_id"))
+                new_shots.append(shot)
+                continue
             # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
             # DIFFERENT engine than the one the prior beat left resident, drain the
             # prior engine's residue and FLUSH the allocator, so two heavy engines
@@ -5307,6 +5419,18 @@ def check_ltx_open_health(manifest, *, strict=None):
         eid = str(row.get("engine_id") or "")
         if eid in _LTX_OPEN_ENGINES and row.get("exists"):
             continue                      # healthy: a real LTX open clip
+        if _receipt.is_sanctioned_gap(row):
+            # C6 (2026-08-28): a SANCTIONED open beat is not a health failure.
+            # This check hunts an open that fell to the procgen/still floor
+            # when an LTX engine was expected -- a wiring fault. An opener
+            # whose required still the model refused never had an engine to
+            # fall from, and the operator's ruling says that episode still
+            # publishes; raising here in strict mode would contradict it.
+            _LOG.warning(
+                "[OTR.render_driver] LTX-OPEN: radio-open beat %s was "
+                "SANCTIONED (the image model refused its still) -- floored by "
+                "design, not a health failure.", bid or row.get("shot_id"))
+            continue
         bad.append({"shot_id": row.get("shot_id"), "beat_id": bid,
                     "role": role, "engine_id": eid,
                     "exists": bool(row.get("exists"))})
@@ -5713,6 +5837,8 @@ def build_clip_manifest(result, *, episode_id=""):
     rows = []
     total = 0
     hist = {}
+    # Read once per manifest, from the receipt -- see the row's own note.
+    _gap_beats_for_manifest = sanctioned_gap_beat_ids(led)
     for order, shot in enumerate(shots):
         sid = shot.get("shot_id")
         clip = clips.get(sid) or {}
@@ -5750,6 +5876,17 @@ def build_clip_manifest(result, *, episode_id=""):
         row = {
             "order": order, "shot_id": sid, "beat_id": bid,
             "engine_id": eid,
+            # C3 (2026-08-28): the sanction travels to the CONSUMERS.
+            # ``timeline_quality_report`` and node 92's success predicate both
+            # read ``manifest["clips"]`` and never see ``video.shots``, so
+            # without this projection a refused beat and a crashed one are the
+            # same absent row to every reader downstream -- and counting them
+            # alike is what would let a broken render publish as "degraded".
+            # Stamped ONLY when the receipt says so; never inferred from the
+            # missing file.
+            "status": (_receipt.STATUS_SANCTIONED_GAP
+                       if bid in _gap_beats_for_manifest
+                       else _receipt.STATUS_OK),
             "role": str(shot.get("role") or ""),
             "family": clip.get("family") or shot.get("family") or "",
             "path": path,
