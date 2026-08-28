@@ -2117,6 +2117,17 @@ def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
 _LTX25_FRAMING = ("full face clearly visible, generous headroom, "
                   "the subject in real motion")
 
+#: THE FOLEY LANE GETS ITS OWN FRAMING, and the reason is the joint latent.
+#: `ltx25_foley_plus` decodes audio and video TOGETHER, so what the picture
+#: shows is also an audio instruction: a face-forward portrait asks for a voice
+#: to go with the face just as surely as the word "speech" does. This leads with
+#: the SOUND SOURCE -- the hands, the object, the contact -- and simply does not
+#: mention the face or the mouth, positively or negatively. Saying "mouth
+#: closed" would put the mouth back in the conditioning.
+_LTX25_FOLEY_FRAMING = ("hands and the objects they touch held clearly in "
+                        "frame, the subject shown working, the subject in "
+                        "real motion")
+
 
 def _ltx25_parts(inputs):
     """Subject, setting, expression, motion, then camera LAST.
@@ -2180,7 +2191,7 @@ def compose_ltx25_foley_plus(self, inputs):
     if not core:
         return _ltx25_legacy(inputs)
     return ("%s, working the objects within reach so every movement has a "
-            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
+            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FOLEY_FRAMING))
 
 
 def compose_ltx25_mime(self, inputs):
