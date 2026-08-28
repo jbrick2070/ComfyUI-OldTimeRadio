@@ -1515,3 +1515,146 @@ nothing else.
 snapshot `C:\Users\jeffr\AppData\Local\Temp\otr-speak-act-kibitz-20260826-2125`
 must still not be deleted; what it now owes is the live proof in the row below,
 not more code.
+
+---
+
+## CLOSED 2026-08-28 -- foley audibility, the voice-bleed fix, and the LTX 2.5 foley+mime qualification window
+
+Archived verbatim from the top of GO_FORWARD_PLAN.md. Both rows are now resolved: see PBUG-20260827-03 and PBUG-20260828-01 in `docs/PROD_BUG_LOG.md` for the closing receipts, and the live queue described in the replacement row for the six-leg listening proof still in flight when this was archived.
+
+### >>> TAKE THIS FIRST: MAKE THE FOLEY BED AUDIBLE <<<
+
+**OPERATOR, 2026-08-27, after listening: *"I think foley is our biggest gap
+now."* That settles the order -- this row is above everything else.**
+
+**THE BED IS MIXED, LEVELLED, GREEN ON EVERY RECEIPT, AND INAUDIBLE.**
+PBUG-20260827-03, Bible `12.137`. Published episode
+`signal_lost_ink_and_martyrdom_20260827_071626`. Measured: the bed sits
+**37-58 dB under the programme, median 45** (audible is 15-25 under).
+
+**THE CAUSE, and it is one line of code.**
+`FOLEY_LANE_GAINS['ltx25_foley_plus'] = (0.20, 0.80)` in
+`nodes/_otr_video_engines/foley_stems.py` is a BARE MULTIPLIER on stems whose
+level is never measured. LTX 2.5 emits foley at **-30 to -55 dBFS RMS**, so
+0.20 subtracts another 14 dB from something already inaudible.
+
+**ALREADY RULED OUT, with evidence -- do not re-derive:** the mux ran (the two
+masters differ; the mp4 carries AAC 48 kHz stereo); the video DID generate audio
+(every stem carries signal, loudest peak -12.8 dBFS); it was the right engine on
+all 12 beats. **And the A/B that settles it: `ltx25_mime` at gain 1.00, on
+equally quiet stems, published the same day and the operator said *"sounds
+great."*** Same engine, same mux, same stem levels -- only the gain differs.
+
+**THE DECISION THAT BLOCKS THE FIX, AND IT IS THE OPERATOR'S.** A single larger
+constant CANNOT work: the stems span 21.2 dB RMS, so a value that lifts the
+quietest puts the loudest forward of the dialogue. Both panel lanes (Codex
+`gpt-5.6-sol`, Cursor Grok 4.6 High) converged on referencing each stem before
+applying the ratio -- which **RULING 2 forbids by name**
+(`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`: *"The foley stem gets no
+normalization pass of its own"*). That ruling was made before anyone knew the
+stems arrive 30-55 dB down. **Amend it or the bed stays inaudible; there is no
+third option that respects it as written.**
+
+**THE OPERATOR'S OWN HYPOTHESIS, WORTH TESTING FIRST BECAUSE IT IS FREE.**
+*"Shouldn't we be rendering a foley?"* -- the motion bake-in (`65538f41`,
+`f46abe03`) landed AFTER every episode rendered so far, and LTX 2.5 scores the
+event it can SEE. More visible action may produce LOUDER stems, which could
+raise the bed without touching RULING 2 at all. **One foley leg on the new
+prompts distinguishes the two causes**, and no episode has yet rendered with
+them.
+
+* Run it: `-Profile otr_ltx25_high_foley_plus -Acts 2`.
+* Then measure the stems, do not guess: compare raw stem RMS against the
+  -30/-55 dBFS baseline recorded in PBUG-20260827-03.
+* **The 2-second harness exists:** `scripts/otr_replay_foley_mix.py
+  <episode_dir> [--inject-unpositioned]` replays the mix from disk artifacts, so
+  a terminal-node fault never again costs a 3-hour render.
+
+**WHAT WOULD PROVE IT FIXED:** per-beat `RMS(bed in window) - RMS(programme in
+window)` inside the intended band, and an operator listening pass. Both panel
+lanes were explicit that `foley_bed=mixed` is PLUMBING, not audibility -- the
+receipt that hid this bug must not be the receipt that closes it.
+
+---
+
+### >>> THEN: COCKNEY BLEED -- CODE SHIPPED, A LIVE LEG AND A BIBLE ROW OWED <<<
+
+**THE CODE IS DONE AND PUSHED (`a967b47c`).** Roster semantics are gone: the
+Cockney rule is scoped to the ACTIVE SPEAKER -- `(req.speaker,)` per line,
+`tuple(slot.speaker for slot in beat_group)` per exchange -- the rule names
+LEMMY as its grammatical subject and fences every other character's register,
+and `append_dialogue_policy` refuses roster-shaped values instead of widening.
+Receipt: `PBUG-20260827-02` in `docs/PROD_BUG_LOG.md`. Suite 12377 passed /
+121 skipped / 1 xfailed; Bug Bible 22 passed; canonical workflow untouched and
+re-validated at 23 nodes / 60 links.
+
+**WHAT IS STILL OWED -- TWO THINGS, and the second is cheap.** FIRST, the live
+canonical leg. The 5080 was rendering the mime + H3 chain for the whole coder
+window, so nothing has yet proven production reachability or given the operator
+a LISTENING gate.
+Run it from `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md` P5.3 exactly --
+`media_archive`, `lemmy_cameo=always include`, three acts, `-Port` omitted so
+the wrapper picks a free ephemeral port -- and require the applied-patch receipt
+to show both widgets before accepting the leg.
+
+**DO NOT RE-DERIVE THE FIX AND DO NOT RE-OPEN THE ARC.** The captured-prompt
+tests are the deterministic scoping gate and they already pass; the live leg
+proves reachability and sound, which is a different claim. A small lexical
+sample can never prove bleed impossible and must not become a dialogue
+blacklist. If bleed somehow survives, P5.3 item 10 says where to look next --
+the labeled full-cast voice cards and the rolling prior context -- before
+anyone widens the patch.
+
+**SECOND: THE BUG BIBLE CANDIDATE, and the coverage scan is ALREADY DONE so the
+qualifying window does not pay for it twice.** Deferred deliberately -- the
+`PROD_BUG_LOG.md` amendment puts a single promotion at WRAP-UP, and a
+cross-project rule should not be minted while its production proof is
+outstanding. Promote it in the same window that qualifies the leg.
+
+* **The class:** a style or policy instruction whose GATE is a membership test
+  over a population (*is X anywhere in this cast?*) while its SCOPE over
+  subjects is never written down, delivered as a SUBJECTLESS imperative into a
+  prompt that renders several subjects in one call. Absence is the correct
+  answer for a lone non-target subject; a NEGATIVE clause is the only thing
+  that works when target and non-target share a single call.
+* **Checked against `BUG_BIBLE.yaml` (315 entries, guide HEAD `91e4cea`) and
+  `otr_coverage_index.yaml`. Two neighbours, neither of them a cover:** `07.29`
+  is a shared prompt builder invoked with the wrong scope PROFILE, and it is
+  image-generation -- it names the scope failure but not the gate-versus-scope
+  confusion and not the missing grammatical subject. `12.136` is yesterday's
+  rule and keys on the routed ENGINE'S CAPABILITY, a different axis entirely.
+  `12.114` is the reserved-identity ASSET leak -- the voice, not the prompt.
+* **The verify half worth carrying, because it is the part that nearly fooled
+  this window:** a presence-and-absence pair proves nothing until it is run RED
+  against the old code. One of these tests passes on the unfixed implementation
+  for an ACCIDENTAL reason -- `_normalize_cast` had already turned cast rows
+  into objects the old str-or-dict detector could not see -- so it pins a
+  forward invariant and is not evidence of a fix. Its docstring says so.
+
+---
+
+### >>> NEXT: QUALIFY THE LTX 2.5 FOLEY BED + MIME -- A RENDER WINDOW <<<
+
+**FOLEY IS QUALIFIED AS OF 2026-08-27. MIME AND THE LISTENING TEST ARE NOT.**
+A live canonical leg on `otr_ltx25_high_foley_plus` ran 3h19m09s and published
+`signal_lost_ink_and_martyrdom_20260827_071626` to `otr/obs/`:
+`RESULT SUCCESS`, `obs_publish OK`,
+`foley_bed=mixed beats=12/13 lanes=ltx25_foley_plus:12 master_gain=0.80`,
+`foley_loudness=lufs measured=-12.29 -> target=-14.0 gain_db=-1.71
+peak_dbfs=-3.52`, and -- the line that matters --
+`foley_unpositioned=1 (no master-mix slot; normal for music_inter bridges)`,
+which is PBUG-20260826-02's killer beat being skipped instead of killing the
+episode. 37 decodes, zero fatal markers.
+
+**WHAT IS STILL OWED:** the MIME leg (running at time of writing), and **the
+listening test, which no receipt can stand in for** -- `foley_bed=mixed` proves
+the bed was decoded, placed and levelled, not that it sounds right under the
+dialogue.
+
+**A TERMINAL-NODE FAULT NO LONGER COSTS A WHOLE RENDER.**
+`scripts/otr_replay_foley_mix.py <episode_dir> [--inject-unpositioned]` replays
+the foley mix from disk artifacts in about two seconds. Use it before spending
+three hours.
+
+
+---

@@ -27,140 +27,54 @@ belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
 
 ### OPEN, IN PRIORITY ORDER
 
-### >>> TAKE THIS FIRST: MAKE THE FOLEY BED AUDIBLE <<<
+### >>> TAKE THIS FIRST: NAME THE MIME SOUND, THEN LISTEN <<<
 
-**OPERATOR, 2026-08-27, after listening: *"I think foley is our biggest gap
-now."* That settles the order -- this row is above everything else.**
+**FOLEY AUDIBILITY IS RESOLVED, THE VOICE BLEED IT UNCOVERED IS FIXED, AND SIX
+LEGS ARE RENDERING RIGHT NOW TO PROVE BOTH.** PBUG-20260827-03 closed
+2026-08-28: it was never the mixer. `65538f41`/`f46abe03` (per-lane motion
+prompts) landed after every prior episode rendered, and once the dispatch
+seam actually reached the engines (`24f85f95`, `34253841`) the SAME
+`FOLEY_LANE_GAINS` 0.20 took raw stems from -34.4..-56.2 dBFS to
+-14.0..-41.5, and bed-vs-programme from 45 dB under to -6.6..-21.4. Ruling 2
+never needed amending. The operator called it before the measurement did:
+*"shouldn't we be rendering a foley?"*
 
-**THE BED IS MIXED, LEVELLED, GREEN ON EVERY RECEIPT, AND INAUDIBLE.**
-PBUG-20260827-03, Bible `12.137`. Published episode
-`signal_lost_ink_and_martyrdom_20260827_071626`. Measured: the bed sits
-**37-58 dB under the programme, median 45** (audible is 15-25 under).
+**WHAT THAT AUDIBLE BED THEN REVEALED: voices, because the tail named no
+sound.** `signal_lost_a_name_stripped_bare_20260827_195142` -- operator:
+*"is speech the best word, or dialogue is bleeding into the prompt"*.
+Production asked for `"matched environmental foley... ambient room tone"`, a
+CATEGORY that leaves the model to choose, and with a face in frame it chose
+voice. Fixed 2026-08-28, PBUG-20260828-01: a cue table now names the sounds
+the beat's own action makes (`nodes/_otr_video_engines/eng_ltx25.py`), foley
+and mime share the identical string (*"the only difference between foley and
+mime is the mux layer"*), and a scoped kibitz r3 review (codex) caught and
+fixed three real defects before ship -- a weapon-noun collision with the
+banana route, a false-positive "finished" receipt, and `document` matching
+`documentary`. Full receipt: `kibitz-runs/2026-08-28-named-sounds/`.
+Commits `d3cca496`..`a196fd90`, pushed, HEAD == origin verified, suite
+12365/121/1, 0 regressions.
 
-**THE CAUSE, and it is one line of code.**
-`FOLEY_LANE_GAINS['ltx25_foley_plus'] = (0.20, 0.80)` in
-`nodes/_otr_video_engines/foley_stems.py` is a BARE MULTIPLIER on stems whose
-level is never measured. LTX 2.5 emits foley at **-30 to -55 dBFS RMS**, so
-0.20 subtracts another 14 dB from something already inaudible.
+**FOUND AND FIXED IN THE SAME PASS, UNRELATED BUT ADJACENT:** the style-cue
+prefix was landing in front of `minimax_h3`'s required verbatim opener on any
+non-default style pack, silently breaking "must begin exactly" -- confirmed
+live on the anime pack, `d3cca496`. Not a production incident (the default
+pack's cue is empty, so it never fired); a review catch, not a Bug Bible
+candidate.
 
-**ALREADY RULED OUT, with evidence -- do not re-derive:** the mux ran (the two
-masters differ; the mp4 carries AAC 48 kHz stereo); the video DID generate audio
-(every stem carries signal, loudest peak -12.8 dBFS); it was the right engine on
-all 12 beats. **And the A/B that settles it: `ltx25_mime` at gain 1.00, on
-equally quiet stems, published the same day and the operator said *"sounds
-great."*** Same engine, same mux, same stem levels -- only the gain differs.
+**WHAT IS STILL OWED -- THE LISTENING TEST, and it is the whole reason the
+code work happened.** No receipt can stand in for it. Six 1-act legs are
+running now via `scripts/otr_overnight_lane_prompts.ps1` (mime first, since
+its prompt has never been heard; then foley, plain ltx25 video, H3 silent,
+H3 audio-in, the ltx_audio_in baseline) -- watch `otr/obs/` in the morning.
+The obs path bug in the queue script itself (pointed at the repo's own empty
+`otr/obs` instead of ComfyUI's real `output/otr/obs`, which would have
+silently reported every leg FAILED all night) was caught and fixed before it
+could do that; see `a196fd90`.
 
-**THE DECISION THAT BLOCKS THE FIX, AND IT IS THE OPERATOR'S.** A single larger
-constant CANNOT work: the stems span 21.2 dB RMS, so a value that lifts the
-quietest puts the loudest forward of the dialogue. Both panel lanes (Codex
-`gpt-5.6-sol`, Cursor Grok 4.6 High) converged on referencing each stem before
-applying the ratio -- which **RULING 2 forbids by name**
-(`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`: *"The foley stem gets no
-normalization pass of its own"*). That ruling was made before anyone knew the
-stems arrive 30-55 dB down. **Amend it or the bed stays inaudible; there is no
-third option that respects it as written.**
-
-**THE OPERATOR'S OWN HYPOTHESIS, WORTH TESTING FIRST BECAUSE IT IS FREE.**
-*"Shouldn't we be rendering a foley?"* -- the motion bake-in (`65538f41`,
-`f46abe03`) landed AFTER every episode rendered so far, and LTX 2.5 scores the
-event it can SEE. More visible action may produce LOUDER stems, which could
-raise the bed without touching RULING 2 at all. **One foley leg on the new
-prompts distinguishes the two causes**, and no episode has yet rendered with
-them.
-
-* Run it: `-Profile otr_ltx25_high_foley_plus -Acts 2`.
-* Then measure the stems, do not guess: compare raw stem RMS against the
-  -30/-55 dBFS baseline recorded in PBUG-20260827-03.
-* **The 2-second harness exists:** `scripts/otr_replay_foley_mix.py
-  <episode_dir> [--inject-unpositioned]` replays the mix from disk artifacts, so
-  a terminal-node fault never again costs a 3-hour render.
-
-**WHAT WOULD PROVE IT FIXED:** per-beat `RMS(bed in window) - RMS(programme in
-window)` inside the intended band, and an operator listening pass. Both panel
-lanes were explicit that `foley_bed=mixed` is PLUMBING, not audibility -- the
-receipt that hid this bug must not be the receipt that closes it.
-
----
-
-### >>> THEN: COCKNEY BLEED -- CODE SHIPPED, A LIVE LEG AND A BIBLE ROW OWED <<<
-
-**THE CODE IS DONE AND PUSHED (`a967b47c`).** Roster semantics are gone: the
-Cockney rule is scoped to the ACTIVE SPEAKER -- `(req.speaker,)` per line,
-`tuple(slot.speaker for slot in beat_group)` per exchange -- the rule names
-LEMMY as its grammatical subject and fences every other character's register,
-and `append_dialogue_policy` refuses roster-shaped values instead of widening.
-Receipt: `PBUG-20260827-02` in `docs/PROD_BUG_LOG.md`. Suite 12377 passed /
-121 skipped / 1 xfailed; Bug Bible 22 passed; canonical workflow untouched and
-re-validated at 23 nodes / 60 links.
-
-**WHAT IS STILL OWED -- TWO THINGS, and the second is cheap.** FIRST, the live
-canonical leg. The 5080 was rendering the mime + H3 chain for the whole coder
-window, so nothing has yet proven production reachability or given the operator
-a LISTENING gate.
-Run it from `docs/2026-08-27-cockney-bleed/CODE_READY_PLAN.md` P5.3 exactly --
-`media_archive`, `lemmy_cameo=always include`, three acts, `-Port` omitted so
-the wrapper picks a free ephemeral port -- and require the applied-patch receipt
-to show both widgets before accepting the leg.
-
-**DO NOT RE-DERIVE THE FIX AND DO NOT RE-OPEN THE ARC.** The captured-prompt
-tests are the deterministic scoping gate and they already pass; the live leg
-proves reachability and sound, which is a different claim. A small lexical
-sample can never prove bleed impossible and must not become a dialogue
-blacklist. If bleed somehow survives, P5.3 item 10 says where to look next --
-the labeled full-cast voice cards and the rolling prior context -- before
-anyone widens the patch.
-
-**SECOND: THE BUG BIBLE CANDIDATE, and the coverage scan is ALREADY DONE so the
-qualifying window does not pay for it twice.** Deferred deliberately -- the
-`PROD_BUG_LOG.md` amendment puts a single promotion at WRAP-UP, and a
-cross-project rule should not be minted while its production proof is
-outstanding. Promote it in the same window that qualifies the leg.
-
-* **The class:** a style or policy instruction whose GATE is a membership test
-  over a population (*is X anywhere in this cast?*) while its SCOPE over
-  subjects is never written down, delivered as a SUBJECTLESS imperative into a
-  prompt that renders several subjects in one call. Absence is the correct
-  answer for a lone non-target subject; a NEGATIVE clause is the only thing
-  that works when target and non-target share a single call.
-* **Checked against `BUG_BIBLE.yaml` (315 entries, guide HEAD `91e4cea`) and
-  `otr_coverage_index.yaml`. Two neighbours, neither of them a cover:** `07.29`
-  is a shared prompt builder invoked with the wrong scope PROFILE, and it is
-  image-generation -- it names the scope failure but not the gate-versus-scope
-  confusion and not the missing grammatical subject. `12.136` is yesterday's
-  rule and keys on the routed ENGINE'S CAPABILITY, a different axis entirely.
-  `12.114` is the reserved-identity ASSET leak -- the voice, not the prompt.
-* **The verify half worth carrying, because it is the part that nearly fooled
-  this window:** a presence-and-absence pair proves nothing until it is run RED
-  against the old code. One of these tests passes on the unfixed implementation
-  for an ACCIDENTAL reason -- `_normalize_cast` had already turned cast rows
-  into objects the old str-or-dict detector could not see -- so it pins a
-  forward invariant and is not evidence of a fix. Its docstring says so.
-
----
-
-### >>> NEXT: QUALIFY THE LTX 2.5 FOLEY BED + MIME -- A RENDER WINDOW <<<
-
-**FOLEY IS QUALIFIED AS OF 2026-08-27. MIME AND THE LISTENING TEST ARE NOT.**
-A live canonical leg on `otr_ltx25_high_foley_plus` ran 3h19m09s and published
-`signal_lost_ink_and_martyrdom_20260827_071626` to `otr/obs/`:
-`RESULT SUCCESS`, `obs_publish OK`,
-`foley_bed=mixed beats=12/13 lanes=ltx25_foley_plus:12 master_gain=0.80`,
-`foley_loudness=lufs measured=-12.29 -> target=-14.0 gain_db=-1.71
-peak_dbfs=-3.52`, and -- the line that matters --
-`foley_unpositioned=1 (no master-mix slot; normal for music_inter bridges)`,
-which is PBUG-20260826-02's killer beat being skipped instead of killing the
-episode. 37 decodes, zero fatal markers.
-
-**WHAT IS STILL OWED:** the MIME leg (running at time of writing), and **the
-listening test, which no receipt can stand in for** -- `foley_bed=mixed` proves
-the bed was decoded, placed and levelled, not that it sounds right under the
-dialogue.
-
-**A TERMINAL-NODE FAULT NO LONGER COSTS A WHOLE RENDER.**
-`scripts/otr_replay_foley_mix.py <episode_dir> [--inject-unpositioned]` replays
-the foley mix from disk artifacts in about two seconds. Use it before spending
-three hours.
-
+**Judge it as a whole**, not against a sync-only rubric (operator, after
+judging a separate LTX 2.3 IA2V A/B the same night: *"I'm creating radio
+drama, not impersonating an AI assistant"* -- colour, movement and life count,
+they are not subordinate to a technical score).
 
 ---
 
@@ -1152,6 +1066,60 @@ arc BEFORE code, not after.
   lines the three-column console is already a polite fiction: col3's scrolling
   transcript is as unreadable as anything col1 clips. This is a DESIGN job -- a card
   laid out for a small canvas -- not more ladder heroics.
+
+### PARKED -- retire `OTR_ENABLE_LTX_I2V` (operator ruling: "no switches nor
+flags, all video models request and ingest stills")
+
+**SCOPED 2026-08-28, and it is BIGGER than a flag flip -- an architecture
+retirement, not a grep-and-fix.** Investigated while working the backlog
+during the overnight render queue; not started, because starting an
+uncompletable-tonight change on a tight credit budget risks leaving the tree
+half-migrated, which is worse than parking it.
+
+**What removing the flag actually requires:** deleting the WHOLE text-only
+LTX graph-building path (`eng_ltx_video.py`'s non-conditioned encode branch,
+its `_use_i2v`/`_i2v_enabled` gate, and the parallel gate at
+`render_driver.py:2339`), so `ltx_video` conditions on its scene still
+UNCONDITIONALLY -- missing still becomes a structural failure with no
+`=0` escape, matching the sibling `_require_still` contract in
+`cheap_families` this docstring already points at as a model.
+
+**The real test cost, file by file (not the flat "19 rewrites" estimate this
+carried before) -- 8 files, ~22 sites, two different repair classes:**
+
+* **Pure avoidance shortcuts, safe to just drop the setenv** (the flag was
+  never reaching a code path these tests exercise -- `render_driver`'s gate
+  keys on the exact id `"ltx_video"`, and these test other lanes or prompt
+  composition only): `test_brief_prompt_finishing.py`,
+  `test_look_qa_round5.py`, `test_nonaudio_prompt_policy.py` (the
+  `_text_only_lane` fixture), `test_video_render_driver.py`.
+* **Genuine dual-path assertions that must be REWRITTEN or DELETED, not
+  patched:** `test_video_motion.py` carries a whole dedicated suite proving
+  the toggle itself works -- `test_i2v_opt_out_restores_text_only`, and an
+  assertion that the raised error names `OTR_ENABLE_LTX_I2V=0` as the escape
+  hatch. Once the toggle is gone there is nothing left to assert; these get
+  deleted, and `test_i2v_default_on_with_init` /
+  `test_i2v_flag_on_with_init_engages` likely collapse into one test since
+  "default" and "explicit on" become the same state.
+  `test_still_spine_helpers.py:975-986` asserts scene_still WITH the flag and
+  a **portrait fallback** WITHOUT it -- that fallback path ceases to exist and
+  the second half of the test goes with it.
+  `test_still_plan_parity.py`'s `_ENV_KEYS`/scenario matrix carries an
+  `("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"})` row that must be removed, not
+  adapted -- there is no more "off" state to parametrize over.
+  `test_video_motion_forward.py` has three sampler/encode-mechanics tests
+  that deliberately select the text-only path to isolate mechanics from the
+  i2v decision; each needs a real init-image fixture added so they exercise
+  the (now-mandatory) conditioned path instead, or an explicit decision that
+  those mechanics no longer have an unconditioned case to test.
+
+**Do this as ONE session with room to finish it**, not squeezed into the tail
+of another. Read `eng_ltx_video.py`'s full `_node_candidates_i2v` and its
+non-i2v sibling before touching anything -- the graph-branch shape has not
+yet been read end to end, only the gate functions have. This is a "one
+verifiable right answer" item per the review-routing test (the operator
+already ruled the design; what remains is execution), so it does not need a
+kibitz arc -- one clean finished-diff review plus the full suite is the gate.
 
 ### Test-harness and tooling
 
