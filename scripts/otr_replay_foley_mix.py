@@ -264,16 +264,44 @@ def print_audibility(rows):
         return
 
     low, high = AUDIBLE_BAND_DB
-    inside = [d for _bid, d in finite if low <= d <= high]
     values = [d for _bid, d in finite]
+    # WHICH SIDE OF THE BAND, AND IT MATTERS (2026-08-28). The delta is the bed
+    # measured against the programme, so a MORE NEGATIVE number is a QUIETER
+    # bed. Two failures live outside this band and they are opposites:
+    #
+    #   d < low   the bed is BURIED -- under the floor, the original PBUG
+    #   d > high  the bed is FORWARD -- louder than a bed should sit, competing
+    #             with the dialogue instead of supporting it
+    #
+    # The verdict used to call both of them "NOT audible", which is simply
+    # false for the forward case and sends a reader to raise a gain that is
+    # already too high. An instrument that reports the wrong direction gets
+    # ignored, and rightly.
+    buried = [d for d in values if d < low]
+    forward = [d for d in values if d > high]
+    inside = [d for d in values if low <= d <= high]
     print("delta range    : %+.2f dB (quietest) .. %+.2f dB (loudest)"
           % (min(values), max(values)))
     print("audible band   : %+.1f .. %+.1f dB -- %d of %d judgeable beat(s) "
           "inside" % (low, high, len(inside), len(values)))
-    print("VERDICT        : %s"
-          % ("AUDIBLE on every judgeable beat" if len(inside) == len(values)
-             else "NOT audible on %d of %d judgeable beat(s)"
-                  % (len(values) - len(inside), len(values))))
+    if buried:
+        print("below band     : %d beat(s) BURIED, quietest %+.2f dB "
+              "(raise the lane gain)" % (len(buried), min(buried)))
+    if forward:
+        print("above band     : %d beat(s) too FORWARD, loudest %+.2f dB "
+              "(lower the lane gain)" % (len(forward), max(forward)))
+    if not buried and not forward:
+        verdict = "AUDIBLE and correctly seated on every judgeable beat"
+    elif buried and forward:
+        verdict = ("MIS-SEATED -- %d beat(s) buried and %d too forward of %d "
+                   "judgeable" % (len(buried), len(forward), len(values)))
+    elif buried:
+        verdict = ("NOT audible -- %d of %d judgeable beat(s) buried under the "
+                   "programme" % (len(buried), len(values)))
+    else:
+        verdict = ("TOO FORWARD -- %d of %d judgeable beat(s) sit louder than "
+                   "a bed should" % (len(forward), len(values)))
+    print("VERDICT        : %s" % verdict)
 
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]

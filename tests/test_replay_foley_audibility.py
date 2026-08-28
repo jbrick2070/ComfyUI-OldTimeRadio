@@ -109,7 +109,39 @@ def test_a_bed_inside_the_band_reads_as_audible(capsys):
     """The verdict this whole exercise is trying to eventually produce."""
     REPLAY.print_audibility([_row("b001", -20.0), _row("b002", -18.0)])
     out = capsys.readouterr().out
-    assert "VERDICT        : AUDIBLE on every judgeable beat" in out
+    assert "VERDICT        : AUDIBLE and correctly seated" in out
+
+
+def test_a_bed_under_the_band_reads_as_BURIED(capsys):
+    """The original PBUG: the bed is there but nobody can hear it."""
+    REPLAY.print_audibility([_row("b001", -41.5), _row("b002", -20.0)])
+    out = capsys.readouterr().out
+    assert "VERDICT        : NOT audible" in out
+    assert "1 beat(s) BURIED" in out
+    assert "raise the lane gain" in out
+
+
+def test_a_bed_over_the_band_reads_as_TOO_FORWARD_not_inaudible(capsys):
+    """THE DEFECT THIS SPLIT EXISTS TO REMOVE (2026-08-28).
+
+    A bed 6.6 dB under the programme is not inaudible -- it is too FORWARD,
+    competing with the dialogue. The verdict used to call this "NOT audible",
+    which is false and sends a reader to RAISE a gain that is already too high.
+    """
+    REPLAY.print_audibility([_row("b001", -6.6), _row("b002", -8.0)])
+    out = capsys.readouterr().out
+    assert "VERDICT        : TOO FORWARD" in out
+    assert "NOT audible" not in out
+    assert "lower the lane gain" in out
+
+
+def test_a_bed_wrong_in_BOTH_directions_says_so(capsys):
+    """Reporting only one side would hide half the problem."""
+    REPLAY.print_audibility([_row("b001", -41.5), _row("b002", -6.6)])
+    out = capsys.readouterr().out
+    assert "VERDICT        : MIS-SEATED" in out
+    assert "1 beat(s) BURIED" in out
+    assert "1 beat(s) too FORWARD" in out
 
 
 def test_rms_db_of_silence_is_negative_infinity_not_a_crash():
