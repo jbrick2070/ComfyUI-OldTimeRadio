@@ -2117,16 +2117,15 @@ def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
 _LTX25_FRAMING = ("full face clearly visible, generous headroom, "
                   "the subject in real motion")
 
-#: THE FOLEY LANE GETS ITS OWN FRAMING, and the reason is the joint latent.
-#: `ltx25_foley_plus` decodes audio and video TOGETHER, so what the picture
-#: shows is also an audio instruction: a face-forward portrait asks for a voice
-#: to go with the face just as surely as the word "speech" does. This leads with
-#: the SOUND SOURCE -- the hands, the object, the contact -- and simply does not
-#: mention the face or the mouth, positively or negatively. Saying "mouth
-#: closed" would put the mouth back in the conditioning.
-_LTX25_FOLEY_FRAMING = ("hands and the objects they touch held clearly in "
-                        "frame, the subject shown working, the subject in "
-                        "real motion")
+#: FOLEY SHARES THE SIBLINGS' FRAMING, and that is a correction (2026-08-27).
+#: A brief patch gave this lane a hands-and-objects framing on the theory that a
+#: face invites the model to synthesise a voice on the joint latent. It does --
+#: but all three ltx25 lanes SHARE ONE STILL PLAN, whose `scene_character` row
+#: mints "full head and shoulders with clear headroom inside frame, face
+#: unobstructed". So a hands-only prompt argues with its own start frame, and
+#: the operator has ruled that lip-sync and foley may share a still. The audio
+#: is steered where the ruling puts it -- by NAMING THE SOUNDS, which is the
+#: load-bearing half -- not by hiding the face from a picture that shows one.
 
 
 def _ltx25_parts(inputs):
@@ -2191,7 +2190,7 @@ def compose_ltx25_foley_plus(self, inputs):
     if not core:
         return _ltx25_legacy(inputs)
     return ("%s, working the objects within reach so every movement has a "
-            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FOLEY_FRAMING))
+            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
 
 
 def compose_ltx25_mime(self, inputs):
