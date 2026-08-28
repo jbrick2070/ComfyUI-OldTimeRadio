@@ -7485,8 +7485,27 @@ to re-id and update its references in the same change.
   IDENTITY FIX -- it is a de-facto control, not a verdict. The MIME leg behind
   it in the queue spawns a fresh process and is the real test, on the exact
   lane where the vocalization was heard.
-- **STILL OWED, and it is the whole question:** a live leg proving the model
-  now stays quiet. The fix removes the nouns that WERE spoken; it does not
+- **OPERATOR ACCEPTANCE, 2026-08-28 -- THIS IS NOT AN OPEN INVESTIGATION ANY
+  MORE.** In his words, after the fixes below shipped: *"if it does, it does.
+  We read the requirements, we tried coding prompts as best we can. It is what
+  it is."*
+  **Do not reopen this as a prompt-engineering campaign.** The remedies were
+  applied: the dialogue no longer reaches these lanes, the character identity
+  no longer reaches them, our own instruction prose no longer reaches them,
+  and the sound request is a tag list rather than a sentence. If the model
+  still vocalises some residue of what remains -- the writer's own setting,
+  expression and motion text -- **that is accepted as a property of a joint
+  audio-video model**, not a defect to keep grinding.
+  Specifically OFF the table unless the operator asks: further prompt-shape
+  rounds, the keyword-form probe, filling `LTX25_NEGATIVE_PROMPT` as a recipe
+  exception, and retiring mime's audio (he wants that audio -- see the mux
+  ruling in `foley_stems.py`). This matches the standing pattern of the
+  2026-08-04 "story quality is done" ruling: the remedy is accepted as-is and
+  the chase stops.
+- **STILL WORTH KNOWING (not owed, and not a task):** a live leg on the
+  post-fix prompts would tell us how much residue remains. `scripts/otr_audit_joint_av_stems.py`
+  answers it in minutes on any future episode, for free, whenever one happens
+  to render. Read it if curious; do not schedule work against it. The fix removes the nouns that WERE spoken; it does not
   prove the model will not vocalise the setting, the motion clause, or the
   sound names instead. A kibitz r1 panel (codex + antigravity) returned NO on
   the first problem statement and reframed the goal correctly: this is not

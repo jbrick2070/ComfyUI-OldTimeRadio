@@ -2008,7 +2008,12 @@ _NO_VOICE_CLAUSE = "No speech, no voices."
 #: How the named sounds are seated once they are chosen. "close and dry" asks
 #: for the sound of a room the action is happening IN, rather than a scored or
 #: reverberant mix the drama's own mixer would then have to fight.
-_SOUND_FRAME = "close and dry in the room"
+#:
+#: A TAG, NOT A CLAUSE (2026-08-28). This lane READS ITS PROMPT ALOUD, and a
+#: transcribed stem quoted the old wording -- "close and dry in the room" --
+#: back at us. Dropping the preposition costs nothing in conditioning and
+#: leaves less that scans as a sentence to deliver.
+_SOUND_FRAME = "close dry room tone"
 
 #: At most three named sounds. The golden recipes name two or three; a longer
 #: list starts competing with the visual half of the very same string, and on
@@ -2188,10 +2193,13 @@ def named_sounds_for(positive):
 
 
 def _join_sounds(sounds):
-    """``a, b and c`` -- an Oxford-free list, because this is spoken prose."""
-    if len(sounds) == 1:
-        return sounds[0]
-    return "%s and %s" % (", ".join(sounds[:-1]), sounds[-1])
+    """``a, b, c`` -- a TAG LIST, deliberately not prose.
+
+    This used to render "a, b and c", which reads as a sentence fragment and
+    is exactly the shape this lane has been caught speaking aloud. A bare
+    comma list conditions the same and scans as a caption.
+    """
+    return ", ".join(sounds)
 
 
 #: THE FULL CANONICAL TERMINATOR -- what a finished joint-AV prompt ends with,
@@ -2221,8 +2229,8 @@ def build_joint_av_suffix(positive):
     formatter. If a future arm shows interleaving matters, this is the seam
     that moves. Pure.
     """
-    return "with %s, %s. %s" % (_join_sounds(named_sounds_for(positive)),
-                                _SOUND_FRAME, _NO_VOICE_CLAUSE)
+    return "%s, %s. %s" % (_join_sounds(named_sounds_for(positive)),
+                           _SOUND_FRAME, _NO_VOICE_CLAUSE)
 
 
 def finish_joint_av_positive(engine_id, positive):
@@ -2396,6 +2404,35 @@ def _ltx25_legacy(inputs):
     return str(inputs.get("text_prompt") or "")
 
 
+#: THE JOINT-AV PICTURE CLAUSE -- ONE STRING, BOTH LANES (operator ruling,
+#: restated 2026-08-28: "foley and mime should have the same prompting, the
+#: only difference is the mux layer setting").
+#:
+#: The two formatters below remain SEPARATE FUNCTIONS bound per class, because
+#: a different standing ruling requires it -- "I want each lane independent, so
+#: later one could have slow motion, some could have tulip motion" -- and the
+#: dispatcher resolves `compose_prompt` from each class's own `__dict__`.
+#: Separate functions, shared text: when the lanes SHOULD diverge again, one
+#: lane stops referencing this constant and nothing else moves.
+#:
+#: Foley's wording is the survivor, by name: "they use the new foley
+#: prompting". It is also the better instruction, since "every movement has a
+#: visible source" is what earns a bed, and a mime beat that earns one loses
+#: nothing.
+#: RETIRED 2026-08-28, and kept here as a tombstone so it is not re-added.
+#: This clause was SPOKEN ALOUD by the model -- a transcribed stem reads "So
+#: every movement has a visible source". So was `_LTX25_FRAMING` ("full face,
+#: clearly visible, generous"). Both were OUR instructions, not the writer's
+#: content, and the joint-AV lanes now compose from the authored leaves alone:
+#: setting, expression, motion, camera. The motion work of 2026-08-27 is in
+#: those leaves and is untouched.
+#:
+#: The silent `ltx25_video` lane still uses `_LTX25_FRAMING`, correctly -- it
+#: discards its audio latent and cannot say anything.
+_JOINT_AV_ACTION_RETIRED = ("working the objects within reach so every "
+                            "movement has a visible source")
+
+
 def compose_ltx25_video(self, inputs):
     """``ltx25_video`` -- PUSH THE LIMIT. One decisive within-frame action.
 
@@ -2434,12 +2471,21 @@ def compose_ltx25_foley_plus(self, inputs):
     core = _ltx25_parts(inputs, include_appearance=False)
     if not core:
         return _ltx25_legacy_joint_av(inputs)
-    return ("%s, working the objects within reach so every movement has a "
-            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
+    return core.rstrip(" ,.")
 
 
 def compose_ltx25_mime(self, inputs):
-    """``ltx25_mime`` -- expressive silent action with a clear endpoint.
+    """``ltx25_mime`` -- BYTE-IDENTICAL to foley. The mux is the difference.
+
+    Operator ruling, restated 2026-08-28: *"foley and mime should have the
+    same prompting, the only difference is the mux layer setting."* The lanes
+    diverge at `FOLEY_LANE_GAINS` -- foley mixes its bed at 0.20 under the
+    programme at 0.80; mime plays its generated audio at 1.00 with the
+    programme muted to 0.00 -- and nowhere else.
+
+    This stays its OWN function rather than an alias, because the lanes must
+    remain independently re-wordable ("later one could have slow motion, some
+    could have tulip motion"). Shared text, separate seams.
 
     NO IDENTITY WALL, for the same reason as its foley sibling -- this lane
     rendered a woman saying "Queen of the Fairies" out loud because her
@@ -2461,8 +2507,9 @@ def compose_ltx25_mime(self, inputs):
     core = _ltx25_parts(inputs, include_appearance=False)
     if not core:
         return _ltx25_legacy_joint_av(inputs)
-    return ("%s, the gesture played out fully and carried to a clear held "
-            "endpoint, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
+    # IDENTICAL to foley by ruling. This lane keeps its OWN function so it can
+    # diverge later without an architectural change.
+    return core.rstrip(" ,.")
 
 
 # THE EXPLICIT BINDINGS. One entry per class ``__dict__`` -- this is what makes

@@ -91,6 +91,14 @@ FOLEY_RECEIPT_KEYS = (
 #: attenuated to zero in that window at mux time, exactly as foley_plus
 #: attenuates it to 0.80. Same pipeline, same code path, one different
 #: constant. It deletes a whole node and an execution-order inversion.
+#: RE-AFFIRMED BY THE OPERATOR 2026-08-28, in his words: *"mime should have
+#: the native audio 'foley' layer at 100% and do not use the TTS / music /
+#: announcer audio."* That is exactly the row below, and it is recorded here
+#: because the mime gains were questioned twice in one night -- once while
+#: hunting a vocalization defect, and once while considering retiring mime's
+#: audio entirely. BOTH are answered: the native audio STAYS at 1.00, and the
+#: programme (TTS, music cues, announcer) STAYS at 0.00 inside mime windows.
+#: Do not propose dropping mime's generated audio; the operator wants it.
 FOLEY_LANE_GAINS = {
     "ltx25_foley_plus": (0.20, 0.80),
     "ltx25_mime": (1.00, 0.00),

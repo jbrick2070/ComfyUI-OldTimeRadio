@@ -511,7 +511,7 @@ def test_shotlock_and_the_execution_plan_resolve_the_same_engine():
 
 #: The invariant terminator every joint-AV prompt must end with.
 _NO_VOICE = "No speech, no voices."
-_SOUND_FRAME = "close and dry in the room"
+_SOUND_FRAME = "close dry room tone"
 
 #: THE TWO CATEGORY PHRASES THAT MUST NEVER COME BACK (operator, 2026-08-27).
 #: Production used to append these instead of naming a sound, and with a human
@@ -524,13 +524,48 @@ _BANNED_CATEGORIES = ("matched environmental foley", "ambient room tone",
 _CORE = "a captain repairing a smoking console"
 #: "console" is the only lexicon cue in `_CORE`, so its suffix is single-sound
 #: and can be asserted exactly.
-_CORE_FINISHED = (_CORE + ", with switches clicking and dials turning, "
+_CORE_FINISHED = (_CORE + ", switches clicking and dials turning, "
                   + _SOUND_FRAME + ". " + _NO_VOICE)
 
 
 def test_the_foley_suffix_names_the_sound_of_the_action():
     assert ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE) == \
         _CORE_FINISHED
+
+
+def test_foley_and_mime_compose_the_IDENTICAL_PICTURE_too():
+    """OPERATOR RULING, restated 2026-08-28: "foley and mime should have the
+    same prompting, the only difference is the mux layer setting."
+
+    An earlier pass unified only the AUDIO TAIL and left the picture clauses
+    divergent -- foley said "working the objects within reach so every
+    movement has a visible source", mime said "the gesture played out fully
+    and carried to a clear held endpoint". That is not the same prompting.
+    """
+    inputs = {"appearance": "40s, rustic weaver", "setting": "a moonlit bower",
+              "expression": "awed", "motion": "he reaches toward her",
+              "camera": "static medium shot"}
+    foley = ltx25.compose_ltx25_foley_plus(object(), inputs)
+    mime = ltx25.compose_ltx25_mime(object(), inputs)
+    assert foley == mime, "the lanes diverged again: %r vs %r" % (foley, mime)
+    # and end to end, through the finisher
+    assert (ltx25.finish_joint_av_positive("ltx25_foley_plus", foley)
+            == ltx25.finish_joint_av_positive("ltx25_mime", mime))
+
+
+def test_the_lanes_remain_INDEPENDENTLY_rewordable():
+    """The OTHER standing ruling, which the sameness must not quietly undo:
+    "I want each lane independent, so later one could have slow motion, some
+    could have tulip motion." Same TEXT today, separate SEAMS always -- the
+    dispatcher resolves compose_prompt from each class's own __dict__, so
+    collapsing these into one shared method would make it stop seeing the
+    children at all."""
+    foley_fn = ltx25.Ltx25FoleyPlusEngine.__dict__.get("compose_prompt")
+    mime_fn = ltx25.Ltx25MimeEngine.__dict__.get("compose_prompt")
+    video_fn = ltx25.Ltx25VideoEngine.__dict__.get("compose_prompt")
+    assert foley_fn is not None and mime_fn is not None and video_fn is not None
+    assert foley_fn is not mime_fn
+    assert mime_fn is not video_fn
 
 
 def test_foley_and_mime_receive_the_IDENTICAL_string():
@@ -971,6 +1006,13 @@ def test_a_mime_open_is_finished_with_named_sounds(_text_only_lane):
     req = rd.build_request_from_shot(_open_shot("ltx25_mime"), _open_ledger())
     assert _SOUND_FRAME in req["text_prompt"]
     assert req["text_prompt"].endswith(_NO_VOICE)
+    # TAG FORM, NOT PROSE (2026-08-28): this lane reads its prompt aloud, and
+    # a transcribed stem quoted the old "with ... close and dry in the room"
+    # wording back at us. The sounds are still NAMED -- that is
+    # PBUG-20260828-01's fix and must not regress -- they are simply no longer
+    # wrapped in a sentence.
+    assert ", with " not in req["text_prompt"]
+    assert "close and dry in the room" not in req["text_prompt"]
 
 
 def test_a_silent_ltx25_character_beat_is_not_told_to_hold_still(
@@ -1086,7 +1128,7 @@ def test_an_already_finished_prompt_still_gets_its_budget_cleared(
     """
     monkeypatch.setenv(
         "OTR_LTX_RADIO_PROMPT",
-        "a quiet console at midnight, with switches clicking and dials "
+        "a quiet console at midnight, switches clicking and dials "
         "turning, " + _SOUND_FRAME + ". " + _NO_VOICE)
     req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
                                      _open_ledger())
