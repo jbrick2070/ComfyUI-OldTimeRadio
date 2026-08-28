@@ -598,46 +598,6 @@
             "name": "enable_phase_8_video_readiness"
           },
           "link": null
-        },
-        {
-          "localized_name": "render_selection",
-          "name": "render_selection",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "render_selection"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "render_max_n",
-          "name": "render_max_n",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "render_max_n"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "protagonist_only",
-          "name": "protagonist_only",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "protagonist_only"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "manual_line_ids",
-          "name": "manual_line_ids",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "manual_line_ids"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -697,11 +657,7 @@
       },
       "widgets_values": [
         true,
-        true,
-        "all",
-        6,
-        false,
-        ""
+        true
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"

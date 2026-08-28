@@ -150,11 +150,10 @@ def test_director_and_shot_lock_carry_the_ceiling_onto_the_ledger():
 
     led = json.dumps({"cast": [], "lines": [], "meta": {}})
     locked = OTRShotLock().lock(led, audio_done="x",
-                                video_policy_json=_policy(17), image_done="")
+                                video_policy_json=_policy(17))
     assert json.loads(locked[0])["video"]["max_render_frames"] == 17
     # An empty/legacy policy stays unpinned rather than inventing a ceiling.
-    legacy = OTRShotLock().lock(led, audio_done="x", video_policy_json="{}",
-                                image_done="")
+    legacy = OTRShotLock().lock(led, audio_done="x", video_policy_json="{}")
     assert json.loads(legacy[0])["video"]["max_render_frames"] == 0
 
 

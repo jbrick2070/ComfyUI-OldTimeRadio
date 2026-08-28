@@ -1103,25 +1103,17 @@ class TestCascadeB3Surface:
             if n.get("type") == "OTR_LedgerFreezeCascade"
         )
         wv = cascade.get("widgets_values", [])
-        assert len(wv) == 6, (
+        assert len(wv) == 2, (
             f"cascade widgets_values length drift: {len(wv)} "
-            f"(expected 6 post-VRAM-rip: phase_7, phase_8, "
-            f"render_selection, render_max_n, protagonist_only, "
-            f"manual_line_ids)"
+            f"(expected 2 since 2026-08-28: the four deprecated "
+            f"compatibility widgets -- render_selection, render_max_n, "
+            f"protagonist_only, manual_line_ids -- were removed as the "
+            f"trailing suffix; only phase_7 and phase_8 remain)"
         )
         # 0 = enable_phase_7_audio_readiness  (bool)
         # 1 = enable_phase_8_video_readiness  (bool)
-        # 2 = render_selection                (str: "all"|"dramatic_peaks_only")
-        # 3 = render_max_n                    (int)
-        # 4 = protagonist_only                (bool)
-        # 5 = manual_line_ids                 (str)
         assert isinstance(wv[0], bool)
         assert isinstance(wv[1], bool)
-        assert isinstance(wv[2], str)
-        assert wv[2] in ("all", "dramatic_peaks_only")
-        assert isinstance(wv[3], (int, float))
-        assert isinstance(wv[4], bool)
-        assert isinstance(wv[5], str)
 
 
 # ---------------------------------------------------------------------------

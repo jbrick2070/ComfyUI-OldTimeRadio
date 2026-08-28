@@ -1084,46 +1084,6 @@
             "name": "enable_phase_8_video_readiness"
           },
           "link": null
-        },
-        {
-          "localized_name": "render_selection",
-          "name": "render_selection",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "render_selection"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "render_max_n",
-          "name": "render_max_n",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "render_max_n"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "protagonist_only",
-          "name": "protagonist_only",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "protagonist_only"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "manual_line_ids",
-          "name": "manual_line_ids",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "manual_line_ids"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -1193,11 +1153,7 @@
       },
       "widgets_values": [
         true,
-        true,
-        "all",
-        6,
-        false,
-        ""
+        true
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2350,16 +2306,6 @@
           "shape": 7,
           "type": "STRING",
           "link": null
-        },
-        {
-          "localized_name": "consistency_gate_warn_only",
-          "name": "consistency_gate_warn_only",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "consistency_gate_warn_only"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -2384,9 +2330,7 @@
       "properties": {
         "Node name for S&R": "OTR_MetaBriefImagePromptGen"
       },
-      "widgets_values": [
-        false
-      ],
+      "widgets_values": [],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
     },
@@ -2424,28 +2368,11 @@
           "link": 251
         },
         {
-          "localized_name": "image_done",
-          "name": "image_done",
-          "shape": 7,
-          "type": "STRING",
-          "link": null
-        },
-        {
           "localized_name": "gate_in",
           "name": "gate_in",
           "shape": 7,
           "type": "STRING",
           "link": 284
-        },
-        {
-          "localized_name": "consistency_gate_warn_only",
-          "name": "consistency_gate_warn_only",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "consistency_gate_warn_only"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -2494,9 +2421,7 @@
       "properties": {
         "Node name for S&R": "OTR_ShotLock"
       },
-      "widgets_values": [
-        false
-      ],
+      "widgets_values": [],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
     },
@@ -3482,7 +3407,7 @@
       12,
       0,
       90,
-      4,
+      3,
       "STRING"
     ],
     [

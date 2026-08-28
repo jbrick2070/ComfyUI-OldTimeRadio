@@ -2477,7 +2477,11 @@ class OTRMetaBriefImagePromptGen:
                     "multiline": True, "default": "{}", "forceInput": True,
                     "tooltip": "OTR_ImageDirector policy: granularity/seed + per-role still 'aspects' (so character stills match the selected video engine: portrait 832x1216 vs 16:9 832x480).",
                 }),
-                "consistency_gate_warn_only": ("BOOLEAN", {"default": False}),
+                # `consistency_gate_warn_only` was REMOVED 2026-08-28: the
+                # node displayed a Boolean, forwarded it one hop, and the
+                # helper deleted it -- "the compatibility gate argument is
+                # ignored", in its own words. The helper keeps its parameter;
+                # the NODE stops advertising a dead choice.
                 "gate_in": ("STRING", {
                     "multiline": True, "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",
@@ -2490,7 +2494,7 @@ class OTRMetaBriefImagePromptGen:
         return True
 
     def generate(self, script_json, image_policy_json="{}",
-                 consistency_gate_warn_only=False, gate_in=""):
+                 gate_in=""):
         try:
             led = json.loads(script_json or "{}")
             if not isinstance(led, dict):
@@ -2526,7 +2530,7 @@ class OTRMetaBriefImagePromptGen:
         llm_fn = _resolve_writer_llm(meta, warnings)
         payload, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,
-            consistency_gate_warn_only=bool(consistency_gate_warn_only),
+            consistency_gate_warn_only=False,   # widget removed 2026-08-28
             lines=lines,
             still_aspects=_still_aspects_from_policy(image_policy_json),
             mesh_fodder_roles=_mesh_fodder_roles_from_policy(image_policy_json),

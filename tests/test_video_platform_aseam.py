@@ -275,13 +275,12 @@ def test_forceinput_no_widget(cls):
 
 
 def test_string_socket_semantic_guard():
-    """The three STRING gates (script_json / audio_done / image_done) are typed
+    """The two STRING gates (script_json / audio_done) are typed
     STRING + forceInput, no widget sub-key."""
     it = OTRShotLock.INPUT_TYPES()
     gates = {
         "script_json": it["required"]["script_json"],
         "audio_done": it["required"]["audio_done"],
-        "image_done": it["optional"]["image_done"],
     }
     for name, spec in gates.items():
         assert spec[0] == "STRING", name
@@ -368,15 +367,11 @@ def test_clip_budget_is_pure_per_beat():
     assert budget["warnings"] == []
 
 
-def test_image_done_gate_serializes():
-    it = OTRShotLock.INPUT_TYPES()
-    assert "image_done" in it["optional"]
-    led = json.dumps({"cast": [], "lines": [], "meta": {}})
-    a = OTRShotLock().lock(led, audio_done="x", video_policy_json="{}", image_done="")
-    b = OTRShotLock().lock(led, audio_done="x", video_policy_json="{}", image_done="img:done")
-    # NON-BLOCKING in v1: the image_done value does not change the plan.
-    assert json.loads(a[0])["video"] == json.loads(b[0])["video"]
-    assert a[3].startswith("shot_lock:done:")
+# `test_image_done_gate_serializes` was REMOVED 2026-08-28 with the socket
+# it exercised. ShotLock's `image_done` was a superseded unwired fix --
+# unlinked in all 62 graphs, its parameter never read -- and the LIVE
+# image-before-video gate is canonical link 267, ImageGenDispatcher ->
+# VideoRenderBatch, which has its own coverage.
 
 
 def _char_ledger():

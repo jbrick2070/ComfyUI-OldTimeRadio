@@ -2639,25 +2639,26 @@ class OTRShotLock:
                 }),
             },
             "optional": {
-                "image_done": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "forceInput": True,
-                    "tooltip": (
-                        "Image-done gate (mirrors audio_done). Declared to "
-                        "freeze the image-before-video contract; NON-BLOCKING "
-                        "in v1 (Flux gen-1 runs in-process, nothing emits it "
-                        "yet; C1 wires the emitter). Opaque STRING."
-                    ),
-                }),
-                "consistency_gate_warn_only": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "Compatibility-only saved-workflow widget. Authored "
-                        "non-empty M4 prompts are always preserved; empty or "
-                        "unparseable replies use the deterministic template."
-                    ),
-                }),
+                # `image_done` (an input socket) and `consistency_gate_warn_only`
+                # (a widget) were REMOVED 2026-08-28, safety-gated first:
+                #
+                # * image_done was a SUPERSEDED UNWIRED FIX. It promised the
+                #   image-before-video ordering gate, was unlinked in all 62
+                #   graphs carrying this node, and its parameter was never read
+                #   -- not even forwarded. The LIVE ordering mechanism is
+                #   canonical link 267, ImageGenDispatcher.image_done ->
+                #   VideoRenderBatch.image_done, which bypasses ShotLock
+                #   entirely. Do NOT wire Dispatcher -> ShotLock instead:
+                #   ShotLock already feeds the Dispatcher its locked ledger and
+                #   episode_id, so any edge back closes a 90 -> 91 -> 90 cycle.
+                #   Removing input index 3 moved gate_in (link 284) dst_slot
+                #   4 -> 3; repaired by identity in canonical, variants
+                #   regenerated.
+                # * consistency_gate_warn_only was displayed, forwarded one
+                #   hop, and deleted -- a knob controlling nothing. The helper
+                #   `derive_creative_directives` keeps its own parameter (a
+                #   direct-call test exercises both values); the NODE no longer
+                #   advertises a choice it does not honour.
                 "gate_in": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -2686,7 +2687,7 @@ class OTRShotLock:
 
     # ------------------------------------------------------------------ #
     def lock(self, script_json, audio_done="", video_policy_json="{}",
-             image_done="", consistency_gate_warn_only=False, gate_in=""):
+             gate_in=""):
         from . import _otr_ledger_consumers as _OTRLC
 
         led = _OTRLC.load_ledger(script_json)
@@ -2782,7 +2783,9 @@ class OTRShotLock:
 
         creative, cre_warn = derive_creative_directives(
             beats, meta, led,
-            consistency_gate_warn_only=bool(consistency_gate_warn_only),
+            # The widget is gone; the helper keeps its parameter and the
+            # shipped value was always False.
+            consistency_gate_warn_only=False,
             video_policy=policy,
         )
         warnings.extend(cre_warn)

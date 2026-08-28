@@ -185,4 +185,6 @@ def test_production_workflow_visual_structure_pinned():
     n90 = nodes[90]
     rename_gate = [i for i in n90["inputs"] if i.get("name") == "gate_in"]
     assert rename_gate and rename_gate[0].get("link") == 284
-    assert links[284] == [284, 12, 0, 90, 4, "STRING"]
+    # dst_slot 3 since 2026-08-28: removing ShotLock's dead image_done input
+    # (index 3) shifted gate_in down one. The link id is unchanged.
+    assert links[284] == [284, 12, 0, 90, 3, "STRING"]

@@ -172,29 +172,14 @@ class OTR_LedgerFreezeCascade:
                 # Positional compatibility inputs retained because the canonical
                 # workflow is immutable in this change. All four are ignored;
                 # real render selection belongs exclusively to ShotLock.
-                "render_selection": (
-                    ("all", "dramatic_peaks_only"),
-                    {
-                        "default": "all",
-                        "tooltip": "Deprecated compatibility input; ignored.",
-                    },
-                ),
-                "render_max_n": ("INT", {
-                    "default": 6,
-                    "min": 0,
-                    "max": 999,
-                    "step": 1,
-                    "tooltip": "Deprecated compatibility input; ignored.",
-                }),
-                "protagonist_only": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "Deprecated compatibility input; ignored.",
-                }),
-                "manual_line_ids": ("STRING", {
-                    "default": "",
-                    "multiline": False,
-                    "tooltip": "Deprecated compatibility input; ignored.",
-                }),
+                # Four "deprecated compatibility inputs" (render_selection,
+                # render_max_n, protagonist_only, manual_line_ids) were REMOVED
+                # 2026-08-28: each was accepted and immediately deleted, so the
+                # UI showed four knobs that controlled nothing. They were the
+                # TRAILING widget suffix, so the saved-graph migration was
+                # [true,true,"all",6,false,""] -> [true,true] with no re-index
+                # of survivors and no link movement (safety-gated: no link in
+                # any of the 63 graphs targeted their slots).
             },
         }
 
@@ -215,14 +200,7 @@ class OTR_LedgerFreezeCascade:
         technical_model: str = "",
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
-        # Deprecated positional compatibility arguments; the canonical
-        # workflow keeps their slots byte-identical, but runtime ignores them.
-        render_selection: str = "all",
-        render_max_n: int = 6,
-        protagonist_only: bool = False,
-        manual_line_ids: str = "",
     ):
-        del render_selection, render_max_n, protagonist_only, manual_line_ids
 
         # Lazy imports to keep node-load cheap.
         from . import _otr_freeze_cascade as _LFC_ORCH
