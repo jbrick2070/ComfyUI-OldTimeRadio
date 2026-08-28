@@ -738,6 +738,46 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## A BLOCKING DEPENDENCY IS A CLAIM, NOT A VERDICT -- CHECK UP A LEVEL (operator ruling 2026-08-28)
+
+**Operator, in his words:** *"it should check up a level -- if it says we
+can't remove because of dependency B, well, check what dependency B really
+does."*
+
+**THE RULE.** When an audit, a reviewer or your own grep says "X cannot be
+removed because B uses it", that is the START of the investigation, not the
+end. Go read B. Two things are true often enough to be worth the look every
+time:
+
+* **B may itself be dead.** A chain of dead code keeps every link alive under
+  a naive reachability check -- three orphans that only call each other look
+  perfectly referenced. The only way out is to ask whether B has a live
+  caller, and then whether *its* caller does.
+* **B may not really depend on X.** It may import X and never call it, call
+  it only in a branch nothing reaches, or duplicate what X does and use its
+  own copy. An import is not a use.
+
+**Two live examples from the 2026-08-28 sweep, both of which the rule catches:**
+
+1. `_otr_voice_resolver` looked alive because `tests/test_voice_backends.py`
+   imported it. Reading that consumer showed the import existed ONLY to assert
+   that the live registry's `KNOWN_ENGINES` matched the resolver's DUPLICATE
+   copy of the same set. The dependency was a consistency check on a
+   redundancy -- deleting the redundancy is what removed the need for the
+   check, and both went together.
+2. The fuzzy cast-consolidation cluster in `story_orchestrator.py` "has
+   callers" only in the sense that its four functions call EACH OTHER, and its
+   test regex-extracts them from source rather than importing them. Nothing
+   outside the cluster reaches it. A reachability check that stopped at the
+   first caller would have reported it live.
+
+**The honest limit, and it is why the rule says "check", not "delete".** A
+symbol reached only by tests is not automatically dead -- it may be a parked
+capability, a safety tool, or an unwired FIX somebody wrote and never
+connected (which is a different finding entirely, and more valuable than a
+deletion). Checking up a level tells you WHICH of those it is. It does not
+license removing something because its only consumer is a test.
+
 ## ONE MACHINE OWNS THE WORKFLOW AT A TIME -- THE WORKFLOW BATON (operator ruling 2026-08-28 -- hard)
 
 **Operator, in his words:** *"I want only one machine to own the workflow at

@@ -133,9 +133,10 @@ forbidden = re.compile(
     # accidental reintroduction of period-locked language inside any
     # new orchestrator-layer LLM prompt. Tokenize suppression handles
     # forensic comment / docstring mentions (e.g. the C2b deletion
-    # forensic note itself, and the still-orphan _load_canon_for_writer
+    # forensic note itself, and, until 2026-08-28, the _load_canon_for_writer
     # docstring that still names SCAFFOLDING_PREAMBLE as historical
-    # context until the Sprint G orphan sweep).
+    # context. That function was DELETED 2026-08-28 by the orphan
+    # sweep it was waiting for; only the C2b note still needs it.
     r"|1950s Americana"                     # C2b: 5-pillar era anchor
     r"|golden.age radio"                    # C2b: dramaturg era anchor
     r"|\bOmni.Retro\b"                      # C2b: 5-pillar branding
