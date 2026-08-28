@@ -5589,7 +5589,27 @@ only visible because the cameo was FORCED and then did not appear.
   the same name" complaint, seen live for the first time. Two samples is not a
   measurement; `scripts/otr_name_randomness_lab.py` was built this session to
   measure it properly and has not been run.
-- status: OPEN. Evidence refreshed, scope corrected from one lane to two.
+- status: **CLOSED 2026-08-28 -- both named lanes resolved, live-proven.** The
+  entry describes 2026-08-15 artifacts at HEAD `50790099` and predates the two
+  fixes that answered it. Of the two content-owned lanes it named: `scifi_news`
+  is RETIRED (no longer a live bank), and `scifi_news_pro` received exactly the
+  two-part repair this entry demanded, in the lane runner and NOT via
+  `lock_cast()` as the warning required -- the cameo roll at
+  `nodes/_otr_scifi_news_pro.py:4560-4568` (`resolve_lemmy_cameo`, receipt
+  stamped and durably saved) and the cast contract at `:4818-4820`, landed by
+  `b46db68e` / `da44f642` / `7faf3bf7`.
+  **Live evidence, 2026-08-28: 48 `scifi_news_pro` ledgers written after the
+  fix, ZERO with an empty `cast_contract`** (all carry `lemmy_hit`,
+  `lemmy_policy`, `casting_attempts`, `num_characters_locked`). And the cameo
+  itself is proven to FIRE on this lane, not merely to be wired: a natural roll
+  on `signal_lost_the_caretakers_clause_20260826_155835` cast LEMMY with **8
+  dialogue lines** and published to `otr/obs/` (98.8 MB on disk).
+  **The sibling risk this entry flagged is also gone:** PBUG-20260811-01
+  ("forcing the cameo kills the writer") was itself CLOSED 2026-08-16 as
+  MIS-ATTRIBUTED -- the widget was inert on that lane at the repro commit, so
+  a cameo fix never had to be proved against it.
+  Left open deliberately and tracked elsewhere: the "always picks Elias" naming
+  observation below is a separate diversity defect, not a cameo one.
 
 **TWO CORRECTIONS, 2026-08-16** (verified against the frozen ledgers and the
 git record; the census that grounds them is at the end of this file):
