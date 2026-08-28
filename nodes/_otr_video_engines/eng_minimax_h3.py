@@ -1257,9 +1257,13 @@ except ImportError:  # pragma: no cover -- flat test imports
 
 #: THE OFFICIAL ONE-IMAGE I2VA REFERENCE LINE, required verbatim as the FIRST
 #: thing in an H3 prompt. Pinned here because it was not previously in this
-#: file at all. See also: these lanes are exempt from the style-cue PREFIX in
-#: render_driver, which would otherwise push text in front of this opener and
-#: make "must begin exactly" false on any non-default style pack.
+#: file at all. See also: `render_driver._style_cue_after_pinned_opener` seats
+#: the style cue AFTER this opener instead of prefixing it, which would
+#: otherwise push text in front of the opener and make "must begin exactly"
+#: false on any non-default style pack. That was a live defect until
+#: 2026-08-28: this comment claimed an exemption that nothing implemented, and
+#: the anime pack demonstrably produced "anime style. For the target video, ...".
+#: The cue is seated rather than dropped so the pack's look is not lost here.
 H3_REFERENCE_OPENER = (
     "For the target video, at 0.00 seconds into the target video, "
     "<Picture 1> (from [Shot 1]) is fully referenced."

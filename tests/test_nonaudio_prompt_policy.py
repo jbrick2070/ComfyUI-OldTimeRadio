@@ -119,6 +119,63 @@ def test_audio_in_lane_directive_bytes_are_unchanged():
     assert silent["text_prompt"] != with_policy["text_prompt"]
 
 
+# --------------------------------------------------------------------------- #
+# the style cue must never precede a lane's PINNED opener
+# --------------------------------------------------------------------------- #
+
+class _StyledPack:
+    """A minimal stand-in for a non-default `VisualStyle` -- only the three
+    attributes `compact_style_cue` reads."""
+    style_id = "anime"
+    positive_tail = "anime style, cel shaded, clean linework"
+    portrait_look_talking = ""
+
+
+class _DefaultPack:
+    style_id = "sci_fi_radio"
+    positive_tail = "whatever"
+    portrait_look_talking = ""
+
+
+def test_a_style_cue_never_precedes_the_H3_required_opener():
+    """CONFIRMED LIVE (r3, 2026-08-28): the anime pack turned H3's required
+    opener into "anime style. For the target video, ..." -- exactly the
+    failure `eng_minimax_h3.py` already claimed was impossible. The claim was
+    true only on the default pack, whose cue is empty."""
+    from nodes._otr_video_engines.eng_minimax_h3 import H3_REFERENCE_OPENER
+    composed = (H3_REFERENCE_OPENER + " the announcer leans toward the "
+               "microphone, the movement carried at a clear steady tempo "
+               "to a visible endpoint")
+    out = rd._style_cue_after_pinned_opener(_StyledPack, composed)
+    assert out.startswith(H3_REFERENCE_OPENER)
+    assert "anime style" in out
+
+
+def test_the_style_cue_still_reaches_an_H3_prompt_after_the_opener():
+    """The fix SEATS the cue rather than dropping it -- an exemption would
+    silently lose the pack's look on both H3 lanes."""
+    from nodes._otr_video_engines.eng_minimax_h3 import H3_REFERENCE_OPENER
+    composed = H3_REFERENCE_OPENER + " hands steady on the console"
+    out = rd._style_cue_after_pinned_opener(_StyledPack, composed)
+    assert out != composed
+    assert "anime style" in out
+
+
+def test_the_default_pack_is_byte_identical_on_an_H3_prompt():
+    """The default pack's cue is empty, which is why this defect never
+    surfaced in production -- and why it must stay a true no-op."""
+    from nodes._otr_video_engines.eng_minimax_h3 import H3_REFERENCE_OPENER
+    composed = H3_REFERENCE_OPENER + " hands steady on the console"
+    assert rd._style_cue_after_pinned_opener(_DefaultPack, composed) == composed
+
+
+def test_a_non_H3_prompt_still_gets_the_ordinary_prefix():
+    """No pinned opener present -> ordinary behaviour, unaffected by the fix."""
+    plain = "hands on the console, dust drifting"
+    out = rd._style_cue_after_pinned_opener(_StyledPack, plain)
+    assert out.startswith("anime style")
+
+
 def test_still_word_keeps_the_dialogue_because_the_words_are_the_picture():
     """`still_word` is `static_image_gen`, not an audio family -- it is the one
     NON-audio lane that keeps the line on purpose, because it renders the words
@@ -452,49 +509,182 @@ def test_shotlock_and_the_execution_plan_resolve_the_same_engine():
 # the LTX 2.5 joint-AV positive finisher
 # --------------------------------------------------------------------------- #
 
-_FOLEY = ("matched environmental foley for the visible action, ambient room "
-          "tone. No speech, no voices, pure action.")
-_MIME_TAIL = ("instrumental scene score and non-speech ambience matching the "
-              "visible action. No speech, no voices.")
+#: The invariant terminator every joint-AV prompt must end with.
+_NO_VOICE = "No speech, no voices."
+_SOUND_FRAME = "close and dry in the room"
+
+#: THE TWO CATEGORY PHRASES THAT MUST NEVER COME BACK (operator, 2026-08-27).
+#: Production used to append these instead of naming a sound, and with a human
+#: in frame the model filled the unnamed request with VOICES. If either of
+#: these strings reappears in a joint-AV prompt, the bug is back.
+_BANNED_CATEGORIES = ("matched environmental foley", "ambient room tone",
+                      "instrumental scene score", "non-speech ambience",
+                      "scene-appropriate")
+
 _CORE = "a captain repairing a smoking console"
+#: "console" is the only lexicon cue in `_CORE`, so its suffix is single-sound
+#: and can be asserted exactly.
+_CORE_FINISHED = (_CORE + ", with switches clicking and dials turning, "
+                  + _SOUND_FRAME + ". " + _NO_VOICE)
 
 
-def test_the_foley_suffix_is_exact():
+def test_the_foley_suffix_names_the_sound_of_the_action():
     assert ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE) == \
-        _CORE + ", " + _FOLEY
+        _CORE_FINISHED
 
 
-def test_the_mime_suffix_without_moods_is_exact():
+def test_foley_and_mime_receive_the_IDENTICAL_string():
+    """Operator, 2026-08-27: "foley / mime same thing, they use the new foley
+    prompting" and "the only difference between foley and mime is the mux
+    layer". Mime used to lead with the brief's mood terms and ask for
+    "instrumental scene score" -- a category, and the same defect the foley
+    tail had. One shape now, so the two cannot drift apart."""
     assert ltx25.finish_joint_av_positive("ltx25_mime", _CORE) == \
-        _CORE + ", scene-appropriate " + _MIME_TAIL
+        ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE)
 
 
-def test_mime_mood_terms_are_stripped_deduped_and_capped_at_three():
+def test_the_finisher_takes_no_mood_argument_any_more():
+    """The brief's `music_mood_terms` still drives the MUSIC bookends through
+    `_otr_music_prompt`, which was always their real owner. Passing them here
+    must be a hard error, not a silently ignored keyword."""
+    with pytest.raises(TypeError):
+        ltx25.finish_joint_av_positive("ltx25_mime", _CORE,
+                                       music_mood_terms=["tense"])
+
+
+@pytest.mark.parametrize("banned", _BANNED_CATEGORIES)
+@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):
+    """The regression guard for the whole fix. A category leaves the model to
+    choose the sound; with a face in frame it chooses voice."""
+    out = ltx25.finish_joint_av_positive(engine, _CORE)
+    assert banned not in out
+
+
+@pytest.mark.parametrize("core,expected_sound", [
+    ("she pushes the heavy door open", "a door latch clacking"),
+    ("rain hammering the window", "rain drumming"),
+    ("papers scattered across the desk", "papers rustling"),
+    ("boots on the metal deck", "metal clanking"),
+    ("he lifts the telephone", "a receiver clattering onto its cradle"),
+])
+def test_the_named_sounds_come_from_the_action_itself(core, expected_sound):
+    assert expected_sound in ltx25.finish_joint_av_positive(
+        "ltx25_foley_plus", core)
+
+
+def test_an_action_with_no_cue_still_NAMES_sounds():
+    """Falling back to a category here would reinstate the exact defect."""
     out = ltx25.finish_joint_av_positive(
-        "ltx25_mime", _CORE,
-        music_mood_terms=["  tense ", "", "tense", "melancholy", "brooding",
-                          "dropped"])
-    assert out == _CORE + ", tense, melancholy, brooding " + _MIME_TAIL
+        "ltx25_foley_plus", "a figure stands looking out")
+    assert "cloth shifting" in out
+    assert out.endswith(_NO_VOICE)
+    for banned in _BANNED_CATEGORIES:
+        assert banned not in out
 
 
-@pytest.mark.parametrize("moods", ["tense", None, 42, {"a": 1}, ("tense",)])
-def test_a_non_list_mood_value_yields_no_moods(moods):
-    """The brief declares `music_mood_terms: list[str]`. A bare string here is
-    a caller mistake, and treating it as one long mood is worse than ignoring
-    it."""
-    assert ltx25.finish_joint_av_positive(
-        "ltx25_mime", _CORE, music_mood_terms=moods) == \
-        _CORE + ", scene-appropriate " + _MIME_TAIL
+def test_at_most_three_sounds_are_named():
+    """One latent decodes the picture AND the audio, so a long sound list
+    competes with the visual half of the very same string."""
+    crowded = ("she runs through the rain past the fire, papers and glass "
+               "underfoot, a door and a clock and a bell and an engine")
+    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", crowded)
+    assert len(ltx25.named_sounds_for(crowded)) == 3
+    assert out.endswith(_NO_VOICE)
+
+
+def test_a_weapon_beat_names_NO_weapon_sound(capsys):
+    """THE BANANA COLLISION (r3, 2026-08-28).
+
+    `_otr_banana_route.apply` -- "transform every weapon noun" -- runs AFTER
+    this tail is composed, on a pinned ordering. Proven live: "the captain
+    raises his revolver toward the hatch" named "a hammer clicking back", and
+    the banana route then rendered "raises his banana". The picture showed a
+    banana while the audio asked for a revolver hammer.
+
+    The weapon cue was the ONLY lexicon entry whose subject that route
+    rewrites, so it is gone. This test is the guard against it returning.
+    """
+    core = "the captain raises his revolver toward the hatch"
+    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", core)
+    for weapon_sound in ("hammer", "gunshot", "shot", "cocking"):
+        assert weapon_sound not in out.split(core)[-1], \
+            "a weapon sound came back into the lexicon: %r" % out
+    # the beat is still finished, off its non-weapon cue
+    assert out.endswith(_NO_VOICE)
+    assert "a door latch clacking" in out          # "hatch"
+
+
+@pytest.mark.parametrize("cue,forbidden", [
+    ("archival documentary footage of the crew", "papers rustling"),
+])
+def test_a_style_cue_word_does_not_masquerade_as_an_action(cue, forbidden):
+    """`document` matched `documentary`, and `archival_documentary` is a real
+    style pack whose two-word video cue is literally "archival documentary" --
+    so every beat of that pack was asking for rustling paper."""
+    assert forbidden not in ltx25.finish_joint_av_positive(
+        "ltx25_foley_plus", cue)
+
+
+def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
+    """THE FALSE RECEIPT (r3, 2026-08-28).
+
+    A caller-supplied prompt merely ENDING in the no-voice clause used to come
+    back unchanged with no sound named at all, while observability still
+    reported joint_av_prompt=finished. Idempotency now requires the full
+    canonical terminator, so such a prompt gets properly finished.
+    """
+    bare = "an operator override that happens to end here. No speech, no voices."
+    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", bare)
+    assert out != bare
+    assert out.rstrip(" ,.;:").endswith(
+        ltx25.JOINT_AV_TERMINATOR.rstrip(" ,.;:"))
+
+
+def test_a_properly_finished_prompt_IS_left_alone():
+    """The other half of the same contract -- it must still be idempotent."""
+    once = ltx25.finish_joint_av_positive(
+        "ltx25_foley_plus", "hands on the console")
+    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", once) == once
+
+
+def test_the_fallback_names_exactly_ONE_sound():
+    """One latent decodes the picture AND the audio, so three simultaneous
+    fallback events are three instructions to the PICTURE too -- on the beat
+    least likely to contain them."""
+    sounds = ltx25.named_sounds_for("a figure stands looking out")
+    assert len(sounds) == 1, sounds
+    for invented in ("footsteps", "knocking"):
+        assert invented not in sounds[0]
+
+
+def test_the_receipt_records_WHICH_sounds_were_named(_text_only_lane):
+    """A receipt that cannot distinguish a good cue from a wrong one is not
+    evidence. `joint_av_prompt=finished` alone could not."""
+    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+                                     _open_ledger())
+    obs = req["observability"]
+    assert obs["joint_av_prompt"] == "finished"
+    assert obs["joint_av_sounds"]
+    for sound in obs["joint_av_sounds"]:
+        assert sound in req["text_prompt"]
 
 
 def test_the_finisher_is_idempotent():
     once = ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE)
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", once) == once
+    twice = ltx25.finish_joint_av_positive("ltx25_foley_plus", once)
+    # THREE passes, not two. The suffix is DERIVED FROM THE PROMPT, so once it
+    # is appended the prompt carries sound words the lexicon would match on a
+    # second read. A whole-suffix comparison would drift here; keying on the
+    # invariant no-voice clause is what holds it stable.
+    assert twice == once
+    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", twice) == once
+    assert once.count(_NO_VOICE) == 1
 
 
 def test_trailing_punctuation_is_trimmed_before_the_join():
     assert ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", _CORE + " ,.;: ") == _CORE + ", " + _FOLEY
+        "ltx25_foley_plus", _CORE + " ,.;: ") == _CORE_FINISHED
 
 
 @pytest.mark.parametrize("engine", ["ltx25_video", "minimax_h3_video", "humo",
@@ -512,7 +702,7 @@ def test_a_blank_positive_raises_and_names_the_engine(engine, blank):
 
 
 @pytest.mark.parametrize("engine,tail", [
-    ("ltx25_foley_plus", "No speech, no voices, pure action."),
+    ("ltx25_foley_plus", "No speech, no voices."),
     ("ltx25_mime", "No speech, no voices."),
 ])
 def test_the_non_speech_tail_is_last(engine, tail):
@@ -577,7 +767,7 @@ def test_the_ordinary_idempotent_case_still_holds():
 def test_the_helper_has_no_dialogue_argument():
     import inspect
     params = inspect.signature(ltx25.finish_joint_av_positive).parameters
-    assert set(params) == {"engine_id", "positive", "music_mood_terms"}
+    assert set(params) == {"engine_id", "positive"}
 
 
 # --------------------------------------------------------------------------- #
@@ -643,22 +833,31 @@ def test_a_foley_open_composes_a_real_prompt_and_finishes_it(_text_only_lane):
     prompt = req["text_prompt"]
     assert "a 1940s radio studio" not in prompt
     assert req["observability"]["prompt_source"] == "motion_role"
-    assert prompt.endswith(_FOLEY)
+    assert prompt.endswith(_NO_VOICE)
     assert req["observability"]["joint_av_prompt"] == "finished"
 
 
-def test_a_mime_open_reads_the_briefs_own_mood_terms(_text_only_lane):
+def test_a_mime_open_IGNORES_the_briefs_mood_terms(_text_only_lane):
+    """The mood terms used to LEAD the mime tail. Under the operator's ruling
+    mime takes the foley prompting unchanged, so a brief full of moods must
+    make no difference to the string -- the moods still reach the music
+    bookends, which is where they always belonged."""
     meta = dict(_BRIEF_META)
-    meta["music_mood_terms"] = ["  tense ", "", "tense", "elegiac", "hushed",
-                                "ignored"]
-    req = rd.build_request_from_shot(_open_shot("ltx25_mime"),
-                                     _open_ledger(meta))
-    assert req["text_prompt"].endswith("tense, elegiac, hushed " + _MIME_TAIL)
+    meta["music_mood_terms"] = ["tense", "elegiac", "hushed"]
+    with_moods = rd.build_request_from_shot(
+        _open_shot("ltx25_mime"), _open_ledger(meta))["text_prompt"]
+    without = rd.build_request_from_shot(
+        _open_shot("ltx25_mime"), _open_ledger())["text_prompt"]
+    assert with_moods == without
+    assert with_moods.endswith(_NO_VOICE)
+    for banned in _BANNED_CATEGORIES:
+        assert banned not in with_moods
 
 
-def test_a_mime_open_without_mood_terms_uses_the_default_lead(_text_only_lane):
+def test_a_mime_open_is_finished_with_named_sounds(_text_only_lane):
     req = rd.build_request_from_shot(_open_shot("ltx25_mime"), _open_ledger())
-    assert req["text_prompt"].endswith("scene-appropriate " + _MIME_TAIL)
+    assert _SOUND_FRAME in req["text_prompt"]
+    assert req["text_prompt"].endswith(_NO_VOICE)
 
 
 def test_a_silent_ltx25_character_beat_is_not_told_to_hold_still(
@@ -727,7 +926,9 @@ def test_the_operator_override_is_finished_too(monkeypatch, _text_only_lane):
     monkeypatch.setenv("OTR_LTX_RADIO_PROMPT", "OPERATOR SAYS EXACTLY THIS")
     req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
                                      _open_ledger())
-    assert req["text_prompt"] == "OPERATOR SAYS EXACTLY THIS, " + _FOLEY
+    assert req["text_prompt"].startswith("OPERATOR SAYS EXACTLY THIS,")
+    assert _SOUND_FRAME in req["text_prompt"]
+    assert req["text_prompt"].endswith(_NO_VOICE)
 
 
 def test_the_digest_and_length_describe_the_shipped_prompt(_text_only_lane):
@@ -756,7 +957,7 @@ def test_the_mandatory_tail_is_never_trimmed_by_a_prompt_budget(_text_only_lane)
                                      _open_ledger())
     prompt = req["text_prompt"]
     assert len(prompt) > 188, len(prompt)      # past the scene branch's budget
-    assert prompt.endswith(_FOLEY), prompt[-140:]
+    assert prompt.endswith(_NO_VOICE), prompt[-140:]
 
 
 def test_an_already_finished_prompt_still_gets_its_budget_cleared(
@@ -770,13 +971,15 @@ def test_an_already_finished_prompt_still_gets_its_budget_cleared(
     this seam exists to protect. A lane that keeps its audio owes that tail
     whether or not this call is what appended it.
     """
-    monkeypatch.setenv("OTR_LTX_RADIO_PROMPT",
-                       "a quiet console at midnight, " + _FOLEY)
+    monkeypatch.setenv(
+        "OTR_LTX_RADIO_PROMPT",
+        "a quiet console at midnight, with switches clicking and dials "
+        "turning, " + _SOUND_FRAME + ". " + _NO_VOICE)
     req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
                                      _open_ledger())
-    assert req["text_prompt"].count("pure action.") == 1     # not stacked
+    assert req["text_prompt"].count(_NO_VOICE) == 1          # not stacked
     assert req["observability"]["joint_av_prompt"] == "finished"
-    assert req["text_prompt"].endswith(_FOLEY)
+    assert req["text_prompt"].endswith(_NO_VOICE)
 
 
 def test_a_public_menu_id_on_the_shot_row_still_gets_finished(_text_only_lane):
@@ -790,7 +993,7 @@ def test_a_public_menu_id_on_the_shot_row_still_gets_finished(_text_only_lane):
     req = rd.build_request_from_shot(shot, _open_ledger())
     prompt = req["text_prompt"]
     assert req["observability"].get("joint_av_prompt") == "finished"
-    assert prompt.endswith(_FOLEY)
+    assert prompt.endswith(_NO_VOICE)
     # THE ASSERTIONS ABOVE ARE NOT SUFFICIENT ON THEIR OWN, and an earlier cut
     # of this test proved it: with the id unresolved at the SCENE allowlist the
     # beat kept build_request's hardcoded default and then had the suffix
@@ -808,7 +1011,7 @@ def test_a_public_menu_mime_id_is_also_finished(_text_only_lane):
     req = rd.build_request_from_shot(_open_shot("ltx25_high_mime"),
                                      _open_ledger())
     assert "a 1940s radio studio" not in req["text_prompt"]
-    assert req["text_prompt"].endswith(_MIME_TAIL)
+    assert req["text_prompt"].endswith(_NO_VOICE)
     assert req["observability"]["prompt_source"] == "motion_role"
 
 
@@ -853,7 +1056,7 @@ def test_a_character_beat_on_foley_gets_no_dialogue_end_to_end():
                                "path": "X:/img/still_b1.png"}]},
     })
     assert _LINE not in req["text_prompt"]
-    assert req["text_prompt"].endswith(_FOLEY)
+    assert req["text_prompt"].endswith(_NO_VOICE)
 
 
 @pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])

@@ -76,6 +76,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 
@@ -1994,51 +1995,192 @@ class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
 #: prefix match, because ``ltx25_video`` shares the prefix and must not finish.
 _JOINT_AV_ENGINES = ("ltx25_foley_plus", "ltx25_mime")
 
-_FOLEY_SUFFIX = ("matched environmental foley for the visible action, ambient "
-                 "room tone. No speech, no voices, pure action.")
+#: THE INVARIANT TERMINATOR. Every finished joint-AV positive ends with this
+#: exact clause, and the golden recipes are why it is worded this plainly.
+#:
+#: DO NOT "STRENGTHEN" IT. A previous attempt replaced it with a longer
+#: prohibition and added seven more voice tokens to the conditioning, which is
+#: the opposite of the goal -- text encoders handle negation badly, so naming
+#: SPEECH more often makes speech MORE likely. The lab's good results use this
+#: form, in this position, on this model. It is short on purpose.
+_NO_VOICE_CLAUSE = "No speech, no voices."
 
-#: The mime tail, shared by both mood shapes so the two cannot drift apart.
-_MIME_TAIL = ("instrumental scene score and non-speech ambience matching the "
-              "visible action. No speech, no voices.")
+#: How the named sounds are seated once they are chosen. "close and dry" asks
+#: for the sound of a room the action is happening IN, rather than a scored or
+#: reverberant mix the drama's own mixer would then have to fight.
+_SOUND_FRAME = "close and dry in the room"
 
-#: What leads the mime tail when the brief carried no mood.
-_MIME_DEFAULT_LEAD = "scene-appropriate"
+#: At most three named sounds. The golden recipes name two or three; a longer
+#: list starts competing with the visual half of the very same string, and on
+#: this lane the picture and the audio are decoded from one latent.
+_MAX_NAMED_SOUNDS = 3
 
-#: Three, mirroring ``_otr_music_prompt``'s own ``music_mood_terms[:3]`` -- one
-#: brief field should not be read two different ways by two consumers.
-_MIME_MAX_MOOD_TERMS = 3
+#: ACTION CUE -> THE SOUNDS THAT ACTION ACTUALLY MAKES.
+#:
+#: THIS TABLE IS THE WHOLE FIX (operator ruling 2026-08-27). Production used to
+#: append "matched environmental foley for the visible action, ambient room
+#: tone" -- which names NO SOUND AT ALL and leaves the model to choose one. With
+#: a human in frame it chose voice. The golden lab recipes never leave that
+#: choice open: they name "heavy wooden thud", "papers rustling", "rain
+#: drumming", "mechanical clanking". Naming the sound is the difference.
+#:
+#: Ordered, and the order is the priority -- the first three distinct matches
+#: win, so the most sound-producing actions sit near the top. Matching reads the
+#: composed positive, which already contains the beat's action text; that is
+#: deliberate and keeps this a PURE function of the prompt with no new ledger
+#: field, no writer pass, and no schema change (Option B: "no feature flag, no
+#: new schema, no new architecture").
+#:
+#: CUES MATCH ON A LEADING WORD BOUNDARY, NOT AS BARE SUBSTRINGS, and that is
+#: not a theoretical nicety -- a bare-substring pass demonstrably fired on
+#: "investigate" (gate -> a slamming door), "grunt" (run -> footsteps) and
+#: "sticking" (tick -> a clock). A quiet character beat asking for a slamming
+#: door is exactly the kind of wrong cue that makes the whole bed untrustworthy.
+#: The boundary is LEADING ONLY, so useful inflections still match: "paperwork"
+#: and "papers" both hit `paper`, "steps" hits `step`.
+_SOUND_LEXICON = (
+    (("door", "hatch", "gate"), "a door latch clacking and hinges creaking"),
+    (("typewriter", "typing", "keyboard"), "typewriter keys striking"),
+    (("switch", "dial", "knob", "lever", "console", "panel", "control"),
+     "switches clicking and dials turning"),
+    # "document" is NOT a cue: it matches "documentary", and the
+    # `archival_documentary` style pack's video cue is literally "archival
+    # documentary", which put papers rustling under every beat of that pack.
+    # "paper", "page", "file" and "letter" already carry the real cases.
+    (("paper", "page", "letter", "file", "map", "note"),
+     "papers rustling and pages turning"),
+    (("spark", "electric", "wire", "current", "circuit"),
+     "an electric buzz and sparks snapping"),
+    (("engine", "motor", "machine", "gear", "piston", "turbine"),
+     "machinery grinding and thrumming"),
+    (("radio", "static", "transmit", "signal", "receiver", "dispatch"),
+     "static hissing"),
+    (("glass", "bottle", "window", "mirror", "jar"), "glass clinking"),
+    (("metal", "steel", "iron", "pipe", "chain", "rail"), "metal clanking"),
+    (("rain", "storm", "downpour"), "rain drumming"),
+    (("wind", "gale", "draft"), "wind moaning"),
+    (("fire", "flame", "burn", "match", "lantern"), "fire crackling"),
+    (("water", "river", "sea", "wave", "pour"), "water sloshing"),
+    (("key", "lock", "bolt"), "keys jangling and a lock turning"),
+    (("phone", "telephone", "cradle"), "a receiver clattering onto its cradle"),
+    (("bell", "chime"), "a single struck bell"),
+    # "watch" is NOT a cue here. It was meant as the wristwatch, but "watches"
+    # is far commoner as the VERB -- "she watches the horizon" was asking for
+    # a ticking clock in an empty landscape. "clock" and "tick" carry it.
+    (("clock", "tick"), "a clock ticking"),
+    (("book", "ledger", "volume"), "a heavy book thumping shut"),
+    (("box", "crate", "lid", "case", "trunk"), "a wooden lid thudding"),
+    # NO WEAPON CUE, AND THAT IS DELIBERATE (r3 finding, 2026-08-28). The
+    # banana route -- "transform every weapon noun", `_otr_banana_route.apply`
+    # -- runs AFTER this tail is composed, on a PINNED ordering. Proven live:
+    # "the captain raises his revolver toward the hatch" named "a hammer
+    # clicking back", and the banana route then rendered "raises his banana".
+    # The picture showed a banana while the audio asked for a revolver hammer.
+    # This was the ONLY lexicon entry whose subject that route rewrites, so
+    # dropping it removes the whole collision class rather than patching a
+    # symptom. Re-ordering the seam instead would touch a pinned QA ruling and
+    # is recorded as an open design item, not smuggled in here.
+    (("horse", "hoof", "hooves"), "hooves striking stone"),
+    (("crowd", "street", "market", "platform"), "a crowd murmuring far off"),
+    (("chair", "table", "desk", "bench", "stool"),
+     "wood scraping across the floor"),
+    (("coat", "cloth", "sleeve", "fabric", "curtain"), "cloth shifting"),
+    (("step", "walk", "pace", "stride", "foot", "boot", "run"),
+     "footsteps landing on the floor"),
+)
+
+#: Compiled once at import. Keyed by the cue string itself so the lexicon
+#: above stays readable as data rather than as a wall of escaped patterns.
+_CUE_PATTERNS = {cue: re.compile(r"\b" + re.escape(cue))
+                 for cues, _sound in _SOUND_LEXICON for cue in cues}
+
+#: WHEN NOTHING MATCHES, STILL NAME SOUNDS. Falling back to a category here
+#: would reinstate exactly the defect this table exists to remove, so the
+#: fallback is concrete: the quietest sound a present body makes.
+#:
+#: ONE CUE, NOT THREE (r3 finding, 2026-08-28). The fallback used to name cloth
+#: AND footsteps AND objects striking wood. One latent decodes the picture and
+#: the audio from this string, so three simultaneous events are three
+#: instructions to the PICTURE as well -- on a beat whose action matched
+#: nothing, which is precisely the beat least likely to contain them. A single
+#: conservative cue cannot invent a walk or a dropped object.
+_FALLBACK_SOUNDS = ("cloth shifting as the body settles",)
 
 
-def _normalize_mood_terms(music_mood_terms):
-    """First-seen unique, stripped, non-blank mood terms, capped at three.
+def named_sounds_for(positive):
+    """The sounds this action would actually make, most telling first.
 
-    A NON-LIST yields none, deliberately, and that includes a bare string: the
-    brief declares ``music_mood_terms: list[str]``
-    (``_otr_story_brief.py:147``), so a string here is a caller handing over the
-    wrong thing, and treating it as one long mood is worse than ignoring it.
+    Reads the composed positive because that is where the beat's action text
+    already lives. Returns at most ``_MAX_NAMED_SOUNDS`` distinct phrases, and
+    NEVER returns an empty list -- an unnamed sound request is the defect.
     Pure.
     """
-    if not isinstance(music_mood_terms, list):
-        return []
-    out = []
-    for term in music_mood_terms:
-        if not isinstance(term, str):
+    text = str(positive or "").lower()
+    found = []
+    for cues, sound in _SOUND_LEXICON:
+        if sound in found:
             continue
-        cleaned = term.strip()
-        if cleaned and cleaned not in out:
-            out.append(cleaned)
-            if len(out) >= _MIME_MAX_MOOD_TERMS:
-                break
-    return out
+        if any(_CUE_PATTERNS[cue].search(text) for cue in cues):
+            found.append(sound)
+            if len(found) >= _MAX_NAMED_SOUNDS:
+                return found
+    if not found:
+        return list(_FALLBACK_SOUNDS)
+    return found
 
 
-def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
+def _join_sounds(sounds):
+    """``a, b and c`` -- an Oxford-free list, because this is spoken prose."""
+    if len(sounds) == 1:
+        return sounds[0]
+    return "%s and %s" % (", ".join(sounds[:-1]), sounds[-1])
+
+
+#: THE FULL CANONICAL TERMINATOR -- what a finished joint-AV prompt ends with,
+#: whatever sounds were named. Invariant, because both halves are constants.
+#:
+#: IDEMPOTENCY KEYS ON THIS, NOT ON THE NO-VOICE CLAUSE ALONE (r3 finding,
+#: 2026-08-28). A caller-supplied prompt that merely ended in "No speech, no
+#: voices." -- an operator override, a hand-written fixture -- came back
+#: unchanged with NO sound named, while observability still reported
+#: `joint_av_prompt=finished`. That is a false receipt on the exact field used
+#: to prove the lane got its audio requirement.
+JOINT_AV_TERMINATOR = "%s. %s" % (_SOUND_FRAME, _NO_VOICE_CLAUSE)
+
+
+def build_joint_av_suffix(positive):
+    """The audio requirement for a joint-AV lane, with its sounds NAMED.
+
+    Shape, and each part earns its place (see the problem statement at
+    ``docs/2026-08-27-action-prompting/LTX25_AUDIO_PROMPTING_PROBLEM_STATEMENT.md``)::
+
+        with <named sounds>, close and dry in the room. No speech, no voices.
+
+    KNOWN AND DELIBERATE: the golden recipes INTERLEAVE sound into the action
+    sentence, and this appends instead. Whether interleaving is required or
+    whether naming is sufficient is that document's open question 2, and
+    appending is the form that can be added without rewriting every lane's
+    formatter. If a future arm shows interleaving matters, this is the seam
+    that moves. Pure.
+    """
+    return "with %s, %s. %s" % (_join_sounds(named_sounds_for(positive)),
+                                _SOUND_FRAME, _NO_VOICE_CLAUSE)
+
+
+def finish_joint_av_positive(engine_id, positive):
     """Append this lane's audio requirement to an already-composed positive.
 
     FINISHES, never replaces: the caller's visual core is preserved verbatim and
     the suffix appended, so every engine's own prompt dialect, style cue and era
-    tail survive untouched. Idempotent -- a positive already ending in its
-    suffix comes back unchanged, so a second call cannot stack the tail.
+    tail survive untouched.
+
+    FOLEY AND MIME GET THE IDENTICAL STRING (operator, 2026-08-27: *"foley /
+    mime same thing, they use the new foley prompting"* and *"the only
+    difference between foley and mime is the mux layer"*). The old mime branch
+    led with the brief's mood terms and asked for "instrumental scene score" --
+    a CATEGORY, not a sound, and so the same defect the foley tail had. There is
+    now one shape, so the two cannot drift apart, and the lanes differ where the
+    operator says they differ: at the mixer.
 
     Takes NO dialogue argument, and that is the point. These lanes GENERATE
     audio but are not audio-IN lanes: nothing spoken may reach them, and the
@@ -2059,27 +2201,19 @@ def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
             "conditions the picture AND the generated audio from this one "
             "string, so there would be nothing for the foley or the score to "
             "match." % eid)
-    if eid == "ltx25_foley_plus":
-        suffix = _FOLEY_SUFFIX
-    else:
-        moods = _normalize_mood_terms(music_mood_terms)
-        lead = ", ".join(moods) if moods else _MIME_DEFAULT_LEAD
-        suffix = "%s %s" % (lead, _MIME_TAIL)
     core = positive.rstrip()
-    # ALREADY FINISHED? Compare with trailing punctuation normalised on BOTH
-    # SIDES (2026-08-27). Each suffix ends in a period of its OWN, so a prompt
-    # that legitimately ends in one is caught by the first test; the second
-    # catches a prompt carrying stray punctuation AFTER the suffix, which the
-    # first cannot see.
-    #
-    # The obvious-looking repair -- strip the core first, then test -- is WRONG
-    # and was proposed as the fix by a panel lane: stripping the core removes
-    # the suffix's own period, so an already-finished prompt fails the test and
-    # collects a SECOND copy of the suffix. That would have turned a narrow
-    # edge case into a defect on the common path.
+    # IDEMPOTENCY KEYS ON THE CANONICAL TERMINATOR, NOT ON THE WHOLE SUFFIX.
+    # The suffix is DERIVED FROM THE PROMPT, so once appended the prompt carries
+    # sound words -- "door", "glass", "metal" -- that the lexicon would match on
+    # a second pass, producing a DIFFERENT suffix and defeating a whole-suffix
+    # comparison. `JOINT_AV_TERMINATOR` is built from two constants, so it is
+    # invariant across every lane and every action while still proving a sound
+    # frame is actually present. Trailing punctuation is normalised on both
+    # sides so a prompt carrying stray punctuation after it is still recognised.
     trimmed = core.rstrip(" ,.;:")
-    if core.endswith(suffix) or trimmed.endswith(suffix.rstrip(" ,.;:")):
+    if trimmed.endswith(JOINT_AV_TERMINATOR.rstrip(" ,.;:")):
         return positive
+    suffix = build_joint_av_suffix(core)
     return (trimmed + ", " + suffix) if trimmed else suffix
 
 
@@ -2180,11 +2314,14 @@ def compose_ltx25_foley_plus(self, inputs):
     has to EARN the bed: hands on dials, papers, switches, footfalls.
 
     IT WRITES NO AUDIO INSTRUCTION. ``finish_joint_av_positive`` is the sole
-    owner of this lane's audio tail and appends it once, downstream. That
-    function's idempotency is EXACT suffix matching, so a formatter ending in
-    its own sound-adjacent wording would fail to match and the canonical tail
-    would be appended anyway -- leaving two different audio clauses instead of
-    one. The phrasing below stays visual for that reason.
+    owner of this lane's audio tail and appends it once, downstream. Its
+    idempotency now keys on ``JOINT_AV_TERMINATOR`` -- a constant built from the
+    sound frame and the no-voice clause -- rather than on the whole suffix,
+    because the suffix is derived from the prompt and cannot be compared
+    against itself. A formatter that ended in its own sound wording would still
+    fail to carry that terminator and would collect the canonical tail anyway,
+    leaving two audio clauses instead of one. The phrasing below stays visual
+    for that reason.
     """
     core = _ltx25_parts(inputs)
     if not core:
@@ -2198,8 +2335,16 @@ def compose_ltx25_mime(self, inputs):
 
     **NOT an audio-in lane either.** The performance carries the beat with no
     speech at all, so the action reads larger than its siblings and lands on a
-    held final pose. Like foley it writes NO audio instruction: the ambience
-    tail belongs to ``finish_joint_av_positive`` alone.
+    held final pose. Like foley it writes NO audio instruction: the sound tail
+    belongs to ``finish_joint_av_positive`` alone.
+
+    AND IT IS NOW THE SAME TAIL FOLEY GETS, verbatim (operator, 2026-08-27:
+    *"the only difference between foley and mime is the mux layer"*). This lane
+    used to receive a mood-led request for "instrumental scene score" -- a
+    CATEGORY, which left the model to pick the sound and, with a person in
+    frame, it picked voices. The PICTURE is still this lane's own: a mime beat
+    plays larger and holds its endpoint, which is what the two formatters
+    genuinely differ on.
     """
     core = _ltx25_parts(inputs)
     if not core:
@@ -2220,4 +2365,5 @@ Ltx25MimeEngine.compose_prompt = compose_ltx25_mime
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
-           "finish_joint_av_positive"]
+           "finish_joint_av_positive", "build_joint_av_suffix",
+           "named_sounds_for", "JOINT_AV_TERMINATOR"]

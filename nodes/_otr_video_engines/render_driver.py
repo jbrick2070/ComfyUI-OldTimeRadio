@@ -1446,6 +1446,28 @@ def _prefix_video_style_cue(vstyle, prompt):
     return prefix_style_cue(vstyle, prompt)
 
 
+def _style_cue_after_pinned_opener(vstyle, prompt):
+    """Apply the style cue, but never in front of a lane's REQUIRED opener.
+
+    Returns the ordinary prefixed prompt for every lane that has no pinned
+    opener, so this is a no-op everywhere except the two H3 lanes. Pure.
+    """
+    text = str(prompt or "")
+    try:
+        from .eng_minimax_h3 import H3_REFERENCE_OPENER
+    except ImportError:  # pragma: no cover -- flat test imports
+        from eng_minimax_h3 import H3_REFERENCE_OPENER  # type: ignore
+    if not text.startswith(H3_REFERENCE_OPENER):
+        return _prefix_video_style_cue(vstyle, text)
+    rest = text[len(H3_REFERENCE_OPENER):].lstrip()
+    if not rest:
+        return text
+    cued = _prefix_video_style_cue(vstyle, rest)
+    if cued == rest:                      # default pack -> empty cue
+        return text
+    return "%s %s" % (H3_REFERENCE_OPENER, cued)
+
+
 def _ia2v_talking_register_active(engine_id):
     """True iff ``engine_id`` is the ltx_audio_in lane AND its active recipe
     is the two-stage ia2v_canonical lip-sync graph (engine-owned decision --
@@ -3088,7 +3110,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # split are deliberately NOT applied here. Style cue still runs (one
         # owner, unchanged), and the joint-AV / safety / banana finalizers
         # further down are untouched and each still run exactly once.
-        text_prompt = _prefix_video_style_cue(_vstyle, text_prompt)
+        #
+        # A PINNED OPENER OUTRANKS THE CUE'S POSITION, NOT THE CUE ITSELF
+        # (2026-08-28). `_prefix_video_style_cue` PREPENDS, and the two H3
+        # lanes require `H3_REFERENCE_OPENER` verbatim as the FIRST thing in
+        # the prompt -- the official one-image I2VA grammar. Prepending the cue
+        # made "must begin exactly" false on every non-default style pack:
+        # proven on the anime pack, where the prompt became "anime style. For
+        # the target video, ...". `eng_minimax_h3.py` already documented these
+        # lanes as exempt from the prefix; nothing implemented it.
+        #
+        # The cue is SEATED AFTER THE OPENER rather than dropped, so both
+        # contracts hold at once -- an exemption would silently lose the pack's
+        # look on two lanes. The default sci_fi_radio pack yields an empty cue,
+        # which is why this never surfaced in production.
+        text_prompt = _style_cue_after_pinned_opener(_vstyle, text_prompt)
         req["text_prompt"] = text_prompt
         _stamp_prompt_meta(req, "engine:%s" % _eng_id, text_prompt,
                            subsource=str(creative.get("source") or ""),
@@ -3463,25 +3499,21 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _jav_engine = _engine_id
     if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
         try:
-            from .._otr_brief_reader import _read_brief_field
+            from .eng_ltx25 import (JOINT_AV_TERMINATOR,
+                                    finish_joint_av_positive, named_sounds_for)
         except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_brief_reader import _read_brief_field  # type: ignore
-        try:
-            from .eng_ltx25 import finish_joint_av_positive
-        except ImportError:  # pragma: no cover -- flat test imports
-            from eng_ltx25 import finish_joint_av_positive  # type: ignore
-        # Mime scores the scene, so it reads the brief's OWN mood terms. No
-        # cascade into atmosphere or script text: `_otr_music_prompt` already
-        # owns that fallback ladder for the music bookends, and a second,
-        # slightly different ladder here is how two consumers of one brief
-        # field quietly drift apart.
-        _jav_moods = (
-            _read_brief_field((ledger or {}).get("meta") or {},
-                              "music_mood_terms", default=[])
-            if _jav_engine == "ltx25_mime" else [])
+            from eng_ltx25 import (  # type: ignore
+                JOINT_AV_TERMINATOR, finish_joint_av_positive, named_sounds_for)
+        # NO MOOD READ ANY MORE (operator, 2026-08-28). Mime used to lead its
+        # tail with the brief's music_mood_terms and ask for "instrumental
+        # scene score" -- a CATEGORY, which is precisely the defect that made
+        # the foley bed choose voices. The operator collapsed the two lanes to
+        # one prompt: "foley / mime same thing, they use the new foley
+        # prompting ... the only difference between foley and mime is the mux
+        # layer". The brief's mood terms still drive the MUSIC bookends through
+        # `_otr_music_prompt`, which was always their real owner.
         _jav_before = str(req.get("text_prompt") or "")
-        _jav_after = finish_joint_av_positive(
-            _jav_engine, _jav_before, music_mood_terms=_jav_moods)
+        _jav_after = finish_joint_av_positive(_jav_engine, _jav_before)
         # THE PROTECTION IS UNCONDITIONAL, THE MUTATION IS NOT (2026-08-27,
         # found independently by two panel lanes). These two lines used to sit
         # inside the `!=` branch below, so a prompt that ALREADY carried its
@@ -3494,7 +3526,25 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _prompt_char_budget = None
         _prompt_protected_clause = None
         _jav_obs = req.setdefault("observability", {})
-        _jav_obs["joint_av_prompt"] = "finished"
+        # THE RECEIPT HAS TO BE PROVABLE, NOT ASSERTED (r3 finding, 2026-08-28).
+        # This field used to be stamped "finished" unconditionally, so a prompt
+        # that came back WITHOUT a sound frame -- an operator override already
+        # ending in the no-voice clause, say -- still reported finished. That is
+        # a false claim in the one field used to prove the lane received its
+        # audio requirement, and evidence in this repo is cited by hash.
+        # Stamp what is actually true of the string, and record WHICH sounds
+        # were named so a reader can tell a good cue from a wrong one without
+        # re-deriving it.
+        _jav_ok = _jav_after.rstrip(" ,.;:").endswith(
+            JOINT_AV_TERMINATOR.rstrip(" ,.;:"))
+        _jav_obs["joint_av_prompt"] = "finished" if _jav_ok else "UNFINISHED"
+        if _jav_after != _jav_before:
+            _jav_obs["joint_av_sounds"] = named_sounds_for(_jav_before)
+        if not _jav_ok:
+            _LOG.warning(
+                "[OTR.render_driver] JOINT-AV: %s beat %s did NOT end with the "
+                "canonical audio terminator -- the lane keeps its audio and "
+                "owes that clause", _jav_engine, _beat_id_for_shot(shot))
         if _jav_after != _jav_before:
             req["text_prompt"] = _jav_after
             # Restamp the digest and length ONLY, following the banana

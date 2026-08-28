@@ -7274,12 +7274,29 @@ to re-id and update its references in the same change.
 - the A/B that settles it: `ltx25_mime` at gain **1.00** on equally quiet stems
   published the same day and the operator's verdict was *"sounds great"*. Same
   engine, same mux, same stem levels -- only the gain differs.
-- fix: **NOT YET IMPLEMENTED.** Panel (Codex + Cursor) converged: no single
-  larger constant can work, because the stems span 21.2 dB RMS. The remedy is
-  to reference each stem before applying the ratio, which requires AMENDING
-  RULING 2 (`docs/2026-08-26-foley-bed-OPERATOR-RULINGS.md`), whose text forbids
-  a per-stem normalization pass by name. That is an operator decision and is
-  the outstanding item.
+- fix: **RESOLVED 2026-08-27, AND NOT THE WAY THIS ENTRY PREDICTED. NO GAIN
+  WAS CHANGED AND RULING 2 NEVER NEEDED AMENDING.** The panel and this entry
+  both diagnosed the MIXER, reasoning that a bare 0.20 multiplier on stems
+  spanning 21.2 dB RMS could not be rescued by any single constant. That was
+  sound reasoning about the wrong stage. The stems were quiet because the
+  PICTURE was barely moving: the per-lane motion prompts committed in
+  `65538f41` were never reaching the engines, sitting on the dead side of a
+  `get("text_prompt") or <lane default>` fallback that ShotLock populated
+  unconditionally. A lane whose picture holds still has nothing to make a
+  sound about, and LTX 2.5 decodes both halves from one latent.
+  With the dispatch seam landed (`24f85f95`, `34253841`) and the SAME
+  `FOLEY_LANE_GAINS` value of 0.20, raw stems moved from **-34.4..-56.2 dBFS to
+  -14.0..-41.5**, and bed-vs-programme from **-35..-56 dB under to -6.6..-21.4**
+  -- inside or above the 15-25 band rather than 45 dB below it. The operator
+  called it before the measurement did: *"shouldn't we be rendering a foley?"*
+  **The lesson, and it is the reusable part: a level problem measured at the
+  mixer can be an ACTION problem authored upstream.** Reference the stage that
+  PRODUCES the signal before rescaling the stage that carries it.
+- residual, and it is the opposite defect: four beats now sit slightly FORWARD
+  of the band rather than under it. That is an operator listening call, not a
+  fault. The replay instrument used to report both directions as "NOT audible";
+  it now names BURIED versus TOO FORWARD, because telling a reader to raise a
+  gain that is already too high is worse than saying nothing.
 - verify idea: `scripts/otr_replay_foley_mix.py <episode_dir>` replays the mix
   from disk in ~2 s. Success is per-beat RMS(bed in window) - RMS(programme in
   window) landing in the intended band; extend the replay to print that column
@@ -7319,3 +7336,53 @@ to re-id and update its references in the same change.
   character beats visibly move. **The live half is still owed: no episode has
   yet rendered with these defaults.**
 - bible-worthy: YES, promoted as `12.138`.
+
+## PBUG-20260828-01 -- the foley prompt named no sound at all, so the model chose voices
+
+- surfaced: published episode
+  `signal_lost_a_name_stripped_bare_20260827_195142` (8 beats on
+  `ltx25_foley_plus`, RESULT SUCCESS, `obs_publish OK`, 76.5 MB), operator by
+  ear 2026-08-27: *"is speech the best word, or dialogue is bleeding into the
+  prompt"*. The bed was finally AUDIBLE (see PBUG-20260827-03) and what became
+  audible was talking.
+- symptom: the generated foley bed contains voice-like material on a lane that
+  receives no dialogue and must never produce speech.
+- root cause: the audio tail was a CATEGORY, not a sound. Production appended
+  `"matched environmental foley for the visible action, ambient room tone. No
+  speech, no voices, pure action."` -- which names no sound whatsoever. It asks
+  the model to match the action and leaves the model to decide what matching
+  sounds like; `ltx25_foley_plus` and `ltx25_mime` decode picture and audio
+  from ONE latent, so with a human face in frame the unnamed request is filled
+  with the most face-shaped sound available: a voice. The mime lane had the
+  same defect in different words, asking for `"instrumental scene score"`.
+- ruled out, with evidence: **the negation is NOT the bug.** A first attempt
+  read `"No speech, no voices"` as the fault and proposed strengthening it,
+  which added seven more voice tokens to the conditioning. The lab's
+  known-good recipes use that exact short phrase in that exact position and
+  they are the GOOD result. **The lab's "never direct the audio" doctrine also
+  does not apply** -- that is H3 MUSIC guidance, and conflating two models'
+  doctrines is the family-thinking this sprint exists to remove.
+- fix: name the sounds. An ordered cue table maps the beat's own action
+  vocabulary to the sounds that action makes, at most three, seated `"close
+  and dry in the room"`, ending in the unchanged no-voice clause. When nothing
+  matches it still names a sound rather than falling back to a category, since
+  a category is the defect. Foley and mime now receive the IDENTICAL string
+  (operator: *"the only difference between foley and mime is the mux layer"*).
+- three defects the r3 review caught in the fix itself, all fixed and covered:
+  a weapon cue that desynchronised from `_otr_banana_route` (which transforms
+  every weapon noun AFTER the tail is composed -- proven: a revolver beat named
+  "a hammer clicking back" while the picture rendered a banana); an idempotency
+  marker weak enough that a prompt merely ending in the no-voice clause was
+  stamped `joint_av_prompt=finished` with no sound named at all; and a `document`
+  cue that matched `documentary`, putting rustling paper under every beat of
+  the `archival_documentary` style pack.
+- verify idea: `joint_av_sounds` in the request observability now records which
+  phrases were named, so a wrong cue is readable from the receipt without
+  re-deriving it. A live leg per joint-AV lane published to `otr/obs/`, plus the
+  operator's ear on the bed, is the real gate -- **still owed at the time of
+  writing; legs are rendering.**
+- bible-worthy: CANDIDATE. The reusable class is *"an unnamed generative
+  request is not a neutral one -- the model fills it, and on a joint latent it
+  fills it with whatever the picture suggests"*. Check
+  `otr_coverage_index.yaml` before promoting; it is adjacent to but distinct
+  from `12.137` (foley audibility) and `12.138` (damping adjectives).
