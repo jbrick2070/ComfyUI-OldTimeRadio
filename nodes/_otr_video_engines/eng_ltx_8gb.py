@@ -1591,3 +1591,36 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
 
 __all__ = ["Ltx8gbEngine", "RECIPE_LTX8_I2V"]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+def compose_ltx_8gb(self, inputs):
+    """`ltx_8gb` -- one literal atomic action with a visible endpoint.
+
+    LTX-Video 0.9.8 distilled 2B: a separate checkpoint and recipe from LTX 2.3
+    and 2.5, so it borrows NEITHER lane's assumptions. Prompt is the only
+    production semantic control here and the exact maximum is unmeasured, so
+    complex choreography and travel stay out until there is exact evidence.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+    tail = (", %s" % camera) if camera else ", camera locked"
+    return ("%s, a single clear action completed on screen%s"
+            % (core.rstrip(" ,."), tail))
+
+
+Ltx8gbEngine.compose_prompt = compose_ltx_8gb

@@ -1240,3 +1240,72 @@ __all__ = [
     "H3_MODEL_RUNGS", "H3_CANVAS_RUNGS", "H3_MODEL_FPS", "H3_CANVAS_FPS",
     "H3_RECIPE", "H3_RECIPE_RECEIPT",
 ]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+#: THE OFFICIAL ONE-IMAGE I2VA REFERENCE LINE, required verbatim as the FIRST
+#: thing in an H3 prompt. Pinned here because it was not previously in this
+#: file at all. See also: these lanes are exempt from the style-cue PREFIX in
+#: render_driver, which would otherwise push text in front of this opener and
+#: make "must begin exactly" false on any non-default style pack.
+H3_REFERENCE_OPENER = (
+    "For the target video, at 0.00 seconds into the target video, "
+    "<Picture 1> (from [Shot 1]) is fully referenced."
+)
+
+def compose_minimax_h3_video(self, inputs):
+    """`minimax_h3_video` -- silent. The official one-image I2VA grammar.
+
+    The opener is REQUIRED VERBATIM and is pinned here because it did not exist
+    in this file before: the old default said "the subject crosses the frame".
+    Exactly one <Picture 1>, and NO dialogue, <Audio, overall_soundscape or
+    non_diegetic_music -- omitting the audio fields is the correct silent-lane
+    behaviour; emitting "N/A" is not.
+
+    One flowing action with explicit TEMPO, then one camera type/amplitude/speed
+    described separately. Prompt is the only exposed semantic motion control on
+    this lane; speed wording is a request, not proof of displacement.
+    """
+    core = _parts(inputs)
+    if not core:
+        return _legacy(inputs)
+    return ("%s %s, the movement carried at a clear steady tempo to a visible "
+            "endpoint" % (H3_REFERENCE_OPENER, core.rstrip(" ,.")))
+
+
+def compose_minimax_h3_audio_in(self, inputs):
+    """`minimax_h3_audio_in` -- lip-sync plus JUST ENOUGH movement.
+
+    Human-reviewed lab result: PASS at 5.17s on seed 43, and the IDENTICAL
+    prompt FAILED on seed 42 -- so this lane is seed-sensitive and its recorded
+    failure mode is the jaw, chin and collar reshaping as the head approaches
+    yaw. Hence: ONE weight shift or forward lean plus a small head tilt, staying
+    frontal, and STOP BEFORE PROFILE.
+
+    Dialogue is retained here (this lane preserves it) and referenced against
+    <Audio 1>, which is what the upstream grammar asks for.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    line = str((inputs or {}).get("dialogue") or "").strip()
+    spoken = (" <d>[English]%s</d>, synchronised to <Audio 1>" % line) if line else ""
+    return ("%s %s, one slight forward weight shift and a small head tilt, "
+            "staying frontal with the mouth and jaw clearly visible, camera "
+            "locked%s" % (H3_REFERENCE_OPENER, core.rstrip(" ,."), spoken))
+
+
+MiniMaxH3VideoEngine.compose_prompt = compose_minimax_h3_video
+MiniMaxH3AudioInEngine.compose_prompt = compose_minimax_h3_audio_in

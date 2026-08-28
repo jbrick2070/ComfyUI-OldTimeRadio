@@ -511,3 +511,42 @@ __all__ = [
     "_extract_video_output",
     "_interaction_payload",
 ]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# This lane takes the ORDINARY request path (provider_side, but its prompt
+# arrives as request text_prompt), so it binds a formatter like a local lane
+# rather than editing a partner conditioner. Bound to the class itself:
+# dispatch reads type(engine).__dict__, so nothing here can leak to a sibling.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+def _google_chronological(inputs, tail):
+    """Chronological action, endpoint, then ONE camera behaviour.
+
+    Both Google lanes want the same SHAPE and neither exposes a numeric motion
+    control, so the prompt is the only lever. They are bound separately anyway,
+    so either can diverge without touching the other.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+    move = camera if camera else "one small camera move"
+    return ("%s, the action developing decisively across the shot -- turning, "
+            "reaching, rising or crossing the space as the beat calls for -- "
+            "and finishing on a clear final position. Camera: %s. %s"
+            % (core.rstrip(" ,."), move, tail))
+
+
+def compose_googleomnivideoengine(self, inputs):
+    """`GoogleOmniVideoEngine` -- Gemini Omni Flash Preview; provider chooses 3-10s; NO numeric motion control exists, so the prompt is the whole lever."""
+    return _google_chronological(inputs, "One continuous shot, no cuts.")
+
+
+GoogleOmniVideoEngine.compose_prompt = compose_googleomnivideoengine

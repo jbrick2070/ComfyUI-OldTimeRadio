@@ -1352,3 +1352,49 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
 __all__ = ["WanTi2vEngine", "RECIPE_WAN_TI2V", "WAN_TI2V_RECIPE",
            "PREQUALIFICATION_ENV"]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+#: The official TI2V finished-prompt limit, applied to THIS lane only.
+WAN_MAX_WORDS = 100
+
+
+def compose_wan_ti2v(self, inputs):
+    """`wan_ti2v` -- subject action and camera described INDEPENDENTLY.
+
+    Upstream teaches temporal, cause-and-effect prose rather than
+    comma-separated motion tags, and caps the finished prompt at 100 words.
+    That cap is self-checked here because the banana funnel is CHARACTER-based
+    and has no word cap to delegate to.
+
+    The shipped recipe (30 steps, CFG 5.0, shift 5.0) sits in a normal guidance
+    regime -- that does NOT make shift or CFG amplitude sliders, and none of
+    them move for this feature.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+    text = ("%s, and as the action completes it settles on a clear final "
+            "position" % core.rstrip(" ,."))
+    if camera:
+        text = "%s. Camera: %s" % (text, camera)
+    words = text.split()
+    if len(words) > WAN_MAX_WORDS:
+        text = " ".join(words[:WAN_MAX_WORDS])
+    return text
+
+
+WanTi2vEngine.compose_prompt = compose_wan_ti2v

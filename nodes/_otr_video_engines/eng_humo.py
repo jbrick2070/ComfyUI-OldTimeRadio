@@ -1522,3 +1522,73 @@ __all__ = [
     "HuMoEngine", "HuMo14BLandscapeEngine",
     "HuMo17BEngine", "HuMo17BLandscapeEngine",
 ]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+def _humo_envelope(inputs, *, allow_shoulder=False):
+    """The shared SAFE ENVELOPE assembly for the HuMo family.
+
+    Bound separately to each HuMo class below -- never inherited -- so the four
+    variants stay independently editable even though they currently agree.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    minor = ("one small shoulder response" if allow_shoulder
+             else "one nod or a small gesture kept below the chin")
+    return ("%s, medium-close and frontal with the mouth and jaw continuously "
+            "visible, one controlled lean or weight shift plus %s, camera "
+            "locked, hands and props clear of the face"
+            % (core.rstrip(" ,."), minor))
+
+
+def compose_humo(self, inputs):
+    """`humo` -- HuMo 14B FP8. The highest-confidence local lip-sync lane.
+
+    Human PASS at 3.88s and the bake-off winner. Its documented first failure is
+    HANDS OR PROPS NEAR THE FACE, so the envelope names that explicitly. A tiny
+    push may REPLACE the lean; it must never accompany it -- they are separate
+    rungs on the ladder, not a combination.
+    """
+    return _humo_envelope(inputs)
+
+
+def compose_humo_14b_169(self, inputs):
+    """`humo_14B_169` -- the same 14B recipe, wide. Same envelope."""
+    return _humo_envelope(inputs)
+
+
+def compose_humo_17b(self, inputs):
+    """`humo_1.7B` -- human PASS at 5.16s, accurate and stable.
+
+    Slightly more permissive than 14B on shoulder movement, per the lab's own
+    per-lane row; still locked camera and restrained gestures.
+    """
+    return _humo_envelope(inputs, allow_shoulder=True)
+
+
+def compose_humo_17b_169(self, inputs):
+    """`humo_1.7B_169` -- 1.7B wide. Same conservative envelope.
+
+    The wide aspect's exact motion limit is UNMEASURED, so it does not get more
+    than its portrait sibling on the strength of aspect alone.
+    """
+    return _humo_envelope(inputs, allow_shoulder=True)
+
+
+HuMoEngine.compose_prompt = compose_humo
+HuMo14BLandscapeEngine.compose_prompt = compose_humo_14b_169
+HuMo17BEngine.compose_prompt = compose_humo_17b
+HuMo17BLandscapeEngine.compose_prompt = compose_humo_17b_169

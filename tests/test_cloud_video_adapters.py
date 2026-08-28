@@ -330,21 +330,32 @@ def test_seedance_prompt_conditioner_softens_risky_music_open():
         _MUSIC_OPEN_RISKY_PROMPT)
     lower = conditioned.lower()
 
+    # ARTIFACT GUARDS ONLY, as of 2026-08-27 (operator: "these cloud engines
+    # can handle lip sync and motion so give them the max"). Two softeners were
+    # REMOVED because they damped rather than protected -- and this test now
+    # pins that split rather than the old blanket softening.
+    #
+    #   whip_pans / white_hot  -> KEPT. Whip pans are a documented failure mode
+    #                             on this family and blown highlights are an
+    #                             artifact; neither is "motion".
+    #   aggressively           -> GONE. It rewrote to "subtly", which is the
+    #                             exact word PBUG-20260827-04 banned.
+    #   dynamic_dolly_push     -> GONE. It rewrote decisive camera work into
+    #                             "slow controlled", quietly undoing the new
+    #                             envelope on every Seedance render.
     assert meta["changed"] is True
     assert meta["softeners_applied"] == [
-        "dynamic_dolly_push",
         "whip_pans",
         "white_hot",
-        "aggressively",
     ]
     assert "whip-pans" not in lower
     assert "white-hot" not in lower
-    assert "vibrates aggressively" not in lower
-    assert "dynamic dolly push" not in lower
     assert "slowly sweeps across frequencies" in lower
     assert "bright warm glow" in lower
-    assert "vibrates subtly" in lower
-    assert "slow controlled dolly push forward" in lower
+    # The strong motion wording now SURVIVES to the provider.
+    assert "vibrates aggressively" in lower
+    assert "dynamic dolly push" in lower
+    assert "vibrates subtly" not in lower
     assert "\n\n" in conditioned
     assert ecv._SEEDANCE_SMOOTH_MARKER in conditioned
 

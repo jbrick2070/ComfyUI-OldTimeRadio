@@ -1662,3 +1662,23 @@ class LtxAudioInEngine(_LtxAvBase):
 
 
 __all__ = ["LtxAudioInEngine"]
+
+
+# NO OWN compose_prompt ON THIS LANE, AND THAT IS DELIBERATE (2026-08-27).
+#
+# `ltx_audio_in` keeps the shared driver path because that path carries three
+# things this lane PROVED it needs, which a formatter here would have to
+# re-implement and initially got wrong:
+#
+#   1. the P4 talking register -- the two-stage ia2v recipe animates what the
+#      prompt NARRATES, so "lips opening and closing naturally in sync" and the
+#      "face visible, speaking to camera" opener are load-bearing, not wording;
+#   2. the 240-char budget with the style cue FRONT-LOADED INSIDE it, so a
+#      non-default visual pack does not push the sync clause out of the cap; and
+#   3. recipe gating -- the compact form is proven on the two-stage graph and on
+#      nothing else, so the single-pass recipe must keep the shared prompt.
+#
+# Replacing proven, delicate, probe-backed behaviour with a fresh
+# re-implementation for the sake of uniformity is not an improvement. If this
+# lane ever wants its own voice, start from render_driver's existing compact
+# talking path and move it here WHOLE -- do not paraphrase it.

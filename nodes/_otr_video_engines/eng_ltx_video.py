@@ -1875,3 +1875,41 @@ class LtxVideoEngine(_MC.MotionEngineBase):
 
 
 __all__ = ["LtxVideoEngine"]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+def compose_ltx_video(self, inputs):
+    """`ltx_video` -- LTX 2.3 HQ. One staged turn/reach/rise with an endpoint.
+
+    APPEARANCE AND SETTING ARE RESTATED ON PURPOSE. The research is explicit:
+    do not assume the init still is always present, because T2V remains a
+    supported path on this lane. Restating the look every beat is also the
+    cheapest identity anchor available when it does run text-only.
+
+    Moderate motion is locally PROVEN on the current recipe -- a requested
+    turn/reach preserved identity, detail and a locked camera. Large travel is
+    UNMEASURED and is deliberately not requested here. The base/refine anchor
+    strengths are not tuned through this feature.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+    tail = (", %s" % camera) if camera else ", camera locked"
+    return ("%s, the movement staged clearly from start to a held finish%s"
+            % (core.rstrip(" ,."), tail))
+
+
+LtxVideoEngine.compose_prompt = compose_ltx_video

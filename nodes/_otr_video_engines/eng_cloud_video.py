@@ -155,10 +155,13 @@ _KLING_AVATAR_MARKER = (
 #: damping -- while expression and gesture are freed.
 _KLING_AVATAR_BASE_CLAUSE = (
     "Broadcast-style digital human delivery. Natural lip sync follows the "
-    "supplied audio exactly and matches the spoken line word for word. Hold "
-    "the head and shoulders in frame, with vivid facial expression, live eye "
-    "contact, and hands and shoulders moving with the words. "
-    "No camera shake, no sudden reframing. "
+    "supplied audio exactly and matches the spoken line word for word -- the "
+    "sync leads everything else. Vivid facial expression and live eye "
+    "contact, with full upper-body performance: the subject leans, turns, "
+    "shifts weight and gestures freely with the words, and may rise or step "
+    "within the scene as the line demands. The camera moves with intent -- a "
+    "push, a track or a considered reframe. Keep the face unobstructed so the "
+    "mouth stays readable. No camera shake, no sudden reframing. "
     f"{_KLING_AVATAR_MARKER}")
 
 _SEEDANCE_MODEL_ALIASES = {
@@ -175,20 +178,35 @@ _SEEDANCE_RESOLUTIONS = {
     "Seedance 2.0 Mini": ("480p", "720p"),
 }
 _SEEDANCE_RATIOS = ("16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive")
+#: MOTION RAISED, ARTIFACT GUARDS KEPT (2026-08-27, Option B).
+#: What changed: "slow dolly with gentle ease-in and ease-out", "remains gentle
+#: and continuous throughout" and "Gentle parallax only" were DAMPING -- the
+#: 08-17 antipattern that authored the silly pan. What did NOT change: every
+#: artifact guard. Whip pans, handheld shake, sudden reframing, jump cuts and
+#: rapid zooms are documented FAILURE MODES on this family, not stillness, and
+#: the reference-image preservation is what holds continuity.
+#: Budget (operator matrix): one purposeful audio-reactive subject action plus
+#: one stabilized camera move. Audio-CONDITIONED -- never promise phoneme sync.
 _SEEDANCE_SMOOTH_MARKER = (
-    "Gentle parallax only; all motion gradual and physically continuous.")
+    "Full sustained action; motion physically continuous and uncut.")
 _SEEDANCE_SMOOTH_MOTION_CLAUSE = (
-    "One continuous uncut shot. Smooth stabilized camera on a slow dolly "
-    "with gentle ease-in and ease-out. Motion begins immediately in the first "
-    "frame and remains gentle and continuous throughout. Preserve the "
-    "reference-image composition and framing. No whip pans, handheld shake, "
-    "sudden reframing, jump cuts, or rapid zooms. "
+    "One continuous uncut shot with strong, decisive movement. The subject "
+    "performs a full action that responds to the audio and develops across "
+    "the shot -- turning, reaching, rising, crossing the space -- and lands on "
+    "a clear final position, with a purposeful camera move that follows the "
+    "action. Motion begins immediately in the first frame and is sustained "
+    "throughout. Preserve the reference-image subject and style. No whip "
+    "pans, handheld shake, sudden reframing, jump cuts, or rapid zooms. "
     f"{_SEEDANCE_SMOOTH_MARKER}")
-_SEEDANCE_PROMPT_VARIANT = "seedance_smooth_v1"
+_SEEDANCE_PROMPT_VARIANT = "seedance_action_v2"
+#: ARTIFACT GUARDS ONLY (2026-08-27). Two entries were removed because they
+#: were DAMPING rather than protection: "aggressively"->"subtly" (and "subtly"
+#: is precisely the word PBUG-20260827-04 banned) and "dynamic dolly
+#: push"->"slow controlled dolly push", which would have quietly undone the new
+#: motion envelope on every Seedance render. What remains guards against real,
+#: documented failure modes on this family -- whip pans, rapid zooms, handheld
+#: shake and blown highlights -- and those are kept verbatim.
 _SEEDANCE_PROMPT_SOFTENERS = (
-    ("dynamic_dolly_push",
-     re.compile(r"\bdynamic\s+dolly\s+push\b", re.IGNORECASE),
-     "slow controlled dolly push"),
     ("handheld_dolly",
      re.compile(r"\bhandheld\s+dolly\b", re.IGNORECASE),
      "stabilized dolly"),
@@ -201,9 +219,6 @@ _SEEDANCE_PROMPT_SOFTENERS = (
     ("rapid_zooms",
      re.compile(r"\brapid\s+zooms?\b", re.IGNORECASE),
      "slow controlled push"),
-    ("aggressively",
-     re.compile(r"\baggressively\b", re.IGNORECASE),
-     "subtly"),
     ("standalone_handheld",
      re.compile(r"\bhandheld\b", re.IGNORECASE),
      "stabilized"),
@@ -229,16 +244,24 @@ _WAN_SMOOTH_MARKER = (
 #: still-looking render for a broken one. The distinction matters: "slow"
 #: describes how the SUBJECT moves; the exclusions describe how the CAMERA and
 #: the geometry must not fail.
+#: MOTION RAISED, ARTIFACT GUARDS KEPT (2026-08-27, Option B). "gentle
+#: parallax" was the only damping phrase here and is replaced by the budget the
+#: operator's matrix names: one purposeful action arc, an endpoint, an optional
+#: reaction, one camera behaviour. Every geometry and negative guard below is
+#: preserved verbatim -- melting geometry and warped faces are failure modes.
 _WAN_SMOOTH_MOTION_CLAUSE = (
     "Generate one continuous shot from the first frame. Preserve the "
     "first-frame subject, composition, aspect ratio, lighting, and visual "
-    "style. The subject moves with clear purpose; keep the motion physically "
-    "continuous, with gentle parallax and no cuts. No whip pans, handheld "
-    "shake, sudden reframing, jump cuts, "
+    "style. The subject carries out a full, decisive action that develops "
+    "across the shot -- turning, reaching, rising, or crossing the space -- and "
+    "finishes on a clear final position, with a purposeful camera move "
+    "described in its own right; keep the motion physically continuous and "
+    "uncut and sustained from the first frame. No whip pans, "
+    "handheld shake, sudden reframing, jump cuts, "
     "rapid zooms, melting geometry, warped faces, drifting text, black frames, "
     "or pillarbox bars. "
     f"{_WAN_SMOOTH_MARKER}")
-_WAN_PROMPT_VARIANT = "wan_i2v_smooth_v1"
+_WAN_PROMPT_VARIANT = "wan_i2v_action_v2"
 _WAN_NEGATIVE_DEFAULT = visual_safety_negative(
     "jump cuts, whip pans, rapid zooms, handheld shake, jitter, flicker, "
     "melting geometry, warped face, distorted hands, drifting text, unreadable "
@@ -247,16 +270,23 @@ _WAN_NEGATIVE_DEFAULT = visual_safety_negative(
 _VIDU_Q2_MODEL = "viduq2-pro-fast"
 _VIDU_Q2_RESOLUTION = "720p"
 _VIDU_Q2_MOVEMENT_AMPLITUDES = ("auto", "small", "medium", "large")
+#: THE CONTRADICTION THIS RESOLVES (2026-08-27). The clause said "move
+#: gently" and "subtle parallax" while Option B raises this lane's
+#: `movement_amplitude` to `medium` -- paying for more amplitude and asking for
+#: less in the same request. The damping goes; every artifact guard stays.
 _VIDU_Q2_SMOOTH_MARKER = (
-    "Vidu Q2 i2v motion; preserve the still and move gently.")
+    "Vidu Q2 i2v motion; preserve the still and carry a full action.")
 _VIDU_Q2_SMOOTH_MOTION_CLAUSE = (
     "Generate one continuous image-to-video shot from the supplied start "
     "frame. Preserve the subject identity, composition, period-radio visual "
-    "style, lighting, and aspect ratio. Use gentle physically continuous "
-    "motion with subtle parallax. No sudden reframing, jump cuts, rapid zooms, "
-    "melting geometry, warped faces, drifting text, black frames, or bars. "
+    "style, lighting, and aspect ratio. The subject performs a full, decisive "
+    "action that develops across the shot and completes on a clear final "
+    "position, with a purposeful camera move, physically continuous and "
+    "sustained throughout. No sudden reframing, jump cuts, rapid "
+    "zooms, melting geometry, warped faces, drifting text, black frames, or "
+    "bars. "
     f"{_VIDU_Q2_SMOOTH_MARKER}")
-_VIDU_Q2_PROMPT_VARIANT = "vidu_q2_pro_fast_720p_smooth_v1"
+_VIDU_Q2_PROMPT_VARIANT = "vidu_q2_pro_fast_720p_action_v2"
 
 
 def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":

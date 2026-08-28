@@ -385,3 +385,38 @@ __all__ = [
     "FastWan8gbEngine", "RECIPE_FASTWAN_8GB", "PREQUALIFICATION_ENV_FASTWAN",
     "FASTWAN_8GB_RECIPE", "FASTWAN_SIGMAS", "FASTWAN_LORA_NAME",
 ]
+
+
+# =========================================================================== #
+# PER-LANE MOTION PROMPT -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+# Bound to the class ITSELF at the bottom of this block. Dispatch reads
+# ``type(engine).__dict__``, so an inherited formatter is invisible -- that is
+# what keeps this lane independent of its siblings. Editing this changes THIS
+# lane and nothing else.
+try:
+    from .motion_common import compose_parts as _parts, compose_legacy as _legacy
+except ImportError:  # pragma: no cover -- flat test imports
+    from motion_common import compose_parts as _parts, compose_legacy as _legacy
+
+
+def compose_fastwan_8gb(self, inputs):
+    """`fastwan_8gb` -- shorter and more atomic than full WAN.
+
+    DELIBERATELY NOT WAN'S PROMPT, even though this class subclasses
+    WanTi2vEngine. The distilled DMD lane (3 steps, literal sigmas, CFG 1 with
+    no unconditional branch) has its own unmeasured reach, so it does NOT
+    inherit WAN's 100-word cap and does NOT lean on negative prompting -- at
+    CFG 1 there is no negative branch to steer with.
+
+    One action, a clear end state, locked or small camera.
+    """
+    core = _parts(inputs, include_camera=False)
+    if not core:
+        return _legacy(inputs)
+    camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+    tail = (", %s" % camera) if camera else ", camera locked"
+    return "%s, ending on a clear final position%s" % (core.rstrip(" ,."), tail)
+
+
+FastWan8gbEngine.compose_prompt = compose_fastwan_8gb

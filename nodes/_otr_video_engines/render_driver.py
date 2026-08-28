@@ -3052,7 +3052,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "engine_id": _eng_id,
             }
             _lane_text = str(_lane_formatter(_lane_engine, _lane_inputs) or "")
-            if _lane_text.strip():
+            # A FORMATTER THAT HANDED BACK THE SHARED PROMPT DID NOT COMPOSE,
+            # AND THE RECEIPT MUST NOT SAY IT DID. Every lane's documented rule
+            # for a row with no authored leaves is "return text_prompt
+            # unchanged" -- correct behaviour, but stamping `engine:<id>` over
+            # it would claim the lane wrote something it did not. The stamp is
+            # how a live leg proves reachability, so a lie here is expensive:
+            # it would read as success on exactly the beats that still fall
+            # through.
+            if _lane_text.strip() and _lane_text != _lane_inputs["text_prompt"]:
                 text_prompt = _lane_text
                 _lane_composed = True
             else:

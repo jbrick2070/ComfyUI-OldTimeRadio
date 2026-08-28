@@ -846,3 +846,51 @@ __all__ = [
     "compute_real_frame_budget",
     "MotionEngineBase",
 ]
+
+
+def compose_parts(inputs, *, include_camera=True):
+    """Subject, setting, expression, motion -- then camera LAST.
+
+    SHARED ORDERING, NEVER A SHARED PROMPT. This exists so eleven lanes do not
+    each reimplement "join the authored leaves in the order the research asked
+    for". What each lane SAYS around this is entirely its own; a lane that wants
+    a different structure ignores this and builds its string directly.
+
+    Returns "" when the row carries no authored leaves at all, which is the
+    caller's signal to fall back to the shared prompt (see `compose_legacy`).
+    """
+    # THE FALLBACK TEST KEYS ON THE *AUTHORED* LEAVES ONLY, and that is a law
+    # question rather than a style one. `appearance` and `setting` are resolved
+    # from the ledger and are therefore ALWAYS available -- testing them would
+    # make this look "composed" on a beat where the writer authored no
+    # directives at all, and the formatter would then build a prompt from the
+    # look alone and DISCARD the writer's authored vocabulary. THE LAW: "an
+    # audit may improve a story; it may never fail one for ... visual
+    # vocabulary." A beat whose writer gave no directives keeps that writer's
+    # own finished prompt, verbatim.
+    authored = [str((inputs or {}).get(k) or "").strip().strip(",")
+                for k in ("expression", "motion", "camera")]
+    if not any(authored):
+        return ""
+    parts = []
+    for key in ("appearance", "setting", "expression", "motion"):
+        value = str((inputs or {}).get(key) or "").strip().strip(",")
+        if value:
+            parts.append(value)
+    if not parts:
+        return ""
+    if include_camera:
+        camera = str((inputs or {}).get("camera") or "").strip().strip(",")
+        if camera:
+            parts.append(camera)
+    return ", ".join(parts)
+
+
+def compose_legacy(inputs):
+    """The ONE documented rule for a row with no authored leaves.
+
+    An older ledger carries only the finished shared prompt. Returning it
+    unchanged is replay correctness -- not a second path, not a feature switch,
+    and identical in every lane.
+    """
+    return str((inputs or {}).get("text_prompt") or "")
