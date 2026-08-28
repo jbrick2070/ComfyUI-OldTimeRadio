@@ -1185,9 +1185,16 @@ factual source note. Return only the transition, without a label or markup."""
 _NEWS_CODA_SYSTEM_V2_EXAMPLES = ""
 
 
-def clean_one_line(text: str, max_chars: int = 0) -> str:
-    """Transport-clean spoken text; max_chars is compatibility-only."""
-    del max_chars
+def clean_one_line(text: str) -> str:
+    """Collapse a raw string into one clean spoken line. Hygiene only.
+
+    This never shortens or reshapes the words a model wrote -- length is the
+    model's call, per the no-prose-gate law (314dd481, 2026-07-24). A
+    `max_chars` parameter used to sit here as a documented no-op after that
+    retirement; it was REMOVED 2026-08-28 because the writer still passed 200
+    into it, which read exactly like a real constraint. The corpus proved the
+    theater: 18.5% of real published announcer lines exceed 200 chars.
+    """
     return " ".join(str(text or "").split()).strip(" \t\"'").strip()
 
 
@@ -1245,11 +1252,13 @@ def _authored_or_one_more_ask(
     return ok2, cleaned2, True
 
 
-def validate_announcer_line(
-    text: str, *, min_chars: int = 0, max_chars: int = 0,
-) -> tuple[bool, str]:
-    """Check only nonempty, label-free, markup-free row structure."""
-    del min_chars, max_chars
+def validate_announcer_line(text: str) -> tuple[bool, str]:
+    """Check only nonempty, label-free, markup-free row structure.
+
+    NO LENGTH BAND -- rejecting a spoken line for size is the prose gate this
+    project retired on purpose (314dd481). The `min_chars`/`max_chars` no-op
+    parameters were removed 2026-08-28.
+    """
     cleaned = clean_one_line(text)
     if not cleaned:
         return False, ""

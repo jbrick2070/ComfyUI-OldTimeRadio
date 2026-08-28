@@ -4082,8 +4082,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             _open_status_quo = ""
             for _b in outline.beats:
                 if str(getattr(_b, "speaker_role", "")) == "character":
+                    # (the stray `200` removed 2026-08-28: it predated the
+                    # no-prose-gate retirement and enforced nothing.)
                     _open_status_quo = _OTRLC.clean_one_line(
-                        str(getattr(_b, "intent", "") or ""), 200,
+                        str(getattr(_b, "intent", "") or ""),
                     )
                     break
             safe_open_brief = _OTRLC.SafeOpenBrief(
