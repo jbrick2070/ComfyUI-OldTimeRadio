@@ -135,12 +135,11 @@ def _writer_schemas() -> dict:
                     # the canonical workflow node-1 vector.
                     "comfy_slot_a_model": ("STRING", {"default": ""}),
                     "comfy_slot_b_model": ("STRING", {"default": ""}),
-                    # Refine loop v1 (2026-06-23): the refine_target_grade
-                    # dropdown appended at index 21 (END) to mirror the live
-                    # INPUT_TYPES + the canonical workflow node-1 vector.
-                    "refine_target_grade": (
-                        ["Off", "C+", "B", "B+", "A"], {"default": "Off"},
-                    ),
+                    # refine_target_grade was REMOVED 2026-08-28 (an inert
+                    # widget -- the revision loop its tooltip advertised had
+                    # been deleted a month earlier). Dropped here in lockstep
+                    # with the live INPUT_TYPES and all 62 saved graphs: this
+                    # fixture MIRRORS them, so it drifts the moment they move.
                     # Story-scaffold toggle (2026-06-24): appended at index 22
                     # (END) to mirror the live INPUT_TYPES + the canonical
                     # workflow node-1 vector.
@@ -254,7 +253,6 @@ def _writer_node_fixture() -> dict:
                     "deepseek/deepseek-v4-pro",               # 18 openrouter_slot_b_model
                     "anthropic/claude-opus-4.7",              # 19 comfy_slot_a_model
                     "deepseek/deepseek-v4-pro",               # 20 comfy_slot_b_model
-                    "Off",                                    # 21 refine_target_grade
                     "auto",                                   # 22 story_scaffold
                     "science_news",                           # 23 source_bank (2C)
                     "sci_fi_radio",                           # 24 visual_style (3C)
@@ -524,10 +522,11 @@ def test_round_trip_canonical_node1_inputs_correct():
     round-trip conversion sees a schema matching the live vector.
     """
     dump = _dump_canonical_node1()
-    # 33: 28 (pre-S5) plus the six LLM runtime-policy widgets, MINUS the
-    # `target_words` widget removed 2026-08-14. gate_in is a forceInput
-    # socket and does not occupy a slot.
-    assert len(dump) == 33, f"node 1 widgets_values length drift: {len(dump)}"
+    # 32: 28 (pre-S5) plus the six LLM runtime-policy widgets, MINUS
+    # `target_words` (removed 2026-08-14) and MINUS `refine_target_grade`
+    # (removed 2026-08-28 -- an inert widget whose revision loop was already
+    # gone). gate_in is a forceInput socket and does not occupy a slot.
+    assert len(dump) == 32, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

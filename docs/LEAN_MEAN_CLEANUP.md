@@ -1,7 +1,8 @@
 # Lean/Mean Cleanup - Current Coding Plan
 
-**Status:** current plan authority; planning only, no cleanup code has landed from
-this document.
+**Status:** current plan authority. **Cleanup HAS landed from this document** -- orders 1-6 complete (`3f727a43`), and individual rows carry their own resolved status (e.g. `nsfw_frame_qc.py`, deleted 2026-08-28). The header said "planning only, no cleanup code has landed" until 2026-08-28, which told every auditor who read this file first exactly the wrong thing. Trust the per-row status, not a global claim. Original wording preserved in git.
+<!-- superseded: planning only, no cleanup code has landed from
+this document. -->
 
 **Grounding baseline:** committed `v2.0-alpha` HEAD
 `ed3ae2c708b32e988dc15d47666c891ec68ad74c` on 2026-08-22. The worktree also
@@ -66,7 +67,7 @@ Use these verdicts:
 | `nodes/otr_shot_duration_calculator.py` | REMOVE-SAFE | Contains an already-unregistered duration stub superseded by `OTR_ShotLock`. | Direct imports of the retired helper implementation. | Preserve the two deleted node IDs in workflow validation; replace broad implementation tests with the existing retirement guard. |
 | Legacy cast prototypes | REMOVE-SAFE | `_build_cast_rows` in `OTR_LedgerScriptWriter.py` and the test-only `_otr_cast_contract.py` / `_otr_cast_repair.py` prototype stack have no production caller and are not in the live CastLock path. | Manual/test-only `CastContract`, lock/load, alias detection, director-plan builder, and repair experiments. | Keep live `_otr_casting.lock_cast`; delete the writer orphan, both prototype modules, `test_cast_contract.py`, `test_cast_contract_helpers.py`, and `test_cast_repair.py` together after a final import scan. Rehome any assertion R4 judges to protect the live CastLock contract before deleting its old host. |
 | `scripts/normalize_workflow_widgets.py` | REMOVE-AFTER-MIGRATION | Self-described over-aggressive normalizer; no caller. Its dry-run mode can still report drift. | That standalone dry-run report. | Confirm `OTR_WorkflowValidator` plus the link/widget audit cover the useful report, or have R4 explicitly accept the report loss, then delete; never retain an unsafe apply path merely for history. |
-| `nodes/_otr_shared/nsfw_frame_qc.py` | RE-GROUND | Default-off, test-only offline frame sampler. | Optional manual/offline NSFW sampling, not canonical behavior. | Delete only if R4 explicitly accepts that safety-tool loss; remove its private tests/vectors in the same commit. |
+| ~~`nodes/_otr_shared/nsfw_frame_qc.py`~~ | **RESOLVED -- DELETED 2026-08-28** | Default-off, test-only offline frame sampler; zero production consumers confirmed by audit. | The safety-tool loss WAS accepted, explicitly, by the operator this session and with his reasoning stated: visual-content style is now owned by `_otr_banana_route`, and the 2026-08-03 no-content-guardrails directive stands. That is the R4-equivalent acceptance this row required. | DONE. Module + `test_video_nsfw_frame_qc.py` + `test_video_nsfw_frame_qc_additive.py` removed in one commit, and `test_video_survival_guide_vectors.py` de-referenced ATOMICALLY in the same change -- its line-27 import would otherwise have failed collection of the whole file and silently taken the ghost-node, VRAM-leak, widget-serialization and pipe-deadlock vectors with it. `retry_taxonomy.FailureKind.NSFW` was deliberately NOT touched: the dependency ran one way only, and that WARN-class value is independent and separately tested. |
 | `nodes/_otr_shared/slot_matrix.py` and `content_oracle.py` | REMOVE-AFTER-MIGRATION | Test-only matrix and media/QC assertions. | Direct deletion would weaken live engine tests. | Move useful helpers into `tests/support/`, update consumers, then remove the production-looking modules. |
 
 No tracked `_tmp_video_art_*.json` cleanup remains. Generated `scripts/_*.json`

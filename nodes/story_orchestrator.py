@@ -307,185 +307,36 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 
 
 # -----------------------------------------------------------------------------
-# CAST CONSOLIDATION HELPERS
-# Used by the LPL writer's cast-lock path to collapse near-duplicate cast
-# rows that arise from prefix-overlap (LLOYD vs LLOYD KAPOOR) or LLM typo
-# divergence (STANLEY vs STANLEARY). BUG-LOCAL-068 anchor preserved.
-# -----------------------------------------------------------------------------
-
-
-def _norm_cast_key(s):
-    """Normalise a character name for lookup: strip, upper, _ -> space."""
-    return (s or "").strip().upper().replace("_", " ")
-
-
-def _cast_names_should_merge(name_a, name_b, fuzzy_ratio=0.85):
-    """Decide whether two normalised cast names refer to the same character.
-
-    Returns (should_merge: bool, winner_name: str | None) where winner_name
-    is the name that should survive the merge.
-
-    Rules (in order of precedence):
-      1. Exact equality after strip/upper/underscore-normalisation -> merge
-      2. Token prefix overlap: shorter is a strict whitespace-aligned prefix
-         of longer (e.g. "LLOYD" prefix of "LLOYD KAPOOR") -> merge,
-         winner = longer (more information).
-      3. SequenceMatcher.ratio >= fuzzy_ratio AND both have the same
-         single-token shape (no spaces) -> merge, winner = longer
-         (typo divergence: "STANLEY" + "STANLEARY" -> keep "STANLEY"
-         only when a clear winner emerges; ties favour the longer string).
-
-    Returns (False, None) when the names are distinct characters.
-    Empty / one-char names are never merged.
-    """
-    if not name_a or not name_b:
-        return (False, None)
-    a = name_a.strip()
-    b = name_b.strip()
-    if len(a) <= 1 or len(b) <= 1:
-        return (False, None)
-    if a == b:
-        return (True, a)
-    # Token prefix overlap: shorter must end on a word boundary inside longer
-    short, long_ = (a, b) if len(a) < len(b) else (b, a)
-    if long_.startswith(short + " "):
-        return (True, long_)
-    # Pure typo divergence: only collapse single-token names. We do NOT
-    # apply fuzzy ratio across multi-token names because "ROBERT FROST"
-    # and "ROBERT FORD" would otherwise merge incorrectly.
-    if " " in a or " " in b:
-        return (False, None)
-    import difflib
-    ratio = difflib.SequenceMatcher(None, a, b).ratio()
-    if ratio >= fuzzy_ratio:
-        # Prefer the longer string. If tied, prefer the alphabetically
-        # earlier so the choice is deterministic.
-        if len(a) > len(b):
-            return (True, a)
-        if len(b) > len(a):
-            return (True, b)
-        return (True, min(a, b))
-    return (False, None)
-
-
-def _consolidate_similar_cast_rows(cast_rows):
-    """Collapse near-duplicate cast rows in place.
-
-    For each pair of rows whose names should merge per
-    `_cast_names_should_merge`, fold the loser's data into the winner:
-      - voice_preset: any non-None value wins (loser's wins if winner has
-        None — common pattern: speaker row has dialogue but no voice;
-        description row has voice but no dialogue).
-      - description / gender: any non-empty value wins.
-      - line_count, word_count: summed (defensive — usually only one row
-        carries them, but if the parser tagged both we don't lose dialogue).
-      - char_id, name: from the winner.
-
-    Loser rows are removed. Order of survivors preserves the order of
-    their first appearance. Returns a NEW list; does not mutate the
-    input list, but row dicts inside the result are the original objects
-    (mutated in place where merging happened).
-
-    Idempotent: running twice yields the same result as running once.
-
-    BUG-LOCAL-098: callers that need to rewrite downstream `char_id`
-    references (e.g. `lines[i].char_id`) should use
-    ``_consolidate_similar_cast_rows_with_aliases`` which returns
-    ``(consolidated_cast, alias_map)`` where alias_map is
-    ``{loser_char_id: winner_char_id}``. The plain function here is
-    kept for back-compat with callers that don't track aliases.
-    """
-    consolidated, _ = _consolidate_similar_cast_rows_with_aliases(cast_rows)
-    return consolidated
-
-
-def _consolidate_similar_cast_rows_with_aliases(cast_rows):
-    """BUG-LOCAL-098: like ``_consolidate_similar_cast_rows`` but also
-    returns the ``{loser_char_id: winner_char_id}`` alias map so
-    callers can rewrite line/sfx/music ``char_id`` references to the
-    surviving cast entry. Without this, dedup leaves the cast clean
-    but ``lines[i].char_id`` still points at the dropped char_id,
-    causing Bark to fail voice resolution for those lines (observed
-    on the Arcadia run: l001 + l033 referenced ``c02`` after the
-    ANNOUCNER/ANNOUNCER typo merge dropped c02 from cast).
-    """
-    if not cast_rows or len(cast_rows) < 2:
-        return list(cast_rows or []), {}
-
-    keep = list(cast_rows)
-    aliases: dict[str, str] = {}  # loser_char_id -> winner_char_id
-    i = 0
-    while i < len(keep):
-        row_i = keep[i]
-        name_i = _norm_cast_key(row_i.get("name"))
-        j = i + 1
-        while j < len(keep):
-            row_j = keep[j]
-            name_j = _norm_cast_key(row_j.get("name"))
-            should, winner = _cast_names_should_merge(name_i, name_j)
-            if should:
-                # Identify winner row vs loser row
-                if winner == name_i:
-                    win_row, lose_row = row_i, row_j
-                else:
-                    win_row, lose_row = row_j, row_i
-                # Fold loser into winner
-                if not win_row.get("voice_preset") and lose_row.get("voice_preset"):
-                    win_row["voice_preset"] = lose_row["voice_preset"]
-                if not win_row.get("description") and lose_row.get("description"):
-                    win_row["description"] = lose_row["description"]
-                if not win_row.get("gender") and lose_row.get("gender"):
-                    win_row["gender"] = lose_row["gender"]
-                # Numeric fields summed defensively
-                for fld in ("line_count", "word_count"):
-                    a = win_row.get(fld) or 0
-                    b = lose_row.get(fld) or 0
-                    if a or b:
-                        win_row[fld] = a + b
-                # Make sure winner uses the canonical winner name
-                win_row["name"] = winner
-                # BUG-LOCAL-098: record loser->winner char_id alias so
-                # the caller can rewrite lines[i].char_id and other
-                # references that pointed at the loser. Chains of
-                # aliases (e.g. STANLEY -> STANLEARY -> STANLERY are
-                # all aliases of the final survivor) get flattened by
-                # walking the alias map transitively below.
-                lose_cid = (lose_row.get("char_id") or "").strip()
-                win_cid = (win_row.get("char_id") or "").strip()
-                if lose_cid and win_cid and lose_cid != win_cid:
-                    aliases[lose_cid] = win_cid
-                # Remove loser, restart inner walk so we re-check the
-                # winner row against everyone else (chained typos like
-                # STANLEY / STANLEARY / STANLERY all collapse safely).
-                if lose_row is row_i:
-                    keep.pop(i)
-                    name_i = _norm_cast_key(row_i.get("name") if i < len(keep) else None)
-                    # i now points at what was row_j; recheck from j=i+1
-                    j = i + 1
-                    if i < len(keep):
-                        row_i = keep[i]
-                        name_i = _norm_cast_key(row_i.get("name"))
-                    else:
-                        break
-                else:
-                    keep.pop(j)
-                    # j stays the same -- now points at the next row
-                continue
-            j += 1
-        i += 1
-
-    # Flatten chained aliases: if A -> B and B -> C, rewrite A -> C.
-    # Bounded loop in case of cycles (shouldn't happen but defensive).
-    for _ in range(len(aliases) + 1):
-        changed = False
-        for k, v in list(aliases.items()):
-            if v in aliases and aliases[v] != v:
-                aliases[k] = aliases[v]
-                changed = True
-        if not changed:
-            break
-
-    return keep, aliases
+# THE CAST-CONSOLIDATION CLUSTER WAS REMOVED 2026-08-28.
+#
+# Four functions (_norm_cast_key, _cast_names_should_merge, and the two
+# _consolidate_similar_cast_rows* entry points) that merged near-duplicate
+# cast rows -- LLOYD vs LLOYD KAPOOR, STANLEY vs STANLEARY. They fixed a
+# REAL bug (BUG-LOCAL-071/098, live on two consecutive runs in April 2026),
+# and the banner above them claimed the LPL writer's cast-lock path used
+# them. IT NEVER DID. Their only caller was the deleted LLMDirector.direct();
+# that whole legacy class was deleted on 2026-05-12 (249bc06c, Director
+# retirement).
+#
+# THE DEFECT IS NOT JUST UNOBSERVED, IT IS STRUCTURALLY IMPOSSIBLE NOW.
+# The old bug needed cast rows DERIVED from LLM dialogue tags; today the
+# cast is locked FIRST and the LLM is constrained to it, behind six
+# independent guards -- pool names against a taken_names set, duplicate
+# rejection in the cast validator, RuntimeErrors on duplicate names and on
+# a count mismatch, an OutlineFailedError reroll for invented speakers, and
+# a bare char_id_by_name subscript that raises rather than minting a row.
+#
+# MEASURED BEFORE DELETING: 1,987 frozen ledgers scanned with the shipped
+# merge rule -- ZERO hits, zero dangling char_id refs, zero duplicate names
+# or ids. A deliberately looser heuristic surfaced 57 pairs, and every one
+# was two real characters (mothers and daughters, siblings, LAB TECHNICIAN
+# 1/2) with different genders and different voices.
+#
+# AND WIRING IT WOULD HAVE BROKEN THE BUILD: a merge drops a cast row, so
+# non_announcer_count falls below the requested num_characters and the
+# assertion at OTR_LedgerScriptWriter.py:3999-4005 raises 'Cast lock count
+# mismatch' -- every render where it fired would die. The generalizable
+# lesson survives as BUG_BIBLE legacy_id BUG-LOCAL-068.
 
 
 # -----------------------------------------------------------------------------

@@ -24,7 +24,6 @@ from __future__ import annotations
 import ast
 import pathlib
 
-from nodes._otr_shared import nsfw_frame_qc as qc
 from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_video_engines import registry as vreg
 # Register every engine so the no-fallback declarations can be checked.
@@ -70,7 +69,7 @@ def test_no_engine_declares_any_fallback_reference():
 
 
 def test_a_s7_modules_register_no_ghost_node():
-    for mod in (rt, qc):
+    for mod in (rt,):
         assert not hasattr(mod, "NODE_CLASS_MAPPINGS")
 
 
@@ -97,7 +96,7 @@ def test_oom_block_class_tears_down_zero_retries():
 # widget-serialization (BUG-258 -- forceInput / widget integrity)
 # --------------------------------------------------------------------------- #
 def test_a_s7_surface_adds_no_widget_to_misserialize():
-    for mod in (rt, qc):
+    for mod in (rt,):
         for obj in vars(mod).values():
             if isinstance(obj, type) and obj.__module__ == mod.__name__:
                 assert not hasattr(obj, "INPUT_TYPES"), (

@@ -18,13 +18,22 @@ the heavy engine loads. V-4 / V-5: it NEVER calls ``unload_all_models``
 -- the targeted detach is the actual VRAM move.
 
 ``free_otr_pipeline_residue()`` is the single canonical residue-freer.
-It is called from two sites:
 
-  1. OTR_HuMoTierLoader.load() -- before the tier VRAM check, so the
-     free-VRAM reading the auto-downgrade rule keys off is real.
-  2. OTR_BatchHumoRender inter-phase cleanup -- before Phase C, after
-     Phase A/B text + audio encoding, so HuMo's diffusion loop starts
-     against a drained allocator.
+CALLER LIST CORRECTED 2026-08-28. This paragraph named exactly two sites --
+``OTR_HuMoTierLoader.load()`` before the tier VRAM check, and
+``OTR_BatchHumoRender``'s inter-phase cleanup before Phase C -- and neither
+calls it any more; ``eng_humo.py`` now only MENTIONS it in a comment
+describing what its own detach-reclaim replaced. The function did not become
+less important, it became more general, and the docstring simply never caught
+up. Live callers today:
+
+  * ``_otr_gguf_backend.py`` -- around GGUF model handoffs.
+  * ``_otr_video_engines/render_driver.py`` -- pre-render, and the
+    inter-engine reclaim between two beats on different engines, which is what
+    keeps two heavy engines from co-residing on a 16 GB card.
+  * ``_otr_video_engines/wrapper_bridge.py``.
+
+Verify with a grep before trusting this list too -- it has been wrong once.
 
 Every step is best-effort: a missing API on an older torch / Comfy
 combo, or a model that was never loaded, is a no-op, never a raise.

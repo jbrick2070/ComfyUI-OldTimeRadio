@@ -744,10 +744,33 @@ current fact; see the note directly under that table for exactly what changed.
 can't remove because of dependency B, well, check what dependency B really
 does."*
 
-**THE RULE.** When an audit, a reviewer or your own grep says "X cannot be
+**THE RULE, AND IT IS THREE LAYERS DEEP** (extended by the operator the same
+day: *"even if it says A has dependency B, check dependency B -- and for good
+measure check dependency C too. Three layers. Does it actually do
+anything?"*). When an audit, a reviewer or your own grep says "X cannot be
 removed because B uses it", that is the START of the investigation, not the
-end. Go read B. Two things are true often enough to be worth the look every
-time:
+end.
+
+    A looks alive because B references it.
+    B looks alive because C references it.
+    If C is dead, the whole chain is dead -- and at ONE hop it looks
+    perfectly referenced from the inside.
+
+So walk it until you reach something genuinely live: a registered node in
+`NODE_CLASS_MAPPINGS`, a string named in `workflows/*.json`, a CLI entry
+point, or a test asserting PRODUCTION behaviour rather than exercising the
+orphan. Report the chain in the form
+`symbol -> caller -> its caller -> reached: <what makes this live>`, and if
+you cannot walk it to something live within three hops, say so plainly rather
+than assuming a fourth hop would rescue it.
+
+**AND ASK THE THIRD QUESTION: does the chain actually DO anything?** A
+function that is called, computes a value, and whose return nobody reads is
+dead in the way that matters -- and it survives every reachability check ever
+written, because it genuinely has a caller. That shape is the most valuable
+thing this rule finds.
+
+Go read B. Two things are true often enough to be worth the look every time:
 
 * **B may itself be dead.** A chain of dead code keeps every link alive under
   a naive reachability check -- three orphans that only call each other look

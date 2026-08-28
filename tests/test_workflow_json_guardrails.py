@@ -603,19 +603,18 @@ class TestWriterB2aSurface:
         #  17  openrouter_slot_b_model
         #  18  comfy_slot_a_model
         #  19  comfy_slot_b_model
-        #  20  refine_target_grade
-        #  21  story_scaffold
-        #  22  source_bank
-        #  23  visual_style
-        #  24  google_api_slot_a_model
-        #  25  google_api_slot_b_model
-        #  26  source_ref
-        #  27  llm_device                  "cuda"
-        #  28  llm_attn_impl               "sdpa"
-        #  29  llm_quant_policy            "bnb_nf4"
-        #  30  llm_vram_ceiling_gb         14.5
-        #  31  gguf_n_ctx                  4096
-        #  32  gguf_quant                  "Q8_0"
+        #  20  story_scaffold
+        #  21  source_bank
+        #  22  visual_style
+        #  23  google_api_slot_a_model
+        #  24  google_api_slot_b_model
+        #  25  source_ref
+        #  26  llm_device                  "cuda"
+        #  27  llm_attn_impl               "sdpa"
+        #  28  llm_quant_policy            "bnb_nf4"
+        #  29  llm_vram_ceiling_gb         14.5
+        #  30  gguf_n_ctx                  4096
+        #  31  gguf_quant                  "Q8_0"
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -647,9 +646,10 @@ class TestWriterB2aSurface:
         # ["1".."8"] default "3": 'auto' meant "derive the act count from
         # target_words", which no longer exists, so there is no derive
         # path left to default to.
-        assert len(wv) == 33, (
-            f"writer widgets_values length drift: {len(wv)} (expected 33 "
-            f"after the 2026-08-14 target_words removal)"
+        assert len(wv) == 32, (
+            f"writer widgets_values length drift: {len(wv)} (expected 32 "
+            f"after the 2026-08-14 target_words removal and the 2026-08-28 "
+            f"refine_target_grade removal)"
         )
         # Slot 6: act_count must ship as "3" (the classic setup/complication/
         # resolution shape) -- there is no 'auto' choice left to fall back to.
@@ -697,19 +697,18 @@ class TestWriterB2aSurface:
             f"comfy_slot_b_model (slot 19) must ship the disabled sentinel; "
             f"got {wv[19]!r}"
         )
-        # Slot 20: refine_target_grade (refine loop v1, 2026-06-23) -- APPENDED
-        # at the END; ships "Off" (the loop is default-OFF / byte-identical).
-        assert wv[20] == "Off", (
-            f"refine_target_grade (slot 20) must ship 'Off' (the refine loop is "
-            f"default-OFF in the shipped bake); got {wv[20]!r}"
-        )
-        # Slot 21: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
+        # Slot 20 WAS refine_target_grade until 2026-08-28, when it was
+        # removed as an inert widget (the revision loop it advertised had been
+        # deleted a month earlier) and every later slot shifted down by one
+        # across all 62 workflows carrying this node. Its assertion went with
+        # it; the slots below are renumbered accordingly.
+        # Slot 20: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
         # (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
-        assert wv[21] == "auto", (
-            f"story_scaffold (slot 21) must ship 'auto' (follow the env/default "
-            f"scaffold setting in the shipped bake); got {wv[21]!r}"
+        assert wv[20] == "auto", (
+            f"story_scaffold (slot 20) must ship 'auto' (follow the env/default "
+            f"scaffold setting in the shipped bake); got {wv[20]!r}"
         )
-        # Slot 22: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
+        # Slot 21: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
         # -- APPENDED at the END; ships the production story-bank surface AND
         # must be a REGISTERED bank id (cross-checked against the live routing
         # registry so a re-order / typo cannot ship silently). The roster trim
@@ -724,54 +723,54 @@ class TestWriterB2aSurface:
         # typo shipping a value that resolves to nothing.
         from nodes import _otr_story_routing as _routing
         from nodes import _otr_rolls as _rolls
-        assert wv[22] == _rolls.BANK_SENTINEL or wv[22] in _routing.list_bank_ids(), (
-            f"source_bank (slot 22) must ship the roll sentinel "
+        assert wv[21] == _rolls.BANK_SENTINEL or wv[21] in _routing.list_bank_ids(), (
+            f"source_bank (slot 21) must ship the roll sentinel "
             f"{_rolls.BANK_SENTINEL!r} or a registered bank id "
-            f"{_routing.list_bank_ids()!r}; got {wv[22]!r}"
+            f"{_routing.list_bank_ids()!r}; got {wv[21]!r}"
         )
-        # Slot 23: visual_style (Stage 3C multi-modal story schema,
+        # Slot 22: visual_style (Stage 3C multi-modal story schema,
         # 2026-07-06) -- APPENDED at the END; ships the production look AND
         # must be a REGISTERED style id (live registry cross-check).
         # 2026-08-15 (operator): the roll sentinel ships here too -- same
         # reasoning as slot 22 above. Sentinel OR an eligible style id.
-        assert wv[23] == _rolls.STYLE_SENTINEL or wv[23] in _rolls.eligible_style_ids(), (
-            f"visual_style (slot 23) must ship the roll sentinel "
+        assert wv[22] == _rolls.STYLE_SENTINEL or wv[22] in _rolls.eligible_style_ids(), (
+            f"visual_style (slot 22) must ship the roll sentinel "
             f"{_rolls.STYLE_SENTINEL!r} or an eligible style id "
-            f"{_rolls.eligible_style_ids()!r}; got {wv[23]!r}"
+            f"{_rolls.eligible_style_ids()!r}; got {wv[22]!r}"
+        )
+        assert wv[23] == "(select Google API model)", (
+            f"google_api_slot_a_model (slot 23) must ship the unselected "
+            f"sentinel; got {wv[23]!r}"
         )
         assert wv[24] == "(select Google API model)", (
-            f"google_api_slot_a_model (slot 24) must ship the unselected "
+            f"google_api_slot_b_model (slot 24) must ship the unselected "
             f"sentinel; got {wv[24]!r}"
         )
-        assert wv[25] == "(select Google API model)", (
-            f"google_api_slot_b_model (slot 25) must ship the unselected "
-            f"sentinel; got {wv[25]!r}"
-        )
-        assert wv[26] == "", (
-            f"source_ref (slot 26) must ship blank/inert; got {wv[26]!r}"
+        assert wv[25] == "", (
+            f"source_ref (slot 25) must ship blank/inert; got {wv[25]!r}"
         )
         # Slots 27-32: S5 platform-portability (2026-07-10) LLM
         # runtime-policy tail, APPENDED after source_ref. Defaults equal
         # the nv50 16 GB baseline so an old 28-slot workflow resolves
         # byte-identically.
-        assert wv[27] == "cuda", (
-            f"llm_device (slot 27) must ship 'cuda' (nv50 baseline); "
-            f"got {wv[27]!r}"
+        assert wv[26] == "cuda", (
+            f"llm_device (slot 26) must ship 'cuda' (nv50 baseline); "
+            f"got {wv[26]!r}"
         )
-        assert wv[28] == "sdpa", (
-            f"llm_attn_impl (slot 28) must ship 'sdpa'; got {wv[28]!r}"
+        assert wv[27] == "sdpa", (
+            f"llm_attn_impl (slot 27) must ship 'sdpa'; got {wv[27]!r}"
         )
-        assert wv[29] == "bnb_nf4", (
-            f"llm_quant_policy (slot 29) must ship 'bnb_nf4'; got {wv[29]!r}"
+        assert wv[28] == "bnb_nf4", (
+            f"llm_quant_policy (slot 28) must ship 'bnb_nf4'; got {wv[28]!r}"
         )
-        assert wv[30] == 14.5, (
-            f"llm_vram_ceiling_gb (slot 30) must ship 14.5; got {wv[30]!r}"
+        assert wv[29] == 14.5, (
+            f"llm_vram_ceiling_gb (slot 29) must ship 14.5; got {wv[29]!r}"
         )
-        assert wv[31] == 4096, (
-            f"gguf_n_ctx (slot 31) must ship 4096; got {wv[31]!r}"
+        assert wv[30] == 4096, (
+            f"gguf_n_ctx (slot 30) must ship 4096; got {wv[30]!r}"
         )
-        assert wv[32] == "Q8_0", (
-            f"gguf_quant (slot 32) must ship 'Q8_0'; got {wv[32]!r}"
+        assert wv[31] == "Q8_0", (
+            f"gguf_quant (slot 31) must ship 'Q8_0'; got {wv[31]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[2], str) and wv[2], (

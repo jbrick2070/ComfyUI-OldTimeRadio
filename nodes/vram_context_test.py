@@ -237,12 +237,17 @@ class VRAMContextTest:
                 }),
             },
             "optional": {
-                "optimization_profile": (
-                    ["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"],
-                    {"default": "Standard",
-                     "tooltip": "Same widget as LLMScriptWriter -- "
-                                "controls 4-bit NF4 vs full precision."},
-                ),
+                # `optimization_profile` was REMOVED 2026-08-28. Its tooltip
+                # said it "controls 4-bit NF4 vs full precision"; it did not.
+                # Every run loaded through the module-level BASELINE_POLICY and
+                # the selected value only labelled the receipt -- so every
+                # Pro-vs-Standard-vs-Obsidian comparison this diagnostic ever
+                # produced measured the SAME configuration three times under
+                # three names, which is worse than having no dial. Removing it
+                # cost no workflow migration: the node appears in no shipped
+                # graph. If real per-profile measurement is wanted later, the
+                # honest build varies `LLMRuntimePolicy(quant_policy=...)` at
+                # the `request_slot` call rather than re-adding a label.
                 "measurement_label": ("STRING", {
                     "default": "",
                     "multiline": False,
@@ -261,7 +266,6 @@ class VRAMContextTest:
         model_id: str,
         probe_lengths: str,
         max_new_tokens: int = 16,
-        optimization_profile: str = "Standard",
         measurement_label: str = "",
     ):
         # Late imports so the node loads cleanly even if the loader
@@ -388,7 +392,6 @@ class VRAMContextTest:
             led.data.setdefault("meta", {}).setdefault("vram_test_results", []).append({
                 "label":                measurement_label or None,
                 "model_id":             model_id,
-                "optimization_profile": optimization_profile,
                 "max_new_tokens":       int(max_new_tokens),
                 "load_s":               round(load_s, 2),
                 "base_torch_gb":        round(base_torch_gb, 3),
@@ -408,7 +411,6 @@ class VRAMContextTest:
             f"## VRAM Context Test -- `{model_id}`",
             "",
             f"- **label**: {measurement_label or '_<none>_'}",
-            f"- **profile**: {optimization_profile}",
             f"- **accelerator**: {accel}"
             + ("" if accel == "cuda" else
                " (no CUDA -- VRAM torch column is "

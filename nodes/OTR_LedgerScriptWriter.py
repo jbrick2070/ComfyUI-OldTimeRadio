@@ -366,17 +366,14 @@ the air for 84 lines across 30 episodes."""
 # ---------------------------------------------------------------------------
 
 
-# The optimization_profile widget was removed from INPUT_TYPES on
-# 2026-05-23 (UI simplification, ROADMAP PRIORITY 2): of its VRAM tiers
-# only "Standard" was ever validated. This tier list is retained --
-# _resolve_inputs keeps its "Standard" default and the meta plumbing,
-# so re-exposing the widget when the v2 loader's profile branches land
-# is a one-line INPUT_TYPES add against this list.
-_OPTIMIZATION_PROFILE_CHOICES = [
-    "Standard",
-    "Pro (Ultra Quality)",
-    "Obsidian (UNSTABLE/4GB)",
-]
+# `_OPTIMIZATION_PROFILE_CHOICES` was REMOVED 2026-08-28. Its widget left
+# INPUT_TYPES on 2026-05-23 and the list stayed so that "re-exposing the widget
+# ... is a one-line INPUT_TYPES add against this list". Three months on nothing
+# reads it -- no widget, no workflow, no test -- and the sibling dial it was
+# modelled on turned out to LABEL its output without controlling anything
+# (vram_context_test.py, removed the same day). A list kept for a hypothetical
+# future reader is scaffolding; the one-line add is no harder to write from
+# scratch. The live "Standard" default in _resolve_inputs is untouched.
 
 
 # ---------------------------------------------------------------------------
@@ -2488,26 +2485,24 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         ),
                     },
                 ),
-                # Refine loop (v1, 2026-06-23) -- APPENDED at the END of optional
-                # (the next widgets_values index) so existing widget indices are
-                # untouched (BUG-LOCAL-097). The iterative story-REVISION loop.
-                "refine_target_grade": (
-                    ["Off", "C+", "B", "B+", "A"],
-                    {
-                        "default": "Off",
-                        "tooltip": (
-                            "Iterative story-REVISION loop (v1): keep REWRITING "
-                            "the story (revising the existing draft) until it "
-                            "reaches this grade, then ship -- or stop at a hard "
-                            "cap of 5 passes. Off = disabled (single pass, the "
-                            "default, byte-identical). B (~75) is a reachable "
-                            "target for a local model; A (~90) may never be hit "
-                            "(it then ships the last revision). Local-only. The "
-                            "env vars OTR_STORY_REFINE_BAR / OTR_STORY_REFINE_"
-                            "PASSES override this widget for headless runs."
-                        ),
-                    },
-                ),
+                # `refine_target_grade` was REMOVED 2026-08-28 -- a
+                # DISHONEST CONTROL, not merely an unused one. Its tooltip
+                # promised to "keep REWRITING the story ... until it
+                # reaches this grade", offered five grades and a five-pass
+                # cap, and named OTR_STORY_REFINE_BAR /
+                # OTR_STORY_REFINE_PASSES as headless overrides.
+                #
+                # NONE OF THAT EXISTED. The refine machinery was deleted
+                # 2026-07-24; neither env var is read anywhere in the repo,
+                # and `_refine_loop` / `refine_pass` / `story_refine` return
+                # zero hits. The widget spent a month promising a revision
+                # loop that could not run, which is worse than absent -- a
+                # reader reasonably believed the knob did something.
+                #
+                # Removed WITH its migration (operator ruling 2026-08-28 --
+                # "that's being lazy not to remove an inert widget"): slot
+                # 20 dropped and every later slot re-indexed across all 62
+                # workflow files carrying this node. Every one stored 'Off'.
                 # Story-scaffold toggle (2026-06-24) -- APPENDED at the END of
                 # optional (next widgets_values index, BUG-LOCAL-097) so existing
                 # widget indices are untouched. The single user-facing control
@@ -2841,7 +2836,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # operator is not logged in / the Comfy Credits lane is unused.
         auth_token_comfy_org=None,
         api_key_comfy_org=None,
-        refine_target_grade="Off",
         # Story-scaffold UI toggle (2026-06-24): auto/on/off. Governs the whole
         # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
         # top of the body). Default "auto" => env/default => byte-identical.

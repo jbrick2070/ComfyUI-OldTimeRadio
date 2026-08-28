@@ -15,8 +15,10 @@ and each class has a single deterministic action:
 * ``BlockClass.WARN`` -- subjective quality / coherence / NSFW gates (and the
   A/V-sync guard). These WARN only: the already-rendered clip is RETAINED and a
   warning is logged; a WARN gate NEVER discards rendered output, NEVER aborts
-  an episode, and NEVER touches the frozen master audio. The offline NSFW
-  frame-QC sampler is DEFAULT-OFF and warn-only because SFW is an invariant.
+  an episode, and NEVER touches the frozen master audio. (The offline NSFW
+  frame-QC sampler that used to be named here was REMOVED 2026-08-28; the
+  FailureKind.NSFW value below is independent of it and stays -- an image
+  model can still decline a card, and that is a WARN, not a stop.)
   The A/V-sync guard does a best-effort deterministic retime of the VIDEO
   frames (never the audio).
 

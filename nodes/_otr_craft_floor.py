@@ -1,10 +1,20 @@
 """nodes/_otr_craft_floor.py -- Build 2 (2026-05-28).
 
-DETERMINISTIC Tier-A integrity gate for the Story Room slot-formatted
-output. PROMOTED from docs/sprint_drafts/build2/ and wired into
-OTR_StoryRoomExtract.run per build2/WIRING_SPEC.md (Option A +
-Placement 1). Helper module only -- not a node, not in _NODE_MODULES,
-so ComfyUI never auto-imports it; OTR_StoryRoomExtract imports it lazily.
+DETERMINISTIC Tier-A integrity gate for slot-formatted dialogue output.
+
+WHO ACTUALLY CALLS THIS, corrected 2026-08-28. The paragraph here used to say
+it was "wired into OTR_StoryRoomExtract.run" and lazily imported by that node.
+BOTH NODES IN THAT SENTENCE WERE DELETED on 2026-05-29 with the dormant Story
+Room cluster, and they now appear only in the retired-node-ID tombstone list in
+`_workflow_validation.py` so a stale workflow referencing them fails loudly.
+The module itself is very much alive -- under a different caller entirely:
+`OTR_LedgerScriptWriter` imports `evaluate_tier_a` / `normalize_slot_line`
+(`OTR_LedgerScriptWriter.py:4914-4916`) on its exchange-prepass path, via
+`_otr_compose_exchange.make_tier_a_adapter`. Nothing about the Story Room
+design survives here but the vocabulary.
+
+Helper module only -- not a node, not in _NODE_MODULES, so ComfyUI never
+auto-imports it.
 
 What this module is (per GO_FORWARD_PLAN_v10 Build 2 + critique 2):
     Format / integrity ONLY. No semantic judgment, no LLM call, no

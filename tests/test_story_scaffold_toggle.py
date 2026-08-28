@@ -55,12 +55,12 @@ class TestWidgetSurface:
         # shifted every slot from num_characters onward down by 1).
         spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[21] == "story_scaffold"
-        assert order[22] == "source_bank"
-        assert order[23] == "visual_style"
-        assert order[24] == "google_api_slot_a_model"
-        assert order[25] == "google_api_slot_b_model"
-        assert order[26] == "source_ref"
+        assert order[20] == "story_scaffold"
+        assert order[21] == "source_bank"
+        assert order[22] == "visual_style"
+        assert order[23] == "google_api_slot_a_model"
+        assert order[24] == "google_api_slot_b_model"
+        assert order[25] == "source_ref"
 
 
 class TestApplyScaffoldEnv:

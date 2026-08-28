@@ -8,10 +8,19 @@ stays agnostic to the repo's pydantic v1/v2 split.
 Law: JSON owns content/config; Python owns validation/routing/execution; no
 fallbacks; unknown id = hard error.
 
-STAGE 1 IS DORMANT: this module is loaded + tested but NOT yet consumed by any
-production node. A migrated seam (Stage 1b+) uses get_pack_prompt (raises on
-missing -- no hidden fallback); get_pack_prompt_or_none is the pre-migration
-passthrough (None -> caller keeps its Python constant).
+THIS MODULE IS LIVE, and the paragraph here used to say the opposite.
+
+Until 2026-08-28 it read "STAGE 1 IS DORMANT: this module is loaded + tested
+but NOT yet consumed by any production node." The migration it was waiting for
+happened: `_otr_creative_prompt_router.py:76` imports `get_pack_prompt` and
+the router's own comments name it as the fail-loud boundary for three separate
+lanes ("a lane that lacks them fails LOUD at get_pack_prompt"). The router
+serves the canonical writer, so a claim of dormancy sent every reader looking
+for a caller that was one import away.
+
+`get_pack_prompt` raises on a missing pack -- no hidden fallback.
+`get_pack_prompt_or_none` remains the pre-migration passthrough (None -> the
+caller keeps its Python constant) for seams that have not moved.
 """
 from __future__ import annotations
 

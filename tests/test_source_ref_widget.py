@@ -27,9 +27,9 @@ _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
 def test_source_ref_slot_pinned_with_llm_policy_tail():
     """S5 platform-portability (2026-07-10): source_ref is NO LONGER the
-    final append-only widget -- OLD pin: order[27] == "source_ref" AND
+    final append-only widget -- OLD pin: order[26] == "source_ref" AND
     len(order) == 28 (the tail). NEW pin (post S5): source_ref stays fixed
-    at order[27], the six explicit LLM runtime-policy widgets
+    at order[26], the six explicit LLM runtime-policy widgets
     (llm_device .. gguf_quant) were appended after it, and the gate_in
     forceInput socket became the final declared entry. Renamed from
     test_source_ref_is_final_append_only_widget since that name would now
@@ -37,33 +37,35 @@ def test_source_ref_slot_pinned_with_llm_policy_tail():
 
     2026-08-14: the `target_words` widget (formerly slot 1) was deleted,
     shifting every slot from num_characters onward down by 1 -- source_ref
-    moved from order[27] to order[26], and the tail (llm_device ..
+    moved from order[26] to order[25], and the tail (llm_device ..
     gguf_quant .. gate_in) shifted down by 1 with it.
     """
     spec = OTR_LedgerScriptWriter.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
 
-    assert order[22] == "source_bank"
-    assert order[23] == "visual_style"
-    assert order[24] == "google_api_slot_a_model"
-    assert order[25] == "google_api_slot_b_model"
-    assert order[26] == "source_ref"
-    assert order[27] == "llm_device"
-    assert order[28] == "llm_attn_impl"
-    assert order[29] == "llm_quant_policy"
-    assert order[30] == "llm_vram_ceiling_gb"
-    assert order[31] == "gguf_n_ctx"
-    assert order[32] == "gguf_quant"
-    assert order[33] == "gate_in"
-    assert len(order) == 34
+    assert order[21] == "source_bank"
+    assert order[22] == "visual_style"
+    assert order[23] == "google_api_slot_a_model"
+    assert order[24] == "google_api_slot_b_model"
+    assert order[25] == "source_ref"
+    assert order[26] == "llm_device"
+    assert order[27] == "llm_attn_impl"
+    assert order[28] == "llm_quant_policy"
+    assert order[29] == "llm_vram_ceiling_gb"
+    assert order[30] == "gguf_n_ctx"
+    assert order[31] == "gguf_quant"
+    assert order[32] == "gate_in"
+    # 33 since 2026-08-28: refine_target_grade (slot 20) was removed as an
+    # inert widget and every pin below it shifted down one.
+    assert len(order) == 33
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
     assert meta["default"] == ""
 
-    # gate_in is declared (order[33]) but is a forceInput socket -- it
+    # gate_in is declared (order[32]) but is a forceInput socket -- it
     # consumes NO widgets_values slot (verified against the live 33-wide
-    # vector in test_patch_widget_by_name_lands_source_ref_slot_26 and
+    # vector in test_patch_widget_by_name_lands_source_ref_slot_25 and
     # tests/test_otr_api_companions.py::test_round_trip_canonical_node1_
     # inputs_correct).
     gate_type, gate_meta = spec["optional"]["gate_in"]
@@ -94,7 +96,7 @@ def test_source_ref_on_both_headless_whitelists():
     assert "source_ref" in otr_api.CREATIVE_WHITELIST
 
 
-def test_patch_widget_by_name_lands_source_ref_slot_26():
+def test_patch_widget_by_name_lands_source_ref_slot_25():
     import otr_api
 
     spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -123,16 +125,16 @@ def test_patch_widget_by_name_lands_source_ref_slot_26():
     # vector tops out at 33. schemas comes from the LIVE INPUT_TYPES()
     # above, so this already reflects the new vector -- only the pin
     # needed updating.
-    assert len(node1["widgets_values"]) == 33
+    assert len(node1["widgets_values"]) == 32
     # 2026-08-15 (operator): canonical ships the roll sentinels on both slots so
     # an unattended run varies bank and style. These two lines are NEIGHBOUR
     # checks -- they exist to prove the source_ref patch landed at 26 without
     # disturbing anything around it, so they track canonical's saved values.
-    assert node1["widgets_values"][22] == "roll (any eligible bank)"
-    assert node1["widgets_values"][23] == "roll (any style)"
+    assert node1["widgets_values"][21] == "roll (any eligible bank)"
+    assert node1["widgets_values"][22] == "roll (any style)"
+    assert node1["widgets_values"][23] == "(select Google API model)"
     assert node1["widgets_values"][24] == "(select Google API model)"
-    assert node1["widgets_values"][25] == "(select Google API model)"
-    assert node1["widgets_values"][26] == "https://example.invalid/source.txt"
+    assert node1["widgets_values"][25] == "https://example.invalid/source.txt"
 
 
 def test_patch_creative_allows_source_ref():
@@ -156,4 +158,4 @@ def test_patch_creative_allows_source_ref():
         schemas,
     )
     node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-    assert node1["widgets_values"][26] == "pd://sherlock/case-001"
+    assert node1["widgets_values"][25] == "pd://sherlock/case-001"

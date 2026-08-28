@@ -114,7 +114,32 @@ def _log_fingerprint_failure_once(engine_id, exc) -> None:
 
 
 def _ffmpeg_bin(ffmpeg: str) -> str:
-    return ffmpeg if (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)) else ""
+    """The ffmpeg this box should run, or ``""`` when it has none.
+
+    HONOURS ``OTR_FFMPEG`` BEFORE PATH (2026-08-28). It did not, and that was
+    the mirror image of a bug the pack had already fixed once: the shared
+    ``_otr_shared/ffprobe.py`` resolver exists because only `otr_credits_roll`
+    honoured ``OTR_FFPROBE`` while every other caller trusted PATH. That
+    consolidation was scoped to the PROBE; the ENCODER kept the same hole here,
+    in `otr_caption_burn`, `otr_master_audio_mux` and `otr_silent_composite` --
+    which are the caption burn, the terminal audio mux and the silent-video
+    normalize, i.e. the LAST three stages of an episode.
+
+    So on a box where ffmpeg is reachable only through ``OTR_FFMPEG`` -- the
+    AMD/Mac/alternate-box case the variant workflows exist for -- every earlier
+    stage would succeed (the video engines all honour the variable) and the
+    episode would die at the end, having spent the whole render.
+
+    The explicit widget argument still wins when it resolves: an operator who
+    typed a path meant it. The env var is consulted only when the passed value
+    does not resolve, and PATH remains the last resort.
+    """
+    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
+        return ffmpeg
+    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
+    if cand and (os.path.isfile(cand) or shutil.which(cand)):
+        return cand
+    return shutil.which("ffmpeg") or ""
 
 
 def _ffprobe_bin() -> str:

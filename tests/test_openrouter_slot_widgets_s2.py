@@ -69,26 +69,30 @@ def test_widget_order_appends_slots_at_end():
     assert order[17] == "openrouter_slot_b_model"
     assert order[18] == "comfy_slot_a_model"
     assert order[19] == "comfy_slot_b_model"
-    assert order[20] == "refine_target_grade"   # refine loop v1 (2026-06-23)
-    assert order[21] == "story_scaffold"          # scaffold toggle (2026-06-24)
-    assert order[22] == "source_bank"             # Stage 2C (2026-07-05)
-    assert order[23] == "visual_style"            # Stage 3C (2026-07-06)
-    assert order[24] == "google_api_slot_a_model" # Google API (2026-07-08)
-    assert order[25] == "google_api_slot_b_model" # Google API (2026-07-08)
-    assert order[26] == "source_ref"              # Source Banks v2 (2026-07-08)
+    # slot 20 was refine_target_grade until 2026-08-28. It was an inert
+    # widget promising a revision loop deleted a month earlier, so it was
+    # removed WITH its migration and every later slot moved down by one.
+    assert order[20] == "story_scaffold"          # scaffold toggle (2026-06-24)
+    assert order[21] == "source_bank"             # Stage 2C (2026-07-05)
+    assert order[22] == "visual_style"            # Stage 3C (2026-07-06)
+    assert order[23] == "google_api_slot_a_model" # Google API (2026-07-08)
+    assert order[24] == "google_api_slot_b_model" # Google API (2026-07-08)
+    assert order[25] == "source_ref"              # Source Banks v2 (2026-07-08)
     # S5 platform-portability (2026-07-10): the six explicit LLM
     # runtime-policy widgets, appended at 27-32 (append-only).
-    assert order[27] == "llm_device"
-    assert order[28] == "llm_attn_impl"
-    assert order[29] == "llm_quant_policy"
-    assert order[30] == "llm_vram_ceiling_gb"
-    assert order[31] == "gguf_n_ctx"
-    assert order[32] == "gguf_quant"
+    assert order[26] == "llm_device"
+    assert order[27] == "llm_attn_impl"
+    assert order[28] == "llm_quant_policy"
+    assert order[29] == "llm_vram_ceiling_gb"
+    assert order[30] == "gguf_n_ctx"
+    assert order[31] == "gguf_quant"
     # gate_in (S5 validation-order fix) is a forceInput SOCKET -- present
     # in the INPUT_TYPES key order but consumes NO widgets_values slot
     # (the serialized widget vector stays 33).
-    assert order[33] == "gate_in"
-    assert len(order) == 34
+    assert order[32] == "gate_in"
+    # 33 since 2026-08-28: refine_target_grade (was slot 20) was removed
+    # as an inert widget, with all 62 saved graphs re-indexed.
+    assert len(order) == 33
 
 
 # --- conditional creative default; technical never flips --------------------

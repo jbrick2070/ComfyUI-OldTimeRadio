@@ -316,16 +316,6 @@
           "link": null
         },
         {
-          "localized_name": "refine_target_grade",
-          "name": "refine_target_grade",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "refine_target_grade"
-          },
-          "link": null
-        },
-        {
           "localized_name": "story_scaffold",
           "name": "story_scaffold",
           "shape": 7,
@@ -525,7 +515,6 @@
         "(enable OpenRouter)",
         "(enable Comfy Credits)",
         "(enable Comfy Credits)",
-        "Off",
         "auto",
         "roll (any eligible bank)",
         "roll (any style)",
