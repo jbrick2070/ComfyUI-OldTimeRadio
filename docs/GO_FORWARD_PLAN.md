@@ -57,10 +57,14 @@ be tangled in here:
 ### >>> FIRST: READ THE OVERNIGHT QUEUE'S RESULTS IN `otr/obs/` -- THE LEG COST IS ALREADY PAID <<<
 
 **WHAT IS OWED -- THE LISTENING TEST, and it is the whole reason the
-code work happened.** No receipt can stand in for it. Six 1-act legs are
-running now via `scripts/otr_overnight_lane_prompts.ps1` (mime first, since
-its prompt has never been heard; then foley, plain ltx25 video, H3 silent,
-H3 audio-in, the ltx_audio_in baseline) -- watch `otr/obs/` in the morning.
+code work happened.** No receipt can stand in for it. The queue state as of
+the 2026-08-28 morning restart: the FOLEY control leg already PUBLISHED
+(`the_curdling_of_memory`, obs #23); the remaining four run via
+`scripts/_tmp_overnight_rest2.ps1` -- MIME FIRST (the lane where the
+vocalization was heard, so it is the real test of the prompt work), then H3
+silent, H3 audio-in, the ltx_audio_in baseline. Watch `otr/obs/`; the live
+swim-lane view (`tmp/otr_swimlane.html`, self-refreshing) shows which stage
+the current leg is in.
 The obs path bug in the queue script itself (pointed at the repo's own empty
 `otr/obs` instead of ComfyUI's real `output/otr/obs`, which would have
 silently reported every leg FAILED all night) was caught and fixed before it
@@ -504,8 +508,9 @@ arc BEFORE code, not after. (Its sibling, the GGUF generation deadline, CLOSED
   alone, so an `engine_facts` builder using a bare `getattr` would classify it local
   and let the radio-host redirect send a cloud avatar to local LTX. Needs a regression
   on picked AND forced `cloud_kling_avatar`.
-- **Four env-read sites missing from the S0b inventory:** `eng_ltx_video.py:541-564`
-  (`OTR_ENABLE_LTX_I2V`), `render_driver.py:1176-1203` and
+- **Env-read sites missing from the S0b inventory** (was four; the
+  `OTR_ENABLE_LTX_I2V` site was DELETED by the 2026-08-28 retirement, so two
+  remain): `render_driver.py:1176-1203` and
   `otr_meta_brief_image_prompt.py:297-300` (`OTR_ENABLE_HUMO_HOSTS`), and
   `eng_ltx_av.py:352-353,403-432` (recipe/UNET re-read outside `assert_usable`).
 - **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At
