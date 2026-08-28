@@ -10,9 +10,32 @@ kibitz-runs/
 # comfy-cli's security scan flagged exec() calls and semicolon-statements here
 # (2.0.0-alpha.1 publish log) -- not user-facing, not documented in README, and
 # not needed by anyone installing via the registry.
-scripts/_otr_b_spikes/
-scripts/otr_ltx_motion_smoke.py
-scripts/otr_wan_smoke.py
+# 2026-08-28: THE WHOLE scripts/ TREE, and here is the reasoning.
+#
+# alpha.8 was the last version the registry marked Active. alpha.9, .10 and
+# .11 are all Flagged. Between alpha.8 and alpha.9 three files were ADDED that
+# shipped: two subprocess-spawning sweep scripts and a PowerShell .ps1. The
+# tree also ships _otr_chatterbox_install.ps1, _otr_dia_install.ps1,
+# _otr_indextts2_install.ps1, .bat and .cmd files -- INSTALLER scripts that
+# spawn processes, inside a Python node pack. That is exactly the shape a
+# security scanner is built to flag.
+#
+# NOTHING IN THE PACK IMPORTS scripts/. Verified: no `from scripts`/`import
+# scripts` anywhere in nodes/ or __init__.py (the single mention in
+# __init__.py is a comment). The node functionality is nodes/ plus
+# __init__.py; scripts/ is dev harness -- headless runners, soaks, sweeps,
+# probes, installers -- which a user installing from the registry never runs.
+#
+# 135 files stop shipping because of this line. That is the point: it removes
+# the entire subprocess/PowerShell surface from the published bundle in one
+# move, and it costs the installing user nothing.
+#
+# THIS IS A HYPOTHESIS ABOUT THE FLAG CAUSE, NOT A CONFIRMED FIX. The scanner
+# is a private Comfy-Org repo and gives no reason. If alpha.12 still flags,
+# the next suspects are the base64 decodes in the google_* cloud engines and
+# the urlopen calls in the feed fetcher -- both of which ARE node
+# functionality and cannot simply be excluded.
+scripts/
 
 # 2026-08-22: internal-only material that was shipping to every installer --
 # ~23 MB of it, including the operator's own directives file. None of it is
