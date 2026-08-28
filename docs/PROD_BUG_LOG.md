@@ -4038,6 +4038,34 @@ into it than it earned:**
   normalization vs a target-window compressor vs prompting the dialogue beats
   for more present sounds is a design call with more than one defensible
   answer.
+- **STRUCTURE MEASURED 2026-08-28 -- the quiet stems contain REAL CONTENT, not
+  hiss.** This was the gating question for any fix that lifts a stem: raising a
+  -62.9 dBFS beat by 25 dB amplifies whatever is in it, and a level threshold
+  cannot tell a distant clock from decoder floor. Short-window structure can:
+  `p95 - p50` of 50 ms window RMS separates events-over-a-floor from a
+  stationary wash, and crest factor cross-checks it (gaussian noise sits near
+  12 dB).
+
+      beat                rms dB   crest   spread   reads as
+      b001  announcer      -34.8    26.1     18.1   real events
+      b002  character      -50.4    31.6      6.1   weak but real events
+      b003  character      -49.3    25.3      7.8   weak but real events
+      b004  character      -62.9    28.5      8.0   weak but real events
+      b005  character      -59.6    33.2      9.6   weak but real events
+      b006  announcer      -36.8    28.6      7.3   weak but real events
+      music_closing        -31.9    23.4     16.9   real events
+      music_opening        -35.3    27.0     18.2   real events
+
+  **NOTHING reads as stationary.** Crest runs 23-33 dB across every stem, so
+  there is transient content everywhere -- b004 included. A lift is therefore
+  physically available; it is not amplifying silence.
+
+  **And the split the operator HEARD is level, not content.** `b006` is an
+  ANNOUNCER beat whose structure (7.3 dB spread) sits in the same class as the
+  character beats -- it is simply 13 dB louder. Only `b001` and the two music
+  bookends are structurally busy (17-18 dB spread). So "announcer good,
+  character bad" is a fader problem, not a generation problem, which is what
+  makes a per-beat ride the right shape rather than a prompt change.
 - instrument note: `scripts/otr_replay_foley_mix.py` measures the mix, and its
   verdict wording still conflates too-quiet with too-loud (owed from
   2026-08-27) -- it reports "NOT audible" for a bed that is too FORWARD, which
