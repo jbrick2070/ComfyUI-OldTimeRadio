@@ -2083,6 +2083,130 @@ def finish_joint_av_positive(engine_id, positive, *, music_mood_terms=()):
     return (trimmed + ", " + suffix) if trimmed else suffix
 
 
+# =========================================================================== #
+# PER-LANE MOTION PROMPTS -- EDIT HERE (Option B, operator ruling 2026-08-27)
+# =========================================================================== #
+#
+# THREE LANES, THREE PROMPTS, NO SHARING. These classes are a subclass chain
+# (mime <- foley_plus <- video), and that inheritance is deliberate for the
+# MACHINERY -- same recipe, same graph, same 97-frame rung. It must never apply
+# to the PROMPT: the operator's requirement is that one lane can later have slow
+# motion, another backwards motion, and editing one may not touch another.
+#
+# HOW THAT IS ENFORCED: the render driver dispatches on
+# ``type(engine).__dict__.get("compose_prompt")``. Only a formatter bound to the
+# class ITSELF is visible; an inherited one is not. The explicit bindings at the
+# bottom of this block put one entry in each class's own ``__dict__``, so the
+# guarantee is mechanical rather than a matter of authoring discipline.
+#
+# THE BUDGET (operator's Option B matrix): one start -> development -> endpoint
+# action arc, at most one minor reaction, one independent camera behaviour.
+# LTX 2.5 is the local lane with the strongest evidence behind asking for a lot
+# -- lane-7 A/B excursion 39-50 against a floor of 6 -- so identity and
+# composition drift are the practical ceiling here, not the model's willingness
+# to move.
+#
+# NO DAMPING WORDS, EVER. "subtle", "restrained", "barely", "stable" are what
+# authored the silly pan (PBUG-20260827-04). Do not reintroduce them here.
+
+#: Framing each silent LTX 2.5 lane carries FOR ITSELF. The driver's generic
+#: ``startswith("ltx")`` suffix is skipped for a lane that composes its own
+#: prompt, so this has to live here -- and it deliberately drops the old
+#: "stable centered subject", which on a lane with no mouth to protect was an
+#: instruction to hold still.
+_LTX25_FRAMING = ("full face clearly visible, generous headroom, "
+                  "the subject in real motion")
+
+
+def _ltx25_parts(inputs):
+    """Subject, setting, expression, motion, then camera LAST.
+
+    Shared ASSEMBLY, never a shared prompt: it only orders the parts the
+    operator's matrix names. A lane that wants to diverge entirely stops
+    calling it. Returns "" when the row carries no structured leaves.
+    """
+    parts = []
+    for key in ("appearance", "setting", "expression", "motion"):
+        value = str(inputs.get(key) or "").strip().strip(",")
+        if value:
+            parts.append(value)
+    if not parts:
+        return ""
+    camera = str(inputs.get("camera") or "").strip().strip(",")
+    if camera:
+        parts.append(camera)          # camera AFTER the subject action
+    return ", ".join(parts)
+
+
+def _ltx25_legacy(inputs):
+    """The one documented rule for a row with no structured leaves.
+
+    Not a second path and not a feature switch -- the same formatter handling
+    incomplete input. An older ledger keeps rendering exactly what it rendered
+    before, which is replay correctness rather than a gate.
+    """
+    return str(inputs.get("text_prompt") or "")
+
+
+def compose_ltx25_video(self, inputs):
+    """``ltx25_video`` -- PUSH THE LIMIT. One decisive within-frame action.
+
+    The operator's rule for the silent lanes is "push the limit to what it is
+    capable of", and this is the lane with local proof behind that: every
+    shipping-strength arm cleared the lab's motion floor several times over.
+    """
+    core = _ltx25_parts(inputs)
+    if not core:
+        return _ltx25_legacy(inputs)
+    return "%s, %s" % (core.rstrip(" ,."), _LTX25_FRAMING)
+
+
+def compose_ltx25_foley_plus(self, inputs):
+    """``ltx25_foley_plus`` -- the action must be VISIBLY SOUND-PRODUCING.
+
+    **NOT an audio-in lane** (operator, explicitly: *"mime and foley ... do need
+    more motion than audio in lanes -- they are not audio in lanes"*). It takes
+    the full silent motion budget. What makes it different is that the picture
+    has to EARN the bed: hands on dials, papers, switches, footfalls.
+
+    IT WRITES NO AUDIO INSTRUCTION. ``finish_joint_av_positive`` is the sole
+    owner of this lane's audio tail and appends it once, downstream. That
+    function's idempotency is EXACT suffix matching, so a formatter ending in
+    its own sound-adjacent wording would fail to match and the canonical tail
+    would be appended anyway -- leaving two different audio clauses instead of
+    one. The phrasing below stays visual for that reason.
+    """
+    core = _ltx25_parts(inputs)
+    if not core:
+        return _ltx25_legacy(inputs)
+    return ("%s, working the objects within reach so every movement has a "
+            "visible source, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
+
+
+def compose_ltx25_mime(self, inputs):
+    """``ltx25_mime`` -- expressive silent action with a clear endpoint.
+
+    **NOT an audio-in lane either.** The performance carries the beat with no
+    speech at all, so the action reads larger than its siblings and lands on a
+    held final pose. Like foley it writes NO audio instruction: the ambience
+    tail belongs to ``finish_joint_av_positive`` alone.
+    """
+    core = _ltx25_parts(inputs)
+    if not core:
+        return _ltx25_legacy(inputs)
+    return ("%s, the gesture played out fully and carried to a clear held "
+            "endpoint, %s" % (core.rstrip(" ,."), _LTX25_FRAMING))
+
+
+# THE EXPLICIT BINDINGS. One entry per class ``__dict__`` -- this is what makes
+# the three lanes independent in the dispatcher's eyes. Do NOT collapse these
+# into a base-class method: that would restore exactly the sharing the operator
+# ruled out, and the dispatcher would stop seeing the children entirely.
+Ltx25VideoEngine.compose_prompt = compose_ltx25_video
+Ltx25FoleyPlusEngine.compose_prompt = compose_ltx25_foley_plus
+Ltx25MimeEngine.compose_prompt = compose_ltx25_mime
+
+
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",

@@ -2958,7 +2958,124 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             "[OTR.render_driver] GHOST SIGNAL: %s beat %s composed %d chars, "
             "negative %d chars, slots=%s", _shot_role, shot.get("shot_id"),
             len(_g_positive), len(_g_negative), ",".join(_g_obs["prompt_slots"]))
-    if text_prompt and not _ghost_composed:
+    # ===================================================================== #
+    # PER-LANE PROMPT DISPATCH (Option B, operator ruling 2026-08-27).
+    # ===================================================================== #
+    #
+    # THE DEFECT THIS FIXES. Every lane used to compose its prompt as
+    # ``get("text_prompt") or <the lane's motion default>``, and ShotLock
+    # populates ``text_prompt`` unconditionally for every character beat -- so
+    # the per-lane motion prompts committed in 65538f41 lived on the dead side
+    # of that ``or`` and never once rendered. The live H3 leg of 2026-08-27
+    # proved it from production: every character beat logged ``source=m4``.
+    #
+    # THE RULE: one path per lane, always active. No flag, no shadow state, no
+    # legacy route. A lane that declares its OWN ``compose_prompt`` composes
+    # here, and the ENTIRE legacy chain below -- the M4 wall, the ia2v talking
+    # rewrite, the env override, the motion-role branch, the brief+beat branch
+    # and both fallbacks -- is skipped for it. Review flagged that omitting this
+    # bypass would let a legacy branch silently overwrite the lane's output,
+    # which would be the second prompt path the operator forbade.
+    #
+    # ``type(engine).__dict__`` AND NOT ``hasattr``, deliberately. The engine
+    # classes are subclass chains (mime <- foley_plus <- video; h3 silent and
+    # h3 audio-in share a base; fastwan subclasses wan). ``hasattr`` would find
+    # an INHERITED formatter and hand one lane another lane's motion -- exactly
+    # what "each lane independent" forbids. Only a formatter bound to the class
+    # itself is visible to dispatch.
+    #
+    # SCOPE: ``character_video`` only. Announcer and music beats have no
+    # ``creative`` row at all (CHARACTER_BEARING_ROLES is character_video
+    # alone), so a formatter there would compose from nothing, return blank,
+    # and ``finish_joint_av_positive`` raises on a blank positive -- a dead
+    # episode at the foley/mime bookends. Those beats keep the motion-register
+    # branch they already have.
+    _lane_composed = False
+    if (not _ghost_composed
+            and _shot_role == "character_video"
+            and _eng_id and _vreg.is_registered(_eng_id)):
+        _lane_engine = _vreg.get_engine(_eng_id)
+        _lane_formatter = type(_lane_engine).__dict__.get("compose_prompt")
+        if _lane_formatter is not None:
+            _lane_line = _line_index(ledger).get(str(_visual_beat_id)) or {}
+            # DIALOGUE IS STRUCTURAL, NOT POLICY. A lane that does not preserve
+            # dialogue is handed "" here, so it cannot leak a spoken line even
+            # if its formatter wanted to. ``_lane_preserves_dialogue`` is the
+            # existing authority (it keys on the engine FAMILY); a hand-written
+            # membership list would drift from it.
+            try:
+                from ..otr_shot_lock import (  # type: ignore
+                    _lane_preserves_dialogue as _lane_keeps_dialogue)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from otr_shot_lock import (  # type: ignore
+                    _lane_preserves_dialogue as _lane_keeps_dialogue)
+            try:
+                _keeps = bool(_lane_keeps_dialogue(_eng_id, _shot_role))
+            except Exception:  # noqa: BLE001 -- a silent lane is the safe default
+                _keeps = False
+            # APPEARANCE AND SETTING ARE RESOLVED HERE, NOT STORED.
+            # Adding them to the creative object would be a schema extension
+            # Option B forbids, and `creative["text_prompt"]` already contains
+            # the appearance -- storing a second raw copy invites a formatter
+            # emitting it twice, and worse, re-bleeding the subject anchor's
+            # "speaking to camera" into the silent lanes. Both resolvers are
+            # pure ledger reads.
+            try:
+                from ..otr_shot_lock import (  # type: ignore
+                    _appearance_for_char as _lane_appearance,
+                    _read_setting as _lane_setting)
+            except ImportError:  # pragma: no cover -- flat test imports
+                from otr_shot_lock import (  # type: ignore
+                    _appearance_for_char as _lane_appearance,
+                    _read_setting as _lane_setting)
+            try:
+                _lane_look = str(_lane_appearance(
+                    ledger, str(shot.get("char_id") or "")) or "")
+            except Exception:  # noqa: BLE001 -- a missing look is not fatal
+                _lane_look = ""
+            try:
+                _lane_where = str(_lane_setting(
+                    (ledger or {}).get("meta") or {}) or "")
+            except Exception:  # noqa: BLE001
+                _lane_where = ""
+            _lane_inputs = {
+                "appearance": _lane_look,
+                "setting": _lane_where,
+                "expression": str(creative.get("expression") or ""),
+                "motion": str(creative.get("motion") or ""),
+                "camera": str(creative.get("camera") or ""),
+                "text_prompt": str(creative.get("text_prompt") or ""),
+                "dialogue": (str(_lane_line.get("text") or "")
+                             if _keeps else ""),
+                "role": _shot_role,
+                "beat_id": str(_visual_beat_id or ""),
+                "engine_id": _eng_id,
+            }
+            _lane_text = str(_lane_formatter(_lane_engine, _lane_inputs) or "")
+            if _lane_text.strip():
+                text_prompt = _lane_text
+                _lane_composed = True
+            else:
+                # A formatter that returns nothing is a BUG in that lane, not a
+                # reason to render a blank picture. Fall through to the legacy
+                # chain and say so, loudly.
+                _LOG.warning(
+                    "[OTR.render_driver] lane formatter for %r returned an "
+                    "empty prompt on beat %s -- falling back to the shared "
+                    "composer; this is a defect in that lane's compose_prompt",
+                    _eng_id, _visual_beat_id)
+
+    if _lane_composed:
+        # The lane owns its framing, so the generic LTX suffix and the family
+        # split are deliberately NOT applied here. Style cue still runs (one
+        # owner, unchanged), and the joint-AV / safety / banana finalizers
+        # further down are untouched and each still run exactly once.
+        text_prompt = _prefix_video_style_cue(_vstyle, text_prompt)
+        req["text_prompt"] = text_prompt
+        _stamp_prompt_meta(req, "engine:%s" % _eng_id, text_prompt,
+                           subsource=str(creative.get("source") or ""),
+                           beat=_beat_id_for_shot(shot))
+    elif text_prompt and not _ghost_composed:
         # Authored M4 visual vocabulary is not a publication gate. Preserve it
         # verbatim; framing/style composition below may add context but never
         # deletes story-world objects by means of a Python word list.
