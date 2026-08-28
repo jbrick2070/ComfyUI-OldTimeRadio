@@ -13,7 +13,7 @@ prompt-prefix-strip post-process. The only delta: a
 prefix_allowed_tokens_fn keyed off the pydantic schema is passed into
 generate().
 
-This module is dormant until 3-C wires Stage 1 into the writer.
+THIS MODULE IS LIVE (banner corrected 2026-08-28 -- it claimed dormancy long after 3-C landed): OTR_LedgerScriptWriter constructs make_constrained_generate_fn for SlotJobFields, and 1,645 of 2,001 corpus ledgers carry the resulting meta['slot_drama_contracts'].
 
 Slot tag: technical -- structured JSON pass.
 

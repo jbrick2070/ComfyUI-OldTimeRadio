@@ -165,7 +165,7 @@ class TestHeadlessSurface:
         # S5 platform-portability (2026-07-10): OLD pin 28 -> pin 34
         # (llm_device..gguf_quant appended at 28-33; visual_style at 24).
         # 2026-08-14: target_words removal shifted everything from
-        # num_characters onward down by 1 -- visual_style now sits at 23
+        # num_characters onward down by 1 -- visual_style now sits at 22 (23 until the 2026-08-28 refine_target_grade removal shifted it)
         # and the vector tops out at 33. schemas comes from the LIVE
         # INPUT_TYPES() above, so this already reflects the new vector --
         # only the pin needed updating.

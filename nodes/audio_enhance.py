@@ -110,7 +110,7 @@ def _stereo_decorrelate(waveform: torch.Tensor, amount: float = 0.15) -> torch.T
 
 # `_normalize()` (peak-normalise to a target dBFS) was REMOVED 2026-08-28.
 # It was DEFINED AND NEVER CALLED -- the only uncalled helper in this file,
-# while the other nine are all live -- and its widget went with it.
+# while the other seven are all live -- and its widget went with it.
 #
 # It was not merely unused, it was SUPERSEDED. Delivery level is set once,
 # downstream, in LUFS by `scene_sequencer._master_loudness`. Peak and LUFS are

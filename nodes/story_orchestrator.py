@@ -52,7 +52,10 @@ from datetime import datetime, timedelta
 # was here -- imported and never used, the only repo reference to that module.
 # The node and module are retired; the import went with them.
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
-from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
+from ._vram_log import vram_snapshot, vram_reset_peak
+# (`force_vram_offload` was dropped from this import 2026-08-28: zero AST
+# loads in this module -- an import is not a use. The function itself lives
+# on in _vram_log and its real callers.)
 
 # Canonical OTR paths -- single source of truth for output locations.
 # (director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
@@ -146,7 +149,12 @@ class _LLMTimeoutWorkflowPause(_LLMTimeout):
 
 
 import threading
-_TIMEOUT_CTX = threading.local()
+# `_TIMEOUT_CTX = threading.local()` was REMOVED 2026-08-28: its ONLY reader
+# was the deleted GemmaHeartbeatStreamer's put(), so the writes and cleanup in
+# `_run_with_timeout` had become write-only ceremony. The deadline the REAL
+# transports check is loader-owned -- `set_generation_deadline()` below, read
+# back by `_DeadlineStoppingCriteria` and the GGUF backend -- and that path is
+# untouched.
 
 def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     """Run fn() in a worker thread with a wall-clock timeout.
@@ -169,11 +177,11 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     deadline = time.monotonic() + timeout_sec
 
     def _worker():
-        # _TIMEOUT_CTX feeds GemmaHeartbeatStreamer (a legacy streamer this
-        # phase's shared make_generate_fn transport never uses). The
-        # loader-owned deadline is what the real transports check: the
+        # The loader-owned deadline is what the real transports check: the
         # transformers closures via _DeadlineStoppingCriteria, and the GGUF
         # backend via get_generation_deadline() + conditional streaming.
+        # (A thread-local mirror of this deadline was removed 2026-08-28
+        # with its only reader, the legacy GemmaHeartbeatStreamer.)
         # Both now read the SAME monotonic value installed here.
         #
         # Not best-effort: a guard whose install can silently no-op is
@@ -184,7 +192,6 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
         # everything it sets -- previously an exception between the two
         # assignments could leave one installed with no owner.
         try:
-            _TIMEOUT_CTX.deadline = deadline
             _otr_loader_mod.set_generation_deadline(deadline)
             # A worker scheduled AFTER the budget already expired must not
             # start at all. This is the check that covers the dominant
@@ -198,8 +205,6 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
                 )
             return fn()
         finally:
-            if hasattr(_TIMEOUT_CTX, "deadline"):
-                del _TIMEOUT_CTX.deadline
             _otr_loader_mod.set_generation_deadline(None)
 
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"otr-{phase_label}")

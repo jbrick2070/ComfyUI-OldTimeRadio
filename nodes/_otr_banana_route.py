@@ -24,10 +24,13 @@ render driver (after _apply_visual_safety_prompt) -- gated by:
 Env is read per call; on a RESIDENT server an env change needs a fresh boot
 (no widget exists by operator ruling -- no canonical-workflow change, ever).
 
-THE DEFAULT GRAPH IS INERT for this route: the shipped canonical selects the
-procedural viz_* engines, which ignore text_prompt and mint no stills. A user
-flipping the env there and seeing no bananas is reading it correctly; the
-route needs a prompt-consuming engine selection (e.g. ltx_audio_in).
+THE DEFAULT GRAPH NOW FEEDS THIS ROUTE (banner corrected 2026-08-28 -- the
+paragraph here described a retired graph for months): the shipped canonical
+selects `still_flat (16:9)` for all three roles, which MINTS STILLS from
+text prompts, so the route is live by default. The corpus agrees:
+`banana_route` appears in 320 ledgers and `still_flat` in 319 of them. The
+old text claimed the canonical ran procedural viz_* engines that mint no
+stills -- true once, long gone.
 
 Split-switch honesty: stills-on/video-off (or inverse) is a real capability
 only on t2v lanes. On i2v lanes the anchor still carries the look, so a split

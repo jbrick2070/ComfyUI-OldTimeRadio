@@ -97,10 +97,8 @@ def patched_sequencer_env(tmp_path):
     def _fake_room_tone(span_len_sec, sr, intensity=0.01, descriptors=""):
         return np.zeros(int(span_len_sec * sr), dtype=np.float32)
 
-    # Inline-Bark fallback: replace with a deterministic 0.5s clip so
-    # the dispatch path that consumes it doesn't need a real model.
-    def _fake_bark_for_line(text, preset, temperature=0.7):
-        return np.zeros(12000, dtype=np.float32), 24000
+    # `_fake_bark_for_line` was removed 2026-08-28 with the deleted
+    # inline-Bark fallback it stubbed -- nothing patched it any more.
 
     with patch(
         # S31.5 B1: post-S31 B4 `story_orchestrator._unload_llm` was

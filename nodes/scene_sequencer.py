@@ -596,15 +596,17 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 
 
 # -----------------------------------------------------------------------------
-# INLINE BARK TTS - called by SceneSequencer for dynamic dialogue generation
-# -----------------------------------------------------------------------------
-
+# (BANNER CORRECTED 2026-08-28: this section header used to read "INLINE BARK
+# TTS - called by SceneSequencer for dynamic dialogue generation", advertising
+# as live a path whose removal is recorded in the tombstone near the top of
+# this file. Nothing here generates audio any more.)
+#
 # Voice preset resolution: cast.voice_preset is the only source.
 # The legacy Director voice_map fallback + _voice_preset_for_character +
 # gender-aware grab-bag pools were deleted in voice-path-cleanbreak
 # 2026-05-12. Empty / non-v2 cast.voice_preset is a writer contract
-# violation -- SceneSequencer raises ValueError at the inline-Bark
-# fallback site (Gate 3 mirror).
+# violation -- the sequencer's clip-shortfall gate raises ValueError
+# (Gate 3 mirror); there is no inline-Bark fallback left to reach.
 
 
 
