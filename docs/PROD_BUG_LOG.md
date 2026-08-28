@@ -3995,7 +3995,55 @@ into it than it earned:**
 
 ---
 
-## PBUG-20260828-01 -- a MUSIC bookend is routed to `minimax_h3_audio_in`, which needs a portrait no music beat can have
+## PBUG-20260828-03 -- joint-AV foley is 12-28 dB QUIETER on character beats than on announcer beats
+
+- surfaced: operator listening test, 2026-08-28, on the published episode
+  `signal_lost_the_curdling_of_memory_20260828_060512` (lane
+  `otr_ltx25_high_foley_plus`). His report: *"I can hear the foley on the
+  announcer, good, but the character beats no -- either it's not being muxed
+  or the mix is too low or there is no foley in the actual video. But why is
+  the announcer OK?"*
+- **The asymmetry WAS the diagnosis.** Measured from the durable per-beat
+  stems on disk (`<ep>/audio/foley/beat_shot_*_foley.wav`), RMS dBFS:
+
+      b001  announcer  ANNOUNCER       -34.8
+      b002  character  ALICE HALPERT   -50.4
+      b003  character  DALE BEATTY     -49.2
+      b004  character  ALICE HALPERT   -62.9
+      b005  character  DALE BEATTY     -59.6
+      b006  announcer  ANNOUNCER       -36.8
+      music_opening / music_closing    -35.3 / -31.9
+
+  **Mean delta announcer-vs-other 12.4 dB; worst case 28.1 dB** (b001 -34.8
+  against b004 -62.9).
+- **NOT the mux and NOT routing -- both ruled out by evidence.** All 8 shots
+  rendered on `ltx25_foley_plus` (`meta.render_engines.by_role` shows
+  `character_video: {ltx25_foley_plus: 4}`), and all 8 durable stems exist on
+  disk. **The joint-AV model simply GENERATED much quieter audio on the
+  dialogue beats.** At the lane's 0.20 native gain a -62.9 dBFS stem arrives
+  near -77 dBFS under programme -- inaudible, not merely low.
+- **The defect is DYNAMIC RANGE ACROSS BEATS, not overall level, and that
+  distinction decides the fix.** Raising the global gain (the operator's first
+  instinct, "bring it up 20%") moves every beat together: ~1.6 dB against a
+  28 dB gap, while pushing the announcer and music beats -- already audible,
+  some already sitting FORWARD of the 15-25 dB target band per the 2026-08-27
+  audibility measurement -- further forward still. A per-beat normalization
+  into a common window is the shape that matches the measured defect.
+- **Comparison point the operator supplied the same day, worth keeping:** he
+  called `signal_lost_reel_time_20260828_042015` *"perfect"*. That episode is
+  `ltx25_video` (the SILENT lane) 8/8 with the conventional TTS + music +
+  designed bed and NO joint-AV foley at all. The finished audio path is the
+  conventional one; the joint-AV foley lanes are the experimental ones.
+- status: **OPEN.** Not fixed in the session that measured it: per-beat
+  normalization vs a target-window compressor vs prompting the dialogue beats
+  for more present sounds is a design call with more than one defensible
+  answer.
+- instrument note: `scripts/otr_replay_foley_mix.py` measures the mix, and its
+  verdict wording still conflates too-quiet with too-loud (owed from
+  2026-08-27) -- it reports "NOT audible" for a bed that is too FORWARD, which
+  would misreport exactly the beats this entry says are already forward.
+
+## PBUG-20260828-02 -- a MUSIC bookend is routed to `minimax_h3_audio_in`, which needs a portrait no music beat can have
 
 - surfaced: live canonical headless leg, 2026-08-28, profile
   `otr_w45_minimax_h3_audio_in` (LEG 3 of the overnight lane-prompt queue).
