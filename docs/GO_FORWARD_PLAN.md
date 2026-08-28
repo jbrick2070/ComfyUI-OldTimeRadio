@@ -89,6 +89,51 @@ All of this is provable by the suite, a scoped review, or an offline read.
 One coder window at a time; every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
+**THE CODING ORDER (2026-08-28, operator-set: the 4060 frictionless test is
+what he is excited about; everything else serves it or follows it):**
+
+1. **Judge the sanctioned-gap r2 panel and CODE it** (1.1 -- plan written,
+   all three reviews returned, awaiting the driver's judgment). Closes the
+   control path AND the only surviving LEMMY-era PBUG (-02).
+2. **The 4060 frictionless set** (1.0 below) -- small, verified, and the
+   gate on the registry republish he will trigger.
+3. **Spandrel `_resolve_model` hardening** (1.5) -- repro first; fix only if
+   reproducible; one finished-diff review.
+4. **Gender-ladder SPEC REWRITE** (1.3 -- now fully unblocked: both operator
+   rulings recorded at its head).
+5. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process, no ComfyUI).
+6. Handoff bookkeeping.
+
+### 1.0 THE 4060 FRICTIONLESS SET (operator priority -- the path to "download the template, click run" on his 4060)
+
+Four small items, all verified against the tree on 2026-08-28, plus one trap:
+
+* **`workflows/variants/otr_4060_floor.json`: `"quant_policy": "none"` ->
+  `"bnb_nf4"`.** One line. The single thing blocking the 4060 from loading
+  its 10 GB writer; the old justification for "none" is provably stale
+  (accelerate + bitsandbytes are declared deps now).
+* **Declare `kokoro` in `requirements.txt`** and fix the stale repo hint at
+  `nodes/_otr_audio_engines/eng_kokoro.py:139` (`1038lab/KokoroTTS` in the
+  error message vs `hexgrad/Kokoro-82M` actually loaded at `:159`). Two
+  lines; removes the biggest fresh-install voice friction.
+* **Ship a template in `example_workflows/`** -- the 4060 floor graph
+  already exists as a variant; it just does not ship where "download and
+  click run" looks.
+* **README model table** from the compatibility workbook's Baseline Combos
+  tab (`outputs/20260828-ungated-models/` -- the LIVING fact sheet: edit
+  cells in place, never add a changelog tab). Include the HF-token
+  two-tier story: defaults need no account ever; gated upgrades = account +
+  license click-through + `HF_TOKEN` once (the resolver already finds it).
+* **THE TRAP: `pyproject.toml` edits AUTO-FIRE a registry publish.** The
+  `kokoro` line also belongs in its static deps -- but that edit WAITS and
+  rides the deliberate republish: operator deletes the flagged node entry
+  (his click, not ours) -> ONE commit bumps the version + adds kokoro to
+  pyproject -> clean publish -> clean 4060 install of the shipped template.
+
+Waiting on externals, not on us: Codex deep research on the HF-token
+problem statement (`docs/2026-08-28-hf-token-feature/PROBLEM_STATEMENT.md`)
+and the operator's registry node-delete click.
+
 ### 1.1 THE SANCTIONED-GAP CONTROL PATH -- r2, the coding plan, is the next step
 
 **Live-proven necessary on 2026-08-26.** Ideogram is not seed-deterministic:
@@ -113,7 +158,14 @@ permits publishing an all-refused episode, it does NOT permit REPORTING one as
 a clean render, and the `required_scene_targets` ledger-completeness law is
 untouched.
 
-**Next step is r2, the coding plan**, per r1's own stated roster
+**STATE 2026-08-28: r2 plan IS WRITTEN and the panel has REPORTED.** The
+plan: `docs/2026-08-28-sanctioned-gap-r2/CODING_PLAN.md` (five changes C1-C5
+in dependency order, every cite re-pinned at HEAD `aa4f4b1d`). Reviews:
+`kibitz-runs/2026-08-28-sanctioned-gap-r2/r2/` (codex + antigravity +
+cursor, the operator's best-of-3). Next action: the driver grounds the three
+reviews, writes `final.md`, and codes what survives.
+
+**The original next step was r2, the coding plan**, per r1's own stated roster
 (r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
 about this row is waiting on the operator.
 
@@ -245,58 +297,16 @@ Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
 dramatis personae. **Operator decision, not a driver call** -- cross-listed as
 Section 3, question B.
 
-### 1.4 RETIRE `OTR_ENABLE_LTX_I2V` (operator ruling: "no switches nor flags, all video models request and ingest stills") -- ONE full session
+### 1.4 ~~RETIRE `OTR_ENABLE_LTX_I2V`~~ -- DONE 2026-08-28, tombstone
 
-**SCOPED 2026-08-28, and it is BIGGER than a flag flip -- an architecture
-retirement, not a grep-and-fix.** Investigated while working the backlog
-during the overnight render queue; not started, because starting an
-uncompletable-tonight change on a tight credit budget risks leaving the tree
-half-migrated, which is worse than parking it.
-
-**What removing the flag actually requires:** deleting the WHOLE text-only
-LTX graph-building path (`eng_ltx_video.py`'s non-conditioned encode branch,
-its `_use_i2v`/`_i2v_enabled` gate, and the parallel gate at
-`render_driver.py:2339`), so `ltx_video` conditions on its scene still
-UNCONDITIONALLY -- missing still becomes a structural failure with no
-`=0` escape, matching the sibling `_require_still` contract in
-`cheap_families` this docstring already points at as a model.
-
-**The real test cost, file by file (not the flat "19 rewrites" estimate this
-carried before) -- 8 files, ~22 sites, two different repair classes:**
-
-* **Pure avoidance shortcuts, safe to just drop the setenv** (the flag was
-  never reaching a code path these tests exercise -- `render_driver`'s gate
-  keys on the exact id `"ltx_video"`, and these test other lanes or prompt
-  composition only): `test_brief_prompt_finishing.py`,
-  `test_look_qa_round5.py`, `test_nonaudio_prompt_policy.py` (the
-  `_text_only_lane` fixture), `test_video_render_driver.py`.
-* **Genuine dual-path assertions that must be REWRITTEN or DELETED, not
-  patched:** `test_video_motion.py` carries a whole dedicated suite proving
-  the toggle itself works -- `test_i2v_opt_out_restores_text_only`, and an
-  assertion that the raised error names `OTR_ENABLE_LTX_I2V=0` as the escape
-  hatch. Once the toggle is gone there is nothing left to assert; these get
-  deleted, and `test_i2v_default_on_with_init` /
-  `test_i2v_flag_on_with_init_engages` likely collapse into one test since
-  "default" and "explicit on" become the same state.
-  `test_still_spine_helpers.py:975-986` asserts scene_still WITH the flag and
-  a **portrait fallback** WITHOUT it -- that fallback path ceases to exist and
-  the second half of the test goes with it.
-  `test_still_plan_parity.py`'s `_ENV_KEYS`/scenario matrix carries an
-  `("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"})` row that must be removed, not
-  adapted -- there is no more "off" state to parametrize over.
-  `test_video_motion_forward.py` has three sampler/encode-mechanics tests
-  that deliberately select the text-only path to isolate mechanics from the
-  i2v decision; each needs a real init-image fixture added so they exercise
-  the (now-mandatory) conditioned path instead, or an explicit decision that
-  those mechanics no longer have an unconditioned case to test.
-
-**Do this as ONE session with room to finish it**, not squeezed into the tail
-of another. Read `eng_ltx_video.py`'s full `_node_candidates_i2v` and its
-non-i2v sibling before touching anything -- the graph-branch shape has not
-yet been read end to end, only the gate functions have. This is a "one
-verifiable right answer" item per the review-routing test (the operator
-already ruled the design; what remains is execution), so it does not need a
-kibitz arc -- one clean finished-diff review plus the full suite is the gate.
+Shipped the same night it was scoped: `192d3aa2` (family = image_to_video,
+declarative still requirement, both driver maps, the enum token, content
+oracle) + `f9eab3f6` and `063e8c0b` (the seven test sites the full suite then
+found, including two prompt-only fixtures that now SUPPLY a still instead of
+disabling the requirement, and the soak rotation's text_to_video chair
+re-seated with `animatediff15_v3_haunted_video`). Full suite green. The
+operator's ruling is now simply how the lane works; there is no flag to
+retire and no text-only LTX path to reason about.
 
 ### 1.5 NARROW LEARNED-UPSCALE HARDENING ONLY (lifted from the archived 2026-08-13 runway table, row 4)
 
@@ -774,14 +784,13 @@ build is not.** The honest shape, which is NOT one render:
 **Full design (coverage matrix, per-row assertions, skip-reporting rules, risks)
 is in the 2026-08-25 workflow result; re-derive from this row if it is lost.**
 
-**A note that used to ride this item and still matters:** *"Phases 2-4" of the
-old LEMMY row are STILL undefined anywhere in the repo* -- the phase numbering
-lives only in a gitignored `kibitz-runs/` directory. Per
-`docs/2026-08-16-lemmy-open-changes-PROBLEM-STATEMENT.md`, the six row-2 exit
-clauses are the only readable statement of intent. **Asking a window to
-"complete Phases 2-4" is not an actionable exit condition** -- retire the
-numbering or recover it (Section 3, question C), but do not let it keep
-sending windows in circles.
+**The old LEMMY "Phases 2-4" numbering is RETIRED (2026-08-28).** The trio it
+tracked collapsed on live evidence: -01 closed 08-16 (mis-attributed), -03
+closed 08-18, -03 EXTENDED closed 08-28 (`a469ffb2` -- 48 post-fix
+scifi_news_pro ledgers, zero empty cast contracts, and a natural-roll LEMMY
+with 8 lines published to obs on 08-26). Nothing remains for a phase number
+to point at; PBUG-02 below is the sole survivor and has its own exit
+condition.
 
 ### Batch R4 -- ONE canonical `fastwan_8gb` leg with 60-second opening AND closing cues proves PBUG-20260811-02
 
@@ -892,10 +901,9 @@ stated where a default exists; silence keeps the default.
 * **(B) ANSWERED 2026-08-28: YES -- fill only the unknowns.** KNOWN rows stay
   untouchable. Ruling recorded at the top of Section 1.3 together with the
   web-tier replacement (LLM decides, cached name index).
-* **(C) LEMMY "Phases 2-4": retire the numbering or recover it.** The phase
-  numbering lives only in a gitignored `kibitz-runs/` directory; asking a
-  window to "complete Phases 2-4" is not an actionable exit condition. Detail:
-  the note at the end of Batch R3.
+* **(C) ANSWERED BY EVENTS 2026-08-28: the numbering is retired.** The LEMMY
+  trio it tracked is fully closed on live evidence (see Batch R3's note);
+  nothing remains for a phase number to point at.
 * **(D) The `full_text` HTML block-join separator.** Inserting separators is a
   WIDER change to the coordinate system `source_digest` pins -- it belongs in
   the source adapter, and it is the DOMINANT P0 failure cause on live evidence.
