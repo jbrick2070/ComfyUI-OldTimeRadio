@@ -112,7 +112,12 @@ DEFERRABLE = (
     "has NO scene still",                              # scene-init family
     "IA2V TALKING register:",                          # missing cast portrait
     "(MetaBrief mints it when the engine lip-syncs)",  # missing radio face
-    "LTX-I2V requires a minted scene still",           # THE ltx_video NO_RENDER
+    # "LTX-I2V requires a minted scene still" was REMOVED 2026-08-28: its
+    # raise site went with OTR_ENABLE_LTX_I2V. ltx_video declares
+    # family="image_to_video" now, so its cast-time gap surfaces through
+    # the SHARED scene-init raise -- the "has NO scene still" needle
+    # above, which this table already covers. Deferral itself is by
+    # TYPE, so the lane lost no protection, only a private wording.
     "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait",
 )
 

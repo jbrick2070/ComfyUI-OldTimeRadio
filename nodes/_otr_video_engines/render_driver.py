@@ -99,10 +99,12 @@ ENGINE_FAMILY = {
 #: families keep coverage via the extra announcer legs.
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
-    # ltx_video became image_to_video on 2026-08-28, so this row no longer
-    # covers text_to_video -- the seat below already walks image_to_video via
-    # wan_ti2v, and this one keeps ltx_video itself under soak.
-    ("music_visual", "ltx_video", "image_to_video"),
+    # The text_to_video seat, RE-SEATED 2026-08-28: ltx_video declared its
+    # true family (image_to_video) and left this chair, exactly as wan_i2v
+    # left the image_to_video chair when the 14B retired. The remaining LOCAL
+    # text_to_video engine takes it, so the rotation still walks one engine
+    # per family and the family does not silently drop out of soak coverage.
+    ("music_visual", "animatediff15_v3_haunted_video", "text_to_video"),
     # The image_to_video seat. It was `wan_i2v` until the 14B was retired on
     # 2026-08-26; `wan_ti2v` (the 5B) takes it rather than the row being
     # dropped, because dropping it would leave the soak walking NO
