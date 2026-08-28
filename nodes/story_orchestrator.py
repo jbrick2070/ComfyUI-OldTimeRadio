@@ -339,213 +339,35 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 # lesson survives as BUG_BIBLE legacy_id BUG-LOCAL-068.
 
 
-# -----------------------------------------------------------------------------
-# Phase 3d: BARK VOICE HEALTH CHECK
-# Synthesize a 1-second test clip for each active English preset at startup.
-# Any preset that returns silence or NaN gets removed from _VOICE_PROFILES
-# for the rest of the session, so the writer can never re-assign a broken
-# voice. Runs once per process, lazily on first ScriptWriter init so we
-# don't pay the Bark load cost in environments that only import the module.
-# -----------------------------------------------------------------------------
-_BARK_HEALTH_CHECKED = False
-_BARK_HEALTH_DISABLED = set()
+# THE BARK PRESET-HEALTH CLUSTER WAS REMOVED 2026-08-28 -- the one C2 item
+# that was NOT ordinary dead code, resolved by verdict after an adversarial
+# review (kibitz-runs/2026-08-28-c2-bark-health/).
+#
+# `_bark_test_presets` / `_bark_health_check` / `_bark_health_check_for_cast`
+# were LIVE until the Director retirement (249bc06c, 2026-05-12) deleted
+# their only call site, silently orphaning a real safety check: nothing on
+# the current path validated that a Bark preset produces audible audio, and
+# the adversarial pass CONFIRMED a finite, nonempty, silent tensor passes
+# every downstream contract (pack, sequence, enhance, master, mux,
+# obs_publish) -- none of which tests audibility.
+#
+# THE SAFETY MIGRATED BEFORE THE DELETION, to the right seam:
+# BarkEngine.generate_voice now rejects empty / nonfinite /
+# peak-below-1e-4 output with BarkSilentOutputError, on every live
+# production Bark render, BEFORE downstream spend. Never a preset remap --
+# the deleted cluster's remapping behaviour is exactly what the no-fallback
+# rip forbids reintroducing.
+#
+# The tables went with it: `_VOICE_PROFILES` was a semantic duplicate of
+# config/cast_pools.py; `_ANNOUNCER_PRESETS` and `_LEMMY_PROFILE` were
+# stale, DIVERGENT copies of definitions that live elsewhere -- keeping a
+# wrong copy of a voice table is how a settled voice regresses.
 
 
-def _bark_test_presets(presets_to_test):
-    """Run a 1-second synthesis test on each given Bark preset.
-
-    Pure helper: no global state mutation, no idempotency flag. Returns
-    (passed: set, disabled: set, reason: str | None). Reason is non-None
-    only on a "skip everything" outcome (Bark unimportable / probe failed).
-
-    Used by both the legacy full-catalog `_bark_health_check()` and the
-    new lazy cast-only `_bark_health_check_for_cast()`.
-    """
-    if not presets_to_test:
-        return set(), set(), None
-    presets_to_test = sorted(set(presets_to_test))
-
-    try:
-        import numpy as np
-        from ._otr_bark_lib import _load_bark
-        from ._otr_bark_lib import _generate_single_line
-    except ImportError as e:
-        log.info("[VoiceHealth] Bark not importable (%s) - skipping health check", e)
-        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
-        return set(), set(), f"bark unavailable ({e})"
-
-    # Smoke test on a single preset before the full sweep -- catches
-    # "Bark itself is broken" early so we don't mark every preset failed.
-    try:
-        # 2026-08-25: was _load_bark(device="cuda"), the only call site in the
-        # tree that overrode the auto-detect default (every other caller --
-        # eng_bark.py, scene_sequencer.py, bark_preset_audition.py -- lets
-        # _load_bark pick cuda-if-available-else-cpu). On a Mac or any
-        # CUDA-less install that forced from_pretrained onto a "cuda:0"
-        # device_map and raised HERE, before _generate_single_line's device
-        # fix below is ever reached -- so this health check reported a
-        # misleading CUDA error instead of the real "bark probe failed" it
-        # should give on CPU. Also risked a cache thrash against the
-        # single-slot _BARK_CACHE if bark was already loaded on "cpu".
-        model, processor = _load_bark()
-        _probe, _ = _generate_single_line("Test.", presets_to_test[0], model, processor, temperature=0.6)
-    except Exception as e:
-        log.warning("[VoiceHealth] Bark probe failed (%s) - leaving presets untested", e)
-        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark probe failed ({e})")
-        return set(presets_to_test), set(), f"probe failed ({e})"
-
-    test_text = "Testing one two three."
-    passed, disabled = set(), set()
-    for preset in presets_to_test:
-        t0 = time.time()
-        try:
-            arr, _ = _generate_single_line(test_text, preset, model, processor, temperature=0.6)
-            if arr.size == 0:
-                raise ValueError("empty audio")
-            if not np.isfinite(arr).all():
-                raise ValueError("NaN/Inf in output")
-            if float(np.max(np.abs(arr))) < 1e-4:
-                raise ValueError("silent output")
-            passed.add(preset)
-            log.info("[VoiceHealth] %s OK (%.1fs)", preset, time.time() - t0)
-            _runtime_log(f"VOICE_HEALTH_OK: {preset} ({time.time()-t0:.1f}s)")
-        except Exception as e:
-            disabled.add(preset)
-            log.warning("[VoiceHealth] %s FAILED: %s", preset, e)
-            _runtime_log(f"VOICE_HEALTH_DISABLED: {preset} - {e}")
-    return passed, disabled, None
 
 
-def _bark_health_check():
-    """LEGACY: full-catalog Bark warmup + global pool mutation.
-
-    Tests every active en_speaker_* preset and removes failed presets
-    from `_VOICE_PROFILES`, `_ANNOUNCER_PRESETS`, and `_LEMMY_PROFILE`.
-    Idempotent: runs only on the first call per process.
-
-    NOTE: This function is kept exported as a manual catalog-validation
-    tool and for any external caller. It is no longer invoked by the
-    default orchestration path -- the lazy `_bark_health_check_for_cast()`
-    runs after cast assignment instead. Historical context: see commit
-    249bc06 (voice-path-cleanbreak S2).
-    """
-    global _BARK_HEALTH_CHECKED, _VOICE_PROFILES, _ANNOUNCER_PRESETS, _LEMMY_PROFILE
-    if _BARK_HEALTH_CHECKED:
-        return
-    _BARK_HEALTH_CHECKED = True
-
-    log.info("[VoiceHealth] Running 1-second Bark health check on full catalog...")
-    _runtime_log("VOICE_HEALTH: Starting full-catalog Bark preset health check")
-    presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
-                              {p for p, _ in _ANNOUNCER_PRESETS} |
-                              {_LEMMY_PROFILE["voice_preset"]})
-    _, disabled, reason = _bark_test_presets(presets_to_test)
-    if reason:
-        return
-    if disabled:
-        _BARK_HEALTH_DISABLED.update(disabled)
-        _VOICE_PROFILES[:] = [vp for vp in _VOICE_PROFILES if vp[0] not in disabled]
-        _ANNOUNCER_PRESETS[:] = [(p, n) for p, n in _ANNOUNCER_PRESETS if p not in disabled]
-        if _LEMMY_PROFILE["voice_preset"] in disabled:
-            survivors = [vp[0] for vp in _VOICE_PROFILES if vp[1] == "male"]
-            if survivors:
-                fallback = survivors[0]
-                log.warning("[VoiceHealth] LEMMY preset disabled - falling back to %s", fallback)
-                _runtime_log(f"VOICE_HEALTH_DISABLED: LEMMY preset replaced with {fallback}")
-                _LEMMY_PROFILE["voice_preset"] = fallback
-        _runtime_log(f"VOICE_HEALTH: {len(disabled)} preset(s) disabled, {len(_VOICE_PROFILES)} remain")
-    else:
-        _runtime_log(f"VOICE_HEALTH: All {len(presets_to_test)} presets passed")
 
 
-def _bark_health_check_for_cast(cast_rows):
-    """LAZY: validate only the Bark presets the cast actually uses.
-
-    Trades a one-time ~120s full-catalog warmup at writer start for a
-    ~5-25s targeted check after the writer locks the cast. On any
-    preset failure, swaps the cast row's voice_preset for a known-good fallback
-    of the same gender from `_VOICE_PROFILES` and records the swap.
-
-    Mutates cast_rows IN PLACE; returns the list (same object) for
-    chainability. Kokoro voices (`bm_*` / `am_*` / `bf_*` / `af_*`) are
-    skipped because Kokoro has its own loader path.
-    """
-    if not cast_rows:
-        return cast_rows or []
-
-    # Extract distinct Bark presets the cast actually uses
-    bark_voices_in_cast = set()
-    for r in cast_rows:
-        vp = r.get("voice_preset") or ""
-        if isinstance(vp, str) and vp.startswith("v2/"):
-            bark_voices_in_cast.add(vp)
-
-    if not bark_voices_in_cast:
-        _runtime_log("VOICE_HEALTH_LAZY: cast has no Bark presets (Kokoro-only?); skipped")
-        return cast_rows
-
-    log.info("[VoiceHealth] Lazy cast check on %d preset(s): %s",
-             len(bark_voices_in_cast), sorted(bark_voices_in_cast))
-    _runtime_log(f"VOICE_HEALTH_LAZY: testing {len(bark_voices_in_cast)} cast preset(s)")
-    _, disabled, reason = _bark_test_presets(sorted(bark_voices_in_cast))
-    if reason:
-        # Bark not importable or probe failed -- leave cast alone, BatchBark
-        # will surface the issue at generation time as it always has.
-        return cast_rows
-    if not disabled:
-        _runtime_log(f"VOICE_HEALTH_LAZY: all {len(bark_voices_in_cast)} cast preset(s) passed")
-        return cast_rows
-
-    # Re-assign each disabled preset to a fallback voice from the same
-    # gender pool, avoiding duplicates within the cast where possible.
-    in_use = {r.get("voice_preset") for r in cast_rows if r.get("voice_preset")}
-    log.warning("[VoiceHealth] %d cast preset(s) failed; remapping",
-                len(disabled))
-    for row in cast_rows:
-        vp = row.get("voice_preset") or ""
-        if vp not in disabled:
-            continue
-        # SYNONYM-CANONICALIZED (item 8, 2026-08-06): lower-casing alone left
-        # `woman`/`man` unmatched against the pool's `male`/`female`, so a
-        # disabled preset was remapped without regard to the row's stated
-        # gender. Blank MUST stay blank -- the tier-1 candidate filter below
-        # short-circuits on a falsy gender to accept any preset while still
-        # preferring one no other character holds. Mapping blank to "other"
-        # would empty tiers 1-2 (no profile is tagged "other") and drop through
-        # to the tier that ignores the not-in-use preference, which can hand two
-        # characters the same voice.
-        from ._otr_roster_gender import canonical_bank_gender
-        gender = canonical_bank_gender(row.get("gender"))
-        # Prefer same-gender survivors not already used by another cast row
-        candidates = [pp for pp, gg in _VOICE_PROFILES
-                      if pp not in disabled
-                      and pp not in _BARK_HEALTH_DISABLED
-                      and (not gender or gg == gender)
-                      and pp not in in_use]
-        # Fallback 1: same gender, even if already in use
-        if not candidates and gender:
-            candidates = [pp for pp, gg in _VOICE_PROFILES
-                          if pp not in disabled
-                          and pp not in _BARK_HEALTH_DISABLED
-                          and gg == gender]
-        # Fallback 2: any surviving voice
-        if not candidates:
-            candidates = [pp for pp, gg in _VOICE_PROFILES
-                          if pp not in disabled and pp not in _BARK_HEALTH_DISABLED]
-        if not candidates:
-            log.error("[VoiceHealth] no fallback available for cast row %s; voice_preset stays %s",
-                      row.get("name"), vp)
-            _runtime_log(f"VOICE_HEALTH_LAZY: no fallback available for {row.get('name')}; preset {vp} retained (BatchBark will fail)")
-            continue
-        new_vp = candidates[0]
-        log.warning("[VoiceHealth] %s remapped: %s -> %s (gender=%s)",
-                    row.get("name") or "(unnamed)", vp, new_vp, gender or "any")
-        _runtime_log(f"VOICE_HEALTH_LAZY: remap {row.get('name')} {vp} -> {new_vp}")
-        row["voice_preset"] = new_vp
-        in_use.discard(vp)
-        in_use.add(new_vp)
-    _BARK_HEALTH_DISABLED.update(disabled)
-    return cast_rows
 
 # -----------------------------------------------------------------------------
 # LOG CLEANUP - compliant fixes handle most warnings at the source.
@@ -641,15 +463,12 @@ _DEMEANORS = [
     "measured", "wry", "stoic", "anxious", "confident", "weary",
 ]
 
-# Accent pool - 100% English-native presets only.
-# Foreign presets (de_speaker, fr_speaker, etc.) caused Bark hallucinations:
-# the model generates foreign-language phonemes when given English text,
-# producing gibberish instead of accented English. Until Bark's multilingual
-# stability improves, all characters use en_speaker_* presets.
-# See: v1.1 "Test Signal" critique - Lemmy (de_speaker_0) was unintelligible.
-_ACCENTS = [
-    ("neutral",  "en", 1.00),   # English-only - no foreign presets
-]
+# `_pick_accent` / `_ACCENTS` REMOVED 2026-08-28: zero references
+# anywhere, not even a comment. And reconnecting them would have done
+# nothing -- `_ACCENTS` had collapsed to a single 100%-weight entry in
+# 2026-07 (after a foreign-accent Lemmy proved unintelligible), so the
+# 'weighted random selection' the docstring described had no weights
+# left to select between.
 
 # Per-character voice traits pool. Drawn at cast-roll time so each character
 # carries a fixed (gender, age_band, tone, energy, vocab_register, signature)
@@ -672,81 +491,10 @@ _VOICE_TRAITS = [
 ]
 
 
-# Voice presets mapped by gender + vocal quality + language code.
-# English-native presets (en_speaker_*) have known vocal qualities.
-# International presets (xx_speaker_*) are grouped by speaker index tendencies.
-# Each entry: (preset, gender, quality_tags)
-_VOICE_PROFILES = [
-    # -- English native (neutral accent) --
-    ("v2/en_speaker_0", "male",   "en", {"authoritative", "deep", "50s", "60s", "announcer", "commander"}),
-    ("v2/en_speaker_1", "male",   "en", {"calm", "measured", "30s", "40s", "technical", "pilot"}),
-    ("v2/en_speaker_3", "male",   "en", {"energetic", "sharp", "20s", "30s", "rebel", "technician"}),
-    ("v2/en_speaker_5", "male",   "en", {"warm", "weary", "wry", "50s", "60s", "doctor", "scientist"}),
-    ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s", "officer", "android"}),
-    ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s", "engineer", "mechanic"}),
-    # English native (female)
-    ("v2/en_speaker_2", "female", "en", {"clipped", "precise", "30s", "40s", "officer", "neutral-british"}), # Sounds precise/British-adjacent
-    ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s", "pilot", "explorer"}),
-    ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s", "commander", "senator"}),
-    # FIX-3 (v1.2): en_speaker_7 reclassified to female to prevent CAST_GENDER_POOL_EXHAUSTED
-    # on 3-female episodes (was causing VEX/ZARA to share en_speaker_9 and sound identical).
-    # Bark labels en_speaker_7 as androgynous - in English it reads soft/lighter so we
-    # use it as the "younger" female slot (20s, anxious/sharp/technician).
-    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s", "technician", "hacker"}),
-    # -- DISABLED: Foreign accent presets ------------------------------
-    # These caused Bark hallucinations - the model generates foreign-language
-    # phonemes when fed English text, producing gibberish. Kept as comments
-    # for future reference if Bark's multilingual stability improves.
-    # See v1.1 "Test Signal" critique: de_speaker_0 (Lemmy) was unintelligible,
-    # fr_speaker lines also showed artifacts.
-    #
-    # German:  de_speaker_0/3/5 (male), de_speaker_2/7 (female)
-    # Spanish: es_speaker_0/6/8 (male), es_speaker_4/9 (female)
-    # French:  fr_speaker_1/5 (male), fr_speaker_2/4 (female)
-    # Indian:  hi_speaker_0/5 (male), hi_speaker_4/9 (female)
-    # Italian: it_speaker_0/6 (male), it_speaker_4/9 (female)
-    # Japanese: ja_speaker_1/6 (male), ja_speaker_4 (female)
-    # Korean:  ko_speaker_0 (male), ko_speaker_4 (female)
-    # Russian: ru_speaker_0/3 (male), ru_speaker_4/9 (female)
-    # Brazilian: pt_speaker_0 (male), pt_speaker_4 (female)
-    # Polish:  pl_speaker_0 (male), pl_speaker_4 (female)
-]
-
-# ANNOUNCER voice pool - randomized per episode for gender balance (50/50 male/female)
-# ANNOUNCER always uses neutral English (en_speaker_*) - no accent
-_ANNOUNCER_PRESETS = [
-    ("v2/en_speaker_0", "Male, authoritative, deep"),
-    ("v2/en_speaker_1", "Male, measured, calm"),
-    ("v2/en_speaker_4", "Female, warm, energetic"),
-    ("v2/en_speaker_9", "Female, mature, authoritative"),
-]
-
-# LEMMY fixed profile - always gravelly/raspy male, English-native preset
-_LEMMY_PROFILE = {
-    "name": "LEMMY",
-    "gender": "male",
-    "age": "50s",
-    "demeanor": "gravelly",
-    "accent": "neutral",  # English-native preset; gravelly tone comes from en_speaker_8 vocal quality
-    "voice_preset": "v2/en_speaker_8",  # English native - gravelly, confident, 40s-50s. Avoids Bark hallucination from de_speaker
-    "notes": "Male, gravelly/raspy, 50s, gruff mechanic voice, iconic",
-}
 
 
-def _pick_accent(rng) -> tuple:
-    """Weighted random accent selection. Returns (accent_label, lang_code).
 
-    ~60% neutral English, ~40% spread across international accents.
-    Uses cumulative distribution for deterministic weighted selection.
-    """
-    roll = rng.random()
-    cumulative = 0.0
-    for label, code, weight in _ACCENTS:
-        cumulative += weight
-        if roll < cumulative:
-            return label, code
-    # Fallback (rounding errors)
-    return "neutral", "en"
+
 
 
 # -----------------------------------------------------------------------------
@@ -1771,32 +1519,22 @@ _RE_LLM_BRACKET_NAME_DIALOGUE = re.compile(
 )
 
 
-def _normalize_dialogue_names(text):
-    """Intelligent LLM output normalizer — strips all creative formatting
-    variants down to canonical NAME: format in one pass.
-
-    Called once before WORD_EXTEND (Step 0) and once on extension LLM output.
-    All downstream consumers (word-count regex, FORMAT_NORM, PARSE) see clean text.
-    """
-    def _clean_colon(m):
-        name = m.group(1).strip().replace('_', ' ')
-        # Collapse multiple spaces (from stripped underscores or padding)
-        name = ' '.join(name.split())
-        return f'{name}:'
-    # Pass 1: bracket-shorthand '[NAME, mood] dialogue' -> 'NAME: dialogue'.
-    # Skip structural bracketed tokens ([ENV:...], [SFX:...], [VOICE: NAME...],
-    # [ACT TWO], [SCENE 3]). The [VOICE: NAME, ...] form is handled by Pass 2
-    # after the bracket is stripped and the NAME: colon form remains.
-    def _clean_bracket(m):
-        raw_name = m.group(1).strip().replace('_', ' ')
-        first_word = raw_name.split()[0] if raw_name else ''
-        if first_word.upper() in _BRACKET_STRUCTURAL_TOKENS:
-            return m.group(0)  # leave structural tags untouched
-        name = ' '.join(raw_name.split())
-        return f'{name}: '
-    text = _RE_LLM_BRACKET_NAME_DIALOGUE.sub(_clean_bracket, text)
-    # Pass 2: classic colon + bold/underscore decorated forms.
-    return _RE_LLM_DIALOGUE_NAME.sub(_clean_colon, text)
+# `GemmaHeartbeatStreamer` WAS REMOVED 2026-08-28: it was never once
+# CONSTRUCTED -- zero `GemmaHeartbeatStreamer(` call sites in the repo.
+# `_normalize_dialogue_names` went with it, its only caller being the
+# dead class's own `_process_line`.
+#
+# BOTH ITS JOBS HAVE NAMED LIVE REPLACEMENTS, which is why this is a
+# deletion rather than a gap: deadline enforcement is
+# `_DeadlineStoppingCriteria` in `_otr_model_loader.py`, wired into the
+# real generate() calls; the dashboard heartbeat is
+# `_otr_writer_heartbeat.WriterHeartbeatStreamer`, wired at two live
+# call sites (commit 2894b852, 'you can watch the model write again').
+#
+# ONE CAPABILITY HAS NO REPLACEMENT and is named here rather than lost
+# quietly: its `live_ledger` / `_emit_partial_ledger` partial-ledger
+# streaming. Since the class was never constructed, that capability was
+# already inert -- deleting it loses nothing that was not already lost.
 
 
 # ── Scene inventory (diagnostic instrumentation) ────────────────
@@ -1830,275 +1568,6 @@ from . import _otr_model_loader as _otr_loader_mod
 register_vram_cleanup(_otr_loader_mod.unload_llm)
 
 
-class GemmaHeartbeatStreamer(BaseStreamer):
-    """Custom streamer that pulses heartbeats to _runtime_log for Canonical Tokens.
-
-    Hooks into model.generate() at the token level. Every time Gemma completes
-    a line that contains a recognizable script tag (=== SCENE, [VOICE:],
-    [ENV:], (beat)), it writes a timestamped entry to otr_runtime.log immediately.
-
-    Also tracks:
-      - Scene count (how many === SCENE === tags so far)
-      - Dialogue line count (how many [VOICE:] tags)
-      - Unique character names seen
-      - Token generation speed (tokens/sec, reported every 100 tokens)
-
-    The OTR Monitor (otr_monitor.py) tails otr_runtime.log and folds these
-    heartbeats into the live dashboard - so you can watch the script being
-    written in real time without touching ComfyUI.
-    """
-
-    def __init__(self, tokenizer, skip_prompt=False, live_ledger=False, **decode_kwargs):
-        self.tokenizer = tokenizer
-        self.skip_prompt = skip_prompt
-        self.decode_kwargs = decode_kwargs
-
-        # v1.5: Incremental decoding state (Resolves O(N^2) complexity)
-        self.token_cache = []
-        self.print_len = 0
-        self.line_buffer = ""
-
-        self.on_prompt_end = True
-        self.print_streamer = TextStreamer(tokenizer, skip_prompt=skip_prompt, **decode_kwargs)
-
-        # Counters for the dashboard
-        self.scene_count = 0
-        self.dialogue_count = 0
-        self.characters_seen = set()
-
-        # Token speed tracking
-        self.total_tokens = 0
-        self._start_time = time.time()
-        self._last_speed_report = 0
-
-        # L1.5 live-ledger streaming hook. Only the script-body call site
-        # passes live_ledger=True; spine/critique/revision/grammarian
-        # streamers leave the singleton untouched. The body streamer resets
-        # the singleton at __init__ so a fresh episode starts clean, then
-        # writes partial ledger snapshots every _LEDGER_THROTTLE_LINES new
-        # dialogue lines. The post-parse end-hook overwrites with the
-        # canonical parsed cast + lines on the SAME file.
-        self.live_ledger = bool(live_ledger)
-        self._streamed_lines = []   # list of (name, full_text)
-        self._streamed_chars = {}   # name -> char_id
-        self._last_ledger_save_at = 0
-        self._LEDGER_THROTTLE_LINES = 3
-        # NOTE 2026-04-29: removed `new_ledger()` here. write_script() now
-        # owns ledger creation at workflow entry (much earlier than this
-        # streamer construction), so calling new_ledger() here would WIPE
-        # the early ledger that's been accumulating gen_params + git_commit
-        # + meta state during NewsFetcher / model load / OpenClose Spine.
-        # The streamer's _emit_partial_ledger / _record_streamed_line use
-        # get_ledger() (which returns the singleton, creates one if missing)
-        # so this branch is no longer needed for first-write semantics.
-        # If write_script's early init fails for any reason, get_ledger()
-        # still creates a placeholder on first read -- no functional regression.
-
-    def put(self, value):
-        """Processes a new batch of tokens incrementally."""
-        # Check strict streaming timeout.
-        # MUST be time.monotonic(): _run_with_timeout stores a monotonic
-        # deadline in _TIMEOUT_CTX as of 2026-08-25. Comparing a monotonic
-        # deadline against time.time() would make this expire on its FIRST
-        # token on any box whose uptime is less than its epoch time -- i.e.
-        # always -- silently converting every streamed generation into a
-        # TimeoutError. Both clocks must match; they are not interchangeable.
-        if (hasattr(_TIMEOUT_CTX, "deadline")
-                and time.monotonic() > _TIMEOUT_CTX.deadline):
-            raise TimeoutError("Streaming deadline exceeded - gracefully aborting generator")
-
-        # Standard console output
-        self.print_streamer.put(value)
-
-        # -- Token-level processing --
-        if len(value.shape) > 1 and value.shape[0] > 1:
-            raise ValueError("GemmaHeartbeatStreamer only supports batch size 1")
-        elif len(value.shape) > 1:
-            value = value[0]
-
-        if self.skip_prompt and self.on_prompt_end:
-            self.on_prompt_end = False
-            return
-
-        token_list = value.tolist()
-        self.token_cache.extend(token_list)
-        self.total_tokens += len(token_list)
-
-        # v1.5: Incremental decoding logic (adapted from transformers.TextStreamer)
-        # Instead of decoding EVERYTHING every token, we only decode the new slice.
-        text = self.tokenizer.decode(self.token_cache, **self.decode_kwargs)
-        
-        # Determine the "new" text generated in this step
-        if text.endswith("\n") or text.endswith("\r"):
-            new_text = text[self.print_len:]
-            self.line_buffer += new_text
-            self._process_line(self.line_buffer.strip())
-            self.line_buffer = ""
-            self.print_len = len(text)
-        elif text.endswith(" ") or text.endswith(".") or text.endswith("!") or text.endswith("?"):
-            # Partial line update
-            new_text = text[self.print_len:]
-            self.line_buffer += new_text
-            self.print_len = len(text)
-        
-        # Report speed every 25 tokens (v1.5 CLEAN: higher heartbeat frequency)
-        if self.total_tokens - self._last_speed_report >= 25:
-            elapsed = time.time() - self._start_time
-            if elapsed > 0:
-                tps = self.total_tokens / elapsed
-                _runtime_log(
-                    f"ScriptWriter: {self.total_tokens} tokens | "
-                    f"{tps:.1f} tok/s | {self.scene_count} scenes | "
-                    f"{self.dialogue_count} lines | "
-                    f"{len(self.characters_seen)} chars"
-                )
-                self._last_speed_report = self.total_tokens
-
-    def end(self):
-        """Flush the remaining buffer and report final stats."""
-        self.print_streamer.end()
-        # v1.5: Flush any remaining incremental line_buffer content
-        if self.token_cache:
-            text = self.tokenizer.decode(self.token_cache, **self.decode_kwargs)
-            remaining = text[self.print_len:]
-            self.line_buffer += remaining
-        if self.line_buffer.strip():
-            self._process_line(self.line_buffer.strip())
-        self.token_cache = []
-        self.line_buffer = ""
-        self.print_len = 0
-
-        elapsed = time.time() - self._start_time
-        tps = self.total_tokens / elapsed if elapsed > 0 else 0
-        _runtime_log(
-            f"ScriptWriter DONE: {self.total_tokens} tokens in {elapsed:.1f}s "
-            f"({tps:.1f} tok/s) | {self.scene_count} scenes | "
-            f"{self.dialogue_count} dialogue lines | "
-            f"Characters: {', '.join(sorted(self.characters_seen)) or 'none'}"
-        )
-        # L1.5: flush any tail lines that hadn't crossed the throttle
-        # threshold so the viewer sees the final draft before critique
-        # runs and overwrites.
-        if self.live_ledger and self._streamed_lines:
-            self._emit_partial_ledger()
-
-    # -- L1.5 live-ledger helpers --------------------------------------
-    def _record_streamed_line(self, name, full_text):
-        """Track a fresh dialogue line and write a partial ledger snapshot.
-
-        Only fires when self.live_ledger=True (script-body call site).
-        Throttled to one save per _LEDGER_THROTTLE_LINES new lines so the
-        on-disk file isn't rewritten on every token. Failures are
-        swallowed -- the ledger never blocks streaming.
-        """
-        if not self.live_ledger:
-            return
-        try:
-            self._streamed_lines.append((name, full_text or ""))
-            if name not in self._streamed_chars:
-                self._streamed_chars[name] = f"c{len(self._streamed_chars)+1:02d}"
-            if (self.dialogue_count - self._last_ledger_save_at
-                    >= self._LEDGER_THROTTLE_LINES):
-                self._emit_partial_ledger()
-                self._last_ledger_save_at = self.dialogue_count
-        except Exception:
-            pass
-
-    def _emit_partial_ledger(self):
-        """Save the running cast + lines accumulated during streaming."""
-        try:
-            from .production_ledger import get_ledger
-            led = get_ledger()
-            cast_rows = [
-                {"char_id": cid, "name": name}
-                for name, cid in self._streamed_chars.items()
-            ]
-            line_rows = []
-            for i, (name, text) in enumerate(self._streamed_lines):
-                line_rows.append({
-                    "line_id":  f"l{i+1:03d}",
-                    # The streamed name IS the speaker; carry it so even a
-                    # partial snapshot names who is talking (PBUG-20260814-01).
-                    "speaker":  name,
-                    "char_id":  self._streamed_chars.get(name),
-                    "text":     text,
-                })
-            led.set_cast(cast_rows)
-            led.set_lines(line_rows)
-            led.save()
-        except Exception:
-            pass
-
-    def _process_line(self, line):
-        """Detect Canonical Tokens, update counters, pulse the heartbeat."""
-        if not line:
-            return
-
-        # -- Scene break: === SCENE X === -----------------------------
-        if "===" in line:
-            self.scene_count += 1
-            _runtime_log(f"ScriptWriter: {line.strip()}")
-            return
-
-        # -- Voice tag: [VOICE: NAME, traits] dialogue ----------------
-        if "[VOICE:" in line.upper():
-            self.dialogue_count += 1
-            try:
-                # Case-insensitive tag extraction
-                line_up = line.upper()
-                start_idx = line_up.find("[VOICE:") + 7
-                end_idx = line.find("]", start_idx)
-                tag_content = line[start_idx:end_idx]
-
-                name = tag_content.split(",", 1)[0].strip().upper()
-                self.characters_seen.add(name)
-
-                # Full dialogue (untruncated) for the ledger; trim only
-                # the trailing punctuation/markdown decorations.
-                full_dialogue = line[end_idx+1:].strip().strip('"*_“”')
-                clean_dialogue = full_dialogue[:60]
-                _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
-                self._record_streamed_line(name, full_dialogue)
-            except (IndexError, ValueError):
-                _runtime_log(f"ScriptWriter: Voice line #{self.dialogue_count}")
-            return
-
-        # -- ENV tag --------------------------------------------------
-        if "[ENV:" in line:
-            try:
-                desc = line.split("[ENV:", 1)[1].split("]", 1)[0].strip()
-                _runtime_log(f"ScriptWriter: ENV: {desc[:50]}")
-            except (IndexError, ValueError):
-                pass
-            return
-
-        # -- Bare "CHARACTER: dialogue" format (BUG-007 format) --------
-        # The LLM often writes "DALE: I heard something" instead of
-        # [VOICE: DALE, traits] tags. Detect NAME: at start of line.
-        # BUG-023: normalize Markdown bold before matching
-        import re
-        line = _normalize_dialogue_names(line)
-        bare_match = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', line)
-        if bare_match:
-            name = bare_match.group(1).strip()
-            # Skip false positives like "SCENE:", "SFX:", "ENV:", "NOTE:"
-            # BUG-LOCAL-037: TITLE added so the streaming heartbeat does not
-            # mistake the writer-prompt's "TITLE: <...>" first line for a
-            # character speaking the title text.
-            if name not in ("SCENE", "SFX", "ENV", "NOTE", "NARRATOR",
-                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE",
-                            "TITLE"):
-                self.dialogue_count += 1
-                self.characters_seen.add(name)
-                full_dialogue = bare_match.group(2).strip().strip('"*_“”')
-                clean_dialogue = full_dialogue[:60]
-                _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
-                self._record_streamed_line(name, full_dialogue)
-                return
-
-        # -- Beat pause -----------------------------------------------
-        if "(beat)" in line.lower():
-            return  # beats are too frequent to log individually
 
 
 # -----------------------------------------------------------------------------

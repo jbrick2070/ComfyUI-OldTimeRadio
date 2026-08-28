@@ -24,6 +24,20 @@ from __future__ import annotations
 from .registry import register
 
 
+class BarkSilentOutputError(RuntimeError):
+    """Bark returned audio no listener could hear -- empty, nonfinite, or with
+    a global peak below 1e-4 (~-80 dBFS, the sequencer's own silence
+    threshold).
+
+    A DEDICATED type, deliberately: the C2 verdict (2026-08-28) forbids
+    remapping the preset or engine on this failure, and a dedicated class
+    means no broad `except` an engine-fallback path might own can quietly
+    absorb it into a remap. It is a RENDER error -- the line failed, loudly,
+    before any downstream spend -- not a usability reason: the engine itself
+    is fine and stays selectable.
+    """
+
+
 @register
 class BarkEngine:
     name = "bark"
@@ -162,4 +176,31 @@ class BarkEngine:
         wav = torch.from_numpy(
             np.asarray(audio_np, dtype=np.float32)
         ).reshape(1, 1, -1)
+        # THE OUTPUT GATE (2026-08-28, C2 verdict after adversarial review).
+        # Every downstream contract -- packing, sequencing, enhance, mastering,
+        # mux, obs_publish -- checks shape, duration, rate and hash, and NOT
+        # ONE checks that the audio is audible. A finite, nonempty, silent
+        # tensor walks the whole path and publishes as a structurally valid
+        # clip: missing dialogue disguised as delivered dialogue. This is the
+        # ONE seam every live production Bark render passes through, so the
+        # gate lives here and nowhere wider.
+        #
+        # 1e-4 is ALIGNED WITH EXISTING SILENCE SEMANTICS, not corpus-derived:
+        # it is the exact threshold scene_sequencer._trim_trailing_silence
+        # already uses to call a sample silent (~-80 dBFS). The two modern
+        # Bark auditions on record peak ~0.35-0.41, thousands of times above
+        # it. NO remap, NO silent retry, NO duration test, NO generalisation
+        # to other engines -- each of those was argued and rejected in the
+        # review; raising HERE is early (before sequencing, images, video and
+        # mux), so it wastes a line, not a render.
+        peak = float(wav.abs().max().item()) if wav.numel() else 0.0
+        if wav.numel() == 0 or not torch.isfinite(wav).all() or peak < 1e-4:
+            raise BarkSilentOutputError(
+                "bark returned unusable audio for preset %r (samples=%d, "
+                "peak=%.2e, finite=%s): a silent-but-nonempty clip would "
+                "pack, sequence and PUBLISH as a structurally valid line, "
+                "so it is rejected at the engine instead. Re-run the line; "
+                "never remap the preset." % (
+                    voice_preset, int(wav.numel()), peak,
+                    bool(torch.isfinite(wav).all())))
         return {"waveform": wav, "sample_rate": int(sr)}

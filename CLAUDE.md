@@ -173,6 +173,28 @@ IS my workflow.
   `widgets_values` is POSITIONAL -- only ever APPEND a new optional widget at the END (inserting mid-list
   shifts every saved value -> silent drift, BUG-LOCAL-097). A widget converted to an input keeps its
   value slot AND gains an input with `"widget": {"name": ...}`.
+- **REMOVING A WIDGET TOUCHES THREE THINGS, NOT ONE (learned the hard way 2026-08-28).** An inert widget
+  SHOULD be removed -- operator: *"that's being lazy not to remove an inert widget"* -- and the positional
+  problem is WORK, not a veto. But the work is bigger than it looks, and I corrupted all 63 workflows by
+  doing only the first two:
+  1. **`widgets_values`** -- drop the value at the widget's index in every saved graph.
+  2. **The `inputs` DESCRIPTOR array** -- drop the `{"widget": {"name": ...}}` entry.
+  3. **EVERY LINK TARGETING A LATER SLOT.** `dst_slot` in `[link_id, src_node, src_slot, dst_node,
+     dst_slot, type]` is an INDEX INTO THAT SAME `inputs` ARRAY, which holds link sockets and widget
+     descriptors together. Remove a descriptor and every link past it is off by one. This is invisible to
+     a widget-count check and to `build_variants --check`; `tests/test_workflow_link_target_indexes.py`
+     is what catches it. **Repair by IDENTITY, not arithmetic:** set each `dst_slot` to the index whose
+     `inputs[i].link` equals that link's id -- self-correcting and impossible to double-apply.
+  **A TRAILING widget is nearly free; a mid-list one costs the re-index everywhere.** Check which you have
+  before estimating.
+  **VARIANTS ARE GENERATED, NEVER HAND-EDITED.** Fix `otr_canonical.json`, then run
+  `python scripts/build_variants.py --all` and confirm with `--check`. Editing the variants directly
+  passes a naive diff and then fails regeneration.
+  **VERIFY WITH ALL FOUR:** `build_variants.py --check`, `tests/test_widget_value_alignment.py` (one node
+  type declares one widget ORDER everywhere -- catches a migration that updated canonical and missed a
+  variant), `tests/test_canonical_widget_input_parity.py` (count parity), and
+  `tests/test_workflow_link_target_indexes.py` (link integrity). The first three all passed while the
+  links were broken.
 - After editing it, re-validate: `OTR_WorkflowValidator` + a JSON round-trip + a link/widget audit
   (widget-count vs live INPUT_TYPES, every wired input-name in INPUT_TYPES, link referential integrity).
 ### 0A. THE ISOLATED-BENCH CARVE-OUT IS STRUCK -- THERE IS NO EXEMPTION (operator, 2026-08-23)
