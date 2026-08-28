@@ -738,6 +738,52 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## ONE MACHINE OWNS THE WORKFLOW AT A TIME -- THE WORKFLOW BATON (operator ruling 2026-08-28 -- hard)
+
+**Operator, in his words:** *"I want only one machine to own the workflow at
+any time. So once we test the 4060-slim version of the workflow on the 5080,
+then we load it up on the 4060, and that becomes our system of truth for
+updates. Then when we're done, we move it back to the 5080 and retest there."*
+
+**THE RULE.** Exactly one machine is the OWNER of the workflow JSON at any
+moment. Only the owner edits it. The other machine may RUN what it has, but
+may not change it -- an edit made on a non-owner is either lost or becomes a
+divergence, and a diverged workflow JSON is the single most expensive file in
+this repo to reconcile.
+
+This is the machine-level form of the rule that already governs windows: *one
+coder window in the code at a time* (`CLAUDE.md`). Same failure, wider blast
+radius -- two boxes editing the graph is how `widgets_values` drift, phantom
+diffs, and silently-unwired nodes get in.
+
+**THE BATON IS GIT, and the handoff has three steps that are not optional:**
+
+1. The owner **commits and pushes** every workflow change before giving up
+   ownership. An unpushed edit is not a handoff; it is lost work waiting to
+   happen.
+2. The new owner **pulls and verifies HEAD == origin** before its first edit.
+3. The old owner **stops editing** -- it may render, it may read, it does not
+   write. If it needs a change, it asks the owner or waits for the baton.
+
+**THE ROUTE FOR THE 4060 CAMPAIGN, in the operator's order:**
+
+| step | owner | what happens |
+|---|---|---|
+| 1 | 5080 | the 4060-slim workflow is VERIFIED here first -- a fast box makes a mistake cost minutes, not hours |
+| 2 | 4060 | ownership MOVES. The 4060 is the system of truth while its own fixes are made |
+| 3 | 5080 | ownership RETURNS, and the workflow is RETESTED here before it is considered done |
+
+**Step 3 is not a formality.** A workflow tuned on the 4060 has been proven on
+one box only; the retest on the 5080 is what proves the changes did not
+quietly depend on the small-card configuration. Do not skip it because the
+4060 leg was green.
+
+**A note for whoever holds the baton:** the canonical
+(`workflows/otr_canonical.json`) remains the source of truth for the GRAPH --
+its nodes, links and wiring. Per-machine model PICKS live in
+`workflows/variants/` (ruling 2026-08-25). The baton governs who may write to
+either of them; it does not merge the two files into one.
+
 ## AN ALL-REFUSED EPISODE STILL PUBLISHES (operator ruling 2026-08-27 -- hard)
 
 **THE QUESTION, and it was asked because a panel refused to answer it for him.**
