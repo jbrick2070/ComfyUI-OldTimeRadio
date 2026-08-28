@@ -3995,6 +3995,55 @@ into it than it earned:**
 
 ---
 
+## PBUG-20260828-01 -- a MUSIC bookend is routed to `minimax_h3_audio_in`, which needs a portrait no music beat can have
+
+- surfaced: live canonical headless leg, 2026-08-28, profile
+  `otr_w45_minimax_h3_audio_in` (LEG 3 of the overnight lane-prompt queue).
+  Server log `tmp/otr_headless_54750.log`; episode
+  `signal_lost_echoes_of_deception_20260828_133104`.
+- symptom: `RESULT FAIL canonical_runner_exit=1`, nothing in `otr/obs`. The
+  render dies at the first bookend:
+
+      [OTR video] render FAILED (no fallback) shot shot_music_opening_001
+      engine minimax_h3_audio_in: FamilyInputGap: candidate
+      'minimax_h3_audio_in' (family audio_conditioned_video) requires
+      input(s) ['init_image'] the request does not carry
+
+- **NOT a missing still.** The ledger for that episode carries 8 image rows
+  including BOTH `music_opening_001` and `music_closing_001`, so the image
+  phase did its job. The still exists; the request never carried it.
+- root cause, two halves that only bite together:
+  1. `minimax_h3_audio_in` declares `required_inputs = ("audio_ref",
+     "init_image")` (`nodes/_otr_video_engines/eng_minimax_h3.py:1112`), and
+     its own assertion says what that input IS: *"requires init_image -- the
+     reference node needs a PORTRAIT"* (`:1156`). It is a talking-FACE engine.
+  2. It is EXPLICITLY excluded from the scene-init attach --
+     `_engine_scene_init_required` ends `and _eng_id not in ("ltx_audio_in",
+     "minimax_h3_audio_in")` (`render_driver.py:2245-2249`) -- correctly, since
+     a face lane wants a portrait rather than a scene still.
+  So the engine needs a portrait, the attach path deliberately withholds the
+  scene still, and **a music bookend has no character, so no portrait can
+  exist for it.** The beat is unrenderable by that engine by construction.
+- the real defect is ROUTING, not inputs: the profile sends `music_visual`
+  (and the bookends generally) to a lane that can only serve a character beat.
+  The sibling `minimax_h3_video` leg renders the same episode shape fine --
+  its by_role stamp shows `music_visual: {minimax_h3_video: 2}`.
+- **SAME CLASS AS PBUG-20260811-02** (`scifi_news_pro` dies at video render
+  with no still for the closing-music beat). Different engine and different
+  failure point, one root: a music bookend handed to an engine that cannot
+  serve it. Whoever fixes one should read the other first.
+- IMPACT IS BOUNDED, and worth stating so nobody over-prioritises it: the
+  audio-in lane is a lip-SYNC upgrade, not a requirement. The operator watched
+  `signal_lost_reel_of_resistance_20260828_121427` (pure `minimax_h3_video`,
+  8/8 shots) the same day and reported the character's lips move acceptably --
+  generic mouth articulation from the prompt, not sync. So this blocks an
+  optional quality lane, not the shipping path.
+- status: **OPEN.** Not fixed in the session that found it: choosing between
+  (a) the profile not routing bookends to a face lane and (b) the engine
+  declining a characterless role is a design call with more than one
+  defensible answer, and the two-strikes/review-routing rule says that gets a
+  round before code.
+
 ## PBUG-20260811-01 -- forcing the LEMMY cameo kills the scifi_news_pro writer
 
 - surfaced: two live canonical headless legs, 2026-08-11 (`PROBE B_90w_forced`,
