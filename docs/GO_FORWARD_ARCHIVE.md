@@ -1658,3 +1658,354 @@ three hours.
 
 
 ---
+
+---
+
+# ARCHIVED 2026-08-28 -- the lean-and-mean reorganization
+
+**Why these blocks are here.** The operator asked for the go-forward to be
+cleaned up *"lean and mean"* and reorganized *"on the most logical [basis] so
+we can code the most and test the least."* `GO_FORWARD_PLAN.md` was rebuilt
+that day into three working queues (no-render work / render work batched by
+the leg that proves it / operator questions in one pass). Everything below
+was REMOVED from the plan in that pass and is preserved VERBATIM: closed
+receipts from the 2026-08-27/28 sessions, the superseded 2026-08-13 runway
+table, stale scheduling text, and re-triage notes whose conclusions were
+folded into the live queues. Nothing was deleted. Every operator ruling these
+blocks carried was lifted into the plan's "SECTION 4 -- STANDING RULINGS
+LIFTED FROM ARCHIVED BLOCKS" BEFORE the move. Blocks that stayed live were
+retitled/renumbered in place and are NOT duplicated here.
+
+## 1. The file-header prune note of 2026-08-24 (its standing warning was kept in the new header)
+
+**Pruned again 2026-08-24** on the same instruction -- *"update the go forward
+plan so it's accurate, truly go forward items"*. 402 lines of closed receipts
+and superseded text went to the archive VERBATIM, nothing edited and nothing
+deleted: a superseded problem statement, five coding-sprint rows that were
+already closed, a superseded ship-intent block, and two stale queue-state
+receipts. **Most of that was written into this file the same day it was removed
+-- by the window that closed the work.** Recording what you just finished
+inside a section headed OPEN is the easiest way to make this file lie, and it
+is the specific failure the 2026-08-16 self-audit flagged and did not dare fix
+blind. Receipts belong in `docs/PROD_BUG_LOG.md` and the archive; rulings
+belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
+
+## 2. The 2026-08-27/28 foley / voice-bleed / named-sounds receipts (top-of-queue block; the LISTENING TEST paragraphs stayed live as THE CURRENT STEP)
+
+### >>> TAKE THIS FIRST: NAME THE MIME SOUND, THEN LISTEN <<<
+
+**FOLEY AUDIBILITY IS RESOLVED, THE VOICE BLEED IT UNCOVERED IS FIXED, AND SIX
+LEGS ARE RENDERING RIGHT NOW TO PROVE BOTH.** PBUG-20260827-03 closed
+2026-08-28: it was never the mixer. `65538f41`/`f46abe03` (per-lane motion
+prompts) landed after every prior episode rendered, and once the dispatch
+seam actually reached the engines (`24f85f95`, `34253841`) the SAME
+`FOLEY_LANE_GAINS` 0.20 took raw stems from -34.4..-56.2 dBFS to
+-14.0..-41.5, and bed-vs-programme from 45 dB under to -6.6..-21.4. Ruling 2
+never needed amending. The operator called it before the measurement did:
+*"shouldn't we be rendering a foley?"*
+
+**WHAT THAT AUDIBLE BED THEN REVEALED: voices, because the tail named no
+sound.** `signal_lost_a_name_stripped_bare_20260827_195142` -- operator:
+*"is speech the best word, or dialogue is bleeding into the prompt"*.
+Production asked for `"matched environmental foley... ambient room tone"`, a
+CATEGORY that leaves the model to choose, and with a face in frame it chose
+voice. Fixed 2026-08-28, PBUG-20260828-01: a cue table now names the sounds
+the beat's own action makes (`nodes/_otr_video_engines/eng_ltx25.py`), foley
+and mime share the identical string (*"the only difference between foley and
+mime is the mux layer"*), and a scoped kibitz r3 review (codex) caught and
+fixed three real defects before ship -- a weapon-noun collision with the
+banana route, a false-positive "finished" receipt, and `document` matching
+`documentary`. Full receipt: `kibitz-runs/2026-08-28-named-sounds/`.
+Commits `d3cca496`..`a196fd90`, pushed, HEAD == origin verified, suite
+12365/121/1, 0 regressions.
+
+**FOUND AND FIXED IN THE SAME PASS, UNRELATED BUT ADJACENT:** the style-cue
+prefix was landing in front of `minimax_h3`'s required verbatim opener on any
+non-default style pack, silently breaking "must begin exactly" -- confirmed
+live on the anime pack, `d3cca496`. Not a production incident (the default
+pack's cue is empty, so it never fired); a review catch, not a Bug Bible
+candidate.
+
+## 3. Stale scheduling text from the H3 acceptance row (overtaken by the overnight queue; the durable one-GPU warning was kept in the live Section 2 intro)
+
+**THE BOX IS FREE, AND THE FOLEY RE-RUN OUTRANKS THIS ROW.** The foley
+qualification leg that held port 8000 all night DIED at its terminal node after
+3h17m22s and published nothing (PBUG-20260826-02, fixed in `499312bb`). Its two
+python processes from 21:43 are still resident holding port 8000 with the GPU
+already back to ~1.2 GB; whoever goes next resets them per `CLAUDE.md`
+section 4.
+
+**Order matters here.** Foley/mime qualification is the NEXT ITEM at the top of
+this file and its blocker was only just cleared, so the foley re-run takes the
+box first. This H3 row is a single leg and can follow it. Do NOT start both --
+two windows resetting one GPU is how each kills the other's leg.
+
+**There is no untreated foley BEFORE artifact to preserve** -- that leg never
+reached the mix. The H3 before/after A/B is unaffected: its BEFORE sample is the
+published Caretaker episode named above.
+
+## 4. The 2026-08-25 LEMMY re-triage result (its two live conclusions -- the fastwan_8gb leg and the Phases 2-4 question -- were lifted into Batch R4 and Section 3 of the live plan)
+
+**THE RE-TRIAGE THE PREVIOUS BANNER DEMANDED WAS DONE 2026-08-25 (late). Its
+result is below; the old banner text follows underneath, unedited.**
+
+**Runway row 2 (LEMMY Phases 2-4 + "its three live PBUGs") IS MOSTLY CLOSED and
+the row is STALE.** Checked against the real tree, not the banner:
+* **PBUG-20260811-01 -- CLOSED 2026-08-16, MIS-ATTRIBUTED.** The cameo never
+  killed the writer; `lemmy_force` was INERT on that lane at the repro commit.
+  Row 2's clause 5 asks to "resolve the fable2 BAD_LINE interaction" -- a bug
+  closed as never having been about the cameo. **Withdrawn premise.**
+* **PBUG-20260811-03 -- CLOSED 2026-08-18**, fixed and live-proven on a
+  forced-cameo leg (`da44f642` + `7faf3bf7`).
+* **PBUG-20260811-02 -- the ONLY one still OPEN.** Root cause established, the
+  repair is WRITTEN, and it is not a coding item: it needs a canonical
+  `fastwan_8gb` leg with 60-SECOND opening AND closing cues (long enough to
+  chunk at `_MUSIC_MAX_CHUNK_DUR_S = 22.0`). **That is a RENDER window, not a
+  coder slot.**
+* **Clause 4 is moot** -- `scifi_news` no longer exists (live banks are
+  media_archive, original, scifi_news_pro, public_domain, shakespeare,
+  custom_source_bank).
+* **"Phases 2-4" are STILL undefined anywhere in the repo** -- the phase
+  numbering lives only in a gitignored `kibitz-runs/` directory. Per
+  `docs/2026-08-16-lemmy-open-changes-PROBLEM-STATEMENT.md`, the six row-2
+  exit clauses are the only readable statement of intent. **Asking a window to
+  "complete Phases 2-4" is not an actionable exit condition** -- retire the
+  numbering or recover it, but do not let it keep sending windows in circles.
+
+## 5. The superseded CURRENT RUNWAY table (operator-ordered 2026-08-13; rows 1-2 superseded/closed, row 3 lifted to Batch R6, row 4's work to Section 1.5 and its ruling to Section 4, row 5's pointer to "After this queue")
+
+## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
+
+**ROW 1 BELOW IS SUPERSEDED by PRIORITY 1 above (operator 2026-08-14).** Its
+order was "resume the upstream Story Lab and A/B against it"; the lab is now
+parked, read-only and being retired, and the story work happens in production.
+Rows 2-5 are unchanged and still run in their listed order, behind PRIORITY 1.
+
+This block is authoritative. It supersedes every older order, count, Lemmy gate,
+and review-routing sentence lower in this file. Re-ground the active row against
+the Windows tree before editing; when a row is coded, fully tested, committed and
+pushed, move its receipt to `docs/HANDOFF_LOG.md` and remove it from this forward
+queue in the same push.
+
+| # | Active work | Exit condition |
+|---:|---|---|
+| 1 | **SUPERSEDED -- what remains is PRIORITY 1 at the top of this file** | Do NOT restart from the Story Lab. |
+| 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
+| 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
+| 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
+| 5 | **Handoff after executable rows 1-4** | Continue in `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. This row is a pointer, not work that precedes lean-mean. Lean-mean scope and coding order live only in `docs/LEAN_MEAN_CLEANUP.md`. |
+
+## 6. THE CODING SPRINT header of 2026-08-04 (stale framing; its cross-references to sections 0 / 0-BIS / 0-QUATER were already among the eleven broken pointers the 2026-08-16 audit recorded -- the targets left this file long ago. Its live items -- the gender ladder and the H3 standing context -- remain in the plan)
+
+## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
+
+Item 1 is the structural work and consumes most of a session; items 2-3 are
+small and share one campaign. Items 8 and 9 are DONE (receipts in
+`docs/HANDOFF_LOG.md`). The live open work is sections 0 (video matrix pattern,
+did NOT converge), 0-BIS (no-mirror, CODE-READY), 0-QUATER's deferred
+shield-scoping chunk (own kibitz arc), and the 0-QUINQUE MiniMax ruling.
+Work by priority, not by number -- the numbering is historical.
+
+**RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
+line is spent -- it governed that session only, and the 08-05 handoff opens on a
+live-proof obligation. Reset per `CLAUDE.md` section 4 before any leg: selective
+CIM kill by CommandLine, never a blanket python kill (it severs the MCP tooling).
+
+Everything below was verified against the real files on 2026-08-04, is
+non-GPU, and is provable by the suite alone. Work them in order; each ends
+green and pushed on its own.
+
+## 7. Item 6, the G15 scene-coherence vacuity fix -- FIXED 2026-08-28 (the STILL OWED arming question stayed live as Section 3, question A)
+
+### 6. ~~A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD~~ -- FIXED 2026-08-28
+
+**The join and the vacuity refusal are done.** `find_scene_coherence_issues`
+(`nodes/_otr_scene_guard.py`) now joins `beat_id -> beats[].scene_id`, the
+join the schema actually has -- `lines[].scene_id` is confirmed dead, no
+writer has ever populated it. `_check_g15_scene_coherence`
+(`nodes/_otr_ledger_freeze.py`) writes the full `{required, checked, verdict,
+issues}` shape into `report.info`, and an armed gate that examines zero real
+linkages now fails loud instead of passing silently -- distinguished from a
+ledger with no scenes at all, which stays a legitimate clean skip (a
+pre-existing, different state; conflating the two would have been a wider
+behavior change than asked). Commit `e2807dcc`, reviewed via scoped kibitz r2
+(codex, 6 MUST-FIX, all grounded and folded in --
+`kibitz-runs/2026-08-28-scene-coherence-vacuity/`), 28 tests including a
+named regression guard, full suite 12374/121/1, 0 regressions, HEAD == origin
+verified.
+
+**STILL OWED, and it is the ONLY thing left on this item:** whether any bank
+should actually ARM `defaults.scene_coherence_check`. Nothing does today --
+the fix changes a function with zero live callers in current production, by
+design, so this shipped at zero risk. GO_FORWARD's original text said
+"measure OFFLINE over the published corpus first, then arm in ONE change" --
+that measurement was never attempted tonight and stays open. Whoever picks
+this up next decides first whether any bank should arm it at all before
+running that measurement.
+
+## 8. The "Two carried items" heading note (both items were relocated live: the Gutenberg fetch to Section 3 question G, the Shakespeare verbatim executor to Section 5)
+
+### Two carried items with no home of their own
+
+(Titled "Bench leftovers" until 2026-08-23 -- a name that now reads as the
+retired VIDEO bench and has nothing to do with it. The block it referred to was
+an older conditional list, gone long before. Renamed rather than moved: both
+items below are real and open.)
+
+## 9. The OPEN BUGS section header and the 2026-08-11 bank-sweep trio (two of three CLOSED per the re-triage above; PBUG-20260811-02 lives on as Batch R4)
+
+## OPEN BUGS / DEFECTS (live, not yet closed)
+
+MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not. That
+split is why the two eyeball-era entries at the end are PARKED rather than live.
+
+### The 2026-08-11 bank-sweep trio (LEMMY sprint, all three OPEN)
+
+Found by a six-bank live render sweep, not by tests. Full detail lives in
+`docs/PROD_BUG_LOG.md` and `docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`;
+these rows exist so a window working THIS list actually sees them.
+
+* **PBUG-20260811-03 -- `scifi_news` lost the LEMMY cameo it was built for.**
+  ROOT CAUSE ESTABLISHED: `scifi_news` is a CONTENT-OWNED lane
+  (`delivery_mode_for_meta(meta) == CONTENT_OWNED`, measured off the sweep's own
+  ledger; `original` is `legacy`). Content-owned runners build their own cast and
+  never run the writer's seeded picker, and `lock_cast()` is what applies the
+  cameo -- so it cannot fire there. The empty `cast_contract` is the same
+  deliberate decision: that block stamps `meta.episode_seed` and withholds
+  `cast_seed`, because claiming one on a lane-owned cast detonated CastLock's
+  replay before (`num_characters must be 1-6, got 0`).
+  **THE OBVIOUS FIX IS THE WRONG ONE** -- routing content-owned lanes back
+  through `lock_cast()` is precisely what that comment warns against. The repair
+  belongs in the lane runner. **Operator row 15.**
+  *Worst of the three by exposure:* nothing fails and nothing logs, so every
+  `scifi_news` episode since the redesign has shipped with no cast contract.
+* **PBUG-20260811-01 -- forcing the cameo kills the `scifi_fable2` writer on
+  `scifi_news_pro`.** `pass 'script' failed after 4 attempt(s): markup ladder
+  exhausted; BAD_LINE`. Reproduced at 30 AND 90 target words, so NOT a word
+  squeeze; with the cameo on its natural roll the writer passes cleanly. Root
+  cause not established.
+* **PBUG-20260811-02 -- `scifi_news_pro` dies at node 92 with no materialized
+  still for beat `music_closing_001`** (`still-spine handoff missing materialized
+  scene still ... engine still_flat`), on the same profile where five other banks
+  produced one. Seen ONCE. Re-run before treating the cause as understood.
+
+## 10. The orphan-lifecycle pair intro and the CLOSED GGUF generation-deadline row (the registry half stays live in Section 1.6; the row's reachability lesson is lifted into Section 4)
+
+### The orphan-lifecycle pair (deferred 2026-08-25, both DESIGN items, neither a grep-and-fix)
+
+Both fall out of PBUG-20260825-04, whose four landed fixes shipped in
+`fb67d059` after a full kibitz r1-r4 arc (Codex r2/r3, Cursor r4, Fable r1).
+The arc found a new race in each of the first two cuts of the same fix, so
+**do not treat either item below as mechanical** -- each is a genuine design
+choice with more than one defensible answer, which per CLAUDE.md means a full
+arc BEFORE code, not after.
+
+- **THE GENERATION DEADLINE NOW COVERS THE GGUF LANE -- CLOSED 2026-08-25
+  (evening).** Left this row in place rather than deleting it, because the
+  DEFERRAL'S OWN SEVERITY CALL WAS WRONG and that is the reusable part. It
+  said "VERIFY FIRST, it may be live rather than theoretical: check whether
+  the current production technical-slot catalog row is `gguf_native`". That
+  check was run and answered NO -- the canonical technical slot resolves to
+  the transformers `google/gemma-4-12b-it` row -- and the honest-looking
+  conclusion "latent, not live" was WRONG, because it asked only about the
+  UNPROFILED canonical run. **Six committed `status="shipping"` profiles
+  (`otr_g4_fastwan`, `_humo`, `_ltx_8gb`, `_ltx_audio_in`, `_ltx_video`,
+  `_wan_ti2v`) pin `technical_model` to `unsloth/gemma-4-12b-it-GGUF`, and
+  profile `status` is validated but is NOT an application gate** -- so real
+  shipping runs were hitting the uncovered lane the whole time. *A
+  reachability question answered against the default path only is not
+  answered.*
+  Shipped: deadline-conditional streaming in `_otr_gguf_backend` (no
+  deadline -> the identical non-streaming call, `stream` absent entirely;
+  a deadline -> stream and stop between chunks), plus ONE shared absolute
+  `time.monotonic()` deadline computed BEFORE worker submission, a pre-call
+  admission check, a parent recheck after `future.result()`, and the legacy
+  `GemmaHeartbeatStreamer` migrated to the same clock. Receipts in
+  `docs/PROD_BUG_LOG.md` (PBUG-20260825-04, deferral 1) and
+  `kibitz-runs/2026-08-25-gguf-deadline/`.
+
+## 11. The PARKED re-observe heading (its body rides Batch R5 live) and the original PARKED D2 heading
+
+### PARKED -- unverified at HEAD, re-observe on the next real render legs
+(The 2026-07-24 "after SFX" checkpoint is VOID -- SFX is parked. The re-observe
+now rides whatever real render legs come next, D2 included.)
+
+## PARKED -- D2 (renders have resumed; run when a render window is free for fail-hunting soak legs)
+
+## 12. The original "After this queue" block (its content survives in the live plan's Section 2 deferred items and closing section)
+
+## After this queue
+
+One coder window at a time; every chunk = focused tests + full suite + Bug Bible
++ commit AND push + `HEAD == origin/v2.0-alpha`.
+
+When the executable rows in the authoritative table above are exhausted,
+continue with `ROADMAP.md`.
+Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md` is its sole
+current scope, blast-radius, coding-order, and verification authority.
+
+Open judgment question (render-window, not a coder slot): the LOCAL mistral/gemma
+writer matrix. The Sonnet arm of the creative-writer question is answered
+(`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
+never ran.
+
+## 13. Bug Bible receipts: the two promotions completed 2026-08-28 and the older promotion receipts
+
+| ~~`PBUG-20260823-01` (preflight gate vocabulary collision)~~ | **DONE 2026-08-28.** Promoted as Bible `12.139`, survival-guide `7121254`, count 317 -> 318 (README bumped in all THREE places it appears -- a third hyphenated "317-entry" occurrence was missed on the first pass and caught by the regression suite's own count check before commit, not after). Coverage-index row added. Regression suite 22 passed / 26 skipped / 3 xfailed. No overlap found against `12.79` (VCS-diff narrowness) or the sys.modules stub-ownership entry -- genuine gap. |
+| ~~`PBUG-20260823-02` (watcher timeout worded as render death)~~ | **DONE 2026-08-28.** Promoted as Bible `12.140`, survival-guide `67ad867`, count 318 -> 319 (all three README places). Coverage-index row added. Regression suite 22 passed / 26 skipped / 3 xfailed. Zero overlap hits in either file -- clean gap. |
+
+**PROMOTED 2026-08-25 (evening): Bible `12.134`, survival-guide `6633ef6`, count
+312 -> 313** (README bumped in all three places, coverage-index row added, Bible
+regression re-run green 22/26/3). Source: **PBUG-20260825-04**, the
+BUG-LOCAL-098 tripwire firing loud on a 4060 load that had in fact succeeded --
+admissible because it surfaced as a real production traceback, promotable
+because the fix is verified and its coverage is automatable
+(`tests/test_bug098_orphan_race.py`). The reusable half is deliberately NOT
+"the threshold was wrong": the guard sampled `torch.cuda.memory_allocated()`,
+a PROCESS-WIDE counter, and reported the delta as one model's footprint, so an
+abandoned worker freeing tensors concurrently drove it negative. *A diagnostic
+that gates on a shared, process-wide quantity cannot make a claim about one
+component of that process* -- and the tell is that the check LOOKS
+model-scoped because it brackets one model's load. Checked against
+`otr_coverage_index.yaml` and the Bible first: `12.46` covers the orphan
+thread PINNING VRAM, which is the adjacent-but-different half, so this is a
+genuine gap rather than a second entry for a covered class.
+**Also fixed in the same commit:** `otr_coverage_index.yaml` had a
+pre-existing unquoted `Root cause: ` colon-space on one record, so the index
+-- whose entire purpose is to be machine-readable so the 4M-token scrape is
+never repaid -- did not parse at all. Quoted; it now loads (429 records) and
+its header metadata is re-synced to the Bible HEAD.
+
+**PROMOTED 2026-08-18 (evening): Bible `12.114`, survival-guide `b9aada7e`, count
+292 -> 293** (README bumped in all three places, coverage-index row added, Bible
+regression re-run green 20/26/3). Source: **PBUG-20260817-08**, the Lemmy cameo
+voice -- admissible because it surfaced on two live published episodes, and
+promotable now only because the fix is verified. The entry carries TWO reusable
+halves: *a reservation that exists as a convention in one subsystem is invisible
+to another subsystem enumerating the same catalogue*, and the diagnostic trap
+that cost more time than the bug -- ***a post-fix sighting is not proof the fix
+failed; check process age first.*** Its verify section also pins *sweep the
+SELECTOR, not the helper* and *count a corpus by ROLE before concluding anything
+about pool concentration*.
+
+**NOTHING ELSE WAS PROMOTED 2026-08-18, deliberately, and
+the reasoning is worth keeping.** The evidence-guards work EXECUTED an existing entry's verify
+steps rather than discovering a new class: `12.111` verify step 3 is what turned
+up G1's partial guard, and `12.111`'s own `cause` section already describes that
+failure verbatim -- *"Refusing only when a specific file (`MANIFEST.json`) exists
+leaves every sibling artifact unprotected ... the separate `_KEY` directory"*. An
+entry that predicts the defect you then find does not need a second entry.
+The window's other finding -- `engine_impl_version` structurally unfillable
+because no adapter defines `impl_version` -- is **static-audit only**, so the
+admission rule bars it regardless of how real it is. And nothing had actually
+rotted: all eleven cited artifacts re-hashed clean, so there is no live artifact
+to admit. **Preventive work with no live failure produces no Bible row.**
+
+**NOTHING WAS PROMOTED 2026-08-17 (item B window), deliberately.** The window's
+findings are all static-audit -- the positive-prose ban, the seven-call-site
+video negative, the B6 gate gap, the traceroute's coverage blind spot -- and the
+admission rule reserves the Bible for defects verified by a live artifact.
+`PBUG-20260817-01` was re-proved on pixels here but is ALREADY covered by Bible
+`12.108`, whose tag list literally includes `prompt-audit-cannot-see-pixels`.
+Bible stays **287**, README stays 287 in all three places; the Three-File
+Contract is intact.

@@ -11,57 +11,52 @@
 Split 2026-08-23 on the operator's instruction: *"go forward should only have the
 go forward plans. Only."*
 
-**Pruned again 2026-08-24** on the same instruction -- *"update the go forward
-plan so it's accurate, truly go forward items"*. 402 lines of closed receipts
-and superseded text went to the archive VERBATIM, nothing edited and nothing
-deleted: a superseded problem statement, five coding-sprint rows that were
-already closed, a superseded ship-intent block, and two stale queue-state
-receipts. **Most of that was written into this file the same day it was removed
--- by the window that closed the work.** Recording what you just finished
-inside a section headed OPEN is the easiest way to make this file lie, and it
-is the specific failure the 2026-08-16 self-audit flagged and did not dare fix
-blind. Receipts belong in `docs/PROD_BUG_LOG.md` and the archive; rulings
-belong in `docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
+**Reorganized 2026-08-28 (the lean-and-mean pass)** on the operator's
+instruction: *"clean up the go forward so it's lean and mean, and then analyze
+and reorganize it on the most logical [basis] so we can code the most and test
+the least."* The organizing fact: most items here need a LIVE RENDER LEG to
+prove, and a leg costs 1-3 HOURS on one GPU -- testing is the bottleneck,
+coding is not. So the file is now three working queues plus support sections:
+
+* **Section 1 -- NO-RENDER WORK.** Everything provable without a GPU leg,
+  front-loaded so it can all ship in coding sittings.
+* **Section 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT.** One leg
+  proves several items; each batch says so explicitly.
+* **Section 3 -- WAITING ON THE OPERATOR.** Every open question in one list,
+  answerable in one pass instead of interrupt-by-interrupt.
+* **Section 4** -- rulings lifted verbatim from archived blocks.
+  **Section 5** -- parked/deferred. **Section 6** -- standing traps.
+
+Receipts from the 2026-08-27/28 sessions and superseded queue blocks moved to
+the archive VERBATIM, nothing deleted; every operator ruling they carried was
+lifted into Section 4 FIRST. The standing warning from the 2026-08-24 prune
+(now itself in the archive) still binds: **recording what you just finished
+inside a section headed OPEN is the easiest way to make this file lie.**
+Receipts belong in `docs/PROD_BUG_LOG.md` and the archive; rulings belong in
+`docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
+
+## HOW TO READ THIS FILE (three files since 2026-08-23)
+
+**THE PLAN IS THIS FILE AND IT IS ONLY OPEN WORK.** Operator: *"go forward
+should only have the go forward plans. Only."* Two companions carry what used to
+be tangled in here:
+
+* `docs/OTR_STANDING_RULINGS.md` -- the laws, the standing operator rulings, the
+  review routing, the model/credit ladder, how to talk to the operator, the
+  obs-path override, window packing, tombstones and pointers. **Read it. It is
+  not optional and it is not history** -- it is the set of constraints the next
+  piece of work has to satisfy. When something in this plan says "THE LAW" or
+  "the REVIEW ROUTING block", that is where it now lives.
+* `docs/GO_FORWARD_ARCHIVE.md` -- closed receipts, verbatim. **Not read to
+  resume.**
+
+`CLAUDE.md` is unchanged and remains the highest authority.
 
 ## THE CURRENT STEP -- READ THIS FIRST
 
-### OPEN, IN PRIORITY ORDER
+### >>> FIRST: READ THE OVERNIGHT QUEUE'S RESULTS IN `otr/obs/` -- THE LEG COST IS ALREADY PAID <<<
 
-### >>> TAKE THIS FIRST: NAME THE MIME SOUND, THEN LISTEN <<<
-
-**FOLEY AUDIBILITY IS RESOLVED, THE VOICE BLEED IT UNCOVERED IS FIXED, AND SIX
-LEGS ARE RENDERING RIGHT NOW TO PROVE BOTH.** PBUG-20260827-03 closed
-2026-08-28: it was never the mixer. `65538f41`/`f46abe03` (per-lane motion
-prompts) landed after every prior episode rendered, and once the dispatch
-seam actually reached the engines (`24f85f95`, `34253841`) the SAME
-`FOLEY_LANE_GAINS` 0.20 took raw stems from -34.4..-56.2 dBFS to
--14.0..-41.5, and bed-vs-programme from 45 dB under to -6.6..-21.4. Ruling 2
-never needed amending. The operator called it before the measurement did:
-*"shouldn't we be rendering a foley?"*
-
-**WHAT THAT AUDIBLE BED THEN REVEALED: voices, because the tail named no
-sound.** `signal_lost_a_name_stripped_bare_20260827_195142` -- operator:
-*"is speech the best word, or dialogue is bleeding into the prompt"*.
-Production asked for `"matched environmental foley... ambient room tone"`, a
-CATEGORY that leaves the model to choose, and with a face in frame it chose
-voice. Fixed 2026-08-28, PBUG-20260828-01: a cue table now names the sounds
-the beat's own action makes (`nodes/_otr_video_engines/eng_ltx25.py`), foley
-and mime share the identical string (*"the only difference between foley and
-mime is the mux layer"*), and a scoped kibitz r3 review (codex) caught and
-fixed three real defects before ship -- a weapon-noun collision with the
-banana route, a false-positive "finished" receipt, and `document` matching
-`documentary`. Full receipt: `kibitz-runs/2026-08-28-named-sounds/`.
-Commits `d3cca496`..`a196fd90`, pushed, HEAD == origin verified, suite
-12365/121/1, 0 regressions.
-
-**FOUND AND FIXED IN THE SAME PASS, UNRELATED BUT ADJACENT:** the style-cue
-prefix was landing in front of `minimax_h3`'s required verbatim opener on any
-non-default style pack, silently breaking "must begin exactly" -- confirmed
-live on the anime pack, `d3cca496`. Not a production incident (the default
-pack's cue is empty, so it never fired); a review catch, not a Bug Bible
-candidate.
-
-**WHAT IS STILL OWED -- THE LISTENING TEST, and it is the whole reason the
+**WHAT IS OWED -- THE LISTENING TEST, and it is the whole reason the
 code work happened.** No receipt can stand in for it. Six 1-act legs are
 running now via `scripts/otr_overnight_lane_prompts.ps1` (mime first, since
 its prompt has never been heard; then foley, plain ltx25 video, H3 silent,
@@ -76,9 +71,512 @@ judging a separate LTX 2.3 IA2V A/B the same night: *"I'm creating radio
 drama, not impersonating an AI assistant"* -- colour, movement and life count,
 they are not subordinate to a technical score).
 
+**One morning pass over `otr/obs/` judges six lanes at once** -- this is
+Batch R0 in Section 2. The same episodes are also a free re-observation
+chance for the two parked eyeball items (announcer framing, name-splice #2;
+see Batch R5), and the two H3 legs may already satisfy Batch R1's receipt
+conditions -- check before spending another leg.
+
+(The foley-audibility resolution, the named-sounds ship, the voice-bleed fix
+and the H3 style-cue ordering fix that this listening test proves are all
+closed receipts now -- 2026-08-28, in the archive and `docs/PROD_BUG_LOG.md`.)
+
 ---
 
-### >>> OWED: THE LIVE H3 ACCEPTANCE PROOF FOR THE PROMPT-POLICY FIX <<<
+## SECTION 1 -- NO-RENDER WORK (code the most: everything here ships without a GPU leg)
+
+All of this is provable by the suite, a scoped review, or an offline read.
+One coder window at a time; every chunk = focused tests + full suite + Bug
+Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
+
+### 1.1 THE SANCTIONED-GAP CONTROL PATH -- r2, the coding plan, is the next step
+
+**Live-proven necessary on 2026-08-26.** Ideogram is not seed-deterministic:
+after the music-card fix it went from refusing every music card to **6 of 7**,
+and that ONE refusal still killed a 30-minute episode at the still-spine gate.
+No amount of prompt work takes a stochastic refusal to zero.
+
+The dispatcher already says "the episode continues" and the composite already
+floors an `exists=False` row -- **nothing in between mints that row**. Spec and
+r1 judgment: `kibitz-runs/2026-08-25-model-refusal-required-still/`.
+Accounting for it landed 2026-08-26 (`a2837b05`) and is deliberately inert
+until this exists.
+
+**THE BLOCKER IS CLEARED -- r2 CAN RUN (2026-08-27).** r1 ended on one open
+item it refused to decide for the operator: what an episode should do when
+EVERY required still is sanctioned-gapped, given that node 92's success check
+is `clip_count > 0`. **Asked and ruled 2026-08-27: it PUBLISHES.** The full
+ruling, its reasoning and -- importantly -- what it does NOT license are in
+`docs/OTR_STANDING_RULINGS.md` under *"AN ALL-REFUSED EPISODE STILL PUBLISHES"*.
+Read it there before r2, because the ruling is narrower than its headline: it
+permits publishing an all-refused episode, it does NOT permit REPORTING one as
+a clean render, and the `required_scene_targets` ledger-completeness law is
+untouched.
+
+**Next step is r2, the coding plan**, per r1's own stated roster
+(r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
+about this row is waiting on the operator.
+
+**r1 WAS WRITTEN 2026-08-25 AND THE TREE MOVED THE NEXT DAY. RE-GROUNDED
+2026-08-27 against HEAD -- do not hand r2 the stale finding list.** `a2837b05`
+landed on 2026-08-26 and added 85 lines to `otr_video_render_batch.py`, so one
+of r1's four findings is already closed and one of the survivors got SHARPER.
+
+| r1 finding | status at HEAD, verified by reading the file |
+|---|---|
+| 1. Nothing mints the `exists=False` row between a sanctioned dispatch and the spine | **STILL THE ROW.** This is the item itself. |
+| 2. The skip branch never reaches the renderer loop | **STILL OPEN**, unverified in this pass -- r2 grounds it. |
+| 3a. The manifest loop counts a gap as a delivered receipt (`:146-150`) | **ALREADY FIXED** by `a2837b05`. `_clip_delivered_motion(clip)` (`:134-153`, `exists` alone, deliberately) now routes an undelivered beat to `sanctioned_gap_shot_ids` at `:213` instead of minting a receipt for it. Do NOT re-fix this. |
+| 3b. `delivered_frames_ok` is True over an absent clip (`:750-770`) | **STILL LIVE**, and here is the exact mechanism: a gap has no `source == "clip"` segment, so `segs` is empty, `status` becomes `no_clip_segment` -- and `no_clip_segment` is the one status that flips NOTHING. `ok_all` is only cleared by `held_last_frame`, or by `not positioned and segs and delivered != tgt`, whose `segs` guard is falsy for exactly this case (`otr_silent_composite.py:766-769`). |
+| 4. An all-refused episode reports FAILURE (`clip_count > 0`) | **STILL LIVE, now at `otr_video_render_batch.py:640`** -- and `a2837b05` made it BITE rather than merely lurk. |
+
+**FINDING 4 DESERVES ITS OWN PARAGRAPH, because the fix for 3a is what armed
+it.** `clip_count` is `len(receipts)` (`:129`), and since `a2837b05` receipts
+correctly EXCLUDE sanctioned gaps. So an all-refused episode now has a genuinely
+empty receipt list and `"ok": manifest["clip_count"] > 0` genuinely evaluates
+False. Before that commit the gap rows were counted as receipts, so the same
+episode would have reported ok=True by ACCIDENT -- for the wrong reason, off a
+receipt that lied. **The correct accounting collides head-on with the 2026-08-27
+ruling that such an episode must publish**, which is not a regression in
+`a2837b05` but the point at which an existing contradiction became honest enough
+to see. r2 fixes the success predicate, NOT the accounting.
+
+**The payload-never-empty guarantee already anticipates this** and is worth
+reading before designing (`otr_video_render_batch.py:203-209`):
+`OTR_CreditsRoll._require` rejects `{}`/`[]`/`None`/`""`, so an all-gap episode
+returning an empty payload would convert a publishable degraded episode into a
+hard mux-time failure -- "the exact outcome the sanctioned gap exists to
+prevent", in the code's own words. Whoever writes r2 starts from there.
+
+### 1.2 LOCAL-LLM SWEEP LEG 0 -- the in-process preflight (~15-20 min, no ComfyUI)
+
+Leg 0 of the local-LLM acceptance sweep is NOT a render: one command,
+in-process -- `request_slot` -> ~40-token generate -> `_self_unload` per row,
+with `reset_peak_memory_stats()` around each. It is what fails loudly on a
+dead row. Run it in a coding sitting; the four canonical legs it precedes are
+Batch R3 in Section 2, and the full sweep design lives there in one piece so
+it is not split across sections.
+
+### 1.3 CHARACTER GENDER LADDER -- the SPEC REWRITE (fold r2 + r3, then r3 again; NOT r4)
+
+Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
+`HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
+MIRANDA are all correct.
+
+**The split IS the diagnosis, and it means the render code is not broken.**
+Shakespeare ships 14 provenance sidecars carrying `characters` with genders; the
+prose lane has ONE tracked sidecar and its `characters` key is `None`. The pin
+chain already exists and is lane-neutral (`_otr_roster_gender.py`, 12.6 KB, on
+disk). Shakespeare is right because the DATA is there. Prose is rolled because it
+is not. **This is a vendor-time data gap with a working consumer** -- the exact
+inverse of the Item 7 bug, where the value existed and nothing read it.
+
+Spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` (Fable, driver-grounded).
+A four-tier TOTAL ladder -- roster -> pronouns in the source text ->
+character-in-work web lookup -> name-frequency percentage -- stamping `gender`
+(always populated, never `unknown`, because a voice must still be cast) plus
+`gender_source` and a confidence. Operator rulings baked in: Shakespeare's KNOWN
+rows are untouchable, the announcer stays randomly male/female by design, and the
+invented lanes (`original`, `scifi_news`, `scifi_news_pro`, `media_archive`) keep
+rolling -- their characters do not exist, so a name search there risks matching a
+real person.
+
+**Codex r2 verdict: NO. Eleven must-fixes, at `kibitz-runs/2026-08-05-gender-ladder/r2/codex.md`.**
+The diagnosis survived; the mechanism did not. The three that matter:
+
+1. **The web search would silently do nothing.** The spec passes a tools/plugins
+   argument to `OpenRouterBackend.generate`, which swallows unknown kwargs through
+   `**_ignored` -- no error, no search, a confident answer from a model that never
+   looked. That is the same silent-no-op class as the defect above.
+2. **"LLM extraction over the FULL unit text" cannot run.** `beckoning_fair_one.txt`
+   is 143,176 bytes and 58 of 65 source files exceed 12,000 bytes, against a
+   32,768 estimated-token per-call cap.
+3. **Blanket surname aliases are identity-unsafe.** Two rows sharing a surname
+   with the same gender currently produce a confident pin rather than an
+   abstention.
+
+**r3 RAN 2026-08-06 and it is STILL NO** -- Codex NO with 7 must-fixes, agy
+yes-with-fixes with 9. That is three NOs across two rounds, and r3's findings invalidate
+the CODING PLAN rather than its line numbers, so the standing re-ground rule applies:
+**the next step is a SPEC REWRITE folding r2 + r3, then r3 again. Not r4.**
+
+Both lanes independently found (a) a manifest sequencing deadlock -- the stamper is
+specced to run per-unit inside the vendor fetch loop, but the manifest is written only
+AFTER the loop, so it can never see the unit it was called for; and (b)
+`RosterGenderVerdict` has no `gender_source` / `gender_confidence` fields, so the
+ladder's whole output cannot be carried without changing every verdict-construction
+path. Codex also confirmed the r2 finding that the OpenRouter backend still has no
+web/plugin parameter, so the web-search tier would silently do nothing.
+
+Judgment: `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/judgment.md` (LOCAL
+ONLY). **Trap: commit `496d9d57` inserted ~90 lines near the top of
+`nodes/_otr_roster_gender.py`, so every cite into that file in the r3 review has
+SHIFTED. Re-pin before acting.** The rewrite should also CONSUME the
+`normalize_gender` boundary item 8 installed there rather than adding a second
+normalization path.
+
+**Found while grounding, and it reopens an operator ruling:** 32 of 85 Shakespeare
+roster rows are `unknown` TODAY -- 38% of the lane assumed solved. Comedy of Errors
+ships 7 characters, every one unknown. The narrower ruling that fits the evidence:
+Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
+`unknown` rows. That fixes 32 rows without ever second-guessing a parsed
+dramatis personae. **Operator decision, not a driver call** -- cross-listed as
+Section 3, question B.
+
+### 1.4 RETIRE `OTR_ENABLE_LTX_I2V` (operator ruling: "no switches nor flags, all video models request and ingest stills") -- ONE full session
+
+**SCOPED 2026-08-28, and it is BIGGER than a flag flip -- an architecture
+retirement, not a grep-and-fix.** Investigated while working the backlog
+during the overnight render queue; not started, because starting an
+uncompletable-tonight change on a tight credit budget risks leaving the tree
+half-migrated, which is worse than parking it.
+
+**What removing the flag actually requires:** deleting the WHOLE text-only
+LTX graph-building path (`eng_ltx_video.py`'s non-conditioned encode branch,
+its `_use_i2v`/`_i2v_enabled` gate, and the parallel gate at
+`render_driver.py:2339`), so `ltx_video` conditions on its scene still
+UNCONDITIONALLY -- missing still becomes a structural failure with no
+`=0` escape, matching the sibling `_require_still` contract in
+`cheap_families` this docstring already points at as a model.
+
+**The real test cost, file by file (not the flat "19 rewrites" estimate this
+carried before) -- 8 files, ~22 sites, two different repair classes:**
+
+* **Pure avoidance shortcuts, safe to just drop the setenv** (the flag was
+  never reaching a code path these tests exercise -- `render_driver`'s gate
+  keys on the exact id `"ltx_video"`, and these test other lanes or prompt
+  composition only): `test_brief_prompt_finishing.py`,
+  `test_look_qa_round5.py`, `test_nonaudio_prompt_policy.py` (the
+  `_text_only_lane` fixture), `test_video_render_driver.py`.
+* **Genuine dual-path assertions that must be REWRITTEN or DELETED, not
+  patched:** `test_video_motion.py` carries a whole dedicated suite proving
+  the toggle itself works -- `test_i2v_opt_out_restores_text_only`, and an
+  assertion that the raised error names `OTR_ENABLE_LTX_I2V=0` as the escape
+  hatch. Once the toggle is gone there is nothing left to assert; these get
+  deleted, and `test_i2v_default_on_with_init` /
+  `test_i2v_flag_on_with_init_engages` likely collapse into one test since
+  "default" and "explicit on" become the same state.
+  `test_still_spine_helpers.py:975-986` asserts scene_still WITH the flag and
+  a **portrait fallback** WITHOUT it -- that fallback path ceases to exist and
+  the second half of the test goes with it.
+  `test_still_plan_parity.py`'s `_ENV_KEYS`/scenario matrix carries an
+  `("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"})` row that must be removed, not
+  adapted -- there is no more "off" state to parametrize over.
+  `test_video_motion_forward.py` has three sampler/encode-mechanics tests
+  that deliberately select the text-only path to isolate mechanics from the
+  i2v decision; each needs a real init-image fixture added so they exercise
+  the (now-mandatory) conditioned path instead, or an explicit decision that
+  those mechanics no longer have an unconditioned case to test.
+
+**Do this as ONE session with room to finish it**, not squeezed into the tail
+of another. Read `eng_ltx_video.py`'s full `_node_candidates_i2v` and its
+non-i2v sibling before touching anything -- the graph-branch shape has not
+yet been read end to end, only the gate functions have. This is a "one
+verifiable right answer" item per the review-routing test (the operator
+already ruled the design; what remains is execution), so it does not need a
+kibitz arc -- one clean finished-diff review plus the full suite is the gate.
+
+### 1.5 NARROW LEARNED-UPSCALE HARDENING ONLY (lifted from the archived 2026-08-13 runway table, row 4)
+
+Harden the two `SpandrelEsrgan._resolve_model` edge cases if still
+reproducible. The ruling attached to this row is lifted into Section 4: **the
+multi-GPU learned-upscale stage itself is CLOSED and must not be reopened.**
+
+### 1.6 OPEN DEFECTS THAT ARE CODING WORK (a leg may prove some of them later; none needs a leg to FIX)
+
+MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
+
+**EVERY LINE CITE IN THIS SECTION IS SUSPECT.** Each one checked during the
+2026-07-27 triage had moved: `_is_cloud_video_engine` is `render_driver.py:1599` not
+`1274-1295`; the "NO FALLBACK to text-only" refusal is `:2148` not `1801-1817`;
+`_use_i2v` is `eng_ltx_video.py:583` not `559-572`. The defects are mostly still
+real; their coordinates are not. **Re-pin a row's cite when you touch it.**
+Path note (verified 2026-08-04): engine adapters live under
+`nodes/_otr_video_engines/` (and `_otr_audio_engines/`, `_otr_image_engines/`)
+-- bare `eng_*.py` cites in these rows are shorthand for those paths.
+
+#### The P0 / source-span cluster (2026-07-30)
+
+- **`full_text` reaches the span coordinate system carrying HTML BLOCK JOINS WITH
+  NO SEPARATOR, and on the live evidence this is the DOMINANT P0 failure cause.**
+  Measured in the campaign logs: `'...Field of Martian PolygonsNASA/JPL-'`,
+  `'...and the School ofEngine'`, `'...what you're doing.Let's s'`, `'...(AMR).The
+  resea'`. The RSS adapter strips tags without inserting whitespace, so two elements
+  fuse into one token. `_normalize_span_source_text` collapses whitespace RUNS but
+  cannot insert a space that was never there, so the model quotes the sentences a
+  reader sees and they are not byte-exact in the stored text -- exactly the
+  "non-literal source span" rejection that killed 12 of the 15 P0 legs.
+  **Deliberately NOT fixed by A-3:** inserting separators is a WIDER change to the
+  coordinate system `source_digest` pins -- an operator decision, and it belongs in
+  the source adapter rather than the codex normalizer. Owed: which adapter builds
+  `full_text`, whether a separator can be inserted at admission without breaking any
+  accepted ledger, and a fixture from these four strings. (Cross-listed as
+  Section 3, question D.)
+- **The deterministic P0 rung PRUNES SILENTLY, which violates the plan's own
+  Invariant 3.** `repair_literal_source_metadata` drops an unsupported span, then its
+  evidence row, then the fact -- and emits no receipt. An accepted P0 index simply
+  has fewer facts than the model wrote, and nothing says which were dropped or why.
+  Under "fail loud, not fatal" the degrade is the right direction and the silence is
+  not.
+- **The deterministic P0 rung is ALL-OR-NOTHING across an artifact, and can poison
+  its own good work.** It is handed `a0_payload` (all seven keys) while
+  `_validate_fact_index` restricts spans to `allowed_source_fields` (the projection).
+  A quote rehomed into a field the projection omitted makes `post_validator` reject
+  the WHOLE repaired artifact -- "cites source field ... outside the supplied P0
+  evidence" -- so one unlucky rehome discards every correct prune in the same pass.
+  Either give the repairer the allowlist or prune per row.
+- **Nothing measures whether a pruned P0 index is ACCEPTED** (recorded, no action
+  owed yet). No live leg has ever run with the deterministic rung reachable (it became
+  reachable at `47c554fa`, after the campaign stopped), and the rejection logs carry
+  only a truncated `raw head` plus no source payload, so the question cannot be
+  answered offline. A-1's instrumentation is what makes the next campaign able to
+  answer it.
+- **`scifi_news` P0 convergence defect** -- both 120w and 320w legs fail in P0 after
+  two attempts on non-literal fact source spans; provider/model convergence, extends
+  BUG-11.35. NOT a word/length gate. Blocks the last 120w receipt and the
+  `scifi_news` live reverify (PBUGs 20260712-22/23/24/25, fixed in tree, reverify
+  still owed).
+- **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs provider cap
+  `512`; the whole-artifact retry contracts LANDED @ `314dd481` are the base; the
+  residual fix is now unblocked. Related independent items: the P9 8K
+  structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do not
+  raise the minimum word target as a capacity workaround.
+
+#### The orphan-occupancy registry (design item -- full arc BEFORE code)
+
+Falls out of PBUG-20260825-04, whose four landed fixes shipped in
+`fb67d059` after a full kibitz r1-r4 arc (Codex r2/r3, Cursor r4, Fable r1).
+The arc found a new race in each of the first two cuts of the same fix, so
+**do not treat this item as mechanical** -- it is a genuine design
+choice with more than one defensible answer, which per CLAUDE.md means a full
+arc BEFORE code, not after. (Its sibling, the GGUF generation deadline, CLOSED
+2026-08-25 -- receipt in the archive; its lesson is lifted into Section 4.)
+
+- **THE ORPHAN-OCCUPANCY REGISTRY -- still deferred, now on its third
+  independent confirmation.** `has_local_resident_llm()` reports "nothing
+  resident" the instant a timeout invalidates the cache dict, even while the
+  orphan worker is still actively running CUDA kernels on the model that
+  entry described. `nodes/otr_shot_lock.py:1781` and
+  `nodes/otr_video_render_batch.py:289` both trust that signal before
+  starting visual/video work. The r1 panel (Codex + Cursor + Fable) deferred
+  this unanimously; r3 and r4 each re-raised it and each time it was
+  re-confirmed as correctly out of scope for the cache-bookkeeping fixes.
+  Shape: a process-global, lock-protected registry of in-flight generations,
+  registered before invalidation and cleared via `Future.add_done_callback`,
+  with fail-fast admission on `request_slot` and the visual-entry guards
+  reading real occupancy instead of the dict's cleared-or-not state.
+  **What this session's fixes did and did not buy:** they close the concrete
+  cache-bookkeeping windows (no abandoned publish, no laundered
+  invalidation, no torn read, no unconditional teardown of a foreign live
+  entry); they do NOT make orphan GPU occupancy visible to a downstream
+  visual stage. That remains exactly as exposed as before.
+
+#### Coverage, canvas and clip-contract
+
+- **The route lock is ONE NODE TOO LATE for the image phase** (found 2026-07-25, node
+  order confirmed against the canonical JSON: `87 VideoDirector -> 88 ImageDirector ->
+  89 MetaBrief -> 90 ShotLock -> 91 ImageGenDispatcher -> 92 VideoRenderBatch`).
+  `resolve_final_shot_engines` runs at node 92, but stills are minted at 91 and image
+  PROMPTS at 89. The landed fix closed the spine-validation gap; the image phase still
+  relies on its own MIRROR (`otr_meta_brief_image_prompt._effective_prompt_engine_for_role`,
+  whose docstring says it "mirrors the image dispatcher's effective-engine seam").
+  **Chunk 1 of the coverage block is the fix.** Note node 89 precedes node 90, so
+  hoisting to ShotLock still does not put MetaBrief downstream of the authority --
+  that needs a VideoDirector-time freeze and is NOT in scope. (This is also the
+  "image-phase still ownership" item from the campaign queue.)
+- **THREE silent coverage mechanisms exist, not one** (found 2026-07-25).
+  Mechanism 1, the engine mirror/ping-pong (`wrapper_bridge.extend_frames_to_target`),
+  is GONE from `eng_ltx_8gb` -- pinned behaviourally by a test that detonates the
+  helper and renders successfully. It REMAINS in `eng_wan_ti2v`, deliberately and
+  permanently: WAN renders a short native clip on purpose and fills the beat with it,
+  which is the shipped 8GB tier contract `PBUG-20260723-02` protects. **Still open:**
+  composite loop-fill (`otr_silent_composite._should_loop_fill`, which also SUPPRESSES
+  its own underrun warning once it activates) and held-last-frame. For `ltx_8gb` the
+  composite path is now de facto unreachable -- the adapter returns exactly the
+  requested count or raises -- but not structurally impossible:
+  `encode_frames_to_silent_mp4` reports the size of the array it piped into ffmpeg
+  rather than re-probing what ffmpeg wrote, so an encode-side drop could still
+  under-report. PRE-EXISTING; close it when the assembly boundary is next opened.
+- **`_should_loop_fill` names the permanent fix and it is now being built**
+  (`otr_silent_composite.py:244-266`): *"The real fix is phrase-chunking (render the
+  beat's correct duration so it never underruns) -- tracked as a follow-up."* The
+  coverage block IS that follow-up.
+- **THE 7d-PREFLIGHT THAT "PROVED THE GPU" RAN AT THE WRONG CANVAS** (found
+  2026-07-27, B5 panel; verified -- and it corrects a claim this file once made).
+  `render_single` and both HTTP entry points use the older ledger-free `build_request`,
+  which never reaches the canvas seam and defaults to `OTR_VIDEO_RENDER_CANVAS`
+  (832x480). So the "GPU IS PROVEN" leg (`ltx_8gb`, 25 frames, 3004 MB) exercised
+  832x480, not the production canvas. `render_single` parity is explicitly deferred by
+  the O1 judgment; what must NOT happen is another "proof" through that harness being
+  read as a production proof. (The 512x288 canvas itself HAS since rendered live --
+  bench arm D, three cells -- but through a DIRECT-NODE graph, which proves the canvas
+  and the recipe, not the seam.)
+- **The ShotLock WRITE-side canvas validation is still owed** (O1 judgment item 1).
+  `otr_shot_lock.py` stamps `video.canonical_canvas` unvalidated from a possibly-empty
+  policy. B5 made this non-load-bearing for the render (the engine declares its own
+  canvas now), so it is no longer urgent -- the drift guard in
+  `tests/test_ltx_8gb_canonical_canvas.py` covers the disagreement that matters. Close
+  it when the general canvas resolver lands.
+- **Odd-canvas evenness is validated at the ENCODER, not where the canvas is chosen.**
+  The stride defect itself is closed (`b1f2ee86`): `ffmpeg_silent_mp4_cmd` declares the
+  REAL width/height and `encode_frames_to_silent_mp4` REFUSES an odd canvas by name,
+  because yuv420p subsamples chroma 2x2 and cannot represent an odd dimension. Still
+  true and NOT fixed: neither `WanInitImageMixin._dims()` nor the `Canvas` schema
+  validates evenness, so an odd canvas is caught late rather than at the choice. No
+  live producer builds one today (832x480, 512x288, 1472x832 are all even).
+- **`CanonicalClip.frame_count` -- "the integer timing authority" -- HALF CLOSED**
+  (`58e288af` + `40780b82`, count closed @ `48e3c6fb` without paying a decode). Every
+  module that writes a clip now ffprobes it, and a roster gate in
+  `tests/test_terminal_frame.py` fails by name for any module that writes a clip
+  without proving it. What this proves and what it does not: it proves the muxer wrote
+  what it was piped, which is the right question for a clip written by ONE ffmpeg
+  pass; it does NOT prove decodability, which is why `assemble_beat_segments` still
+  decode-counts every ASSEMBLED beat and must keep doing so. **Re-verify before
+  acting:** this row's "still self-declared elsewhere" pointers (the four `viz_*` and
+  four `still_*` engines) were both closed afterwards, so the remaining open surface
+  may be empty.
+- **KNOWN LIMIT of the widened roster gate**, recorded so it is not rediscovered as a
+  surprise: the codec flag is matched as a STRING CONSTANT, so a flag assembled at
+  runtime (an f-string, `"-c:%s" % stream`) or the stream-index spelling `-c:0` is
+  invisible to the sweep. Nothing in the tree does that today; an encoder that ever
+  needs to must be pinned in `_ENTRY_POINT_PROOFS` by hand, which the inventory test
+  makes a visible decision. Separately, ONE mutant survives the round by construction:
+  deleting the self-proving membership assertion is catchable only by a meta-test of
+  that assertion.
+- **`ltx_av` underruns long beats** (found 2026-07-25, codex; confirmed). It caps at
+  `_LTX_AV_MAX_FRAMES` (`eng_ltx_av.py:58`, default 497, env-overridable) and clamps
+  at `:950-953`. It is NOT "renders to target natively" as three earlier docs claimed.
+- **Ping-pong on a capped HuMo beat played lip sync BACKWARDS** -- FIXED in code @
+  `a1d810f1`, but the finding is STATIC (no live artifact), so it is NOT a PBUG row. A
+  capped-14B leg would reproduce it. Kept here so the live proof is not forgotten
+  (listed under Section 2, deferred render items).
+- **`docs/ENGINE_MATRIX.md` reports the DECLARED contract only** (found 2026-07-27).
+  Correct today and consistent with its own stated design (every number read from the
+  live registry). But the moment a profile pins an `ltx_8gb` ceiling, the matrix keeps
+  printing `9-161 step 8` for a tier whose real window is narrower, and the `--check`
+  drift gate cannot notice because it diffs the registry, which the effective contract
+  never touches. Owed at the prequalification step, not before.
+
+#### Routing, env-capture and the credits card
+
+- **`wants_talking_prompt()` escapes any routing freeze.** It calls
+  `_recipe_config(self._recipe())` and `_recipe()` (`eng_ltx_av.py:402-432`) re-reads
+  `OTR_LTX_AV_RECIPE` / `OTR_LTX_AV_SHARP` / the UNET name on EVERY call by documented
+  design ("Read fresh every call"). So a `required="when_engine_talking"` row evaluated
+  through the hook re-reads the environment after capture. S0b-core needs ONE shared
+  `row_is_active(...)` evaluator over captured state, with the talking result inside
+  `ltx_resolved`.
+- **`provider_side` is a THREE-part rule, not an attribute.** `_is_cloud_video_engine`
+  accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`.
+  `cloud_kling_avatar` has no `provider_side` attribute and is caught by the id prefix
+  alone, so an `engine_facts` builder using a bare `getattr` would classify it local
+  and let the radio-host redirect send a cloud avatar to local LTX. Needs a regression
+  on picked AND forced `cloud_kling_avatar`.
+- **Four env-read sites missing from the S0b inventory:** `eng_ltx_video.py:541-564`
+  (`OTR_ENABLE_LTX_I2V`), `render_driver.py:1176-1203` and
+  `otr_meta_brief_image_prompt.py:297-300` (`OTR_ENABLE_HUMO_HOSTS`), and
+  `eng_ltx_av.py:352-353,403-432` (recipe/UNET re-read outside `assert_usable`).
+- **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At
+  512x288 (the ltx_8gb tier) col1 is 65px past its footer even with every ledger row
+  this policy may drop already dropped; at 640x360 it is 12px over. Both are drawn
+  anyway (a terminal node never destroys a finished episode) and LOGGED at ERROR
+  naming the canvas -- the old behaviour was drawn, clipped by PIL, silent. At 288
+  lines the three-column console is already a polite fiction: col3's scrolling
+  transcript is as unreadable as anything col1 clips. This is a DESIGN job -- a card
+  laid out for a small canvas -- not more ladder heroics.
+
+### 1.7 THE ADAPTATION DESIGN (hardened, NOT yet built; multi-session -- start only with room to finish step 1)
+
+Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md`.
+
+**The keystone correction: compile source speech, do not generate it.** A ledger row
+that merely POINTS at a source segment proves structure, not meaning --
+`PRODUCTION_SPRINT_LESSONS.md` lesson 11 documents that exact failure class.
+Source-owned text must be materialized deterministically from an authenticated
+segmented artifact and verified against it. "Summarize into X words" then means
+SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not paraphrasing -- which also removes
+the VRAM hazard, since no model sits in the source-speech path.
+
+Settled by arithmetic: an episode cannot exceed **1,520 words** (19 voiced beats at
+act_count 7, `BEAT_WORD_HARD_MAX` 80), so full-scene performance is impossible
+without redesigning beat topology. Build target is the 300-word unit.
+
+**NEXT, IN ORDER:**
+
+1. **The segmented source artifact** (schema, spans, hashes,
+   `body[start:end] == segment.text`, omission receipts) and the pass-to-field
+   ownership table -- **nothing else codes until that table exists.**
+2. **Cast from the selected cut.** Real scenes carry 3-12 speakers against a
+   6-character ceiling (`_otr_casting.py` 1-6, `OutlineRequest` rejects >6), so which
+   speakers appear must follow from the cut that fits the word budget. Coupled hard
+   to the capacity guard: at act_count 1 there are exactly THREE voiced beats, so a
+   4-person cast is a mathematically guaranteed `CastVoiceCoverageError` -- the
+   failure that killed `scifi_news` in the six-bank run. `compute_episode_budget`
+   must also receive the TRUE locked cast.
+3. **Loosen the count-match invariant** (`OTR_LedgerScriptWriter.py:4061-4067` hard-
+   raises on any locked != requested) and change the pack text that tells the model
+   to drop figures.
+4. **Extend `_otr_provenance.py`** -- do not add a second attribution owner -- and
+   bind its output to the verified body hash.
+5. **Schema migration** to retire `cast_hints`; still required by the validators and
+   by `public_domain_manifest_schema.json`, so manifests and tests migrate in the
+   same change. (`visual_style_policy`, the other half of this item, was ripped
+   2026-08-04.)
+
+**KNOWN AND NOT FIXED:** `canonicalize_shakespeare_text` truncates at 12,000 chars
+and the interpreter sees only the first 5,000, so a 3,445-word scene reaches the
+brief as ~880 words, silently. Belongs with the artifact work, where each beat is
+fed its own segment rather than a blind prefix.
+
+### 1.8 STYLE / IDENTITY DECISION WORK (backlog; not the next coder window)
+
+Grounded by the 2026-08-03 four-agent forensics; every line has a file:line in the
+session traces.
+
+1. **"Invent one and tag it"**: add a derived style/genre field to
+   `run_story_brief_reflection` (`_otr_story_brief.py:513` -- proven content-loyal on
+   both specimens), stamp beside `story_brief`, repoint the treatment `Style:` line
+   (`video_engine.py:1762`) and the HUD (`video_engine.py:1336` -> `_build_left`
+   `:1592`) at it. Highest-leverage item here: it fixes the credits line for all six
+   banks uniformly.
+2. **Rename `meta.style` -> `meta.story_scaffold`** (operator: too many metas; the
+   field is neither scifi nor a description). Consumers move in ONE atomic change:
+   writer stamps, credits `_story_style_receipt`, `visual_plan.style`,
+   `video_engine.py:1336`, tests -- AND the ledger validators (r3):
+   `_otr_ledger_consistency.py` pins the field in its matrix
+   (`MatrixRow("style", ...)` at `:68`, `:177`) and `_otr_ledger_cleanup.py`
+   reads it too; missing them fails ledger validation on the first episode.
+3. **Ghost-name reconciliation fork**: pitch cast never reaches `lock_cast` (names
+   are a pure pool draw; `source_character_names` deliberately None for invention
+   lanes). Decide: scrub briefs after cast lock, or propagate pitch names. Evidence:
+   Evelyn/Leonard as offscreen lore; Fogbound Rails bio still opens "Lizzie Gray".
+   (Cross-listed as Section 3, question E.)
+4. **Dead fields found**: `ending_template` computed but zero LineRequest call sites
+   pass it; `seed_policy.style_seed_env` validated but unconsumed; `dramatic_state`
+   derived PRE-dialogue goes stale in the treatment.
+5. **`meta` is a 120-key drawer** -- the cleanup the operator keeps asking for. Scope
+   as its own rip with the ledger law (every field one owner).
+
+---
+
+## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least)
+
+A leg is 1-3 hours on the one GPU. Run batches SERIALLY -- *"two windows
+resetting one GPU is how each kills the other's leg"* (from the archived
+scheduling note; still true). Reset per `CLAUDE.md` section 4 before every
+leg. A leg that does not reach `otr/obs/` did not pass. **Every canonical leg
+below is also a free chance to** (a) re-observe the two parked eyeball items
+(Batch R5) and (b) watch the two ledger-cleanup behaviour changes named in
+Open risks that have no live receipt yet.
+
+### Batch R0 -- ALREADY RENDERED: the six overnight 1-act legs. One morning pass over `otr/obs/` proves six lanes
+
+See THE CURRENT STEP at the top of this file. One pass proves: the mime
+prompt, the foley bed under dialogue, plain ltx25 video, H3 silent, H3
+audio-in, and the ltx_audio_in baseline -- and may satisfy Batch R1 for free
+(check the H3 legs' prompt receipts before spending R1's leg).
+
+### Batch R1 -- ONE leg on `otr_w45_minimax_h3_video` proves the H3 prompt-policy fix
 
 **The code is shipped, green and pushed (`e923a9f3`, suite 12332/121/1). What
 is missing is the one thing CPU tests cannot supply: a published episode.**
@@ -125,25 +623,7 @@ been refused even if the patch had landed. Writers DO ride as `-Set`
 on `minimax_h3_video`, rendered before the fix. Do not overwrite it or reuse
 its episode identity; it is half of the A/B.
 
-**THE BOX IS FREE, AND THE FOLEY RE-RUN OUTRANKS THIS ROW.** The foley
-qualification leg that held port 8000 all night DIED at its terminal node after
-3h17m22s and published nothing (PBUG-20260826-02, fixed in `499312bb`). Its two
-python processes from 21:43 are still resident holding port 8000 with the GPU
-already back to ~1.2 GB; whoever goes next resets them per `CLAUDE.md`
-section 4.
-
-**Order matters here.** Foley/mime qualification is the NEXT ITEM at the top of
-this file and its blocker was only just cleared, so the foley re-run takes the
-box first. This H3 row is a single leg and can follow it. Do NOT start both --
-two windows resetting one GPU is how each kills the other's leg.
-
-**There is no untreated foley BEFORE artifact to preserve** -- that leg never
-reached the mix. The H3 before/after A/B is unaffected: its BEFORE sample is the
-published Caretaker episode named above.
-
----
-
-### >>> THEN: SCENE + PORTRAIT `elements: []` -- MEASURE IT BEFORE DESIGNING IT <<<
+### Batch R2 -- ONE image-mode sweep on `otr_soak_llmsweep_02` settles SCENE + PORTRAIT `elements: []`
 
 **THIS ROW USED TO ORDER A FULL ARC. IT NO LONGER DOES, because the premise it
 rested on was never measured.** Re-grounded 2026-08-27 against the evidence
@@ -212,98 +692,14 @@ mis-fires."* Two defensible answers, not equal:
 Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
 PBUG-20260826-01.
 
----
+### Batch R3 -- FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator directive 2026-08-25)
 
-### >>> ALSO OPEN: THE SANCTIONED-GAP CONTROL PATH <<<
+**One sweep of four legs (after Leg 0, Section 1.2) proves all 7 surviving
+local LLM rows in BOTH slots, plus the gemma Q8_0 negative probe -- and each
+leg doubles as a ledger-cleanup live-watch and an eyeball re-observation
+chance.**
 
-**Live-proven necessary on 2026-08-26.** Ideogram is not seed-deterministic:
-after the music-card fix it went from refusing every music card to **6 of 7**,
-and that ONE refusal still killed a 30-minute episode at the still-spine gate.
-No amount of prompt work takes a stochastic refusal to zero.
-
-The dispatcher already says "the episode continues" and the composite already
-floors an `exists=False` row -- **nothing in between mints that row**. Spec and
-r1 judgment: `kibitz-runs/2026-08-25-model-refusal-required-still/`.
-Accounting for it landed 2026-08-26 (`a2837b05`) and is deliberately inert
-until this exists.
-
-**THE BLOCKER IS CLEARED -- r2 CAN RUN (2026-08-27).** r1 ended on one open
-item it refused to decide for the operator: what an episode should do when
-EVERY required still is sanctioned-gapped, given that node 92's success check
-is `clip_count > 0`. **Asked and ruled 2026-08-27: it PUBLISHES.** The full
-ruling, its reasoning and -- importantly -- what it does NOT license are in
-`docs/OTR_STANDING_RULINGS.md` under *"AN ALL-REFUSED EPISODE STILL PUBLISHES"*.
-Read it there before r2, because the ruling is narrower than its headline: it
-permits publishing an all-refused episode, it does NOT permit REPORTING one as
-a clean render, and the `required_scene_targets` ledger-completeness law is
-untouched.
-
-**Next step is r2, the coding plan**, per r1's own stated roster
-(r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
-about this row is waiting on the operator.
-
-**r1 WAS WRITTEN 2026-08-25 AND THE TREE MOVED THE NEXT DAY. RE-GROUNDED
-2026-08-27 against HEAD -- do not hand r2 the stale finding list.** `a2837b05`
-landed on 2026-08-26 and added 85 lines to `otr_video_render_batch.py`, so one
-of r1's four findings is already closed and one of the survivors got SHARPER.
-
-| r1 finding | status at HEAD, verified by reading the file |
-|---|---|
-| 1. Nothing mints the `exists=False` row between a sanctioned dispatch and the spine | **STILL THE ROW.** This is the item itself. |
-| 2. The skip branch never reaches the renderer loop | **STILL OPEN**, unverified in this pass -- r2 grounds it. |
-| 3a. The manifest loop counts a gap as a delivered receipt (`:146-150`) | **ALREADY FIXED** by `a2837b05`. `_clip_delivered_motion(clip)` (`:134-153`, `exists` alone, deliberately) now routes an undelivered beat to `sanctioned_gap_shot_ids` at `:213` instead of minting a receipt for it. Do NOT re-fix this. |
-| 3b. `delivered_frames_ok` is True over an absent clip (`:750-770`) | **STILL LIVE**, and here is the exact mechanism: a gap has no `source == "clip"` segment, so `segs` is empty, `status` becomes `no_clip_segment` -- and `no_clip_segment` is the one status that flips NOTHING. `ok_all` is only cleared by `held_last_frame`, or by `not positioned and segs and delivered != tgt`, whose `segs` guard is falsy for exactly this case (`otr_silent_composite.py:766-769`). |
-| 4. An all-refused episode reports FAILURE (`clip_count > 0`) | **STILL LIVE, now at `otr_video_render_batch.py:640`** -- and `a2837b05` made it BITE rather than merely lurk. |
-
-**FINDING 4 DESERVES ITS OWN PARAGRAPH, because the fix for 3a is what armed
-it.** `clip_count` is `len(receipts)` (`:129`), and since `a2837b05` receipts
-correctly EXCLUDE sanctioned gaps. So an all-refused episode now has a genuinely
-empty receipt list and `"ok": manifest["clip_count"] > 0` genuinely evaluates
-False. Before that commit the gap rows were counted as receipts, so the same
-episode would have reported ok=True by ACCIDENT -- for the wrong reason, off a
-receipt that lied. **The correct accounting collides head-on with the 2026-08-27
-ruling that such an episode must publish**, which is not a regression in
-`a2837b05` but the point at which an existing contradiction became honest enough
-to see. r2 fixes the success predicate, NOT the accounting.
-
-**The payload-never-empty guarantee already anticipates this** and is worth
-reading before designing (`otr_video_render_batch.py:203-209`):
-`OTR_CreditsRoll._require` rejects `{}`/`[]`/`None`/`""`, so an all-gap episode
-returning an empty payload would convert a publishable degraded episode into a
-hard mux-time failure -- "the exact outcome the sanctioned gap exists to
-prevent", in the code's own words. Whoever writes r2 starts from there.
-
----
-
-### >>> NEXT ITEM: THE LOCAL-LLM ACCEPTANCE SWEEP (operator directive 2026-08-25) <<<
-
-**THE RE-TRIAGE THE PREVIOUS BANNER DEMANDED WAS DONE 2026-08-25 (late). Its
-result is below; the old banner text follows underneath, unedited.**
-
-**Runway row 2 (LEMMY Phases 2-4 + "its three live PBUGs") IS MOSTLY CLOSED and
-the row is STALE.** Checked against the real tree, not the banner:
-* **PBUG-20260811-01 -- CLOSED 2026-08-16, MIS-ATTRIBUTED.** The cameo never
-  killed the writer; `lemmy_force` was INERT on that lane at the repro commit.
-  Row 2's clause 5 asks to "resolve the fable2 BAD_LINE interaction" -- a bug
-  closed as never having been about the cameo. **Withdrawn premise.**
-* **PBUG-20260811-03 -- CLOSED 2026-08-18**, fixed and live-proven on a
-  forced-cameo leg (`da44f642` + `7faf3bf7`).
-* **PBUG-20260811-02 -- the ONLY one still OPEN.** Root cause established, the
-  repair is WRITTEN, and it is not a coding item: it needs a canonical
-  `fastwan_8gb` leg with 60-SECOND opening AND closing cues (long enough to
-  chunk at `_MUSIC_MAX_CHUNK_DUR_S = 22.0`). **That is a RENDER window, not a
-  coder slot.**
-* **Clause 4 is moot** -- `scifi_news` no longer exists (live banks are
-  media_archive, original, scifi_news_pro, public_domain, shakespeare,
-  custom_source_bank).
-* **"Phases 2-4" are STILL undefined anywhere in the repo** -- the phase
-  numbering lives only in a gitignored `kibitz-runs/` directory. Per
-  `docs/2026-08-16-lemmy-open-changes-PROBLEM-STATEMENT.md`, the six row-2
-  exit clauses are the only readable statement of intent. **Asking a window to
-  "complete Phases 2-4" is not an actionable exit condition** -- retire the
-  numbering or recover it, but do not let it keep sending windows in circles.
-
-**THE OPERATOR REDIRECTED THE WINDOW MID-SESSION, and these are his words:**
+**THE OPERATOR'S WORDS, which are this item's charter:**
 *"when all this LLM coding is done we should look and do more coding and retest
 all local LLMs on a 1 runthrough that should catch it"*; *"if it doesn't fit
 nicely or requires Ollama rip it from the dropdown and blast radius"*; *"clean
@@ -356,212 +752,33 @@ build is not.** The honest shape, which is NOT one render:
 **Full design (coverage matrix, per-row assertions, skip-reporting rules, risks)
 is in the 2026-08-25 workflow result; re-derive from this row if it is lost.**
 
----
+**A note that used to ride this item and still matters:** *"Phases 2-4" of the
+old LEMMY row are STILL undefined anywhere in the repo* -- the phase numbering
+lives only in a gitignored `kibitz-runs/` directory. Per
+`docs/2026-08-16-lemmy-open-changes-PROBLEM-STATEMENT.md`, the six row-2 exit
+clauses are the only readable statement of intent. **Asking a window to
+"complete Phases 2-4" is not an actionable exit condition** -- retire the
+numbering or recover it (Section 3, question C), but do not let it keep
+sending windows in circles.
 
+### Batch R4 -- ONE canonical `fastwan_8gb` leg with 60-second opening AND closing cues proves PBUG-20260811-02
 
-## HOW TO READ THIS FILE (three files since 2026-08-23)
+Lifted verbatim from the 2026-08-25 re-triage (the rest of that re-triage, and
+the closed 2026-08-11 bank-sweep trio it retired, are in the archive):
 
-**THE PLAN IS THIS FILE AND IT IS ONLY OPEN WORK.** Operator: *"go forward
-should only have the go forward plans. Only."* Two companions carry what used to
-be tangled in here:
+* **PBUG-20260811-02 -- the ONLY one still OPEN.** Root cause established, the
+  repair is WRITTEN, and it is not a coding item: it needs a canonical
+  `fastwan_8gb` leg with 60-SECOND opening AND closing cues (long enough to
+  chunk at `_MUSIC_MAX_CHUNK_DUR_S = 22.0`). **That is a RENDER window, not a
+  coder slot.**
 
-* `docs/OTR_STANDING_RULINGS.md` -- the laws, the standing operator rulings, the
-  review routing, the model/credit ladder, how to talk to the operator, the
-  obs-path override, window packing, tombstones and pointers. **Read it. It is
-  not optional and it is not history** -- it is the set of constraints the next
-  piece of work has to satisfy. When something in this plan says "THE LAW" or
-  "the REVIEW ROUTING block", that is where it now lives.
-* `docs/GO_FORWARD_ARCHIVE.md` -- closed receipts, verbatim. **Not read to
-  resume.**
+Full detail: `docs/PROD_BUG_LOG.md` and the archived trio block.
 
-`CLAUDE.md` is unchanged and remains the highest authority.
+### Batch R5 -- OPPORTUNISTIC: D2 fail-hunting still legs; every clean leg is also an eyeball re-observation
 
-## CURRENT RUNWAY -- OPERATOR-ORDERED 2026-08-13. WORK IT TOP TO BOTTOM.
+Run when a render window is free and nothing above needs the box.
 
-**ROW 1 BELOW IS SUPERSEDED by PRIORITY 1 above (operator 2026-08-14).** Its
-order was "resume the upstream Story Lab and A/B against it"; the lab is now
-parked, read-only and being retired, and the story work happens in production.
-Rows 2-5 are unchanged and still run in their listed order, behind PRIORITY 1.
-
-This block is authoritative. It supersedes every older order, count, Lemmy gate,
-and review-routing sentence lower in this file. Re-ground the active row against
-the Windows tree before editing; when a row is coded, fully tested, committed and
-pushed, move its receipt to `docs/HANDOFF_LOG.md` and remove it from this forward
-queue in the same push.
-
-| # | Active work | Exit condition |
-|---:|---|---|
-| 1 | **SUPERSEDED -- what remains is PRIORITY 1 at the top of this file** | Do NOT restart from the Story Lab. |
-| 2 | **Give LEMMY a fighting chance: complete Phases 2-4 and its three live PBUGs** | Preserve the Cockney floor with one upstream engine-policy authority wired through the canonical workflow, CastLock and renderer; qualify real routes by operator-audition receipts; close the six-engine gender-only pin gap; restore or explicitly decline `scifi_news` cameo policy; resolve the fable2 BAD_LINE interaction; re-observe the missing closing before diagnosing. No silent substitute and no defined-but-unwired policy. |
-| 3 | **Run seven fresh post-change 45-word render proofs** | All seven exact public engine IDs pass against the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server `Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk. See **WHAT IS ACTUALLY LEFT** below. |
-| 4 | **Narrow learned-upscale hardening only** | Harden the two `SpandrelEsrgan._resolve_model` edge cases if still reproducible. The multi-GPU learned-upscale stage itself is CLOSED and must not be reopened. |
-| 5 | **Handoff after executable rows 1-4** | Continue in `ROADMAP.md`: lean-mean -> RunPod/AMD/Mac -> install -> product docs/v2 release. This row is a pointer, not work that precedes lean-mean. Lean-mean scope and coding order live only in `docs/LEAN_MEAN_CLEANUP.md`. |
-
-## ON DECK -- WHAT REMAINS OF CONTINUITY CORRECTNESS
-
-### 0-QUINQUE. MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
-
-**THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
-say the next step was an operator ruling on "does H3 belong in the video
-dropdown given the 4 s floor vs the sub-4 s beats". That framing is RETIRED.
-The operator's 2026-08-09 direction: H3 is **"a series of sprints all to refine
-the video paths"** -- scope TBA.
-
-**What that changes for a window picking this up:**
-* It is NOT a yes/no dropdown admission any more, so do not go looking for a
-  verdict to record. There is nothing blocked on the operator here.
-* The unit of work is a SPRINT against the video paths, not a one-shot chunk.
-  Expect several, each with its own kibitz gate, each landing green and pushed
-  on its own.
-* The 4 s floor is now an INPUT to that refinement -- a constraint the video
-  paths have to accommodate or explicitly route around -- rather than a
-  disqualifier that settles admission.
-
-**Scope is TBA and that is deliberate.** Do NOT invent the sprint list. When the
-operator names the first sprint, write it into THE QUEUE at the top of this file
-as its own row, and leave this section as the standing context.
-
-**Grounding that survives the reframing:**
-* Problem statement `docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` is
-  UNTRACKED and another window's working file -- never stage, edit or delete it
-  from a different window. Read it; do not touch it.
-* The matrix-pattern spec already names MiniMax as a churn driver
-  (`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5), so a video-path
-  sprint will likely collide with the un-converged matrix work (section 0). Read
-  that section's "what survived all four rounds" before designing anything.
-* The recipes are NOT on the table (standing directive). A video-path sprint
-  refines PATHS -- routing, canvas negotiation, admission, extension -- never
-  the shipped render recipe.
-
-## THE CODING SPRINT (operator directive 2026-08-04; re-sized by the r1-r4 arc)
-
-Item 1 is the structural work and consumes most of a session; items 2-3 are
-small and share one campaign. Items 8 and 9 are DONE (receipts in
-`docs/HANDOFF_LOG.md`). The live open work is sections 0 (video matrix pattern,
-did NOT converge), 0-BIS (no-mirror, CODE-READY), 0-QUATER's deferred
-shield-scoping chunk (own kibitz arc), and the 0-QUINQUE MiniMax ruling.
-Work by priority, not by number -- the numbering is historical.
-
-**RENDERS HAVE RESUMED** (2026-08-05). The 08-04 "no render runs this session"
-line is spent -- it governed that session only, and the 08-05 handoff opens on a
-live-proof obligation. Reset per `CLAUDE.md` section 4 before any leg: selective
-CIM kill by CommandLine, never a blanket python kill (it severs the MCP tooling).
-
-Everything below was verified against the real files on 2026-08-04, is
-non-GPU, and is provable by the suite alone. Work them in order; each ends
-green and pushed on its own.
-
-### 6. ~~A TERMINAL FREEZE GATE THAT HAS NEVER READ A POPULATED FIELD~~ -- FIXED 2026-08-28
-
-**The join and the vacuity refusal are done.** `find_scene_coherence_issues`
-(`nodes/_otr_scene_guard.py`) now joins `beat_id -> beats[].scene_id`, the
-join the schema actually has -- `lines[].scene_id` is confirmed dead, no
-writer has ever populated it. `_check_g15_scene_coherence`
-(`nodes/_otr_ledger_freeze.py`) writes the full `{required, checked, verdict,
-issues}` shape into `report.info`, and an armed gate that examines zero real
-linkages now fails loud instead of passing silently -- distinguished from a
-ledger with no scenes at all, which stays a legitimate clean skip (a
-pre-existing, different state; conflating the two would have been a wider
-behavior change than asked). Commit `e2807dcc`, reviewed via scoped kibitz r2
-(codex, 6 MUST-FIX, all grounded and folded in --
-`kibitz-runs/2026-08-28-scene-coherence-vacuity/`), 28 tests including a
-named regression guard, full suite 12374/121/1, 0 regressions, HEAD == origin
-verified.
-
-**STILL OWED, and it is the ONLY thing left on this item:** whether any bank
-should actually ARM `defaults.scene_coherence_check`. Nothing does today --
-the fix changes a function with zero live callers in current production, by
-design, so this shipped at zero risk. GO_FORWARD's original text said
-"measure OFFLINE over the published corpus first, then arm in ONE change" --
-that measurement was never attempted tonight and stays open. Whoever picks
-this up next decides first whether any bank should arm it at all before
-running that measurement.
-
-### 7. CHARACTER GENDER IS ROLLED ON PROSE LANES -- Scrooge shipped female (spec REWRITE owed; r2 and r3 both returned NO)
-
-Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
-`HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
-MIRANDA are all correct.
-
-**The split IS the diagnosis, and it means the render code is not broken.**
-Shakespeare ships 14 provenance sidecars carrying `characters` with genders; the
-prose lane has ONE tracked sidecar and its `characters` key is `None`. The pin
-chain already exists and is lane-neutral (`_otr_roster_gender.py`, 12.6 KB, on
-disk). Shakespeare is right because the DATA is there. Prose is rolled because it
-is not. **This is a vendor-time data gap with a working consumer** -- the exact
-inverse of the Item 7 bug, where the value existed and nothing read it.
-
-Spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` (Fable, driver-grounded).
-A four-tier TOTAL ladder -- roster -> pronouns in the source text ->
-character-in-work web lookup -> name-frequency percentage -- stamping `gender`
-(always populated, never `unknown`, because a voice must still be cast) plus
-`gender_source` and a confidence. Operator rulings baked in: Shakespeare's KNOWN
-rows are untouchable, the announcer stays randomly male/female by design, and the
-invented lanes (`original`, `scifi_news`, `scifi_news_pro`, `media_archive`) keep
-rolling -- their characters do not exist, so a name search there risks matching a
-real person.
-
-**Codex r2 verdict: NO. Eleven must-fixes, at `kibitz-runs/2026-08-05-gender-ladder/r2/codex.md`.**
-The diagnosis survived; the mechanism did not. The three that matter:
-
-1. **The web search would silently do nothing.** The spec passes a tools/plugins
-   argument to `OpenRouterBackend.generate`, which swallows unknown kwargs through
-   `**_ignored` -- no error, no search, a confident answer from a model that never
-   looked. That is the same silent-no-op class as the defect above.
-2. **"LLM extraction over the FULL unit text" cannot run.** `beckoning_fair_one.txt`
-   is 143,176 bytes and 58 of 65 source files exceed 12,000 bytes, against a
-   32,768 estimated-token per-call cap.
-3. **Blanket surname aliases are identity-unsafe.** Two rows sharing a surname
-   with the same gender currently produce a confident pin rather than an
-   abstention.
-
-**r3 RAN 2026-08-06 and it is STILL NO** -- Codex NO with 7 must-fixes, agy
-yes-with-fixes with 9. That is three NOs across two rounds, and r3's findings invalidate
-the CODING PLAN rather than its line numbers, so the standing re-ground rule applies:
-**the next step is a SPEC REWRITE folding r2 + r3, then r3 again. Not r4.**
-
-Both lanes independently found (a) a manifest sequencing deadlock -- the stamper is
-specced to run per-unit inside the vendor fetch loop, but the manifest is written only
-AFTER the loop, so it can never see the unit it was called for; and (b)
-`RosterGenderVerdict` has no `gender_source` / `gender_confidence` fields, so the
-ladder's whole output cannot be carried without changing every verdict-construction
-path. Codex also confirmed the r2 finding that the OpenRouter backend still has no
-web/plugin parameter, so the web-search tier would silently do nothing.
-
-Judgment: `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/judgment.md` (LOCAL
-ONLY). **Trap: commit `496d9d57` inserted ~90 lines near the top of
-`nodes/_otr_roster_gender.py`, so every cite into that file in the r3 review has
-SHIFTED. Re-pin before acting.** The rewrite should also CONSUME the
-`normalize_gender` boundary item 8 installed there rather than adding a second
-normalization path.
-
-**Found while grounding, and it reopens an operator ruling:** 32 of 85 Shakespeare
-roster rows are `unknown` TODAY -- 38% of the lane assumed solved. Comedy of Errors
-ships 7 characters, every one unknown. The narrower ruling that fits the evidence:
-Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
-`unknown` rows. That fixes 32 rows without ever second-guessing a parsed
-dramatis personae. **Operator decision, not a driver call.**
-
-### Two carried items with no home of their own
-
-(Titled "Bench leftovers" until 2026-08-23 -- a name that now reads as the
-retired VIDEO bench and has nothing to do with it. The block it referred to was
-an older conditional list, gone long before. Renamed rather than moved: both
-items below are real and open.)
-
-The first: **the three works that refuse to vendor** (`ghost_ship` gid 11045,
-`purple_cloud` 11229, `beleaguered_city` 11521 --
-`scripts/otr_vendor_public_domain_library.py:303/341/542` against the parser
-at `:594-686`) **needs one Gutenberg fetch, so it is operator-opt-in only** --
-not schedulable inside an offline sprint.
-
-**Do NOT start the Shakespeare verbatim executor in this session.** It is a
-multi-session structural change gated on the ownership table
-(`docs/2026-08-03-fidelity-pass-ownership.md`) with four overwrite paths to close
-first, and starting it half-way is worse than not starting it.
-
-## PARKED -- D2 (renders have resumed; run when a render window is free for fail-hunting soak legs)
-
+**D2 (from the long-standing parked row -- renders have resumed):**
 Reset per AGENTS.md section 4, boot headless, run **320-word `public_domain` or
 `shakespeare` still legs until one fails** (~1 in 6). Three legs on 08-04 all
 published, which at that rate is a ~58% chance of zero -- neither confirmed nor
@@ -584,93 +801,98 @@ passes that ALL published).
 Record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
 `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
 
-## After this queue
+**The two eyeball re-observations that RIDE these legs (and any other real
+render leg -- they cost zero extra legs):**
 
-One coder window at a time; every chunk = focused tests + full suite + Bug Bible
-+ commit AND push + `HEAD == origin/v2.0-alpha`.
+Both were eyeball observations against a story engine that has since had its LLM
+vetoes ripped, THE LAW imposed, six banks renamed onto new packs, word-fit ceilings
+retired, the repair-first plan landed, and a ledger cleanup pass added. Neither has a
+reproduction at current HEAD, and under the standing rule a finding with no
+reproduction is not a row. **Do NOT schedule coder time against either.** They are
+settled by the operator eyeballing a real render leg: still there -> re-admit
+as a FRESH dated row with that leg as evidence; gone -> the LAW-era work already fixed
+it, tombstone it.
 
-When the executable rows in the authoritative table above are exhausted,
-continue with `ROADMAP.md`.
-Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md` is its sole
-current scope, blast-radius, coding-order, and verification authority.
+- **Announcer framing defect** (`docs/2026-07-11-announcer-framing-defect.md`).
+  Episodes START a story instead of admitting you into one; the announcer takes debate
+  turns instead of framing. Operator eyeball 2026-07-11. If it survives re-observation
+  the fix is still seam + score contract + fail-closed validator, never Python
+  authorship.
+- **Name-splice defect #2.** v4-campaign Phase 0 record in HANDOFF_LOG; its timebox
+  predates THE LAW.
 
-Open judgment question (render-window, not a coder slot): the LOCAL mistral/gemma
-writer matrix. The Sonnet arm of the creative-writer question is answered
-(`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
-never ran.
+### Batch R6 -- SEVEN 45-word engine proofs (from the archived 2026-08-13 runway table, row 3 -- CONFIRM STILL OWED before spending seven legs)
 
-## THE ADAPTATION DESIGN (hardened, NOT yet built)
+Lifted verbatim from the archived table: **Run seven fresh post-change 45-word
+render proofs.** Exit condition: All seven exact public engine IDs pass against
+the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server
+`Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk.
 
-Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md`.
+**Flagged 2026-08-28:** the row's "See WHAT IS ACTUALLY LEFT below" pointer is
+one of the eleven cross-references the 2026-08-16 audit already recorded as
+BROKEN (target removed before the audit; see the archive). The engine list must
+be re-derived from the live registry, and whether all seven proofs are still
+owed at current HEAD has not been re-verified. Confirm before rendering.
 
-**The keystone correction: compile source speech, do not generate it.** A ledger row
-that merely POINTS at a source segment proves structure, not meaning --
-`PRODUCTION_SPRINT_LESSONS.md` lesson 11 documents that exact failure class.
-Source-owned text must be materialized deterministically from an authenticated
-segmented artifact and verified against it. "Summarize into X words" then means
-SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not paraphrasing -- which also removes
-the VRAM hazard, since no model sits in the source-speech path.
+### Deferred render items (each blocked, or waiting on something else first)
 
-Settled by arithmetic: an episode cannot exceed **1,520 words** (19 voiced beats at
-act_count 7, `BEAT_WORD_HARD_MAX` 80), so full-scene performance is impossible
-without redesigning beat topology. Build target is the 300-word unit.
+- **Capped-14B HuMo leg** -- live proof of the ping-pong lip-sync reversal fix
+  (`a1d810f1`); see the coverage cluster row in Section 1.6.
+- **The LOCAL mistral/gemma writer matrix** (render-window judgment question,
+  not a coder slot). The Sonnet arm of the creative-writer question is answered
+  (`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
+  never ran.
+- **`scifi_news` live reverify** (PBUGs 20260712-22/23/24/25, fixed in tree) --
+  blocked by the `scifi_news` P0 convergence defect (Section 1.6), then fan-out.
+- **The WAN 8-GB proof obligations** -- a render on a PHYSICAL 8 GB card is
+  still owed (the four-arm bench PREQUALIFIED on a 16 GB card told to reserve
+  8 GiB, which is not the same claim), and the 18-engine GPU campaign is engine
+  COVERAGE, not an 8-GB qualification. Both sit behind Section 3, question F.
 
-**NEXT, IN ORDER:**
+---
 
-1. **The segmented source artifact** (schema, spans, hashes,
-   `body[start:end] == segment.text`, omission receipts) and the pass-to-field
-   ownership table -- **nothing else codes until that table exists.**
-2. **Cast from the selected cut.** Real scenes carry 3-12 speakers against a
-   6-character ceiling (`_otr_casting.py` 1-6, `OutlineRequest` rejects >6), so which
-   speakers appear must follow from the cut that fits the word budget. Coupled hard
-   to the capacity guard: at act_count 1 there are exactly THREE voiced beats, so a
-   4-person cast is a mathematically guaranteed `CastVoiceCoverageError` -- the
-   failure that killed `scifi_news` in the six-bank run. `compute_episode_budget`
-   must also receive the TRUE locked cast.
-3. **Loosen the count-match invariant** (`OTR_LedgerScriptWriter.py:4061-4067` hard-
-   raises on any locked != requested) and change the pack text that tells the model
-   to drop figures.
-4. **Extend `_otr_provenance.py`** -- do not add a second attribution owner -- and
-   bind its output to the verified body hash.
-5. **Schema migration** to retire `cast_hints`; still required by the validators and
-   by `public_domain_manifest_schema.json`, so manifests and tests migrate in the
-   same change. (`visual_style_policy`, the other half of this item, was ripped
-   2026-08-04.)
+## SECTION 3 -- WAITING ON THE OPERATOR (answer these in ONE pass)
 
-**KNOWN AND NOT FIXED:** `canonicalize_shakespeare_text` truncates at 12,000 chars
-and the interpreter sees only the first 5,000, so a 3,445-word scene reaches the
-brief as ~880 words, silently. Belongs with the artifact work, where each beat is
-fed its own segment rather than a blind prefix.
+Nothing in this section needs a render or a coder until answered. Defaults are
+stated where a default exists; silence keeps the default.
 
-## STYLE / IDENTITY DECISION WORK (backlog; not the next coder window)
+### The question list
 
-Grounded by the 2026-08-03 four-agent forensics; every line has a file:line in the
-session traces.
-
-1. **"Invent one and tag it"**: add a derived style/genre field to
-   `run_story_brief_reflection` (`_otr_story_brief.py:513` -- proven content-loyal on
-   both specimens), stamp beside `story_brief`, repoint the treatment `Style:` line
-   (`video_engine.py:1762`) and the HUD (`video_engine.py:1336` -> `_build_left`
-   `:1592`) at it. Highest-leverage item here: it fixes the credits line for all six
-   banks uniformly.
-2. **Rename `meta.style` -> `meta.story_scaffold`** (operator: too many metas; the
-   field is neither scifi nor a description). Consumers move in ONE atomic change:
-   writer stamps, credits `_story_style_receipt`, `visual_plan.style`,
-   `video_engine.py:1336`, tests -- AND the ledger validators (r3):
-   `_otr_ledger_consistency.py` pins the field in its matrix
-   (`MatrixRow("style", ...)` at `:68`, `:177`) and `_otr_ledger_cleanup.py`
-   reads it too; missing them fails ledger validation on the first episode.
-3. **Ghost-name reconciliation fork**: pitch cast never reaches `lock_cast` (names
-   are a pure pool draw; `source_character_names` deliberately None for invention
-   lanes). Decide: scrub briefs after cast lock, or propagate pitch names. Evidence:
-   Evelyn/Leonard as offscreen lore; Fogbound Rails bio still opens "Lizzie Gray".
-4. **Dead fields found**: `ending_template` computed but zero LineRequest call sites
-   pass it; `seed_policy.style_seed_env` validated but unconsumed; `dramatic_state`
-   derived PRE-dialogue goes stale in the treatment.
-5. **`meta` is a 120-key drawer** -- the cleanup the operator keeps asking for. Scope
-   as its own rip with the ledger law (every field one owner).
-
-## OPEN OPERATOR QUESTIONS (flagged, awaiting a ruling)
+* **(A) Arm `defaults.scene_coherence_check` on any bank?** The G15 vacuity fix
+  shipped 2026-08-28 (`e2807dcc`; receipt in the archive) but nothing arms the
+  gate today -- the fix changed a function with zero live callers in current
+  production, by design, so it shipped at zero risk. GO_FORWARD's original text
+  said "measure OFFLINE over the published corpus first, then arm in ONE
+  change" -- that measurement was never attempted and stays open. Whoever picks
+  this up next decides first whether any bank should arm it at all before
+  running that measurement. (The measurement itself is no-render work once
+  ruled.)
+* **(B) May gender-ladder tiers 3-4 fill ONLY Shakespeare's 32 `unknown` roster
+  rows** (KNOWN rows stay untouchable)? Detail: Section 1.3, final paragraph.
+* **(C) LEMMY "Phases 2-4": retire the numbering or recover it.** The phase
+  numbering lives only in a gitignored `kibitz-runs/` directory; asking a
+  window to "complete Phases 2-4" is not an actionable exit condition. Detail:
+  the note at the end of Batch R3.
+* **(D) The `full_text` HTML block-join separator.** Inserting separators is a
+  WIDER change to the coordinate system `source_digest` pins -- it belongs in
+  the source adapter, and it is the DOMINANT P0 failure cause on live evidence.
+  Detail: the first row of Section 1.6's P0 cluster.
+* **(E) Ghost-name reconciliation fork:** scrub briefs after cast lock, or
+  propagate pitch names. Detail: Section 1.8, item 3.
+* **(F) After profile retirement, who owns a tier's native render ceiling?**
+  The single blocker on the code-complete WAN 8-GB block, and the question that
+  also unblocks the 8-GB writer-profile fix and the A2 echo fix. Detail blocks
+  below.
+* **(G) The three works that refuse to vendor** (`ghost_ship` gid 11045,
+  `purple_cloud` 11229, `beleaguered_city` 11521 --
+  `scripts/otr_vendor_public_domain_library.py:303/341/542` against the parser
+  at `:594-686`) **need one Gutenberg fetch, so it is operator-opt-in only** --
+  not schedulable inside an offline sprint.
+* **(H) The Bible fan-out batch** -- one operator pass clears every row marked
+  "awaiting fan-out" in the promotion table below, the PBUG-20260710-07
+  retirement ratification, and the duplicate-id cleanup.
+* **(I) Name the first H3 video-path sprint** -- standing context below.
+* Plus the standing question list carried from before, verbatim:
 
 * A research_only source now WITHHOLDS the OBS copy instead of killing
   the finished render (chunk 0.5 behaviour change, live since 08-15).
@@ -700,155 +922,44 @@ session traces.
   either add a third token for "canonical warm, no era tail, no grade tail", or
   ratify that the `ltx_radio_face` path is EXEMPT from the plan's style-tail
   authority. Default if unruled: the exemption, because it changes no behaviour.
-* **After profile retirement, who owns a tier's native render ceiling?** The full
-  statement of this one is in the WAN 8-GB row under OPEN BUGS -- it is the single
-  blocker on a code-complete block.
 * **`check_compatibility`: ratify the inert constant, or schedule the rip?** See
   Open risks.
 
-## OPEN BUGS / DEFECTS (live, not yet closed)
+### Standing context for question (I): MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
 
-MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not. That
-split is why the two eyeball-era entries at the end are PARKED rather than live.
+**THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
+say the next step was an operator ruling on "does H3 belong in the video
+dropdown given the 4 s floor vs the sub-4 s beats". That framing is RETIRED.
+The operator's 2026-08-09 direction: H3 is **"a series of sprints all to refine
+the video paths"** -- scope TBA.
 
-**EVERY LINE CITE IN THIS SECTION IS SUSPECT.** Each one checked during the
-2026-07-27 triage had moved: `_is_cloud_video_engine` is `render_driver.py:1599` not
-`1274-1295`; the "NO FALLBACK to text-only" refusal is `:2148` not `1801-1817`;
-`_use_i2v` is `eng_ltx_video.py:583` not `559-572`. The defects are mostly still
-real; their coordinates are not. **Re-pin a row's cite when you touch it.**
-Path note (verified 2026-08-04): engine adapters live under
-`nodes/_otr_video_engines/` (and `_otr_audio_engines/`, `_otr_image_engines/`)
--- bare `eng_*.py` cites in these rows are shorthand for those paths.
+**What that changes for a window picking this up:**
+* It is NOT a yes/no dropdown admission any more, so do not go looking for a
+  verdict to record. There is nothing blocked on the operator here.
+* The unit of work is a SPRINT against the video paths, not a one-shot chunk.
+  Expect several, each with its own kibitz gate, each landing green and pushed
+  on its own.
+* The 4 s floor is now an INPUT to that refinement -- a constraint the video
+  paths have to accommodate or explicitly route around -- rather than a
+  disqualifier that settles admission.
 
-### The 2026-08-11 bank-sweep trio (LEMMY sprint, all three OPEN)
+**Scope is TBA and that is deliberate.** Do NOT invent the sprint list. When the
+operator names the first sprint, write it into Section 1 or 2 of this file as
+its own row, and leave this section as the standing context.
 
-Found by a six-bank live render sweep, not by tests. Full detail lives in
-`docs/PROD_BUG_LOG.md` and `docs/2026-08-11-FINDING-lane-cast-contract-divergence.md`;
-these rows exist so a window working THIS list actually sees them.
+**Grounding that survives the reframing:**
+* Problem statement `docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` is
+  UNTRACKED and another window's working file -- never stage, edit or delete it
+  from a different window. Read it; do not touch it.
+* The matrix-pattern spec already names MiniMax as a churn driver
+  (`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5), so a video-path
+  sprint will likely collide with the un-converged matrix work (section 0). Read
+  that section's "what survived all four rounds" before designing anything.
+* The recipes are NOT on the table (standing directive). A video-path sprint
+  refines PATHS -- routing, canvas negotiation, admission, extension -- never
+  the shipped render recipe.
 
-* **PBUG-20260811-03 -- `scifi_news` lost the LEMMY cameo it was built for.**
-  ROOT CAUSE ESTABLISHED: `scifi_news` is a CONTENT-OWNED lane
-  (`delivery_mode_for_meta(meta) == CONTENT_OWNED`, measured off the sweep's own
-  ledger; `original` is `legacy`). Content-owned runners build their own cast and
-  never run the writer's seeded picker, and `lock_cast()` is what applies the
-  cameo -- so it cannot fire there. The empty `cast_contract` is the same
-  deliberate decision: that block stamps `meta.episode_seed` and withholds
-  `cast_seed`, because claiming one on a lane-owned cast detonated CastLock's
-  replay before (`num_characters must be 1-6, got 0`).
-  **THE OBVIOUS FIX IS THE WRONG ONE** -- routing content-owned lanes back
-  through `lock_cast()` is precisely what that comment warns against. The repair
-  belongs in the lane runner. **Operator row 15.**
-  *Worst of the three by exposure:* nothing fails and nothing logs, so every
-  `scifi_news` episode since the redesign has shipped with no cast contract.
-* **PBUG-20260811-01 -- forcing the cameo kills the `scifi_fable2` writer on
-  `scifi_news_pro`.** `pass 'script' failed after 4 attempt(s): markup ladder
-  exhausted; BAD_LINE`. Reproduced at 30 AND 90 target words, so NOT a word
-  squeeze; with the cameo on its natural roll the writer passes cleanly. Root
-  cause not established.
-* **PBUG-20260811-02 -- `scifi_news_pro` dies at node 92 with no materialized
-  still for beat `music_closing_001`** (`still-spine handoff missing materialized
-  scene still ... engine still_flat`), on the same profile where five other banks
-  produced one. Seen ONCE. Re-run before treating the cause as understood.
-
-### The P0 / source-span cluster (2026-07-30)
-
-- **`full_text` reaches the span coordinate system carrying HTML BLOCK JOINS WITH
-  NO SEPARATOR, and on the live evidence this is the DOMINANT P0 failure cause.**
-  Measured in the campaign logs: `'...Field of Martian PolygonsNASA/JPL-'`,
-  `'...and the School ofEngine'`, `'...what you're doing.Let's s'`, `'...(AMR).The
-  resea'`. The RSS adapter strips tags without inserting whitespace, so two elements
-  fuse into one token. `_normalize_span_source_text` collapses whitespace RUNS but
-  cannot insert a space that was never there, so the model quotes the sentences a
-  reader sees and they are not byte-exact in the stored text -- exactly the
-  "non-literal source span" rejection that killed 12 of the 15 P0 legs.
-  **Deliberately NOT fixed by A-3:** inserting separators is a WIDER change to the
-  coordinate system `source_digest` pins -- an operator decision, and it belongs in
-  the source adapter rather than the codex normalizer. Owed: which adapter builds
-  `full_text`, whether a separator can be inserted at admission without breaking any
-  accepted ledger, and a fixture from these four strings.
-- **The deterministic P0 rung PRUNES SILENTLY, which violates the plan's own
-  Invariant 3.** `repair_literal_source_metadata` drops an unsupported span, then its
-  evidence row, then the fact -- and emits no receipt. An accepted P0 index simply
-  has fewer facts than the model wrote, and nothing says which were dropped or why.
-  Under "fail loud, not fatal" the degrade is the right direction and the silence is
-  not.
-- **The deterministic P0 rung is ALL-OR-NOTHING across an artifact, and can poison
-  its own good work.** It is handed `a0_payload` (all seven keys) while
-  `_validate_fact_index` restricts spans to `allowed_source_fields` (the projection).
-  A quote rehomed into a field the projection omitted makes `post_validator` reject
-  the WHOLE repaired artifact -- "cites source field ... outside the supplied P0
-  evidence" -- so one unlucky rehome discards every correct prune in the same pass.
-  Either give the repairer the allowlist or prune per row.
-- **Nothing measures whether a pruned P0 index is ACCEPTED** (recorded, no action
-  owed yet). No live leg has ever run with the deterministic rung reachable (it became
-  reachable at `47c554fa`, after the campaign stopped), and the rejection logs carry
-  only a truncated `raw head` plus no source payload, so the question cannot be
-  answered offline. A-1's instrumentation is what makes the next campaign able to
-  answer it.
-- **`scifi_news` P0 convergence defect** -- both 120w and 320w legs fail in P0 after
-  two attempts on non-literal fact source spans; provider/model convergence, extends
-  BUG-11.35. NOT a word/length gate. Blocks the last 120w receipt and the
-  `scifi_news` live reverify (PBUGs 20260712-22/23/24/25, fixed in tree, reverify
-  still owed).
-- **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs provider cap
-  `512`; the whole-artifact retry contracts LANDED @ `314dd481` are the base; the
-  residual fix is now unblocked. Related independent items: the P9 8K
-  structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do not
-  raise the minimum word target as a capacity workaround.
-
-### The orphan-lifecycle pair (deferred 2026-08-25, both DESIGN items, neither a grep-and-fix)
-
-Both fall out of PBUG-20260825-04, whose four landed fixes shipped in
-`fb67d059` after a full kibitz r1-r4 arc (Codex r2/r3, Cursor r4, Fable r1).
-The arc found a new race in each of the first two cuts of the same fix, so
-**do not treat either item below as mechanical** -- each is a genuine design
-choice with more than one defensible answer, which per CLAUDE.md means a full
-arc BEFORE code, not after.
-
-- **THE GENERATION DEADLINE NOW COVERS THE GGUF LANE -- CLOSED 2026-08-25
-  (evening).** Left this row in place rather than deleting it, because the
-  DEFERRAL'S OWN SEVERITY CALL WAS WRONG and that is the reusable part. It
-  said "VERIFY FIRST, it may be live rather than theoretical: check whether
-  the current production technical-slot catalog row is `gguf_native`". That
-  check was run and answered NO -- the canonical technical slot resolves to
-  the transformers `google/gemma-4-12b-it` row -- and the honest-looking
-  conclusion "latent, not live" was WRONG, because it asked only about the
-  UNPROFILED canonical run. **Six committed `status="shipping"` profiles
-  (`otr_g4_fastwan`, `_humo`, `_ltx_8gb`, `_ltx_audio_in`, `_ltx_video`,
-  `_wan_ti2v`) pin `technical_model` to `unsloth/gemma-4-12b-it-GGUF`, and
-  profile `status` is validated but is NOT an application gate** -- so real
-  shipping runs were hitting the uncovered lane the whole time. *A
-  reachability question answered against the default path only is not
-  answered.*
-  Shipped: deadline-conditional streaming in `_otr_gguf_backend` (no
-  deadline -> the identical non-streaming call, `stream` absent entirely;
-  a deadline -> stream and stop between chunks), plus ONE shared absolute
-  `time.monotonic()` deadline computed BEFORE worker submission, a pre-call
-  admission check, a parent recheck after `future.result()`, and the legacy
-  `GemmaHeartbeatStreamer` migrated to the same clock. Receipts in
-  `docs/PROD_BUG_LOG.md` (PBUG-20260825-04, deferral 1) and
-  `kibitz-runs/2026-08-25-gguf-deadline/`.
-
-- **THE ORPHAN-OCCUPANCY REGISTRY -- still deferred, now on its third
-  independent confirmation.** `has_local_resident_llm()` reports "nothing
-  resident" the instant a timeout invalidates the cache dict, even while the
-  orphan worker is still actively running CUDA kernels on the model that
-  entry described. `nodes/otr_shot_lock.py:1781` and
-  `nodes/otr_video_render_batch.py:289` both trust that signal before
-  starting visual/video work. The r1 panel (Codex + Cursor + Fable) deferred
-  this unanimously; r3 and r4 each re-raised it and each time it was
-  re-confirmed as correctly out of scope for the cache-bookkeeping fixes.
-  Shape: a process-global, lock-protected registry of in-flight generations,
-  registered before invalidation and cleared via `Future.add_done_callback`,
-  with fail-fast admission on `request_slot` and the visual-entry guards
-  reading real occupancy instead of the dict's cleared-or-not state.
-  **What this session's fixes did and did not buy:** they close the concrete
-  cache-bookkeeping windows (no abandoned publish, no laundered
-  invalidation, no torn read, no unconditional teardown of a foreign live
-  entry); they do NOT make orphan GPU occupancy visible to a downstream
-  visual stage. That remains exactly as exposed as before.
-
-### The 8 GB / profile cluster
+### Detail for question (F): the 8 GB / profile cluster -- four blocks, one underlying decision
 
 - **WAN 8-GB low-VRAM launch contract -- CODE-COMPLETE and PROOF-INCOMPLETE. It is
   not a coding item; the one thing blocking it is an OPERATOR DECISION.**
@@ -949,172 +1060,113 @@ arc BEFORE code, not after.
   wired correctly: `otr_8gb_wan.json` sets BOTH `launch.env.OTR_WAN_TI2V_MAX_FRAMES`
   and `video.max_render_frames`.
 
-### Coverage, canvas and clip-contract
+---
 
-- **The route lock is ONE NODE TOO LATE for the image phase** (found 2026-07-25, node
-  order confirmed against the canonical JSON: `87 VideoDirector -> 88 ImageDirector ->
-  89 MetaBrief -> 90 ShotLock -> 91 ImageGenDispatcher -> 92 VideoRenderBatch`).
-  `resolve_final_shot_engines` runs at node 92, but stills are minted at 91 and image
-  PROMPTS at 89. The landed fix closed the spine-validation gap; the image phase still
-  relies on its own MIRROR (`otr_meta_brief_image_prompt._effective_prompt_engine_for_role`,
-  whose docstring says it "mirrors the image dispatcher's effective-engine seam").
-  **Chunk 1 of the coverage block is the fix.** Note node 89 precedes node 90, so
-  hoisting to ShotLock still does not put MetaBrief downstream of the authority --
-  that needs a VideoDirector-time freeze and is NOT in scope. (This is also the
-  "image-phase still ownership" item from the campaign queue.)
-- **THREE silent coverage mechanisms exist, not one** (found 2026-07-25).
-  Mechanism 1, the engine mirror/ping-pong (`wrapper_bridge.extend_frames_to_target`),
-  is GONE from `eng_ltx_8gb` -- pinned behaviourally by a test that detonates the
-  helper and renders successfully. It REMAINS in `eng_wan_ti2v`, deliberately and
-  permanently: WAN renders a short native clip on purpose and fills the beat with it,
-  which is the shipped 8GB tier contract `PBUG-20260723-02` protects. **Still open:**
-  composite loop-fill (`otr_silent_composite._should_loop_fill`, which also SUPPRESSES
-  its own underrun warning once it activates) and held-last-frame. For `ltx_8gb` the
-  composite path is now de facto unreachable -- the adapter returns exactly the
-  requested count or raises -- but not structurally impossible:
-  `encode_frames_to_silent_mp4` reports the size of the array it piped into ffmpeg
-  rather than re-probing what ffmpeg wrote, so an encode-side drop could still
-  under-report. PRE-EXISTING; close it when the assembly boundary is next opened.
-- **`_should_loop_fill` names the permanent fix and it is now being built**
-  (`otr_silent_composite.py:244-266`): *"The real fix is phrase-chunking (render the
-  beat's correct duration so it never underruns) -- tracked as a follow-up."* The
-  coverage block IS that follow-up.
-- **THE 7d-PREFLIGHT THAT "PROVED THE GPU" RAN AT THE WRONG CANVAS** (found
-  2026-07-27, B5 panel; verified -- and it corrects a claim this file once made).
-  `render_single` and both HTTP entry points use the older ledger-free `build_request`,
-  which never reaches the canvas seam and defaults to `OTR_VIDEO_RENDER_CANVAS`
-  (832x480). So the "GPU IS PROVEN" leg (`ltx_8gb`, 25 frames, 3004 MB) exercised
-  832x480, not the production canvas. `render_single` parity is explicitly deferred by
-  the O1 judgment; what must NOT happen is another "proof" through that harness being
-  read as a production proof. (The 512x288 canvas itself HAS since rendered live --
-  bench arm D, three cells -- but through a DIRECT-NODE graph, which proves the canvas
-  and the recipe, not the seam.)
-- **The ShotLock WRITE-side canvas validation is still owed** (O1 judgment item 1).
-  `otr_shot_lock.py` stamps `video.canonical_canvas` unvalidated from a possibly-empty
-  policy. B5 made this non-load-bearing for the render (the engine declares its own
-  canvas now), so it is no longer urgent -- the drift guard in
-  `tests/test_ltx_8gb_canonical_canvas.py` covers the disagreement that matters. Close
-  it when the general canvas resolver lands.
-- **Odd-canvas evenness is validated at the ENCODER, not where the canvas is chosen.**
-  The stride defect itself is closed (`b1f2ee86`): `ffmpeg_silent_mp4_cmd` declares the
-  REAL width/height and `encode_frames_to_silent_mp4` REFUSES an odd canvas by name,
-  because yuv420p subsamples chroma 2x2 and cannot represent an odd dimension. Still
-  true and NOT fixed: neither `WanInitImageMixin._dims()` nor the `Canvas` schema
-  validates evenness, so an odd canvas is caught late rather than at the choice. No
-  live producer builds one today (832x480, 512x288, 1472x832 are all even).
-- **`CanonicalClip.frame_count` -- "the integer timing authority" -- HALF CLOSED**
-  (`58e288af` + `40780b82`, count closed @ `48e3c6fb` without paying a decode). Every
-  module that writes a clip now ffprobes it, and a roster gate in
-  `tests/test_terminal_frame.py` fails by name for any module that writes a clip
-  without proving it. What this proves and what it does not: it proves the muxer wrote
-  what it was piped, which is the right question for a clip written by ONE ffmpeg
-  pass; it does NOT prove decodability, which is why `assemble_beat_segments` still
-  decode-counts every ASSEMBLED beat and must keep doing so. **Re-verify before
-  acting:** this row's "still self-declared elsewhere" pointers (the four `viz_*` and
-  four `still_*` engines) were both closed afterwards, so the remaining open surface
-  may be empty.
-- **KNOWN LIMIT of the widened roster gate**, recorded so it is not rediscovered as a
-  surprise: the codec flag is matched as a STRING CONSTANT, so a flag assembled at
-  runtime (an f-string, `"-c:%s" % stream`) or the stream-index spelling `-c:0` is
-  invisible to the sweep. Nothing in the tree does that today; an encoder that ever
-  needs to must be pinned in `_ENTRY_POINT_PROOFS` by hand, which the inventory test
-  makes a visible decision. Separately, ONE mutant survives the round by construction:
-  deleting the self-proving membership assertion is catchable only by a meta-test of
-  that assertion.
-- **`ltx_av` underruns long beats** (found 2026-07-25, codex; confirmed). It caps at
-  `_LTX_AV_MAX_FRAMES` (`eng_ltx_av.py:58`, default 497, env-overridable) and clamps
-  at `:950-953`. It is NOT "renders to target natively" as three earlier docs claimed.
-- **Ping-pong on a capped HuMo beat played lip sync BACKWARDS** -- FIXED in code @
-  `a1d810f1`, but the finding is STATIC (no live artifact), so it is NOT a PBUG row. A
-  capped-14B leg would reproduce it. Kept here so the live proof is not forgotten.
-- **`docs/ENGINE_MATRIX.md` reports the DECLARED contract only** (found 2026-07-27).
-  Correct today and consistent with its own stated design (every number read from the
-  live registry). But the moment a profile pins an `ltx_8gb` ceiling, the matrix keeps
-  printing `9-161 step 8` for a tier whose real window is narrower, and the `--check`
-  drift gate cannot notice because it diffs the registry, which the effective contract
-  never touches. Owed at the prequalification step, not before.
+## SECTION 4 -- STANDING RULINGS LIFTED FROM ARCHIVED BLOCKS (2026-08-28)
 
-### Routing, env-capture and the credits card
+Lifted VERBATIM before their blocks moved to the archive. The full
+standing-rulings authority remains `docs/OTR_STANDING_RULINGS.md`.
 
-- **`wants_talking_prompt()` escapes any routing freeze.** It calls
-  `_recipe_config(self._recipe())` and `_recipe()` (`eng_ltx_av.py:402-432`) re-reads
-  `OTR_LTX_AV_RECIPE` / `OTR_LTX_AV_SHARP` / the UNET name on EVERY call by documented
-  design ("Read fresh every call"). So a `required="when_engine_talking"` row evaluated
-  through the hook re-reads the environment after capture. S0b-core needs ONE shared
-  `row_is_active(...)` evaluator over captured state, with the talking result inside
-  `ltx_resolved`.
-- **`provider_side` is a THREE-part rule, not an attribute.** `_is_cloud_video_engine`
-  accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`.
-  `cloud_kling_avatar` has no `provider_side` attribute and is caught by the id prefix
-  alone, so an `engine_facts` builder using a bare `getattr` would classify it local
-  and let the radio-host redirect send a cloud avatar to local LTX. Needs a regression
-  on picked AND forced `cloud_kling_avatar`.
-- **Four env-read sites missing from the S0b inventory:** `eng_ltx_video.py:541-564`
-  (`OTR_ENABLE_LTX_I2V`), `render_driver.py:1176-1203` and
-  `otr_meta_brief_image_prompt.py:297-300` (`OTR_ENABLE_HUMO_HOSTS`), and
-  `eng_ltx_av.py:352-353,403-432` (recipe/UNET re-read outside `assert_usable`).
-- **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At
-  512x288 (the ltx_8gb tier) col1 is 65px past its footer even with every ledger row
-  this policy may drop already dropped; at 640x360 it is 12px over. Both are drawn
-  anyway (a terminal node never destroys a finished episode) and LOGGED at ERROR
-  naming the canvas -- the old behaviour was drawn, clipped by PIL, silent. At 288
-  lines the three-column console is already a polite fiction: col3's scrolling
-  transcript is as unreadable as anything col1 clips. This is a DESIGN job -- a card
-  laid out for a small canvas -- not more ladder heroics.
+* From the archived 2026-08-13 runway table, row 4: **"The multi-GPU
+  learned-upscale stage itself is CLOSED and must not be reopened."** (The
+  narrow `SpandrelEsrgan._resolve_model` hardening survives as Section 1.5.)
+* From the same table, row 1: **"Do NOT restart from the Story Lab."** (The lab
+  is parked, read-only and being retired; the story work happens in
+  production.)
+* **Operator acceptance 2026-08-28: LTX 2.5 vocalizing its prompt is CLOSED --
+  it is not an open investigation.** Do not re-open it from older text. The
+  named-sounds cue table, the joint-AV identity/prose removal, the runtime
+  identity-leak guard and the ASR stem auditor are the shipped answer; receipts
+  in the archive, `docs/PROD_BUG_LOG.md` and `git log` (`d3cca496`..`5cd4dcc8`).
+* From the archived GGUF generation-deadline row (CLOSED 2026-08-25), the
+  reusable lesson the row was kept for: **"A reachability question answered
+  against the default path only is not answered."**
 
-### PARKED -- retire `OTR_ENABLE_LTX_I2V` (operator ruling: "no switches nor
-flags, all video models request and ingest stills")
+---
 
-**SCOPED 2026-08-28, and it is BIGGER than a flag flip -- an architecture
-retirement, not a grep-and-fix.** Investigated while working the backlog
-during the overnight render queue; not started, because starting an
-uncompletable-tonight change on a tight credit budget risks leaving the tree
-half-migrated, which is worse than parking it.
+## SECTION 5 -- PARKED / DEFERRED (out of the working queue)
 
-**What removing the flag actually requires:** deleting the WHOLE text-only
-LTX graph-building path (`eng_ltx_video.py`'s non-conditioned encode branch,
-its `_use_i2v`/`_i2v_enabled` gate, and the parallel gate at
-`render_driver.py:2339`), so `ltx_video` conditions on its scene still
-UNCONDITIONALLY -- missing still becomes a structural failure with no
-`=0` escape, matching the sibling `_require_still` contract in
-`cheap_families` this docstring already points at as a model.
+### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
 
-**The real test cost, file by file (not the flat "19 rewrites" estimate this
-carried before) -- 8 files, ~22 sites, two different repair classes:**
+**Status: PARKED, not rejected.** Operator: *"park it on go forward."* Raised
+after the operator observed we should have far more voices than the writer is
+being offered. He was right, by a wide margin.
 
-* **Pure avoidance shortcuts, safe to just drop the setenv** (the flag was
-  never reaching a code path these tests exercise -- `render_driver`'s gate
-  keys on the exact id `"ltx_video"`, and these test other lanes or prompt
-  composition only): `test_brief_prompt_finishing.py`,
-  `test_look_qa_round5.py`, `test_nonaudio_prompt_policy.py` (the
-  `_text_only_lane` fixture), `test_video_render_driver.py`.
-* **Genuine dual-path assertions that must be REWRITTEN or DELETED, not
-  patched:** `test_video_motion.py` carries a whole dedicated suite proving
-  the toggle itself works -- `test_i2v_opt_out_restores_text_only`, and an
-  assertion that the raised error names `OTR_ENABLE_LTX_I2V=0` as the escape
-  hatch. Once the toggle is gone there is nothing left to assert; these get
-  deleted, and `test_i2v_default_on_with_init` /
-  `test_i2v_flag_on_with_init_engages` likely collapse into one test since
-  "default" and "explicit on" become the same state.
-  `test_still_spine_helpers.py:975-986` asserts scene_still WITH the flag and
-  a **portrait fallback** WITHOUT it -- that fallback path ceases to exist and
-  the second half of the test goes with it.
-  `test_still_plan_parity.py`'s `_ENV_KEYS`/scenario matrix carries an
-  `("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"})` row that must be removed, not
-  adapted -- there is no more "off" state to parametrize over.
-  `test_video_motion_forward.py` has three sampler/encode-mechanics tests
-  that deliberately select the text-only path to isolate mechanics from the
-  i2v decision; each needs a real init-image fixture added so they exercise
-  the (now-mandatory) conditioned path instead, or an explicit decision that
-  those mechanics no longer have an unconditioned case to test.
+#### The finding, measured live
 
-**Do this as ONE session with room to finish it**, not squeezed into the tail
-of another. Read `eng_ltx_video.py`'s full `_node_candidates_i2v` and its
-non-i2v sibling before touching anything -- the graph-branch shape has not
-yet been read end to end, only the gate functions have. This is a "one
-verifiable right answer" item per the review-routing test (the operator
-already ruled the design; what remains is execution), so it does not need a
-kibitz arc -- one clean finished-diff review plus the full suite is the gate.
+| pool | count | what it serves |
+|------|-------|----------------|
+| Bark `VOICE_PROFILES` (`config/cast_pools.py`) | **10** (6M/4F) | what the writer's casting menu offers |
+| Kokoro presets on disk | 4 | ANNOUNCER only, a separate namespace |
+| **Voice reference bank** (`config/voice_reference_bank.json`) | **204 declared, 153 resolvable on disk** (97M/106F/1N) | IndexTTS2 / Dia / Chatterbox cloning |
+
+`_otr_voice_bank.default_char_engine()` returns **`indextts2`**, promoted to the
+shipped character-voice default on 2026-06-04. It is a zero-shot CLONING engine:
+`requires_voice_ref = True`, `voice_ref_kind = "wav_path"`. Every reference clip
+is a distinct voice.
+
+So the writer casts from **10 Bark presets** while the engine that actually
+speaks the characters draws from a **153-voice reference bank**.
+`_otr_casting.py` states it outright -- *"Open-character voices are always drawn
+from the Bark pool (VOICE_PROFILES in config/cast_pools.py), so the tts_model is
+Bark by construction"* -- and `_assert_unique_bark_voices` enforces uniqueness
+across those 10.
+
+#### Why this is parked rather than done
+
+`MAX_SPEAKING_CAST = 10` was set from the Bark pool and is therefore a Bark
+artifact, not a real ceiling. But raising the constant alone achieves NOTHING:
+`_deal_voice_menu` builds the menu from `VOICE_PROFILES` and refuses with
+*"voice stock capacity 10 < cast size N"*. The actual work is pointing the
+casting menu at the reference bank when the character engine is a cloning
+engine.
+
+**That is why it is parked and not done unilaterally.** It changes what
+`voice_preset` and `tts_model` MEAN on every cast row, and cast rows are ledger
+JOIN KEYS -- `cast[].name` / `char_id` / `voice_preset` / `voice_ref_id` /
+`voice_engine`, joined from `lines[].speaker` and `beats[].char_id`. Under the
+operator's hard rule (*the writer must OBEY the ledger for downstream content; a
+hole in the ledger is a broken render*), a change of that shape needs every
+field's owner enumerated BEFORE the call is moved, not after.
+
+#### What the work is, when it is taken up
+
+1. Enumerate every consumer of a cast row's voice fields -- casting, TTS
+   dispatch, per-beat audio slicing, credits, portraits, captions, `obs_publish`
+   -- and name the new owner of each field. Exactly one owner each.
+2. Make the casting menu engine-aware: Bark presets when the character engine is
+   Bark, reference-bank entries when it is a cloning engine. Gender and
+   `commercial_clean` already exist on bank rows.
+3. Replace `_assert_unique_bark_voices` with an engine-agnostic
+   one-voice-per-character invariant. The rule itself is right and must survive:
+   two characters sharing a voice is a correctness defect.
+4. Derive `MAX_SPEAKING_CAST` from the ACTIVE engine's pool instead of a
+   constant. `tests/test_cast_size_is_a_request.py` already asserts the constant
+   matches the live stock, so it will report the drift rather than hide it.
+5. Prove on `scifi_news_pro` (the only bank on the fable2 writer) with a cast
+   larger than 10 and complete speaker-to-`char_id` equality in the ledger.
+
+Related and already shipped: `num_characters` is now a REQUEST rather than a cap
+(operator directive, all banks) -- see `tests/test_cast_size_is_a_request.py`.
+
+### The Shakespeare verbatim executor -- do NOT start it in a single session
+
+**Do NOT start the Shakespeare verbatim executor in this session.** It is a
+multi-session structural change gated on the ownership table
+(`docs/2026-08-03-fidelity-pass-ownership.md`) with four overwrite paths to close
+first, and starting it half-way is worse than not starting it.
+
+### Carried administrative rows
+
+- **PBUG-20260710-07** -- root fix shipped; stays ROOT-OPEN in the log until ratified
+  at the next operator fan-out (green codex leg `c1f3891f` is the retire candidate).
+  (Cleared by Section 3, question H.)
+- **Phase-2 de-naming** (module filenames, `meta[]` ledger keys, wire-schema `.v4`
+  literals) -- DEFERRED, operator-flagged, from the keep-6 rename.
+
+---
+
+## SECTION 6 -- STANDING TRAPS AND RECORDED LIMITS (carried knowledge; no scheduled work)
 
 ### Test-harness and tooling
 
@@ -1150,103 +1202,22 @@ kibitz arc -- one clean finished-diff review plus the full suite is the gate.
   ratio; the reasoning is recorded in `coverage_plan.partition_beat` so the next reader
   does not re-derive the bound and re-ship the regression.
 
-### PARKED -- unverified at HEAD, re-observe on the next real render legs
-(The 2026-07-24 "after SFX" checkpoint is VOID -- SFX is parked. The re-observe
-now rides whatever real render legs come next, D2 included.)
-
-Both were eyeball observations against a story engine that has since had its LLM
-vetoes ripped, THE LAW imposed, six banks renamed onto new packs, word-fit ceilings
-retired, the repair-first plan landed, and a ledger cleanup pass added. Neither has a
-reproduction at current HEAD, and under the standing rule a finding with no
-reproduction is not a row. **Do NOT schedule coder time against either.** They are
-settled by the operator eyeballing a real render leg after SFX: still there -> re-admit
-as a FRESH dated row with that leg as evidence; gone -> the LAW-era work already fixed
-it, tombstone it.
-
-- **Announcer framing defect** (`docs/2026-07-11-announcer-framing-defect.md`).
-  Episodes START a story instead of admitting you into one; the announcer takes debate
-  turns instead of framing. Operator eyeball 2026-07-11. If it survives re-observation
-  the fix is still seam + score contract + fail-closed validator, never Python
-  authorship.
-- **Name-splice defect #2.** v4-campaign Phase 0 record in HANDOFF_LOG; its timebox
-  predates THE LAW.
-
-### Carried administrative rows
-
-- **PBUG-20260710-07** -- root fix shipped; stays ROOT-OPEN in the log until ratified
-  at the next operator fan-out (green codex leg `c1f3891f` is the retire candidate).
-- **Phase-2 de-naming** (module filenames, `meta[]` ledger keys, wire-schema `.v4`
-  literals) -- DEFERRED, operator-flagged, from the keep-6 rename.
+---
 
 ## Bug Bible promotion field -- pending actions only
 
 | Record | Pending action |
 |---|---|
 | `PBUG-20260712-22/23/24/25` | Live reverify -- blocked by the `scifi_news` P0 convergence defect, then fan-out |
-| `PBUG-20260712-18/19/26` + `PBUG-20260713-15..18` + `-20` | Awaiting the next operator Bible fan-out (overlap check + approval) |
+| `PBUG-20260712-18/19/26` + `PBUG-20260713-15..18` + `-20` | Awaiting the next operator Bible fan-out (overlap check + approval; Section 3, question H) |
 | `PBUG-20260713-19` | Live requalification pending (promoted BUG-05.11) |
 | duplicate-id cleanup | Same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
 | historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
-| ~~`PBUG-20260823-01` (preflight gate vocabulary collision)~~ | **DONE 2026-08-28.** Promoted as Bible `12.139`, survival-guide `7121254`, count 317 -> 318 (README bumped in all THREE places it appears -- a third hyphenated "317-entry" occurrence was missed on the first pass and caught by the regression suite's own count check before commit, not after). Coverage-index row added. Regression suite 22 passed / 26 skipped / 3 xfailed. No overlap found against `12.79` (VCS-diff narrowness) or the sys.modules stub-ownership entry -- genuine gap. |
-| ~~`PBUG-20260823-02` (watcher timeout worded as render death)~~ | **DONE 2026-08-28.** Promoted as Bible `12.140`, survival-guide `67ad867`, count 318 -> 319 (all three README places). Coverage-index row added. Regression suite 22 passed / 26 skipped / 3 xfailed. Zero overlap hits in either file -- clean gap. |
 | **Seedance softener mangles authored prompts (2026-08-17)** | **CANDIDATE, not admissible yet.** A blind regex pass over authored text produced "Dial slowly sweeps wildly" and inverted "vibrates aggressively" -> "vibrates subtly" on the DEFAULT pack's most energetic beat. Provable statically and now fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever runs and produces the artifact. Nearest existing coverage is `12.108`'s `self-veto-resolution` / `phrase-not-word-matching` tags, which do NOT cover blind-regex rewriting of authored text |
 
-**PROMOTED 2026-08-25 (evening): Bible `12.134`, survival-guide `6633ef6`, count
-312 -> 313** (README bumped in all three places, coverage-index row added, Bible
-regression re-run green 22/26/3). Source: **PBUG-20260825-04**, the
-BUG-LOCAL-098 tripwire firing loud on a 4060 load that had in fact succeeded --
-admissible because it surfaced as a real production traceback, promotable
-because the fix is verified and its coverage is automatable
-(`tests/test_bug098_orphan_race.py`). The reusable half is deliberately NOT
-"the threshold was wrong": the guard sampled `torch.cuda.memory_allocated()`,
-a PROCESS-WIDE counter, and reported the delta as one model's footprint, so an
-abandoned worker freeing tensors concurrently drove it negative. *A diagnostic
-that gates on a shared, process-wide quantity cannot make a claim about one
-component of that process* -- and the tell is that the check LOOKS
-model-scoped because it brackets one model's load. Checked against
-`otr_coverage_index.yaml` and the Bible first: `12.46` covers the orphan
-thread PINNING VRAM, which is the adjacent-but-different half, so this is a
-genuine gap rather than a second entry for a covered class.
-**Also fixed in the same commit:** `otr_coverage_index.yaml` had a
-pre-existing unquoted `Root cause: ` colon-space on one record, so the index
--- whose entire purpose is to be machine-readable so the 4M-token scrape is
-never repaid -- did not parse at all. Quoted; it now loads (429 records) and
-its header metadata is re-synced to the Bible HEAD.
-
-**PROMOTED 2026-08-18 (evening): Bible `12.114`, survival-guide `b9aada7e`, count
-292 -> 293** (README bumped in all three places, coverage-index row added, Bible
-regression re-run green 20/26/3). Source: **PBUG-20260817-08**, the Lemmy cameo
-voice -- admissible because it surfaced on two live published episodes, and
-promotable now only because the fix is verified. The entry carries TWO reusable
-halves: *a reservation that exists as a convention in one subsystem is invisible
-to another subsystem enumerating the same catalogue*, and the diagnostic trap
-that cost more time than the bug -- ***a post-fix sighting is not proof the fix
-failed; check process age first.*** Its verify section also pins *sweep the
-SELECTOR, not the helper* and *count a corpus by ROLE before concluding anything
-about pool concentration*.
-
-**NOTHING ELSE WAS PROMOTED 2026-08-18, deliberately, and
-the reasoning is worth keeping.** The evidence-guards work EXECUTED an existing entry's verify
-steps rather than discovering a new class: `12.111` verify step 3 is what turned
-up G1's partial guard, and `12.111`'s own `cause` section already describes that
-failure verbatim -- *"Refusing only when a specific file (`MANIFEST.json`) exists
-leaves every sibling artifact unprotected ... the separate `_KEY` directory"*. An
-entry that predicts the defect you then find does not need a second entry.
-The window's other finding -- `engine_impl_version` structurally unfillable
-because no adapter defines `impl_version` -- is **static-audit only**, so the
-admission rule bars it regardless of how real it is. And nothing had actually
-rotted: all eleven cited artifacts re-hashed clean, so there is no live artifact
-to admit. **Preventive work with no live failure produces no Bible row.**
-
-**NOTHING WAS PROMOTED 2026-08-17 (item B window), deliberately.** The window's
-findings are all static-audit -- the positive-prose ban, the seven-call-site
-video negative, the B6 gate gap, the traceroute's coverage blind spot -- and the
-admission rule reserves the Bible for defects verified by a live artifact.
-`PBUG-20260817-01` was re-proved on pixels here but is ALREADY covered by Bible
-`12.108`, whose tag list literally includes `prompt-audit-cannot-see-pixels`.
-Bible stays **287**, README stays 287 in all three places; the Three-File
-Contract is intact.
+(The 12.139 / 12.140 promotions completed 2026-08-28 and the 2026-08-25 /
+2026-08-18 / 2026-08-17 promotion receipts are in the archive.)
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval queue is
 `docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented fixture creates a row.
@@ -1305,68 +1276,13 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 - Lean-mean has one current ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.
   The retired FRONT/TAIL and SW-1 execution model must not be revived.
 
-## PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+## After this queue
 
-**Status: PARKED, not rejected.** Operator: *"park it on go forward."* Raised
-after the operator observed we should have far more voices than the writer is
-being offered. He was right, by a wide margin.
+One coder window at a time; every chunk = focused tests + full suite + Bug Bible
++ commit AND push + `HEAD == origin/v2.0-alpha`.
 
-### The finding, measured live
-
-| pool | count | what it serves |
-|------|-------|----------------|
-| Bark `VOICE_PROFILES` (`config/cast_pools.py`) | **10** (6M/4F) | what the writer's casting menu offers |
-| Kokoro presets on disk | 4 | ANNOUNCER only, a separate namespace |
-| **Voice reference bank** (`config/voice_reference_bank.json`) | **204 declared, 153 resolvable on disk** (97M/106F/1N) | IndexTTS2 / Dia / Chatterbox cloning |
-
-`_otr_voice_bank.default_char_engine()` returns **`indextts2`**, promoted to the
-shipped character-voice default on 2026-06-04. It is a zero-shot CLONING engine:
-`requires_voice_ref = True`, `voice_ref_kind = "wav_path"`. Every reference clip
-is a distinct voice.
-
-So the writer casts from **10 Bark presets** while the engine that actually
-speaks the characters draws from a **153-voice reference bank**.
-`_otr_casting.py` states it outright -- *"Open-character voices are always drawn
-from the Bark pool (VOICE_PROFILES in config/cast_pools.py), so the tts_model is
-Bark by construction"* -- and `_assert_unique_bark_voices` enforces uniqueness
-across those 10.
-
-### Why this is parked rather than done
-
-`MAX_SPEAKING_CAST = 10` was set from the Bark pool and is therefore a Bark
-artifact, not a real ceiling. But raising the constant alone achieves NOTHING:
-`_deal_voice_menu` builds the menu from `VOICE_PROFILES` and refuses with
-*"voice stock capacity 10 < cast size N"*. The actual work is pointing the
-casting menu at the reference bank when the character engine is a cloning
-engine.
-
-**That is why it is parked and not done unilaterally.** It changes what
-`voice_preset` and `tts_model` MEAN on every cast row, and cast rows are ledger
-JOIN KEYS -- `cast[].name` / `char_id` / `voice_preset` / `voice_ref_id` /
-`voice_engine`, joined from `lines[].speaker` and `beats[].char_id`. Under the
-operator's hard rule (*the writer must OBEY the ledger for downstream content; a
-hole in the ledger is a broken render*), a change of that shape needs every
-field's owner enumerated BEFORE the call is moved, not after.
-
-### What the work is, when it is taken up
-
-1. Enumerate every consumer of a cast row's voice fields -- casting, TTS
-   dispatch, per-beat audio slicing, credits, portraits, captions, `obs_publish`
-   -- and name the new owner of each field. Exactly one owner each.
-2. Make the casting menu engine-aware: Bark presets when the character engine is
-   Bark, reference-bank entries when it is a cloning engine. Gender and
-   `commercial_clean` already exist on bank rows.
-3. Replace `_assert_unique_bark_voices` with an engine-agnostic
-   one-voice-per-character invariant. The rule itself is right and must survive:
-   two characters sharing a voice is a correctness defect.
-4. Derive `MAX_SPEAKING_CAST` from the ACTIVE engine's pool instead of a
-   constant. `tests/test_cast_size_is_a_request.py` already asserts the constant
-   matches the live stock, so it will report the drift rather than hide it.
-5. Prove on `scifi_news_pro` (the only bank on the fable2 writer) with a cast
-   larger than 10 and complete speaker-to-`char_id` equality in the ledger.
-
-Related and already shipped: `num_characters` is now a REQUEST rather than a cap
-(operator directive, all banks) -- see `tests/test_cast_size_is_a_request.py`.
-
----
-
+When the sections above are exhausted, continue with `ROADMAP.md`: lean-mean ->
+RunPod/AMD/Mac -> install -> product docs/v2 release. That is a pointer, not
+work that precedes lean-mean. Lean-mean is not an item in this queue:
+`docs/LEAN_MEAN_CLEANUP.md` is its sole current scope, blast-radius,
+coding-order, and verification authority.
