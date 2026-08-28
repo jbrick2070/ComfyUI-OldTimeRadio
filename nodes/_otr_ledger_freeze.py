@@ -738,7 +738,7 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
             ledger_data, report.errors, report.warnings,
         )
         _check_g15_scene_coherence(
-            ledger_data, report.errors, report.warnings,
+            ledger_data, report.errors, report.warnings, report.info,
         )
     return report
 
@@ -813,17 +813,58 @@ def _check_g15_scene_coherence(
     ledger_data: dict,
     errors: List[str],
     warnings: List[str],
+    info: dict,
 ) -> None:
     """G15: the scene records (header) and the lines assigned to scenes (body)
-    must be structurally consistent."""
+    must be structurally consistent.
+
+    ``info`` carries ``{scene_coherence_required, scene_coherence_checked,
+    scene_coherence_verdict, scene_coherence_issues}`` per
+    ``docs/GO_FORWARD_PLAN.md``'s "Split request from verdict" instruction --
+    always written when the gate is armed, so a reader auditing a REQUIRED
+    ledger's report can see the request even on a clean run.
+    """
     meta = ledger_data.get("meta")
-    if not isinstance(meta, dict) or not meta.get("scene_coherence_check"):
+    required = isinstance(meta, dict) and bool(meta.get("scene_coherence_check"))
+    if not required:
         return  # opt-in only; inert for every current bank
     try:
         from ._otr_scene_guard import find_scene_coherence_issues
     except ImportError:  # pragma: no cover -- flat test/standalone load
         from _otr_scene_guard import find_scene_coherence_issues  # type: ignore
-    issues = find_scene_coherence_issues(ledger_data)
+    issues, checked = find_scene_coherence_issues(ledger_data)
+    info["scene_coherence_required"] = True
+    info["scene_coherence_checked"] = checked
+    info["scene_coherence_issues"] = list(issues)
+
+    # VACUITY, NOT "no scenes at all" (kibitz r2 MUST-FIX 4). Scenes may be
+    # legitimately absent -- that has always been a clean skip, unrelated to
+    # this fix. The defect this whole change exists to catch is an ARMED gate
+    # that examined zero REAL linkages despite scenes being declared: 55
+    # published ledgers carried real scene_id data on their beats and this
+    # check passed every one of them, because it read a field no writer ever
+    # populated. Checking `scenes_declared` here, off the ledger directly,
+    # is what tells the two states apart.
+    scenes_declared = bool(ledger_data.get("scenes"))
+    vacuous = scenes_declared and checked == 0
+
+    if vacuous:
+        info["scene_coherence_verdict"] = "vacuous"
+        errors.append(
+            "G15: scene_coherence_check is armed and scenes are declared, "
+            "but ZERO non-music lines resolved through beat_id to a beat "
+            "carrying scene_id -- the gate cannot vouch for coherence it "
+            "never looked at."
+        )
+    elif issues:
+        info["scene_coherence_verdict"] = "issues"
+    else:
+        info["scene_coherence_verdict"] = "clean"
+
+    # Report any issues found (duplicate scene_id, or a resolved line
+    # pointing at an undeclared scene) REGARDLESS of the vacuity verdict --
+    # a vacuity failure must never suppress a structural defect the same
+    # pass already found (kibitz r2 MUST-FIX 5).
     if issues:
         sample = issues[:5]
         more = "" if len(issues) <= 5 else f" (+{len(issues) - 5} more)"
