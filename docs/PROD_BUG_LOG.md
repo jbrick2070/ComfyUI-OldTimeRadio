@@ -7432,6 +7432,52 @@ to re-id and update its references in the same change.
   `joint_av_identity_leak` and logs LOUD for every path not yet imagined.
 - verify: the guard replayed over every joint-AV beat ever rendered flags
   **13/13 as they shipped and 0/13 as they compose today**.
+- **THE STEM AUDIT, 2026-08-28 -- and it REFRAMES this entry. The defect is
+  not identity text; it is ANY distinctive text.** `scripts/otr_audit_joint_av_stems.py`
+  transcribes the raw per-beat model output (CPU whisper-tiny.en). The stem is
+  the only honest surface: on the foley lane the final mix keeps the master at
+  0.80, so real TTS is present and confounds any listening test. Four episodes,
+  and the progression is unambiguous:
+
+  | episode | rendered | stems with words | WHAT it says |
+  |---|---|---|---|
+  | `..._the_mysterious_prints_secret_...` | 08-26 21:54 | 45/52 | **the actual script dialogue**, 7 lines near-verbatim |
+  | `..._ink_and_martyrdom_...` | 08-27 07:16 | 4/49 | junk only ("Huh? Huh?") -- effectively clean |
+  | `..._a_name_stripped_bare_...` | 08-27 19:51 | 11/28 | **the FORMATTER'S OWN INSTRUCTION TEXT** |
+  | `..._the_weaver_of_dreams_...` (mime) | 08-28 00:34 | 13/14 | **identity AND instruction text** |
+
+- **The dialogue half was ALREADY FIXED, and this is the first hard evidence
+  that fix was real.** The 08-26 episode spoke seven near-verbatim script
+  lines; `e923a9f3` ("Silent lanes stop mouthing the dialogue they cannot
+  speak", PBUG-20260827-01) landed 08-27 00:08, **2h14m later**. Verified
+  against the live driver: dialogue reaches only `humo` today, never
+  `ltx25_foley_plus` or `ltx25_mime`. Ruled out the cheap explanation first --
+  correlation of those stems against our TTS master is **0.011-0.025**, so
+  they are NOT our audio in the wrong file; the model generated that speech.
+
+- **WHAT IT SAYS NOW IS OUR OWN PROMPT, VERBATIM.** From
+  `a_name_stripped_bare`: *"So every movement has a visible source"* -- that
+  is `compose_ltx25_foley_plus`'s own clause, *"working the objects within
+  reach so every movement has a visible source"*. Also *"full face, clearly
+  visible, generous"* (`_LTX25_FRAMING`) and *"RestryScream Monarch"*
+  (a garbling of LEAR's *"weary monarch"*). From the mime episode: *"the
+  gesture played out fully and carried to a clear held end point"* --
+  `compose_ltx25_mime`'s own clause.
+
+- **AND THAT MEANS THE DISPATCH SEAM PUT IT THERE.** `ink_and_martyrdom`
+  (08-27 07:16) is nearly clean at 4/49; `a_name_stripped_bare` (08-27 19:51)
+  is full of formatter text. Between them the per-lane dispatch seam
+  (`24f85f95`, `34253841`) started actually delivering each lane's own
+  composed wording to the engine. The prompts got better and the model started
+  reading them aloud. **This is a cost of that work, and it is recorded here
+  rather than discovered again later.**
+
+- **CONSEQUENCE FOR THE FIX ALREADY IN THIS ENTRY:** dropping `appearance` is
+  necessary and insufficient. It removes "Queen of the Fairies" and "weary
+  monarch"; it does nothing about "so every movement has a visible source",
+  because that is an INSTRUCTION, not an identity. `No speech, no voices.` was
+  present in every one of these prompts.
+
 - **WHICH LEG PROVES WHAT, recorded so a later reader does not misread the
   first one.** The overnight foley leg running when this fix landed started
   **05:58:05**; `eng_ltx25.py` was modified **06:12:24**. Python imports at
