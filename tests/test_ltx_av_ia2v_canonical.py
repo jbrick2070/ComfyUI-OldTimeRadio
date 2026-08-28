@@ -287,7 +287,7 @@ def _music_open_shot():
 
 
 def _char_face_shot():
-    m4 = ("face visible, speaking to camera, 40s, Lead Astronomer. Face: "
+    shared_video_prompting_engine = ("face visible, speaking to camera, 40s, Lead Astronomer. Face: "
           "Oval, hooded eyes, aquiline nose, thin lips. Hair: short grey. "
           "Wearing a rumpled observatory jumper over a checked shirt, "
           + "x" * 700)
@@ -295,7 +295,7 @@ def _char_face_shot():
             "engine_id": "ltx_audio_in", "role": "character_video",
             "family": "audio_conditioned_video", "target_frame_count": 25,
             "source_line_ids": ["b002"], "char_id": "c01",
-            "creative": {"text_prompt": m4, "source": "m4"}}
+            "creative": {"text_prompt": shared_video_prompting_engine, "source": "shared_video_prompting_engine"}}
 
 
 def test_announcer_bookend_gets_talking_register(ia2v_env, tmp_path,
@@ -375,7 +375,7 @@ def test_announcer_with_m4_still_gets_talking_register(ia2v_env, tmp_path,
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     shot = _announcer_open_shot()
     shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
-                                       "on the window", "source": "m4"}
+                                       "on the window", "source": "shared_video_prompting_engine"}
     req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
     assert "lips opening and closing" in req["text_prompt"]
     assert "large expressive grille-mouth" in req["text_prompt"]
@@ -396,7 +396,7 @@ def test_announcer_with_m4_keeps_m4_on_single_pass_recipe(tmp_path,
 
     shot = _announcer_open_shot()
     shot["creative"] = {"text_prompt": "a moody radio studio scene, rain "
-                                       "on the window", "source": "m4"}
+                                       "on the window", "source": "shared_video_prompting_engine"}
     req = rd.build_request_from_shot(shot, _ltx_ledger(tmp_path))
     assert "rain on the window" in req["text_prompt"]
     assert "lips opening and closing" not in req["text_prompt"]

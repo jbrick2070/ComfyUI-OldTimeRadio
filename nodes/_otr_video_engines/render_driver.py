@@ -537,7 +537,7 @@ def _slice_master_audio(master_path, start_s, dur_s, master_hash="",
 
 # --------------------------------------------------------------------------- #
 # Per-shot request builder (the REAL episode path). Resolves the character
-# portrait + the per-beat voice audio + the M4 creative prompt from the
+# portrait + the per-beat voice audio + the shared visual prompt from the
 # ShotLock-planned ledger, keyed to ONE shot. Additive: the soak/global-assets
 # path (build_request) is untouched. Pure (reads the ledger, never writes; the
 # frozen audio section is only ever read) and CPU-tested.
@@ -1549,7 +1549,7 @@ def _beat_clauses(line, shot_id):
 
 def _stamp_prompt_meta(req, source, prompt, *, subsource="", beat=""):
     """Stamp prompt observability onto the request's ``observability`` dict
-    (round 5 F2): source enum (m4|env|brief+beat), sha8, char count --
+    (round 5 F2): source enum (shared_video_prompting_engine|engine:<id>|env|brief+beat), sha8, char count --
     ``run_episode`` copies them onto the trace rows (durable in the node-92
     /history report) and one INFO line makes operator log review mechanical.
     The W7-pre builder migration moved these off the top level: VideoRequest
@@ -2712,7 +2712,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # grows weight; memoize the bool here and reuse it below).
     _talking_register = _ia2v_talking_register_active(shot.get("engine_id"))
     # ia2v TALKING register, radio-bookend precedence: an explicitly audio-driven
-    # announcer or music bookend that happens to carry an M4 creative prompt would
+    # announcer or music bookend that happens to carry an shared visual prompt would
     # otherwise take the M4 branch below and the talking swap in the motion
     # branch would never fire. Under the two-stage lip-sync recipe the
     # talking register OUTRANKS M4 on radio bookends -- clearing the text here
@@ -2744,7 +2744,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # never authored.
     _prompt_char_budget = None
     _prompt_protected_clause = None
-    # THE GHOST SIGNAL BRANCH (2026-08-22), and it runs BEFORE the M4 wall.
+    # THE GHOST SIGNAL BRANCH (2026-08-22), and it runs BEFORE the shared visual prompt.
     #
     # CAPABILITY, NEVER AN ENGINE NAME. The branch fires on the engine's declared
     # `prompt_profile`, resolved without assuming every id on a shot is
@@ -2971,7 +2971,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     #
     # THE RULE: one path per lane, always active. No flag, no shadow state, no
     # legacy route. A lane that declares its OWN ``compose_prompt`` composes
-    # here, and the ENTIRE legacy chain below -- the M4 wall, the ia2v talking
+    # here, and the ENTIRE legacy chain below -- the shared visual prompt, the ia2v talking
     # rewrite, the env override, the motion-role branch, the brief+beat branch
     # and both fallbacks -- is skipped for it. Review flagged that omitting this
     # bypass would let a legacy branch silently overwrite the lane's output,
@@ -3096,7 +3096,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # talking clause, hard-cap at the proven 240-char budget. Every
         # other engine (HuMo, wan, ltx_video) keeps the full M4 verbatim.
         if _is_char_face_beat and _talking_register:
-            # fragment = the M4's first sentence; else last full CLAUSE under
+            # fragment = the shared prompt's first sentence; else last full CLAUSE under
             # the remaining budget (kibitz r2: comma-heavy identity openings
             # have no period -- never hard-cut mid-word). Non-default visual
             # packs get a two-word cue first; the fragment shrinks so the
@@ -3128,7 +3128,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _prompt_protected_clause = _IA2V_TALKING_CLAUSE_CHARACTER
             _LOG.warning(
                 "[OTR.render_driver] IA2V TALKING register: character beat "
-                "%s M4 wall -> compact talking prompt (%d chars, style_cue=%r)",
+                "%s shared visual prompt -> compact talking prompt (%d chars, style_cue=%r)",
                 _beat_id_for_shot(shot), len(text_prompt), _style_cue)
         elif (str(shot.get("engine_id") or "").startswith("ltx")
                 and _shot_role not in ("announcer_visual", "music_visual")):
@@ -3160,12 +3160,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if _prompt_char_budget is not None:
             _prompt_char_budget += len(text_prompt) - _pre_cue_chars
         req["text_prompt"] = text_prompt
-        _stamp_prompt_meta(req, "m4", text_prompt,
+        # "shared_video_prompting_engine", not the old undefined "m4": this is the prompt
+        # ShotLock composes and EVERY lane shares unless it declares its own
+        # compose_prompt. Reads against "engine:<id>" in the same log.
+        _stamp_prompt_meta(req, "shared_video_prompting_engine", text_prompt,
                            subsource=str(creative.get("source") or ""),
                            beat=_beat_id_for_shot(shot))
     elif not _ghost_composed and (_is_char_face_beat
                                  or _fam == "audio_driven_face"):
-        # HuMo-seam ticket Part C: a FACE beat with NO M4 creative prompt is
+        # HuMo-seam ticket Part C: a FACE beat with NO shared visual prompt is
         # the proven microphone re-introduction path -- the build_request
         # generic studio default is inappropriate for a character beat. Use a
         # world-neutral deterministic fallback; the announcer keeps the radio
@@ -3203,7 +3206,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # varied opens -- finished with the brief's era tail under the LTX char
     # budget. Covers ALL roles (announcer/music opens AND character),
     # killing the generic "a 1940s radio studio"
-    # default for text engines. Precedence: M4 creative prompt (finished at
+    # default for text engines. Precedence: shared visual prompt (finished at
     # ShotLock) > OTR_LTX_RADIO_PROMPT (operator override, VERBATIM, no
     # finishing) > brief-composed + finished. (_shot_role parsed above, once.)
     # RESOLVED ONCE, HERE, FOR EVERY MEMBERSHIP TEST BELOW (2026-08-27). All

@@ -322,7 +322,7 @@ class TestPerBeatScenePrompts:
                   creative={"text_prompt": "a writer prompt", "source": "llm"})
         req = _rd.build_request_from_shot(s, led)
         assert req["text_prompt"] == "a writer prompt"
-        assert req["observability"]["prompt_source"] == "m4"
+        assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
         assert req["observability"]["prompt_subsource"] == "llm"
 
 

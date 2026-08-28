@@ -337,7 +337,7 @@ class TestRecursiveFractalExplicitStyleCue:
                 "target_frame_count": 25, "source_line_ids": ["b002"],
                 "char_id": "c01",
                 "creative": {"text_prompt": "face visible, speaking to camera",
-                             "source": "m4"}}
+                             "source": "shared_video_prompting_engine"}}
         led = {"meta": _meta_for("recur_frac"),
                "video": {"video_revision": 1, "shots": []},
                "lines": [{"line_id": "b002", "char_id": "c01",
@@ -350,7 +350,7 @@ class TestRecursiveFractalExplicitStyleCue:
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
             "recursive fractal light field. face visible")
-        assert req["observability"]["prompt_source"] == "m4"
+        assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
         assert req["observability"]["visual_style"] == "recur_frac"
 
     def test_recursive_fractal_style_cue_hits_character_fallback_prompt(

@@ -612,6 +612,71 @@ class MotionEngineBase:
     ``prepare`` and the V-4 patcher-detach ``teardown`` (NEVER
     ``unload_all_models``), so every motion adapter serialises behind one lease
     and tears down without the global unload. ``__init__`` is cheap (no weights).
+
+    YOUR LANE'S PROMPT -- READ THIS WHEN YOU ADD AN ENGINE
+    ------------------------------------------------------
+    **You get a working prompt for free, and that is deliberate.** A new engine
+    that declares nothing receives the shared M4 prompt that ShotLock composes
+    per character beat -- appearance, setting, expression, motion, camera,
+    finished and style-tailed. That default is the CHEAP WAY TO BRING A LANE UP:
+    register the adapter, render a beat, and you have a picture before you have
+    written a single word of prompt.
+
+    **When the generic prompt is not what your model wants, declare your own:**
+
+    .. code-block:: python
+
+        def compose_prompt(self, inputs: dict) -> str:
+            ...
+
+    Bind it and the ENTIRE shared composer chain is skipped for your lane --
+    permanently, on every render, with no flag to forget to set. That is the
+    whole point: the per-lane motion prompts written in 65538f41 sat unreachable
+    behind an ``or`` for weeks because there was no way for a lane to claim its
+    own voice, and a live H3 leg proved every beat was still rendering the
+    generic wall.
+
+    **IT MUST BE ON YOUR OWN CLASS.** Dispatch reads
+    ``type(engine).__dict__.get("compose_prompt")``, never ``hasattr``. An
+    INHERITED formatter is invisible to it, on purpose: these adapters are
+    subclass chains (mime <- foley_plus <- video; h3 silent and h3 audio-in
+    share a base; fastwan subclasses wan), and inheriting a sibling's prompt is
+    how one lane silently gets another lane's motion. If a variant genuinely
+    wants the same words, bind the same function to it explicitly -- sameness
+    should be a visible choice, never a default.
+
+    ``inputs`` keys, every one a ``str`` and never ``None``:
+
+    ==================  ====================================================
+    ``appearance``      the character's look, resolved from the ledger
+    ``setting``         the episode's setting
+    ``expression``      } the authored per-beat leaves that also feed
+    ``motion``          } the shared prompt -- this is what you shape
+    ``camera``          }
+    ``text_prompt``     the shared M4 prompt, available but not automatic
+    ``dialogue``        the spoken line, or ``""`` -- see below
+    ``role``            always ``character_video`` when you are called
+    ``beat_id``         for logs and error messages
+    ==================  ====================================================
+
+    Three rules that are not style preferences:
+
+    * **``dialogue`` is empty unless your lane preserves it.** The call site
+      consults ``_lane_preserves_dialogue``, so a silent lane is handed ``""``
+      and CANNOT leak a spoken line. Do not reach around this.
+    * **Return the finished visual prompt, non-empty.** Style cue, joint-AV
+      tail, cloud safety and the banana cap all still run after you, each
+      exactly once. If your lane has an audio tail (foley/mime), its owner is
+      ``finish_joint_av_positive`` -- do not write one yourself; its idempotency
+      is exact suffix matching, so your own sound wording would not match and
+      you would end up with two different audio clauses.
+    * **Handle a row with no leaves.** An older ledger may carry only
+      ``text_prompt``; return it unchanged in that case. One rule, no branches.
+
+    You are only called for ``character_video``. Announcer and music beats carry
+    no authored leaves at all, so they keep the shared radio motion registers --
+    edit those in ``render_driver._LTX_MOTION_PROMPT_BY_ROLE`` if a bookend
+    needs different movement.
     """
 
     declared_isolation = ISOLATION_IN_PROCESS

@@ -748,7 +748,7 @@ def _music_open_ledger(bank="original"):
              # (render_driver reads creative.text_prompt at :2580)
              "creative": {"text_prompt": "the gunman levels his revolver at "
                                          "the radio console",
-                          "source": "m4"}},
+                          "source": "shared_video_prompting_engine"}},
         ]},
     }
 

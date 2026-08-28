@@ -396,7 +396,7 @@ def test_the_composer_cannot_consume_dialogue_title_or_m4_because_it_has_no_para
     parameters, so no code path can reach them."""
     params = set(inspect.signature(gsp.compose_ghost_prompt).parameters)
     for forbidden in ("dialogue", "text", "line_text", "episode_title", "title",
-                      "m4", "creative", "ledger", "cast_row", "speaker",
+                      "shared_video_prompting_engine", "creative", "ledger", "cast_row", "speaker",
                       "name"):
         assert forbidden not in params, (
             "compose_ghost_prompt accepts %r; a parameter is a path" % forbidden)
@@ -696,7 +696,7 @@ def test_an_m4_creative_wall_on_a_ghost_shot_is_ignored():
     shot = _ghost_shot()
     shot["creative"] = {
         "text_prompt": "A SPRAWLING NINE HUNDRED CHARACTER SCENE WALL " * 12,
-        "source": "m4"}
+        "source": "shared_video_prompting_engine"}
     req = _build(shot, _ghost_ledger())
     obs = req.get("observability") or {}
     assert obs.get("prompt_source") == gsp.GHOST_PROMPT_SOURCE, (

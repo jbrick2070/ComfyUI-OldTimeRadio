@@ -311,7 +311,7 @@ def test_humo_character_beat_preserves_authored_m4_visual_vocabulary():
     req = rd.build_request_from_shot(
         _face_shot("character_video", creative), _FACE_LEDGER)
     p = req["text_prompt"]
-    assert req["observability"]["prompt_source"] == "m4"
+    assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
     assert "studio microphone" in p.lower()
     assert "weathered face" in p
     assert "lantern glow" in p
@@ -339,7 +339,7 @@ def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
     assert shot["engine_id"] == "ltx_audio_in"           # redirected off HuMo
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
-    assert req["observability"]["prompt_source"] == "m4"
+    assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
 
 
 def test_humo_character_beat_missing_creative_uses_world_neutral_fallback():
