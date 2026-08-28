@@ -7432,6 +7432,13 @@ to re-id and update its references in the same change.
   `joint_av_identity_leak` and logs LOUD for every path not yet imagined.
 - verify: the guard replayed over every joint-AV beat ever rendered flags
   **13/13 as they shipped and 0/13 as they compose today**.
+- **WHICH LEG PROVES WHAT, recorded so a later reader does not misread the
+  first one.** The overnight foley leg running when this fix landed started
+  **05:58:05**; `eng_ltx25.py` was modified **06:12:24**. Python imports at
+  process start, so THAT LEG CARRIES THE NAMED-SOUNDS TAIL BUT NOT THE
+  IDENTITY FIX -- it is a de-facto control, not a verdict. The MIME leg behind
+  it in the queue spawns a fresh process and is the real test, on the exact
+  lane where the vocalization was heard.
 - **STILL OWED, and it is the whole question:** a live leg proving the model
   now stays quiet. The fix removes the nouns that WERE spoken; it does not
   prove the model will not vocalise the setting, the motion clause, or the
