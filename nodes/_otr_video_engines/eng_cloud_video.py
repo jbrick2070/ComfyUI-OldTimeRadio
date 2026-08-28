@@ -270,6 +270,23 @@ _WAN_NEGATIVE_DEFAULT = visual_safety_negative(
 _VIDU_Q2_MODEL = "viduq2-pro-fast"
 _VIDU_Q2_RESOLUTION = "720p"
 _VIDU_Q2_MOVEMENT_AMPLITUDES = ("auto", "small", "medium", "large")
+
+#: SET FROM THE VENDOR SPEC, NOT FROM A RENDER (operator, 2026-08-28: "reach
+#: the requirements spec and prompt knob the best we can, we can test later,
+#: it's an uncommon option"). Vidu documents `auto` as best for PORTRAIT-style
+#: animation and `medium`/`large` as the recommendation for full-body or
+#: ACTION scenes; `small` is for subtle motion.
+#:
+#: This lane asks for an action scene in as many words -- the motion clause
+#: below reads "performs a full, decisive action that develops across the shot
+#: and completes on a clear final position, with a purposeful camera move".
+#: Pairing that request with `auto` was asking for an action and paying for a
+#: portrait. The note directly under this block already recorded `medium` as
+#: the intent on 2026-08-27; the default simply had not moved.
+#:
+#: NOT YET PROVEN ON A RENDER, deliberately -- Vidu is a PAID cloud lane and an
+#: uncommon option, so the comparison is deferred rather than bought.
+_VIDU_Q2_MOVEMENT = "medium"
 #: THE CONTRADICTION THIS RESOLVES (2026-08-27). The clause said "move
 #: gently" and "subtle parallax" while Option B raises this lane's
 #: `movement_amplitude` to `medium` -- paying for more amplitude and asking for
@@ -930,8 +947,9 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
     still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _movement_amplitude(self) -> str:
+        """MEDIUM, on the vendor's own guidance -- see `_VIDU_Q2_MOVEMENT`."""
         return self._choice(
-            "OTR_CLOUD_VIDU_Q2_MOVEMENT", "auto",
+            "OTR_CLOUD_VIDU_Q2_MOVEMENT", _VIDU_Q2_MOVEMENT,
             _VIDU_Q2_MOVEMENT_AMPLITUDES, transform=str.lower)
 
     def _partner_inputs(self, request):
