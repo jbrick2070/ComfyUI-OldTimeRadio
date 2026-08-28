@@ -49,7 +49,7 @@ FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 #: with their roles (kept in sync with render_driver._PROFILES).
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
-    ("music_visual", "ltx_video", "text_to_video"),
+    ("music_visual", "ltx_video", "image_to_video"),   # 2026-08-28
     # The image_to_video seat -- `wan_i2v` until the 14B was retired on
     # 2026-08-26, `wan_ti2v` (the 5B) after. KEEP THIS TUPLE IDENTICAL to
     # `render_driver._PROFILES`: the GPU soak must walk the same shape the CPU

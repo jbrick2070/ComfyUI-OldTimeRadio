@@ -97,7 +97,6 @@ _META = {"episode_id": "ep_still_plan_parity",
 _ENV_KEYS = (
     "OTR_FORCE_ENGINE_MAP",
     "OTR_ENABLE_HUMO_HOSTS",
-    "OTR_ENABLE_LTX_I2V",
     "OTR_LTX_AV_RECIPE",
     "OTR_LTX_AV_UNET",
 )
@@ -114,7 +113,6 @@ _CONFIGURATIONS = (
     ("force_bookends_cloud_kling",
      {"OTR_FORCE_ENGINE_MAP":
       "announcer_visual=cloud_kling_avatar,music_visual=cloud_kling_avatar"}),
-    ("ltx_i2v_off", {"OTR_ENABLE_LTX_I2V": "0"}),
     ("ia2v_non_talking", {"OTR_LTX_AV_RECIPE": "distilled_native"}),
 )
 
@@ -244,9 +242,11 @@ def _render_decisions_row(engine_id, policy):
         requires_scene = bool(_rd._still_spine_requires_scene(
             shot, eff, family))
         ia2v_active = bool(_rd._ia2v_talking_register_active(eff))
-        ltx_i2v_gate = (
-            eff == "ltx_video"
-            and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1")
+        # ltx_video no longer has a gate of its own: it declares
+        # family = "image_to_video" and routes through the SHARED scene-init
+        # path, so the requirement is unconditional (OTR_ENABLE_LTX_I2V was
+        # retired 2026-08-28).
+        ltx_i2v_gate = (eff == "ltx_video")
         ia2v_portrait_gate = (
             eff == "ltx_audio_in"
             and role == "character_video"

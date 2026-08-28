@@ -107,19 +107,25 @@ VALID_ASPECTS = frozenset((
 
 #: The closed activation enum (never a bool, never an expression per spec
 #: section 5). ``when_engine_talking`` evaluates the engine's own
-#: ``wants_talking_prompt()`` hook; ``when_ltx_i2v_enabled`` evaluates the
-#: FROZEN ``routing_state.enable_ltx_i2v`` (S0b's captured field). Adding a
-#: fifth token is an operator decision.
+#: ``wants_talking_prompt()`` hook. Adding a fourth token is an operator
+#: decision.
+#:
+#: ``when_ltx_i2v_enabled`` WAS REMOVED 2026-08-28 and must not come back. It
+#: was an ad-hoc token invented for exactly one engine, gating on the
+#: ``OTR_ENABLE_LTX_I2V`` env flag, and at mint time it already behaved
+#: identically to ``always`` -- nothing branched on it. ltx_video now declares
+#: ``required="always"`` like every sibling, and the flag is retired under the
+#: operator ruling "no switches nor flags, all video models request and ingest
+#: stills". A closed enum with a dead member invites a future declaration
+#: nothing honours.
 REQUIRED_ALWAYS = "always"
 REQUIRED_NEVER = "never"
 REQUIRED_WHEN_ENGINE_TALKING = "when_engine_talking"
-REQUIRED_WHEN_LTX_I2V_ENABLED = "when_ltx_i2v_enabled"
 
 VALID_REQUIRED = frozenset((
     REQUIRED_ALWAYS,
     REQUIRED_NEVER,
     REQUIRED_WHEN_ENGINE_TALKING,
-    REQUIRED_WHEN_LTX_I2V_ENABLED,
 ))
 
 #: Style-tail policy consulted by the visual-style authority at prompt time.
@@ -329,7 +335,6 @@ __all__ = [
     "REQUIRED_ALWAYS",
     "REQUIRED_NEVER",
     "REQUIRED_WHEN_ENGINE_TALKING",
-    "REQUIRED_WHEN_LTX_I2V_ENABLED",
     "VALID_REQUIRED",
     "STYLE_TAIL_FULL",
     "STYLE_TAIL_MINIMAL_CLEAN",

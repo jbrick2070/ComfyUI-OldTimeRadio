@@ -36,13 +36,16 @@ def test_ltx_video_registered_and_dark():
     assert vreg.is_registered("ltx_video")
     eng = vreg.get_engine("ltx_video")
     assert isinstance(eng, LtxVideoEngine)
-    assert eng.family == "text_to_video" and eng.family in sc.FAMILIES
+    # image_to_video since 2026-08-28: the declaration caught up with the
+    # behaviour, and `render_driver._SCENE_INIT_FAMILIES` keys the scene-still
+    # attachment off exactly this field.
+    assert eng.family == "image_to_video" and eng.family in sc.FAMILIES
     # 2026-06-17: announcer + music DEFAULT moved to ltx_audio_in (the audio-in
     # lane). ltx_video keeps its roles (still SELECTABLE) but no longer claims a
     # default role.
     assert eng.default_roles == ()
     assert eng.requires_flag is None               # registry IS the menu (no flag gate)
-    assert eng.required_inputs == ("text_prompt",)
+    assert eng.required_inputs == ("text_prompt", "init_image")
     assert eng.declared_isolation == mc.ISOLATION_IN_PROCESS
     assert eng.binds_seed is True
     assert "ltx_video" in vreg.all_engine_names()   # in the full static dropdown
@@ -211,60 +214,69 @@ def _i2v_req(init_path=""):
     return r
 
 
-def test_i2v_default_on_with_init(monkeypatch, tmp_path):
-    """LK-1a: i2v is the DEFAULT -- flag unset + an on-disk init engages."""
-    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+def test_the_still_is_REQUIRED_and_declared_like_every_sibling():
+    """THE CONTRACT, after OTR_ENABLE_LTX_I2V was retired 2026-08-28.
+
+    Operator ruling: "no switches nor flags, all video models request and
+    ingest stills." The declaration is what makes it true -- `render_driver`
+    attaches the per-beat scene still by FAMILY (`_SCENE_INIT_FAMILIES`), so a
+    lane claiming `text_to_video` would silently stop receiving one. That is
+    the exact build-breaker an independent review caught before this shipped.
+    """
     eng = vreg.get_engine("ltx_video")
-    p = tmp_path / "still.png"
-    p.write_bytes(b"\x89PNG\r\n\x1a\n")
-    assert eng._use_i2v(_i2v_req(str(p))) is True
+    assert type(eng).family == "image_to_video"
+    assert "init_image" in type(eng).required_inputs
+    assert getattr(type(eng), "accepts_still", False) is True
+    # and the sibling it now matches
+    sib = vreg.get_engine("ltx_8gb")
+    assert type(sib).family == type(eng).family
 
 
-def test_i2v_opt_out_restores_text_only(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
-    eng = vreg.get_engine("ltx_video")
-    p = tmp_path / "still.png"
-    p.write_bytes(b"\x89PNG\r\n\x1a\n")
-    assert eng._use_i2v(_i2v_req(str(p))) is False
+def test_a_missing_or_stale_still_REFUSES_with_no_escape_hatch(tmp_path):
+    """A4 (2026-07-27) held that a missing still is TERMINAL, not a silent
+    degrade to text-only. That is still the policy, and there is no longer an
+    opt-out to name in the error: the flag is gone, so the message must not
+    advertise one.
 
-
-def test_i2v_flag_on_missing_init_REFUSES(monkeypatch):
-    """A4 (2026-07-27): this used to assert the silent degrade to text-only,
-    which is the state render_driver.py:2146-2150 already calls terminal
-    ("NO FALLBACK to text-only rendering"). Two policies over one state; the
-    adapter now holds the same one. A STALE path is the case the driver
-    cannot catch -- it only checks that the still index holds a non-empty
-    string, never that the file is there."""
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
+    A STALE path is the case `render_driver` cannot catch -- it only checks
+    that the still index holds a non-empty string, never that the file exists.
+    """
     eng = vreg.get_engine("ltx_video")
 
     with pytest.raises(RuntimeError) as no_init:
-        eng._use_i2v(_i2v_req())                              # no init at all
-    assert "NO FALLBACKS" in str(no_init.value)
-    assert "OTR_ENABLE_LTX_I2V=0" in str(no_init.value)
+        eng._require_init_image(_i2v_req())                   # no init at all
+    assert "no text-only path" in str(no_init.value).lower()
+    assert "OTR_ENABLE_LTX_I2V" not in str(no_init.value), (
+        "the error must not advertise a flag that no longer exists")
 
     with pytest.raises(RuntimeError) as stale:
-        eng._use_i2v(_i2v_req("Z:/nope/still.png"))           # stale path
+        eng._require_init_image(_i2v_req("Z:/nope/still.png"))
     assert "Z:/nope/still.png" in str(stale.value)
-    assert "no usable on-disk init image" in str(stale.value)
 
-
-def test_i2v_opt_out_is_the_only_route_to_text_only(monkeypatch):
-    """The refusal must not be reachable when the operator has explicitly
-    opted out -- otherwise the escape hatch the error message names would
-    not exist, and a text-only render would be impossible."""
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
-    eng = vreg.get_engine("ltx_video")
-    assert eng._use_i2v(_i2v_req()) is False
-    assert eng._use_i2v(_i2v_req("Z:/nope/still.png")) is False
-
-
-def test_i2v_flag_on_with_init_engages(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "1")
-    eng = vreg.get_engine("ltx_video")
+    # ...and a real on-disk still is returned, not merely accepted
     p = tmp_path / "still.png"
     p.write_bytes(b"\x89PNG\r\n\x1a\n")
-    assert eng._use_i2v(_i2v_req(str(p))) is True
+    assert eng._require_init_image(_i2v_req(str(p))) == str(p)
+
+
+def test_the_retired_flag_helpers_are_GONE():
+    """A guard against a helpful re-introduction. `_use_i2v` and
+    `_i2v_enabled` existed only to read the env flag; `_build_graph` was the
+    text-only graph builder they selected. All three are deleted, and a
+    future reader wiring any of them back would be restoring the second
+    render path the ruling forbids."""
+    eng = type(vreg.get_engine("ltx_video"))
+    for gone in ("_use_i2v", "_i2v_enabled"):
+        assert not hasattr(eng, gone), (
+            "%s came back -- that is the retired flag gate" % gone)
+    # `_build_graph` STAYS and this asserts so deliberately. Both reviews said
+    # to delete it as "the text-only builder"; it is not. `_build_graph_i2v`
+    # CALLS it to build the shared base graph before layering the image
+    # conditioning on, so deleting it broke the render outright. The thing
+    # that was actually removed is the `use_i2v` false ARM in render_clip.
+    assert hasattr(eng, "_build_graph"), (
+        "_build_graph is the shared base graph _build_graph_i2v builds on -- "
+        "it is not the text-only path and must not be deleted")
 
 
 def test_i2v_candidates_and_graph_topology(monkeypatch):
@@ -318,7 +330,6 @@ def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
     """DEFAULT-ON (LK-1a) + a scene still in the ledger -> the ltx request
     shows init_source=scene_still; no still -> LOUD structural failure."""
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)   # the default
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     still = tmp_path / "scene_b001.png"
     still.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -340,33 +351,10 @@ def test_i2v_driver_attaches_scene_still_with_trace(monkeypatch, tmp_path):
     assert req["asset_refs"]["init_image"] == str(still)
     # missing still -> structural failure; no hidden text-only degradation
     ledger2 = dict(ledger, images={"images": []})
-    with pytest.raises(rd.RenderError, match="LTX-I2V requires"):
+    # The refusal now comes from the SHARED scene-init path, not a bespoke
+    # ltx_video branch -- that is the whole point of declaring
+    # family = "image_to_video". Same policy, one owner.
+    with pytest.raises(rd.DeferredImageGapError, match="NO scene still"):
         rd.build_request_from_shot(shot, ledger2)
 
 
-def test_i2v_flag_off_driver_behavior_unchanged(monkeypatch, tmp_path):
-    """Explicit opt-OUT (=0) restores the pre-LK-1 text-only behavior."""
-    from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
-    monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
-    still = tmp_path / "scene_b001.png"
-    still.write_bytes(b"\x89PNG\r\n\x1a\n")
-    ledger = {
-        "meta": {"story_brief_status": "ok", "story_brief": "a relay station",
-                 "story_brief_terms": {"setting": ["a relay station"]}},
-        "lines": [{"line_id": "b001", "char_id": "announcer",
-                   "speaker_role": "announcer", "text": "Tonight...",
-                   "start_s": 0.0, "dur_s": 5.0}],
-        "images": {"images": [{"object_id": "scene_b001", "kind": "scene_wide",
-                               "beat_id": "b001", "path": str(still)}]},
-    }
-    shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
-            "role": "announcer_visual", "engine_id": "ltx_video",
-            "group_id": "grp_announcer_visual", "target_frame_count": 50,
-            "creative": {}}
-    req = rd.build_request_from_shot(shot, ledger)
-    assert req["observability"]["init_source"] != "scene_still"   # opt-out holds
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-v"]))

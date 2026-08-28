@@ -205,7 +205,39 @@ def test_wan_render_requires_init_image():
 
 # --- end-to-end with fakes + real ffmpeg ----------------------------------- #
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_ltx_render_clip_to_silent_mp4(monkeypatch):
+
+def _still_on(req, tmp_dir):
+    """Attach a real on-disk init image. The lane requires one now -- there is
+    no flag to switch the requirement off, so a mechanics test supplies a
+    still instead of dodging the decision."""
+    import pathlib
+    p = pathlib.Path(tmp_dir) / "init.png"
+    p.write_bytes(b"\x89PNG\r\n\x1a\n")
+    req["asset_refs"] = {"init_image": str(p)}
+    return req
+
+
+def _use_fakes_on_the_i2v_path(monkeypatch, np, n=4):
+    """Inject the fake node classes where the SINGLE render path reads them.
+
+    Before 2026-08-28 these tests set `eng._classes`, which `render_clip` only
+    consulted on its text-only arm. That arm is gone -- the lane always builds
+    the image-conditioned graph -- and `load()` fills `_classes` from the
+    SAMPLING candidate set, which carries no `loadimage`/`img2vid`. Reusing
+    that cache for the i2v graph would be wrong in production, so the engine
+    deliberately re-resolves, and a test must intercept the RESOLVER rather
+    than pre-fill the cache.
+    """
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    fakes = dict(_ltx_fakes(np, n=n))
+    fakes.setdefault("loadimage", _mk(lambda self, **k: (("image",),)))
+    fakes.setdefault("img2vid", _mk(lambda self, **k: (("latent",),)))
+    monkeypatch.setattr(_wb, "resolve_graph_classes",
+                        lambda cands: {k: fakes[k] for k in cands if k in fakes})
+    monkeypatch.setattr(_wb, "stage_into_comfy_input", lambda p: "init.png")
+    return fakes
+
+def test_ltx_render_clip_to_silent_mp4(monkeypatch, tmp_path):
     # Base (non-loop) render mechanics: pin the boomerang OFF so frame_count is
     # the raw decode (the loop path has its own test below -- BUG-LOCAL-117d).
     # S5: pin single_pass -- this test exercises the FROZEN GGUF-mini
@@ -216,15 +248,15 @@ def test_ltx_render_clip_to_silent_mp4(monkeypatch):
     # test exercises sampler/encode mechanics, not the i2v decision, so it
     # declares the text path with the shipped opt-out instead of arriving
     # there by accident.
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "off")
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
-    eng._classes = _ltx_fakes(np, n=4)
+    _use_fakes_on_the_i2v_path(monkeypatch, np, n=4)
     req = {"shot_id": "s1", "text_prompt": "a neon diner",
            "canvas": {"w": 768, "h": 512, "fps": 25},
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
+    _still_on(req, tmp_path)
     prepared = {"patchers": []}
     clip = eng.canonicalize(eng.render_clip(req, prepared), req, {})
     p = pathlib.Path(clip["path"])
@@ -237,7 +269,7 @@ def test_ltx_render_clip_to_silent_mp4(monkeypatch):
 
 
 @pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
+def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch, tmp_path):
     # DEFAULT FLIPPED 2026-08-01 (operator): "no boomerangs, remove all
     # boomerangs in place of native clips". BUG-LOCAL-117d's loop_via_reverse was
     # the ltx_video default and render_clip mirrored the decoded frames
@@ -247,15 +279,15 @@ def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
     # S5: pin single_pass (frozen mechanics; hq_two_stage has its own tests).
     # A4 (2026-07-27): same as above -- stillless request, text path declared
     # explicitly now that the silent i2v degrade is gone.
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.delenv("OTR_LTX_LOOP_VIA_REVERSE", raising=False)
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
-    eng._classes = _ltx_fakes(np, n=4)
+    _use_fakes_on_the_i2v_path(monkeypatch, np, n=4)
     req = {"shot_id": "s1", "text_prompt": "a neon diner",
            "canvas": {"w": 768, "h": 512, "fps": 25},
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
+    _still_on(req, tmp_path)
     prepared = {"patchers": []}
     raw = eng.render_clip(req, prepared)
     # ``ltx_loop_via_reverse`` was the flag this used to assert. The field went
@@ -273,7 +305,7 @@ def test_ltx_render_clip_does_not_boomerang_by_default(monkeypatch):
         p.unlink(missing_ok=True)
 
 
-def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch):
+def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch, tmp_path):
     """Was "still boomerangs when explicitly opted in" -- the device was retired
     as a DEFAULT but kept behind ``OTR_LTX_LOOP_VIA_REVERSE=on``.
 
@@ -286,15 +318,15 @@ def test_ltx_render_clip_does_NOT_boomerang_even_when_opted_in(monkeypatch):
     4 decoded frames used to become 7 (2N-1, the forward-then-reverse cycle).
     They stay 4, and the clip is trimmed or refused rather than doubled back.
     """
-    monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
     monkeypatch.setenv("OTR_LTX_VIDEO_RECIPE", "single_pass")
     monkeypatch.setenv("OTR_LTX_LOOP_VIA_REVERSE", "on")
     np = pytest.importorskip("numpy")
     eng = LtxVideoEngine()
-    eng._classes = _ltx_fakes(np, n=4)
+    _use_fakes_on_the_i2v_path(monkeypatch, np, n=4)
     req = {"shot_id": "s1", "text_prompt": "a neon diner",
            "canvas": {"w": 768, "h": 512, "fps": 25},
            "timing": {"target_frame_count": 49}, "seed_bundle": {"request_seed": 7}}
+    _still_on(req, tmp_path)
     raw = eng.render_clip(req, {"patchers": []})
     # The flag field is gone with the machinery (step 5). The question this test
     # exists to ask -- does the env hatch reach the frames? -- is now answered by

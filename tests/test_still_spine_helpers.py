@@ -972,18 +972,14 @@ class TestDispatcherStillSpine:
             shot("humo", "audio_driven_face"), ledger)
         assert req["observability"]["init_source"] == "portrait"
         assert req["asset_refs"]["init_image"] == str(portrait)
-        # text engine (ltx_video): LK-1a flipped i2v DEFAULT ON -- the scene
-        # still wins when present; OTR_ENABLE_LTX_I2V=0 restores the
-        # pre-spine portrait-by-char init.
-        monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
+        # ltx_video takes the scene still, ALWAYS. The portrait-fallback half
+        # of this assertion is gone with OTR_ENABLE_LTX_I2V (retired
+        # 2026-08-28): the lane declares family = "image_to_video", so it
+        # routes through the SHARED _SCENE_INIT_FAMILIES path like every
+        # sibling and there is no switch that could send it to a portrait.
         req = rd.build_request_from_shot(
-            shot("ltx_video", "text_to_video"), ledger)
+            shot("ltx_video", "image_to_video"), ledger)
         assert req["observability"]["init_source"] == "scene_still"
-        monkeypatch.setenv("OTR_ENABLE_LTX_I2V", "0")
-        req = rd.build_request_from_shot(
-            shot("ltx_video", "text_to_video"), ledger)
-        assert req["observability"]["init_source"] == "portrait"
-        monkeypatch.delenv("OTR_ENABLE_LTX_I2V", raising=False)
 
         # NO-FALLBACK (2026-07-03): a scene-init family with a MISSING scene still
         # now RAISES -- it never silently degrades to the pre-spine portrait init.

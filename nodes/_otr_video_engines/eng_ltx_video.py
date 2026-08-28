@@ -32,9 +32,10 @@ CFGGuider cfg=1.0 + SamplerCustomAdvanced) + VAEDecodeTiled 512/64/4096/8 + i2v
 strength 0.75 at 832x480. ``OTR_LTX_SAMPLER`` default ``distilled`` (these values
 HARDCODED to the mini -- the #1 invariant; env knobs ignored in distilled mode);
 ``ksampler`` keeps the 30-step manual A/B path (env knobs apply there only).
-``OTR_ENABLE_LTX_I2V`` defaults ON: LTX shots condition on their FULL-FRAME scene
-still (never a portrait), ``OTR_LTX_I2V_STRENGTH`` (ksampler mode only; distilled
-hardcodes 0.75).
+LTX shots ALWAYS condition on their FULL-FRAME scene still (never a portrait) --
+declared via ``family = "image_to_video"`` and ``required_inputs``, not a flag
+(``OTR_ENABLE_LTX_I2V`` was retired 2026-08-28). ``OTR_LTX_I2V_STRENGTH``
+applies in ksampler mode only; distilled hardcodes 0.75.
 
 S5 (2026-07-02, operator ratified): ``OTR_LTX_VIDEO_RECIPE``
 (auto|hq_two_stage|single_pass, default auto = unet-family detection). On the
@@ -587,13 +588,13 @@ class _SigmasFromValues:
 _LTX_VIDEO_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
                  target_class="scene", aspect="wide",
-                 required="when_ltx_i2v_enabled",
+                 required="always",
                  framing_geometry=(
                      "full-frame macro, centered subject"),
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_beat", cardinality="per_beat",
                  target_class="scene", aspect="wide",
-                 required="when_ltx_i2v_enabled",
+                 required="always",
                  framing_geometry=(
                      ("cinematic three-quarter framing, the subject shown "
                       "whole with clear space around it inside frame, "
@@ -601,7 +602,7 @@ _LTX_VIDEO_STILL_PLAN = (
                  style_tail_policy="full"),
     StillPlanRow(kind="scene_character", cardinality="per_beat",
                  target_class="scene", aspect="wide",
-                 required="when_ltx_i2v_enabled",
+                 required="always",
                  framing_geometry=(
                      ("cinematic medium shot, the character framed within a "
                       "wide 16:9 environment, full head and shoulders with "
@@ -625,7 +626,16 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     """The ltx_video text->video adapter (in-process, default-OFF / dark)."""
 
     name = "ltx_video"
-    family = "text_to_video"
+    #: image_to_video, NOT text_to_video (2026-08-28). This lane has conditioned
+    #: on a still on every production path for months -- the DEV-family unet
+    #: resolves RECIPE_HQ_TWO_STAGE, and `_render_clip_hq` requires an on-disk
+    #: init image unconditionally. The declared family lagged the behaviour.
+    #: It matters beyond documentation: `render_driver._SCENE_INIT_FAMILIES`
+    #: attaches the per-beat scene still BY FAMILY, so declaring
+    #: text_to_video is what forced the bespoke `OTR_ENABLE_LTX_I2V` block to
+    #: exist in the driver at all. Declaring the truth here is what let that
+    #: block be deleted.
+    family = "image_to_video"
     #: Still-aspect identity (2026-06-17): ltx_video renders 16:9 832x480, so the
     #: director must mint a WIDE init still (1472x832), NOT the portrait default --
     #: a portrait still fed to the wide render decapitates heads. A class attribute
@@ -650,7 +660,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # role -- so default_engine_for_role(announcer/music) resolves to ltx_av_music.
     default_roles = ()
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
-    required_inputs = ("text_prompt",)
+    #: THE STILL IS REQUIRED, DECLARED THE WAY EVERY SIBLING DECLARES IT
+    #: (eng_ltx_8gb, eng_wan_ti2v, eng_mesh_stage all name `init_image` here).
+    #: Operator: "all video models request and ingest stills."
+    required_inputs = ("text_prompt", "init_image")
+    accepts_still = True
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 169 (8*20+1 is
     #: 161; 169 = 8*21+1 is the live-DECODE-PROVEN ceiling on this box).
     #: max_frames is the LITERAL 169, deliberately NOT ``OTR_LTX_MAX_FRAMES``
@@ -920,16 +934,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # With the flag on (DEFAULT since LK-1a -- the 2026-06-11 look
     # restoration; the Part-B probe PASSED at 1472x832x169f) AND a request
     # init image present, render_clip builds the image-conditioned wrapper
-    # graph (LTXVImgToVideo) instead of txt2vid. ENGINE_FAMILY stays
-    # text_to_video (no registry/family change, no new widgets) -- the
-    # branch lives entirely inside the adapter. The decode band is
-    # UNTOUCHED: the same _ltx_frame_length floor/cap governs both paths
-    # (do NOT touch the 169f floor). Set OTR_ENABLE_LTX_I2V=0 to restore
-    # the text-only path (the murk the operator rejected).
-    @staticmethod
-    def _i2v_enabled() -> bool:
-        return os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"
-
+    # graph (LTXVImgToVideo). There is no txt2vid path any more and no flag
+    # to restore one: `family = "image_to_video"` and
+    # `required_inputs = ("text_prompt", "init_image")` say so declaratively,
+    # the way every sibling engine does. The decode band is UNTOUCHED -- the
+    # same _ltx_frame_length floor/cap governs the render (do NOT touch the
+    # 169f floor).
     @staticmethod
     def _init_image_path(request) -> str:
         """The request's init image path (asset_refs still/init_image/image),
@@ -946,38 +956,35 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                     return v["path"]
         return ""
 
-    def _use_i2v(self, request) -> bool:
-        """True iff the env flag is on AND the request carries an init image
-        that exists on disk. Flag OFF = the text path, byte-identical. Flag ON
-        with a missing or stale init image REFUSES -- it does not degrade.
+    def _require_init_image(self, request) -> str:
+        """The on-disk init image for this beat, or RAISE. Never degrades.
 
-        A4 (2026-07-27): this used to log and return False, which put two
-        contradictory policies over one state. ``render_driver`` already calls
-        that state terminal for the ledger path ("NO FALLBACK to text-only
-        rendering", render_driver.py:2146-2150), so whichever boundary the
-        request reached first decided whether a missing still killed the
-        episode or silently changed how it was rendered. The driver's check is
-        also weaker than this one: it only asks whether the still INDEX holds a
-        non-empty path, while this asks whether the file is on disk -- so a
-        STALE path passed the driver and degraded here, and requests built
-        through the older ledger-free ``build_request`` never met the driver's
-        check at all. One policy now, enforced at the boundary that can see the
-        file. The deliberate text-only render keeps its explicit opt-out.
+        A4 (2026-07-27), and the reasoning still stands with the flag gone:
+        this used to log and return False, which put two contradictory
+        policies over one state. `render_driver` already calls a missing still
+        terminal for the ledger path ("NO FALLBACK to text-only rendering"),
+        so whichever boundary the request reached first decided whether a
+        missing still killed the episode or silently changed how it rendered.
+        The driver's check is also WEAKER than this one -- it asks only whether
+        the still INDEX holds a non-empty path, while this asks whether the
+        file is on disk, so a STALE path passed the driver and degraded here,
+        and requests built through the older ledger-free `build_request` never
+        met the driver's check at all.
 
-        Mirrors the shipped sibling contract in ``cheap_families``
-        (``_require_still``): a still-REQUIRED family refuses its floor rather
-        than shipping something that merely looks finished."""
-        if not self._i2v_enabled():
-            return False
+        One policy, enforced at the boundary that can see the file. Mirrors the
+        shipped sibling contract in `cheap_families._require_still`: a
+        still-REQUIRED family refuses its floor rather than shipping something
+        that merely looks finished.
+        """
         p = self._init_image_path(request)
         if p and os.path.exists(p):
-            return True
+            return p
         raise RuntimeError(
-            "%s has LTX-I2V enabled but the request carries no usable on-disk "
-            "init image (asset_refs still/init_image=%r) -- refusing the "
-            "text-only path (NO FALLBACKS). The image phase must mint this "
-            "beat's still before the video render; set OTR_ENABLE_LTX_I2V=0 "
-            "to render text-only deliberately." % (self.name, p))
+            "%s requires an on-disk init image and the request carries none "
+            "(asset_refs still/init_image=%r). This lane conditions on the "
+            "beat's scene still, always -- there is NO text-only path to fall "
+            "back to. The image phase must mint this beat's still before the "
+            "video render." % (self.name, p))
 
     def _node_candidates_i2v(self):
         """The image-conditioned graph's node candidates (on the ACTIVE
@@ -1412,6 +1419,14 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         h = int(c_get("h", 0) or 0) or _LTX_DEFAULT_H
         return w, h
 
+    # KEPT, AND HERE IS WHY IT IS NOT THE TEXT-ONLY PATH (2026-08-28).
+    # Two independent reviews both said to delete this along with the flag,
+    # and deleting it BROKE THE RENDER: `_build_graph_i2v` CALLS it to build
+    # the shared base graph before layering the image conditioning on top.
+    # It is the common trunk, not the txt2vid branch -- the branch was the
+    # `use_i2v` false arm in `render_clip`, and that is what was actually
+    # removed. Caught by `test_i2v_candidates_and_graph_topology` raising
+    # AttributeError, which is the test earning its keep.
     def _build_graph(self, plan, length, width, height):
         """The declarative LTXV graph -- the frozen GGUF mini recipe reproduced
         EXACTLY (workflows/ltx_bookend_mini_repro_gguf_mit.json, the
@@ -1526,6 +1541,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                                          "temporal_overlap": 8}}
         return graph
 
+
     def _weight_receipt(self, path):
         """A BOUNDED, stable receipt for one weight file: (basename, size,
         mtime_ns). Mirrors ``eng_ltx_8gb._file_receipt`` deliberately -- NOT a
@@ -1603,17 +1619,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         recipe = self._recipe()
         if recipe == RECIPE_HQ_TWO_STAGE:
             return self._render_clip_hq(request, prepared, plan)
-        use_i2v = self._use_i2v(request)
-        # LK-1b: resolve the ACTIVE candidate set (sampler mode + LoRA
-        # wiring are env/ckpt-dependent). A load()-time cache (or a test's
-        # injected fakes) wins on the non-i2v path; resolve_graph_classes
-        # fail-LOUD names every missing wrapper class at once.
-        if use_i2v:
-            classes = _wb.resolve_graph_classes(self._node_candidates_i2v())
-        else:
-            classes = dict(getattr(self, "_classes", None)
-                           or _wb.resolve_graph_classes(
-                               self._node_candidates_sampling()))
+        # ONE PATH (2026-08-28). There is no longer a text-only branch to
+        # choose between: this lane conditions on a still, always. LK-1b still
+        # applies -- resolve the ACTIVE candidate set, because sampler mode and
+        # LoRA wiring are env/ckpt-dependent, and resolve_graph_classes is
+        # fail-LOUD about every missing wrapper class at once.
+        classes = _wb.resolve_graph_classes(self._node_candidates_i2v())
         if self._sampler_mode() == "distilled":
             # The SIGMAS source is in-adapter (not a registered node class);
             # injected AFTER resolve so the resolver never sees it. A test
@@ -1630,17 +1641,13 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         length = _ltx_frame_length(plan["target_frame_count"], self.target_fps)
         width = max(32, (width // 32) * 32)
         height = max(32, (height // 32) * 32)
-        if use_i2v:
-            init_path = self._init_image_path(request)
-            image_name = _wb.stage_into_comfy_input(init_path)
-            _LOG.warning(
-                "[eng_ltx_video] LTX-I2V: conditioning on init image %s "
-                "(%dx%d, length %d)", os.path.basename(init_path),
-                width, height, length)
-            graph = self._build_graph_i2v(plan, length, width, height,
-                                          image_name)
-        else:
-            graph = self._build_graph(plan, length, width, height)
+        init_path = self._require_init_image(request)
+        image_name = _wb.stage_into_comfy_input(init_path)
+        _LOG.warning(
+            "[eng_ltx_video] LTX-I2V: conditioning on init image %s "
+            "(%dx%d, length %d)", os.path.basename(init_path),
+            width, height, length)
+        graph = self._build_graph_i2v(plan, length, width, height, image_name)
         # free_after_use (2026-06-09 capstone catch + GGUF splice): the Gemma-3
         # text encoder + the projection ckpt + the intermediates must NOT stay
         # co-resident with the GGUF UNET through the sampler (the 16 GB ceiling).

@@ -45,7 +45,7 @@ _FAMILY_FALLBACK: dict = {
     "humo_1.7B": "audio_driven_face",
     "humo_1.7B_169": "audio_driven_face",
     "humo_14B_169": "audio_driven_face",
-    "ltx_video": "text_to_video",
+    "ltx_video": "image_to_video",   # 2026-08-28: matches the engine class
     "ltx_audio_in": "audio_conditioned_video",
     "wan_ti2v": "image_to_video",
     "mesh_stage": "image_to_video",

@@ -67,7 +67,11 @@ ENGINE_FAMILY = {
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
     # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out) -- removed here too.
-    "ltx_video": "text_to_video",
+    # 2026-08-28: image_to_video, matching the engine class. This map is
+    # consulted BEFORE the live registry (see the wan_i2v note below), so a
+    # stale row here would keep answering "text_to_video" forever and the
+    # scene still would never attach.
+    "ltx_video": "image_to_video",
     # wan_i2v RETIRED 2026-08-26 and removed HERE too: engine_family()
     # consults this static map BEFORE the live registry, so a stale row
     # keeps answering "image_to_video" forever with no error path at all.
@@ -95,7 +99,10 @@ ENGINE_FAMILY = {
 #: families keep coverage via the extra announcer legs.
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
-    ("music_visual", "ltx_video", "text_to_video"),
+    # ltx_video became image_to_video on 2026-08-28, so this row no longer
+    # covers text_to_video -- the seat below already walks image_to_video via
+    # wan_ti2v, and this one keeps ltx_video itself under soak.
+    ("music_visual", "ltx_video", "image_to_video"),
     # The image_to_video seat. It was `wan_i2v` until the 14B was retired on
     # 2026-08-26; `wan_ti2v` (the 5B) takes it rather than the row being
     # dropped, because dropping it would leave the soak walking NO
@@ -2328,30 +2335,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             "ltx_audio_in on the WIDE radio-face still %s (LIP-SYNC under the "
             "ia2v_canonical recipe since 2026-07-02)", _abrole, shot.get("shot_id"),
             os.path.basename(_fpath))
-    # LTX-I2V ticket Part B (2026-06-11) -- DEFAULT ON since LK-1a (the
-    # look restoration): every ltx_video shot conditions on the beat's
-    # ST-3-minted scene still (init_source=scene_still in the trace) --
-    # the music open b000 included (its text-only render was the murk
-    # cause). A missing still is a structural image/video failure, not a
-    # permitted quality downgrade. Set OTR_ENABLE_LTX_I2V=0 to explicitly
-    # restore text-only LTX.
-    if (str(shot.get("engine_id") or "") == "ltx_video"
-            and os.environ.get("OTR_ENABLE_LTX_I2V", "1") == "1"):
-        _bid = _visual_beat_id
-        _still = _still_index(ledger).get(str(_bid), "")
-        if _still:
-            init_image = _still
-            init_source = "scene_still"
-            _LOG.warning(
-                "[OTR.render_driver] LTX-I2V: beat %s conditioning on scene "
-                "still %s (default since LK-1a)", _bid,
-                os.path.basename(_still))
-        else:
-            raise DeferredImageGapError(
-                "LTX-I2V requires a minted scene still for beat %s; the image "
-                "phase produced no usable path. NO FALLBACK to text-only "
-                "rendering. Fix the image target receipt before video dispatch."
-                % _bid)
+    # THE BESPOKE ltx_video STILL BLOCK IS GONE (2026-08-28). It existed only
+    # because ltx_video declared `family = "text_to_video"` and so fell outside
+    # `_SCENE_INIT_FAMILIES`, which is how every other scene-init engine gets
+    # its per-beat still. The engine now declares `family = "image_to_video"`
+    # and `required_inputs = ("text_prompt", "init_image")`, so it routes
+    # through the shared path above like its siblings, and the
+    # `OTR_ENABLE_LTX_I2V` switch it was gated on is retired -- operator
+    # ruling: "no switches nor flags, all video models request and ingest
+    # stills".
     # Route-A's local HuMo-radio-face music-bookend workaround (2026-06-28) is
     # RETIRED 2026-06-30 (see _enforce_radio_is_host above): a local HuMo
     # music_visual beat redirects to ltx_audio_in before _family is computed.
