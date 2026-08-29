@@ -368,3 +368,38 @@ explicit-dict device_map (panel Test C: loads, forwards, generates) or the GGUF
 lane -- and per -07's correction, neither the GGUF weights nor
 `llama-cpp-python` exist on this box today. E2B remains the qualified writer
 here.
+
+## Step 11 -- the GGUF route is BLOCKED ON MRKT by a CUDA-major mismatch
+
+Four shipped profiles (`8gb_lite`, `otr_8gb_ltx`, `otr_8gb_wan`,
+`otr_8gb_fastwan`) pin `unsloth/gemma-4-12b-it-GGUF` at `quant_policy: "none"`
+-- i.e. the repo already asserts 12B-on-8GB via llama.cpp, which splits GPU/CPU
+natively with no meta-tensor round trip, so none of step 10's arithmetic
+applies. **None of those four has ever been run on this box.** Probed the
+cheapest disqualifying step first, before spending a ~7 GB model download:
+
+- venv python is **3.13.12**. PyPI has NO `llama-cpp-python` wheel for 3.13
+  (`--only-binary=:all:` -> "No matching distribution found").
+- The project's own CUDA wheel index DOES have one: `llama_cpp_python 0.3.35`
+  installs cleanly from `abetlen.github.io/llama-cpp-python/whl/cu124`.
+- **But it cannot load.** `RuntimeError: Failed to load shared library
+  'llama_cpp\lib\llama.dll' ... or one of its dependencies`. Cause identified
+  from the bundled files rather than guessed: the wheel ships a CUDA-**12**
+  build (`ggml-cuda.dll`, 819 MB) and NO CUDA runtime, while this box provides
+  only **`cudart64_13.dll`** (CUDA 13.0, via torch 2.12.1+cu130). Major-version
+  mismatch, not a missing DLL.
+
+**Left the box exactly as found:** the wheel is UNINSTALLED. An importable-but-
+broken `llama_cpp` is worse than an absent one -- any availability probe would
+report the lane usable and then fail at load, which is precisely the
+"documented path is not a working path" class this drill keeps catching.
+
+**The remaining step is an operator decision, not a window's:** supplying a
+CUDA 12 runtime alongside torch's 13 (e.g. `pip install nvidia-cuda-runtime-cu12`
+plus its bin dir on PATH at launch) would likely satisfy it, but it mixes CUDA
+majors inside a process that also loads torch, on the one box with a PROVEN
+shipping render path. Not worth risking that unilaterally for a writer upgrade
+when E2B already ships. **Recorded, not attempted.** The four GGUF profiles
+therefore remain UNVERIFIED on 8 GB hardware -- a real gap in the shipping
+story, and the natural next rung of the proving ground whenever the operator
+wants it.
