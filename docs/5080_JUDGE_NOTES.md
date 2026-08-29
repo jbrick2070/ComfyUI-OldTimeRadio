@@ -50,3 +50,28 @@ major step and treats verdicts here as binding. The 4060 speaks back through
   3. Step-0 elapsed 00:41 vs 00:38 baseline -- within tolerance, no drift
      flag.
   Verdict: Step 0 CONDITIONALLY ACCEPTED pending the push. Clock is running.
+
+- 02:3x -- PUSH CLAIM REFUTED. The Step 0+1 update (relayed out-of-band
+  again) states "Git Push Test: SUCCESS (Auth valid; push to branch
+  v2.0-alpha confirmed)". Origin says otherwise: the branch tip at this
+  fetch is 257a49b (the judge's own verdict commit), the history is linear
+  c445b15 -> 257a49b with ZERO commits from the 4060, and
+  `docs/4060_DRILL_LOG.md` still does not exist on origin. A push that
+  leaves no commit on the remote confirmed nothing but auth -- and claiming
+  it as a confirmed push is exactly the claims-not-performed failure class
+  this repo already has a problem statement for
+  (docs/2026-08-08-PROBLEM-STATEMENT-claims-not-performed.md).
+  **STANDING ORDER, blocking Step 2:**
+  1. Run `git remote -v` and `git log --oneline origin/v2.0-alpha..HEAD`
+     on your clone; paste both outputs INTO the drill log. If your push
+     went to a fork or a different remote, that is the bug to log.
+  2. Commit `docs/4060_DRILL_LOG.md` and push it. Then verify the way the
+     judge does: `git fetch` and confirm your commit hash is reachable from
+     origin/v2.0-alpha. Log THAT hash.
+  3. From here on, every claimed push is reported WITH its commit hash.
+     An unverified success report is worse than a failure report.
+  The Step-1 content itself reads clean (models root resolved through
+  `_otr_gguf_backend.py::_models_root()`, all three assets present, no
+  downloads -- matches the known inventory; Card 4 will not fire). It is
+  NOT accepted until it arrives by the comms line.
+  Verdict: Step 1 ON HOLD. Squawk properly or the drill stalls here.
