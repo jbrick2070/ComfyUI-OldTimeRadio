@@ -159,12 +159,7 @@ def test_phase_10_hard_fails_on_g6_violation():
     with pytest.raises(_LFC.FreezeAssertionError):
         _LFC.phase_10_gap_audit_post_and_freeze(led)
 
-
-def test_phase_10_clean_path_is_covered_by_existing_lfc_tests():
-    """Phase 10's pass-path (no critical gaps -> frozen_clean / frozen_with_warns)
-    is covered by tests/test_lfc_phase_0_10_gap_audit.py against full fixtures.
-    G6 contract is fully exercised here by the direct run_gap_audit cases
-    above plus test_phase_10_hard_fails_on_g6_violation; building a fixture
-    that passes every other Phase 0 check just to re-prove the pass-path
-    would duplicate coverage. This placeholder documents the coverage seam."""
-    assert True
+# Phase 10's PASS-path (no critical gaps -> frozen_clean / frozen_with_warns)
+# is covered by tests/test_lfc_phase_0_10_gap_audit.py against full fixtures;
+# the placeholder test that used to say so here was an assert-True tautology
+# and was removed 2026-08-28 (V5).

@@ -57,22 +57,6 @@ def _ltx_fakes(np, n=4):
     }
 
 
-def _wan_fakes(np, n=4):
-    img = np.zeros((n, 24, 32, 3), dtype="float32")
-    return {
-        "unet": _mk(lambda self, **k: (_FakeModel(),)),
-        "modelsampling": _mk(lambda self, **k: (_FakeModel(),)),
-        "clip": _mk(lambda self, **k: (object(),)),
-        "pos": _mk(lambda self, **k: (("c",),)),
-        "neg": _mk(lambda self, **k: (("c",),)),
-        "vae": _mk(lambda self, **k: (object(),)),
-        "loadimage": _mk(lambda self, **k: (object(), object())),
-        "wan": _mk(lambda self, **k: (("p",), ("n",), ("latent",))),
-        "ksampler": _mk(lambda self, **k: (("latent",),)),
-        "vaedecode": _mk(lambda self, **k: (img,)),
-    }
-
-
 # --- topology -------------------------------------------------------------- #
 def test_ltx_graph_topology_ksampler_rollback(monkeypatch):
     """OTR_LTX_SAMPLER=ksampler keeps the GGUF loaders but swaps the distilled
@@ -204,8 +188,6 @@ def test_wan_render_requires_init_image():
 
 
 # --- end-to-end with fakes + real ffmpeg ----------------------------------- #
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-
 def _still_on(req, tmp_dir):
     """Attach a real on-disk init image. The lane requires one now -- there is
     no flag to switch the requirement off, so a mechanics test supplies a
@@ -237,6 +219,7 @@ def _use_fakes_on_the_i2v_path(monkeypatch, np, n=4):
     monkeypatch.setattr(_wb, "stage_into_comfy_input", lambda p: "init.png")
     return fakes
 
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
 def test_ltx_render_clip_to_silent_mp4(monkeypatch, tmp_path):
     # Base (non-loop) render mechanics: pin the boomerang OFF so frame_count is
     # the raw decode (the loop path has its own test below -- BUG-LOCAL-117d).

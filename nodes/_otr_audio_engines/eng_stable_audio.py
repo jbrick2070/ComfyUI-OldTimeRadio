@@ -1,7 +1,9 @@
 """Stable Audio music adapter -- opt-in, commercial-clean.
 
 Stability Community license (commercial use under a revenue cap). Native
-ComfyUI support keeps Blackwell risk low. Opt-in behind OTR_ENABLE_STABLE_AUDIO.
+ComfyUI support keeps Blackwell risk low. Opt-in by INSTALL (the registry is
+the menu -- no enable flag exists); loading fails with a NAMED error until
+stable-audio-tools is installed.
 ``interface == "clip"``: the theme node calls ``generate_clip``.
 
 Stable Audio is natively stereo and the target is stereo end to end, so output
@@ -35,7 +37,7 @@ class StableAudioMusicEngine:
         except ImportError as exc:
             raise RuntimeError(
                 "stable-audio-tools is not installed -- install Stable Audio "
-                "before enabling OTR_ENABLE_STABLE_AUDIO"
+                "before rendering with stable_audio_music"
             ) from exc
         import os
 
@@ -62,7 +64,7 @@ class StableAudioMusicEngine:
         chain is still mono). GPU-VALIDATE (F): the plan's target is the
         ComfyUI-native SA3 sampler; scripts/otr_audio_dep_pilot pins the real
         entry point + that it binds a ``torch.Generator`` on the box, then flips
-        ``supports_external_generator`` True. Flag-gated + default-off until then.
+        ``supports_external_generator`` True. Default-off until then.
         """
         import torch
 

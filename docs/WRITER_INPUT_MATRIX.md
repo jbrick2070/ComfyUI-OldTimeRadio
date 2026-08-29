@@ -21,8 +21,8 @@ fix does NOT cover).
 The single most load-bearing fact in this file, and it INVERTED on 2026-08-16:
 **no shipped lane binds a grammar during decoding any more.** The only lane that
 ever did was the codex runner, retired with the `scifi_news` rip
-(PBUG-20260816-01), and `_bind_local_slot_schema` went with it. The writer still
-EXPOSES the capability (`OTR_LedgerScriptWriter.py`) and NOTHING consumes it --
+(PBUG-20260816-01). The writer still EXPOSES the capability (the
+`_otr_bind_schema` hook set at `OTR_LedgerScriptWriter.py:730`) and NOTHING consumes it --
 live extension space, not a live path. Every shipped lane is post-validated: a
 schema instruction in text, parsed after the fact.
 

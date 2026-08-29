@@ -293,9 +293,6 @@ class _CloudImageBase:
                 "require a non-empty prompt")
         return append_visual_safety_clause(prompt)
 
-    def _seed(self, request) -> int:
-        return int(_first_present(request, "seed", "request_seed", default=0))
-
     def _seed_u64(self, request) -> int:
         return _clamp_int(
             _first_present(request, "seed", "request_seed", default=0),

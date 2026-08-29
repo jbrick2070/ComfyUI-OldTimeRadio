@@ -56,11 +56,13 @@ class AudioEngine(Protocol):
 class EngineUsabilityReason(str, enum.Enum):
     """The six reasons an engine may be refused for a role (fail-closed).
 
-    ``assert_usable`` (registry level, no IO) raises ``GATED_BY_FLAG``,
-    ``MALFORMED_CONFIG`` and ``INCOMPATIBLE_PROFILE``. The disk/token/commercial
-    reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``, ``NONCOMMERCIAL_BLOCKED``)
-    are raised by the profile resolver and the release gate, which reuse this
-    same enum + :class:`EngineUnusable` so the taxonomy is single-sourced.
+    ``assert_usable`` (registry level, no IO) raises ``MALFORMED_CONFIG`` and
+    ``INCOMPATIBLE_PROFILE`` (there is NO GATED_BY_FLAG case -- C6, the
+    registry IS the menu; the enum member survives only for parity). The
+    disk/token/commercial reasons (``MISSING_MODEL``, ``MISSING_HF_TOKEN``,
+    ``NONCOMMERCIAL_BLOCKED``) are raised by the profile resolver and the
+    release gate, which reuse this same enum + :class:`EngineUnusable` so the
+    taxonomy is single-sourced.
     """
 
     GATED_BY_FLAG = "gated_by_flag"

@@ -119,16 +119,17 @@ verdict is not polluted by known-open defects):**
 **RUNNING BESIDE THE ORDER -- THE DEAD-CODE CAMPAIGN (operator standing
 instruction 2026-08-28: keep hunting "until there are no more dead code
 candidates"; STOP RULE = two independent blind deep sweeps returning zero
-CONFIRMED findings).** Three rounds done: ~2,600 lines removed, eleven lying
-comments corrected, two real bugs fixed (OTR_FFMPEG honored at the last three
-pipeline stages; the Bark silent-output gate), six inert widgets + one dead
-socket migrated across all 63 graphs (safety-gated, QA'd, and VERIFIED BY THE
-OPERATOR'S OWN MANUAL UI OPEN -- his "I always find issues" streak broke).
-The hunt prompt is `docs/DEAD_CODE_HUNT_PROMPT_V4.md` (deep sweep: scripts/,
-unread ledger fields, env-var inventory, test debris, config). AUTHORIZED BUT
-UNEXECUTED, part of "done": delete `_voice_backends` (~300 lines, verified
-test-only), consolidate Chatterbox/Dia `_load_wav` into `_otr_sidecar`,
-retire the cue-manifest false-claim helpers. A SEPARATE pre-ship pass, the
+CONFIRMED findings).** FIVE rounds done through 2026-08-28 evening: rounds
+1-3 (~2,600 lines, eleven lying comments, two real bug fixes, seven widget
+migrations verified by the operator's own UI open), round 4 (`d084585d` --
+`_voice_backends` deleted, Chatterbox/Dia `_load_wav` consolidated,
+cue-manifest helpers retired), and the V4 master report fully adjudicated
+and executed (`18ff0533` + `0ce621a0`: 18/19 findings CONFIRMED by a
+7-verifier grounding pass, ten ready findings + six operator-ruled
+retirements executed, three operator-ruled KEEPs recorded, the 3D spike lab
+deferred to the 3D-retirement boundary). The V5 sweep (18 findings,
+`docs/2026-08-28-dead-code-hunt-v5/`) is under adjudication. The live hunt
+prompt is `docs/DEAD_CODE_HUNT_PROMPT_V5.md`. A SEPARATE pre-ship pass, the
 KNOB CENSUS (`docs/KNOB_CENSUS_PROMPT.md`), tables every WORKING widget
 against corpus evidence + a think-like-a-human judgment; the operator rules
 per row -- census informs what the 4060 template pins.
@@ -834,11 +835,13 @@ build is not.** The honest shape, which is NOT one render:
   only `Q4_K_M` -- so any leg carrying it runs Q4_K_M.
 * **A KNOWN FALSE-GREEN TO DESIGN AROUND:** `meta.slot_calls_by_slot` is
   incremented ONLY inside `_SlotScheduler._account_and_get_entry`
-  (`OTR_LedgerScriptWriter.py:627`). SIX `request_slot` sites live outside it
-  (`story_orchestrator.py:1224`/`:1351`, `otr_shot_lock.py:1002`,
-  `OTR_LedgerFreezeCascade.py:282`, `OTR_LedgerScriptWriter.py:4393`,
-  `_otr_motion_clause.py:361`). The counter proves IN-WRITER generation only;
-  reading it as full-row exercise is a false green.
+  (`OTR_LedgerScriptWriter.py:598`, method at `:591`). SIX `request_slot`
+  sites live outside it (re-pinned 2026-08-28 against `688fb849`:
+  `story_orchestrator.py:835`/`:962`, `otr_shot_lock.py:1310`,
+  `OTR_LedgerFreezeCascade.py:260`, `OTR_LedgerScriptWriter.py:4408` -- the
+  SlotContract path, and the registered `nodes/vram_context_test.py:314`).
+  The counter proves IN-WRITER generation only; reading it as full-row
+  exercise is a false green.
 * **The operator's creative/technical parity rule is the sweep's acceptance
   criterion.** Structurally both slots already build from the IDENTICAL
   `dropdown_choices()` list, so no row is slot-restricted; what is unproven is
@@ -1007,12 +1010,6 @@ stated where a default exists; silence keeps the default.
   seeded by a real Library of Congress item on 'Midnight' (1939) -- the operator
   caught it on screen. Second specimen of the content-blind-draw class. The
   scaffold-off rule so far was stated only for `original`.
-* **Rename the un-namespaced `OTR_WAN_*` knobs?** `eng_wan_i2v`'s six frozen knobs
-  are `OTR_WAN_STEPS` / `_CFG` / `_SHIFT` / `_SAMPLER` / `_SCHEDULER` / `_NEGATIVE`
-  -- no `I2V` namespace, unlike every sibling. Default if unruled: leave them. The
-  freeze already removed the power that made the missing namespace dangerous (they
-  are consent-act-only now and cannot bind a production leg), and a rename would
-  silently break operator muscle memory for a sweep.
 * **`style_tail_policy`'s closed enum cannot express a SHIPPED path.**
   `VALID_STYLE_TAIL_POLICIES` has `full` and `minimal_clean`, but
   `build_radio_host_prompt`'s `ltx_radio_mouth` branch

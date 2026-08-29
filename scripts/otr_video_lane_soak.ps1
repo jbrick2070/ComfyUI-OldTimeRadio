@@ -6,8 +6,9 @@
 .DESCRIPTION
   WHY THIS EXISTS (operator, 2026-08-26): "test gemma-4-E2B-it on all valid
   local image and video lanes", then "kill and reboot server all you want".
-  That second sentence is what makes this script possible -- four of the
-  fifteen local video lanes cannot share a server with the other eleven.
+  That second sentence is what makes this script possible -- seven of the
+  fourteen local video lanes cannot share a server with the other seven
+  (groups B/C/D below need their own boot contracts).
 
   A profile's `launch.env` is a BOOT contract, not a per-leg switch. The
   headless launcher reads OTR_HEADLESS_RESERVE_VRAM_GB and
@@ -16,7 +17,7 @@
   line. Those are start-up flags: nothing can change them on a running server.
   So the lanes group by the boot they need, and each group costs one reboot.
 
-    A  default        11 lanes  no clamp
+    A  default         7 lanes  no clamp
     B  humo_diet       4 lanes  reserve 2.921 GB + no pinned host memory
     C  ltx_av_diet     1 lane   no pinned host memory, NO reserve
     D  h3              2 lanes  reserve 12 GB + no pinned host memory

@@ -35,9 +35,10 @@ are env-overridable so the operator never edits code):
   * ``OTR_ZIMAGE_UNET_DTYPE`` -- UNETLoader weight_dtype (default ``"default"``).
 
 Fail-closed: ``assert_usable`` raises MISSING_MODEL until the diffusion-model file
-exists (the TE+VAE loaders fail LOUD at render -> dispatcher floor). Greyed until
-``OTR_ENABLE_ZIMAGE=1``. Kept OUT of ``registry.VALIDATED_ENGINES`` (hidden from
-the tested-only dropdown) until the GPU A/B look-match passes.
+exists (the TE+VAE loaders fail LOUD at render -> dispatcher floor). No enable
+flag gates selection -- the registry is the menu; ``OTR_ENABLE_ZIMAGE`` is
+vestigial and read by nothing (``test_image_engine_c2.py`` pins the no-gate
+behavior). ``registry.VALIDATED_ENGINES`` was removed 2026-06-29 (C4).
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + role
 vocabulary + stdlib. torch / comfy / the model are NEVER imported here -- the heavy
@@ -53,7 +54,8 @@ from .._otr_shared.role_compat import ROLES
 
 log = logging.getLogger("OTR.image.z_image_turbo")
 
-#: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
+#: VESTIGIAL (no runtime reader; the registry is the menu). Kept only for
+#: pattern parity with sibling engines and the no-gate regression test.
 ENABLE_FLAG = "OTR_ENABLE_ZIMAGE"
 
 #: Split-file weights. Defaults target the LOW-VRAM fp8 variants (the whole point

@@ -2,13 +2,13 @@
 #
 # One row per (role, engine). Curated per-engine default_params live HERE -- not
 # in the delivery layer. The resolver (nodes/_otr_engine_profiles.py) loads this
-# lazily (cached, exception-wrapped) and hashes the file text into the
-# engine_profile source sha (a re-baseline trigger). Engine names MUST match the
+# lazily (cached, exception-wrapped) and keys its in-process cache on the
+# file text hash. Engine names MUST match the
 # audio-engine registry. The model-backed defaults are now the shipped out-of-box
 # default per role: IndexTTS2 voice (PROMOTED 2026-06-04) and Stable Audio 3 music
 # (PROMOTED 2026-06-03). With no permanent legacy fallback, a render fails closed
 # with a NAMED error until that engine's deps/weights are installed (C-7);
-# model_path / model_sha256 stay empty until F pins them.
+# model_path stays empty until F pins it.
 #
 # Sprint-1 declarative metadata (additive; never changes live byte-identical
 # dispatch): rank (fallback priority, lower = tried first), is_default (the
@@ -19,7 +19,6 @@
 # (non-blocking notice emitted when gated). license_state MIRRORS
 # commercial_clean here -- final license sign-off is Sprint 6, not an
 # unattended flip.
-profile_schema_version: "1"
 
 profiles:
   # --- character voice ---
@@ -31,7 +30,6 @@ profiles:
     engine: bark
     commercial_clean: false        # Suno Bark terms not confirmed for commercial use
     model_path: ""
-    model_sha256: ""
     # Per-stage temps (2026-06-17 whiny-voice fix): semantic stays warm (0.7) for
     # content commitment; coarse/fine acoustics drop to 0.5 to firm up the thin/
     # whiny timbre. text_temp/waveform_temp are kept as legacy ALIASES (semantic
@@ -62,7 +60,6 @@ profiles:
     engine: chatterbox
     commercial_clean: true         # MIT
     model_path: ""
-    model_sha256: ""
     default_params: {exaggeration: 0.5, cfg_weight: 0.4, temperature: 0.6}
     # default_clean = the commercial-clean cast bank (2026-06-18 voice roundtable):
     # selecting it routes _resolve_char_engine to chatterbox (MIT) -- the release-
@@ -90,7 +87,6 @@ profiles:
     engine: indextts2
     commercial_clean: false        # Bilibili license -- non-commercial use gated
     model_path: ""
-    model_sha256: ""
     # THE ADAPTER OWNS THE EMOTION BLEND, NOT THIS FILE. `emo_alpha` below is a
     # cache-key declaration, not a runtime authority: `emotion_payload` resolves
     # alpha and the mass ceiling from the environment or from the constants in
@@ -140,7 +136,6 @@ profiles:
     engine: dia
     commercial_clean: true         # Apache-2.0 -> commercial-clean engine (safe to ship)
     model_path: ""
-    model_sha256: ""
     default_params: {}
     # default_clean: dia (Apache-2.0) is the clean-bank PEER of chatterbox; the
     # legacy-first order (chatterbox before dia) means chatterbox wins, dia is the
@@ -169,7 +164,6 @@ profiles:
     engine: kokoro
     commercial_clean: true         # Apache-2.0
     model_path: ""
-    model_sha256: ""
     default_params: {speed: 0.95}   # matches the shipped announcer cadence (was 1.0; aligned to live behavior, clean-break 1b)
     allowed_voice_banks: [kokoro_builtin]
     engine_impl_version: "1"
@@ -192,7 +186,6 @@ profiles:
     engine: kokoro
     commercial_clean: true         # Apache-2.0
     model_path: ""
-    model_sha256: ""
     default_params: {speed: 0.95}
     allowed_voice_banks: [kokoro_builtin]
     engine_impl_version: "1"
@@ -211,7 +204,6 @@ profiles:
     engine: chatterbox
     commercial_clean: true         # MIT
     model_path: ""
-    model_sha256: ""
     default_params: {exaggeration: 0.4, cfg_weight: 0.4, temperature: 0.6}
     allowed_voice_banks: [default]
     engine_impl_version: "1"
@@ -230,7 +222,6 @@ profiles:
     engine: dia
     commercial_clean: true         # Apache-2.0 -> commercial-clean engine (safe to ship)
     model_path: ""
-    model_sha256: ""
     default_params: {}
     allowed_voice_banks: [default, default_clean]
     engine_impl_version: "1"
@@ -255,7 +246,6 @@ profiles:
     engine: bark
     commercial_clean: false        # Suno Bark terms not confirmed for commercial use
     model_path: ""
-    model_sha256: ""
     default_params: {semantic_temp: 0.7, coarse_temp: 0.5, fine_temp: 0.5, text_temp: 0.7, waveform_temp: 0.7, normalize_bark_output: false}
     allowed_voice_banks: [bark_legacy]
     engine_impl_version: "1"
@@ -275,7 +265,6 @@ profiles:
     engine: musicgen
     commercial_clean: false        # CC-BY-NC-4.0 -- non-commercial
     model_path: ""
-    model_sha256: ""
     default_params: {guidance_scale: 3.0, temperature: 1.0}
     allowed_voice_banks: []
     engine_impl_version: "1"
@@ -294,8 +283,7 @@ profiles:
     engine: stable_audio_music
     commercial_clean: true         # Stability Community license (revenue-capped)
     model_path: ""
-    model_sha256: ""
-    default_params: {steps: 100, cfg_scale: 7.0, seconds_total: 30}
+    default_params: {steps: 100, seconds_total: 30}
     allowed_voice_banks: []
     engine_impl_version: "1"
     sample_rate: 44100
@@ -313,8 +301,7 @@ profiles:
     engine: stable_audio_3
     commercial_clean: true         # SA3 community license -- commercial use OK
     model_path: ""
-    model_sha256: ""
-    default_params: {steps: 100, cfg_scale: 6.0, seconds_total: 30, sampler: dpmpp_3m_sde_gpu, scheduler: exponential}
+    default_params: {steps: 100, seconds_total: 30, sampler: dpmpp_3m_sde_gpu, scheduler: exponential}
     allowed_voice_banks: []
     engine_impl_version: "1"
     sample_rate: 44100
@@ -336,7 +323,6 @@ profiles:
     engine: elevenlabs
     commercial_clean: true          # library premade voices, ToS-clean (S2 pool)
     model_path: ""
-    model_sha256: ""
     default_params: {stability: 0.5}
     allowed_voice_banks: [elevenlabs_cloud]
     engine_impl_version: "1"
@@ -350,10 +336,7 @@ profiles:
     license_state: clean
     warn_text: ""
     partner_row: cloud_elevenlabs_tts
-    provider_id: elevenlabs
     auth_required: true
-    billing_category: tts
-    canonicalizer: audio
     error_policy: fail_loud
 
   - profile_id: announcer_elevenlabs_cloud_v1
@@ -361,7 +344,6 @@ profiles:
     engine: elevenlabs
     commercial_clean: true
     model_path: ""
-    model_sha256: ""
     default_params: {stability: 0.5}
     allowed_voice_banks: [elevenlabs_cloud]
     engine_impl_version: "1"
@@ -375,10 +357,7 @@ profiles:
     license_state: clean
     warn_text: ""
     partner_row: cloud_elevenlabs_tts
-    provider_id: elevenlabs
     auth_required: true
-    billing_category: tts
-    canonicalizer: audio
     error_policy: fail_loud
 
   # --- direct Google Gemini TTS voice (BYO API key, not Comfy Partner cloud).
@@ -391,7 +370,6 @@ profiles:
     engine: google_tts
     commercial_clean: true
     model_path: ""
-    model_sha256: ""
     default_params: {model: gemini-2.5-flash-preview-tts}
     allowed_voice_banks: [google_tts]
     engine_impl_version: "1"
@@ -405,10 +383,7 @@ profiles:
     license_state: clean
     warn_text: "Google Gemini TTS is preview; voice stability may vary."
     partner_row: ""
-    provider_id: google
     auth_required: true
-    billing_category: tts
-    canonicalizer: audio
     error_policy: fail_loud
     use_cache: true
 
@@ -417,7 +392,6 @@ profiles:
     engine: google_tts
     commercial_clean: true
     model_path: ""
-    model_sha256: ""
     default_params: {model: gemini-2.5-flash-preview-tts}
     allowed_voice_banks: [google_tts]
     engine_impl_version: "1"
@@ -431,10 +405,7 @@ profiles:
     license_state: clean
     warn_text: "Google Gemini TTS is preview; voice stability may vary."
     partner_row: ""
-    provider_id: google
     auth_required: true
-    billing_category: tts
-    canonicalizer: audio
     error_policy: fail_loud
     use_cache: true
 
@@ -448,7 +419,6 @@ profiles:
     engine: sonilo
     commercial_clean: true          # Sonilo library service, ToS commercial-clean
     model_path: ""
-    model_sha256: ""
     default_params: {}
     allowed_voice_banks: []
     engine_impl_version: "1"
@@ -462,10 +432,7 @@ profiles:
     license_state: clean
     warn_text: ""
     partner_row: cloud_sonilo_music
-    provider_id: sonilo
     auth_required: true
-    billing_category: music
-    canonicalizer: audio
     error_policy: fail_loud
 
   # --- direct Google Lyria MUSIC (BYO API key, not Comfy Partner cloud).
@@ -477,8 +444,7 @@ profiles:
     engine: google_lyria
     commercial_clean: true
     model_path: ""
-    model_sha256: ""
-    default_params: {model: lyria-3-clip-preview, provider_duration_s: 30}
+    default_params: {model: lyria-3-clip-preview}
     allowed_voice_banks: []
     engine_impl_version: "1"
     sample_rate: 44100
@@ -491,8 +457,5 @@ profiles:
     license_state: clean
     warn_text: "Google Lyria 3 Clip is paid-only and currently preview; it returns fixed 30-second MP3 music clips."
     partner_row: ""
-    provider_id: google
     auth_required: true
-    billing_category: music
-    canonicalizer: audio
     error_policy: fail_loud

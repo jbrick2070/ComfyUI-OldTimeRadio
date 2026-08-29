@@ -37,7 +37,6 @@ from nodes._otr_video_engines import wrapper_bridge as wb
 # that catches a hold factor read from a module constant instead of through
 # `self`, which is the G1.3 defect this file exists for.
 GOLDEN = "animatediff15_v3_haunted_video"
-CADENCE_LANES = ()
 EXPECTED_HOLD = {GOLDEN: 2}
 
 #: A real episode beat. Legs on 2026-08-22 ran 2444-2944 delivered frames over
@@ -185,15 +184,6 @@ def test_the_graph_asks_for_this_lanes_own_frame_count(lane, monkeypatch):
     latent = [kw for name, kw in rec.calls if name == "latent"][0]
     expected = gs.ghost_source_request(REAL_BEAT_FRAMES, EXPECTED_HOLD[lane])
     assert latent["batch_size"] == expected
-
-
-@pytest.mark.parametrize("lane", (GOLDEN,))
-def test_a_lower_hold_generates_strictly_fewer_frames(lane, monkeypatch):
-    rec, _raw, _cap = _render(lane, monkeypatch)
-    latent = [kw for name, kw in rec.calls if name == "latent"][0]
-    golden_ask = gs.ghost_source_request(REAL_BEAT_FRAMES, 2)
-    if EXPECTED_HOLD[lane] > 2:
-        assert latent["batch_size"] < golden_ask
 
 
 @pytest.mark.parametrize("lane", (GOLDEN,))

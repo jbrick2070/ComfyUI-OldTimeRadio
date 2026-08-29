@@ -13,7 +13,6 @@ rem the extra-paths yaml); an ltx2\ subfolder prefix breaks the resolve (that
 rem prefix belongs to the LORA path only). Caught proof8 attempt 2.
 set OTR_LTX_AV_UNET=ltx-2.3-22b-dev-Q3_K_M.gguf
 set OTR_LTX_AV_RECIPE=
-set OTR_ENABLE_ZIMAGE=1
 set OTR_ZIMAGE_UNET=z_image_turbo_nvfp4.safetensors
 set OTR_ZIMAGE_CLIP=qwen_3_4b_fp8_mixed.safetensors
 set OTR_ZIMAGE_VAE=ae.safetensors

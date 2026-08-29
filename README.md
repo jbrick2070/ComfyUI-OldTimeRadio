@@ -15,7 +15,7 @@ routes exist; they stay off unless you turn them on.
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
 > EXTENSIONS → comfyui-old-time-radio → otr_canonical**, then **Queue Prompt**.
-> The 34 `OTR_` nodes are the parts; that workflow is the thing you actually run.
+> The 25 `OTR_` nodes are the parts; that workflow is the thing you actually run.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
@@ -78,7 +78,7 @@ gated rows below.
 |---|---|
 | `google/gemma-2-2b-it` | https://huggingface.co/google/gemma-2-2b-it |
 
-**Ungated — nothing required:** `google/gemma-4-12b-it`, `Qwen/Qwen2.5-14B-Instruct`,
+**Ungated — nothing required:** `google/gemma-4-12b-it`,
 `mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`.
 
 > **Note:** Gemma **4** is Apache-2.0 and ungated, unlike Gemma **2** and Gemma **3**. Only
@@ -206,9 +206,7 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | **likely** | yes | yes |
 | `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | **likely** | yes | yes |
 | `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
-| `animatediff15_video (16:9)` | not measured (3.9 GB of weights) | ? | ? | yes |
-| `animatediff15_h3_video (16:9)` | same weights as `animatediff15_video`, hold-3 cadence | ? | ? | yes |
-| `animatediff15_h5_video (16:9)` | same weights as `animatediff15_video`, hold-5 cadence | ? | ? | yes |
+| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights, hold-2 cadence | ? | ? | yes |
 | `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
 | `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB @ 480x832x129 | no | maybe | yes |
 | `humo14_high_audio_in_wide (16:9)` | 13.06 GiB @ 832x480x97 | no | no | yes |
@@ -219,19 +217,18 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |
 
-`animatediff15_h3_video` and `animatediff15_h5_video` are peers of the golden
-`animatediff15_video` lane, differing only in how many delivered frames each
-generated frame fills (hold-3 / hold-5 vs. the golden hold-2) — same weights,
-same VRAM class. Three other AnimateDiff lanes (`animatediff15_v2_video`,
-`animatediff15_v3_video`, `animatediff15_v3_haunted_video`) exist in the
-registry but have not yet rendered a proving episode; they are not listed here
-until they ship.
+`animatediff15_v3_haunted_video` is the ONE surviving AnimateDiff lane
+(operator directive 2026-08-23: "delete any animatediff that are not
+haunted"). Its former peers — `animatediff15_video`, the hold-3/hold-5
+cadence variants, `animatediff15_v2_video`, and `animatediff15_v3_video` —
+are retired and tombstoned in the engine registry; they no longer appear in
+any dropdown.
 
 **Licensing note on this table:** most engines here are open weights, but two
 are not. `h3_low_video` / `h3_low_audio_in` (MiniMax H3) run under a personal,
 non-transferable authorization the maintainer obtained directly from MiniMax —
 it does not transfer to your install; treat H3 as off unless you have your own
-agreement with MiniMax. `animatediff15_video` and its two cadence peers load a
+agreement with MiniMax. `animatediff15_v3_haunted_video` loads a
 motion module with **no published license grant** (`commercial_clean = False`
 in the adapter) — fine for personal/hobby use, not cleared for commercial
 redistribution. See [License & Credits](#license--credits) for the full list.
@@ -497,7 +494,7 @@ appear there as they render.
 
 Development runs under a sibling QA harness — the
 [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a 306-entry machine-readable Bug Bible distilled from this project's live production
+a machine-readable Bug Bible (319 entries and growing) distilled from this project's live production
 incidents, plus a static regression suite that runs against this pack after every change.
 Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
@@ -626,7 +623,7 @@ their authors.
 - `h3_low_video` / `h3_low_audio_in` (MiniMax H3) — a personal, non-transferable
   authorization the maintainer obtained directly from MiniMax; it does not carry over to
   your install.
-- `animatediff15_video` and its cadence peers — the shipped motion module publishes no
+- `animatediff15_v3_haunted_video` — the shipped motion module publishes no
   license grant at all (`commercial_clean = False`); fine for personal use, not cleared for
   commercial redistribution.
 - The `shakespeare` story bank adapts Folger Digital Texts, which are CC BY-NC 3.0

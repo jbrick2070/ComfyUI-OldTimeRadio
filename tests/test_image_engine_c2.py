@@ -1,9 +1,9 @@
 """C2 -- second image engine (Z-Image-Turbo), build-or-NO-GO, default-OFF. CPU tests.
 
 Proves the image registry holds >=2 engines + the model-agnostic layer (Flux stays
-gen 1; Z-Image is an opt-in peer, greyed until OTR_ENABLE_ZIMAGE=1 AND its cu128
-sidecar exists). The live render is the operator cu128-sidecar GPU smoke -- NOT
-covered here.
+gen 1; Z-Image is an opt-in peer selectable with NO flag gate -- the registry is
+the menu, and availability is the on-disk model check). The live render is the
+operator GPU smoke -- NOT covered here.
 """
 from __future__ import annotations
 

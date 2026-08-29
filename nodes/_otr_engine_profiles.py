@@ -28,7 +28,6 @@ from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason, assert_us
 
 log = logging.getLogger("OTR")
 
-PROFILE_SCHEMA_VERSION = "1"
 _PROFILES_FILENAME = "audio_engine_profiles.yaml"
 
 # Sprint 1: validated value sets for the new declarative profile metadata.
@@ -93,7 +92,6 @@ class EngineProfile(BaseModel):
     engine: str
     commercial_clean: bool
     model_path: str = ""
-    model_sha256: str = ""
     default_params: dict = Field(default_factory=dict)
     allowed_voice_banks: List[str] = Field(default_factory=list)
     engine_impl_version: str = "1"
@@ -118,11 +116,8 @@ class EngineProfile(BaseModel):
     # partner-node invoke contract; they do NOT change the byte-identical default
     # dispatch (the cloud engine is dropdown-opt-in, never a default). ---
     partner_row: str = ""            # pinned partner_nodes.yaml key (e.g. cloud_elevenlabs_tts)
-    provider_id: str = ""            # provider label (elevenlabs / sonilo)
     required_param_defaults: dict = Field(default_factory=dict)
     auth_required: bool = False      # cloud engines need OTR_COMFY_API_KEY (fail-loud)
-    billing_category: str = ""       # cost-estimator category (tts / music)
-    canonicalizer: str = ""          # canonicalize_audio variant to run on the result
     error_policy: str = ""           # "" | fail_loud (cloud = fail_loud, no local fallback)
 
     # --- Cloud-audio-cache chunk 2 (2026-08-08): content-addressed replay

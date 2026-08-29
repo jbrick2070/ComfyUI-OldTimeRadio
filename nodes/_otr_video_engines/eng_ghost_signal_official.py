@@ -174,7 +174,7 @@ class GhostSignalV3HauntedEngine(GhostSignalV3Engine):
             return ADAPTER_V3_STRENGTH
 
 
-__all__ = ["GhostSignalV3Engine", "GhostSignalV2Engine",
+__all__ = ["GhostSignalV3Engine",
            "GhostSignalV3HauntedEngine",
            "MM_V3_NAME", "MM_V2_NAME",
            "MM_V3_MIN_BYTES", "MM_V2_MIN_BYTES",

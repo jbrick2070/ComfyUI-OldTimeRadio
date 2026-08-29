@@ -14,9 +14,11 @@ final. Keep this updated as legs run (source of truth for the cloud sweep).
 Legend: PASS (obs final) | FAIL (root-cause noted) | TESTING | UNTESTED |
 N/A (engine not valid for that position by design).
 
-Harness: `scripts/_otr_cloud_audio_babysit.py` (direct-submit; managed engines via
-`apply_profile`, the CastLock `voice_bank`/node-83 music engine via
-`patch_widget_by_name`). Key loaded per-command from User env. One fresh server per leg.
+Harness: NONE at HEAD -- the babysit script is deleted. Resume via
+`scripts/otr_api.py` direct-submit: managed engines via
+`apply_profile_to_workflow` (`otr_api.py:874`), the CastLock `voice_bank` /
+node-83 music engine via `patch_widget_by_name` (`otr_api.py:413`). Key
+loaded per-command from User env. One fresh server per leg.
 
 RULE learned 2026-07-04: face/avatar VIDEO engines (HuMo-family: kling_avatar,
 seedance, etc.) must be scoped to `character_video` ONLY. Forcing them on the

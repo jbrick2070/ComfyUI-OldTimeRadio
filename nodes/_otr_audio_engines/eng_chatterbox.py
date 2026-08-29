@@ -4,9 +4,10 @@ Chatterbox (Resemble AI, MIT -> commercial-clean ENGINE) pins its own torch /
 numpy that would brick the Blackwell (torch 2.10 / cu130) ComfyUI venv, so --
 exactly like IndexTTS2 -- it runs in its OWN isolated venv as a supervised
 subprocess worker. This adapter, in ComfyUI's venv, drives it over line-delimited
-JSON and reads back the rendered WAV; ZERO shared torch. Opt-in behind
-OTR_ENABLE_CHATTERBOX; a render fails CLOSED with a NAMED error until the Path B
-worker + venv are installed (C-7). ``interface == "per_line"``.
+JSON and reads back the rendered WAV; ZERO shared torch. Opt-in by INSTALL,
+not by flag (the registry is the menu -- no enable flag exists): a render
+fails CLOSED with a NAMED error until the Path B worker + venv are installed
+(C-7). ``interface == "per_line"``.
 
 Subprocess lifecycle (bounded read + idempotent teardown) lives in
 ``_otr_sidecar`` so a hung worker cannot block the render thread forever and a
@@ -91,8 +92,8 @@ class ChatterboxEngine:
             if not os.path.exists(path):
                 raise RuntimeError(
                     "Chatterbox Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_chatterbox_install.ps1 (isolated venv) and set "
-                    "OTR_ENABLE_CHATTERBOX=1 before rendering with chatterbox" % (label, path))
+                    "scripts\\_otr_chatterbox_install.ps1 (isolated venv) "
+                    "before rendering with chatterbox" % (label, path))
         err_path = os.path.join(_REPO_ROOT, "_otr_chatterbox_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:

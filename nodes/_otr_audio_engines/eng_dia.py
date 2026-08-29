@@ -97,8 +97,8 @@ class DiaEngine:
             if not os.path.exists(path):
                 raise RuntimeError(
                     "Dia Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_dia_install.ps1 (isolated venv + weights) and set "
-                    "OTR_ENABLE_DIA=1 before rendering with dia" % (label, path))
+                    "scripts\\_otr_dia_install.ps1 (isolated venv + weights) "
+                    "before rendering with dia" % (label, path))
         err_path = os.path.join(_REPO_ROOT, "_otr_dia_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:

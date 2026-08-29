@@ -1,6 +1,6 @@
 # OTR Chatterbox Path-B install -- isolated venv so chatterbox's pinned torch /
 # numpy NEVER touch the main ComfyUI torch-2.10 / cu130 venv. Run from anywhere.
-# After it finishes: setx OTR_ENABLE_CHATTERBOX 1, then RESTART ComfyUI.
+# After it finishes: RESTART ComfyUI (no enable flag -- installing IS the opt-in).
 $ErrorActionPreference = "Stop"
 $Root = "C:\Users\jeffr\Documents\ComfyUI\chatterbox"
 $Venv = Join-Path $Root ".venv"
@@ -25,7 +25,6 @@ $VPy = Join-Path $Venv "Scripts\python.exe"
 
 Write-Host ""
 Write-Host "Done. Next steps:"
-Write-Host "  setx OTR_ENABLE_CHATTERBOX 1"
 Write-Host ("  (optional) setx OTR_CHATTERBOX_VENV " + '"' + $VPy + '"')
 Write-Host "  Restart ComfyUI. On the canonical workflow set node 80 voice_bank=default"
 Write-Host "  and node 81 engine=chatterbox, then queue a small cast."

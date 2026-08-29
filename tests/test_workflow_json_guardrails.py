@@ -897,14 +897,6 @@ class TestCascadeB3Surface:
         "enable_phase_6_episode_arc",
     })
 
-    def _cascade_class(self):
-        # Lazy import: nodes/_otr_*.py do not import torch but pulling
-        # the cascade class via `nodes.OTR_LedgerFreezeCascade` walks
-        # the package's __init__.py which DOES import torch in some
-        # paths. AST-walk the source file instead to keep this test
-        # cheap.
-        return None
-
     def test_cascade_has_no_local_model_widget(self):
         """AST scan of OTR_LedgerFreezeCascade.INPUT_TYPES: the
         `optional` block must NOT contain a `model_id` widget. The

@@ -275,11 +275,10 @@ def test_dispatch_fails_closed_with_taxonomy(monkeypatch):
 
 
 def test_stable_audio_missing_hf_token_fails_closed(monkeypatch):
-    """Flag on but no HF_TOKEN -> MISSING_HF_TOKEN on the generate path (C-5)."""
+    """No HF_TOKEN -> MISSING_HF_TOKEN on the generate path (C-5)."""
     from nodes._otr_audio_engines import EngineUnusable, EngineUsabilityReason
     from nodes.stable_audio_theme import StableAudioTheme
 
-    monkeypatch.setenv("OTR_ENABLE_STABLE_AUDIO", "1")
     monkeypatch.delenv("HF_TOKEN", raising=False)
     with pytest.raises(EngineUnusable) as missing:
         StableAudioTheme().generate(

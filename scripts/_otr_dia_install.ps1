@@ -1,7 +1,7 @@
 # OTR Dia Path-B install -- isolated venv (Nari Labs Dia, Apache-2.0 ->
 # COMMERCIAL-CLEAN). Blackwell (RTX 5080, sm_120) needs a CUDA cu128 torch
 # build, which would conflict with the main venv -> isolate it.
-# After it finishes: setx OTR_ENABLE_DIA 1, then RESTART ComfyUI.
+# After it finishes: RESTART ComfyUI (no enable flag -- installing IS the opt-in).
 $ErrorActionPreference = "Stop"
 $Root = "C:\Users\jeffr\Documents\ComfyUI\dia"
 $Venv = Join-Path $Root ".venv"
@@ -29,7 +29,6 @@ $VPy = Join-Path $Venv "Scripts\python.exe"
 
 Write-Host ""
 Write-Host "Done. Next steps:"
-Write-Host "  setx OTR_ENABLE_DIA 1"
 Write-Host ("  (optional) setx OTR_DIA_VENV " + '"' + $VPy + '"')
 Write-Host "  Restart ComfyUI. On the canonical workflow set node 80 voice_bank=default"
 Write-Host "  and node 81 engine=dia, then queue a small cast."

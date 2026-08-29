@@ -132,7 +132,6 @@ def _minimal_profile_row(**updates):
         "engine": "google_tts",
         "commercial_clean": True,
         "model_path": "",
-        "model_sha256": "",
         "default_params": {},
         "allowed_voice_banks": ["google_tts"],
         "engine_impl_version": "1",
@@ -146,10 +145,7 @@ def _minimal_profile_row(**updates):
         "license_state": "clean",
         "warn_text": "",
         "partner_row": "",
-        "provider_id": "google",
         "auth_required": True,
-        "billing_category": "tts",
-        "canonicalizer": "audio",
         "error_policy": "fail_loud",
     }
     row.update(updates)
@@ -169,7 +165,7 @@ def test_direct_api_validation_contract():
 def test_cloud_validation_still_requires_partner_row():
     with pytest.raises(ValueError, match="runtime=cloud requires a partner_row"):
         EP.EngineProfile.model_validate(
-            _minimal_profile_row(runtime="cloud", provider_id="elevenlabs")
+            _minimal_profile_row(runtime="cloud")
         )
 
 

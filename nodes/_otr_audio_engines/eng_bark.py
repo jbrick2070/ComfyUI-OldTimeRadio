@@ -14,10 +14,11 @@ cast-lock contract violation -- generate_voice fails closed with a named
 EngineUnusable(MALFORMED_CONFIG), the same renderability net the legacy batch
 node enforced before it was retired.
 
-text_temp is the char_bark_v1 profile default (config/audio_engine_profiles.yaml,
-the curated-params SSOT, plan D5). tests/test_bark_legacy_node_retired.py pins
-text_temp == that profile value so the hardcoded constant cannot silently drift
-from the profile. UTF-8, no BOM, ASCII-only source.
+The live per-stage temperatures come from the char_bark_v1 profile
+(config/audio_engine_profiles.yaml, the curated-params SSOT, plan D5) via
+_resolve_stage_temps, which honors the legacy text_temp/waveform_temp KEY
+aliases inside the profile dict; tests/test_bark_voice_stage_temps.py pins
+that resolution ladder. UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
@@ -49,7 +50,6 @@ class BarkEngine:
     sample_rate = 24000
     supports_external_generator = False  # Bark.generate binds no external Generator
     voice_ref_field = "voice_preset"     # dispatch routes cast.voice_preset to the ref slot
-    text_temp = 0.7                      # == char_bark_v1 profile default_params.text_temp (legacy alias)
     # Per-stage temperatures (2026-06-17 whiny-voice fix). These class attrs are
     # the FALLBACK baseline when the char_bark_v1 profile is missing/malformed;
     # the live values come from the profile via _resolve_stage_temps (which honors

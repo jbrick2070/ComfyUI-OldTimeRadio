@@ -31,16 +31,16 @@ Current modules following this convention:
 
 | Module                      | Exports                              | Importers                                                                  |
 |-----------------------------|--------------------------------------|----------------------------------------------------------------------------|
-| `nodes/_otr_bark_lib.py`    | `_load_bark`, `_unload_bark`         | `batch_bark_generator.py`, `scene_sequencer.py`, `story_orchestrator.py`   |
-| `nodes/_otr_sfx_lib.py`     | `SFX_GENERATORS`                     | `batch_procedural_sfx.py`                                                  |
+| `nodes/_otr_bark_lib.py`    | `_load_bark`, `_unload_bark`         | `scene_sequencer.py`, `_otr_model_loader.py`, `_otr_vram_levers.py`        |
 | `nodes/_otr_casting.py`     | cast contract helpers                | `OTR_LedgerScriptWriter.py`                                                |
-| `nodes/_otr_ledger_consumers.py` | `load_ledger`, `iter_lines`, ... | `batch_audiogen_generator.py`, `batch_procedural_sfx.py`, `scene_sequencer.py`, `musicgen_theme.py`, `video_engine.py`, `otr_video_plan.py` |
-| `nodes/_otr_ledger_freeze.py` | `FreezeCascade`, gate helpers     | `OTR_LedgerScriptWriter.py`, `batch_bark_generator.py`                     |
+| `nodes/_otr_ledger_consumers.py` | `load_ledger`, `iter_lines`, ... | `scene_sequencer.py`, `cast_lock.py`, `otr_shot_lock.py`, `video_engine.py`, `stable_audio_theme.py`, `otr_credits_roll.py`, `_otr_captions.py`, `_otr_ledger.py`, `_otr_voice_node_common.py`, `_otr_writer_tail.py`, `_otr_content_authorship.py` |
+| `nodes/_otr_ledger_freeze.py` | `FreezeCascade`, gate helpers     | `_otr_freeze_cascade.py`, `_otr_captions.py`, `_otr_ledger_cleanup.py`, `_otr_scene_guard.py`, `_otr_cast_coverage_repair.py`, `_otr_cast_voice_coverage.py` |
 
-**Note on the `_lib` suffix:** only the first two entries above
-(`_otr_bark_lib.py`, `_otr_sfx_lib.py`) carry the strict `_lib`
-suffix this section's header documents. The three remaining
-entries (`_otr_casting.py`, `_otr_ledger_consumers.py`,
+**Note on the `_lib` suffix:** only the first entry above
+(`_otr_bark_lib.py`) carries the strict `_lib` suffix this
+section's header documents (`_otr_sfx_lib.py` was removed with
+the SFX rip, commit `b56d970f`). The three remaining entries
+(`_otr_casting.py`, `_otr_ledger_consumers.py`,
 `_otr_ledger_freeze.py`) are private library modules that predate
 the suffix convention; they're listed here because they expose
 the same kind of helper surface, but they aren't required to
@@ -53,8 +53,9 @@ grandfathered.
 The S19.2 doc-freshness check
 (`tests/test_naming_conventions.py::test_conventions_doc_lists_every_lib_module`)
 scans `nodes/_otr_*_lib.py` strictly and asserts every match
-appears in this doc. As of 2026-05-13 there are 2 such modules and
-both are listed.
+appears in this doc. As of 2026-08-28 there is 1 such module and
+it is listed. (The check is one-way: it catches a module missing
+from this doc, never a doc row whose module was deleted.)
 
 ### Test enforcement (S10.3)
 

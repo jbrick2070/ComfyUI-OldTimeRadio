@@ -7,7 +7,9 @@ This folder is intentionally small. Current operator planning lives in
 
 - `openrouter-setup.md` - optional BYO OpenRouter LLM setup.
 - `comfy-credits-setup.md` - optional Comfy Credits / Partner API setup.
-- `google_tts_ideas.md` - current Google BYO API design notes.
+- `google_tts_ideas.md` - the ORIGINAL design notes for the Google BYO API
+  lane; the plan SHIPPED as `nodes/_otr_audio_engines/eng_google_tts.py`
+  (registered, live), so read the adapter for current truth.
 - `gemma4-gguf-native-setup.md` and `gemma4/` - local Gemma GGUF notes.
 
 ## The video model reference (read both before adding or changing an engine)
