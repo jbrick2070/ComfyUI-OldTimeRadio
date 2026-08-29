@@ -8286,9 +8286,17 @@ call to make, not a tidy-up.
 - **impact:** every GGUF generate pays a full model load, and nothing is ever
   cached. That is the entire Mac / AMD / CPU story plus every `*_gguf` profile,
   because those lanes are GGUF by construction (bitsandbytes NF4 is CUDA-only).
-  It is also the likely proximate cause of the server death, though that is
-  NOT yet proven -- 22 loads whose instances are never adopted are 22
-  llama.cpp contexts whose release is unaccounted for.
+  **The server death on that leg is NOT explained by this defect and remains
+  OPEN.** It is also NOT PBUG-20260829-12's illegal instruction, and that is
+  ruled out by evidence rather than by architecture: on this box llama.cpp
+  loaded and generated successfully 22 times in that same leg, and a separate
+  standalone load produced coherent prose in 0.6 s. The wheel runs here. The
+  two boxes differ -- 5080: Intel Core Ultra 9 275HX; 4060: i9-13900H -- which
+  is consistent with -12 being 13900H-specific. What killed the 5080's server
+  is still unknown: the log ends mid-load with no traceback, which is a hard
+  process death rather than a Python exception. Worth noting only as a
+  suspicion: 22 llama.cpp contexts that are never adopted are 22 whose release
+  is unaccounted for.
 - **NOT FIXED, deliberately, and this is the reason.** There are at least three
   defensible repairs -- thread the new epoch back out of the eviction; move the
   eviction into `request_slot` so the caller owns the bump; or re-capture the
@@ -8304,7 +8312,15 @@ call to make, not a tidy-up.
   into a permanent cache miss, silently, while every log line looks like a
   race it is protecting you from.
 
-## PBUG-20260829-11 -- the GGUF lane's prebuilt wheel dies with ILLEGAL INSTRUCTION on a 13th-gen Intel mobile CPU
+## PBUG-20260829-12 -- the GGUF lane's prebuilt wheel dies with ILLEGAL INSTRUCTION on a 13th-gen Intel mobile CPU
+
+> **ID NOTE.** Logged as `-11` in commit `f0b3008f` from the 4060 window and
+> renumbered to `-12` here: the 5080 window had pushed a different `-11`
+> (the GGUF cache-epoch defect above) six minutes earlier. Two boxes
+> appending to the same log picked the same next number. Nothing was lost --
+> `.gitattributes` marks this file `merge=union` precisely so a tail
+> collision keeps BOTH sides -- but the ID had to be made unique by hand.
+> The commit message for `f0b3008f` still says `-11`; this entry is that bug.
 
 - **found:** 2026-08-29 on the 4060 (MRKT), running the operator's own
   frictionless-install question: which writer dropdowns actually load and finish
