@@ -99,6 +99,11 @@ machinery. Animated characters with mouth motion + independent voice track =
 lanes (prompt for animated speaking characters, loose motion), not new
 infrastructure -- which is exactly what makes it cheap on an 8 GB card.
 
+Acceptance bar, from the operator directly: the trade is worth it at ~0.5x
+render time ("thats ok if its .5 teh render time"). Speed IS the product here
+-- the lane earns its place by halving the render, with the dub aesthetic
+absorbing whatever sync fidelity that costs.
+
 ## Step 5 -- leg 3 in flight (legacy loader)
 
 Server relaunched with `--disable-dynamic-vram`; episode re-queued
