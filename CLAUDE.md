@@ -270,8 +270,32 @@ remembering even now: a measurement is not a proof, and only the canonical path 
 - **Stale git `index.lock`:** if `git add`/`commit` fails with "index.lock: File exists" AND
   `Get-Process git` is empty, the lock is STALE (a real git op finishes in seconds) -- remove
   `.git\index.lock` and retry. Do NOT remove it while a git process is actually running.
-- **One coder window in the code at a time** (serialize via `docs/GO_FORWARD_PLAN.md`). Two windows
-  editing the same file -- especially the workflow JSON -- is how it gets corrupted.
+- **TWO WINDOWS, SPLIT BY AREA, BOTH PUSH (operator decision 2026-08-29 -- supersedes the older
+  "one coder window at a time" line).** The 5080 and the 4060 both run coder windows and both push
+  to `v2.0-alpha` directly. Serialization by turn-taking was the old answer and it cost more than it
+  bought: on 2026-08-29 the two boxes landed ~25 commits with zero lost work, and the 4060 found
+  three defects in the 5080's own files (a fetcher pulling the wrong motion module, an h3 profile
+  declaring a canvas its engine overruled, a re-run that could not have tested what it claimed)
+  while the 5080 fixed a loader bug that was killing the 4060's legs. Neither would have happened
+  quickly behind a single-writer queue.
+  **THE SPLIT -- every file has exactly one owner, and the owner pushes it:**
+  * **The 4060 (MRKT) owns the portability surface:** any profile IT has proven on 8 GB hardware,
+    `docs/4060_DRILL_LOG.md`, and the fresh-install / least-friction path. It is the only box that
+    can answer "does this work somewhere other than where it was written", which is the one question
+    the dev box structurally cannot answer about itself.
+  * **The 5080 (IDREAM) owns the shipping surface:** `pyproject.toml` and anything registry-facing,
+    `workflows/otr_canonical.json` and its variants, `nodes/`, and profile `status` promotions.
+  * **`docs/PROD_BUG_LOG.md` is shared and append-only** -- both boxes write it, by appending.
+  **WHAT MAKES THIS SAFE IS STRUCTURAL, NOT ETIQUETTE.** `.gitattributes` marks the append-only logs
+  `merge=union`, so a tail collision keeps BOTH sides automatically instead of raising conflict
+  markers that a tired window resolves by picking one. That resolution was performed BY HAND twice
+  on 2026-08-29 before the guard existed. Union can duplicate; it cannot lose. Never extend
+  `merge=union` to `.json` or `.py` -- it yields invalid JSON and code that parses and is wrong.
+  **STILL TRUE AND UNCHANGED:** two windows editing THE SAME FILE at once is how it gets corrupted,
+  and the workflow JSON is the worst case. The split exists precisely so that does not happen; when
+  work genuinely crosses the boundary, the owner of the file makes the edit, or the two windows
+  agree in-message first. `docs/GO_FORWARD_PLAN.md` remains the place to serialize a genuinely
+  shared multi-step effort.
 - Use **AskUserQuestion** for genuine operator decisions; use the **task list** for any multi-step work.
 ## 2. AUTONOMY / PRIME DIRECTIVE
 - NEVER ask me to run scripts, commands, or anything. YOU run it: Desktop Commander first; if DC can't,
