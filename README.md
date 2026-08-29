@@ -90,6 +90,41 @@ Hugging Face cache the first time the pipeline runs — the writer
 (~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
 before you start it on a metered connection.
 
+### 2b-ii. The GGUF writer lane — install 0.3.33, not the latest
+
+Only needed if you select a `*-GGUF` writer row. It is the lane that runs a
+large writer on a small card, and **it is the only local writer lane that works
+off NVIDIA at all** — bitsandbytes NF4 is CUDA-only, so every Mac, AMD and CPU
+profile in this pack (`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm`,
+`cpu_floor`) runs GGUF through in-process llama.cpp. No Ollama, no sidecar
+process, no extra port.
+
+```bash
+pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+```
+
+**Pin the version. Do not take the latest.** `0.3.35` dies with
+`STATUS_ILLEGAL_INSTRUCTION` (`WinError -1073741795`) inside
+`llama_init_from_model`, before a single token. It reproduces at
+`n_gpu_layers=0`, so the fault is in the **CPU backend** and no GPU avoids it.
+`0.3.33` loads and generates on the same machine, and the two builds were
+confirmed byte-identical across two different machines by SHA-256. An unpinned
+`pip install llama-cpp-python` resolves to the broken one today.
+
+On Windows, CUDA wheels also need an importable CUDA 12 runtime:
+
+```bash
+pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12
+```
+
+These coexist safely with a CUDA 13 torch — measured on both Blackwell and Ada,
+loading llama.cpp first and then running a real CUDA matmul through torch.
+
+> **Test it the way OTR does.** A bare `import llama_cpp` fails even on a
+> *working* install, because OTR preloads the CUDA DLLs and extends the DLL
+> search path first. Use the pack's own path instead:
+> `from nodes._otr_gguf_backend import _import_llama_cpp; _import_llama_cpp()`
+
 ### 2c. Hugging Face token — best practice
 
 **You do not need a token to run OTR.** The 8 GB haunted profile and everything

@@ -996,10 +996,19 @@ def _import_llama_cpp():
     except Exception as exc:  # noqa: BLE001
         raise GGUFNativeConfigError(
             "llama-cpp-python is not importable in the ComfyUI venv. "
-            "Install a CUDA-enabled llama-cpp-python build for this Python "
-            "environment before selecting unsloth/gemma-4-12b-it-GGUF. "
+            "INSTALL VERSION 0.3.33 SPECIFICALLY -- do NOT take the latest: "
+            "0.3.35 dies with STATUS_ILLEGAL_INSTRUCTION (WinError "
+            "-1073741795) inside llama_init_from_model, and unpinned installs "
+            "resolve to it. Reproduced at n_gpu_layers=0, so the fault is in "
+            "the CPU backend and no GPU can avoid it; 0.3.33 loads and "
+            "generates on the same hardware, hash-verified as the same binary "
+            "on two machines (PBUG-20260829-12). "
+            "  pip install llama-cpp-python==0.3.33 "
+            "--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124 "
             "On Windows CUDA wheels also require importable CUDA 12 runtime "
-            "DLLs such as nvidia-cuda-runtime-cu12 and nvidia-cublas-cu12."
+            "DLLs: pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 "
+            "(these coexist safely with a CUDA 13 torch -- measured on both "
+            "Blackwell and Ada)."
         ) from exc
     return Llama
 
