@@ -8081,3 +8081,65 @@ is NOT a fixed property of the small writer. This leg logged `Ghost Prompt v2:
 8 beat(s) authored (writer_llm=8)` with zero fallbacks. The difference tracked
 the style pack (`visual_storybased` here, `shakespeare_stage_realism` there),
 not the model.
+
+### ARITHMETIC NOTE on PBUG-20260829-05/-06 -- 12B NF4 DOES NOT FIT 8 GB, AND NO BUDGET FIX REACHES THAT (5080, 2026-08-29)
+
+**Read this before doing -05.** -05 says the GPU budget is a hardcoded tag
+table that ignores live free VRAM, and that is true and still worth fixing.
+But it is easy to read -05 as *"derive the budget properly and 12B works on
+the 4060."* It does not, and the next session should not spend a day
+discovering that.
+
+The 4060's 12B leg (prompt `5c509116`) ran on the post-fix loader with the
+budget demonstrably CORRECT -- `{0: '6.8GiB'}` instead of `3.2GiB`, confirmed
+both by executing the shipped function and by 6676 MiB of live VRAM during the
+load, which a 3.2 GiB cap could not have produced. It still failed, at
+`dispatch_model` with the -06 meta-tensor `RuntimeError`. That is the
+discriminating result: **if -05 were the cause, a correct budget would have
+changed the outcome.** It did not.
+
+The reason, computed here from `google/gemma-4-12b-it`'s own `config.json`
+rather than from a rule of thumb (`C:\ComfyUI-Models\huggingface\hub\
+models--google--gemma-4-12b-it\snapshots\5926caa4...\config.json`):
+
+| term | value |
+|---|---|
+| `vocab_size` | 262,144 |
+| `hidden_size` | 3,840 |
+| `tie_word_embeddings` | true (so no separate lm_head copy) |
+| bf16 embedding table, **which NF4 does not quantize** | 262144 x 3840 x 2 B = **1.88 GiB** |
+| 12B params at 4 bits | **5.59 GiB** |
+| **floor, before activations, KV cache or CUDA context** | **7.46 GiB** |
+| planned GPU budget after the -07 fix | 6.80 GiB |
+| the whole card | 8188 MiB = 8.00 GiB |
+
+7.46 > 6.80, so `infer_auto_device_map` assigns a CPU tail that is CORRECT, not
+a bug. bitsandbytes then refuses the CPU-dispatched modules, the retry permits
+them, and -06 kills it at dispatch. And raising the budget does not rescue it:
+7.46 GiB of weights plus activations and the CUDA context does not fit in 8.00
+GiB of total card either. **The tag collision (-07) was real and is fixed, but
+it was never what stopped 12B on this hardware.**
+
+So take -06 on if you want the explicit-dict `device_map` to work in general --
+that is a genuine defect with its own value. Do not take it on expecting a good
+12B writer on an 8 GB card. Even if dispatch succeeded, the bf16 CPU side is
+~3.9 GiB re-streamed every forward.
+
+**What DOES put a 12B writer on 8 GB is the GGUF lane, and the repo already has
+profiles for it** -- `8gb_lite`, `otr_8gb_ltx`, `otr_8gb_wan`, `otr_8gb_fastwan`
+all pin `unsloth/gemma-4-12b-it-GGUF` at `quant_policy: "none"`. llama.cpp
+splits GPU/CPU natively with no meta-tensor round trip, which is a different
+mechanism entirely and is not subject to any of the arithmetic above.
+
+**DELIBERATELY NOT CHANGED, so nobody "fixes" it later without reading this.**
+`otr_4060_haunted_12b` and `otr_4060_viz_12b` declare `vram_ceiling_gb: 12.0`
+on an 8 GB card. That admission gate (`_assert_policy_admits_vram`) exists to
+refuse a doomed load EARLY rather than let it die deep, so a ceiling 4 GiB
+above the physical card is why this failure costs 38.53 s instead of being
+refused at once. Tightening it to 8.0 was considered and rejected on two
+grounds: the operator's standing directive is that a guard is legitimate only
+when the alternative is a SILENT WRONG RENDER, and this alternative is a loud
+crash; and both profiles are `draft` experiment lanes that the 4060 window is
+actively using to observe -06's mechanism, which an early refusal would
+prevent. Leave them. If the operator later wants the early refusal, that is his
+call to make, not a tidy-up.
