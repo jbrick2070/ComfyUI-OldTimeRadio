@@ -402,13 +402,17 @@ GGUF_ROWS: tuple[GGUFRow, ...] = (
             ),
         },
         context_window=8192,
-        # kv_gb_per_1k stays None until MEASURED on this artifact. The schema
-        # refuses a guessed constant and it is right to: borrowing the gemma
-        # row's 0.70 would be an invention, and this model's KV geometry
-        # differs (36 layers, 8 kv-heads, head_dim 128). Until it is measured
-        # the fit estimate prices weights only, which is honest-but-optimistic
-        # rather than confidently wrong.
-        kv_gb_per_1k=None,
+        # MEASURED 2026-08-29 on the RTX 4060 8 GB, two independent points read
+        # off the backend's own physical-free preflight rather than derived:
+        #     kv 2.80 GB @ n_ctx 4096  ->  0.684 GB / 1k
+        #     kv 5.70 GB @ n_ctx 8192  ->  0.696 GB / 1k
+        # Pinned at the CONSERVATIVE 0.70 rather than the lower 0.684: this
+        # number gates admission, and under-pricing KV on an 8 GB card is the
+        # direction that ends in an OOM instead of a refusal.
+        # NOT PERFECTLY LINEAR -- the two points differ, so there is a small
+        # fixed term in the estimate. Anyone extrapolating far outside
+        # 4096-8192 should measure again rather than trusting the slope.
+        kv_gb_per_1k=0.70,
         # UNPROVEN until a live leg publishes on this row. Not "PASS" on the
         # strength of arithmetic -- a dropdown row is a promise the model will
         # load, and no episode has been rendered with this writer yet.

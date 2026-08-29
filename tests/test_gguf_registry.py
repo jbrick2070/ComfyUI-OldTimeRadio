@@ -79,9 +79,17 @@ def test_qwen_2507_row_shape():
     # This model has no <think> in its chat template; its Qwen3.5-4B sibling
     # does. Flipping this to a thinking policy would mean a different model.
     assert row.think_policy == "none"
-    # Deliberately un-optimistic until a live leg proves them. If someone
-    # promotes these, the promotion must cite the leg -- see the gemma row.
-    assert row.kv_gb_per_1k is None, "kv must stay None until MEASURED"
+    # kv was None until MEASURED, and this is the citation the earlier
+    # assertion demanded: two points off the backend's own physical-free
+    # preflight on a real RTX 4060 8 GB -- 2.80 GB @ n_ctx 4096 (0.684/1k) and
+    # 5.70 GB @ n_ctx 8192 (0.696/1k). Pinned CONSERVATIVE at 0.70, because
+    # under-pricing KV on an 8 GB card ends in an OOM rather than a refusal.
+    assert row.kv_gb_per_1k == 0.70, (
+        "kv_gb_per_1k must stay the measured value; changing it needs a new "
+        "measurement on real hardware, not a re-estimate")
+    # STILL UNKNOWN, and it must stay that way until an episode PUBLISHES on
+    # this row. The model loads and generates -- that is not the same claim.
+    # The one live leg attempted so far died on PBUG-20260829-11.
     assert row.vram_fit_tier == "UNKNOWN", "no episode has rendered on this row"
 
 

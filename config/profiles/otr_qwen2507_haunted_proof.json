@@ -1,6 +1,6 @@
 {
   "id": "otr_qwen2507_haunted_proof",
-  "display_name": "PROOF LEG: haunted lane + Qwen3-4B-Instruct-2507 GGUF writer -- one variable changed from otr_nvidia_8gb_haunted (the writer). Exists to move that row's vram_fit_tier off UNKNOWN with a published episode.",
+  "display_name": "PROOF LEG: haunted lane + Qwen3-4B-Instruct-2507 GGUF writer -- one variable changed from otr_nvidia_8gb_haunted (the writer). n_ctx 4096: 8192 was MEASURED to need 8.03 GB against 6.94 GB free on a real 8 GB card, so it contradicted this profile's own 6.8 ceiling.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -38,7 +38,7 @@
     "attn_impl": "sdpa",
     "quant_policy": "none",
     "vram_ceiling_gb": 6.8,
-    "gguf_n_ctx": 8192,
+    "gguf_n_ctx": 4096,
     "gguf_quant": "Q4_K_M",
     "creative_model": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
     "technical_model": "unsloth/Qwen3-4B-Instruct-2507-GGUF",

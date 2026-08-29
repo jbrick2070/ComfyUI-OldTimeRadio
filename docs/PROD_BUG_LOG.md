@@ -8253,3 +8253,53 @@ call to make, not a tidy-up.
   lane, not the install.* Distinct from the kokoro/ffmpeg class (dependency the
   dev box happens to have) because here NO box could have had it without a
   manual step nobody wrote down.
+
+## PBUG-20260829-11 -- every GGUF generate reloads the model: the load path's own eviction makes it look abandoned to itself
+
+- **found:** 2026-08-29 on the 5080, on a LIVE canonical leg (prompt
+  `d2c39f80-c9e0-423a-bd0d-e02c931a64c4`, profile
+  `otr_qwen2507_haunted_proof`). Not a unit test -- this is invisible to one.
+- **observed:** in a single episode's worth of writer calls the server logged
+  **22 GGUF load attempts, 22 "abandoned" warnings, and 0 cache adoptions.**
+  The model was re-loaded from disk for every structured call, then the server
+  died with no traceback (hard process death, not an exception).
+- **MECHANISM, confirmed against the code and not inferred from the symptom:**
+  1. `request_slot` snapshots `_my_cache_epoch = _current_cache_epoch()`
+     (`_otr_model_loader.py:1513`) BEFORE any local work.
+  2. The GGUF load path then calls
+     `free_otr_pipeline_residue(reason="GGUFNative load preflight")`
+     (`_otr_gguf_backend.py:1202`), whose step 1 is `unload_llm()`
+     (`_otr_vram_levers.py:143`).
+  3. `unload_llm()` -> `_detach_and_invalidate_locked()` -> **bumps the epoch.**
+  4. `_publish_cache_entry_if_current(_my_cache_epoch, ...)` (`:1751`) then
+     sees a moved epoch, refuses to publish, and logs "completed after this
+     call was abandoned".
+  **The call is not abandoned. It advanced the epoch itself, and is then
+  disqualified by its own action.** The guard is doing exactly what it was
+  written to do; the defect is that the GGUF path trips it.
+- **The code already names the right shape.** `unload_llm`'s own docstring:
+  "the authoritative-invalidator shape used by every caller OUTSIDE
+  request_slot's own control flow ... **NOT** used by request_slot's own
+  self-triggered transitions; see `_self_unload` for why those need a
+  conditional (ownership-checked) claim instead." The GGUF preflight calls the
+  unconditional form from INSIDE that control flow.
+- **impact:** every GGUF generate pays a full model load, and nothing is ever
+  cached. That is the entire Mac / AMD / CPU story plus every `*_gguf` profile,
+  because those lanes are GGUF by construction (bitsandbytes NF4 is CUDA-only).
+  It is also the likely proximate cause of the server death, though that is
+  NOT yet proven -- 22 loads whose instances are never adopted are 22
+  llama.cpp contexts whose release is unaccounted for.
+- **NOT FIXED, deliberately, and this is the reason.** There are at least three
+  defensible repairs -- thread the new epoch back out of the eviction; move the
+  eviction into `request_slot` so the caller owns the bump; or re-capture the
+  epoch after a self-triggered unload -- and they differ in their concurrency
+  guarantees. The guard being tripped is the one that stops an abandoned call
+  from publishing a model a later caller would then generate on concurrently,
+  so a careless fix reintroduces a double-generate race. This is a design item
+  under the 2026-08-17 rule and gets a panel before code, not a solo swing at
+  the end of a long session with the operator away.
+- **bible-worthy: PENDING the fix.** The portable rule is already visible: a
+  guard keyed on "did the world change under me" must not be tripped by the
+  guarded call's OWN side effects -- otherwise it converts a correctness check
+  into a permanent cache miss, silently, while every log line looks like a
+  race it is protecting you from.
