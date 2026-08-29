@@ -403,3 +403,34 @@ when E2B already ships. **Recorded, not attempted.** The four GGUF profiles
 therefore remain UNVERIFIED on 8 GB hardware -- a real gap in the shipping
 story, and the natural next rung of the proving ground whenever the operator
 wants it.
+
+**CORRECTION TO MY OWN CONCERN, from the 5080's audit:** I flagged that those
+four GGUF profiles might be asserting `shipping` while unrun. They are all
+`draft`. The repo had already declined to make the claim, so there was nothing
+to demote and my worry was unfounded -- recorded because a concern raised in
+this log should be answered in it.
+
+**The audit's real result is worth more than my question was.** Across all 38
+`shipping` profiles: structural validation plus every named visual engine
+resolved against the live registry returns ZERO broken. The tier split:
+
+    vram_ceiling 14.5   ->  37 profiles   (the 5080's tier: the dev box)
+    vram_ceiling  6.8   ->   1 profile    otr_nvidia_8gb_haunted
+
+**Exactly one shipping profile targets hardware that is not the development
+box, and it is the one this box's leg proved.** Every other shipping claim is
+a claim about the machine it was written on. That is not dishonest -- nothing
+overstates itself -- but it is the precise shape of the ship story: the pack is
+broadly proven on a 16 GB 5080 and, as of 2026-08-29, at exactly one point on
+8 GB consumer hardware. What evidence `shipping` ought to REQUIRE is an
+operator question and has been put to him, not decided by either window.
+
+**Also checked, and my DLL worry was unfounded:** `_import_llama_cpp()`
+(`_otr_gguf_backend.py:939`) wraps preparation and import in `except
+Exception`, not `except ImportError`, so the shared-library RuntimeError I hit
+is caught and converted to a `GGUFNativeConfigError` that already names
+`nvidia-cuda-runtime-cu12`/`nvidia-cublas-cu12`; and
+`validate_gemma_gguf_ready()` ATTEMPTS the import rather than probing for the
+module, so a broken binding reports `binding_available: False`. The uninstall
+was still right -- leave the box as found -- but the availability probe would
+not have lied.
