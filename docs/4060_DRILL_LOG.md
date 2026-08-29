@@ -571,3 +571,118 @@ implications, not a bug fix, so it is surfaced rather than taken.
 profile, no workflow JSON was touched -- this is three pip installs in the MRKT
 venv and one log entry. The 5080 is provably untouched because nothing left
 this box's environment.
+
+## THE FRICTIONLESS-INSTALL ANSWER: LOW and HIGH on 8 GB, every value measured
+
+Operator's ask (2026-08-29): *"how can we get Claude to see how frictionless our
+best frictionless setup low and high capabilities are on the 4060 and decide
+what dropdowns those JSONs should have."* Friction is defined as six observable
+numbers per candidate, none of them a judgement call. Answers below are from
+this box's runs, not from argument. **Where a value is unproven it says
+UNPROVEN.**
+
+### LOW -- `otr_nvidia_8gb_haunted` -- CONFIRMED, with one asterisk
+
+The incumbent's job was to be confirmed or beaten. It is **confirmed**: three
+published episodes, and it is the only profile in the repo whose evidence comes
+from hardware other than the machine it was written on.
+
+| # | friction question | measured answer |
+|---|---|---|
+| 1 | GB before first render | **16.03 GB** (not the ~3.7 the label used to claim) |
+| 2 | HF token required? | **No.** Every artifact fetched anonymously |
+| 3 | auto-download or manual? | **MIXED** -- writer/voices/music auto; SD1.5 + motion module + adapter are manual placements |
+| 4 | undeclared dependency? | **YES, two.** `ComfyUI-AnimateDiff-Evolved` (PBUG-09) and `pyloudnorm` (PBUG-04) |
+| 5 | does it LOAD | **Yes** -- through the real path, three times |
+| 6 | wall / peak VRAM | **55 / 38.7 / 35.4 min**, ~4.2 GB peak of 8.0 |
+
+The 16.03 GB breaks down as 3.94 GB of explicit placements (SD1.5 1.99,
+`v3_sd15_mm` 1.56, `v3_sd15_adapter` 0.10, `kokoro-v1_0` 0.30) plus HF-cache
+pulls the old label omitted: **gemma-4-E2B-it 9.57**, musicgen-small 2.21,
+Kokoro-82M 0.31.
+
+**THE ASTERISK, and it is the honest limit of all three episodes:** this box was
+hand-prepared. The node pack arrived by `git clone` at 03:00, not by any
+documented step. The runs prove the LANE; they do not prove an INSTALL. That
+gap closes only on a box that has never been touched -- the clean-room test,
+which is parked with the operator.
+
+**Defended dropdown values for LOW** -- every one carries a reason:
+
+    role_overrides  announcer/music/character_visual : animatediff15_v3_haunted_video
+                    -- text_to_video, so NO image model enters the beat path.
+                       Verified: zero z_image/Lumina2 loads across a whole episode.
+                    announcer/music/character_image  : z_image_turbo
+                    -- DECLARED BUT NEVER INVOKED on this lane. Inert, kept only
+                       for role completeness. UNPROVEN as an 8 GB image lane:
+                       z_image never completed an episode here.
+    slot_overrides  voice_bank kokoro_builtin | char+announcer kokoro
+                    -- 3 episodes; needs the repo_id gate (PBUG-02) to exist at all.
+                    music_engine musicgen -- stable_audio_3 ckpt is not on disk.
+                    video_render_engine animatediff15_v3_haunted_video -- as above.
+    llm             creative+technical google/gemma-4-E2B-it, quant_policy "none"
+                    -- PASS/PASS on the fit gate at both ceilings; 3 published
+                       episodes; ungated; anonymous. THE proven 8 GB writer.
+                       quant_policy "none" also means _plan_max_memory returns
+                       None, so the tag-table class of defect (PBUG-05/-07)
+                       cannot reach this profile at all.
+                    vram_ceiling_gb 6.8 -- the tier value; admits E2B, refuses 12B.
+    render          512x288, fps 25, frame_budget 25
+                    -- 25 is REQUIRED, not stylistic: mm-p_0.5 has a hard 32-frame
+                       ceiling without a context window, and the v3 lane uses a
+                       sliding context window to exceed it. 49 frames crashed.
+    launch          NO --disable-dynamic-vram. Measured: stock DynamicVRAM is
+                    ~30% FASTER here (2322 s vs 3303 s) and does not abort,
+                    because this lane never loads the image UNET that triggered
+                    PBUG-03.
+
+### HIGH -- the best an 8 GB card can do, still frictionless -- **UNPROVEN**
+
+HIGH's whole premise was a better writer in the same 8 GB. The candidate was
+`unsloth/Qwen3-4B-Instruct-2507-GGUF`: 2.33 GiB against E2B's 9.57 GB on disk,
+Apache-2.0, ungated, anonymous fetch in **46 s**, byte- and sha256-exact against
+the pinned row. Its VRAM fit is **proven with headroom on this card**:
+
+    n_ctx 8192 -> REFUSED  Free 6.94 GB < Needed 8.03 (weights 2.33 + kv 5.70)
+    n_ctx 4096 -> ADMITTED Free 6.94 GB   Needed 5.23 (weights 2.33 + kv 2.80)
+                 then llama.cpp init: n_ctx=4096, n_gpu_layers=-1  (FULL GPU)
+
+Measured `kv_gb_per_1k`: 0.684 @ 4096 and 0.696 @ 8192 -- not perfectly linear,
+so a small fixed term exists; pinned conservatively at 0.70.
+
+**And then it hard-faulted:** `OSError [WinError -1073741795]` =
+`STATUS_ILLEGAL_INSTRUCTION`, at `llama_init_from_model`, 2.58 s in. Not VRAM
+(1.7 GB headroom), not the artifact (hash-exact). **HIGH therefore has no
+proven writer today and I will not ship an unproven one as a default.**
+
+Root cause is NOT settled and my first answer was wrong. I blamed the CPU's
+lack of AVX-512; the 5080 lacks it too and works, so that is dead. The live
+suspect is the WHEEL VERSION -- and the binaries genuinely differ:
+
+    4060  llama_cpp_python 0.3.35  ggml-cuda.dll 819.27 MB  86555e1c0b39d826...  FAULTS
+    5080  llama_cpp_python 0.3.33  ggml-cuda.dll 945.37 MB  715bf1e45e9ff80e...  WORKS
+
+Identical wheel tags (`py3-none-win_amd64`), both from an index, all four DLLs
+different. The decisive test -- install 0.3.33, verify by HASH not version
+string, load through `_import_llama_cpp()` on a fresh process -- is queued
+behind live legs. **Until it resolves, HIGH's writer row is UNPROVEN.**
+
+### WHAT I REJECTED, and why
+
+| rejected | why, measured |
+|---|---|
+| `gemma-4-12b-it` (transformers) | 11.9 GB; FAIL at 6.8. Floor is 7.46 GB (5.59 NF4 + 1.88 bf16 embeddings NF4 never touches) on an 8.0 GB card |
+| `gemma-4-12b-it` **as the shipped default** | it IS the shipped graph default and it FAILS here -- PBUG-13, operator's call |
+| `gemma-4-E4B-it` NF4 | refused by the same CPU-dispatch path as 12B before the -07 fix; unretested since |
+| LTX video lane | never completed an episode on this card, two attempts |
+| `z_image_turbo` stills | survived sampling once under the legacy loader; never completed an episode |
+| `--disable-dynamic-vram` as a default | measured 30% SLOWER and unnecessary on this lane |
+| `n_ctx` 8192 for GGUF | refused on 8 GB by the backend's own physical-free preflight |
+| multi-act episodes | never run here; `--act-count 1` only |
+
+### THE HONEST HEADLINE
+
+**LOW ships today and is proven three times. HIGH does not exist yet** -- not
+because 8 GB cannot host a better writer (the fit is proven with headroom) but
+because the binding that would run it faults on this machine. One version test
+stands between HIGH being real and HIGH being a plan, and it is queued.
