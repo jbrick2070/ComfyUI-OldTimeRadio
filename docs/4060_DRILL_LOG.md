@@ -199,10 +199,41 @@ FINDING #4 (cold-install): pyloudnorm is declared in NEITHER
 requirements.txt NOR pyproject -- every registry install masters by peak,
 not LUFS. Rides the next deliberate pyproject bump alongside kokoro.
 
-Night ledger for this box: 4 cold-install findings (kokoro repo_id
+## Step 8 -- OPERATOR DIRECTIVE (2026-08-29 ~10:00) + the writer-size answer
+
+Directive, his words: "I don't want guards to kill anything -- an OOM is the
+only killer." Guards may fall back LOUDLY (the ghost-prompt fallback and the
+peak-master fallback last night are the model); they must not abort a render
+on an estimate or a quality judgment. Reconciling this with the standing
+fail-loud/no-fallback guards (miscast voices, scope NO FALLBACK raises,
+VRAMFit) is a DESIGN ITEM for the dev box, not a dawn rewrite from here.
+
+The directive got a live test within minutes. He asked why the writer was
+E2B and not gemma-4-12b (which is fully cached here -- not gated, never
+selected; every 4060 profile pins E2B for headroom). Measured answers:
+
+- 12B attempt 1: KILLED BY A GUARD, not memory -- VRAMFitFailedError,
+  "estimated 11.9 GB peak vs 6.8 ceiling", 0.10 s. Exactly the class the
+  directive outlaws. Ceiling raised to 12.0 to let physics judge.
+- 12B attempt 2: the memory judge ruled -- bnb 4-bit validate_environment:
+  "Some modules are dispatched on the CPU... Make sure you have enough GPU
+  RAM to fit the quantized model." 12B nf4 does not fit this card. Accepted.
+- E4B attempt (otr_4060_haunted_e4b, nf4, ceiling 6.8): SAME CPU-dispatch
+  refusal in 2.17 s -- suspicious, because ~4-5 GB of nf4 weights against
+  ~7.1 GB free should fit. CANDIDATE FINDING #5: the loader's
+  device_map/max_memory derivation may be over-reserving on small cards
+  (or MatFormer per-layer-embedding modules are planned to CPU by design and
+  trip the bnb refusal). Two attempts spent; per the two-strikes rule the
+  third swing belongs to a panel/dev-box review, not this window.
+
+Standing writer verdict for MRKT until that lands: E2B (unquantized) is the
+qualified writer; 12B nf4 measured out; E4B nf4 blocked pending the loader
+question.
+
+Night ledger for this box: 4 confirmed cold-install findings (kokoro repo_id
 TypeError, DynamicVRAM native abort at image load, ffmpeg-9 -vsync removal
--- all three root-fixed on origin -- plus the undeclared pyloudnorm), ~32 GB
-of weights staged byte-exact, 2 profiles shipped, 1 episode published.
-Operator's framing to carry forward: this box is rung one of a PORTABILITY
-PROVING GROUND -- rented GPU classes as a qualification matrix for the
-workflow, not as render farms.
+-- all three root-fixed on origin -- plus the undeclared pyloudnorm), 1
+candidate finding (E4B/nf4 loader fit), ~32 GB of weights staged byte-exact,
+4 profiles shipped, 1 episode published. Operator's framing to carry
+forward: this box is rung one of a PORTABILITY PROVING GROUND -- rented GPU
+classes as a qualification matrix for the workflow, not as render farms.
