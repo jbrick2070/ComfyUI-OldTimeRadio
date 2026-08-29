@@ -425,6 +425,33 @@ broadly proven on a 16 GB 5080 and, as of 2026-08-29, at exactly one point on
 8 GB consumer hardware. What evidence `shipping` ought to REQUIRE is an
 operator question and has been put to him, not decided by either window.
 
+## Step 12 -- the loudness fix proven end to end; shipping profile passes a SECOND time
+
+Leg: `--profile otr_nvidia_8gb_haunted`, prompt `e9799331`, stock path (no
+`--disable-dynamic-vram`), pyloudnorm 0.2.0 now present.
+
+    RESULT SUCCESS + obs publish + mp4
+    signal_lost_whispers_over_brittle_pages_20260829_113929_...final.mp4
+    53.3 MB, 67.72 s, h264 + AAC
+    wall: 2121 s (35.4 min)  -- third consecutive pass, and the fastest yet
+
+**PBUG-20260829-04 is now CLOSED ON THIS BOX, proven by the artifact rather
+than by the install succeeding:**
+
+    [EpisodeAssembler] Final loudness master: measured -12.01 LUFS ->
+    target -14.0 LUFS (gain -1.99 dB), true-peak ceiling -1.0 dBFS
+    [peak-limited] (post-crossfade)
+
+`legacy peak master` fallbacks this leg: **0**. So the LUFS path genuinely ran,
+and this is the FIRST episode from MRKT that is loudness-comparable to any 5080
+episode in the shared obs folder. The two earlier ones
+(`the_ledgers_whisper`, `shadows_lengthening_on_the_heath`) remain peak-mastered
+and are not comparable -- that gap is historical now, not ongoing. The
+`pyproject` declaration is still owed and still rides the next deliberate bump.
+
+**Shipping-profile tally on 8 GB hardware: 3 for 3** (haunted_local, then
+`otr_nvidia_8gb_haunted` twice), all publishing, at 55 / 38.7 / 35.4 min.
+
 **Also checked, and my DLL worry was unfounded:** `_import_llama_cpp()`
 (`_otr_gguf_backend.py:939`) wraps preparation and import in `except
 Exception`, not `except ImportError`, so the shared-library RuntimeError I hit
