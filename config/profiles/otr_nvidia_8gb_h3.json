@@ -1,6 +1,6 @@
 {
   "id": "otr_nvidia_8gb_h3",
-  "display_name": "8GB NVIDIA: MiniMax H3 low-VRAM (7.3GiB @864x480, ~39.6GB weights, silent today)",
+  "display_name": "8GB NVIDIA: MiniMax H3 low-VRAM (7.3GiB @864x480, ~39.6GB weights, needs a first frame so an image lane too; video lane is silent -- voices + music still muxed in)",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
