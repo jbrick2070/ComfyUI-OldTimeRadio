@@ -326,3 +326,45 @@ two different profiles that are byte-identical apart from their names. Still
 unproven on this box: LTX (never finished), the z_image stills lane (never
 completed an episode), multi-act episodes, and any quantized writer (see
 -05/-06/-07).
+
+## Step 10 -- the 12B leg against the -07 fix: the tag fix WORKS and does NOT rescue 12B
+
+Leg: `--profile otr_4060_haunted_12b`, prompt `5c509116`, on origin `5987b336`
+(carrying the token-boundary fix `da54ee9d`), fresh server so the new loader
+was actually imported.
+
+**The -07 fix is confirmed working, measured two ways.** Executing the shipped
+post-fix `_plan_max_memory` (AST-extracted, run in the venv):
+`google/gemma-4-12b-it @ 8.00 GB -> {0: '6.8GiB', 'cpu': '32GiB'}` -- up from
+`3.2GiB` -- while `gemma-4-2b-it`, `gemma-2-2b-it` and `gemma-4-E2B-it` all
+still correctly get `3.2GiB`, and the 16 GB path is unchanged at `13.5GiB`.
+Corroborated at runtime: VRAM reached **6676 MiB** during this load, consistent
+with a ~6.8 GiB budget being filled, where the pre-fix 3.2 GiB cap could not
+have.
+
+**And the leg still FAILED -- shape read from the log, not from the prediction:**
+
+    line  65  Loading LLM model: google/gemma-4-12b-it (quantized=True)
+    line 214  hf_quantizer.validate_environment(device_map=device_map)
+              ValueError: Some modules are dispatched on the CPU or the disk
+    line  69  WARNING [StoryOrchestrator] ... exceeds the GPU budget for a
+              full NF4 load -> the 22975e1c retry fires (LOUD, as designed)
+    line 242  dispatch_model(model, **device_map_kwargs)
+    line 329  RuntimeError: Tensor.item() cannot be called on meta tensors
+    Prompt executed in 38.53 s; ModelLoaderError, no publish (correct).
+
+**THE FAILURE MATCHES -06, NOT -05.** -05's defect was the budget; the budget
+is now correct and the run still spilled, because 12B NF4 (~6.99 GiB planned,
+plus Gemma's bf16 embedding table that NF4 never touches) genuinely does not
+fit 6.8 GiB on an 8188 MiB card. So `infer_auto_device_map` legitimately
+assigns a CPU tail, bnb refuses it, the retry permits it, and -06's mechanism
+then kills it at dispatch -- exactly the panel's Test A -> Test B sequence,
+reproduced here at the corrected budget.
+
+**What this settles:** the tag collision was real and is fixed, but it was
+never what stopped 12B on this card. **12B NF4 does not fit 8 GB by
+arithmetic**, and no budget change reaches that. The remaining routes are the
+explicit-dict device_map (panel Test C: loads, forwards, generates) or the GGUF
+lane -- and per -07's correction, neither the GGUF weights nor
+`llama-cpp-python` exist on this box today. E2B remains the qualified writer
+here.
