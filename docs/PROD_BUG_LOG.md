@@ -8193,3 +8193,63 @@ call to make, not a tidy-up.
   a guard that ignores the caller's own parameters refuses work it should
   admit, and does it silently on exactly the hardware the dev box cannot see.
   Not yet promoted: no live render has been driven through the corrected gate.
+
+## PBUG-20260829-09 -- the SHIPPING 8 GB profile needs a third-party node pack that is declared NOWHERE
+
+- **found:** 2026-08-29 on the 4060 (MRKT), while measuring the friction of the
+  least-friction path per the operator's request ("how frictionless is our best
+  frictionless setup on the 4060"). Found by measurement, not by review: the
+  question "how many GB and how many manual steps before a first render" forced
+  an inventory of what actually had to be true on this disk.
+- **artifact:** `otr_nvidia_8gb_haunted` -- `status: "shipping"` as of
+  `5987b336`, and the ONLY shipping profile in the repo whose evidence comes
+  from non-dev-box hardware (three published episodes on this card). Its three
+  visual roles and its `video_render_engine` all resolve to
+  `animatediff15_v3_haunted_video`, which is implemented by
+  `nodes/_otr_video_engines/eng_ghost_signal.py` and executes through the
+  **`ComfyUI-AnimateDiff-Evolved`** custom node pack (`ADE_*` nodes).
+- **the defect:** that node pack is declared in NONE of the places a user or an
+  installer would look. Measured:
+
+      README.md         mentions of AnimateDiff-Evolved : 0
+      requirements.txt  mentions                        : 0
+      pyproject.toml    mentions                        : 0
+      scripts/otr_fetch_lane_weights.py                 : does not install it
+
+  `requirements.txt` and `pyproject.toml` could not carry it in any case -- it
+  is a ComfyUI custom node pack, not a pip distribution -- which is precisely
+  why it needs a DOCUMENTED step instead. There is currently no such step.
+- **user-visible consequence:** a user installs OTR from the registry, selects
+  the profile the repo says is *shipping* for their 8 GB card, and the video
+  engine cannot execute. The pack's own `__init__.py` per-node try/except
+  (documented in CLAUDE.md 7A) means this does NOT zero out the pack -- it
+  degrades to a missing engine, which is harder to diagnose, not easier.
+- **why the drill did not catch it sooner, and this is the instructive part:**
+  this box HAS the node pack, so all three episodes rendered. It is present
+  only because the driver `git clone`d it by hand during the 03:00 race while
+  assembling the lane from engine constants. **The proven path and the
+  documented path are not the same path**, and the proof does not transfer to
+  anyone following the docs. Every friction number recorded for this lane was
+  measured on a box that had been hand-prepared.
+- **fix:** NOT FIXED. It is a documentation/installer change on the
+  fresh-install surface (4060-owned under the 2026-08-29 split), and the right
+  shape needs an operator call: either the README states the node-pack
+  prerequisite explicitly for the haunted lane, or `otr_fetch_lane_weights.py`
+  grows a node-pack step, or the lane declares it in a machine-readable
+  preflight so `check_*` fails loudly with the install command instead of the
+  engine going missing. Recorded before choosing, because "which of the three"
+  is a shipping decision.
+- **companion finding, same measurement, no separate entry:** the profile's
+  `display_name` advertises "~3.7GB weights". Measured total that must land on
+  disk before a first render on a clean box: **16.03 GB** --
+  SD1.5 1.99 + v3_sd15_mm 1.56 + v3_sd15_adapter 0.10 + kokoro-v1_0 0.30
+  (3.94 GB of explicit placements) plus the HF-cache pulls the label omits:
+  **gemma-4-E2B-it 9.57 GB**, musicgen-small 2.21 GB, Kokoro-82M 0.31 GB. The
+  "~3.7GB" figure counts only the video lane's own artifacts. It is not false
+  about what it measures; it is read as a total by anyone choosing a profile on
+  a metered connection.
+- bible-worthy: CANDIDATE. The reusable class is the one this drill keeps
+  hitting from new angles: *a lane proven on a hand-prepared box proves the
+  lane, not the install.* Distinct from the kokoro/ffmpeg class (dependency the
+  dev box happens to have) because here NO box could have had it without a
+  manual step nobody wrote down.
