@@ -1,6 +1,6 @@
 {
   "id": "otr_nvidia_8gb_haunted",
-  "display_name": "8GB NVIDIA: HAUNTED (AnimateDiff v3, ~3.7GB weights, no image model needed; video lane is silent -- kokoro voices + musicgen are still muxed in)",
+  "display_name": "8GB NVIDIA: HAUNTED (AnimateDiff v3, ~3.7GB weights, no image model needed; video lane is silent -- kokoro voices + musicgen are still muxed in) -- NO HF TOKEN NEEDED",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",
