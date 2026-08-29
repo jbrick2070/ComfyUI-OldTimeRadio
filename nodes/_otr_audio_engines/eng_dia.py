@@ -196,19 +196,7 @@ class DiaEngine:
             _SC.remove_quietly(out_path)
             raise RuntimeError("Dia render failed: %s" % resp.get("error"))
         try:
-            return self._load_wav(resp["out_path"], resp.get("sample_rate", self.sample_rate))
+            return _SC.load_wav_as_audio(
+                resp["out_path"], resp.get("sample_rate", self.sample_rate))
         except Exception as exc:  # noqa: BLE001 -- corrupt ok:true output -> named C-7 error
             raise RuntimeError("Dia worker output load failed: %s" % exc)
-
-    @staticmethod
-    def _load_wav(path, sample_rate):
-        """Load the worker's WAV into the main venv as an AUDIO dict (soundfile,
-        not torchaudio.load)."""
-        import soundfile as sf
-        import torch
-        try:
-            data, sr = sf.read(path, dtype="float32", always_2d=True)  # [T, C]
-        finally:
-            _SC.remove_quietly(path)
-        wav = torch.from_numpy(data.T).contiguous()  # [C, T]
-        return {"waveform": wav, "sample_rate": int(sr or sample_rate)}

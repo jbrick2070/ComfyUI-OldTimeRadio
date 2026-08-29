@@ -168,7 +168,8 @@ def test_legacy_synth_binds_ordered_music_sentinels(monkeypatch):
     out = StableAudioTheme().generate(
         script_json=_ledger(lines=lines), engine="musicgen",
     )
-    by_cue = CM.index_by_cue_id(CM.parse_manifest(out[1], batch_size=2))
+    manifest = CM.parse_manifest(out[1], batch_size=2)
+    by_cue = {r["cue_id"]: r for r in manifest["cues"]}
 
     assert by_cue["opening"]["anchor_line_id"] == "b000"
     assert by_cue["closing"]["anchor_line_id"] == "b900"
@@ -226,13 +227,14 @@ def test_scifi_news_pro_music_rows_render_by_cue_id(monkeypatch):
     # authored prompts pass through verbatim (composer NOT invoked)
     assert {c["prompt"] for c in calls} == {"slow open", "bridge", "resolve"}
     manifest = CM.parse_manifest(out[1], batch_size=3)
-    by_cue = CM.index_by_cue_id(manifest)
+    by_cue = {r["cue_id"]: r for r in manifest["cues"]}
     assert set(by_cue) == {"opening", "inter_01", "closing"}
     assert by_cue["inter_01"]["placement"] == "interstitial"
     assert by_cue["inter_01"]["anchor_line_id"] == "shot_001_music"
-    # anchor index is intact for the sequencer's boundary resolution
-    by_anchor = CM.index_by_anchor_line_id(manifest)
-    assert by_anchor["shot_001_music"]["cue_id"] == "inter_01"
+    # every row carries its authored anchor into the manifest, which is how
+    # reconcile_ledger_music hands it back to ledger.music[] consumers
+    anchors = {r["anchor_line_id"]: r["cue_id"] for r in manifest["cues"]}
+    assert anchors["shot_001_music"] == "inter_01"
 
 
 def test_musicgen_clip_prompt_from_meta_brief(monkeypatch):

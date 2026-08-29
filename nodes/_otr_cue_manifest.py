@@ -220,43 +220,6 @@ def validate_manifest(
         )
 
 
-def index_by_cue_id(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """cue_id -> row. Assumes a validated manifest (unique cue_ids)."""
-    return {r["cue_id"]: r for r in (manifest.get("cues") or [])}
-
-
-def index_by_anchor_line_id(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """anchor_line_id -> row, skipping rows with no anchor (legacy synth cues).
-    Used by SceneSequencer to resolve a music-boundary sentinel line to its
-    cue (scifi_news_pro sentinels carry no cue_id -- the anchor is the only link)."""
-    out: Dict[str, Dict[str, Any]] = {}
-    for row in (manifest.get("cues") or []):
-        anchor = row.get("anchor_line_id")
-        if anchor:
-            out[str(anchor)] = row
-    return out
-
-
-def index_all_by_anchor_line_id(
-    manifest: Dict[str, Any],
-) -> Dict[str, List[Dict[str, Any]]]:
-    """Return every cue at each anchor in manifest batch order.
-
-    An ordinary dialogue row may legally anchor more than one cue placement.
-    The older one-row index remains for callers whose contract guarantees a
-    unique sentinel, while timeline consumers use this lossless form so no cue
-    is silently overwritten.
-    """
-    out: Dict[str, List[Dict[str, Any]]] = {}
-    for row in sorted(
-        (manifest.get("cues") or []), key=lambda value: value["batch_index"]
-    ):
-        anchor = row.get("anchor_line_id")
-        if anchor:
-            out.setdefault(str(anchor), []).append(row)
-    return out
-
-
 def _music_row_from_manifest(row: Dict[str, Any]) -> Dict[str, Any]:
     """Project one rendered manifest row into the canonical ledger shape."""
     return {

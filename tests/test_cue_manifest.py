@@ -114,29 +114,6 @@ def test_malformed_json_raises():
         CM.parse_manifest("{not json")
 
 
-def test_index_helpers():
-    m = CM.build_manifest(32000, [
-        _row("opening", 0, placement="opening", anchor_line_id="L0"),
-        _row("inter_01", 1, anchor_line_id="L1"),
-    ])
-    assert set(CM.index_by_cue_id(m)) == {"opening", "inter_01"}
-    by_anchor = CM.index_by_anchor_line_id(m)
-    assert by_anchor["L1"]["cue_id"] == "inter_01"
-    # rows without an anchor are skipped
-    m2 = CM.build_manifest(32000, [_row("x", 0)])
-    assert CM.index_by_anchor_line_id(m2) == {}
-
-
-def test_index_all_preserves_multiple_cues_at_one_anchor():
-    m = CM.build_manifest(32000, [
-        _row("inter_01", 0, anchor_line_id="L1"),
-        _row("inter_02", 1, anchor_line_id="L1"),
-    ])
-    assert [
-        row["cue_id"] for row in CM.index_all_by_anchor_line_id(m)["L1"]
-    ] == ["inter_01", "inter_02"]
-
-
 def test_prompt_hash_mismatch_raises():
     row = _row("inter_01", 0)
     row["prompt_sha256"] = "0" * 64

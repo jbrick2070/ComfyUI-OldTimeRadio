@@ -10,6 +10,10 @@ Centralizes the things the polish roundtable flagged across both new adapters:
   pipes AND the stderr file handle and reaps the process (kill + wait), so a
   failed start / mid-request crash never leaks a handle or a zombie. Safe to call
   twice (tolerates already-closed handles) and with ``proc=None``.
+* :func:`load_wav_as_audio` -- one shared load of a worker-written WAV into the
+  main venv as an AUDIO dict (soundfile, never torchaudio.load), removing the
+  temp file whether or not the read succeeds. torch/soundfile import lazily
+  inside the call, so importing this module stays side-effect-free.
 
 The proven IndexTTS2 adapter keeps its own inline lifecycle (byte-identical,
 shipped); these helpers are for the NEW opt-in sidecars. Import is side-effect-free.
@@ -51,6 +55,21 @@ def remove_quietly(path):
             os.remove(path)
     except OSError:
         pass
+
+
+def load_wav_as_audio(path, fallback_sample_rate):
+    """Load a worker-written WAV into the main venv as an AUDIO dict. soundfile,
+    NOT torchaudio.load -- the Blackwell venv routes load() through the
+    uninstalled torchcodec backend. The temp file is removed even when the read
+    fails (the worker's output dir must never accumulate)."""
+    import soundfile as sf
+    import torch
+    try:
+        data, sr = sf.read(path, dtype="float32", always_2d=True)  # [T, C]
+    finally:
+        remove_quietly(path)
+    wav = torch.from_numpy(data.T).contiguous()  # [C, T]
+    return {"waveform": wav, "sample_rate": int(sr or fallback_sample_rate)}
 
 
 def read_protocol_line(proc, timeout, what):
