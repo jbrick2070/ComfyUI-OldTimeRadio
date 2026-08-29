@@ -7707,3 +7707,198 @@ to re-id and update its references in the same change.
   to run.* Two independent instances landed the same night (this and kokoro
   `repo_id`), which is the argument for a rule rather than two fixes. Check
   against `otr_coverage_index.yaml` before promoting.
+
+## PBUG-20260829-02 -- `kokoro` 0.7.16's `KPipeline` has no `repo_id` kwarg; every cold install died at its first spoken line
+
+- **found:** 2026-08-29, live leg on the 4060 (MRKT), prompt `82e70344` FAIL
+  at 439.35 s. First render ever attempted on that box.
+- **artifact:** a real canonical render. The writer wrote 6 lines / 70 words,
+  the ledger froze `frozen_with_warns`, casting assigned kokoro voices -- then
+  the very first TTS clip raised
+  `TypeError: KPipeline.__init__() got an unexpected keyword argument 'repo_id'`.
+  No obs publish, correctly.
+- **root cause:** `nodes/_otr_audio_engines/eng_kokoro.py::load` passed
+  `repo_id="hexgrad/Kokoro-82M"` UNCONDITIONALLY. The newest release on PyPI is
+  `kokoro` 0.7.16, whose signature is `KPipeline(lang_code, model, trf, device)`
+  -- no such parameter. Verified by inspecting the installed signature, not by
+  reading docs.
+- **blast radius:** every stock `pip install kokoro` install, on the lane that
+  is the DEFAULT announcer voice in the shipped canonical workflow. The pack
+  reached the first spoken line and died, on a machine where nothing was wrong.
+- **why it hid:** the 5080 dev box runs `kokoro` 0.9.4 -- a build NEWER than the
+  published PyPI line -- which does accept `repo_id`. So the call had always
+  worked there and always would.
+- **fix:** `8b041034`. `inspect.signature(KPipeline.__init__)` is consulted once
+  and `repo_id` is passed ONLY if the installed build declares it; on an
+  unprobeable signature the legacy kwarg is kept, preserving existing behaviour.
+  Forward-compatible in both directions.
+- **companion defect, same night:** `kokoro` was declared in NEITHER
+  `requirements.txt` NOR `pyproject` -- the pack's default voice engine was an
+  undeclared dependency. Fixed by the 5080 in `03a8cb43` (requirements); the
+  pyproject half rides the next deliberate version bump, since editing
+  pyproject auto-fires a registry publish.
+- bible-worthy: STRONG CANDIDATE, and the same reusable class as
+  PBUG-20260829-01: *a dependency signature the dev box accepts is not the
+  signature the ecosystem ships -- probe the installed artifact.* Two
+  independent instances the same night. Check `otr_coverage_index.yaml` first.
+
+## PBUG-20260829-03 -- ComfyUI DynamicVRAM (`comfy_aimdo`) ABORTS THE PROCESS on an 8 GB OOM instead of raising
+
+- **found:** 2026-08-29, live leg on the 4060 (MRKT), immediately after the
+  kokoro fix above. Prompt id not captured -- the server process died, so the
+  poller never observed a terminal state, which is itself part of this report.
+- **artifact:** a real canonical render, further along than any before it. All
+  six voice clips generated, ledger frozen, visual-direction pass complete.
+  Then, at the z_image sampler's step 0/8 ("Model Initializing"):
+
+      aimdo: src/hostbuf.c:283:ERROR:hostbuf_read_file_slice: device copy
+      failed result=2 device_ptr=0x0E00000000 device=0 size=39321600
+      Fatal Python error: Aborted
+
+  CUDA error 2 is out-of-memory, hit while DynamicVRAM streamed the 6.2 GB
+  z_image UNET onto a card still holding OTR's HF-side residents.
+- **TWO defects, and the second is the worse one:**
+  1. **Ours:** the pack's residency discipline does not evict the writer before
+     the image phase. Harmless at 16 GB, fatal at 8 GB.
+  2. **ComfyUI's:** DynamicVRAM's failure mode is a NATIVE PROCESS ABORT, not a
+     Python exception. Nothing can catch it, no node can log it, no retry or
+     loud degradation is possible, and the whole server dies mid-episode. Every
+     diagnostic and recovery mechanism this codebase has is bypassed. A raised
+     OOM would have been catchable; an abort is not.
+- **blast radius:** any 8 GB card on a current ComfyUI (DynamicVRAM is ON by
+  default) running a lane that loads a large image UNET after the writer.
+- **workaround, PROVEN not assumed:** launch with `--disable-dynamic-vram`. The
+  legacy loader partial-loads the same UNET (5.9 GB offloaded to RAM, 211 MB
+  buffer) and was actively SAMPLING at the exact step where aimdo aborted --
+  verified on the next leg (prompt `5de1bf46`), which was then killed by
+  operator order for unrelated reasons, not by memory.
+- **fix:** NOT FIXED -- workaround only, carried in the 4060 headless launch
+  script. The two real fixes are (1) evict the writer before the image phase,
+  which is ours and is a residency-discipline change, and (2) ComfyUI's abort
+  behaviour, which is not.
+- bible-worthy: CANDIDATE, and the reusable class is not about ComfyUI: *a
+  memory manager that aborts the process instead of raising removes every
+  diagnostic, fallback and recovery path the application has -- treat an
+  abort-on-OOM dependency as a hard portability constraint, not a tuning knob.*
+
+## PBUG-20260829-04 -- `pyloudnorm` is undeclared, so every cold install masters by PEAK instead of LUFS
+
+- **found:** 2026-08-29, in the log of the SUCCESSFUL 4060 leg (prompt
+  `be8d016d`, published episode
+  `signal_lost_the_ledgers_whisper_20260829_045225`).
+- **artifact:** a published episode. `[EpisodeAssembler] LUFS measurement
+  unavailable (No module named 'pyloudnorm'); falling back to the legacy peak
+  master.` The render did NOT fail -- this degraded loudly and correctly, which
+  is why it needs a log entry rather than a crash report.
+- **root cause:** `pyloudnorm` is declared in NEITHER `requirements.txt` NOR the
+  `pyproject` static dependency list. Verified by grepping both. The
+  loudness-normalisation path is written to tolerate its absence, so nothing
+  ever complained on a box that happened to have it.
+- **blast radius:** every registry and cold install masters to peak rather than
+  the intended -14 LUFS. The dev box has the package incidentally, so episodes
+  rendered there are correct and episodes rendered anywhere else are quieter and
+  inconsistent with them -- a difference nobody sees in a log and everybody
+  hears in a playlist. Directly relevant now that two boxes publish into one
+  broadcast folder.
+- **fix:** NOT YET. Must ride the next DELIBERATE pyproject version bump
+  (alpha.9-12 were Flagged/Pending at the time, and editing pyproject
+  auto-fires a publish), alongside the `kokoro` declaration from
+  PBUG-20260829-02.
+- bible-worthy: CANDIDATE. Class: *a dependency that is present on the dev box
+  by accident is not a declared dependency, and a graceful fallback around it
+  hides the omission indefinitely.*
+
+## PBUG-20260829-05 -- `_plan_max_memory`'s QUANTIZED budget is still a hardcoded tag table (the other half of PBUG-20260825-03)
+
+- **found:** 2026-08-29, four live headless legs on the 4060 (MRKT), driven by
+  the operator asking why the writer was `gemma-4-E2B` and not `gemma-4-12b`.
+  The 12B is fully cached on that box -- not gated, never selected.
+- **artifact / the measurement chain, all live:**
+  1. `otr_4060_haunted_12b` (12B, `bnb_nf4`, `vram_ceiling_gb: 6.8`): died in
+     **0.10 s** with `VRAMFitFailedError: estimated 11.9 GB peak resident vs
+     6.8 GB ceiling`. An ESTIMATE killed the render before any allocation --
+     precisely what the operator's 2026-08-29 directive forbids (below).
+  2. Ceiling raised to 12.0 so physics could rule: bnb's
+     `quantizer_bnb_4bit.validate_environment` raised `ValueError: Some modules
+     are dispatched on the CPU or the disk...` (prompt `41f34374`).
+  3. `otr_4060_haunted_e4b` (`gemma-4-E4B`, ~4-5 GB of NF4 weights against
+     ~7.1 GB free): the **same** refusal in 2.17 s. That cannot be explained by
+     model size.
+  4. `otr_4060_viz_12b` -- `viz_camera` on all four video roles (a procedural
+     lane holding ZERO video-model VRAM), on a freshly booted server with
+     ~7.4 GB free: the **same** refusal again. The video lanes are irrelevant;
+     the cap fires first.
+- **root cause:** `nodes/_otr_model_loader.py::_plan_max_memory` (~L496-509)
+  returns, for `bnb_nf4`/`bnb_8bit` on a sub-12 GB card, a HARDCODED
+  `{0: "6.8GiB", "cpu": "32GiB"}` for any model id tagged `9b`/`12b`/`e4b`/
+  `4b-it` -- **regardless of how much VRAM is actually free**. The explicit
+  `cpu` key then invites `device_map="auto"` to plan an offload for anything
+  over 6.8 GiB on-GPU, and bitsandbytes' 4-bit path REFUSES a plan containing
+  CPU-dispatched modules. `E4B` fails identically because its MatFormer
+  per-layer embeddings stay unquantized and clear the 6.8 GiB cap even though
+  its `Linear4bit` modules fit the card easily.
+- **RELATIONSHIP TO PBUG-20260825-03, and this is the point of the entry:** that
+  entry fixed the UNQUANTIZED half of this same function -- return `None` when
+  the policy is not bnb, so a bf16 load no longer inherits a 4-bit cap. The
+  QUANTIZED half, the tag table itself and its `cpu` key, was left exactly as
+  it was. Same function, same defect class, the other branch. The earlier fix
+  was correct and complete for what it claimed; this is what it did not cover.
+- **fix:** PARTIAL -- `22975e1c`. `load_llm` now catches that specific bnb
+  refusal and retries ONCE with a fresh `BitsAndBytesConfig` carrying
+  `llm_int8_enable_fp32_cpu_offload=True` (the identical permission the 8-bit
+  branch has always carried), behind a LOUD warning; models that fit take the
+  unchanged first-attempt path, so a 16 GB box is not affected. That removes the
+  REFUSAL. It does NOT fix the budget: the tag table still ignores live free
+  VRAM. Remaining work, for a design pass rather than a patch: derive the GPU
+  budget from `torch.cuda.mem_get_info` minus a stated buffer, and/or drop the
+  `cpu` key on 4-bit loads so accelerate raises an honest OOM instead of
+  planning a spill bnb will reject.
+- **OPERATOR DIRECTIVE that governs the remaining work (2026-08-29, verbatim):**
+  *"I don't want guards to kill anything -- an OOM is the only killer."* Guards
+  may degrade LOUDLY; they may not abort a render on an estimate or a quality
+  judgment. Reconciling this with the standing fail-loud / no-fallback guards is
+  a genuine design question, not a mechanical edit.
+- bible-worthy: CANDIDATE. Class: *a resource budget derived from a name-tag
+  table instead of the live resource is wrong on every machine the table did not
+  anticipate.* Note its sibling PBUG-20260825-03 is already recorded, which
+  strengthens the case for a rule over a third point fix.
+
+## PBUG-20260829-06 -- 4-bit CPU-offload retry loads all shards, then dies on meta tensors
+
+- **found:** 2026-08-29, live leg on the 4060 (MRKT) immediately after
+  `22975e1c`. Prompt executed in 64.37 s.
+- **artifact:** the retry did exactly what it was built to do -- the loud
+  warning appears in the log, and `google/gemma-4-12b-it` streamed **all 677
+  weight shards** onto the card for the first time that night (VRAM observed
+  climbing past 3.3 GB mid-load). Then:
+  `RuntimeError: Tensor.item() cannot be called on meta tensors`, wrapped as
+  `ModelLoaderError: load_llm failed for model_id='google/gemma-4-12b-it'`.
+- **root cause:** UNDER INVESTIGATION at time of writing (a panel is running).
+  Working hypothesis, to be confirmed against the INSTALLED library source
+  rather than documentation: `llm_int8_enable_fp32_cpu_offload` was designed for
+  the 8-bit path, and on a 4-BIT load accelerate's dispatch plan marks overflow
+  modules for CPU but the 4-bit materialisation step never runs for them, so
+  they remain on the `meta` device -- a shape-only placeholder with no storage
+  -- and the first `.item()` against one raises. Likely interacts with
+  `low_cpu_mem_usage=True` and with the hardcoded `max_memory` map from
+  PBUG-20260829-05.
+- **blast radius:** ONLY the new retry path, i.e. only loads that were
+  previously refused outright. No regression: a model that fits takes the
+  unchanged first-attempt path. This entry exists because a fix that converts a
+  refusal into a different failure must be logged as such, not reported as a
+  fix.
+- **fix:** NOT FIXED. Two candidate routes, neither yet proven on a live leg:
+  (a) an EXPLICIT module-level `device_map` that pins every quantized module to
+  `cuda:0` and offloads only the non-quantized ones (`embed_tokens`, `lm_head`,
+  and gemma-4's per-layer embeddings), instead of `"auto"` plus a cpu budget;
+  (b) the pack's OWN GGUF lane (`unsloth/gemma-4-12b-it-GGUF`, deadline
+  streaming, partial offload handled natively in C++ where it actually works),
+  which is blocked on MRKT only because `llama-cpp-python` is absent from that
+  venv.
+- **collateral fix in the same commit:** `load_llm`'s outer `except (OSError,
+  ValueError)` wrap reported every one of these failures as "Failed to load ...
+  from the local HF cache", which sent diagnosis toward a cache problem three
+  separate times while the real cause sat in the chained traceback. It now names
+  the underlying exception type and message.
+- bible-worthy: TOO EARLY -- record, do not promote. The mechanism is not yet
+  established and no fix is proven on a live artifact.
