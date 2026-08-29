@@ -183,7 +183,26 @@ result: **the haunted AnimateDiff lane is the first and only lane to carry a
 complete episode through an 8 GB card end to end.** The dub-lane thesis
 holds on this hardware.
 
-Night ledger for this box: 3 cold-install bugs found and root-fixed on
-origin (kokoro repo_id TypeError, DynamicVRAM native abort at image load,
-ffmpeg-9 -vsync removal), ~32 GB of weights staged byte-exact, 2 profiles
-shipped, 1 episode published.
+CLAIM SCOPE (verified against the leg-2 log, so nobody overclaims): every
+stage ran end to end; the two degradations were LOUD, never silent -- (a)
+Ghost Prompt v2 used its deterministic prompt author on all 8 beats (the E2B
+writer's leaf attempts were rejected by the guards), (b) pyloudnorm is
+missing so mastering fell back from LUFS to legacy peak. "procgen_blended"
+in the filename is the canonical compose chain, not a lane fallback. The
+honest sentence: **the canonical workflow is 4060-proven end to end on the
+otr_4060_haunted_local profile with --disable-dynamic-vram** -- not bare
+"4060-proof". Unproven on this box: LTX (never finished), the z_image stills
+lane (survived sampling once, never completed an episode), multi-act
+episodes, and the haunted lane under stock DynamicVRAM.
+
+FINDING #4 (cold-install): pyloudnorm is declared in NEITHER
+requirements.txt NOR pyproject -- every registry install masters by peak,
+not LUFS. Rides the next deliberate pyproject bump alongside kokoro.
+
+Night ledger for this box: 4 cold-install findings (kokoro repo_id
+TypeError, DynamicVRAM native abort at image load, ffmpeg-9 -vsync removal
+-- all three root-fixed on origin -- plus the undeclared pyloudnorm), ~32 GB
+of weights staged byte-exact, 2 profiles shipped, 1 episode published.
+Operator's framing to carry forward: this box is rung one of a PORTABILITY
+PROVING GROUND -- rented GPU classes as a qualification matrix for the
+workflow, not as render farms.
