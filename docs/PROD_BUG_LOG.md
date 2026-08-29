@@ -7902,3 +7902,128 @@ to re-id and update its references in the same change.
   the underlying exception type and message.
 - bible-worthy: TOO EARLY -- record, do not promote. The mechanism is not yet
   established and no fix is proven on a live artifact.
+
+## PBUG-20260829-07 -- `"2b-it" in "google/gemma-4-12b-it"` is True: the 12B writer is handed the 2B budget
+
+**This entry also CORRECTS a factual error in PBUG-20260829-05 above, and
+records the experimentally-confirmed mechanism for PBUG-20260829-06.**
+
+- **found:** 2026-08-29, by an adversarial panel run from the 4060 window on the
+  `-06` meta-tensor failure. Both verification lenses independently reported it,
+  and the driver then re-verified it alone before writing this entry, by
+  AST-extracting the shipped `_plan_max_memory` source and EXECUTING it in the
+  ComfyUI venv -- not by reading it and not by trusting the panel.
+- **the defect:** `nodes/_otr_model_loader.py:502`
+
+      is_actually_2b = any(tag in sid for tag in ("2b-it", "2b_it")) or sid.endswith("2b")
+
+  `"2b-it"` is a SUBSTRING of `"12b-it"`. So `google/gemma-4-12b-it` tests
+  TRUE for "is actually a 2B model". That branch is evaluated at :505, BEFORE
+  the `("9b", "12b", "e4b", "4b-it")` branch at :507 that was written for it.
+  The 12B model is therefore handed the budget intended for a 2B model.
+- **measured, by executing the real function (`quant_policy="bnb_nf4"`,
+  `cuda_available=True`):**
+
+      google/gemma-4-12b-it   vram= 8.00  -> {0: '3.2GiB', 'cpu': '32GiB'}   <-- WRONG BRANCH
+      google/gemma-4-E4B-it   vram= 8.00  -> {0: '6.8GiB', 'cpu': '32GiB'}
+      google/gemma-4-E2B-it   vram= 8.00  -> {0: '3.2GiB', 'cpu': '32GiB'}
+      google/gemma-2-2b-it    vram= 8.00  -> {0: '3.2GiB', 'cpu': '32GiB'}
+      google/gemma-4-12b-it   vram=15.99  -> {0: '13.5GiB', 'cpu': '32GiB'}
+
+- **CORRECTION TO PBUG-20260829-05:** that entry states the 12B is capped at
+  `{0: "6.8GiB", "cpu": "32GiB"}`. **That is wrong.** The shipped code never
+  produces 6.8 GiB for this model id; it produces **3.2 GiB**. Everything else
+  in `-05` stands -- the budget is still a hardcoded tag table that ignores live
+  free VRAM, the `cpu` key still invites a placement bnb refuses, and all four
+  live legs still failed as recorded. Only the number was wrong, and it was
+  wrong because the driver read the intended branch instead of executing the
+  function. Logged rather than quietly edited: the file is append-only.
+- **why it hid, and it is the night's fourth instance of the same pattern:** at
+  `total_vram >= 12.0` the function returns at :503 BEFORE `is_actually_2b` is
+  ever consulted. So on the 16 GB dev box the collision is unreachable -- the
+  12B gets `13.5GiB` and everything looks correct. The bug exists ONLY on cards
+  below 12 GiB, i.e. only on the machines the pack is trying to support.
+- **blast radius:** every sub-12 GiB card loading any quantized model whose id
+  contains a `2b-it`/`2b_it` substring inside a larger number -- `12b-it` today,
+  and `22b-it`/`32b-it`/`42b-it` for anything future. Those models get a 3.2 GiB
+  GPU budget, so `infer_auto_device_map` pushes the overwhelming majority of the
+  model to CPU: measured on a meta skeleton, **40 of 48 decoder layers offloaded
+  at 3.2 GiB versus 9 of 48 at the intended 6.8 GiB.**
+- **why this matters more than a wrong constant:** it is what makes the `-06`
+  retry unusable rather than merely slow. CPU-mapped modules are exempted from
+  quantization and stay bf16, so the CPU side is ~4x what the planner sized:
+  **17.0 GiB of bf16 weights at the shipped 3.2 GiB budget, against 19.0 GiB of
+  free RAM on this box**, streamed GPU-ward and re-parked to meta on every
+  forward pass. That is a MemoryError risk and seconds-per-token, not a working
+  writer. At the intended 6.8 GiB it would have been 3.9 GiB -- survivable.
+- **fix:** NOT FIXED HERE. `_otr_model_loader.py` is owned by the 5080 window
+  under two-strikes and the fix is deliberately not being written at 4am from
+  this box. The minimal correct change is to anchor the test instead of
+  substring-matching it (e.g. require a non-digit before the `2b`, or match the
+  parameter tag as a token rather than a substring). Verified inert on the
+  flagship: at `total_vram >= 12.0` both the shipped and the anchored form
+  return identical dicts for every id tested, because :503 returns first.
+
+### CONFIRMED MECHANISM for PBUG-20260829-06 (was "under investigation")
+
+A verifier REPRODUCED all three legs in this venv against a purpose-built tiny
+`LlamaForCausalLM`, so this is no longer a hypothesis:
+
+- **Test A** -- `device_map="auto"`, 4-bit, no flag: the
+  "Some modules are dispatched on the CPU or the disk" `ValueError`, raised at
+  `transformers/integrations/accelerate.py:370` ->
+  `quantizer_bnb_4bit.py:74`. Identical to OTR's first failure.
+- **Test B** -- `device_map="auto"`, 4-bit, `llm_int8_enable_fp32_cpu_offload=True`:
+  weights all stream, then `RuntimeError: Tensor.item() cannot be called on meta
+  tensors` via `state_dict()` -> `bitsandbytes/nn/modules.py:606` ->
+  `functional.py:565` `"nested_offset": self.offset.item()`. **Frame-for-frame
+  identical to OTR's second failure.**
+- **Test C** -- explicit device_map DICT + the same flag: **LOADED OK**, 0
+  `Linear4bit` inside any CPU-mapped subtree, forward OK, generate OK.
+
+**Root cause, precisely:** the flag is INERT when `device_map="auto"`.
+`quantizer_bnb_4bit.py:133-136` -- the branch that actually protects CPU modules
+by adding them to `modules_to_not_convert` -- is gated on
+`isinstance(device_map, dict)`, and `modeling_utils.py:4416` calls
+`preprocess_model()` BEFORE `:4436` resolves `"auto"` into a dict. So at that
+moment `device_map` is still the STRING and the exemption never fires. The retry
+removed the refusal and left every CPU-bound layer as a quantized `Linear4bit`
+-- exactly the configuration the refusal exists to prevent. accelerate then
+parks those params on `meta` between forwards (`hooks.py:330/410`), and
+`QuantState.to()` (`bitsandbytes/functional.py:580-587`) has no meta guard and
+mutates `code`/`absmax`/`offset` to meta IN PLACE. The `.item()` is then reached
+from `attach_execution_device_hook` (`hooks.py:471`) walking `state_dict()`.
+
+**TWO TRAPS, both proven, both of which look like fixes:**
+1. **Do NOT set `bnb_4bit_use_double_quant=False`.** It removes `nested`, so
+   `as_dict()` never reaches `offset.item()` and the load appears to succeed --
+   but the meta-poisoned `Params4bit` then raises
+   `NotImplementedError: Cannot copy out of meta tensor; no data!` at the first
+   forward. It moves the crash from load time into the middle of a render.
+2. **Do NOT drop the `"cpu"` key** to force a GPU-only fit:
+   `accelerate/utils/modeling.py:1112-1114` appends `"disk"` when it is absent,
+   so overflow becomes a DISK offload and the error becomes
+   "We need an `offload_dir`". (This retires one of the two options `-05`
+   proposed; recorded so nobody re-proposes it.)
+
+**REGRESSION SAFETY of the shipped `22975e1c` retry, independently verified:**
+the `except ValueError` retry block is UNREACHABLE on a >=14.5 GiB card.
+`_otr_model_loader.py:903-904` sets `device_map={"": 0}` there, and
+`transformers/integrations/accelerate.py:345` only validates when `device_map`
+is a `str` -- so the ValueError is never raised on the 5080, and
+`modeling_utils.py:4475` never enters the dispatch path that does meta parking.
+The 5080's behaviour is byte-for-byte unchanged. A verifier tried to break this
+and could not.
+
+**A CLAIM THE PANEL MADE THAT IS FALSE, recorded so it is not repeated:** the
+investigation asserted this box already holds
+`C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf` and
+recommended routing 12B-on-8GB to the GGUF lane on that basis. **Checked on
+disk: `C:\ComfyUI-Models` does not exist on MRKT, that file does not exist, and
+there are ZERO `.gguf` files anywhere in this install's models tree.** The claim
+came from `CLAUDE.md` section 6A, which describes the 5080's layout, and was
+reported as this box's live state. The GGUF route remains the most promising
+DURABLE answer for a big writer on 8 GB -- llama.cpp splits GPU/CPU natively
+with no meta round-trip -- but on this box it needs both a ~7 GB download and
+`llama-cpp-python`, neither of which is present. Same lesson as the night's
+first finding: a documented path is not a file on disk.
