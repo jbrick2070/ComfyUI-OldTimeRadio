@@ -8045,3 +8045,39 @@ first finding: a documented path is not a file on disk.
   redesign (derive from `torch.cuda.mem_get_info` minus a stated buffer)
   remains open, and the 4060's panel retired the "drop the cpu key" option by
   proving accelerate appends `disk` and fails on `offload_dir` instead.
+
+### AMENDMENT to PBUG-20260829-03 (scope) and PBUG-20260829-04 (status) -- 2026-08-29, 4060
+
+**-03 does NOT reach the shipping 8 GB default.** Live proof: `--profile
+otr_nvidia_8gb_haunted`, prompt `814d4e4d`, server booted WITHOUT
+`--disable-dynamic-vram` and with DynamicVRAM verified genuinely active
+(comfy-aimdo 0.4.15, 6 CUDA hooks, NVML pressure, WDDM adapter matched).
+**RESULT SUCCESS + obs_publish OK**, 75.32 s h264+AAC, 2322 s wall, and ZERO
+aborts (`Fatal Python error` / `hostbuf_read_file_slice` grep = 0). The -03
+abort fires while DynamicVRAM streams the 6.2 GB z_image UNET; the haunted lane
+is text_to_video and loads no image model at all, so the hazard is absent by
+construction. **`--disable-dynamic-vram` is NOT a requirement for this profile**
+and must not be documented as one -- it remains required only for lanes that
+load a large image UNET after the writer. -03 stays OPEN for those lanes.
+
+Unexpected corollary, measured: the STOCK path was ~30% FASTER than the
+byte-identical profile with the flag (2322 s vs 3303 s). DynamicVRAM is an
+improvement on this lane, not a tax.
+
+**-04 status on this box: RESOLVED LOCALLY, still open in the package.**
+`pyloudnorm 0.2.0` is now installed in the MRKT venv (matching the 5080's
+version), so this box masters to -14 LUFS from the next leg onward. The
+declaration in `pyproject.toml` -- what a registry install actually reads --
+is still missing and still rides the next deliberate version bump. **Both 4060
+episodes published before this install (`the_ledgers_whisper`,
+`shadows_lengthening_on_the_heath`) were PEAK-mastered and are therefore NOT
+loudness-comparable to any 5080 episode in the same obs folder.** Any mix or
+foley-level judgement made across boxes before now is confounded at the master
+stage.
+
+**Also retired, so it is not re-quoted as a finding:** step 7's observation that
+the E2B writer fell back to the deterministic ghost-prompt author on all 8 beats
+is NOT a fixed property of the small writer. This leg logged `Ghost Prompt v2:
+8 beat(s) authored (writer_llm=8)` with zero fallbacks. The difference tracked
+the style pack (`visual_storybased` here, `shakespeare_stage_realism` there),
+not the model.

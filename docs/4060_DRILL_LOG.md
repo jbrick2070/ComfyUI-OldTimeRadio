@@ -266,3 +266,63 @@ candidate finding (E4B/nf4 loader fit), ~32 GB of weights staged byte-exact,
 4 profiles shipped, 1 episode published. Operator's framing to carry
 forward: this box is rung one of a PORTABILITY PROVING GROUND -- rented GPU
 classes as a qualification matrix for the workflow, not as render farms.
+
+## Step 9 -- THE ASTERISK IS GONE: the SHIPPING default passes on the STOCK path
+
+The claim's biggest caveat was that every 4060 success used
+`--disable-dynamic-vram`, a flag no ordinary user passes. That caveat is now
+retired by measurement.
+
+**Leg: `--profile otr_nvidia_8gb_haunted` (the 5080's SHIPPING default, not a
+tuned local profile), prompt `814d4e4d`, server booted WITHOUT the flag.**
+DynamicVRAM confirmed genuinely ACTIVE at boot rather than assumed:
+comfy-aimdo 0.4.15, 6 CUDA hooks installed, NVML pressure enabled, WDDM
+adapter matched, "DynamicVRAM support detected and enabled".
+
+    RESULT SUCCESS + obs_publish OK + mp4 on disk
+    signal_lost_shadows_lengthening_on_the_heath_20260829_104142
+      _silent_procgen_blended_captioned_with_credits_final.mp4
+    60.4 MB, 75.32 s, h264 + AAC
+    wall: 2322 s (38.7 min) queue-to-publish
+    aimdo aborts: 0    (grep: Fatal Python error / hostbuf_read_file_slice = 0)
+
+**THREE FINDINGS BEYOND THE PASS:**
+
+1. **PBUG-20260829-03 does NOT reach the shipping haunted default.** The abort
+   fired while DynamicVRAM streamed the 6.2 GB z_image UNET; this lane is
+   text_to_video and loads no image model at all, so the hazard is absent by
+   construction. `--disable-dynamic-vram` is therefore NOT a requirement for
+   `otr_nvidia_8gb_haunted` -- it remains required only for lanes that load a
+   large image UNET after the writer. Scope the user-facing docs accordingly:
+   the 8 GB haunted path works out of the box.
+2. **The stock path was FASTER, which nobody predicted:** 2322 s here versus
+   3303 s (55 min) for the byte-identical profile WITH the flag last night --
+   about 30% quicker. DynamicVRAM is not merely survivable on this lane, it is
+   an improvement. Peak VRAM during beats sat at ~4.2 GB of 8.0 GB.
+3. **The writer authored every visual prompt this time:** `Ghost Prompt v2:
+   8 beat(s) authored (writer_llm=8)`, zero `deterministic_fallback` -- against
+   8-of-8 fallback on the previous leg. So the E2B fallback recorded in step 7
+   is NOT a fixed property of the small writer; it varied with the style pack
+   (`visual_storybased` here vs `shakespeare_stage_realism` there). Do not
+   quote "E2B cannot author ghost prompts" as a finding; it can.
+
+**Degradations: all LOUD, none silent.** Per-beat VRAM reclaim (x8 pairs, by
+design), two ghost-prompt info warnings, one stale-master-path re-resolve that
+self-healed, one `ledger_clean_line_judge` retry, and the pyloudnorm fallback
+below.
+
+**AUDIO PROVENANCE, and it invalidates cross-box mix comparisons before now:**
+`pyloudnorm` was absent from this venv, so BOTH 4060 episodes
+(`the_ledgers_whisper`, `shadows_lengthening_on_the_heath`) were mastered by
+the legacy PEAK path while every 5080 episode was mastered to -14 LUFS. Same
+folder, same broadcast, two different masterers, evidence limited to one
+warning line. `pyloudnorm 0.2.0` is now installed here (matching the 5080), so
+episodes from this box are comparable from the NEXT leg onward -- these two are
+not. See PBUG-20260829-04.
+
+**THE HONEST CLAIM NOW:** *the canonical workflow is 4060-proven end to end on
+`otr_nvidia_8gb_haunted`, out of the box, with no launch flags* -- twice, on
+two different profiles that are byte-identical apart from their names. Still
+unproven on this box: LTX (never finished), the z_image stills lane (never
+completed an episode), multi-act episodes, and any quantized writer (see
+-05/-06/-07).
