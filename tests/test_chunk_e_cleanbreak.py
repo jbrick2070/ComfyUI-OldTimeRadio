@@ -99,13 +99,6 @@ class TestEpisodeAssemblerWavSave:
     temp dir, then verifies a valid 16-bit PCM WAV is written and
     output_path is a real file path."""
 
-    def _make_waveform(self, seconds=2.0, sr=24000, channels=2):
-        import torch
-        samples = int(seconds * sr)
-        # mono -> (1, channels, samples) shape that EpisodeAssembler expects
-        data = torch.zeros(1, channels, samples)
-        return {"waveform": data, "sample_rate": sr}
-
     def test_wav_saved_and_path_returned(self, tmp_path):
         import torch
         import importlib, sys

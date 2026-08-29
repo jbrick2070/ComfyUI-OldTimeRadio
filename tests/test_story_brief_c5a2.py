@@ -103,28 +103,6 @@ def _find_call_site(execute_node, target_name: str) -> list[ast.Call]:
     return hits
 
 
-def _find_assign_to_subscript(
-    execute_node, value_name: str, key_value: str,
-) -> list[ast.Assign]:
-    """Find `value_name['key_value'] = ...` assignments."""
-    hits: list[ast.Assign] = []
-    for node in ast.walk(execute_node):
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if not isinstance(target, ast.Subscript):
-                continue
-            if not (
-                isinstance(target.value, ast.Name)
-                and target.value.id == value_name
-                and isinstance(target.slice, ast.Constant)
-                and target.slice.value == key_value
-            ):
-                continue
-            hits.append(node)
-    return hits
-
-
 # ---------------------------------------------------------------------------
 # 1. Module-level import (E-22 / RR-B4)
 # ---------------------------------------------------------------------------

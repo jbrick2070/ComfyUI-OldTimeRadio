@@ -393,19 +393,6 @@ def test_the_test_mode_path_stamps_a_complete_deterministic_object():
 
 
 # --------------------------------------------------------------------------- #
-# 6. The later motion-clause pass never pays for a lane that owns its motion.
-# --------------------------------------------------------------------------- #
-
-def _mc_ledger(engines):
-    return {"video": {"shots": [
-        {"shot_id": "shot_b%03d" % i, "source_line_ids": ["b%03d" % i],
-         "char_id": "c02", "engine_id": eng}
-        for i, eng in enumerate(engines, start=1)]},
-        "lines": [{"line_id": "b%03d" % i, "text": "A real spoken line here."}
-                  for i in range(1, len(engines) + 1)]}
-
-
-# --------------------------------------------------------------------------- #
 # 7. One beat, one clip, one prompt -- and no workflow change.
 # --------------------------------------------------------------------------- #
 

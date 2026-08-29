@@ -341,17 +341,6 @@ class TestAdjacencyWiredEndToEnd:
 # Change 2 -- phase word allocation is unchanged after the schema trim
 # ---------------------------------------------------------------------------
 
-def _beat_json_with_words(words):
-    """An old-style Stage 3 mock response that still emits target_words
-    -- proves the stray key is harmless and Python's allocation wins.
-    """
-    return json.dumps({
-        "intent": "advance the scene toward the next turn",
-        "target_words": words,
-        "mood": "tense",
-    })
-
-
 # `TestPhaseWordAllocationUnchanged` was DELETED 2026-08-14, not repaired.
 # Its two tests existed to prove that Python's per-beat word allocation beat
 # whatever number the LLM emitted -- `test_combiner_stamps_python_allocation_not_llm_number` and `test_phase_word_totals_match_the_python_allocation`.

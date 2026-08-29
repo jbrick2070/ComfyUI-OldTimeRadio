@@ -163,7 +163,6 @@ workflows/*.json.bak
 # The soak driver + the one-shot engine smoke + the verified launch recipe are
 # the production-stable stamp's tooling -- keep them versioned by exception.
 !scripts/_otr_soak_capstone.py
-!scripts/_otr_single_engine_smoke.py
 !scripts/_otr_soak_server_launch.cmd
 !scripts/_otr_soak_marathon.py
 # --- 2026-08-24: scripts/otr_overnight_loop.sh's crash-recovery calls this

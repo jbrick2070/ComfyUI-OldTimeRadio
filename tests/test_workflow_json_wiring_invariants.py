@@ -47,37 +47,6 @@ VALIDATOR_SRC = REPO_ROOT / "nodes" / "_otr_workflow_validator.py"
 PORTRAIT_SRC = REPO_ROOT / "visual" / "batch_flux_portrait_render.py"
 
 
-def _ast_extract_class_attr_tuple(
-    src_path: Path, class_name: str, attr_name: str,
-) -> tuple[str, ...] | None:
-    """Return the tuple-of-strings value for a class-level attribute.
-
-    AST-parse the source file (no execution), find the named class,
-    locate the attr assignment, and return its tuple-of-strings value.
-    Avoids importing the module (which would pull in ComfyUI runtime
-    dependencies like `folder_paths` that don't resolve under pytest).
-    """
-    tree = ast.parse(src_path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ClassDef) or node.name != class_name:
-            continue
-        for stmt in node.body:
-            if not isinstance(stmt, ast.Assign):
-                continue
-            for target in stmt.targets:
-                if isinstance(target, ast.Name) and target.id == attr_name:
-                    if isinstance(stmt.value, ast.Tuple):
-                        out: list[str] = []
-                        for elt in stmt.value.elts:
-                            if (
-                                isinstance(elt, ast.Constant)
-                                and isinstance(elt.value, str)
-                            ):
-                                out.append(elt.value)
-                        return tuple(out)
-    return None
-
-
 def _ast_extract_class_attr_bool(
     src_path: Path, class_name: str, attr_name: str,
 ) -> bool | None:

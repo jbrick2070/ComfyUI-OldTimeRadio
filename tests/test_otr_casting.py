@@ -68,16 +68,6 @@ def _desc_response(
     return json.dumps({"character_description": description})
 
 
-# Back-compat: some legacy-shaped responses still carry gender +
-# voice_preset. The new DescriptionResponse schema ignores the extra
-# keys (pydantic by default), so a fat response still parses.
-def _good_response(name="ALICE",  # noqa: ARG001
-                   description="Sharp-eyed scientist, 30s, anxious about the data.",
-                   gender="female",  # noqa: ARG001
-                   voice_preset="v2/en_speaker_4"):  # noqa: ARG001
-    return _desc_response(description)
-
-
 # ---------------------------------------------------------------------------
 # assemble_pre_locked_rows
 # ---------------------------------------------------------------------------

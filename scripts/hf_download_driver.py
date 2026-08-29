@@ -2,7 +2,8 @@
 hf_download_driver.py
 =====================
 
-Tiny child process invoked by scripts/download_video_stack_weights.ps1.
+Tiny child process invoked by downloader wrappers (currently
+scripts/download_ltx_0_9_8.ps1 and the 4060 model fetcher).
 Reads a JSON spec from a file path passed as argv[1] (path approach
 avoids cmd/PowerShell quote-stripping when passing JSON on the command
 line).  Runs the matching huggingface_hub call and prints an OK/FAIL line.

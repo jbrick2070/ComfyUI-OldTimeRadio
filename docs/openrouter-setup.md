@@ -37,12 +37,15 @@ setx OPENROUTER_API_KEY "sk-or-v1-PASTE-YOUR-REAL-KEY-HERE"
 
 No quotes are required (the key has no spaces), but they're safe — `setx` strips them, so the stored value stays clean. This saves to your User environment permanently. **Never paste your real key into a chat, a commit, or a screenshot.**
 
-## Step 4 — Turn it on and pick your models
+## Step 4 — Pick your models
 
-Two named remote slots, **A** and **B**, each point at a real model slug of your choice. Set them once:
+Saving the key in Step 3 is what turns the lane on — **the presence of
+`OPENROUTER_API_KEY` is the only gate.** (There is no separate enable flag;
+the old `OTR_ENABLE_OPENROUTER` opt-in was removed and setting it does
+nothing.) Two named remote slots, **A** and **B**, each point at a real model
+slug of your choice. Set them once:
 
 ```
-setx OTR_ENABLE_OPENROUTER 1
 setx OPENROUTER_MODEL_A "anthropic/claude-3.5-sonnet"
 setx OPENROUTER_MODEL_B "openai/gpt-4o"
 ```
@@ -138,17 +141,17 @@ OpenRouter does not log prompts/completions by default, and routes around provid
 
 ## Turn it off
 
-Set the gate to `0` (or clear it) and restart ComfyUI:
-
-```
-setx OTR_ENABLE_OPENROUTER 0
-```
-
-The OpenRouter A/B options disappear from the dropdowns and the pipeline is back to 100% local. Your saved key stays put for next time; to remove it entirely, delete the `OPENROUTER_API_KEY` user variable.
+**The only real off switch is removing the key from the environment.** Delete
+the `OPENROUTER_API_KEY` user variable (System Properties → Environment
+Variables, or `reg delete "HKCU\Environment" /v OPENROUTER_API_KEY /f`) and
+restart ComfyUI in a fresh terminal. With no key in the process environment
+the OpenRouter A/B options disappear from the dropdowns and the pipeline is
+back to 100% local. There is no flag that disables the lane while the key
+remains set — do not rely on one as a privacy or cost kill switch.
 
 ## Troubleshooting
 
-- **No OpenRouter A/B in the dropdown** → `OPENROUTER_API_KEY` or `OTR_ENABLE_OPENROUTER=1` isn't set, or ComfyUI wasn't restarted in a new terminal after `setx`.
+- **No OpenRouter A/B in the dropdown** → `OPENROUTER_API_KEY` isn't set, or ComfyUI wasn't restarted in a new terminal after `setx`.
 - **The slug picker (`openrouter_slot_a/b_model`) only shows a recommended default + `(no OpenRouter models cached …)`** → the catalog cache is empty. Run `scripts\otr_openrouter_refresh.py`, then reload the node. (You can still type/keep any valid slug — a saved one is preserved even when out of the visible list.)
 - **Run aborts on a technical pass** → the remote model didn't return valid JSON (fail-closed). Switch that slot to local or to a structured-output-capable model.
 - **"Insufficient credits" / rate-limit errors** → you're on a paid or rate-limited model; add credits or switch to a `:free` slug.

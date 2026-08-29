@@ -98,43 +98,27 @@ rem The canonical wrapper chooses a free local port per leg. Direct/manual
 rem launches keep the historical port as a harmless default.
 if not defined OTR_HEADLESS_PORT set OTR_HEADLESS_PORT=8000
 echo [launch] OTR headless port %OTR_HEADLESS_PORT%
+rem Lane tokens (FLOOR/HUMO/LTX/WAN) are accepted from every harness, but the
+rem old OTR_ENABLE_* engine exports they used to set were VESTIGIAL and were
+rem removed 2026-08-28: every registered video engine declares
+rem requires_flag=None -- the registry is the menu, and engine selection is
+rem profile-driven. The one live lane payload is WAN's model/recipe exports.
 if /i "%2"=="FLOOR" (
-  set OTR_ENABLE_HUMO=
-  echo [launch] heavy engines OFF ^(floor leg^)
+  echo [launch] FLOOR leg ^(engine selection is profile/registry-driven^)
 ) else if /i "%2"=="HUMO" (
-  set OTR_ENABLE_HUMO=1
-  echo [launch] HUMO lane: explicit OTR_ENABLE_HUMO=1
+  echo [launch] HUMO lane token accepted ^(no enable flag exists; profiles route the engine^)
 ) else if /i "%2"=="LTX" (
-  set OTR_ENABLE_HUMO=
-  set OTR_ENABLE_LTX_VIDEO=1
-  rem OTR_ENABLE_LTX_AV added in lane 7 (2026-08-11). This token is THE LTX
-  rem boot lane and it was enabling only ONE of the two LTX engines, so the
-  rem audio-in lane could not be smoked on the boot it declares without the
-  rem operator exporting a flag by hand -- and a boot lane you have to
-  rem supplement by hand is not a boot lane. Both LTX engines stay DEFAULT-OFF
-  rem on every other token; this one turns them on together, which is what its
-  rem name has always promised.
-  set OTR_ENABLE_LTX_AV=1
-  echo [launch] LTX lane: Sage-free boot, OTR_ENABLE_LTX_VIDEO=1, OTR_ENABLE_LTX_AV=1, HuMo OFF
+  echo [launch] LTX lane token accepted ^(both LTX engines registry-selectable; no enable flags exist^)
 ) else if /i "%2"=="WAN" (
-  set OTR_ENABLE_HUMO=
   rem GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B engine. The 5B
-  rem REQUIRES the Wan2.2 VAE (M8), not the 2.1 VAE.
-  rem
-  rem THE 14B i2v HALF OF THIS TOKEN IS GONE (2026-08-26). It set
-  rem OTR_ENABLE_WAN_I2V + OTR_WAN_I2V_CKPT for an engine that could not fit the
-  rem card: 19.82 GiB of weights against a 14.5 GiB target, which is why it
-  rem timed out at 120 minutes while this 5B lane finished in 48. The engine is
-  rem retired and tombstoned; the token now enables the ONE Wan lane that runs.
-  rem The old M3 preflight note ("every registered core Wan engine's enable flag
-  rem must be 1") is satisfied by that one engine now, not two.
-  set OTR_ENABLE_WAN_TI2V=1
+  rem REQUIRES the Wan2.2 VAE (M8), not the 2.1 VAE. The 14B i2v half of this
+  rem token is retired (2026-08-26). These two exports are the lane's live
+  rem payload and eng_wan_ti2v reads both.
   set OTR_WAN_TI2V_CKPT=C:\ComfyUI-Models\diffusion_models\Wan2.2-TI2V-5B-Q5_K_M.gguf
   set OTR_WAN_TI2V_VAE_NAME=wan2.2_vae.safetensors
-  echo [launch] WAN lane: OTR_ENABLE_WAN_TI2V=1, HuMo OFF
+  echo [launch] WAN lane: TI2V-5B ckpt + VAE exports set
 ) else (
-  set OTR_ENABLE_HUMO=
-  echo [launch] heavy engines OFF ^(default no-lane^)
+  echo [launch] no lane token ^(engine selection is profile/registry-driven^)
 )
 rem Canonical headless boots do not consume hidden per-leg env hook files.
 rem Harnesses that need a special env must pass it explicitly in their own

@@ -45,35 +45,6 @@ def _make_audio(n_clips: int, samples_per: int = 24000, sr: int = 24000):
     return {"waveform": waveform, "sample_rate": sr}
 
 
-def _music_bus(cue_id: str, anchor_line_id: str, *, samples: int = 12000):
-    from nodes import _otr_cue_manifest as CM
-    from nodes.production_ledger import music_cue_spec_sha256
-
-    prompt = "A brief instrumental bridge."
-    duration = float(samples) / 48000.0
-    cue_hash = music_cue_spec_sha256({
-        "generation_prompt": prompt,
-        "target_duration_s": duration,
-        "placement": "interstitial",
-        "anchor_line_id": anchor_line_id,
-    })
-    manifest = CM.build_manifest(48000, [{
-        "cue_id": cue_id,
-        "batch_index": 0,
-        "sample_count": samples,
-        "sample_rate": 48000,
-        "prompt": prompt,
-        "prompt_sha256": CM.prompt_sha256(prompt),
-        "cue_spec_sha256": cue_hash,
-        "placement": "interstitial",
-        "anchor_line_id": anchor_line_id,
-        "seed": 7,
-        "requested_duration_s": duration,
-        "actual_duration_s": duration,
-        "output_path": f"C:/episode/{cue_id}.wav",
-    }])
-    return _make_audio(1, samples_per=samples, sr=48000), CM.dumps(manifest)
-
 @pytest.fixture
 def patched_sequencer_env(tmp_path):
     """Patch the GPU + ledger I/O surfaces so sequence() is hermetic.

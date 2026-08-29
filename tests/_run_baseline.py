@@ -194,78 +194,11 @@ def _dropdown_text_match(workflow_val, schema_val):
 _V2_PLACEHOLDER_TYPES = set()
 
 
-def _dump_schema_for_node(schemas, node_type, out_path):
-    """Write the raw ComfyUI schema for a node to disk for debugging.
-
-    Useful for diagnosing widget-value alignment bugs where the schema
-    param ordering does not match the INPUT_TYPES definition order.
-    """
-    schema = schemas.get(node_type)
-    if schema:
-        import json as _json
-        with open(out_path, "w", encoding="utf-8") as f:
-            _json.dump(schema.get("input", {}), f, indent=2)
-        print(f"  Schema dump: {out_path}")
-    else:
-        print(f"  WARNING: {node_type} not found in schemas")
-
-
-# Known-correct widget values for OTR_BatchAudioGenGenerator.
-# BUG-LOCAL-008: schema param ordering from /object_info does not match
-# INPUT_TYPES definition order, causing positional wv mapping to start
-# at the wrong slot. Until root cause is fixed, hardcode correct values.
-_AUDIOGEN_CORRECT_INPUTS = {
-    "episode_seed": "",
-    "model_id": "facebook/audiogen-medium",
-    "guidance_scale": 3.0,
-    "default_duration": 3.0,
-}
-
-# Known-correct widget values for OTR_MusicGenTheme.
-# BUG-LOCAL-298: node 14's script_json is a forceInput, but the workflow JSON
-# still tags that input with a "widget" flag. _workflow_to_api_prompt counts a
-# linked-with-widget-flag input as a KEPT widgets_values slot, so it overcounts
-# by one and the 4-value vector ["", "facebook/musicgen-medium", 3.0, false]
-# shifts: episode_seed<-model, model_id<-guidance, guidance_scale<-False (0.0).
-# 0.0 < the node's min=1.0, so ComfyUI rejects node 14; since EpisodeAssembler
-# reads node 14's opening/closing theme outputs, the ENTIRE audio output is
-# invalidated and the prompt no-ops (0 lines). The production ComfyUI frontend
-# and tests/test_workflow_audio_widget_vectors.py both correctly EXCLUDE the
-# forceInput slot (the length-4 vector is correct and that test passes); only
-# this headless replica converter overcounts. Hardcode the intended values,
-# mirroring the BUG-LOCAL-008 AudioGen correction above.
-_MUSICGEN_CORRECT_INPUTS = {
-    "episode_seed": "",
-    "model_id": "facebook/musicgen-medium",
-    "guidance_scale": 3.0,
-    "allow_silence_fallback": False,
-}
-
-
-def _fix_known_widget_drift(prompt):
-    """Apply hardcoded corrections for nodes with known widget drift.
-
-    BUG-LOCAL-008: OTR_BatchAudioGenGenerator gets episode_seed and
-    model_id from the wrong wv slots due to schema ordering mismatch.
-    BUG-LOCAL-298: OTR_MusicGenTheme shifts by one because its forceInput
-    script_json carries a "widget" flag in the workflow JSON (see the
-    _MUSICGEN_CORRECT_INPUTS note). Both corrections overwrite with the
-    workflow's intended values; linked inputs (e.g. script_json) are left
-    untouched because .update() only sets the listed widget keys.
-    """
-    for nid, node_data in prompt.items():
-        ct = node_data.get("class_type")
-        if ct == "OTR_BatchAudioGenGenerator":
-            before = {k: node_data["inputs"].get(k) for k in _AUDIOGEN_CORRECT_INPUTS}
-            node_data["inputs"].update(_AUDIOGEN_CORRECT_INPUTS)
-            print(f"  Fixed node #{nid} OTR_BatchAudioGenGenerator widget drift")
-            log.info("BUG-LOCAL-008 fix applied: was %s, now correct", before)
-        elif ct == "OTR_MusicGenTheme":
-            before = {k: node_data["inputs"].get(k) for k in _MUSICGEN_CORRECT_INPUTS}
-            node_data["inputs"].update(_MUSICGEN_CORRECT_INPUTS)
-            print(f"  Fixed node #{nid} OTR_MusicGenTheme widget drift")
-            log.info("BUG-LOCAL-298 fix applied: was %s, now correct", before)
-    return prompt
+# The BUG-LOCAL-008 / BUG-LOCAL-298 widget-drift corrections and the schema
+# dump that diagnosed them were removed 2026-08-28: both targeted nodes
+# (OTR_BatchAudioGenGenerator, OTR_MusicGenTheme) are retired -- neither is
+# registered nor present in the canonical workflow, so both branches were
+# unreachable no-ops.
 
 
 def _strip_non_audio_nodes(prompt):
@@ -547,21 +480,12 @@ def run_episode_and_get_audio_bytes(seeds):
     prompt = _workflow_to_api_prompt(workflow, schemas)
     print(f"  Built prompt with {len(prompt)} nodes")
 
-    # Dump schema for known problem node (BUG-LOCAL-008 diagnosis)
-    _dump_schema_for_node(
-        schemas, "OTR_BatchAudioGenGenerator",
-        os.path.join(os.path.dirname(__file__), "debug_audiogen_schema.json")
-    )
-
     print("Stripping non-audio v2 placeholder nodes...")
     prompt = _strip_non_audio_nodes(prompt)
 
     # Find assembler before injecting seeds
     assembler_nid = _find_assembler_node_id(prompt)
     print(f"  EpisodeAssembler is node #{assembler_nid}")
-
-    print("Applying known widget drift corrections (BUG-LOCAL-008)...")
-    prompt = _fix_known_widget_drift(prompt)
 
     print("Injecting fixed seeds...")
     prompt = _inject_seeds_into_prompt(prompt, seeds)

@@ -81,25 +81,6 @@ if "folder_paths" not in sys.modules:
     sys.modules["folder_paths"] = _fp_stub
 
 
-@pytest.fixture
-def standard_budget():
-    """v2.0 production-shape EpisodeBudget for outline + composer tests.
-
-    Mirrors OTR_LedgerScriptWriter defaults (act_count=3,
-    num_characters=2, include_act_breaks=True)
-    so prompt-shape tests exercise the production code path. S28
-    cleanbreak removed the `budget=None` back-compat — every
-    OutlineRequest now needs a real budget; this fixture is the
-    canonical one for tests that don't pin a specific shape.
-    """
-    from nodes._otr_episode_budget import compute_episode_budget
-    return compute_episode_budget(
-        act_count=3,
-        include_act_breaks=True,
-        num_characters=2,
-    )
-
-
 @pytest.fixture(autouse=True, scope="session")
 def _otr_no_cuda_during_collection():
     """Autouse session-scope fixture; documents the env-var approach.

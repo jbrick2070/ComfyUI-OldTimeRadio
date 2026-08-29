@@ -460,40 +460,9 @@ _LAST_NAMES = [
     "Steiner",
 ]
 
-# Trait pools for procedural character profiles
-_GENDERS = ["male", "female"]
-_AGE_BRACKETS = ["20s", "30s", "40s", "50s", "60s"]
-_DEMEANORS = [
-    "calm", "intense", "warm", "sharp", "dry", "energetic",
-    "measured", "wry", "stoic", "anxious", "confident", "weary",
-]
-
-# `_pick_accent` / `_ACCENTS` REMOVED 2026-08-28: zero references
-# anywhere, not even a comment. And reconnecting them would have done
-# nothing -- `_ACCENTS` had collapsed to a single 100%-weight entry in
-# 2026-07 (after a foreign-accent Lemmy proved unintelligible), so the
-# 'weighted random selection' the docstring described had no weights
-# left to select between.
-
-# Per-character voice traits pool. Drawn at cast-roll time so each character
-# carries a fixed (gender, age_band, tone, energy, vocab_register, signature)
-# tuple across every scene. Without this, the LLM improvises traits inside
-# each [VOICE:] tag and the same character drifts in voice/age/gender between
-# scenes. Signature is a one-line speech tic the LLM keeps consistent.
-# Keep this list balanced: ~50/50 gender split, varied age bands, varied
-# energy levels, no two entries with identical (gender, age, tone) triples.
-_VOICE_TRAITS = [
-    ("male",   "30s", "wry",          "low",    "blue-collar",  "trims sentences mid-thought"),
-    ("female", "40s", "clipped",      "high",   "technical",    "answers questions with questions"),
-    ("male",   "50s", "weathered",    "low",    "plainspoken",  "drops articles when stressed"),
-    ("female", "20s", "curious",      "medium", "academic",     "names tools by their model number"),
-    ("male",   "60s", "gravelly",     "low",    "rural",        "ends sentences with 'son' or 'kid'"),
-    ("female", "30s", "sardonic",     "medium", "urban",        "speaks in fragments under stress"),
-    ("male",   "40s", "anxious",      "high",   "bureaucratic", "qualifies every statement"),
-    ("female", "50s", "authoritative","medium", "command",      "issues orders, never asks"),
-    ("male",   "20s", "earnest",      "high",   "vernacular",   "uses contractions even when formal"),
-    ("female", "60s", "quiet",        "low",    "lyrical",      "speaks in metaphor when scared"),
-]
+# The procedural trait pools (_GENDERS / _AGE_BRACKETS / _DEMEANORS /
+# _VOICE_TRAITS) were removed 2026-08-28: definition-only, zero loads --
+# the cast-roll path they described no longer draws from this module.
 
 
 

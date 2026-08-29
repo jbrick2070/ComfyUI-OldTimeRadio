@@ -12,7 +12,7 @@ sys.modules stubbing pollutes the tester's own namespace. A child
 process with the sentinel pre-installed gives a clean answer.
 
 Exit codes:
-  0  all 12 prompt modules import cleanly with sentinels installed
+  0  all 5 prompt modules import cleanly with sentinels installed
   1  at least one module accessed a forbidden import surface
   2  child process crashed for an unrelated reason
 
@@ -29,14 +29,12 @@ import json
 import os
 import subprocess
 import sys
-import textwrap
 from pathlib import Path
 
-# Active prompt entrypoint modules.
-# Order does not matter for the guard; module names mirror the
-# table in docs/2026-05-16-otr-headless-prompt-tester__00_question.md.
+# Active prompt entrypoint modules. Order does not matter for the guard.
+# (_otr_style_picker was retired with the style-picker rip; the module no
+# longer exists, so listing it here would fail the guard on a ghost.)
 PROMPT_MODULES = (
-    "nodes._otr_style_picker",
     "nodes._otr_outline",
     "nodes._otr_casting",
     "nodes._otr_line_composer",

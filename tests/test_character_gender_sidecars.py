@@ -173,15 +173,6 @@ class TestPronounScan:
         assert "jane" in mention_forms("Jane Eyre")
 
 
-# --------------------------------------------------------------------------- #
-# the vendored corpus -- the artifact, not a fixture
-# --------------------------------------------------------------------------- #
-def _sidecar(slug: str) -> dict:
-    path = _SOURCES / f"{slug}.provenance.json"
-    assert path.is_file(), f"missing vendored sidecar: {path}"
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 class TestTheLadderItself:
     """Tier 1 had NEVER executed, and nothing in the tree would have said so.
 

@@ -51,7 +51,7 @@
     "ref_path": {
       "type": "string",
       "minLength": 1,
-      "description": "Path to the reference audio clip on local disk (VALIDATE_INPUTS checks local-disk presence)."
+      "description": "Path to the reference audio clip on local disk (resolved and verified at render time inside generate(); queue-time VALIDATE_INPUTS deliberately accepts)."
     },
     "ref_sha256": {
       "type": "string",

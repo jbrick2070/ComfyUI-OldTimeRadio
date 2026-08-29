@@ -67,17 +67,6 @@ def _loader_load_llm_source() -> str:
     raise RuntimeError("load_llm function not found in _otr_model_loader.py")
 
 
-def _orch_load_llm_source() -> str:
-    src = ORCH_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "_load_llm":
-            start = node.lineno - 1
-            end = node.end_lineno or len(src.splitlines())
-            return "\n".join(src.splitlines()[start:end])
-    raise RuntimeError("_load_llm function not found in story_orchestrator.py")
-
-
 # ---------------------------------------------------------------------------
 # Profile-branch AST tests
 # ---------------------------------------------------------------------------
@@ -159,70 +148,6 @@ def test_load_llm_8bit_comes_from_policy():
 # ---------------------------------------------------------------------------
 # Runtime shape tests
 # ---------------------------------------------------------------------------
-
-
-def _install_load_llm_stub(monkeypatch):
-    """S31 B4 update: post-deletion of `_so._LLM_CACHE`, the loader's
-    `load_llm` no longer has a cache-hit short-circuit (request_slot
-    handles caching at the outer layer). Runtime shape tests stub the
-    HEAVY transformers / bitsandbytes / CUDA path by patching
-    `transformers.AutoTokenizer.from_pretrained` and
-    `AutoModelForCausalLM.from_pretrained` to return fakes, plus
-    `torch.cuda.is_available` -> False so the body skips every GPU
-    branch. The body then runs end-to-end and constructs the
-    cache_entry dict from the fake model + tokenizer.
-    """
-
-    class _StubModel:
-        device = "cpu"
-
-        def to(self, _d):
-            return self
-
-        def cpu(self):
-            return self
-
-        def eval(self):
-            return self
-
-        def generate(self, *args, **kwargs):
-            return [[0]]
-
-        def modules(self):
-            return iter([])
-
-    class _StubTok:
-        eos_token_id = 0
-
-        def __call__(self, _text, return_tensors=None):
-            class _Inputs:
-                input_ids = type("S", (), {"shape": (1, 5)})()
-
-                def to(self, _d):
-                    return self
-
-            return _Inputs()
-
-    stub_model = _StubModel()
-    stub_tok = _StubTok()
-
-    import torch
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-
-    from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
-    monkeypatch.setattr(
-        AutoTokenizer, "from_pretrained",
-        classmethod(lambda cls, *a, **kw: stub_tok),
-    )
-    monkeypatch.setattr(
-        AutoModelForCausalLM, "from_pretrained",
-        classmethod(lambda cls, *a, **kw: stub_model),
-    )
-    monkeypatch.setattr(
-        AutoConfig, "from_pretrained",
-        classmethod(lambda cls, *a, **kw: type("C", (), {"max_position_embeddings": 8192})()),
-    )
-    return stub_model, stub_tok
 
 
 def test_load_llm_returns_cache_entry_dict_shape():

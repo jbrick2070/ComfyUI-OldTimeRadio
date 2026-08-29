@@ -55,16 +55,6 @@ def _silent_video(path, dur=2.0, with_audio=False):
     _ff(*args)
 
 
-def _audio_stream_info(path):
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "a:0",
-         "-show_entries", "stream=codec_name,sample_rate,channels",
-         "-of", "json", str(path)],
-        check=True, capture_output=True, text=True, timeout=60).stdout
-    streams = json.loads(out or "{}").get("streams") or []
-    return streams[0] if streams else {}
-
-
 # --------------------------------------------------------------------------- #
 # OTR_MasterAudioMux -- the terminal, audio-critical node
 # --------------------------------------------------------------------------- #

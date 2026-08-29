@@ -119,10 +119,6 @@ def _src(links_by_id, link_id):
     return (L[1], L[2])
 
 
-def _dst_nodes(links_by_id, link_ids):
-    return sorted(links_by_id[i][3] for i in link_ids)
-
-
 def _dst(links_by_id, by_id, link_id):
     """(dst_node_id, dst_input_name) for a link id."""
     L = links_by_id[link_id]

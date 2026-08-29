@@ -247,10 +247,6 @@ def test_budget_ceiling_blocks_reserve(rig):
 # ---------------------------------------------------------------------------
 
 
-def _slow_behavior(_kwargs):
-    raise AssertionError("must not be called synchronously")
-
-
 def test_interrupt_cancels_and_bills(monkeypatch, rig):
     async def _sleepy(self, **kwargs):
         await asyncio.sleep(120)

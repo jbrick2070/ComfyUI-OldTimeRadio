@@ -144,10 +144,6 @@ def _fit():
 # ---------------------------------------------------------------------------
 
 
-def _remote_entry(enabled_backend):
-    return enabled_backend.load(SLOT_A, _row())
-
-
 def _row():
     import types
     return types.SimpleNamespace(repo_id=SLOT_A, loader_backend="openrouter_http", context_window=8192)

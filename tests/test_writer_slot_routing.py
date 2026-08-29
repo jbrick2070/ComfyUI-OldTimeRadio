@@ -36,19 +36,6 @@ def _writer_tree() -> ast.AST:
     return ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
 
 
-def _run_method() -> ast.FunctionDef:
-    tree = _writer_tree()
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.ClassDef)
-            and node.name == "OTR_LedgerScriptWriter"
-        ):
-            for sub in node.body:
-                if isinstance(sub, ast.FunctionDef) and sub.name == "run":
-                    return sub
-    raise RuntimeError("OTR_LedgerScriptWriter.run not found")
-
-
 # ---------------------------------------------------------------------------
 # 1. test_no_direct_load_llm_calls_inside_writer
 # ---------------------------------------------------------------------------
