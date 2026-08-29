@@ -8579,3 +8579,85 @@ stays UNKNOWN until an episode publishes. Next step here is to install 0.3.33
 into the venv properly (after the live legs clear), re-run the GGUF leg, and
 then attempt 12B with `OTR_GGUF_N_GPU_LAYERS` layer splitting per the operator's
 "prove me wrong with an OOM" directive.
+
+## PBUG-20260829-14 -- the clean judge false-positives on ordinary dialogue at 2B, and its "repairs" delete real content
+
+- **found:** 2026-08-29 by the 5080 window, during the operator-directed
+  bank/engine churn (`scripts/otr_bank_engine_sweep.py`, `--act-count 1`,
+  `google/gemma-4-E2B-it` pinned in BOTH writer slots).
+- **admissible:** four LIVE published episodes, each with RESULT SUCCESS +
+  `obs_publish OK` + the mp4 on disk. Evidence read from the frozen ledgers'
+  own `meta.ledger_clean.rows[]` receipts, not from a static audit.
+
+**WHAT THE STAGE IS FOR.** `_otr_ledger_clean` asks a model, per line, "is every
+word of this something the character says out loud?" -- so stage business never
+reaches TTS. On a capable model it works: in `The Lullaby Reel` (12B) it caught
+`"Simpson stand"` as third-person action inside an announcer line and repaired
+`"...Stone Simpson stand poised over a document"` to `"...are poised over a
+document"`. That is the pass doing exactly its job.
+
+**THE DEFECT.** At `gemma-4-E2B-it` the judge flags ORDINARY DIALOGUE as stage
+business, and the tell is structural: it quotes the ENTIRE LINE as the offending
+segment rather than naming a segment inside it. Every one of these is a
+character speaking:
+
+        "Hold still there, child. Show me what you've got in your hand."   why=action
+        "I need the parchment now, before the light fades entirely."       why=scene description
+        "But we can't just seal it away, Priam; what good is a preserved
+         shadow if no one bothers to read the light?"                      why=stage business
+        "It wasn't about the pressing, Fletcher, it was about the sound."  why=scene description
+        "Perhaps the insistence on the shadow is merely a reflection of
+         what we haven't yet cataloged as the main source."                why=scene description
+
+**THE HARM IS IN THE ROWS IT THINKS IT FIXED, NOT THE ONES IT GIVES UP ON.**
+An `unclean` row fails safe -- the original text survives to TTS. A `repaired`
+row is COMMITTED, so a false positive the repair believes it resolved silently
+edits correct dialogue:
+
+  * `The Loose Clasp` b005: `"The clasp is loose, little bird; show me how you
+    keep it fastened."` -> `"Show me how you keep it fastened"`. Half the line
+    deleted, including the clasp -- **in the episode titled "The Loose Clasp."**
+  * `The Negative's Label` b004: `"You've been staring..."` -> `"Youve been
+    staring..."`. The apostrophe is destroyed, which is a TTS pronunciation
+    defect, not a cosmetic one.
+  * `Marginalia of Truth` b002: `"isn't just wear, it's a deliberate mark"` ->
+    `"isn't just wear it is a deliberate mark"`. Contraction expanded and comma
+    stripped -- both prosody inputs.
+
+**THE MEASURED SPREAD (voiced rows = 6 in every episode; one act):**
+
+        model                bank            flagged  repaired  unclean  model_calls
+        gemma-4-E2B-it (2B)  original            5        2        3         23
+        gemma-4-E2B-it (2B)  media_archive       5        1        4         24
+        gemma-4-E2B-it (2B)  media_archive       3        1        2         16
+        gemma-4-E2B-it (2B)  media_archive       0        0        0          6
+        gemma-4-12b-it       media_archive       1        1        0          8
+        gemma-4-12b-it       public_domain       0        0        0          5
+        gemma-4-12b-it       shakespeare         0        0        0          5
+
+  13 flags / 9 unclean across four 2B episodes; 1 flag / 0 unclean across three
+  12B episodes, and that single 12B flag was a TRUE positive correctly repaired.
+  **Honest scope limit:** the 12B rows are prior runs, not a controlled A/B --
+  different banks and conditions. The 2B false-positive rate does not depend on
+  that contrast, though: the flagged quotes above are dialogue on their face.
+
+**SECOND-ORDER COST.** Chasing false positives triples the pass: 16-24 model
+calls per episode at 2B against 5-8 at 12B, and every episode lands
+`frozen_with_warns` instead of clean, which desensitizes the one signal that is
+supposed to mean something.
+
+**WHY THIS IS NOT "CHASING STORY QUALITY" (operator directive 2026-08-04).**
+Nothing here asks for better prose. A pass that DELETES correct dialogue the
+writer produced, and strips apostrophes out of words heading for TTS, is a
+ledger fault -- the same class as a character speaking with the wrong voice.
+The fix direction is the judge's precision, not the writing.
+
+**NOT FIXED, DELIBERATELY.** How to harden a judge against its own false
+positives has more than one defensible answer -- require a named sub-segment
+strictly shorter than the line before a repair may commit; gate the repair on
+a confidence signal; refuse the clean stage below a model size; keep the flag
+but never commit a whole-line rewrite. That is a design choice, so per
+CLAUDE.md it wants an arc before code, not a unilateral edit from the window
+that found it. Surfaced to the operator with the evidence.
+
+**Blast radius: 5080 findings only. No code, profile, or workflow was touched.**
