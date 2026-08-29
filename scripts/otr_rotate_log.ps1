@@ -17,10 +17,9 @@
 #
 # CONTRACT: the caller's log path is NEVER repointed. This only MOVES an
 # existing file aside; the caller then writes a fresh log at the original path.
-# Eight harnesses depend on that path (otr_headless_canonical.ps1,
-# _otr_w45_boot.ps1, otr_humo_vram_ladder.py, otr_ia2v_server_boot.cmd,
-# run_humo_bakeoff.py, run_ltx_av_q_bakeoff.py, run_video_arm_bakeoff.py,
-# run_wan_ti2v_bakeoff.py).
+# The live harnesses that depend on that path: otr_headless_canonical.ps1,
+# _otr_w45_boot.ps1, otr_ia2v_server_boot.cmd. (The bakeoff runners and the
+# HuMo VRAM ladder that used to be in this roster were all retired.)
 #
 # EXIT 0 = nothing to rotate, or rotated successfully.
 # EXIT 1 = a prior log exists and could NOT be moved. The caller must then

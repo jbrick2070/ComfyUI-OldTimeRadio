@@ -374,6 +374,10 @@ class WorkflowValidator:
         # server persists env across prompts; stale values are overwritten).
         # The VRAM OOM budget is owned by the operator's tier JSON now, so the
         # validator no longer exports a ceiling -- only the active profile id.
+        # No in-repo module reads these two exports (audited 2026-08-28); they
+        # are OUTPUTS kept for external tooling and the same-process node packs
+        # -- the env value is the only full-fidelity record of which workflow
+        # snapshot actually ran (the log prints a 12-char prefix).
         os.environ["OTR_ACTIVE_PROFILE"] = profile_id
         snapshot_hash = ""
         try:

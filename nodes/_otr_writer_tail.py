@@ -1100,11 +1100,14 @@ class WriterTailMixin:
             )
 
         # The first structurally complete inline ledger is authoritative.
-        _writer_word_receipt = _OTRWD.stamp_actual(
+        # stamp_actual files the receipt at word_budget.actual_receipts[stage]
+        # AND merges it onto word_budget top-level; the old top-level
+        # meta.writer_word_delivery alias was a byte-equal duplicate and was
+        # retired 2026-08-28 (V4 finding 12).
+        _OTRWD.stamp_actual(
             led.data,
             stage="writer_final_rows",
         )
-        meta["writer_word_delivery"] = dict(_writer_word_receipt)
 
 
         # --- K.5.5/K.5.6 final-row reflections ------------------------
@@ -1434,11 +1437,10 @@ class WriterTailMixin:
         # `word_budget.actual_receipts`, so restamping under the old name
         # would overwrite the pre-clean record instead of adding the
         # post-clean one. Counts are telemetry, never a gate (THE LAW).
-        _writer_word_receipt = _OTRWD.stamp_actual(
+        _OTRWD.stamp_actual(
             led.data,
             stage="writer_final_rows_post_clean",
         )
-        meta["writer_word_delivery"] = dict(_writer_word_receipt)
 
         from ._otr_readiness import stamp_text_for_tts_delivery
         from ._otr_text_delivery import CONTENT_OWNED, delivery_mode_for_meta

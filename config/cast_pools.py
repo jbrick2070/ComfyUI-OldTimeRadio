@@ -281,23 +281,13 @@ for _genre, _nameset in _GENRE_NAME_SETS.items():
     }
 
 
-# Trait pools for procedural character profiles
-GENDERS = ["male", "female"]
-AGE_BRACKETS = ["20s", "30s", "40s", "50s", "60s"]
-DEMEANORS = [
-    "calm", "intense", "warm", "sharp", "dry", "energetic",
-    "measured", "wry", "stoic", "anxious", "confident", "weary",
-]
-
-# Accent pool - 100% English-native presets only.
-# Foreign presets (de_speaker, fr_speaker, etc.) caused Bark hallucinations:
-# the model generates foreign-language phonemes when given English text,
-# producing gibberish instead of accented English. Until Bark's multilingual
-# stability improves, all characters use en_speaker_* presets.
-# See: v1.1 "Test Signal" critique - Lemmy (de_speaker_0) was unintelligible.
-ACCENTS = [
-    ("neutral",  "en", 1.00),   # English-only - no foreign presets
-]
+# The legacy procedural trait pools (GENDERS / AGE_BRACKETS / DEMEANORS /
+# ACCENTS) were removed 2026-08-28: zero in-repo readers. The ACCENTS lesson
+# survives the list it sat above and still binds casting: foreign Bark presets
+# (de_speaker, fr_speaker, ...) hallucinate foreign-language phonemes on
+# English text -- v1.1 "Test Signal" Lemmy (de_speaker_0) was unintelligible --
+# so every character uses en_speaker_* presets until Bark's multilingual
+# stability improves.
 
 # Voice presets mapped by gender + vocal quality + language code.
 # English-native presets (en_speaker_*) have known vocal qualities.

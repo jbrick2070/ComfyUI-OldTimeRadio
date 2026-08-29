@@ -3172,17 +3172,21 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         #        engine (build_story_contract, needs script_brief)
         #   D.3  lock_cast() -- ANNOUNCER first, LEMMY 11%, then
         #        per-character LLM call for description+gender+voice
-        #   D.4  led.set_cast() + stamp cast_status="locked"
+        #   D.4  led.set_cast() + cast_status="locked"; the requested count
+        #        lives at cast_contract.num_characters_request (the field
+        #        cast_lock replays from -- the old top-level duplicates
+        #        requested_num_characters/cast_locked retired 2026-08-28)
         #   D.5  generate_outline() consumes the locked character_cast
         # ---------------------------------------------------------------
         # D.1 Ledger up front. Subsequent stages stamp meta against it.
+        # cast_status="building" is deliberately kept: frozen in a crashed
+        # partial ledger it is the one signal that casting never finished.
         led = _PL.new_ledger(episode_id=None)
         episode_id = led.episode_id           # pending_<YYYYMMDD_HHMMSS>
         audio_dir = Path(led.out_dir)         # otr/episodes/<ep>/audio/
         episode_root = audio_dir.parent       # otr/episodes/<ep>/
         meta = led.data.setdefault("meta", {})
         meta["cast_status"] = "building"
-        meta["requested_num_characters"] = resolved["num_characters"]
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
@@ -3834,7 +3838,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
-        meta["cast_locked"]           = True
         meta["cast_contract_version"] = "cast-v1"
         meta["cast_contract"] = {
             "lemmy_hit":              cast_meta["lemmy_hit"],

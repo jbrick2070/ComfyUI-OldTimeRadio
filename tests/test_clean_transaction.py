@@ -443,8 +443,11 @@ def test_the_delivered_word_receipt_is_restamped_after_the_window(
     OTR_LedgerScriptWriter()._run_writer_tail(ctx)
 
     meta = ctx.led.data["meta"]
-    assert meta["writer_word_delivery"]["stage"] == (
-        "writer_final_rows_post_clean")
+    # The top-level writer_word_delivery alias was retired 2026-08-28 (V4
+    # finding 12): stamp_actual merges the LATEST receipt onto word_budget
+    # itself, so the stage pointer lives there now.
+    assert "writer_word_delivery" not in meta
+    assert meta["word_budget"]["stage"] == "writer_final_rows_post_clean"
     receipts = meta["word_budget"]["actual_receipts"]
     assert "writer_final_rows" in receipts
     assert "writer_final_rows_post_clean" in receipts
