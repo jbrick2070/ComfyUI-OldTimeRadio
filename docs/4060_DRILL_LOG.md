@@ -506,3 +506,68 @@ is caught and converted to a `GGUFNativeConfigError` that already names
 module, so a broken binding reports `binding_available: False`. The uninstall
 was still right -- leave the box as found -- but the availability probe would
 not have lied.
+
+## Step 13 -- CORRECTION: step 11 was WRONG. The GGUF binding WORKS on MRKT.
+
+**Retracting my own finding, because the test that produced it was invalid.**
+Step 11 concluded the GGUF lane was blocked on this box by a CUDA-major
+mismatch. The CAUSE named there (no CUDA 12 runtime present) was real, but the
+EVIDENCE was worthless: I tested with a bare `import llama_cpp`, which BYPASSES
+`_prepare_windows_llama_dll_runtime()` -- the function that adds the DLL
+directories and preloads the CUDA dependencies. A bare import fails even on a
+fully working install. The 5080 hit the identical error the same way and nearly
+declared its own working lane broken, which is how the flaw surfaced.
+
+**Re-tested through OTR's REAL path (`_import_llama_cpp()`), after installing
+the two pip packages the code expects:**
+
+    pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12
+    pip install --extra-index-url .../whl/cu124 llama-cpp-python
+
+    [loaded _otr_gguf_backend]
+    _import_llama_cpp() -> <class 'llama_cpp.llama.Llama'>
+    RESULT: GGUF BINDING USABLE
+
+**And the coexistence risk I declined to take is measured safe HERE, not just
+on Blackwell.** Tested in the RISKY order -- llama_cpp resident FIRST, then
+torch:
+
+    torch 2.12.1+cu130 cuda 13.0
+    cuda available after llama_cpp load: True
+    real CUDA matmul after llama_cpp load: OK  (1.5147e+08)
+    device: NVIDIA GeForce RTX 4060 Laptop GPU
+
+So a CUDA-12 runtime (cudart64_12 / cublas64_12, from pip) and torch's CUDA 13
+coexist in one process on Ada as well as Blackwell, and torch keeps driving the
+GPU with llama.cpp resident. Verified BEFORE anything else that the render path
+was unharmed: a clean torch CUDA matmul immediately after install. **No CUDA
+toolkit install was ever required -- it was two pip packages.**
+
+**THE ONLY REMAINING BLOCKER IS THE MODEL FILE -- a path problem plus a
+download:**
+
+    validate_gemma_gguf_ready() -> ok: False,
+      model_path: C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\
+                  gemma-4-12b-it-Q8_0.gguf
+      model_exists: False, expected_size: 12,669,646,240
+
+`C:\ComfyUI-Models` does not exist on MRKT (see the top of this log), so the
+GGUF row resolves to a root this box has never had. It needs
+`OTR_COMFYUI_MODELS_ROOT` pointed at the real tree, plus the weight itself.
+
+**WHY THIS MATTERS BEYOND ONE WRITER:** every non-NVIDIA profile in the repo
+(`otr_mac_mps`, `otr_amd16_rocm`, `otr_amd8_rocm`, `cpu_floor`) runs GGUF at
+`quant_policy: "none"`, because bitsandbytes NF4 is CUDA-only. GGUF is not a
+niche lane -- it is the entire Mac / AMD / CPU story, and its binding is now
+known-good here. Also: GGUF quantizes the embedding table while NF4 leaves it
+bf16, which is precisely the 1.88 GiB that put 12B out of reach in step 10.
+That reopens the writer question on 8 GB entirely.
+
+**Status: binding PROVEN, lane UNPROVEN.** No GGUF weight has been run on this
+box. Which model and which quant is a product decision with quality
+implications, not a bug fix, so it is surfaced rather than taken.
+
+**Blast radius (per CLAUDE.md 0B): 4060 ONLY.** No shared code, no `nodes/`, no
+profile, no workflow JSON was touched -- this is three pip installs in the MRKT
+venv and one log entry. The 5080 is provably untouched because nothing left
+this box's environment.
