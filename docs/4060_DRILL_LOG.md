@@ -86,6 +86,19 @@ writer et al). Two ship-relevant findings, only findable on a small card:
    exception -- the whole server dies, nothing can catch or retry it. The
    legacy loader raises a catchable OOM instead.
 
+## Operator observation (2026-08-29 ~03:20, watching the live stream) -- the "dub lane"
+
+Watching an animated episode play on the live OBS stream, the operator called
+out that the UNSYNCED mouth/motion animation over the voice track reads like a
+JAPANESE DUB -- an aesthetic audiences have accepted for decades -- and asked
+for it as ITS OWN LANE ("I'm serious"). Why it matters as a lane, in his
+framing: great perceived lip-sync feel at ZERO sync cost -- no audio fed into
+the video generator, no audio-conditioned models, no per-beat clip timing
+machinery. Animated characters with mouth motion + independent voice track =
+"close to perfect for a jap dub". This is a STYLE PRESET on the existing video
+lanes (prompt for animated speaking characters, loose motion), not new
+infrastructure -- which is exactly what makes it cheap on an 8 GB card.
+
 ## Step 5 -- leg 3 in flight (legacy loader)
 
 Server relaunched with `--disable-dynamic-vram`; episode re-queued
