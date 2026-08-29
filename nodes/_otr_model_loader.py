@@ -935,12 +935,54 @@ def load_llm(
                 if torch.cuda.is_available() else 0.0
             )
 
-            model = AutoModelForCausalLM.from_pretrained(
-                load_target,
-                local_files_only=True,
-                config=model_config,
-                **common_kwargs,
-            )
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    load_target,
+                    local_files_only=True,
+                    config=model_config,
+                    **common_kwargs,
+                )
+            except ValueError as _dispatch_err:
+                # Operator directive 2026-08-29: guards do not kill a render;
+                # an OOM is the only killer. bnb-4bit's validate_environment
+                # REFUSES a load whose device_map plans any CPU module unless
+                # fp32 CPU offload is explicitly permitted -- so a 12B NF4 on
+                # an 8 GB card died on a REFUSAL, not on memory. The 8-bit
+                # branch above already passes llm_int8_enable_fp32_cpu_offload
+                # (the flag covers 4-bit too, despite the int8 name); extend
+                # the same permission here as a LOUD one-shot retry: GPU-fit
+                # modules stay NF4 on CUDA, overflow runs fp32 on CPU --
+                # slower per token, but it LOADS, and only a genuine CUDA OOM
+                # can still end it. Anything but this exact refusal re-raises.
+                if not (needs_4bit
+                        and "dispatched on the cpu" in str(_dispatch_err).lower()):
+                    raise
+                log.warning(
+                    "[StoryOrchestrator] %s exceeds the GPU budget for a full "
+                    "NF4 load (%s); RETRYING with fp32 CPU offload -- "
+                    "CPU-resident layers run at fp32, expect a slower writer. "
+                    "Per operator directive the only remaining killer is a "
+                    "real OOM.", _stripped_model_id, _dispatch_err)
+                _runtime_log(
+                    f"[StoryOrchestrator] NF4 CPU-offload retry active for "
+                    f"{_stripped_model_id} (loud degradation, not a kill)")
+                # BUG-LOCAL-098: fresh BitsAndBytesConfig for the retry --
+                # transformers mutates the instance during from_pretrained.
+                _offload_quant = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    llm_int8_enable_fp32_cpu_offload=True,
+                )
+                _retry_kwargs = dict(common_kwargs)
+                _retry_kwargs["quantization_config"] = _offload_quant
+                model = AutoModelForCausalLM.from_pretrained(
+                    load_target,
+                    local_files_only=True,
+                    config=model_config,
+                    **_retry_kwargs,
+                )
             _runtime_log(
                 f"LLM model loaded from "
                 f"{'canonical snapshot' if snapshot_path else 'model_id with cache_dir'} "
@@ -1004,10 +1046,15 @@ def load_llm(
                         f"Desktop and re-queue. Tracked as BUG-LOCAL-098."
                     )
         except (OSError, ValueError) as local_err:
+            # Name the REAL cause -- this wrap spent a night labeling a bnb
+            # device-map refusal as a cache problem, which sent diagnosis to
+            # the wrong place three times before anyone read the chained
+            # traceback.
             raise ModelLoaderError(
-                f"Failed to load LLM model {_stripped_model_id!r} from the "
-                f"local HF cache at {cache_dir_path!r}; OTR does not use a "
-                "network fallback inside load_llm."
+                f"Failed to load LLM model {_stripped_model_id!r} (local HF "
+                f"cache at {cache_dir_path!r}; OTR does not use a network "
+                f"fallback inside load_llm). Underlying error: "
+                f"{type(local_err).__name__}: {str(local_err)[:400]}"
             ) from local_err
 
         if quant_config is None and max_memory is None:

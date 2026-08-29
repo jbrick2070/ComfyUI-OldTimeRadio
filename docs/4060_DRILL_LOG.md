@@ -230,6 +230,21 @@ Standing writer verdict for MRKT until that lands: E2B (unquantized) is the
 qualified writer; 12B nf4 measured out; E4B nf4 blocked pending the loader
 question.
 
+LOADER FIX LANDED (operator order "fix the auto-loader so it doesn't
+reject"): load_llm now retries a refused NF4 load ONCE with
+llm_int8_enable_fp32_cpu_offload (the same permission the 8-bit branch has
+always had), behind a loud warning -- fitting models take the unchanged
+first-attempt path; oversized ones now ATTEMPT instead of being refused.
+Verified live: the 12B streamed its weights for the first time all night
+(677 shards, retry warning in the log). It then failed DEEPER in
+transformers' offload machinery -- "Tensor.item() cannot be called on meta
+tensors" -- which is a second, separate defect in the bnb-4bit CPU-offload
+path, handed to the dev box with finding #5. The wrap that mislabeled these
+refusals as cache errors now names the underlying exception. GGUF lane
+checked as the designed alternative (model id -> unsloth/gemma-4-12b-it-GGUF,
+native partial offload): blocked on MRKT because llama-cpp-python is not in
+this venv; installing the CUDA build on Windows is a dev-box decision.
+
 FINDING #5 CONFIRMED AND PINNED (operator's viz+12B experiment, profile
 `otr_4060_viz_12b`: viz_camera on all four video roles to free the whole
 card, fresh server, ~7.4 GB free -- SAME refusal):
