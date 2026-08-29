@@ -1562,6 +1562,8 @@ def _estimate_resident_gb(
     model_id: str,
     *,
     safetensors_gb_hint: float | None = None,
+    gguf_quant: str | None = None,
+    context_cap: int | None = None,
 ) -> float | None:
     """Rough heuristic for VRAM resident size on the OTR pipeline.
 
@@ -1594,19 +1596,37 @@ def _estimate_resident_gb(
         # ~= weights on disk + the per-row KV cache at its context window. An
         # unpinned row (approx 0.0 = UNKNOWN) yields None (can't estimate).
         if getattr(curated, "provider", "local") == "gguf_native":
-            weights_gb = float(curated.approx_safetensors_gb)
-            if weights_gb <= 0.0:
-                return None
+            # PRICE WHAT THE REQUEST ACTUALLY ASKED FOR, not the row's worst
+            # case. `curated.approx_safetensors_gb` is `row.approx_artifact_gb()`
+            # -- the FIRST pinned artifact, which is Q8_0 on the gemma row -- and
+            # the KV term used to read `row.context_window`, the row's MAXIMUM.
+            # Together they priced every caller at 11.8 + 5.6 = 17.4 GB no matter
+            # what it requested, so a profile asking for Q4_K_M at n_ctx 2048 was
+            # judged on a Q8_0 load at 8192 and REFUSED at 2.56x its ceiling.
+            # The honest figure for that request is 6.63 + 1.40 = 8.03 GB, a 1.18x
+            # WARN. See PBUG-20260829-08.
+            weights_gb = 0.0
             kv_gb = 0.0
             try:
                 from . import _otr_gguf_backend as _gguf
                 _row = _gguf.gguf_row_for_repo(model_id)
+                if gguf_quant:
+                    try:
+                        _fn, _size, _sha = _row.artifact_for_quant(gguf_quant)
+                        if _size:
+                            weights_gb = float(_size) / (1024.0 ** 3)
+                    except Exception:  # noqa: BLE001 -- unknown quant: fall back
+                        weights_gb = 0.0
                 if _row.kv_gb_per_1k is not None:
-                    kv_gb = (
-                        float(_row.context_window) / 1024.0
-                    ) * float(_row.kv_gb_per_1k)
+                    _ctx = context_cap or _row.context_window
+                    kv_gb = (float(_ctx) / 1024.0) * float(_row.kv_gb_per_1k)
             except Exception:  # noqa: BLE001 -- KV additive; absent -> weights only
                 kv_gb = 0.0
+            if weights_gb <= 0.0:
+                # No per-quant pin available: the projected row's own figure.
+                weights_gb = float(curated.approx_safetensors_gb)
+            if weights_gb <= 0.0:
+                return None
             return weights_gb + kv_gb
         return float(curated.approx_safetensors_gb) / 2.0
     if safetensors_gb_hint is not None and safetensors_gb_hint > 0:
@@ -1620,6 +1640,7 @@ def check_vram_fit(
     *,
     ceiling_gb: float | None = None,
     safetensors_gb_hint: float | None = None,
+    gguf_quant: str | None = None,
 ) -> VRAMFitVerdict:
     """Coarse guardrail against the obvious oversize case (70B-on-16GB).
     Returns a tiered verdict (never raises):
@@ -1641,7 +1662,8 @@ def check_vram_fit(
     ceiling = ceiling_gb if ceiling_gb is not None else DEFAULT_VRAM_CEILING_GB
     curated = _by_repo_id().get(model_id)
     estimate = _estimate_resident_gb(
-        model_id, safetensors_gb_hint=safetensors_gb_hint
+        model_id, safetensors_gb_hint=safetensors_gb_hint,
+        gguf_quant=gguf_quant, context_cap=context_cap
     )
 
     # FAIL case first: clearly oversized regardless of curation.

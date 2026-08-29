@@ -8143,3 +8143,53 @@ crash; and both profiles are `draft` experiment lanes that the 4060 window is
 actively using to observe -06's mechanism, which an early refusal would
 prevent. Leave them. If the operator later wants the early refusal, that is his
 call to make, not a tidy-up.
+
+## PBUG-20260829-08 -- the VRAM gate priced every GGUF request as Q8_0 at max context, refusing 7 profiles their own writer
+
+- **found:** 2026-08-29 on the 5080, by Fable while grounding an architecture
+  question that turned out not to exist. Confirmed here by EXECUTING the
+  shipped gate, not by reading it.
+- **mechanism:** `_otr_model_catalog._estimate_resident_gb` priced a
+  `gguf_native` row from `curated.approx_safetensors_gb`, which is
+  `GGUFRow.approx_artifact_gb()` -- the FIRST PINNED artifact, `Q8_0` on the
+  gemma row -- and added KV at `row.context_window`, the row's MAXIMUM. Neither
+  term looked at what the caller actually requested. Every profile therefore
+  priced identically: 11.8 GiB + (8192/1024 x 0.7) = **17.40 GB**, whatever its
+  `gguf_quant` or `gguf_n_ctx` said.
+- **impact:** `check_vram_fit` FAILs at >=1.5x ceiling, and
+  `_assert_policy_admits_vram` raises on FAIL *before any load*. Measured:
+
+        8gb_lite         6.8  Q4_K_M @2048  FAIL 17.40
+        otr_8gb_ltx      6.8  Q4_K_M @2048  FAIL 17.40
+        otr_8gb_wan      6.8  Q4_K_M @2048  FAIL 17.40
+        otr_8gb_fastwan  6.8  Q4_K_M @2048  FAIL 17.40
+        otr_amd8_rocm    6.8  Q4_K_M @2048  FAIL 17.40
+        otr_mac_mps     10.0  Q4_K_M @4096  FAIL 17.40
+        otr_nv40_12gb   10.5  Q4_K_M @4096  FAIL 17.40
+
+  Seven profiles could not load the writer they ship with, and the error told
+  the operator to "pick a smaller model" when the smaller quant was already
+  picked. **That is every Mac, AMD and 8 GB profile in the pack** -- the whole
+  non-NVIDIA story, which is exactly the cross-platform claim being made.
+  `cpu_floor` escapes only because `vram_ceiling_gb == 0` returns before the
+  gate. INVISIBLE on the 16 GB dev box: 17.40 < 21.75 lands WARN, a log line.
+- **fix:** the estimator now takes `gguf_quant` and `context_cap` and prices
+  the requested artifact at the requested context; `check_vram_fit` forwards
+  both; the single call site passes `policy.gguf_quant`. Measured after:
+  8 GB profiles 8.03 (WARN, admitted), `otr_mac_mps` and `otr_nv40_12gb` 9.43
+  (PASS), `otr_g4_*` 12.23 (PASS), `otr_amd16_rocm` at Q8_0@4096 14.60 (WARN --
+  correctly still cautious for the larger quant).
+- **BLAST RADIUS, stated per CLAUDE.md 0B -- this changes BOTH boxes.** The
+  4060/Mac/AMD tiers move FAIL -> WARN/PASS, which is a real behaviour change:
+  they can now load. The 5080's `otr_g4_*` rows move WARN -> PASS. Only FAIL
+  raises, so **no 5080 render behaviour changes** -- what changes there is one
+  caution log line, and the estimate becoming honest (12.23 rather than 17.40).
+  Not claimed as "5080 untouched", because it isn't.
+- **pinned by** `tests/test_gguf_fit_prices_requested_quant.py` (6 cases), which
+  also asserts the oversize guard still FAILs a 70B-on-8GB pick so the fix
+  cannot turn the gate into a rubber stamp.
+- **bible-worthy: YES, once proven on a live leg.** The portable rule is "a
+  preflight estimate must price the REQUEST, not the resource's worst case" --
+  a guard that ignores the caller's own parameters refuses work it should
+  admit, and does it silently on exactly the hardware the dev box cannot see.
+  Not yet promoted: no live render has been driven through the corrected gate.

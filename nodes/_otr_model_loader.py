@@ -1382,8 +1382,11 @@ def _assert_policy_admits_vram(
         )
         return
 
+    # The policy's OWN quant, not the row's first pinned artifact. Without it
+    # a profile requesting Q4_K_M was judged on a Q8_0 load (PBUG-20260829-08).
     fit_verdict = _otr_catalog.check_vram_fit(
         model_id, ctx_verdict.value, ceiling_gb=policy.vram_ceiling_gb,
+        gguf_quant=getattr(policy, "gguf_quant", None),
     )
 
     # FAIL escalates BEFORE any cache reuse, network or disk work. A 70B pick
