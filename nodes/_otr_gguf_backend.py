@@ -370,6 +370,55 @@ GGUF_ROWS: tuple[GGUFRow, ...] = (
         stop_tokens=(),
         think_policy="qwen3_no_think",
     ),
+    GGUFRow(
+        repo_id="unsloth/Qwen3-4B-Instruct-2507-GGUF",
+        subdir="Qwen3-4B-Instruct-2507",
+        # THE 8 GB WRITER. Fetched 2026-08-29 to the canonical path with NO HF
+        # token at all (huggingface_hub token=False, 197 s) -- the repo is
+        # ungated and Apache-2.0 read off its own LICENSE file, not the card
+        # metadata. size and sha256 below are MEASURED from that artifact on
+        # disk, per the A6 rule; nothing here is copied from a model card.
+        #
+        # WHY THIS ROW AND NOT A BIGGER ONE. Under NF4 the embedding table
+        # stays bf16, which is what put gemma-4-12b at a 6.97 GiB floor and
+        # made it unloadable on an 8 GB card (PBUG-20260829-07 arithmetic
+        # note). GGUF quantizes the embeddings too, so the same class of model
+        # gets materially cheaper here. At 2.33 GiB of weights plus ~1.13 GiB
+        # of KV at 8K, the whole-card envelope is ~5.0-6.5 GiB including CUDA
+        # context and the desktop -- which is the number that matters, not the
+        # weights alone.
+        #
+        # think_policy IS "none", AND THAT IS A MEASURED CLAIM. This model's
+        # chat_template contains no `<think>` and exposes no `enable_thinking`
+        # knob (checked against tokenizer_config.json on the Hub). Its sibling
+        # Qwen3.5-4B DOES emit `<think>` by default, which is why that one is
+        # NOT this row. It matters because the writer emits LMFE-constrained
+        # JSON and a reasoning preamble fights the constraint.
+        artifacts={
+            "Q4_K_M": (
+                "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+                2497281120,
+                "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597",
+            ),
+        },
+        context_window=8192,
+        # kv_gb_per_1k stays None until MEASURED on this artifact. The schema
+        # refuses a guessed constant and it is right to: borrowing the gemma
+        # row's 0.70 would be an invention, and this model's KV geometry
+        # differs (36 layers, 8 kv-heads, head_dim 128). Until it is measured
+        # the fit estimate prices weights only, which is honest-but-optimistic
+        # rather than confidently wrong.
+        kv_gb_per_1k=None,
+        # UNPROVEN until a live leg publishes on this row. Not "PASS" on the
+        # strength of arithmetic -- a dropdown row is a promise the model will
+        # load, and no episode has been rendered with this writer yet.
+        vram_fit_tier="UNKNOWN",
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        requires_auth=False,
+        stop_tokens=(),
+        think_policy="none",
+    ),
 )
 
 
