@@ -7667,3 +7667,43 @@ to re-id and update its references in the same change.
   also an audio script, so any text placed in it may be SPOKEN -- and identity
   text is doubly wrong because the conditioning image already carries it.*
   Promote after the live proof, not before.
+
+## PBUG-20260829-01 -- `-vsync` was REMOVED in ffmpeg 9, killing every episode at the scopes stage
+
+- **found:** 2026-08-29, live leg on the 4060 (MRKT), prompt `02835636` FAIL.
+  Reported by the Fable session driving that box; verified from the 5080 by
+  reading the pushed fix and probing this box's own ffmpeg.
+- **artifact:** a real canonical render. Everything upstream PASSED, including
+  every haunted AnimateDiff beat (v3 + sliding context window, ~9-10 s/step at
+  4.9 GB with SD1.5 fully resident -- that lane genuinely fits 8 GB).
+  `OTR_SceneAwareScopes` then died instantly at argv parse: ffmpeg 9 rejects
+  `-vsync` with "Unrecognized option 'vsync'" before reading a single frame.
+- **blast radius:** FIVE call sites passed `-vsync` unconditionally --
+  `_otr_shared/scope_draw.py`, `_otr_shared/encode_sink.py`,
+  `otr_silent_composite.py` (x2), `otr_caption_burn.py`. Any box on ffmpeg 9
+  loses every episode at the same spot; the failure is not lane-specific.
+- **why it hid:** `-vsync` was deprecated in ffmpeg 5.1 but still ACCEPTED, and
+  the 5080 runs 8.0.1, which takes both spellings. So the bug is invisible on
+  the development box and appears the day anyone upgrades ffmpeg -- or on any
+  new user's machine that ships a current build. Same shape as the kokoro
+  `repo_id` catch earlier the same night (PBUG candidate below): the dev box's
+  older dependency masks a break that hits every fresh install.
+- **fix:** `f88a0179`. `scope_draw.cfr_flags(ffmpeg)` PROBES the installed
+  binary once with a 1-frame lavfi null encode and caches per binary path,
+  returning `-fps_mode cfr` when accepted and legacy `-vsync cfr` otherwise;
+  all five sites route through it. `-fps_mode` only exists from 5.1 up, so
+  neither spelling is safe unconditionally -- probing the artifact actually
+  installed is the only correct answer, exactly as the kokoro fix does.
+  Verified on the 5080: `cfr_flags('ffmpeg')` returns `['-fps_mode', 'cfr']`
+  on 8.0.1.
+- **self-caught trap worth keeping:** `-fps_mode` is an OUTPUT option. Placed
+  before `-i` the probe fails and silently falls back to the legacy spelling --
+  a probe that always reports "old ffmpeg" would have shipped looking correct.
+  It sits after `-i`, and was verified selecting `-fps_mode` on the ffmpeg 9
+  box.
+- bible-worthy: STRONG CANDIDATE. The reusable class is not about ffmpeg at
+  all: *a dependency flag the dev box still accepts is not a flag the ecosystem
+  still accepts -- probe the installed artifact, never the version you happen
+  to run.* Two independent instances landed the same night (this and kokoro
+  `repo_id`), which is the argument for a rule rather than two fixes. Check
+  against `otr_coverage_index.yaml` before promoting.
