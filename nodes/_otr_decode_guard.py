@@ -50,10 +50,13 @@ WHAT THIS IS NOT:
 * NOT a word-count gate. ``target_words`` is never read here and must never be.
   A word target is a REQUEST, never a limit.
 * NOT a quality judgement. It cannot see style, only exact repetition.
-* NOT terminal by itself -- it raises a REROLLABLE phase. But note that
-  ``MAX_CANDIDATE_CYCLES`` is 3, so three FALSE positives could still end an
-  episode. That is why the thresholds below are deliberately conservative:
-  this must fire on a runaway and essentially never on writing.
+* NOT terminal by itself -- it raises a REROLLABLE phase, so a false positive
+  costs a retry rather than the episode. The thresholds below stay deliberately
+  conservative anyway: repeated false fires would burn a run's retry budget and
+  then end it. (This paragraph used to justify itself with
+  ``MAX_CANDIDATE_CYCLES`` from ``_otr_scifi_codex.py`` -- a retry budget in a
+  module that no longer exists. Tuning against a deleted mechanism is how a
+  threshold ends up defended by nothing.)
 
 DESIGN NOTES that are load-bearing (settled review, 2026-08-13):
 * The criterion LATCHES rather than raising. Raising from inside a criterion

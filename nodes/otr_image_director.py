@@ -70,15 +70,10 @@ SEED_MODES = ("request_hash", "fixed")
 DEFAULT_FRESH_CAP = 15
 
 
-def _image_model_combo() -> list:
-    """Every REGISTERED image engine + the custom sentinel (registry IS the menu).
-
-    Built from ``registry.all_engine_names()`` -- there is NO validated-subset
-    filter (C4, 2026-06-29): every registered image engine is SELECTABLE (validation
-    is the operator's MANUAL process, never a code gate). ``+ Add Custom Model``
-    stays the escape hatch."""
-    names = list(_ireg.all_engine_names())
-    return names + [ADD_CUSTOM]
+# `_image_model_combo` was removed 2026-08-28: it built a dropdown this node
+# no longer declares. Image-MODEL selection lives in ONE place, OTR_VideoDirector
+# (operator 2026-06-18: "only in one place not two"), which has its own live
+# copy; this one fed no widget and had no production caller.
 
 
 def _registry_descriptors() -> list:
@@ -100,20 +95,22 @@ def _registry_descriptors() -> list:
 # capability (requires_mesh_fodder, mesh_stage) and is untouched.
 
 
-#: Image-prompt ROLE -> the video slot that renders it (the role->engine join the
-#: prompt fork needs). Route-A: the ONE shared per-role map
-#: (nodes/_otr_shared/role_slots.py); aliased here for any importer of this name.
-_ROLE_TO_VIDEO_SLOT = _role_slots.ROLE_TO_VIDEO_SLOT
+#: `_ROLE_TO_VIDEO_SLOT` was removed 2026-08-28. It aliased
+#: `_otr_shared/role_slots.ROLE_TO_VIDEO_SLOT` "for any importer of this name"
+#: and there was no such importer -- the dispatcher defines its own identical
+#: alias. Import the shared map directly.
 
 
 def _is_mesh_fodder_engine(engine_id: str) -> bool:
     """True if ``engine_id`` is a registered VIDEO engine declaring the
     ``requires_mesh_fodder`` capability (the 3D image-streams routing gate).
 
-    TOLERANT, unlike :func:`_is_3d_engine`: mesh-fodder routing is additive and
-    opt-in, so an empty / unregistered / custom engine is simply NOT-fodder
-    (False) -- it must never raise and block a normal episode. The capability
-    is read off the registered adapter, never an engine-name/family check."""
+    TOLERANT by design: mesh-fodder routing is additive and opt-in, so an
+    empty / unregistered / custom engine is simply NOT-fodder (False) -- it
+    must never raise and block a normal episode. The capability is read off the
+    registered adapter, never an engine-name/family check. (The stricter
+    `_is_3d_engine` this used to contrast itself with was retired with the 3D
+    family, lean-mean order 4.)"""
     if not engine_id or not _vreg.is_registered(engine_id):
         return False
     return bool(getattr(_vreg.get_engine(engine_id), "requires_mesh_fodder",
@@ -187,9 +184,9 @@ class OTRImageDirector:
                     "default": "per_object",
                     "tooltip": (
                         "per_object: one image reused per character/prop "
-                        "(cheapest; maps to mesh-once for 3D). per_beat: a fresh "
-                        "image per beat (capped to the audio beat budget). 3D "
-                        "roles are hard-locked to per_object."
+                        "(cheapest). per_beat: a fresh image per beat, capped "
+                        "by fresh_cap and the audio-derived beat budget -- "
+                        "more variety, more render time."
                     ),
                 }),
                 "fresh_cap": ("INT", {
@@ -381,15 +378,17 @@ class OTRImageDirector:
 
     @staticmethod
     def _parse_video_policy_required(raw) -> dict:
-        """FAIL-CLOSED video-policy parse (3D plan section 3): the policy is
-        a REQUIRED wired input; empty, malformed, non-object, or missing its
-        ``video_models`` dict RAISES -- a silently-ignored policy is exactly
-        the drift that disabled the 3D granularity lock."""
+        """FAIL-CLOSED video-policy parse: the policy is a REQUIRED wired
+        input; empty, malformed, non-object, or missing its ``video_models``
+        dict RAISES. The rule outlived the 3D granularity lock that first
+        motivated it -- a silently-ignored policy means this node's per-role
+        engine join is guessing, which is the drift the fail-closed parse
+        exists to stop."""
         if not isinstance(raw, str) or not raw.strip():
             raise ValueError(
                 "OTR_ImageDirector: video_policy_json is EMPTY -- wire "
                 "OTR_VideoDirector.video_policy_json into this input "
-                "(provider before consumer); the 3D granularity lock cannot "
+                "(provider before consumer); the per-role engine join cannot "
                 "run on an empty policy (fail-closed)."
             )
         try:

@@ -12,8 +12,13 @@ predecessor `otr_ltx_2_5_integration_handoff.md`. Reviewed against
 **THE LAB'S NUMBERS ARE LAB NUMBERS.** `CLAUDE.md` section 0A is explicit that a
 bench result "may never be worded as qualification" for OTR and must be
 re-proved through the canonical workflow. So the VRAM figure below is recorded
-as a lab observation and is NOT an envelope key; the G4 admission row and the
-`low`/`high` token in the public id both wait on OUR OWN solo smoke (G8).
+as a lab observation and is NOT an envelope key, and the G4 envelope admission
+still waits on OUR OWN solo smoke (G8).
+
+The `low`/`high` token in the public id is NO LONGER waiting -- that naming is
+settled and the `high` lanes are registered and shipping (corrected 2026-08-28;
+this paragraph used to bundle the naming decision with the open envelope
+question, so a reader could not tell which half was still undecided).
 
 **AND THE RECIPE IS NOT ON THE TABLE** (operator, standing rule, restated
 2026-08-19: *"no chasing vram recipes please... we are running on the Q3, that's
@@ -38,10 +43,11 @@ LTX25_DIT_GGUF = "LTX-2.5-Distilled-Q3_K_M.gguf"
 #: The text encoder. Gemma-4 12B with the LTX 2.5 projection, Q5 quantised.
 LTX25_TEXT_ENCODER_GGUF = "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf"
 
-#: Native BF16 VAEs. The AUDIO vae is named here even though the first lane
-#: never decodes with it -- the later foley lanes will, and the lab measured
-#: that decode as cheap (<50 MB VRAM, <1 s). Naming it now costs nothing and
-#: means the foley work does not have to rediscover the filename.
+#: Native BF16 VAEs. The AUDIO vae is DECODED TODAY by the Foley and MIME
+#: lanes (a second decode pass in eng_ltx25; measured cheap in the lab at
+#: <50 MB VRAM and <1 s, which is why it was affordable). It was named here
+#: before those lanes existed, and this comment described the decode as
+#: future work until 2026-08-28.
 LTX25_VIDEO_VAE = "ltx-2.5-video-vae-bf16.safetensors"
 LTX25_AUDIO_VAE = "ltx-2.5-audio-vae-bf16.safetensors"
 

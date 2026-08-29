@@ -347,7 +347,7 @@ def test_clip_budget_no_double_count():
         {"beat_id": "b2", "role": "retired_role_b", "char_id": "", "text": "",
          "samples": 12000, "sample_rate": 24000, "dur_s": None},
     ]
-    budget = sl.compute_clip_budget(beats, {}, 25)
+    budget = sl.compute_clip_budget(beats, 25)
     assert budget["per_beat"]["b1"] == 25
     assert budget["per_beat"]["b2"] == 12
     assert budget["total_frames"] == 37 == sum(budget["per_beat"].values())
@@ -361,10 +361,9 @@ def test_clip_budget_is_pure_per_beat():
          "text": "", "samples": 1000, "sample_rate": 24000, "dur_s": None}
         for i in range(3)
     ]
-    budget = sl.compute_clip_budget(beats, {}, 25)
-    assert set(budget) == {"per_beat", "total_frames", "warnings"}
+    budget = sl.compute_clip_budget(beats, 25)
+    assert set(budget) == {"per_beat", "total_frames"}
     assert len(budget["per_beat"]) == 3
-    assert budget["warnings"] == []
 
 
 # `test_image_done_gate_serializes` was REMOVED 2026-08-28 with the socket
@@ -551,7 +550,7 @@ def test_3d_expression_not_in_mesh_key():
     creative = {"b1": {"expression": "angry-scowl", "motion": "m", "camera": "c",
                        "text_prompt": "p", "source": "llm",
                        "request_hash": "rh", "prompt_hash": "ph"}}
-    budget = sl.compute_clip_budget(beats, {}, 25)
+    budget = sl.compute_clip_budget(beats, 25)
     _groups, shots = sl.build_execution_plan(beats, budget, creative, {})
     sh = shots[0]
     cache_blob = json.dumps(sh["cache_keys"])
@@ -794,7 +793,7 @@ def test_clip_budget_sum_equals_episode_duration():
         {"beat_id": "b3", "role": "retired_role_b", "char_id": "", "text": "",
          "samples": 6000, "sample_rate": sr, "dur_s": None},
     ]
-    budget = sl.compute_clip_budget(beats, {}, fps)
+    budget = sl.compute_clip_budget(beats, fps)
     total_samples = sum(b["samples"] for b in beats)
     episode_frames = (total_samples * fps) // sr
     assert budget["total_frames"] == episode_frames
@@ -804,7 +803,7 @@ def test_clip_budget_sum_equals_episode_duration():
 def test_clip_budget_empty_script_radio_floor():
     """Empty script -> radio-floor: zero frames, NO abort.
     OTR_ShotLock still stamps a video section for an episode with no lines."""
-    budget = sl.compute_clip_budget([], {}, 25)
+    budget = sl.compute_clip_budget([], 25)
     assert budget["total_frames"] == 0
     assert budget["per_beat"] == {}
 

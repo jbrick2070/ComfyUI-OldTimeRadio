@@ -18,7 +18,7 @@ fallback) already existed at 10+ other ``cast_pools`` call sites across
 ``nodes/_otr_casting.py``, ``nodes/_otr_voice_bank.py``,
 ``nodes/_otr_voice_route.py``, ``nodes/_otr_scifi_news_pro.py``, and ANOTHER
 function in this exact same file three lines above
-(``_resolve_lemmy_voice_policy``, :49-55) -- proof that the pattern was known
+(``_lemmy_voice_policy``, :41+) -- proof that the pattern was known
 and simply not applied here. This test pins the shape so it cannot regress at
 any of the guarded call sites, and would have failed on the bug as filed.
 """

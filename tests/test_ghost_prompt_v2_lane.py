@@ -103,7 +103,7 @@ def _plan(ledger=None, policy=None, warnings=None):
     led = ledger if ledger is not None else _ledger()
     pol = policy if policy is not None else POLICY
     beats = sl.extract_beats(led)
-    budget = sl.compute_clip_budget(beats, pol, 25)
+    budget = sl.compute_clip_budget(beats, 25)
     for beat in beats:
         budget["per_beat"].setdefault(beat["beat_id"], 50)
     groups, shots = sl.build_execution_plan(

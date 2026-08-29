@@ -447,27 +447,19 @@ class TestSliceCurveCacheKeySplit:
         assert k != rd.slice_cache_key("h", 1.0, 2.0,
                                        **dict(base, slicer_version="3"))
 
-    def test_curve_key_binds_driver_inputs_slice_key_does_not(self):
-        """The SPLIT: driver-side inputs (line_id / fps / driver version /
-        mapping hash / onset policy) churn ONLY the curve key -- the cheap
-        44.1k WAV key never moves."""
-        sk = rd.slice_cache_key("h", 1.0, 2.0)
-        base = dict(fps=25, driver_version="rhubarb-1.13",
-                    mapping_hash="map_v1", onset_policy="onset_in_clip_v1")
-        ck = rd.curve_cache_key(sk, "b001", **base)
-        assert ck != rd.curve_cache_key(sk, "b002", **base)
-        assert ck != rd.curve_cache_key(sk, "b001", **dict(base, fps=24))
-        assert ck != rd.curve_cache_key(
-            sk, "b001", **dict(base, driver_version="rhubarb-1.14"))
-        assert ck != rd.curve_cache_key(
-            sk, "b001", **dict(base, mapping_hash="map_v2"))
-        assert ck != rd.curve_cache_key(
-            sk, "b001", **dict(base, onset_policy="other"))
-        # the curve key DERIVES from the slice key (audio identity flows in)
-        sk2 = rd.slice_cache_key("h2", 1.0, 2.0)
-        assert ck != rd.curve_cache_key(sk2, "b001", **base)
-        # and the slice key itself is untouched by any driver input
-        assert sk == rd.slice_cache_key("h", 1.0, 2.0)
+    def test_the_curve_cache_key_is_gone_with_its_unbuilt_cache(self):
+        """`curve_cache_key` was removed 2026-08-28 along with the tests that
+        exercised its arithmetic. It keyed a Rhubarb->ARKit CURVE cache that was
+        never built -- no production caller, no curve artifact, and the 3D lane
+        it served is retired. Only this isolated test ever called it, which made
+        it look maintained.
+
+        The SLICE half is the live one and keeps its own coverage above."""
+        assert not hasattr(rd, "curve_cache_key")
+        assert "curve_cache_key" not in getattr(rd, "__all__", ())
+        # the audio slice key is untouched and still deterministic
+        assert rd.slice_cache_key("h", 1.0, 2.0) == rd.slice_cache_key(
+            "h", 1.0, 2.0)
 
     def test_build_request_from_shot_threads_the_ledger_hash(self):
         """build_request_from_shot feeds master_audio_sha256 into the slicer

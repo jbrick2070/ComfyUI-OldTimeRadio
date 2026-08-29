@@ -109,8 +109,11 @@ GHOST_NON_FIGURE_MODES = ("object", "signal")
 #: fallback into proof eligibility.
 GHOST_AUTHOR_SOURCES = ("writer_llm", "replay", "deterministic_fallback")
 
-#: Leaf shape. The model is TOLD 6--10 words; the hard bounds are wider so a
-#: good answer one word outside the request is not thrown away.
+#: Leaf shape. The model is TOLD 8--12 words (the ASK constants below, which
+#: are what the generated rule text actually says); the hard bounds are wider
+#: so a good answer one word outside the request is not thrown away. The
+#: comment claimed 6--10 until 2026-08-28 -- a band that matched neither the
+#: constants nor the prompt.
 GHOST_LEAF_MAX_CHARS = 96
 GHOST_LEAF_MIN_WORDS = 5
 GHOST_LEAF_MAX_WORDS = 14

@@ -145,11 +145,12 @@ def clip_rows_by_shot(manifest):
     a manifest carrying the same beat twice was graded as though it carried it
     once -- and which of the two got graded depended on file order. Here the
     FIRST occurrence wins and the duplicate is left for ``RULE_MANIFEST_SHAPE``
-    (step 3 of the no-mirror build, NOT YET LANDED) to report: a duplicate is a
-    defect to name, never a conflict to resolve quietly. Until that rule exists
-    a duplicate is silently tolerated, exactly as it was before -- the change
-    here is only WHICH of the two rows gets graded, and both regimes are
-    audit-only.
+    to report: a duplicate is a defect to name, never a conflict to resolve
+    quietly. That rule HAS landed -- ``grade_manifest_shape()`` detects
+    duplicate shot ids and ``grade_episode()`` calls it -- so the duplicate is
+    reported rather than silently tolerated. (This paragraph said "NOT YET
+    LANDED" until 2026-08-28.) The change here is only WHICH of the two rows
+    gets graded, and both regimes are audit-only.
 
     **It crashed on a non-record.** ``r.get`` on a list, a string or a number
     inside ``clips`` raised ``AttributeError`` straight out of the grader, past

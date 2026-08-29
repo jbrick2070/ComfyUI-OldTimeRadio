@@ -768,8 +768,19 @@ def apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key, vol=0.0):
 # Silent ffmpeg encode (copied; SILENT -- only OTR_MasterAudioMux adds audio).
 # --------------------------------------------------------------------------- #
 def find_ffmpeg(ffmpeg):
+    """Resolve the ffmpeg binary: explicit argument if it resolves, then the
+    ``OTR_FFMPEG`` env var, then PATH.
+
+    The env step is not optional politeness -- OTR_SceneAwareScopes ships a
+    tooltip promising exactly this order, and without it an install where
+    ffmpeg is reachable ONLY through ``OTR_FFMPEG`` encodes nothing while the
+    operator-facing contract says it should.
+    """
     if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
         return ffmpeg
+    env = (os.environ.get("OTR_FFMPEG") or "").strip()
+    if env and (shutil.which(env) or os.path.isfile(env)):
+        return env
     return shutil.which("ffmpeg")
 
 

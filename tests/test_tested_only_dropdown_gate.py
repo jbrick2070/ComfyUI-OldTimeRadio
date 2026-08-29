@@ -2,15 +2,20 @@
 
 The TESTED-ONLY dropdown gate (VALIDATED_ENGINES + validated_engine_names) was
 DELETED 2026-06-29 (C4): there is no validated-subset filter. The
-OTR_VideoDirector / OTR_ImageDirector per-role COMBOs now list EVERY REGISTERED
-engine + the "+ Add Custom Model" sentinel -- a registered engine is selectable
-and renders (it may hard-fail LOUD; validation is the operator's MANUAL process,
-never a code gate). The bare engine id is still the SAVED value (the video combo
-shows aspect-derived labels for display only).
+OTR_VideoDirector per-role COMBOs list EVERY REGISTERED engine + the
+"+ Add Custom Model" sentinel -- a registered engine is selectable and renders
+(it may hard-fail LOUD; validation is the operator's MANUAL process, never a
+code gate). The bare engine id is still the SAVED value (the video combo shows
+aspect-derived labels for display only).
+
+RETARGETED 2026-08-28: the image-combo assertions used to call
+`otr_image_director._image_model_combo`, which fed NO widget -- that node has
+had no image-model dropdown since the 2026-06-18 "only in one place not two"
+ruling moved model selection to OTR_VideoDirector. They were asserting against
+a shadow menu, so they now exercise the live one.
 """
 from __future__ import annotations
 
-from nodes import otr_image_director as idr
 from nodes import otr_video_director as vd
 from nodes._otr_image_engines import registry as ireg
 from nodes._otr_video_engines import registry as vreg
@@ -26,9 +31,9 @@ def test_video_combo_is_the_full_registry_plus_sentinel():
 
 
 def test_image_combo_is_the_full_registry_plus_sentinel():
-    combo = idr._image_model_combo()
-    assert combo[-1] == idr.ADD_CUSTOM
-    listed = set(combo) - {idr.ADD_CUSTOM}
+    combo = vd._image_model_combo()
+    assert combo[-1] == vd.ADD_CUSTOM
+    listed = set(combo) - {vd.ADD_CUSTOM}
     assert listed == set(ireg.all_engine_names())
 
 
@@ -57,7 +62,7 @@ def test_formerly_hidden_engines_are_now_selectable():
     assert {"still_motion"} <= video
     assert "still_parallax" not in video
     assert "wan_i2v" not in video
-    image = set(idr._image_model_combo())
+    image = set(vd._image_model_combo())
     assert "z_image_turbo" in image
 
 
@@ -65,5 +70,5 @@ def test_registry_unchanged_v6_intact():
     """V-6: the registry is the single source -- the dropdown no longer narrows it."""
     assert set(vd._engine_id_from_pick(c) for c in vd._video_model_combo()
                if c != vd.ADD_CUSTOM) == set(vreg.all_engine_names())
-    assert (set(idr._image_model_combo()) - {idr.ADD_CUSTOM}) == set(
+    assert (set(vd._image_model_combo()) - {vd.ADD_CUSTOM}) == set(
         ireg.all_engine_names())

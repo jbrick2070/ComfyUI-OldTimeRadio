@@ -699,25 +699,17 @@ class SceneSequencer:
                     "tooltip": "Shift all dialogue clips on the timeline (ms). "
                                "Positive = delay, negative = advance."
                 }),
-                # 720-bakeoff C3: the music bus. The theme node (node 83) emits
-                # ALL cues in ONE padded AUDIO batch + a manifest that maps each
-                # batch row to a cue. The sequencer inserts INTERSTITIAL cues
-                # inline at their music_inter boundary line (resolved by
-                # anchor_line_id); opening/closing are prepended/appended by
-                # EpisodeAssembler. Optional -- legacy lanes leave both unwired
-                # and every music line stays a passthrough (byte-parity).
-                "music_cue_audio": ("AUDIO", {
-                    "tooltip": "Padded AUDIO batch of every music cue from "
-                               "OTR_StableAudioTheme. Sliced per manifest "
-                               "sample_count; never the padded tail."
-                }),
-                "music_cue_manifest_json": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "forceInput": True,
-                    "tooltip": "Cue manifest JSON from OTR_StableAudioTheme "
-                               "(maps cue_id/anchor_line_id -> batch row)."
-                }),
+                # THE MUSIC BUS IS NOT WIRED HERE, and these sockets are gone
+                # (2026-08-28). `music_cue_audio` / `music_cue_manifest_json`
+                # were DECLARED on this node but `sequence()` never accepted
+                # them -- commit 59286499 removed the signature, body and wires
+                # and left the declarations behind. Wiring either in the UI
+                # therefore raised TypeError on a node that advertised the
+                # input. The live bus is OTR_EpisodeAssembler (canonical node
+                # 7), fed by OTR_StableAudioTheme (node 83) over links 282/283;
+                # it declares both sockets and consumes them. The parity
+                # regression in tests/test_input_types_signature_parity.py is
+                # what keeps a declaration from outliving its parameter again.
             },
         }
 

@@ -109,10 +109,12 @@ FOLEY_LANE_GAINS = {
 #: detail -- see the table above.
 GLOBAL_MASTER_GAIN_LANES = frozenset({"ltx25_foley_plus"})
 
-#: Kept as the name three call sites already read. It is the FOLEY-BED lane
-#: specifically; :data:`FOLEY_LANE_GAINS` is the full roster.
-FOLEY_ENGINE_ID = "ltx25_foley_plus"
-MIME_ENGINE_ID = "ltx25_mime"
+#: `FOLEY_ENGINE_ID` / `MIME_ENGINE_ID` were removed 2026-08-28. Their comment
+#: claimed "three call sites already read" them and there were none: every
+#: routing and mixing decision keys off :data:`FOLEY_LANE_GAINS` membership and
+#: resolved engine ids, never a bare scalar comparison -- which is the point
+#: `is_foley_route` makes below. A false scalar authority sitting over a live
+#: table is exactly what sends the next reader to the wrong place.
 
 
 def is_foley_route(video_policy_json):
@@ -125,7 +127,7 @@ def is_foley_route(video_policy_json):
 
     IDS ARE RESOLVED BEFORE THEY ARE COMPARED. ``effective_video_models`` can
     hold a public menu string, an internal id, or a legacy alias depending on
-    how the policy was frozen, so a bare ``== FOLEY_ENGINE_ID`` would answer
+    how the policy was frozen, so a bare ``== "ltx25_foley_plus"`` would answer
     False for ``'ltx25_high_foley_plus (16:9)'`` -- an episode that really is on
     the route. Both callers use THIS function for exactly that reason.
 
@@ -683,7 +685,7 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
 
 __all__ = [
     "FOLEY_GAIN", "MASTER_GAIN_UNDER_FOLEY", "FOLEY_RECEIPT_KEYS",
-    "FOLEY_ENGINE_ID", "is_foley_route",
+    "is_foley_route",
     "FoleyStemError", "sha256_of_file", "samples_per_frame",
     "durable_foley_dir",
     "write_pcm16_wav", "read_pcm16_wav", "assemble_beat_foley_segments",

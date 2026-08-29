@@ -426,11 +426,13 @@ def _probe_audio_duration(path):
         return 0.0
 
 
-#: A real clip whose on-disk frames are below this fraction of its beat target is
-#: a gross underrun -- the composite would hold the last frame for most of the beat
-#: (the wan_ti2v 17/280 freeze). LOUD-warn so a future short-clip engine is caught,
-#: not silently frozen. Env OTR_CLIP_UNDERRUN_FRAC (0 disables).
-_CLIP_UNDERRUN_FRAC = 0.5
+#: `_CLIP_UNDERRUN_FRAC` and its `OTR_CLIP_UNDERRUN_FRAC` env read were removed
+#: 2026-08-28. Nothing had read either since the underrun check went TERMINAL
+#: (see the explanation below): a fractional "is this bad enough to mention"
+#: threshold cannot survive a rule where any shortfall is fatal. The env NAME
+#: still appears in tests/test_clip_fill.py ON PURPOSE -- that test sets the
+#: retired knob to prove it cannot weaken the terminal rule, which is a
+#: regression receipt, not a leftover.
 
 
 class ClipUnderrunsItsBeat(RuntimeError):

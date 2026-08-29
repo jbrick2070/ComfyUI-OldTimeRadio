@@ -88,8 +88,6 @@ Widget surface (current as of 2026-05-23):
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
         repetition_penalty FLOAT  (anti-loop penalty; 1.0 disables)
         max_new_tokens_cap INT    (per-line composer token ceiling)
-        enable_polish_pass BOOLEAN (optional post-compose narration-leak
-                                    check)
 
     The optimization_profile combo was a widget here until 2026-05-23;
     removed in the ROADMAP PRIORITY 2 UI simplification (only "Standard"
@@ -263,9 +261,11 @@ __all__ = ["OTR_LedgerScriptWriter"]
 # Constants
 # ---------------------------------------------------------------------------
 
-VOICED_ROLES = {"character", "announcer"}
-"""Speaker roles that produce spoken dialogue. These trigger an LLM
-compose_line call. Other roles (music_*) skip the LLM."""
+# `VOICED_ROLES` was removed 2026-08-28: this copy had no reader (the loop
+# below branches on `speaker_role == "character"` / `NON_VOICED_ROLES`). The
+# authority for which roles are spoken is
+# `nodes/_otr_spoken_text_policy.py`; the private per-lane copies elsewhere
+# are deliberate and stay independent.
 
 NON_VOICED_ROLES = {"music_open", "music_close", "music_inter"}
 """Speaker roles that are pure render contracts: no LLM call, no
@@ -1376,7 +1376,6 @@ def _fetch_rss_seed_or_die(
     try:
         news = _so._fetch_science_news(
             max_feeds=10, model_id=model_id,
-            optimization_profile="Standard",
             load_config=load_config, policy=policy,
         )
         if not news:
@@ -4282,16 +4281,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 and str(ln.get("speaker_role") or "").strip().lower() == "character"
             ]
             _voice_slot_ids: list[str] = _char_voice_slot_ids or _all_voice_slot_ids
-            if slot_scheduler is not None:
-                with slot_scheduler.helper_context("dramatic_state"):
-                    _dramatic_state = _derive_news_ds(
-                        meta=meta,
-                        cast_rows=led.data.get("cast") or cast_rows or [],
-                        voice_slot_ids=_voice_slot_ids,
-                        slot_fn=technical_generate_fn,
-                        arc_shape=_arc_shape,
-                    )
-            else:
+            # `slot_scheduler` is CONSTRUCTED unconditionally far above and
+            # dereferenced several times before this point, so the old
+            # `if ... is not None` guard could never be False -- and its
+            # `else` re-called `_derive_news_ds` with byte-identical arguments,
+            # differing only by dropping the helper_context attribution. An
+            # unreachable branch that silently loses a receipt is worse than no
+            # branch (removed 2026-08-28).
+            with slot_scheduler.helper_context("dramatic_state"):
                 _dramatic_state = _derive_news_ds(
                     meta=meta,
                     cast_rows=led.data.get("cast") or cast_rows or [],
@@ -4527,7 +4524,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             )
 
         # --- I. Per-beat loop ------------------------------------------
-        script_text_parts: list = []
+        # `script_text_parts` (and the per-beat `[VOICE: ...]` token that fed
+        # it) were removed 2026-08-28: the list was appended to on every voiced
+        # beat and NEVER read -- not here, not by WriterTailContext, not by the
+        # tail. Three comments called it a live diagnostic; a diagnostic
+        # nothing can observe is just work. Slot-0's transcript authority is
+        # `assemble_script_text_from_ledger`, which reads the saved ledger.
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
 
         base_temp = resolved["temperature"]
@@ -4951,7 +4953,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
             cid: str
-            token: str
             beat_compose_flags: tuple[str, ...] = ()
 
             if beat.speaker_role == "character":
@@ -4972,10 +4973,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     beat_compose_flags = ()
                 else:
                     # LLM slot: creative -- dialogue composer per-beat
-                    # narrative pass. Polish (creative; routed through
-                    # polish_generate_fn from the scheduler) handles
-                    # the narration-leak cleanup pass when
-                    # enable_polish_pass is on.
+                    # narrative pass. (There is no `enable_polish_pass`
+                    # widget and there never was: the name appeared only in
+                    # two comments, describing a control the operator could
+                    # not set. Narration-leak cleanup lives in the composer's
+                    # own repair path.)
                     # S32 B6: helper_context attribution. Per-beat
                     # invocation; the context-manager overhead is
                     # constant-time and negligible relative to the LLM
@@ -5044,16 +5046,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         )
 
                 cid = char_id_by_name[beat.speaker]
-                # An unfillable beat emits NO transcript token and enters NO
-                # context window: `[VOICE: MARA, wry] ` is a nonempty string
-                # that would reach the transcript carrying no speech, and an
-                # empty "previous line" is worse than no previous line for
-                # every beat composed after it.
-                token = (
-                    f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
-                    if cleaned else ""
-                )
-
+                # An unfillable beat enters NO context window: an empty
+                # "previous line" is worse than no previous line for every beat
+                # composed after it.
                 if cleaned:
                     last_lines.append((beat.speaker, cleaned))
                     if len(last_lines) > LAST_LINES_WINDOW:
@@ -5191,11 +5186,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         )
                     cleaned = line_res.text
                     beat_compose_flags = line_res.compose_flags
-                token = (
-                    f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
-                    if cleaned else ""
-                )
-
                 if cleaned:
                     last_lines.append(("ANNOUNCER", cleaned))
                     if len(last_lines) > LAST_LINES_WINDOW:
@@ -5217,7 +5207,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # post-loop, which skips empty-text rows.
                 cleaned = ""
                 cid = beat.speaker_role
-                token = ""
 
             else:
                 log.warning(
@@ -5239,7 +5228,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # update_line_text return value. False means no row
             # matched -- the ledger skeleton and the outline have
             # drifted apart and the disk ledger silently misses this
-            # beat while script_text_parts populates. Fail loud.
+            # beat. Fail loud.
             _ok = led.update_line_text(beat.beat_id, cleaned)
             if not _ok:
                 raise RuntimeError(
@@ -5257,12 +5246,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             }
             _OTRL.patch_line_fields(led.data, beat.beat_id, _line_fields)
             led.save()
-            # rip-sfx-broll (2026-07-01): music render-contract rows emit
-            # an empty token -- skip it (the post-loop
-            # assemble_script_text_from_ledger is slot-0's authority and
-            # skips empty-text rows the same way).
-            if token:
-                script_text_parts.append(token)
 
         # --- I.4.9. Post-composition announcer-intro REWRITE ----------
         # (INTRO_REWRITE_SPEC 2026-07-09, kibitz r2-r4, shape A.) The

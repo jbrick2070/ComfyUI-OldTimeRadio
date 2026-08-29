@@ -1825,8 +1825,9 @@ def assemble_script_text_from_ledger(led_data: dict) -> str:
     """Rebuild the writer's slot-0 `script_text` string from the
     canonical ledger lines.
 
-    Token format matches what `OTR_LedgerScriptWriter.run()` originally
-    accumulates in `script_text_parts`:
+    Token format matches what `OTR_LedgerScriptWriter.run()` emitted per beat
+    before that in-loop list was removed (2026-08-28); this function is now
+    the only producer of the slot-0 transcript:
       - character beat:  ``[VOICE: NAME, traits] <text>``
       - announcer beat:  ``[VOICE: ANNOUNCER, traits] <text>``
       - music beat:      skipped (render contract, no transcript text;

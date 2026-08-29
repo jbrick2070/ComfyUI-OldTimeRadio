@@ -108,19 +108,23 @@ def _probe_float(path: str, stream: str) -> float:
             return -1.0
 
 
-def _count_audio_streams(path: str) -> int:
-    fp = _ffprobe_bin()
-    if not fp:
-        return -1
-    p = _run([fp, "-v", "error", "-select_streams", "a", "-show_entries",
-              "stream=index", "-of", "csv=p=0", path])
-    return len([ln for ln in (p.stdout or "").splitlines() if ln.strip()])
+# `_count_audio_streams` was removed 2026-08-28: no caller anywhere. The
+# identically named helper in tests/test_credits_roll_spec.py is that test's
+# own local, not a consumer of this one.
 
 
-def audio_pcm_sha(path: str) -> str:
+def audio_pcm_sha(path: str, ffmpeg: str = "ffmpeg") -> str:
     """SHA-256 of decoded s16le mono @24k -- codec/container-agnostic audio
-    identity (same method the A-S2 mux probe used). '' on failure."""
-    fp = shutil.which("ffmpeg")
+    identity (same method the A-S2 mux probe used). '' on failure.
+
+    Resolves its binary through :func:`_ffmpeg_bin` -- explicit argument, then
+    ``OTR_FFMPEG``, then PATH -- so the fail-closed identity proof honours the
+    same resolution order the encode did. It used to call ``shutil.which``
+    directly, which meant that on an env-only install (ffmpeg reachable ONLY
+    via ``OTR_FFMPEG``) the mux encoded fine and then this returned '' --
+    failing a FINISHED episode at the last boundary.
+    """
+    fp = _ffmpeg_bin(ffmpeg)
     if not fp:
         return ""
     raw = subprocess.run(
@@ -151,8 +155,8 @@ def _credits_tail_ceiling() -> float:
     already-booted server, so a malformed one must be IGNORED, never FATAL. The
     house posture is `otr_silent_composite._unsharp_amount`; this adds the
     WARNING that one omits, because a ceiling silently reverting to the default
-    is a ceiling the operator thinks they moved. This is the one env read in
-    the mux."""
+    is a ceiling the operator thinks they moved. (It is not the mux's only env
+    read -- `_ffmpeg_bin` consults `OTR_FFMPEG` in the same call.)"""
     raw = os.environ.get("OTR_MAX_CREDITS_TAIL_S")
     if raw in (None, ""):
         return _MAX_CREDITS_TAIL_S_DEFAULT
@@ -329,8 +333,10 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         raise ValueError(f"OTR_MasterAudioMux: ffmpeg mux failed :: {p.stderr.strip()[:300]}")
 
     # byte-identity: the output audio must decode identically to the master.
-    h_master = audio_pcm_sha(master_audio_path)
-    h_out = audio_pcm_sha(out_path)
+    # Pass the ALREADY-RESOLVED binary so the proof cannot resolve differently
+    # from the encode that just ran.
+    h_master = audio_pcm_sha(master_audio_path, fb)
+    h_out = audio_pcm_sha(out_path, fb)
     if not h_out or h_out != h_master:
         raise ValueError(
             f"OTR_MasterAudioMux: output audio NOT byte-identical to master "

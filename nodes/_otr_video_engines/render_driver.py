@@ -438,18 +438,11 @@ def slice_cache_key(master_hash, start_s, dur_s, *,
     ).hexdigest()[:16]
 
 
-def curve_cache_key(slice_key, line_id, *, fps, driver_version,
-                    mapping_hash, onset_policy="onset_in_clip_v1"):
-    """The CURVE cache key (3D plan 7.3): the W7 Rhubarb->ARKit curve file
-    binds the SLICE key (content-true audio identity) + line_id + fps +
-    driver version + viseme-mapping-table hash + onset policy. Changing any
-    driver-side input regenerates curves WITHOUT touching the cheap WAV
-    (the split's whole point). Pure; 16-hex."""
-    return hashlib.sha256(
-        ("curve|%s|line=%s|fps=%d|drv=%s|map=%s|onset=%s"
-         % (slice_key, line_id, int(fps), driver_version, mapping_hash,
-            onset_policy)).encode("utf-8")
-    ).hexdigest()[:16]
+# `curve_cache_key` was removed 2026-08-28. It was the exported key for the
+# W7 Rhubarb->ARKit CURVE cache -- a cache that was never built: no production
+# caller, no curve artifact on disk, and the 3D lane it belonged to is retired.
+# The audio SLICE half above (`slice_cache_key`, `SLICER_VERSION`) is live and
+# untouched; only the curve half was a public contract for nothing.
 
 
 def _slicer_ffmpeg_bin():
@@ -2690,7 +2683,9 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # default "none" stamp (init_image is empty) would HIDE that we refused
         # to mesh the scene still; surface it explicitly (mirrors i2v above).
         req["observability"]["init_source"] = "missing_mesh_fodder"
-        req["observability"]["mesh_fodder_missing"] = True
+        # (The separate `mesh_fodder_missing` boolean was removed 2026-08-28:
+        # it restated the durable `init_source` stamp on the same line, and
+        # only a direct-builder test ever read it.)
     else:
         req["observability"]["init_source"] = (init_source if init_image
                                                else "none")
@@ -3771,7 +3766,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         _video_seed = _seed_from_hash(req_hash, "%s#seg%d"
                                       % (shot.get("shot_id"), _seg_index))
     req["seed_bundle"] = {"request_seed": _video_seed}
-    req["observability"]["video_seed_segment_index"] = _seg_index
+    # `video_seed_segment_index` was removed 2026-08-28. It was never projected
+    # into the durable trace, and it would have MISLED if it were: multi-segment
+    # requests are rebuilt per segment, so this original request's index 0 is
+    # not the segment a reader would be looking at. The per-segment rows carry
+    # their own `segment_index`, which is the honest one.
     # Operator 2026-06-12: surface the per-beat LTX/video sampler seed (the
     # deterministic request-hash seed the engines render with) in the trace so
     # future renders are apples-to-apples with the 6/5 baseline.
@@ -4813,7 +4812,15 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "ghost_drawable_beat", "ghost_drawable_beat_sha8",
                         "positive_clip_tokens", "positive_clip_windows",
                         "negative_clip_tokens", "negative_clip_windows",
-                        "clip_window_max", "clip_counter"):
+                        "clip_window_max", "clip_counter",
+                        # JOINT-AV RECEIPTS. Stamped on the request and declared
+                        # in the schema, but omitted from this allowlist -- so
+                        # the published /history evidence never carried what a
+                        # joint-AV beat actually asked for or was heard to say.
+                        # `joint_av_identity_leak` is only present when a leak
+                        # was detected; absent stays absent, never invented.
+                        "joint_av_prompt", "joint_av_sounds",
+                        "joint_av_identity_leak"):
                 if key in obs:
                     row[key] = obs[key]
                 elif isinstance(request, dict) and ("_" + key) in request:
@@ -6100,7 +6107,11 @@ def _clip_summary(clip):
             "extension_mode": (clip or {}).get("extension_mode")}
 
 
-def _episode_facts(ep, meta):
+def _episode_facts(ep):
+    # `meta` was accepted and never read (removed 2026-08-28). The report this
+    # builds reads its meta at the enclosing layer, where the value is actually
+    # in scope. (scripts/otr_video_soak.py has its own same-named helper that
+    # DOES use meta -- different function, untouched.)
     led = ep["ledger"]
     sec = led["video"]
     shots = {s["shot_id"]: s for s in sec["shots"]}
@@ -6136,8 +6147,8 @@ def assemble_report(meta, input_ledger, e1, e2, *, elapsed_s,
     return {
         "meta": meta,
         "elapsed_s": round(float(elapsed_s), 1),
-        "episode_1": _episode_facts(e1, meta),
-        "episode_2": _episode_facts(e2, meta),
+        "episode_1": _episode_facts(e1),
+        "episode_2": _episode_facts(e2),
         "input_shot_count": len(input_ledger["video"]["shots"]),
         # NO-TRAIL LOUD contract (2026-07-02): the forced-OOM leg's outcome --
         # {"raised": bool, "error_type": str, "detail": str} or None when the
@@ -6345,7 +6356,7 @@ __all__ = [
     "classify_failure", "engine_family",
     "build_soak_fixture", "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
-    "SLICER_VERSION", "slice_cache_key", "curve_cache_key",
+    "SLICER_VERSION", "slice_cache_key",
     "run_real_episode", "build_clip_manifest", "persist_episode_clips",
     "parse_engine_override", "apply_engine_override",
     "render_shot", "run_episode", "assemble_report", "assert_soak_ok",

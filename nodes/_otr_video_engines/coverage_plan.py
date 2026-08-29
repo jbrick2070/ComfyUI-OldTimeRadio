@@ -637,8 +637,10 @@ def segment_render_window(plan, segment_index, fps):
 #: ``_still_spine_row_for_beat`` both select scene rows BY BEAT with a
 #: last-write-wins / plate precedence, so a segment still wearing a scene kind
 #: would shadow the beat's own still and segment 0 would render from the LAST
-#: segment's image. A distinct kind makes the segment rows invisible to every
-#: existing consumer, which is what keeps this chunk behaviour-inert.
+#: segment's image. The distinct kind makes segment rows invisible to the
+#: GENERIC scene-row selectors -- not to every consumer, which this comment
+#: claimed until 2026-08-28: the image dispatcher and the render driver both
+#: have DEDICATED jump-aware readers that match on this kind on purpose.
 JUMP_STILL_KIND = "jump_segment"
 
 #: Object-id prefix for a jump-segment still.

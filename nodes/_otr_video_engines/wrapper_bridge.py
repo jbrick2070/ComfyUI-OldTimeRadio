@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import subprocess
 
 _LOG = logging.getLogger("OTR.video.wrapper_bridge")
@@ -42,8 +43,11 @@ COLOR_PRIMARIES = "bt709"
 class WrapperNodeMissing(RuntimeError):
     """A required ComfyUI wrapper node class is not installed / registered.
 
-    Raised fail-closed (NAMED) so a render degrades via the engine fallback chain
-    with a LOUD restamp instead of crashing -- never a silent skip."""
+    Raised fail-closed and NAMED. It ESCALATES: the selected engine is the one
+    that renders, and a missing wrapper node stops that beat by name rather
+    than sliding down a chain. (This docstring described a degrade "via the
+    engine fallback chain" until 2026-08-28 -- that chain was retired, and the
+    no-fallback rule is exactly what makes the named failure useful.)"""
 
 
 class GraphExecutionError(RuntimeError):
@@ -923,9 +927,41 @@ def extract_terminal_frame(clip_path, out_path, *, ffmpeg="ffmpeg"):
     return out_path
 
 
+def resolve_ffmpeg(ffmpeg="ffmpeg"):
+    """The binary an ffmpeg command should actually run, in ONE order:
+    the explicit value if it resolves, then ``OTR_FFMPEG`` if it resolves,
+    then bare ``ffmpeg`` on PATH.
+
+    Applied at the two EXECUTION points below rather than in the ten pure arg
+    builders, so their tested arg lists are unchanged. Without it this bridge
+    ran a literal ``"ffmpeg"``: the cheap-family preflight VALIDATES
+    ``OTR_FFMPEG`` and then the render dropped it, so an install where ffmpeg
+    is reachable only through that variable passed preflight and died later,
+    after the expensive work. Every heavy lane (still families, HuMo, LTX,
+    MiniMax, Wan, Ghost Signal) encodes through here.
+    """
+    cand = (ffmpeg or "").strip()
+    if cand and (shutil.which(cand) or os.path.isfile(cand)):
+        return cand
+    env = (os.environ.get("OTR_FFMPEG") or "").strip()
+    if env and (shutil.which(env) or os.path.isfile(env)):
+        return env
+    return shutil.which("ffmpeg") or (cand or "ffmpeg")
+
+
+def _with_resolved_ffmpeg(cmd):
+    """Return ``cmd`` with argv[0] resolved through :func:`resolve_ffmpeg`."""
+    if not cmd:
+        return cmd
+    out = list(cmd)
+    out[0] = resolve_ffmpeg(out[0])
+    return out
+
+
 def run_ffmpeg(cmd):
     """Run an ffmpeg command (no stdin); raise a NAMED GraphExecutionError on a
     non-zero exit or a missing ffmpeg. Returns ``cmd`` on success."""
+    cmd = _with_resolved_ffmpeg(cmd)
     try:
         proc = subprocess.run(cmd, stdout=subprocess.DEVNULL,
                               stderr=subprocess.PIPE)
@@ -1044,7 +1080,8 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
             "and the correct frame count. Fix the CANVAS upstream (round the "
             "render size to even), not the stride. NO FALLBACK."
             % (w, h, out_path))
-    cmd = ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf)
+    cmd = _with_resolved_ffmpeg(
+        ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf))
     try:
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)

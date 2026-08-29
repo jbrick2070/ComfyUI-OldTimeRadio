@@ -347,14 +347,56 @@ def contract_from_running_server():
 
     ``DEFAULT`` is checked LAST. It constrains nothing, so it matches every
     server and would shadow a real diet boot if it were tried first.
+
+    THREE RULES, and each one was a real defect before it was written down:
+
+    * **Reserve is a FLOOR, not an equality.** ``check_running_server`` has
+      always compared ``>=`` -- reserving MORE than a contract asks for is
+      still inside the envelope it was measured in. This matched ``==``, so a
+      server booted with ``--reserve-vram 16`` did not identify as ``h3`` (12)
+      and H3 REFUSED ITS OWN VALID BOOT.
+    * **Sage is consulted.** A Sage-constrained contract may not be named on a
+      server where Sage is KNOWN to disagree. An UNKNOWN Sage state stays a
+      candidate on purpose: identification is not the gate, and the named
+      ``assert_running_server`` check that follows is what issues the
+      fail-closed "unverifiable Sage" reason in the operator's language.
+    * **Most-constrained wins, deterministically.** With floors, one server can
+      satisfy several contracts (reserve 12 + pinned-off satisfies both ``h3``
+      and ``humo_diet``). Ordering by reserve floor, then by how many knobs the
+      contract pins, makes the answer the MOST specific boot the server can be
+      -- not whichever name happened to sort first.
     """
     state = running_server_boot_state()
     if not state.get("available"):
         return None
-    for name in sorted(BOOT_CONTRACTS, key=lambda n: (n == DEFAULT, n)):
+    got_reserve = state.get("reserve_vram_gb")
+    got_pinned = state.get("disable_pinned_memory")
+    got_sage = state.get("sage_attention")
+
+    def _is_candidate(spec) -> bool:
+        want = spec["reserve_vram_gb"]
+        if want is not None and (
+                got_reserve is None
+                or float(got_reserve) + 1e-6 < float(want)):
+            return False
+        want = spec["disable_pinned_memory"]
+        if want is not None and bool(got_pinned) != bool(want):
+            return False
+        want = spec["sage_attention"]
+        if want is not None and got_sage is not None and bool(got_sage) != bool(want):
+            return False
+        return True
+
+    def _specificity(name):
         spec = BOOT_CONTRACTS[name]
-        if all(spec[k] is None or state.get(k) == spec[k]
-               for k in ("reserve_vram_gb", "disable_pinned_memory")):
+        pinned_knobs = sum(
+            1 for k in ("reserve_vram_gb", "disable_pinned_memory",
+                        "sage_attention") if spec[k] is not None)
+        floor = spec["reserve_vram_gb"] or 0.0
+        return (name == DEFAULT, -float(floor), -pinned_knobs, name)
+
+    for name in sorted(BOOT_CONTRACTS, key=_specificity):
+        if _is_candidate(BOOT_CONTRACTS[name]):
             return name
     return None
 

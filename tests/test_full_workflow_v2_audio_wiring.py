@@ -239,11 +239,17 @@ def test_audio_nodes_ledger_from_castlock(by_id, links_by_id):
 
 def test_music_cue_fanout_by_name(by_id, links_by_id):
     """720-bakeoff C3: node 83 emits ONE padded cue batch + a manifest.
-    cue_audio_clips fans out to SceneSequencer + EpisodeAssembler
-    (music_cue_audio); cue_manifest_json fans out to both
-    (music_cue_manifest_json). The legacy opening/closing theme links
-    (241/242/243) are GONE, and node 7's opening/closing theme inputs stay
-    DECLARED but unlinked (BUG-LOCAL-097).
+
+    THE FAN-OUT IS TO ONE CONSUMER, NOT TWO (wording corrected 2026-08-28).
+    `cue_audio_clips` -> EpisodeAssembler `music_cue_audio` (link 282) and
+    `cue_manifest_json` -> EpisodeAssembler `music_cue_manifest_json`
+    (link 283). SceneSequencer was never wired: commit 59286499 removed its
+    signature, body and wires, leaving only orphaned INPUT_TYPES declarations
+    that could not be accepted -- those declarations are now gone too, and
+    tests/test_input_types_signature_parity.py keeps them gone.
+
+    The legacy opening/closing theme links (241/242/243) are GONE, and node 7's
+    opening/closing theme inputs stay DECLARED but unlinked (BUG-LOCAL-097).
 
     NODE 12's `closing_audio` IS NO LONGER DECLARED AT ALL (2026-08-19).
     It was removed on the operator's ruling: the node accepted that AUDIO

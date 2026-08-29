@@ -174,23 +174,15 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     floored picture -- would advertise a complete slate of rendered video while
     containing none of it.
 
-    **NO SANCTIONED GAP CAN REACH THIS FUNCTION YET, AND THAT IS NOT AN
-    OVERSIGHT -- IT IS THE STATE OF THE BUILD.** Stated plainly because a
-    reader would otherwise conclude the survivable-gap path is finished: the
-    image dispatcher DOES record a model refusal and continue
-    (``otr_image_gen_dispatcher`` ``is_model_refusal``), and the composite DOES
-    floor a row lacking ``exists``+``path``
-    (``otr_silent_composite``) -- but nothing in between yet MINTS that row. On
-    the canonical ``still_flat`` path the refused object is omitted from the
-    required-target receipt, ``_still_spine_requires_scene`` is True, and
-    ``validate_and_repair_still_spine`` raises before any manifest is built; if
-    that were bypassed, ``_require_still`` raises again in ``render_clip``.
-    So today this filter is correct-by-construction and inert.
-
-    It lands NOW anyway, ahead of the control path that will feed it, because
-    the alternative is shipping that path against accounting already known to be
-    wrong -- and the first thing a sanctioned gap would have done on arrival is
-    quietly invent delivered motion on the credits card.
+    **SANCTIONED GAPS REACH THIS FUNCTION, AND THE PATH IS LIVE.** This
+    docstring used to say the opposite, in bold, and it was true when written:
+    the accounting landed ahead of the control path that feeds it. That path
+    shipped on 2026-08-28 (C0-C7). ``render_driver.build_clip_manifest`` now
+    stamps gap rows with ``STATUS_SANCTIONED_GAP`` from
+    ``sanctioned_gap_beat_ids(led)``, those rows travel in
+    ``manifest["clips"]``, and ``is_sanctioned_gap(clip)`` sorts them here. A
+    bold instruction to disbelieve a finished path is worse than no comment,
+    which is why this paragraph was rewritten rather than deleted.
 
     THE GAPS ARE COUNTED, NEVER DROPPED. Silently omitting the refused beats
     would trade one untruth for another: a receipt that shows six delivered
@@ -568,7 +560,6 @@ class OTRVideoRenderBatch:
             )
         else:
             _rd.validate_and_repair_still_spine(ledger)
-        manifest_episode_id = episode_id
         ep = _rd.run_real_episode(ledger,
                                   master_audio_path=str(master_audio_path or ""))
         # CLIP-FILL Piece 4: move each rendered per-beat clip out of the

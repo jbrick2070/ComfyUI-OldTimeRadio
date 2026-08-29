@@ -32,17 +32,14 @@ import json
 import logging
 import os
 import random
-from random import SystemRandom
-
-# OS-backed RNG for the Lemmy easter-egg coin flip.
-# We can't use the seeded module-level `random` because it's seeded per-episode
-# from the fingerprint (for reproducible Gemma behavior), which would freeze the
-# 11% roll into "always on" or "always off" for any given widget config.
-# SystemRandom is unaffected by random.seed() and gives a true ~11% per run.
-_LEMMY_RNG = SystemRandom()
-_LEMMY_HISTORY = []  # Rolling window of recent Lemmy coin flips (True/False)
 import re
 import time
+
+# The Lemmy coin flip does NOT live here. `_LEMMY_RNG` / `_LEMMY_HISTORY` (and
+# the `SystemRandom` import that existed only for them) were removed
+# 2026-08-28: definition-only, with no reader anywhere. The live roll is in
+# `config/cast_pools.py` -- a different module object, so these were never the
+# same RNG the episode actually used.
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -398,67 +395,12 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 #   - Temperature capped at 0.55 for international presets (0.5 first lines)
 # -----------------------------------------------------------------------------
 
-# Sci-fi character name pools - contemporary, neutral, tech-aligned
-# Omni-Retro 5-Pillar Naming Pool - short, punchy, Bark-optimized (1-2 syllables, hard consonants)
-# Pillars: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Density, Russian Dieselpunk
-_FIRST_NAMES = [
-    # 1950s Americana Noir
-    "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
-    "Cole", "Drake", "Quinn", "Reese", "Kane", "Carter", "Blake",
-    # Afrofuturism
-    "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia",
-    # Neo-Tokyo Cyberpunk
-    "Ren", "Akira", "Kenji", "Yuki", "Sora", "Jiro", "Rei", "Hiro",
-    # Thai Density
-    "Krit", "Mali", "Niran", "Sunan", "Dao", "Pim", "Som",
-    # Russian Dieselpunk
-    "Lev", "Anya", "Dmitri", "Sergei", "Volkov", "Mira", "Yuri",
-    # Simpsons (sci-fi viable)
-    "Nelson", "Martin", "Carl", "Lenny", "Montgomery", "Seymour", "Edna",
-    "Ned", "Barney", "Moe", "Kent", "Rod", "Todd", "Jimbo", "Dolph", "Kearney",
-    # Pulp adventure (generic first names)
-    "Dale", "Tommy", "Pinky",
-    # Public domain classics (published before 1931)
-    "Alice", "Allan", "Ayesha", "Cavor", "Dracula", "Edward", "Griffin", "Gulliver",
-    "Henry", "James", "John", "Karnacki", "Leviathan", "Mina", "Nemo", "Phileas",
-    "Quasimodo", "Robinson", "Sherlock", "Smee", "Tarkon", "Victor", "Watson", "Wendy",
-    # Peter O'Toole characters
-    "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan",
-    # Jim Carrey characters
-    "Truman", "Fletcher", "Joel", "Stanley", "Walter", "Ace", "Lloyd", "Bruce",
-    # Robin Williams characters
-    "Mork", "Adrian", "Sean", "Andrew", "Parry", "Malcolm", "Daniel", "Chris",
-    # The Office - generic character first names
-    "Michael", "Pam", "Ryan", "Kevin", "Kelly", "Meredith",
-    "Stanley", "Toby", "Darryl", "Erin", "Creed", "Oscar", "Phyllis",
-    # Real actor first names
-    "Steve", "Rainn", "Jenna", "Mindy", "Ellie", "Rashida", "Ed",
-    # Classic fiction characters (generic)
-    "Clarisse", "Doug", "Travis", "Charlie", "Will", "Faber",
-    "Rick", "Palmer", "Glen", "Isidore", "Bob", "Donna", "Juliana",
-    "Manfred", "Leo",
-    # Richard Pryor characters
-    "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip", "Grover",
-    # Robin Williams (additional)
-    "Peter", "Sailor", "Djinn",
-]
-
-_LAST_NAMES = [
-    "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
-    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
-    "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
-    # Generic last names (scrubbed franchise-specific)
-    "Burns", "Hibbert", "Flanders", "Houten", "Smithers",
-    "Terwilliger", "Bouvier", "Simpson", "Gordon", "Ming",
-    "Carruthers", "Corben",
-    # The Office - character last names (generic ones only)
-    "Scott", "Halpert", "Beesly", "Howard", "Bernard", "Malone",
-    "Kapoor", "Palmer", "Hudson", "Martin", "Flenderson", "Philbin", "Vance",
-    # Ray Bradbury (generic)
-    "Beatty", "Spender", "Stendahl", "Eckels", "Halloway",
-    # Misc classic (generic)
-    "Steiner",
-]
+# The `_FIRST_NAMES` / `_LAST_NAMES` pools were removed 2026-08-28:
+# definition-only, with no reader in production or tests. The LIVE name
+# pools are `config/cast_pools.py` (FIRST_NAMES_BY_GENDER /
+# FIRST_NAMES_BY_GENRE / LAST_NAMES), which is what casting actually draws
+# from -- these were a stale second copy, and their sibling trait pools had
+# already been removed for the same reason.
 
 # The procedural trait pools (_GENDERS / _AGE_BRACKETS / _DEMEANORS /
 # _VOICE_TRAITS) were removed 2026-08-28: definition-only, zero loads --
@@ -515,8 +457,10 @@ SCIENCE_NEWS_FEEDS = [
 
 
 #: Set (once) to the ImportError text when the HTML body scraper cannot load.
-#: Read by the v4 source-floor failure path so a missing package is never
-#: misreported as an exhausted feed pool. Empty string = scraper is available.
+#: Its ONLY reader is the log-once guard below -- it keeps a missing
+#: BeautifulSoup from re-reporting itself on every article in a run. It does
+#: NOT reach the source-floor failure message, which an earlier version of this
+#: comment claimed; that message still names the feeds. Empty = available.
 _BODY_SCRAPER_UNAVAILABLE: str = ""
 
 
@@ -767,7 +711,6 @@ def _record_news_usage(url: str, headline: str) -> None:
 def _llm_rank_news_candidates(
     pool: list[dict],
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
-    optimization_profile: str = "Standard",
     top_k: int = 5,
     load_config=None,
     policy=None,
@@ -905,7 +848,6 @@ def _llm_rank_news_candidates(
 def _llm_rerank_with_bodies(
     candidates_with_body: list[dict],
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
-    optimization_profile: str = "Standard",
     load_config=None,
     policy=None,
 ) -> list[dict]:
@@ -1137,8 +1079,14 @@ def _body_rerank_preview(text: str, limit: int = 800) -> str:
 
 
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
-                         model_id=None, optimization_profile="Standard",
+                         model_id=None,
                          *, load_config=None, policy=None):
+    # `optimization_profile` was removed from this signature 2026-08-28. It
+    # was threaded three levels deep -- here, then into the two LLM news-rank
+    # helpers -- and NEITHER receiver ever read it (AST-verified: zero Load
+    # references, zero onward forwards). The identically named writer widget
+    # that really does select a quantization profile is a different value on a
+    # different path and is untouched.
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
@@ -1307,7 +1255,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
         ranked = _llm_rank_news_candidates(
             pool,
             model_id=model_id,
-            optimization_profile=optimization_profile,
             top_k=5,
             load_config=load_config,
             policy=policy,
@@ -1383,7 +1330,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             rich = _llm_rerank_with_bodies(
                 rich,
                 model_id=model_id,
-                optimization_profile=optimization_profile,
                 load_config=load_config,
                 policy=policy,
             )
@@ -1432,65 +1378,21 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
 #   script markup:       ~1.2x (VOICE/SFX/ENV tags, scene headers, beats)
 #   combined:            1.3 * 1.2 = 1.56 → round to 1.6
 #
-# TWO RATIOS SHIP; three more were written and never read (mixed, outline and
-# an Obsidian-4GB act variant) and were removed 2026-08-22 rather than left as
-# a table the reader has to test against the code to trust.
-_TOKEN_RATIO_DIALOGUE = 1.6    # dialogue-dominant (OTR radio drama default)
-_TOKEN_RATIO_ACT_CHUNK = 2.0   # per-act chunked generation (needs slack for act boundaries)
+# THE LAST TWO RATIOS WENT THE SAME WAY (2026-08-28). Three siblings were
+# removed on 2026-08-22 for being written and never read; re-checked at HEAD,
+# `_TOKEN_RATIO_DIALOGUE` and `_TOKEN_RATIO_ACT_CHUNK` had no reader either --
+# `tests/test_core.py` re-declares the literals rather than importing them, so
+# the constants proved nothing about the code. The arithmetic above is kept as
+# the RECORD of where 1.6 and 2.0 came from, should a caller ever want them.
 
 
-# ── Intelligent Dialogue Name Normalizer (BUG-023) ──────────────────────────
-# LLMs at high temperature produce creative dialogue formatting that breaks
-# the standard NAME: regex. This normalizer strips ALL variants down to
-# canonical FIRSTNAME LASTNAME: format before any word-count or parsing runs.
-#
-# Handles:
-#   **FIRST LAST**, concerned: text    → FIRST LAST: text
-#   *FIRST LAST*(angry): text          → FIRST LAST: text
-#   __FIRST LAST__: text               → FIRST LAST: text
-#   FIRST_LAST: text                   → FIRST LAST: text
-#   *FIRST_LAST*, whispering: text     → FIRST LAST: text
-#   [FIRST LAST, traits] text          → FIRST LAST: text  (BUG-LOCAL-063)
-#   [FIRST, mood] text                 → FIRST: text       (BUG-LOCAL-063)
-#
-# Standard NAME: lines pass through unchanged (regex only fires on decorated
-# names — plain uppercase + colon is a no-op match that rewrites identically).
-_RE_LLM_DIALOGUE_NAME = re.compile(
-    r'^'
-    r'[*_]{0,2}'                           # leading **, *, __, _
-    r'([A-Z][A-Z0-9_ ]{0,25})'            # character name (may have underscores)
-    r'[*_]{0,2}'                           # trailing **, *, __, _
-    r'(?:\s*[,(]\s*[a-z][a-z ]*[)]?)?'    # optional emotion: ", concerned" or "(angry)"
-    r':(?=\s)',                             # colon followed by whitespace (avoid SFX:rumble)
-    re.MULTILINE
-)
-
-# BUG-LOCAL-063 (2026-04-24): The normalizer's promise --
-# "All downstream consumers (word-count regex, FORMAT_NORM, PARSE) see clean
-# text" -- broke when Mistral Nemo's preferred [NAME, mood] text shorthand
-# landed here unrecognized. Run #4 produced a clean script with ~18 lines of
-# `[MINDSY, Female, 30s, Urgent, Determined] Kane, I've crunched the numbers!`
-# style dialogue, but WORD_ENFORCEMENT's dialogue-counting regex (which looks
-# for `NAME:` form) saw zero and triggered the rescue pipeline, which then
-# discarded itself, producing a near-empty final MP4. Pattern below rewrites
-# bracket-shorthand to canonical `NAME:` form so every downstream counter
-# sees the same clean text. Structural tokens (ENV/SFX/MUSIC/VOICE/ACT/SCENE/
-# BEAT/PAUSE/TRANSITION/FADE/CUT/INT/EXT) pass through untouched.
-_BRACKET_STRUCTURAL_TOKENS = frozenset({
-    "ENV", "SFX", "MUSIC", "VOICE", "ACT", "SCENE", "BEAT", "PAUSE",
-    "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT", "INT", "EXT",
-    "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR", "SYSTEM_SENTINEL",
-    "OPENING", "CLOSING", "INTERSTITIAL",
-})
-_RE_LLM_BRACKET_NAME_DIALOGUE = re.compile(
-    r'^'
-    r'\['                                   # opening bracket
-    r'([A-Z][A-Z0-9_ ]{1,25})'             # character name (may have underscores/spaces)
-    r'(?:,\s*[^\]]*?)?'                    # optional traits list (non-greedy)
-    r'\]'                                   # closing bracket
-    r'\s+(?=\S)',                           # at least one space, dialogue follows
-    re.MULTILINE,
-)
+# The dialogue-name normalizer's REGEXES were removed 2026-08-28 with the
+# same reasoning as the class below: `_RE_LLM_DIALOGUE_NAME`,
+# `_BRACKET_STRUCTURAL_TOKENS` and `_RE_LLM_BRACKET_NAME_DIALOGUE` were
+# definition-only after their sole consumer went, while the block around them
+# still described live normalization in the present tense. The BUG-023 and
+# BUG-LOCAL-063 histories they documented are preserved in the bug log; a
+# comment that claims a rewrite nothing performs is worse than no comment.
 
 
 # `GemmaHeartbeatStreamer` WAS REMOVED 2026-08-28: it was never once
@@ -1561,10 +1463,11 @@ register_vram_cleanup(_otr_loader_mod.unload_llm)
 # -----------------------------------------------------------------------------
 
 
-# This lets the next phase automatically inherit the exact same model memory
-# space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
-# -----------------------------------------------------------------------------
-_CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"
+# `_CURRENT_LLM_MODEL` was removed 2026-08-28. Its comment described a
+# model-memory-inheritance mechanism -- the next phase reusing whatever the
+# Script Writer loaded -- and no such code existed: the name was assigned once
+# and read nowhere. Slot residency is owned by `_otr_model_loader.request_slot`
+# and the writer's `_SlotScheduler`, which is where that behaviour really is.
 
 
 # ============================================================================

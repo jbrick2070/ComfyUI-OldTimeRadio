@@ -798,6 +798,14 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         process was really started with -- because a check that reads the same
         config the launcher was supposed to honour cannot tell "applied" from
         "written down" (lesson L6).
+
+        THE SECOND CHECK ASSERTS THIS LANE'S OWN CONTRACT, not whatever the
+        profile happens to name. On a real episode leg the policy every adapter
+        sees is rebuilt from the ledger's ``video`` section and carries NO
+        ``launch`` key, so ``contract_for_profile`` answers ``default`` -- a
+        contract that constrains nothing. Asserting that verified NOTHING while
+        reading like a defense: the reserve, pinned-memory and Sage-absence
+        clamps H3 requires were never actually checked here.
         """
         from .._otr_shared import boot_contracts as _bc
         problems = _bc.check_engine_against_profile(self, profile or {})
@@ -806,7 +814,10 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family,
                 EngineUsabilityReason.INCOMPATIBLE_PROFILE,
                 "; ".join(problems), kind="video")
-        _bc.assert_running_server(_bc.contract_for_profile(profile or {}))
+        declared = tuple(getattr(self, "compatible_boot_contracts", ()) or ())
+        _bc.assert_running_server(
+            declared[0] if len(declared) == 1
+            else _bc.contract_for_profile(profile or {}))
 
     # ---- residency ----------------------------------------------------- #
     def load(self):

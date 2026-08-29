@@ -70,10 +70,12 @@ GHOST_PROMPT_SOURCE = "ghost_signal"
 #: without the common funnel ever having to cut a protected clause.
 GHOST_PROMPT_MAX_CHARS = 320
 
-#: The normal operating band. Not a gate -- a target the composer aims at so the
-#: banana headroom above is real rather than nominal.
-GHOST_PROMPT_TARGET_LOW = 260
-GHOST_PROMPT_TARGET_HIGH = 280
+#: `GHOST_PROMPT_TARGET_LOW` / `_HIGH` (260/280) were removed 2026-08-28. They
+#: were exported and described as "a target the composer aims at", and no
+#: composer ever compared anything to them -- both `compose_ghost_prompt` and
+#: its v2 sibling trim against GHOST_PROMPT_MAX_CHARS alone. A quality target
+#: nothing pursues reads like a contract and is not one. Removing the constants
+#: changes no prompt bytes and therefore no persisted request hash.
 
 #: The negative's own ceiling, same number, same phrase-safe rule.
 GHOST_NEGATIVE_MAX_CHARS = 320
@@ -915,8 +917,7 @@ __all__ = [
     "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_VERSION_V2",
     "GHOST_PROMPT_SOURCE", "GHOST_MODE_LAWS_V2", "GHOST_V2_SLOTS",
     "distill_sigil_components", "compose_ghost_prompt_v2",
-    "GHOST_PROMPT_MAX_CHARS", "GHOST_PROMPT_TARGET_LOW",
-    "GHOST_PROMPT_TARGET_HIGH", "GHOST_NEGATIVE_MAX_CHARS",
+    "GHOST_PROMPT_MAX_CHARS", "GHOST_NEGATIVE_MAX_CHARS",
     "GHOST_SIGIL_MAX_CHARS", "LANE_HYGIENE_NEGATIVE", "GHOST_SHOT_LAW",
     "GHOST_FRAMING", "GHOST_TRIM_ORDER", "GHOST_INTENT_ACTIONS",
     "GHOST_NEUTRAL_ACTIONS", "SIGIL_BUCKETS", "SIGIL_NEUTRAL_POOLS",

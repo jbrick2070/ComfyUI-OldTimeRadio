@@ -738,12 +738,12 @@ class WriterTailMixin:
             )
         else:
             # kibitz r3 D4 (2026-07-09) ROOT-CAUSE FIX: assemble from the
-            # CANONICAL ledger, not the in-flight script_text_parts list.
-            # script_text_parts still holds the in-loop tokens -- it never
-            # saw the I.5 outro overwrite (title regen was reading the
-            # deterministic PLACEHOLDER close), and it would never see the
+            # CANONICAL ledger. The writer's old in-loop token list never saw
+            # the I.5 outro overwrite (title regen was reading the
+            # deterministic PLACEHOLDER close) and would never have seen the
             # I.4.9 intro rewrite. Same authority the slot-0 output uses
-            # (section L below); script_text_parts stays diagnostic-only.
+            # (section L below). That list was removed outright 2026-08-28 --
+            # nothing ever read it, so "diagnostic-only" was generous.
             assembled_script = _PL.assemble_script_text_from_ledger(led.data)
             # PBUG-20260815-05: anchor the title pass to the work it is
             # actually adapting. `identity_from_meta` is the SINGLE
@@ -1311,12 +1311,11 @@ class WriterTailMixin:
 
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
-        # CANONICAL ledger rows, not from the in-flight script_text_parts
-        # list. Post-loop mutations (the news_close_brief announcer
-        # override in I.5) write to led.data["lines"] but were not
-        # always mirrored back into script_text_parts. The
-        # script_text_parts list is now diagnostic-only; the ledger is
-        # the source of truth for the slot-0 STRING output.
+        # CANONICAL ledger rows. Post-loop mutations (the news_close_brief
+        # announcer override in I.5) write to led.data["lines"] and were not
+        # mirrored into the writer's old in-loop token list, which is why the
+        # ledger is the source of truth for the slot-0 STRING output. That
+        # list is gone as of 2026-08-28; nothing read it.
         # Sprint 3E (2026-05-25): the former J.6 post-hoc title
         # substitution -- another such ledger-only mutation -- is gone
         # (late title binding means no provisional title in dialogue).

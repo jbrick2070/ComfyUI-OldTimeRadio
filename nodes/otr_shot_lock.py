@@ -642,21 +642,26 @@ def derive_opening_music_beat(ledger: dict, fps: int):
     return beat, frames
 
 
-def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
+def compute_clip_budget(beats: list, fps: int) -> dict:
     """Audio-derived per-beat ``target_frame_count``.
 
     Frame counts come from CUMULATIVE audio SAMPLES -- ``frame_at(pos) =
     (pos*fps)//sample_rate`` -- so adjacent beats meet exactly (no double-count,
     no gap). When a beat carries only ``dur_s`` (no samples) it degrades to
-    ``round(dur_s*fps)``. Returns ``{per_beat:{beat_id:frames}, total_frames,
-    warnings}``. Pure; gated by the caller on ``audio_done``.
+    ``round(dur_s*fps)``. Returns ``{per_beat:{beat_id:frames}, total_frames}``.
+    Pure; gated by the caller on ``audio_done``.
+
+    NARROWED 2026-08-28. It used to accept a ``policy`` dict it never read, and
+    to return a ``warnings`` list that was initialised empty and never appended
+    to on any path -- while the docstring advertised it and the caller dutifully
+    extended from it. An always-empty return key is a promise the function
+    cannot keep.
 
     rip-sfx-broll (2026-07-01): the POOLING budget
     (clip_mode / pool_n / character_render_count) was removed with the
     retired_role_a / retired_role_b roles -- every beat renders per-beat.
     """
     fps = int(fps) if fps else 25
-    warnings: list = []
     sample_rate = 0
     for b in beats:
         sr = b.get("sample_rate")
@@ -683,7 +688,6 @@ def compute_clip_budget(beats: list, policy: dict, fps: int) -> dict:
     return {
         "per_beat": per_beat,
         "total_frames": total_frames,
-        "warnings": warnings,
     }
 
 
@@ -2764,8 +2768,7 @@ class OTRShotLock:
             pass
 
         beats = extract_beats(led)
-        budget = compute_clip_budget(beats, policy, fps)
-        warnings.extend(budget.get("warnings", []))
+        budget = compute_clip_budget(beats, fps)
 
         # The OPENING-MUSIC scene (operator look-QA 2026-06-10): injected
         # AFTER the budget so the real beats keep their exact cumulative-

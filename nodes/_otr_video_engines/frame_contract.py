@@ -409,10 +409,16 @@ def normalized_planning_ceiling(value) -> int:
     the ceiling. Never raises -- a malformed stamp reads as UNPINNED, matching
     ``motion_common.profile_max_render_frames``, because a ceiling nobody can
     parse must not silently become a small number.
+
+    ``OverflowError`` is caught for a real reason: Python's own JSON parser
+    accepts bare ``Infinity``, so a profile or ledger carrying it reaches here
+    as ``float('inf')`` and ``int(inf)`` RAISES -- which would have broken the
+    "never raises" promise at the ShotLock stamp and the render boundary.
+    Infinite reads as UNPINNED, which is what an unbounded ceiling means.
     """
     try:
         return max(0, int(value or 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

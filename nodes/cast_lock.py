@@ -682,7 +682,7 @@ class CastLock:
         # root to sys.path directly. This is the SAME two-tier shape already
         # used at :50-55 in this file and at 10+ other cast_pools call sites
         # (_otr_casting.py, _otr_voice_bank.py, _otr_voice_route.py,
-        # _otr_scifi_fable2.py) -- this one function was missing it.
+        # _otr_scifi_news_pro.py) -- this one function was missing it.
         #
         # 2026-08-25 PBUG: a bare `from config import cast_pools` here (no
         # relative-first, no fallback) worked by ACCIDENT in every proof leg
@@ -701,7 +701,7 @@ class CastLock:
                 from config import cast_pools as _POOLS  # type: ignore
             except ImportError:
                 # Fail soft HERE, fail closed DOWNSTREAM (this file's own
-                # convention -- see _resolve_lemmy_voice_policy above). The
+                # convention -- see _lemmy_voice_policy above). The
                 # announcer row is left unstamped; _assert_voice_preset_invariant,
                 # run by the caller right after this returns, raises a named,
                 # actionable error instead of this function's own opaque
@@ -929,11 +929,11 @@ class CastLock:
         # the bank on those, not just gender. Legacy ledgers without the stamp
         # fall back to the (empty) entry-level fields -> behavior unchanged.
         voice_slots = meta.get("cast_voice_slots") or {}
-        # VC chunk 4 (2026-06-22): the HYBRID LLM voice-fit decision (the writer
-        # proposed a voice_ref_id; Python validated it). Honour the accepted id
-        # when this CastLock resolved the SAME engine and it still validates +
-        # does not collide; otherwise fall closed to the deterministic scorer.
-        voice_decisions = meta.get("voice_cast_decision") or {}
+        # The `voice_decisions` local that used to read
+        # `meta.voice_cast_decision` here was removed 2026-08-28: it was
+        # assigned and never used once the hybrid LLM voice-fit branch went
+        # (2026-08-18). The durable ledger KEY is untouched -- it is still
+        # stamped and still verified -- only this dead read is gone.
         # announcer_engine is the sentinel: the resolver never returns None for
         # it, while target_engine legitimately can be None (a preset-only bank).
         if announcer_engine is None:
@@ -1151,11 +1151,14 @@ class CastLock:
             # the deterministic scorer below entirely. That is why the scorer
             # handled only ~4% of production casting.
             #
-            # `voice_decisions` is still read above and is still stamped (empty)
-            # by the writer, so a legacy ledger carrying real decisions loads
-            # without complaint -- its proposals are simply ignored now, and the
-            # scorer casts the row. That is the intended behaviour, not a
-            # fallback: the LLM had no information the scorer lacks.
+            # `meta.voice_cast_decision` is still STAMPED (empty) by the writer
+            # and still verified downstream, so a legacy ledger carrying real
+            # decisions loads without complaint -- its proposals are simply
+            # ignored now, and the scorer casts the row. That is the intended
+            # behaviour, not a fallback: the LLM had no information the scorer
+            # lacks. CastLock itself no longer reads the key at all (the dead
+            # local above went 2026-08-28); an earlier version of this comment
+            # said it did.
 
             # Prefer the writer's voice-fit slot (timbre/age_band); fall back to
             # any entry-level fields for legacy ledgers without the stamp.

@@ -373,7 +373,19 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
                     src.with_suffix("")).with_suffix(".canon.mp4")
     vf = (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
           f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps={fps},format=yuv420p")
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-an",
+    # Same resolution order the AUDIO canonicalizer above already uses:
+    # OTR_FFMPEG then PATH. This built a literal "ffmpeg", so on an env-only
+    # install audio canonicalized and video did not. `shutil` is imported
+    # locally here, matching that function's own convention (this module keeps
+    # its top-level import surface stdlib-minimal).
+    import shutil
+
+    ffmpeg_bin = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
+        or shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
+                              "ffmpeg not found -- cannot canonicalize video")
+    cmd = [ffmpeg_bin, "-v", "error", "-y", "-i", str(src), "-an",
            "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
            "-colorspace", "bt709", "-color_primaries", "bt709",
            "-color_trc", "bt709", "-movflags", "+faststart", str(out_path)]

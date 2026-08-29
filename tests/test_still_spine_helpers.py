@@ -1043,8 +1043,10 @@ class TestDispatcherStillSpine:
             {"object_id": "still_b007", "kind": "scene_beat",
              "beat_id": "b007", "path": str(scene)}]}
         req2 = rd.build_request_from_shot(shot, ledger2)
+        # `init_source` IS the durable receipt for this refusal; the separate
+        # `mesh_fodder_missing` boolean that restated it was removed 2026-08-28.
         assert req2["observability"]["init_source"] == "missing_mesh_fodder"
-        assert req2["observability"]["mesh_fodder_missing"] is True
+        assert "mesh_fodder_missing" not in req2["observability"]
         # never the scene still (asset_refs omits an empty init_image key)
         assert req2["asset_refs"].get("init_image", "") != str(scene)
 

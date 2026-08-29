@@ -101,15 +101,12 @@ def word_boundary_cut(text, budget) -> str:
     return " ".join(kept).rstrip(" ,;:-")
 
 
-_WS_RE = re.compile(r"\s+")
-
-
-def collapse_ws(text) -> str:
-    """Collapse whitespace runs to single spaces and strip. Pure."""
-    return _WS_RE.sub(" ", str(text or "")).strip()
-
+# `collapse_ws` / `_WS_RE` were removed 2026-08-28: exported, never called.
+# The video lane keeps its own `_normalize_ws` (ghost_signal_prompt.py) with
+# nine live call sites, and by the operator's 2026-08-23 ruling the engine
+# lanes stay independent -- so this shared copy had no future consumer either.
 
 __all__ = [
     "DANGLING_TAIL_WORDS", "is_dangling", "drop_dangling_tail",
-    "longest_clause_prefix", "word_boundary_cut", "collapse_ws",
+    "longest_clause_prefix", "word_boundary_cut",
 ]
