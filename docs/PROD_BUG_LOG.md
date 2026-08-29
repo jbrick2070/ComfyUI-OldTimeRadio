@@ -8027,3 +8027,21 @@ DURABLE answer for a big writer on 8 GB -- llama.cpp splits GPU/CPU natively
 with no meta round-trip -- but on this box it needs both a ~7 GB download and
 `llama-cpp-python`, neither of which is present. Same lesson as the night's
 first finding: a documented path is not a file on disk.
+- **PBUG-20260829-07 FIX LANDED (5080 session).** The size-tag substring
+  collision is closed. `_plan_max_memory` now matches `2b-it` / `2b_it` as a
+  BARE TOKEN -- a digit immediately before the tag means a different size, so
+  `12b-it` no longer satisfies the 2B test -- and the bare `endswith("2b")`
+  arm got the same guard. Measured on the shipped function, 8 GB card,
+  bnb_nf4: `gemma-4-12b-it` moves from `{0:'3.2GiB'}` to `{0:'6.8GiB'}`,
+  while `gemma-4-2b-it`, `gemma-2-2b-it` and `gemma-4-E2B-it` all still get
+  `3.2GiB`. The `>=12.0` branch is untouched, so the 5080 path is
+  byte-identical (`13.5GiB` at 15.99 GB, before and after).
+  Pinned by `tests/test_plan_max_memory_size_tags.py` (11 cases, both
+  directions, plus the no-cuda and unquantized guards so PBUG-20260825-03's
+  half cannot regress either). Verified independently on the 5080 by
+  executing the shipped function before and after, not by reading it.
+  **This does NOT close -05.** The budget is still a hardcoded tag table that
+  ignores live free VRAM; it is now merely the CORRECT hardcoded number. The
+  redesign (derive from `torch.cuda.mem_get_info` minus a stated buffer)
+  remains open, and the 4060's panel retired the "drop the cpu key" option by
+  proving accelerate appends `disk` and fails on `offload_dir` instead.

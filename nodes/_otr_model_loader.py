@@ -499,7 +499,31 @@ def _plan_max_memory(
     if quant_policy not in ("bnb_nf4", "bnb_8bit"):
         return None
     sid = (model_id or "").lower()
-    is_actually_2b = any(tag in sid for tag in ("2b-it", "2b_it")) or sid.endswith("2b")
+    # PBUG-20260829-07: this MUST be a bare-token match, never a substring.
+    # `"2b-it" in "google/gemma-4-12b-it"` is TRUE -- "12b-it" ENDS in "2b-it"
+    # -- so the 12B model was handed the 2-BILLION budget (3.2GiB) on every
+    # card under 12 GiB, and then spilled to CPU because it obviously did not
+    # fit. Measured on the shipped function before the fix:
+    #     gemma-4-12b-it @ 8.00 GB -> {0: '3.2GiB'}   <-- the 2B budget
+    #     gemma-4-E4B-it @ 8.00 GB -> {0: '6.8GiB'}
+    # Invisible on a >=12 GiB box because the branch below returns first,
+    # which is the fourth "the dev card masks it" defect of 2026-08-29.
+    # A digit immediately before the tag means a DIFFERENT size (12b, 22b),
+    # so the character preceding the match must not be a digit.
+    def _has_size_tag(tags) -> bool:
+        for tag in tags:
+            start = 0
+            while True:
+                i = sid.find(tag, start)
+                if i < 0:
+                    break
+                if i == 0 or not sid[i - 1].isdigit():
+                    return True
+                start = i + 1
+        return False
+
+    is_actually_2b = _has_size_tag(("2b-it", "2b_it")) or (
+        sid.endswith("2b") and not (len(sid) >= 3 and sid[-3].isdigit()))
     if total_vram >= 12.0:
         return {0: f"{total_vram - 2.5:.1f}GiB", "cpu": "32GiB"}
     if is_actually_2b:
