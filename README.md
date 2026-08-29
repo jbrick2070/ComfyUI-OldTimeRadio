@@ -74,16 +74,26 @@ gated rows below.
 
 **Gated — you must accept the terms on the model page first, then supply a token:**
 
-| Model | Accept terms at |
-|---|---|
-| `google/gemma-2-2b-it` | https://huggingface.co/google/gemma-2-2b-it |
+| Model / weights | What it is | Accept terms at |
+|---|---|---|
+| `google/gemma-2-2b-it` | an optional writer LLM | https://huggingface.co/google/gemma-2-2b-it |
+| `Lightricks/LTX-2.5` | the LTX 2.5 **video** weights | https://huggingface.co/Lightricks/LTX-2.5 |
 
 **Ungated — nothing required:** `google/gemma-4-12b-it`,
-`mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`.
+`mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`,
+`Lightricks/LTX-Video` (the older 0.9.x line), and the `Comfy-Org` Wan repackages.
 
 > **Note:** Gemma **4** is Apache-2.0 and ungated, unlike Gemma **2** and Gemma **3**. Only
 > `gemma-2-2b-it` still requires a terms click (verified against the Hugging Face API, which
 > reports `"gated": "manual"` for that repo and `"gated": false` for every other curated row).
+
+> **The LTX 2.5 gate bites late, and that is why it is listed here** (added 2026-08-29 after
+> it stopped a clean-machine install). Nothing in a default first run touches it — the
+> canonical workflow ships on the procedural video floor — so you meet it only when you
+> select an `ltx25_*` row in `OTR_VideoDirector`. Its repo reports `"gated": "auto"`:
+> approval is automatic, but the terms click and a token are both still required, and an
+> unauthenticated fetch returns **HTTP 401** rather than anything that reads like a licence
+> problem. If an `ltx25_*` lane fails to download its weights, this is why.
 
 Accepting the terms is a **manual, one-time click** while signed in to Hugging Face — a token
 alone is not enough, and the download fails until you have done both. Get a token at
