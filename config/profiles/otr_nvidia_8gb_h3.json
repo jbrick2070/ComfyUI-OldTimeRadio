@@ -68,8 +68,8 @@
   },
   "render": {
     "fps": 25,
-    "canvas_w": 512,
-    "canvas_h": 288,
+    "canvas_w": 864,
+    "canvas_h": 480,
     "composite_res": "1920x1080",
     "composite_w": 1920,
     "composite_h": 1080,
@@ -78,10 +78,7 @@
   },
   "preflight": {
     "required_models": [
-      "google/gemma-4-E2B-it",
-      "v1-5-pruned-emaonly-fp16.safetensors",
-      "v3_sd15_mm.ckpt",
-      "v3_sd15_adapter.ckpt"
+      "google/gemma-4-E2B-it"
     ],
     "required_keys": []
   },

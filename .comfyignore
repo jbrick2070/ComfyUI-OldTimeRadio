@@ -30,11 +30,52 @@ kibitz-runs/
 # the entire subprocess/PowerShell surface from the published bundle in one
 # move, and it costs the installing user nothing.
 #
-# THIS IS A HYPOTHESIS ABOUT THE FLAG CAUSE, NOT A CONFIRMED FIX. The scanner
-# is a private Comfy-Org repo and gives no reason. If alpha.12 still flags,
-# the next suspects are the base64 decodes in the google_* cloud engines and
-# the urlopen calls in the feed fetcher -- both of which ARE node
-# functionality and cannot simply be excluded.
+# 2026-08-29, MEASURED: THE HYPOTHESIS ABOVE IS WRONG. KEEP THE LINE ANYWAY.
+#
+# alpha.12 shipped with this exclusion in force and was Flagged like the three
+# before it. The two published bundles were then downloaded and compared file
+# by file rather than reasoned about, and the result inverts the theory:
+#
+#   alpha.8   ACTIVE   814 files, 368 .py, 119 under scripts/, 28 .ps1/.bat/.cmd
+#   alpha.12  FLAGGED  715 files, 277 .py,   0 under scripts/,  0 .ps1/.bat/.cmd
+#
+# The version carrying 28 PowerShell and batch INSTALLERS passed. The version
+# carrying none of them failed. Worse for the theory, the executable trigger
+# surface is IDENTICAL across the two bundles -- counting files that contain
+# each pattern, outside scripts/ in both cases:
+#
+#   subprocess 33/33   Popen 9/9   base64 5/5   urlopen 2/2
+#   pickle 1/1   __import__ 1/1   ctypes 2/2   marshal 1/1
+#   shell=True 0/0   os.system 0/0   exec( 0/0
+#
+# The only two deltas are `eval(` 3->4 and `socket` 27->28, and BOTH new hits
+# are COMMENT TEXT -- `.eval()` inside a prose note in otr_silent_composite.py
+# and "(an input socket)" in otr_shot_lock.py. Not code.
+#
+# That also retires the two suspects this comment used to name: the google_*
+# base64 decodes and the feed fetcher's urlopen calls are present in EQUAL
+# NUMBER in the version the registry marked Active. They cannot be what
+# distinguishes Flagged from Active. Do not re-open them.
+#
+# And the diff at the actual flag boundary -- alpha.8 -> alpha.9 -- adds no
+# trigger pattern at all: six shipped .py files changed, zero new subprocess,
+# exec, eval, base64, pickle, urlopen or socket call among them.
+#
+# WHAT REMAINS: nothing we shipped explains the flag, which points at a rule
+# change on Comfy-Org's side between the two scans. Their scanner is a private
+# repo and returns no reason, and there is no publisher self-service path to
+# Active (CLAUDE.md 7A). Asking Comfy-Org is the move, and it is the
+# operator's to make. Until then `latest_version` resolves to alpha.8, so
+# every registry install receives 2026-08-25 code.
+#
+# THE EXCLUSION STAYS regardless, on its own merits: 132 tracked files of dev
+# harness (119 of them were actually in the alpha.8 bundle, counted in the
+# downloaded zip) -- headless runners, soaks, sweeps, probes, installers --
+# that nothing in
+# the pack imports and no installing user runs. Verified: no `from scripts` /
+# `import scripts` anywhere in nodes/ or __init__.py. It is correct hygiene.
+# It was simply never the fix, and the next session should not re-run this
+# experiment expecting a different answer.
 scripts/
 
 # 2026-08-22: internal-only material that was shipping to every installer --

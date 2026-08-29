@@ -79,7 +79,25 @@ PyYAML>=6.0
 #
 # NOT YET IN `pyproject.toml`, deliberately: that file's static dependency
 # list is what the Comfy Registry reads, and editing it AUTO-FIRES a publish
-# (see CLAUDE.md 7A). The kokoro line rides the next deliberate version bump
-# rather than firing one while a version is still Pending.
+# (see CLAUDE.md 7A). Both lines below ride the NEXT deliberate version bump.
+#
+# THE REASON FOR WAITING CHANGED ON 2026-08-29, so do not read the old one.
+# It used to be "a version is still Pending". alpha.12 has since resolved --
+# to Flagged, joining alpha.9, .10 and .11. `latest_version` therefore still
+# resolves to alpha.8 (2026-08-25), which is what every registry install
+# actually receives. A bump today would publish alpha.13 into the same wall
+# and deliver nothing, so the bump waits on the flag being cleared -- which
+# needs Comfy-Org, not us. When it clears, bump ONCE carrying both lines.
 kokoro>=0.7.16
+
+# pyloudnorm was declared NOWHERE -- not here, not in pyproject.toml -- while
+# `scene_sequencer.py` imports it to measure integrated loudness and master
+# every episode to -14 LUFS. Its import sits in a try/except with a
+# deliberate fallback to the legacy peak master, so a fresh install does not
+# crash; it just quietly produces a QUIETER, differently-mastered episode
+# than the one this project tunes and listens to, and says so only in a
+# warning line. That is the worst shape a missing dependency can take: no
+# error, no failed render, just worse audio for everyone who installed from
+# the registry. Declared 2026-08-29. 0.2.0 is what this box has measured on.
+pyloudnorm>=0.1.1
 

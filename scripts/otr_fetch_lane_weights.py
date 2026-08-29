@@ -30,13 +30,35 @@ import urllib.request
 #: lane -> list of (hf_repo, path_in_repo, models_subfolder)
 #: Sizes in the comments are the real blob sizes read from the HF API.
 LANES = {
-    # ~3.7 GB total. No image model needed: the haunted lane is text_to_video
+    # ~3.8 GB total. No image model needed: the haunted lane is text_to_video
     # (accepts_still = False), so it also skips z_image entirely.
+    #
+    # THESE ARE THE v3 WEIGHTS, AND `mm-p_0.5.pth` IS NOT ONE OF THEM. The
+    # first version of this bundle fetched mm-p_0.5 and no adapter, which
+    # would have handed a fresh user 1.7 GB of the wrong file and left the
+    # lane unable to start. The lane is `animatediff15_v3_haunted_video` ->
+    # `GhostSignalV3HauntedEngine`, which extends the **V3** engine
+    # (`motion_module_name = MM_V3_NAME = "v3_sd15_mm.ckpt"`) and is the one
+    # sibling that also sets `lora_name = ADAPTER_V3_NAME`. Read off the
+    # classes, not the docs. `mm-p_0.5.pth` belongs to the GOLDEN lane
+    # (`GhostSignalEngine`), a different engine this bundle does not install.
+    #
+    # The adapter is small and easy to skip, and skipping it is not harmless:
+    # the haunted lane's whole difference from the clean v3 lane is that LoRA
+    # on the model path. Without it the render either fails the artifact check
+    # or -- worse -- produces the CLEAN picture while stamping a haunted
+    # receipt, which the engine's own docstring calls the one outcome the lane
+    # may never produce.
+    #
+    # guoyww/animatediff is UNGATED (verified against the HF API, gated:False),
+    # so both files download with no token and no licence click.
     "haunted": [
         ("Comfy-Org/stable-diffusion-v1-5-archive",
          "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints"),        # 2.0 GB
-        ("manshoety/beta_testing_models",
-         "mm-p_0.5.pth", "animatediff_models"),                          # 1.7 GB
+        ("guoyww/animatediff",
+         "v3_sd15_mm.ckpt", "animatediff_models"),                      # 1.67 GB
+        ("guoyww/animatediff",
+         "v3_sd15_adapter.ckpt", "loras"),                              # 0.10 GB
     ],
     # ~39.6 GB total, but it carries NATIVE AUDIO and is proven at 8 GB by
     # vram-recipe-lab/eightgb_bench (864x480, 90f, 24fps, requires_audio).
