@@ -214,6 +214,46 @@ SHA-256-pinned API graphs from `scripts/bench_graphs/`, wrote only to
 result could never be worded as qualification. That last clause is the part worth
 remembering even now: a measurement is not a proof, and only the canonical path ships.
 
+### 0B. START EVERY SESSION BY PULLING, AND NEVER FIX ONE BOX BY BREAKING THE OTHER
+**Operator directive 2026-08-29. Two rules, one cause: there are now TWO boxes writing this
+repo (section 1's split-by-area), so YOUR CHECKOUT IS NOT AUTHORITATIVE AND YOUR HARDWARE IS
+NOT THE ONLY HARDWARE.**
+
+**FIRST ACTION OF EVERY SESSION, BEFORE READING OR EDITING ANYTHING:**
+```
+git fetch origin v2.0-alpha
+git log --oneline HEAD..origin/v2.0-alpha     # what the other box did while you were away
+git pull --rebase origin v2.0-alpha
+```
+Then SAY what came down. A session that opens `workflows/otr_canonical.json` without doing this
+is reading a file that may be hours stale, and the moment it edits and pushes, **the other box's
+work is reverted by a change that looks like a clean commit.** That is the single most expensive
+way to lose work here and it leaves no conflict and no error -- just a quiet revert with a
+plausible message on top of it. The `merge=union` guard protects the append-only LOGS; it does
+NOT protect the workflow JSON, `nodes/`, or the profiles, and nothing can.
+
+**THE SECOND RULE, AND IT IS THE ONE WITH TEETH: A FIX FOR ONE MACHINE MUST PROVE THE OTHER
+MACHINE IS UNCHANGED -- MEASURED, NOT ASSERTED.**
+The 4060 exists to find what the 5080 cannot see about itself. That is its whole value, and it
+is also the hazard: a change that makes an 8 GB card work can silently degrade the 16 GB card
+that renders the actual episodes, and the 5080 window will not notice because its tests still
+pass. "Passes the suite" is not the same claim as "the 5080's numbers did not move."
+* **Confine it if you can.** Per-machine choices belong in PROFILES and VARIANTS, not in
+  `otr_canonical.json` and not in shared code. A change that lives entirely inside a 4060
+  profile CANNOT reach the 5080, and that is the preferred shape of every portability fix.
+* **When shared code genuinely must change, run the OTHER box's path and show the number
+  before and after.** The worked example is PBUG-20260829-07 (2026-08-29): the 12B writer was
+  being handed the 2B VRAM budget on 8 GB cards. The fix touched `_plan_max_memory`, which every
+  machine calls. Before pushing, the 5080's own path was executed and printed both sides --
+  `gemma-4-12b-it @ 15.99 GB -> {0: '13.5GiB'}` before AND after, byte-identical -- because the
+  `>= 12 GiB` branch returns before any size tag is read. That single printed line is what made
+  the fix safe to push, and it took under a minute.
+* **State the blast radius in the commit message.** Name which machines' behaviour changes and
+  which is provably untouched. A commit that silently alters both boxes while claiming to fix one
+  is the defect this rule exists to prevent.
+* **Unsure whether it reaches the other box? It reaches the other box.** Treat it as shared and
+  measure.
+
 ## 1. HOW COWORK ACTUALLY WORKS HERE (read this first)
 - **Two separate filesystems.** The file tools (Read / Write / Edit) operate on the REAL Windows files --
   that is your primary editor. **Desktop Commander** (`mcp__Desktop_Commander__*`) runs PowerShell on the
