@@ -1,6 +1,6 @@
 {
   "id": "otr_nvidia_8gb_haunted",
-  "display_name": "8GB NVIDIA: HAUNTED (AnimateDiff v3, ~3.7GB weights, no image model needed; video lane is silent -- kokoro voices + musicgen are still muxed in) -- no HF token REQUIRED (set one anyway: anonymous pulls get throttled)",
+  "display_name": "8GB NVIDIA: HAUNTED (AnimateDiff v3 -- NEEDS the ComfyUI-AnimateDiff-Evolved node pack; ~3.9GB video weights but ~16GB total on a clean box once the writer, music and voice models pull; no image model needed; video lane is silent -- kokoro voices + musicgen are still muxed in) -- no HF token REQUIRED (set one anyway: anonymous pulls get throttled)",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",

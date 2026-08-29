@@ -75,6 +75,38 @@ def node_class_mappings(mapping=None):
         return {}
 
 
+#: Class-name prefix -> the ComfyUI node pack that provides it.
+#: WHY THIS EXISTS: the missing-class error named `ADE_AnimateDiffLoaderGen1`
+#: and told the operator to "install the wrapper", which is only actionable if
+#: they already know which pack that is. The haunted lane needs
+#: ComfyUI-AnimateDiff-Evolved and that requirement was documented NOWHERE --
+#: not README, not requirements.txt, not pyproject.toml, and it cannot go in
+#: either of the latter two because a ComfyUI node pack is not a pip dist.
+#: It was found only because the 4060 had git-cloned the pack by hand while
+#: assembling the lane, so the PROVEN path and the DOCUMENTED path had quietly
+#: diverged (PBUG-20260829-09). Naming the pack in the error is the cheapest
+#: place to close that gap: it reaches the user who never reads the README.
+_PACK_FOR_PREFIX = (
+    ("ADE_", "ComfyUI-AnimateDiff-Evolved",
+     "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"),
+    ("VHS_", "ComfyUI-VideoHelperSuite",
+     "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"),
+)
+
+
+def _pack_hint(names) -> str:
+    """Name the PACK behind a missing class, so the error is actionable."""
+    packs = {}
+    for name in names:
+        for prefix, pack, url in _PACK_FOR_PREFIX:
+            if isinstance(name, str) and name.startswith(prefix):
+                packs[pack] = url
+    if not packs:
+        return ""
+    return " -- provided by %s; install it into ComfyUI/custom_nodes and restart" % (
+        ", ".join("%s (%s)" % (pack, url) for pack, url in sorted(packs.items())))
+
+
 def resolve_node_class(candidates, mapping=None):
     """Return the first installed node class among ``candidates`` (ordered names).
 
@@ -92,7 +124,8 @@ def resolve_node_class(candidates, mapping=None):
             return m[name]
     raise WrapperNodeMissing(
         "none of the ComfyUI node classes %r are installed (install the wrapper "
-        "+ restart ComfyUI); %d node classes registered" % (names, len(m)))
+        "+ restart ComfyUI); %d node classes registered%s"
+        % (names, len(m), _pack_hint(names)))
 
 
 def resolve_graph_classes(specs, mapping=None):
@@ -111,9 +144,11 @@ def resolve_graph_classes(specs, mapping=None):
         else:
             out[node_id] = m[hit]
     if missing:
+        every_name = [c for cands in specs.values()
+                      for c in ((cands,) if isinstance(cands, str) else cands) if c]
         raise WrapperNodeMissing(
             "missing ComfyUI node classes for: %s (install the wrapper + restart "
-            "ComfyUI)" % "; ".join(sorted(missing)))
+            "ComfyUI)%s" % ("; ".join(sorted(missing)), _pack_hint(every_name)))
     return out
 
 

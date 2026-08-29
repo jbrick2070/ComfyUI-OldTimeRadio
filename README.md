@@ -65,6 +65,31 @@ Then restart ComfyUI so it loads the nodes.
 > missing from the menu, that line is where to look. Use the same Python that runs
 > ComfyUI (for portable installs: `python_embeded\python.exe -m pip install -r requirements.txt`).
 
+### 2b. ComfyUI node packs — required by some video lanes
+
+A few OTR video engines drive **other people's ComfyUI nodes**. Those are node
+packs, not Python packages, so `pip install` cannot supply them and they are
+deliberately absent from `requirements.txt` and `pyproject.toml`. Install them
+into `ComfyUI/custom_nodes/` (ComfyUI-Manager, or `git clone`) and restart
+ComfyUI.
+
+| lane / profile | needs | why |
+|---|---|---|
+| `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | provides the `ADE_*` classes the haunted lane samples through |
+
+**You do not have to memorise this.** If a pack is missing, the render stops
+with a named error that now tells you which pack to install and where to get
+it — it does not fail silently or half-render. But it stops at render time,
+*after* the model weights have downloaded, which is why it is written here too.
+
+**What the 8 GB haunted profile actually downloads on a clean machine: ~16 GB.**
+The video lane itself is only ~3.9 GB (SD1.5 1.99, `v3_sd15_mm` 1.56, the
+domain adapter 0.10, kokoro voices 0.30). The rest arrives through the
+Hugging Face cache the first time the pipeline runs — the writer
+(`gemma-4-E2B-it`, ~9.6 GB), `musicgen-small` (~2.2 GB) and `Kokoro-82M`
+(~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
+before you start it on a metered connection.
+
 ### 3. Hugging Face token — only if you pick a gated model
 
 **Most people need no token at all.** The shipped canonical workflow pins
