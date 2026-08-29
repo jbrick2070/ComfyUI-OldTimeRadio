@@ -1256,12 +1256,42 @@ class GGUFNativeBackend:
                 kv_gb, n_ctx,
             )
             if free_gb < estimated_needed_gb:
-                raise GGUFNativeConfigError(
-                    f"Insufficient VRAM for GGUF n_ctx={n_ctx}: free "
-                    f"{free_gb:.2f} GB < needed {estimated_needed_gb:.2f} "
-                    f"GB. Lower gguf_n_ctx (policy), free VRAM, or pick a "
-                    "smaller quant. NO silent context downgrade (the old "
-                    "4096->2048 downgrade truncated generations)."
+                # OPERATOR DIRECTIVE 2026-08-29: "prove me wrong with an OOM
+                # but don't put an artificial gate", and the standing rule it
+                # restates -- "I don't want guards to kill anything, an OOM is
+                # the only killer".
+                #
+                # THIS USED TO RAISE, AND THE ESTIMATE IT RAISED ON IS WRONG
+                # FOR THE ONE CONFIGURATION THAT MAKES A BIG MODEL FIT A SMALL
+                # CARD. `weights_gb` is the WHOLE FILE on disk; it takes no
+                # account of `n_gpu_layers`, which is precisely the lever for
+                # splitting a model across GPU and CPU. A 12B Q4_K_M at
+                # n_gpu_layers=35 puts roughly two thirds of the weights on the
+                # card, but this check priced all of it and refused a load that
+                # would have worked. Refusing a working configuration on an
+                # estimate of a configuration nobody requested is the
+                # definition of an artificial gate.
+                #
+                # So: SAY EVERYTHING THE ERROR SAID, then attempt the load.
+                # llama.cpp allocates against real hardware and will fail
+                # honestly if it truly does not fit -- and that failure is
+                # evidence, where this refusal was only ever arithmetic.
+                #
+                # WHAT IS DELIBERATELY PRESERVED: no silent context downgrade.
+                # The old 4096->2048 fallback truncated generations, which is
+                # why the raise replaced it. Nothing is downgraded here; the
+                # requested configuration is attempted exactly as asked.
+                partial = eff_n_gpu_layers is not None and eff_n_gpu_layers >= 0
+                log.warning(
+                    "[GGUFNative] VRAM estimate EXCEEDS free: free %.2f GB < "
+                    "needed %.2f GB (n_ctx=%d). PROCEEDING ANYWAY -- an OOM is "
+                    "the only authority here. If it fails: lower gguf_n_ctx, "
+                    "free VRAM, pick a smaller quant, or offload layers via "
+                    "OTR_GGUF_N_GPU_LAYERS.%s",
+                    free_gb, estimated_needed_gb, n_ctx,
+                    (" NOTE: n_gpu_layers=%d requests a PARTIAL offload, so "
+                     "this estimate is an upper bound -- it prices the whole "
+                     "file on the GPU." % eff_n_gpu_layers) if partial else "",
                 )
 
         # Effective n_batch / n_gpu_layers resolved above (load_config when
