@@ -153,11 +153,21 @@ class KokoroEngine:
         # lang_code 'b' = British English; pin repo_id to suppress migration noise.
         # S4: EXPLICIT device from the CastLock ledger stamp (threaded by the
         # voice node as requested_device; default cuda = nv50 baseline).
-        self._pipeline = KPipeline(
-            lang_code="b",
-            device=(getattr(self, "requested_device", None) or "cuda"),
-            repo_id="hexgrad/Kokoro-82M",
-        )
+        # repo_id only exists on kokoro builds newer than the 0.7.x PyPI line
+        # (0.7.16's KPipeline is (lang_code, model, trf, device)); passing it
+        # unconditionally is a TypeError on a stock pip install.
+        import inspect
+
+        kwargs = {
+            "lang_code": "b",
+            "device": (getattr(self, "requested_device", None) or "cuda"),
+        }
+        try:
+            if "repo_id" in inspect.signature(KPipeline.__init__).parameters:
+                kwargs["repo_id"] = "hexgrad/Kokoro-82M"
+        except (TypeError, ValueError):
+            kwargs["repo_id"] = "hexgrad/Kokoro-82M"
+        self._pipeline = KPipeline(**kwargs)
 
     def unload(self):
         pipe, self._pipeline = self._pipeline, None
