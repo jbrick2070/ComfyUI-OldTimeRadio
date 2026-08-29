@@ -8303,3 +8303,66 @@ call to make, not a tidy-up.
   guarded call's OWN side effects -- otherwise it converts a correctness check
   into a permanent cache miss, silently, while every log line looks like a
   race it is protecting you from.
+
+## PBUG-20260829-11 -- the GGUF lane's prebuilt wheel dies with ILLEGAL INSTRUCTION on a 13th-gen Intel mobile CPU
+
+- **found:** 2026-08-29 on the 4060 (MRKT), running the operator's own
+  frictionless-install question: which writer dropdowns actually load and finish
+  on 8 GB. Live leg, profile `otr_4060_high_probe` (the 5080's
+  `otr_qwen2507_haunted_proof` with `gguf_n_ctx` lowered to fit 8 GB).
+- **artifact:** a real canonical render. The GGUF writer got FURTHER than any
+  previous attempt -- binding imported through OTR's own path, VRAM preflight
+  PASSED, llama.cpp began initialising -- and then the process took a hardware
+  fault:
+
+      [GGUFNative] VRAM Preflight: Free=6.94 GB | Needed=5.23 GB
+        (weights=2.33 from Qwen3-4B-Instruct-2507-Q4_K_M.gguf, kv=2.80 @ n_ctx=4096)
+      [GGUFNative] Initializing llama.cpp Llama instance:
+        n_ctx=4096, n_gpu_layers=-1, n_batch=512
+      File ".../llama_cpp/_internals.py", line 263, in __init__
+        ctx = llama_cpp.llama_init_from_model(self.model.model, self.params)
+      OSError: [WinError -1073741795] Windows Error 0xc000001d
+
+  `0xc000001d` is `STATUS_ILLEGAL_INSTRUCTION`. Prompt executed in 2.58 s.
+- **root cause (high confidence, from the hardware):** the wheel contains CPU
+  instructions this processor does not implement. Measured on this box:
+
+      CPU  : 13th Gen Intel(R) Core(TM) i9-13900H
+      torch: cpu capability == AVX2   (i.e. NO AVX-512)
+
+  Raptor Lake / Alder Lake MOBILE parts have AVX-512 fused off. The wheel is
+  `llama_cpp_python 0.3.35` from `abetlen.github.io/llama-cpp-python/whl/cu124`
+  -- a prebuilt binary, not compiled on the target. It crashes at
+  `llama_init_from_model`, i.e. after the model file is accepted and while the
+  context is being built.
+- **why this is a FRICTIONLESS-INSTALL defect and not a niche crash:** the
+  affected hardware is mainstream consumer laptops -- exactly the machines an
+  8 GB profile exists to serve. And the whole non-NVIDIA story rides this same
+  binding: `otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and `cpu_floor` all
+  run GGUF at `quant_policy: "none"` because bitsandbytes NF4 is CUDA-only. A
+  writer dropdown that hard-faults the worker on a common CPU is worse than one
+  that refuses: there is no exception to catch, no loud degradation, and the
+  message a user sees names a Windows error code rather than a cause.
+- **it is NOT a VRAM problem and NOT the model:** the preflight explicitly
+  passed with 1.7 GB of headroom, the weight is byte- and sha256-exact against
+  the pinned row (2,497,281,120 / 3605803b...c67e597), and the failure is a CPU
+  fault raised through ctypes.
+- **fix:** NOT FIXED, and the right fix is not mine to pick. Candidates, in the
+  order I would try them: (a) a wheel built without AVX-512 -- upstream ships
+  variants, and the correct one for this class of CPU needs identifying rather
+  than assuming; (b) build from source on the target with the ISA detected
+  (costs a toolchain, which is itself friction); (c) treat the GGUF lane as
+  UNSUPPORTED on mobile Intel until (a) is proven, and say so in the docs
+  instead of letting a user discover it as a Windows error code.
+- **what this settles for the 8 GB dropdown question, which is what the
+  operator actually asked:** `unsloth/Qwen3-4B-Instruct-2507-GGUF` is NOT a
+  frictionless 8 GB writer on this hardware today. Its size and licence are
+  ideal (2.33 GiB, Apache-2.0, ungated, anonymous fetch in 46 s) and its VRAM
+  fit is proven with headroom -- but it cannot start on this CPU. The proven
+  frictionless writer on this box remains `google/gemma-4-E2B-it`
+  (unquantized, transformers lane), which has three published episodes.
+- bible-worthy: STRONG CANDIDATE. The reusable class is new tonight and is not
+  the dependency-version class: *a prebuilt native wheel encodes an ISA
+  assumption that no dependency declaration expresses -- it installs cleanly,
+  imports cleanly, passes its own preflight, and then takes a hardware fault.*
+  Version pinning cannot express it and a pip resolver cannot catch it.
