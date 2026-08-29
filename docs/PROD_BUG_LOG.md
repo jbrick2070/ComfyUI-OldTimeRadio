@@ -8433,3 +8433,38 @@ receives.
 
 Recorded as a correction rather than an edit: the log is append-only and I
 would rather the wrong confidence stay visible next to what corrected it.
+
+### CROSS-CUTTING NOTE, 2026-08-29 -- what one extra machine actually bought
+
+Not a bug. A synthesis of the nine logged on 2026-08-29, recorded here because
+the individual entries do not show the shape and the portability plan that
+argues it lives in `docs/2026-*/`, which is gitignored and therefore invisible
+to the other box.
+
+**FOUR ARE THE SAME DEFECT WEARING DIFFERENT CLOTHES:** kokoro 0.9.4 vs the
+0.7.16 PyPI ships; ffmpeg 8.0.1 vs the 9 that removed `-vsync`; llama-cpp
+0.3.33 (945 MB CUDA backend, works) vs 0.3.35 (819 MB, faults); and
+ComfyUI-AnimateDiff-Evolved, present on the proving box only because someone
+git-cloned it by hand at 03:00. In each case **the dev box held a version, or
+a file, that a fresh install does not get** -- and in each case the code was
+correct against what was installed locally.
+
+**THE OTHER FOUR ARE WORSE, AND ARE THE REAL ARGUMENT.** PBUG-07's size-tag
+collision, -08's VRAM gate, -10's token resolver and -11's cache epoch are
+arithmetic and logic that are CORRECT on 16 GB and WRONG on 8. -07 is the
+cleanest example: the `>= 12 GiB` branch returns before any size tag is read,
+so a 16 GB card cannot reach the bug by any test, however thorough. That is
+not a diligence gap. It is a gap diligence cannot close from one machine,
+because the second machine takes a different branch.
+
+**TWO CAME FROM THE BOXES CHECKING EACH OTHER, not from either running alone.**
+-09 surfaced when the 4060 asked why its friction numbers were measured on a
+hand-prepared box. And -12's first root cause -- "no AVX-512" -- was asserted
+with high confidence and then killed by the other box's contradicting evidence
+(llama.cpp generated 22 times on a CPU that also lacks AVX-512), which
+relocated the cause to a version difference that is now testable by hash.
+Neither the assertion nor the correction was available to one machine.
+
+**The operating consequence, and it is cheap:** any claim of the form "works on
+consumer hardware" is worth exactly the number of distinct machines it has run
+on. Ours was one. It is now two, and two found nine.
