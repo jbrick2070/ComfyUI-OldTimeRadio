@@ -425,6 +425,51 @@ broadly proven on a 16 GB 5080 and, as of 2026-08-29, at exactly one point on
 8 GB consumer hardware. What evidence `shipping` ought to REQUIRE is an
 operator question and has been put to him, not decided by either window.
 
+## OPEN ACTION -- THE REPO IS CURRENT; THE REGISTRY IS NOT. SOMEONE MUST OWN THE PUBLISH.
+
+Operator asked, 2026-08-29, whether anyone is making sure the repo AND the Comfy
+registry carry the latest work. Checked both rather than answering from memory:
+
+**REPO: DONE.** `HEAD == origin/v2.0-alpha`, zero uncommitted files. Every fix
+and every log entry from both boxes is pushed.
+
+**REGISTRY: NOT DONE, and it needs MORE than the flag clearing.** Two separate
+blockers, and the second one is easy to miss:
+
+1. `latest_version` = **alpha.8** (2026-08-25). alpha.9/.10/.11/.12 are all
+   Flagged. Proven not to be our doing: alpha.8 shipped 814 files including 28
+   `.ps1`/`.bat` installers and PASSED; alpha.12 shipped 715 files with ZERO
+   scripts and FAILED, with identical trigger-pattern counts. Deleting 135
+   script files changed nothing. Only unblock: **the operator asks Comfy-Org
+   directly** -- their scan findings go to a private Discord that publishers
+   cannot see.
+2. **EVEN IF THE FLAG CLEARED, alpha.12 WOULD NOT FIX A COLD INSTALL.**
+   `pyproject.toml` -- the ONLY dependency list the registry reads -- still
+   declares neither `kokoro` nor `pyloudnorm` (verified by grep just now;
+   `requirements.txt` carries them, and the registry does not read it). So a
+   user installing an Active alpha.12 would still hit the kokoro cold-install
+   crash on their first spoken line. **The fix requires a NEW version, not a
+   promotion of an existing one.**
+
+**RELEASE CHECKLIST for whoever does the bump, so it is not reconstructed:**
+- Add `kokoro` and `pyloudnorm` to `[project] dependencies` in `pyproject.toml`
+  (static literal list -- the registry does NOT evaluate setuptools' dynamic
+  form; proven on alpha.3 vs alpha.4).
+- Set a NEW version string. `2.0.0-alpha.12` is BURNED -- `(node_id, version)`
+  is uniquely indexed server-side and version-delete is a SOFT delete that
+  permanently consumes the string.
+- Editing `pyproject.toml` AUTO-FIRES the publish workflow on push. That is the
+  trigger, so make it one deliberate commit carrying BOTH declarations.
+- After publishing, verify with
+  `curl https://api.comfy.org/nodes/comfyui-old-time-radio/versions` that the
+  dependency count is non-zero -- do not assume.
+- Do NOT bump while a version is Pending, and do not bump merely to show motion:
+  a bump into the flag wall publishes a version nobody can install.
+
+**OWNER: the 5080 window** (it owns `pyproject.toml`, profiles and the
+ship-facing install story). **GATE: the operator's Comfy-Org question.** Neither
+window can clear the gate; both fixes above are worthless to users until it is.
+
 ## Step 12 -- the loudness fix proven end to end; shipping profile passes a SECOND time
 
 Leg: `--profile otr_nvidia_8gb_haunted`, prompt `e9799331`, stock path (no
