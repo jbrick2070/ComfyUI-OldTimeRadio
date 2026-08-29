@@ -836,6 +836,43 @@ def _has_nvenc(ffmpeg):
         return False
 
 
+_CFR_FLAGS_CACHE = {}
+
+
+def cfr_flags(ffmpeg):
+    """The constant-frame-rate flag pair the INSTALLED ffmpeg accepts.
+
+    ``-vsync`` (deprecated since 5.1) was REMOVED outright by ffmpeg 9: it
+    dies at argv parse time with "Unrecognized option 'vsync'" before a single
+    frame is read, which killed a whole otherwise-green episode at the scopes
+    stage on the first box carrying ffmpeg 9 (MRKT 2026-08-29). Its
+    replacement ``-fps_mode`` only exists from 5.1 up, so neither spelling is
+    safe unconditionally. Same discipline as the kokoro ``repo_id`` gate:
+    probe the artifact actually installed, once, and cache per binary path --
+    a 1-frame lavfi null encode, so the probe exercises the real argv parser.
+    On any probe failure fall back to the legacy spelling, preserving the
+    behavior every pre-ffmpeg-9 install has always had.
+    """
+    key = str(ffmpeg)
+    hit = _CFR_FLAGS_CACHE.get(key)
+    if hit is not None:
+        return list(hit)
+    flags = ["-vsync", "cfr"]
+    try:
+        probe = subprocess.run(
+            [ffmpeg, "-hide_banner", "-loglevel", "error",
+             "-f", "lavfi", "-i", "nullsrc=s=16x16:r=5:d=0.2",
+             "-fps_mode", "cfr",  # OUTPUT option: must follow -i
+             "-frames:v", "1", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=10)
+        if probe.returncode == 0:
+            flags = ["-fps_mode", "cfr"]
+    except Exception:  # noqa: BLE001 -- unprobeable binary: keep legacy flags
+        pass
+    _CFR_FLAGS_CACHE[key] = list(flags)
+    return list(flags)
+
+
 def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
     """Stream ``frames_iter`` to a SILENT bt709 / yuv420p H.264 mp4.
 
@@ -922,7 +959,7 @@ def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
         cmd += ["-preset", "p5", "-rc", "vbr", "-b:v", "8M"]
     else:
         cmd += ["-preset", "medium", "-crf", "20"]
-    cmd += ["-pix_fmt", "yuv420p", "-vsync", "cfr", "-r", str(fps),
+    cmd += ["-pix_fmt", "yuv420p"] + cfr_flags(fb) + ["-r", str(fps),
             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
             "-movflags", "+faststart", out_path]
     # ffmpeg's stderr goes to a TEMP FILE, not a PIPE. Nothing reads stderr

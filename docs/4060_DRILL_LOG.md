@@ -143,3 +143,22 @@ lane regardless of the race. Race leg queued ~03:52 as prompt 02835636,
 preflight green on all three lane models. Wall time to be reported honestly
 against the LTX baseline (5080: 270-285 s/beat; 4060 LTX never completed a
 beat).
+
+RACE LEG 1 OUTCOME: FAIL at the scopes stage -- the night's THIRD genuine
+cold-install portability catch. Everything upstream passed: writer, voices,
+music, base-video encode, and ALL haunted AnimateDiff beats (v3 module +
+sliding context window; later beats ~9-10 s/step at a comfortable 4.9 GB,
+SD1.5 fully resident -- no offload, unlike everything LTX/z_image). Then
+OTR_SceneAwareScopes died instantly: `Unrecognized option 'vsync'`. ffmpeg 9
+(this box) REMOVED `-vsync` (deprecated since 5.1); the 5080's older ffmpeg
+still accepts it, so the bug was invisible everywhere but here. Five call
+sites shipped it (scope_draw, encode_sink, silent_composite x2,
+caption_burn).
+
+Fix (this commit), same discipline as the kokoro repo_id gate: a shared
+`scope_draw.cfr_flags(ffmpeg)` that probes the installed binary once (1-frame
+lavfi null encode -- exercises the real argv parser) and returns
+`-fps_mode cfr` when accepted, legacy `-vsync cfr` otherwise; all five sites
+route through it. Verified on this box: probe selects `-fps_mode`; AST parse
+clean on all four files. Race leg 2 re-queued 04:32:12 as prompt be8d016d
+with the fix loaded.

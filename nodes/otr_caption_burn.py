@@ -39,6 +39,11 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+try:
+    from ._otr_shared.scope_draw import cfr_flags
+except ImportError:  # non-package contexts (tests / CLI)
+    from _otr_shared.scope_draw import cfr_flags  # type: ignore
+
 log = logging.getLogger("OTR")
 
 _CAPTION_STYLE_CHOICES = ["sdh_standard", "otr_crt"]
@@ -237,7 +242,7 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
         "-i", os.path.abspath(video_path),
         "-an",                                   # silent in, silent out (V-1)
         "-vf", f"ass={ass_name},fps={max(1, int(fps))}",
-        "-vsync", "cfr",
+        *cfr_flags(fb),
         "-pix_fmt", "yuv420p",
         "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
         "-c:v", "libx264", "-crf", "18", "-preset", "fast",

@@ -14,6 +14,8 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from .scope_draw import cfr_flags
+
 
 def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
     if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
@@ -104,7 +106,7 @@ class RawVideoSink:
             else:
                 cmd += ["-preset", "medium", "-crf", "20"]
             cmd += [
-                "-pix_fmt", "yuv420p", "-vsync", "cfr", "-r", str(self.fps),
+                "-pix_fmt", "yuv420p", *cfr_flags(fb), "-r", str(self.fps),
                 "-color_primaries", "bt709", "-color_trc", "bt709",
                 "-colorspace", "bt709", "-movflags", "+faststart",
                 str(self.output_path),

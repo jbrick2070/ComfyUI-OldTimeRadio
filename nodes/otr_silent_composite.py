@@ -6,7 +6,9 @@ is the radio-floor video (``OTR_SignalLostVideo``); later windows composite real
 engine clips here too. Whatever the source, the output is guaranteed:
 
 * **silent** -- ``-an`` strips any audio (invariant V-1: only MasterAudioMux adds audio),
-* **CFR** at the canonical fps (``fps`` filter + ``-vsync cfr``; no VFR drift),
+* **CFR** at the canonical fps (``fps`` filter + the CFR flag the installed
+  ffmpeg accepts -- ``-fps_mode cfr`` on 5.1+, legacy ``-vsync cfr`` before
+  it, via ``scope_draw.cfr_flags``; no VFR drift),
 * **yuv420p**, even (mod-2) dimensions, padded to the canonical canvas,
 * **bt709 IDENTITY-tagged** -- untagged input is TAGGED bt709, NEVER matrix-converted
   (no silent BT.601->709 shift); the scale/pad filters do not touch the color matrix,
@@ -23,6 +25,11 @@ import shutil
 import subprocess
 import tempfile
 import logging
+
+try:
+    from ._otr_shared.scope_draw import cfr_flags
+except ImportError:  # non-package contexts (tests / CLI)
+    from _otr_shared.scope_draw import cfr_flags  # type: ignore
 
 try:  # ComfyUI loads these node modules flat as well as packaged
     from ._otr_shared import ffprobe as _ffp
@@ -341,7 +348,7 @@ def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
         "-i", in_path,
         "-an",                                  # V-1: strip ALL audio
         "-vf", vf,
-        "-vsync", "cfr",                        # constant frame rate (no VFR drift)
+        *cfr_flags(fb),                         # constant frame rate (no VFR drift)
         "-pix_fmt", "yuv420p",
         # TAG bt709 (identity) -- do NOT matrix-convert an untagged source.
         "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
@@ -858,9 +865,11 @@ def _seg_vf(w, h, fps, start_frame, sharpen=True, mode=None):
         post=",tpad=stop_mode=clone:stop_duration=3600")
 
 
-def _color_args(out_path):
+def _color_args(fb, out_path):
     # TAG bt709 identity (never matrix-convert) + canonical yuv420p H.264.
-    return ["-vsync", "cfr", "-pix_fmt", "yuv420p",
+    # ``fb`` picks the CFR spelling the installed ffmpeg accepts (ffmpeg 9
+    # removed -vsync); see scope_draw.cfr_flags.
+    return [*cfr_flags(fb), "-pix_fmt", "yuv420p",
             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
             "-c:v", "libx264", "-crf", "18", "-preset", "fast", out_path]
 
@@ -898,7 +907,7 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
                "-vf", _seg_vf(w, h, fps, start_frame,
                               mode=delivery_scale_mode),
-               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+               "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
         p = _run(cmd)
         if p.returncode != 0:
             raise ValueError(
@@ -922,7 +931,7 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
         loop_args = ["-stream_loop", "-1"] if loop else []
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
                "-vf", _seg_vf(w, h, fps, start_frame, sharpen=sharpen),
-               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+               "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
         p = _run(cmd)
         if p.returncode != 0:
             raise ValueError(
@@ -946,7 +955,7 @@ def _encode_segment(fb, src, n_frames, seg_path, *, w, h, fps, start_frame=0,
         loop_args = ["-stream_loop", "-1"] if loop else []
         cmd = [fb, "-y", "-loglevel", "error"] + loop_args + ["-i", src, "-an",
                "-vf", _seg_vf(w, h, fps, start_frame, sharpen=True),
-               "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+               "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
         p = _run(cmd)
         if p.returncode != 0:
             raise ValueError(
@@ -1025,7 +1034,7 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                 "-i", "-", "-an",
                 "-frames:v", str(int(n_frames)),
                 "-vf", "scale=out_color_matrix=bt709:out_range=tv"
-                ] + _color_args(seg_path)
+                ] + _color_args(fb, seg_path)
 
     dec_stderr_fobj, dec_stderr_path = _tempfile_stderr("dec")
     enc_stderr_fobj, enc_stderr_path = _tempfile_stderr("enc")
@@ -1169,7 +1178,7 @@ def _encode_black(fb, n_frames, seg_path, *, w, h, fps):
     so an episode with neither a clip nor a floor still assembles)."""
     cmd = [fb, "-y", "-loglevel", "error",
            "-f", "lavfi", "-i", "color=c=black:s=%dx%d:r=%d" % (w, h, fps),
-           "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+           "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
     p = _run(cmd)
     if p.returncode != 0:
         raise ValueError("OTR_SilentComposite: black segment failed (%s) :: %s"
@@ -1273,7 +1282,7 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
     cmd = [fb, "-y", "-loglevel", "error"] + bg_in + [
         "-f", "concat", "-safe", "0", "-i", listfile, "-an",
         "-filter_complex", graph,
-        "-frames:v", str(int(n_frames))] + _color_args(seg_path)
+        "-frames:v", str(int(n_frames))] + _color_args(fb, seg_path)
     p = _run(cmd)
     if p.returncode != 0:
         raise ValueError(
