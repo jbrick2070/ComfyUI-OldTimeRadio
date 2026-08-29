@@ -1830,7 +1830,9 @@ def auto_download_if_missing(
     huggingface_hub.snapshot_download) and `_hf_api` (object with
     model_info() method) to drive tests without network calls.
     """
-    from ._otr_hf_auth import resolve_hf_token
+    # EXECUTION path -- use the Hub-aware resolver so a cached
+    # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).
+    from ._otr_hf_auth import resolve_hf_token_runtime as resolve_hf_token
     from ._otr_model_inputs import (
         GatedModelError,
         InsufficientDiskSpaceError,

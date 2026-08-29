@@ -90,6 +90,75 @@ Hugging Face cache the first time the pipeline runs — the writer
 (~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
 before you start it on a metered connection.
 
+### 2c. Hugging Face token — best practice
+
+**You do not need a token to run OTR.** The 8 GB haunted profile and everything
+it pulls are ungated: verified by anonymous download of the real weight files,
+with no credential sent. Same for the writer, the voices and the music.
+
+**Set one anyway.** Anonymous downloads are rate-limited, and a multi-gigabyte
+pull that gets throttled part-way is a failed install rather than a slow one.
+`huggingface_hub` says so itself on every anonymous fetch: *"You are sending
+unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher
+rate limits and faster downloads."* Get one at
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) —
+**read** scope is enough.
+
+#### The safe ways, in order of preference
+
+**1. Log in once (recommended).** This writes the token to a file only your
+account can read, and nothing else ever has to know about it:
+
+```bash
+hf auth login
+```
+
+**2. Or create the token file yourself.** It is a plain text file containing
+**the raw token and nothing else** — no quotes, no `HF_TOKEN=`, no JSON. Create
+it at:
+
+```
+Windows   C:\Users\<you>\.cache\huggingface\token
+macOS     ~/.cache/huggingface/token
+Linux     ~/.cache/huggingface/token
+```
+
+and the entire contents are one line:
+
+```
+hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+That is the whole file. OTR reads this location *and* the one your `HF_HOME`
+points at, so it works whether you logged in before or after installing OTR.
+
+**3. Or an environment variable**, if you prefer or you are running headless:
+`HF_TOKEN=hf_xxxx`. On Windows, ComfyUI Desktop does not inherit user-scope
+variables, so OTR also reads `HKCU\Environment` to cover that gap.
+
+#### What NOT to do, and why it matters
+
+**Never paste a token into a node widget** — not into OTR's, not into any other
+pack's, no matter what a Note node beside it says. A widget value is written
+into `widgets_values` in the workflow JSON, which means it travels with:
+
+* every workflow file you save, share, or attach to a bug report
+* the prompt in ComfyUI's queue and `/history`
+* **the PNG metadata of every image you generate** (that embedded workflow is
+  exactly what lets you drag a PNG back onto the canvas to restore it)
+* any traceback or support bundle that prints the node's inputs
+
+"Just don't save the workflow" is an instruction, not a control, and most of
+those paths are not a save. **OTR has no token widget anywhere and never will.**
+
+**Do not put it in a `.env` file at the ComfyUI root.** Vanilla ComfyUI does not
+read one — there is no dotenv loader in `main.py` and `python-dotenv` is not
+even a ComfyUI dependency. It will be silently ignored.
+
+**Be careful with ComfyUI Desktop's environment-variable editor.** It can set
+`HF_TOKEN`, but Desktop itself warns those values are stored **unencrypted**.
+Prefer the login file above.
+
 ### 3. Hugging Face token — only if you pick a gated model
 
 **Most people need no token at all.** The shipped canonical workflow pins
