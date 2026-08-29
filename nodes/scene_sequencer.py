@@ -83,7 +83,8 @@ def _stamp_master_wav_flavour(ledger: dict, flavour: str) -> None:
     normally agree -- but a hand-edited graph that wires the policy to one and
     not the other has two possible outcomes and only one is benign:
 
-    * assembler LEVELLED, mux mixes and levels -> the 0.20/0.80 balance is
+    * assembler LEVELLED, mux mixes and levels -> the fixed foley/master
+      balance (0.50/0.50 since the 2026-08-29 ruling) is
       struck against an already-levelled master. The delivery level is still
       correct, because ``_master_loudness`` normalises TO a target rather than
       applying a relative boost.

@@ -144,7 +144,7 @@ def test_the_foley_lane_is_registered_public_and_on_the_capability_roster():
     # WHOLE episode mix -- a label that only described the picture would hide
     # the actual consequence of choosing it.
     label = pub._PUBLIC_LABEL["ltx25_high_foley_plus"].lower()
-    assert "foley" in label and "0.20" in label
+    assert "foley" in label and "0.50" in label
 
 
 def test_the_foley_lane_never_wears_the_ripped_beds_name():
@@ -313,12 +313,13 @@ def test_the_foley_receipts_survive_the_parents_closed_clip_dict():
 
 
 def test_the_operator_ratio_is_a_ruling_and_has_exactly_one_owner():
-    """0.20/0.80 is an operator ruling, not a tunable, and it is defined ONCE
-    in `foley_stems` -- the engine, the manifest and the mux all import it. A
-    second copy is how two stages come to disagree about a mix."""
+    """0.50/0.50 is an operator ruling (2026-08-29, raised from 0.20/0.80),
+    not a tunable, and it is defined ONCE in `foley_stems` -- the engine, the
+    manifest and the mux all import it. A second copy is how two stages come
+    to disagree about a mix."""
     from nodes._otr_video_engines import foley_stems as fs
     assert (eng_ltx25.LTX25_FOLEY_GAIN,
-            eng_ltx25.LTX25_MASTER_GAIN_UNDER_FOLEY) == (0.20, 0.80)
+            eng_ltx25.LTX25_MASTER_GAIN_UNDER_FOLEY) == (0.50, 0.50)
     assert eng_ltx25.LTX25_FOLEY_GAIN is fs.FOLEY_GAIN
     assert eng_ltx25.LTX25_MASTER_GAIN_UNDER_FOLEY is fs.MASTER_GAIN_UNDER_FOLEY
     assert eng_ltx25.LTX25_FOLEY_RECEIPT_KEYS is fs.FOLEY_RECEIPT_KEYS

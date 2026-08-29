@@ -599,6 +599,18 @@ def extract_beats(ledger: dict) -> list:
             "samples": ln.get("samples", ln.get("audio_samples")),
             "sample_rate": ln.get("sample_rate"),
             "dur_s": ln.get("dur_s", ln.get("duration_s")),
+            # THE STORY FIELDS RIDE THE BEAT (2026-08-29). The line row already
+            # carries them (production_ledger.set_lines stamps every line with
+            # shot_id / beat_intent / traits) and dropping them here forced the
+            # nonverbal director to work from the bare line text alone --
+            # motion with no stake in it, which is how a demand under threat
+            # rendered as a fidget. Copied AT THE SOURCE rather than joined
+            # back by beat_id later, because a synthesized beat id
+            # (`beat_0007`, the music beats) has no line row to join against
+            # and a silent empty join is exactly the miss this avoids.
+            "shot_id": ln.get("shot_id"),
+            "beat_intent": ln.get("beat_intent"),
+            "traits": ln.get("traits"),
         })
     return beats
 
@@ -978,7 +990,6 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     never the words. Whatever comes back is filtered against the line anyway
     (``_repeats_the_line``), because an instruction is not an enforcement.
     """
-    del meta  # symmetry with _build_batch_prompt; the brief tails append later
     # THE ASK IS KINETIC AND LINE-DRIVEN (2026-08-27, operator: the action
     # part of the prompt is inspired by the dialogue/story). The first cut
     # asked for a "restrained facial expression", which told the writer to
@@ -986,18 +997,39 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
     # scale-to-the-line language below is deliberately the same contract as
     # the ripped `_otr_motion_clause.build_clause_messages` (its kinetic
     # amendment), so the two derivation paths cannot drift apart in spirit.
+    #
+    # THE STORY CONTEXT IS PRIVATE EVIDENCE, NOT OUTPUT (2026-08-29). This
+    # builder used to `del meta` and hand the model nothing but the bare
+    # line, so the director staged motion with no stake in it -- a demand
+    # under threat and a weather report earned the same fidget. It now reads
+    # the episode logline and key objects from meta and each beat's
+    # beat_intent/traits off the beat row (stamped by `extract_beats` from
+    # the frozen line), all as INPUT-ONLY context: the response schema, the
+    # quote filter, and every ban below are unchanged.
+    logline = str(((meta or {}).get("produced_story") or {})
+                  .get("logline") or "").strip()
+    key_objects = [str(o).strip() for o in (meta or {}).get("key_objects")
+                   or [] if str(o or "").strip()]
     lines = [
         "You are a film director working on a SILENT shot. For EACH beat "
         "below you are given the line the character speaks, as CONTEXT ONLY -- "
         "the camera records no sound and the actor must NOT be shown speaking "
-        "it. Give the visible PERFORMANCE the line implies instead: a vivid "
-        "facial expression, and the KINETIC body action the moment demands -- "
-        "what the body actually DOES, the motion vector, not a pose. SCALE "
-        "THE MOVEMENT TO THE LINE: a calm line earns small motion; an urgent, "
-        "angry or frightened line earns real movement (rises, strides, wheels "
-        "around, slams, recoils, grabs, points). Do not cap yourself at "
-        "fidgets. Then a camera direction. Reply ONLY with a JSON list of "
-        'objects {"beat_id","expression","motion","camera"}.',
+        "it. Treat the character, the story context, the beat intent and the "
+        "line as PRIVATE EVIDENCE: never quote them back. Give the visible "
+        "PERFORMANCE the line implies instead: a vivid facial expression, and "
+        "the KINETIC body action the moment demands -- convert the line's "
+        "dramatic pressure into one coherent chain of two or three visible "
+        "physical actions, what the body actually DOES, the motion vector, "
+        "not a pose. SCALE THE MOVEMENT TO THE LINE: a calm line earns small "
+        "motion; an urgent, angry or frightened line earns real movement "
+        "(rises, strides, wheels around, slams, recoils, grabs, points), and "
+        "at least one of its actions makes REAL CONTACT with an object the "
+        "setting or the listed objects support -- name the concrete verbs, "
+        "objects and materials (a brass dial rolled down, a ledger snapped "
+        "shut, a chart slapped onto the wooden desk), because the shot's "
+        "sound is derived from exactly those words. Do not cap yourself at "
+        "fidgets. Then ONE camera movement only. Reply ONLY with a JSON list "
+        'of objects {"beat_id","expression","motion","camera"}.',
         # Same finisher contract as the spoken path: the era/style tails are
         # APPENDED later and must not be duplicated here.
         "Do not include film-stock, film-grain, or lighting-style terms; "
@@ -1009,25 +1041,41 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "Describe the named character as the VISIBLE subject; never describe "
         "scenery or props without the character.",
         f"Setting: {setting}",
-        "Beats:",
     ]
+    if logline:
+        lines.append("Story (private context): %s" % logline[:240])
+    if key_objects:
+        lines.append("Objects on hand: %s" % ", ".join(key_objects[:8]))
+    lines.append("Beats:")
     for b in batch:
         appearance = _appearance_for_char(ledger, b["char_id"])
+        payload = {
+            "beat_id": b["beat_id"],
+            "character": appearance[:160],
+            # The SAME capped value the filter compares against; see
+            # `_line_context`. Sending one slice and filtering on another
+            # is how an exact quote of the shown context got through.
+            "line_context_do_not_quote": _line_context(b["text"]),
+        }
+        # Present-key only: a beat that never carried these (a synthetic
+        # music beat, an old ledger) does not acquire nulls. beat_intent is
+        # capped through the same word-boundary helper as the line -- the
+        # writer emits full SENTENCES there (test_look_qa_round5's live
+        # catch) and an uncapped one would drown the payload.
+        intent = str(b.get("beat_intent") or "").strip()
+        if intent:
+            payload["beat_intent"] = _line_context(intent)
+        traits = b.get("traits")
+        if traits:
+            payload["traits"] = str(traits)[:160]
         lines.append(
-            json.dumps({
-                "beat_id": b["beat_id"],
-                "character": appearance[:160],
-                # The SAME capped value the filter compares against; see
-                # `_line_context`. Sending one slice and filtering on another
-                # is how an exact quote of the shown context got through.
-                "line_context_do_not_quote": _line_context(b["text"]),
-                # ensure_ascii FALSE, unlike the spoken-path builder above, and
-                # that is the point of "one value, two consumers": escaped as
-                # \uXXXX the model is shown something the filter -- which
-                # tokenises the DECODED string -- could never match, so the
-                # shared-value invariant would hold in Python and be false in
-                # the only place it matters.
-            }, ensure_ascii=False)
+            # ensure_ascii FALSE, unlike the spoken-path builder above, and
+            # that is the point of "one value, two consumers": escaped as
+            # \uXXXX the model is shown something the filter -- which
+            # tokenises the DECODED string -- could never match, so the
+            # shared-value invariant would hold in Python and be false in
+            # the only place it matters.
+            json.dumps(payload, ensure_ascii=False)
         )
     return "\n".join(lines)
 
@@ -1161,15 +1209,33 @@ def derive_creative_directives(
                 # The capped context, NOT the raw line -- the model can only
                 # quote what it was shown, and comparing against a longer
                 # sequence than it ever saw is a filter that cannot fire.
-                line_tokens = _word_tokens(_line_context(b["text"]))
+                #
+                # THE STORY CONTEXT GETS THE SAME BACKSTOP (2026-08-29). The
+                # prompt shows beat_intent and the logline as PRIVATE
+                # EVIDENCE, and an instruction is not an enforcement -- the
+                # docstring above says exactly that about the line. The same
+                # contiguous whole-run test guards them: only a verbatim
+                # quote can fire it, never shared vocabulary. `traits` is
+                # deliberately NOT filtered -- two adjectives meant to color
+                # the expression are not a quotation when they reach it.
+                context_runs = [_word_tokens(_line_context(b["text"]))]
+                _intent = str(b.get("beat_intent") or "").strip()
+                if _intent:
+                    context_runs.append(_word_tokens(_line_context(_intent)))
+                _logline = str(((meta or {}).get("produced_story") or {})
+                               .get("logline") or "").strip()[:240]
+                if _logline:
+                    context_runs.append(_word_tokens(_logline))
                 kept = {}
                 for key in _DIRECTIVE_KEYS:
                     value = str(d.get(key) or "").strip()
-                    if value and _repeats_the_line(value, line_tokens):
+                    if value and any(_repeats_the_line(value, run)
+                                     for run in context_runs if run):
                         warnings.append(
-                            "beat %s: the writer put the spoken line back into "
-                            "%r on a silent lane; dropped (the lane cannot "
-                            "deliver it)" % (b["beat_id"], key))
+                            "beat %s: the writer put shown private context "
+                            "(the line, the beat intent, or the logline) back "
+                            "into %r on a silent lane; dropped (the lane "
+                            "cannot deliver it)" % (b["beat_id"], key))
                         value = ""
                     kept[key] = value
                 if any(kept.values()):

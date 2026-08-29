@@ -3570,13 +3570,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _jav_engine = _engine_id
     if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
         try:
-            from .eng_ltx25 import (JOINT_AV_TERMINATOR,
-                                    finish_joint_av_positive,
-                                    identity_leaks_in, named_sounds_for)
+            from .eng_ltx25 import (finish_joint_av_positive,
+                                    identity_leaks_in,
+                                    joint_av_prompt_is_finished,
+                                    sounds_named_in)
         except ImportError:  # pragma: no cover -- flat test imports
             from eng_ltx25 import (  # type: ignore
-                JOINT_AV_TERMINATOR, finish_joint_av_positive,
-                identity_leaks_in, named_sounds_for)
+                finish_joint_av_positive, identity_leaks_in,
+                joint_av_prompt_is_finished, sounds_named_in)
         # NO MOOD READ ANY MORE (operator, 2026-08-28). Mime used to lead its
         # tail with the brief's music_mood_terms and ask for "instrumental
         # scene score" -- a CATEGORY, which is precisely the defect that made
@@ -3605,14 +3606,16 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # ending in the no-voice clause, say -- still reported finished. That is
         # a false claim in the one field used to prove the lane received its
         # audio requirement, and evidence in this repo is cited by hash.
-        # Stamp what is actually true of the string, and record WHICH sounds
-        # were named so a reader can tell a good cue from a wrong one without
-        # re-deriving it.
-        _jav_ok = _jav_after.rstrip(" ,.;:").endswith(
-            JOINT_AV_TERMINATOR.rstrip(" ,.;:"))
+        # `joint_av_prompt_is_finished` is the one owner of that judgement
+        # since the 2026-08-29 golden-shape reordering (sound frame PRESENT
+        # plus the no-voice clause LAST -- the frame-and-clause pair is no
+        # longer contiguous at the tail on a normally composed prompt), and
+        # the sounds receipt reads the FINISHED string by phrase membership,
+        # because the composer now seats the sounds itself and a cue re-scan
+        # would match the phrases' own words.
+        _jav_ok = joint_av_prompt_is_finished(_jav_after)
         _jav_obs["joint_av_prompt"] = "finished" if _jav_ok else "UNFINISHED"
-        if _jav_after != _jav_before:
-            _jav_obs["joint_av_sounds"] = named_sounds_for(_jav_before)
+        _jav_obs["joint_av_sounds"] = sounds_named_in(_jav_after)
         if not _jav_ok:
             _LOG.warning(
                 "[OTR.render_driver] JOINT-AV: %s beat %s did NOT end with the "
@@ -4452,6 +4455,20 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # block below this one was written to close, one field group over.
     if foley_receipts is not None:
         beat_clip.update(foley_receipts)
+        # THE BEAT CLIP CARRIES ITS OWN AUDIO (operator ruling 2026-08-29: a
+        # joint-AV clip he cannot HEAR is a failed render). The assembled beat
+        # stem is muxed into the assembled beat mp4 as an AAC preview track --
+        # the WAV stays the authoritative mix source, and OTRSilentComposite
+        # re-encodes every row with -an, so this track can never reach the
+        # episode master or be mixed twice. Fails LOUD: a foley beat whose
+        # clip stayed silent is exactly the false green the lane must not
+        # produce. has_audio flips to True HERE, at beat scope, because it is
+        # true here and only here -- the per-segment rows stay silent and
+        # their contract is unchanged.
+        _foley.mux_native_audio_into_beat_clip(
+            assembled, foley_receipts["foley_path"],
+            fps=int((clip or {}).get("fps") or 25))
+        beat_clip["has_audio"] = True
     else:
         for _fkey in _foley.FOLEY_RECEIPT_KEYS:
             beat_clip.pop(_fkey, None)

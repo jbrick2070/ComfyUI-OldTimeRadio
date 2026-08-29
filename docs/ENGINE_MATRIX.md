@@ -282,9 +282,9 @@ and it read exactly like a measured number until someone looked.
 | humo_1.7B | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_1.7B_169 | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
-| ltx25_foley_plus | - | contract max | docs/2026-08-27-action-prompting |
-| ltx25_mime | - | contract max | docs/2026-08-27-action-prompting |
-| ltx25_video | - | contract max | docs/2026-08-27-action-prompting |
+| ltx25_foley_plus | - | contract max | none cited |
+| ltx25_mime | - | contract max | none cited |
+| ltx25_video | - | contract max | none cited |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | docs/evidence |

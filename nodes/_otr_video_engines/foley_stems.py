@@ -4,7 +4,8 @@ A foley stem is the audio LTX 2.5 already computes while it renders a clip --
 footsteps, room tone, a score written for the exact picture on screen -- kept
 instead of discarded and written beside the clip as a 16-bit PCM WAV. It is
 mixed UNDER the frozen episode master at ``OTR_MasterAudioMux``, at the fixed
-0.20 foley / 0.80 master the operator ruled on 2026-08-26.
+0.50 foley / 0.50 master the operator ruled on 2026-08-29 (raised from the
+2026-08-26 0.20 / 0.80 after the bed proved inaudible by ear).
 
 THIS IS NOT THE SFX BED. The SFX bed was separately GENERATED effects from a
 dedicated model; it was ripped on 2026-08-06 and is staying dead, and
@@ -34,28 +35,33 @@ import wave
 
 _LOG = logging.getLogger("OTR.foley")
 
-#: THE FIXED MIX -- an operator ruling, not a knob (2026-08-26): *"ducking
-#: fixed i would say .20 foley .80 voice."* Linear coefficients applied to the
-#: FULL master (dialogue, procedural room tone, themes and music cues together),
-#: because ``OTR_EpisodeAssembler`` folds all of it into ONE WAV and there is no
-#: separate voice bus to duck against. No sidechain, no envelope following, no
-#: per-beat loudness analysis: a static gain is deterministic, so the same
-#: inputs give the same master every single time.
+#: THE FIXED MIX -- an operator ruling, not a knob. RAISED TO 0.50 / 0.50 BY
+#: THE OPERATOR 2026-08-29 (*"let have foley ab 5050 split"*), superseding the
+#: 2026-08-26 0.20 / 0.80 ruling, after the published episode
+#: ``signal_lost_blood_and_the_broken_crown_20260828_203439`` proved the bed
+#: inaudible by ear: raw stems measured 10-40 dB under the lab's golden
+#: reference renders, and 0.20 under a full master buried what remained.
+#: The ratio change is +7.96 dB on the bed and -4.08 dB on the programme --
+#: +12.04 dB of relative lift -- and the final ``_master_loudness`` delivery
+#: pass (-14 LUFS, -1 dBFS rail) restores overall level afterwards, so the
+#: change moves the BALANCE, not the loudness.
 #:
-#: THE MASTER IS NOT ATTENUATED BY THE FOLEY'S PRESENCE. Voice holds 0.80
+#: Linear coefficients applied to the FULL master (dialogue, procedural room
+#: tone, themes and music cues together), because ``OTR_EpisodeAssembler``
+#: folds all of it into ONE WAV and there is no separate voice bus to duck
+#: against. No sidechain, no envelope following, no per-beat loudness
+#: analysis: a static gain is deterministic, so the same inputs give the same
+#: master every single time.
+#:
+#: THE MASTER IS NOT ATTENUATED BY THE FOLEY'S PRESENCE. Voice holds its gain
 #: whether or not a stem exists for a given beat, so a beat with no foley does
 #: not get louder than its neighbours.
 #:
 #: NOT the retired SFX bed's 0.45, and the difference is the point rather than
 #: an accident: this bed plays UNDER dialogue continuously, where that one
 #: played in the gaps.
-#:
-#: Ledger-driven ducking -- 0.20 under a line and higher between lines, driven
-#: from the frozen ledger rather than by detecting the voice -- is DEFERRED, not
-#: rejected. The operator: *"let's start simple 80/20."* 0.20 remains the speech
-#: floor in that later design, so these two constants survive it.
-FOLEY_GAIN = 0.20
-MASTER_GAIN_UNDER_FOLEY = 0.80
+FOLEY_GAIN = 0.50
+MASTER_GAIN_UNDER_FOLEY = 0.50
 
 #: The receipt keys a foley row carries. ONE tuple, consumed by the adapter, the
 #: coverage assembler, the manifest builder and the mux alike, so a key cannot
@@ -73,11 +79,11 @@ FOLEY_RECEIPT_KEYS = (
 #: reason they share this module. Operator, 2026-08-26: *"foley and mime, we
 #: need this feature for both."*
 #:
-#: * ``ltx25_foley_plus`` -- 0.20 / 0.80. A bed UNDER the episode. The master
-#:   gain is GLOBAL: it applies to the whole timeline, not only to the beats
-#:   that carry a bed, because RULING 1 is explicit that *"voice holds 0.80
-#:   whether or not a foley stem exists for that beat, so a beat without foley
-#:   does not get louder"*.
+#: * ``ltx25_foley_plus`` -- 0.50 / 0.50 (operator, 2026-08-29). A bed UNDER
+#:   the episode. The master gain is GLOBAL: it applies to the whole timeline,
+#:   not only to the beats that carry a bed, because RULING 1 is explicit that
+#:   voice holds its gain *"whether or not a foley stem exists for that beat,
+#:   so a beat without foley does not get louder"*.
 #: * ``ltx25_mime`` -- 1.00 / 0.00. A silent performance carrying the video's
 #:   own score. The master gain is PER-WINDOW: it zeroes only the mime beats'
 #:   own samples, because engines are ROLE-WIDE and an episode with a mime role
@@ -89,7 +95,7 @@ FOLEY_RECEIPT_KEYS = (
 #: "mime generates no TTS" brief): nothing has to happen before the master
 #: freezes, because nothing is being REPLACED -- the master is simply
 #: attenuated to zero in that window at mux time, exactly as foley_plus
-#: attenuates it to 0.80. Same pipeline, same code path, one different
+#: attenuates it to 0.50. Same pipeline, same code path, one different
 #: constant. It deletes a whole node and an execution-order inversion.
 #: RE-AFFIRMED BY THE OPERATOR 2026-08-28, in his words: *"mime should have
 #: the native audio 'foley' layer at 100% and do not use the TTS / music /
@@ -100,7 +106,7 @@ FOLEY_RECEIPT_KEYS = (
 #: programme (TTS, music cues, announcer) STAYS at 0.00 inside mime windows.
 #: Do not propose dropping mime's generated audio; the operator wants it.
 FOLEY_LANE_GAINS = {
-    "ltx25_foley_plus": (0.20, 0.80),
+    "ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_mime": (1.00, 0.00),
 }
 
@@ -440,6 +446,118 @@ def assemble_beat_foley_segments(segments, out_path, *, expect_frames, fps):
     }
 
 
+def mux_native_audio_into_beat_clip(video_path, wav_path, *, fps):
+    """Put the beat's native audio INTO the beat mp4, in place. Fail loud.
+
+    Operator ruling 2026-08-29: a joint-AV beat clip with no audible audio is a
+    failed render -- he opens the files in ``clips/`` and judges the model by
+    what he hears, and a silent mp4 beside an authoritative WAV sidecar made
+    the lane look broken when it was merely inconvenient. So after the beat
+    stem is assembled, the SAME audio is muxed into the beat mp4 as an AAC
+    preview track. The WAV stays the authoritative source the master mux
+    reads; ``OTRSilentComposite`` re-encodes every row with ``-an``, so this
+    track can never reach the episode master or be mixed twice.
+
+    THE SEAM IS THE BEAT, NOT THE SEGMENT, and that is load-bearing: per-
+    segment mp4s feed a video-only concat and die in ``_shared/tmp``, so audio
+    muxed there would be invisible. The beat mp4 is the artifact the operator
+    actually opens.
+
+    In place via a temp SIBLING and ``os.replace``: the muxed file is written
+    beside the original (same directory, so the tmp-tree discipline holds and
+    the rename cannot cross filesystems), proved with ffprobe -- exactly one
+    video and one audio stream, durations within one frame -- and only then
+    swapped over the original. Any failure removes the sibling and raises, so
+    the original silent mp4 is never half-replaced.
+
+    ``-c:v copy`` on purpose: the video stream was already encoded and PROVED
+    (frame count, bt709, fps) by the assembler; re-encoding here could drop or
+    duplicate frames with nothing downstream re-counting them.
+    """
+    try:
+        from . import wrapper_bridge as _wb
+    except ImportError:                            # pragma: no cover -- flat
+        import wrapper_bridge as _wb               # type: ignore
+    try:
+        from .._otr_shared import ffprobe as _fp   # type: ignore
+    except ImportError:                            # pragma: no cover -- flat
+        from _otr_shared import ffprobe as _fp     # type: ignore
+
+    video_path = str(video_path)
+    wav_path = str(wav_path)
+    if not os.path.isfile(video_path):
+        raise FoleyStemError(
+            "native-audio mux: beat mp4 %r is missing" % video_path)
+    if not os.path.isfile(wav_path):
+        raise FoleyStemError(
+            "native-audio mux: beat foley WAV %r is missing. NO FALLBACK -- "
+            "a silent clip here is indistinguishable from a lane that never "
+            "generated audio" % wav_path)
+
+    root, ext = os.path.splitext(video_path)
+    sibling = root + "_av" + (ext or ".mp4")
+    cmd = ["ffmpeg", "-y", "-loglevel", "error",
+           "-i", video_path, "-i", wav_path,
+           "-map", "0:v:0", "-map", "1:a:0",
+           "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+           "-movflags", "+faststart", sibling]
+    assert "-shortest" not in cmd, \
+        "-shortest must never appear here: the stem was cut to the picture"
+    try:
+        _wb.run_ffmpeg(cmd)
+        try:
+            doc = _fp.probe_json(
+                sibling, entries="stream=codec_type,duration")
+        except _fp.FFprobeError as exc:
+            raise FoleyStemError(
+                "native-audio mux could not prove %r: %s"
+                % (sibling, exc)) from exc
+        streams = doc.get("streams") or []
+        kinds = [str(s.get("codec_type") or "") for s in streams]
+        if kinds.count("video") != 1 or kinds.count("audio") != 1:
+            raise FoleyStemError(
+                "native-audio mux wrote %r with streams %r; the contract is "
+                "exactly one video and one audio" % (sibling, kinds))
+        durs = {}
+        for stream in streams:
+            kind = str(stream.get("codec_type") or "")
+            try:
+                durs[kind] = float(stream.get("duration"))
+            except (TypeError, ValueError):
+                pass
+        if "video" not in durs or "audio" not in durs:
+            raise FoleyStemError(
+                "native-audio mux could not read both stream durations from "
+                "%r (got %r)" % (sibling, durs))
+        if durs["audio"] <= 0.0:
+            raise FoleyStemError(
+                "native-audio mux wrote an EMPTY audio stream into %r"
+                % sibling)
+        # One frame of slack plus AAC's priming/padding overhead: an AAC
+        # encode is granular to its 1024-sample frame, so the container
+        # duration legitimately overshoots the picture by a few tens of ms.
+        tolerance = (1.0 / float(fps)) + 0.10
+        if abs(durs["video"] - durs["audio"]) > tolerance:
+            raise FoleyStemError(
+                "native-audio mux: %r has video %.3f s but audio %.3f s "
+                "(tolerance %.3f s). The stem and the picture disagree about "
+                "this beat's length" % (sibling, durs["video"],
+                                        durs["audio"], tolerance))
+        os.replace(sibling, video_path)
+    except Exception:
+        try:
+            os.remove(sibling)
+        except OSError:
+            pass
+        raise
+    _LOG.info(
+        "[OTR foley] native audio muxed into beat clip: %.3f s AAC under "
+        "%.3f s video -> %s", durs["audio"], durs["video"],
+        os.path.basename(video_path))
+    return {"video_duration_s": durs["video"],
+            "audio_duration_s": durs["audio"]}
+
+
 def conform_to_master(stem, stem_rate, master_rate, master_channels):
     """Bring one stem to the master's channel count and sample rate.
 
@@ -504,10 +622,11 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
     WHY AN ENVELOPE AND NOT A SCALAR, and it is two rulings rather than a
     generalisation for its own sake:
 
-    * ``ltx25_foley_plus`` attenuates the master GLOBALLY to 0.80. RULING 1 is
-      explicit -- *"voice holds 0.80 whether or not a foley stem exists for
-      that beat, so a beat without foley does not get louder"* -- so this one
-      really is a single scale across the whole timeline.
+    * ``ltx25_foley_plus`` attenuates the master GLOBALLY, to 0.50 since the
+      2026-08-29 ruling. RULING 1 is explicit -- *"voice holds its gain
+      whether or not a foley stem exists for that beat, so a beat without
+      foley does not get louder"* -- so this one really is a single scale
+      across the whole timeline.
     * ``ltx25_mime`` attenuates PER WINDOW, to 0.00. Engines are ROLE-WIDE, so
       an episode with a mime role still has roles that speak, and all of them
       share ONE master WAV. A global zero would silence the episode; what
@@ -689,5 +808,6 @@ __all__ = [
     "FoleyStemError", "sha256_of_file", "samples_per_frame",
     "durable_foley_dir",
     "write_pcm16_wav", "read_pcm16_wav", "assemble_beat_foley_segments",
+    "mux_native_audio_into_beat_clip",
     "conform_to_master", "mix_foley_under_master",
 ]

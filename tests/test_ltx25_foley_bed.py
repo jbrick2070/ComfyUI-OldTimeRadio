@@ -174,31 +174,31 @@ def _row(path, start_s, frames, space="master_mix",
 
 
 def test_the_operator_ratio_is_applied_exactly_once(tmp_path):
-    """0.20 foley / 0.80 master, on the FULL master -- dialogue, room tone,
-    themes and cues together, because the assembler folds all of it into one
-    WAV and no separate voice bus exists to duck against."""
+    """0.50 foley / 0.50 master (operator, 2026-08-29), on the FULL master --
+    dialogue, room tone, themes and cues together, because the assembler folds
+    all of it into one WAV and no separate voice bus exists to duck against."""
     master = np.full((2, 100 * STEP), 0.5, dtype=np.float32)
     bed = _stem(tmp_path, "bed.wav", 100, 0.25)
     mixed, stats = fs.mix_foley_under_master(
         master, RATE, [_row(bed, 0.0, 100)], fps=FPS)
     assert stats["placed"] == 1
     assert stats["lanes"] == {"ltx25_foley_plus": 1}
-    assert stats["global_master_gain"] == 0.80
+    assert stats["global_master_gain"] == 0.50
     assert stats["muted_samples"] == 0
-    assert np.allclose(mixed, 0.5 * 0.8 + 0.25 * 0.2, atol=1e-3)
+    assert np.allclose(mixed, 0.5 * 0.5 + 0.25 * 0.5, atol=1e-3)
 
 
 def test_a_beat_with_no_bed_is_SILENCE_and_the_master_is_not_boosted(tmp_path):
     """Two rulings in one assertion. A beat with no stem gets silence -- never a
     neighbour's bed, which would put audio generated for one picture under
-    another. And the master holds 0.80 whether or not a bed exists, so a beat
+    another. And the master holds 0.50 whether or not a bed exists, so a beat
     without foley does not get louder than its neighbours."""
     master = np.full((2, 100 * STEP), 0.5, dtype=np.float32)
     bed = _stem(tmp_path, "bed.wav", 10, 0.25)
     mixed, _stats = fs.mix_foley_under_master(
         master, RATE, [_row(bed, 0.0, 10)], fps=FPS)
-    assert np.allclose(mixed[:, :10 * STEP], 0.4 + 0.05, atol=1e-3)
-    assert np.allclose(mixed[:, 10 * STEP:], 0.4, atol=1e-3)
+    assert np.allclose(mixed[:, :10 * STEP], 0.25 + 0.125, atol=1e-3)
+    assert np.allclose(mixed[:, 10 * STEP:], 0.25, atol=1e-3)
 
 
 def test_stems_SPLAT_at_their_own_offsets_and_OVERLAPS_add(tmp_path):
@@ -303,7 +303,7 @@ def test_mime_zeroes_ONLY_its_own_windows_never_the_whole_episode(tmp_path):
     assert stats["lanes"] == {"ltx25_mime": 1}
     assert stats["global_master_gain"] == 1.0, (
         "mime must NOT attenuate the whole timeline -- that is the foley "
-        "lane's global 0.80, and applying it here would duck every role")
+        "lane's global 0.50, and applying it here would duck every role")
     assert stats["muted_samples"] == 10 * STEP
     # Before the mime window: the master, untouched.
     assert np.allclose(mixed[:, :10 * STEP], 0.5, atol=1e-3)
@@ -327,27 +327,27 @@ def test_a_mixed_episode_gives_each_lane_its_OWN_gains(tmp_path):
         fps=FPS, lane_ids={"ltx25_foley_plus", "ltx25_mime"})
 
     assert stats["lanes"] == {"ltx25_foley_plus": 1, "ltx25_mime": 1}
-    # The foley lane's 0.80 is GLOBAL, so it floors the whole timeline...
-    assert stats["global_master_gain"] == 0.80
-    assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.8 + 0.25 * 0.2, atol=1e-3)
-    assert np.allclose(mixed[:, 10 * STEP:20 * STEP], 0.5 * 0.8, atol=1e-3)
+    # The foley lane's 0.50 is GLOBAL, so it floors the whole timeline...
+    assert stats["global_master_gain"] == 0.50
+    assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.5 + 0.25 * 0.5, atol=1e-3)
+    assert np.allclose(mixed[:, 10 * STEP:20 * STEP], 0.5 * 0.5, atol=1e-3)
     # ...and the mime window still goes to zero on top of it, at full foley.
     assert np.allclose(mixed[:, 20 * STEP:30 * STEP], 0.25, atol=1e-3)
-    assert np.allclose(mixed[:, 30 * STEP:], 0.5 * 0.8, atol=1e-3)
+    assert np.allclose(mixed[:, 30 * STEP:], 0.5 * 0.5, atol=1e-3)
 
 
-def test_the_global_080_applies_to_beats_with_no_bed_at_all(tmp_path):
+def test_the_global_master_gain_applies_to_beats_with_no_bed_at_all(tmp_path):
     """RULING 1, and it is why `lane_ids` exists as a parameter at all: "voice
-    holds 0.80 whether or not a foley stem exists for that beat, so a beat
+    holds its gain whether or not a foley stem exists for that beat, so a beat
     without foley does not get louder". An episode whose foley role rendered
-    NO beats still gets the 0.80 floor -- which cannot be inferred from the
+    NO beats still gets the 0.50 floor -- which cannot be inferred from the
     rows, because there are none."""
     master = np.full((1, 100 * STEP), 0.5, dtype=np.float32)
     mixed, stats = fs.mix_foley_under_master(
         master, RATE, [], fps=FPS, lane_ids={"ltx25_foley_plus"})
     assert stats["placed"] == 0
-    assert stats["global_master_gain"] == 0.80
-    assert np.allclose(mixed, 0.4, atol=1e-3)
+    assert stats["global_master_gain"] == 0.50
+    assert np.allclose(mixed, 0.25, atol=1e-3)
 
 
 def test_an_UNPOSITIONED_beat_is_skipped_loudly_not_fatal(tmp_path):
@@ -380,8 +380,8 @@ def test_an_UNPOSITIONED_beat_is_skipped_loudly_not_fatal(tmp_path):
         "an unpositioned beat must be COUNTED -- a bed missing from half an "
         "episode has to be visible in the receipt, not just a log line")
     # The positioned bed still landed; the episode still ships.
-    assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.8 + 0.25 * 0.2, atol=1e-3)
-    assert np.allclose(mixed[:, 10 * STEP:], 0.5 * 0.8, atol=1e-3)
+    assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.5 + 0.25 * 0.5, atol=1e-3)
+    assert np.allclose(mixed[:, 10 * STEP:], 0.5 * 0.5, atol=1e-3)
 
 
 def test_every_beat_unpositioned_still_delivers_a_master(tmp_path):
@@ -395,7 +395,7 @@ def test_every_beat_unpositioned_still_delivers_a_master(tmp_path):
         [{"foley_path": orphan, "start_s": None, "frame_count": 10,
           "engine_id": "ltx25_foley_plus"}], fps=FPS)
     assert (stats["placed"], stats["unpositioned"]) == (0, 1)
-    assert np.allclose(mixed, 0.5 * 0.8, atol=1e-3)
+    assert np.allclose(mixed, 0.5 * 0.5, atol=1e-3)
 
 
 def test_a_stem_from_a_lane_with_no_gains_is_a_refusal(tmp_path):

@@ -1,6 +1,6 @@
 {
   "id": "otr_ltx25_high_foley_plus",
-  "display_name": "LTX 2.5 Distilled Q3: FOLEY BED, 832x480x97 (5080-only; 0.20 foley / 0.80 master, global)",
+  "display_name": "LTX 2.5 Distilled Q3: FOLEY BED, 832x480x97 (5080-only; 0.50 foley / 0.50 master, global)",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",

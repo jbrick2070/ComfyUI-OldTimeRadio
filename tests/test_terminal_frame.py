@@ -304,6 +304,17 @@ _SELF_PROVING_ENTRY_POINTS = {
     # count for a count proof to check against.
     ("cloud_media_canonical.py", "canonicalize_video"):
         "post = _ffprobe_streams(",
+    # The 2026-08-29 beat-clip audio mux. Its VIDEO stream is `-c:v copy` --
+    # a verbatim stream copy of a beat mp4 whose colour contract and frame
+    # count `assemble_beat_segments` proved moments earlier, so a re-encode
+    # proof would re-prove unchanged bytes. What it CAN change -- the stream
+    # census and the container timing -- it proves itself, in its own
+    # dialect: it probes the file it just wrote, refuses unless the census is
+    # exactly one video plus one audio stream, and refuses when the two
+    # durations disagree beyond one frame plus AAC granularity. It also swaps
+    # in via a temp sibling, so a failed proof leaves the proven original.
+    ("foley_stems.py", "mux_native_audio_into_beat_clip"):
+        "doc = _fp.probe_json(",
 }
 
 

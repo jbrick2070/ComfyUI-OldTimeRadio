@@ -317,13 +317,14 @@ _PUBLIC_LABEL = {
     # SAY WHAT IT CHANGES ABOUT THE EPISODE, because that is what the operator
     # is choosing when he picks this row: it is not a picture option, it is a
     # MIX decision that reaches the whole master. The ratio is in the label for
-    # the same reason -- 0.20/0.80 is an operator ruling, not a tunable, and a
-    # label that hid it would invite someone to go looking for the knob.
+    # the same reason -- 0.50/0.50 is an operator ruling (2026-08-29, raised
+    # from 0.20/0.80), not a tunable, and a label that hid it would invite
+    # someone to go looking for the knob.
     "ltx25_high_foley_plus": (
         "LTX 2.5 Distilled Q3 HQ two-stage + FOLEY BED - high VRAM (same "
         "picture as ltx25_high_video; keeps the model's own footsteps, room "
-        "tone and score and mixes them under the episode master at 0.20 foley "
-        "/ 0.80 master. Affects the WHOLE episode mix, music included)"),
+        "tone and score and mixes them with the episode master at 0.50 foley "
+        "/ 0.50 master. Affects the WHOLE episode mix, music included)"),
     # SAY THE CONSEQUENCE FIRST. This row is ROLE-WIDE like every engine
     # dropdown, so picking it for a role makes EVERY beat of that role a silent
     # performance -- which is a much larger decision than picking a picture

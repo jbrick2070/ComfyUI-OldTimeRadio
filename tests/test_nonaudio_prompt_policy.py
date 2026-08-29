@@ -279,7 +279,9 @@ def test_a_field_that_quotes_the_whole_line_is_dropped():
     c = creative["b1"]
     assert _LINE not in c["text_prompt"]
     assert "a vivid, readable reaction" in c["text_prompt"]   # fell back
-    assert any("spoken line back into" in w for w in warns)
+    # The message widened 2026-08-29 when the beat intent and the logline
+    # joined the line under the same backstop.
+    assert any("private context" in w and "back into" in w for w in warns)
     # the OTHER fields survived -- one bad field is not a collapsed beat
     assert "steps forward" in c["text_prompt"]
 
@@ -311,7 +313,7 @@ def test_a_quote_of_the_shown_context_is_caught_on_a_long_line():
     prompt = creative["b1"]["text_prompt"]
     assert shown[:80] not in prompt
     assert "a vivid, readable reaction" in prompt          # fell back
-    assert any("spoken line back into" in w for w in warns)
+    assert any("private context" in w and "back into" in w for w in warns)
 
 
 def test_the_model_is_shown_exactly_what_the_filter_compares():
@@ -523,8 +525,9 @@ _BANNED_CATEGORIES = ("matched environmental foley", "ambient room tone",
 
 _CORE = "a captain repairing a smoking console"
 #: "console" is the only lexicon cue in `_CORE`, so its suffix is single-sound
-#: and can be asserted exactly.
-_CORE_FINISHED = (_CORE + ", switches clicking and dials turning, "
+#: and can be asserted exactly. The phrase carries the 2026-08-29 intensity
+#: wording (the golden recipes say HOW LOUD, and that is what raised the bed).
+_CORE_FINISHED = (_CORE + ", a sharp switch snap and close mechanical clicks, "
                   + _SOUND_FRAME + ". " + _NO_VOICE)
 
 
@@ -600,7 +603,7 @@ def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):
     ("she pushes the heavy door open", "a door latch clacking"),
     ("rain hammering the window", "rain drumming"),
     ("papers scattered across the desk", "papers rustling"),
-    ("boots on the metal deck", "metal clanking"),
+    ("boots on the metal deck", "a hard metal clang"),
     ("he lifts the telephone", "a receiver clattering onto its cradle"),
 ])
 def test_the_named_sounds_come_from_the_action_itself(core, expected_sound):
@@ -626,6 +629,86 @@ def test_at_most_three_sounds_are_named():
     out = ltx25.finish_joint_av_positive("ltx25_foley_plus", crowded)
     assert len(ltx25.named_sounds_for(crowded)) == 3
     assert out.endswith(_NO_VOICE)
+
+
+# --------------------------------------------------------------------------- #
+# the 2026-08-29 golden shape: sounds INSIDE the action, clause still last
+# --------------------------------------------------------------------------- #
+
+def test_the_composer_seats_sounds_inside_the_action_golden_shape():
+    """Operator ruling 2026-08-29 ("prompt for foley like the golden recipe").
+    The lab's golden prompts interleave the sound with the action that causes
+    it, and they are the renders whose audio measures ~-25 dB mean while the
+    append-a-tag-list shape measured 10-40 dB under. The composed order is
+    setting, expression, motion, sounds, sound frame, camera -- and the
+    no-voice clause still arrives LAST, from the finisher, downstream of the
+    style-cue pass."""
+    inputs = {"setting": "a shadowed office", "expression": "impatient",
+              "motion": "slams his fist on the desk and snatches the papers",
+              "camera": "fast lateral move"}
+    core = ltx25.compose_ltx25_foley_plus(object(), inputs)
+    thud = "a loud heavy wooden thud echoing"
+    assert thud in core
+    assert core.index("slams his fist") < core.index(thud)
+    assert core.index(thud) < core.index("fast lateral move")
+    assert core.index(_SOUND_FRAME) < core.index("fast lateral move")
+    assert _NO_VOICE not in core, "the clause belongs to the finisher alone"
+    fin = ltx25.finish_joint_av_positive("ltx25_foley_plus", core)
+    assert fin.endswith(_NO_VOICE)
+    assert fin == core.rstrip(" ,.;:") + ". " + _NO_VOICE, (
+        "finishing a composed core must append ONLY the clause -- a second "
+        "derived tail would name the sounds twice")
+    # and it is idempotent through the new predicate
+    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", fin) == fin
+
+
+def test_a_desk_slam_is_an_impact_never_furniture_scraping():
+    """The 2026-08-29 lexicon fix: the old chair/table/desk row matched the
+    NOUN, so a fist slam at a desk asked for wood scraping. The impact row
+    owns it now, and scraping needs an actual drag verb."""
+    inputs = {"setting": "a study", "expression": "furious",
+              "motion": "slams his fist on the desk", "camera": "push in"}
+    core = ltx25.compose_ltx25_foley_plus(object(), inputs)
+    assert "a loud heavy wooden thud echoing" in core
+    assert "wood scraping" not in core
+    assert "wood scraping across the floor" in ltx25.named_sounds_for(
+        "he drags the chair back and scrapes it across the boards")
+    assert "wood scraping across the floor" not in ltx25.named_sounds_for(
+        "he sits quietly at the desk reading")
+
+
+def test_sounds_are_derived_from_the_action_never_the_camera():
+    """A camera direction naming a lexicon word must not mint a sound -- the
+    composer derives sounds from setting+expression+motion only."""
+    inputs = {"setting": "an empty room", "expression": "calm",
+              "motion": "stands and waits",
+              "camera": "the camera tracks past the door"}
+    core = ltx25.compose_ltx25_foley_plus(object(), inputs)
+    assert "a door latch clacking" not in core
+
+
+def test_finishedness_is_frame_present_plus_clause_last():
+    """The r3 false-receipt finding survives the reordering: a bare no-voice
+    tail with NO sound frame is still unfinished, and a frame with no tail
+    clause is unfinished too. The frame-and-clause pair is no longer
+    contiguous on a composed prompt, so the old endswith(terminator) check
+    would call every correctly finished prompt unfinished."""
+    assert not ltx25.joint_av_prompt_is_finished("x. " + _NO_VOICE)
+    assert not ltx25.joint_av_prompt_is_finished(
+        "x, " + _SOUND_FRAME + ", steady push in")
+    good = "x, " + _SOUND_FRAME + ", steady push in. " + _NO_VOICE
+    assert ltx25.joint_av_prompt_is_finished(good)
+    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", good) == good
+
+
+def test_the_sounds_receipt_reads_phrases_off_the_finished_string():
+    """`sounds_named_in` matches PHRASES, not cues, because the phrases
+    contain cue words and a cue re-scan over a finished prompt would match
+    its own output."""
+    text = ("a figure at the console, a loud heavy wooden thud echoing, "
+            + _SOUND_FRAME + ", push in. " + _NO_VOICE)
+    assert ltx25.sounds_named_in(text) == ["a loud heavy wooden thud echoing"]
+    assert ltx25.sounds_named_in("no sounds here at all") == []
 
 
 def test_a_weapon_beat_names_NO_weapon_sound(capsys):

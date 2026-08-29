@@ -8,10 +8,12 @@ same still, and the only picture decode is 1664x960.
   ``LTXVSeparateAVLatent`` -- it never resolves ``LTXVAudioVAEDecode`` at all --
   so the clip is silent and only ``OTR_MasterAudioMux`` ever adds audio.
 * ``ltx25_foley_plus`` (the foley bed, 2026-08-26) KEEPS it: the audio latent is
-  decoded to a WAV SIDECAR and mixed under the episode master at that same mux,
-  at a fixed 0.20 / 0.80. Its mp4 is still silent and still proves it, so
-  invariant V-1 is untouched -- the mux remains the only node that puts audio
-  into a video.
+  decoded to a WAV SIDECAR and mixed with the episode master at that same mux,
+  at a fixed 0.50 / 0.50 (operator, 2026-08-29; raised from 0.20 / 0.80). The
+  per-segment mp4s stay silent and prove it; the BEAT clip additionally gains
+  an AAC preview of the same audio at assembly (see the FoleyPlus class
+  docstring), which the silent composite strips -- so the mux remains the only
+  node that puts audio into the EPISODE.
 
 THE FOUNDATION ARRIVED, SO THE SEAM DID TOO -- and this docstring used to say
 flatly that there is no hook. It was right to. The operator's construction-site
@@ -105,8 +107,8 @@ _LOG = logging.getLogger("OTR.eng_ltx25")
 #: into one per beat, and ``OTR_MasterAudioMux`` READS and mixes the result --
 #: so the format is a contract between three files rather than a detail of this
 #: one. The constants come with it: ``FOLEY_GAIN`` / ``MASTER_GAIN_UNDER_FOLEY``
-#: are the operator's fixed 0.20/0.80 ruling, and a second copy of them here is
-#: exactly how two stages come to disagree about a mix. Cold-import clean --
+#: are the operator's fixed ruling (0.50/0.50 since 2026-08-29), and a second
+#: copy of them here is exactly how two stages come to disagree about a mix. Cold-import clean --
 #: ``foley_stems`` is stdlib-only at module scope (V-12).
 
 #: EMPTY, AND DELIBERATELY KEPT. Both Chunk B siblings shipped on 2026-08-26 --
@@ -1627,8 +1629,9 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     Identical picture to ``ltx25_video`` -- same locked recipe, same two-stage
     graph, same 97-frame rung -- plus the one thing that lane throws away: the
     audio latent at ``refine_separate`` slot 1. It is decoded to a WAV sidecar
-    and mixed UNDER the episode master at ``OTR_MasterAudioMux``, at the fixed
-    0.20 / 0.80 the operator ruled on 2026-08-26.
+    and mixed WITH the episode master at ``OTR_MasterAudioMux``, at the fixed
+    0.50 / 0.50 the operator ruled on 2026-08-29 (raised from the 2026-08-26
+    0.20 / 0.80 after the bed proved inaudible by ear).
 
     THIS IS NOT THE SFX BED AND THE TWO MUST NEVER BE CONFLATED. The SFX bed
     was separately GENERATED effects from a dedicated model; it was ripped on
@@ -1656,14 +1659,21 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     applies them in sample space; doing it here as well would cut picture-
     locked audio twice.
 
-    WHAT THIS LANE DOES *NOT* DO. It does not touch the mp4, which stays silent
-    and still proves it with ffprobe; ``has_audio`` stays False and invariant
-    V-1 is unchanged. Mime (the same mechanism at 1.00 / 0.00, generate-and-
-    discard) SHIPPED ALONGSIDE THIS LANE rather than after it -- the operator
+    WHAT THIS LANE DOES *NOT* DO. The ENGINE does not touch the mp4: every
+    per-segment mp4 stays silent, proves it with ffprobe, and ``has_audio``
+    stays False on the segment row. The BEAT-level clip is a different story
+    since 2026-08-29 (operator: a joint-AV clip he cannot hear is a failed
+    render): after the coverage assembler cuts the beat stem, the render
+    driver muxes that same audio INTO the beat mp4 as an AAC preview track
+    (``foley_stems.mux_native_audio_into_beat_clip``) and flips the beat
+    row's ``has_audio`` to True. The WAV sidecar stays the authoritative mix
+    source, and ``OTRSilentComposite`` re-encodes every row with ``-an``, so
+    the preview track can never reach the episode master -- V-1's real
+    guarantee, "only ``OTR_MasterAudioMux`` puts audio into the EPISODE",
+    holds exactly as before. Mime (the same mechanism at 1.00 / 0.00)
+    SHIPPED ALONGSIDE THIS LANE rather than after it -- the operator
     overrode the deferral mid-build -- so ``Ltx25MimeEngine`` below is
-    registered and public. This paragraph claimed the opposite until
-    2026-08-27; a per-window master gain really is a different fork from the
-    global 0.80, which is why it is a subclass and not a flag.
+    registered and public.
     """
 
     name = "ltx25_foley_plus"
@@ -1923,7 +1933,7 @@ class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
     same harvest of the audio latent, the same second-pass decode, the same
     durable stem, the same cut in the coverage assembler. What differs is
     entirely at the mux, in a table -- 1.00 foley / 0.00 master instead of
-    0.20 / 0.80 -- which is why this class body is almost empty and should
+    0.50 / 0.50 -- which is why this class body is almost empty and should
     stay that way.
 
     THE TTS AND THE MUSIC CUE ARE STILL GENERATED, AND THEN MIXED TO ZERO.
@@ -2043,26 +2053,51 @@ _MAX_NAMED_SOUNDS = 3
 #: door is exactly the kind of wrong cue that makes the whole bed untrustworthy.
 #: The boundary is LEADING ONLY, so useful inflections still match: "paperwork"
 #: and "papers" both hit `paper`, "steps" hits `step`.
+#: INTENSITY WORDING IS DELIBERATE AND MEASURED-IN (operator ruling
+#: 2026-08-29). The lab's golden recipes render their audio at ~-25 dB mean;
+#: production stems were landing 10-40 dB under that, and the one textual
+#: difference was that the goldens say HOW LOUD -- "a LOUD HEAVY wooden thud
+#: ECHOING", "papers rustling VIOLENTLY", "rain drumming STEADILY". The
+#: phrases below carry that intensity language on purpose. This is the
+#: opposite of the damping-words rule and does not conflict with it: damping
+#: words are banned from MOTION prompts because they still the picture;
+#: intensity words on SOUND phrases are what raise the bed.
 _SOUND_LEXICON = (
+    # THE IMPACT ROW SITS FIRST, and first is the point: an impact is the
+    # loudest, most beat-defining sound an action makes, and priority is
+    # lexicon order. This row is also the 2026-08-29 fix for the desk-slam
+    # defect: "slams his fist on the desk" used to name WOOD SCRAPING (the
+    # old chair/table/desk row matched the noun, unconditionally) -- an
+    # impact must never become furniture dragging.
+    # "thump" is NOT a cue: leading-boundary it matches "thumping", which
+    # prose uses for a HEARTBEAT far more often than for a blow -- the same
+    # wrong-cue class as the desk row above. "pound" is kept as the judged
+    # call the other way: "pounds the table/door" is the dominant use in
+    # ACTION text, and the nonverbal director is instructed to write visible
+    # body actions, not interior states.
+    (("slam", "pound", "punch", "bang", "smack", "fist"),
+     "a loud heavy wooden thud echoing"),
     (("door", "hatch", "gate"), "a door latch clacking and hinges creaking"),
     (("typewriter", "typing", "keyboard"), "typewriter keys striking"),
-    (("switch", "dial", "knob", "lever", "console", "panel", "control"),
-     "switches clicking and dials turning"),
+    (("switch", "lever", "console", "panel", "control"),
+     "a sharp switch snap and close mechanical clicks"),
+    (("dial", "knob", "tuning"), "close dial ticks and clicks"),
     # "document" is NOT a cue: it matches "documentary", and the
     # `archival_documentary` style pack's video cue is literally "archival
     # documentary", which put papers rustling under every beat of that pack.
     # "paper", "page", "file" and "letter" already carry the real cases.
     (("paper", "page", "letter", "file", "map", "note"),
-     "papers rustling and pages turning"),
+     "papers rustling violently and pages snapping sharply"),
     (("spark", "electric", "wire", "current", "circuit"),
      "an electric buzz and sparks snapping"),
     (("engine", "motor", "machine", "gear", "piston", "turbine"),
-     "machinery grinding and thrumming"),
+     "heavy machinery clanking under a steady mechanical hum"),
     (("radio", "static", "transmit", "signal", "receiver", "dispatch"),
-     "static hissing"),
+     "a strong burst of radio static"),
     (("glass", "bottle", "window", "mirror", "jar"), "glass clinking"),
-    (("metal", "steel", "iron", "pipe", "chain", "rail"), "metal clanking"),
-    (("rain", "storm", "downpour"), "rain drumming"),
+    (("metal", "steel", "iron", "pipe", "chain", "rail"),
+     "a hard metal clang and a bright latch snap"),
+    (("rain", "storm", "downpour"), "rain drumming steadily"),
     (("wind", "gale", "draft"), "wind moaning"),
     (("fire", "flame", "burn", "match", "lantern"), "fire crackling"),
     (("water", "river", "sea", "wave", "pour"), "water sloshing"),
@@ -2073,7 +2108,8 @@ _SOUND_LEXICON = (
     # is far commoner as the VERB -- "she watches the horizon" was asking for
     # a ticking clock in an empty landscape. "clock" and "tick" carry it.
     (("clock", "tick"), "a clock ticking"),
-    (("book", "ledger", "volume"), "a heavy book thumping shut"),
+    (("book", "ledger", "volume"),
+     "a deep book thump and a stiff cover creak"),
     (("box", "crate", "lid", "case", "trunk"), "a wooden lid thudding"),
     # NO WEAPON CUE, AND THAT IS DELIBERATE (r3 finding, 2026-08-28). The
     # banana route -- "transform every weapon noun", `_otr_banana_route.apply`
@@ -2087,8 +2123,17 @@ _SOUND_LEXICON = (
     # is recorded as an open design item, not smuggled in here.
     (("horse", "hoof", "hooves"), "hooves striking stone"),
     (("crowd", "street", "market", "platform"), "a crowd murmuring far off"),
-    (("chair", "table", "desk", "bench", "stool"),
-     "wood scraping across the floor"),
+    # SCRAPING NEEDS A DRAG VERB NOW (operator ruling 2026-08-29). The old
+    # row fired on the FURNITURE NOUNS ("chair", "table", "desk", ...), so
+    # any beat set at a desk asked for wood scraping whatever the action
+    # was -- including a fist slam, which the impact row above now owns.
+    # Scraping is a real sound only when something is actually dragged.
+    # Leading-boundary audit: "drags/dragged/dragging", "scrapes/scraping",
+    # "shoves/shoved", "slides/sliding" all match; "landslide" does not
+    # (no word boundary before "slide"). Known accepted edge: "dragon"
+    # matches "drag" -- motion text from the nonverbal director describes
+    # physical actions, where that word does not occur.
+    (("drag", "scrape", "shove", "slide"), "wood scraping across the floor"),
     (("coat", "cloth", "sleeve", "fabric", "curtain"), "cloth shifting"),
     (("step", "walk", "pace", "stride", "foot", "boot", "run"),
      "footsteps landing on the floor"),
@@ -2202,60 +2247,104 @@ def _join_sounds(sounds):
     return ", ".join(sounds)
 
 
-#: THE FULL CANONICAL TERMINATOR -- what a finished joint-AV prompt ends with,
-#: whatever sounds were named. Invariant, because both halves are constants.
-#:
-#: IDEMPOTENCY KEYS ON THIS, NOT ON THE NO-VOICE CLAUSE ALONE (r3 finding,
-#: 2026-08-28). A caller-supplied prompt that merely ended in "No speech, no
-#: voices." -- an operator override, a hand-written fixture -- came back
-#: unchanged with NO sound named, while observability still reported
-#: `joint_av_prompt=finished`. That is a false receipt on the exact field used
-#: to prove the lane got its audio requirement.
+#: The LEGACY contiguous terminator -- what a finished joint-AV prompt ended
+#: with under the pre-2026-08-29 append-at-the-tail shape, and what the
+#: legacy branch of ``finish_joint_av_positive`` still appends for prompts
+#: that never met the composer. Since the golden-shape reordering the frame
+#: and the clause are NOT contiguous on a normally composed prompt (the
+#: camera clause sits between them), so finished-ness is decided by
+#: ``joint_av_prompt_is_finished`` -- frame PRESENT plus clause LAST -- and
+#: never by matching this constant at the tail. Kept exported because the
+#: two-constant pair is still the exact tail of a legacy-finished prompt.
 JOINT_AV_TERMINATOR = "%s. %s" % (_SOUND_FRAME, _NO_VOICE_CLAUSE)
 
 
 def build_joint_av_suffix(positive):
-    """The audio requirement for a joint-AV lane, with its sounds NAMED.
+    """The LEGACY appended tail -- sounds named, frame, clause, all at the end.
 
-    Shape, and each part earns its place (see the problem statement at
-    ``docs/2026-08-27-action-prompting/LTX25_AUDIO_PROMPTING_PROBLEM_STATEMENT.md``)::
+    Shape::
 
-        with <named sounds>, close and dry in the room. No speech, no voices.
+        <named sounds>, close dry room tone. No speech, no voices.
 
-    KNOWN AND DELIBERATE: the golden recipes INTERLEAVE sound into the action
-    sentence, and this appends instead. Whether interleaving is required or
-    whether naming is sufficient is that document's open question 2, and
-    appending is the form that can be added without rewriting every lane's
-    formatter. If a future arm shows interleaving matters, this is the seam
-    that moves. Pure.
+    SUPERSEDED AS THE MAIN PATH on 2026-08-29: the open question of whether
+    appending is as good as the golden recipes' interleaving was answered by
+    measurement (production stems 10-40 dB under the goldens) and by operator
+    ruling, and ``_ltx25_joint_av_core`` now seats the sounds inside the
+    action at compose time. This suffix remains the tail for prompts that
+    never met the composer -- overrides, old ledgers, fixtures -- so no input
+    is ever left without its audio requirement. Pure.
     """
     return "%s, %s. %s" % (_join_sounds(named_sounds_for(positive)),
                            _SOUND_FRAME, _NO_VOICE_CLAUSE)
 
 
-def finish_joint_av_positive(engine_id, positive):
-    """Append this lane's audio requirement to an already-composed positive.
+def joint_av_prompt_is_finished(text):
+    """True when a joint-AV positive carries its full audio requirement.
 
-    FINISHES, never replaces: the caller's visual core is preserved verbatim and
-    the suffix appended, so every engine's own prompt dialect, style cue and era
-    tail survive untouched.
+    TWO CONDITIONS, BOTH REQUIRED: the invariant sound frame is PRESENT
+    somewhere in the string (proving sounds were actually seated -- a bare
+    no-voice tail proves nothing, which is the r3 false-receipt finding of
+    2026-08-28), and the no-voice clause is the FINAL clause (its position is
+    part of what works on this model). This replaces the old check that the
+    frame-plus-clause pair sat contiguously at the tail: since the 2026-08-29
+    golden-shape ruling the sounds and the frame sit BEFORE the camera clause,
+    with only the no-voice clause at the very end, so the pair is no longer
+    contiguous on a correctly finished prompt. Pure.
+    """
+    body = str(text or "")
+    if _SOUND_FRAME not in body:
+        return False
+    return body.rstrip(" ,.;:").endswith(_NO_VOICE_CLAUSE.rstrip(" ,.;:"))
+
+
+def sounds_named_in(text):
+    """Which lexicon sound phrases a FINISHED prompt actually carries. Pure.
+
+    The observability receipt used to re-run ``named_sounds_for`` over the
+    pre-finish string, which was honest when sounds were appended at the
+    finish seam. Now that the composers seat the sounds themselves, the
+    receipt must read the final string -- and it must match PHRASES, not
+    cues, because the phrases themselves contain cue words ("papers rustling
+    violently" contains "papers") and a cue scan over a finished prompt
+    re-matches its own output.
+    """
+    body = str(text or "")
+    found = [sound for _cues, sound in _SOUND_LEXICON if sound in body]
+    found.extend(s for s in _FALLBACK_SOUNDS if s in body and s not in found)
+    return found
+
+
+def finish_joint_av_positive(engine_id, positive):
+    """Finish a joint-AV positive: guarantee sounds are seated and the
+    no-voice clause is last.
+
+    FINISHES, never replaces: the caller's visual core is preserved verbatim,
+    so every engine's own prompt dialect, style cue and era tail survive
+    untouched. Since the 2026-08-29 golden-shape ruling the NORMAL path
+    arrives here with its sounds already seated by the composer (setting,
+    expression, motion, sounds, sound frame, camera -- see
+    ``_ltx25_joint_av_core``), and this seam appends exactly one thing: the
+    no-voice clause, AFTER whatever the style-cue pass added, so the clause
+    stays the final clause of the finished string.
+
+    THE LEGACY TAIL SURVIVES for prompts that never went through the
+    composer -- an operator override, an old ledger's ``text_prompt``, a
+    fixture. A string with no sound frame in it still collects the full
+    appended suffix exactly as before, so no input is ever left without its
+    audio requirement.
 
     FOLEY AND MIME GET THE IDENTICAL STRING (operator, 2026-08-27: *"foley /
     mime same thing, they use the new foley prompting"* and *"the only
-    difference between foley and mime is the mux layer"*). The old mime branch
-    led with the brief's mood terms and asked for "instrumental scene score" --
-    a CATEGORY, not a sound, and so the same defect the foley tail had. There is
-    now one shape, so the two cannot drift apart, and the lanes differ where the
-    operator says they differ: at the mixer.
+    difference between foley and mime is the mux layer"*).
 
     Takes NO dialogue argument, and that is the point. These lanes GENERATE
     audio but are not audio-IN lanes: nothing spoken may reach them, and the
-    suffix forbids voices outright.
+    clause forbids voices outright.
 
     Returns ``positive`` unchanged for every engine outside
     ``_JOINT_AV_ENGINES``. Raises ``ValueError`` naming the engine when a
-    Foley/Mime positive is blank -- the audio half would then be conditioned on
-    nothing at all, which is a silent bad render rather than a loud one.
+    Foley/Mime positive is blank -- the audio half would then be conditioned
+    on nothing at all, which is a silent bad render rather than a loud one.
     Pure; stdlib only, so it imports cold on a CPU-only process.
     """
     eid = str(engine_id or "")
@@ -2267,18 +2356,22 @@ def finish_joint_av_positive(engine_id, positive):
             "conditions the picture AND the generated audio from this one "
             "string, so there would be nothing for the foley or the score to "
             "match." % eid)
-    core = positive.rstrip()
-    # IDEMPOTENCY KEYS ON THE CANONICAL TERMINATOR, NOT ON THE WHOLE SUFFIX.
-    # The suffix is DERIVED FROM THE PROMPT, so once appended the prompt carries
-    # sound words -- "door", "glass", "metal" -- that the lexicon would match on
-    # a second pass, producing a DIFFERENT suffix and defeating a whole-suffix
-    # comparison. `JOINT_AV_TERMINATOR` is built from two constants, so it is
-    # invariant across every lane and every action while still proving a sound
-    # frame is actually present. Trailing punctuation is normalised on both
-    # sides so a prompt carrying stray punctuation after it is still recognised.
-    trimmed = core.rstrip(" ,.;:")
-    if trimmed.endswith(JOINT_AV_TERMINATOR.rstrip(" ,.;:")):
+    if joint_av_prompt_is_finished(positive):
         return positive
+    core = positive.rstrip()
+    trimmed = core.rstrip(" ,.;:")
+    if _SOUND_FRAME in core:
+        # The composer already seated the sounds; only the final clause is
+        # owed. Appended with a sentence break so the clause reads as its own
+        # sentence, exactly as the golden recipes end.
+        return (trimmed + ". " + _NO_VOICE_CLAUSE) if trimmed \
+            else _NO_VOICE_CLAUSE
+    # LEGACY: no sound frame anywhere, so this string never met the composer.
+    # The full derived tail is appended, same shape as before the 2026-08-29
+    # reordering. The suffix is derived from the prompt, so once appended the
+    # prompt carries sound words the lexicon would re-match -- which is why
+    # idempotency keys on the frame-plus-clause predicate above, never on a
+    # whole-suffix comparison.
     suffix = build_joint_av_suffix(core)
     return (trimmed + ", " + suffix) if trimmed else suffix
 
@@ -2359,6 +2452,51 @@ def _ltx25_parts(inputs, *, include_appearance=True):
     camera = str(inputs.get("camera") or "").strip().strip(",")
     if camera:
         parts.append(camera)          # camera AFTER the subject action
+    return ", ".join(parts)
+
+
+def _ltx25_joint_av_core(inputs):
+    """The GOLDEN-SHAPED joint-AV core: sounds seated INSIDE the action, not
+    appended after the camera.
+
+    Order: setting, expression, motion, the named sounds, the sound frame,
+    then camera LAST. This is the 2026-08-29 operator ruling ("prompt for
+    foley like the golden recipe") made concrete: the lab's golden prompts
+    interleave the sounds with the action that causes them -- "slamming his
+    fist on the desk, a loud heavy wooden thud echoing ... rain drumming
+    steadily" -- and they are the renders whose audio measures ~-25 dB mean
+    while the old append-a-tag-list shape measured 10-40 dB under that. The
+    deterministic equivalent of interleaving is seating the sound group
+    directly after the motion clause that causes it, before the camera.
+
+    THE SOUNDS ARE DERIVED FROM THE PRE-SOUND TEXT ONLY -- setting,
+    expression, motion -- never from the camera clause and never from style
+    cues (which are appended downstream, after compose). That kills two
+    false-match classes structurally: a camera direction naming a lexicon
+    word, and the `archival_documentary` style-cue class the lexicon comment
+    records.
+
+    NO appearance leaf, same as before: the joint latent SPEAKS proper nouns
+    (proven live 2026-08-28, "Queen of the Fairies"), and identity is carried
+    by the conditioning still. The no-voice clause is NOT added here --
+    ``finish_joint_av_positive`` owns it, downstream of the style-cue pass, so
+    it stays the final clause of the finished string.
+
+    Returns "" when the row carries no structured leaves, exactly like
+    ``_ltx25_parts``, so the caller falls back to the legacy path.
+    """
+    parts = []
+    for key in ("setting", "expression", "motion"):
+        value = str(inputs.get(key) or "").strip().strip(",")
+        if value:
+            parts.append(value)
+    if not parts:
+        return ""
+    parts.extend(named_sounds_for(", ".join(parts)))
+    parts.append(_SOUND_FRAME)
+    camera = str(inputs.get("camera") or "").strip().strip(",")
+    if camera:
+        parts.append(camera)          # camera AFTER the sounds it records
     return ", ".join(parts)
 
 
@@ -2454,21 +2592,19 @@ def compose_ltx25_foley_plus(self, inputs):
     the full silent motion budget. What makes it different is that the picture
     has to EARN the bed: hands on dials, papers, switches, footfalls.
 
-    NO IDENTITY WALL. This lane composes with ``include_appearance=False``:
-    the joint latent SPEAKS proper nouns out of the prompt, and identity is
-    already fixed by the conditioning still. See ``_ltx25_parts``.
+    NO IDENTITY WALL. This lane composes without the appearance leaf: the
+    joint latent SPEAKS proper nouns out of the prompt, and identity is
+    already fixed by the conditioning still. See ``_ltx25_joint_av_core``.
 
-    IT WRITES NO AUDIO INSTRUCTION. ``finish_joint_av_positive`` is the sole
-    owner of this lane's audio tail and appends it once, downstream. Its
-    idempotency now keys on ``JOINT_AV_TERMINATOR`` -- a constant built from the
-    sound frame and the no-voice clause -- rather than on the whole suffix,
-    because the suffix is derived from the prompt and cannot be compared
-    against itself. A formatter that ended in its own sound wording would still
-    fail to carry that terminator and would collect the canonical tail anyway,
-    leaving two audio clauses instead of one. The phrasing below stays visual
-    for that reason.
+    THE SOUNDS ARE SEATED HERE, IN THE GOLDEN SHAPE (operator ruling
+    2026-08-29): setting, expression, motion, then the named sounds and the
+    sound frame, then camera -- sounds inside the action, the way the lab's
+    golden recipes phrase the renders whose audio actually measures loud.
+    ``finish_joint_av_positive`` still owns the final no-voice clause and
+    appends it once, downstream of the style-cue pass, so the clause stays
+    the last sentence of the finished string.
     """
-    core = _ltx25_parts(inputs, include_appearance=False)
+    core = _ltx25_joint_av_core(inputs)
     if not core:
         return _ltx25_legacy_joint_av(inputs)
     return core.rstrip(" ,.")
@@ -2479,8 +2615,8 @@ def compose_ltx25_mime(self, inputs):
 
     Operator ruling, restated 2026-08-28: *"foley and mime should have the
     same prompting, the only difference is the mux layer setting."* The lanes
-    diverge at `FOLEY_LANE_GAINS` -- foley mixes its bed at 0.20 under the
-    programme at 0.80; mime plays its generated audio at 1.00 with the
+    diverge at `FOLEY_LANE_GAINS` -- foley mixes its bed at 0.50 with the
+    programme at 0.50; mime plays its generated audio at 1.00 with the
     programme muted to 0.00 -- and nowhere else.
 
     This stays its OWN function rather than an alias, because the lanes must
@@ -2489,14 +2625,15 @@ def compose_ltx25_mime(self, inputs):
 
     NO IDENTITY WALL, for the same reason as its foley sibling -- this lane
     rendered a woman saying "Queen of the Fairies" out loud because her
-    `character_description` began with that title. See ``_ltx25_parts``.
+    `character_description` began with that title. See ``_ltx25_joint_av_core``.
 
     **NOT an audio-in lane either.** The performance carries the beat with no
     speech at all, so the action reads larger than its siblings and lands on a
-    held final pose. Like foley it writes NO audio instruction: the sound tail
+    held final pose. Like foley it seats its sounds in the golden shape via
+    ``_ltx25_joint_av_core`` (2026-08-29), and the final no-voice clause
     belongs to ``finish_joint_av_positive`` alone.
 
-    AND IT IS NOW THE SAME TAIL FOLEY GETS, verbatim (operator, 2026-08-27:
+    AND IT IS THE SAME SHAPE FOLEY GETS, verbatim (operator, 2026-08-27:
     *"the only difference between foley and mime is the mux layer"*). This lane
     used to receive a mood-led request for "instrumental scene score" -- a
     CATEGORY, which left the model to pick the sound and, with a person in
@@ -2504,7 +2641,7 @@ def compose_ltx25_mime(self, inputs):
     plays larger and holds its endpoint, which is what the two formatters
     genuinely differ on.
     """
-    core = _ltx25_parts(inputs, include_appearance=False)
+    core = _ltx25_joint_av_core(inputs)
     if not core:
         return _ltx25_legacy_joint_av(inputs)
     # IDENTICAL to foley by ruling. This lane keeps its OWN function so it can
@@ -2525,5 +2662,6 @@ __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
            "finish_joint_av_positive", "build_joint_av_suffix",
-           "named_sounds_for", "JOINT_AV_TERMINATOR",
+           "named_sounds_for", "sounds_named_in",
+           "joint_av_prompt_is_finished", "JOINT_AV_TERMINATOR",
            "identity_leaks_in"]
