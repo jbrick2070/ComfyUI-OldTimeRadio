@@ -112,3 +112,34 @@ legacy loader, the 4060 profile (or docs) must carry that flag -- or the pack
 must evict the writer before the image phase -- before an 8 GB card is a
 supported target. Target unchanged: RESULT SUCCESS + obs_publish OK + mp4 in
 `output\otr\obs`.
+
+LEG 3 OUTCOME: the crash-point survival was PROVEN -- the legacy loader
+partial-loaded the z_image UNET (5.9 GB offloaded to RAM) and was actively
+sampling at the exact step where leg 2's aimdo abort killed the process. The
+8 GB finding stands confirmed in both directions: DynamicVRAM aborts, legacy
+loader survives. Leg 3 was then KILLED BY OPERATOR ORDER (~03:40, selective
+CIM kill per section 4) to free the card for the haunted race below; it never
+reached obs_publish, so it is logged as killed-in-flight, not as a pass.
+
+## Step 6 -- the haunted race (operator order: all three GPUs)
+
+Operator pivoted the night: a 3-way AnimateDiff race (4060 vs 5080 vs H100
+via the 5080) on the pack's OWN haunted lane, `animatediff15_v3_haunted_video`
+(eng_ghost_signal_official.py), toward the dub-lane goal above. If AnimateDiff
+proves faster overall than LTX for beat video, LTX is killed as the beat lane
+("if the animatediff is faster overall, kill the ltx and launch animatediff").
+
+4060 staging, all verified byte-exact against the engine's own documented
+sizes: mm-p_0.5.pth 1,817,894,327 B; v3_sd15_mm.ckpt 1,673,262,583 B;
+v3_sd15_adapter.ckpt 102,134,097 B (-> models\loras); SD1.5 fp16
+2,132,696,762 B; plus ComfyUI-AnimateDiff-Evolved cloned and loading in 0.5 s.
+
+New profile `config/profiles/otr_4060_haunted_local.json`: the proven
+nano-local stack (E2B writer, kokoro voices, musicgen) with all visual roles
+on the haunted lane, frame_budget 25 per the ghost profile's recipe. The
+haunted lane is TEXT_TO_VIDEO -- no scene stills -- so the 6.2 GB z_image
+UNET leaves the beat hot path entirely, which may make this the natural 8 GB
+lane regardless of the race. Race leg queued ~03:52 as prompt 02835636,
+preflight green on all three lane models. Wall time to be reported honestly
+against the LTX baseline (5080: 270-285 s/beat; 4060 LTX never completed a
+beat).
