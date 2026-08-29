@@ -162,3 +162,28 @@ lavfi null encode -- exercises the real argv parser) and returns
 route through it. Verified on this box: probe selects `-fps_mode`; AST parse
 clean on all four files. Race leg 2 re-queued 04:32:12 as prompt be8d016d
 with the fix loaded.
+
+## Step 7 -- RESULT SUCCESS: first episode ever published from this box
+
+Race leg 2 (prompt be8d016d): **RESULT SUCCESS + obs publish + the mp4 on
+disk** -- every gate the operator defines, on the first run with the cfr fix.
+
+    signal_lost_the_ledgers_whisper_20260829_045225_silent_procgen_blended
+    _captioned_with_credits_final.mp4
+    66.6 MB, 69.92 s, h264 + AAC (real audio: kokoro voices + musicgen),
+    published to local otr\obs; LISTEN.html rebuilt beside it (1 episode);
+    copied to D:\4060-transfer for the 5080's pull the moment a path opens.
+
+Numbers, honestly framed: 3,303 s (~55 min) queue-to-publish end to end on
+the haunted lane. Beats sampled at ~9-10.7 s/step x 20 steps (~3-3.6 min per
+clip) at 4.9 GB with SD1.5 fully resident. There is no same-box LTX number
+to race it against because LTX NEVER FINISHED on this card (leg 2 aimdo
+abort; leg 3 killed mid-image by operator order) -- which is itself the
+result: **the haunted AnimateDiff lane is the first and only lane to carry a
+complete episode through an 8 GB card end to end.** The dub-lane thesis
+holds on this hardware.
+
+Night ledger for this box: 3 cold-install bugs found and root-fixed on
+origin (kokoro repo_id TypeError, DynamicVRAM native abort at image load,
+ffmpeg-9 -vsync removal), ~32 GB of weights staged byte-exact, 2 profiles
+shipped, 1 episode published.
