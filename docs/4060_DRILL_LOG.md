@@ -230,6 +230,20 @@ Standing writer verdict for MRKT until that lands: E2B (unquantized) is the
 qualified writer; 12B nf4 measured out; E4B nf4 blocked pending the loader
 question.
 
+FINDING #5 CONFIRMED AND PINNED (operator's viz+12B experiment, profile
+`otr_4060_viz_12b`: viz_camera on all four video roles to free the whole
+card, fresh server, ~7.4 GB free -- SAME refusal):
+`_otr_model_loader.py::_plan_max_memory` hardcodes, for bnb quant on a
+sub-12GB card, `{0: "6.8GiB", "cpu": "32GiB"}` for any model id tagged
+9b/12b/e4b/4b-it -- regardless of actual free VRAM. The explicit cpu lane
+invites accelerate to plan offload for anything over 6.8 GiB on-GPU, and
+bnb-4bit's validate_environment refuses CPU-dispatched modules. The video
+lanes are irrelevant; the cap fires first. E4B dies the same way because
+its MatFormer per-layer embeddings stay unquantized and clear 6.8 GiB even
+though its linears fit. Third swing handed to the dev box with the
+operator's guard directive attached (derive budget from live free VRAM
+and/or drop the cpu key so a genuine OOM speaks instead of a guard).
+
 Night ledger for this box: 4 confirmed cold-install findings (kokoro repo_id
 TypeError, DynamicVRAM native abort at image load, ffmpeg-9 -vsync removal
 -- all three root-fixed on origin -- plus the undeclared pyloudnorm), 1
