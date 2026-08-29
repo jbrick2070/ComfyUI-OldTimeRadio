@@ -69,3 +69,17 @@ spandrel~=0.4.1
 pydantic>=2.0
 PyYAML>=6.0
 
+# kokoro is the DEFAULT announcer voice in the shipped canonical workflow, and
+# it was never declared here -- so a fresh install reached the first announcer
+# line and failed on an import nobody had asked pip to satisfy. Declared
+# 2026-08-29 alongside the cold-install fix in `eng_kokoro.py`, where the
+# `repo_id` kwarg is now signature-gated: the current PyPI line (0.7.x) does
+# not accept it and raised TypeError on the first clip, while newer builds
+# (0.9.x) do. Both now work.
+#
+# NOT YET IN `pyproject.toml`, deliberately: that file's static dependency
+# list is what the Comfy Registry reads, and editing it AUTO-FIRES a publish
+# (see CLAUDE.md 7A). The kokoro line rides the next deliberate version bump
+# rather than firing one while a version is still Pending.
+kokoro>=0.7.16
+

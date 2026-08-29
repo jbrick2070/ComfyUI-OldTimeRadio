@@ -136,7 +136,7 @@ class KokoroEngine:
                 self.name, "announcer_voice", EngineUsabilityReason.MISSING_MODEL,
                 f"kokoro announcer voice {voice_id!r} not found at {path}. Fetch "
                 f"it OFFLINE (never during a render), e.g.: huggingface-cli "
-                f"download 1038lab/KokoroTTS voices/{voice_id}.pt --local-dir "
+                f"download hexgrad/Kokoro-82M voices/{voice_id}.pt --local-dir "
                 f"{_kokoro_model_dir()}",
             )
 

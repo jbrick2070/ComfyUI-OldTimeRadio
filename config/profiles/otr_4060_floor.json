@@ -36,7 +36,7 @@
   "llm": {
     "device": "cuda",
     "attn_impl": "sdpa",
-    "quant_policy": "none",
+    "quant_policy": "bnb_nf4",
     "vram_ceiling_gb": 6.8,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",
