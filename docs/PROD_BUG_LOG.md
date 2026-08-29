@@ -8468,3 +8468,47 @@ Neither the assertion nor the correction was available to one machine.
 **The operating consequence, and it is cheap:** any claim of the form "works on
 consumer hardware" is worth exactly the number of distinct machines it has run
 on. Ours was one. It is now two, and two found nine.
+
+## PBUG-20260829-13 -- the SHIPPED workflow's default writer cannot load on an 8 GB card
+
+- **found:** 2026-08-29 by the 4060 window, sharpening a different report;
+  confirmed here by reading the shipped graph and executing the gate.
+- **the shipped graph, read directly from `workflows/otr_canonical.json`:**
+  `OTR_LedgerScriptWriter` carries `google/gemma-4-12b-it (11.9 GB)` in **both**
+  writer slots. Occurrences of Mistral-Nemo in that file: **zero.**
+- **so the constant and the graph disagree, and the graph wins.**
+  `_otr_model_catalog.DEFAULT_LLM` is `mistralai/Mistral-Nemo-Instruct-2407`,
+  but nothing a user does reaches that constant on the out-of-the-box path.
+  Open the shipped workflow, press Run -- the writer is the 12B.
+- **measured against each tier:**
+
+        8 GB card       ceiling  6.8  ->  FAIL   est 11.95 GB
+        12 GB card      ceiling 10.5  ->  WARN   est 11.95 GB
+        16 GB dev box   ceiling 14.5  ->  PASS   est 11.95 GB
+
+  The 8 GB user's exact experience: `VRAMFitFailedError: 'google/gemma-4-12b-it':
+  estimated 11.9 GB peak resident vs 6.8 GB ceiling -- pick a smaller model.`
+  Which is a correct refusal from a correct guard, delivered to someone who
+  never chose the model -- it was the shipped default.
+- **why the dev box cannot see it:** 11.95 against 14.5 is PASS. The identical
+  number is a silent pass here and a hard refusal there. Same class as -07 and
+  -08: correct on 16 GB, wrong on 8.
+- **NOT CHANGED, and this one is genuinely the operator's call, not a defect
+  with one right answer.** Two defensible defaults:
+  * ship the best writer for dev-class hardware and expect small-card users to
+    select a profile (today's behaviour, and the 12B IS the better writer);
+  * ship a default that runs everywhere -- `gemma-4-E2B-it` at 3.0 GB is
+    already proven, ungated, and is what the shipping 8 GB profile uses -- and
+    let 16 GB users move up.
+  The operator's standing rule cuts toward the second ("a dropdown row is a
+  promise the model will load"; a shipped DEFAULT is a stronger promise than a
+  dropdown row). But `otr_canonical.json` is the section-0 source of truth,
+  changing it regenerates every variant, and which writer greets a new user is
+  a product decision about first impressions, not a wiring fix. It waits.
+- **open question this does NOT answer, flagged by the 4060:** whether a clean
+  box downloads all 11.9 GB *before* being refused, or is refused first. That
+  box already has the model cached, so it can observe the refusal but not the
+  ordering. The gate is called before `snapshot_download` per its own docstring
+  ("a 70B pick on a 16 GB card must not trigger snapshot_download"), which
+  predicts refuse-first -- but that is a code reading, not a measurement, and
+  it needs a box without the cache to settle.
