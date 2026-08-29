@@ -1,3 +1,66 @@
+## 2026-08-28 -- HEAD 83be6c74 +handoff (v2.0-alpha) -- CODER (dead-code campaign + widget migrations + sanctioned-gap C7 closed)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit.
+
+Did: the largest single-day cleanup this repo has had, every removal
+  evidence-gated. (1) SANCTIONED GAP CLOSED END TO END: C0-C6 `cd96e9b3`
+  (spine accepts gap receipts, dispatcher mints them, loop keeps gapped
+  beats, manifest/payload/predicate honest), C7 `83be6c74` proves the chain
+  through the real spine+planner -- all-refused episode floors and publishes
+  degraded; unsanctioned absence still fails loud. (2) DEAD-CODE ROUNDS 1-3:
+  ~2,600 lines removed with three-layer verification (canon loader, voice
+  resolver, cache key, cast-consolidation cluster incl. its lying banner,
+  nsfw_frame_qc, inline-Bark fallback + helpers, GemmaHeartbeatStreamer,
+  accent picker, P0 partials held by ruling); Bark preset-health cluster
+  MIGRATED-then-deleted -- BarkSilentOutputError now gates every live Bark
+  render at eng_bark.py (empty/nonfinite/peak<1e-4, threshold pinned to the
+  sequencer's own silence constant by test). (3) WIDGET MIGRATIONS, all
+  safety-gated by Sonnet three-layer verdicts then frozen-tree QA'd:
+  refine_target_grade (62 files), normalize_dbfs + never-called _normalize
+  (61), FreezeCascade x4 compat widgets, both consistency_gate_warn_only,
+  ShotLock image_done socket (link 284 dst_slot 4->3 BY IDENTITY, variants
+  REGENERATED). QA caught the one miss: a hardcoded link pin in
+  test_workflow_live_passes_validator.py. OPERATOR MANUALLY OPENED the
+  migrated canonical in the UI and ran it -- no issues into procgen, breaking
+  his always-find-issues streak. (4) Two real bugs fixed: OTR_FFMPEG now
+  honored by caption burn / master mux / silent composite (was credits-only;
+  the mirror of the fixed ffprobe bug), and the Bark gate above. (5) Line
+  length theater (finding 8) ruled by delegated Sonnet decision: params
+  dropped, corpus proof 18.5% of real lines exceed the fake cap, TypeError
+  regression pins deletion. (6) CLAUDE.md gained the widget-removal recipe
+  (THREE things + the links trap; the kwarg fallout is the known fourth);
+  standing rulings gained check-up-a-level (three layers) and the workflow
+  baton. (7) PBUGs: -02 music-bookend-to-face-engine (OPEN, design call),
+  -03 foley 12-28dB character/announcer spread measured + stems proven real
+  content not hiss (OPEN, panel ran, LUFS direction set); LEMMY trio fully
+  closed on corpus evidence. Suite 12350/121/1 green, Bible 22 passed.
+  Bible delta: nothing promoted -- the two new PBUGs are OPEN and the ffmpeg
+  find was static-audit (admission rule bars both). Renders: foley control +
+  mime legs published (obs 25); H3-audio-in leg FAILED by PBUG -02.
+Current step: coding-order steps 1-2 DONE; next is step 3 (gender-ladder
+  spec v2 -> one review round -> code) or the authorized-unexecuted dead-code
+  items (_voice_backends deletion, _load_wav consolidation, cue-manifest
+  helpers). Operator is running hunts (V4 prompt) + the knob census in
+  external lanes; their reports come back for adjudication.
+Next: adjudicate any V4/census results (three layers, corpus, safety gates);
+  execute the three authorized dead-code items; gender-ladder review round.
+  4060 set stays LAST by ruling. Leg 0 needs an idle GPU. BOX STATE: the
+  OPERATOR'S OWN manual canonical run was LIVE on the 5080 at handoff --
+  server resident, VRAM busy; do not launch renders or touch the workflow
+  until his run finishes (workflow baton: he holds it).
+Models: driver Opus 5 / Fable 5 (operator-switched). Sanctioned-gap r2 was a
+  FULL best-of-3 panel (codex gpt-5.6-sol + antigravity Gemini 3.7 Flash +
+  cursor grok-4.6-high) -- all three NO, driver judged, plan hardened
+  C0->C7. C2 Bark verdict: cursor strategic QA + driver-launched adversarial
+  review (ACCEPT-WITH-CHANGES), then implemented. Widget migrations: Sonnet 5
+  safety gate (three-layer, per operator) + Sonnet 5 frozen-diff post-code
+  QA. Finding 8: delegated Sonnet 5 decision. Scoped reviews, not full
+  arcs, per the 08-17/08-20 routing -- each roster stated above is exact.
+Commits: cd96e9b3, 70906423, 063e8c0b, a469ffb2, d3fc677b, 0844b11e,
+  41dbe60f, 4322f899, f32fd791, db87e65d, 83be6c74 (+ ~15 more docs/fix
+  commits, all pushed same-session). The handoff commit lands on top.
+
 ## 2026-08-27 (late) -- HEAD a6b10bbb +handoff (v2.0-alpha) -- CODER (foley and mime QUALIFIED by ear; motion baked in per lane; the foley bed is mixed and INAUDIBLE and that is now the top row; 6 commits)
 
 **THE BOX IS BUSY. DO NOT RESET IT BLIND.** An H3 acceptance leg is rendering

@@ -99,19 +99,39 @@ until we are done with all other bugs." The 4060 test is the CAPSTONE: it
 runs once, on a tree with every other bug already closed, so the frictionless
 verdict is not polluted by known-open defects):**
 
-1. **Judge the sanctioned-gap r2 panel and CODE it** (1.1 -- plan written,
-   all three reviews returned, awaiting the driver's judgment). Closes the
-   control path AND the only surviving LEMMY-era PBUG (-02).
-2. **Spandrel `_resolve_model` hardening** (1.5) -- repro first; fix only if
-   reproducible; one finished-diff review.
-3. **Gender-ladder SPEC REWRITE** (1.3 -- now fully unblocked: both operator
-   rulings recorded at its head).
-4. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process, no ComfyUI).
+1. ~~Sanctioned gap~~ **DONE 2026-08-28, fully.** C0-C6 shipped `cd96e9b3`;
+   C7 proved the chain END TO END (`83be6c74`) -- an all-refused episode
+   floors every beat and publishes degraded, an unsanctioned absence still
+   fails loud at the spine. The predicted hole was already closed by C2.
+2. ~~Spandrel~~ **DONE 2026-08-28** -- neither edge case reproduced; the
+   untested warn-cap got tests (`ef957ecf`).
+3. **Gender-ladder: SPEC v2 -> one review round -> CODE** (1.3; the spec is
+   written and pushed, the code is not started; three NOs in its history
+   mean the round is not optional).
+4. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
+   GPU, do not contend with a render).
 5. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
    republish sequence it gates: operator's node-delete click -> version bump
    + kokoro in pyproject in ONE commit -> clean publish -> the 4060 template
    test.
 6. Handoff bookkeeping.
+
+**RUNNING BESIDE THE ORDER -- THE DEAD-CODE CAMPAIGN (operator standing
+instruction 2026-08-28: keep hunting "until there are no more dead code
+candidates"; STOP RULE = two independent blind deep sweeps returning zero
+CONFIRMED findings).** Three rounds done: ~2,600 lines removed, eleven lying
+comments corrected, two real bugs fixed (OTR_FFMPEG honored at the last three
+pipeline stages; the Bark silent-output gate), six inert widgets + one dead
+socket migrated across all 63 graphs (safety-gated, QA'd, and VERIFIED BY THE
+OPERATOR'S OWN MANUAL UI OPEN -- his "I always find issues" streak broke).
+The hunt prompt is `docs/DEAD_CODE_HUNT_PROMPT_V4.md` (deep sweep: scripts/,
+unread ledger fields, env-var inventory, test debris, config). AUTHORIZED BUT
+UNEXECUTED, part of "done": delete `_voice_backends` (~300 lines, verified
+test-only), consolidate Chatterbox/Dia `_load_wav` into `_otr_sidecar`,
+retire the cue-manifest false-claim helpers. A SEPARATE pre-ship pass, the
+KNOB CENSUS (`docs/KNOB_CENSUS_PROMPT.md`), tables every WORKING widget
+against corpus evidence + a think-like-a-human judgment; the operator rules
+per row -- census informs what the 4060 template pins.
 
 ### 1.0 THE 4060 FRICTIONLESS SET (the CAPSTONE -- runs LAST, after every other bug closes; the path to "download the template, click run" on his 4060)
 
