@@ -2125,13 +2125,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "(JSON validators, GBNF grammar output, "
                             "reviewer verdicts, cast contract checks, "
                             "format normalization, news interpreter). "
-                            "Default matches creative_writing_model so "
-                            "the single-model audio baseline holds; "
-                            "pick a smaller model here when you want "
-                            "Slot 1 != Slot 2 routing for VRAM headroom. "
-                            "To use a remote OpenRouter model, set "
-                            "OPENROUTER_API_KEY and "
-                            "pick OpenRouter A/B (see docs/openrouter-setup.md)."
+                            "Profile/platform-owned baseline: your hardware "
+                            "profile pins it, and a direct headless -Set "
+                            "override is sanctioned and wins over the "
+                            "profile when supplied. Pick a smaller model "
+                            "here when you want Slot 1 != Slot 2 routing "
+                            "for VRAM headroom. To use a remote OpenRouter "
+                            "model, set OPENROUTER_API_KEY and pick "
+                            "OpenRouter A/B (see docs/openrouter-setup.md)."
                         ),
                     },
                 ),
@@ -2200,7 +2201,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "  1 -> a single scene\n"
                             "  2 -> setup, resolution\n"
                             "  3 -> setup, complication, resolution\n"
-                            "  8 -> the full arc, through crisis and climax"
+                            "  6 -> the full arc, through crisis and climax"
                         ),
                     },
                 ),

@@ -170,8 +170,19 @@ class OTRImageDirector:
                 # longer has its own image-model dropdowns; it reads the per-role
                 # picks from the wired video_policy_json["image_models"] and owns
                 # only the granularity / fresh-cap / seed policy.
-                "announcer_granularity": (gran, {"default": "per_object"}),
-                "music_granularity": (gran, {"default": "per_object"}),
+                "announcer_granularity": (gran, {
+                    "default": "per_object",
+                    "tooltip": "How often announcer beats get a fresh still: "
+                               "per_object = one reused image (cheapest), "
+                               "per_beat = fresh per beat, capped by fresh_cap "
+                               "and the audio beat budget.",
+                }),
+                "music_granularity": (gran, {
+                    "default": "per_object",
+                    "tooltip": "How often music-card beats get a fresh still: "
+                               "per_object = one reused card, per_beat = fresh "
+                               "per cue, same caps as announcer_granularity.",
+                }),
                 "character_granularity": (gran, {
                     "default": "per_object",
                     "tooltip": (
@@ -189,7 +200,14 @@ class OTRImageDirector:
                         "beat budget (never over-generate)."
                     ),
                 }),
-                "seed_mode": (list(SEED_MODES), {"default": SEED_MODES[0]}),
+                "seed_mode": (list(SEED_MODES), {
+                    "default": SEED_MODES[0],
+                    "tooltip": "request_hash: seeds derive deterministically "
+                               "from each request (same episode re-renders "
+                               "byte-identical stills). fixed: every still "
+                               "uses request_seed verbatim -- for A/B "
+                               "comparisons.",
+                }),
                 "request_seed": ("INT", {
                     "default": 0, "min": 0, "max": 0xFFFFFFFF,
                     "tooltip": "Base seed (NOT named 'seed' on purpose, V-7).",

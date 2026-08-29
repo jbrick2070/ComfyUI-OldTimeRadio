@@ -387,8 +387,9 @@ class OTRVideoRenderBatch:
                     "Inert in mode=single and mode=episode."
                 )}),
                 "frame_count": ("INT", {"default": 25, "min": 1, "max": 240, "tooltip": (
-                    "Diagnostic harness only (mode=soak): per-clip frame count. "
-                    "Ignored in mode=episode (per-shot frame budget is planned upstream)."
+                    "Diagnostic harness only: per-clip frame count, consumed by "
+                    "mode=single AND mode=soak. Ignored in mode=episode (the "
+                    "per-shot frame budget is planned upstream)."
                 )}),
             },
             "optional": {
@@ -397,8 +398,21 @@ class OTRVideoRenderBatch:
                     "single engine to render). Inert in mode=soak and mode=episode "
                     "(episode routes each beat by its planned per-role engine)."
                 )}),
-                "portrait_path": ("STRING", {"default": ""}),
-                "audio_path": ("STRING", {"default": ""}),
+                "portrait_path": ("STRING", {
+                    "default": "",
+                    "tooltip": "Diagnostic harness only (mode=single and "
+                               "mode=soak): conditioning still for the "
+                               "harness render. Inert in mode=episode, where "
+                               "each beat's still comes from the planned "
+                               "ledger.",
+                }),
+                "audio_path": ("STRING", {
+                    "default": "",
+                    "tooltip": "Diagnostic harness only (mode=single and "
+                               "mode=soak): driving audio for the harness "
+                               "render. Inert in mode=episode, where per-beat "
+                               "audio comes from the episode's own clips.",
+                }),
                 "patched_ledger_json": ("STRING", {
                     "default": "{}", "multiline": True, "forceInput": True,
                     "tooltip": (

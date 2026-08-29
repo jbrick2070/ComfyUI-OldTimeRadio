@@ -1484,10 +1484,32 @@ class OTRSilentComposite:
                 }),
             },
             "optional": {
-                "canvas_w": ("INT", {"default": 1472, "min": 16, "max": 7680}),
-                "canvas_h": ("INT", {"default": 832, "min": 16, "max": 4320}),
-                "fps": ("INT", {"default": 25, "min": 1, "max": 120}),
-                "ffmpeg": ("STRING", {"default": "ffmpeg"}),
+                "canvas_w": ("INT", {
+                    "default": 1472, "min": 16, "max": 7680,
+                    "tooltip": "Silent-composite canvas width (px). "
+                               "Profile/platform-owned: variants pin it per "
+                               "hardware tier; both dimensions must be even "
+                               "(yuv420p) or the encode refuses by name.",
+                }),
+                "canvas_h": ("INT", {
+                    "default": 832, "min": 16, "max": 4320,
+                    "tooltip": "Silent-composite canvas height (px). "
+                               "Profile/platform-owned, even values only -- "
+                               "see canvas_w.",
+                }),
+                "fps": ("INT", {
+                    "default": 25, "min": 1, "max": 120,
+                    "tooltip": "Fallback frame rate for the silent timeline. "
+                               "When the clip manifest carries its own fps "
+                               "(the audio-derived budget), the manifest wins "
+                               "and this value is ignored.",
+                }),
+                "ffmpeg": ("STRING", {
+                    "default": "ffmpeg",
+                    "tooltip": "ffmpeg binary for the composite encode. "
+                               "Resolution order: this widget's value if it "
+                               "runs, then the OTR_FFMPEG env var, then PATH.",
+                }),
                 "output_path": ("STRING", {
                     "default": "",
                     "tooltip": "Silent composite path. Empty -> <output>/otr/episodes/<stem>_silent.mp4.",

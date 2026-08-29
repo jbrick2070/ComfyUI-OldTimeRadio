@@ -320,7 +320,12 @@ class AudioEnhance:
                 }),
                 "tape_emulation": (["off", "subtle", "medium", "heavy"], {
                     "default": "off",
-                    "tooltip": "Analog tape emulation intensity"
+                    "tooltip": "Analog tape emulation intensity. Each step up "
+                               "adds more period character (saturation, wow/"
+                               "flutter, hiss) and costs more clarity -- "
+                               "'heavy' audibly softens dialogue. 'off' is "
+                               "the clean master; this is an audible "
+                               "episode-facing choice, not a technical knob."
                 }),
                 # `normalize_dbfs` was REMOVED 2026-08-28. It was inert TWICE
                 # over: nothing read the parameter, AND `_normalize()` -- the

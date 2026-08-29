@@ -208,9 +208,25 @@ class WorkflowValidator:
                 "workflow_json_path": ("STRING", {
                     "multiline": False,
                     "default": str(_DEFAULT_WORKFLOW_PATH),
+                    "tooltip": "Path of the workflow JSON this validator audits "
+                               "(default: the canonical graph). Template/expert "
+                               "field -- generated variants stamp it; a missing "
+                               "file fails the validation report, not the render.",
                 }),
-                "validate_anyway": ("BOOLEAN", {"default": True}),
-                "strict_unknown_types": ("BOOLEAN", {"default": True}),
+                "validate_anyway": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "True: always run the structural audit and report "
+                               "findings. False: skip the audit body and report "
+                               "'skipped'. Diagnostic switch; it never blocks the "
+                               "episode either way.",
+                }),
+                "strict_unknown_types": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "True: an unregistered node type in the audited "
+                               "JSON is a reported violation. False: unknown "
+                               "types are listed as informational only. Keep "
+                               "True on the canonical graph.",
+                }),
             },
             # GATE B S2 STAMP (the switchable-workflow decision doc, section
             # 4): the THREE stamp widgets are the ONLY new optional fields
@@ -218,9 +234,26 @@ class WorkflowValidator:
             # emit_snapshot (S3) writes them on generated .gen.json tiers.
             # Node `properties` were rejected (not executable in API prompts).
             "optional": {
-                "profile_id": ("STRING", {"multiline": False, "default": ""}),
-                "master_hash": ("STRING", {"multiline": False, "default": ""}),
-                "generated_by": ("STRING", {"multiline": False, "default": ""}),
+                "profile_id": ("STRING", {
+                    "multiline": False, "default": "",
+                    "tooltip": "Generation stamp: which hardware profile "
+                               "generated this variant. Written by "
+                               "build_variants, empty on the canonical master. "
+                               "Do not hand-edit.",
+                }),
+                "master_hash": ("STRING", {
+                    "multiline": False, "default": "",
+                    "tooltip": "Generation stamp: sha256 of the canonical "
+                               "master this variant was generated from. A "
+                               "mismatch against the real master means the "
+                               "variant is stale -- regenerate, never hand-fix.",
+                }),
+                "generated_by": ("STRING", {
+                    "multiline": False, "default": "",
+                    "tooltip": "Generation stamp: the tool/version that emitted "
+                               "this variant. Empty on the canonical master; "
+                               "informational in the validation report.",
+                }),
             },
         }
 

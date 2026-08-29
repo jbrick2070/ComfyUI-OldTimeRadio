@@ -260,11 +260,31 @@ class OTRVideoDirector:
                     "tooltip": "Image source for music beats.",
                 }),
                 "character_image_model": (image, {
-                    "tooltip": "Image source for character beats (kept slot).",
+                    "tooltip": "Image engine that mints the still for "
+                               "character beats (the portrait-bearing shots). "
+                               "Profile/platform-owned: variants pin it per "
+                               "hardware tier; the runtime engine registry "
+                               "resolves the final engine.",
                 }),
-                "fps": ("INT", {"default": 25, "min": 1, "max": 60}),
-                "canvas_w": ("INT", {"default": 832, "min": 16, "max": 7680}),
-                "canvas_h": ("INT", {"default": 480, "min": 16, "max": 4320}),
+                "fps": ("INT", {
+                    "default": 25, "min": 1, "max": 60,
+                    "tooltip": "Frame rate the video plan budgets beats at. "
+                               "Profile/platform-owned; downstream stages read "
+                               "it from the plan, so change it via profile, "
+                               "not per-episode.",
+                }),
+                "canvas_w": ("INT", {
+                    "default": 832, "min": 16, "max": 7680,
+                    "tooltip": "Video plan canvas width (px). "
+                               "Profile/platform-owned per hardware tier; "
+                               "engines may declare their own native canvas "
+                               "that supersedes this at render.",
+                }),
+                "canvas_h": ("INT", {
+                    "default": 480, "min": 16, "max": 4320,
+                    "tooltip": "Video plan canvas height (px). "
+                               "Profile/platform-owned -- see canvas_w.",
+                }),
                 "seed_mode": (list(SEED_MODES), {
                     "default": SEED_MODES[0],
                     "tooltip": "request_hash (deterministic) | fixed.",

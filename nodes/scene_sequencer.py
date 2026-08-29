@@ -685,7 +685,14 @@ class SceneSequencer:
                     "default": 999, "min": 1, "max": 9999,
                     "tooltip": "Last line to render"
                 }),
-                "output_dir": ("STRING", {"default": ""}),
+                "output_dir": ("STRING", {
+                    "default": "",
+                    "tooltip": "Override directory for per-line audio files. "
+                               "Empty (the shipped default) = the episode's own "
+                               "audio dir from the ledger, which is where every "
+                               "downstream stage looks. Expert field: pointing "
+                               "it elsewhere strands the files.",
+                }),
                 # v1.5 Phase 3: Time-Alignment Offset Pin
                 "dialogue_offset_ms": ("FLOAT", {
                     "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
@@ -1152,7 +1159,13 @@ class EpisodeAssembler:
         return {
             "required": {
                 "scene_audio": ("AUDIO",),
-                "episode_title": ("STRING", {"default": "The Last Frequency"}),
+                "episode_title": ("STRING", {
+                    "default": "The Last Frequency",
+                    "tooltip": "Label for this node's episode_info output and "
+                               "log lines ONLY -- the published title comes "
+                               "from the ledger (the Writer's episode_title), "
+                               "not from here. Diagnostic field.",
+                }),
             },
             "optional": {
                 "opening_theme_audio": ("AUDIO",),

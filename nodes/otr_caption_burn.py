@@ -280,14 +280,38 @@ class OTRCaptionBurn:
                     "default": False,
                     "tooltip": "Burn SDH open captions into the video. Default OFF (clean master); enabled by the capability profile. Node 86 is the single caption owner.",
                 }),
-                "caption_style": (_CAPTION_STYLE_CHOICES, {"default": _DEFAULT_CAPTION_STYLE}),
-                "fps": ("INT", {"default": 25, "min": 1, "max": 120}),
-                "ffmpeg": ("STRING", {"default": "ffmpeg"}),
+                "caption_style": (_CAPTION_STYLE_CHOICES, {
+                    "default": _DEFAULT_CAPTION_STYLE,
+                    "tooltip": "Visual style of the burned SDH captions. The "
+                               "OTR_CAPTION_STYLE env var may override the "
+                               "STYLE only -- no env var can turn burning on; "
+                               "only the burn_captions widget (or a supplied "
+                               "title-card plan, which forces the hero-title "
+                               "burn alone) does that.",
+                }),
+                "fps": ("INT", {
+                    "default": 25, "min": 1, "max": 120,
+                    "tooltip": "Frame rate used for caption timing math. Must "
+                               "match the incoming silent video's real rate or "
+                               "captions drift against speech.",
+                }),
+                "ffmpeg": ("STRING", {
+                    "default": "ffmpeg",
+                    "tooltip": "ffmpeg binary for the caption burn. Resolution "
+                               "order: this widget's value if it runs, then "
+                               "the OTR_FFMPEG env var, then PATH.",
+                }),
                 "ledger_path": ("STRING", {
                     "default": "",
                     "tooltip": "Optional explicit timed-ledger path. Empty -> resolved from the video stem (otr_audio_dir / in-flight ledger).",
                 }),
-                "output_path": ("STRING", {"default": ""}),
+                "output_path": ("STRING", {
+                    "default": "",
+                    "tooltip": "Captioned mp4 path. Empty (the shipped "
+                               "default) -> <stem>_captioned.mp4 beside the "
+                               "input video. With burn OFF and no title plan "
+                               "the input passes through untouched.",
+                }),
                 "gate_in": ("STRING", {
                     "default": "", "forceInput": True,
                     "tooltip": "Optional ordering signal (opaque STRING).",

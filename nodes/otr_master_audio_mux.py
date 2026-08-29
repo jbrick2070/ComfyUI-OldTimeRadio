@@ -824,8 +824,19 @@ class OTRMasterAudioMux:
                     "default": "", "forceInput": True,
                     "tooltip": "Retired connector kept for topology compatibility (rip-sfx 2026-08-06). The manifest is hashed by IS_CHANGED but has no effect on the output.",
                 }),
-                "fps": ("INT", {"default": 25, "min": 1, "max": 120}),
-                "ffmpeg": ("STRING", {"default": "ffmpeg"}),
+                "fps": ("INT", {
+                    "default": 25, "min": 1, "max": 120,
+                    "tooltip": "Frame rate declared to the mux for timing "
+                               "math. Must match the silent video's real rate "
+                               "(the composite's manifest fps); the mux never "
+                               "resamples frames.",
+                }),
+                "ffmpeg": ("STRING", {
+                    "default": "ffmpeg",
+                    "tooltip": "ffmpeg binary for the master mux. Resolution "
+                               "order: this widget's value if it runs, then "
+                               "the OTR_FFMPEG env var, then PATH.",
+                }),
                 "output_path": ("STRING", {
                     "default": "",
                     "tooltip": "Final mp4 path. Empty -> <output>/otr/episodes/<stem>_final.mp4.",

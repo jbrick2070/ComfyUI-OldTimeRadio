@@ -701,7 +701,14 @@ class PostUpscaleProcgenBlend:
                 }),
             },
             "optional": {
-                "blend_mode": (_BLEND_MODE_CHOICES, {"default": _DEFAULT_BLEND_MODE}),
+                "blend_mode": (_BLEND_MODE_CHOICES, {
+                    "default": _DEFAULT_BLEND_MODE,
+                    "tooltip": "Compositing operator for the procgen overlay "
+                               "onto the upscaled master (screen lightens, "
+                               "overlay boosts contrast, normal replaces). "
+                               "Works with blend_opacity; the shipped pair is "
+                               "the qualified look.",
+                }),
                 "blend_opacity": ("FLOAT", {
                     "default": _DEFAULT_BLEND_OPACITY,
                     "min": 0.0, "max": 1.0, "step": 0.05,

@@ -396,9 +396,23 @@ class SceneAwareScopes:
                 "audio": ("AUDIO", {
                     "tooltip": "Master audio for analysis ONLY (never decoded "
                                "into the video). Absent -> silent idle scopes."}),
-                "out_w": ("INT", {"default": 1920, "min": 320, "max": 7680, "step": 2}),
-                "out_h": ("INT", {"default": 1080, "min": 240, "max": 4320, "step": 2}),
-                "ffmpeg": ("STRING", {"default": "ffmpeg", "multiline": False}),
+                "out_w": ("INT", {
+                    "default": 1920, "min": 320, "max": 7680, "step": 2,
+                    "tooltip": "Scopes output width (px, even values). "
+                               "Profile/platform-owned; matches the final "
+                               "master canvas, not the render-tier canvas.",
+                }),
+                "out_h": ("INT", {
+                    "default": 1080, "min": 240, "max": 4320, "step": 2,
+                    "tooltip": "Scopes output height (px, even values). "
+                               "Profile/platform-owned -- see out_w.",
+                }),
+                "ffmpeg": ("STRING", {
+                    "default": "ffmpeg", "multiline": False,
+                    "tooltip": "ffmpeg binary for the scopes encode. "
+                               "Resolution order: this widget's value if it "
+                               "runs, then the OTR_FFMPEG env var, then PATH.",
+                }),
                 # APPEND-ONLY (BUG-LOCAL-097 positional rule -- keep LAST). 'off'
                 # is byte-identical to today (landscape clips show nothing); 'bottom'
                 # paints a green audio-reactive frequency strip along the bottom of
