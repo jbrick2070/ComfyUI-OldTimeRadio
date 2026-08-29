@@ -8512,3 +8512,70 @@ on. Ours was one. It is now two, and two found nine.
   ("a 70B pick on a 16 GB card must not trigger snapshot_download"), which
   predicts refuse-first -- but that is a code reading, not a measurement, and
   it needs a box without the cache to settle.
+
+### ROOT CAUSE PROVEN for PBUG-20260829-12 -- it is a WHEEL REGRESSION, not this CPU
+
+**`llama-cpp-python` 0.3.35 is broken on this machine. 0.3.33 is not. Same
+model file, same CPU, same process shape, opposite outcomes -- measured, not
+reasoned.**
+
+Test design, chosen so it could run WITHOUT disturbing two live render legs and
+WITHOUT touching the installed wheel: 0.3.33 installed to an isolated
+`--target` directory, loaded in a separate process with that directory first on
+`sys.path`, and initialised **CPU-ONLY** (`n_gpu_layers=0, n_ctx=512`). CPU-only
+is the minimal reproduction because `STATUS_ILLEGAL_INSTRUCTION` is a CPU fault;
+it also costs zero VRAM, which is why it could run against a busy GPU.
+
+    0.3.35 (installed)   n_gpu_layers=0, n_ctx=512  -> OSError [WinError -1073741795]
+                                                        at llama_init_from_model
+    0.3.33 (isolated)    n_gpu_layers=0, n_ctx=512  -> LOADED OK
+                                                        GENERATED: "Radio is a medium that
+                                                        transmits audio signals over long
+                                                        distances using electro..."
+
+**VERIFIED BY HASH, NOT BY VERSION STRING** -- the 5080 supplied its working
+prefixes precisely so this could not be fooled by two builds sharing a version
+number:
+
+    ggml-cuda.dll   4060/0.3.33  715bf1e45e9ff80ee23b752853adaf7a  == 5080's working build
+    llama.dll       4060/0.3.33  3c6b4c7b8833da976e2da09aca759bd9  == 5080's working build
+
+Byte-identical to the binary that works on Blackwell. So the artifact that runs
+there runs here too, and the machines never actually differed in capability --
+they differed in which build `pip` handed them.
+
+**TWO CLAIMS OF MINE ARE NOW DEAD, and both were mine to kill:**
+1. *AVX-512* -- already retracted; both CPUs lack it.
+2. *The CUDA build* -- the 126 MB `ggml-cuda.dll` delta looked like the obvious
+   suspect and is a **red herring**. The fault reproduces with
+   `n_gpu_layers=0`, i.e. with the CUDA backend never entering the code path.
+   **The regression is in the CPU backend.** I would have chased the CUDA
+   difference for hours; the CPU-only reproduction cost one run and settled it.
+
+**A UNIT DISCREPANCY, recorded rather than smoothed over:** the 5080 reported
+its `ggml-cuda.dll` as 945.37 MB; the same file measures 901.57 MiB here. The
+SHA-256 is identical, so it is one file and the difference is MB-vs-MiB
+reporting, not two artifacts. Noting it because a size mismatch beside a hash
+match is exactly the kind of thing that sends someone down a wrong path later.
+
+**CONSEQUENCE, and it is larger than one row:** the GGUF lane is unblocked on
+8 GB Intel mobile by a version pin. That lane is the ONLY writer path for
+`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and `cpu_floor`, since
+bitsandbytes NF4 is CUDA-only -- so this pin decides whether the entire
+non-NVIDIA story functions on a fresh install. And `llama-cpp-python` resolving
+to *latest* means a fresh install gets 0.3.35: **the broken one is the default
+a new user receives today.**
+
+**PINNING IS NOT MINE AND I HAVE NOT DONE IT.** `requirements.txt` and
+`pyproject.toml` are the shipping surface (CLAUDE.md split, 2026-08-29), and the
+`pyproject` edit auto-fires a registry publish, so it deserves exactly one edit
+carrying a value a test has passed. It now has one: **pin 0.3.33**, or at
+minimum exclude 0.3.35, with this entry as the evidence. Handing it over rather
+than taking it.
+
+**Still true and unchanged:** nothing has RENDERED on the GGUF lane on this box.
+The binding is proven to load and generate; `vram_fit_tier` on the 2507 row
+stays UNKNOWN until an episode publishes. Next step here is to install 0.3.33
+into the venv properly (after the live legs clear), re-run the GGUF leg, and
+then attempt 12B with `OTR_GGUF_N_GPU_LAYERS` layer splitting per the operator's
+"prove me wrong with an OOM" directive.
