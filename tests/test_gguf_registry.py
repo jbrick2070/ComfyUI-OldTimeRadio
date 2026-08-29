@@ -48,11 +48,41 @@ class FakeLlama:
 # ---------------------------------------------------------------------------
 
 
-def test_registry_has_two_rows_gemma_and_qwen():
+QWEN_2507 = "unsloth/Qwen3-4B-Instruct-2507-GGUF"
+
+
+def test_registry_rows_are_the_expected_set():
+    """Pin the ROSTER, not a bare count.
+
+    This asserted `len(GGUF_ROWS) == 2` and broke the moment a third row was
+    added -- which is the wrong failure: a count tells you a number moved, not
+    which model appeared or vanished. A vanished row is the dangerous case
+    (a lane silently leaves the dropdown), and a set comparison names it.
+    """
     ids = {r.repo_id for r in GGF.GGUF_ROWS}
-    assert GEMMA in ids and QWEN in ids
-    assert len(GGF.GGUF_ROWS) == 2
+    assert ids == {GEMMA, QWEN, QWEN_2507}, (
+        "GGUF roster drift -- missing %r, unexpected %r"
+        % (sorted({GEMMA, QWEN, QWEN_2507} - ids), sorted(ids - {GEMMA, QWEN, QWEN_2507})))
     assert GGF.GGUF_TOP_K == 40
+
+
+def test_qwen_2507_row_shape():
+    """The 8 GB cross-platform writer. Values MEASURED 2026-08-29, not carded."""
+    row = GGF.gguf_row_for_repo(QWEN_2507)
+    fn, size, sha = row.artifacts["Q4_K_M"]
+    assert fn == "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+    assert size == 2497281120, "size must stay the measured on-disk byte count"
+    assert sha == ("3605803b982cb64aead44f6c1b2ae36e3acdb41d8"
+                   "e46c8a94c6533bc4c67e597")
+    assert row.requires_auth is False
+    assert row.license == "apache_2_0"
+    # This model has no <think> in its chat template; its Qwen3.5-4B sibling
+    # does. Flipping this to a thinking policy would mean a different model.
+    assert row.think_policy == "none"
+    # Deliberately un-optimistic until a live leg proves them. If someone
+    # promotes these, the promotion must cite the leg -- see the gemma row.
+    assert row.kv_gb_per_1k is None, "kv must stay None until MEASURED"
+    assert row.vram_fit_tier == "UNKNOWN", "no episode has rendered on this row"
 
 
 def test_gemma_row_shape():
