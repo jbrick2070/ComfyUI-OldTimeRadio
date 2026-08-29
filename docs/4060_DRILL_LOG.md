@@ -66,7 +66,31 @@ install with the kokoro lane does. Fix (this commit): pass `repo_id` only
 when `inspect.signature` says the installed KPipeline accepts it.
 Prompt executed in 439.35s; no obs publish (correct -- it failed).
 
-## Step 4 -- leg 2 in flight
+## Step 4 -- leg 2: FAIL at image-UNET load (DynamicVRAM native abort on 8 GB)
 
-Server restarted with the fix; episode re-queued. Target: RESULT SUCCESS +
-obs_publish OK + mp4 in `output\otr\obs`. Log updates on completion.
+Kokoro fix HELD: writer wrote (6 lines / 150 words), freeze landed, casting
+assigned, all 6 voice clips generated, visual-direction pass completed. Then at
+the z_image sampler's step 0/8 ("Model Initializing"):
+
+    aimdo: src/hostbuf.c:283:ERROR:hostbuf_read_file_slice: device copy
+    failed result=2 ... size=39321600
+    Fatal Python error: Aborted
+
+CUDA error 2 = out of memory, hit while comfy_aimdo (DynamicVRAM) streamed the
+6.2 GB image UNET onto a card still holding OTR's HF-side residents (gemma
+writer et al). Two ship-relevant findings, only findable on a small card:
+
+1. The pack's residency discipline does not evict the writer before the image
+   phase; fine at 16 GB, fatal at 8 GB.
+2. DynamicVRAM's failure mode is a NATIVE PROCESS ABORT, not a Python
+   exception -- the whole server dies, nothing can catch or retry it. The
+   legacy loader raises a catchable OOM instead.
+
+## Step 5 -- leg 3 in flight (legacy loader)
+
+Server relaunched with `--disable-dynamic-vram`; episode re-queued
+(`--profile otr_4060_nano_local --act-count 1`). If leg 3 passes only with the
+legacy loader, the 4060 profile (or docs) must carry that flag -- or the pack
+must evict the writer before the image phase -- before an 8 GB card is a
+supported target. Target unchanged: RESULT SUCCESS + obs_publish OK + mp4 in
+`output\otr\obs`.
