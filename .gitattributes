@@ -29,3 +29,33 @@
 *.zip binary
 *.tar.gz binary
 *.whl binary
+
+# ---------------------------------------------------------------------------
+# APPEND-ONLY LOGS: NEVER LOSE AN ENTRY TO A MERGE (2026-08-29)
+# ---------------------------------------------------------------------------
+# Two windows write these files -- the 5080 and the 4060 -- and both append to
+# the TAIL, which is the one region git is guaranteed to call a conflict. It
+# happened twice in one night. Both times the resolution was "keep both
+# sides", done by hand, and both times a tired window could just as easily
+# have picked one and silently dropped the other's finding.
+#
+# `merge=union` is git's built-in answer: on a conflicting hunk it keeps BOTH
+# sides, in order, instead of writing conflict markers. That is exactly the
+# by-hand resolution we performed twice, done automatically and identically
+# every time.
+#
+# THE TRADE, stated honestly so nobody is surprised by it: union merge can
+# DUPLICATE text if two windows edit the SAME region differently -- amending
+# one existing entry from both boxes at once, say. It cannot LOSE text. For a
+# log whose purpose is to be the durable record, a visible duplicate you can
+# delete beats a silent deletion you never learn about. Losing an entry is the
+# failure that matters here; duplicating one is an annoyance.
+#
+# This applies ONLY to append-heavy prose logs. Do NOT extend it to code, to
+# JSON, or to the workflow files -- union-merging a .json produces a file that
+# is not valid JSON, and union-merging a .py produces code that parses and is
+# wrong.
+docs/PROD_BUG_LOG.md   merge=union
+docs/4060_DRILL_LOG.md merge=union
+docs/known-failures.md merge=union
+BUG_LOG.md             merge=union
