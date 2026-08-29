@@ -8382,3 +8382,54 @@ call to make, not a tidy-up.
   assumption that no dependency declaration expresses -- it installs cleanly,
   imports cleanly, passes its own preflight, and then takes a hardware fault.*
   Version pinning cannot express it and a pip resolver cannot catch it.
+
+### CORRECTION to PBUG-20260829-12 (the illegal-instruction fault) -- root cause DOWNGRADED, 2026-08-29
+
+**The AVX-512 hypothesis in that entry is probably WRONG, and I am saying so
+before it hardens into a fact.** I wrote it as "high confidence, from the
+hardware". The 5080's evidence, which arrived after, contradicts it:
+
+    5080  Intel Core Ultra 9 275HX (Arrow Lake)  -- llama.cpp loaded and
+          generated 22 times in one leg; a standalone load wrote prose in 0.6 s
+    4060  Intel i9-13900H (Raptor Lake)          -- 0xc000001d at
+          llama_init_from_model
+
+**Arrow Lake mobile has no AVX-512 either.** Intel has fused AVX-512 off on
+consumer parts since Alder Lake, so BOTH boxes lack it -- yet only one faults.
+An instruction neither CPU implements cannot explain why one works. The
+observation that this CPU is AVX2-max is still true; it is simply no longer
+load-bearing.
+
+**The stronger lead, and it was in front of me the whole time -- the WHEEL
+VERSIONS DIFFER:**
+
+    5080  llama_cpp_python 0.3.33   ggml-cuda.dll ~945 MB   WORKS
+    4060  llama_cpp_python 0.3.35   ggml-cuda.dll  819 MB   FAULTS
+
+Different build, different size, different result. A newer wheel raising its
+ISA baseline (or shipping a differently-tuned CUDA build) explains both
+observations without requiring the two CPUs to differ in a capability they do
+not differ in. **UNTESTED at time of writing** -- the test is to install 0.3.33,
+the version proven on the other box, and re-run through
+`_import_llama_cpp()`. That test is queued behind a live churn leg rather than
+run mid-render, because the running server may hold `llama.dll` open from the
+faulting attempt and swapping a loaded DLL is its own failure mode.
+
+**What is unchanged and still solid in -12:** the fault is real, reproducible,
+and fatal on this box; it is NOT a VRAM problem (preflight passed with 1.7 GB
+headroom) and NOT the artifact (byte- and sha256-exact against the pinned row);
+the user-visible symptom is a bare Windows error code; and the consequence for
+the dropdown question stands -- the GGUF writer is not a frictionless 8 GB
+choice on this machine TODAY.
+
+**What changes:** the reusable class is narrower than I claimed. It is not
+"prebuilt wheels encode an ISA assumption your CPU may not meet" as a general
+law -- that is still possible but unproven. What IS demonstrated is the thing
+this drill keeps proving from new angles: *two boxes running the "same"
+dependency were running different builds of it, and only the box that had never
+had it installed found out.* Same shape as kokoro 0.7.16 vs 0.9.4 and ffmpeg 9
+vs 8.0.1. The dev box's working version is not the version a fresh install
+receives.
+
+Recorded as a correction rather than an edit: the log is append-only and I
+would rather the wrong confidence stay visible next to what corrected it.
