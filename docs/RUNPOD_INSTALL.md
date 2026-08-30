@@ -566,3 +566,35 @@ does not, and neither does the pack appearing on disk.
 `docs/RUNPOD_TEMPLATE_README.md` — 4,993 characters, fits RunPod's 5,000 limit
 (count decoded characters, not bytes; the em-dashes are multibyte and `wc -c`
 overstates by ~60).
+
+### 9A. ffmpeg is a HARD requirement and the pod image does not have it
+
+**Measured 2026-08-30, first OTR render ever submitted to rented hardware.** The
+leg reached `t=404s` -- writer done, script written -- and then died:
+
+    [canonical-api] ERROR node 12 (OTR_SignalLostVideo) raised BrokenPipeError
+      File ".../nodes/video_engine.py", line 1098, in _encode_mp4
+        proc.stdin.write(frame.tobytes())
+
+`_encode_mp4` opens ffmpeg with `subprocess.Popen` and streams raw frames into
+its stdin. **A BrokenPipeError on the first write means ffmpeg was never
+running** -- the process died immediately, which on a clean image means the
+binary is absent.
+
+    apt-get update && apt-get install -y ffmpeg
+
+**Add this to the template's start command**, before ComfyUI starts. Every
+visual path needs it, not just this lane -- the procgen video, the composite,
+the credits roll and the master mux all shell out to ffmpeg.
+
+**Why this was not caught earlier and is easy to miss again:** it fails SEVEN
+MINUTES IN, after the LLM has written a complete script, so it looks like a
+video-engine bug rather than a missing system package. Nothing earlier in the
+pipeline touches ffmpeg, so a pod can pass every install check -- 25 `OTR_`
+classes, 143 `ADE_`, all four models registered -- and still be unable to
+produce a single frame.
+
+**A note on PyAV:** `av` is a ComfyUI core dependency and ships its own bundled
+ffmpeg libraries, which is why probing PyAV in-process succeeds on a box with no
+ffmpeg binary. That bundled build is NOT on PATH and is not what `Popen` finds.
+PyAV working proves nothing about the binary.
