@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.13"
+version = "2.0.0-alpha.14"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -28,6 +28,21 @@ dependencies = [
     "spandrel~=0.4.1",
     "pydantic>=2.0",
     "PyYAML>=6.0",
+    # THE COLD-INSTALL PAIR (alpha.14). Both were fixed in CODE on 2026-08-29
+    # and both were unreachable from a registry install, because the registry
+    # reads only this literal list -- the same lesson alpha.3 vs alpha.4 taught
+    # when the setuptools dynamic form recorded dependencies: [].
+    #
+    # kokoro is the DEFAULT announcer voice in the shipped canonical workflow.
+    # Without it a fresh install reaches its FIRST SPOKEN LINE and dies on
+    # KPipeline.__init__() got an unexpected keyword argument 'repo_id'.
+    "kokoro>=0.7.16",
+    # pyloudnorm is imported by scene_sequencer to master every episode to
+    # -14 LUFS. Its import is try/except with a deliberate fallback, so a
+    # missing install does not crash -- it quietly ships a differently
+    # mastered, quieter episode and says so only in one warning line. That
+    # silence is why it went unnoticed for so long.
+    "pyloudnorm>=0.1.1",
 ]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
