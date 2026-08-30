@@ -990,3 +990,35 @@ out of process. Both are architecture calls on the shipping surface. A flag
 cannot reach this.
 
 **8 GB writer answer, unchanged: `gemma-4-E2B-it`,** four published episodes.
+## Step 17 -- PBUG-11 reproduced in 16 SECONDS, in isolation
+
+The operator suggested testing the GGUF lane on its own rather than through a
+whole episode. That was the right call and it produced the cleanest artifact of
+the night. `scripts/repro_pbug11_gguf_cache.py` calls OTR's own
+`request_slot` TWICE for the same GGUF row -- no ComfyUI, no graph, no
+episode, no competing VRAM consumer, one thread:
+
+    CALL 1: OK in 12.30s   epoch 0 -> 1   LLM_CACHE.model_id = None
+    CALL 2: OK in  4.01s   epoch 1 -> 2   LLM_CACHE.model_id = None
+    both:   "[Selector] slot=creative GGUF load ... completed after this call
+             was abandoned (cache epoch advanced) -- NOT adopting"
+
+**The cache is None after two SUCCESSFUL loads.** The epoch increments once per
+call because each load bumps the very counter it then checks itself against.
+Call 2's 4.01 s is a real reload (a cache hit would be milliseconds); it is
+faster than call 1 only because the OS file cache is warm.
+
+**Why this beats another episode as evidence:** every alternative explanation
+is eliminated BY CONSTRUCTION rather than by argument. No second model to
+collide with, no pipeline stage, nothing that can time out, no concurrency, and
+`n_gpu_layers=35` deliberately chosen because it is the known-good setting on
+this card -- so an OOM cannot muddy the result. It also reproduces on the FIRST
+call of a cold process, with an empty cache and epoch 0, which kills any fix
+keyed on "has something been cached yet".
+
+16 seconds and deterministic, against ~40 minutes for a render that could fail
+for six other reasons. Handed to the 5080 so the third fix attempt can be
+verified in seconds instead of by burning a leg.
+
+**Scope, not overstated:** this reproduces the CACHING defect only. The memory
+collision is a separate, downstream consequence and is not exercised here.
