@@ -9293,3 +9293,77 @@ from the 4060 window plus that box's own traces:
 
 **Two swings spent (this addendum is the second).** Per the two-strikes rule
 the third gets a panel before code.
+
+## PBUG-20260829-20 -- the news-read validator calls a REAL person from the source an "invented character" and kills the episode
+
+- **found:** 2026-08-29 on the 4060 (MRKT), prompt `537a6d1d`, profile
+  `otr_nvidia_8gb_haunted`, `--source-bank scifi_news_pro`, `--act-count 1`,
+  writer `google/gemma-4-E2B-it`. RESULT FAIL at t=340 s, node 1
+  `OTR_LedgerScriptWriter`. Nothing published.
+- **the failure:**
+
+      [OTR_StructuredCall] 'scifi_news_pro_news_read' attempt 1 failed:
+        the closing read is a FACTUAL report and it names invented characters
+        (Pataranutaporn). Report only what the source says, using the source's
+        own ...
+      attempt 2/3: typed repair at temperature=0.100
+      attempt 2 (repair) failed: <identical complaint>
+      exhausted the retry ladder after 2 attempt(s); raising
+        StructuredCallFailedError
+      -> NewsProTreatmentError: [scifi_news_pro] pass 'news_read'
+      -> RESULT FAIL
+
+- **THE FLAGGED NAME IS REAL AND CAME FROM THE SOURCE.** This is not a
+  hallucination the guard caught; it is the guard rejecting correct work:
+
+      [NewsFetcher] Pool: 121 headlines from 21 feeds
+      [OTR_LedgerScriptWriter] RSS_FETCH OK: source=MIT News - Media Lab,
+        head='3 Questions: Neural transparency and the future of AI design
+        Assistant Profes...'
+      [OTR_LedgerScriptWriter] heartbeat: ... PEOPLE - Pat Pataranutaporn
+      [OTR_LedgerScriptWriter] heartbeat: ... PEOPLE - Pataranutaporn
+        PLACES - MIT  THINGS - AI's neural network ...
+
+  The source is an **MIT News / Media Lab** item. Pat Pataranutaporn is an
+  actual MIT Media Lab researcher named in that article. The writer's own
+  entity-extraction pass pulled him out of the source correctly, under
+  `PEOPLE`, alongside `PLACES - MIT`. The model then did exactly what the
+  instruction demands -- reported what the source says, using the source's own
+  names -- and the validator failed it for doing so, twice, then killed the
+  episode.
+
+- **likely mechanism, stated as a hypothesis because I have not read the
+  validator:** the check appears to test names appearing in the news read
+  against the episode's CAST (the fictional characters), and treats anything
+  not in the cast as "invented". For a FACTUAL news bank that inverts the
+  requirement -- a factual report SHOULD name real people from the source, and
+  those people are by definition not in the fictional cast. The error text
+  itself contains the contradiction: it says "it names invented characters"
+  and then instructs "report only what the source says, using the source's own
+  [names]", which is what the model did.
+
+- **why it matters beyond one leg:** `scifi_news_pro` is a shipped bank, and
+  this is the SECOND time it has taken down an 8 GB episode today -- the first
+  was PBUG-20260829-16 at the video stage, 72 minutes in. This one fails at
+  5.7 minutes, which is cheaper, but it fails on the CONTENT of a real news
+  article, so it will recur on any source that names a person. The retry ladder
+  cannot help: a "typed repair" at lower temperature produced the identical
+  correct answer and was rejected identically, because the answer was never
+  wrong.
+
+- **operator directive relevance:** this is a guard killing a render on a
+  quality judgement rather than on a resource limit, which is precisely the
+  class the operator's 2026-08-29 directive addresses ("I don't want guards to
+  kill anything -- an OOM is the only killer"). A false positive here is not a
+  degraded episode; it is no episode at all.
+
+- **fix:** NOT MINE. `nodes/_otr_scifi_news_pro.py` (`_pass_news_read`, ~L2117,
+  raising from `run_scifi_news_pro_episode` ~L4708) is the shipping surface.
+  Recorded with a full reproduction: profile `otr_nvidia_8gb_haunted`,
+  `--source-bank scifi_news_pro`, `--act-count 1`, E2B writer. Note the source
+  article is drawn live from RSS, so the exact headline will differ per run --
+  but any item naming a person should reproduce it.
+
+- bible-worthy: CANDIDATE. Class: *a validator written for fiction applied to a
+  factual lane inverts its own rule -- "not in the cast" means "invented" for a
+  drama and means "correctly sourced" for a news report.*
