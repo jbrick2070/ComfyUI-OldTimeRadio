@@ -140,6 +140,61 @@ def audio_pcm_sha(path: str, ffmpeg: str = "ffmpeg") -> str:
 _MAX_CREDITS_TAIL_S_DEFAULT = 45.0
 
 
+def duration_receipt_line(v_dur: float, a_dur: float, max_tail_s: float,
+                          tail_src: str, tol: float) -> str:
+    """The ``duration_check`` receipt line. Numbers in, one line out.
+
+    Pure ON PURPOSE, and extracted after the 4060 made the right criticism of
+    how this was first covered. The original test for PBUG-20260830-01 asserted
+    on the AST -- branch shape and string presence -- because reaching the real
+    branch needs ffprobe, two rendered media files and a full mux. That test was
+    mutation-verified and did detect the defect, but as the 4060 put it: a
+    source-shape assertion "proves the code is written correctly, not that it
+    runs correctly", cannot catch a behavioural regression that preserves the
+    shape, and goes red on a refactor that preserves the behaviour. Both are the
+    wrong failure mode for a receipt.
+
+    So the decision moved somewhere it can be CALLED. Three verdicts, and they
+    are three different claims that must never collapse into each other:
+
+    ``UNPROVEN``
+        ``_probe_float`` returns ``-1.0`` when ffprobe is absent or the duration
+        is unparsable. The budget comparison is then meaningless, so the gate is
+        SKIPPED -- and a skipped gate must not report as a passed one. Reported
+        rather than made fatal because this is the final sanity ceiling, not the
+        primary correctness guard (the CreditsRoll and composite frame budgets
+        are), and refusing here would lose a finished episode on a box that
+        merely lacks ffprobe.
+    ``OVER_BUDGET``
+        The video runs past the audio by more than the credits tail allows. This
+        no longer raises -- the operator ruled on 2026-08-30 that a length
+        disagreement must never discard a finished episode -- which is exactly
+        why the receipt has to say so. With the raise gone this line is the ONLY
+        compact signal a reader gets, and an always-OK receipt made every
+        overshoot invisible in the summary this node exists to emit. The overage
+        rides the line at full precision so a reader never has to go find the
+        warning to get the number.
+    ``OK``
+        The fall-through, reachable only when the probe worked AND the budget
+        held.
+
+    The budget arithmetic mirrors the warning above it deliberately: both ask
+    ``v_dur > a_dur + max_tail_s + tol``, so the receipt and the log can never
+    disagree about whether this episode was over.
+    """
+    head = (f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
+            f"tail_budget={max_tail_s:.1f}s ({tail_src})")
+
+    if v_dur < 0 or a_dur < 0:
+        return head + " UNPROVEN (duration probe failed -- gate SKIPPED, not passed)"
+
+    if v_dur > a_dur + max_tail_s + tol:
+        over_by = (v_dur - a_dur) - max_tail_s - tol
+        return head + f" OVER_BUDGET by {over_by:.4f}s (published anyway)"
+
+    return head + " OK"
+
+
 def _credits_tail_ceiling() -> float:
     """The ``OTR_MAX_CREDITS_TAIL_S`` ceiling -- NAMED and ignored when
     malformed, never fatal.
@@ -267,13 +322,6 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     env_ceiling = _credits_tail_ceiling()      # NAMED-and-ignored if malformed
     max_tail_s = declared if declared > 0 else env_ceiling
     tail_src = "declared" if declared > 0 else "env_ceiling"
-    # THE BUDGET VERDICT IS STATE, NOT JUST A LOG LINE (PBUG-20260830-01).
-    # This check used to only warn, and the receipt below bound its `else`
-    # to the PROBE check -- so a successful ffprobe printed OK even on an
-    # episode that had just failed this gate by 8.86s. The 4060 caught the
-    # two lines seconds apart in one run: `DURATION MISMATCH ... by 8.8608s`
-    # immediately above `duration_check ... OK`.
-    over_budget_by = None
     if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
         # Print the EXCESS and the OVERAGE at full precision. The old message
         # rendered the budget as "%.1f" -- so a declared tail of 75.1800s printed
@@ -281,7 +329,6 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         # violated a budget it was under. Never round the number the reader is
         # being asked to compare against.
         _excess = v_dur - a_dur
-        over_budget_by = _excess - max_tail_s - tol
         # OPERATOR DIRECTIVE 2026-08-30: "don't kill a duration mismatch, just
         # let it fly." THIS USED TO RAISE, and raising here is the most
         # expensive refusal in the pipeline: by the time this runs the writer,
@@ -311,46 +358,12 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
             max_tail_s + tol, _excess - max_tail_s - tol, _excess,
         )
     if v_dur < 0 or a_dur < 0:
-        # THE RECEIPT MAY NOT SAY OK OVER A FAILED PROBE. `_probe_float`
-        # returns -1.0 when ffprobe is absent or the duration is unparsable,
-        # and the gate above is skipped in that case -- so the old line
-        # appended "duration_check v=-1.000s a=-1.000s ... OK", which reads as
-        # a passed check to every downstream reader of this report.
-        #
-        # Reported as UNPROVEN rather than made fatal: the gate is the FINAL
-        # SANITY CEILING, not the primary correctness guard (the CreditsRoll
-        # and composite frame budgets are), and refusing here would lose a
-        # finished episode on a box that merely lacks ffprobe. What must not
-        # happen is a receipt claiming a proof it does not have.
-        report.append(
-            f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
-            f"tail_budget={max_tail_s:.1f}s ({tail_src}) UNPROVEN "
-            f"(duration probe failed -- gate SKIPPED, not passed)")
         log.warning(
             "[OTR_MasterAudioMux] duration gate SKIPPED: probe returned "
             "v=%.3f a=%.3f. The video-longer-than-audio ceiling was NOT "
             "checked for this episode.", v_dur, a_dur)
-    elif over_budget_by is not None:
-        # OVER, AND THE RECEIPT SAYS SO. The gate no longer raises -- the
-        # operator ruled a length disagreement must never discard a finished
-        # episode -- which makes this line the ONLY compact signal a reader
-        # gets. "Publishing anyway" is not "fine": an episode that overshoots
-        # its credits tail still published, and the receipt must carry that
-        # fact rather than the loudness of the warning being the only clue.
-        #
-        # Named OVER_BUDGET to sit beside OK and UNPROVEN as a third verdict
-        # rather than reusing either. The overage rides the line at full
-        # precision so the receipt is self-contained: a reader comparing it
-        # against the budget never has to go find the warning to get the
-        # number.
-        report.append(
-            f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
-            f"tail_budget={max_tail_s:.1f}s ({tail_src}) OVER_BUDGET "
-            f"by {over_budget_by:.4f}s (published anyway)")
-    else:
-        report.append(
-            f"duration_check v={v_dur:.3f}s a={a_dur:.3f}s "
-            f"tail_budget={max_tail_s:.1f}s ({tail_src}) OK")
+    report.append(
+        duration_receipt_line(v_dur, a_dur, max_tail_s, tail_src, tol))
 
     _poll_interrupt()
     # UNCONDITIONAL master copy (rip-sfx bed, 2026-08-06): the SFX mix branch
