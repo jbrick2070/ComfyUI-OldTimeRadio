@@ -567,34 +567,56 @@ does not, and neither does the pack appearing on disk.
 (count decoded characters, not bytes; the em-dashes are multibyte and `wc -c`
 overstates by ~60).
 
-### 9A. ffmpeg is a HARD requirement and the pod image does not have it
+### 9A. NVENC, not ffmpeg — a build-time capability test that lies at runtime
 
-**Measured 2026-08-30, first OTR render ever submitted to rented hardware.** The
-leg reached `t=404s` -- writer done, script written -- and then died:
+**This section previously said the pod image lacked ffmpeg. That was wrong.**
+ffmpeg was already installed (`7:6.1.1-3ubuntu5`, `apt-get` reported
+`0 newly installed`). The real fault was one level down and far more
+interesting.
 
-    [canonical-api] ERROR node 12 (OTR_SignalLostVideo) raised BrokenPipeError
-      File ".../nodes/video_engine.py", line 1098, in _encode_mp4
-        proc.stdin.write(frame.tobytes())
+**What actually happened.** The first OTR render ever submitted to rented
+hardware reached `t=404s` — writer finished, script written, audio done — then
+died with `BrokenPipeError` at `OTR_SignalLostVideo`. ffmpeg's own log named it
+exactly:
 
-`_encode_mp4` opens ffmpeg with `subprocess.Popen` and streams raw frames into
-its stdin. **A BrokenPipeError on the first write means ffmpeg was never
-running** -- the process died immediately, which on a clean image means the
-binary is absent.
+    Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_nvenc))
+    [h264_nvenc] Cannot load libnvidia-encode.so.1
+    [vost#0:0/h264_nvenc] Error while opening encoder
+    Conversion failed!
 
-    apt-get update && apt-get install -y ffmpeg
+The container exposes CUDA for compute but **not `libnvidia-encode.so.1`**, so
+hardware h264 encoding is unavailable. That is normal for rented GPUs and for
+most Docker setups; it is not a RunPod defect.
 
-**Add this to the template's start command**, before ComfyUI starts. Every
-visual path needs it, not just this lane -- the procgen video, the composite,
-the credits roll and the master mux all shell out to ffmpeg.
+**Why our CPU fallback did not save it.** `video_engine._check_nvenc` decided
+with:
 
-**Why this was not caught earlier and is easy to miss again:** it fails SEVEN
-MINUTES IN, after the LLM has written a complete script, so it looks like a
-video-engine bug rather than a missing system package. Nothing earlier in the
-pipeline touches ffmpeg, so a pod can pass every install check -- 25 `OTR_`
-classes, 143 `ADE_`, all four models registered -- and still be unable to
-produce a single frame.
+    "h264_nvenc" in (ffmpeg -codecs output)
+
+That answers *"was ffmpeg COMPILED with nvenc"*, not *"can nvenc RUN here"*.
+Ubuntu builds ffmpeg `--enable-nvenc`, so the string was present, the check said
+yes, and the already-existing `libx264` fallback never got a chance to fire.
+
+**Fixed in `bd6bd936`** — the check now encodes one frame to `-f null -` and
+believes the result.
+
+**Two things worth carrying away, both about how this failed rather than what
+failed:**
+
+* **It failed SEVEN MINUTES IN, after the expensive work was done.** Nothing
+  earlier in the pipeline touches the encoder, so a pod passes every install
+  check — 25 `OTR_` classes, 143 `ADE_`, all four models registered — and still
+  cannot produce a frame. Install verification does not imply render capability.
+* **A capability probe can be wrong in the safe-looking direction.** The first
+  attempt at the fix probed with a 64x64 canvas, which NVENC refuses outright
+  ("Frame Dimension less than the minimum supported value") — so a *healthy*
+  5080 probed as unavailable and would have been silently pushed onto CPU
+  encoding. Measured before and after on the working machine, caught, raised to
+  256x256. **Probe at a realistic size, and always measure the machine that
+  already works.**
 
 **A note on PyAV:** `av` is a ComfyUI core dependency and ships its own bundled
-ffmpeg libraries, which is why probing PyAV in-process succeeds on a box with no
-ffmpeg binary. That bundled build is NOT on PATH and is not what `Popen` finds.
+ffmpeg libraries, so an in-process probe succeeds regardless. That bundled build
+is not on PATH and is not what `subprocess.Popen` finds. PyAV working proves
+nothing about the binary or about NVENC.
 PyAV working proves nothing about the binary.
