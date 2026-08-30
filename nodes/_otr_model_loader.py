@@ -1382,10 +1382,27 @@ def _assert_policy_admits_vram(
         )
         return
 
-    # The policy's OWN quant, not the row's first pinned artifact. Without it
-    # a profile requesting Q4_K_M was judged on a Q8_0 load (PBUG-20260829-08).
+    # PRICE THE REQUEST, NOT THE ROW'S CEILING -- both terms.
+    #
+    # The quant half was PBUG-20260829-08: without it a profile asking for
+    # Q4_K_M was judged on a Q8_0 load. The CONTEXT half is the same defect and
+    # was still live (PBUG-20260829-20): `ctx_verdict.value` is the row's
+    # context_window -- 8192 for the gemma GGUF row -- while the loader will
+    # actually open the context the POLICY asks for. A profile requesting
+    # n_ctx 4096 was therefore priced at 8192:
+    #
+    #     gemma-4-12b-it-GGUF Q4_K_M @ 4096  ->  9.43 GB   WARN, admitted
+    #     gemma-4-12b-it-GGUF Q4_K_M @ 8192  -> 12.23 GB   FAIL, refused
+    #
+    # and it was refused against a card that MEASURED 7,751 MiB running that
+    # exact configuration with all 48 layers resident. The gate was refusing a
+    # load the hardware performs, on the arithmetic of a context nobody asked
+    # for. Third instance of this family after the gate (-08) and the dropdown
+    # badge (-17); the lesson is that a row's declared maximum is never the
+    # right number to judge a specific request by.
+    _est_ctx = getattr(policy, "gguf_n_ctx", None) or ctx_verdict.value
     fit_verdict = _otr_catalog.check_vram_fit(
-        model_id, ctx_verdict.value, ceiling_gb=policy.vram_ceiling_gb,
+        model_id, _est_ctx, ceiling_gb=policy.vram_ceiling_gb,
         gguf_quant=getattr(policy, "gguf_quant", None),
     )
 
