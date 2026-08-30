@@ -490,3 +490,76 @@ ComfyUI-Manager by any route**: not `@latest` (nothing to resolve), not
 path, which is exactly the friction the template's start command exists to
 absorb -- a start command runs as container init and never meets Manager's
 security policy at all.
+
+---
+
+## 9. TEMPLATE v2 — the tweak list, accumulated from a full session of doing it by hand
+
+The operator saved a template from the working pod. **v1 captures the image and
+ports; v2 folds in everything below.** Written down because each item cost real
+time to discover and none of it is guessable.
+
+### Config
+
+| field | value | why |
+|---|---|---|
+| Region | **EU-RO-1** | where GPUs actually schedule; US-CA-2 never gave one |
+| Network volume | mounted at `/workspace` | 4 GB of weights re-download every boot without it |
+| Container disk | > 5 GB | pack + torch deps land here, not on the volume |
+| HTTP port | `8188` **ComfyUI** | everything drives through it |
+| HTTP port | `8888` **JupyterLab** | the ONLY shell we ever got; keep it |
+| HTTP port | `8080` FileBrowser | optional — returned 401 all session, never used |
+| UDP ports | none | nothing here uses UDP; SSH is TCP |
+| `--highvram` | **NOT in a shared template** | right on 31.4 GiB, WRONG on 8 GB |
+
+### Environment
+
+    OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models
+
+**Not optional.** Without it `_models_root()` falls through to its Windows
+default and the fetcher writes ~4 GB into a literal directory named
+`C:\ComfyUI-Models`, which ComfyUI never scans. It reports success. This burned
+a whole diagnosis cycle: the first pod's checkpoint list stayed empty and was
+read as a failed download when the bytes were on disk the whole time.
+
+Set it at DEPLOY time. A Manager reboot restarts the ComfyUI process with its
+existing environment and argv — it does not re-read the image's config, so
+post-hoc changes appear not to take.
+
+### Start command
+
+Runs as container init, which is why it works at all: it never meets
+ComfyUI-Manager's `security_level`, and it does not care that our registry entry
+is Flagged. Shape:
+
+    CN=/workspace/runpod-slim/ComfyUI/custom_nodes
+    [ -d "$CN/ComfyUI-OldTimeRadio" ] || \
+        git clone -b v2.0-alpha <repo> "$CN/ComfyUI-OldTimeRadio"
+    python3 -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt"
+    python3 "$CN/ComfyUI-OldTimeRadio/scripts/otr_fetch_lane_weights.py" haunted
+    <exec the image's normal entrypoint>
+
+* **Idempotent guards** so a restart does not re-clone.
+* **`python3`, never `python`** — this image has no `python` on PATH, and a
+  one-liner whose clone already succeeded dies on it in a way that reads as
+  total failure.
+* **`-b v2.0-alpha` is mandatory** — `main` is thousands of commits behind.
+* **It must end by exec'ing the image's real start.** A start command REPLACES
+  the entrypoint; get this wrong and the pod boots and serves nothing, silently
+  — the same failure shape as section 0.
+* **AnimateDiff-Evolved does NOT need to be in here.** It is Active on the
+  registry and installs over plain HTTP with no terminal (proven: 1036 -> 1181
+  classes, 143 `ADE_`). Bake it in only if you want the template offline-complete.
+
+### Verify, every time
+
+    GET /object_info   ->  OTR_ non-zero
+
+The only thing that proves a pack loaded. A Manager install reporting success
+does not, and neither does the pack appearing on disk.
+
+### README
+
+`docs/RUNPOD_TEMPLATE_README.md` — 4,993 characters, fits RunPod's 5,000 limit
+(count decoded characters, not bytes; the em-dashes are multibyte and `wc -c`
+overstates by ~60).
