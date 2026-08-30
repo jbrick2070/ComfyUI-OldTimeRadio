@@ -8744,3 +8744,82 @@ look worst on the error metric are the ones already failing safe; the quiet
 `original` lane is where correct dialogue is actually being rewritten.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+## PBUG-20260829-16 -- the SHIPPING 8 GB profile crashes on the `scifi_news_pro` bank at the opening music shot
+
+- **found:** 2026-08-29 on the 4060 (MRKT), during the operator's variety churn
+  ("churn 1-act episodes to find the AI's weak points"). Found by VARYING THE
+  BANK, which is the only reason it surfaced: every prior episode on this box
+  used a different bank and all three passed.
+- **artifact:** a real canonical render, prompt `0ee975ff`, profile
+  `otr_nvidia_8gb_haunted` (the `status: "shipping"` profile), `--act-count 1`,
+  `--source-bank scifi_news_pro`. **RESULT FAIL after 4304 s (72 minutes)** --
+  it died at the video stage, i.e. after the writer, the voices, the music and
+  the whole audio master had already been produced. Nothing published.
+
+      ERROR node 92 (OTR_VideoRenderBatch) raised RenderError
+      shot shot_shot_000_music engine 'animatediff15_v3_haunted_video'
+      failed to render; fallbacks are disabled (FailureKind.CRASH_BEFORE_LOAD)
+      -- fix the engine or its inputs:
+      GhostCadenceError: Ghost Signal cadence needs a delivered target of at least 1
+
+- **what it is NOT:** not VRAM (the card was at 4.6 GB of 8.0 when it raised),
+  not the model files, not the node pack, and not the CPU fault from -12. The
+  engine refused its own INPUTS: a delivered target of zero shots for the
+  opening music beat.
+- **why it matters more than one failed leg:** this is the profile the repo
+  marks `shipping` for 8 GB, and it is the only shipping profile whose evidence
+  comes from non-dev hardware. Its three passes were `shakespeare`-flavoured and
+  archive-flavoured banks. **One bank change turns it into a 72-minute total
+  loss** -- and the loss is maximal, because the failure lands at the video
+  stage after every expensive upstream stage has completed. A user on a slow
+  laptop pays the entire render cost and receives nothing.
+- **`CRASH_BEFORE_LOAD` and `fallbacks are disabled` are correct behaviour, not
+  the bug.** The no-fallback rip is deliberate and right: a silent substitution
+  here would ship a wrong-looking episode. The defect is upstream -- something
+  in the `scifi_news_pro` shot plan delivers zero targets for
+  `shot_shot_000_music`. Note also the doubled prefix in the shot id
+  (`shot_shot_000_music`, and `shot_shot_002_b2` earlier in the same leg), which
+  may or may not be related but is worth a look by whoever owns the planner.
+- **fix:** NOT FIXED and NOT MINE. `nodes/_otr_video_engines/eng_ghost_signal.py`
+  and the shot planner are the shipping surface (5080) under the 2026-08-29
+  split. Handing it over with the reproduction: profile
+  `otr_nvidia_8gb_haunted`, `--act-count 1`, `--source-bank scifi_news_pro`.
+  Whether it reproduces on 16 GB is the first question -- if it does, it is a
+  planner defect independent of card size and the 8 GB box merely happened to
+  run that bank first.
+- **process note for the churn:** the three passing episodes on this box used
+  ONE bank family. Varying the bank found a crash in the first new bank tried.
+  That is a small sample making a large point about what "3 for 3" was actually
+  evidence of.
+- bible-worthy: CANDIDATE, pending the 16 GB reproduction. If it is
+  bank-specific rather than card-specific, the reusable class is *a profile
+  proven on one content bank is not proven on the others, and the expensive
+  stages run first* -- i.e. content variation is a test dimension, not a
+  cosmetic one.
+
+### EVIDENCE ADDED TO PBUG-20260829-13 -- and the real failure mode is WORSE than the gate message
+
+The untouched shipped graph was run on this 8 GB card: prompt `4270a0d0`, no
+`--profile`, nothing changed. **RESULT FAIL**, node 1
+`OTR_LedgerScriptWriter`. That is the live artifact -13 was missing.
+
+But the failure is not the clean refusal the gate arithmetic predicted. The
+default writer `google/gemma-4-12b-it` went PAST the fit gate into the loader,
+took the bitsandbytes CPU-dispatch refusal, triggered the retry, and died as:
+
+    ModelLoaderError: load_llm failed for model_id='google/gemma-4-12b-it':
+    Tensor.item() cannot be called on meta tensors
+
+**So a fresh 8 GB user pressing Run on the shipped workflow does not get
+"estimated 11.9 GB vs 6.8 GB ceiling -- pick a smaller model". They get
+"Tensor.item() cannot be called on meta tensors"** -- a message with no
+actionable content, naming neither the model, the memory, nor the remedy. That
+is PBUG-06 surfacing on the default path, which makes -06 a first-run
+experience defect rather than an advanced-configuration one, and it raises the
+priority of -13 accordingly.
+
+**Caveat unchanged and still open:** this box has `gemma-4-12b-it` cached, so
+the refusal was reached without a download. Whether a clean box pays 11.9 GB of
+bandwidth before failing this way is still unmeasured and still needs a machine
+without the cache.
