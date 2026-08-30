@@ -9798,3 +9798,53 @@ operative rule: **measure the bridges in the ledger; never derive them.** A
 tuning derived from `act_count` would have been wrong on one of these two legs
 no matter which one it was derived from.
 
+
+### CORRECTION to the PBUG-20260829-16 companion observation -- the bridge count is NOT bank behaviour (2026-08-30, 4060 + 5080)
+
+The entry above explains the bridge-count divergence as **bank behaviour**:
+*"`music_inter_count` is the OUTLINE's instruction to the writer, not a
+constraint on what a bank ultimately emits ... So the divergence is bank
+behaviour rather than a broken formula."* **That is wrong and is withdrawn.**
+
+**The 4060 refuted it by running the same bank twice:**
+
+    leg 2204f5f8   --act-count 2   ->  2 bridges  (18 beats)
+    leg 8ea39846   --act-count 2   ->  1 bridge   (13 beats)
+
+Same bank, same flag, different count. **It replicates on the 5080**, on the
+same profile and the same `--act-count 5`, across nine episodes rendered the
+same night:
+
+    8 of 9   28 beats   4 bridges     (matches act_count - 1)
+    1 of 9   54 beats   0 bridges     <<< the_leadlined_hearth
+
+So the count tracks **EPISODE SHAPE**, and episode shape varies run to run on
+identical inputs. "My banks match the formula" was a statement about the
+episodes that happened to be rendered, not a property of those banks -- eight
+matching runs looked like a rule and were a sample.
+
+**The operational rule is unchanged and is now better supported: MEASURE the
+bridges in the ledger, never derive them from `act_count` or from the bank.** A
+tuning of `MUSIC_BRIDGE_FALLBACK_DUR_S` derived from `act_count` would have been
+wrong on at least one leg from each machine.
+
+**Also corrected, the 4060's own claim: the padding is not a constant.** It was
+presented as characterised off two agreeing points; a third moved it:
+
+    5080  5-act  4 bridges   16.83 s    = 16.0 + 0.83
+    4060  2-act  2 bridges    8.8608 s  =  8.0 + 0.8608
+    4060  2-act  1 bridge     4.9271 s  =  4.0 + 0.9271
+
+The per-bridge **4.0 s is exact in all three**. The remainder is 0.83-0.93 and
+moves. Model the residual as `4.0 x bridges + ~0.9 s` and do not treat the tail
+term as stable.
+
+**Neither correction touches the fix.** Both are about how confidently two
+numbers seen twice were described as laws. Recorded because the entry above
+would otherwise send the next reader looking for a bank-specific cause that does
+not exist.
+
+**PBUG-20260830-01 is now proven on the live path** (4060 leg 8ea39846, pushed
+49c3a570): `duration_check ... OVER_BUDGET by 4.9271s (published anyway)`,
+agreeing with its warning to four decimals, where three hours earlier the same
+node printed `OK`.
