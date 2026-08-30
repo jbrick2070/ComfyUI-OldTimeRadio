@@ -224,6 +224,19 @@ ZERO stills** — so the lane would register, load, and render text-to-video und
 an image-to-video receipt. That is the worst failure shape in this codebase: a
 receipt that lies. Section 6's table missed it entirely.
 
+> **CORRECTED IN ROUND 2 (Codex, grounded, and I checked the call path myself).**
+> The *conclusion* survives; the *mechanism* above is wrong, and I folded it in
+> without verifying it. `engine_consumes_still` in
+> `nodes/otr_image_gen_dispatcher.py` reads `accepts_still` FIRST and returns it
+> whenever it is not `None`; `required_inputs` is only the fallback for engines
+> that predate the flag. So a class declaring `accepts_still = True` gets its
+> stills minted no matter what `still_plan` says — an empty plan does NOT zero
+> out the dispatcher. What an empty plan *does* do is lie in the other
+> direction: `still_plan_helpers.py` defines `()` as a real declaration meaning
+> "this lane needs no images", so shipping it would misstate the lane's pixel
+> contract and skip the plan-authored kind/identity behaviour. The sibling still
+> needs a truthful non-empty scene plan. Same fix, different reason.
+
 ### Section 6's table was too short. VERIFIED additional surfaces:
 
 | surface | why it is not optional |
@@ -275,3 +288,128 @@ look at four clips, and only then decide whether a lane exists at all. That
 inverts the spec's original recommendation and is better: the question that
 decides everything — does the haunted look survive a conditioning still — is
 answered by four clips and an eye, not by an engine.
+
+## 11. REVIEW ROUND 2 — Codex, grounded 2026-08-30
+
+Independent end-to-end read of this spec at commit `07a47008`. I verified its
+decision-changing claims against the real files before folding; what follows is
+what survived, not what was asserted. Its engine roster matched the live
+`_VIDEO_REGISTRY` name-for-name, which is why I trust the rest of it.
+
+### 11.1 The central premise of this spec was false
+
+**Route B was never blocked by an AnimateDiff-Evolved upgrade.** This spec chose
+Route A (latent init) largely to avoid disturbing the proven ADE 1.6.0 install
+the 8 GB haunted lane depends on. That trade does not exist. SparseCtrl is not
+ADE's to ship — ADE's own README, line 6, names `ComfyUI-Advanced-ControlNet`
+and says it *"Includes SparseCtrl support."* Verified locally: the only file in
+the installed ADE tree that even mentions SparseCtrl is its README, and **ACN is
+not installed here at all.**
+
+So the real Route B cost is *installing one new node pack*, not upgrading a
+working one — materially cheaper and lower-risk than this spec assumed, and it
+removes the main argument for preferring a mechanism AnimateDiff v3 does not use
+for image conditioning. Route A stays in scope only as a cheap hypothesis probe;
+it is not the recommended build.
+
+**Corollary:** matching version numbers are not compatibility proof. ACN's
+DinkLink layer checks an ADE boundary and warns the cross-pack API can change,
+so ACN + this exact ADE commit still has to be qualified, not assumed.
+
+### 11.2 The blocker is upstream of both routes, and it is already logged
+
+Neither route has an 8 GB product path today, and the reason has nothing to do
+with video conditioning. **PBUG-20260829-03**: on the 4060, activating the image
+role native-aborts the ComfyUI process at the Z-Image sampler's step 0/8 —
+
+    Fatal Python error: Aborted
+
+CUDA error 2 (out of memory) while ComfyUI's DynamicVRAM streamed the 6.2 GB
+Z-Image UNET onto a card still holding OTR's residents. This is worse than an
+ordinary OOM: it calls native `abort`, so OTR never gets to catch it, write a
+receipt, or degrade. Its own amendment records that the shipping haunted profile
+survives *only* because its text-to-video engine never activates the image role.
+
+An image-to-video haunted lane activates exactly that role. **Until the canonical
+image phase can generate and reclaim its Z-Image bundle on 8 GB, this lane has no
+4060 story regardless of how good its conditioning is.** That measurement comes
+first, before any engine work, and an actual OOM decides it — no estimate gate.
+
+### 11.3 Contract corrections
+
+* **`required_inputs = ("text_prompt", "init_image")`.** Round 1 was right that
+  `("init_image",)` alone would crash. Round 2 adds why the obvious repair is
+  also wrong: `negative_prompt` **cannot** be added to `required_inputs` — it is
+  not in the closed request-token vocabulary in `schemas.py`. Its non-blank
+  requirement stays a renderer invariant, enforced inside the Ghost renderer.
+* **H3 is not a template to copy.** It gets away with `("init_image",)` because
+  it owns a prompt fallback and a dedicated first-frame conditioner. Ghost has
+  no text fallback, so it cannot inherit that shape.
+* **Cache identity is prompt-only today.** `shot_cache_identity` hashes prompt,
+  negative prompt, shot/seed/canvas and artifacts — **not** the init image and
+  **not** denoise. An I2V identity that treats two different stills as the same
+  request is a false contract and must not ship.
+
+### 11.4 Surfaces section 6 missed
+
+Verified present in the repo and enforced by tests:
+
+* `workflows/variants/<profile>.json` **and** `<profile>.launch.md` — generated
+  for every committed profile (70 launch files exist today).
+* `docs/ENGINE_MATRIX.md` — regenerate via `tools/engine_matrix.py`; parity is
+  enforced.
+* `tests/fixtures/still_plan_head_parity.json` — regenerate the roster.
+  (Round 1 named `still_plan_matrix.json`; **no such file exists.**)
+* `tests/test_frame_contract.py` — its unbounded-engine set is a literal roster,
+  not automatic.
+* `scripts/otr_w45_campaign.py` — every new local engine joins the roster or
+  gets a deliberate `PROFILE_EXCEPTIONS` mapping.
+* `docs/evidence/video_evidence_manifest.json` — needs an explicit
+  `admission_unenforced` statement until a real measurement lands. No estimated
+  cost may ever kill a render.
+* `nodes/_otr_video_engines/registry.py` — a `CAPABILITIES` row is required;
+  `@register` on the class does the registration. This spec's "one registration"
+  wording was inaccurate.
+* `workflows/otr_canonical.json` needs **no** structural edit while this stays an
+  internal engine/profile addition. A new widget would immediately drag in
+  canonical + `widget_mapping.json` + all variants as same-change edits.
+
+### 11.5 Factual corrections to earlier sections
+
+* **12 effective `image_to_video` engines, not six.** Verified against the live
+  registry: `cloud_vidu_q2_pro_fast_720p`, `cloud_wan_i2v`, `fastwan_8gb`,
+  `ltx25_foley_plus`, `ltx25_mime`, `ltx25_video`, `ltx_8gb`, `ltx_video`,
+  `mesh_stage`, `minimax_h3_video`, `wan_ti2v`, `word_razzle`.
+* **The golden and clean-v3 Ghost lanes are not selectable siblings.** They are
+  unregistered/tombstoned bases kept as inheritance references.
+  `animatediff15_v3_haunted_video` is the one surviving AnimateDiff lane.
+* **Haunted adapter strength is not frozen at 1.0** —
+  `OTR_GHOST_HAUNTED_LORA_STRENGTH` overrides it, and no value has been
+  qualified by eye.
+* **"SparseCtrl is strictly better" is not established.** It is the purpose-built
+  mechanism; comparative quality on *this* haunted stack is empirical.
+* **Upstream warns about exactly our plan:** AnimateDiff recommends the animated
+  image come from the same SD 1.5 model used for animation. A Z-Image still fed
+  to a haunted SD 1.5 checkpoint violates that, and cross-model subject drift may
+  dominate even when SparseCtrl works correctly.
+
+### 11.6 Revised recommendation
+
+1. **Measure the image phase on the 4060 first** (PBUG-20260829-03). Clean
+   server, real 512x288 canonical beat; record baseline / post-writer reclaim /
+   Z-Image peak / post-decode reclaim / video-stage peaks. If it still aborts,
+   stop — there is no 8 GB lane to build.
+2. **Then qualify ACN 1.6.0 in isolation** through the real
+   `workflows/otr_canonical.json`, on an unregistered probe path with no
+   selectable profile row.
+3. **Then build the SparseCtrl lane** as its own engine id with its own recipe,
+   receipt and evidence row — never swapped in behind Route A's identity, which
+   would make old renders unreproducible.
+4. Route A's 0.35/0.50/0.65/0.80 denoise sweep remains valid, but it can only
+   falsify Route A. It says nothing about whether the purpose-built mechanism is
+   worth building.
+
+**Both reviewers agree on the one thing that matters: do not build this as
+originally specified.** Round 1 said run the cheap experiment first. Round 2
+says that experiment is aimed at the wrong stage — measure the image phase
+before touching the video engine at all.
