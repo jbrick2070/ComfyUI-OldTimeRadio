@@ -493,11 +493,14 @@ security policy at all.
 
 ---
 
-## 9. TEMPLATE v2 — the tweak list, accumulated from a full session of doing it by hand
+## 9. THE TEMPLATE SPEC — current requirements, kept in place
 
-The operator saved a template from the working pod. **v1 captures the image and
-ports; v2 folds in everything below.** Written down because each item cost real
-time to discover and none of it is guessable.
+**This is a LIVING spec, not a version history.** When something changes, edit
+the cell; do not append a v3. What matters is what a template needs *today* —
+nobody ever needs to know what it needed last week.
+
+Every item below cost real time to discover and none of it is guessable from
+the outside.
 
 ### Config
 
