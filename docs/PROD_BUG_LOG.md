@@ -9367,3 +9367,57 @@ the third gets a panel before code.
 - bible-worthy: CANDIDATE. Class: *a validator written for fiction applied to a
   factual lane inverts its own rule -- "not in the cast" means "invented" for a
   drama and means "correctly sourced" for a news report.*
+
+## PBUG-20260829-16 -- RESOLVED, verified on the sentinel shape (4060, 2026-08-30)
+
+Attempt 2 of the fix (commit b2f36242, authored on the 5080) is **CONFIRMED
+WORKING** against the only bank that carries the failing shape.
+
+- **leg:** prompt `cc8b0e1d-3c0f-4403-9305-52ea5fcbc80c`, profile
+  `otr_nvidia_8gb_haunted`, `--source-bank scifi_news_pro`, `--act-count 1`,
+  8188 MiB card. Server PID 24536 booted 04:03:07; b2f36242 landed 03:56:42,
+  so the fix was genuinely in the process under test.
+- **RESULT SUCCESS.** Published
+  `signal_lost_the_engineered_bloom_20260830_044129_..._final.mp4`,
+  131 MB / 137,335,578 B, 155.28 s, h264 1920x1080 @25fps + aac.
+  ffprobe-verified playable, both streams present.
+
+**The three signals the 5080 asked for:**
+
+1. `foley_unpositioned=` -- **NOT EMITTED.** No foley receipt line of any kind
+   appears in this leg's log. Reported as absence, not as zero: I cannot tell
+   from this run whether the counter is zero or simply not logged on this
+   path. If the 5080 needs the number, the emit site has to be unconditional.
+2. **video/audio delta: 24.57 s. Credits roll: 24.6 s. Excess: -0.03 s** --
+   zero within a single frame (0.04 s at 25fps). The 18.93 s is gone.
+   Mechanism visible in the log:
+   `[OTR_SilentComposite] A/V-sync master reconcile: 3293 -> 3268 frames
+   (positioned ledger cross-check)` -- 25 frames trimmed to match the
+   positioned ledger, then `assembled 15 beats -> 3268 frames; budget 3268 OK`.
+3. **It PUBLISHES.** Signal 3 is yes.
+
+**The sentinel rule fired exactly as specified, twice:**
+
+    [OTR_ShotLock] music row shot_000_music is a pre-audio sentinel;
+      the timed music_open mirror owns the timeline
+    [OTR_ShotLock] music row shot_002_music is a pre-audio sentinel;
+      the timed music_close mirror owns the timeline
+
+**Clean-run counters:** `exceeds master audio` 0, cadence refusals 0,
+zero-frame warnings 0.
+
+**Scope of the claim, stated honestly:** this proves the fix on ONE bank, ONE
+act, ONE run. It does not prove the general case, and signal 1 is unanswered.
+What it does close is the specific question that was only falsifiable here --
+the 4060 is the only box producing the sentinel ledger shape, and on that
+shape the excess is now zero rather than 18.93 s.
+
+**Bank status on 8 GB after this leg: 5 of 5 proven.** `scifi_news_pro` was
+the last one failing; it had taken down two 8 GB episodes in a day
+(PBUG-16 at the video stage 72 min in, PBUG-20 at the writer 5.7 min in).
+
+- bible-worthy: YES. Class: *a phantom row that exists to be mirrored must be
+  dropped by the consumer that reads the pre-audio ledger, not by the producer
+  that writes it -- deleting it at the source killed an unrelated engine
+  (`fastwan_8gb`) that depended on the sentinel.*
+
