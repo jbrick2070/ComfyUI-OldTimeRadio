@@ -23,17 +23,55 @@ def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
     return shutil.which("ffmpeg")
 
 
+#: Cached for the process. The probe costs about a second and the answer cannot
+#: change while we run.
+_NVENC_PROBE: Optional[bool] = None
+
+
 def has_nvenc(ffmpeg: str) -> bool:
+    """Can h264_nvenc actually ENCODE here -- not merely exist in the build.
+
+    THE OBVIOUS TEST IS WRONG AND COST A WHOLE EPISODE (2026-08-30). This used
+    to answer with ``"h264_nvenc" in (ffmpeg -codecs)``, which reports whether
+    ffmpeg was COMPILED with nvenc. On any container that ships a full ffmpeg
+    without the NVIDIA encode library -- the normal case on rented GPUs --
+    that is true while encoding is impossible:
+
+        [h264_nvenc] Cannot load libnvidia-encode.so.1
+        [vost#0:0/h264_nvenc] Error while opening encoder
+        Conversion failed!
+
+    Callers stream raw frames into ffmpeg's stdin, so a dead encoder surfaces
+    as BrokenPipeError or a RuntimeError on the first write -- eighteen minutes
+    into a render on the leg that found this, long after the script and audio
+    were finished, naming nothing useful.
+
+    **This is the ONLY nvenc decision in the pack.** There were two identical
+    string tests, here and in ``video_engine``; fixing one left the other to
+    fail the same render at a later node, which is exactly what happened. The
+    node now delegates here.
+
+    Probes at 256x256 deliberately: NVENC rejects tiny frames outright with
+    "Frame Dimension less than the minimum supported value", so a 64x64 probe
+    reports a HEALTHY card as unavailable and silently drops it to CPU.
+    """
+    global _NVENC_PROBE
+    if _NVENC_PROBE is not None:
+        return _NVENC_PROBE
     try:
         out = subprocess.run(
-            [ffmpeg, "-hide_banner", "-codecs"],
+            [ffmpeg, "-hide_banner", "-loglevel", "error",
+             "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
+             "-c:v", "h264_nvenc", "-frames:v", "1",
+             "-f", "null", "-"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=20,
         )
-        return "h264_nvenc" in (out.stdout or "")
-    except Exception:  # noqa: BLE001 -- profiling helper: absence just means CPU encode.
-        return False
+        _NVENC_PROBE = out.returncode == 0
+    except Exception:  # noqa: BLE001 -- a probe must never be fatal.
+        _NVENC_PROBE = False
+    return _NVENC_PROBE
 
 
 @dataclass
