@@ -87,11 +87,22 @@ def test_master_audio_mux_no_shortest_and_credits_tail_guard(tmp_path, monkeypat
     final, _r = mux_master_audio(str(silent), str(master), str(out_ok), fps=25)
     assert os.path.isfile(final)
     assert audio_pcm_sha(final) == audio_pcm_sha(str(master))
-    # GROSS drift PAST the credits-tail budget still FAILS LOUD (a real
-    # frame-budget bug, not the intended post-roll).
+    # GROSS drift PAST the budget is REPORTED, NOT REFUSED (operator directive
+    # 2026-08-30: "don't kill a duration mismatch, just let it fly"). By the
+    # time this gate runs, the writer, voices, music, every video beat and the
+    # full audio master are already rendered -- refusing to mux discards a
+    # finished episode over a consistency judgement, which is the class the
+    # operator has ruled must never kill a render. The number still reaches the
+    # log at full precision, because a gross overshoot usually IS an upstream
+    # frame-budget bug worth chasing.
     monkeypatch.setenv("OTR_MAX_CREDITS_TAIL_S", "0.25")
-    with pytest.raises(ValueError):
-        mux_master_audio(str(silent), str(master), str(tmp_path / "drift.mkv"), fps=25)
+    drift_out = tmp_path / "drift.mkv"
+    final_drift, _rd = mux_master_audio(
+        str(silent), str(master), str(drift_out), fps=25)
+    assert os.path.isfile(final_drift), "a gross-drift episode was not published"
+    # and the audio is STILL byte-identical -- publishing anyway must never
+    # become truncating (no -shortest), which is the invariant that matters.
+    assert audio_pcm_sha(final_drift) == audio_pcm_sha(str(master))
     # the node never silently truncates (no -shortest); the source proves it -- the
     # only '-shortest' token in the mux module is the V-2 guard assert, never a cmd arg.
     src = (REPO_ROOT / "nodes" / "otr_master_audio_mux.py").read_text(encoding="utf-8")
@@ -182,13 +193,16 @@ def test_credits_tail_gate_absorbs_concat_frame_quantization(tmp_path):
     assert os.path.isfile(final)
     assert audio_pcm_sha(final) == audio_pcm_sha(str(master))
 
-    # GROSS drift is STILL caught -- the slack is a quantization bound, not a
-    # blind widening. A tail budget of ~0 against a 1s excess must abort.
-    with pytest.raises(ValueError):
-        mux_master_audio(
-            str(silent), str(master), str(tmp_path / "gross.mkv"), fps=25,
-            declared_credits_tail_s=0.01,
-        )
+    # GROSS drift is still DETECTED but no longer aborts (see the sibling test
+    # and the operator directive of 2026-08-30). The quantization slack remains
+    # a real bound rather than a blind widening -- what changed is the penalty
+    # for exceeding it: a loud log line instead of a discarded episode.
+    gross, _rg = mux_master_audio(
+        str(silent), str(master), str(tmp_path / "gross.mkv"), fps=25,
+        declared_credits_tail_s=0.01,
+    )
+    assert os.path.isfile(gross)
+    assert audio_pcm_sha(gross) == audio_pcm_sha(str(master))
 
 
 @needs_ffmpeg

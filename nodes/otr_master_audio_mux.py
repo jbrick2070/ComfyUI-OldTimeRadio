@@ -274,13 +274,33 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
         # violated a budget it was under. Never round the number the reader is
         # being asked to compare against.
         _excess = v_dur - a_dur
-        raise ValueError(
-            f"OTR_MasterAudioMux: silent video {v_dur:.4f}s exceeds master audio "
-            f"{a_dur:.4f}s by {_excess:.4f}s, over the credits-tail budget "
-            f"({max_tail_s:.4f}s [{tail_src}] + {tol:.4f}s tol = "
-            f"{max_tail_s + tol:.4f}s) by {_excess - max_tail_s - tol:.4f}s "
-            f"-- likely a composite/credits frame-budget bug, not the intended "
-            f"silent credits tail"
+        # OPERATOR DIRECTIVE 2026-08-30: "don't kill a duration mismatch, just
+        # let it fly." THIS USED TO RAISE, and raising here is the most
+        # expensive refusal in the pipeline: by the time this runs the writer,
+        # the voices, the music, every video beat and the full audio master are
+        # already rendered. Refusing to mux discards a finished episode over a
+        # length disagreement -- a consistency judgement, not a resource limit,
+        # which is exactly the class the operator has ruled must never kill a
+        # render. An OOM is the only killer.
+        #
+        # Observed cost: a complete scifi_news_pro leg died here at the last
+        # step because the silent video ran 41.99s past the master audio, 18.87s
+        # beyond the credits-tail budget. Every frame of it was already on disk.
+        #
+        # The number is still WORTH KNOWING -- a gross overshoot usually IS a
+        # frame-budget bug upstream (PBUG-20260829-16's music-beat duration is a
+        # live example) -- so it is logged loudly, at full precision, with the
+        # same wording the exception carried. What changes is that it no longer
+        # throws the episode away to tell you.
+        log.warning(
+            "[OTR_MasterAudioMux] DURATION MISMATCH (publishing anyway): silent "
+            "video %.4fs exceeds master audio %.4fs by %.4fs, over the "
+            "credits-tail budget (%.4fs [%s] + %.4fs tol = %.4fs) by %.4fs -- "
+            "usually a composite/credits frame-budget bug upstream, not the "
+            "intended silent credits tail. The muxed episode will carry %.4fs "
+            "of video past the end of its audio.",
+            v_dur, a_dur, _excess, max_tail_s, tail_src, tol,
+            max_tail_s + tol, _excess - max_tail_s - tol, _excess,
         )
     if v_dur < 0 or a_dur < 0:
         # THE RECEIPT MAY NOT SAY OK OVER A FAILED PROBE. `_probe_float`
