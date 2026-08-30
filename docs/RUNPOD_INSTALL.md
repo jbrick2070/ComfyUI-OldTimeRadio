@@ -871,11 +871,30 @@ shows the exact `{{ RUNPOD_SECRET_<name> }}` string to paste when the secret is
 created. Secrets are injected at pod creation, exactly like SSH keys, so **a
 secret added to a RUNNING pod does not reach it** -- redeploy.
 
-**Do NOT run `huggingface-cli login` on the pod.** With `HF_HOME` on the volume
-it writes the token in plaintext to `/workspace/hf/token`, where it then
-persists on shared storage across every pod that mounts that volume, long after
-the pod that typed it is gone. The Secret route keeps the token out of the
-volume and out of any terminal history.
+**`hf auth login` IS fully supported -- just not on a shared volume.**
+`nodes/_otr_hf_auth.py` reads the login token FILE as a first-class source
+(PBUG-20260829-10 exists precisely because it once did not, which made the
+documented login invisible). The objection here is storage, not support: with
+`HF_HOME` on the volume, login writes the token in plaintext to
+`/workspace/hf/token`, where it persists on shared storage for every future pod
+that mounts that volume, long after the pod that typed it is gone. On a laptop
+or a single-tenant box, `hf auth login` is the right answer. On a shared network
+volume, use the Secret.
+
+### There is NO RunPod-specific path, and that is by design
+
+A Secret is not a mechanism -- it is one way to set `HF_TOKEN`, which is the
+universal contract. OTR resolves the token from three independent sources and
+never learns which one was used:
+
+    1. os.environ["HF_TOKEN"]      RunPod Secrets, Docker -e, systemd, CI, export
+    2. Windows HKCU\Environment     ComfyUI Desktop, which does not inherit user env
+    3. the `hf auth login` file    the documented HF way, any OS
+
+So a pod user and a laptop user execute identical code. Nothing about adopting
+Secrets narrows who can run this, and no second path needs maintaining. The only
+`runpod` string in `nodes/` is a comment in `_otr_paths.py` noting that path
+priority exists SO cloud deployments work -- portability, not coupling.
 
 **The token is only needed for GATED repos.** Everything the default path uses
 is ungated: the writer, voices, music, the haunted lane, `minimax_h3` and
