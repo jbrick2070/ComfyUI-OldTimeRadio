@@ -9240,3 +9240,56 @@ line/episode, gemma-2-2b by inventing replacement dialogue. There is no third
 option in the current dropdown.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+### PBUG-20260829-11 ADDENDUM -- a FAILED fix attempt, and the semantics it taught (5080, 2026-08-29)
+
+**Recording a wrong fix on purpose.** The next window will reach for the same
+one, because it looks obviously correct.
+
+**WHAT I TRIED:** make `_detach_and_invalidate_locked` skip the epoch bump when
+`LLM_CACHE` holds no entry. Reasoning: the epoch is a change counter, and
+clearing an already-empty cache changes nothing.
+
+**WHY IT IS WRONG, and it is wrong in the guard's PRIMARY case.** Four tests
+went red, `test_self_unload_cannot_launder_a_prior_external_invalidation`
+among them. The guard exists so an external handler can orphan a call that is
+**still loading** -- and while a call is loading, **the cache is empty by
+definition**, because nothing has published yet. So the early-out disables the
+protection in exactly the scenario it was written for.
+
+**THE SEMANTICS, stated so nobody re-derives them the hard way: the bump
+signals INTENT TO ORPHAN, not "state changed."** An invalidator saying "the
+in-flight loader must not publish" is making a claim about the FUTURE, not
+recording a change to the present. Residency is irrelevant to that claim.
+Reverted; 26 tests green again.
+
+**CONSTRAINTS ON ANY FUTURE FIX**, from three independent review lanes run
+from the 4060 window plus that box's own traces:
+
+* **It fires on the FIRST `request_slot` of a cold process** -- epoch 0, empty
+  cache, ~30 s after "got prompt", nothing in flight to abandon. So it is
+  DETERMINISTIC, not a race, and **any fix keyed on "has anything been cached
+  yet" is dead on arrival.**
+* **The causality runs one way:** non-adoption -> every call cold-loads ->
+  the reloads collide -> OOM. Measured: 23 of 23 load failures at
+  `Free=0.00 GB`, 14 of 14 successes at `Free=6.91 GB`, total correlation,
+  with torch reporting `allocated 0, reserved 0` throughout (the occupant is
+  llama.cpp, not torch). **Fixing -11 should make the memory symptom vanish on
+  its own.** If it does not, that is a SECOND defect and worth separating.
+* **A reproduction free of the OOM confound exists:** at
+  `OTR_GGUF_N_GPU_LAYERS=35` on the 4060, the memory collisions disappear
+  entirely (0 load failures, 12 preflights all at `Free=6.9x`) while the
+  abandonment continues (13 of them). Use that shape to test a fix without
+  capacity noise.
+* **The shape the code already names:** `unload_llm`'s docstring says the
+  unconditional invalidator is for callers OUTSIDE `request_slot`'s control
+  flow, and that self-triggered teardowns need the ownership-checked
+  `_self_unload`. `request_slot` already does this correctly for its own
+  transitions. The one caller using the wrong door is the GGUF backend's
+  preflight, `_otr_gguf_backend.py` -> `free_otr_pipeline_residue` ->
+  `_otr_vram_levers` -> `unload_llm()`. Threading the caller's epoch to that
+  eviction is the fix; it is plumbing across two files in the most
+  concurrency-sensitive code in the pack, which is why it gets a panel first.
+
+**Two swings spent (this addendum is the second).** Per the two-strikes rule
+the third gets a panel before code.
