@@ -1023,14 +1023,52 @@ def _check_nvenc(ffmpeg_path):
             _NVENC_AVAILABLE = False
             log.info("[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
             return False
+        # PROBE IT, DO NOT ASK THE BUILD (2026-08-30).
+        #
+        # This used to test `"h264_nvenc" in ffmpeg -codecs`, which answers "was
+        # ffmpeg COMPILED with nvenc", not "can nvenc RUN here". Those differ on
+        # every container that ships a full ffmpeg without the NVIDIA encode
+        # library, which is the normal case on rented GPUs. Ubuntu's ffmpeg is
+        # built `--enable-nvenc`, so the string test passed on a RunPod pod and
+        # the encoder then failed to open:
+        #
+        #     [h264_nvenc] Cannot load libnvidia-encode.so.1
+        #     [vost#0:0/h264_nvenc] Error while opening encoder
+        #     Conversion failed!
+        #
+        # The caller streams raw frames into ffmpeg's stdin, so a dead encoder
+        # surfaces as `BrokenPipeError` on the first write -- SEVEN MINUTES into
+        # a render, after the script and the audio are done, naming nothing
+        # useful. The whole episode was lost to a one-line capability test.
+        #
+        # So actually encode one frame to nothing and see if it survives.
+        # `-f lavfi -i nullsrc` costs no disk and about a second, and the result
+        # is cached for the process like the old answer was.
         try:
-            result = subprocess.run(
-                [ffmpeg_path, "-hide_banner", "-codecs"],
-                capture_output=True, text=True, timeout=5,
+            probe = subprocess.run(
+                [ffmpeg_path, "-hide_banner", "-loglevel", "error",
+                 # 256x256, not something smaller: NVENC refuses tiny frames with
+                 # "Frame Dimension less than the minimum supported value",
+                 # which would make a WORKING card probe as unavailable. A 64x64
+                 # probe did exactly that on the 5080 and would have pushed a
+                 # healthy machine onto CPU encoding.
+                 "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
+                 "-c:v", "h264_nvenc", "-frames:v", "1",
+                 "-f", "null", "-"],
+                capture_output=True, text=True, timeout=20,
             )
-            _NVENC_AVAILABLE = "h264_nvenc" in result.stdout
-        except Exception:
+            _NVENC_AVAILABLE = probe.returncode == 0
+            if not _NVENC_AVAILABLE:
+                # The reason matters -- a missing driver library and a bad
+                # parameter look identical from the outside, and this is the
+                # only place the distinction is cheap to record.
+                why = (probe.stderr or "").strip().splitlines()
+                log.info("[Video] h264_nvenc probe failed (%s); using CPU",
+                         why[-1][:160] if why else "no stderr")
+        except Exception as exc:  # noqa: BLE001 -- a probe must never be fatal
             _NVENC_AVAILABLE = False
+            log.info("[Video] h264_nvenc probe could not run (%s); using CPU",
+                     type(exc).__name__)
         tag = "NVIDIA h264_nvenc" if _NVENC_AVAILABLE else "CPU libx264"
         log.info("[Video] Encoder: %s", tag)
         return _NVENC_AVAILABLE
