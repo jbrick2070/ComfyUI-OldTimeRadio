@@ -8906,3 +8906,48 @@ yet" until a sample lands on the other side. The whole-line rate, measured over
 denominator held; a zero over a small one did not.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+### PBUG-20260829-14, second addendum -- the damage is in the REPAIR, not only the judge, and a model swap does not fix it
+
+Diffed every COMMITTED repair on disk (1,274 across 292 episodes) before -> after
+and classified what the repair actually did. This reframes the entry above: I had
+been treating the harm as a judge-precision problem, fixable by choosing a better
+writer. Half of it is not.
+
+        model                    committed   STAGE-DIR-REMOVED   terminal-punct   majority-of-line
+                                             (the legitimate job)    stripped         deleted
+        mistralai/Mistral-Nemo       1128        367 (33%)            12 (1%)        222 (20%)
+        google/gemma-4-12b-it         117         87 (74%)             0 (0%)         15 (13%)
+        google/gemma-4-E2B-it          29          4 (14%)            26 (90%)         9 (31%)
+
+**WHAT THE MODEL CHOICE DOES CHANGE, and it is a lot.** The share of commits that
+remove a genuine stage direction -- the only thing this pass exists to do -- runs
+74% at gemma-4-12b, 33% at Mistral-Nemo, and 14% at gemma-4-E2B-it. E2B's commits
+are overwhelmingly NOT doing the job: 90% of them strip the line's terminal
+punctuation while only 14% remove a stage direction. The 12B strips terminal
+punctuation ZERO times in 117 commits. That is a real, large, model-dependent
+quality gap and it supports preferring a better judge.
+
+**WHAT THE MODEL CHOICE DOES NOT FIX.** `majority-of-line-deleted` appears at
+EVERY model, including the 12B (15) and most heavily in absolute terms at
+Mistral-Nemo (222 commits across 242 episodes). Those are lines where the repair
+returned less than 60% of the words it was given. A pass licensed to remove a
+named segment should not be able to delete most of a line, at any model size.
+
+**THE DESIGN CONSTRAINT THIS IMPLIES** -- offered as the shape of a fix, not as a
+fix, since it is a design choice and belongs in an arc: the repair should not be
+permitted to alter anything OUTSIDE the segment the judge named. That single
+invariant would kill terminal-punctuation stripping, ellipsis stripping, dropped
+sentence-initial words and majority-of-line deletion in one move, at every model,
+without touching the judge at all -- and it composes with, rather than replaces,
+choosing a better judge.
+
+**HONEST LIMIT ON THIS INSTRUMENT.** The tags overlap and are heuristic. Removing
+a parenthetical stage direction legitimately removes its commas, so
+`comma-stripped` co-occurring with `STAGE-DIRECTION-REMOVED` is very likely my
+classifier double-counting correct work, and those two columns should not be read
+as independent. The column I stand behind is `terminal-punct-stripped`: excising
+a mid-line parenthetical has no reason to touch the line's final period, and the
+90%-vs-0% split between E2B and the 12B is not explainable as classifier noise.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
