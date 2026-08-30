@@ -274,3 +274,88 @@ the only thing that proves a pack loaded, and it is two seconds.
   path in section 5 does not have this problem and is the better first render.
 * Cost discipline: a running pod bills whether or not it is doing anything. The
   balance at the time of writing was $65.58.
+
+### 7A. IT WORKS. The pack loads on this template — MEASURED 2026-08-30
+
+    before clone   1036 node classes    OTR_: 0
+    after  clone   1061 node classes    OTR_: 25   <- all 25, no skips
+
+**Section 0's conclusion is now formally dead.** A rented pod CAN load this
+pack. What follows is the exact path that worked, in order, so nobody derives it
+again.
+
+#### Step 1 — find the path ComfyUI actually scans. DO NOT ASSUME IT.
+
+This template does **not** use `/workspace/ComfyUI`. It uses:
+
+    /workspace/runpod-slim/ComfyUI/custom_nodes
+
+The obvious guess fails outright:
+
+    bash: cd: /workspace/ComfyUI/custom_nodes: No such file or directory
+
+Costing a round trip to a wrong guess is exactly what section 4 warned about, and
+this document handed out the wrong path anyway. **Look before you clone** — the
+JupyterLab file browser shows the tree at a glance, or:
+
+    python -c "import folder_paths, os; print(os.path.dirname(folder_paths.__file__))"
+
+#### Step 2 — get a shell
+
+Both HTTP install routes are closed (section 7), so a shell is required:
+
+* **Web terminal** — a toggle on the pod's Connect tab. It lives in RunPod's own
+  console, NOT on a pod-proxied port. Probing `<podId>-19123.proxy.runpod.net`
+  and friends returns 404; do not go looking for it there.
+* **JupyterLab (8888)** — has token auth on. Every API path returns
+  `403 {"message": "Forbidden"}` without it, including `/api/terminals`,
+  `/api/contents` and `/api/status`. The bare `/lab` URL is NOT enough; the
+  console's link carries `?token=...`. Its **Terminal** works fine once open.
+
+#### Step 3 — clone and install, one line
+
+    cd /workspace/runpod-slim/ComfyUI/custom_nodes && \
+      git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio && \
+      pip install -r ComfyUI-OldTimeRadio/requirements.txt
+
+`-b v2.0-alpha` is mandatory. `main` is thousands of commits behind and still
+advertises `version = "1.0.0"`.
+
+#### Step 4 — restart, and IGNORE THE 502
+
+    POST /api/manager/reboot   ->   HTTP 502
+
+**That 502 is the restart working, not failing.** The server drops the
+connection as it goes down, so curl reports a bad gateway; ComfyUI was serving
+again ~40 s later. Poll `/system_stats` for a 200 instead of trusting the reboot
+call's status code.
+
+#### Step 5 — prove it, don't assume it
+
+    curl -s "$URL/object_info" | python -c "
+    import json,sys; oi=json.load(sys.stdin)
+    print(len(oi), sum(1 for k in oi if k.startswith('OTR_')))"
+
+A non-zero `OTR_` count is the only proof a pack loaded. Two seconds, and it is
+the difference between this document's section 0 and this section.
+
+#### What this pod is
+
+    pod      gigantic_magenta_sturgeon (w7rggm1x5d3q7x)
+    GPU      RTX 5090, 31.4 GiB      <- double the 5080's 16 GiB
+    RAM      109 GB
+    ComfyUI  0.26.2   Manager V3.41
+
+#### Still not done
+
+**No OTR episode has yet rendered on rented hardware.** Loading 25 node classes
+is not rendering an episode. What remains:
+
+1. **Weights.** Nothing is downloaded yet. Use the ungated bundle in section 5
+   (`gemma-4-E2B-it`, SD 1.5, `v3_sd15_mm.ckpt`, `v3_sd15_adapter.ckpt`,
+   `Kokoro-82M`, `musicgen-small`) for the first render — it needs no token.
+2. **`OTR_COMFYUI_MODELS_ROOT`** must be set explicitly; the default is
+   Windows-oriented and wrong on a pod.
+3. **ComfyUI-AnimateDiff-Evolved** for the haunted lane; the LTX 2.5 foley lane
+   additionally needs a gated Hugging Face model, so that one wants a token set
+   as a pod env var.
