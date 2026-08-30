@@ -172,3 +172,105 @@ HTTP 401 anonymously). Everything else in the pack is ungated.
 
 If you get an OTR episode out of a pod, that is new information — the project
 would like to hear about it.
+
+---
+
+## 7. Second template, MEASURED 2026-08-30 — the pack-load problem is different here, and the blocker is OURS
+
+A second pod was tested, which is what section 6 asked for. **The n=1 conclusion
+in section 0 does not generalise**: this template does not have the invisible-
+directory fault. It has a different wall, and that wall is on our side.
+
+### The pod
+
+    pod        gigantic_magenta_sturgeon (w7rggm1x5d3q7x)
+    GPU        RTX 5090, 31.4 GiB          <- double the 5080's 16 GiB
+    RAM        109 GB
+    ComfyUI    0.26.2
+    Manager    V3.41
+    services   8188 ComfyUI, 8080 FileBrowser, 8888 JupyterLab
+
+### Everything reachable over HTTP, no shell needed
+
+**The proxy URL pattern is `https://<podId>-<port>.proxy.runpod.net`** and it
+works without auth for these endpoints:
+
+    /system_stats                 200   <- GPU model + VRAM, ComfyUI version
+    /object_info                  200   <- 1.76 MB, the section-1 test
+    /api/manager/version          200   <- "V3.41"
+    /api/manager/queue/status     200   <- {"total_count":0,...}
+    /api/manager/queue/install    POST
+    /api/manager/queue/start      POST
+
+`/system_stats` answers "which GPU did I actually get" in one call and costs
+nothing — do it first, before assuming a pod matches its template name.
+
+### This template DOES load third-party packs
+
+`/object_info` returned **1036 node classes** against the 847 in section 0, and
+30 `LTX*` plus 43 `Wan*` classes — those are ComfyUI core now, not packs, but the
+class count alone shows a fuller install than the broken template. There is no
+evidence here of the Manager-writes-where-ComfyUI-does-not-scan fault.
+
+### THE TWO REAL WALLS, both hit in one session
+
+**1. Manager refuses a git-URL install over HTTP.**
+
+    POST /api/manager/queue/install  {"repository": "https://github.com/..."}
+    -> HTTP 404  "A security error has occurred. Please check the terminal logs"
+
+This is ComfyUI-Manager's `security_level`, not a bug and not a RunPod policy. A
+network-exposed instance will not install an arbitrary git URL. Lowering it means
+editing Manager's config, which needs a shell — so it is not a way around
+needing one.
+
+**2. A CNR install is ACCEPTED and then does nothing, because our registry
+version is Pending.**
+
+    POST /api/manager/queue/install  {"id": "comfyui-old-time-radio", ...}
+    -> HTTP 200                       (accepted)
+    POST /api/manager/queue/start     -> HTTP 200
+    queue status, 60 s later          -> total_count 0, is_processing false
+    /object_info                      -> OTR_: 0
+
+Nothing was ever queued. The cause is on our side and is already documented in
+`CLAUDE.md` section 7A:
+
+    https://api.comfy.org/nodes/comfyui-old-time-radio
+    -> latest_version: null
+
+Versions sit `NodeVersionStatusPending` until Comfy-Org's own cron promotes
+them, and **while pending, `latest_version` resolves to null**, so Manager has
+no target to resolve. The registry install cannot work for us until a version
+goes Active. **This is the single thing most likely to waste the next session's
+hour**: the POST returns 200, the queue reports healthy, and nothing installs.
+
+### So the install path needs a shell — and getting one is one click
+
+Both HTTP routes are closed, so a shell is required after all. On this pod there
+are three ways in, in order of friction:
+
+1. **Web terminal** — a toggle on the pod's Connect tab ("Enable web terminal",
+   default Stopped). One click by the operator, no key handling.
+2. **JupyterLab on 8888** — already running (302 to its auth page).
+3. **Direct TCP SSH** (`ssh -> <ip>:<port> -> :22`) — needs an SSH key added to
+   the account first.
+
+With a shell, the install is the ordinary one:
+
+    cd /workspace/ComfyUI/custom_nodes    # confirm the path ComfyUI SCANS first
+    git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+    # restart ComfyUI, then re-run the section 1 check
+
+**Re-run the section-1 `/object_info` check after the restart regardless.** It is
+the only thing that proves a pack loaded, and it is two seconds.
+
+### What is still unproven on a pod
+
+* **No OTR episode has ever rendered on rented hardware.** Unchanged from
+  section 6.
+* The **LTX 2.5 foley lane needs a gated Hugging Face model**, so that lane
+  additionally needs a token set as a pod env var by the operator. The ungated
+  path in section 5 does not have this problem and is the better first render.
+* Cost discipline: a running pod bills whether or not it is doing anything. The
+  balance at the time of writing was $65.58.
