@@ -36,7 +36,7 @@ PROVIDER = "gguf_native"
 ROW_ID = "unsloth/gemma-4-12b-it-GGUF"
 
 DEFAULT_GGUF_FILENAME = "gemma-4-12b-it-Q8_0.gguf"
-EXPECTED_Q8_0_SIZE_BYTES = 12_669_646_240
+EXPECTED_Q8_0_SIZE_BYTES = 12_669_647_680
 DEFAULT_CONTEXT_WINDOW = 4096
 
 # KV-cache cost per 1024 context cells, in GB. Conservative: the preflight would rather
@@ -89,13 +89,13 @@ GGUF_ARTIFACTS: dict[str, tuple[str, int | None, str | None]] = {
     "Q8_0": (
         "gemma-4-12b-it-Q8_0.gguf",
         EXPECTED_Q8_0_SIZE_BYTES,
-        "74d2d4f0b5b08ca8589d1a5f50e689c0984469f3cedbdc7d67458c6e9e35496a",
+        "f20e7ff1be28c283eeeb18fc895733791c56a5851d5cd3fe9691b7f7d12afa72",
     ),
     "Q6_K": ("gemma-4-12b-it-Q6_K.gguf", None, None),
     "Q4_K_M": (
         "gemma-4-12b-it-Q4_K_M.gguf",
-        7121860000,
-        "43fec98c5102b1c446b4ddd0a9439f1db3a2e1f2e0b8cd143ce1ea619a9403d6",
+        7121861440,
+        "0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42",
     ),
 }
 
