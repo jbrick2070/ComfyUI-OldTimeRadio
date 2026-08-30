@@ -8951,3 +8951,83 @@ a mid-line parenthetical has no reason to touch the line's final period, and the
 90%-vs-0% split between E2B and the 12B is not explainable as classifier noise.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+## PBUG-20260829-18 -- `gemma-2-2b-it` emits FENCED JSON and the line-judge parser rejects it
+
+- **found:** 2026-08-29 on the 4060 (MRKT), on the leg testing `gemma-2-2b-it`
+  as a replacement writer -- prompt `81ad671f`, `otr_nvidia_8gb_haunted`,
+  `--source-bank shakespeare`, `--act-count 1`. **The leg PASSED** (RESULT
+  SUCCESS, obs publish, `signal_lost_olivias_unsettled_unease_20260829_173228`,
+  80.2 MB). This defect is inside a passing episode, which is why it needed the
+  log rather than the verdict.
+- **artifact:** three parse failures in one episode, all the same shape:
+
+      [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1 failed:
+        no decodable top-level JSON object found: line 1 column 1 (char 0)
+        | raw head: ```json {"segments_read": 4, "not_speech": [{"quote": "Cesar...
+      [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 2 failed:  (same)
+      [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1 failed:
+        | raw head: ```json {"segments_read": 6, "not_speech": [{"quote": "My la...
+
+  **The model's answer is well-formed JSON. It is wrapped in a markdown
+  ```json fence, and the parser refuses the whole payload on that alone.**
+- **attributed by writer model, chronologically from the server log**, so this
+  is not guilt by association:
+
+      L314   MODEL google/gemma-4-E2B-it   -> 9 voiced, 14 model calls, ZERO parse failures
+      L1732  MODEL google/gemma-2-2b-it    -> 6 voiced,  9 model calls, THREE parse failures
+
+  Same node, same prompt template, same box, same session. Only the writer
+  changed.
+- **what it costs:** the judge's verdict is DISCARDED and retried. The content
+  was not wrong -- the visible quotes (`"Cesar...` = Cesario, `"My la...` = "My
+  lady") are exactly the Twelfth Night text under judgement, i.e. the model was
+  reading correctly and naming real segments. So this burns model calls and
+  throws away correct work on a card where model calls are the expensive part.
+- **why it matters beyond one model, and this is the reusable half:** emitting
+  fenced JSON is COMMON model behaviour, not an oddity. A parser that rejects
+  ` ```json ` cannot accept a large class of models, so this is not really a
+  `gemma-2-2b` defect -- it is a robustness gap in the structured-call layer
+  that only appears when someone tries a model outside the ones already in use.
+  Stripping a leading/trailing code fence before parsing is a few lines and has
+  no downside for models that do not use one.
+- **fix:** NOT MINE. `_otr_shared` / the `OTR_StructuredCall` decoder is the
+  shipping surface under the 2026-08-29 split. Recorded with the reproduction:
+  any leg with `--creative-model "google/gemma-2-2b-it (2.6 GB)"`.
+- bible-worthy: CANDIDATE. Class: *a structured-output parser that accepts only
+  bare JSON silently narrows the set of usable models, and the narrowing is
+  invisible until someone swaps the model.* Same family as the version-skew
+  findings tonight -- the dev box's model choice hid a constraint nobody
+  declared.
+
+### CLEAN-STAGE RESULT for `gemma-2-2b-it` on shakespeare -- ENCOURAGING, NOT YET A PROPERTY
+
+Measured from the authoritative `[ledger_clean]` summary, against the 5080's
+`gemma-4-E2B-it` shakespeare baseline (6 eps / 36 voiced: 24 flags = 67%,
+whole-line 24/24 = **100%**, 3 committed repairs):
+
+    gemma-2-2b-it, shakespeare, 1 episode:
+      6 voiced rows
+      1 flagged                                    (17% vs E2B's 67%)
+      2 SEGMENTS NAMED on that flag                <-- it localized
+      0 repaired, 0 improved, 1 still unclean
+      0 COMMITTED REPAIRS  -> zero damaged lines this episode
+
+**The signal points the predicted way: it named segments rather than quoting a
+whole line, and it committed nothing, so no dialogue was rewritten.** The one
+flag failed safe -- `b005` stayed unclean and the original text reached TTS,
+which is the correct outcome for a false positive.
+
+**AND IT IS ONE FLAG.** Per the 5080's own warning -- which it earned by
+retracting a "shakespeare commits zero repairs" claim that survived four
+episodes and died on the fifth -- a zero over a small denominator is
+indistinguishable from "not enough samples yet". My denominator is 1. This is
+an encouraging first data point on the hardest bank, not a property, and it must
+not be quoted as "gemma-2-2b does not damage lines".
+
+**A CONFOUND I WILL NOT HIDE:** three of this leg's judge calls were thrown away
+to the fence bug above. So the clean-stage numbers were produced by a judge that
+was partly failing to be heard. Whether the flag rate would rise or fall with
+the fence fixed is unknown, and this leg cannot answer it. **The fence fix
+should land before anyone treats gemma-2-2b's clean-stage numbers as
+comparable to E2B's.**
