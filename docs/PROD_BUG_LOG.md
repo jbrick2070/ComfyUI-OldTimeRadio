@@ -8823,3 +8823,44 @@ priority of -13 accordingly.
 the refusal was reached without a download. Whether a clean box pays 11.9 GB of
 bandwidth before failing this way is still unmeasured and still needs a machine
 without the cache.
+
+### EVIDENCE for PBUG-20260829-16 -- the duration EXISTS, on the cue, not on the line
+
+Ledger inspected: `signal_lost_the_millisecond_map_20260829_163343` (what
+prompt 0ee975ff titled itself before dying). Cost seconds; a reproduction
+would have cost another 72-minute render.
+
+Of 13 line rows, **11 carry real timing**. The only two with
+`dur_s=None, start_s=None` are the two music beats:
+
+    shot_000_b1      dur_s=3.783    start_s=9.500
+    shot_001_b1..b5  dur_s=12.688 .. 5.688     (all populated)
+    shot_002_b1..b3  dur_s=6.453 .. 20.568     (all populated)
+    shot_000_music   dur_s=None     start_s=None   <-- raised here
+    shot_002_music   dur_s=None     start_s=None   <-- would raise next
+
+Neither ends with `b000_music_open`, the suffix `render_driver.py` keys the
+opening-music path on, and the ledger contains **no `samples` field at all**.
+
+**But the duration is not missing from the ledger -- it is on the CUE:**
+
+    led["music"][0] = { cue_id: "opening", anchor_line_id: "shot_000_music",
+                        start_s: 0.0, dur_s: 10.0,
+                        wav_path: ...\music_cue_opening.wav }
+
+The cue knows it is 10.0 s and has a rendered wav on disk; the line it anchors
+to carries `None`. `compute_clip_budget` reads the LINE, finds nothing,
+yields 0, and `ghost_unique_source_count` raises. **A plumbing defect, not a
+missing-data one** -- the value simply never crosses `anchor_line_id` onto the
+anchored row.
+
+Two consequences worth recording. The second music beat has the identical
+shape, so this is not "the opening beat is special" -- it is every
+bank-generated music anchor in this ledger. And the three PASSING episodes on
+this box used music beats named `music_opening_001` / `music_closing_001`,
+a different scheme that presumably took the synthetic-open path. So the blast
+radius is *banks that name music anchors `<shot>_music`*, not
+`scifi_news_pro` specifically -- and keying a contract on an id STRING is what
+let a bank rename its beats out of the contract.
+
+Fix site is the shipping surface (planner / render driver), not mine.
