@@ -9586,3 +9586,74 @@ noticing, not invariants somebody will come to verify.
 against a ~9 s cold baseline, because the 8 GB card thermally throttles under
 sustained multi-hour load. Timings from long 8 GB sessions are not comparable to
 cold-start ones.
+
+## PBUG-20260830-01 -- `duration_check ... OK` is printed for an episode that just FAILED the duration gate
+
+- **found:** 2026-08-30 on the 4060 (MRKT), leg `2204f5f8`, profile
+  `otr_nvidia_8gb_haunted`, `--act-count 2`, bank `scifi_news_pro`. RESULT
+  SUCCESS, episode published. The defect is in the RECEIPT, not the render.
+- **the contradiction, both lines from the same run, same node, seconds apart:**
+
+      [OTR_MasterAudioMux] DURATION MISMATCH (publishing anyway): silent video
+        155.1200s exceeds master audio 120.9282s by 34.1918s, over the
+        credits-tail budget (25.2110s [declared] + 0.1200s tol = 25.3310s)
+        by 8.8608s
+      [OTR_MasterAudioMux] duration_check v=155.120s a=120.928s
+        tail_budget=25.2s (declared) OK
+
+  The gate failed by 8.86 s and the receipt says **OK**.
+
+- **mechanism, read from the file (`nodes/otr_master_audio_mux.py`):** there are
+  two independent conditionals and the `else` is bound to the wrong one.
+
+      L270  if v_dur >= 0 and a_dur >= 0 and v_dur > a_dur + max_tail_s + tol:
+      L295      log.warning("DURATION MISMATCH (publishing anyway) ...")
+      L305  if v_dur < 0 or a_dur < 0:
+      L317      report.append("... UNPROVEN (duration probe failed)")
+      L325  else:
+      L326      report.append("... OK")
+
+  The `else` at L325 attaches to the PROBE check at L305, not to the BUDGET
+  check at L270. So any episode whose probes succeed reports `OK` regardless of
+  whether it passed the budget. The only path that can ever print anything other
+  than `OK` is a failed ffprobe.
+
+- **why it is worth an entry rather than a shrug:** the surrounding comment
+  (L306-L316) states the exact rule this violates, and states it about the
+  neighbouring case: *"What must not happen is a receipt claiming a proof it
+  does not have."* That fix landed for the failed-probe path and the
+  over-budget path was left. The two are the same defect class.
+
+  This also interacts badly with the 2026-08-30 operator directive that turned
+  the raise into a warning ("don't kill a duration mismatch, just let it fly").
+  That directive is correct and must stand -- an episode must not be discarded
+  at the last step over a length disagreement. But it means the WARNING is now
+  the only signal, and a reader who greps the receipt -- which is the compact,
+  machine-readable summary the mux exists to emit -- sees `OK` on every episode
+  forever. The louder the render gets about a real overshoot, the more confident
+  the receipt looks.
+
+- **fix: NOT MINE.** `nodes/` is the 5080's surface per the split. The shape is
+  a one-line binding change (track the L270 verdict and report `OVER_BUDGET`,
+  or make L325's `else` conditional on it) but the WORDING is a contract
+  decision for downstream readers, so it is theirs to choose.
+
+- bible-worthy: CANDIDATE. Class: *when a fatal check is deliberately softened
+  to a warning, the receipt that summarises it must be re-pointed at the same
+  verdict -- otherwise the summary silently inverts while the log stays honest.*
+
+### Companion observation (NOT a defect, recorded because it contradicts a stated formula)
+
+`--act-count 2` on `scifi_news_pro` minted **two** `music_inter` bridges, not
+the one predicted by `music_inter_count = (act_count - 1)`
+(`_otr_episode_budget.py:254`):
+
+    shot_000_music  role=music_open    -> sentinel, dropped from beat list
+    shot_001_music  role=music_inter   -> bridge, rendered 4.0s
+    shot_002_music  role=music_inter   -> bridge, rendered 4.0s
+    shot_003_music  role=music_close   -> sentinel, dropped from beat list
+
+Either the formula is not the operative one for this bank or the count is off by
+one. Flagged for whoever owns the budget module; it changes nothing about the
+fix's correctness and the arithmetic below is consistent with TWO bridges.
+
