@@ -536,56 +536,104 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
     return ledger
 
 
-def _music_cue_dur_s(ledger, line_id):
-    """Duration of the music cue ANCHORED to ``line_id``, or None.
+#: Seconds of picture for an act-break music bridge nothing timed.
+#: PBUG-20260829-16.
+#:
+#: Commit 59286499 ("rip interstitial audio insertion", 2026-07-22) removed the
+#: ``interstitial`` cue slot and with it the ONLY code that stamped ``start_s``
+#: and ``dur_s`` onto ``music_inter`` rows::
+#:
+#:     -_CUE_SLOTS = ("opening", "closing", "interstitial")
+#:     -    _mrow["start_s"] = float(_p["start_s"])
+#:     -    _mrow["dur_s"]   = float(_p["dur_s"])
+#:
+#: The rip itself was deliberate and stands. What it did not do is re-home the
+#: ledger fields it stopped writing, and the writer kept planning the beats
+#: (``_otr_episode_budget``: ``music_inter_count = act_count - 1`` whenever
+#: ``include_act_breaks``). So every act break since has minted a row with no
+#: cue, no audio, no ``start_s`` and no ``dur_s`` -- it budgets to ZERO frames
+#: and the video stage refuses it, killing the whole episode 40+ minutes in.
+#: Measured across every ledger on this box: 742 carry ``music_inter`` rows and
+#: NONE has ever published.
+#:
+#: The value is not a taste call. The last correctly-timed bridge this repo
+#: produced was ``music_inter_01_001`` on 2026-07-21 -- the day before the rip --
+#: at ``dur_s=4.087``. This rounds it. The bridge is silent by design (see
+#: ``otr_master_audio_mux``: "it renders a picture and occupies no master-mix
+#: time at all"), so nothing but the picture's length depends on the number.
+MUSIC_BRIDGE_FALLBACK_DUR_S = 4.0
 
-    PBUG-20260829-16. A bank that names its music anchors ``<shot>_music``
-    produces ledger LINE rows with ``dur_s=None`` while the music CUE that
-    anchors to them carries the real duration and a rendered wav:
+#: Video roles the assembler mints a deterministic MIRROR row for.
+_MIRRORED_MUSIC_ROLES = ("music_open", "music_close")
 
-        led["music"][0] = {cue_id: "opening", anchor_line_id: "shot_000_music",
-                           start_s: 0.0, dur_s: 10.0, wav_path: ...}
-        led["lines"][*] where line_id == "shot_000_music" -> dur_s None
 
-    The information was never missing -- it simply never crossed
-    ``anchor_line_id`` onto the row every downstream consumer reads. The beat
-    therefore budgeted to ZERO frames, and the failure surfaced 72 minutes
-    later at the video stage as "Ghost Signal cadence needs a delivered target
-    of at least 1", naming neither music nor duration.
+def _untimed_music_sentinels(lines) -> set:
+    """``line_id``s of pre-audio music SENTINELS, which own no timeline.
 
-    ONLY ``dur_s`` IS TAKEN, DELIBERATELY. The cue's ``start_s`` is stamped
-    with ``start_s_space: "master_mix"`` and is NOT in the line's coordinate
-    space; copying it would trade a loud crash for silently wrong placement.
-    A duration is space-independent, which is why it alone can cross.
+    A bank may author its own music row (``shot_000_music``) alongside the
+    assembler's deterministic one (``music_opening_001``). These are NOT two
+    competing copies of one beat -- they are one beat in two lifecycle stages:
 
-    Resolved HERE, at beat construction, rather than inside the budget: the
-    beat is what every consumer reads, so one fix serves the ghost lane and
-    every other lane at once.
+    * the **sentinel** is authored pre-audio, carries the bank's own id, is
+      untimed BY DESIGN, and is load-bearing -- it is what tells the assembler
+      to mint the mirror and reserve that beat's still;
+    * the **mirror** is minted post-audio under the assembler's deterministic
+      id and carries the real ``start_s``/``dur_s``.
+
+    Only the mirror is a timeline segment. The sentinel must never become one,
+    **regardless of whether a cue could supply it a duration** -- and a cue can,
+    because the cue's ``anchor_line_id`` points at the SENTINEL, not the mirror.
+    An earlier fix here read that anchor and handed the sentinel the cue's
+    duration, which put 10.0 s + 8.0 s onto the timeline a second time on top of
+    the mirror that already carried it. The 4060 measured the result as an
+    18.93 s overshoot at the master mux. The sentinel did not need a number; it
+    needed to not be rendered.
+
+    Detected by role rather than by cue id, because keying on the cue selects
+    exactly the wrong row of the pair.
+
+    ``music_inter`` is deliberately OUT of scope: an act break has no mirror to
+    defer to, so it is a real beat missing its duration and gets
+    :data:`MUSIC_BRIDGE_FALLBACK_DUR_S` instead of being dropped. And nothing
+    here changes what a bank EMITS -- suppressing the sentinel upstream is what
+    killed ``fastwan_8gb`` twice (PBUG-20260811-02, commit 3446af3f); this only
+    decides which rows become video beats.
     """
-    if not line_id:
+    def _timed(row) -> bool:
+        return (row.get("dur_s", row.get("duration_s")) is not None
+                or row.get("samples", row.get("audio_samples")) is not None)
+
+    mirrored_roles = {
+        str(r.get("speaker_role") or "").strip().lower()
+        for r in lines
+        if isinstance(r, dict) and _timed(r)
+    }
+
+    sentinels = set()
+    for row in lines:
+        if not isinstance(row, dict) or _timed(row):
+            continue
+        role = str(row.get("speaker_role") or "").strip().lower()
+        if role in _MIRRORED_MUSIC_ROLES and role in mirrored_roles:
+            sentinels.add(str(row.get("line_id") or ""))
+    return sentinels
+
+
+def _music_bridge_dur_s(line: dict):
+    """:data:`MUSIC_BRIDGE_FALLBACK_DUR_S` for an untimed act-break bridge.
+
+    Returns ``None`` for every other row, so a missing duration anywhere else
+    still surfaces as the loud zero-frame warning rather than being papered
+    over with a number nobody measured.
+    """
+    role = str((line or {}).get("speaker_role") or "").strip().lower()
+    if role != "music_inter":
         return None
-    try:
-        cues = (ledger or {}).get("music") or []
-    except Exception:  # noqa: BLE001 -- a malformed ledger must not raise here
-        return None
-    target = str(line_id)
-    for cue in cues:
-        if not isinstance(cue, dict):
-            continue
-        if str(cue.get("anchor_line_id") or "") != target:
-            continue
-        dur = cue.get("dur_s")
-        try:
-            dur = float(dur)
-        except (TypeError, ValueError):
-            continue
-        if dur > 0:
-            log.info(
-                "[OTR_ShotLock] music line %s has no dur_s; taking %.3f s from "
-                "cue %r via anchor_line_id", target, dur,
-                str(cue.get("cue_id") or ""))
-            return dur
-    return None
+    log.info(
+        "[OTR_ShotLock] music bridge %s carries no duration (its audio pass "
+        "was removed in 59286499); rendering %.1fs of picture",
+        str((line or {}).get("line_id") or "?"), MUSIC_BRIDGE_FALLBACK_DUR_S)
+    return MUSIC_BRIDGE_FALLBACK_DUR_S
 
 
 def extract_beats(ledger: dict) -> list:
@@ -624,9 +672,15 @@ def extract_beats(ledger: dict) -> list:
     id_to_first = {str(c.get("char_id") or ""):
                    (str(c.get("name") or "").split() or [""])[0]
                    for c in cast_rows}
+    music_sentinels = _untimed_music_sentinels(lines)
     beats = []
     for i, ln in enumerate(lines):
         if not isinstance(ln, dict):
+            continue
+        if str(ln.get("line_id") or "") in music_sentinels:
+            log.info(
+                "[OTR_ShotLock] music row %s is a pre-audio sentinel; the timed %s mirror owns the timeline",
+                ln.get("line_id"), ln.get("speaker_role"))
             continue
         cid = _normalize_char_id(str(ln.get("char_id") or ""))
         text = str(ln.get("text") or "").strip()
@@ -651,7 +705,7 @@ def extract_beats(ledger: dict) -> list:
             "samples": ln.get("samples", ln.get("audio_samples")),
             "sample_rate": ln.get("sample_rate"),
             "dur_s": (ln.get("dur_s", ln.get("duration_s"))
-                      or _music_cue_dur_s(ledger, ln.get("line_id"))),
+                      or _music_bridge_dur_s(ln)),
             # THE STORY FIELDS RIDE THE BEAT (2026-08-29). The line row already
             # carries them (production_ledger.set_lines stamps every line with
             # shot_id / beat_intent / traits) and dropping them here forced the
