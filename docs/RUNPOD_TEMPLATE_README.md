@@ -1,109 +1,99 @@
-# Old Time Radio (OTR) for ComfyUI
+# OTR — Old Time Radio for ComfyUI
 
 Generate complete radio-drama episodes on a rented GPU — script, cast, voices,
-music, video and credits — from a single ComfyUI workflow.
+music, video and credits — from one ComfyUI workflow.
 
 ## Description
 
-OTR is a ComfyUI node pack that writes and produces a finished audio-drama
-episode end to end. A local LLM writes the script and casts it; each character
-gets a distinct synthesized voice; music cues are generated per scene; every
-beat is rendered to video; and the whole thing is muxed, captioned and given a
-credits roll. The output is a single MP4.
+OTR is a ComfyUI node pack that writes and produces a finished audio drama end
+to end. A local LLM writes and casts the script; each character gets a distinct
+synthesized voice; music cues are generated per scene; every beat is rendered to
+video; and the result is muxed, captioned and given a credits roll. Output is a
+single MP4.
 
-It runs **fully local and offline-first** — no API keys, no paid services, no
-cloud calls. The default lane needs no Hugging Face token at all.
+It runs **fully local** — no API keys, no paid services, no cloud calls. The
+default lane needs no Hugging Face token.
 
 Episodes draw from public-domain fiction, Shakespeare, an original bank and
 archive lanes. A 3-act episode runs 4–6 minutes; 1 to 5 acts are supported.
 
-**Status: the pack installs and registers cleanly on a pod (verified — 25 node
-classes). A full episode render on rented hardware has NOT yet been verified.**
-It is proven on local 8 GB and 16 GB NVIDIA cards. Treat pod rendering as
-unproven until you have your own successful run.
+**Status: a full episode has rendered and published on rented hardware.**
+Verified 2026-08-30 on an RTX PRO 4000 Blackwell (24 GB): a 1-act episode in
+34 min, 8 clips, VRAM peak 15,990 MB. Also proven on local 8 GB and 16 GB
+NVIDIA cards.
 
 ## Getting Started
 
 ### Dependencies
 
 * **NVIDIA GPU.** 8 GB is the proven floor (RTX 4060, nine published episodes);
-  16 GB is comfortable. Extra VRAM adds little here — the models are small.
-* **A network volume, mounted at `/workspace`.** Strongly recommended. Model
-  weights are ~4 GB for the default lane and re-download on every pod start
-  without persistent storage. Provision it in the **same region** as the pod or
-  it will not attach.
-* **Disk:** ~20 GB for the pack, its deps and default weights; more for
-  extra lanes.
+  16 GB is comfortable. Extra VRAM adds little — the models are small.
+* **A network volume mounted at `/workspace`, plus `HF_HOME` pointing INTO
+  it.** Set `HF_HOME=/workspace/hf`. Without it the writer/voice/music cache
+  (tens of GB) lands on the container disk and is erased on every stop, so a
+  volume alone does not save you the download. Create the volume in the **same
+  region** as the pod or it will not attach.
+* **Disk:** ~20 GB for the pack, its dependencies and default weights.
 * **No Hugging Face token needed** for the default haunted lane. Some optional
-  lanes (LTX 2.5) use gated models and do require one — set `HF_TOKEN` as a pod
-  environment variable if you want those.
+  lanes (LTX 2.5) use gated models and need `HF_TOKEN` set as a pod environment
+  variable.
 
 ### Using the template
 
-Deploy the pod and wait for **ComfyUI on port 8188** to report Ready. On first
-boot the start command clones the pack and downloads the default weights, so
-the first start takes several minutes longer than later ones.
-
-**Verify the pack actually loaded before doing anything else.** This is the
-single most useful check, and a pod can report a pack installed while
-contributing zero nodes:
+Wait for **ComfyUI on port 8188** to report Ready, then open a terminal
+(JupyterLab on 8888, or the web terminal) and install:
 
 ```
-curl -s "https://<podId>-8188.proxy.runpod.net/object_info" | python3 -c "
-import json,sys; oi=json.load(sys.stdin)
-print('classes:', len(oi), ' OTR_:', sum(1 for k in oi if k.startswith('OTR_')))"
+cd $(python3 -c "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))")/custom_nodes
+git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+cd ComfyUI-OldTimeRadio && python3 -m pip install -r requirements.txt
+OTR_COMFYUI_MODELS_ROOT=$(python3 -c "import folder_paths,os;print(os.path.join(os.path.dirname(folder_paths.__file__),'models'))") \
+  python3 scripts/otr_fetch_lane_weights.py haunted
 ```
 
-A non-zero `OTR_` count means you are ready. Zero means the pack did not load —
-see Help.
+`-b v2.0-alpha` is **mandatory** — `main` is thousands of commits behind.
+Use `python3`; many images have no `python` on PATH.
 
-Then either open ComfyUI in a browser and load the workflow from
+Restart ComfyUI, then **verify the pack loaded** — this is the only real proof,
+and a pod can report a pack installed while contributing zero nodes:
+
+```
+curl -s "$URL/object_info" | python3 -c "import json,sys; oi=json.load(sys.stdin); print('OTR_:', sum(1 for k in oi if k.startswith('OTR_')))"
+```
+
+Non-zero means ready. Then load the workflow in the browser from
 **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio →
-otr_canonical**, or drive it headlessly:
-
-```
-COMFYUI_URL=https://<podId>-8188.proxy.runpod.net \
-  python3 scripts/otr_canonical_api_run.py \
-    --profile otr_nvidia_8gb_haunted \
-    --act-count 1
-```
-
-`--act-count 1` is the fastest meaningful run. The finished episode lands in
-ComfyUI's output directory.
+otr_canonical**, or drive it headlessly with
+`scripts/otr_canonical_api_run.py --profile otr_nvidia_8gb_haunted
+--act-count 1`.
 
 ## Help
 
-**"No nodes" / the pack seems missing.** Run the `/object_info` check above. It
-is the only thing that proves a pack loaded — a Manager install reporting
-success does not. If `OTR_` is zero, ComfyUI is scanning a different directory
-than the one the pack was installed into. Find the real one:
+**Weights download but ComfyUI can't see them.** Set
+`OTR_COMFYUI_MODELS_ROOT` as shown above. Without it the fetcher falls back to a
+Windows path, which on Linux becomes a literal directory of that name — several
+GB land somewhere nothing scans, and it reports success.
 
-```
-python3 -c "import folder_paths, os; print(os.path.dirname(folder_paths.__file__))"
-```
+**"No nodes" / pack seems missing.** Run the `/object_info` check. A Manager
+install reporting success does not prove a pack loaded. If `OTR_` is zero,
+ComfyUI is scanning a different directory than the one you installed into.
 
-**`python: command not found`.** Many pod images ship only `python3`. Use
-`python3` everywhere; a one-line command whose clone succeeded can still die on
-this and read as a total failure.
+**`python: command not found`.** Use `python3` everywhere.
 
-**Restarting.** `POST /api/manager/reboot` returns **HTTP 502 and works anyway** —
-the server drops the connection on its way down. Poll `/system_stats` for a 200
-rather than trusting the reboot call's status code.
+**Restarting.** `POST /api/manager/reboot` returns **502 and works anyway** —
+the server drops the connection going down. Poll `/system_stats` for a 200
+instead of trusting the reboot's status code. A Manager reboot does **not**
+re-read the image's argument file; stop and start the pod for argument changes.
 
-**Changing launch arguments.** A Manager reboot restarts the ComfyUI *process*
-with its existing arguments; it does not re-read the image's argument file. Stop
-and start the pod for argument changes to take effect.
+**Encoding.** OTR probes for NVENC and falls back to CPU automatically. Most
+containers expose CUDA for compute but not `libnvidia-encode.so.1`, so CPU
+encoding is normal and expected on rented GPUs.
 
-**`--highvram`.** Reasonable on a 24 GB+ card. **Do not set it on 8 GB** — it is
-hardware-specific, not a general improvement. When in doubt leave VRAM handling
-on automatic.
-
-**First render is slow.** Model loads dominate. Later runs on the same pod reuse
-what is resident.
+**First render is slow** — model loads dominate. Later runs reuse what's
+resident.
 
 **Long renders.** The headless runner stops *watching* after a bounded time; it
-does not stop the render. A timeout while the queue still shows work means the
-episode is still going. Use `--timeout 0` to wait for a terminal result.
+does not stop the render. Use `--timeout 0` to wait for a terminal result.
 
 ## Authors
 
@@ -117,6 +107,6 @@ Built on ComfyUI and ComfyUI-AnimateDiff-Evolved.
 ## Version History
 
 * 0.1
-    * Initial template. Install and node registration verified on a pod
-      (1036 → 1061 classes, 25 `OTR_`). Episode rendering on rented hardware
-      not yet verified.
+    * Initial template on `runpod/comfyui:cuda13.0`. Install and node
+      registration verified on an RTX 5090 pod (1036 → 1061 classes, 25
+      `OTR_`). Episode rendering on rented hardware not yet verified.
