@@ -620,3 +620,117 @@ ffmpeg libraries, so an in-process probe succeeds regardless. That bundled build
 is not on PATH and is not what `subprocess.Popen` finds. PyAV working proves
 nothing about the binary or about NVENC.
 PyAV working proves nothing about the binary.
+
+---
+
+## 10. THE PLAYBOOK — what actually works, in order (MEASURED 2026-08-30)
+
+Sections 0-9 are the archaeology. This is the procedure.
+
+### Step 1 — add an SSH key to the ACCOUNT, once, ever
+
+**This is the answer to "how do we stop typing into a terminal", and none of the
+HTTP routes were.** Generate a keypair on the workstation, paste the PUBLIC half
+into RunPod's account -> SSH Public Keys. RunPod injects it into every pod's
+`authorized_keys` **at pod creation** -- a key added to a RUNNING pod does not
+reach it, so add it before deploying.
+
+    ssh-keygen -t ed25519 -f ~/.ssh/runpod_otr -N ""
+    # paste ~/.ssh/runpod_otr.pub into the account, then deploy
+
+Everything after this is scriptable and needs no human.
+
+**USE THE DIRECT TCP FORM, NOT THE PROXY.**
+
+    ssh root@<ip> -p <port> -i ~/.ssh/runpod_otr      # takes commands. USE THIS.
+    ssh <pod>-<hash>@ssh.runpod.io -i ...             # forces an interactive
+                                                      # shell, IGNORES the command
+                                                      # argument, and its PTY
+                                                      # CORRUPTS long input:
+                                                      # `memory.total` arrived as
+                                                      # `memory.totaal`.
+
+If only the proxy is available, have the REMOTE side fetch what it needs
+(`curl` the script from the repo) rather than typing it across the PTY.
+
+### Step 2 — deploy WITH the network volume
+
+Select the network volume explicitly at deploy. RunPod states it *"Replaces
+volume disk"*, so it does not conflict with a template's storage block -- the
+earlier pods simply did not have it selected. Verify from inside:
+
+    df -h /workspace
+    mfs#euro-3.runpod.net:9421  2.0P  ...  /workspace    <- volume IS mounted
+    overlay                      55G  ...  /             <- it is NOT
+
+**CHECK WHICH GPU YOU ACTUALLY GOT.** A deploy summary saying "RTX 5090 32 GB"
+produced an **RTX PRO 4000 Blackwell, 24 GB**. One call, no cost:
+
+    GET /system_stats
+
+### Step 3 — set BOTH storage roots, or the volume only half works
+
+Two separate caches, and missing either wastes the drive:
+
+| what | variable | why |
+|---|---|---|
+| video weights | `OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models` | set in the TEMPLATE; without it `_models_root()` falls back to `C:\ComfyUI-Models`, which on Linux becomes a literal directory nothing scans -- and reports success |
+| writer / voice / music | `HF_HOME=/workspace/hf` | **defaults to `/root/.cache`, which is on the 55 GB CONTAINER disk and is erased on stop.** Without this the 24 GB writer re-downloads every session even with a volume attached |
+
+**The expensive half is the one that defaults to the disposable place.** Video
+weights are 3.7 GB; the HF cache with both writers is **38 GB**.
+
+ComfyUI reads `HF_HOME` at start, so a cache created afterwards is invisible to
+it. Symlink rather than fight the env:
+
+    ln -s /workspace/hf /root/.cache/huggingface
+
+### Step 4 — provision, in one command, from the repo
+
+    ssh <pod> 'cat > /root/provision.sh' < scripts/otr_pod_provision.sh
+    ssh <pod> 'nohup bash /root/provision.sh > /root/prov.log 2>&1 &'
+
+**Run it DETACHED.** A foreground SSH session dies on any client-side timeout
+and takes the install with it -- this cost one full run mid-`pip install`.
+
+The script locates the tree ComfyUI actually scans (**do not assume
+`/workspace/ComfyUI`; this image uses `/workspace/runpod-slim/ComfyUI`**),
+recovers `OTR_COMFYUI_MODELS_ROOT` from `/proc/1/environ` because **SSH sessions
+do not inherit container env**, clones both packs, installs deps, and fetches
+the ungated bundle.
+
+### Step 5 — warm the HF models BEFORE rendering
+
+Skipping this fails the first render at **73 seconds**:
+
+    ERROR node 1 (OTR_LedgerScriptWriter) raised _LLMTimeoutWorkflowPause
+
+transformers fetches the writer on first use and the download outlasts the
+writer timeout. **A developer box never sees this** -- its HF cache has been warm
+for months -- so it only ever appears on a fresh machine, wearing the name of a
+model problem.
+
+Set an `HF_TOKEN` (a RunPod **Secret**, not a plain env var -- the console warns
+"Environment variables are not encrypted") for rate limits and gated lanes.
+
+### Step 6 — restart, verify, then render
+
+`POST /api/manager/reboot` returns **502 and works**; poll `/system_stats` for a
+200. Then the only check that proves anything:
+
+    GET /object_info   ->   OTR_ non-zero, ADE_ non-zero, ckpt_name populated
+
+**Install verification does not imply render capability.** A pod passed every
+install check -- 25 `OTR_`, 143 `ADE_`, all models registered -- and still could
+not produce a frame, because `h264_nvenc` cannot initialise in a container
+without `libnvidia-encode.so.1`. Fixed in the pack (the probe now encodes a test
+frame instead of grepping `ffmpeg -codecs`), but the shape of that failure is
+the lesson: it landed **7-18 minutes in**, after the script and audio were done.
+
+### What a fresh pod costs, measured
+
+    RTX PRO 4000 Blackwell 24 GB   $0.58/hr
+    RTX 5090 32 GB                 $0.69/hr
+    network volume 200 GB          $0.019/hr  (~$14/mo, billed regardless)
+    first provision                ~6 min     (packs + 3.7 GB weights)
+    HF warm, both writers          38 GB, once per VOLUME -- not per pod
