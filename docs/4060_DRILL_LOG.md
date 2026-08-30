@@ -1056,3 +1056,43 @@ fine and SMB is refusing an unauthenticated session before consulting the ACL.
 **Blocker is one credential prompt on the 5080, which only the operator can
 answer.** Both windows declined to enter credentials or weaken the
 guest-logon policy to avoid it.
+## Step 19 -- the last failing bank publishes; 5 of 5 proven on 8 GB
+
+`scifi_news_pro` against b2f36242. RESULT SUCCESS, 121 min wall clock.
+`signal_lost_the_engineered_bloom_20260830_044129`, 131 MB, 155.28 s.
+
+The number that mattered: **excess -0.03 s** (delta 24.57 s vs a 24.6 s
+credits roll), against 18.93 s before. Under one frame at 25fps.
+
+Two process notes worth keeping.
+
+**I verified the fix was in the process before trusting the result.** Server
+PID 24536 booted 04:03:07; b2f36242 landed 03:56:42. Three times earlier in
+this drill I reported a success signal before confirming the thing it claimed,
+so the boot-time check is now a precondition, not a courtesy.
+
+**I did not call it fixed on the RESULT line.** SUCCESS + published is not the
+same claim as "the overshoot is gone". I measured both streams with ffprobe
+and found delta 24.57 s -- *larger* than the 18.93 s I was hoping to see go to
+zero -- and only after pulling the declared credits length (24.6 s) did the
+number resolve. Had I stopped at "PUBLISHED" I would have been right by luck;
+had I stopped at "delta is 24.57 s" I would have reported a regression. The
+tail had to be decomposed before either reading meant anything.
+
+**Signal 1 is unanswered and I said so.** `foley_unpositioned=` never appears
+in the log. Absence of a line is not a zero, and I reported it to the 5080 as
+absence. That is the same error class as the one I made earlier in this drill
+with `llama_perf_context_print`, where I read a missing log line as proof the
+12B produced nothing -- it was gated behind an env var and the model had in
+fact generated. Missing output means the emit site is silent, nothing more.
+
+**Thermal note for anyone reading 8 GB timings:** beats ran ~20 s/step against
+a ~9 s cold baseline. Multi-hour sessions on this card are throttled and their
+timings are not comparable to cold-start ones. The 121 minutes is not a
+per-episode cost figure.
+
+Open on this box: PBUG-20 (news-read validator rejects real people named in
+the source) is independent of this fix and still kills scifi_news_pro legs at
+the writer. PBUG-11 (GGUF cache epoch) still blocks the 12B in-pipeline;
+repro at `scripts/repro_pbug11_gguf_cache.py`, 16 s, deterministic.
+
