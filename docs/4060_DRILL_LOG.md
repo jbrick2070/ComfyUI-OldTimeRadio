@@ -882,3 +882,60 @@ itself is unaffected and still needs one leg to confirm.
 writer. Load and generate are proven; a full canonical leg is not. The 12B is
 a ~2x slower writer per token than E2B on this card and the render is long, so
 that is the next leg, not a footnote.
+## Step 15 -- the 12B EPISODE FAILED, and it qualifies my own step-14 claim
+
+**Step 14 said "12B RUNS ON THE 8 GB CARD". That is true STANDALONE and NOT
+true inside the pipeline. Recording the distinction because I stated the
+stronger version.**
+
+Leg: prompt `93d53b06`, profile `otr_4060_12b_gguf_offload` exactly as
+committed (ceiling 6.8, Q4_K_M, n_ctx 4096), `--source-bank media_archive`,
+on 219dab79 with the 5080's gate fix.
+
+**THE GATE FIX WORKS -- confirmed live**, and this is the first thing to say
+because it was the blocker I handed over:
+
+    [Selector] proceeding with caution: ctx_cap=UNKNOWN@8192, vram_fit=WARN@9.4 GB
+
+9.4 GB WARN, admitted, exactly as predicted. The old code priced it at 12.2 GB
+and FAILED it. My committed ceiling of 6.8 needed no change.
+
+**THEN THE LOAD FAILED, 27 TIMES:**
+
+    [OTR_LineComposer] generate_fn raised: ValueError:
+      Failed to load model from file: ...\gemma-4-12b-it-Q4_K_M.gguf
+    successful GGUF loads in the whole leg: 0
+    RESULT FAIL at t=640 s, node 80 (OTR_CastLock) raised ValueError
+
+**The file is not the problem** -- the identical path loaded three times in my
+standalone probe minutes earlier. **The difference is what else is resident.**
+The probe ran on an idle card (~500 MiB used). In-pipeline the ComfyUI process
+holds VRAM, and although the backend ran its eviction every time --
+`[GGUFNative] Running pre-load VRAM eviction` then `[VRAMLevers]
+free_otr_pipeline_residue ... OK: unload_llm, _unload_bark, gc.collect,
+soft_empty_cache, cuda.empty_cache` -- the load still failed on all 27
+attempts.
+
+**THE HONEST ARITHMETIC:** the model needs 7,751 MiB of an 8,188 MiB card. That
+leaves ~437 MiB. Torch's caching allocator reserves VRAM it does not return to
+the driver, and ComfyUI's own residents sit in the same process. **A model that
+needs 95% of the card cannot share a process with anything else, no matter how
+well the eviction works.** Standalone success and in-process failure are both
+correct results about different situations.
+
+**WHAT IS PROVEN, precisely:**
+  * gemma-4-12b-it Q4_K_M loads and generates on this 8 GB card in a CLEAN
+    process -- 48/48 layers, 7,751 MiB, three configurations. Unchanged.
+  * The current upstream artifact works (the 5080's re-pin evidence). Unchanged.
+  * The gate fix admits it. Confirmed live.
+  * **It does NOT currently produce an episode**, because the canonical pipeline
+    is one process and the writer wants the whole card.
+
+**WHAT WOULD MAKE IT WORK, not attempted and not mine to choose:** the writer
+would have to run OUT OF PROCESS (a separate llama.cpp process the node talks
+to), or the pipeline would have to fully release the CUDA context before the
+writer loads rather than emptying a cache inside a process that keeps its
+reservations. Both are architecture calls for the shipping surface.
+
+**Still standing for 8 GB TODAY: `gemma-4-E2B-it`** -- four published
+episodes, and the only writer that renders start to finish on this card.
