@@ -939,3 +939,54 @@ reservations. Both are architecture calls for the shipping surface.
 
 **Still standing for 8 GB TODAY: `gemma-4-E2B-it`** -- four published
 episodes, and the only writer that renders start to finish on this card.
+## Step 16 -- LOW_VRAM did NOT fix it, and I reported "0 failures" too early
+
+**Correcting myself before anything else: I told the operator "zero load
+failures -- your flag worked" at t=100 s. The final count was 27, the same as
+without the flag.** I sampled a counter 100 seconds into a 12-minute leg and
+reported it as an outcome. The flag was real and it did change behaviour, but
+my headline was measured before the thing it claimed to measure had happened.
+
+Leg: prompt `8ea60a1c`, `--disable-dynamic-vram --lowvram` (both required --
+`cli_args.py:170` says `--lowvram` "doesn't do anything if dynamic vram is
+enabled", and `enables_dynamic_vram()` is true by default, so the flag alone
+is a silent no-op). Boot confirmed `Set vram state to: LOW_VRAM`.
+
+**WHAT LOW_VRAM DID FIX:** the FIRST load succeeded, and the 12B actually wrote
+a script --
+
+    [OTR_LedgerScriptWriter] DONE: episode_id=pending_20260829_204814,
+      lines=6, words=59, est_minutes=1
+
+That is the first script ever written by a 12B model on this 8 GB card. It also
+logged the operator's directive working exactly as intended:
+
+    [GGUFNative] VRAM estimate EXCEEDS free: free 6.94 GB < needed 9.53 GB
+      (n_ctx=4096). PROCEEDING ANYWAY -- an OOM is the only authority here.
+
+**WHAT IT DID NOT FIX:** every SUBSEQUENT load. `OTR_LineComposer` reloads the
+writer per line and hit `ValueError: Failed to load model from file` 27 times.
+The unfilled lines left the ledger structurally incomplete, and the freeze
+cascade correctly stamped `needs_full_rerun`, so `OTR_CastLock` refused to
+render:
+
+    ValueError: OTR_CastLock: freeze cascade stamped
+      freeze_verdict='needs_full_rerun' for structural ledger corruption.
+      Refusing to cast/render.
+
+**THE REAL SHAPE OF THE PROBLEM, now that two configurations have shown it:**
+this is not "does the 12B fit" -- it fits, measured three ways at 7,751 MiB.
+It is that **the pipeline loads and unloads the writer repeatedly**, and a
+model needing 95% of the card can only win that race the first time. Once any
+allocation lands between reloads, every later load fails. LOW_VRAM raised the
+success rate from zero loads to one; it cannot make the repeated case work.
+
+**CastLock's refusal is correct behaviour and should not be "fixed".** A ledger
+with unfilled lines must not reach TTS. The defect is upstream of it.
+
+**WHAT WOULD ACTUALLY WORK, unchanged from step 15 and now better evidenced:**
+the writer must persist across calls instead of being reloaded per line, or run
+out of process. Both are architecture calls on the shipping surface. A flag
+cannot reach this.
+
+**8 GB writer answer, unchanged: `gemma-4-E2B-it`,** four published episodes.
