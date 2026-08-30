@@ -1022,3 +1022,37 @@ verified in seconds instead of by burning a leg.
 
 **Scope, not overstated:** this reproduces the CACHING defect only. The memory
 collision is a separate, downstream consequence and is not exercised here.
+## Step 18 -- public_domain PASSES: third bank proven on this card
+
+Leg 96b37d22, otr_nvidia_8gb_haunted, --source-bank public_domain,
+--act-count 1. **RESULT SUCCESS + obs publish**:
+signal_lost_the_thickening_dread_20260829_235812_...final.mp4, 48.4 MB.
+Fifth episode from this box, staged to D:\4060-transfer.
+
+**Bank coverage on 8 GB hardware is now three distinct banks**, which matters
+because "3 for 3" earlier today turned out to be three legs of ONE bank family
+and the first new bank crashed it (PBUG-16). Current honest tally for
+otr_nvidia_8gb_haunted on this card:
+
+    shakespeare       PASS  (olivias_unsettled_unease, gemma-2-2b writer)
+    public_domain     PASS  (the_thickening_dread, E2B writer)
+    media_archive     PASS  (earlier legs)
+    scifi_news_pro    FAIL  x2 -- PBUG-16 (video stage, 72 min) then
+                             PBUG-20 (news-read validator, 5.7 min)
+
+So the profile is proven on three banks and fails on one, for two DIFFERENT
+reasons, both now logged and both on the shipping surface. That is a more
+useful sentence than "3 for 3" ever was.
+
+**Transport, resolved to a single human action:** the direct cable is dead at
+the 5080's end (0 bps, no 10.55.x bound there), so this box's 10.55.0.2 and
+its successful pings were never reaching IDREAM -- that traffic was Wi-Fi.
+Irrelevant, because Wi-Fi works: 445 is reachable both directions, and
+4060-transfer is an exported share with Everyone/Full at
+192.168.26.146. The 5080 read Test-Path returning False as "share does not
+exist"; a bare 
+et use PROMPTED for a username, which proves the path is
+fine and SMB is refusing an unauthenticated session before consulting the ACL.
+**Blocker is one credential prompt on the 5080, which only the operator can
+answer.** Both windows declined to enter credentials or weaken the
+guest-logon policy to avoid it.
