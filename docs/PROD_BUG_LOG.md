@@ -9657,3 +9657,91 @@ Either the formula is not the operative one for this bank or the count is off by
 one. Flagged for whoever owns the budget module; it changes nothing about the
 fix's correctness and the arithmetic below is consistent with TWO bridges.
 
+
+### FIX for PBUG-20260830-01 -- the receipt gets a third verdict (2026-08-30, 5080)
+
+**Root cause confirmed exactly as reported: a mis-bound `else`.** The budget
+check at `nodes/otr_master_audio_mux.py` computed the overage and **logged** it,
+but recorded no state. The receipt's `else` therefore bound to the **probe**
+check immediately above it, so a successful `ffprobe` printed `OK`
+unconditionally, and the only branch that could print anything else was a
+*failed probe*. The over-budget case had no branch at all -- which is why the
+two lines appeared seconds apart in one run, the gate failing by 8.8608 s while
+the receipt said `OK`.
+
+This is the same rule the file already stated one branch over, for the
+`UNPROVEN` case -- *"What must not happen is a receipt claiming a proof it does
+not have."* It was applied to the probe failure and missed for the budget
+failure.
+
+**The fix.** The budget check now records its verdict (`over_budget_by`) where
+it already computes the number for the warning, and the receipt is a three-way:
+
+    if   probe failed        -> UNPROVEN (gate SKIPPED, not passed)
+    elif over_budget_by      -> OVER_BUDGET by N.NNNNs (published anyway)
+    else                     -> OK
+
+`OVER_BUDGET` sits beside `OK` and `UNPROVEN` as a third verdict rather than
+reusing either, and the overage rides the line at full precision so the receipt
+is **self-contained** -- a reader comparing against the budget never has to go
+find the warning to get the number.
+
+**Why the wording was free to choose:** nothing parses `duration_check`. It is
+referenced only inside the mux and in docs, so adding a verdict breaks no
+downstream reader. Confirmed by grep across `*.py`, `*.ps1`, `*.sh`, `*.md`.
+
+**Why this got sharper, not milder, under "let it fly."** The operator's
+2026-08-30 directive is right and stands -- refusing to mux discards a finished
+episode over a length disagreement, which is a consistency judgement rather than
+a resource limit. But converting the raise into a warning made this receipt the
+**only compact signal** a reader gets, so an always-`OK` receipt made every
+overshoot invisible in exactly the summary the node exists to emit. The louder a
+real overshoot got in the log, the more confident the receipt looked.
+
+**Coverage:** `tests/test_duration_receipt_cannot_say_ok_when_over_budget.py`.
+Checked structurally against the AST rather than behaviourally, because reaching
+the branch needs ffprobe, two rendered media files and a full mux, while the
+defect was never in the arithmetic -- it was in which `if` the `else` attached
+to. **The test was mutation-verified:** the file was reverted to the mis-bound
+shape, the suite went red on that test, and it went green again on restore. A
+structural test that has not been shown to fail against the original defect is
+not evidence.
+
+Full suite 12,464 passed.
+
+**BLAST RADIUS:** `nodes/otr_master_audio_mux.py` is shared, so both machines
+emit the new verdict. No behaviour changes -- nothing is gated, refused or
+published differently; only what the receipt *says* about an episode it was
+already publishing. The 5080's running overnight loop was deliberately NOT
+restarted for it, so it takes effect at the next natural server start rather
+than interrupting episodes mid-flight; the 4060 boots its own server and picks
+it up on its next leg.
+
+### Companion observation (NOT a defect) -- the bridge count is bank-dependent
+
+The 4060 observed `--act-count 2` minting **two** `music_inter` bridges on
+`scifi_news_pro` (`shot_001_music`, `shot_002_music`), where
+`_otr_episode_budget.py`'s `music_inter_count = (act_count - 1)` predicts one.
+On the 5080's banks the formula held exactly: a 5-act episode minted four
+(`b006`, `b011`, `b016`, `b021`).
+
+`music_inter_count` is the OUTLINE's instruction to the writer, not a constraint
+on what a bank ultimately emits, and `scifi_news_pro` mints its own music rows
+under its `<shot>_music` naming. So the divergence is bank behaviour rather than
+a broken formula, and it changes nothing about correctness today.
+
+**It matters for one thing only, and it is worth remembering before anyone tunes
+`MUSIC_BRIDGE_FALLBACK_DUR_S`:** the residual scales with the bridge COUNT, and
+that count cannot be predicted from `act_count` alone on every bank. Measure the
+bridges in the ledger rather than deriving them.
+
+### The residual is measured on both shapes now, and it is the accepted one
+
+    5080, 5-act, 4 bridges  ->  16.83 s excess   (padding 0.83 s)
+    4060, 2-act, 2 bridges  ->   8.86 s excess   (padding 0.86 s)
+
+Bridges x 4.0 s plus ~0.85 s of frame padding, reproduced across two cards, two
+act counts and two banks. This is the operator's accepted "let it fly" residual,
+**not a defect**. Closing it means extending the bed under the bridges or
+shortening them -- an operator decision about how the episode sounds, and now
+one with a number from each machine.
