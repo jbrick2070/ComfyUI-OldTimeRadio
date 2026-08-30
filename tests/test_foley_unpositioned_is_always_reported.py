@@ -19,6 +19,26 @@ must not be invisible" -- so it is reported at every value.
 The neighbouring counters (``muted_samples``, ``skipped``, ``conform_notes``)
 stay conditional deliberately: those are exceptions worth noticing, not
 invariants worth confirming. This test does not touch them.
+
+**SCOPE, and this test would overstate itself without it.** Removing the gate
+did NOT answer the question the 4060 was actually asking, because the counter
+was only the smaller half of what it hit. The entire foley block -- the whole
+``report`` list that every ``foley_*`` line is appended to -- sits behind
+``_foley_route()`` / ``foley_stems.is_foley_route``, which is true only when a
+role renders on the foley engine. The profile under test was
+``animatediff15_v3_haunted_video``, so that block never ran and NO foley line
+printed at all; "no foley receipt line of any kind" was the complete finding,
+not a symptom of this gate.
+
+And the counter could not have seen a bridge there regardless: it increments per
+foley STEM lacking ``start_s`` (``foley_stems.py``), and its own comment scopes
+that to "on a foley lane it still produces a stem". AnimateDiff has no audio
+path, so a haunted-lane bridge produces no stem to count.
+
+So what this test protects is real but narrow: **on a genuine foley route**, the
+count is legible at zero. Making a bridge's unpositioned status visible on a
+NON-foley lane would be a different receipt at a different site, and no test
+here claims it exists.
 """
 from __future__ import annotations
 
