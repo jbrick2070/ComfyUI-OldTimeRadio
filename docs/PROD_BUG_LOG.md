@@ -9367,3 +9367,96 @@ the third gets a panel before code.
 - bible-worthy: CANDIDATE. Class: *a validator written for fiction applied to a
   factual lane inverts its own rule -- "not in the cast" means "invented" for a
   drama and means "correctly sourced" for a news report.*
+
+### AMENDMENT to PBUG-20260829-16 -- the ROOT is a 39-day ledger hole from commit 59286499, and attempt 1 was actively harmful (2026-08-30, 5080 + 4060)
+
+**Attempt 1 (`_music_cue_dur_s`, resolve a duration through `anchor_line_id`)
+was not merely incomplete. It was harmful exactly where it fired, and it is
+now removed rather than narrowed.**
+
+**How it was caught.** The 5080 predicted an 18.87 s overshoot from its own
+reading; the 4060 then measured **18.9312 s** on different hardware, a different
+bank, and a different episode length -- mechanism reproduced to within 60 ms.
+The leg reached the master mux ~86 minutes in, which it had never done before,
+and was rejected:
+
+    ERROR node 85 (OTR_MasterAudioMux) raised ValueError
+    silent video 140.0400s exceeds master audio 97.6278s by 42.4122s,
+    over the credits-tail budget (23.3610s [declared] + 0.1200s tol = 23.4810s)
+    by 18.9312s
+
+**Why the fix was wrong: the anchor points at the row that must NOT render.**
+A music beat exists in two lifecycle stages, and the 4060 established this from
+`otr_meta_brief_image_prompt.py`'s own comments (L1382, L1450):
+
+* the **SENTINEL** (`shot_000_music`) is authored PRE-audio under the bank's own
+  id, untimed **by design**, and load-bearing -- it is what tells the assembler
+  to mint the mirror and reserve that beat's still;
+* the **MIRROR** (`music_opening_001`) is minted POST-audio under the
+  assembler's deterministic id and carries the real `start_s`/`dur_s`.
+
+The cue's `anchor_line_id` points at the **sentinel**. So attempt 1 timed
+precisely the row that owns no timeline, emitting 10.0 s + 8.0 s a second time
+on top of the mirror that already carried them. 10.0 + 8.0 = 18.0 s; the
+measured 18.93 s is that plus frame-budget padding at 25 fps. These are **not
+duplicates** -- suppressing the bank's emission is what killed `fastwan_8gb`
+twice (PBUG-20260811-02, commit 3446af3f), so the fix excludes the sentinel from
+the **video beat list** only and changes nothing about what a bank emits.
+
+**The separate and larger half: a 39-day unowned-field regression.**
+Commit **`59286499` ("feat: rip interstitial audio insertion", 2026-07-22)**
+removed the `interstitial` cue slot and with it the only code that stamped
+timing on `music_inter` rows:
+
+    -_CUE_SLOTS = ("opening", "closing", "interstitial")
+    -    "dur_s": float(_seg_len) / float(sample_rate),
+    -        _mrow["start_s"] = float(_p["start_s"])
+    -        _mrow["dur_s"]   = float(_p["dur_s"])
+    -        _mrow["start_s_space"] = "scene_audio"
+    -    "lines_positioned=%d/%d music_inter_positioned=%d",
+
+The rip was deliberate and stands. What it did not do is **re-home the ledger
+fields it stopped writing**, while the writer kept planning the beats
+(`_otr_episode_budget.py:254` -- `music_inter_count = (act_count - 1) if
+include_act_breaks else 0`). Every act break since has therefore minted a row
+with no cue, no audio, no `start_s` and no `dur_s`. It budgets to ZERO frames
+and the video stage refuses it 40+ minutes in:
+
+    GhostCadenceError: cadence needs a delivered target of at least 1 frame,
+    got 0 -- a 0-frame beat is a planning bug, not something to paper over here
+
+**Measured across all 2,021 ledgers on the 5080:**
+
+    ledgers WITH music_inter : 742
+      ...of those, PUBLISHED : 0
+      ...with ANY timing     : 1   (music_inter_01_001, 2026-07-21, dur_s=4.087)
+
+That single timed survivor is dated **one day before the rip** and is where the
+new `MUSIC_BRIDGE_FALLBACK_DUR_S = 4.0` comes from -- a measurement, not a taste
+call. This is exactly the failure the operator's standing rule names: *a ripped
+pass with an unowned field is a broken render, not a simplification.* Every
+5-act episode requested since 07-22 has died on it.
+
+**Fix (attempt 2, `b2f36242`)** -- `nodes/otr_shot_lock.py`:
+1. `_untimed_music_sentinels()` -- a pre-audio sentinel never becomes a video
+   beat while a timed mirror of the same role exists. Keyed on **role**, not cue
+   id, because keying on the cue selects the wrong row of the pair.
+2. `_music_cue_dur_s` **deleted**. There is no shape in which reading that
+   anchor for a duration is correct.
+3. `MUSIC_BRIDGE_FALLBACK_DUR_S` for `music_inter` **only** -- an untimed
+   character line still raises the loud zero-frame warning rather than silently
+   receiving a number.
+
+**Blast radius (both machines, `nodes/` is shared):** 5080 banks carry no
+sentinel (`anchor_line_id=None`), so rule 1 is inert there and they gain
+act-break bridges that render instead of crashing; 4060 banks carry the
+sentinel, and rule 1 is what removes their 18.93 s. Both shapes are covered by
+unit fixtures lifted from real ledgers. Full suite 12,457 passed.
+
+**Status: 5080 half in proof on live hardware; 4060 half NOT yet proven.** The
+sentinel rule is only falsifiable on the box that has the sentinel shape. Until
+a `scifi_news_pro` leg runs against `b2f36242`, this entry is half-evidenced and
+must not be read as closed. Per the operator's directive tonight -- *"don't kill
+a duration mismatch, just let it fly"* -- a residual mismatch now warns and
+publishes rather than discarding a finished episode, so a green `otr/obs` entry
+carrying a warning is a pass.
