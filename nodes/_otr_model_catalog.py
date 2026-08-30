@@ -1255,18 +1255,54 @@ def vram_badge_for(repo_id: str) -> str:
     cannot load is a broken menu, and the failure arrives minutes later as a
     VRAMFitFailedError rather than at the moment of choosing.
 
-    This deliberately reports the SAME number the admission gate will compute
-    (:func:`_estimate_resident_gb`), so the badge and the refusal can never
-    disagree. Remote handles and un-estimable rows get no badge rather than a
-    guess -- the download-state badge was removed for exactly that reason, and
-    a wrong number is worse than none."""
+    It reports the same figure :func:`_estimate_resident_gb` computes, so the
+    badge and the gate cannot drift apart. Remote handles and un-estimable rows
+    get no badge rather than a guess -- the download-state badge was removed
+    for exactly that reason, and a wrong number is worse than none.
+
+    GGUF ROWS ARE PRICED AT THE DEFAULT CONTEXT, AND SAY SO (PBUG-20260829-17).
+    A GGUF row's cost is weights + KV, and KV scales with ``n_ctx`` -- so a
+    single number is only meaningful once you know which context it assumes.
+    This used to assume the row's MAXIMUM, which priced the rarest case as the
+    norm: `unsloth/Qwen3-4B-Instruct-2507-GGUF` showed **7.9 GB** (2.3 weights
+    + 5.6 KV at n_ctx 8192) when the same model needs **5.2 GB** at the default
+    4096 -- measured on an 8 GB card. Only 6 of 94 shipped profiles request
+    8192; 69 request 4096.
+
+    THE COST OF THAT WAS A USER WALKING AWAY. An 8 GB owner reads "(7.9 GB)"
+    against an 8 GB card and skips the smallest, cheapest-to-download,
+    Apache-2.0 writer in the list -- 2.3 GB on disk, loads with headroom. The
+    operator's directive is that a dropdown states "how much VRAM it needs so
+    users select only the one they can use"; 7.9 was not what it needs.
+
+    Same defect shape as PBUG-20260829-08 -- pricing the ROW's maximum instead
+    of the REQUEST -- which was fixed in the gate and survived here in the
+    label. The context is now named in the badge so the number can never again
+    be read as unconditional."""
+    ctx = None
+    suffix = ""
     try:
-        est = _estimate_resident_gb(repo_id)
+        from ._otr_shared.llm_policy import LLMRuntimePolicy as _Policy
+        row = None
+        try:
+            from . import _otr_gguf_backend as _gguf
+            row = _gguf.gguf_row_for_repo(repo_id)
+        except Exception:  # noqa: BLE001 -- not a GGUF row; no context term
+            row = None
+        if row is not None and row.kv_gb_per_1k:
+            ctx = int(getattr(_Policy, "gguf_n_ctx", 4096)
+                      if isinstance(getattr(_Policy, "gguf_n_ctx", None), int)
+                      else _Policy.__dataclass_fields__["gguf_n_ctx"].default)
+            suffix = " @%dk ctx" % (ctx // 1024)
+    except Exception:  # noqa: BLE001 -- a badge must never break the picker
+        ctx, suffix = None, ""
+    try:
+        est = _estimate_resident_gb(repo_id, context_cap=ctx)
     except Exception:  # noqa: BLE001 -- a badge must never break the picker
         return ""
     if not est or est <= 0:
         return ""
-    return " (%.1f GB)" % float(est)
+    return " (%.1f GB%s)" % (float(est), suffix)
 
 
 def _top_installed_alternatives(hub_root: Path | None = None) -> list[str]:
