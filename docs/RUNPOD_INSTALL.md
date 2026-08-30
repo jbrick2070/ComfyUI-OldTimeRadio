@@ -445,3 +445,48 @@ seconds instead of failing twenty minutes into a render.
   to VRAM.**
 * `comfy-aimdo` (DynamicVRAM) ships on this image. That is the component that
   called native `abort()` and killed a 4060 episode in PBUG-20260829-03.
+
+### 8A. CORRECTION — we are FLAGGED, not Pending, and that changes the diagnosis
+
+Section 8 blamed the zero-terminal install failing on our registry versions
+being *Pending*. **That was wrong.** Measured 2026-08-30:
+
+    https://api.comfy.org/nodes/comfyui-old-time-radio/versions
+    2.0.0-alpha.14   NodeVersionStatusFlagged
+    2.0.0-alpha.13   NodeVersionStatusFlagged
+    versions: 2      active: 0
+
+**No Active version exists at all** -- alpha.8 and earlier went away with the
+listing that was deleted and recreated. So `@latest` has nothing to resolve to.
+
+**The Manager API itself works perfectly.** Proven on the same pod, same
+session, zero terminal: ComfyUI-AnimateDiff-Evolved installed over HTTP because
+it IS Active (1.5.7), taking the pod from 1036 to 1181 node classes with 143
+`ADE_` classes registered.
+
+    POST /api/manager/queue/install
+      {"id": "<cnr-id>", "version": "latest", "selected_version": "latest",
+       "channel": "default", "mode": "remote"}
+    POST /api/manager/queue/start
+    POST /api/manager/reboot        # 502, works anyway
+    GET  /object_info               # confirm
+
+`version`, `channel` and `mode` are read with `json_data['...']`, not `.get()`,
+so all three are MANDATORY -- omitting any is a 500, which is what a malformed
+`install_model` body returns too.
+
+**The `nightly` branch cannot substitute.** Setting `selected_version:
+"nightly"` makes Manager read `repository` and route through
+`get_risky_level(git_url, pip)` then `is_allowed_security_level(...)`, which
+refuses an arbitrary git URL on a network-exposed instance:
+
+    HTTP 404  "A security error has occurred. Please check the terminal logs"
+
+**Consequence, and it is bigger than pods.** Flagged does NOT self-resolve the
+way Pending does -- Pending waits for Comfy-Org's cron, Flagged means their
+scanner objected. Until a version goes Active, **nobody can install OTR through
+ComfyUI-Manager by any route**: not `@latest` (nothing to resolve), not
+`nightly` (security), not on a pod and not on a desktop. A git clone is the only
+path, which is exactly the friction the template's start command exists to
+absorb -- a start command runs as container init and never meets Manager's
+security policy at all.
