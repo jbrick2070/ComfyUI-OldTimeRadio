@@ -184,3 +184,94 @@ where it currently sits inert because the haunted lane refuses stills.
 3. One seam for image consumption, or two engines?
 4. Does the haunted look survive a conditioning still at all? — the question
    that decides whether any of this is worth building.
+
+---
+
+## 10. REVIEW ROUND 1 — Antigravity, grounded 2026-08-30
+
+Reviewed by `agy` against the real files; every claim below was then verified by
+me against those files before being folded in. Its verdict: **do not build as
+specified — run the disqualifying probe first.** I accept that.
+
+### Errors it found in this spec, all CONFIRMED by re-reading the code
+
+1. **`required_inputs = ("init_image",)` IS WRONG AND WOULD CRASH AT RENDER.**
+   `GhostSignalEngine._assert_required_inputs` (`eng_ghost_signal.py:727`) hard-
+   requires BOTH `text_prompt` and `negative_prompt`, with the comment "Ghost
+   owns its whole subject, so an empty prompt is a blank picture, not a
+   default". Declaring only `init_image` lets the compat layer admit a textless
+   call that then dies mid-render.
+   **Correct: `required_inputs = ("text_prompt", "init_image")`.**
+
+2. **"Six engines already declare image_to_video" was wrong.** It is **12
+   declarations across 8 files** — I counted files with `grep -l` and reported
+   them as engines. `eng_wan_ti2v.py` and three separate engines inside
+   `eng_cloud_video.py` were missed.
+
+3. **File attribution in section 3 is loose.** The live haunted lane is
+   `GhostSignalV3HauntedEngine` in `eng_ghost_signal_official.py:120`. The
+   VALUES I quoted are correct — verified that the subclass overrides none of
+   `family`, `accepts_still`, `required_inputs` or `still_plan`, inheriting all
+   four from the base — but they should be attributed to the base class.
+
+### The surface I missed that would have SILENTLY produced nothing
+
+**`still_plan` is a required class attribute and mine would have been empty.**
+`GhostSignalEngine` declares `still_plan: tuple = ()` (`:351`) because it needs
+no stills. `eng_minimax_h3` declares `still_plan = _H3_STILL_PLAN` (`:453`).
+**An I2V engine with an empty `still_plan` causes the image dispatcher to mint
+ZERO stills** — so the lane would register, load, and render text-to-video under
+an image-to-video receipt. That is the worst failure shape in this codebase: a
+receipt that lies. Section 6's table missed it entirely.
+
+### Section 6's table was too short. VERIFIED additional surfaces:
+
+| surface | why it is not optional |
+|---|---|
+| `registry.py` `CAPABILITIES` dict | `tests/test_capability_profiles.py:393` asserts `set(vreg.CAPABILITIES) == set(vreg.all_engine_names())`. Registering without it FAILS CI. |
+| engine class `still_plan` | non-empty `StillPlanRow` entries, or no stills are minted (above) |
+| `tests/fixtures/still_plan_matrix.json` | parity test; needs regeneration |
+| `public_engines.py` `_PUBLIC_LABEL` | 1:1 bijection assert |
+| `content_oracle.py` `_FAMILY_FALLBACK` | bare-script family resolution |
+| `docs/ENGINE_MATRIX.md` via `tools/engine_matrix.py` | `test_engine_matrix_doc` asserts every registered engine is documented |
+| frame-contract tests | sweep new engines automatically |
+
+### Its answers to the four open questions
+
+1. **`init_image` REQUIRED**, not optional — a silent I2V→T2V fallback would
+   produce unconditioned video under an I2V receipt and mask image-dispatcher
+   failures. The prompt-only lane already exists as a separate dropdown row, so
+   the fallback buys nothing. **Adopted.**
+2. **Neither route should be committed today.** Route A is weak conditioning;
+   Route B needs an ADE bump that endangers the only proven 8 GB lane.
+   **Adopted** — see the probe below.
+3. **Two engines, not one seam.** Recipes stamp receipts, and hiding SparseCtrl
+   behind Route A's engine id would make the receipt lie about what conditioned
+   the pixels. This reverses my recommendation, and it is right: the receipt
+   argument is the same one that governs the haunted-vs-clean lane split.
+   **Adopted.**
+4. **The disqualifying probe** (its design, and it is cheap): one still from
+   `z_image_turbo`, `VAEEncode` → `RepeatLatentBatch(16)` → `KSampler` with the
+   v3 motion module + adapter at strength 1.0, at denoise **0.35 / 0.50 / 0.65 /
+   0.80**, decoded to four clips. Disqualified if ≤0.50 shows zero macro-motion
+   with texture boil, or ≥0.65 loses the still's identity within 2–3 frames.
+
+### Its technical hypothesis for WHY Route A likely fails — INFERRED, not verified
+
+Repeating one still latent across the window gives the motion module's temporal
+attention identical cross-frame keys and queries, which suppresses motion
+trajectory while leaving high-frequency texture free to boil. SD1.5 AnimateDiff
+has **no image-conditioning channel** without SparseCtrl or IP-Adapter, unlike
+Wan/LTX which condition through DiT patches.
+
+**This is reasoning, not measurement, and I am recording it as such.** But it
+predicts exactly the failure the probe is designed to detect, which is a good
+sign for both.
+
+### Where this leaves the spec
+
+**Route A is now a PROBE, not a build.** Write the standalone probe script,
+look at four clips, and only then decide whether a lane exists at all. That
+inverts the spec's original recommendation and is better: the question that
+decides everything — does the haunted look survive a conditioning still — is
+answered by four clips and an eye, not by an engine.
