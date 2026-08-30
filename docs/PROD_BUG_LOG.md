@@ -9745,3 +9745,56 @@ act counts and two banks. This is the operator's accepted "let it fly" residual,
 **not a defect**. Closing it means extending the bed under the bridges or
 shortening them -- an operator decision about how the episode sounds, and now
 one with a number from each machine.
+
+### PBUG-20260830-01 RESOLVED -- verified BEHAVIOURALLY on the live path (4060, leg 8ea39846)
+
+The fix (e8f55696, restructured in 36963c3f) is proven on the real mux, not only
+in a test. Server restarted on e8f55696; `--act-count 2`; RESULT SUCCESS;
+published `signal_lost_iron_bar_and_reckoning_20260830_094514` (82.5 MB).
+
+**The receipt now states the verdict it previously concealed, and the two lines
+agree to four decimals:**
+
+    [OTR_MasterAudioMux] DURATION MISMATCH (publishing anyway): silent video
+      100.5200s exceeds master audio 73.2399s by 27.2801s, over the credits-tail
+      budget (22.2330s [declared] + 0.1200s tol = 22.3530s) by 4.9271s
+    [OTR_MasterAudioMux] duration_check v=100.520s a=73.240s tail_budget=22.2s
+      (declared) OVER_BUDGET by 4.9271s (published anyway)
+
+Three hours earlier, under the same conditions, the second line read `OK`.
+
+**Why a live leg was required and the unit tests were not sufficient:** the
+tests exercise the verdict function; they do not exercise the mux, the ffprobe
+calls, or the wiring between them. This leg proves the line reaches the log on
+the production path.
+
+### TWO CORRECTIONS TO EARLIER CLAIMS IN THIS LOG -- both mine
+
+**1. The residual padding is NOT a constant.** I wrote that the 5080's 0.83 s
+and my 0.86 s were "the same constant, different card". A third data point
+refutes it:
+
+    5080  5-act  4 bridges  16.83 s excess  = 16.0 + 0.83
+    4060  2-act  2 bridges   8.8608 s       =  8.0 + 0.8608
+    4060  2-act  1 bridge    4.9271 s       =  4.0 + 0.9271
+
+The per-bridge **4.0 s is exact in all three**. The remainder is 0.83-0.93 s and
+varies. Two points agreeing is not a constant; it is two points. Anyone tuning
+the bridge duration should model the residual as `4.0 x bridges + ~0.9 s`, and
+should not expect the tail term to be stable.
+
+**2. The bridge count is not bank behaviour -- it is EPISODE behaviour.** The
+companion observation on PBUG-20260830-01 said `scifi_news_pro` mints two
+bridges at `--act-count 2` where the formula predicts one, and the 5080's
+reading was that banks emit their own rows. Both of us were reasoning from one
+run each. The same bank at the same act count produced:
+
+    leg 2204f5f8  --act-count 2  ->  2 music_inter bridges  (18 beats)
+    leg 8ea39846  --act-count 2  ->  1 music_inter bridge   (13 beats)
+
+So the count varies **run to run on identical inputs**, tracking episode shape
+rather than bank or act count. This strengthens rather than weakens the
+operative rule: **measure the bridges in the ledger; never derive them.** A
+tuning derived from `act_count` would have been wrong on one of these two legs
+no matter which one it was derived from.
+
