@@ -755,3 +755,69 @@ mislocalizing judge the most opportunities to be wrong, so it is the bank where
 the difference between the two writers should be largest. **It will be reported
 with the clean-stage instrument -- flag rate, unclean rate, whole-line share --
 not merely pass/fail**, so one 8 GB leg is comparable to the 339.
+
+### FALSIFIED: gemma-2-2b is NOT a replacement writer -- and my leg helped point the wrong way
+
+My shakespeare leg (prompt 81ad671f, published) reported 1 flag, 2 segments
+named, 0 committed repairs, and I called it "encouraging, not a property". The
+5080 then ran the same model across FOUR banks and the property does not exist:
+
+    whole-line share     gemma-2-2b      gemma-4-E2B-it
+      media_archive        2/24 =   8%       93%
+      original             2/6  =  33%       86%
+      public_domain        4/4  = 100%       94%
+      shakespeare          3/3  = 100%      100%
+
+The 8% that made it look like a replacement was a MEDIA_ARCHIVE ARTIFACT.
+Aggregate moved 8% -> 30% once the other banks landed, and on the fidelity
+lanes it converges with E2B at 100%.
+
+**It is WORSE than E2B, and the damage mode differs in kind.** On shakespeare
+it flagged 3 and COMMITTED 3 (E2B commits 12.5% of its shakespeare flags and
+fails safe on the rest). And it does not truncate, it SUBSTITUTES:
+
+    before : 'A most excellent way to make an impression, my lady.'
+    after  : 'I must truly master this...this...grace'
+    before : 'Fancy that.'
+    produced: "Maria's voice, I must truly master this grace"
+
+The output bears no relation to the input -- a small model handed a rewrite
+instruction invents a replacement line, which is then committed and SPOKEN.
+That is worse than truncation because nothing downstream can catch it: the row
+is well-formed, in character, and wrong.
+
+**WHAT MY OWN LEG ACTUALLY CONTRIBUTED, stated plainly:** one episode, one
+bank, one flag -- and the direction it suggested was wrong. I did label the
+denominator before anyone challenged it, and that caveat is the only reason
+this did not become a recommendation. It is not enough to be right about the
+uncertainty if the number still gets quoted; **a single-leg result on a new
+model should not be reported as a signal at all, only as a leg that ran.**
+
+**STANDING WRITER ANSWER FOR 8 GB, unchanged and now better tested:**
+google/gemma-4-E2B-it remains the proven renderer and still damages roughly a
+line per episode. There is no drop-in small replacement. The 5080's conclusion
+is the right one and my data does not dent it: the fix belongs in the REPAIR's
+contract -- *may not alter anything outside the segment the judge named* --
+because that single invariant blocks all three of gemma-2-2b's substitutions
+and E2B's truncations alike. A better judge was never going to be the answer.
+
+### THE FENCE DIVERGENCE IS STILL UNEXPLAINED -- and the stacks differ
+
+Eliminated on BOTH boxes: quantization (quantized=False both sides), snapshot
+revision (299a8560... identical), judge temperature (0.200), node, prompt
+template, and now the BANK -- the 5080's shakespeare leg quoted
+You speak of "excellent" as if you had no hand in the matter. (embedded double
+quotes, the exact fence-inducing material) across 146 judge calls with ZERO
+failures, against my 3 failures in 9 calls.
+
+Remaining difference, and it is the fourth instance of tonight's pattern:
+**the two installs are not running the same stack.**
+
+    4060 (fences):  transformers 5.14.1  tokenizers 0.22.2  torch 2.12.1+cu130
+    5080 (clean) :  torch 2.10.0+cu130   (transformers/tokenizers to be confirmed)
+
+The snapshot's own generation_config.json declares
+"transformers_version": "4.42.4" -- i.e. these weights were published against
+a transformers a full major line older than what this box runs. Whatever the
+cause, the parser fix stands on its own: accepting a fenced payload is correct
+defensive behaviour regardless of who emits one.
