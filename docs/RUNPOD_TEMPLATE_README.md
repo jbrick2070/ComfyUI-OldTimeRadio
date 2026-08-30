@@ -14,9 +14,8 @@ credits roll. The output is a single MP4.
 It runs **fully local and offline-first** — no API keys, no paid services, no
 cloud calls. The default lane needs no Hugging Face token at all.
 
-Episodes are drawn from source banks: public-domain fiction, Shakespeare, an
-original bank, and archive-driven lanes. A 3-act episode runs 4–6 minutes; the
-pipeline supports 1 to 5 acts.
+Episodes draw from public-domain fiction, Shakespeare, an original bank and
+archive lanes. A 3-act episode runs 4–6 minutes; 1 to 5 acts are supported.
 
 **Status: the pack installs and registers cleanly on a pod (verified — 25 node
 classes). A full episode render on rented hardware has NOT yet been verified.**
@@ -28,14 +27,13 @@ unproven until you have your own successful run.
 ### Dependencies
 
 * **NVIDIA GPU.** 8 GB is the proven floor (RTX 4060, nine published episodes);
-  16 GB is comfortable. More VRAM does not speed up the default lane much — the
-  models are small.
+  16 GB is comfortable. Extra VRAM adds little here — the models are small.
 * **A network volume, mounted at `/workspace`.** Strongly recommended. Model
   weights are ~4 GB for the default lane and re-download on every pod start
   without persistent storage. Provision it in the **same region** as the pod or
   it will not attach.
-* **Disk:** ~20 GB for the pack, its Python dependencies and the default
-  weights. More if you enable additional video lanes.
+* **Disk:** ~20 GB for the pack, its deps and default weights; more for
+  extra lanes.
 * **No Hugging Face token needed** for the default haunted lane. Some optional
   lanes (LTX 2.5) use gated models and do require one — set `HF_TOKEN` as a pod
   environment variable if you want those.
@@ -103,24 +101,22 @@ on automatic.
 **First render is slow.** Model loads dominate. Later runs on the same pod reuse
 what is resident.
 
-**Long renders and client timeouts.** The headless runner watches for a bounded
-time and then stops *watching* — it does not stop the render. If it reports a
-timeout while the queue still shows work in progress, the episode is still going
-and will still finish. Use `--timeout 0` to wait for a terminal result.
+**Long renders.** The headless runner stops *watching* after a bounded time; it
+does not stop the render. A timeout while the queue still shows work means the
+episode is still going. Use `--timeout 0` to wait for a terminal result.
 
 ## Authors
 
 Jeffrey A. Brick — [@jbrick2070](https://github.com/jbrick2070)
 
-Source: <https://github.com/jbrick2070/ComfyUI-OldTimeRadio> (branch
-`v2.0-alpha` — `main` is stale and should not be used)
+Source: <https://github.com/jbrick2070/ComfyUI-OldTimeRadio> — branch
+`v2.0-alpha`. `main` is stale; do not use it.
 
-Built on [ComfyUI](https://github.com/comfyanonymous/ComfyUI) and
-[ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved).
+Built on ComfyUI and ComfyUI-AnimateDiff-Evolved.
 
 ## Version History
 
 * 0.1
-    * Initial template. Pack install and node registration verified on a pod
-      (1036 → 1061 classes, 25 `OTR_` classes). Episode rendering on rented
-      hardware not yet verified.
+    * Initial template. Install and node registration verified on a pod
+      (1036 → 1061 classes, 25 `OTR_`). Episode rendering on rented hardware
+      not yet verified.
