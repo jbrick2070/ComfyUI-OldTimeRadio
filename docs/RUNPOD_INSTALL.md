@@ -866,9 +866,17 @@ roots with neither complete. The volume confirms the layout is right:
 RunPod's own console says it plainly -- *"Environment variables are not
 encrypted"* -- so a token pasted into the env field is stored in the clear and
 is visible to anyone who can read the template. Create it under **Secrets** in
-the RunPod account, then reference it from the template's env value; the console
-shows the exact `{{ RUNPOD_SECRET_<name> }}` string to paste when the secret is
-created. Secrets are injected at pod creation, exactly like SSH keys, so **a
+the RunPod account, then reference it from the template's env value.
+
+**The reference form is the secret's NAME, upper-cased, behind a
+`RUNPOD_SECRET_` prefix** (confirmed against a real secret, 2026-08-30):
+
+    secret name                  HF_TOKEN
+    env var name in template     HF_TOKEN
+    env var VALUE in template    {{ RUNPOD_SECRET_HF_TOKEN }}
+
+The value is that literal placeholder, braces included -- never the token
+itself. The secret's own detail page prints the exact string to paste. Secrets are injected at pod creation, exactly like SSH keys, so **a
 secret added to a RUNNING pod does not reach it** -- redeploy.
 
 **`hf auth login` IS fully supported -- just not on a shared volume.**
