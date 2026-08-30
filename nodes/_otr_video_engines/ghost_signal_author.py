@@ -959,6 +959,24 @@ GHOST_FALLBACK_CLAUSES = {
         "a figure leans over a table and goes still",
         "a figure straightens and looks off past the frame",
         "a figure turns away and walks into the dark",
+        # WIDENED 2026-08-30. Six clauses exhausted on the first 5-ACT episode
+        # of the overnight run -- "the figure fallback pool is exhausted: 6
+        # clauses, all already used in this episode ... widen the pool", which
+        # is the error telling the reader exactly what it wants. A longer
+        # episode simply has more beats than six distinct pictures, and the
+        # authored path forbids duplicate leaves on purpose.
+        "a figure crosses the room and stops at the window",
+        "a figure sits down slowly and rests both hands on the table",
+        "a figure reaches up and pulls a cord above the desk",
+        "a figure stands in the doorway with the light behind",
+        "a figure bends toward the floor and rises again",
+        "a figure turns a page and holds the paper to the lamp",
+        "a figure paces once and settles against the wall",
+        "a figure lowers a hand to the table and leaves it there",
+        "a figure steps back until the dark takes the edges",
+        "a figure tilts toward a sound somewhere off the frame",
+        "a figure draws a coat closed and stands very still",
+        "a figure moves past the lamp and the shadow swings wide",
     ),
     "object": (
         "it tilts on the table as a shadow crosses it",
@@ -967,6 +985,21 @@ GHOST_FALLBACK_CLAUSES = {
         "it stands on a desk while dust drifts across it",
         "it turns a quarter and the highlight slides away",
         "it sinks slowly into the shadow at the table edge",
+        # Widened with figure (above). Non-figure modes must carry NO human
+        # words -- `_HUMAN_WORDS` rejects a clause that "requests a person in
+        # object mode" -- so these stay strictly on the thing and the light.
+        "it slides an inch across the wood and stops",
+        "it gleams once as the lamp above it steadies",
+        "it lies on its side while the light narrows",
+        "it sits square on the desk and the shadow lengthens",
+        "it shifts as the table takes a knock from below",
+        "it darkens as the glow behind it fades out",
+        "it rests on scattered paper and holds the light",
+        "it turns slightly and the engraved edge catches",
+        "it stands upright while dust settles around it",
+        "it leans against the lamp base and stays there",
+        "it tips forward and rights itself on the wood",
+        "it holds a thin white line along its upper edge",
     ),
     "signal": (
         "a lamp swings past it and the shadow sweeps the wall",
@@ -975,6 +1008,19 @@ GHOST_FALLBACK_CLAUSES = {
         "it sits in the dark as a slow light passes over it",
         "the light on it narrows to a single bright band",
         "the light leaves it and the room goes dim",
+        # Widened with figure (above); same no-human-words rule as object.
+        "a slow beam crosses it and climbs the far wall",
+        "the glow tightens on it and the corners go black",
+        "light pulses over it once and holds steady",
+        "a shaft of light drops across it from above",
+        "the lamp flickers and the shadow jumps behind it",
+        "light rakes across it and settles low",
+        "a pale wash finds it and spreads to the wall",
+        "the beam swings wide and returns to rest on it",
+        "light fades from it and the room closes in",
+        "a hard edge of light cuts across it",
+        "the glow behind it swells and steadies",
+        "light slides along it and stops at the seam",
     ),
 }
 
