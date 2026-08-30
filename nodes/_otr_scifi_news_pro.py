@@ -2039,9 +2039,40 @@ def _make_news_read_validator(dossier: DossierLLM, cast_names: "list[str]"):
     count and craft are not inspected and never will be here -- THE LAW.
     """
     anchors = _news_read_source_anchors(dossier)
+    # A NAME THE SOURCE ITSELF USES IS NEVER FICTION, even when the cast
+    # borrowed it (PBUG-20260829-20). This lane builds its characters FROM the
+    # article's entities, so a real person named in the source routinely ends
+    # up in `cast_names` too -- and then the factual close, correctly naming
+    # him, was rejected as "naming invented characters". Observed on an MIT
+    # News item about Pat Pataranutaporn: the writer's own entity pass had
+    # extracted him under PEOPLE, next to PLACES - MIT, and the validator
+    # failed the read twice and killed the episode at 5.7 minutes.
+    #
+    # The error text carried its own refutation -- "it names invented
+    # characters (Pataranutaporn) ... report only what the source says, using
+    # the source's own names" -- and no retry could rescue it, because the
+    # answer was never wrong. A lower-temperature repair produced the same
+    # correct text and was rejected identically.
+    #
+    # Subtracting the anchors keeps the real check intact: a character the
+    # source never mentions, appearing in a factual report, is still caught.
+    # Matched on whole WORDS of each anchor, not the whole anchor string: the
+    # cast typically carries the SURNAME ("Pataranutaporn") while the dossier
+    # holds the full name ("Pat Pataranutaporn"), so exact comparison misses
+    # the very case this exists for. Word-level equality (never substring)
+    # keeps it precise -- "Ada" is not exempted by an anchor "Adam Smith".
+    _source_attested = set()
+    for _a in anchors:
+        _a = str(_a or "").strip()
+        if not _a:
+            continue
+        _source_attested.add(_a.casefold())
+        for _w in re.split(r"[^0-9A-Za-z'-]+", _a):
+            if len(_w) >= 3:
+                _source_attested.add(_w.casefold())
     fiction = tuple(
         name for name in (str(n or "").strip() for n in cast_names)
-        if len(name) >= 3
+        if len(name) >= 3 and name.casefold() not in _source_attested
     )
 
     def _check(read: NewsCloseRead) -> "str | None":

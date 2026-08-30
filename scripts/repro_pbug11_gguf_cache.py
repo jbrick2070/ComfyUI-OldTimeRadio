@@ -18,13 +18,35 @@ import time
 import types
 from pathlib import Path
 
-INSTALL = Path(r"C:\Users\jeffr\AppData\Local\Comfy-Desktop\ComfyUI-Installs"
-               r"\ComfyUI\ComfyUI")
-REPO = INSTALL / "custom_nodes" / "comfyui-old-time-radio"
-MODEL = INSTALL / "models" / "LLM" / "converted" / "gemma-4-12b-it" / "gemma-4-12b-it-Q4_K_M.gguf"
+# BOX-AGNOSTIC RESOLUTION (5080 addition). The 4060 wrote this against its own
+# absolute paths; both boxes need to run it, and a harness that reproduces only
+# on the machine that found the bug is half a harness. Env overrides still win,
+# so the original invocation on the 4060 is unchanged.
+REPO = Path(os.environ.get("OTR_REPO") or Path(__file__).resolve().parents[1])
 
-os.environ.setdefault("HF_HOME", str(INSTALL / "models" / "huggingface"))
-os.environ.setdefault("OTR_COMFYUI_MODELS_ROOT", str(INSTALL / "models"))
+
+def _repro_models_root() -> Path:
+    """OTR's own authority for where weights live -- never a hardcoded guess."""
+    for var in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
+        v = os.environ.get(var)
+        if v:
+            return Path(v)
+    for cand in (Path("C:/ComfyUI-Models"), REPO.parents[1] / "models"):
+        if cand.exists():
+            return cand
+    return Path("C:/ComfyUI-Models")
+
+
+MODELS = _repro_models_root()
+MODEL = Path(os.environ.get("OTR_REPRO_GGUF") or (
+    MODELS / "LLM" / "converted" / "gemma-4-12b-it" / "gemma-4-12b-it-Q4_K_M.gguf"))
+INSTALL = REPO.parents[1]
+
+os.environ.setdefault("HF_HOME", str(MODELS / "huggingface"))
+os.environ.setdefault("OTR_COMFYUI_MODELS_ROOT", str(MODELS))
+
+if not MODEL.is_file():
+    raise SystemExit("repro: GGUF not found at %s -- set OTR_REPRO_GGUF" % MODEL)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 pkg = types.ModuleType("otrpack"); pkg.__path__ = [str(REPO)]; sys.modules["otrpack"] = pkg
