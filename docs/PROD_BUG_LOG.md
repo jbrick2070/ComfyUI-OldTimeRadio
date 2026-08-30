@@ -9513,3 +9513,76 @@ must not be read as closed. Per the operator's directive tonight -- *"don't kill
 a duration mismatch, just let it fly"* -- a residual mismatch now warns and
 publishes rather than discarding a finished episode, so a green `otr/obs` entry
 carrying a warning is a pass.
+
+### PBUG-20260829-16 CLOSED on both shapes -- the sentinel half proven on 8 GB (2026-08-30, 4060 leg cc8b0e1d)
+
+The amendment above states the 4060 half was **not** yet proven. It is now, on
+the only box that produces the sentinel shape.
+
+**4060, leg `cc8b0e1d`**, profile `otr_nvidia_8gb_haunted`, `--source-bank
+scifi_news_pro`, `--act-count 1`, 8188 MiB card. Server PID 24536 booted
+04:03:07 against a commit that landed 03:56:42, so the fix was genuinely in the
+process under test rather than a stale import -- the check that cost this
+project a wasted 27-minute leg earlier in the same session.
+
+**The sentinel rule fired verbatim, on both phantom rows:**
+
+    [OTR_ShotLock] music row shot_000_music is a pre-audio sentinel;
+                   the timed music_open mirror owns the timeline
+    [OTR_ShotLock] music row shot_002_music is a pre-audio sentinel;
+                   the timed music_close mirror owns the timeline
+
+**The 18.93 s is gone, to within one frame:**
+
+    video 155.28 s | audio 130.71 s | delta 24.57 s
+    credits roll declared 24.6 s  ->  excess = -0.03 s
+
+One frame at 25 fps is 0.04 s, so the excess is zero within measurement
+resolution. The mechanism is visible:
+
+    [OTR_SilentComposite] A/V-sync master reconcile: 3293 -> 3268 frames
+                          (positioned ledger cross-check)
+    [OTR_SilentComposite] assembled 15 beats -> 3268 frames @25fps 1920x1080
+                          silent; budget 3268 OK
+
+**Published and independently verified:**
+`signal_lost_the_engineered_bloom_20260830_044129_..._final.mp4`,
+137,335,578 B, 155.28 s, h264 1920x1080 @25fps + aac, both streams present by
+ffprobe. Counters clean: `exceeds master audio` 0, cadence refusals 0,
+zero-frame warnings 0.
+
+**5080 side, same fix, the other shape:** first 5-act episode this project has
+ever published -- `signal_lost_roses_of_defiance_20260830_041000`, 313 MB,
+334.12 s, 1920x1080 @25 fps, stereo 48 kHz, 12/12 sampled midpoint frames
+carrying real picture. All four act-break bridges timed at 4.0 s;
+`budget 7460 OK`.
+
+**WHAT IS AND IS NOT CLOSED.** One bank, one act, one run on the 4060 side; this
+does not prove the general case. What it does close is the question that was
+only falsifiable there: on the sentinel shape, the excess is now zero instead of
+18.93 s. `scifi_news_pro` was the last bank failing on 8 GB, making it **5 of 5
+proven**. PBUG-20260829-20 remains open and is independent of this fix.
+
+**RESIDUAL ON THE 5080 SHAPE, recorded rather than hidden:** the 5-act episode
+still exceeds its master audio by 16.8325 s beyond the credits-tail budget,
+which is 4 bridges x 4.0 s plus frame padding -- the bridges themselves. This is
+coherent, not mysterious: per the mux contract a bridge occupies no master-mix
+time, so every second of bridge picture is a second the master does not have. It
+warns and publishes rather than discarding a finished 78-minute render, per the
+operator's 2026-08-29 directive. Closing it means either extending the bed under
+the bridges or shortening them, and that is an operator decision, not a defect
+to fix silently.
+
+**ONE SIGNAL WAS NOT DELIVERABLE, and it was a real defect in the receipt.** The
+4060 was asked for `foley_unpositioned=` and correctly reported it as ABSENT
+rather than zero, because the counter was emitted only when non-zero -- so a
+reader who does not see the line cannot tell "no unpositioned beats" from "this
+line never ran". `otr_master_audio_mux` now reports it at every value, with
+`tests/test_foley_unpositioned_is_always_reported.py` holding the gate open. The
+neighbouring counters stay conditional on purpose: those are exceptions worth
+noticing, not invariants somebody will come to verify.
+
+**Cost note for planning (4060):** 121 minutes wall clock; beats ran ~20 s/step
+against a ~9 s cold baseline, because the 8 GB card thermally throttles under
+sustained multi-hour load. Timings from long 8 GB sessions are not comparable to
+cold-start ones.

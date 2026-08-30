@@ -573,14 +573,23 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
     if stats["skipped"]:
         report.append("foley_skipped=%d (outside the master)"
                       % stats["skipped"])
-    if stats["unpositioned"]:
-        # BEATS THAT MADE A STEM BUT OWN NO WINDOW IN THE MASTER. A music_inter
-        # bridge is the normal case -- it renders a picture and occupies no
-        # master-mix time at all. Reported because the same count is a FAULT
-        # for any other role, and a bed quietly missing from half an episode
-        # must not be invisible.
-        report.append("foley_unpositioned=%d (no master-mix slot; normal for "
-                      "music_inter bridges)" % stats["unpositioned"])
+    # BEATS THAT MADE A STEM BUT OWN NO WINDOW IN THE MASTER. A music_inter
+    # bridge is the normal case -- it renders a picture and occupies no
+    # master-mix time at all. Reported because the same count is a FAULT for
+    # any other role, and a bed quietly missing from half an episode must not
+    # be invisible.
+    #
+    # UNCONDITIONAL, INCLUDING AT ZERO (2026-08-30). This used to be gated on a
+    # non-zero count, which makes the number unreadable: the 4060 went looking
+    # for it to confirm the sentinel fix on 8 GB hardware and could only report
+    # ABSENT, which is not the same claim as ZERO and does not close the
+    # question it was asked to close. A counter that disappears at its most
+    # common value cannot be trusted at any value -- "I did not see it" and "it
+    # was fine" must not share a representation. The neighbouring counters stay
+    # conditional on purpose: they are exceptions worth noticing, while this one
+    # is a standing invariant somebody will come to verify.
+    report.append("foley_unpositioned=%d (no master-mix slot; normal for "
+                  "music_inter bridges)" % stats["unpositioned"])
     if stats["conform_notes"]:
         report.append("foley_conformed=" + "; ".join(stats["conform_notes"]))
     log.info("[OTR_MasterAudioMux] %s", " | ".join(report))
