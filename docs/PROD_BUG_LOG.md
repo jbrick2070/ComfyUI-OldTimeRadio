@@ -9185,3 +9185,58 @@ dependency pin expresses and no single-machine test can surface.
   audit of pinned artifacts against upstream is cheap, but it needs the network
   and so cannot be a unit test in an offline-first pack. Left as a note rather
   than a fragile test.
+
+### PBUG-20260829-14, fourth addendum -- the POSITIVE CONTROL: the clean stage is not broken, it is model-scoped
+
+Ran 8 fresh one-act episodes (two passes over media_archive / original /
+public_domain / shakespeare, `google/gemma-4-12b-it` in both writer slots, all 8
+PASS, all published to obs). This is the counterfactual the first three addenda
+lacked: they established that the pass damages text at E2B and gemma-2-2b, but not
+whether the pass itself is unsound.
+
+**IT IS SOUND. The 8 fresh 12B episodes produced 4 flags total, ZERO whole-line,
+and both banks that destroyed the small models produced NOTHING to fix:**
+
+        The Sovereign of Clay    shakespeare     0 flagged  0 repaired  0 unclean   5 calls
+        The Diary of Earnshaw    public_domain   0 flagged  0 repaired  0 unclean   5 calls
+        The Pulse of the Hunt    original        1 flagged  1 repaired  0 unclean  11 calls
+        The Weeping Emulsion     media_archive   1 flagged  1 repaired  0 unclean   8 calls
+
+Updated 12B population: **65 episodes, 692 voiced rows, 126 flags, 4 whole-line =
+3%, 6 unclean = 1%.**
+
+**THE THREE-WAY COMPARISON ON SHAKESPEARE, the bank that broke both small models:**
+
+        writer              flags  whole-line  committed   what the commits did
+        gemma-4-E2B-it        24      100%         3       truncated correct lines
+        gemma-2-2b-it          3      100%         3       INVENTED replacement dialogue
+        gemma-4-12b-it         0        --         0       nothing to fix
+
+**AND BOTH 12B REPAIRS WERE `found_by=patterns`, NOT THE JUDGE** -- the cheap
+deterministic detector caught a third-person action verb and an attribution verb,
+and the model judge merely concurred. In 29 clean-stage model calls across those
+four episodes the 12B judge originated ZERO spurious flags. Both repairs were
+minimal and correct:
+
+    'Cranston stand'  ->  '...Nia Bouvier and Jiro Cranston are frozen in the...'
+    'says'            ->  "...regardless of the safety gauge's warning about..."
+
+Localized, grammatical, rest of the line preserved verbatim, contractions intact,
+no punctuation touched. That is the pass working exactly as designed.
+
+**WHAT THIS CHANGES ABOUT THE FIX.** The first addendum implied the design was at
+fault. It is not -- the whole-line failure and the prosody damage are properties
+of WHICH MODEL JUDGES, and they vanish at 12B. That does NOT retire the repair-
+contract invariant proposed in the second addendum ("may not alter anything
+outside the segment the judge named"); it re-scopes it. The invariant is not a
+repair for a broken design, it is the GUARD that would make a small-model judge
+survivable -- and it is needed precisely because the writer where the defect
+disappears is the one that cannot load on 8 GB.
+
+**THE TRADE, NOW QUANTIFIED ON BOTH SIDES, and it is the operator's call:** the
+only writer measured clean on all four banks (gemma-4-12b-it, 11.9 GB) FAILS the
+8 GB gate. Every writer that fits 8 GB damages text -- E2B by truncation at ~1
+line/episode, gemma-2-2b by inventing replacement dialogue. There is no third
+option in the current dropdown.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
