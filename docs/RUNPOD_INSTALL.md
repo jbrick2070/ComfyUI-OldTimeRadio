@@ -821,3 +821,66 @@ See PBUG-20260830-24. A `RESULT SUCCESS` leg publishes an episode that
                                    haunted lane, 8 clips
                                    2058 s  (34.3 min)  RESULT SUCCESS
                                    VRAM peak 15,990 MB
+
+---
+
+## 12. The template needs updating, and `HF_HOME` is the reason
+
+**Measured on the live pod 2026-08-30.** The template currently injects only:
+
+    OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models
+    JUPYTER_PASSWORD=<generated>
+    PYTHONUNBUFFERED=1
+
+**`HF_HOME` is absent**, and the cache survives on this pod only because of a
+symlink made by hand:
+
+    /root/.cache/huggingface -> /workspace/hf        # NOT in the template
+    /workspace/hf  =  84 GB
+
+A fresh pod from today's template gets no symlink, so `HF_HOME` falls back to
+`/root/.cache/huggingface` on the 55 GB container disk -- which cannot even hold
+84 GB, and is erased on stop regardless. **Every new pod would re-download the
+whole cache.** That is the single most valuable field to add.
+
+### `HF_HOME` IS the best practice, and the volume proves the layout
+
+One variable, not three. `HF_HOME` is the modern root; `HF_HUB_CACHE` defaults
+to `$HF_HOME/hub` and `TRANSFORMERS_CACHE` is deprecated in favour of it. Do not
+set the legacy names -- setting several is how a cache ends up split across two
+roots with neither complete. The volume confirms the layout is right:
+
+    /workspace/hf/hub     <- model repos
+    /workspace/hf/xet     <- xet chunk store
+
+### Template fields to set
+
+| field | value | why |
+|---|---|---|
+| `OTR_COMFYUI_MODELS_ROOT` | `/workspace/runpod-slim/ComfyUI/models` | already correct, keep |
+| `HF_HOME` | `/workspace/hf` | **add** -- 84 GB, re-downloaded every pod without it |
+| `HF_TOKEN` | a RunPod **Secret** reference | **add** -- gated lanes only |
+
+### The HF token: use a RunPod Secret, and never a plain env var
+
+RunPod's own console says it plainly -- *"Environment variables are not
+encrypted"* -- so a token pasted into the env field is stored in the clear and
+is visible to anyone who can read the template. Create it under **Secrets** in
+the RunPod account, then reference it from the template's env value; the console
+shows the exact `{{ RUNPOD_SECRET_<name> }}` string to paste when the secret is
+created. Secrets are injected at pod creation, exactly like SSH keys, so **a
+secret added to a RUNNING pod does not reach it** -- redeploy.
+
+**Do NOT run `huggingface-cli login` on the pod.** With `HF_HOME` on the volume
+it writes the token in plaintext to `/workspace/hf/token`, where it then
+persists on shared storage across every pod that mounts that volume, long after
+the pod that typed it is gone. The Secret route keeps the token out of the
+volume and out of any terminal history.
+
+**The token is only needed for GATED repos.** Everything the default path uses
+is ungated: the writer, voices, music, the haunted lane, `minimax_h3` and
+`wan_ti2v` all fetch with no account. The one gated video repo is
+`Lightricks/LTX-2.5`, which reports `gated: "auto"` and needs the terms accepted
+once, by hand, on the model page -- `scripts/otr_fetch_lane_weights.py`
+deliberately refuses to offer it, because a script must never paper over a
+licence click.
