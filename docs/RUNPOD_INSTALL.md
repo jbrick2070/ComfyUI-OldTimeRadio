@@ -359,3 +359,89 @@ is not rendering an episode. What remains:
 3. **ComfyUI-AnimateDiff-Evolved** for the haunted lane; the LTX 2.5 foley lane
    additionally needs a gated Hugging Face model, so that one wants a token set
    as a pod env var.
+
+---
+
+## 8. THE SPEEDRUN — the install is zero-terminal, and WE are what breaks it
+
+Everything in section 7A was done by hand in a JupyterLab terminal. **Almost
+none of it had to be.** Manager exposes the whole install over HTTP, and every
+endpoint answers on this pod:
+
+    POST /api/manager/queue/install         install a node pack   -> 200
+    POST /api/manager/queue/install_model   install a model       -> 500 on an
+                                                                     empty body,
+                                                                     i.e. it EXISTS
+    POST /api/manager/queue/start           run the queue         -> 200
+    POST /api/manager/reboot                restart               -> 502, and it
+                                                                     works anyway
+    GET  /object_info                       prove it loaded       -> 200
+
+`install_model` returning **500 rather than 404** is the tell: the endpoint is
+present and only rejected a malformed payload. Working out its exact shape is
+maybe half an hour, and it removes the second terminal step (weights) the same
+way the first POST removes the first (nodes).
+
+### What actually forced a terminal, and it is ours
+
+    GET https://api.comfy.org/nodes/comfyui-old-time-radio
+    -> latest_version: null
+
+Our alpha.13/.14 are still `NodeVersionStatusPending`. Manager therefore has no
+target to resolve, the CNR install accepts with **HTTP 200 and installs
+nothing**, and the only remaining route is a git clone — which Manager refuses
+over HTTP with *"A security error has occurred"* because the instance is network
+exposed. **Two closed doors, one root cause, and the root cause is on our side
+of the fence.**
+
+This is the same Pending state `CLAUDE.md` section 7A already blames for
+ComfyUI-Manager reporting "not a CNR node" on nightly installs. It now also
+costs a pod install its zero-touch path. **Check the registry FIRST**: if
+`latest_version` is non-null, the speedrun below works and nobody types
+anything.
+
+### The speedrun, once a version is Active
+
+No SSH key, no Jupyter token, no web terminal. From any machine that can reach
+the pod:
+
+    URL=https://<podId>-8188.proxy.runpod.net
+
+    1. GET  $URL/system_stats          # which GPU did I actually get?
+    2. POST $URL/api/manager/queue/install
+            {"id": "comfyui-old-time-radio", "version": "latest",
+             "selected_version": "latest", "channel": "default", "mode": "remote"}
+       POST $URL/api/manager/queue/install     # same, for AnimateDiff-Evolved
+       POST $URL/api/manager/queue/install_model   # x4, the ungated bundle
+    3. POST $URL/api/manager/queue/start
+       GET  $URL/api/manager/queue/status      # poll to total_count 0
+    4. POST $URL/api/manager/reboot            # expect 502; poll /system_stats for 200
+    5. GET  $URL/object_info                   # OTR_ non-zero == it loaded
+    6. COMFYUI_URL=$URL python scripts/otr_canonical_api_run.py \
+            --profile otr_nvidia_8gb_haunted --act-count 1
+
+Step 6 works remotely because the runner's model preflight validates against the
+**server's** `/object_info`, not local disk — so a short fetch is refused in
+seconds instead of failing twenty minutes into a render.
+
+### Three tiers of frictionless, in dependency order
+
+1. **Get a registry version Active.** Fixes it for every user, not just pods,
+   and turns "clone a repo in a terminal" into clicking Install. Everything else
+   is downstream of this one.
+2. **Drive the Manager API** as above. Needs the `install_model` payload shape.
+3. **A custom RunPod template** with pack and weights baked in — genuinely
+   zero-step for someone who is not the author, also the most work, and it goes
+   stale the moment the pack moves.
+
+### Terminal gotchas, if a shell is unavoidable anyway
+
+* **`python` is NOT on PATH on this image — only `python3`.** The fetcher died
+  on `bash: python: command not found` after the clone in the same one-liner had
+  already succeeded, which reads as a total failure and is not.
+* **`--highvram` is not in the default `argv`** (`main.py --listen 0.0.0.0
+  --port 8188 --enable-cors-header`). Worth adding on a 31.4 GiB card. **It is
+  wrong on 8 GB — do not put it in a general recommendation without binding it
+  to VRAM.**
+* `comfy-aimdo` (DynamicVRAM) ships on this image. That is the component that
+  called native `abort()` and killed a 4060 episode in PBUG-20260829-03.
