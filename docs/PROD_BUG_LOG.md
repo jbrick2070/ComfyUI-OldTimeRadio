@@ -8661,3 +8661,46 @@ CLAUDE.md it wants an arc before code, not a unilateral edit from the window
 that found it. Surfaced to the operator with the evidence.
 
 **Blast radius: 5080 findings only. No code, profile, or workflow was touched.**
+
+### CORRECTION to PBUG-20260829-14 -- it is not "2B", it is gemma-4-E2B-it specifically, and the flag RATE is not the defect
+
+Re-ran the survey across **every frozen ledger on disk (339 scanned)** rather
+than the four episodes the original entry rested on. Two claims in that entry
+do not survive the wider sample and are withdrawn here.
+
+        model                      eps   flag rate   unclean rate   WHOLE-LINE share of flags
+        google/gemma-4-E2B-it       28       73%          59%          119/131 =  91%
+        google/gemma-2-2b-it         3       42%          17%            1/20  =   5%
+        mistralai/Mistral-Nemo      243       83%          23%          191/1643 = 12%
+        google/gemma-4-12b-it       57       19%           1%            4/122 =   3%
+        unsloth/gemma-4-12b-GGUF     7       24%           0%            1/14  =   7%
+
+**WITHDRAWN CLAIM 1 -- "the small model flags too much."** It does not. Mistral-Nemo
+flags 83% of voiced rows, MORE than E2B's 73%, and Mistral is a 12B. Flag volume
+is not the defect and never was. The discriminator is whether the judge can
+LOCALIZE its complaint to a segment inside the line: E2B quotes the whole line
+in 91% of its flags, every other model in 3-12%. A whole-line quote is the
+judge saying "all of this is stage business" about a line that is dialogue.
+
+**WITHDRAWN CLAIM 2 -- "this is a 2B parameter-count problem."** It is not.
+`google/gemma-2-2b-it` is SMALLER (2.6 GB vs 3.0 GB) and sits at a 5% whole-line
+share -- indistinguishable from the 12B rows. So the defect tracks the specific
+model, not the size class. The original entry's implied lesson ("do not run the
+clean stage below N parameters") would have been the wrong fix.
+
+**WHAT SURVIVES, and it is stronger than before.** The E2B whole-line rate is
+91% across 28 episodes and 5 banks, not a four-episode artifact. And the harm
+statement sharpens: E2B COMMITTED 24 repairs across those 28 episodes, and since
+~91% of its flags are whole-line false positives, most of those committed edits
+silently rewrote correct dialogue -- on the order of **one damaged line per
+episode**. The other 107 unclean rows fail safe with the original text intact.
+
+**CONSEQUENCE FOR THE FRICTIONLESS-INSTALL ANSWER (and it reverses a
+recommendation).** `gemma-4-E2B-it` was the 8 GB writer of record on the strength
+of rendering successfully. It renders, but it damages roughly a line an episode
+through the clean stage. `google/gemma-2-2b-it` is smaller, is PASS/PASS at both
+the 14.5 and 7.5 GiB ceilings, and shows none of the localization failure.
+**UNDER-SAMPLED AND NOT YET A RECOMMENDATION:** 3 episodes, all `media_archive`.
+It is the obvious next thing to put a leg on, and it is cheap -- 2.6 GB.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
