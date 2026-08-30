@@ -821,3 +821,64 @@ The snapshot's own generation_config.json declares
 a transformers a full major line older than what this box runs. Whatever the
 cause, the parser fix stands on its own: accepting a fenced payload is correct
 defensive behaviour regardless of who emits one.
+## Step 14 -- 12B RUNS ON THE 8 GB CARD. Full 48-layer GPU offload, measured.
+
+**Operator's question ("I want to try to get 4-12b on the 4060 to work",
+"prove me wrong with an OOM but don't put an artificial gate") is ANSWERED:
+YES, and with more headroom than anyone predicted.**
+
+Artifact: `gemma-4-12b-it-Q4_K_M.gguf`, 7,121,861,440 bytes, sha256
+`0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42` -- fetched
+anonymously in 228 s, and independently confirmed by the 5080 against the HF
+API's LFS oid as the CURRENT upstream blob. Binding: llama-cpp-python 0.3.33,
+DLL hashes byte-identical to the 5080's working build.
+
+Measured by loading through `Llama(model_path=...)` DIRECTLY -- bypassing
+`GGUF_ROWS` because the pin is stale (PBUG-19) and would have rejected the
+file on size before llama.cpp was ever reached:
+
+    n_gpu_layers  n_ctx   load    generate   VRAM peak / 8188 MiB   result
+        35        2048    4.5 s     3.7 s          6585            PASS
+        48        2048    5.3 s     2.4 s          7841            PASS
+        48        4096    5.3 s     2.8 s          7751            PASS
+
+**ALL 48 LAYERS FIT.** llama.cpp's own line: `load_tensors: offloaded 48/49
+layers to GPU`. The estimate going in was ~35 of 48 at 2048 and ~23 at 4096;
+the truth is the whole model at 4096, which is why the operator's "no
+artificial gate" instruction mattered -- an estimate-based refusal would have
+stopped this at 8192 and never learned that 4096 with full offload is
+comfortable.
+
+**Doubling the context cost essentially nothing** (7841 -> 7751 MiB, i.e. within
+noise and slightly LOWER). That is consistent with gemma-4's hybrid/sliding KV
+cache -- its `generation_config.json` declares
+`"cache_implementation": "hybrid"` -- so KV does not scale linearly with
+n_ctx here the way it does for the Qwen row (0.70 GB per 1k, measured earlier).
+**Do not extrapolate KV cost across model families.**
+
+Generation is coherent 1950s radio narration and FASTER at full offload than at
+35 layers (2.4 s vs 3.7 s), which is the expected sign that the 13 CPU-resident
+layers were the bottleneck.
+
+**Profile shipped: `config/profiles/otr_4060_12b_gguf_offload.json`** --
+Q4_K_M, `gguf_n_ctx` 4096, `quant_policy: "none"`, default
+`n_gpu_layers` (-1 = all). **No `OTR_GGUF_N_GPU_LAYERS` override is
+needed**: the pack's existing default is already the correct setting for this
+card, which is a better outcome than a tuned value because a fresh install gets
+it without knowing anything.
+
+**WHY THIS IS THE PORTABLE ANSWER, not just a 4060 one:** bitsandbytes NF4 is
+CUDA-only, so `otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and
+`cpu_floor` can ONLY run GGUF. This is the same artifact and the same lane
+they use. The operator asked for "preferably the one that AMD and Mac can also
+use" and that is exactly what was tested.
+
+**COST RECORDED, per the operator's own kill order:** the `scifi_news_pro`
+re-run (prompt `40d5b422`) was killed at t=740 s to free the GPU. That
+forfeits the first live test of the PBUG-16 `anchor_line_id` fix; the fix
+itself is unaffected and still needs one leg to confirm.
+
+**STILL UNPROVEN AND NOT CLAIMED:** no EPISODE has been rendered with this
+writer. Load and generate are proven; a full canonical leg is not. The 12B is
+a ~2x slower writer per token than E2B on this card and the render is long, so
+that is the next leg, not a footnote.
