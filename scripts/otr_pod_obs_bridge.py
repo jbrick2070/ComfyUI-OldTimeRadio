@@ -21,6 +21,19 @@ exactly the case where you do not need a heuristic.
 A published episode is identifiable, so identify it: obs_publish writes into
 the `otr/obs` subfolder, and the finished artifact carries `_final` in its name.
 Require BOTH. An intermediate satisfies neither.
+
+**WHY THE HTTP ROUTE CANNOT WORK, AND WHY SSH IS THE DEFAULT (PBUG-20260830-24).**
+Proven on a live pod leg that returned RESULT SUCCESS and published a 77 MB
+episode to `otr/obs`: `/history` recorded exactly one video, the INTERMEDIATE in
+the episode's `audio/` folder. `OTR_MasterAudioMux` publishes the deliverable
+but returns a bare tuple with no `ui` payload, so ComfyUI never records the
+published copy -- it is not in `/history` under any key, and no amount of
+filtering can find what was never written down. The `--http` route below is
+therefore correct AND permanently empty on a healthy render; it is kept only
+because it is the honest thing to report when SSH is unavailable.
+
+The directory obs_publish writes IS the record, so read that directory. SSH is
+the default for exactly that reason.
 """
 from __future__ import annotations
 
@@ -92,6 +105,51 @@ def fetch(base: str, fn: str, sub: str, typ: str, dest_dir: str):
     return dest
 
 
+def sync_over_ssh(args) -> int:
+    """Pull every published episode the pod has and this box does not.
+
+    ADD-ONLY, like the HTTP route: an existing name is skipped, never
+    overwritten, and nothing already in obs is moved, renamed or removed.
+    """
+    import subprocess
+    if not args.host:
+        print("  --host <ip> is required for the SSH route "
+              "(or pass --http to use the empty /history route)")
+        return 2
+    common = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=20",
+              "-o", "BatchMode=yes", "-i", args.key]
+    listing = subprocess.run(
+        ["ssh"] + common + ["-p", str(args.port), "root@" + args.host,
+         "ls -1 %s/*%s.mp4 2>/dev/null" % (args.pod_obs, _PUBLISHED_MARKER)],
+        capture_output=True, text=True, timeout=120)
+    names = [ln.strip() for ln in listing.stdout.splitlines() if ln.strip()]
+    print("  published episodes on the pod: %d" % len(names))
+    os.makedirs(args.dest, exist_ok=True)
+    pulled = 0
+    for remote in names:
+        fn = remote.rsplit("/", 1)[-1]
+        dest = os.path.join(args.dest, fn)
+        if os.path.exists(dest):
+            print("  SKIP (add-only, already present): %s" % fn[:70])
+            continue
+        tmp = dest + ".part"
+        rc = subprocess.run(
+            ["scp"] + common + ["-P", str(args.port),
+             "root@%s:%s" % (args.host, remote), tmp],
+            capture_output=True, text=True, timeout=1800).returncode
+        if rc == 0 and os.path.getsize(tmp) > 0:
+            os.replace(tmp, dest)
+            print("  PULLED %8.1f MB  %s"
+                  % (os.path.getsize(dest) / 1048576.0, fn[:60]))
+            pulled += 1
+        else:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            print("  FAILED %s" % fn[:60])
+    print("  %d new episode(s) in obs" % pulled)
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("pod_id")
@@ -99,12 +157,26 @@ def main(argv=None) -> int:
     ap.add_argument("--watch", action="store_true",
                     help="poll until the pod's queue is idle, then pull")
     ap.add_argument("--poll-s", type=int, default=60)
+    ap.add_argument("--host", help="pod IP for the SSH route (default route)")
+    ap.add_argument("--port", default="22", help="pod SSH port")
+    ap.add_argument("--key", default=os.path.join(
+        os.path.expanduser("~"), ".ssh", "runpod_otr"))
+    ap.add_argument("--pod-obs",
+                    default="/workspace/runpod-slim/ComfyUI/output/otr/obs")
+    ap.add_argument("--http", action="store_true",
+                    help="use the /history route instead of SSH. It is honest "
+                         "and it finds nothing -- see the module docstring.")
     ap.add_argument("--max-wait-s", type=int, default=4 * 60 * 60)
     args = ap.parse_args(argv)
+
+    if not args.http:
+        return sync_over_ssh(args)
 
     base = "https://%s-8188.proxy.runpod.net" % args.pod_id
     print("pod  : %s" % base)
     print("dest : %s" % args.dest)
+    print("NOTE : the HTTP route reads /history, which does NOT record the")
+    print("       published episode (PBUG-20260830-24). Expect zero. Use SSH.")
 
     if args.watch:
         t0 = time.time()

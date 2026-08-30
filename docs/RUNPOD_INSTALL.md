@@ -734,3 +734,90 @@ the lesson: it landed **7-18 minutes in**, after the script and audio were done.
     network volume 200 GB          $0.019/hr  (~$14/mo, billed regardless)
     first provision                ~6 min     (packs + 3.7 GB weights)
     HF warm, both writers          38 GB, once per VOLUME -- not per pod
+
+---
+
+## 11. Lessons the hard way -- read this before debugging a pod
+
+Each of these cost real time or real money on 2026-08-30. They are here so the
+next session does not re-buy them.
+
+### `pgrep -f "ComfyUI/main.py"` MATCHES ITS OWN SSH COMMAND
+
+    ssh pod 'pgrep -f "ComfyUI/main.py"'   ->  returns the pid of THAT shell
+
+The pattern is present in the command line you just sent, so `pgrep` finds your
+own `bash -c`, you kill it, and the follow-up listing comes back empty -- which
+reads exactly like "ComfyUI is dead." It is not. **The real process is
+`python main.py --listen 0.0.0.0 --port 8188`** -- a RELATIVE path that pattern
+never matched to begin with.
+
+**Identify the server by its listening port, never by a name pattern:**
+
+    ss -lptn | grep 8188        ->  LISTEN  353/python
+
+This produced a confident and completely wrong "ComfyUI is not running on the
+pod" before the port check corrected it.
+
+### AN EMPTY QUEUE IS NOT READINESS -- it is also what a DEAD server reports
+
+A sweep gated on `queue_running + queue_pending == 0` started the instant
+ComfyUI could answer `/queue`, while `/object_info` was still returning the
+RunPod **502 "Waiting for service to respond"** page. All 25 lanes failed in
+about a second each and the run looked like 25 broken lanes.
+
+**Readiness is three conditions together:**
+
+1. `/object_info` returns 200 -- the SERVER is answering, not the proxy
+   placeholder,
+2. it contains `OTR_` classes -- the PACK is loaded, not merely ComfyUI,
+3. the queue is empty -- so a wall-clock number measures a render and not a wait.
+
+Gate before the sweep AND before every leg; one wedged lane otherwise poisons
+every lane after it. `scripts/`-adjacent helper: `pod_ready.py` in the session
+scratchpad does exactly this.
+
+### NOTHING RESTARTS COMFYUI FOR YOU on `runpod/comfyui:cuda13.0`
+
+There is no supervisor. Kill it and the port stays dead until you relaunch it
+yourself, with the container env recovered from `/proc/1/environ` (an SSH
+session does not inherit it):
+
+    cd /workspace/runpod-slim/ComfyUI
+    eval "$(tr '\0' '\n' < /proc/1/environ | grep -E '^(OTR_COMFYUI_MODELS_ROOT|HF_HOME|HF_TOKEN)=' | sed 's/^/export /')"
+    nohup .venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188 \
+          --enable-cors-header > /workspace/comfyui.log 2>&1 &
+
+### THE IMAGE'S COMFYUI LOGS TO A PIPE, SO THERE IS NOTHING TO TAIL
+
+    ls -l /proc/<pid>/fd/1   ->   pipe:[636008536]
+
+Stage has to be read from `/queue` and from files appearing under
+`output/otr/episodes/`. **Relaunching it yourself with `> /workspace/comfyui.log`
+is worth doing for that reason alone** -- it turns a blind pod into one you can
+read.
+
+### A ROLLED SOURCE BANK TURNS A LANE SWEEP INTO BANK ROULETTE
+
+The first sweep rolled `source_bank`, drew `scifi_news_pro`, and died at 82s in
+`_llm_rank_news_candidates` with `_LLMTimeoutWorkflowPause`. That number
+describes the news bank's LLM ranking call. It says **nothing** about the video
+lane that leg was supposed to be measuring.
+
+**Pin the bank and the style so the lane is the only variable.** `original` is
+the right control: fully local, no RSS fetch, no source document.
+
+### VERIFY WHAT THE DELIVERABLE ACTUALLY IS -- `/history` will mislead you
+
+See PBUG-20260830-24. A `RESULT SUCCESS` leg publishes an episode that
+`/history` does not list; the only video it advertises is the intermediate in
+`audio/`. Pull published episodes by listing the obs DIRECTORY over SSH:
+
+    python scripts/otr_pod_obs_bridge.py <podId> --host <ip> --port <port>
+
+### Measured, so it is not re-guessed
+
+    RTX PRO 4000 Blackwell 24 GB   1-act, gemma-4-12b writer, AnimateDiff
+                                   haunted lane, 8 clips
+                                   2058 s  (34.3 min)  RESULT SUCCESS
+                                   VRAM peak 15,990 MB

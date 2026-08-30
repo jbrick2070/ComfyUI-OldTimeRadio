@@ -9848,3 +9848,48 @@ not exist.
 49c3a570): `duration_check ... OVER_BUDGET by 4.9271s (published anyway)`,
 agreeing with its warning to four decimals, where three hours earlier the same
 node printed `OK`.
+
+---
+
+## PBUG-20260830-24 -- a published episode is invisible to the API that published it
+
+**Verified on a live pod leg** (RunPod `m2ukhfg1j6tpki`, prompt
+`27572fc3-3010-46b0-83fe-357895bb1304`, RESULT SUCCESS in 2058s, 2026-08-30).
+The episode published correctly: 77 MB
+`signal_lost_the_silk_of_the_lapel_20260830_225025_..._final.mp4` in
+`otr/obs`, with `obs_publish OK` in the report. Then the pull tool found
+nothing, and it was right to.
+
+`/history` for that prompt records exactly **two** node outputs:
+
+    node 12  gifs  sub=otr/episodes/<ep>/audio  fn=<ep>.mp4      <- INTERMEDIATE
+    node 92  text  {"ok": true, "episode_id": ..., ...}          <- receipt
+
+The published deliverable is **not in `/history` under any key.**
+`OTR_MasterAudioMux` is `OUTPUT_NODE = True` but returns a bare
+`(final_video_path, report)` tuple with no `ui` payload, so ComfyUI never
+records the artifact it just published. The only video the API advertises is
+the pre-post-processing mux out of `audio/` -- no credits, no captions, no
+procgen blend.
+
+**Why this is worth an entry rather than a shrug.** Any consumer that asks the
+API "what did this render produce" is told about the intermediate and not the
+episode. That is how a 27 MB intermediate reached `otr/obs` earlier the same day
+and sat there looking finished: the tool took the largest video in `/history`,
+and `/history` genuinely had nothing better to offer. Tightening that tool to
+require the `otr/obs` subfolder plus the `_final` marker was correct and made it
+permanently empty, because it was filtering a list the deliverable was never on.
+
+**Owner: not yet assigned, and deliberately.** The root fix is for the mux to
+declare its published copy (`{"ui": {...}, "result": (...)}`), which is the
+conventional ComfyUI shape for an OUTPUT_NODE. It is a return-contract change
+with a real blast radius -- five call sites across
+`tests/test_publication_eligibility.py` and `tests/test_video_render_path_cw4.py`
+unpack the 2-tuple -- and `OTR_OBS_DIR` can point obs outside the server's
+output root, where declaring a `/view`-able path would be a lie. That wants
+deciding, not a drive-by.
+
+**Worked around, honestly:** `scripts/otr_pod_obs_bridge.py` now defaults to an
+SSH route that lists the obs directory, because the directory obs_publish writes
+IS the record. The `--http` route is kept and prints, up front, that it will
+find nothing.
