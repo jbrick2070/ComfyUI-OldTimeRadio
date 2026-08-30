@@ -9135,3 +9135,53 @@ three changed whether CODE RAN; this one changes WHAT A MODEL EMITS, which no
 dependency pin expresses and no single-machine test can surface.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+## PBUG-20260829-19 -- every pinned gemma GGUF artifact is UNOBTAINABLE: upstream re-uploaded, the pins did not follow
+
+- **found:** 2026-08-29 on the 5080, chasing a 1,440-byte discrepancy between
+  the two boxes' copies of the same file. Neither box had measured wrong --
+  they had DIFFERENT FILES.
+- **audited every pinned GGUF artifact against what HuggingFace serves today:**
+
+        unsloth/gemma-4-12b-it-GGUF  Q8_0    pin 12,669,646,240  upstream 12,669,647,680   DRIFTED
+        unsloth/gemma-4-12b-it-GGUF  Q6_K    unpinned
+        unsloth/gemma-4-12b-it-GGUF  Q4_K_M  pin  7,121,860,000  upstream  7,121,861,440   DRIFTED
+        unsloth/Qwen3-8B-GGUF        Q4_K_M  ok
+        unsloth/Qwen3-4B-2507-GGUF   Q4_K_M  ok
+
+  **Both gemma quants drifted by exactly +1,440 bytes**, which is a systematic
+  upstream re-upload of that repo, not a corrupted download. Confirmed three
+  independent ways: the 4060's freshly downloaded file (sha256
+  `0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42`), the HF
+  API's own recorded LFS oid for that path (identical), and this box's July-12
+  copy still matching the old pin.
+- **impact, and it is the whole non-NVIDIA story again:** `GGUFRow` pins are
+  FAIL-LOUD verified at load, so a freshly downloaded gemma GGUF is REJECTED on
+  size before llama.cpp is reached. **A pin to an artifact upstream no longer
+  serves does not protect a fresh install -- it forbids one.** Every profile
+  naming that row (`8gb_lite`, `otr_8gb_ltx/wan/fastwan`, `otr_amd8_rocm`,
+  `otr_amd16_rocm`, `otr_mac_mps`, `cpu_floor`) is unreachable for a new user
+  for this reason alone, on top of PBUG-20260829-12's wheel version.
+- **it also nearly cost the operator a wrong answer.** The 4060 was minutes from
+  running his 12B-on-8GB layer-offload test against the new file. It would have
+  failed at pin validation, before llama.cpp, and the natural reading of that
+  failure is "12B does not fit 8 GB" -- a real-looking negative to exactly the
+  question he asked. Caught by comparing byte counts across boxes rather than
+  assuming one of us had mistyped.
+- **THIRTEENTH INSTANCE of the day's pattern and the worst of the family.** The
+  previous twelve were a dependency the dev box happened to have: kokoro 0.9.4
+  vs 0.7.16, ffmpeg 8.0.1 vs 9, llama-cpp 0.3.33 vs 0.3.35, an AnimateDiff node
+  pack cloned by hand. This is **the model weights themselves**, pinned to a
+  build that no longer exists. Same shape, highest blast radius.
+- **NOT RE-PINNED YET, deliberately.** The obvious repair is to pin the current
+  values, and that is the direction -- a pin nobody can satisfy protects
+  nothing. But the schema's contract is that a pinned value is a VERIFIED one,
+  and re-pinning to a build merely because it is current would be pinning on
+  faith. The 4060 is proving load-and-generate on the new artifact now, via a
+  probe that bypasses `GGUF_ROWS` entirely (`Llama(model_path=...)` direct), so
+  the offload question and the pin question stay independent. Re-pin when that
+  lands, citing it.
+- **worth having as a standing check:** this was only found by accident. An
+  audit of pinned artifacts against upstream is cheap, but it needs the network
+  and so cannot be a unit test in an offline-first pack. Left as a note rather
+  than a fragile test.
