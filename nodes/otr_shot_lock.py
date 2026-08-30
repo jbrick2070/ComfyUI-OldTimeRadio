@@ -536,6 +536,58 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
     return ledger
 
 
+def _music_cue_dur_s(ledger, line_id):
+    """Duration of the music cue ANCHORED to ``line_id``, or None.
+
+    PBUG-20260829-16. A bank that names its music anchors ``<shot>_music``
+    produces ledger LINE rows with ``dur_s=None`` while the music CUE that
+    anchors to them carries the real duration and a rendered wav:
+
+        led["music"][0] = {cue_id: "opening", anchor_line_id: "shot_000_music",
+                           start_s: 0.0, dur_s: 10.0, wav_path: ...}
+        led["lines"][*] where line_id == "shot_000_music" -> dur_s None
+
+    The information was never missing -- it simply never crossed
+    ``anchor_line_id`` onto the row every downstream consumer reads. The beat
+    therefore budgeted to ZERO frames, and the failure surfaced 72 minutes
+    later at the video stage as "Ghost Signal cadence needs a delivered target
+    of at least 1", naming neither music nor duration.
+
+    ONLY ``dur_s`` IS TAKEN, DELIBERATELY. The cue's ``start_s`` is stamped
+    with ``start_s_space: "master_mix"`` and is NOT in the line's coordinate
+    space; copying it would trade a loud crash for silently wrong placement.
+    A duration is space-independent, which is why it alone can cross.
+
+    Resolved HERE, at beat construction, rather than inside the budget: the
+    beat is what every consumer reads, so one fix serves the ghost lane and
+    every other lane at once.
+    """
+    if not line_id:
+        return None
+    try:
+        cues = (ledger or {}).get("music") or []
+    except Exception:  # noqa: BLE001 -- a malformed ledger must not raise here
+        return None
+    target = str(line_id)
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        if str(cue.get("anchor_line_id") or "") != target:
+            continue
+        dur = cue.get("dur_s")
+        try:
+            dur = float(dur)
+        except (TypeError, ValueError):
+            continue
+        if dur > 0:
+            log.info(
+                "[OTR_ShotLock] music line %s has no dur_s; taking %.3f s from "
+                "cue %r via anchor_line_id", target, dur,
+                str(cue.get("cue_id") or ""))
+            return dur
+    return None
+
+
 def extract_beats(ledger: dict) -> list:
     """Ordered, non-skipped beats from the frozen ledger.
 
@@ -598,7 +650,8 @@ def extract_beats(ledger: dict) -> list:
             "text": text,
             "samples": ln.get("samples", ln.get("audio_samples")),
             "sample_rate": ln.get("sample_rate"),
-            "dur_s": ln.get("dur_s", ln.get("duration_s")),
+            "dur_s": (ln.get("dur_s", ln.get("duration_s"))
+                      or _music_cue_dur_s(ledger, ln.get("line_id"))),
             # THE STORY FIELDS RIDE THE BEAT (2026-08-29). The line row already
             # carries them (production_ledger.set_lines stamps every line with
             # shot_id / beat_intent / traits) and dropping them here forced the
@@ -693,7 +746,25 @@ def compute_clip_budget(beats: list, fps: int) -> dict:
     else:
         for b in beats:
             dur = b.get("dur_s")
-            per_beat[b["beat_id"]] = int(round(float(dur) * fps)) if dur else 0
+            frames = int(round(float(dur) * fps)) if dur else 0
+            if frames < 1:
+                # PBUG-20260829-16: this used to be a silent 0. A beat with no
+                # frames cannot render, but nothing said so until the engine
+                # refused its own inputs at the VIDEO stage -- after the
+                # writer, voices, music and the full audio master were done.
+                # 72 minutes to learn that one beat had no duration. Say it
+                # HERE, where it is cheap and the beat is named. Still not a
+                # raise: an OOM-or-nothing operator directive governs the
+                # render path, and a bank with a genuinely silent beat must
+                # not be blocked by a budget helper.
+                log.warning(
+                    "[OTR_ShotLock] beat %r budgets to ZERO frames (dur_s=%r, "
+                    "samples=%r). Any engine that needs a delivered target "
+                    "will refuse this beat later, at the video stage. If this "
+                    "is a music beat, its duration may live on a music cue "
+                    "that never crossed anchor_line_id onto the line.",
+                    b.get("beat_id"), dur, b.get("samples"))
+            per_beat[b["beat_id"]] = frames
 
     total_frames = sum(per_beat.values())
 
