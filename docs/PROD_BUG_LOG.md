@@ -8704,3 +8704,43 @@ the 14.5 and 7.5 GiB ceilings, and shows none of the localization failure.
 It is the obvious next thing to put a leg on, and it is cheap -- 2.6 GB.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
+
+### PBUG-20260829-14, addendum -- the lane where the judge is MOST wrong is the lane it damages LEAST
+
+Broke the E2B population down by source bank (29 episodes, 186 voiced rows).
+Tested a prediction I had made out loud -- that the fidelity lanes, where the
+writer carries source dialogue, would suffer worst. Half right, and the wrong
+half is the actionable one.
+
+        bank             eps  voiced  flag  flag%  unclean  whole/flag  COMMITTED
+        shakespeare        4      24    16    67%      16     16/16=100%      0
+        public_domain      7      42    28    67%      25     28/28=100%      3
+        media_archive      8      48    28    58%      21     26/28= 93%      7
+        scifi_news_pro     2      20    19    95%      14     15/19= 79%      5
+        original           8      52    44    85%      34     38/44= 86%     10
+        ALL               29     186   135    73%     110    123/135= 91%     25
+
+**CONFIRMED:** the fidelity lanes are where the judge is most wrong. Shakespeare
+and public_domain both sit at a 100% whole-line rate -- when the judge objects on
+those banks it objects to the entire line, every single time.
+
+**REFUTED, and this inverts the priority:** those lanes take the LEAST damage.
+Shakespeare committed ZERO repairs across 16 flags; all 16 went `unclean`, which
+fails safe with the original text intact. `original` committed 10 -- the most of
+any bank -- despite a LOWER whole-line rate (86%).
+
+**THE MECHANISM, and it explains the inversion.** A whole-line flag leaves the
+repair nothing to strip: it must either restate the line or give up. On
+shakespeare and public_domain it gave up every time (source-shaped dialogue does
+not survive being paraphrased into something the judge accepts), so the original
+reached TTS unharmed. On `original`, plainer prose CAN be truncated into
+something that reads clean to the judge -- so the repair "succeeds" and commits.
+`The Loose Clasp` losing its clasp is an `original`-bank episode, and that is not
+a coincidence.
+
+**OPERATING CONSEQUENCE.** If the clean stage is ever gated by model, rank the
+lanes by COMMITTED repairs, not by flag rate or whole-line rate. The banks that
+look worst on the error metric are the ones already failing safe; the quiet
+`original` lane is where correct dialogue is actually being rewritten.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
