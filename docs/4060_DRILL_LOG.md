@@ -686,3 +686,72 @@ behind live legs. **Until it resolves, HIGH's writer row is UNPROVEN.**
 because 8 GB cannot host a better writer (the fit is proven with headroom) but
 because the binding that would run it faults on this machine. One version test
 stands between HIGH being real and HIGH being a plan, and it is queued.
+
+### QUALIFICATION of the LOW writer recommendation -- "it renders" was the only thing I measured
+
+**My friction table calls `google/gemma-4-E2B-it` "THE proven 8 GB writer" on
+the strength of three published episodes. That endorsement is now qualified,
+and the qualification came from an instrument I was not using.**
+
+The 5080 surveyed **339 frozen ledgers** against the `_otr_ledger_clean` stage,
+which asks a model per line "is every word of this something the character says
+out loud?" The number that matters is not how often a model complains, but
+whether it can say WHICH PART of the line it is complaining about:
+
+    model                        eps   flag rate   unclean   whole-line share
+    google/gemma-4-E2B-it         28      73%        59%      119/131 =  91%
+    google/gemma-2-2b-it           3      42%        17%        1/20  =   5%
+    mistralai/Mistral-Nemo       243      83%        23%     191/1643 =  12%
+    google/gemma-4-12b-it         57      19%         1%       4/122  =   3%
+    unsloth/gemma-4-12b-it-GGUF    7      24%         0%        1/14  =   7%
+
+E2B quotes the ENTIRE LINE as the offending segment in 91% of its flags; every
+other model does so 3-12% of the time. A whole-line quote is the judge asserting
+that a line of dialogue is stage business in its entirety.
+
+**The harm is in the repairs it COMMITS, not the ones it abandons.** An unclean
+row fails safe and the original text reaches TTS untouched. A repaired row is
+committed -- so a false positive that the repair believes it resolved rewrites
+correct dialogue. Measured: 24 committed repairs across 28 episodes, i.e.
+**roughly one damaged line per episode**. A real example from the 5080's leg 3:
+*"The clasp is loose, little bird; show me how you keep it fastened."* became
+*"Show me how you keep it fastened"* -- in an episode titled *The Loose Clasp*.
+Another dropped an apostrophe (`You've` -> `Youve`), which is a TTS
+pronunciation defect rather than a cosmetic one.
+
+**WHY MY THREE EPISODES COULD NOT HAVE FOUND THIS, which is the lesson for this
+log:** every leg I ran was scored pass/fail on `RESULT SUCCESS + obs_publish +
+mp4 on disk`. All three passed. A silently rewritten line of dialogue passes
+every one of those gates. **I was measuring whether the pipeline completes, not
+whether the artifact is correct** -- and I would have gone on recommending E2B
+indefinitely, because more legs of the same kind produce more of the same
+evidence. This is the same failure shape as PBUG-04 (peak-vs-LUFS mastering):
+the defect is invisible to the check that was being run, so running the check
+harder never surfaces it.
+
+**TWO CORRECTIONS I WOULD HAVE INHERITED, both caught on the other side before
+they reached me,** recorded because either would have produced a plausible and
+wrong fix:
+1. It is NOT "the small model flags too much" -- Mistral-Nemo, a 12B, flags MORE
+   (83% vs 73%). Flag volume is not the defect; failure to LOCALIZE is.
+2. It is NOT a parameter-count law -- `gemma-2-2b-it` is SMALLER (2.6 GB vs
+   3.0 GB) and sits at a 5% whole-line share, indistinguishable from the 12B
+   rows. "Do not run the clean stage below N parameters" would have been the
+   wrong rule.
+
+**STANDING RECOMMENDATION, revised and narrower than what I wrote before:**
+`gemma-4-E2B-it` remains the only writer with PUBLISHED EPISODES on this card
+and remains what LOW ships today -- it is proven to RENDER. It is NOT
+established as the best 8 GB writer, and on this evidence it is probably not.
+`google/gemma-2-2b-it` is the leading candidate: 2.6 GB, PASS/PASS at both
+ceilings, ungated, already cached here (4.89 GB on disk), and clean on the
+localization measure -- but at 3 episodes of one bank it is under-sampled and I
+will not promote it on that.
+
+**TEST RUNNING:** prompt `81ad671f` -- `otr_nvidia_8gb_haunted`, `--act-count 1`,
+source bank **shakespeare**, `google/gemma-2-2b-it` in both writer slots.
+Shakespeare chosen deliberately: verbatim classical source text gives a
+mislocalizing judge the most opportunities to be wrong, so it is the bank where
+the difference between the two writers should be largest. **It will be reported
+with the clean-stage instrument -- flag rate, unclean rate, whole-line share --
+not merely pass/fail**, so one 8 GB leg is comparable to the 339.
