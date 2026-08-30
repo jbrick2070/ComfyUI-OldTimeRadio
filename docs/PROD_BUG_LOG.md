@@ -9099,3 +9099,39 @@ are all eliminated. The divergence is between the two installs and is not yet
 explained. The fence-stripping fix remains correct defensive work regardless.
 
 **Blast radius: findings only.**
+
+### PBUG-20260829-18, 5080 note 2 -- the fence divergence narrows to a four-version window in `transformers`
+
+Comparing the two installs after the bank, quantization and snapshot-revision
+hypotheses were all eliminated:
+
+                            4060 (3 fences / 9)   5080 (0 fences / 146)
+        transformers             5.14.1                5.10.4
+        tokenizers               0.22.2                0.22.2   <-- IDENTICAL
+        torch                    2.12.1+cu130          2.10.0+cu130
+        accelerate               1.14.0                1.13.0
+        huggingface-hub          1.25.1                1.9.2
+        safetensors              0.8.0                 0.7.0
+
+**THE IDENTICAL `tokenizers` VERSION IS THE LOAD-BEARING DETAIL.** 0.22.2 on both
+boxes rules out a tokenizer-level chat-template difference and leaves
+`transformers`' own template APPLICATION and generation defaults as the suspect,
+across the 5.10.4 -> 5.14.1 window. Supporting: `gemma-2-2b-it`'s shipped
+`generation_config.json` declares `"transformers_version": "4.42.4"`, so BOTH
+boxes run these weights a full major line newer than they were published against
+-- yet only the newer of the two reaches for a markdown fence. A behavioural
+change landing somewhere in 5.11-5.14 fits every fact in evidence.
+
+**NOT CHASED FURTHER, deliberately.** It is bounded and now precisely located, the
+fence-stripping parser fix is correct defensive work regardless of who emits
+fences, and two queued items outrank a diagnostic we can already describe: the
+PBUG-16 `scifi_news_pro` re-run (first new-bank pass for the shipping 8 GB
+profile) and the 12B-on-8GB layer-offload test the operator asked for directly.
+
+**THIS IS THE FOURTH INSTANCE TONIGHT of "same dependency, different build, only
+the second machine finds out"** -- after kokoro 0.7.16/0.9.4, ffmpeg 9/8.0.1 and
+llama-cpp 0.3.35/0.3.33. It is the most interesting of the four because the other
+three changed whether CODE RAN; this one changes WHAT A MODEL EMITS, which no
+dependency pin expresses and no single-machine test can surface.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
