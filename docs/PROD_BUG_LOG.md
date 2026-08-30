@@ -8864,3 +8864,45 @@ radius is *banks that name music anchors `<shot>_music`*, not
 let a bank rename its beats out of the contract.
 
 Fix site is the shipping surface (planner / render driver), not mine.
+### CORRECTION to the PBUG-20260829-14 addendum -- "shakespeare commits zero" was an n=4 artifact and is withdrawn
+
+The addendum above states that shakespeare "committed ZERO repairs across 16
+flags" and builds a mechanism on it (source-shaped dialogue never survives
+paraphrase, so the repair gives up every time). **That claim died on the very
+next episode.** The 8-leg sweep finished with two more shakespeare legs:
+
+        shakespeare eps:   4  ->  5  ->  6
+        flags:            16     20     24
+        whole-line:      100%   100%   100%
+        COMMITTED:          0      2      3
+
+**FINAL, COMPLETE POPULATION (32 episodes, 204 voiced rows, gemma-4-E2B-it):**
+
+        bank             eps  voiced  flag  flag%  unclean  whole/flag   committed  committed/flag
+        shakespeare        6      36    24    67%      21    24/24=100%       3        12.5%
+        public_domain      8      48    32    67%      28    30/32= 94%       4        12.5%
+        media_archive      8      48    28    58%      21    26/28= 93%       7        25%
+        scifi_news_pro     2      20    19    95%      14    15/19= 79%       5        26%
+        original           8      52    44    85%      34    38/44= 86%      10        23%
+        ALL               32     204   147    72%     118   133/147= 90%     29        20%
+
+**WHAT SURVIVES.** The whole-line localization failure is the real finding and it
+got stronger, not weaker: 90% overall, and shakespeare is 24/24 = 100% across six
+episodes. The ORDERING also survives -- the fidelity lanes commit at 12.5% of
+their flags against 23-26% for the others, so a mislocalized flag on source-shaped
+dialogue really is about half as likely to end up committed.
+
+**WHAT IS WITHDRAWN.** "Zero" and "fails safe" and the mechanism story built on
+them. Shakespeare commits at a LOWER rate, not at no rate. The operating
+consequence in the addendum -- rank lanes by committed repairs -- still holds,
+but it must be read as a rate difference, not as a lane that is safe.
+
+**THE PROCESS LESSON, which is the part worth keeping.** A zero observed on four
+episodes was reported as a structural property with a causal story attached. Two
+more episodes of the same bank falsified it. A count of zero is the single
+easiest number to over-read: it is indistinguishable from "not enough samples
+yet" until a sample lands on the other side. The whole-line rate, measured over
+147 flags, moved by one point across the same expansion -- rates over a large
+denominator held; a zero over a small one did not.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**

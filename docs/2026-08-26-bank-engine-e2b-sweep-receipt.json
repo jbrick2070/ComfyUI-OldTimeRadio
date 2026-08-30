@@ -1,11 +1,12 @@
 {
-  "generated_at": "2026-08-26T02:40:36.825142",
+  "generated_at": "2026-08-29T17:47:46.875668",
   "model_under_test": "google/gemma-4-E2B-it (3.0 GB)",
   "slots": "creative AND technical (both)",
+  "lanes": "image",
   "legs_run": 8,
   "legs_total": 8,
-  "pass": 4,
-  "fail": 4,
+  "pass": 8,
+  "fail": 0,
   "results": [
     {
       "leg": 1,
@@ -13,11 +14,12 @@
       "bank": "media_archive",
       "visual_style": "archival_documentary",
       "profile": "otr_soak_llmsweep_01",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
       "ok": true,
       "rc": 0,
-      "minutes": 12.2,
+      "minutes": 12.8,
       "stdout_tail": ""
     },
     {
@@ -26,12 +28,13 @@
       "bank": "media_archive",
       "visual_style": "archival_documentary",
       "profile": "otr_soak_llmsweep_02",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
-      "ok": false,
-      "rc": 1,
-      "minutes": 11.2,
-      "stdout_tail": "1dd status=pending\n[canonical-api] t=592s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=597s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=602s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=607s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=612s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=617s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=622s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=627s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=632s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=637s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=642s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=647s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=652s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=657s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=pending\n[canonical-api] t=662s prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd status=error\n[canonical-api] RESULT FAIL prompt_id=c4b358f5-ed37-487d-a478-00e7eceae1dd\n[canonical-api] ERROR node 92 (OTR_VideoRenderBatch) raised C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_video_engines.render_errors.RenderError\nstill-spine handoff missing materialized scene still for shot shot_music_opening_001 beat music_opening_001 engine still_flat\ntraceback (last 8 frames):\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\comfyui-lora-manager\\py\\metadata_collector\\metadata_hook.py\", line 177, in async_map_node_over_list_with_metadata\n    results = await original_map_node_over_list(\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 390, in render\n    report, manifest_payload, name = self._render_episode(\n                                     ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 493, in _render_episode\n    _rd.validate_and_repair_still_spine(ledger)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_video_engines\\render_driver.py\", line 1126, in validate_and_repair_still_spine\n    raise RenderError(\n"
+      "ok": true,
+      "rc": 0,
+      "minutes": 12.6,
+      "stdout_tail": ""
     },
     {
       "leg": 3,
@@ -39,11 +42,12 @@
       "bank": "original",
       "visual_style": "sci_fi_radio",
       "profile": "otr_soak_llmsweep_01",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
       "ok": true,
       "rc": 0,
-      "minutes": 11.9,
+      "minutes": 12.2,
       "stdout_tail": ""
     },
     {
@@ -52,12 +56,13 @@
       "bank": "original",
       "visual_style": "sci_fi_radio",
       "profile": "otr_soak_llmsweep_02",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
-      "ok": false,
-      "rc": 1,
-      "minutes": 11.5,
-      "stdout_tail": "17a status=pending\n[canonical-api] t=614s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=619s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=624s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=629s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=634s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=639s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=644s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=649s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=654s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=659s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=664s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=669s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=674s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=679s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=pending\n[canonical-api] t=684s prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a status=error\n[canonical-api] RESULT FAIL prompt_id=f58fb109-45b4-4943-ba64-33b5ac4c517a\n[canonical-api] ERROR node 92 (OTR_VideoRenderBatch) raised C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_video_engines.render_errors.RenderError\nstill-spine handoff missing materialized scene still for shot shot_music_closing_001 beat music_closing_001 engine still_flat\ntraceback (last 8 frames):\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\comfyui-lora-manager\\py\\metadata_collector\\metadata_hook.py\", line 177, in async_map_node_over_list_with_metadata\n    results = await original_map_node_over_list(\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 390, in render\n    report, manifest_payload, name = self._render_episode(\n                                     ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 493, in _render_episode\n    _rd.validate_and_repair_still_spine(ledger)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_video_engines\\render_driver.py\", line 1126, in validate_and_repair_still_spine\n    raise RenderError(\n"
+      "ok": true,
+      "rc": 0,
+      "minutes": 12.0,
+      "stdout_tail": ""
     },
     {
       "leg": 5,
@@ -65,11 +70,12 @@
       "bank": "public_domain",
       "visual_style": "storybook_engraving",
       "profile": "otr_soak_llmsweep_01",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
       "ok": true,
       "rc": 0,
-      "minutes": 11.2,
+      "minutes": 12.1,
       "stdout_tail": ""
     },
     {
@@ -78,12 +84,13 @@
       "bank": "public_domain",
       "visual_style": "storybook_engraving",
       "profile": "otr_soak_llmsweep_02",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
-      "ok": false,
-      "rc": 1,
-      "minutes": 10.2,
-      "stdout_tail": "e46 status=pending\n[canonical-api] t=532s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=537s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=542s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=547s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=552s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=557s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=562s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=567s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=572s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=577s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=582s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=587s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=592s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=597s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=pending\n[canonical-api] t=602s prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46 status=error\n[canonical-api] RESULT FAIL prompt_id=1b00c3e4-dfa2-41f3-9cd4-a4b5ad654e46\n[canonical-api] ERROR node 92 (OTR_VideoRenderBatch) raised C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_video_engines.render_errors.RenderError\nstill-spine handoff missing materialized scene still for shot shot_music_opening_001 beat music_opening_001 engine still_flat\ntraceback (last 8 frames):\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\comfyui-lora-manager\\py\\metadata_collector\\metadata_hook.py\", line 177, in async_map_node_over_list_with_metadata\n    results = await original_map_node_over_list(\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 390, in render\n    report, manifest_payload, name = self._render_episode(\n                                     ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 493, in _render_episode\n    _rd.validate_and_repair_still_spine(ledger)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_video_engines\\render_driver.py\", line 1126, in validate_and_repair_still_spine\n    raise RenderError(\n"
+      "ok": true,
+      "rc": 0,
+      "minutes": 11.8,
+      "stdout_tail": ""
     },
     {
       "leg": 7,
@@ -91,11 +98,12 @@
       "bank": "shakespeare",
       "visual_style": "shakespeare_stage_realism",
       "profile": "otr_soak_llmsweep_01",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
       "ok": true,
       "rc": 0,
-      "minutes": 11.1,
+      "minutes": 11.8,
       "stdout_tail": ""
     },
     {
@@ -104,12 +112,13 @@
       "bank": "shakespeare",
       "visual_style": "shakespeare_stage_realism",
       "profile": "otr_soak_llmsweep_02",
+      "video_engine": "",
       "creative_model": "google/gemma-4-E2B-it (3.0 GB)",
       "technical_model": "google/gemma-4-E2B-it (3.0 GB)",
-      "ok": false,
-      "rc": 1,
-      "minutes": 10.4,
-      "stdout_tail": "3b7 status=pending\n[canonical-api] t=548s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=553s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=558s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=563s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=568s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=573s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=578s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=583s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=588s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=593s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=598s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=603s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=608s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=613s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=pending\n[canonical-api] t=618s prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7 status=error\n[canonical-api] RESULT FAIL prompt_id=19d87af9-3f7c-47b8-9ecf-0e276dc573b7\n[canonical-api] ERROR node 92 (OTR_VideoRenderBatch) raised C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_video_engines.render_errors.RenderError\nstill-spine handoff missing materialized scene still for shot shot_music_opening_001 beat music_opening_001 engine still_flat\ntraceback (last 8 frames):\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\comfyui-lora-manager\\py\\metadata_collector\\metadata_hook.py\", line 177, in async_map_node_over_list_with_metadata\n    results = await original_map_node_over_list(\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 390, in render\n    report, manifest_payload, name = self._render_episode(\n                                     ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\otr_video_render_batch.py\", line 493, in _render_episode\n    _rd.validate_and_repair_still_spine(ledger)\n  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_video_engines\\render_driver.py\", line 1126, in validate_and_repair_still_spine\n    raise RenderError(\n"
+      "ok": true,
+      "rc": 0,
+      "minutes": 11.4,
+      "stdout_tail": ""
     }
   ]
 }
