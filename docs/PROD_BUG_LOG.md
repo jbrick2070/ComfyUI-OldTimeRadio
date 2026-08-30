@@ -9031,3 +9031,71 @@ was partly failing to be heard. Whether the flag rate would rise or fall with
 the fence fixed is unknown, and this leg cannot answer it. **The fence fix
 should land before anyone treats gemma-2-2b's clean-stage numbers as
 comparable to E2B's.**
+### PBUG-20260829-14, third addendum -- gemma-2-2b-it is NOT the replacement writer. My own candidate, falsified by my own test.
+
+I proposed `google/gemma-2-2b-it` as a smaller, cleaner frictionless writer on the
+strength of an 8% whole-line rate. I ran it on all four banks (4 legs, 1 act each,
+both writer slots, published to obs). **The recommendation does not survive.**
+
+        gemma-2-2b-it, whole-line share by bank   vs   gemma-4-E2B-it
+            media_archive   2/24  =   8%                26/28 =  93%
+            original        2/6   =  33%                38/44 =  86%
+            public_domain   4/4   = 100%                30/32 =  94%
+            shakespeare     3/3   = 100%                24/24 = 100%
+
+The 8% that made it look like a replacement was a MEDIA_ARCHIVE ARTIFACT. On the
+fidelity lanes it converges with E2B at 100%, and its aggregate moved 8% -> 30%
+the moment the other three banks landed. Exactly the bank-dependence the by-bank
+addendum above documented for E2B; I had one bank and read it as a property.
+
+**IT IS WORSE THAN E2B WHERE IT MATTERS, AND THE DAMAGE MODE IS DIFFERENT IN
+KIND.** On shakespeare it flagged 3 and COMMITTED 3 (E2B commits 12.5% of its
+shakespeare flags and fails safe on the rest). And its commits do not truncate --
+they SUBSTITUTE:
+
+    b002  before: 'A most excellent way to make an impression, my lady.'
+          after : 'I must truly master this...this...grace'
+
+    b005  before: 'Fancy that.'
+          attempt 1 produced: "Maria's voice, I must truly master this grace"
+
+The "after" text has no relationship to the input. This is not a repair pass
+removing stage business, it is a small model handed a rewrite instruction and
+inventing a replacement line, which is then committed to the ledger and spoken.
+E2B deletes parts of correct lines; gemma-2-2b replaces them with different
+lines. Substitution is worse than truncation because nothing downstream can
+detect it -- the row is well-formed, in character, and wrong.
+
+    b003  before: 'You speak of "excellent" as if you had no hand in the matter.'
+          after : 'You speak of excellent as if you had no hand in the matter'
+
+  -- the embedded quotation marks carry the line's irony and are what the writer
+  put there; stripping them is the prosody-damage class from the second addendum,
+  now observed at a third model.
+
+**WHAT THIS DOES TO THE 8 GB WRITER QUESTION.** There is no drop-in small
+replacement identified. E2B remains the proven 8 GB renderer and it is still
+damaging ~1 line/episode. That strengthens, rather than weakens, the second
+addendum's conclusion: the fix belongs in the REPAIR's contract (may not alter
+anything outside the named segment), because that single invariant would have
+blocked all three of these commits at a model that is otherwise unusable here.
+
+**Blast radius: findings only. No code, profile, or workflow touched.**
+
+### PBUG-20260829-18 note from the 5080 -- the fenced-JSON bank hypothesis is also dead
+
+The 4060 proposed that its fenced-JSON judge failures were driven by shakespeare's
+apostrophes and embedded quotation rather than by its machine. Tested directly:
+this box ran gemma-2-2b on shakespeare (`Moonlight's Grace`, 13 clean-stage model
+calls, and b003 above contains exactly the embedded-quotation material named).
+
+        ledger_clean_line_judge calls on this server : 146
+        parse failures                               :   0
+
+Zero, including the shakespeare leg. Both boxes: same model, same snapshot
+revision `299a8560bedf22ed1c72a8a11e7dce4a7f9f51f8`, `quantized=False`, judge
+temperature 0.200, same node. Quantization, snapshot revision, and now the bank
+are all eliminated. The divergence is between the two installs and is not yet
+explained. The fence-stripping fix remains correct defensive work regardless.
+
+**Blast radius: findings only.**
