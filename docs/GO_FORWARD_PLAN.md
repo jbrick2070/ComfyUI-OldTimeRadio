@@ -54,151 +54,76 @@ be tangled in here:
 
 ## THE CURRENT STEP -- READ THIS FIRST
 
-**Rewritten 2026-08-31.** The step this replaces was the 2026-08-28 listening
-test; those legs published and were judged. Two days of portability work on
-rented hardware have since changed what is in front of us.
+*Rewritten 2026-08-31. Receipts live in `docs/PROD_BUG_LOG.md` and the archive.
+Pod knowledge: `docs/RUNPOD_INSTALL.md`. Machine guide: `docs/MACHINE_MATRIX.md`.*
 
-### 1. GHOST CLAUSE POOL EXHAUSTION -- SURVIVED A FIX, SO IT OWES A PANEL
+Two days on rented hardware found three OTR bugs the dev box cannot surface
+about itself -- all fixed, receipts filed -- left the provisioner incomplete,
+and measured nothing of the lane matrix. The 5080 kept shipping throughout.
 
-    GhostAuthorError: the figure fallback pool is exhausted: 18 clauses,
-    all already used in this episode.
+### STANDING CONSTRAINTS
 
-**This is current, not history.** It is in the server log of the box running
-right now, twice, on the widened pools -- `57ee969f` took each mode from 6 to
-18-19 clauses and five-act episodes exhaust them anyway.
+* **The 5080 loop is untouched.** Nothing ships that reduces tomorrow's `obs`
+  count.
+* **The pod stays STOPPED** until queue item 2 completes. The volume stays --
+  it holds the warm cache, which is the expensive thing to recreate.
+* **This queue outranks Section 1's coding order** until it is cleared.
 
-**Widening again is the wrong move and the two-strikes rule now bites.** A
-FINITE pool plus a NO-DUPLICATES rule cannot survive an episode of arbitrary
-length; a bigger pool only moves the act at which it dies. The first fix treated
-the symptom, which is exactly the evidence that the model of the problem is
-wrong. Per the standing rule, the third attempt gets `kibitz-plugin:kibitz`
-BEFORE any code, and this one genuinely qualifies -- there are several
-defensible answers and they are not equivalent:
+### THE QUEUE
 
-* generate leaves combinatorially instead of drawing from a fixed list,
-* scope "no duplicates" to the ACT rather than the EPISODE,
-* allow controlled reuse once the pool is spent, with the receipt saying so,
-* or accept a shorter authored run and let the deterministic path take over
-  loudly rather than raising.
+**1. FIRE THE GHOST-POOL PANEL -- before any code.** Two-strikes has fired:
+`57ee969f` widened the pool 6 -> 18 and five-act episodes exhaust it anyway,
+because a finite pool under a no-duplicates rule cannot survive an episode of
+arbitrary length. Press the panel on the AUTHOR's contract --
+`ghost_signal_author.py` is shared by `otr_shot_lock.py`, `render_driver.py` and
+`schemas.py`, so no lane dodges it -- and on **which candidate changes what the
+viewer sees**: combinatorial generation, act-scoped dedupe, receipted reuse, or
+a loud deterministic takeover. Launch FIRST: it is a wait, not work.
+**DONE WHEN** the arc converges -> code -> a five-act leg publishes clean.
 
-Note which of those change what the viewer sees and which do not -- that is the
-axis the panel should be pressed on.
+**2. THE PROVISIONER IS THE DOER** (operator steer 2026-08-31: "a DOER or an
+instruction manual... not a checker"). A machine-agnostic
+`scripts/otr_provision.py` with a thin pod wrapper, installing: Stable Audio 3
+(the **Comfy-Org repackage**, not Stability's raw repo), index-tts via
+`uv venv --python 3.11` plus the `<comfy_root>` symlink and the four `hf_cache`
+repos, and the reference WAVs. Every step is already written down in
+`RUNPOD_INSTALL.md` section 3 -- this is transcription, not design.
+**DONE WHEN** the acid test passes: saved template -> provision -> one published
+episode, zero hand steps.
 
-### 2. THE PORTABILITY PROGRAM HAS SHOWN MERIT, AND IS NOT FINISHED
+**3. ZERO-FRAME BEAT** -- kills a leg roughly 70 minutes in, after the writer,
+cast, voices and audio master are done. Fix UPSTREAM of
+`otr_shot_lock.py:803`; the helper already warns and correctly does not raise
+(OOM-or-nothing). The question is why a beat arrives with no duration. Leading
+suspect, named in the code's own comment: a cue duration that never crossed
+`anchor_line_id` onto its line -- the PBUG-20260830-16 seam. **`shot_b006` was
+`mode=object source=deterministic_fallback`, so this is not only music rows**,
+and assuming it is would waste the investigation.
+**DONE WHEN** the root fix lands and the failing leg shape passes live.
 
-Two days on rented hardware found **three real OTR bugs**, none of which the dev
-box can surface about itself:
+**4. MACHINE-CLASS REFACTOR** (spec: the 2026-08-31 Fable judgment).
+`config/machine_classes.json` declares the mapping and the generator validates
+it, refusing on contradiction -- **done, `a83968ce`**. Remaining: move PROVEN
+receipts onto the profiles themselves, add the README injection markers plus a
+`--check` drift test.
 
-| defect | why the 5080 cannot see it |
-|---|---|
-| `indextts2` resolved a WINDOWS venv path unconditionally, so the engine could never start on Linux | the Windows path is correct here |
-| `has_nvenc` tested whether ffmpeg was COMPILED with nvenc, not whether it could RUN | nvenc runs here |
-| `OTR_MasterAudioMux` publishes the episode but never declares it, so `/history` shows only the intermediate (PBUG-20260830-24) | nobody reads the API here |
+**5. 24 GB DRAFT PROFILE** -- the instrument the next rental needs. Proof
+follows the profile, never the reverse: a lane is proven BY running under one,
+so waiting for a proven lane before authoring the profile is a deadlock. Spends
+headroom on what a small card cannot -- `indextts2`, the ungated heavy video
+lanes, the 12b writer resident. Stays `draft` until an episode publishes from
+it; fill its `machine_classes.json` row so the gap reads as scheduled work.
 
-Plus a structural finding worth more than any single bug: **OTR's engines name
-FILES but not SOURCES.** Three Hugging Face repo ids exist in all of the engine
-code, so only three lanes were ever fetchable and every other weight on this box
-was placed by hand with its provenance unrecorded. `docs/MODEL_ASSET_INDEX.md`
-now answers "to use X, download Z", and `scripts/otr_fetch_lane_weights.py` has
-gone from 3 lanes to 6.
+**6. NEXT POD SESSION -- one rental, only after item 2.** The acid test AND a
+LOOPED lane sweep on the same dollar: the merit verdict and the unmeasured lane
+matrix together, rather than another debugging round.
 
-**WHAT IS OWED, and it is the whole point:** the fixes are in the repo but the
-PROVISION SCRIPT does not carry them. A fresh pod today would repeat the same
-crawl -- Stable Audio 3, index-tts on Python 3.11 via `uv`, the `<comfy_root>`
-symlink, the reference WAVs. Until `scripts/otr_pod_provision.sh` installs all
-of it unattended, "frictionless" is a claim rather than a result, and the
-fresh-pod run that would test it measures nothing.
+### WATCH -- recorded, not scheduled
 
-**The acid test, once the provisioner is complete:** deploy from the saved
-template onto the network volume, run the provisioner, render one episode. No
-hand steps. That single run is the merit verdict.
-
-### 3. WHAT THE RENTED SOAK DID NOT PRODUCE
-
-Twelve legs, zero episodes. Two blockers sat behind each other -- `indextts2`,
-then Stable Audio 3 -- and each cost a full round to surface, because a lane
-takes seven to thirteen minutes to reach the node that fails. **The lane matrix
-is still unmeasured.** Nothing is known about which video lanes work on rented
-hardware beyond `animatediff15_v3_haunted_video`, which published in 2058 s.
-
-Two process lessons, both already in `docs/RUNPOD_INSTALL.md`: a sweep must LOOP
-rather than walk the roster once (ten lanes failed on a missing model, the model
-was installed twenty minutes later, and none was retried), and a soak on rented
-hardware should fail fast on a missing asset instead of discovering it after the
-script and voices are done.
-
-### 4. THE THREE LIVE 5080 DEFECTS, IN THE ORDER THEY SHOULD BE TAKEN
-
-All three are from the box running now, not from history. Ordered by whether
-the answer is known, because two of them are cheap and one is not.
-
-**A. THE PROVISIONER IS INCOMPLETE -- do this first, it has no design in it.**
-Mechanical, verifiable, and it unblocks the only test that can score the
-portability work. `scripts/otr_pod_provision.sh` must additionally install:
-Stable Audio 3 from `Comfy-Org/stable-audio-3` (the repackage, NOT Stability's
-raw repo -- see the fetcher comment), index-tts with `uv venv --python 3.11`
-because it pins `>=3.10,<3.12`, the `<comfy_root>/index-tts` symlink,
-`checkpoints/hf_cache`'s four runtime repos, and the reference WAVs. There is no
-fork here: every step is already known and written down. **One clean run from a
-saved template with zero hand steps is the merit verdict on two days of work.**
-
-**B. A BEAT CAN BUDGET TO ZERO FRAMES, AND IT COSTS THE WHOLE LEG.**
-
-    RenderError: shot shot_b006 engine 'animatediff15_v3_haunted_video' failed
-    to render -- Ghost Signal cadence needs a delivered target of at least
-    1 frame, got 0 -- a 0-frame beat is a planning bug
-
-`otr_shot_lock.py:803` -- `frames = int(round(float(dur) * fps)) if dur else 0`
--- turns a missing duration into zero frames, and PBUG-20260829-16 already added
-a WARNING there rather than a raise, correctly, since an OOM-or-nothing directive
-governs the render path and a genuinely silent beat must not be blocked by a
-budget helper. **But warning earlier does not make the leg cheaper: the engine
-still refuses at the video stage, after the writer, voices, music and the full
-audio master are done.** The fix is upstream of the helper -- find why a beat
-arrives with no duration. The existing comment names the leading suspect: a
-music beat whose duration lives on a cue that never crossed `anchor_line_id`
-onto the line, which is the same sentinel-versus-mirror seam as PBUG-20260830-16.
-Note `shot_b006` here was `mode=object source=deterministic_fallback`, so do not
-assume it is only music rows.
-
-**C. THE GHOST CLAUSE POOL -- panel first, see item 1. Do NOT widen it again.**
-
-**BOTH B AND C ARE IN SHARED CODE, NOT IN THE HAUNTED LANE. Checked 2026-08-31,
-because the obvious theory was that the retirement on 2026-08-23 kept the buggy
-variant and an earlier peer would be clean.** It did not, and there is no
-earlier peer to go back to. The class chain is three deep and almost empty:
-
-    GhostSignalEngine                  <- the base: cadence, frames, all logic
-      GhostSignalV3Engine              <- swaps the motion module to v3
-        GhostSignalV3HauntedEngine     <- adds a LoRA and lora_strength()
-
-The haunted lane overrides a name, a receipt id, two weight constants and one
-method. Everything that fails is underneath it: the clause pool lives in
-`ghost_signal_author.py`, shared by `otr_shot_lock.py`, `render_driver.py` and
-`schemas.py`; the cadence refusal is raised in `eng_ghost_signal.py:193`, in the
-BASE class. The peers deleted by `187380d0` were
-`eng_ghost_signal_cadence.py` -- hold-3 and hold-5 subclasses that changed only
-the traversal rate, in response to the operator's *"heavily fast paced ... could
-probably bring it down to 5fps"*. They would have exhausted the same pool and
-refused the same zero-frame beat.
-
-**Consequences worth acting on:** there is no lane to switch to in order to dodge
-either defect, so neither can be deferred by picking differently; both affect
-every AnimateDiff lane and anything else that authors ghost prompts, which
-RAISES their priority; and the panel on the pool should be pressed on the
-AUTHOR's contract, not on which lane calls it.
-
-**Not yet diagnosed:** `OTR_LedgerFreezeCascade` failed twice and the runner's
-eight-frame traceback did not capture the message. Next occurrence, read the
-SERVER log rather than the leg log.
-
-### 5. THE 5080 KEPT SHIPPING THROUGHOUT
-
-37 successes against 18 failures across 30 legs, `otr/obs` at 45 episodes, and
-it is mid-leg now. The failures are the pool exhaustion above plus
-`RenderError` from `OTR_VideoRenderBatch` -- worth a look once the pool question
-is settled, since a render that dies after the script and voices are written is
-the expensive kind.
+* `OTR_LedgerFreezeCascade` failed twice and the message was never captured --
+  the runner's eight-frame traceback truncates it. Next occurrence, read the
+  SERVER log, not the leg log.
+* `OTR_VideoRenderBatch` `RenderError` cluster -- triage after items 1 and 3.
 
 ---
 
@@ -305,7 +230,7 @@ untouched.
 
 **SHIPPED 2026-08-28 (`cd96e9b3`). The control path EXISTS.** C0-C6 of the
 hardened plan landed together, full suite 12390 passed / 121 skipped /
-1 xfailed, no regressions. What remains on this row is C7 ONLY -- the
+1 xfailed, no regressions. **SUPERSEDED: C7 was proven END TO END in `83be6c74` (verified 2026-08-31) -- this row's remaining work is closed. Archive on the next tidy.** The original text follows: what remained on this row was C7 ONLY -- the
 end-to-end test through the real spine and composite, which is EXPECTED to
 find a hole (`assemble_silent_timeline` raises "manifest has no renderable
 beats" on an all-gap episode; that hole is the work). Everything else here is
@@ -788,6 +713,8 @@ below is also a free chance to** (a) re-observe the two parked eyeball items
 (Batch R5) and (b) watch the two ledger-cleanup behaviour changes named in
 Open risks that have no live receipt yet.
 
+### Batch R0 -- CLOSED (2026-08-31). Those legs published and were judged; the pointer to THE CURRENT STEP is dead because the rewrite removed that content. Archive on the next tidy.
+
 ### Batch R0 -- ALREADY RENDERED: the six overnight 1-act legs. One morning pass over `otr/obs/` proves six lanes
 
 See THE CURRENT STEP at the top of this file. One pass proves: the mime
@@ -1071,7 +998,28 @@ owed at current HEAD has not been re-verified. Confirm before rendering.
 
 ---
 
-## SECTION 3 -- WAITING ON THE OPERATOR (answer these in ONE pass)
+## SECTION 3 -- WAITING ON THE OPERATOR
+
+### J. THE REGISTRY IS FLAGGED -- two questions, and this is the third time it has been raised
+
+**Verified live 2026-08-31:** `latest_version` is NULL, two versions, **zero
+Active**, both `NodeVersionStatusFlagged`. Nobody can install OTR through
+ComfyUI-Manager by any route -- not on a pod, not on a desktop. For a pack
+intended to go open source, that is the single largest adoption blocker, and it
+has been sitting as a sub-bullet of the capstone behind every other bug.
+
+README now leads with the git clone instead (`786b3fa4`), so a new user has a
+route that works. These two remain, and neither is scheduled because neither has
+been asked:
+
+* **J1. Delete and republish now, yes or no?** Node-delete is a HARD delete that
+  frees every version string for reuse; version-delete is soft and BURNS the
+  string. Only the operator's browser session can do it -- the publish token
+  returns 401.
+* **J2. Who owns finding out WHY alpha.13 and alpha.14 were flagged?** The
+  scanner is a private repo and its findings are not visible to us. Without an
+  answer, a republish may simply be flagged again for the same unknown reason,
+  and we would have spent a version string to learn nothing. (answer these in ONE pass)
 
 Nothing in this section needs a render or a coder until answered. Defaults are
 stated where a default exists; silence keeps the default.
