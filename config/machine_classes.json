@@ -31,7 +31,15 @@
       "key": "8gb",
       "video": "animatediff15_v3_haunted_video",
       "char_voice": "kokoro",
-      "writer_ceiling_gb": 7.5
+      "writer_ceiling_gb": 7.5,
+      "proven": [
+        {
+          "hardware": "RTX 4060 8 GB",
+          "episodes": 9,
+          "date": "2026-08-29",
+          "evidence": "docs/4060_DRILL_LOG.md steps 7-19; five of five banks published"
+        }
+      ]
     },
     {
       "label": "16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)",
@@ -44,7 +52,21 @@
       "key": "16gb",
       "video": "animatediff15_v3_haunted_video",
       "char_voice": "kokoro",
-      "writer_ceiling_gb": 14.5
+      "writer_ceiling_gb": 14.5,
+      "proven": [
+        {
+          "hardware": "RTX 5080 16 GB",
+          "episodes": 45,
+          "date": "2026-08-31",
+          "evidence": "continuous overnight 5-act loops published to otr/obs"
+        },
+        {
+          "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
+          "episodes": 1,
+          "date": "2026-08-30",
+          "evidence": "1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK"
+        }
+      ]
     },
     {
       "key": "12gb",

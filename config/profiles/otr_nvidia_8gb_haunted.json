@@ -89,13 +89,5 @@
     "sage_attention": false,
     "extra_args": [],
     "env": {}
-  },
-  "proven": [
-    {
-      "hardware": "RTX 4060 8 GB",
-      "episodes": 9,
-      "date": "2026-08-29",
-      "evidence": "docs/4060_DRILL_LOG.md steps 7-19; five of five source banks published"
-    }
-  ]
+  }
 }

@@ -26,12 +26,12 @@ Find your machine in the first table. That is the whole answer; everything after
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  16 profile(s), 2 shipping, 1 proven
+## 8 GB  --  16 profile(s), 2 shipping, 0 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
-| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** |
 | `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping` |
+| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping` |
 
 <details><summary>14 draft profile(s) here -- not vouched for</summary>
 
@@ -56,11 +56,10 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  80 profile(s), 41 shipping, 1 proven
+## 16 GB+  --  80 profile(s), 41 shipping, 0 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
-| `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** |
 | `16gb_full` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_bark_announcer_acceptance` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_g4_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
@@ -103,7 +102,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>38 draft profile(s) here -- not vouched for</summary>
+<details><summary>39 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
@@ -117,6 +116,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_16gb_ltx_video` | ltx_video | indextts2 |
 | `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | kokoro |
 | `otr_4060_viz_12b` | viz_camera | kokoro |
+| `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | kokoro |
 | `otr_amd16_rocm` | wan_ti2v | kokoro |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
 | `otr_ideogram4_local_still_word` | still_word | kokoro |
@@ -178,9 +178,6 @@ The tier is `16 GB+` because that is the truth: nothing in `config/profiles/` de
 
 ## The proven rows, and what proves them
 
-* **`otr_5080_haunted_12b_overnight`** on RTX 5080 16 GB -- 45 episode(s), 2026-08-31. continuous overnight 5-act loops published to otr/obs
-* **`otr_5080_haunted_12b_overnight`** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
-* **`otr_nvidia_8gb_haunted`** on RTX 4060 8 GB -- 9 episode(s), 2026-08-29. docs/4060_DRILL_LOG.md steps 7-19; five of five source banks published
 
 ## Measured peaks, with their conditions
 

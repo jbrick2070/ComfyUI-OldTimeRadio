@@ -98,8 +98,16 @@ def load_classes(profiles):
 #: Keeping it honest matters more than keeping it full: PROVEN is the difference
 #: between "we think" and "we know", and a padded list destroys the only reason
 #: the table is worth reading.
-def proven_receipts(prof) -> list:
-    return [r for r in (prof.get("proven") or []) if isinstance(r, dict)]
+def proven_receipts(obj) -> list:
+    """Proof receipts, read from a MATRIX ROW.
+
+    Deliberately not from a profile file. Operator, 2026-08-31: "no profiles,
+    no proven in the code, they just live there" -- there being
+    config/machine_classes.json. Putting receipts on profiles also broke
+    `build_variants --check` on an unknown-key guard, which was that guard
+    correctly refusing a shape nobody had declared.
+    """
+    return [r for r in ((obj or {}).get("proven") or []) if isinstance(r, dict)]
 
 
 def proven_summary(prof) -> str:
@@ -144,6 +152,13 @@ def load_profiles() -> list:
             "proven": d.get("proven") or [],
         })
     return out
+
+
+def _proven_ids(classes) -> set:
+    """Profile ids a matrix row vouches for. Empty now that classes are
+    self-contained, kept so the per-tier tables still mark a proven row."""
+    return {row.get("recommended") for row, _p in (classes or [])
+            if row.get("proven") and row.get("recommended")}
 
 
 def _tier(vram):
@@ -220,7 +235,7 @@ def render() -> str:
         rows = by.get(tier) or []
         if not rows:
             continue
-        prov = sum(1 for r in rows if proven_receipts(r))
+        prov = sum(1 for r in rows if r["id"] in _proven_ids(classes))
         ship = sum(1 for r in rows if r["status"] == "shipping")
         A("## %s  --  %d profile(s), %d shipping, %d proven\n"
           % (tier, len(rows), ship, prov))
@@ -229,14 +244,14 @@ def render() -> str:
         # trust. Drafts are counted and folded away, listed by the engine they
         # select, which is the only thing anyone scans them for.
         headline = [r for r in rows
-                    if proven_receipts(r) or r["status"] == "shipping"]
+                    if r["id"] in _proven_ids(classes) or r["status"] == "shipping"]
         drafts = [r for r in rows if r not in headline]
         if headline:
             A("| profile | video | voice | music | image | confidence |")
             A("|---|---|---|---|---|---|")
             for r in sorted(headline,
-                            key=lambda x: (not proven_receipts(x), x["id"])):
-                conf = "**PROVEN**" if proven_receipts(r) else "`%s`" % r["status"]
+                            key=lambda x: (x["id"] not in _proven_ids(classes), x["id"])):
+                conf = "**PROVEN**" if r["id"] in _proven_ids(classes) else "`%s`" % r["status"]
                 A("| `%s` | %s | %s | %s | %s | %s |" % (
                     r["id"], r["video"], r["voice"], r["music"], r["image"],
                     conf))
