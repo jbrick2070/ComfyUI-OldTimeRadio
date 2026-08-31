@@ -675,15 +675,31 @@ Two separate caches, and missing either wastes the drive:
 | what | variable | why |
 |---|---|---|
 | video weights | `OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models` | set in the TEMPLATE; without it `_models_root()` falls back to `C:\ComfyUI-Models`, which on Linux becomes a literal directory nothing scans -- and reports success |
-| writer / voice / music | `HF_HOME=/workspace/hf` | **defaults to `/root/.cache`, which is on the 55 GB CONTAINER disk and is erased on stop.** Without this the 24 GB writer re-downloads every session even with a volume attached |
+| writer / voice / music | `HF_HOME=<models_root>/huggingface` | **defaults to `/root/.cache`, which is on the 55 GB CONTAINER disk and is erased on stop.** Without this the 24 GB writer re-downloads every session even with a volume attached. **Use the models root, not an invented path -- see below.** |
 
 **The expensive half is the one that defaults to the disposable place.** Video
 weights are 3.7 GB; the HF cache with both writers is **38 GB**.
 
-ComfyUI reads `HF_HOME` at start, so a cache created afterwards is invisible to
-it. Symlink rather than fight the env:
+**THE VALUE IS `<models_root>/huggingface`, AND PICKING ANY OTHER PATH COSTS
+YOU THE CACHE TWICE.** That is OTR's convention, not a preference: the reference
+machine runs `HF_HOME=C:\ComfyUI-Models\huggingface`, and
+`nodes/_otr_hf_env.py` exists specifically to resolve and re-export it. So on a
+pod the value is:
 
-    ln -s /workspace/hf /root/.cache/huggingface
+    HF_HOME=/workspace/runpod-slim/ComfyUI/models/huggingface
+
+**This session got that wrong and paid 84 GB for it.** The template set no
+`HF_HOME`, so 71 GB had already accumulated at the convention; the session then
+symlinked the default cache path to a NEW directory, `/workspace/hf`, and warmed
+it -- fetching Mistral-Nemo (46 GB) and gemma-4-12b (23 GB) a second time. Two
+roots, both live, 69 GB of exact duplicate, and a 200 GB volume that then hit
+`[Errno 122] Disk quota exceeded` mid-download. The duplication is invisible
+until you `du` both roots, because each one looks correct on its own.
+
+ComfyUI reads `HF_HOME` at start, so a cache created afterwards is invisible to
+it. Symlink the default path at the convention rather than inventing a new one:
+
+    ln -sfn /workspace/runpod-slim/ComfyUI/models/huggingface /root/.cache/huggingface
 
 ### Step 4 — provision, in one command, from the repo
 
@@ -835,13 +851,19 @@ See PBUG-20260830-24. A `RESULT SUCCESS` leg publishes an episode that
 **`HF_HOME` is absent**, and the cache survives on this pod only because of a
 symlink made by hand:
 
-    /root/.cache/huggingface -> /workspace/hf        # NOT in the template
-    /workspace/hf  =  84 GB
+    /root/.cache/huggingface -> /workspace/hf        # NOT in the template,
+    /workspace/hf                      =  84 GB      # and the WRONG path
+    <models_root>/huggingface          =  71 GB      # the convention, already there
 
 A fresh pod from today's template gets no symlink, so `HF_HOME` falls back to
 `/root/.cache/huggingface` on the 55 GB container disk -- which cannot even hold
-84 GB, and is erased on stop regardless. **Every new pod would re-download the
-whole cache.** That is the single most valuable field to add.
+the cache, and is erased on stop regardless. **Every new pod would re-download
+everything.** That is the single most valuable field to add.
+
+**Set it to the MODELS ROOT, not to a convenient path of your own choosing.**
+`<models_root>/huggingface` is OTR's convention; anything else silently creates a
+second cache beside the first. That is not hypothetical -- it happened here, cost
+69 GB of duplicate weights, and is what filled the volume.
 
 ### `HF_HOME` IS the best practice, and the volume proves the layout
 
@@ -858,7 +880,7 @@ roots with neither complete. The volume confirms the layout is right:
 | field | value | why |
 |---|---|---|
 | `OTR_COMFYUI_MODELS_ROOT` | `/workspace/runpod-slim/ComfyUI/models` | already correct, keep |
-| `HF_HOME` | `/workspace/hf` | **add** -- 84 GB, re-downloaded every pod without it |
+| `HF_HOME` | `/workspace/runpod-slim/ComfyUI/models/huggingface` | **add** -- tens of GB re-downloaded every pod without it. Must be the MODELS ROOT; any other path gives you two caches |
 | `HF_TOKEN` | a RunPod **Secret** reference | **add** -- gated lanes only |
 
 ### The HF token: use a RunPod Secret, and never a plain env var

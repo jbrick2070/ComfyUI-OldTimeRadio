@@ -29,7 +29,7 @@ NVIDIA cards.
 * **NVIDIA GPU.** 8 GB is the proven floor (RTX 4060, nine published episodes);
   16 GB is comfortable. Extra VRAM adds little — the models are small.
 * **A network volume mounted at `/workspace`, plus `HF_HOME` pointing INTO
-  it.** Set `HF_HOME=/workspace/hf`. Without it the writer/voice/music cache
+  it.** Set `HF_HOME=<models_root>/huggingface` -- OTR's convention. Any other path gives you two caches and downloads everything twice. Without it the writer/voice/music cache
   (tens of GB) lands on the container disk and is erased on every stop, so a
   volume alone does not save you the download. Create the volume in the **same
   region** as the pod or it will not attach.
@@ -81,9 +81,9 @@ ComfyUI is scanning a different directory than the one you installed into.
 **`python: command not found`.** Use `python3` everywhere.
 
 **Restarting.** `POST /api/manager/reboot` returns **502 and works anyway** —
-the server drops the connection going down. Poll `/system_stats` for a 200
-instead of trusting the reboot's status code. A Manager reboot does **not**
-re-read the image's argument file; stop and start the pod for argument changes.
+the server drops the connection going down. Poll `/system_stats` for a 200.
+A Manager reboot does not re-read the image's argument file; stop and start
+the pod for argument changes.
 
 **Encoding.** OTR probes for NVENC and falls back to CPU automatically. Most
 containers expose CUDA for compute but not `libnvidia-encode.so.1`, so CPU
