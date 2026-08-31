@@ -9893,3 +9893,55 @@ deciding, not a drive-by.
 SSH route that lists the obs directory, because the directory obs_publish writes
 IS the record. The `--http` route is kept and prints, up front, that it will
 find nothing.
+
+---
+
+## PBUG-20260831-01 -- an untimed music_open/close with no mirror budgets to ZERO frames
+
+**Verified against real ledgers on the 5080, 2026-08-31.** The leg dies at the
+VIDEO stage, roughly seventy minutes in, after the writer, cast, voices and the
+full audio master are already done:
+
+    RenderError: shot shot_b006 engine 'animatediff15_v3_haunted_video' failed
+    to render; fallbacks are disabled (FailureKind.CRASH_BEFORE_LOAD)
+    -- Ghost Signal cadence needs a delivered target of at least 1 frame, got 0
+    -- a 0-frame beat is a planning bug, not something to paper over here
+
+**THE GAP IS IN MY OWN PBUG-20260830-16 FIX, which covered two of three cases.**
+An untimed music row can reach the frame budget three ways and only two were
+handled:
+
+| case | handled by | before |
+|---|---|---|
+| untimed `music_open`/`music_close` WITH a timed mirror | `_untimed_music_sentinels` drops it -- the mirror owns the timeline | correct |
+| untimed `music_inter` | `_music_bridge_dur_s` -> 4.0 s | correct |
+| untimed `music_open`/`music_close` with **NO** mirror | **nothing** | **0 frames** |
+
+The third case is invisible to both guards by construction: the sentinel filter
+can only recognise a sentinel when a timed mirror EXISTS to make it one, and the
+bridge helper checked `role != "music_inter"` and returned None. So the row
+arrived with `dur_s=None`, `frames = int(round(float(dur) * fps)) if dur else 0`
+gave it zero, and the engine correctly refused inputs it cannot render.
+
+**Proven, not reasoned about.** In `signal_lost_the_apprentices_number` the
+sentinel filter dropped **0** rows while `shot_000_music` (`music_open`) and
+`shot_002_music` (`music_close`) both resolved to an effective duration of
+`None`. Six recent ledgers carry **no `samples` on any row at all**, so
+`compute_clip_budget`'s cumulative-samples path never runs and every beat
+depends entirely on `dur_s` -- which is what makes a single missing duration
+fatal rather than merely imprecise.
+
+**FIX:** `_music_bridge_dur_s` now covers every untimed music role
+(`_UNTIMED_MUSIC_FALLBACK_ROLES`), not just the interstitial. Still not a raise:
+an OOM is the only acceptable killer, and a bank with a genuinely silent beat
+must not be blocked by a budget helper.
+
+**BLAST RADIUS, measured across eight recent ledgers rather than asserted:**
+
+    rows that already had a duration (provably untouched)   223
+    rows rescued from ZERO frames by this change             29
+
+The helper is only consulted when `dur_s` is falsy, so a row with any duration
+cannot change. The only rows affected are ones that currently produce zero
+frames -- i.e. rows that currently kill the leg. Both machines gain; neither can
+regress. 37 shot-lock/budget tests pass.

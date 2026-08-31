@@ -566,6 +566,12 @@ MUSIC_BRIDGE_FALLBACK_DUR_S = 4.0
 #: Video roles the assembler mints a deterministic MIRROR row for.
 _MIRRORED_MUSIC_ROLES = ("music_open", "music_close")
 
+#: Untimed music roles that get the fallback picture duration. Every music role
+#: that can survive the sentinel filter belongs here: a row the filter cannot
+#: recognise as a sentinel (because nothing mirrors it) and that gets no
+#: fallback either is a row that budgets to zero frames and kills the leg.
+_UNTIMED_MUSIC_FALLBACK_ROLES = ("music_inter", "music_open", "music_close")
+
 
 def _untimed_music_sentinels(lines) -> set:
     """``line_id``s of pre-audio music SENTINELS, which own no timeline.
@@ -620,19 +626,44 @@ def _untimed_music_sentinels(lines) -> set:
 
 
 def _music_bridge_dur_s(line: dict):
-    """:data:`MUSIC_BRIDGE_FALLBACK_DUR_S` for an untimed act-break bridge.
+    """:data:`MUSIC_BRIDGE_FALLBACK_DUR_S` for ANY untimed music row.
 
-    Returns ``None`` for every other row, so a missing duration anywhere else
-    still surfaces as the loud zero-frame warning rather than being papered
-    over with a number nobody measured.
+    Returns ``None`` for every non-music row, so a missing duration anywhere
+    else still surfaces as the loud zero-frame warning rather than being
+    papered over with a number nobody measured.
+
+    WIDENED 2026-08-31 FROM ``music_inter`` ALONE, which left a third case
+    falling through both guards and killing the leg:
+
+      * an untimed ``music_open`` / ``music_close`` WITH a timed mirror is
+        dropped by :func:`_untimed_music_sentinels` -- the mirror owns the
+        timeline, and that is correct;
+      * an untimed ``music_inter`` gets the bridge duration below;
+      * an untimed ``music_open`` / ``music_close`` with **NO** mirror got
+        NEITHER. It is not a sentinel (nothing mirrors it, so the filter cannot
+        see it as one) and it was not a bridge (wrong role), so it reached the
+        frame budget with ``dur_s=None``, budgeted to ZERO frames, and the
+        engine refused it at the VIDEO stage -- roughly seventy minutes in,
+        after the writer, cast, voices and the full audio master were done.
+
+    PROVEN ON REAL LEDGERS, not reasoned about. In
+    ``signal_lost_the_apprentices_number`` the sentinel filter dropped 0 rows
+    while ``shot_000_music`` (``music_open``) and ``shot_002_music``
+    (``music_close``) both resolved to an effective duration of ``None``. Six
+    recent ledgers carry no ``samples`` on ANY row, so the cumulative-samples
+    path never runs at all and every beat depends on ``dur_s``.
+
+    Still not a raise, deliberately: an OOM is the only acceptable killer, and
+    a bank with a genuinely silent beat must not be blocked by a budget helper.
     """
     role = str((line or {}).get("speaker_role") or "").strip().lower()
-    if role != "music_inter":
+    if role not in _UNTIMED_MUSIC_FALLBACK_ROLES:
         return None
     log.info(
-        "[OTR_ShotLock] music bridge %s carries no duration (its audio pass "
-        "was removed in 59286499); rendering %.1fs of picture",
-        str((line or {}).get("line_id") or "?"), MUSIC_BRIDGE_FALLBACK_DUR_S)
+        "[OTR_ShotLock] untimed music row %s (%s) carries no duration (its "
+        "audio pass was removed in 59286499); rendering %.1fs of picture",
+        str((line or {}).get("line_id") or "?"), role,
+        MUSIC_BRIDGE_FALLBACK_DUR_S)
     return MUSIC_BRIDGE_FALLBACK_DUR_S
 
 
