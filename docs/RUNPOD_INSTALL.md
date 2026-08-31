@@ -10,6 +10,13 @@ starting with a section titled "Read this first" whose conclusion the file
 itself called formally dead -- before reaching the procedure. Restructured
 2026-08-31. To see how a fact was found: `git log docs/RUNPOD_INSTALL.md`.
 
+**Most of this is NOT RunPod-specific.** Only playbook steps 1-2, section 2
+(template spec) and the volume-speed material are particular to RunPod;
+everything else -- storage roots, warming models, the index-tts build, verifying
+by `/object_info`, and nearly every atlas entry -- applies to ANY fresh Linux
+host. A second cloud provider gets a deploy subsection here, not a rival
+document.
+
 **Its own rule, now applied to the whole file:** this is a LIVING document. When
 something changes, EDIT THE CELL. Do not append a v3.
 
@@ -25,7 +32,7 @@ something changes, EDIT THE CELL. Do not append a v3.
 
 ## 1. The playbook -- what actually works, in order
 
-Sections 0-9 are the archaeology. This is the procedure.
+This is the procedure.
 
 ### Step 1 — add an SSH key to the ACCOUNT, once, ever
 
@@ -253,7 +260,7 @@ least."
 
 ## 3. Models and assets
 
-Sections 10-12 are about standing a pod up. This one is about filling it, which
+Sections 1-2 are about standing a pod up. This one is about filling it, which
 turned out to be the harder half.
 
 ### THE REAL PORTABILITY GAP: engines name FILES, not SOURCES
@@ -283,7 +290,7 @@ produces a lane that still refuses.
 
 ### THE HF CACHE CAN EXIST TWICE, AND EACH COPY LOOKS CORRECT
 
-`HF_HOME` **must** be `<models_root>/huggingface` -- see section 12. Setting it
+`HF_HOME` **must** be `<models_root>/huggingface` -- see section 2. Setting it
 anywhere else does not relocate the cache, it ADDS one:
 
     /workspace/hf/hub                       84 GB   <- the invented path

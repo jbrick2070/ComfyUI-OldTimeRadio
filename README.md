@@ -33,21 +33,12 @@ You need four things: ComfyUI, a GPU, the models, and this node pack. ~20 minute
 Use the official [ComfyUI Desktop installer](https://www.comfy.org/download) (easiest), or a
 manual/portable ComfyUI install. Launch it once to confirm it opens in your browser.
 
+**Renting a GPU instead?** Follow [docs/RUNPOD_INSTALL.md](docs/RUNPOD_INSTALL.md) -- it covers any remote Linux host, not only RunPod.
+
 ### 2. Install this node pack
 
-**Easiest — ComfyUI Registry:** in **ComfyUI Manager**, search for **ComfyUI-OldTimeRadio**
-and click Install. Or from a terminal:
-
-```
-comfy node registry-install comfyui-old-time-radio
-```
-
-Registry installs are packaged, versioned snapshots of the current alpha
-([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)) —
-no branch checkout needed. Restart ComfyUI so it loads the nodes.
-
-**From git (bleeding edge):** clone into your `ComfyUI/custom_nodes/` folder and check out
-the active branch:
+**Use git.** Clone into your `ComfyUI/custom_nodes/` folder and check out the
+active branch:
 
 ```
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
@@ -64,6 +55,15 @@ Then restart ComfyUI so it loads the nodes.
 > `[OldTimeRadio] Skipped '<name>': <reason>` in the console. If a node you expect is
 > missing from the menu, that line is where to look. Use the same Python that runs
 > ComfyUI (for portable installs: `python_embeded\python.exe -m pip install -r requirements.txt`).
+
+**The ComfyUI Registry route does not currently work, and Manager cannot install
+this pack by any route.** Both published versions are `Flagged`
+([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)),
+so `latest_version` resolves to null: `@latest` has no target, and Manager
+refuses the `nightly` git path on any network-exposed instance. Checked live
+2026-08-31 -- 2 versions, 0 active. If Manager reports "not a CNR node" or
+"cannot resolve install target", that is this, not a fault on your machine. Use
+the clone above.
 
 ### 2b. ComfyUI node packs — required by some video lanes
 
