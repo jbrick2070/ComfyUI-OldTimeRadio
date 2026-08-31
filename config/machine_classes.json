@@ -27,24 +27,35 @@
       "vram_max_gb": 9,
       "platform": "any",
       "writer": "gemma-4-E2B",
-      "recommended": "otr_nvidia_8gb_haunted",
-      "alternates": [
-        "otr_4060_12b_gguf_offload"
-      ],
-      "note": "The portability floor. Proven, and the reason it is proven is that a second machine exists."
+      "note": "The portability floor. Proven, and the reason it is proven is that a second machine exists.",
+      "key": "8gb",
+      "video": "animatediff15_v3_haunted_video",
+      "char_voice": "kokoro",
+      "writer_ceiling_gb": 7.5
     },
     {
       "label": "16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)",
       "gpu_vendor": "nvidia",
-      "vram_min_gb": 10,
+      "vram_min_gb": 16,
       "vram_max_gb": 64,
       "platform": "any",
       "writer": "gemma-4-12b",
-      "recommended": "otr_5080_haunted_12b_overnight",
-      "alternates": [
-        "otr_rented24_heavy"
-      ],
-      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs."
+      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.",
+      "key": "16gb",
+      "video": "animatediff15_v3_haunted_video",
+      "char_voice": "kokoro",
+      "writer_ceiling_gb": 14.5
+    },
+    {
+      "key": "12gb",
+      "label": "10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)",
+      "gpu_vendor": "nvidia",
+      "vram_min_gb": 10,
+      "vram_max_gb": 15,
+      "video": "animatediff15_v3_haunted_video",
+      "char_voice": "kokoro",
+      "writer_ceiling_gb": 10.0,
+      "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling."
     },
     {
       "label": "AMD / ROCm",
@@ -53,9 +64,62 @@
       "vram_max_gb": 64,
       "platform": "any",
       "writer": "gemma-4-E2B",
-      "recommended": "otr_amd8_rocm",
-      "alternates": [],
-      "note": "Largely unexplored. The profile exists; no episode has published from it."
+      "note": "Largely unexplored. The profile exists; no episode has published from it.",
+      "key": "amd",
+      "device_backend": "rocm",
+      "video": "wan_ti2v",
+      "char_voice": "kokoro",
+      "writer_ceiling_gb": 7.5
     }
+  ],
+  "defaults": {
+    "_comment": "Shared by every machine. A class row states only what makes that machine DIFFERENT. Nothing here lives in a .py file.",
+    "status": "shipping",
+    "platform": "any",
+    "device_backend": "cuda",
+    "toolchains": [],
+    "allow_sidecars": false,
+    "image": "z_image_turbo",
+    "voice_bank": "default",
+    "announcer_voice": "kokoro",
+    "music": "musicgen",
+    "quant_policy": "bnb_nf4",
+    "features": {
+      "burn_captions": true,
+      "caption_style": "sdh_standard"
+    },
+    "seed_policy": {
+      "request_seed": 42,
+      "seed_mode": "request_hash"
+    },
+    "video_policy": {
+      "device_policy": "cuda",
+      "dtype_policy": "no_fp8_no_fp4"
+    },
+    "image_policy": {
+      "dtype_policy": "fp8_ok"
+    },
+    "audio_policy": {
+      "voice_device": "cuda"
+    },
+    "render": {
+      "fps": 25,
+      "canvas_w": 832,
+      "canvas_h": 480,
+      "composite_res": "1920x1080",
+      "composite_w": 1920,
+      "composite_h": 1080
+    },
+    "llm": {
+      "device": "cuda",
+      "attn_impl": "sdpa",
+      "gguf_n_ctx": 8192,
+      "gguf_quant": "Q4_K_M"
+    }
+  },
+  "known_limits": [
+    "indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, dia, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.",
+    "chatterbox and dia are announcer-capable cloning engines but each needs its own isolated venv; neither is installed on the rented pod.",
+    "OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour."
   ]
 }

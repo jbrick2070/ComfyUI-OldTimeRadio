@@ -154,7 +154,16 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
     workflow = load_workflow(str(wf_path))
 
     applied: list[str] = []
-    if args.profile and args.profile.lower() != "none":
+    if getattr(args, "machine", None):
+        # A machine key expands to the same dict a profile file would have
+        # produced. No file, no second applier -- config/machine_classes.json
+        # is the only place any of these values exist.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from otr_machine_profile import build_profile, resolve
+        _prof = build_profile(resolve(args.machine))
+        workflow = apply_profile_to_workflow(workflow, _prof, schemas)
+        applied.append("machine=%s" % args.machine)
+    elif args.profile and args.profile.lower() != "none":
         workflow = apply_profile_to_workflow(workflow, args.profile, schemas)
         applied.append(f"profile={args.profile}")
         checked = _assert_profile_models_present(
@@ -339,6 +348,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--profile", default="none",
                         help="explicit capability profile id, e.g. none or otr_cloud_lanes")
+    parser.add_argument("--machine", default=None,
+                        help="a machine key from config/machine_classes.json "
+                             "(8gb, 12gb, 16gb, amd). Expands to settings IN "
+                             "MEMORY -- there is no per-machine profile file.")
     parser.add_argument("--title", default=None)
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)

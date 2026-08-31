@@ -300,18 +300,12 @@ it names any missing weight and where it expects it.
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 46 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented) |
-| **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `draft`, unproven |
+| **8 GB NVIDIA (e.g. RTX 4060)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **AMD / ROCm** | -- | -- | -- | -- | -- | **no profile yet** |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
-
-* **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
-  The portability floor. Proven, and the reason it is proven is that a second machine exists.
-* **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
-  One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.
-* **AMD / ROCm** -> `otr_amd8_rocm`
-  Largely unexplored. The profile exists; no episode has published from it.
 
 <!-- END GENERATED: machine-matrix -->
 

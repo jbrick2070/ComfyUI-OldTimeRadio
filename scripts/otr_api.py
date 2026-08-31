@@ -885,29 +885,24 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
 
     if isinstance(profile, str):
         profile = load_profile(profile)
-    # Queue item 8 (2026-08-08): cross-validate the profile's capability
-    # overrides against every registry's enable-set BEFORE applying. Same
-    # coverage as scripts/build_variants.py:build_variant(); no live
-    # application path may bypass validation (Codex r4 MF-3).
-    try:
-        _mapping = load_widget_mapping()
-        from nodes._otr_audio_engines.registry import CAPABILITIES as _AUDIO_CAPS
-        from nodes._otr_video_engines.registry import CAPABILITIES as _VIDEO_CAPS
-        from nodes._otr_image_engines.registry import CAPABILITIES as _IMAGE_CAPS
-        from nodes._otr_upscale_engines.registry import CAPABILITIES as _UPSCALE_CAPS
-        cross_validate_profile(profile, _mapping, {
-            "audio": _AUDIO_CAPS, "video": _VIDEO_CAPS,
-            "image": _IMAGE_CAPS, "upscale": _UPSCALE_CAPS,
-        })
-    except (ImportError, FileNotFoundError, OSError):
-        # Fall through if either (a) a namespace's CAPABILITIES table failed
-        # to import (bare-venv edge cases), or (b) load_widget_mapping()'s
-        # underlying `open()` raised because the mapping file is absent in a
-        # headless smoke context. The applier itself still enforces the
-        # individual widget-mapping contracts at patch time (Sonnet 5 QA
-        # SF-1: the earlier `except ImportError` alone did not match the
-        # FileNotFoundError shape load_widget_mapping actually raises).
-        pass
+    # CAPABILITY CROSS-VALIDATION REMOVED 2026-08-31, by operator directive:
+    # "I don't want to maintain any warning gate either", after "let's power
+    # through testing without inviting some artificial profile gate".
+    #
+    # It compared a profile's choices against each registry's enable-set and
+    # refused combinations BEFORE anything had tried them -- which is backwards
+    # for a project that learns what works by running it. The standing rule is
+    # that an OOM is the only acceptable killer.
+    #
+    # The model now: the dropdown decides, the workflow runs it, and a real
+    # failure is written into config/machine_classes.json under `known_limits`
+    # -- the matrix is the RECORD, never the controller. The code does not
+    # consult it for permission.
+    #
+    # Still enforced, and correctly: the widget-level COMBO check in
+    # _otr_workflow_apply. A value outside a widget's own choice list has no
+    # code path behind it at all, so passing it through fails later and less
+    # clearly than failing at apply.
     flat = []
     for section in ("role_overrides", "slot_overrides", "features"):
         for k, v in (profile.get(section) or {}).items():

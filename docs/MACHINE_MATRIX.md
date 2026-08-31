@@ -8,18 +8,13 @@ Find your machine in the first table. That is the whole answer; everything after
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 46 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented) |
-| **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `draft`, unproven |
+| **8 GB NVIDIA (e.g. RTX 4060)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)** | -- | -- | -- | -- | -- | **no profile yet** |
+| **AMD / ROCm** | -- | -- | -- | -- | -- | **no profile yet** |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
 
-* **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
-  The portability floor. Proven, and the reason it is proven is that a second machine exists.
-* **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
-  One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.
-* **AMD / ROCm** -> `otr_amd8_rocm`
-  Largely unexplored. The profile exists; no episode has published from it.
 
 ## How to read the confidence column
 
@@ -61,7 +56,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  81 profile(s), 41 shipping, 1 proven
+## 16 GB+  --  80 profile(s), 41 shipping, 1 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
@@ -108,7 +103,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>39 draft profile(s) here -- not vouched for</summary>
+<details><summary>38 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
@@ -128,7 +123,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_lemmy_kokoro_diag` | still_flat | kokoro |
 | `otr_mac_mps` | still_motion | kokoro |
 | `otr_nv40_12gb` | wan_ti2v | indextts2 |
-| `otr_rented24_heavy` | wan_ti2v | indextts2 |
 | `otr_sbcov_1` | still_pan | indextts2 |
 | `otr_sbcov_2` | still_flat | indextts2 |
 | `otr_sbcov_3` | still_motion | indextts2 |
