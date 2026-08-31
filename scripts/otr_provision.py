@@ -234,6 +234,27 @@ def install_indextts2(comfy: str, root: str) -> None:
         else "none -- indextts2 refuses without them; copy them here")
 
 
+def cuda_wheel_tag():
+    """The CUDA build ComfyUI itself runs, as a PyTorch wheel tag ("cu128").
+
+    NOT a compute-capability table. ComfyUI's own torch is already proven to
+    have kernels for this GPU -- it is what renders every episode -- so
+    matching it is correct and self-maintaining, where a hand-kept table of
+    architectures needs an edit every time a new one ships.
+
+    This exists because pip's default resolution is blind to the GPU. On a
+    Blackwell pod it installed torch 2.6.0+cu124 for chatterbox and
+    2.6.0+cu126 for dia; both imported fine and both died at the first kernel
+    launch with 'no kernel image is available for execution on the device',
+    while index-tts happened to get cu128 and worked.
+    """
+    r = run([sys.executable, "-c", "import torch;print(torch.version.cuda or '')"])
+    ver = (r.stdout or "").strip()
+    if r.returncode != 0 or not ver:
+        return None
+    return "cu" + ver.replace(".", "")
+
+
 def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
     """Build one isolated voice engine's venv and report its env var.
 
@@ -266,11 +287,31 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
             say("FAILED", "%s venv" % name, r.stderr.strip()[:60])
             return
     env = dict(os.environ, VIRTUAL_ENV=os.path.join(root, ".venv"))
+    # Torch FIRST, from the index matching ComfyUI's own CUDA build. Left to
+    # pip's default resolution this lands whatever wheel is newest-compatible
+    # with the pinned package, which is blind to the GPU -- see cuda_wheel_tag.
+    tag = cuda_wheel_tag()
+    if tag:
+        say("PIN", "%s torch" % name, "%s (matching ComfyUI)" % tag)
+        run([uv, "pip", "install", "-q", "--index-url",
+             "https://download.pytorch.org/whl/" + tag,
+             "torch", "torchaudio"], env=env)
     run([uv, "pip", "install", "-q"] + pip_args, env=env)
-    r = run([venv_py, "-c", "import torch;print(torch.__version__)"])
-    ok = r.returncode == 0
+    # VERIFY WITH A REAL KERNEL LAUNCH, not an import. `import torch` succeeds
+    # on a build with no kernels for this card, so the old check reported OK
+    # for two venvs that then failed at render time. Launching one tiny kernel
+    # turns that silent time-bomb into an install-time failure naming itself.
+    probe = (
+        "import torch; "
+        "cap = torch.cuda.is_available(); "
+        "val = float(torch.zeros(8, device='cuda').sum()) if cap else 0.0; "
+        "print(torch.__version__, 'no-cuda' if not cap else "
+        "('kernel-ok' if val == 0.0 else 'kernel-bad'))"
+    )
+    r = run([venv_py, "-c", probe])
+    ok = r.returncode == 0 and "kernel-bad" not in (r.stdout or "")
     say("OK" if ok else "FAILED", "%s venv" % name,
-        (r.stdout or r.stderr).strip()[:40])
+        ((r.stdout or "").strip() or (r.stderr or "").strip())[:56])
     if ok:
         say("SET", "OTR_%s_VENV" % name.upper(), venv_py)
         os.environ["OTR_%s_VENV" % name.upper()] = venv_py
