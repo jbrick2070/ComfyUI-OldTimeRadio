@@ -13,6 +13,7 @@ generation binding rather than advisory.
 """
 from __future__ import annotations
 
+import io
 import os
 import subprocess
 import sys
@@ -59,21 +60,25 @@ def test_declared_machine_classes_agree_with_their_profiles():
 def test_proven_receipts_carry_their_evidence():
     """PROVEN is the strongest claim the table makes; it must be checkable.
 
-    A receipt without hardware, a count and a pointer to evidence is an opinion
-    wearing a verdict's badge -- which is exactly what the hand-written table
-    had become.
+    Receipts live on the MATRIX ROW, not on a profile file -- a profile has a
+    declared shape and an extra key there broke `build_variants --check`. A
+    receipt without hardware, a count and a pointer to evidence is an opinion
+    wearing a verdict's badge, which is what the hand-written table had become.
     """
-    sys.path.insert(0, os.path.join(_REPO, "scripts"))
-    import otr_machine_matrix as M          # noqa: E402
+    import json
+    with io.open(os.path.join(_REPO, "config", "machine_classes.json"),
+                 encoding="utf-8") as fh:
+        matrix = json.load(fh)
 
     seen = 0
-    for prof in M.load_profiles():
-        for receipt in M.proven_receipts(prof):
+    for row in matrix.get("classes", []):
+        for receipt in (row.get("proven") or []):
             seen += 1
-            for key in ("hardware", "episodes", "evidence"):
-                assert receipt.get(key), (
-                    "%s has a `proven` receipt missing %r: %r"
-                    % (prof["id"], key, receipt))
+            for field in ("hardware", "episodes", "evidence"):
+                assert receipt.get(field), (
+                    "%s has a proven receipt missing %r: %r"
+                    % (row.get("key"), field, receipt))
             assert int(receipt["episodes"]) > 0, (
-                "%s claims proof with zero episodes" % prof["id"])
-    assert seen, "no profile carries a proven receipt -- the table's strongest column is empty"
+                "%s claims proof with zero episodes" % row.get("key"))
+    assert seen, ("no machine class carries a proven receipt -- the matrix's "
+                  "strongest column is empty")
