@@ -269,21 +269,19 @@ def render() -> str:
     for eng, cond, meas in MEASURED:
         A("| `%s` | %s | %s |" % (eng, cond, meas))
     A("")
-    A("### Read every VRAM number with suspicion
-")
+    A("### Read every VRAM number with suspicion\n")
     A("**A peak is mostly what the allocator GRABBED, not what the model "
-      "NEEDED.** Torch's caching allocator does not hand memory back to "
-      "the driver, and consumer cards are built for games -- they take as "
-      "much as is going and recover from pressure rather than refusing. "
-      "So a run that peaked at 15,990 MB on a 24 GB card is NOT evidence "
-      "it needs 16 GB; the same graph under `--reserve-vram` fits in far "
-      "less, which is exactly how the H3 row below was measured.
-")
+      "NEEDED.** These cards are built for games: they take as much as is "
+      "going, most of them grab close to the maximum available AT LOAD, and "
+      "they recover from pressure rather than refusing. Torch's caching "
+      "allocator then never hands it back. So a run that peaked at 15,990 MB "
+      "on a 24 GB card is NOT evidence it needs 16 GB -- the same graph under "
+      "`--reserve-vram` fits in far less, which is exactly how the H3 row "
+      "below was measured.\n")
     A("The honest use of these numbers is COMPARATIVE -- which lane is "
       "heavier than which -- not a shopping threshold. A lane marked "
       "PROVEN on 8 GB is worth more than any peak figure, because a card "
-      "actually did it.
-")
+      "actually did it.\n")
     A("**Host RAM is the limit people miss.** The clamped H3 run peaked at "
       "27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with "
       "16 GiB of RAM will struggle regardless of its GPU, and no VRAM table "

@@ -194,6 +194,12 @@ A VRAM number without its conditions is how somebody buys the wrong card.
 | `ltx25_high_video` | 16 GB card | peak 14.48 GiB -- 5080-class only |
 | `minimax_h3_video` | 16 GB card clamped to --reserve-vram 12 | peak 7.28 GiB VRAM, 27.56 GiB HOST RAM, cold pass |
 
+### Read every VRAM number with suspicion
+
+**A peak is mostly what the allocator GRABBED, not what the model NEEDED.** These cards are built for games: they take as much as is going, most of them grab close to the maximum available AT LOAD, and they recover from pressure rather than refusing. Torch's caching allocator then never hands it back. So a run that peaked at 15,990 MB on a 24 GB card is NOT evidence it needs 16 GB -- the same graph under `--reserve-vram` fits in far less, which is exactly how the H3 row below was measured.
+
+The honest use of these numbers is COMPARATIVE -- which lane is heavier than which -- not a shopping threshold. A lane marked PROVEN on 8 GB is worth more than any peak figure, because a card actually did it.
+
 **Host RAM is the limit people miss.** The clamped H3 run peaked at 27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with 16 GiB of RAM will struggle regardless of its GPU, and no VRAM table warns you.
 
 ## What is NOT here
