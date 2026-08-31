@@ -29,10 +29,13 @@ Resolve the models root through `nodes/_otr_gguf_backend.py::_models_root()` rat
 
 ```
 python scripts/otr_fetch_lane_weights.py haunted
+python scripts/otr_fetch_lane_weights.py humo
+python scripts/otr_fetch_lane_weights.py ltx_8gb
 python scripts/otr_fetch_lane_weights.py minimax_h3
 python scripts/otr_fetch_lane_weights.py otr_nvidia_8gb_h3
 python scripts/otr_fetch_lane_weights.py otr_nvidia_8gb_haunted
 python scripts/otr_fetch_lane_weights.py wan_ti2v
+python scripts/otr_fetch_lane_weights.py wan_ti2v_gguf
 ```
 
 Anything not listed there is a manual install -- see its row below.
@@ -47,9 +50,9 @@ Anything not listed there is a manual install -- see its row below.
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | 2 profile(s) |
 | `google_veo_video` | nothing on disk | - | 3 profile(s) |
-| `humo` | 6 weight file(s) | manual download | 2 profile(s) |
+| `humo` | 6 weight file(s) | `otr_fetch_lane_weights.py humo` | 2 profile(s) |
 | `ltx25` | **not declared in code -- verify** | - | - |
-| `ltx_8gb` | 2 weight file(s) | manual download | 5 profile(s) |
+| `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 5 profile(s) |
 | `ltx_av` | 8 weight file(s) | manual download | - |
 | `ltx_video` | 7 weight file(s) | manual download | 4 profile(s) |
 | `mesh_stage` | 3 weight file(s) | manual download | 1 profile(s) |

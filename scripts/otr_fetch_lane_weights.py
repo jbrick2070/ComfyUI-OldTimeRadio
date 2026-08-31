@@ -83,6 +83,63 @@ LANES = {
          "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
          "text_encoders"),
     ],
+    # ~16.1 GB. COMPLETE: `eng_ltx_8gb` names exactly these two files, and the
+    # destinations are read off its own resolver -- the checkpoint from
+    # ("checkpoints",) and the encoder from ("text_encoders", "clip").
+    #
+    # This lane, and the GGUF one below, were added 2026-08-30 after the asset
+    # index made the real gap visible: OTR's engines name FILES but almost never
+    # name SOURCES. Only three lanes had a recorded provenance, so every other
+    # weight on the reference machine had been placed there by hand and could
+    # not be obtained by anyone else from anything in the repo. Sizes below were
+    # read from the Hub, not estimated.
+    "ltx_8gb": [
+        ("Lightricks/LTX-Video",
+         "ltxv-2b-0.9.8-distilled.safetensors", "checkpoints"),         # 6.34 GB
+        ("comfyanonymous/flux_text_encoders",
+         "t5xxl_fp16.safetensors", "text_encoders"),                    # 9.79 GB
+    ],
+    # ~9.4 GB. The GGUF route for Wan 2.2 TI2V, which `eng_wan_ti2v` also
+    # accepts -- it names both the safetensors set (the `wan_ti2v` lane above)
+    # and these quantized files. They are ALTERNATIVES: fetch one set or the
+    # other, not both.
+    "wan_ti2v_gguf": [
+        ("QuantStack/Wan2.2-TI2V-5B-GGUF",
+         "Wan2.2-TI2V-5B-Q5_K_M.gguf", "diffusion_models"),             # 3.81 GB
+        ("city96/umt5-xxl-encoder-gguf",
+         "umt5-xxl-encoder-Q5_K_M.gguf", "text_encoders"),              # 4.15 GB
+        ("Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+         "split_files/vae/wan2.2_vae.safetensors", "vae"),              # 1.41 GB
+    ],
+}
+
+#: Lanes whose sources are only PARTLY known. Deliberately not in LANES: a lane
+#: that fetches four of its six files hands somebody a broken engine and a
+#: receipt that looks complete, which is worse than a lane that is honestly
+#: absent. Resolve the remaining rows, verify them on the Hub, then promote.
+UNRESOLVED = {
+    "humo": [
+        # RESOLVED, ready to promote once the two below are settled:
+        #   Kijai/WanVideo_comfy_fp8_scaled
+        #     HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors  17.9 GB
+        #   Kijai/WanVideo_comfy
+        #     Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16
+        #                                                            0.74 GB
+        #   umt5_xxl_fp8_e4m3fn_scaled.safetensors  -- same row as `wan_ti2v`
+        #   wan_2.1_vae.safetensors                 -- same row as `wan_ti2v`
+        #
+        # NAME MISMATCH, do not guess: the engine asks for
+        # `humo_1.7B_fp16.safetensors`; the Hub ships
+        # `Wan2_1-HuMo-1_7B_fp16.safetensors` (3.48 GB) at
+        # Kijai/WanVideo_comfy HuMo/. Whether the engine expects the file
+        # RENAMED or a different artifact entirely is not answerable from the
+        # engine source, and fetching 3.48 GB under the wrong name yields a lane
+        # that still refuses.
+        "humo_1.7B_fp16.safetensors",
+        # NOT FOUND on the Hub under this name in the repos the other HuMo
+        # files come from.
+        "whisper_large_v3_fp16.safetensors",
+    ],
 }
 
 #: Convenience bundles: everything a named profile needs that is not already
