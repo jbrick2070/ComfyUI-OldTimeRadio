@@ -147,6 +147,23 @@ def render() -> str:
       "engine code, and the only place file names, repo ids and sizes are "
       "recorded. `scripts/otr_fetch_lane_weights.py --list` shows which lanes "
       "install with one command.\n")
+    A("### The image model depends on your GPU\n")
+    A("`z_image_turbo` is the image engine every machine class uses, and "
+      "it ships in three precisions. The adapter ranks whatever is "
+      "installed nvfp4 > fp8 > bf16 and takes the best -- which is a trap "
+      "if you install the wrong one, because nvfp4 needs hardware fp4 "
+      "(Blackwell, sm_120) and an older card cannot execute it. The "
+      "ranking still chooses it, so the engine picks the one file that "
+      "fails.\n")
+    A("```bash\n"
+      "python scripts/otr_fetch_lane_weights.py z_image            # bf16, any NVIDIA\n"
+      "python scripts/otr_fetch_lane_weights.py z_image_blackwell  # nvfp4, sm_120 only\n"
+      "```\n")
+    A("Fetch ONE, not both. `scripts/otr_pod_provision.sh` reads "
+      "compute_cap and picks for you. If a shared volume already carries "
+      "nvfp4 and your card cannot run it, move that file OUT of the models "
+      "tree -- a subfolder does not hide it, because the ranking matches "
+      "on basename.\n")
     A("Two environment variables decide where everything lands:\n")
     A("```\n"
       "OTR_COMFYUI_MODELS_ROOT   the models root\n"

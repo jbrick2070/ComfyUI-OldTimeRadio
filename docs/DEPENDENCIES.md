@@ -96,6 +96,17 @@ Each pins torch/transformers versions that would brick ComfyUI's own venv, so th
 
 See [MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) -- generated from the engine code, and the only place file names, repo ids and sizes are recorded. `scripts/otr_fetch_lane_weights.py --list` shows which lanes install with one command.
 
+### The image model depends on your GPU
+
+`z_image_turbo` is the image engine every machine class uses, and it ships in three precisions. The adapter ranks whatever is installed nvfp4 > fp8 > bf16 and takes the best -- which is a trap if you install the wrong one, because nvfp4 needs hardware fp4 (Blackwell, sm_120) and an older card cannot execute it. The ranking still chooses it, so the engine picks the one file that fails.
+
+```bash
+python scripts/otr_fetch_lane_weights.py z_image            # bf16, any NVIDIA
+python scripts/otr_fetch_lane_weights.py z_image_blackwell  # nvfp4, sm_120 only
+```
+
+Fetch ONE, not both. `scripts/otr_pod_provision.sh` reads compute_cap and picks for you. If a shared volume already carries nvfp4 and your card cannot run it, move that file OUT of the models tree -- a subfolder does not hide it, because the ranking matches on basename.
+
 Two environment variables decide where everything lands:
 
 ```
