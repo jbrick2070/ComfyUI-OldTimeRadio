@@ -75,7 +75,21 @@ echo "  pip install -r requirements.txt  (into $COMFY_PY)"
 # 5. Weights for the ungated lane. Needs no Hugging Face token.
 echo "  fetching haunted lane weights"
 cd "$CN/ComfyUI-OldTimeRadio" || exit 1
-python3 scripts/otr_fetch_lane_weights.py haunted 2>&1 | tail -8
+"$COMFY_PY" scripts/otr_fetch_lane_weights.py haunted 2>&1 | tail -8
+
+# 5b. THE IMAGE MODEL. Fetching only the video lane is why a machine could
+# follow every documented step and still die at OTR_ImageGenDispatcher --
+# almost every video lane needs a conditioning still first, and z_image_turbo
+# is the image engine for every class in the machine matrix.
+#
+# Architecture decides WHICH file. nvfp4 needs hardware fp4 (sm_120,
+# Blackwell); an Ampere or Ada card cannot execute it, and the adapter ranks
+# nvfp4 above bf16 whenever it is present -- so handing the wrong one to an
+# older card makes the engine pick the single file that fails.
+CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.' | tr -d ' ')
+if [ "${CC:-0}" -ge 120 ] 2>/dev/null; then ZLANE=z_image_blackwell; else ZLANE=z_image; fi
+echo "  fetching image model: $ZLANE (compute_cap ${CC:-unknown})"
+"$COMFY_PY" scripts/otr_fetch_lane_weights.py "$ZLANE" 2>&1 | tail -6
 
 # INDEXTTS2 ON LINUX USES THE ENV VAR, NOT A CODE CHANGE.
 #
@@ -90,6 +104,19 @@ python3 scripts/otr_fetch_lane_weights.py haunted 2>&1 | tail -8
 #
 # OTR_INDEXTTS2_VENV exists for exactly this, touches no code, and moves no
 # fingerprint.
+# ISOLATED VENVS SURVIVE A RECREATE ONLY HALFWAY. Their site-packages sit on
+# the network volume -- 33 GB of them -- but `.venv/bin/python` is a symlink
+# to an interpreter uv installed under /root, which is CONTAINER disk. Every
+# pod recreate wipes it and leaves three dangling venvs that report
+# "missing" while their packages are perfectly intact. Reinstalling the base
+# interpreter repairs all three at once, in about two seconds, and costs
+# nothing when it is already there.
+export PATH="/root/.local/bin:$PATH"
+command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
+if command -v uv >/dev/null 2>&1; then
+  uv python install 3.11 >/dev/null 2>&1 && echo "  uv python 3.11 present (repairs any dangling isolated venv)"
+fi
+
 IT_VENV="$(dirname "$COMFY_ROOT")/index-tts/.venv/bin/python"
 [ -x "$IT_VENV" ] || IT_VENV="$COMFY_ROOT/index-tts/.venv/bin/python"
 if [ -x "$IT_VENV" ]; then
