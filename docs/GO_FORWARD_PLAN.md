@@ -127,7 +127,47 @@ was installed twenty minutes later, and none was retried), and a soak on rented
 hardware should fail fast on a missing asset instead of discovering it after the
 script and voices are done.
 
-### 4. THE 5080 KEPT SHIPPING THROUGHOUT
+### 4. THE THREE LIVE 5080 DEFECTS, IN THE ORDER THEY SHOULD BE TAKEN
+
+All three are from the box running now, not from history. Ordered by whether
+the answer is known, because two of them are cheap and one is not.
+
+**A. THE PROVISIONER IS INCOMPLETE -- do this first, it has no design in it.**
+Mechanical, verifiable, and it unblocks the only test that can score the
+portability work. `scripts/otr_pod_provision.sh` must additionally install:
+Stable Audio 3 from `Comfy-Org/stable-audio-3` (the repackage, NOT Stability's
+raw repo -- see the fetcher comment), index-tts with `uv venv --python 3.11`
+because it pins `>=3.10,<3.12`, the `<comfy_root>/index-tts` symlink,
+`checkpoints/hf_cache`'s four runtime repos, and the reference WAVs. There is no
+fork here: every step is already known and written down. **One clean run from a
+saved template with zero hand steps is the merit verdict on two days of work.**
+
+**B. A BEAT CAN BUDGET TO ZERO FRAMES, AND IT COSTS THE WHOLE LEG.**
+
+    RenderError: shot shot_b006 engine 'animatediff15_v3_haunted_video' failed
+    to render -- Ghost Signal cadence needs a delivered target of at least
+    1 frame, got 0 -- a 0-frame beat is a planning bug
+
+`otr_shot_lock.py:803` -- `frames = int(round(float(dur) * fps)) if dur else 0`
+-- turns a missing duration into zero frames, and PBUG-20260829-16 already added
+a WARNING there rather than a raise, correctly, since an OOM-or-nothing directive
+governs the render path and a genuinely silent beat must not be blocked by a
+budget helper. **But warning earlier does not make the leg cheaper: the engine
+still refuses at the video stage, after the writer, voices, music and the full
+audio master are done.** The fix is upstream of the helper -- find why a beat
+arrives with no duration. The existing comment names the leading suspect: a
+music beat whose duration lives on a cue that never crossed `anchor_line_id`
+onto the line, which is the same sentinel-versus-mirror seam as PBUG-20260830-16.
+Note `shot_b006` here was `mode=object source=deterministic_fallback`, so do not
+assume it is only music rows.
+
+**C. THE GHOST CLAUSE POOL -- panel first, see item 1. Do NOT widen it again.**
+
+**Not yet diagnosed:** `OTR_LedgerFreezeCascade` failed twice and the runner's
+eight-frame traceback did not capture the message. Next occurrence, read the
+SERVER log rather than the leg log.
+
+### 5. THE 5080 KEPT SHIPPING THROUGHOUT
 
 37 successes against 18 failures across 30 legs, `otr/obs` at 45 episodes, and
 it is mid-leg now. The failures are the pool exhaustion above plus
