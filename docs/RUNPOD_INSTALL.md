@@ -775,6 +775,27 @@ never matched to begin with.
 This produced a confident and completely wrong "ComfyUI is not running on the
 pod" before the port check corrected it.
 
+**IT BITES `pkill` HARDER THAN `pgrep`, AND IT BIT TWICE IN ONE SESSION.**
+
+    ssh pod 'pkill -9 -f overnight.sh; ... ; setsid nohup bash overnight.sh &'
+
+kills the SSH session executing that very line, because the line contains
+`overnight.sh`. Everything after the `pkill` never runs. The symptom is
+maddening: the command returns no output, a later check shows the old process
+gone and the new one absent, and the pod sits idle billing while looking like a
+relaunch that quietly failed.
+
+**Put the kill patterns in a SCRIPT FILE on the pod and run the file.** The ssh
+command line then contains only `bash /root/relaunch.sh`, which matches nothing:
+
+    ssh pod 'cat > /root/relaunch.sh' < relaunch.sh
+    ssh pod 'bash /root/relaunch.sh'
+
+Inside the file, still prefer a bracket-escaped pattern for any `ps | grep`, so
+the grep does not match itself either:
+
+    ps -eo pid,args --no-headers | grep -E 'bash /root/overnigh[t].sh'
+
 ### AN EMPTY QUEUE IS NOT READINESS -- it is also what a DEAD server reports
 
 A sweep gated on `queue_running + queue_pending == 0` started the instant
