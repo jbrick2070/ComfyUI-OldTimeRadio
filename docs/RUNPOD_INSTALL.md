@@ -722,3 +722,79 @@ The wording that caused this misread has been fixed at the source -- the message
 now names `available` and says ADVISORY -- but old logs still carry the original
 sentence, which told the reader an abort should happen at the one call site that
 never aborts.
+
+### "I restarted the pod and everything survived, so the template is fine"
+
+It is not fine, and that restart proved nothing. A RESTART leaves the container
+disk intact -- apt packages, `/root`, the token, everything. Only a RECREATE
+(terminate, then create fresh from the template) discards it, and that is the
+only version of the test that tells you whether the documented install path can
+build a working machine. On 2026-08-31 a restart was read as proof; the recreate
+that followed immediately found five separate holes the restart had hidden.
+
+Keep the two words apart when reporting, too. "The pod came back with everything"
+after a restart is a statement about container persistence, not about the repo.
+
+### "The pod has no models, no repo, no ComfyUI -- but the template is right"
+
+Check `RUNPOD_VOLUME_ID` before anything else:
+
+    tr '\0' '\n' < /proc/1/environ | grep RUNPOD_VOLUME_ID
+
+If it is ABSENT, no network volume attached, and `/workspace` is a container
+overlay that merely looks like the real thing -- `df -h /workspace` shows
+`overlay 70G` where an attached volume shows `mfs#<region>.runpod.net:9421`.
+Everything then appears "missing" while nothing is actually lost.
+
+The usual cause is the DATACENTER. Network volumes are region-locked, so a GPU
+outside the volume's region is simply never offered the attach, and the pod
+boots without it. Re-creating in the volume's region is the only fix; a 70 GB
+overlay cannot hold a 176 GB model tree, so "download it again" is not an option.
+
+### "Three isolated voice venvs report missing, but their packages are all there"
+
+Their site-packages live on the network volume -- tens of GB, fully intact --
+while `.venv/bin/python` is a symlink to an interpreter `uv` installed under
+`/root`, which is CONTAINER disk. A recreate wipes it and leaves three dangling
+venvs. The repair is not a reinstall:
+
+    uv python install 3.11        # about two seconds, fixes all three
+
+`scripts/otr_pod_provision.sh` now does this on every run. Before assuming a
+33 GB rebuild, check whether `readlink -f .venv/bin/python` resolves at all.
+
+### "chatterbox and dia die with 'no kernel image is available'"
+
+A CUDA ARCHITECTURE mismatch, not a code fault. Left to resolve torch on its
+own, pip installed cu124 for chatterbox and cu126 for dia; neither ships kernels
+for Blackwell (sm_120), so both imported fine and died at the first kernel
+launch, while index-tts happened to draw cu128 and worked throughout.
+
+Proven by running the SAME venv bytes on an RTX A4500 (sm_86), where all three
+launch kernels cleanly. The installer now takes its CUDA build from ComfyUI's
+own `torch.version.cuda` -- already proven on that machine -- and verifies with a
+real kernel launch, because `import torch` succeeds on a build with no kernels
+and reported OK for both venvs that later failed mid-episode.
+
+### "The image model is installed and the render still says it is not"
+
+Check WHICH file. `z_image_turbo` ships in three precisions and the adapter ranks
+installed candidates `nvfp4 > fp8 > bf16`, so nvfp4 wins whenever present. nvfp4
+needs hardware fp4 (sm_120); an Ampere or Ada card cannot execute it, and the
+ranking will still choose it -- picking the one file that fails.
+
+Fetch by architecture: `z_image_blackwell` on sm_120, `z_image` (bf16) below it.
+The provisioner reads `compute_cap` and picks. If a shared volume already carries
+nvfp4, move it OUT of the models tree -- a subfolder is not enough, because the
+ranking matches on basename.
+
+### "Commands over ssh.runpod.io return garbage or nothing"
+
+The `ssh.runpod.io` proxy only opens interactive shells: it discards a remote
+command, and demands a PTY (`Your SSH client doesn't support PTY`). With `-tt`
+you get a shell whose output is interleaved with escape codes and whose long
+lines are re-wrapped mid-path -- which produced a FALSE reading of a directory
+test, and a wrong "the volume attached" conclusion.
+
+Use the DIRECT form from the Connect tab, `ssh root@<ip> -p <port>`, for anything
+scripted. Keep the proxy for typing at a shell by hand.
