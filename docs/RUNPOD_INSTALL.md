@@ -1074,3 +1074,55 @@ for un-accepted terms, so a single probe that returns OK rules out both at once.
 **A running ComfyUI still will not see it.** The server read its environment at
 start, so a gated model loaded during a RENDER needs the process restarted with
 `HF_TOKEN` exported -- fetching weights from a shell is a separate matter.
+
+### index-tts: the isolated venv needs a DIFFERENT PYTHON, not just a second venv
+
+This is the step that actually blocks `indextts2` on a rented box, and none of
+it is guessable from OTR's side.
+
+**1. The project pins a Python the pod does not have.**
+
+    requires-python = ">=3.10,<3.12"          # index-tts pyproject.toml
+    /usr/bin/python3.12                       # the only interpreter on the image
+
+    ERROR: Package 'indextts' requires a different Python: 3.12.3 not in '<3.12,>=3.10'
+
+So `python3 -m venv` from the host interpreter produces a venv that can never
+install the package. **`uv` is the fix, and it is the project's own tooling** --
+its pyproject tells you to run `uv lock` -- because it can fetch a 3.11:
+
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="/root/.local/bin:$PATH"
+    uv venv --python 3.11 /workspace/index-tts/.venv
+    VIRTUAL_ENV=/workspace/index-tts/.venv uv pip install .
+
+**2. There is no `requirements.txt`.** The project ships only `pyproject.toml`.
+A provision step guarding on `[ -f requirements.txt ]` installs NOTHING and
+leaves a venv with no torch, reporting success the whole way -- a guard that
+silently skips is worse than one that fails loudly.
+
+**3. torch belongs in THAT venv, not in the template.** The pod image already
+has torch for ComfyUI. What is missing is torch inside index-tts's isolated
+environment, which is a per-project dependency resolved by `uv pip install .`.
+No template env var can supply it.
+
+**4. `snapshot_download` of the checkpoints is NOT the whole model.** It gives
+about 5.6 GB; the reference machine has 11.06 GB. The difference is
+`checkpoints/hf_cache`, 5.57 GB across four more repos that index-tts pulls at
+runtime:
+
+    facebook/w2v-bert-2.0     amphion/MaskGCT
+    funasr/campplus           nvidia/bigvgan_v2_22khz_80band_256x
+
+**Pre-fetch them.** Left to the first render they download inside a node with a
+wall-clock timeout, and the failure surfaces as `_LLMTimeoutWorkflowPause` -- a
+message about the model, for a problem that is a missing download.
+
+**5. OTR looks for it at `<comfy_root>/index-tts`.** `eng_indextts2._default()`
+resolves there. Install on the VOLUME so it survives the pod, then symlink:
+
+    ln -sfn /workspace/index-tts /workspace/runpod-slim/ComfyUI/index-tts
+
+That satisfies the engine without duplicating 11 GB and without baking an
+absolute path into a template. `OTR_INDEXTTS2_DIR` / `_VENV` / `_WORKER` remain
+available if a layout genuinely differs.
