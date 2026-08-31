@@ -8,15 +8,18 @@ Find your machine in the first table. That is the whole answer; everything after
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episodes |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 45+ episodes |
+| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episodes published on real 8 GB hardware (RTX 4060) |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 45+ episodes published to otr/obs on a 16 GB RTX 5080, 5-act, continuous overnight loops |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `draft`, unproven |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
 
 * **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
+  The portability floor. Proven, and the reason it is proven is that a second machine exists.
 * **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
+  One class, not three. Nothing declares a ceiling above 16, so a 24 GB card runs exactly what a 16 GB card runs.
 * **AMD / ROCm** -> `otr_amd8_rocm`
+  Largely unexplored. The profile exists; no episode has published from it.
 
 ## How to read the confidence column
 

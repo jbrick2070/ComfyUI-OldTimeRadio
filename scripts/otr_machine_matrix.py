@@ -37,24 +37,58 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
-#: THE HEADLINE TABLE: machine description -> the profile to use.
-#:
-#: Deliberately SHORT. Every machine in the world cannot be listed, and the
-#: profile is the abstraction that stands in for "a machine like this" -- so
-#: this table names a handful of recognisable classes and points each at one
-#: profile. Everything finer-grained is in the per-tier tables below, which
-#: exist for somebody who already knows what they are choosing between.
-#:
-#: `writer` is stated separately because it is the one component the profiles
-#: express as a VRAM ceiling rather than a model name.
-MACHINES = [
-    ("8 GB NVIDIA (e.g. RTX 4060)", "otr_nvidia_8gb_haunted",
-     "gemma-4-E2B", "**PROVEN** -- 9 episodes"),
-    ("16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)",
-     "otr_5080_haunted_12b_overnight",
-     "gemma-4-12b", "**PROVEN** -- 45+ episodes"),
-    ("AMD / ROCm", "otr_amd8_rocm", "gemma-4-E2B", "`draft`, unproven"),
-]
+#: Machine classes are DECLARED in config/machine_classes.json, not here.
+#: Facts in a generator rot invisibly -- nobody greps a script for truth -- so
+#: the judgement lives in data and this module only validates and renders it.
+_CLASS_FILE = os.path.join(_REPO, "config", "machine_classes.json")
+
+#: Not a profile: a mapping config that lives in the same directory and would
+#: otherwise render as a "draft profile not vouched for".
+_NOT_PROFILES = {"widget_mapping"}
+
+
+class ClassValidationError(Exception):
+    """A declared class contradicts the profile it names.
+
+    Raised rather than warned. A compatibility table that quietly disagrees
+    with the profiles is worse than no table: README told users an 8 GB card
+    had "rendered nothing" for days after nine episodes published from one.
+    """
+
+
+def load_classes(profiles):
+    """Declared classes, each validated against the profile it names."""
+    try:
+        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+    except OSError:
+        return []
+    by_id = {p["id"]: p for p in profiles}
+    out, problems = [], []
+    for row in doc.get("classes", []):
+        pid = row.get("recommended")
+        if not pid:
+            out.append((row, None))          # a DECLARED gap, which is allowed
+            continue
+        prof = by_id.get(pid)
+        if prof is None:
+            problems.append("%r names profile %r, which does not exist"
+                            % (row.get("label"), pid))
+            continue
+        want_vendor = row.get("gpu_vendor")
+        if want_vendor and prof["vendor"] not in (want_vendor, "?"):
+            problems.append("%r is %s but %r declares gpu_vendor %s"
+                            % (pid, prof["vendor"], row.get("label"), want_vendor))
+        vram = prof.get("vram")
+        lo, hi = row.get("vram_min_gb"), row.get("vram_max_gb")
+        if vram and lo is not None and hi is not None and not (lo <= float(vram) <= hi):
+            problems.append("%r has vram_ceiling_gb %s, outside %r's %s-%s"
+                            % (pid, vram, row.get("label"), lo, hi))
+        out.append((row, prof))
+    if problems:
+        raise ClassValidationError(
+            "config/machine_classes.json contradicts the profiles:\n  - "
+            + "\n  - ".join(problems))
+    return out
 
 #: Rows that have actually rendered and published an episode, with the evidence.
 #: Keep this SHORT and keep it honest -- it is the difference between "we think"
@@ -134,24 +168,29 @@ def render() -> str:
       "everything after it is detail you only need if the answer is no.\n")
 
     # ---- the one table anybody actually needs ------------------------------
+    classes = load_classes(profs)
     A("## What works on what machine\n")
     A("| your machine | writer | video | voice | music | image | status |")
     A("|---|---|---|---|---|---|---|")
-    for label, pid, writer, note in MACHINES:
-        row = next((p for p in profs if p["id"] == pid), None)
-        if row is None:
-            A("| **%s** | -- | -- | -- | -- | -- | %s |" % (label, note))
+    for row, prof in classes:
+        label = row.get("label", "?")
+        if prof is None:
+            A("| **%s** | -- | -- | -- | -- | -- | **no profile yet** |" % label)
             continue
+        conf = ("**PROVEN** -- %s" % PROVEN[prof["id"]].split(" -- ")[0]
+                if prof["id"] in PROVEN else "`%s`, unproven" % prof["status"])
         A("| **%s** | %s | %s | %s | %s | %s | %s |" % (
-            label, writer, row["video"], row["voice"], row["music"],
-            row["image"], note))
+            label, row.get("writer", "?"), prof["video"], prof["voice"],
+            prof["music"], prof["image"], conf))
     A("")
-    A("**Use the profile named for your machine** -- pass it to "
-      "`--profile`, or pick the matching entries in the dropdowns. The engine "
-      "names above are exactly the dropdown text.\n")
-    for label, pid, _w, _n in MACHINES:
-        if any(p["id"] == pid for p in profs):
-            A("* **%s** -> `%s`" % (label, pid))
+    A("**Use the profile named for your machine** -- pass it to `--profile`, or "
+      "pick the matching entries in the dropdowns. The engine names above are "
+      "exactly the dropdown text.\n")
+    for row, prof in classes:
+        if prof is not None:
+            A("* **%s** -> `%s`" % (row.get("label"), prof["id"]))
+            if row.get("note"):
+                A("  %s" % row["note"])
     A("")
 
     A("## How to read the confidence column\n")
