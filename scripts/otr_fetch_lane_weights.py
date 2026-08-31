@@ -103,6 +103,27 @@ LANES = {
     # accepts -- it names both the safetensors set (the `wan_ti2v` lane above)
     # and these quantized files. They are ALTERNATIVES: fetch one set or the
     # other, not both.
+    # ~3.4 GB. THE MUSIC MODEL, and it blocks far more than a "music lane":
+    # OTR_StableAudioTheme runs on the shared path, so a machine without this
+    # fails EVERY profile that reaches the music node -- eight consecutive lanes
+    # died here on 2026-08-31, about twelve minutes into each, after the script,
+    # cast and voices were already done.
+    #
+    # TWO DELIBERATE CHOICES. The `-base` repo is used because
+    # `stabilityai/stable-audio-3-small-music` is gated:auto and would demand a
+    # licence click, while `-base` is ungated and ships byte-identical files
+    # (2,270,384,940 and 1,183,022,944 -- verified against both). And the files
+    # are RENAMED on the way in, because the engine looks for names upstream
+    # does not use (`_CKPT` / `_TENC` in eng_stable_audio_3.py); the third tuple
+    # element carries the destination NAME here, not just the folder.
+    "stable_audio_3": [
+        ("stabilityai/stable-audio-3-small-music-base",
+         "model.safetensors",
+         "checkpoints/stable_audio_3_small_music.safetensors"),          # 2.27 GB
+        ("stabilityai/stable-audio-3-small-music-base",
+         "t5gemma-b-b-ul2/model.safetensors",
+         "text_encoders/t5gemma_b_b_ul2.safetensors"),                   # 1.18 GB
+    ],
     "wan_ti2v_gguf": [
         ("QuantStack/Wan2.2-TI2V-5B-GGUF",
          "Wan2.2-TI2V-5B-Q5_K_M.gguf", "diffusion_models"),             # 3.81 GB
@@ -166,10 +187,29 @@ def human(n: float) -> str:
     return "%.2f GB" % (n / 1073741824.0)
 
 
+#: Extensions that mark the third manifest element as a full destination PATH
+#: rather than a bare folder.
+_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".gguf", ".pth", ".bin", ".onnx")
+
+
 def fetch(repo: str, path_in_repo: str, subfolder: str, root: str,
           dry_run: bool) -> bool:
-    name = path_in_repo.split("/")[-1]
-    dest_dir = os.path.join(root, subfolder)
+    """Fetch one file. ``subfolder`` may name the destination FILE, not just
+    the folder.
+
+    Some engines look for names upstream does not use -- Stable Audio 3 ships
+    ``model.safetensors`` and OTR asks for ``stable_audio_3_small_music.safetensors``
+    -- so a manifest row has to be able to rename on the way in. Writing
+    ``"checkpoints/stable_audio_3_small_music.safetensors"`` does that; a bare
+    ``"checkpoints"`` keeps the old behaviour of taking the upstream basename,
+    which is what every pre-existing row relies on.
+    """
+    if subfolder.endswith(_WEIGHT_SUFFIXES):
+        dest_dir = os.path.join(root, os.path.dirname(subfolder))
+        name = os.path.basename(subfolder)
+    else:
+        dest_dir = os.path.join(root, subfolder)
+        name = path_in_repo.split("/")[-1]
     dest = os.path.join(dest_dir, name)
     url = "https://huggingface.co/%s/resolve/main/%s" % (repo, path_in_repo)
 

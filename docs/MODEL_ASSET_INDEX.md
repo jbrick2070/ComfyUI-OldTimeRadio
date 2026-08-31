@@ -34,6 +34,7 @@ python scripts/otr_fetch_lane_weights.py ltx_8gb
 python scripts/otr_fetch_lane_weights.py minimax_h3
 python scripts/otr_fetch_lane_weights.py otr_nvidia_8gb_h3
 python scripts/otr_fetch_lane_weights.py otr_nvidia_8gb_haunted
+python scripts/otr_fetch_lane_weights.py stable_audio_3
 python scripts/otr_fetch_lane_weights.py wan_ti2v
 python scripts/otr_fetch_lane_weights.py wan_ti2v_gguf
 ```
@@ -78,7 +79,7 @@ Anything not listed there is a manual install -- see its row below.
 | `kokoro` | `hexgrad/Kokoro-82M` | auto (HF cache) | 91 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 15 profile(s) |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) | - |
-| `stable_audio_3` | 2 weight file(s) | manual download | 78 profile(s) |
+| `stable_audio_3` | 2 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 78 profile(s) |
 
 ## Engines that are a separate INSTALL, not a download
 
