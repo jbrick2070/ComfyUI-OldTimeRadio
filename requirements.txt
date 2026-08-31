@@ -101,3 +101,20 @@ kokoro>=0.7.16
 # the registry. Declared 2026-08-29. 0.2.0 is what this box has measured on.
 pyloudnorm>=0.1.1
 
+# 2026-08-31, found by scripts/otr_venv_audit.py -- the inventory the operator
+# asked for after `accelerate` and `feedparser` both turned out to be declared
+# but absent from ComfyUI's own interpreter. These three are the reverse case:
+# imported by SHIPPING node code and never declared at all, so a fresh install
+# has them only by luck of another pack pulling them in.
+#
+# pycairo: `import cairo` inside nodes/_otr_shared/scope_draw.py and
+# eng_viz_mandala.py, UNGUARDED -- it is a plain import inside the draw
+# function, so on a machine without it every viz_mandala frame and every scope
+# overlay raises ImportError at render time. Confirmed missing on the rented
+# pod today while present here, which is exactly how a gap stays invisible on
+# the box that authors it.
+pycairo>=1.24
+# Pillow: image handling in the cloud-image engine and the media canonicaliser.
+pillow>=10.0
+# aiohttp: imported by __init__.py itself, so it is on the pack's load path.
+aiohttp>=3.9

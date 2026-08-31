@@ -45,8 +45,14 @@ _DIST = {
 #: Provided by ComfyUI itself or the standard library -- not ours to declare.
 _HOST_PROVIDED = {
     "comfy", "folder_paths", "nodes", "server", "execution", "latent_preview",
-    "comfy_extras", "app", "utils",
+    "comfy_extras", "app", "utils", "comfy_api", "comfy_api_nodes",
+    "comfy_execution", "config",
 }
+
+#: Engines that run in their OWN isolated venv by design. Absent from ComfyUI's
+#: interpreter is CORRECT for these -- flagging them would train a reader to
+#: ignore the report. `bpy` is Blender's, only used by an optional mesh script.
+_ISOLATED = {"chatterbox", "dia", "indextts", "bpy", "mathutils"}
 
 
 def _first_party() -> set:
@@ -124,7 +130,7 @@ def main(argv=None) -> int:
     ap.add_argument("--declared-only", action="store_true")
     args = ap.parse_args(argv)
 
-    std, host = _stdlib(), _HOST_PROVIDED | _first_party()
+    std, host = _stdlib(), _HOST_PROVIDED | _first_party() | _ISOLATED
     imports = top_level_imports()
     decl = declared()
 
