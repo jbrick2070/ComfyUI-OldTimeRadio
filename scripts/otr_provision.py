@@ -177,7 +177,9 @@ def install_indextts2(comfy: str, root: str) -> None:
       * the engine resolves <comfy_root>/index-tts, so the install is symlinked
         into place rather than duplicated.
     """
-    it = os.path.join(os.path.dirname(comfy), "index-tts")
+    it = os.path.join(comfy, "index-tts")   # where eng_indextts2._default looks:
+    #  _COMFY_ROOT is the ComfyUI dir ITSELF, not its parent. Installing a
+    #  level up made OTR_INDEXTTS2_VENV mandatory rather than optional.
     if os.name == "nt":
         say("SKIP", "index-tts", "Windows: use scripts/_otr_indextts2_install.ps1")
         return
@@ -205,13 +207,13 @@ def install_indextts2(comfy: str, root: str) -> None:
     say("OK" if r.returncode == 0 else "FAILED", "index-tts deps",
         (r.stdout or r.stderr).strip()[:60])
 
-    link = os.path.join(comfy, "index-tts")
-    if not os.path.exists(link):
-        try:
-            os.symlink(it, link)
-            say("OK", "index-tts symlink", link)
-        except OSError as exc:
-            say("FAILED", "index-tts symlink", str(exc)[:60])
+    # The symlink that used to live here is gone: it linked <comfy>/index-tts
+    # to a clone one directory ABOVE <comfy>, because that is where the clone
+    # went. The clone now goes straight to <comfy>/index-tts -- the path the
+    # adapter actually resolves -- so the indirection has nothing left to do.
+    # chatterbox and dia never had that symlink, which is the whole reason
+    # they could not be found without OTR_<ENGINE>_VENV set by hand.
+    link_windows_shaped_python(it)
 
     # The four repos it pulls at render time, warmed here where a slow download
     # is free rather than inside a node with a wall-clock budget.
@@ -232,6 +234,33 @@ def install_indextts2(comfy: str, root: str) -> None:
     say("OK" if n else "MISSING", "voice reference WAVs",
         "%d in %s" % (n, refs) if n
         else "none -- indextts2 refuses without them; copy them here")
+
+
+def link_windows_shaped_python(root: str) -> str:
+    """Make `.venv/Scripts/python.exe` resolve on Linux, by symlink.
+
+    Every isolated adapter falls back to `<engine>/.venv/Scripts/python.exe`
+    -- a Windows shape -- when OTR_<ENGINE>_VENV is unset. Branching on
+    os.name inside the adapter is the forbidden fix: qualified voice routes
+    are pinned to an adapter FINGERPRINT, and editing one un-qualifies every
+    route audited against it while the episode still renders.
+
+    A symlink moves no fingerprint and needs no environment. That matters
+    more than it sounds: env vars are set by whoever launches ComfyUI, and a
+    pod restart boots it from /start.sh with none of them, so an env-only
+    install silently loses all three cloners on every restart.
+    """
+    if os.name == "nt":
+        return os.path.join(root, ".venv", "Scripts", "python.exe")
+    real = os.path.join(root, ".venv", "bin", "python")
+    shim_dir = os.path.join(root, ".venv", "Scripts")
+    shim = os.path.join(shim_dir, "python.exe")
+    if os.path.exists(real):
+        os.makedirs(shim_dir, exist_ok=True)
+        if os.path.islink(shim) or os.path.exists(shim):
+            os.remove(shim)
+        os.symlink(os.path.join("..", "bin", "python"), shim)
+    return real
 
 
 def cuda_wheel_tag():
@@ -274,7 +303,9 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
     if os.name == "nt":
         say("SKIP", name, "Windows: use scripts/_otr_%s_install.ps1" % name)
         return
-    root = os.path.join(os.path.dirname(comfy), name)
+    root = os.path.join(comfy, name)   # see install_indextts2: the adapters
+    #  resolve <comfy>/<engine>, so installing to <comfy>/../<engine> put the
+    #  venv somewhere nothing looks and made the env var load-bearing.
     venv_py = os.path.join(root, ".venv", "bin", "python")
     uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
     if not os.path.exists(uv):
@@ -313,6 +344,7 @@ def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
     say("OK" if ok else "FAILED", "%s venv" % name,
         ((r.stdout or "").strip() or (r.stderr or "").strip())[:56])
     if ok:
+        link_windows_shaped_python(root)
         say("SET", "OTR_%s_VENV" % name.upper(), venv_py)
         os.environ["OTR_%s_VENV" % name.upper()] = venv_py
 
