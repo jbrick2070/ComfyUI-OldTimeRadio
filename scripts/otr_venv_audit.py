@@ -40,6 +40,11 @@ _DIST = {
     "bs4": "beautifulsoup4", "yaml": "PyYAML", "PIL": "Pillow",
     "cv2": "opencv-python", "sklearn": "scikit-learn", "skimage":
     "scikit-image", "av": "av", "soundfile": "soundfile",
+    # pycairo installs as "pycairo" and imports as "cairo". Without this
+    # the audit reported it undeclared while requirements.txt had carried
+    # it since the pod found it missing -- and a report with a known false
+    # positive in it is a report people stop reading.
+    "cairo": "pycairo",
 }
 
 #: Provided by ComfyUI itself or the standard library -- not ours to declare.
