@@ -259,6 +259,13 @@ def render() -> str:
     A("The tier is `16 GB+` because that is the truth: nothing in "
       "`config/profiles/` declares a VRAM ceiling above 16, so a 24 GB or "
       "32 GB card runs exactly what a 16 GB one runs.\n")
+    A("**A draft now exists that asks for more.** `otr_rented24_heavy` raises "
+      "the writer ceiling 14.5 -> 22 GB and drops NF4 quantisation so the 12b "
+      "writer sits resident, lifts the render frame cap 81 -> 121, and uses "
+      "`indextts2` cloning for BOTH character and announcer where the 16 GB "
+      "tier settles for kokoro on the announcer. It is `draft` and nothing has "
+      "published from it -- proof follows the profile, never the reverse, "
+      "because a lane is proven BY running under one.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
       "ran the 16 GB haunted profile and peaked at 15,990 MB -- two thirds of "
       "the memory it was being billed for. A bigger card earns its cost only by "

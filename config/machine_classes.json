@@ -19,7 +19,6 @@
     "",
     "`recommended` may be null. A declared gap is better than a rediscovered one."
   ],
-
   "classes": [
     {
       "label": "8 GB NVIDIA (e.g. RTX 4060)",
@@ -29,7 +28,9 @@
       "platform": "any",
       "writer": "gemma-4-E2B",
       "recommended": "otr_nvidia_8gb_haunted",
-      "alternates": ["otr_4060_12b_gguf_offload"],
+      "alternates": [
+        "otr_4060_12b_gguf_offload"
+      ],
       "note": "The portability floor. Proven, and the reason it is proven is that a second machine exists."
     },
     {
@@ -40,8 +41,10 @@
       "platform": "any",
       "writer": "gemma-4-12b",
       "recommended": "otr_5080_haunted_12b_overnight",
-      "alternates": [],
-      "note": "One class, not three. Nothing declares a ceiling above 16, so a 24 GB card runs exactly what a 16 GB card runs."
+      "alternates": [
+        "otr_rented24_heavy"
+      ],
+      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs."
     },
     {
       "label": "AMD / ROCm",

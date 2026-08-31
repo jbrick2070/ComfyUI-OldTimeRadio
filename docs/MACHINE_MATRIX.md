@@ -17,7 +17,7 @@ Find your machine in the first table. That is the whole answer; everything after
 * **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
   The portability floor. Proven, and the reason it is proven is that a second machine exists.
 * **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
-  One class, not three. Nothing declares a ceiling above 16, so a 24 GB card runs exactly what a 16 GB card runs.
+  One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.
 * **AMD / ROCm** -> `otr_amd8_rocm`
   Largely unexplored. The profile exists; no episode has published from it.
 
@@ -61,7 +61,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  80 profile(s), 41 shipping, 1 proven
+## 16 GB+  --  81 profile(s), 41 shipping, 1 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
@@ -108,7 +108,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>38 draft profile(s) here -- not vouched for</summary>
+<details><summary>39 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
@@ -128,6 +128,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_lemmy_kokoro_diag` | still_flat | kokoro |
 | `otr_mac_mps` | still_motion | kokoro |
 | `otr_nv40_12gb` | wan_ti2v | indextts2 |
+| `otr_rented24_heavy` | wan_ti2v | indextts2 |
 | `otr_sbcov_1` | still_pan | indextts2 |
 | `otr_sbcov_2` | still_flat | indextts2 |
 | `otr_sbcov_3` | still_motion | indextts2 |
@@ -176,6 +177,8 @@ Video engines they select: `-`, `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_
 ## A bigger card does not currently get you more
 
 The tier is `16 GB+` because that is the truth: nothing in `config/profiles/` declares a VRAM ceiling above 16, so a 24 GB or 32 GB card runs exactly what a 16 GB one runs.
+
+**A draft now exists that asks for more.** `otr_rented24_heavy` raises the writer ceiling 14.5 -> 22 GB and drops NF4 quantisation so the 12b writer sits resident, lifts the render frame cap 81 -> 121, and uses `indextts2` cloning for BOTH character and announcer where the 16 GB tier settles for kokoro on the announcer. It is `draft` and nothing has published from it -- proof follows the profile, never the reverse, because a lane is proven BY running under one.
 
 **That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted profile and peaked at 15,990 MB -- two thirds of the memory it was being billed for. A bigger card earns its cost only by running what a smaller one cannot: the large video lanes, voice cloning rather than the cheap fallback, the better image engines. None of that is proven yet, so this is a note about what to build, not a setting to change.
 

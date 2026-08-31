@@ -309,7 +309,7 @@ it names any missing weight and where it expects it.
 * **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
   The portability floor. Proven, and the reason it is proven is that a second machine exists.
 * **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
-  One class, not three. Nothing declares a ceiling above 16, so a 24 GB card runs exactly what a 16 GB card runs.
+  One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.
 * **AMD / ROCm** -> `otr_amd8_rocm`
   Largely unexplored. The profile exists; no episode has published from it.
 
