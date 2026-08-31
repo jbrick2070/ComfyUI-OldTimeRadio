@@ -77,5 +77,26 @@ echo "  fetching haunted lane weights"
 cd "$CN/ComfyUI-OldTimeRadio" || exit 1
 python3 scripts/otr_fetch_lane_weights.py haunted 2>&1 | tail -8
 
+# INDEXTTS2 ON LINUX USES THE ENV VAR, NOT A CODE CHANGE.
+#
+# eng_indextts2.py resolves `.venv/Scripts/python.exe` -- the Windows layout --
+# and a Linux venv keeps its interpreter at `bin/python`. The obvious fix is to
+# branch on os.name in the adapter. DO NOT. The engine's qualified voice routes
+# are pinned to an adapter/worker FINGERPRINT, so ANY edit to that file
+# invalidates them: changing it un-qualified the shipped Lemmy route
+# ('lemmy-indextts2-algenib-cockney-v2', fingerprint d47779386ce91209 ->
+# c1b64d5c5f6c2f9f) and the cast row silently fell back to an ordinary draw.
+# The episode still rendered, which is what makes it easy to miss.
+#
+# OTR_INDEXTTS2_VENV exists for exactly this, touches no code, and moves no
+# fingerprint.
+IT_VENV="$(dirname "$COMFY_ROOT")/index-tts/.venv/bin/python"
+[ -x "$IT_VENV" ] || IT_VENV="$COMFY_ROOT/index-tts/.venv/bin/python"
+if [ -x "$IT_VENV" ]; then
+  echo "  OTR_INDEXTTS2_VENV=$IT_VENV"
+  export OTR_INDEXTTS2_VENV="$IT_VENV"
+  grep -q OTR_INDEXTTS2_VENV /root/.bashrc 2>/dev/null     || echo "export OTR_INDEXTTS2_VENV=\"$IT_VENV\"" >> /root/.bashrc
+fi
+
 echo "=== provision done  $(date -u '+%H:%M:%SZ') ==="
 ls -1 "$OTR_COMFYUI_MODELS_ROOT/checkpoints" 2>/dev/null | sed 's/^/  ckpt: /'
