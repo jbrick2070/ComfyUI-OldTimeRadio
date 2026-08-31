@@ -54,36 +54,86 @@ be tangled in here:
 
 ## THE CURRENT STEP -- READ THIS FIRST
 
-### >>> FIRST: READ THE OVERNIGHT QUEUE'S RESULTS IN `otr/obs/` -- THE LEG COST IS ALREADY PAID <<<
+**Rewritten 2026-08-31.** The step this replaces was the 2026-08-28 listening
+test; those legs published and were judged. Two days of portability work on
+rented hardware have since changed what is in front of us.
 
-**WHAT IS OWED -- THE LISTENING TEST, and it is the whole reason the
-code work happened.** No receipt can stand in for it. The queue state as of
-the 2026-08-28 morning restart: the FOLEY control leg already PUBLISHED
-(`the_curdling_of_memory`, obs #23); the remaining four run via
-`scripts/_tmp_overnight_rest2.ps1` -- MIME FIRST (the lane where the
-vocalization was heard, so it is the real test of the prompt work), then H3
-silent, H3 audio-in, the ltx_audio_in baseline. Watch `otr/obs/`; the live
-swim-lane view (`tmp/otr_swimlane.html`, self-refreshing) shows which stage
-the current leg is in.
-The obs path bug in the queue script itself (pointed at the repo's own empty
-`otr/obs` instead of ComfyUI's real `output/otr/obs`, which would have
-silently reported every leg FAILED all night) was caught and fixed before it
-could do that; see `a196fd90`.
+### 1. GHOST CLAUSE POOL EXHAUSTION -- SURVIVED A FIX, SO IT OWES A PANEL
 
-**Judge it as a whole**, not against a sync-only rubric (operator, after
-judging a separate LTX 2.3 IA2V A/B the same night: *"I'm creating radio
-drama, not impersonating an AI assistant"* -- colour, movement and life count,
-they are not subordinate to a technical score).
+    GhostAuthorError: the figure fallback pool is exhausted: 18 clauses,
+    all already used in this episode.
 
-**One morning pass over `otr/obs/` judges six lanes at once** -- this is
-Batch R0 in Section 2. The same episodes are also a free re-observation
-chance for the two parked eyeball items (announcer framing, name-splice #2;
-see Batch R5), and the two H3 legs may already satisfy Batch R1's receipt
-conditions -- check before spending another leg.
+**This is current, not history.** It is in the server log of the box running
+right now, twice, on the widened pools -- `57ee969f` took each mode from 6 to
+18-19 clauses and five-act episodes exhaust them anyway.
 
-(The foley-audibility resolution, the named-sounds ship, the voice-bleed fix
-and the H3 style-cue ordering fix that this listening test proves are all
-closed receipts now -- 2026-08-28, in the archive and `docs/PROD_BUG_LOG.md`.)
+**Widening again is the wrong move and the two-strikes rule now bites.** A
+FINITE pool plus a NO-DUPLICATES rule cannot survive an episode of arbitrary
+length; a bigger pool only moves the act at which it dies. The first fix treated
+the symptom, which is exactly the evidence that the model of the problem is
+wrong. Per the standing rule, the third attempt gets `kibitz-plugin:kibitz`
+BEFORE any code, and this one genuinely qualifies -- there are several
+defensible answers and they are not equivalent:
+
+* generate leaves combinatorially instead of drawing from a fixed list,
+* scope "no duplicates" to the ACT rather than the EPISODE,
+* allow controlled reuse once the pool is spent, with the receipt saying so,
+* or accept a shorter authored run and let the deterministic path take over
+  loudly rather than raising.
+
+Note which of those change what the viewer sees and which do not -- that is the
+axis the panel should be pressed on.
+
+### 2. THE PORTABILITY PROGRAM HAS SHOWN MERIT, AND IS NOT FINISHED
+
+Two days on rented hardware found **three real OTR bugs**, none of which the dev
+box can surface about itself:
+
+| defect | why the 5080 cannot see it |
+|---|---|
+| `indextts2` resolved a WINDOWS venv path unconditionally, so the engine could never start on Linux | the Windows path is correct here |
+| `has_nvenc` tested whether ffmpeg was COMPILED with nvenc, not whether it could RUN | nvenc runs here |
+| `OTR_MasterAudioMux` publishes the episode but never declares it, so `/history` shows only the intermediate (PBUG-20260830-24) | nobody reads the API here |
+
+Plus a structural finding worth more than any single bug: **OTR's engines name
+FILES but not SOURCES.** Three Hugging Face repo ids exist in all of the engine
+code, so only three lanes were ever fetchable and every other weight on this box
+was placed by hand with its provenance unrecorded. `docs/MODEL_ASSET_INDEX.md`
+now answers "to use X, download Z", and `scripts/otr_fetch_lane_weights.py` has
+gone from 3 lanes to 6.
+
+**WHAT IS OWED, and it is the whole point:** the fixes are in the repo but the
+PROVISION SCRIPT does not carry them. A fresh pod today would repeat the same
+crawl -- Stable Audio 3, index-tts on Python 3.11 via `uv`, the `<comfy_root>`
+symlink, the reference WAVs. Until `scripts/otr_pod_provision.sh` installs all
+of it unattended, "frictionless" is a claim rather than a result, and the
+fresh-pod run that would test it measures nothing.
+
+**The acid test, once the provisioner is complete:** deploy from the saved
+template onto the network volume, run the provisioner, render one episode. No
+hand steps. That single run is the merit verdict.
+
+### 3. WHAT THE RENTED SOAK DID NOT PRODUCE
+
+Twelve legs, zero episodes. Two blockers sat behind each other -- `indextts2`,
+then Stable Audio 3 -- and each cost a full round to surface, because a lane
+takes seven to thirteen minutes to reach the node that fails. **The lane matrix
+is still unmeasured.** Nothing is known about which video lanes work on rented
+hardware beyond `animatediff15_v3_haunted_video`, which published in 2058 s.
+
+Two process lessons, both already in `docs/RUNPOD_INSTALL.md`: a sweep must LOOP
+rather than walk the roster once (ten lanes failed on a missing model, the model
+was installed twenty minutes later, and none was retried), and a soak on rented
+hardware should fail fast on a missing asset instead of discovering it after the
+script and voices are done.
+
+### 4. THE 5080 KEPT SHIPPING THROUGHOUT
+
+37 successes against 18 failures across 30 legs, `otr/obs` at 45 episodes, and
+it is mid-leg now. The failures are the pool exhaustion above plus
+`RenderError` from `OTR_VideoRenderBatch` -- worth a look once the pool question
+is settled, since a render that dies after the script and voices are written is
+the expensive kind.
 
 ---
 
