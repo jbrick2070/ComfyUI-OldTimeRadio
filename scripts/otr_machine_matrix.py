@@ -90,17 +90,25 @@ def load_classes(profiles):
             + "\n  - ".join(problems))
     return out
 
-#: Rows that have actually rendered and published an episode, with the evidence.
-#: Keep this SHORT and keep it honest -- it is the difference between "we think"
-#: and "we know", and inflating it destroys the only reason the table is useful.
-PROVEN = {
-    "otr_5080_haunted_12b_overnight": (
-        "45+ episodes published to otr/obs on a 16 GB RTX 5080, "
-        "5-act, continuous overnight loops"),
-    "otr_nvidia_8gb_haunted": (
-        "9 episodes published on real 8 GB hardware (RTX 4060) -- "
-        "the portability floor"),
-}
+#: Proof now lives on the PROFILE, in its `proven` list, not here. It is a fact
+#: about the profile, it accrues per-hardware (the haunted lane is proven on 8,
+#: 16 and 24 GB), and under the two-box ownership split the machine that proved
+#: it owns that file anyway. This module only reads and renders it.
+#:
+#: Keeping it honest matters more than keeping it full: PROVEN is the difference
+#: between "we think" and "we know", and a padded list destroys the only reason
+#: the table is worth reading.
+def proven_receipts(prof) -> list:
+    return [r for r in (prof.get("proven") or []) if isinstance(r, dict)]
+
+
+def proven_summary(prof) -> str:
+    rows = proven_receipts(prof)
+    if not rows:
+        return ""
+    total = sum(int(r.get("episodes") or 0) for r in rows)
+    hw = ", ".join(str(r.get("hardware", "?")) for r in rows)
+    return "%d episode(s) on %s" % (total, hw)
 
 #: Measured peaks worth stating, and the exact conditions. A VRAM number without
 #: its conditions is how somebody buys the wrong card.
@@ -133,6 +141,7 @@ def load_profiles() -> list:
             "image": ro.get("character_image") or "-",
             "voice": so.get("char_voice_engine") or "-",
             "music": so.get("music_engine") or "-",
+            "proven": d.get("proven") or [],
         })
     return out
 
@@ -177,8 +186,8 @@ def render() -> str:
         if prof is None:
             A("| **%s** | -- | -- | -- | -- | -- | **no profile yet** |" % label)
             continue
-        conf = ("**PROVEN** -- %s" % PROVEN[prof["id"]].split(" -- ")[0]
-                if prof["id"] in PROVEN else "`%s`, unproven" % prof["status"])
+        conf = ("**PROVEN** -- %s" % proven_summary(prof)
+                if proven_receipts(prof) else "`%s`, unproven" % prof["status"])
         A("| **%s** | %s | %s | %s | %s | %s | %s |" % (
             label, row.get("writer", "?"), prof["video"], prof["voice"],
             prof["music"], prof["image"], conf))
@@ -211,7 +220,7 @@ def render() -> str:
         rows = by.get(tier) or []
         if not rows:
             continue
-        prov = sum(1 for r in rows if r["id"] in PROVEN)
+        prov = sum(1 for r in rows if proven_receipts(r))
         ship = sum(1 for r in rows if r["status"] == "shipping")
         A("## %s  --  %d profile(s), %d shipping, %d proven\n"
           % (tier, len(rows), ship, prov))
@@ -220,14 +229,14 @@ def render() -> str:
         # trust. Drafts are counted and folded away, listed by the engine they
         # select, which is the only thing anyone scans them for.
         headline = [r for r in rows
-                    if r["id"] in PROVEN or r["status"] == "shipping"]
+                    if proven_receipts(r) or r["status"] == "shipping"]
         drafts = [r for r in rows if r not in headline]
         if headline:
             A("| profile | video | voice | music | image | confidence |")
             A("|---|---|---|---|---|---|")
             for r in sorted(headline,
-                            key=lambda x: (x["id"] not in PROVEN, x["id"])):
-                conf = "**PROVEN**" if r["id"] in PROVEN else "`%s`" % r["status"]
+                            key=lambda x: (not proven_receipts(x), x["id"])):
+                conf = "**PROVEN**" if proven_receipts(r) else "`%s`" % r["status"]
                 A("| `%s` | %s | %s | %s | %s | %s |" % (
                     r["id"], r["video"], r["voice"], r["music"], r["image"],
                     conf))
@@ -259,8 +268,12 @@ def render() -> str:
       "change.\n")
 
     A("## The proven rows, and what proves them\n")
-    for pid, why in sorted(PROVEN.items()):
-        A("* **`%s`** -- %s" % (pid, why))
+    for prof in sorted(profs, key=lambda x: x["id"]):
+        for r in proven_receipts(prof):
+            A("* **`%s`** on %s -- %s episode(s), %s. %s"
+              % (prof["id"], r.get("hardware", "?"),
+                 r.get("episodes", "?"), r.get("date", "?"),
+                 r.get("evidence", "")))
     A("")
     A("## Measured peaks, with their conditions\n")
     A("A VRAM number without its conditions is how somebody buys the wrong card.\n")
@@ -299,17 +312,82 @@ def render() -> str:
     return "\n".join(L) + "\n"
 
 
+_BEGIN = "<!-- BEGIN GENERATED: machine-matrix -->"
+_END = "<!-- END GENERATED: machine-matrix -->"
+
+
+def headline_block() -> str:
+    """Just the class table -- what gets injected into README.
+
+    README is the universal front door and already answers "what do I run on my
+    machine". Two hand-eyed surfaces answering one question is how it came to
+    claim an 8 GB card had "rendered nothing" while nine episodes had published
+    from one. So the answer is generated ONCE and injected, rather than told
+    twice.
+    """
+    full = render()
+    start = full.index("## What works on what machine")
+    end = full.index("## How to read the confidence column")
+    return full[start:end].rstrip() + "\n"
+
+
+def inject_readme(check_only: bool = False) -> bool:
+    """Put the class table into README between markers. True if in sync."""
+    path = os.path.join(_REPO, "README.md")
+    s = io.open(path, encoding="utf-8").read()
+    block = _BEGIN + "\n\n" + headline_block() + "\n" + _END
+    if _BEGIN in s and _END in s:
+        head, rest = s.split(_BEGIN, 1)
+        _stale, tail = rest.split(_END, 1)
+        out = head + block + tail
+    else:
+        hook = "## Which video models fit your card"
+        if hook not in s:
+            print("  README hook not found; nothing injected")
+            return True
+        out = s.replace(hook, block + "\n\n" + hook, 1)
+    if out == s:
+        return True
+    if check_only:
+        return False
+    io.open(path, "w", encoding="utf-8", newline="\n").write(out)
+    return False
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stdout", action="store_true")
+    ap.add_argument("--check", action="store_true",
+                    help="fail if the doc or README block is out of date; "
+                         "writes nothing. For CI and the test suite.")
     args = ap.parse_args(argv)
     text = render()
+    dest = os.path.join(_REPO, "docs", "MACHINE_MATRIX.md")
+
     if args.stdout:
         sys.stdout.write(text)
         return 0
-    dest = os.path.join(_REPO, "docs", "MACHINE_MATRIX.md")
+
+    if args.check:
+        try:
+            on_disk = io.open(dest, encoding="utf-8").read()
+        except OSError:
+            on_disk = ""
+        doc_ok = on_disk == text
+        readme_ok = inject_readme(check_only=True)
+        if doc_ok and readme_ok:
+            print("  in sync")
+            return 0
+        if not doc_ok:
+            print("  STALE: docs/MACHINE_MATRIX.md differs from the profiles")
+        if not readme_ok:
+            print("  STALE: README's machine-matrix block differs")
+        print("  run: python scripts/otr_machine_matrix.py")
+        return 1
+
     io.open(dest, "w", encoding="utf-8", newline="\n").write(text)
-    print("wrote %s (%d bytes)" % (dest, len(text)))
+    inject_readme()
+    print("wrote %s (%d bytes) and injected the README block" % (dest, len(text)))
     return 0
 
 

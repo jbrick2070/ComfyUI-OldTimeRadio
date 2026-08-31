@@ -8,8 +8,8 @@ Find your machine in the first table. That is the whole answer; everything after
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episodes published on real 8 GB hardware (RTX 4060) |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 45+ episodes published to otr/obs on a 16 GB RTX 5080, 5-act, continuous overnight loops |
+| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 46 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented) |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `draft`, unproven |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
@@ -181,8 +181,9 @@ The tier is `16 GB+` because that is the truth: nothing in `config/profiles/` de
 
 ## The proven rows, and what proves them
 
-* **`otr_5080_haunted_12b_overnight`** -- 45+ episodes published to otr/obs on a 16 GB RTX 5080, 5-act, continuous overnight loops
-* **`otr_nvidia_8gb_haunted`** -- 9 episodes published on real 8 GB hardware (RTX 4060) -- the portability floor
+* **`otr_5080_haunted_12b_overnight`** on RTX 5080 16 GB -- 45 episode(s), 2026-08-31. continuous overnight 5-act loops published to otr/obs
+* **`otr_5080_haunted_12b_overnight`** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
+* **`otr_nvidia_8gb_haunted`** on RTX 4060 8 GB -- 9 episode(s), 2026-08-29. docs/4060_DRILL_LOG.md steps 7-19; five of five source banks published
 
 ## Measured peaks, with their conditions
 

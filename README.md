@@ -294,6 +294,27 @@ it names any missing weight and where it expects it.
 
 ---
 
+<!-- BEGIN GENERATED: machine-matrix -->
+
+## What works on what machine
+
+| your machine | writer | video | voice | music | image | status |
+|---|---|---|---|---|---|---|
+| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 46 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented) |
+| **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `draft`, unproven |
+
+**Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
+
+* **8 GB NVIDIA (e.g. RTX 4060)** -> `otr_nvidia_8gb_haunted`
+  The portability floor. Proven, and the reason it is proven is that a second machine exists.
+* **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** -> `otr_5080_haunted_12b_overnight`
+  One class, not three. Nothing declares a ceiling above 16, so a 24 GB card runs exactly what a 16 GB card runs.
+* **AMD / ROCm** -> `otr_amd8_rocm`
+  Largely unexplored. The profile exists; no episode has published from it.
+
+<!-- END GENERATED: machine-matrix -->
+
 ## Which video models fit your card
 
 **For the full picture -- writer, video, voice, music and image per machine, with what is PROVEN versus merely shipping -- see [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md).** It is generated from the profiles themselves, so it cannot drift from what the code actually offers. The section below is the video-specific detail behind it.

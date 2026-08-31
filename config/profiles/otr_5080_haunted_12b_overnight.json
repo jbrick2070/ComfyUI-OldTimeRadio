@@ -89,5 +89,19 @@
     "sage_attention": false,
     "extra_args": [],
     "env": {}
-  }
+  },
+  "proven": [
+    {
+      "hardware": "RTX 5080 16 GB",
+      "episodes": 45,
+      "date": "2026-08-31",
+      "evidence": "continuous overnight 5-act loops published to otr/obs"
+    },
+    {
+      "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
+      "episodes": 1,
+      "date": "2026-08-30",
+      "evidence": "1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK"
+    }
+  ]
 }
