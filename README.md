@@ -296,6 +296,9 @@ it names any missing weight and where it expects it.
 
 ## Which video models fit your card
 
+**For the full picture -- writer, video, voice, music and image per machine, with what is PROVEN versus merely shipping -- see [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md).** It is generated from the profiles themselves, so it cannot drift from what the code actually offers. The section below is the video-specific detail behind it.
+
+
 **This table is the profile.** Pick your card, read the column, choose that name
 in the `OTR_VideoDirector` dropdown. Names below are exactly the dropdown
 entries.
