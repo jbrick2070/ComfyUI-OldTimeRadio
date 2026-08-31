@@ -51,8 +51,16 @@ do
 done
 
 # 4. Dependencies.
-echo "  pip install -r requirements.txt"
-python3 -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt" 2>&1 | tail -2
+# INSTALL INTO THE INTERPRETER COMFYUI ACTUALLY RUNS, not the system python3.
+# The image ships ComfyUI in its own venv (.venv-cu128); `python3 -m pip` put
+# requirements somewhere ComfyUI never imports from, so `accelerate` was present
+# on disk and missing at runtime -- the writer died 18 s into a rented leg with
+# "requires `accelerate`" while requirements.txt had listed it all along.
+COMFY_PY="$COMFY_ROOT/.venv-cu128/bin/python"
+[ -x "$COMFY_PY" ] || COMFY_PY=$(ls -1 "$COMFY_ROOT"/.venv*/bin/python 2>/dev/null | head -1)
+[ -x "$COMFY_PY" ] || COMFY_PY=python3
+echo "  pip install -r requirements.txt  (into $COMFY_PY)"
+"$COMFY_PY" -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt" 2>&1 | tail -2
 
 # 5. Weights for the ungated lane. Needs no Hugging Face token.
 echo "  fetching haunted lane weights"
