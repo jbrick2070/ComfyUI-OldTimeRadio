@@ -71,15 +71,59 @@ and measured nothing of the lane matrix. The 5080 kept shipping throughout.
 
 ### THE QUEUE
 
-**1. FIRE THE GHOST-POOL PANEL -- before any code.** Two-strikes has fired:
-`57ee969f` widened the pool 6 -> 18 and five-act episodes exhaust it anyway,
-because a finite pool under a no-duplicates rule cannot survive an episode of
-arbitrary length. Press the panel on the AUTHOR's contract --
-`ghost_signal_author.py` is shared by `otr_shot_lock.py`, `render_driver.py` and
-`schemas.py`, so no lane dodges it -- and on **which candidate changes what the
-viewer sees**: combinatorial generation, act-scoped dedupe, receipted reuse, or
-a loud deterministic takeover. Launch FIRST: it is a wait, not work.
-**DONE WHEN** the arc converges -> code -> a five-act leg publishes clean.
+**1. GHOST POOL -- r1 IS IN, AND IT DISSOLVES THE BUG.** Panel fired
+2026-08-31 (Codex `no`, Antigravity `yes-with-fixes`, Cursor `no`); artifacts in
+`kibitz-runs/2026-08-31-ghost-clause-pool/r1/` (gitignored, local only).
+
+**Uniqueness is measured on the wrong thing.** Verified against the files, not
+taken on the panel's word:
+
+    GHOST_V2_SLOTS = ("pack_cue", "motif", "leaf", "law")   prompt.py:824
+    motif_for_character(components, mode, seed_int)          author.py:644
+    key = leaf.casefold()                                    shot_lock.py:2313
+
+The picture is four slots; the duplicate check reads one. Two beats with the
+same leaf but different CHARACTERS compose different prompts and render
+different pictures -- and the rule rejects them anyway. That is why 6 -> 18
+failed and why 50 would fail too. **The pool is not too small; the test is too
+strict, in a way that does not match what a viewer would notice.**
+
+**BUILD:** uniqueness on the FINALIZED POSITIVE PROMPT, applied identically to
+writer output, replay and the deterministic path -- capacity becomes clauses x
+motifs and the arithmetic failure stops existing. Then a bounded progression,
+total by construction: unused finalized prompt -> reuse a leaf where a different
+motif keeps the prompt new -> reuse the least-recent signature, deterministic on
+`episode_seed + beat_id`, never adjacent. The allocator returns a PER-BEAT reuse
+disposition appended to that beat's existing `fallback_reason` (ShotLock
+currently stamps one batch-wide reason over every object, which would erase the
+original model-failure reason).
+
+**Only pool exhaustion becomes recoverable.** My anchor said "a fallback that
+can raise is not a fallback" and that was overbroad: `GhostAuthorError` has 10
+raise sites covering unknown mode, missing bookend motif, invalid role and an
+empty `motif_cue`. Those are structural corruption and stay loud --
+OOM-or-nothing governs render refusals, not schema violations.
+
+**CUT, so nobody rebuilds them:** the combinatorial generator (a second grammar
+engine before the proxy is fixed), act-scoped uniqueness (verified: no
+authoritative act field exists -- the spec carries beat, role, mode, motif,
+ordinal and arc cue; ShotLock supplies only a mapped `arc_phase`), and "loud
+handover" (it is controlled reuse under a second name).
+
+**DONE WHEN:** >18 same-mode beats complete; mixed replay plus fresh authoring
+completes; all three paths share the invariant; adjacent finalized prompts never
+repeat; same seed gives identical output AND receipts; every beat keeps a valid
+`ghost_prompt`; then the failing five-act topology through
+`workflows/otr_canonical.json` with `obs_publish OK` and the file verified on
+disk. **Existing tests encode the obsolete absolute-leaf rule
+(`test_ghost_prompt_v2_lane.py:399-405, 437-451`;
+`test_ghost_signal_author.py:925-931`) and must be REPLACED with the new
+invariant, not deleted.**
+
+*Open from r1:* whether the anchor's "roughly 70 minutes" belongs to this
+failure or to a `GhostCadenceError` (unseparated); and the panel's own
+assumption that "no adjacent repeat" is the right viewer threshold, which wants
+checking against frames rather than more reasoning.
 
 **2. THE PROVISIONER IS THE DOER** (operator steer 2026-08-31: "a DOER or an
 instruction manual... not a checker"). A machine-agnostic
