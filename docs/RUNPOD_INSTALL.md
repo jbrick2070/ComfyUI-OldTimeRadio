@@ -1190,3 +1190,32 @@ only the renders fail.
 
 Model warming and server startup are independent, so they overlap. On a machine
 billed by the second, serialising them is money spent on waiting.
+
+### THE NETWORK VOLUME IS 6.5x SLOWER THAN LOCAL DISK, AND MODEL SWAPS PAY FOR IT
+
+Measured on the pod, 2026-08-31, same 1 GB read both ways:
+
+    network volume (MooseFS)   277 MB/s
+    container disk           1,800 MB/s
+
+The volume is the right place for weights -- it is the only thing that survives
+a pod -- but it changes the arithmetic on model SWAPPING, and the pipeline swaps
+a lot. `Mistral-Nemo-Instruct-2407` is 46 GB on disk and had been loaded **48
+times** in one server lifetime; at 277 MB/s a single load is roughly **2.8
+minutes of pure disk read**, before any compute.
+
+**This is invisible on the dev box.** A local NVMe makes the same swap cost
+seconds, so a pipeline that reloads a large technical model between passes looks
+free there and is expensive on rented hardware.
+
+**Watch for it in the obvious tell:** `nvidia-smi` showing 3% utilisation with
+several GB resident, while the ComfyUI log scrolls
+`Loading weights: n/363`. That is not a stall and not a hung render -- it is the
+volume. Do not go looking for a deadlock.
+
+**What NOT to do about it.** Do not quietly swap the technical model for a
+smaller one to make the number look better: `technical_model` changes the script
+the writer produces, so that is a content change wearing a performance costume,
+and it invalidates any same-seed comparison against previous runs. If the swap
+cost is worth attacking, it is an operator decision about which model to run, or
+a change to how often the model is unloaded -- not a silent substitution.
