@@ -128,6 +128,41 @@ LANES = {
     # from deep inside sd1_clip -- a message that names neither SA3 nor the
     # missing tokenizer. Both repos are ungated, so there is no reason to prefer
     # the raw one.
+    # ~19.3 GB. THE DEFAULT IMAGE ENGINE, and until 2026-08-31 it had no lane
+    # at all -- so every machine that followed the docs fetched video weights
+    # and then died at OTR_ImageGenDispatcher with 'z_image_turbo diffusion
+    # model not found'. It is the `image` value for EVERY class in the machine
+    # matrix, so a missing image model fails far more lanes than a missing
+    # video model does. bf16 is the universal choice: the adapter RANKS
+    # installed z_image_turbo*.safetensors nvfp4 > fp8 > bf16, so a Blackwell
+    # box that also fetches `z_image_blackwell` gets the faster file
+    # automatically and this one simply stops being chosen.
+    "z_image": [
+        ("Comfy-Org/z_image_turbo",
+         "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+         "diffusion_models"),                                       # 11.46 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/text_encoders/qwen_3_4b.safetensors",
+         "text_encoders"),                                          # 7.49 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/vae/ae.safetensors", "vae"),                  # 0.31 GB
+    ],
+    # ~12.0 GB. Blackwell (sm_120) only -- nvfp4 needs hardware fp4 and an
+    # 8 GB 4060 (sm_89) cannot execute it. Fetch this INSTEAD of `z_image` on
+    # such a card, never as well: the ranking prefers nvfp4 whenever it is
+    # present, so installing it on a card that cannot run it makes the engine
+    # choose the one file that fails. CLIP and VAE are not ranked -- they
+    # resolve by exact filename -- so they are the same two files either way.
+    "z_image_blackwell": [
+        ("Comfy-Org/z_image_turbo",
+         "split_files/diffusion_models/z_image_turbo_nvfp4.safetensors",
+         "diffusion_models"),                                       # 4.20 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/text_encoders/qwen_3_4b.safetensors",
+         "text_encoders"),                                          # 7.49 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/vae/ae.safetensors", "vae"),                  # 0.31 GB
+    ],
     "stable_audio_3": [
         ("Comfy-Org/stable-audio-3",
          "checkpoints/stable_audio_3_small_music.safetensors",
