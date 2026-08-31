@@ -109,20 +109,32 @@ LANES = {
     # died here on 2026-08-31, about twelve minutes into each, after the script,
     # cast and voices were already done.
     #
-    # TWO DELIBERATE CHOICES. The `-base` repo is used because
-    # `stabilityai/stable-audio-3-small-music` is gated:auto and would demand a
-    # licence click, while `-base` is ungated and ships byte-identical files
-    # (2,270,384,940 and 1,183,022,944 -- verified against both). And the files
-    # are RENAMED on the way in, because the engine looks for names upstream
-    # does not use (`_CKPT` / `_TENC` in eng_stable_audio_3.py); the third tuple
-    # element carries the destination NAME here, not just the folder.
+    # USE THE COMFY-ORG REPACKAGE, NOT STABILITY'S RAW REPO -- and note the
+    # engine's own error message says exactly this ("fetch Comfy-Org/
+    # stable-audio-3"). Ignoring it cost a full soak round.
+    #
+    # The raw repo LOOKS right and fails at render time. Its checkpoint is
+    # byte-identical (2,270,384,940 either way), but its text encoder is not:
+    #
+    #   stabilityai .../t5gemma-b-b-ul2/model.safetensors   1,183,022,944
+    #   Comfy-Org   .../t5gemma_b_b_ul2.safetensors         1,187,264,003
+    #                                             difference     4,241,003
+    #
+    # which is exactly the size of `tokenizer.model` in the raw repo. ComfyUI's
+    # SA3 CLIP wants the SentencePiece model EMBEDDED in the state dict as
+    # `spiece_model` (see comfy/text_encoders/sa3.py and spiece_tokenizer.py);
+    # the raw safetensors has no such key, so the loader reaches the file-path
+    # branch, finds nothing, and raises a bare `ValueError: invalid tokenizer`
+    # from deep inside sd1_clip -- a message that names neither SA3 nor the
+    # missing tokenizer. Both repos are ungated, so there is no reason to prefer
+    # the raw one.
     "stable_audio_3": [
-        ("stabilityai/stable-audio-3-small-music-base",
-         "model.safetensors",
-         "checkpoints/stable_audio_3_small_music.safetensors"),          # 2.27 GB
-        ("stabilityai/stable-audio-3-small-music-base",
-         "t5gemma-b-b-ul2/model.safetensors",
-         "text_encoders/t5gemma_b_b_ul2.safetensors"),                   # 1.18 GB
+        ("Comfy-Org/stable-audio-3",
+         "checkpoints/stable_audio_3_small_music.safetensors",
+         "checkpoints"),                                                 # 2.27 GB
+        ("Comfy-Org/stable-audio-3",
+         "text_encoders/t5gemma_b_b_ul2.safetensors",
+         "text_encoders"),                                               # 1.19 GB
     ],
     "wan_ti2v_gguf": [
         ("QuantStack/Wan2.2-TI2V-5B-GGUF",
