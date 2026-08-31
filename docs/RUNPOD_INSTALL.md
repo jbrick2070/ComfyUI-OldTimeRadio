@@ -1126,3 +1126,46 @@ resolves there. Install on the VOLUME so it survives the pod, then symlink:
 That satisfies the engine without duplicating 11 GB and without baking an
 absolute path into a template. `OTR_INDEXTTS2_DIR` / `_VENV` / `_WORKER` remain
 available if a layout genuinely differs.
+
+---
+
+## 14. Running a long sweep unattended, on rented time
+
+`scripts/otr_pod_overnight_sweep.sh`. Copy it to the pod and launch it there.
+
+    ssh <pod> 'cat > /root/overnight.sh' < scripts/otr_pod_overnight_sweep.sh
+    ssh <pod> 'setsid nohup bash /root/overnight.sh > /root/driver.log 2>&1 < /dev/null &'
+
+### RUN IT ON THE POD, NOT FROM THE WORKSTATION
+
+Driving a multi-hour sweep over SSH from Windows ties it to a laptop staying
+awake and a tunnel staying up. A dropped connection ends the night's work while
+the meter keeps running. On the pod it survives anything happening at the other
+end -- and `setsid` is the part that matters, because plain `nohup` still dies
+with the session's process group on some images.
+
+### NO LANE MAY STOP THE RUN
+
+A failing lane is recorded and the sweep moves on. "Does this work on rented
+hardware" is the question being asked, so a failure IS a result. The earlier
+sweep that aborted on the first bad lane produced one data point for the price
+of twenty-five.
+
+### READINESS IS CHECKED BEFORE EVERY LEG, NOT ONCE
+
+An empty queue is not readiness -- a dead server reports an empty queue too. The
+gate is `/object_info` returning 200 **and** containing `OTR_` classes **and** an
+idle queue, re-checked before each leg so one wedged lane cannot poison the rest.
+
+### THE TOKEN MUST BE IN THE SERVER'S ENVIRONMENT, NOT JUST ON DISK
+
+ComfyUI reads its environment once, at start. A token written to the pod after
+boot is invisible to every render until the server is restarted with it
+exported. Fetching weights from a shell is a separate matter and works
+immediately -- which makes this easy to miss, because the downloads succeed and
+only the renders fail.
+
+### WARM IN PARALLEL WITH THE BOOT
+
+Model warming and server startup are independent, so they overlap. On a machine
+billed by the second, serialising them is money spent on waiting.
