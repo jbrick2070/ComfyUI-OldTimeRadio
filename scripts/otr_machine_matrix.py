@@ -98,6 +98,21 @@ def load_classes(profiles):
 #: Keeping it honest matters more than keeping it full: PROVEN is the difference
 #: between "we think" and "we know", and a padded list destroys the only reason
 #: the table is worth reading.
+def merged_row(row):
+    """defaults <- row, through the ONE merge the profile builder uses.
+
+    Reused from otr_machine_profile rather than repeated here: a second
+    merge would be a second definition of what a machine class means, and
+    the doc and the applied profile could then disagree without either
+    being wrong on its own terms.
+    """
+    import sys
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+    from otr_machine_profile import _merged, load_matrix
+    return _merged(load_matrix(), row)
+
+
 def proven_receipts(obj) -> list:
     """Proof receipts, read from a MATRIX ROW.
 
@@ -198,14 +213,20 @@ def render() -> str:
     A("|---|---|---|---|---|---|---|")
     for row, prof in classes:
         label = row.get("label", "?")
-        if prof is None:
-            A("| **%s** | -- | -- | -- | -- | -- | **no profile yet** |" % label)
-            continue
-        conf = ("**PROVEN** -- %s" % proven_summary(prof)
-                if proven_receipts(prof) else "`%s`, unproven" % prof["status"])
+        # Read the ROW, never a profile it may not name. Every machine value
+        # lives in config/machine_classes.json now (operator, 2026-08-31: "no
+        # profiles in the code"), and no row carries `recommended`, so the old
+        # profile-linked branch printed "no profile yet" for ALL FOUR classes
+        # while the matrix held real, proven values. The front-door table of
+        # the guide told every newcomer that nothing runs anywhere.
+        cells = merged_row(row)
+        conf = ("**PROVEN** -- %s" % proven_summary(row)
+                if proven_receipts(row)
+                else "`%s`, unproven" % cells.get("status", "draft"))
         A("| **%s** | %s | %s | %s | %s | %s | %s |" % (
-            label, row.get("writer", "?"), prof["video"], prof["voice"],
-            prof["music"], prof["image"], conf))
+            label, cells.get("writer", "--"), cells.get("video", "--"),
+            cells.get("char_voice", "--"), cells.get("music", "--"),
+            cells.get("image", "--"), conf))
     A("")
     A("**Use the profile named for your machine** -- pass it to `--profile`, or "
       "pick the matching entries in the dropdowns. The engine names above are "
