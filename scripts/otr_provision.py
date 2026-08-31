@@ -253,13 +253,13 @@ def link_windows_shaped_python(root: str) -> str:
     if os.name == "nt":
         return os.path.join(root, ".venv", "Scripts", "python.exe")
     real = os.path.join(root, ".venv", "bin", "python")
-    shim_dir = os.path.join(root, ".venv", "Scripts")
-    shim = os.path.join(shim_dir, "python.exe")
+    scripts_dir = os.path.join(root, ".venv", "Scripts")
+    windows_shaped = os.path.join(scripts_dir, "python.exe")
     if os.path.exists(real):
-        os.makedirs(shim_dir, exist_ok=True)
-        if os.path.islink(shim) or os.path.exists(shim):
-            os.remove(shim)
-        os.symlink(os.path.join("..", "bin", "python"), shim)
+        os.makedirs(scripts_dir, exist_ok=True)
+        if os.path.islink(windows_shaped) or os.path.exists(windows_shaped):
+            os.remove(windows_shaped)
+        os.symlink(os.path.join("..", "bin", "python"), windows_shaped)
     return real
 
 
