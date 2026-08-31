@@ -698,3 +698,27 @@ minutes into each, after the script, cast and voices are already done. Install
 everything up front (playbook step 4). Do not add a checker that merely reports
 it sooner: that moves the discovery earlier without removing any of the work.
 
+
+### "DRAM canary TRIPPED -- but `free -g` says 92 GB available"
+
+Both readings are correct; they measure different things. The canary reports
+`psutil.virtual_memory().available`, and on Linux that diverges from the `free`
+column by the entire page cache. A pod that had just pulled 74 GB of weights
+read `free=19.8 GB` against `available=92.4 GB` -- a 4.7x gap that does not
+exist on a fresh Windows box, which is why this never surfaced on the dev
+machine. Compare like with like before calling it a false alarm.
+
+Then read what the message does NOT say: it is advisory. The blend is the only
+caller, and it deliberately degrades OPEN -- it warns and proceeds, because a
+transient dip during a `filter_complex` blend that buffers frames from two 1080p
+mp4s is expected, not fatal. A tripped canary in the log therefore does not mean
+a degraded episode. The 2026-08-31 sci-fi leg tripped at 1.64 GB and still
+published a full-quality 187 s / 1920x1080 episode. Confirm with the artifact:
+`_captioned_with_credits_final.mp4` present in `otr/obs/` and a `RESULT SUCCESS`
+line is proof the blend ran; the canary line alone proves only that RAM was
+briefly tight.
+
+The wording that caused this misread has been fixed at the source -- the message
+now names `available` and says ADVISORY -- but old logs still carry the original
+sentence, which told the reader an abort should happen at the one call site that
+never aborts.

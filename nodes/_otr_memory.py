@@ -95,6 +95,12 @@ def dram_canary(
 ) -> tuple[bool, str]:
     """Check available system RAM. Returns (ok, reason).
 
+    MEASURES ``psutil.virtual_memory().available``, NOT the ``free``
+    column. On Linux those two differ by the entire page cache -- a pod
+    that had just downloaded 74 GB of weights read free=19.8 GB against
+    available=92.4 GB -- so a reader who compares this number to ``free``
+    concludes the canary is broken when it is not. Compare like with like.
+
     ``ok=True`` if at least ``min_free_gb`` GB of system RAM is
     available, OR if psutil is unavailable / the syscall fails. The
     canary is best-effort and degrades OPEN (never blocks a render
@@ -121,13 +127,13 @@ def dram_canary(
     if avail_gb < float(min_free_gb):
         msg = (
             f"DRAM canary TRIPPED at {label or 'unnamed phase'}: "
-            f"{avail_gb:.2f} GB free, < {min_free_gb:.2f} GB threshold. "
-            "Caller should abort the current phase and degrade to "
-            "fallback rather than risking workstation OOM."
+            f"{avail_gb:.2f} GB available, < {min_free_gb:.2f} GB "
+            "threshold. ADVISORY -- this reports, it does not abort; "
+            "each caller decides for itself."
         )
         log.warning("[OTR_Memory] %s", msg)
         return False, msg
-    return True, f"{avail_gb:.2f} GB free, >= {min_free_gb:.2f} GB threshold"
+    return True, f"{avail_gb:.2f} GB available, >= {min_free_gb:.2f} GB threshold"
 
 
 __all__ = [
