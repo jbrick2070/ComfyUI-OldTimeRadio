@@ -529,6 +529,43 @@ a change to how often the model is unloaded -- not a silent substitution.
 
 Find what you are seeing, not when it was discovered.
 
+### "The pod restarted, the volume is intact, and the venv is broken"
+
+**A stopped pod can lose its GPU.** RunPod offers to migrate: it builds a NEW
+pod with identical GPUs and moves your data. Take it -- "start using CPUs" is
+useless for rendering and "do nothing" gambles on the same hardware freeing up.
+But understand what migrate actually preserves:
+
+    NETWORK VOLUME   kept entirely       167 GB models, 90 GB cache, refs, index-tts
+    CONTAINER DISK   gone                /root/.hf_token, uv, any scripts in /root
+
+**AND THAT COMBINATION BREAKS A `uv` VENV THAT LIVES ON THE VOLUME.** Measured
+on a real migration, 2026-08-31:
+
+    /workspace/index-tts/.venv/lib          14 GB   survived
+    /workspace/index-tts/checkpoints        25 GB   survived
+    /workspace/index-tts/.venv/bin/python   ->  /root/.local/share/uv/python/
+                                                cpython-3.11-.../bin/python3.11
+                                            DANGLING
+
+`uv` does not copy an interpreter into the venv; it SYMLINKS to its own managed
+Python, which lives on the container disk. So 39 GB of expensive install sits
+intact on the volume and is unusable because a ~50 MB interpreter vanished.
+Nothing reports this until something tries to run the venv.
+
+**The repair is trivial once you know, and the path is deterministic:**
+
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="/root/.local/bin:$PATH"
+    uv python install 3.11        # 2.15 s -- the dangling symlink resolves
+
+Do NOT rebuild the venv. `--allow-existing` is the fallback if the version no
+longer matches; reinstalling from scratch would re-download 14 GB of wheels to
+replace a file that was never the problem.
+
+**Also re-send the token** -- it lived on the container disk too. See "Getting
+the token onto a RUNNING pod" above; verify by LENGTH, and strip the BOM.
+
 ### "Install reported success, and the pack contributes ZERO nodes"
 
 ComfyUI is scanning a different directory than the one you installed into. Do
