@@ -173,7 +173,25 @@ class IndexTTS2Engine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return os.environ.get("OTR_INDEXTTS2_VENV") or _default(".venv", "Scripts", "python.exe")
+        """The isolated venv's interpreter, whichever layout this OS uses.
+
+        A venv puts its interpreter in ``Scripts\\python.exe`` on Windows and
+        ``bin/python`` everywhere else. This resolved only the Windows form, so
+        on Linux the existence check in ``load()`` could never pass and the
+        engine refused with "IndexTTS2 Path B not installed" while pointing at a
+        path that is not where a Linux venv keeps its interpreter -- the message
+        blamed the install, and the install was fine.
+
+        Found on a rented Linux pod 2026-08-31, where a correct index-tts
+        install (venv on Python 3.11, checkpoints present, 42 reference WAVs,
+        worker on disk) still failed every lane at ``OTR_BatchCharacterVoices``.
+        """
+        pinned = os.environ.get("OTR_INDEXTTS2_VENV")
+        if pinned:
+            return pinned
+        if os.name == "nt":
+            return _default(".venv", "Scripts", "python.exe")
+        return _default(".venv", "bin", "python")
 
     def _model_dir(self):
         return os.environ.get("OTR_INDEXTTS2_DIR") or _default("checkpoints")
@@ -197,9 +215,14 @@ class IndexTTS2Engine:
                             ("weights dir", model_dir)):
             if not os.path.exists(path):
                 raise RuntimeError(
-                    "IndexTTS2 Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_indextts2_install.ps1 (isolated venv + weights) "
-                    "before rendering with indextts2 (the default char voice)" % (label, path))
+                    "IndexTTS2 Path B not installed: %s missing at %s -- on "
+                    "Windows run scripts\\_otr_indextts2_install.ps1 (isolated "
+                    "venv + weights); elsewhere clone index-tts, build its venv "
+                    "on Python 3.11 (it pins >=3.10,<3.12, so `uv venv --python "
+                    "3.11` is the reliable route), fetch its checkpoints, and "
+                    "point OTR_INDEXTTS2_VENV / _DIR / _WORKER at them if the "
+                    "layout differs. Needed before rendering with indextts2 "
+                    "(the default char voice)" % (label, path))
         cfg = os.path.join(model_dir, "config.yaml")
         if not os.path.exists(cfg):
             raise RuntimeError(
