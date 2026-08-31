@@ -332,9 +332,16 @@ its GPU, and no VRAM table will warn you.
 **Two limits, stated so nobody reads more into this than it carries.** The lab's
 own rule is that a recipe is only `PASS` when a **second consecutive warm run**
 records it, and both H3 MIME receipts are `run_number 1`, cold -- so this is a
-cold pass, not a completed gate. And the physical 8 GB laptop has had its
-hardware inventoried (**8,188 MiB VRAM, 31.7 GiB host RAM**) and has rendered
-**nothing**: its own report says `HARDWARE_OBSERVED_NOT_ENROLLED`.
+cold pass, not a completed gate. **The physical 8 GB laptop has since rendered, and this section used to say
+otherwise.** It reported the card inventoried (**8,188 MiB VRAM, 31.7 GiB host
+RAM**) but having "rendered nothing" -- true when written, false within days,
+and left standing while an 8 GB RTX 4060 published **five of five source banks**
+on `animatediff15_v3_haunted_video` (`docs/4060_DRILL_LOG.md`, steps 7-19). That
+is why the row above reads PROVEN rather than `?`, and why the per-machine table
+is now GENERATED -- see
+[docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md). A hand-kept compatibility
+claim goes stale in the direction that costs a user the most: telling them their
+card cannot do a thing it has already done.
 
 For contrast, `ltx25_high_video` measured **14.48 GiB** on the 16 GB card --
 roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
@@ -348,7 +355,7 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | **likely** | yes | yes |
 | `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | **likely** | yes | yes |
 | `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
-| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights, hold-2 cadence | ? | ? | yes |
+| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights, hold-2 cadence | **PROVEN** | yes | **PROVEN** |
 | `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
 | `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB @ 480x832x129 | no | maybe | yes |
 | `humo14_high_audio_in_wide (16:9)` | 13.06 GiB @ 832x480x97 | no | no | yes |
