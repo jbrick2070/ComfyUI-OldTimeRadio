@@ -1030,3 +1030,47 @@ being measured. The haunted profile works because it pins `kokoro`.
 
 A 200 GB volume is not enough to hold every lane. 400 GB, with the cache stored
 once, is comfortable.
+
+### Getting the token onto a RUNNING pod, without a redeploy
+
+A RunPod secret injects at pod CREATION, so a pod that predates the secret
+cannot see it and no amount of editing the template reaches it. That is worth
+knowing, but it is not the only route: the token can be sent to a live pod
+directly, and it never has to pass through an assistant's context.
+
+    # value goes registry -> ssh stdin -> file. Never echoed, never on a
+    # command line (where it would land in shell history and the process list).
+    $t = [Environment]::GetEnvironmentVariable('HF_TOKEN','User')
+    $t | ssh -p <port> -i <key> root@<ip> "cat > /root/.hf_token && chmod 600 /root/.hf_token"
+
+**PUT IT ON THE CONTAINER DISK (`/root`), NOT THE NETWORK VOLUME.** `/root` dies
+with the pod. `<models_root>/huggingface/token` sits on shared storage and is
+inherited by every future pod that mounts that volume, long after the pod that
+wrote it is gone.
+
+**POWERSHELL WILL CORRUPT IT, SILENTLY.** The transfer above arrived as **41
+bytes for a 37-character token** -- a UTF-8 BOM (3 bytes) plus a CR. The file
+looks right, `cat` prints something that looks like a token, and authentication
+fails with a message about the token being invalid rather than about encoding.
+This is the same Windows trap the project rules already call out for source
+files, and it applies just as well to a credential. Always verify the LENGTH,
+never the value:
+
+    sed -i "1s/^\xEF\xBB\xBF//" /root/.hf_token
+    tr -d "\r\n" < /root/.hf_token > /root/.hf_token.clean
+    mv /root/.hf_token.clean /root/.hf_token
+    wc -c < /root/.hf_token          # must equal the local length
+    head -c3 /root/.hf_token | od -An -tx1   # 68 66 5f = "hf_", NOT ef bb bf
+
+**Then prove it before spending a download on it.** Two calls, no weights moved:
+
+    GET /api/whoami-v2                         -> your username
+    GET /api/models/Lightricks/LTX-2.5         -> OK means the token works AND
+                                                  the licence terms are accepted
+
+That distinction matters: `gated: "auto"` fails identically for a bad token and
+for un-accepted terms, so a single probe that returns OK rules out both at once.
+
+**A running ComfyUI still will not see it.** The server read its environment at
+start, so a gated model loaded during a RENDER needs the process restarted with
+`HF_TOKEN` exported -- fetching weights from a shell is a separate matter.
