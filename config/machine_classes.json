@@ -102,7 +102,7 @@
     "toolchains": [],
     "allow_sidecars": false,
     "image": "z_image_turbo",
-    "voice_bank": "default",
+    "voice_bank": "kokoro_builtin",
     "announcer_voice": "kokoro",
     "music": "musicgen",
     "quant_policy": "bnb_nf4",
@@ -143,6 +143,7 @@
     "indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, dia, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.",
     "chatterbox and dia are announcer-capable cloning engines but each needs its own isolated venv; neither is installed on the rented pod.",
     "OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour.",
-    "scifi_news_pro on a rented pod: the RSS bank works, and two wrong diagnoses were recorded here before the right one. It is NOT datacenter IP blocking -- with a real User-Agent, sciencedaily/BBC/MIT all return 200 from the pod and only cosmosmagazine 403s. It is NOT partial feed failure either; the fetcher already skips a refusing feed. The cause was `feedparser` missing from ComfyUI's own venv, declared in requirements.txt and pyproject.toml but installed by the provisioner into the SYSTEM python. Same root as the `accelerate` failure. Fixed in scripts/otr_pod_provision.sh."
+    "scifi_news_pro on a rented pod: the RSS bank works, and two wrong diagnoses were recorded here before the right one. It is NOT datacenter IP blocking -- with a real User-Agent, sciencedaily/BBC/MIT all return 200 from the pod and only cosmosmagazine 403s. It is NOT partial feed failure either; the fetcher already skips a refusing feed. The cause was `feedparser` missing from ComfyUI's own venv, declared in requirements.txt and pyproject.toml but installed by the provisioner into the SYSTEM python. Same root as the `accelerate` failure. Fixed in scripts/otr_pod_provision.sh.",
+    "voice_bank must match the voice engine: kokoro accepts only 'kokoro_builtin'. Setting 'default' with char_voice=kokoro raises VoiceCastingError at OTR_CastLock, 12 minutes into a leg. Found by running it, 2026-08-31."
   ]
 }
