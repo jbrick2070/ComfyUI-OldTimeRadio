@@ -1,6 +1,6 @@
 {
   "id": "otr_rented24_heavy",
-  "display_name": "RENTED 24 GB+: the heavy set -- wan_ti2v video, indextts2 voice cloning, 12b writer resident. DRAFT: no episode has published from this profile. It exists so a rented card measures a 24 GB recipe instead of re-running the 16 GB one at two-thirds utilisation.",
+  "display_name": "RENTED 24 GB+: the heavy set -- wan_ti2v video, indextts2 CHARACTER voice cloning, stable_audio_3 music, raised writer ceiling and a longer frame budget. Announcer stays kokoro: indextts2 is not an announcer option. DRAFT -- nothing has published from it.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -19,7 +19,7 @@
     "voice_bank": "default",
     "cast_voice_policy": "auto_registry",
     "char_voice_engine": "indextts2",
-    "announcer_voice_engine": "indextts2",
+    "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
     "video_render_engine": "wan_ti2v"
   },
@@ -36,8 +36,8 @@
   "llm": {
     "device": "cuda",
     "attn_impl": "sdpa",
-    "quant_policy": "none",
-    "vram_ceiling_gb": 22.0,
+    "quant_policy": "bnb_nf4",
+    "vram_ceiling_gb": 18.0,
     "gguf_n_ctx": 8192,
     "gguf_quant": "Q4_K_M",
     "creative_model": "unsloth/gemma-4-12b-it-GGUF",
