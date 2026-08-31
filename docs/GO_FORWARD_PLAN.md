@@ -163,6 +163,31 @@ assume it is only music rows.
 
 **C. THE GHOST CLAUSE POOL -- panel first, see item 1. Do NOT widen it again.**
 
+**BOTH B AND C ARE IN SHARED CODE, NOT IN THE HAUNTED LANE. Checked 2026-08-31,
+because the obvious theory was that the retirement on 2026-08-23 kept the buggy
+variant and an earlier peer would be clean.** It did not, and there is no
+earlier peer to go back to. The class chain is three deep and almost empty:
+
+    GhostSignalEngine                  <- the base: cadence, frames, all logic
+      GhostSignalV3Engine              <- swaps the motion module to v3
+        GhostSignalV3HauntedEngine     <- adds a LoRA and lora_strength()
+
+The haunted lane overrides a name, a receipt id, two weight constants and one
+method. Everything that fails is underneath it: the clause pool lives in
+`ghost_signal_author.py`, shared by `otr_shot_lock.py`, `render_driver.py` and
+`schemas.py`; the cadence refusal is raised in `eng_ghost_signal.py:193`, in the
+BASE class. The peers deleted by `187380d0` were
+`eng_ghost_signal_cadence.py` -- hold-3 and hold-5 subclasses that changed only
+the traversal rate, in response to the operator's *"heavily fast paced ... could
+probably bring it down to 5fps"*. They would have exhausted the same pool and
+refused the same zero-frame beat.
+
+**Consequences worth acting on:** there is no lane to switch to in order to dodge
+either defect, so neither can be deferred by picking differently; both affect
+every AnimateDiff lane and anything else that authors ghost prompts, which
+RAISES their priority; and the panel on the pool should be pressed on the
+AUTHOR's contract, not on which lane calls it.
+
 **Not yet diagnosed:** `OTR_LedgerFreezeCascade` failed twice and the runner's
 eight-frame traceback did not capture the message. Next occurrence, read the
 SERVER log rather than the leg log.
