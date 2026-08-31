@@ -142,6 +142,7 @@
   "known_limits": [
     "indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, dia, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.",
     "chatterbox and dia are announcer-capable cloning engines but each needs its own isolated venv; neither is installed on the rented pod.",
-    "OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour."
+    "OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour.",
+    "scifi_news_pro does NOT run on a rented pod. It fetches an RSS seed (_fetch_rss_seed_or_die) and the news sources block datacenter IPs -- measured 2026-08-31: huggingface.co returned 200 from the same pod while sciencedaily.com/rss returned HTTPError. Not a bug and not fixable from our side; use a local bank (original, public_domain, shakespeare, media_archive) on rented hardware."
   ]
 }
