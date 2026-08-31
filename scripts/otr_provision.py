@@ -234,6 +234,56 @@ def install_indextts2(comfy: str, root: str) -> None:
         else "none -- indextts2 refuses without them; copy them here")
 
 
+def install_isolated_voice(comfy: str, name: str, pip_args: list) -> None:
+    """Build one isolated voice engine's venv and report its env var.
+
+    THE ENV VAR IS THE POINT. Each adapter resolves a Windows-shaped default
+    (`.venv/Scripts/python.exe`), and the obvious fix -- branching on os.name
+    inside the adapter -- is the wrong one: qualified voice routes are pinned to
+    an adapter FINGERPRINT, so editing that file un-qualifies every route
+    audited against it and the cast silently drops to an ordinary draw. That
+    cost the shipped Lemmy route once already. Setting OTR_<ENGINE>_VENV moves
+    no fingerprint.
+
+    chatterbox (MIT) and dia (Apache) are the two commercial-clean cloners and
+    the ONLY cloning engines the announcer accepts -- indextts2 is excluded
+    there by its non-commercial licence. So these are not spare options; they
+    are the only route to a cloned announcer.
+    """
+    if os.name == "nt":
+        say("SKIP", name, "Windows: use scripts/_otr_%s_install.ps1" % name)
+        return
+    root = os.path.join(os.path.dirname(comfy), name)
+    venv_py = os.path.join(root, ".venv", "bin", "python")
+    uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
+    if not os.path.exists(uv):
+        run(["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"])
+        uv = os.path.expanduser("~/.local/bin/uv")
+    if not os.path.exists(venv_py):
+        os.makedirs(root, exist_ok=True)
+        r = run([uv, "venv", "--python", "3.11", os.path.join(root, ".venv")])
+        if r.returncode != 0:
+            say("FAILED", "%s venv" % name, r.stderr.strip()[:60])
+            return
+    env = dict(os.environ, VIRTUAL_ENV=os.path.join(root, ".venv"))
+    run([uv, "pip", "install", "-q"] + pip_args, env=env)
+    r = run([venv_py, "-c", "import torch;print(torch.__version__)"])
+    ok = r.returncode == 0
+    say("OK" if ok else "FAILED", "%s venv" % name,
+        (r.stdout or r.stderr).strip()[:40])
+    if ok:
+        say("SET", "OTR_%s_VENV" % name.upper(), venv_py)
+        os.environ["OTR_%s_VENV" % name.upper()] = venv_py
+
+
+#: The isolated voice engines and what each venv needs.
+ISOLATED_VOICES = {
+    "chatterbox": ["chatterbox-tts", "soundfile", "torch", "torchaudio"],
+    "dia": ["git+https://github.com/nari-labs/dia.git", "soundfile",
+            "torch", "torchaudio"],
+}
+
+
 def profile_lanes(profile_id: str) -> list:
     """Which weight bundles a profile needs, read from the profile."""
     path = os.path.join(_REPO, "config", "profiles", profile_id + ".json")
@@ -261,6 +311,9 @@ def profile_lanes(profile_id: str) -> list:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--profile", default="otr_nvidia_8gb_haunted")
+    ap.add_argument("--with-all-voices", action="store_true",
+                    help="build EVERY isolated voice engine: indextts2, "
+                         "chatterbox, dia. Large; each gets its own venv.")
     ap.add_argument("--with-indextts2", action="store_true",
                     help="build the isolated voice-cloning environment (large)")
     ap.add_argument("--list", action="store_true",
@@ -288,6 +341,10 @@ def main(argv=None) -> int:
     fetch_lane_weights(lanes)
     if args.with_indextts2:
         install_indextts2(comfy, root)
+    if args.with_all_voices:
+        install_indextts2(comfy, root)
+        for name, pip_args in ISOLATED_VOICES.items():
+            install_isolated_voice(comfy, name, pip_args)
     else:
         say("SKIP", "index-tts", "pass --with-indextts2 to build it")
 
