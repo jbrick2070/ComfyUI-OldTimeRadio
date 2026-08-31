@@ -56,6 +56,16 @@ done
 # requirements somewhere ComfyUI never imports from, so `accelerate` was present
 # on disk and missing at runtime -- the writer died 18 s into a rented leg with
 # "requires `accelerate`" while requirements.txt had listed it all along.
+# SYSTEM LIBS FIRST. pycairo is a C extension: without libcairo2-dev and
+# pkg-config, `pip install pycairo` fails at metadata generation, and the pack
+# then raises ImportError inside the draw function at RENDER time -- every
+# viz_mandala frame and every scope overlay. pip alone cannot fix it.
+if command -v apt-get >/dev/null 2>&1; then
+  echo "  system libs: libcairo2-dev pkg-config"
+  apt-get update -qq >/dev/null 2>&1
+  apt-get install -y -qq libcairo2-dev pkg-config >/dev/null 2>&1     || echo "    (apt failed -- pycairo may not build; viz_mandala will refuse)"
+fi
+
 COMFY_PY="$COMFY_ROOT/.venv-cu128/bin/python"
 [ -x "$COMFY_PY" ] || COMFY_PY=$(ls -1 "$COMFY_ROOT"/.venv*/bin/python 2>/dev/null | head -1)
 [ -x "$COMFY_PY" ] || COMFY_PY=python3
