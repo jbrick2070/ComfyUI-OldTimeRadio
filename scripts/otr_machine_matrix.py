@@ -220,13 +220,25 @@ def render() -> str:
     A("| `wan_ti2v` (Wan 2.2 TI2V-5B) | RTX A4500, 20 GB, Ampere | "
       "`signal_lost_gleaming_in_ruby_20260901_030818`, 1 act, 3949 s, "
       "obs_publish OK |")
+    A("| `ltx25_high_foley_plus` (LTX 2.5 foley) | RTX 5080, 16 GB | "
+      "4 finished episodes in the 5 days to 2026-09-01, "
+      "delivered_engine `ltx25_foley_plus` |")
+    A("| `ltx25_high_mime` (LTX 2.5 mime) | RTX 5080, 16 GB | "
+      "3 finished episodes in the same window, "
+      "delivered_engine `ltx25_mime` |")
+    A("| `minimax_h3_video` (MiniMax H3) | RTX 5080, 16 GB | "
+      "`signal_lost_reel_of_resistance_20260828_121427` and "
+      "`signal_lost_the_poise_of_stone_20260827_143538` |")
     A("| `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | "
       "`signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, "
       "63.8 s at 1920x1080 |")
-    A("\nTwo of the three were proven on hardware that is not the development "
-      "machine, on a different GPU architecture. That is the point of the "
-      "list: it says what somebody else's computer did, not what this one "
-      "can do.\n")
+    A("\nCOUNTED FROM `delivered_engine` IN THE EPISODE LEDGER, over episodes "
+      "that have a final mp4, in the LAST 5 DAYS. Not from a list kept by "
+      "hand. Recency is the measure because the code moves -- an engine "
+      "proven in June is proven against June.\n")
+    A("Do not grep `episode_canon.json` for engine names: it records none, "
+      "and matches land in PROSE -- searching it for `humo` finds the word "
+      "`humorous` and invents a receipt.\n")
     A("### Proven as an ENGINE, but not yet as an episode\n")
     A("These passed a measured bench on named hardware and have never run "
       "the full OTR pipeline to a published episode. Both facts are worth "
@@ -238,10 +250,6 @@ def render() -> str:
       "27.53 GiB host RAM, 97 frames at 832x480 "
       "(`vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97.json`) "
       "| an OTR episode |")
-    A("| `minimax_h3` | RTX 5080: a full canvas campaign plus the MIME I2V "
-      "receipt at 7.28 GiB VRAM / 27.56 GiB host RAM "
-      "(`vram-recipe-lab/results/h3_canonical_canvas_campaign/`) "
-      "| an OTR episode, and a node pack with a public source |")
     A("\nBoth are queued in the 5080 rotation, so these rows should move up "
       "to the table above on their own.\n")
     A("## What works on what machine\n")

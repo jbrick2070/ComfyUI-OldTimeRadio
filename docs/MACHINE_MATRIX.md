@@ -12,9 +12,14 @@ Only engines that have produced a real OTR episode on named hardware appear here
 |---|---|---|
 | `ltx25_high_video` (LTX 2.5) | RTX 5080 Laptop, 16 GB, Blackwell | `signal_lost_feline_visitor_a_space_oddity_20260831_191928`, 1 act, 01:26:19; canon records engine `ltx25_video` |
 | `wan_ti2v` (Wan 2.2 TI2V-5B) | RTX A4500, 20 GB, Ampere | `signal_lost_gleaming_in_ruby_20260901_030818`, 1 act, 3949 s, obs_publish OK |
+| `ltx25_high_foley_plus` (LTX 2.5 foley) | RTX 5080, 16 GB | 4 finished episodes in the 5 days to 2026-09-01, delivered_engine `ltx25_foley_plus` |
+| `ltx25_high_mime` (LTX 2.5 mime) | RTX 5080, 16 GB | 3 finished episodes in the same window, delivered_engine `ltx25_mime` |
+| `minimax_h3_video` (MiniMax H3) | RTX 5080, 16 GB | `signal_lost_reel_of_resistance_20260828_121427` and `signal_lost_the_poise_of_stone_20260827_143538` |
 | `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | `signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, 63.8 s at 1920x1080 |
 
-Two of the three were proven on hardware that is not the development machine, on a different GPU architecture. That is the point of the list: it says what somebody else's computer did, not what this one can do.
+COUNTED FROM `delivered_engine` IN THE EPISODE LEDGER, over episodes that have a final mp4, in the LAST 5 DAYS. Not from a list kept by hand. Recency is the measure because the code moves -- an engine proven in June is proven against June.
+
+Do not grep `episode_canon.json` for engine names: it records none, and matches land in PROSE -- searching it for `humo` finds the word `humorous` and invents a receipt.
 
 ### Proven as an ENGINE, but not yet as an episode
 
@@ -23,7 +28,6 @@ These passed a measured bench on named hardware and have never run the full OTR 
 | engine | bench receipt | still missing |
 |---|---|---|
 | `humo` (HuMo 14B) | RTX 5080: **PASS**, peak 13.06 GiB VRAM / 27.53 GiB host RAM, 97 frames at 832x480 (`vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97.json`) | an OTR episode |
-| `minimax_h3` | RTX 5080: a full canvas campaign plus the MIME I2V receipt at 7.28 GiB VRAM / 27.56 GiB host RAM (`vram-recipe-lab/results/h3_canonical_canvas_campaign/`) | an OTR episode, and a node pack with a public source |
 
 Both are queued in the 5080 rotation, so these rows should move up to the table above on their own.
 
@@ -79,7 +83,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  88 profile(s), 41 shipping, 0 proven
+## 16 GB+  --  93 profile(s), 41 shipping, 0 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
@@ -125,7 +129,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>47 draft profile(s) here -- not vouched for</summary>
+<details><summary>52 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
@@ -152,6 +156,11 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_rot_ltx25_mime_klein` | ltx25_high_mime | indextts2 |
 | `otr_rot_ltx25_video_klein` | ltx25_high_video | indextts2 |
 | `otr_rot_ltx25_video_lumina` | ltx25_high_video | indextts2 |
+| `otr_rot_tts_ann_chatterbox` | ltx25_high_video | indextts2 |
+| `otr_rot_tts_ann_dia` | ltx25_high_video | indextts2 |
+| `otr_rot_tts_bark` | ltx25_high_video | bark |
+| `otr_rot_tts_chatterbox` | ltx25_high_video | chatterbox |
+| `otr_rot_tts_dia` | ltx25_high_video | dia |
 | `otr_rot_wan_ideogram4` | wan_ti2v | indextts2 |
 | `otr_rot_wan_klein` | wan_ti2v | indextts2 |
 | `otr_sbcov_1` | still_pan | indextts2 |
