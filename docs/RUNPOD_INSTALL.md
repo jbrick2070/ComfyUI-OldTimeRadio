@@ -525,6 +525,85 @@ a change to how often the model is unloaded -- not a silent substitution.
 
 ---
 
+## 4A. What the starter ships, and why it is not LTX 2.5
+
+**Settled 2026-09-01 by a kibitz round on the three pod blockers.** Everything in
+this section is a decision with a receipt, not a preference.
+
+### The starter ships `wan22_high_video`
+
+`config/profiles/otr_runpod_starter.json` selects **`wan22_high_video`**
+(internally `wan_ti2v`), because it is the only lane that is simultaneously:
+
+* **proven off the development machine** -- rendered end to end on a rented RTX
+  A4500 (Ampere, 20 GB) in 3,949 s, and carrying **eight published episodes** in
+  the ledger;
+* **completely fetchable by a stranger** -- the `wan_ti2v_gguf` lane is 9.37 GB
+  and self-contained (GGUF unet + GGUF encoder + Wan 2.2 VAE);
+* **honest about its canvas** -- the engine declares `render_canvas = (832, 480)`
+  and the profile declares the same pair, so the config an operator reads is the
+  canvas that renders.
+
+The engine's `OTR_ENABLE_WAN_TI2V` flag is a vestigial opt-in, not a hardware
+gate. The provisioner now exports it and appends it to `/root/.bashrc`.
+
+### Why LTX 2.5 is NOT in the starter
+
+Two independent reasons, either of which is sufficient:
+
+1. **A stranger cannot obtain it.** Its Gemma-4 encoder needs a ComfyUI-GGUF that
+   does not exist publicly -- upstream `main` rejects the architecture outright
+   with `Unexpected text model architecture type in GGUF file: 'gemma4'`.
+2. **Clearing the loader is not rendering an episode.** With the patch applied,
+   ComfyUI was still SIGKILLed at the container's cgroup limit (57.7 GiB) during
+   the two-stage decode at 1664x960.
+
+LTX 2.5 enters the starter when a clean pod publishes an episode with it, and not
+before.
+
+### H3 is operator-only, permanently, and this is not an engineering question
+
+`docs/H3_LICENSE_ATTESTATION.md` is signed: H3 inference runs only on the
+operator's own hardware, offline, and the weights are never redistributed "in any
+form, quantized included." Separately, the only fetchable H3 text encoder is
+**nvfp4, which requires hardware fp4 (sm_120)** -- so it cannot execute on Ampere
+or Ada regardless. Do not spend time hunting an upstream for the node pack; the
+answer is already written down.
+
+### humo is not blocked and never was
+
+The ledger records **32 published humo episodes** across four engine variants. The
+only gap is that no fetch lane exists yet. That is a download chore, not a blocker.
+(An earlier draft of the blockers document claimed humo had never produced an
+episode. That claim came from grepping the wrong file -- `episode_canon.json`
+records no engines at all. The authority is
+`meta.render_engines.per_clip[].delivered_engine` in the episode ledger.)
+
+### THE DEFECT THIS ROUND ACTUALLY FOUND -- a provisioned pod could not render
+
+Three faults, all fixed, all invisible to a green log:
+
+1. **The music model was never fetched.** The provisioner fetched one video lane
+   and one image precision and called that "the minimum that renders an episode."
+   `otr_fetch_lane_weights.py`'s own `MINIMUM_HINT` names
+   **haunted + one z_image precision + stable_audio_3**, and the `stable_audio_3`
+   lane note reads *"without it EVERY profile fails at the music node."* The
+   provisioner now fetches it by default (`OTR_PROVISION_AUDIO_LANE` to override).
+2. **A failed required download still exited 0.** The script is `set -uo pipefail`
+   with no `-e` -- deliberately, so benign non-zero does not abort a long
+   provision. But required weight lanes now increment a failure counter and the
+   script exits 1 with `provision INCOMPLETE`.
+3. **The starter had no preflight.** `preflight.required_models` was `[]`; it now
+   names seven real checkable filenames. The z_image DIFFUSION model is
+   deliberately excluded -- the provisioner picks its precision from the card, so
+   pinning one variant would fail the check on hardware that correctly chose
+   another.
+
+**The provisioner's default video lane now matches the starter profile** (chosen
+by VRAM: >= 16 GB gets `wan_ti2v_gguf`, smaller cards get the AnimateDiff floor).
+A default that disagrees with the one profile written for newcomers is the same
+bug as the missing music model.
+
 ## 5. Failure atlas -- indexed by SYMPTOM
 
 Find what you are seeing, not when it was discovered.

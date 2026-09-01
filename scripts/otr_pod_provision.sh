@@ -159,16 +159,38 @@ echo "  pip install -r requirements.txt  (into $COMFY_PY)"
 # 5. Weights for the ungated lane. Needs no Hugging Face token.
 cd "$CN/ComfyUI-OldTimeRadio" || exit 1
 
+# Probed ONCE, above every consumer: both the video lane and the image lane
+# below choose from these, and a second nvidia-smi call is a second answer.
+COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '. ')
+VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 | tr -dc '0-9')
+
 # WHICH WEIGHTS, AND WHO DECIDES. Not everyone wants every model, and these are
-# tens of gigabytes -- so this fetches ONE video lane and ONE image precision,
-# which is the minimum that renders an episode, and nothing else. Override with
+# tens of gigabytes -- so this fetches ONE video lane, ONE image precision, and
+# the music model, which together are the minimum that renders an episode.
+#
+# THE MUSIC MODEL IS NOT OPTIONAL AND WAS THE DEFECT HERE. `stable_audio_3` is
+# named in otr_fetch_lane_weights.py's own MINIMUM_HINT and its lane note reads
+# "without it EVERY profile fails at the music node" -- yet this script fetched
+# only video+image and still called that the minimum. A stranger provisioning a
+# fresh pod got a complete-looking install that could not render. Override with
 #
 #   OTR_PROVISION_LANES="haunted minimax_h3"   ./otr_pod_provision.sh
 #   OTR_PROVISION_LANES=""                     ./otr_pod_provision.sh   # skip
 #
 # `otr_fetch_lane_weights.py --list` names every lane. Already-present files are
 # reported PRESENT and re-downloaded never, so re-running this is cheap.
-VIDEO_LANES="${OTR_PROVISION_LANES-haunted}"
+# The DEFAULT must match what config/profiles/otr_runpod_starter.json selects,
+# or a newcomer provisions a pod and then cannot run the one profile written
+# for them. Chosen by VRAM the same way the image lane below is: the starter
+# targets 16 GB+ and wants real video diffusion (wan_ti2v, 832x480, eight
+# published episodes); smaller cards fall back to the AnimateDiff floor.
+if [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then LANE_DEFAULT=wan_ti2v_gguf
+else                                                LANE_DEFAULT=haunted
+fi
+VIDEO_LANES="${OTR_PROVISION_LANES-$LANE_DEFAULT}"
+
+# The music model. Empty to skip, but skipping it means no episode renders.
+AUDIO_LANE="${OTR_PROVISION_AUDIO_LANE-stable_audio_3}"
 
 # The image model is chosen for you because choosing WRONG is silent: the
 # adapter ranks nvfp4 > fp8 > bf16 and nvfp4 needs hardware fp4 (sm_120), so an
@@ -176,20 +198,25 @@ VIDEO_LANES="${OTR_PROVISION_LANES-haunted}"
 # size/offload question, NOT a can-it-run question -- z_image_turbo is the
 # low-VRAM lane and is proven at 8 GB. Set OTR_PROVISION_IMAGE_LANE to override,
 # or empty to skip.
-CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '. ')
-VR=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 | tr -dc '0-9')
+CC="$COMPUTE_CAP"
+VR="$VRAM_MIB"
 if   [ "${CC:-0}" -ge 120 ]   2>/dev/null; then ZDEFAULT=z_image_blackwell
 elif [ "${VR:-0}" -ge 20000 ] 2>/dev/null; then ZDEFAULT=z_image
 else                                              ZDEFAULT=z_image_int8
 fi
 IMAGE_LANE="${OTR_PROVISION_IMAGE_LANE-$ZDEFAULT}"
 
-echo "  weights to fetch: video=[${VIDEO_LANES:-none}] image=[${IMAGE_LANE:-none}]"
+echo "  weights to fetch: video=[${VIDEO_LANES:-none}] image=[${IMAGE_LANE:-none}] audio=[${AUDIO_LANE:-none}]"
 echo "    (compute_cap ${CC:-?}, vram ${VR:-?} MiB; override with OTR_PROVISION_LANES / OTR_PROVISION_IMAGE_LANE)"
-for L in $VIDEO_LANES $IMAGE_LANE; do
+for L in $VIDEO_LANES $IMAGE_LANE $AUDIO_LANE; do
   [ -n "$L" ] || continue
   echo "  --- $L"
-  "$COMFY_PY" scripts/otr_fetch_lane_weights.py "$L" 2>&1 | tail -6
+  # pipefail is set above, so a failed fetch survives the pipe into tail.
+  if ! "$COMFY_PY" scripts/otr_fetch_lane_weights.py "$L" 2>&1 | tail -6; then
+    echo "  !!! lane '$L' FAILED to fetch"
+    PROVISION_FAILURES="${PROVISION_FAILURES:-0}"
+    PROVISION_FAILURES=$((PROVISION_FAILURES + 1))
+  fi
 done
 
 # INDEXTTS2 ON LINUX USES THE ENV VAR, NOT A CODE CHANGE.
@@ -225,6 +252,20 @@ if [ -x "$IT_VENV" ]; then
   export OTR_INDEXTTS2_VENV="$IT_VENV"
   grep -q OTR_INDEXTTS2_VENV /root/.bashrc 2>/dev/null     || echo "export OTR_INDEXTTS2_VENV=\"$IT_VENV\"" >> /root/.bashrc
 fi
+
+# EXIT STATUS IS A PROMISE. There is no `set -e` here on purpose -- benign
+# non-zero (a grep that matches nothing, an absent optional dir) must not abort
+# a long provision. But a REQUIRED weight lane that failed to download is not
+# benign, and reporting exit 0 for it tells a caller the pod is ready when it
+# cannot render. Count those and fail honestly.
+if [ "${PROVISION_FAILURES:-0}" -gt 0 ]; then
+  echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ')  -- ${PROVISION_FAILURES} required lane(s) failed ==="
+  ls -1 "$OTR_COMFYUI_MODELS_ROOT/checkpoints" 2>/dev/null | sed 's/^/  ckpt: /'
+  exit 1
+fi
+
+grep -q OTR_ENABLE_WAN_TI2V /root/.bashrc 2>/dev/null || echo "export OTR_ENABLE_WAN_TI2V=1" >> /root/.bashrc
+export OTR_ENABLE_WAN_TI2V=1
 
 echo "=== provision done  $(date -u '+%H:%M:%SZ') ==="
 ls -1 "$OTR_COMFYUI_MODELS_ROOT/checkpoints" 2>/dev/null | sed 's/^/  ckpt: /'

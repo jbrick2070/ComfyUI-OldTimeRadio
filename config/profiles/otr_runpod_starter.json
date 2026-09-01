@@ -1,6 +1,6 @@
 {
   "id": "otr_runpod_starter",
-  "display_name": "RunPod starter -- one good video, voice, image and writer (16 GB+)",
+  "display_name": "RunPod starter -- one proven video, voice, image and writer (16 GB+)",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -8,9 +8,9 @@
   "toolchains": [],
   "allow_sidecars": true,
   "role_overrides": {
-    "announcer_visual": "ltx25_high_video",
-    "music_visual": "ltx25_high_video",
-    "character_visual": "ltx25_high_video",
+    "announcer_visual": "wan22_high_video",
+    "music_visual": "wan22_high_video",
+    "character_visual": "wan22_high_video",
     "announcer_image": "z_image_turbo",
     "music_image": "z_image_turbo",
     "character_image": "z_image_turbo"
@@ -21,7 +21,7 @@
     "char_voice_engine": "indextts2",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "ltx25_high_video"
+    "video_render_engine": "wan22_high_video"
   },
   "features": {
     "burn_captions": true,
@@ -77,7 +77,15 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": [],
+    "required_models": [
+      "Wan2.2-TI2V-5B-Q5_K_M.gguf",
+      "umt5-xxl-encoder-Q5_K_M.gguf",
+      "wan2.2_vae.safetensors",
+      "stable_audio_3_small_music.safetensors",
+      "t5gemma_b_b_ul2.safetensors",
+      "qwen_3_4b.safetensors",
+      "ae.safetensors"
+    ],
     "required_keys": []
   },
   "launch": {
