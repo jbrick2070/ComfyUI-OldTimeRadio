@@ -1,0 +1,96 @@
+{
+  "id": "otr_rot_h3_lumina",
+  "display_name": "MiniMax H3 low: silent video (sage-free h3 boot) + lumina_image (rotation)",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": true,
+  "role_overrides": {
+    "announcer_visual": "h3_low_video",
+    "music_visual": "h3_low_video",
+    "character_visual": "h3_low_video",
+    "announcer_image": "lumina_image",
+    "music_image": "lumina_image",
+    "character_image": "lumina_image"
+  },
+  "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "indextts2",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "h3_low_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 43,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "bnb_nf4",
+    "vram_ceiling_gb": 14.5,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q8_0",
+    "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "fp8_ok"
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 864,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": []
+  },
+  "launch": {
+    "boot_contract": "h3",
+    "sage_attention": false,
+    "extra_args": [
+      "--disable-pinned-memory",
+      "--reserve-vram",
+      "12"
+    ],
+    "env": {
+      "OTR_HEADLESS_DISABLE_PINNED": "1",
+      "OTR_HEADLESS_RESERVE_VRAM_GB": "12"
+    }
+  }
+}

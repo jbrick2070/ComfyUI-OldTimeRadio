@@ -56,7 +56,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  80 profile(s), 41 shipping, 0 proven
+## 16 GB+  --  88 profile(s), 41 shipping, 0 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
@@ -102,9 +102,9 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>39 draft profile(s) here -- not vouched for</summary>
+<details><summary>47 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
+Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
 | profile | video | voice |
 |---|---|---|
@@ -123,6 +123,14 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_lemmy_kokoro_diag` | still_flat | kokoro |
 | `otr_mac_mps` | still_motion | kokoro |
 | `otr_nv40_12gb` | wan_ti2v | indextts2 |
+| `otr_rot_h3_lumina` | h3_low_video | indextts2 |
+| `otr_rot_humo_klein` | humo | indextts2 |
+| `otr_rot_ltx25_foley_fluxgen1` | ltx25_high_foley_plus | indextts2 |
+| `otr_rot_ltx25_mime_klein` | ltx25_high_mime | indextts2 |
+| `otr_rot_ltx25_video_klein` | ltx25_high_video | indextts2 |
+| `otr_rot_ltx25_video_lumina` | ltx25_high_video | indextts2 |
+| `otr_rot_wan_ideogram4` | wan_ti2v | indextts2 |
+| `otr_rot_wan_klein` | wan_ti2v | indextts2 |
 | `otr_sbcov_1` | still_pan | indextts2 |
 | `otr_sbcov_2` | still_flat | indextts2 |
 | `otr_sbcov_3` | still_motion | indextts2 |
