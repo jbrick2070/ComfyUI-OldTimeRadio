@@ -25,6 +25,48 @@ if [ -z "$COMFY_ROOT" ]; then
   COMFY_ROOT=$(dirname "$(find /workspace / -maxdepth 5 -name folder_paths.py 2>/dev/null | head -1)")
 fi
 [ -d "$COMFY_ROOT" ] || { echo "FATAL: could not locate ComfyUI"; exit 1; }
+
+# --------------------------------------------------------------------------- #
+# 2b. THE HUGGING FACE TOKEN, WITHOUT MAKING ANYONE WRITE A FILE.
+#
+# Gated weights need it, and the friction was real: the documented way was to
+# echo a secret into /root/.hf_token by hand, on every pod, correctly. Easy to
+# skip, easy to fumble, and a fumbled one fails later as a 401 on a download
+# rather than as anything that says "token".
+#
+# THE EASY PATH IS A RUNPOD TEMPLATE ENVIRONMENT VARIABLE. Set HF_TOKEN in the
+# template UI once and every pod from it has one. The catch -- the same one that
+# bites OTR_COMFYUI_MODELS_ROOT -- is that RunPod sets template variables on the
+# CONTAINER (pid 1), and an SSH session gets a fresh environment that does not
+# inherit them. So pid 1 is read directly.
+#
+# Order: an existing file, then this shell, then the container, then a previous
+# `hf auth login`. The VALUE is never printed -- only where it came from and how
+# long it is, which is enough to diagnose a truncated paste and nothing more.
+HF_TOKEN_FILE=/root/.hf_token
+_tok=""; _src=""
+if [ -s "$HF_TOKEN_FILE" ]; then
+  _tok=$(tr -d ' \t\r\n' < "$HF_TOKEN_FILE"); _src="existing $HF_TOKEN_FILE"
+elif [ -n "${HF_TOKEN:-}" ]; then
+  _tok=$(printf '%s' "$HF_TOKEN" | tr -d ' \t\r\n'); _src="HF_TOKEN in this shell"
+else
+  _tok=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null | sed -n 's/^HF_TOKEN=//p' | head -1 | tr -d ' \t\r\n')
+  if [ -n "$_tok" ]; then _src="the pod's template environment (pid 1)"
+  elif [ -s "$HOME/.cache/huggingface/token" ]; then
+    _tok=$(tr -d ' \t\r\n' < "$HOME/.cache/huggingface/token"); _src="a previous hf auth login"
+  fi
+fi
+if [ -n "$_tok" ]; then
+  printf '%s' "$_tok" > "$HF_TOKEN_FILE"; chmod 600 "$HF_TOKEN_FILE"
+  export HF_TOKEN="$_tok"
+  echo "  HF token: found in $_src (${#_tok} chars) -> $HF_TOKEN_FILE"
+  case "$_tok" in hf_*) : ;; *) echo "    WARNING: does not start with hf_ -- check for a truncated paste" ;; esac
+else
+  echo "  HF token: NONE FOUND. Ungated lanes still work; gated ones will 401."
+  echo "    Set HF_TOKEN in the RunPod template, or: printf '%s' <token> > $HF_TOKEN_FILE"
+fi
+unset _tok _src
+
 CN="$COMFY_ROOT/custom_nodes"
 echo "  comfy root : $COMFY_ROOT"
 

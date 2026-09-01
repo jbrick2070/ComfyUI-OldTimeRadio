@@ -987,7 +987,9 @@ index-tts here is what fills the disk, and the failure arrives as
     cd <comfy>/custom_nodes
     git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 
-    # 2. the token, before any gated fetch
+    # 2. the token -- USUALLY NOTHING TO DO HERE
+    #    Set HF_TOKEN once in the RunPod template UI and the provisioner finds
+    #    it by itself. Only needed if you did not:
     printf '%s' "$HF_TOKEN" > /root/.hf_token && chmod 600 /root/.hf_token
 
     # 3. everything else, in one command
@@ -1051,3 +1053,32 @@ Weights for exactly this set, and nothing else:
 LTX 2.5's own weights are gated -- accept the terms on Hugging Face, set
 HF_TOKEN, and note that ComfyUI must be **v0.32.0 or newer** or the lane cannot
 resolve its nodes at all (section 0 of DEPENDENCIES).
+
+### Giving the pod your Hugging Face token, the easy way
+
+**Set `HF_TOKEN` in the RunPod template UI, once.** Every pod from that template
+then has it, and `otr_pod_provision.sh` picks it up with no further action --
+there is no file to write and no command to remember.
+
+The reason that is not obvious: RunPod sets template variables on the CONTAINER
+(pid 1), and an SSH session gets a fresh environment that does NOT inherit them,
+so `echo $HF_TOKEN` over SSH prints nothing even when the template set it. The
+provisioner reads pid 1 directly, which is the same trick it already uses for
+`OTR_COMFYUI_MODELS_ROOT`.
+
+It searches, in order:
+
+    1. an existing /root/.hf_token
+    2. HF_TOKEN in the shell running the provisioner
+    3. HF_TOKEN on the container (pid 1) -- the template variable
+    4. ~/.cache/huggingface/token, from a previous `hf auth login`
+
+and writes whatever it finds to `/root/.hf_token`, chmod 600. It prints only
+WHERE the token came from and HOW LONG it is -- never the value. That length is
+worth reading: a token pasted through PowerShell once arrived 41 characters
+instead of 37, carrying a BOM and a carriage return, and the only symptom was a
+401 much later. Whitespace is now stripped, and a value not starting with `hf_`
+is called out.
+
+With no token, ungated lanes still work; gated ones 401. The provisioner says so
+rather than failing silently.
