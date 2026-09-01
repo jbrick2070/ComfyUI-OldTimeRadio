@@ -1119,3 +1119,32 @@ nothing until a restart. Verify with:
 
     python -c "import sys;sys.path.insert(0,'<comfy>/custom_nodes/ComfyUI-GGUF');
                import loader;print('gemma4' in loader.TXT_ARCH_LIST)"
+
+### "ComfyUI was Killed, and free said there were 193 GiB available"
+
+`free` INSIDE A CONTAINER REPORTS THE HOST'S MEMORY, NOT YOUR LIMIT. Measured
+on a RunPod pod, 2026-09-01:
+
+    free -g              251 GiB total, 193 GiB available
+    cgroup memory.max     61999996928 bytes = 57.7 GiB   <- the real ceiling
+
+ComfyUI ran until it crossed 57.7 GiB and the kernel killed it. The log ends
+mid-render with no error, the shell prints `Killed`, and nothing anywhere
+mentions memory. There is no CUDA OOM because it was never a VRAM problem.
+
+Read the cgroup, not `free`:
+
+    cat /sys/fs/cgroup/memory.max            # cgroup v2
+    cat /sys/fs/cgroup/memory/memory.limit_in_bytes   # v1
+
+**This invalidates casual host-RAM reasoning on any pod**, including OTR's own
+DRAM canary, which reads psutil and therefore sees the host. A canary that
+believes it has 193 GiB will never warn before a kill at 57.7.
+
+What crossed it here: `ltx25_foley_plus` on its TWO-STAGE PASS, decoding at
+1664x960. The video and mime lanes at the same canvas did not. So the two-stage
+decode is the expensive step, and 57.7 GiB is not enough for it -- a real
+number for the matrix, and one the lab's own H3 receipts hint at with their
+27-33 GiB host-RAM figures.
+
+If a pod must run that lane, size the CONTAINER's memory, not the instance's.
