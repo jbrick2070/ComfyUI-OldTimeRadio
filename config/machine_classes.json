@@ -77,6 +77,12 @@
           "episodes": 1,
           "date": "2026-09-01",
           "evidence": "ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute."
+        },
+        {
+          "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
+          "episodes": 1,
+          "date": "2026-09-01",
+          "evidence": "wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here."
         }
       ]
     },
