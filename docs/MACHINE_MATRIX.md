@@ -16,6 +16,17 @@ Only engines that have produced a real OTR episode on named hardware appear here
 
 Two of the three were proven on hardware that is not the development machine, on a different GPU architecture. That is the point of the list: it says what somebody else's computer did, not what this one can do.
 
+### Proven as an ENGINE, but not yet as an episode
+
+These passed a measured bench on named hardware and have never run the full OTR pipeline to a published episode. Both facts are worth having, and they are not the same fact: an engine that samples cleanly can still fail on cast, voices, captions or the mux.
+
+| engine | bench receipt | still missing |
+|---|---|---|
+| `humo` (HuMo 14B) | RTX 5080: **PASS**, peak 13.06 GiB VRAM / 27.53 GiB host RAM, 97 frames at 832x480 (`vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97.json`) | an OTR episode |
+| `minimax_h3` | RTX 5080: a full canvas campaign plus the MIME I2V receipt at 7.28 GiB VRAM / 27.56 GiB host RAM (`vram-recipe-lab/results/h3_canonical_canvas_campaign/`) | an OTR episode, and a node pack with a public source |
+
+Both are queued in the 5080 rotation, so these rows should move up to the table above on their own.
+
 ## What works on what machine
 
 | your machine | writer | video | voice | music | image | status |
