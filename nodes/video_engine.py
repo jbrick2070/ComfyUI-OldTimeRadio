@@ -1127,52 +1127,10 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     return output_path
 
 
-# -----------------------------------------------------------------------------
-# TELEMETRY HUD - Post-roll treatment card
-# Rendered AFTER the episode audio ends.  No spoilers during playback.
-#
-# Layout:
-#   LEFT  (30 %) - static: title, style, news seed, cast & voices
-#   DIV         - 1 px phosphor-green divider
-#   RIGHT (70 %) - scrolling classified transcript (scene arc + full script)
-# -----------------------------------------------------------------------------
-
-def _fh(font, pad=4):
-    """Line height for *font* (PIL getbbox-safe)."""
-    try:
-        bb = font.getbbox("Mg")
-        return bb[3] - bb[1] + pad
-    except Exception:
-        return 16 + pad
 
 
-def _fw(text, font):
-    """Text pixel width for *font* (PIL getbbox-safe)."""
-    if not text:
-        return 0
-    try:
-        bb = font.getbbox(str(text))
-        return max(0, bb[2] - bb[0])
-    except Exception:
-        return len(str(text)) * 8
 
 
-def _draw_wrapped(draw, text, x, y, max_w, font, fill, lh, indent=0):
-    """Word-wrap *text* into *draw* starting at (x, y). Returns new y."""
-    words = str(text).split()
-    line_buf = []
-    for word in words:
-        test = " ".join(line_buf + [word])
-        if _fw(test, font) > max_w and line_buf:
-            draw.text((x + indent, y), " ".join(line_buf), fill=fill, font=font)
-            y += lh
-            line_buf = [word]
-        else:
-            line_buf.append(word)
-    if line_buf:
-        draw.text((x + indent, y), " ".join(line_buf), fill=fill, font=font)
-        y += lh
-    return y
 
 
 def _get_latest_telemetry():
@@ -1215,585 +1173,10 @@ def _get_latest_telemetry():
         
     return peak_gb, speed, model
 
-def _build_hud_dossier(led):
-    """BUG 3 (2026-06-20 operator): the forensic MODEL / ENGINE detail that
-    ``_write_story_treatment`` records, formatted as scrollable credit sections so
-    it shows ON-SCREEN in the rolling credits -- not only in the ``_treatment.txt``
-    sidecar. Mirrors the treatment's blocks, reading the SAME ``meta`` / ``led``
-    fields. Returns ``[{"header": str, "lines": [str, ...]}, ...]``. Best-effort;
-    never raises (a missing field prints "(not recorded)")."""
-    led = led if isinstance(led, dict) else {}
-    meta = led.get("meta") or {}
-    gp = meta.get("gen_params_initial") or {}
-    NR = "(not recorded)"
-
-    def g(d, k, default=NR):
-        v = (d or {}).get(k)
-        return v if (v is not None and v != "") else default
-
-    sections: list = []
-
-    # 1. WRITER / LLM CONFIG
-    wl = [
-        "Creative (A):  %s" % g(gp, "creative_writing_model",
-                                g(meta, "creative_writing_model")),
-        "Technical (B): %s" % g(gp, "technical_model",
-                                g(meta, "technical_model")),
-    ]
-    _tr = meta.get("slot_transitions")
-    if _tr is not None:
-        wl.append("Slot routing:  %s A<->B transition(s)" % _tr)
-    wl.append("Creativity:    %s" % g(gp, "creativity"))
-    wl.append("Temp / top_p:  %s / %s" % (g(gp, "temperature"), g(gp, "top_p")))
-    # 2026-08-14: was "target %s / actual %s". target_words is no longer
-    # written, so the target half printed "(not recorded)" into every
-    # published HUD dossier. Length is an observation now -- report it.
-    wl.append("Words:         %s (char %s / ann %s)" % (
-        g(meta, "total_word_count"),
-        g(meta, "character_word_count"), g(meta, "announcer_word_count")))
-    sections.append({"header": "WRITER / LLM CONFIG", "lines": wl})
-
-    # 2. RESOLVED (OPENROUTER) -- the concrete model each ~latest alias served
-    try:
-        from ._otr_openrouter_backend import resolved_models_snapshot as _rms
-        resolved = _rms() or {}
-    except Exception:  # noqa: BLE001 -- backend optional / not loaded
-        resolved = {}
-    if resolved:
-        rl = []
-        total = 0.0
-        for slug in sorted(resolved):
-            info = resolved[slug] or {}
-            cost = float(info.get("cost_usd") or 0.0)
-            total += cost
-            rl.append("%s -> %s (%d call(s), $%.4f)" % (
-                slug, info.get("resolved") or "(unreported)",
-                int(info.get("calls") or 0), cost))
-        rl.append("Total OpenRouter cost: $%.4f" % total)
-        sections.append({"header": "RESOLVED (OPENROUTER)", "lines": rl})
-
-    # 3. STORY SPINE -- what the episode was ABOUT (produced story + wants).
-    # Meta split (2026-07-09): the premise is the PRODUCED story's logline
-    # (K.5.6 summary of the composed episode); the pre-generation source
-    # digest is printed as "Source:" when the logline exists, keeping the
-    # two concepts visibly distinct. Old ledgers keep the legacy read.
-    sl = []
-    news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
-    produced = (meta.get("produced_story")
-                if isinstance(meta.get("produced_story"), dict) else {})
-    if produced.get("logline"):
-        sl.append("Premise:   %s" % str(produced["logline"]))
-        if news.get("script_brief"):
-            sl.append("Source:    %s" % g(news, "script_brief"))
-    elif news:
-        sl.append("Premise:   %s" % g(news, "script_brief"))
-    if news:
-        _kt = news.get("key_terms") or []
-        if _kt:
-            sl.append("Key terms: %s" % ", ".join(str(t) for t in _kt))
-    ds = (meta.get("dramatic_state")
-          if isinstance(meta.get("dramatic_state"), dict) else {})
-    if ds:
-        sl.append("Question:  %s" % g(ds, "dramatic_question"))
-        sl.append("A wants:   %s" % g(ds, "character_a_wants"))
-        sl.append("B wants:   %s" % g(ds, "character_b_wants"))
-        sl.append("Ending:    %s" % g(ds, "ending_change"))
-    if sl:
-        sections.append({"header": "STORY SPINE", "lines": sl})
-
-    # 4. RENDER ENGINES -- RIPPED (credits enrichment 2026-07-03). The per-role
-    # image/video engine receipts do NOT exist at node-12 time: this node
-    # (OTR_SignalLostVideo) renders BEFORE the image dispatcher (91) and the
-    # video render batch (92), so reading render_engines / image_engines here
-    # only ever printed stale/"(not recorded)" data. The unified receipt roll is
-    # now rendered LATE from the DURABLE ledger in OTR_CreditsRoll (see
-    # nodes/otr_credits_roll.py :: build_credits_sections -> MOTION / IMAGES).
-    # node-12's dossier keeps only what is TRUE at its early time (writer /
-    # story spine / system).
-
-    # 5. SYSTEM -- techie-friendly host / CPU / RAM / GPU / VRAM / CUDA / torch
-    # (operator 2026-06-20). Same source as the treatment; any unprobeable field
-    # degrades to "(unknown)" rather than failing the credits.
-    try:
-        from ._otr_sys_specs import collect_system_specs as _css
-        sysd = _css() or {}
-    except Exception:  # noqa: BLE001 -- spec probe is best-effort
-        sysd = {}
-
-    def sg(k):
-        return sysd.get(k) or "(unknown)"
-
-    sections.append({"header": "SYSTEM", "lines": [
-        "Host:  %s    OS: %s" % (sg("hostname"), sg("os")),
-        "CPU:   %s  (%s)" % (sg("cpu"), sg("cpu_cores")),
-        "RAM:   %s  (peak %s)" % (sg("ram"), sg("ram_peak")),
-        "GPU:   %s  (%s VRAM)" % (sg("gpu"), sg("vram")),
-        "CUDA:  %s    torch %s    Python %s" % (
-            sg("cuda"), sg("torch"), sg("python")),
-    ]})
-
-    return sections
 
 
-def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
-                    news_used, duration_s, W, H):
-    """Return a clean data dict for *_TelemetryHUDRenderer*.
-
-    v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
-    dict). Single parse at top of render_video; no re-parsing here.
-
-    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
-    from `plan` (director-shaped intermediate dict) to explicit
-    `voice_assignments` + `style` + `genre` parameters. Caller derives
-    voice_assignments from led["cast"] via
-    _otr_ledger_consumers.voice_assignments_from_cast.
-
-    Behavior change vs legacy: scene_break / environment / pause
-    item-types don't exist in the v2 ledger schema, so the multi-scene
-    structure collapses to a single pseudo-scene containing all
-    dialogue items from led.lines in ledger order. Cast is
-    enriched from led.cast (which has name + voice_preset per entry).
-    """
-    import time as _t
-
-    led = led if isinstance(led, dict) else {}
-    voice_assignments = voice_assignments if isinstance(voice_assignments, dict) else {}
-
-    # Voice assignments are now derived from cast at the call site.
-    # The dict is shaped {"<name>": {"voice_preset": "..."}} (Sprint 6.2
-    # helper output); flatten to {"<name>": "<preset>"} for HUD use.
-    voices = {}
-    for k, v in voice_assignments.items():
-        if isinstance(v, dict):
-            voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", ""))))
-        else:
-            voices[str(k)] = str(v)
-
-    # News seeds (handle JSON-list format)
-    # kibitz r2-r4 provenance: the first entry may carry a bank-aware
-    # origin_label (original_radio stamps "STORY ORIGIN"); legacy payloads
-    # have no such key and keep the "NEWS SEED" default at draw time.
-    news_seeds = []
-    news_origin_label = ""
-    _nr = (news_used or "").strip()
-    if _nr.startswith("["):
-        try:
-            _entries = json.loads(_nr)
-            news_seeds = [
-                str(s.get("headline", s) if isinstance(s, dict) else s)
-                for s in _entries[:2]
-            ]
-            if _entries and isinstance(_entries[0], dict):
-                news_origin_label = str(
-                    _entries[0].get("origin_label") or "")
-        except Exception:
-            news_seeds = [_nr[:100]]
-    elif _nr:
-        news_seeds = [_nr.split("\n")[0][:100]]
-
-    # Cast: prefer led.cast (v2 ledger has name + voice_preset per entry)
-    # over production_plan.voice_assignments (legacy Director output).
-    # Fall back to voices dict on cast entries with missing presets.
-    cast = []
-    for entry in (led.get("cast") or []):
-        if not isinstance(entry, dict):
-            continue
-        char = str(entry.get("name") or entry.get("char_id") or "?")
-        preset = str(
-            entry.get("voice_preset") or voices.get(char, "")
-        )
-        cast.append({
-            "char":   char,
-            "preset": preset,
-            "desc":   _PRESET_DESC.get(preset, ""),
-        })
-    # If led.cast was empty (e.g. legacy producer that skipped cast
-    # stamping), fall back to voice_assignments-only cast for back-compat.
-    if not cast:
-        cast = [
-            {"char": c, "preset": p, "desc": _PRESET_DESC.get(p, "")}
-            for c, p in sorted(voices.items())
-        ]
-
-    # Scenes: ledger schema has no scene_break / environment markers,
-    # so collapse to a single pseudo-scene. Items walk led.lines in
-    # ledger order, dispatching by speaker_role:
-    #   character / announcer  -> dialogue item
-    #   music_open/close/inter -> skip (HUD never rendered "music"
-    #                            items even under the legacy schema)
-    items = []
-    # Build a name lookup so character/announcer dialogue items can
-    # resolve their voice preset via the cast block we just built.
-    cast_name_to_preset = {c["char"]: c["preset"] for c in cast}
-    from . import _otr_ledger_consumers as _OTRLC
-    for line in _OTRLC.iter_lines(led):
-        role = line.get("speaker_role") or ""
-        text = (line.get("text") or "").strip()
-        if not text:
-            continue
-        if role in ("character", "announcer"):
-            char = _OTRLC.speaker_name(led, line)
-            items.append({
-                "type":   "dialogue",
-                "char":   char,
-                "text":   text,
-                "preset": cast_name_to_preset.get(char, ""),
-            })
-        # music_* speaker_roles intentionally skipped (no HUD handler).
-
-    scenes = [{"scene_num": "1", "env": "", "items": items}] if items else []
-
-    peak_gb, speed, model = _get_latest_telemetry()
-
-    return {
-        "title":      episode_title,
-        # Master style key. Sprint 6.3 (2026-05-12): explicit `style`
-        # parameter from the caller. Sprint C C3 (2026-05-15): the
-        # `or genre` fall-through is deleted alongside the retirement of
-        # the `meta.visual_plan.genre` stamp. The `genre` parameter on
-        # this signature is now dead-but-harmless (always "" from the
-        # caller); Sprint G's orphan-parameter sweep will drop it.
-        "style":      style or "sci-fi",
-        "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
-        "duration_s": duration_s,
-        "resolution": f"{W}x{H}",
-        "news_seeds": news_seeds,
-        "news_origin_label": news_origin_label,
-        "cast":       cast,
-        "scenes":     scenes,
-        # BUG 3: the forensic model/engine dossier scrolls on the credits.
-        "dossier":    _build_hud_dossier(led),
-        "telemetry":  {"peak": peak_gb, "speed": speed, "model": model}
-    }
 
 
-class _TelemetryHUDRenderer:
-    """Post-roll Telemetry HUD frame generator.
-
-    Pre-renders both panels at init time; render() is cheap (crop + paste).
-    """
-
-    # Pixels per second. Raised 65 -> 180 on 2026-08-05 to MATCH
-    # otr_credits_roll._SCROLL_PPS. The operator has asked twice for a faster
-    # tail (60 -> 120 on 08-03, 120 -> 180 on 08-05) and both times only the
-    # credits-roll constant moved -- this HUD post-roll kept scrolling at 65 and
-    # runs up to 90 s, so it had become the slower half of the same perceived
-    # surface. Two scrollers on one tail at two speeds is the defect; one rate is
-    # the fix. Raising pps only SHORTENS the post-roll (hud_frames clamps to
-    # 20-90 s), so no duration guard can be violated by this direction.
-    _SCROLL_PPS = 180  # pixels per second -- keep in step with the credits roll
-
-    def __init__(self, w, h, fps, data):
-        self.w, self.h, self.fps = w, h, fps
-        self.data = data
-
-        self.LEFT_W  = max(280, int(w * 0.36))
-        self.DIV_X   = self.LEFT_W
-        self.RIGHT_X = self.LEFT_W + 2
-        self.RIGHT_W = w - self.LEFT_W - 2
-        self.P       = max(8, w // 120)
-
-        self.f_head  = _load_font(max(22, h // 28))
-        self.f_label = _load_font(max(16, h // 42))
-        self.f_body  = _load_font(max(14, h // 50))
-        self.f_small = _load_font(max(13, h // 58))
-
-        self._lhH = _fh(self.f_head)
-        self._lhL = _fh(self.f_label)
-        self._lhB = _fh(self.f_body)
-        self._lhS = _fh(self.f_small)
-
-        self._left  = self._build_left()
-        self._right, self._right_h, self._right_top = self._build_right()
-
-        # Scanline overlay (full canvas)
-        self._scanlines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        _sl = ImageDraw.Draw(self._scanlines)
-        for sy in range(0, h, max(2, h // 360)):
-            _sl.line([(0, sy), (w, sy)], fill=(0, 0, 0, 40))
-
-    # -- Public API --------------------------------------------------------
-
-    def hud_frames(self):
-        """Total frame count for the HUD post-roll (20-90 s).
-
-        Measured over the CONTENT SPAN, not the canvas. The panel is built on a
-        deliberately generous estimate (>= 3 screens) with a quarter-screen of
-        breathing room above the first line and trailing pad below the last, so
-        canvas height overstates how far there is to travel.
-        """
-        scroll_px = max(0, self._right_span() - self.h)
-        secs = scroll_px / self._SCROLL_PPS + 8.0
-        return int(max(20.0, min(90.0, secs)) * self.fps)
-
-    def _right_span(self):
-        """Height of the REAL transcript content, top of first line to bottom
-        of last."""
-        return max(0, self._right_h - self._right_top)
-
-    def render(self, fi, total_hud_frames):
-        """Return a PIL RGB Image for HUD frame *fi*."""
-        img = Image.new("RGB", (self.w, self.h), CRT_BG)
-
-        # Static left panel
-        img.paste(self._left, (0, 0))
-
-        # Divider
-        d = ImageDraw.Draw(img)
-        d.line([(self.DIV_X, 0), (self.DIV_X, self.h)], fill=CRT_DIM, width=1)
-
-        # Scrolling right panel
-        s_start = int(total_hud_frames * 0.08)
-        s_end   = int(total_hud_frames * 0.92)
-        if fi <= s_start:
-            frac = 0.0
-        elif fi >= s_end:
-            frac = 1.0
-        else:
-            frac = (fi - s_start) / max(1, s_end - s_start)
-
-        # SCROLL THE CONTENT, NOT THE CANVAS (2026-08-12, operator-caught on a
-        # 45-word leg). This was `frac * (self._right_h - self.h)` starting from
-        # 0, which meant the window opened on the quarter-screen of blank
-        # breathing room above the first line and closed BELOW the last one, in
-        # the trailing pad. Measured on the live artifact: ink in this column
-        # ran 0 until t=4s, full 6-14s, and 0 again from t=17s of a 20.8s roll
-        # -- the transcript was absent for ~38% of the credits and the tail
-        # faded out on an empty panel, which is what it looked like from the
-        # couch: "the script scroll is not appearing".
-        #
-        # Anchoring both ends to real ink makes the first line visible at
-        # frac=0 and rests the last line on the bottom edge at frac=1. When the
-        # content is SHORTER than the screen the span clamps to 0 and it simply
-        # holds, fully visible, instead of drifting through emptiness.
-        sy  = self._right_top + int(frac * max(0, self._right_span() - self.h))
-        bot = min(sy + self.h, self._right.height)
-        if bot > sy:
-            crop = self._right.crop((0, sy, self.RIGHT_W, bot))
-            if crop.height < self.h:
-                pad_img = Image.new("RGB", (self.RIGHT_W, self.h), CRT_BG)
-                pad_img.paste(crop, (0, 0))
-                crop = pad_img
-            img.paste(crop, (self.RIGHT_X, 0))
-
-        # Fade in / out (6 % of total)
-        fade_f = max(1, int(total_hud_frames * 0.06))
-        if fi < fade_f:
-            black = Image.new("RGB", (self.w, self.h), (0, 0, 0))
-            img = Image.blend(black, img, fi / fade_f)
-        elif fi > total_hud_frames - fade_f:
-            black = Image.new("RGB", (self.w, self.h), (0, 0, 0))
-            img = Image.blend(black, img, (total_hud_frames - fi) / fade_f)
-
-        # Scanlines
-        img = Image.alpha_composite(img.convert("RGBA"),
-                                    self._scanlines).convert("RGB")
-        return img
-
-    # -- Panel builders ----------------------------------------------------
-
-    def _build_left(self):
-        img = Image.new("RGB", (self.LEFT_W, self.h), CRT_BG)
-        d, P = ImageDraw.Draw(img), self.P
-        y = P
-
-        # Title
-        d.text((P, y), "SIGNAL LOST", fill=CRT_GREEN, font=self.f_head)
-        y += self._lhH
-        d.text((P, y), "EPISODE TREATMENT", fill=CRT_DIM, font=self.f_body)
-        y += self._lhB + P
-        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
-        y += P * 2
-
-        # Metadata
-        d.text((P, y), "METADATA", fill=CRT_AMBER, font=self.f_label)
-        y += self._lhL
-        lbl_w = _fw("DATE  ", self.f_body)
-        for lbl, val in [
-            ("TITLE", self.data.get("title", "?")),
-            # Sprint C C3 (2026-05-15): the `genre` fallback is deleted
-            # alongside the retirement of the `meta.visual_plan.genre`
-            # stamp. New plans always carry `style`; older cached plans
-            # without it now display "?" -- intentional, per the
-            # no-legacy-back-compat directive.
-            ("STYLE", self.data.get("style", "?")),
-            ("LEN",   f'{self.data.get("duration_s", 0) / 60:.1f} min'),
-            ("RES",   self.data.get("resolution", "?")),
-            ("DATE",  self.data.get("produced", "")[:10]),
-        ]:
-            d.text((P, y), lbl, fill=CRT_DIM, font=self.f_body)
-            d.text((P + lbl_w, y), str(val), fill=CRT_WHITE, font=self.f_body)
-            y += self._lhB
-        y += P
-        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
-        y += P * 2
-
-        # News seed (bank-aware origin label; legacy default "NEWS SEED")
-        d.text((P, y),
-               self.data.get("news_origin_label") or "NEWS SEED",
-               fill=CRT_AMBER, font=self.f_label)
-        y += self._lhL
-        for seed in self.data.get("news_seeds", [])[:2]:
-            d.text((P, y), seed, fill=CRT_DIM, font=self.f_body)
-            y += self._lhB + P // 2
-        y += P
-        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
-        y += P * 2
-
-        # Telemetry Block
-        d.text((P, y), "SYSTEM TELEMETRY", fill=CRT_AMBER, font=self.f_label)
-        y += self._lhL
-        
-        telemetry = self.data.get("telemetry", {})
-        speed_raw = telemetry.get('speed', '???')
-        # Ensure it fits elegantly
-        speed_str = f"{float(speed_raw):.1f} T/s" if speed_raw.replace('.', '', 1).isdigit() else f"{speed_raw}"
-        
-        for lbl, val in [
-            ("CORE",  telemetry.get("model", "UNKNOWN")),
-            ("FLUX",  speed_str),
-            ("MEM",   f"{telemetry.get('peak', '???')} GB")
-        ]:
-            d.text((P, y), lbl, fill=CRT_DARK, font=self.f_body)
-            d.text((P + lbl_w, y), str(val), fill=CRT_GREEN, font=self.f_body)
-            y += self._lhB
-            
-        y += P
-        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
-        y += P * 2
-
-        # Cast & voices - stop rendering if we're close to the footer
-        footer_y = self.h - self._lhS - P * 2  # reserve space for footer
-        if y < footer_y:
-            d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_label)
-            y += self._lhL
-        for m in self.data.get("cast", []):
-            if y + self._lhB >= footer_y:
-                break  # no more room - don't draw over the footer
-            d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_body)
-            y += self._lhB
-            preset = m.get("preset", "")
-            if preset and y + self._lhS < footer_y:
-                d.text((P * 2, y), preset, fill=CRT_DIM, font=self.f_small)
-                y += self._lhS
-            desc = m.get("desc", "")
-            if desc and y + self._lhS < footer_y:
-                char_w = max(1, _fw("m", self.f_small))
-                trunc = desc[:(self.LEFT_W - P * 3) // char_w]
-                if len(trunc) < len(desc):
-                    trunc = trunc.rstrip() + "-"
-                d.text((P * 2, y), trunc, fill=CRT_DARK, font=self.f_small)
-                y += self._lhS
-            y += P // 2
-
-        # Footer - always anchored to bottom regardless of cast overflow
-        fy = self.h - self._lhS - P
-        d.line([(P, fy - P), (self.LEFT_W - P, fy - P)], fill=CRT_DARK, width=1)
-        d.text((P, fy), "OTR v1.0", fill=CRT_DARK, font=self.f_small)
-        return img
-
-    def _build_right(self):
-        """Pre-render the full scrollable transcript.
-
-        Returns ``(img, content_bottom, content_top)``. Both edges are reported
-        because the canvas is an over-estimate at BOTH ends -- a quarter screen
-        of breathing room above the first line, generous trailing pad below the
-        last -- and scrolling between canvas edges puts blank panel on screen at
-        the start and end of every roll.
-        """
-        P, RW = self.P, self.RIGHT_W
-        scenes = self.data.get("scenes", [])
-        n_items = sum(len(s.get("items", [])) for s in scenes)
-        # BUG 3: reserve canvas height for the production dossier too (each
-        # dossier line may wrap -> allow 3x for safety) so it never clips.
-        dossier = self.data.get("dossier", [])
-        n_dossier = sum(len(s.get("lines", [])) + 2 for s in dossier)
-        est_h = (self.h
-                 + (len(scenes) * 4 + n_items * 5) * self._lhB
-                 + n_dossier * 3 * self._lhB
-                 + self.h)
-        est_h = max(est_h, self.h * 3)
-
-        img = Image.new("RGB", (RW, est_h), CRT_BG)
-        d   = ImageDraw.Draw(img)
-        y   = self.h // 4   # breathing room above first line
-        # Where real ink begins. The scroll opens here, not at canvas y=0, so
-        # the first line is on screen from the first frame.
-        content_top = y
-
-        # BUG 3 (2026-06-20): PRODUCTION DOSSIER -- the forensic model/engine/system
-        # detail scrolls on-screen ahead of the transcript (mirrors the
-        # _treatment.txt sidecar). Each section = amber header + white body lines;
-        # the transcript follows unchanged so it is never occluded.
-        for sec in (self.data.get("dossier") or []):
-            d.text((P, y), "[ %s ]" % sec.get("header", ""),
-                   fill=CRT_AMBER, font=self.f_label)
-            y += self._lhL + P // 2
-            for line in sec.get("lines", []):
-                y = _draw_wrapped(d, str(line), P * 2, y, RW - P * 3,
-                                  self.f_body, CRT_WHITE, self._lhB)
-            y += P * 2
-        if self.data.get("dossier"):
-            d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
-            y += P * 3
-
-        # Transcript header
-        d.text((P, y), "[ CLASSIFIED TRANSCRIPT ]", fill=CRT_GREEN, font=self.f_head)
-        y += self._lhH
-        d.text((P, y), f"EPISODE  //  {self.data.get('title','?').upper()}",
-               fill=CRT_AMBER, font=self.f_label)
-        y += self._lhL + P
-        d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
-        y += P * 3
-
-        for scene in scenes:
-            sc_num = scene.get("scene_num", "1")
-            env    = scene.get("env", "")
-
-            d.text((P, y), f"--  SCENE {sc_num}", fill=CRT_AMBER, font=self.f_label)
-            y += self._lhL
-            if env:
-                d.text((P * 3, y), f"ENV: {env}", fill=CRT_DIM, font=self.f_body)
-                y += self._lhB
-            y += P
-            d.line([(P, y), (RW // 2, y)], fill=CRT_DARK, width=1)
-            y += P * 2
-
-            for item in scene.get("items", []):
-                kind = item.get("type", "")
-                if kind == "dialogue":
-                    char   = item.get("char", "?")
-                    preset = item.get("preset", "")
-                    char_tag = f"{char}  [{preset}]" if preset else char
-                    d.text((P, y), char_tag, fill=CRT_GREEN, font=self.f_label)
-                    y += self._lhL
-                    y = _draw_wrapped(d, item.get("text", ""),
-                                      P * 3, y, RW - P * 4,
-                                      self.f_body, CRT_WHITE, self._lhB)
-                    y += P
-                elif kind == "pause":
-                    d.text((P, y), "[ . . . ]", fill=CRT_DARK, font=self.f_body)
-                    y += self._lhB
-            y += P * 3
-
-        # Sci-Fi Telemetry Easter Egg
-        telemetry = self.data.get("telemetry", {})
-        y += P * 2
-        easter_egg = f">> DIAGNOSTIC MEMORY ALLOCATION PEAKED AT {telemetry.get('peak', '???')}GB. NEURAL FLUX MAINTAINED AT {telemetry.get('speed', '???')} T/S. CONTAINMENT FIELD HOLDING."
-        y = _draw_wrapped(d, easter_egg, P, y, RW - P * 4, self.f_body, CRT_CYAN, self._lhB)
-        
-        # Footer
-        y += P * 4
-        d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
-        y += P * 2
-        d.text((P, y), "[ END OF CLASSIFIED TRANSCRIPT ]",
-               fill=CRT_DIM, font=self.f_label)
-        y += self._lhL
-        d.text((P, y), "SIGNAL LOST  //  ALL RIGHTS RESERVED",
-               fill=CRT_DARK, font=self.f_small)
-        y += self._lhS + P * 6
-
-        return img, y, content_top
 
 
 # -----------------------------------------------------------------------------
@@ -2299,7 +1682,7 @@ class SignalLostVideoRenderer:
         # sites stayed source-stable. Sprint 6.3 deconstructs that
         # intermediate dict: voice_assignments now derives from
         # led["cast"] at render time (Sprint 6.2 helper); style + genre
-        # are unpacked into local variables. Helpers (_parse_hud_data,
+        # are unpacked into local variables. Helpers (
         # _write_story_treatment) take voice_assignments/style/genre
         # as separate parameters instead of a director-shaped plan dict.
         from . import _otr_ledger_consumers as _OTRLC
@@ -2409,19 +1792,18 @@ class SignalLostVideoRenderer:
         _runtime_log("Video: Analysing audio (FFT + RMS)")
         volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
 
-        # -- 2b. Build post-roll Telemetry HUD (no VRAM, pure PIL) ----
-        # v2 ledger consumer: pass parsed led + plan dicts (parsed at
-        # the top of render_video). HUD never re-parses script_json.
-        try:
-            _hud_data     = _parse_hud_data(episode_title, led,
-                                            voice_assignments, style, genre,
-                                            news_used, duration, W, H)
-            _hud_renderer = _TelemetryHUDRenderer(W, H, fps, _hud_data)
-            _hud_frames   = _hud_renderer.hud_frames()
-        except Exception as _he:
-            log.warning("[Video] HUD build failed (post-roll skipped): %s", _he)
-            _hud_renderer = None
-            _hud_frames   = 0
+        # THE POST-ROLL TELEMETRY HUD WAS REMOVED HERE (2026-09-01).
+        # This engine used to append its own credits card after the episode
+        # audio -- METADATA / NEWS SEED / SYSTEM TELEMETRY / a scrolling
+        # transcript. OTR_CreditsRoll (node 95 in the canonical workflow)
+        # superseded it in a0224438 and this was never taken out, so every
+        # episode carried TWO credits sequences back to back. It went
+        # unnoticed for months because the lane that shows it most plainly is
+        # rarely run.
+        #
+        # What this engine still owns is untouched: the procedural base video,
+        # the title-card plan, and the procgen mp4 that PostUpscaleProcgenBlend
+        # blends -- the `_silent_procgen_blended_` in every output filename.
 
         # -- 3. Save audio to temp WAV for ffmpeg ---------------------
         import tempfile
@@ -2452,12 +1834,7 @@ class SignalLostVideoRenderer:
         # and the real closing music is `closing_theme_audio` on the sequencer
         # (a different input on a different node), while the delivered episode
         # audio is the frozen master muxed on last.
-        if _hud_frames > 0:
-            hud_samples = int(_hud_frames / fps * sr)
-            pcm_out = np.concatenate(
-                [pcm, np.zeros(hud_samples, dtype=np.int16)])
-        else:
-            pcm_out = pcm
+        pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
@@ -2538,7 +1915,7 @@ class SignalLostVideoRenderer:
         _title_timing = _resolve_title_timing(led, volume, fps, total_frames)
         renderer = _CRTRenderer(W, H, episode_title, volume, freqs, waves, fps,
                                 timing=_title_timing)
-        total_encode_frames = total_frames + _hud_frames
+        total_encode_frames = total_frames
 
         # -- Hero title-card plan for the DOWNSTREAM burn ------------------
         # The title is drawn here into a layer that is composited `screen` +
@@ -2573,9 +1950,6 @@ class SignalLostVideoRenderer:
         def _render_crt(fi):
             return renderer.render(fi, draw_scopes=draw_scopes)
 
-        def _render_hud(hi):
-            return _hud_renderer.render(hi, _hud_frames)
-
         def _frame_gen():
             import concurrent.futures
             max_workers = min(32, (os.cpu_count() or 4) + 4)
@@ -2591,14 +1965,6 @@ class SignalLostVideoRenderer:
                         if fi % (fps * 30) == 0 and fi > 0:
                             _runtime_log(f"Video: {fi}/{total_frames} frames rendered")
 
-            # Post-roll Telemetry HUD (no spoilers - plays after audio ends)
-            if _hud_renderer is not None and _hud_frames > 0:
-                _runtime_log(f"Video: Treatment HUD - {_hud_frames} frames")
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    for start in range(0, _hud_frames, chunk_size):
-                        end = min(start + chunk_size, _hud_frames)
-                        for frame in executor.map(_render_hud, range(start, end)):
-                            yield frame
 
         # -- 6. Encode ------------------------------------------------
         _runtime_log(f"Video: Encoding MP4 via ffmpeg -> {os.path.basename(out_path)}")
@@ -2611,7 +1977,7 @@ class SignalLostVideoRenderer:
 
         size_mb = os.path.getsize(out_path) / (1024 * 1024)
         log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames total)",
-                 out_path, size_mb, duration + (_hud_frames / fps), total_encode_frames)
+                 out_path, size_mb, duration, total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
         # Forensic treatment engine-enrich RIPPED (credits enrichment

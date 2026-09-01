@@ -397,19 +397,4 @@ class TestProvenance:
         assert entry["origin_label"] == "STORY ORIGIN"
         assert entry["headline"] == "Final Title"
 
-    def test_hud_parse_reads_origin_label(self):
-        from nodes import video_engine as VE
-        news_used = json.dumps([{"headline": "H",
-                                 "origin_label": "STORY ORIGIN"}])
-        led = {"cast": [], "meta": {}, "lines": []}
-        data = VE._parse_hud_data(
-            "T", led, {}, "style", "genre", news_used, 10.0, 640, 360)
-        assert data["news_origin_label"] == "STORY ORIGIN"
-        assert data["news_seeds"] == ["H"]
 
-    def test_hud_parse_legacy_default(self):
-        from nodes import video_engine as VE
-        data = VE._parse_hud_data(
-            "T", {"cast": [], "meta": {}, "lines": []}, {}, "s", "g",
-            json.dumps([{"headline": "H"}]), 10.0, 640, 360)
-        assert data["news_origin_label"] == ""

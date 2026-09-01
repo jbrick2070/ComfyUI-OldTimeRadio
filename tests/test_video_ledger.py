@@ -5,7 +5,7 @@ The full render_video path is heavy (HUD frame gen + ffmpeg subprocess
 + MP4 muxing). These tests exercise the parsing + helper dispatch +
 write-back paths CPU-only by:
   - Calling the refactored module-level helpers directly
-    (_parse_hud_data, _write_story_treatment) with a stub ledger dict
+    (_write_story_treatment) with a stub ledger dict
   - Probing the title chain via the early-return path in render_video
     when load_ledger raises (legacy-list test)
   - Verifying the meta.procgen_path stamp by patching the singleton
@@ -141,67 +141,6 @@ def test_in_flight_ledger_production_mode_keeps_headless_fallback(
         with pl._LEDGER_LOCK:
             pl._CURRENT = saved
 
-def test_video_hud_telemetry_from_ledger():
-    """_parse_hud_data with a stub ledger produces the expected
-    line-count fidelity: 2 character + 1 announcer dialogue items,
-    music lines silently dropped (the sfx item type died with the sfx
-    subsystem, rip-sfx-broll 2026-07-01).
-
-    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
-    from `plan` (legacy director-shaped dict) to explicit
-    `voice_assignments` + `style` + `genre` parameters. Empty dicts /
-    strings reproduce the legacy `plan = {}` behavior.
-    """
-    from nodes.video_engine import _parse_hud_data
-
-    led = make_stub_ledger()
-    news_used = json.dumps([{"headline": "Test seed"}])
-
-    data = _parse_hud_data(
-        episode_title="Test Title",
-        led=led,
-        voice_assignments={},
-        style="",
-        genre="",
-        news_used=news_used,
-        duration_s=12.3,
-        W=1920, H=1080,
-    )
-
-    assert data["title"] == "Test Title"
-    assert data["duration_s"] == 12.3
-    assert data["resolution"] == "1920x1080"
-    assert data["news_seeds"] == ["Test seed"]
-
-    # Cast pulled from led.cast (LEMMY c01, ASTRA c02 in the stub).
-    cast_chars = [c["char"] for c in data["cast"]]
-    assert "LEMMY" in cast_chars
-    assert "ASTRA" in cast_chars
-    # Voice presets carried through from led.cast voice_preset.
-    cast_presets = [c["preset"] for c in data["cast"]]
-    assert "v2/en_speaker_3" in cast_presets
-    assert "v2/en_speaker_9" in cast_presets
-
-    # Single pseudo-scene (v2 ledger has no scene_break markers).
-    assert len(data["scenes"]) == 1
-    assert data["scenes"][0]["scene_num"] == "1"
-    assert data["scenes"][0]["env"] == ""
-
-    items = data["scenes"][0]["items"]
-    item_types = [it["type"] for it in items]
-    # 1 announcer + 2 character lines = 3 dialogue items; nothing else.
-    assert item_types.count("dialogue") == 3
-    assert "sfx" not in item_types
-    # music_open / music_close lines are intentionally NOT in items.
-    assert "music" not in item_types
-
-    # Dialogue items carry char + text + preset.
-    dialogue_items = [it for it in items if it["type"] == "dialogue"]
-    chars_in_order = [it["char"] for it in dialogue_items]
-    # Stub order: announcer, c01 (LEMMY), c02 (ASTRA).
-    assert chars_in_order[0] == "UNKNOWN"  # announcer char_id="announcer", not in cast
-    assert chars_in_order[1] == "LEMMY"
-    assert chars_in_order[2] == "ASTRA"
 
 
 def test_video_treatment_writes_flat_list(tmp_path):
