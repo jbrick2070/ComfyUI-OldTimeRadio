@@ -151,7 +151,13 @@ def install_node_packs(comfy: str) -> None:
     ]
     for name, url, branch in packs:
         dest = os.path.join(cn, name)
-        if os.path.isdir(os.path.join(dest, ".git")):
+        # PRESENT means the directory is there with something in it, NOT that
+        # it is a git clone. ComfyUI-Manager installs packs without a .git
+        # directory -- the reference 5080 carries ComfyUI-GGUF exactly that
+        # way -- and the old .git test called such a pack absent, then tried
+        # to clone into a non-empty directory, failed, and reported FAILED for
+        # a pack that was installed and working.
+        if os.path.isdir(dest) and os.listdir(dest):
             say("PRESENT", name)
             continue
         cmd = ["git", "clone", "--depth", "1"]
