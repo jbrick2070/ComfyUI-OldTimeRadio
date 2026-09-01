@@ -28,6 +28,16 @@ python3 -c "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))
 # then use that tree's venv python, e.g. <root>/.venv/bin/python
 ```
 
+## 0. ComfyUI itself has a minimum version
+
+Some lanes resolve node classes that live in ComfyUI CORE, not in any node pack, so an older ComfyUI fails them no matter what you install. The failure arrives at RENDER time as WrapperNodeMissing, typically seventeen minutes in, after the script, cast, voices and stills are already done -- it looks nothing like a version problem.
+
+| lane | needs | why |
+|---|---|---|
+| `ltx25` (video / foley_plus / mime) | **ComfyUI >= v0.32.0** | `LTXVDualCFGGuider` and `LTXVModalityGuidance` entered core in commit 57ce8e1a, `Add support for LTX 2.5 (#15499)`, 2026-08-11. First tag containing them is v0.32.0. |
+
+Check yours with `git describe --tags` in the ComfyUI directory. A rented pod image measured v0.26.2 (2026-06-30) -- two months and eight minor versions behind -- and the ltx25 lane was unrunnable there for that reason alone, with every weight and node pack correctly installed.
+
 ## 1. System libraries -- pip cannot install these
 
 | package | install | why, and what breaks without it |

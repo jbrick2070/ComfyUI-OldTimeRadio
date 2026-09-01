@@ -907,3 +907,27 @@ Set both before any command that passes a REMOTE absolute path through Git Bash
 -- the obs bridge, ssh one-liners, docker, kubectl. Running the same command
 from PowerShell also avoids it. The tell is that the identical ssh command works
 when you type it and fails inside the script.
+
+### "ltx25 says WrapperNodeMissing and every pack and weight is installed"
+
+Check ComfyUI's own version before anything else:
+
+    cd <comfy-root> && git describe --tags
+
+**The ltx25 lane needs ComfyUI >= v0.32.0.** `LTXVDualCFGGuider` and
+`LTXVModalityGuidance` live in ComfyUI CORE -- `comfy_extras/nodes_lt.py` -- not
+in ComfyUI-LTXVideo, and they arrived in commit 57ce8e1a, *Add support for LTX
+2.5 (#15499)*, on 2026-08-11. No node pack can supply them.
+
+Measured on the rented pod: its image shipped **v0.26.2 (2026-06-30)**, two
+months and eight minor versions behind the development box's v0.34.2. Updating
+ComfyUI-LTXVideo changed nothing because the pack was already current and never
+had those classes.
+
+This is the most expensive shape of failure in the whole atlas, because every
+signal points the wrong way: the pack is installed, the weights are on disk, the
+node pack is at its latest commit, and the error names a node rather than a
+version. It surfaces at render time, seventeen minutes in.
+
+A pod image is a snapshot. Treat its ComfyUI version as a fact to check, not a
+given -- the template that boots fastest is often the one furthest behind.
