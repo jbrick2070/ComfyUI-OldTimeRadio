@@ -142,6 +142,27 @@ def render() -> str:
       "with nothing. Without a resolvable reference the engine refuses by name "
       "and there is no fallback.\n")
 
+    A("## 3b. Other custom node packs\n")
+    A("OTR resolves these node CLASSES by name at render time, so a missing "
+      "pack does not fail at startup -- it fails deep inside an episode, "
+      "after the script, cast, voices and stills are already done. wan_ti2v "
+      "died seventeen minutes in with WrapperNodeMissing for exactly this "
+      "reason.\n")
+    A("| pack | who needs it | what breaks without it |")
+    A("|---|---|---|")
+    A("| [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |")
+    A("| [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | "
+      "`wan_ti2v`, `ltx25` | `UnetLoaderGGUF` / `CLIPLoaderGGUF`. Both "
+      "lanes default to GGUF weights, so both are dead without it. |")
+    A("| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) "
+      "| `ltx25` | the advanced LTXV nodes (ImgToVideoInplace, "
+      "LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, "
+      "AudioVAEDecode, EmptyLatentAudio, ModalityGuidance). ComfyUI core "
+      "ships only Conditioning/Scheduler/ImgToVideo -- enough for "
+      "`ltx_8gb`, not for `ltx25`. |")
+    A("\n`scripts/otr_provision.py` clones all three. If you install by hand, "
+      "clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node "
+      "classes are registered at startup.\n")
     A("## 4. Model weights\n")
     A("See [MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) -- generated from the "
       "engine code, and the only place file names, repo ids and sizes are "

@@ -126,9 +126,28 @@ def ensure_hf_home(root: str) -> str:
 def install_node_packs(comfy: str) -> None:
     cn = os.path.join(comfy, "custom_nodes")
     os.makedirs(cn, exist_ok=True)
+    # WITHOUT THESE THE MEATY VIDEO LANES DO NOT RUN. Only AnimateDiff was
+    # listed here, so a provisioned machine could render the AnimateDiff lane
+    # and nothing else: wan_ti2v died 17 minutes in with WrapperNodeMissing,
+    # after writing, casting, voices and stills had all completed. The engines
+    # resolve these node CLASSES by name at render time, which is why the
+    # failure arrives late and looks nothing like a missing install.
     packs = [
+        # AnimateDiff lane.
         ("ComfyUI-AnimateDiff-Evolved",
          "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved", None),
+        # UnetLoaderGGUF / CLIPLoaderGGUF -- required by BOTH wan_ti2v and
+        # ltx25, whose default weights are GGUF. Note the directory name has a
+        # hyphen and so cannot be imported by module name; the engines resolve
+        # its node classes through the ComfyUI registry instead.
+        ("ComfyUI-GGUF", "https://github.com/city96/ComfyUI-GGUF", None),
+        # The advanced LTXV nodes -- LTXVImgToVideoInplace, LTXVLatentUpsampler,
+        # LTXVDualCFGGuider, LTXVConcatAVLatent, LTXVSeparateAVLatent,
+        # LTXVAudioVAEDecode, LTXVEmptyLatentAudio, LTXVModalityGuidance.
+        # ComfyUI core carries only the basic three (Conditioning, Scheduler,
+        # ImgToVideo), which is enough for ltx_8gb and not for ltx25.
+        ("ComfyUI-LTXVideo",
+         "https://github.com/Lightricks/ComfyUI-LTXVideo", None),
     ]
     for name, url, branch in packs:
         dest = os.path.join(cn, name)

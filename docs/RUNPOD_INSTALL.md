@@ -798,3 +798,40 @@ test, and a wrong "the volume attached" conclusion.
 
 Use the DIRECT form from the Connect tab, `ssh root@<ip> -p <port>`, for anything
 scripted. Keep the proxy for typing at a shell by hand.
+
+### "WrapperNodeMissing, seventeen minutes into a meaty video lane"
+
+A required CUSTOM NODE PACK is not installed. OTR's video engines resolve node
+CLASSES by name out of the ComfyUI registry at render time, so a missing pack
+cannot fail at startup -- it fails deep inside the episode, after the script,
+the cast, the voices and the stills have all completed successfully. That is
+what makes it read like a code fault instead of a missing install.
+
+    wan_ti2v   needs ComfyUI-GGUF                      (UnetLoaderGGUF, CLIPLoaderGGUF)
+    ltx25      needs ComfyUI-GGUF + ComfyUI-LTXVideo   (the advanced LTXV nodes)
+    ltx_8gb    needs neither -- core ComfyUI carries the basic LTXV three
+
+Both GGUF-dependent lanes default to GGUF weights, so ComfyUI-GGUF is not
+optional for them. `scripts/otr_provision.py` now clones all three packs; before
+2026-08-31 it cloned only AnimateDiff, which is why a fully provisioned machine
+could render the AnimateDiff lane and nothing else. Restart ComfyUI after
+adding a pack -- node classes register at startup.
+
+Diagnose it by reading the traceback rather than the runtime: the exception is
+raised from `wrapper_bridge`, names no file of yours, and the elapsed time will
+be long enough to look like an OOM that never happened.
+
+### "The bf16 image model fits a 20 GB card and not a 16 GB one"
+
+Measured on an A4500: `z_image_turbo_bf16` (11.46 GB) plus `qwen_3_4b` (7.49 GB)
+sat at 19.3 GB of 20 GB during the image stage -- about a gigabyte of headroom,
+and no room at all on a 16 GB card.
+
+This does not affect Blackwell, which runs `z_image_turbo_nvfp4` (4.20 GB) with
+the fp8 encoder. It affects a NON-Blackwell 16 GB card (4080, 4060 Ti 16 GB,
+A4000), which can execute neither nvfp4 nor the bf16 pair comfortably. The
+int8/fp8 variants exist for exactly that case -- but note the adapter's ranking
+is `nvfp4 > fp8 > bf16 > other`, and `z_image_turbo_int8_convrot` contains
+neither "fp8" nor "bf16", so it sorts LAST, below bf16. On such a card set
+`OTR_ZIMAGE_UNET` and `OTR_ZIMAGE_CLIP` explicitly rather than relying on the
+ranking to choose well.
