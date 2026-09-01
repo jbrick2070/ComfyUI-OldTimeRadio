@@ -69,6 +69,48 @@ fi
 COMFY_PY="$COMFY_ROOT/.venv-cu128/bin/python"
 [ -x "$COMFY_PY" ] || COMFY_PY=$(ls -1 "$COMFY_ROOT"/.venv*/bin/python 2>/dev/null | head -1)
 [ -x "$COMFY_PY" ] || COMFY_PY=python3
+
+# --------------------------------------------------------------------------- #
+# 4b. COMFYUI ITSELF HAS A MINIMUM VERSION, AND A POD IMAGE IS A SNAPSHOT.
+#
+# The ltx25 lane resolves LTXVDualCFGGuider and LTXVModalityGuidance out of
+# ComfyUI CORE (comfy_extras/nodes_lt.py). They arrived in commit 57ce8e1a,
+# "Add support for LTX 2.5 (#15499)", 2026-08-11, first released in v0.32.0.
+# No node pack can supply them, and updating ComfyUI-LTXVideo does nothing.
+#
+# A rented image shipped v0.26.2 -- two months and eight minor versions behind
+# -- and the lane failed at render time with WrapperNodeMissing, seventeen
+# minutes in, with every weight on disk and every node pack at its latest
+# commit. Nothing in the error pointed at a version. That is why this is a step
+# and not a note in a document.
+#
+# UPGRADE ONLY. A tree already at or above the minimum is left untouched, so
+# running this can never move a machine that is current.
+OTR_COMFY_MIN_TAG="${OTR_COMFY_MIN_TAG:-v0.32.0}"
+if [ -d "$COMFY_ROOT/.git" ]; then
+  CUR_TAG=$(git -C "$COMFY_ROOT" describe --tags 2>/dev/null | sed 's/-.*//')
+  NEWEST=$(printf '%s\n%s\n' "$CUR_TAG" "$OTR_COMFY_MIN_TAG" | sort -V | tail -1)
+  if [ -n "$CUR_TAG" ] && [ "$CUR_TAG" = "$NEWEST" ]; then
+    echo "  ComfyUI $CUR_TAG >= $OTR_COMFY_MIN_TAG -- left alone"
+  else
+    echo "  ComfyUI ${CUR_TAG:-unknown} is BELOW $OTR_COMFY_MIN_TAG -- upgrading"
+    git -C "$COMFY_ROOT" fetch --tags -q origin 2>/dev/null
+    LATEST=$(git -C "$COMFY_ROOT" tag --sort=-v:refname 2>/dev/null | head -1)
+    if [ -n "$LATEST" ]; then
+      if git -C "$COMFY_ROOT" checkout -q "$LATEST" 2>/dev/null; then
+        echo "    now $(git -C "$COMFY_ROOT" describe --tags 2>/dev/null)"
+        "$COMFY_PY" -m pip install -q -r "$COMFY_ROOT/requirements.txt" 2>&1 | tail -2
+      else
+        echo "    checkout FAILED -- left at ${CUR_TAG:-unknown}"
+      fi
+    else
+      echo "    no tags found -- left at ${CUR_TAG:-unknown}"
+    fi
+  fi
+else
+  echo "  ComfyUI is not a git checkout -- cannot check its version"
+fi
+
 echo "  pip install -r requirements.txt  (into $COMFY_PY)"
 "$COMFY_PY" -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt" 2>&1 | tail -2
 
