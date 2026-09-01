@@ -14,6 +14,11 @@
 *.ini text eol=lf
 *.sh text eol=lf
 
+# These two files preserve byte-identical upstream/patch evidence, including
+# upstream trailing spaces. Their SHA-256 identities are runtime contracts.
+patches/ComfyUI-GGUF-ltx25-gemma4.patch -whitespace
+tests/fixtures/comfyui_gguf_6ea2651/loader.py -whitespace
+
 # Binary files - never touch line endings
 *.wav binary
 *.mp3 binary

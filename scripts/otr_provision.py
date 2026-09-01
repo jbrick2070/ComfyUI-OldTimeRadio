@@ -16,8 +16,9 @@ that way in one session. **The answer is not detecting the gap sooner -- that
 moves the discovery earlier without removing any of the work. The answer is
 installing everything up front so there is nothing left to discover.**
 
-So this never gates a render and never returns a verdict. It installs, then
-prints a receipt of what it did -- a doer confirming its own work.
+So this installs first and prints an auditable receipt. A missing required
+dependency, incompatible pinned node pack, failed automatic download, or
+unverified manual tier is an honest nonzero result -- never a false-ready pod.
 
 MACHINE-AGNOSTIC ON PURPOSE. The five things it does -- locate the tree ComfyUI
 scans, resolve the model roots, install node packs, fetch lane weights, build
@@ -30,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import io
 import json
 import os
@@ -40,8 +42,24 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
+GGUF_PACK_NAME = "ComfyUI-GGUF"
+GGUF_URL = "https://github.com/city96/ComfyUI-GGUF"
+GGUF_PIN = "6ea2651e7df66d7585f6ffee804b20e92fb38b8a"
+GGUF_CLEAN_SHA256 = "b66b5f39a656b1ada80cc452e18cf1e71323cd52b1a61b6852cf90dbf4842345"
+GGUF_PATCHED_SHA256 = "63f8146be990b557728e5e806547fe6f904b87318ff6c4c87dde3c73f17bdf85"
+GGUF_PATCH_SHA256 = "d9185b7a8129f85b59b4df527488aa396da7c99217d336a3580a4c3d0fd4fa04"
+GGUF_PATCH_PATH = os.path.join(_REPO, "patches", "ComfyUI-GGUF-ltx25-gemma4.patch")
+
+LTXVIDEO_PACK_NAME = "ComfyUI-LTXVideo"
+LTXVIDEO_URL = "https://github.com/Lightricks/ComfyUI-LTXVideo"
+LTXVIDEO_PIN = "3b9c5cde4700917074823d45e25401d81049f8fc"
+
 #: Every step appends here; the receipt is printed from it at the end.
 _LOG: list = []
+
+
+class ProvisionFailure(RuntimeError):
+    """A required provisioning step could not be proved complete."""
 
 
 def say(state: str, what: str, detail: str = "") -> None:
@@ -63,6 +81,14 @@ def comfy_root() -> str:
     /workspace/runpod-slim/ComfyUI, and assuming /workspace/ComfyUI cost a round
     trip. Ask the library where it lives.
     """
+    override = os.environ.get("OTR_COMFY_ROOT", "").strip()
+    if override:
+        override = os.path.abspath(os.path.expanduser(override))
+        if not os.path.isfile(os.path.join(override, "folder_paths.py")):
+            raise ProvisionFailure(
+                "OTR_COMFY_ROOT does not name a ComfyUI tree (folder_paths.py missing): %s"
+                % override)
+        return override
     r = run([sys.executable, "-c",
              "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))"])
     if r.returncode == 0 and r.stdout.strip():
@@ -129,6 +155,149 @@ def ensure_hf_home(root: str) -> str:
 # --------------------------------------------------------------------------- #
 # Steps.
 # --------------------------------------------------------------------------- #
+def _normalized_sha256(path: str) -> str:
+    """Hash text after CRLF and lone-CR normalization to LF."""
+    with open(path, "rb") as fh:
+        data = fh.read().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+
+def _git(dest: str, *args: str) -> str:
+    r = run(["git", "-C", dest] + list(args))
+    if r.returncode != 0:
+        detail = (r.stderr or r.stdout or "git command failed").strip()
+        raise ProvisionFailure("git %s failed in %s: %s" %
+                               (" ".join(args), dest, detail[:300]))
+    return (r.stdout or "").strip()
+
+
+def _git_head(dest: str) -> str:
+    return _git(dest, "rev-parse", "HEAD").strip().lower()
+
+
+def _git_changed_paths(dest: str) -> list[str]:
+    out = _git(dest, "diff", "--name-only", "HEAD")
+    return sorted(line.strip().replace("\\", "/") for line in out.splitlines()
+                  if line.strip())
+
+
+def _git_untracked_paths(dest: str) -> list[str]:
+    out = _git(dest, "ls-files", "--others", "--exclude-standard")
+    return sorted(line.strip().replace("\\", "/") for line in out.splitlines()
+                  if line.strip())
+
+
+def _fetch_exact_repo(url: str, pin: str, dest: str) -> None:
+    """Create a detached, shallow checkout of one exact commit."""
+    if os.path.exists(dest) and not os.path.isdir(dest):
+        raise ProvisionFailure("node-pack destination is not a directory: %s" % dest)
+    os.makedirs(dest, exist_ok=True)
+    if os.listdir(dest):
+        raise ProvisionFailure("refusing exact checkout into non-empty directory: %s" % dest)
+    _git(dest, "init", "-q")
+    _git(dest, "remote", "add", "origin", url)
+    _git(dest, "fetch", "-q", "--depth", "1", "origin", pin)
+    _git(dest, "checkout", "-q", "--detach", "FETCH_HEAD")
+    if _git_head(dest) != pin.lower():
+        raise ProvisionFailure("checkout verification failed for %s at %s" % (dest, pin))
+
+
+def _apply_gguf_patch(dest: str) -> None:
+    loader = os.path.join(dest, "loader.py")
+    if not os.path.isfile(GGUF_PATCH_PATH):
+        raise ProvisionFailure("required GGUF patch is missing: %s" % GGUF_PATCH_PATH)
+    if _normalized_sha256(GGUF_PATCH_PATH) != GGUF_PATCH_SHA256:
+        raise ProvisionFailure("GGUF patch identity does not match the pinned SHA-256")
+    if _normalized_sha256(loader) != GGUF_CLEAN_SHA256:
+        raise ProvisionFailure("GGUF loader preimage is not the pinned clean file")
+    r = run(["git", "-C", dest, "apply", "--ignore-space-change",
+             "--ignore-whitespace", os.path.abspath(GGUF_PATCH_PATH)])
+    if r.returncode != 0:
+        raise ProvisionFailure("GGUF LTX 2.5 patch failed: %s" %
+                               ((r.stderr or r.stdout or "unknown error").strip()[:300]))
+
+
+def _verify_patched_gguf_git(dest: str) -> None:
+    loader = os.path.join(dest, "loader.py")
+    if _normalized_sha256(loader) != GGUF_PATCHED_SHA256:
+        raise ProvisionFailure("GGUF patched loader postimage does not match the pinned SHA-256")
+    changed = _git_changed_paths(dest)
+    untracked = _git_untracked_paths(dest)
+    if changed != ["loader.py"] or untracked:
+        raise ProvisionFailure(
+            "GGUF checkout drift: expected only loader.py changed; changed=%s untracked=%s"
+            % (changed, untracked))
+
+
+def ensure_gguf_pack(comfy: str) -> None:
+    """Install or verify the one supported GGUF base plus the LTX 2.5 patch."""
+    dest = os.path.join(comfy, "custom_nodes", GGUF_PACK_NAME)
+    fresh = not os.path.isdir(dest) or not os.listdir(dest)
+    if fresh:
+        _fetch_exact_repo(GGUF_URL, GGUF_PIN, dest)
+
+    loader = os.path.join(dest, "loader.py")
+    if not os.path.isfile(loader):
+        raise ProvisionFailure("%s is missing loader.py" % GGUF_PACK_NAME)
+
+    git_dir = os.path.isdir(os.path.join(dest, ".git"))
+    loader_sha = _normalized_sha256(loader)
+    if not git_dir:
+        if loader_sha == GGUF_CLEAN_SHA256:
+            raise ProvisionFailure(
+                "Manager-installed ComfyUI-GGUF is the clean base, not the required patched build; "
+                "move it aside and rerun --packs-only")
+        if loader_sha != GGUF_PATCHED_SHA256:
+            raise ProvisionFailure(
+                "unverifiable non-git ComfyUI-GGUF loader; move the pack aside and rerun --packs-only")
+        install_pack_requirements(GGUF_PACK_NAME, dest, required=True)
+        say("PRESENT", GGUF_PACK_NAME, "verified patched Manager install")
+        return
+
+    head = _git_head(dest)
+    if head != GGUF_PIN:
+        raise ProvisionFailure(
+            "%s is at %s, required %s; move it aside and rerun --packs-only"
+            % (GGUF_PACK_NAME, head, GGUF_PIN))
+    untracked = _git_untracked_paths(dest)
+    changed = _git_changed_paths(dest)
+    if loader_sha == GGUF_CLEAN_SHA256:
+        if changed or untracked:
+            raise ProvisionFailure(
+                "GGUF clean loader sits in a dirty checkout; refusing to overwrite drift")
+        _apply_gguf_patch(dest)
+        _verify_patched_gguf_git(dest)
+        state = "PATCHED"
+    elif loader_sha == GGUF_PATCHED_SHA256:
+        _verify_patched_gguf_git(dest)
+        state = "PRESENT"
+    else:
+        raise ProvisionFailure(
+            "GGUF loader is neither the pinned clean nor pinned patched file; refusing partial drift")
+    install_pack_requirements(GGUF_PACK_NAME, dest, required=True)
+    say(state, GGUF_PACK_NAME, "%s + LTX 2.5 patch" % GGUF_PIN[:12])
+
+
+def ensure_ltxvideo_pack(comfy: str) -> None:
+    """Install or verify the exact LTXVideo node-pack commit."""
+    dest = os.path.join(comfy, "custom_nodes", LTXVIDEO_PACK_NAME)
+    fresh = not os.path.isdir(dest) or not os.listdir(dest)
+    if fresh:
+        _fetch_exact_repo(LTXVIDEO_URL, LTXVIDEO_PIN, dest)
+    if not os.path.isdir(os.path.join(dest, ".git")):
+        raise ProvisionFailure(
+            "ComfyUI-LTXVideo is not a verifiable git checkout; move it aside and rerun --packs-only")
+    head = _git_head(dest)
+    changed = _git_changed_paths(dest)
+    untracked = _git_untracked_paths(dest)
+    if head != LTXVIDEO_PIN or changed or untracked:
+        raise ProvisionFailure(
+            "ComfyUI-LTXVideo must be clean at %s; found head=%s changed=%s untracked=%s"
+            % (LTXVIDEO_PIN, head, changed, untracked))
+    install_pack_requirements(LTXVIDEO_PACK_NAME, dest, required=True)
+    say("OK" if fresh else "PRESENT", LTXVIDEO_PACK_NAME, LTXVIDEO_PIN[:12])
+
+
 def install_node_packs(comfy: str) -> None:
     cn = os.path.join(comfy, "custom_nodes")
     os.makedirs(cn, exist_ok=True)
@@ -138,22 +307,12 @@ def install_node_packs(comfy: str) -> None:
     # after writing, casting, voices and stills had all completed. The engines
     # resolve these node CLASSES by name at render time, which is why the
     # failure arrives late and looks nothing like a missing install.
+    ensure_gguf_pack(comfy)
+    ensure_ltxvideo_pack(comfy)
     packs = [
         # AnimateDiff lane.
         ("ComfyUI-AnimateDiff-Evolved",
          "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved", None),
-        # UnetLoaderGGUF / CLIPLoaderGGUF -- required by BOTH wan_ti2v and
-        # ltx25, whose default weights are GGUF. Note the directory name has a
-        # hyphen and so cannot be imported by module name; the engines resolve
-        # its node classes through the ComfyUI registry instead.
-        ("ComfyUI-GGUF", "https://github.com/city96/ComfyUI-GGUF", None),
-        # The advanced LTXV nodes -- LTXVImgToVideoInplace, LTXVLatentUpsampler,
-        # LTXVDualCFGGuider, LTXVConcatAVLatent, LTXVSeparateAVLatent,
-        # LTXVAudioVAEDecode, LTXVEmptyLatentAudio, LTXVModalityGuidance.
-        # ComfyUI core carries only the basic three (Conditioning, Scheduler,
-        # ImgToVideo), which is enough for ltx_8gb and not for ltx25.
-        ("ComfyUI-LTXVideo",
-         "https://github.com/Lightricks/ComfyUI-LTXVideo", None),
     ]
     for name, url, branch in packs:
         dest = os.path.join(cn, name)
@@ -165,18 +324,20 @@ def install_node_packs(comfy: str) -> None:
         # a pack that was installed and working.
         if os.path.isdir(dest) and os.listdir(dest):
             say("PRESENT", name)
+            install_pack_requirements(name, dest)
             continue
         cmd = ["git", "clone", "--depth", "1"]
         if branch:
             cmd += ["-b", branch]
         r = run(cmd + [url, dest])
-        say("OK" if r.returncode == 0 else "FAILED", name,
-            "" if r.returncode == 0 else r.stderr.strip()[:60])
-        if r.returncode == 0:
-            install_pack_requirements(name, dest)
+        if r.returncode != 0:
+            raise ProvisionFailure("clone failed for %s: %s" %
+                                   (name, (r.stderr or "").strip()[:300]))
+        say("OK", name)
+        install_pack_requirements(name, dest)
 
 
-def install_pack_requirements(name: str, dest: str) -> None:
+def install_pack_requirements(name: str, dest: str, required: bool = False) -> None:
     """A cloned pack whose own dependencies are missing does not load.
 
     Cloning was treated as installing, and it is not: ComfyUI-GGUF needs the
@@ -190,20 +351,26 @@ def install_pack_requirements(name: str, dest: str) -> None:
     """
     req = os.path.join(dest, "requirements.txt")
     if not os.path.isfile(req):
+        if required:
+            raise ProvisionFailure("%s is missing required requirements.txt" % name)
+        say("SKIP", "%s deps" % name, "requirements.txt not present")
         return
     r = run([sys.executable, "-m", "pip", "install", "-q", "-r", req])
-    say("OK" if r.returncode == 0 else "FAILED", "%s deps" % name,
-        "" if r.returncode == 0 else (r.stderr or "").strip()[:60])
+    if r.returncode != 0:
+        raise ProvisionFailure("dependency install failed for %s: %s" %
+                               (name, (r.stderr or r.stdout or "").strip()[:300]))
+    say("OK", "%s deps" % name)
 
 
 def install_requirements() -> None:
     req = os.path.join(_REPO, "requirements.txt")
     if not os.path.isfile(req):
-        say("SKIP", "requirements.txt", "not found")
-        return
+        raise ProvisionFailure("OTR requirements.txt is missing")
     r = run([sys.executable, "-m", "pip", "install", "-q", "-r", req])
-    say("OK" if r.returncode == 0 else "FAILED", "pip install requirements",
-        "" if r.returncode == 0 else r.stderr.strip()[:60])
+    if r.returncode != 0:
+        raise ProvisionFailure("OTR dependency install failed: %s" %
+                               (r.stderr or r.stdout or "").strip()[:300])
+    say("OK", "pip install requirements")
 
 
 def fetch_lane_weights(lanes) -> None:
@@ -434,7 +601,21 @@ def profile_lanes(profile_id: str) -> list:
     return lanes or ["haunted", "stable_audio_3"]
 
 
+def _print_receipt(success: str = "everything installed.") -> int:
+    print("\nreceipt")
+    bad = [r for r in _LOG if r[0] in ("FAILED", "MISSING")]
+    for state, what, detail in _LOG:
+        print("  %-9s %s%s" % (state, what, (" -- " + detail) if detail else ""))
+    if bad:
+        print("\n  INCOMPLETE: %d required step(s) did not complete." % len(bad))
+        print("  Repair the named step and rerun this same command.")
+        return 1
+    print("\n  %s" % success)
+    return 0
+
+
 def main(argv=None) -> int:
+    _LOG.clear()
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--profile", default="otr_nvidia_8gb_haunted")
     ap.add_argument("--with-all-voices", action="store_true",
@@ -444,9 +625,28 @@ def main(argv=None) -> int:
                     help="build the isolated voice-cloning environment (large)")
     ap.add_argument("--list", action="store_true",
                     help="show what would be installed, install nothing")
+    ap.add_argument("--packs-only", action="store_true",
+                    help="install/verify node packs and OTR dependencies only")
     args = ap.parse_args(argv)
 
-    comfy = comfy_root()
+    try:
+        comfy = comfy_root()
+    except ProvisionFailure as exc:
+        say("FAILED", "ComfyUI root", str(exc))
+        return _print_receipt()
+
+    if args.packs_only:
+        print("OTR provision")
+        print("  comfy root  : %s" % comfy)
+        print("  mode        : packs only")
+        print("")
+        try:
+            install_node_packs(comfy)
+            install_requirements()
+        except ProvisionFailure as exc:
+            say("FAILED", "required pack/dependency", str(exc))
+        return _print_receipt("all required node packs and dependencies verified.")
+
     root = models_root(comfy)
     lanes = profile_lanes(args.profile)
 
@@ -460,33 +660,23 @@ def main(argv=None) -> int:
         return 0
     print("")
 
-    os.environ.setdefault("OTR_COMFYUI_MODELS_ROOT", root)
-    ensure_hf_home(root)
-    install_node_packs(comfy)
-    install_requirements()
-    fetch_lane_weights(lanes)
-    if args.with_indextts2:
-        install_indextts2(comfy, root)
-    if args.with_all_voices:
-        install_indextts2(comfy, root)
-        for name, pip_args in ISOLATED_VOICES.items():
-            install_isolated_voice(comfy, name, pip_args)
-    else:
-        say("SKIP", "index-tts", "pass --with-indextts2 to build it")
-
-    # THE RECEIPT. Not a gate -- a doer saying what it did.
-    print("\nreceipt")
-    bad = [r for r in _LOG if r[0] in ("FAILED", "MISSING")]
-    for state, what, detail in _LOG:
-        print("  %-9s %s%s" % (state, what, (" -- " + detail) if detail else ""))
-    if bad:
-        print("\n  %d step(s) did not complete. This does NOT block a render --"
-              % len(bad))
-        print("  the engines refuse by name if something they need is absent.")
-        print("  See docs/RUNPOD_INSTALL.md section 5 for the symptom index.")
-    else:
-        print("\n  everything installed.")
-    return 0
+    try:
+        os.environ.setdefault("OTR_COMFYUI_MODELS_ROOT", root)
+        ensure_hf_home(root)
+        install_node_packs(comfy)
+        install_requirements()
+        fetch_lane_weights(lanes)
+        if args.with_all_voices:
+            install_indextts2(comfy, root)
+            for name, pip_args in ISOLATED_VOICES.items():
+                install_isolated_voice(comfy, name, pip_args)
+        elif args.with_indextts2:
+            install_indextts2(comfy, root)
+        else:
+            say("SKIP", "index-tts", "pass --with-indextts2 to build it")
+    except ProvisionFailure as exc:
+        say("FAILED", "required provisioning step", str(exc))
+    return _print_receipt()
 
 
 if __name__ == "__main__":

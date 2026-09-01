@@ -1,271 +1,177 @@
 #!/usr/bin/env bash
-# Provision a rented ComfyUI pod with OTR, over SSH, with no human input.
+# Provision one RunPod-style ComfyUI machine through the audited OTR owner.
 #
 #   ssh root@<ip> -p <port> -i <key> 'bash -s' < scripts/otr_pod_provision.sh
 #
-# Idempotent: safe to re-run. Existing clones are pulled, present weights are
-# skipped by the fetcher itself.
-#
-# WHY THE ENV VAR IS PASSED EXPLICITLY. RunPod sets template environment
-# variables on the CONTAINER (pid 1), but an SSH session gets a fresh
-# environment and does not inherit them. Verified on a live pod: pid 1 has
-# OTR_COMFYUI_MODELS_ROOT while `echo $OTR_COMFYUI_MODELS_ROOT` over SSH is
-# empty. Without re-reading it here, `_models_root()` falls back to its Windows
-# default and several GB of weights land in a literal `C:\ComfyUI-Models`
-# directory that ComfyUI never scans -- reporting success the whole time.
+# Safe reruns verify exact state. Existing drift is named and left untouched.
 set -uo pipefail
+
+CORE_PIN_DEFAULT="169fcf35a2fc163fec31338b816503ddac0d3fcf"
+OTR_REPO_URL="https://github.com/jbrick2070/ComfyUI-OldTimeRadio.git"
+
+fail() {
+  echo "FATAL: $*" >&2
+  exit 1
+}
 
 echo "=== OTR pod provision  $(date -u '+%H:%M:%SZ') ==="
 
-# 1. Find the tree ComfyUI actually scans. Do NOT assume /workspace/ComfyUI --
-#    this image uses /workspace/runpod-slim/ComfyUI, and the obvious guess cost
-#    a round trip the first time.
-COMFY_ROOT=$(python3 -c "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))" 2>/dev/null)
+# Locate the exact ComfyUI tree, with an explicit override for side-by-side
+# installs on templates whose bundled tree is not a git checkout.
+COMFY_ROOT="${OTR_COMFY_ROOT:-}"
 if [ -z "$COMFY_ROOT" ]; then
-  COMFY_ROOT=$(dirname "$(find /workspace / -maxdepth 5 -name folder_paths.py 2>/dev/null | head -1)")
+  COMFY_ROOT=$(python3 -c "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))" 2>/dev/null || true)
 fi
-[ -d "$COMFY_ROOT" ] || { echo "FATAL: could not locate ComfyUI"; exit 1; }
-
-# --------------------------------------------------------------------------- #
-# 2b. THE HUGGING FACE TOKEN, WITHOUT MAKING ANYONE WRITE A FILE.
-#
-# Gated weights need it, and the friction was real: the documented way was to
-# echo a secret into /root/.hf_token by hand, on every pod, correctly. Easy to
-# skip, easy to fumble, and a fumbled one fails later as a 401 on a download
-# rather than as anything that says "token".
-#
-# THE EASY PATH IS A RUNPOD TEMPLATE ENVIRONMENT VARIABLE. Set HF_TOKEN in the
-# template UI once and every pod from it has one. The catch -- the same one that
-# bites OTR_COMFYUI_MODELS_ROOT -- is that RunPod sets template variables on the
-# CONTAINER (pid 1), and an SSH session gets a fresh environment that does not
-# inherit them. So pid 1 is read directly.
-#
-# Order: an existing file, then this shell, then the container, then a previous
-# `hf auth login`. The VALUE is never printed -- only where it came from and how
-# long it is, which is enough to diagnose a truncated paste and nothing more.
-HF_TOKEN_FILE=/root/.hf_token
-_tok=""; _src=""
-if [ -s "$HF_TOKEN_FILE" ]; then
-  _tok=$(tr -d ' \t\r\n' < "$HF_TOKEN_FILE"); _src="existing $HF_TOKEN_FILE"
-elif [ -n "${HF_TOKEN:-}" ]; then
-  _tok=$(printf '%s' "$HF_TOKEN" | tr -d ' \t\r\n'); _src="HF_TOKEN in this shell"
-else
-  _tok=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null | sed -n 's/^HF_TOKEN=//p' | head -1 | tr -d ' \t\r\n')
-  if [ -n "$_tok" ]; then _src="the pod's template environment (pid 1)"
-  elif [ -s "$HOME/.cache/huggingface/token" ]; then
-    _tok=$(tr -d ' \t\r\n' < "$HOME/.cache/huggingface/token"); _src="a previous hf auth login"
-  fi
+if [ -z "$COMFY_ROOT" ]; then
+  FOUND_FOLDER_PATHS=$(find /workspace /app /opt / -maxdepth 5 -name folder_paths.py 2>/dev/null | head -1)
+  [ -n "$FOUND_FOLDER_PATHS" ] && COMFY_ROOT=$(dirname "$FOUND_FOLDER_PATHS")
 fi
-if [ -n "$_tok" ]; then
-  printf '%s' "$_tok" > "$HF_TOKEN_FILE"; chmod 600 "$HF_TOKEN_FILE"
-  export HF_TOKEN="$_tok"
-  echo "  HF token: found in $_src (${#_tok} chars) -> $HF_TOKEN_FILE"
-  case "$_tok" in hf_*) : ;; *) echo "    WARNING: does not start with hf_ -- check for a truncated paste" ;; esac
-else
-  echo "  HF token: NONE FOUND. Ungated lanes still work; gated ones will 401."
-  echo "    Set HF_TOKEN in the RunPod template, or: printf '%s' <token> > $HF_TOKEN_FILE"
-fi
-unset _tok _src
-
-CN="$COMFY_ROOT/custom_nodes"
+[ -f "$COMFY_ROOT/folder_paths.py" ] || fail "could not locate ComfyUI; set OTR_COMFY_ROOT to its directory"
+COMFY_ROOT=$(cd "$COMFY_ROOT" && pwd -P)
+export OTR_COMFY_ROOT="$COMFY_ROOT"
+CUSTOM_NODES="$COMFY_ROOT/custom_nodes"
+mkdir -p "$CUSTOM_NODES"
 echo "  comfy root : $COMFY_ROOT"
 
-# 2. Recover the container's env var; fall back to the standard location.
-MODELS_ROOT=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null \
-              | sed -n 's/^OTR_COMFYUI_MODELS_ROOT=//p' | head -1)
+# Use only an interpreter that proves it imports folder_paths from this tree.
+COMFY_PY=""
+for candidate in \
+  "$COMFY_ROOT/.venv-cu128/bin/python" \
+  "$COMFY_ROOT/.venv/bin/python" \
+  "$COMFY_ROOT/venv/bin/python" \
+  "$COMFY_ROOT"/.venv*/bin/python \
+  "$(command -v python3 2>/dev/null || true)"
+do
+  [ -x "$candidate" ] || continue
+  PROBED_ROOT=$(
+    cd "$COMFY_ROOT" && "$candidate" -c \
+      "import folder_paths,os;print(os.path.realpath(os.path.dirname(folder_paths.__file__)))" \
+      2>/dev/null || true
+  )
+  if [ "$PROBED_ROOT" = "$COMFY_ROOT" ]; then
+    COMFY_PY="$candidate"
+    break
+  fi
+done
+[ -n "$COMFY_PY" ] || fail "no Python interpreter imports folder_paths from $COMFY_ROOT"
+echo "  comfy python: $COMFY_PY"
+
+# The portability lab is defined against one exact ComfyUI core. Never replace
+# a template's non-git tree or reset local work. A non-git image gets a clear
+# side-by-side recipe instead.
+CORE_PIN="${OTR_COMFY_CORE_PIN:-$CORE_PIN_DEFAULT}"
+if [ ! -d "$COMFY_ROOT/.git" ]; then
+  echo "FATAL: $COMFY_ROOT is not a git checkout; it will not be overwritten." >&2
+  echo "Create a pinned side-by-side tree, then rerun against it:" >&2
+  echo "  git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/otr-comfyui" >&2
+  echo "  export OTR_COMFY_ROOT=/workspace/otr-comfyui" >&2
+  echo "  # create/use that tree's Python environment, then rerun this script" >&2
+  exit 1
+fi
+if [ -n "$(git -C "$COMFY_ROOT" status --porcelain --untracked-files=all)" ]; then
+  fail "ComfyUI core has tracked changes; refusing to overwrite them"
+fi
+CURRENT_CORE=$(git -C "$COMFY_ROOT" rev-parse HEAD 2>/dev/null || true)
+if [ "$CURRENT_CORE" != "$CORE_PIN" ]; then
+  echo "  pin ComfyUI core: $CORE_PIN"
+  git -C "$COMFY_ROOT" fetch -q --depth 1 origin "$CORE_PIN" \
+    || fail "could not fetch ComfyUI core $CORE_PIN"
+  git -C "$COMFY_ROOT" checkout -q --detach FETCH_HEAD \
+    || fail "could not check out ComfyUI core $CORE_PIN"
+fi
+[ "$(git -C "$COMFY_ROOT" rev-parse HEAD 2>/dev/null)" = "$CORE_PIN" ] \
+  || fail "ComfyUI core verification failed"
+"$COMFY_PY" -m pip install -q -r "$COMFY_ROOT/requirements.txt" \
+  || fail "ComfyUI core requirements failed"
+echo "  core verified: $CORE_PIN"
+
+# Native Cairo headers are needed by the visualizer's pycairo dependency.
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get update -qq >/dev/null 2>&1 \
+    && apt-get install -y -qq libcairo2-dev pkg-config >/dev/null 2>&1 \
+    || fail "system dependencies libcairo2-dev/pkg-config failed"
+fi
+
+# Recover template-scoped model/token settings; SSH does not inherit pid 1's
+# environment on common RunPod images. Secrets are never printed.
+MODELS_ROOT="${OTR_COMFYUI_MODELS_ROOT:-}"
+if [ -z "$MODELS_ROOT" ]; then
+  MODELS_ROOT=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null \
+    | sed -n 's/^OTR_COMFYUI_MODELS_ROOT=//p' | head -1)
+fi
 [ -n "$MODELS_ROOT" ] || MODELS_ROOT="$COMFY_ROOT/models"
 export OTR_COMFYUI_MODELS_ROOT="$MODELS_ROOT"
+export HF_HOME="$MODELS_ROOT/huggingface"
+mkdir -p "$HF_HOME"
 echo "  models root: $OTR_COMFYUI_MODELS_ROOT"
+echo "  HF_HOME    : $HF_HOME"
 
-# 3. Node packs. -b v2.0-alpha is mandatory: main is thousands of commits
-#    behind and still advertises version 1.0.0.
-cd "$CN" || exit 1
-for spec in \
-  "ComfyUI-OldTimeRadio|-b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio" \
-  "ComfyUI-AnimateDiff-Evolved|https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"
-do
-  name="${spec%%|*}"; args="${spec#*|}"
-  if [ -d "$name/.git" ]; then
-    echo "  pull  $name"; git -C "$name" pull --ff-only 2>&1 | tail -1
-  else
-    echo "  clone $name"; git clone $args "$name" 2>&1 | tail -1
-  fi
-done
-
-# 4. Dependencies.
-# INSTALL INTO THE INTERPRETER COMFYUI ACTUALLY RUNS, not the system python3.
-# The image ships ComfyUI in its own venv (.venv-cu128); `python3 -m pip` put
-# requirements somewhere ComfyUI never imports from, so `accelerate` was present
-# on disk and missing at runtime -- the writer died 18 s into a rented leg with
-# "requires `accelerate`" while requirements.txt had listed it all along.
-# SYSTEM LIBS FIRST. pycairo is a C extension: without libcairo2-dev and
-# pkg-config, `pip install pycairo` fails at metadata generation, and the pack
-# then raises ImportError inside the draw function at RENDER time -- every
-# viz_mandala frame and every scope overlay. pip alone cannot fix it.
-if command -v apt-get >/dev/null 2>&1; then
-  echo "  system libs: libcairo2-dev pkg-config"
-  apt-get update -qq >/dev/null 2>&1
-  apt-get install -y -qq libcairo2-dev pkg-config >/dev/null 2>&1     || echo "    (apt failed -- pycairo may not build; viz_mandala will refuse)"
-fi
-
-COMFY_PY="$COMFY_ROOT/.venv-cu128/bin/python"
-[ -x "$COMFY_PY" ] || COMFY_PY=$(ls -1 "$COMFY_ROOT"/.venv*/bin/python 2>/dev/null | head -1)
-[ -x "$COMFY_PY" ] || COMFY_PY=python3
-
-# --------------------------------------------------------------------------- #
-# 4b. COMFYUI ITSELF HAS A MINIMUM VERSION, AND A POD IMAGE IS A SNAPSHOT.
-#
-# The ltx25 lane resolves LTXVDualCFGGuider and LTXVModalityGuidance out of
-# ComfyUI CORE (comfy_extras/nodes_lt.py). They arrived in commit 57ce8e1a,
-# "Add support for LTX 2.5 (#15499)", 2026-08-11, first released in v0.32.0.
-# No node pack can supply them, and updating ComfyUI-LTXVideo does nothing.
-#
-# A rented image shipped v0.26.2 -- two months and eight minor versions behind
-# -- and the lane failed at render time with WrapperNodeMissing, seventeen
-# minutes in, with every weight on disk and every node pack at its latest
-# commit. Nothing in the error pointed at a version. That is why this is a step
-# and not a note in a document.
-#
-# UPGRADE ONLY. A tree already at or above the minimum is left untouched, so
-# running this can never move a machine that is current.
-OTR_COMFY_MIN_TAG="${OTR_COMFY_MIN_TAG:-v0.32.0}"
-if [ -d "$COMFY_ROOT/.git" ]; then
-  CUR_TAG=$(git -C "$COMFY_ROOT" describe --tags 2>/dev/null | sed 's/-.*//')
-  NEWEST=$(printf '%s\n%s\n' "$CUR_TAG" "$OTR_COMFY_MIN_TAG" | sort -V | tail -1)
-  if [ -n "$CUR_TAG" ] && [ "$CUR_TAG" = "$NEWEST" ]; then
-    echo "  ComfyUI $CUR_TAG >= $OTR_COMFY_MIN_TAG -- left alone"
-  else
-    echo "  ComfyUI ${CUR_TAG:-unknown} is BELOW $OTR_COMFY_MIN_TAG -- upgrading"
-    git -C "$COMFY_ROOT" fetch --tags -q origin 2>/dev/null
-    LATEST=$(git -C "$COMFY_ROOT" tag --sort=-v:refname 2>/dev/null | head -1)
-    if [ -n "$LATEST" ]; then
-      if git -C "$COMFY_ROOT" checkout -q "$LATEST" 2>/dev/null; then
-        echo "    now $(git -C "$COMFY_ROOT" describe --tags 2>/dev/null)"
-        "$COMFY_PY" -m pip install -q -r "$COMFY_ROOT/requirements.txt" 2>&1 | tail -2
-      else
-        echo "    checkout FAILED -- left at ${CUR_TAG:-unknown}"
-      fi
-    else
-      echo "    no tags found -- left at ${CUR_TAG:-unknown}"
-    fi
-  fi
+HF_TOKEN_FILE=/root/.hf_token
+TOKEN_VALUE=""
+TOKEN_SOURCE=""
+if [ -s "$HF_TOKEN_FILE" ]; then
+  TOKEN_VALUE=$(tr -d ' \t\r\n' < "$HF_TOKEN_FILE")
+  TOKEN_SOURCE="$HF_TOKEN_FILE"
+elif [ -n "${HF_TOKEN:-}" ]; then
+  TOKEN_VALUE=$(printf '%s' "$HF_TOKEN" | tr -d ' \t\r\n')
+  TOKEN_SOURCE="this shell"
 else
-  echo "  ComfyUI is not a git checkout -- cannot check its version"
+  TOKEN_VALUE=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null \
+    | sed -n 's/^HF_TOKEN=//p' | head -1 | tr -d ' \t\r\n')
+  [ -n "$TOKEN_VALUE" ] && TOKEN_SOURCE="the pod template"
+fi
+if [ -n "$TOKEN_VALUE" ]; then
+  printf '%s' "$TOKEN_VALUE" > "$HF_TOKEN_FILE"
+  chmod 600 "$HF_TOKEN_FILE"
+  export HF_TOKEN="$TOKEN_VALUE"
+  echo "  HF token   : recovered from $TOKEN_SOURCE (${#TOKEN_VALUE} chars)"
+else
+  echo "  HF token   : not found; public lanes work, gated manual files need a token"
+fi
+unset TOKEN_VALUE TOKEN_SOURCE
+
+# Bash owns only the OTR checkout. Python below owns every partner pack,
+# dependency, automatic lane, and manual-tier verification.
+OTR_ROOT="$CUSTOM_NODES/ComfyUI-OldTimeRadio"
+if [ -d "$OTR_ROOT/.git" ]; then
+  git -C "$OTR_ROOT" fetch -q origin v2.0-alpha \
+    || fail "could not fetch OTR v2.0-alpha"
+  git -C "$OTR_ROOT" checkout -q v2.0-alpha \
+    || fail "could not select OTR v2.0-alpha (check local changes)"
+  git -C "$OTR_ROOT" pull -q --ff-only origin v2.0-alpha \
+    || fail "could not fast-forward OTR v2.0-alpha"
+elif [ -e "$OTR_ROOT" ]; then
+  fail "$OTR_ROOT exists but is not a git checkout; move it aside explicitly"
+else
+  git clone -q -b v2.0-alpha "$OTR_REPO_URL" "$OTR_ROOT" \
+    || fail "could not clone OTR v2.0-alpha"
+fi
+cd "$OTR_ROOT" || fail "cannot enter OTR checkout"
+
+if ! "$COMFY_PY" scripts/otr_provision.py --packs-only; then
+  fail "required node packs or dependencies are incomplete"
 fi
 
-echo "  pip install -r requirements.txt  (into $COMFY_PY)"
-"$COMFY_PY" -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt" 2>&1 | tail -2
-
-# 5. Weights for the ungated lane. Needs no Hugging Face token.
-cd "$CN/ComfyUI-OldTimeRadio" || exit 1
-
-# Probed ONCE, above every consumer: both the video lane and the image lane
-# below choose from these, and a second nvidia-smi call is a second answer.
-COMPUTE_CAP=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '. ')
-VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 | tr -dc '0-9')
-
-# WHICH WEIGHTS, AND WHO DECIDES. Not everyone wants every model, and these are
-# tens of gigabytes -- so this fetches ONE video lane, ONE image precision, and
-# the music model, which together are the minimum that renders an episode.
-#
-# THE MUSIC MODEL IS NOT OPTIONAL AND WAS THE DEFECT HERE. `stable_audio_3` is
-# named in otr_fetch_lane_weights.py's own MINIMUM_HINT and its lane note reads
-# "without it EVERY profile fails at the music node" -- yet this script fetched
-# only video+image and still called that the minimum. A stranger provisioning a
-# fresh pod got a complete-looking install that could not render. Override with
-#
-#   OTR_PROVISION_LANES="haunted minimax_h3"   ./otr_pod_provision.sh
-#   OTR_PROVISION_LANES=""                     ./otr_pod_provision.sh   # skip
-#
-# `otr_fetch_lane_weights.py --list` names every lane. Already-present files are
-# reported PRESENT and re-downloaded never, so re-running this is cheap.
-# The DEFAULT must match what config/profiles/otr_runpod_starter.json selects,
-# or a newcomer provisions a pod and then cannot run the one profile written
-# for them. Chosen by VRAM the same way the image lane below is: the starter
-# targets 16 GB+ and wants real video diffusion (wan_ti2v, 832x480, eight
-# published episodes); smaller cards fall back to the AnimateDiff floor.
-if [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then LANE_DEFAULT=wan_ti2v_gguf
-else                                                LANE_DEFAULT=haunted
+# The Python profile router is the sole source of weight ownership. A default
+# keeps the entry point useful for strangers; explicit profiles are encouraged
+# for HuMo and LTX qualification labs.
+VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null \
+  | head -1 | tr -dc '0-9')
+if [ -n "${OTR_PROVISION_PROFILE:-}" ]; then
+  PROFILE="$OTR_PROVISION_PROFILE"
+elif [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then
+  PROFILE="otr_runpod_starter"
+else
+  PROFILE="otr_nvidia_8gb_haunted"
 fi
-VIDEO_LANES="${OTR_PROVISION_LANES-$LANE_DEFAULT}"
-
-# The music model. Empty to skip, but skipping it means no episode renders.
-AUDIO_LANE="${OTR_PROVISION_AUDIO_LANE-stable_audio_3}"
-
-# The image model is chosen for you because choosing WRONG is silent: the
-# adapter ranks nvfp4 > fp8 > bf16 and nvfp4 needs hardware fp4 (sm_120), so an
-# older card handed nvfp4 picks the one file it cannot execute. Precision is a
-# size/offload question, NOT a can-it-run question -- z_image_turbo is the
-# low-VRAM lane and is proven at 8 GB. Set OTR_PROVISION_IMAGE_LANE to override,
-# or empty to skip.
-CC="$COMPUTE_CAP"
-VR="$VRAM_MIB"
-if   [ "${CC:-0}" -ge 120 ]   2>/dev/null; then ZDEFAULT=z_image_blackwell
-elif [ "${VR:-0}" -ge 20000 ] 2>/dev/null; then ZDEFAULT=z_image
-else                                              ZDEFAULT=z_image_int8
-fi
-IMAGE_LANE="${OTR_PROVISION_IMAGE_LANE-$ZDEFAULT}"
-
-echo "  weights to fetch: video=[${VIDEO_LANES:-none}] image=[${IMAGE_LANE:-none}] audio=[${AUDIO_LANE:-none}]"
-echo "    (compute_cap ${CC:-?}, vram ${VR:-?} MiB; override with OTR_PROVISION_LANES / OTR_PROVISION_IMAGE_LANE)"
-for L in $VIDEO_LANES $IMAGE_LANE $AUDIO_LANE; do
-  [ -n "$L" ] || continue
-  echo "  --- $L"
-  # pipefail is set above, so a failed fetch survives the pipe into tail.
-  if ! "$COMFY_PY" scripts/otr_fetch_lane_weights.py "$L" 2>&1 | tail -6; then
-    echo "  !!! lane '$L' FAILED to fetch"
-    PROVISION_FAILURES="${PROVISION_FAILURES:-0}"
-    PROVISION_FAILURES=$((PROVISION_FAILURES + 1))
-  fi
-done
-
-# INDEXTTS2 ON LINUX USES THE ENV VAR, NOT A CODE CHANGE.
-#
-# eng_indextts2.py resolves `.venv/Scripts/python.exe` -- the Windows layout --
-# and a Linux venv keeps its interpreter at `bin/python`. The obvious fix is to
-# branch on os.name in the adapter. DO NOT. The engine's qualified voice routes
-# are pinned to an adapter/worker FINGERPRINT, so ANY edit to that file
-# invalidates them: changing it un-qualified the shipped Lemmy route
-# ('lemmy-indextts2-algenib-cockney-v2', fingerprint d47779386ce91209 ->
-# c1b64d5c5f6c2f9f) and the cast row silently fell back to an ordinary draw.
-# The episode still rendered, which is what makes it easy to miss.
-#
-# OTR_INDEXTTS2_VENV exists for exactly this, touches no code, and moves no
-# fingerprint.
-# ISOLATED VENVS SURVIVE A RECREATE ONLY HALFWAY. Their site-packages sit on
-# the network volume -- 33 GB of them -- but `.venv/bin/python` is a symlink
-# to an interpreter uv installed under /root, which is CONTAINER disk. Every
-# pod recreate wipes it and leaves three dangling venvs that report
-# "missing" while their packages are perfectly intact. Reinstalling the base
-# interpreter repairs all three at once, in about two seconds, and costs
-# nothing when it is already there.
-export PATH="/root/.local/bin:$PATH"
-command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
-if command -v uv >/dev/null 2>&1; then
-  uv python install 3.11 >/dev/null 2>&1 && echo "  uv python 3.11 present (repairs any dangling isolated venv)"
-fi
-
-IT_VENV="$(dirname "$COMFY_ROOT")/index-tts/.venv/bin/python"
-[ -x "$IT_VENV" ] || IT_VENV="$COMFY_ROOT/index-tts/.venv/bin/python"
-if [ -x "$IT_VENV" ]; then
-  echo "  OTR_INDEXTTS2_VENV=$IT_VENV"
-  export OTR_INDEXTTS2_VENV="$IT_VENV"
-  grep -q OTR_INDEXTTS2_VENV /root/.bashrc 2>/dev/null     || echo "export OTR_INDEXTTS2_VENV=\"$IT_VENV\"" >> /root/.bashrc
-fi
-
-# EXIT STATUS IS A PROMISE. There is no `set -e` here on purpose -- benign
-# non-zero (a grep that matches nothing, an absent optional dir) must not abort
-# a long provision. But a REQUIRED weight lane that failed to download is not
-# benign, and reporting exit 0 for it tells a caller the pod is ready when it
-# cannot render. Count those and fail honestly.
-if [ "${PROVISION_FAILURES:-0}" -gt 0 ]; then
-  echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ')  -- ${PROVISION_FAILURES} required lane(s) failed ==="
-  ls -1 "$OTR_COMFYUI_MODELS_ROOT/checkpoints" 2>/dev/null | sed 's/^/  ckpt: /'
+VOICE_ARGS=()
+[ "${OTR_WITH_INDEXTTS2:-0}" = "1" ] && VOICE_ARGS+=(--with-indextts2)
+[ "${OTR_WITH_ALL_VOICES:-0}" = "1" ] && VOICE_ARGS=(--with-all-voices)
+echo "  profile     : $PROFILE (VRAM ${VRAM_MIB:-unknown} MiB)"
+if ! "$COMFY_PY" scripts/otr_provision.py --profile "$PROFILE" "${VOICE_ARGS[@]}"; then
+  echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ') ===" >&2
+  echo "Read docs/RUNPOD_PORTABILITY_LAB.md for every named manual file." >&2
   exit 1
 fi
 
-grep -q OTR_ENABLE_WAN_TI2V /root/.bashrc 2>/dev/null || echo "export OTR_ENABLE_WAN_TI2V=1" >> /root/.bashrc
-export OTR_ENABLE_WAN_TI2V=1
-
-echo "=== provision done  $(date -u '+%H:%M:%SZ') ==="
-ls -1 "$OTR_COMFYUI_MODELS_ROOT/checkpoints" 2>/dev/null | sed 's/^/  ckpt: /'
+echo "=== provision complete  $(date -u '+%H:%M:%SZ') ==="

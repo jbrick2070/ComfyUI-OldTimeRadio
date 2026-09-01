@@ -1,0 +1,31 @@
+diff --git a/loader.py b/loader.py
+index 7cefb11..2e5d4c3 100644
+--- a/loader.py
++++ b/loader.py
+@@ -10,8 +10,13 @@ from .ops import GGMLTensor
+ from .dequant import is_quantized, dequantize_tensor
+ 
+ IMG_ARCH_LIST = {"flux", "sd1", "sdxl", "sd3", "aura", "hidream", "cosmos", "ltxv", "hyvid", "wan", "lumina2", "qwen_image"}
+-TXT_ARCH_LIST = {"t5", "t5encoder", "llama", "qwen2vl", "qwen3", "qwen3vl", "gemma3"}
+-VIS_TYPE_LIST = {"clip-vision", "mmproj"}
++TXT_ARCH_LIST = {"t5", "t5encoder", "llama", "qwen2vl", "qwen3", "qwen3vl", "gemma3", "gemma4"}
++VIS_TYPE_LIST = {"clip-vision", "mmproj"}
++LTXV_BF16_PARAMETERS = {
++    "audio_embeddings_connector.learnable_registers",
++    "keyframes_abs_pos_embedding",
++    "video_embeddings_connector.learnable_registers",
++}
+ 
+ def get_orig_shape(reader, tensor_name):
+     field_key = f"comfy.gguf.orig_shape.{tensor_name}"
+@@ -138,8 +143,8 @@ def gguf_sd_loader(path, handle_prefix="model.diffusion_model.", is_text_model=F
+             torch_tensor = torch_tensor.view(*shape)
+         state_dict[sd_key] = GGMLTensor(torch_tensor, tensor_type=tensor.tensor_type, tensor_shape=shape)
+ 
+-        # 1D tensors shouldn't be quantized, this is a fix for BF16
+-        if len(shape) <= 1 and tensor.tensor_type == gguf.GGMLQuantizationType.BF16:
++        # Raw LTXAV parameters are not loaded through GGMLOps, so their BF16 byte storage must be decoded here.
++        if tensor.tensor_type == gguf.GGMLQuantizationType.BF16 and (len(shape) <= 1 or (arch_str == "ltxv" and tensor_name in LTXV_BF16_PARAMETERS)):
+             state_dict[sd_key] = dequantize_tensor(state_dict[sd_key], dtype=torch.float32)
+ 
+         # keep track of loaded tensor types
