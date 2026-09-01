@@ -843,3 +843,21 @@ The ranking is `nvfp4 > fp8 > bf16 > other`, and `z_image_turbo_int8_convrot`
 matches none of the first three, so it sorts LAST. Fetch ONE precision. If both
 int8 and bf16 are installed the ranking takes bf16 and the smaller download was
 wasted.
+
+### "h3 fails with WrapperNodeMissing and no amount of weights fixes it"
+
+The MiniMax H3 lane needs the **ComfyUI-MiniMax-H3-Turbo** node pack, and that
+pack has no public clone URL in this project's configuration -- on the reference
+machine its git origin is a LOCAL path under `C:\ComfyUI-Models\quarantine\`.
+So `scripts/otr_provision.py` cannot install it, and h3 is not provisionable on
+a fresh machine from the repo alone. The weights being present changes nothing:
+the failure is a missing node CLASS, raised at render time from wrapper_bridge.
+
+Recorded as a limitation rather than fixed, because inventing a clone URL for a
+vendored pack would produce a provisioner that fails later and less clearly.
+
+Worth noting how this was misdiagnosed first: h3 was PREDICTED to fail because
+its text encoder is nvfp4 and the test card was sm_86. It never got that far.
+A missing wrapper pack and an unexecutable kernel look identical from a distance
+-- both are late failures on a lane that "should" work -- and only the traceback
+tells them apart. Read it before naming a cause.
