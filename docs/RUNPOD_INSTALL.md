@@ -861,3 +861,49 @@ its text encoder is nvfp4 and the test card was sm_86. It never got that far.
 A missing wrapper pack and an unexecutable kernel look identical from a distance
 -- both are late failures on a lane that "should" work -- and only the traceback
 tells them apart. Read it before naming a cause.
+
+### "wan_ti2v gets past the missing pack and then says sentencepiece"
+
+    Error: Please make sure sentencepiece and protobuf are installed.
+
+ComfyUI-GGUF's `requirements.txt` lists three packages, and the last two sit
+under a comment reading `# optional - tokenizer`:
+
+    # main
+    gguf>=0.13.0
+    # optional - tokenizer
+    sentencepiece
+    protobuf
+
+They are not optional for this pack's use here -- wan_ti2v loads a GGUF text
+encoder and fails without them, roughly eighteen minutes in, after the script,
+cast, voices and stills are done. "Optional" describes the upstream project's
+view, not OTR's.
+
+Install the WHOLE file, never the line that looks required:
+
+    <comfy-python> -m pip install -r custom_nodes/ComfyUI-GGUF/requirements.txt
+
+`scripts/otr_provision.py` does exactly that for every pack it clones. This
+entry exists because a hand-install picked out `gguf` alone and reproduced the
+failure the provisioner was written to prevent -- the tool was right and the
+shortcut was wrong.
+
+### "The obs bridge says the pod has published 0 episodes, and it has 3"
+
+Git Bash rewrote the path. MSYS converts an argument that looks like a POSIX
+path into a Windows one before the program sees it, so
+
+    --pod-obs /workspace/runpod-slim/ComfyUI/output/otr/obs
+
+arrives as `C:/Program Files/Git/workspace/runpod-slim/...`, the remote `ls`
+matches nothing, and the bridge truthfully reports zero. Nothing is broken; the
+question asked was about a directory that does not exist.
+
+    export MSYS_NO_PATHCONV=1
+    export MSYS2_ARG_CONV_EXCL="*"
+
+Set both before any command that passes a REMOTE absolute path through Git Bash
+-- the obs bridge, ssh one-liners, docker, kubectl. Running the same command
+from PowerShell also avoids it. The tell is that the identical ssh command works
+when you type it and fails inside the script.
