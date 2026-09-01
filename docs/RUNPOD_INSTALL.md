@@ -1082,3 +1082,40 @@ is called out.
 
 With no token, ungated lanes still work; gated ones 401. The provisioner says so
 rather than failing silently.
+
+### "Unexpected text model architecture type in GGUF file: 'gemma4'"
+
+**The ltx25 lane needs a PATCHED ComfyUI-GGUF. Upstream does not work.**
+
+LTX 2.5's text encoder is `gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf`, and
+city96's ComfyUI-GGUF does not list `gemma4` among the architectures it will
+load. Cloned fresh from upstream on 2026-09-01, HEAD `6ea2651` dated
+2026-01-12 -- that IS the current release; the pack simply has not gained the
+architecture.
+
+The reference machine's copy is modified, and the delta is small and specific:
+
+    loader.py   17 lines   "gemma4" added to TXT_ARCH_LIST;
+                           LTXV_BF16_PARAMETERS; a BF16 dequant path for raw
+                           LTXAV parameters that GGMLOps does not handle
+    nodes.py    76 lines
+    ops.py, dequant.py     identical to upstream
+
+So this is not "install a node pack" -- it is "install a node pack and then
+apply changes that exist nowhere public", which is the same shape as the
+MiniMax H3 pack. Both are the honest limit on how portable the pack currently
+is, and both are worth solving by getting the changes upstreamed or published
+rather than by copying files between machines.
+
+**The symptom arrives late and blames the file.** The error names the GGUF, so
+the instinct is to suspect a bad download or the wrong quant. The weights are
+fine; the loader does not know the architecture. Check
+`grep gemma4 <comfy>/custom_nodes/ComfyUI-GGUF/loader.py` before re-downloading
+anything.
+
+**And the patch must reach the PROCESS.** ComfyUI imports loader.py at boot and
+Python will not reload it, so copying the file onto a running server changes
+nothing until a restart. Verify with:
+
+    python -c "import sys;sys.path.insert(0,'<comfy>/custom_nodes/ComfyUI-GGUF');
+               import loader;print('gemma4' in loader.TXT_ARCH_LIST)"
