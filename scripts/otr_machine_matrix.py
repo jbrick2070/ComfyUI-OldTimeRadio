@@ -208,6 +208,25 @@ def render() -> str:
 
     # ---- the one table anybody actually needs ------------------------------
     classes = load_classes(profs)
+    A("## Video engines with a published episode\n")
+    A("Only engines that have produced a real OTR episode on named hardware "
+      "appear here. An engine that loads, or benches well, or has a profile "
+      "written for it, is not on this list. The artifact is the claim.\n")
+    A("| engine | proven on | receipt |")
+    A("|---|---|---|")
+    A("| `ltx25_high_video` (LTX 2.5) | RTX 5080 Laptop, 16 GB, Blackwell | "
+      "`signal_lost_feline_visitor_a_space_oddity_20260831_191928`, 1 act, "
+      "01:26:19; canon records engine `ltx25_video` |")
+    A("| `wan_ti2v` (Wan 2.2 TI2V-5B) | RTX A4500, 20 GB, Ampere | "
+      "`signal_lost_gleaming_in_ruby_20260901_030818`, 1 act, 3949 s, "
+      "obs_publish OK |")
+    A("| `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | "
+      "`signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, "
+      "63.8 s at 1920x1080 |")
+    A("\nTwo of the three were proven on hardware that is not the development "
+      "machine, on a different GPU architecture. That is the point of the "
+      "list: it says what somebody else's computer did, not what this one "
+      "can do.\n")
     A("## What works on what machine\n")
     A("| your machine | writer | video | voice | music | image | status |")
     A("|---|---|---|---|---|---|---|")

@@ -83,6 +83,12 @@
           "episodes": 1,
           "date": "2026-09-01",
           "evidence": "wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here."
+        },
+        {
+          "hardware": "RTX 5080 Laptop 16 GB (Blackwell sm_120)",
+          "episodes": 1,
+          "date": "2026-09-01",
+          "evidence": "ltx25_high_video, 1 act: episode signal_lost_feline_visitor_a_space_oddity_20260831_191928, Prompt executed in 01:26:19. The episode's own canon records render engine ltx25_video. First OTR-published LTX 2.5 episode."
         }
       ]
     },

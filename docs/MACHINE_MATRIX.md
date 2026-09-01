@@ -4,12 +4,24 @@
 
 Find your machine in the first table. That is the whole answer; everything after it is detail you only need if the answer is no.
 
+## Video engines with a published episode
+
+Only engines that have produced a real OTR episode on named hardware appear here. An engine that loads, or benches well, or has a profile written for it, is not on this list. The artifact is the claim.
+
+| engine | proven on | receipt |
+|---|---|---|
+| `ltx25_high_video` (LTX 2.5) | RTX 5080 Laptop, 16 GB, Blackwell | `signal_lost_feline_visitor_a_space_oddity_20260831_191928`, 1 act, 01:26:19; canon records engine `ltx25_video` |
+| `wan_ti2v` (Wan 2.2 TI2V-5B) | RTX A4500, 20 GB, Ampere | `signal_lost_gleaming_in_ruby_20260901_030818`, 1 act, 3949 s, obs_publish OK |
+| `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | `signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, 63.8 s at 1920x1080 |
+
+Two of the three were proven on hardware that is not the development machine, on a different GPU architecture. That is the point of the list: it says what somebody else's computer did, not what this one can do.
+
 ## What works on what machine
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 49 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86) |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 50 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86), RTX 5080 Laptop 16 GB (Blackwell sm_120) |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 
