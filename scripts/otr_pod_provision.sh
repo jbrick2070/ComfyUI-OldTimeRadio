@@ -73,23 +73,40 @@ echo "  pip install -r requirements.txt  (into $COMFY_PY)"
 "$COMFY_PY" -m pip install -q -r "$CN/ComfyUI-OldTimeRadio/requirements.txt" 2>&1 | tail -2
 
 # 5. Weights for the ungated lane. Needs no Hugging Face token.
-echo "  fetching haunted lane weights"
 cd "$CN/ComfyUI-OldTimeRadio" || exit 1
-"$COMFY_PY" scripts/otr_fetch_lane_weights.py haunted 2>&1 | tail -8
 
-# 5b. THE IMAGE MODEL. Fetching only the video lane is why a machine could
-# follow every documented step and still die at OTR_ImageGenDispatcher --
-# almost every video lane needs a conditioning still first, and z_image_turbo
-# is the image engine for every class in the machine matrix.
+# WHICH WEIGHTS, AND WHO DECIDES. Not everyone wants every model, and these are
+# tens of gigabytes -- so this fetches ONE video lane and ONE image precision,
+# which is the minimum that renders an episode, and nothing else. Override with
 #
-# Architecture decides WHICH file. nvfp4 needs hardware fp4 (sm_120,
-# Blackwell); an Ampere or Ada card cannot execute it, and the adapter ranks
-# nvfp4 above bf16 whenever it is present -- so handing the wrong one to an
-# older card makes the engine pick the single file that fails.
-CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.' | tr -d ' ')
-if [ "${CC:-0}" -ge 120 ] 2>/dev/null; then ZLANE=z_image_blackwell; else ZLANE=z_image; fi
-echo "  fetching image model: $ZLANE (compute_cap ${CC:-unknown})"
-"$COMFY_PY" scripts/otr_fetch_lane_weights.py "$ZLANE" 2>&1 | tail -6
+#   OTR_PROVISION_LANES="haunted minimax_h3"   ./otr_pod_provision.sh
+#   OTR_PROVISION_LANES=""                     ./otr_pod_provision.sh   # skip
+#
+# `otr_fetch_lane_weights.py --list` names every lane. Already-present files are
+# reported PRESENT and re-downloaded never, so re-running this is cheap.
+VIDEO_LANES="${OTR_PROVISION_LANES-haunted}"
+
+# The image model is chosen for you because choosing WRONG is silent: the
+# adapter ranks nvfp4 > fp8 > bf16 and nvfp4 needs hardware fp4 (sm_120), so an
+# older card handed nvfp4 picks the one file it cannot execute. Precision is a
+# size/offload question, NOT a can-it-run question -- z_image_turbo is the
+# low-VRAM lane and is proven at 8 GB. Set OTR_PROVISION_IMAGE_LANE to override,
+# or empty to skip.
+CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '. ')
+VR=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 | tr -dc '0-9')
+if   [ "${CC:-0}" -ge 120 ]   2>/dev/null; then ZDEFAULT=z_image_blackwell
+elif [ "${VR:-0}" -ge 20000 ] 2>/dev/null; then ZDEFAULT=z_image
+else                                              ZDEFAULT=z_image_int8
+fi
+IMAGE_LANE="${OTR_PROVISION_IMAGE_LANE-$ZDEFAULT}"
+
+echo "  weights to fetch: video=[${VIDEO_LANES:-none}] image=[${IMAGE_LANE:-none}]"
+echo "    (compute_cap ${CC:-?}, vram ${VR:-?} MiB; override with OTR_PROVISION_LANES / OTR_PROVISION_IMAGE_LANE)"
+for L in $VIDEO_LANES $IMAGE_LANE; do
+  [ -n "$L" ] || continue
+  echo "  --- $L"
+  "$COMFY_PY" scripts/otr_fetch_lane_weights.py "$L" 2>&1 | tail -6
+done
 
 # INDEXTTS2 ON LINUX USES THE ENV VAR, NOT A CODE CHANGE.
 #

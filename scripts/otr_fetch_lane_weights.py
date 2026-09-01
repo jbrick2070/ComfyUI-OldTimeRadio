@@ -29,6 +29,33 @@ import urllib.request
 
 #: lane -> list of (hf_repo, path_in_repo, models_subfolder)
 #: Sizes in the comments are the real blob sizes read from the HF API.
+#: THE PICK LIST. What each lane gives you and what it costs, so a person can
+#: choose BEFORE spending the bandwidth instead of discovering the bill after.
+#: Sizes are the sum of the per-file figures in LANES below; keep them in step
+#: when a lane changes. A wrong number here is worse than no number, because it
+#: is the one thing somebody uses to decide.
+LANE_INFO = {
+    "haunted": (3.65, "AnimateDiff video -- SD1.5 + motion module. The cheapest "
+                      "complete video lane."),
+    "z_image_blackwell": (12.00, "IMAGE model, nvfp4. Blackwell (sm_120) only."),
+    "z_image_int8": (13.58, "IMAGE model, int8. Smallest universal precision."),
+    "z_image": (19.26, "IMAGE model, bf16. Any NVIDIA; largest download."),
+    "stable_audio_3": (3.46, "THE MUSIC MODEL. Sits on the shared path, so "
+                             "without it EVERY profile fails at the music node."),
+    "wan_ti2v_gguf": (9.37, "Wan 2.2 TI2V, quantised. Needs ComfyUI-GGUF."),
+    "wan_ti2v": (0.0, "Wan 2.2 TI2V, safetensors. An ALTERNATIVE to the GGUF "
+                      "set above -- fetch one or the other, never both."),
+    "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
+    "minimax_h3": (39.60, "MiniMax H3 with native audio. The largest lane, and "
+                          "its text encoder is nvfp4 (Blackwell only)."),
+}
+
+#: The least you can install and still render an episode. Everything else is a
+#: choice, not a prerequisite.
+MINIMUM_HINT = ("haunted + one z_image precision + stable_audio_3 "
+                "= about 20 GB and one complete episode")
+
+
 LANES = {
     # ~3.8 GB total. No image model needed: the haunted lane is text_to_video
     # (accepts_still = False), so it also skips z_image entirely.
@@ -153,6 +180,36 @@ LANES = {
     # present, so installing it on a card that cannot run it makes the engine
     # choose the one file that fails. CLIP and VAE are not ranked -- they
     # resolve by exact filename -- so they are the same two files either way.
+    # ~13.6 GB. The smallest UNIVERSAL precision -- smaller download and less
+    # offload pressure than bf16, on any NVIDIA card.
+    #
+    # It is NOT a fits/does-not-fit choice. z_image_turbo is the low-VRAM lane
+    # and is proven at 8 GB (the 4060, nine published episodes); the adapter
+    # offloads the text encoder before the diffusion peak. A reading of
+    # 19.3 GB memory.used on a 20 GB card was briefly mistaken here for a
+    # requirement -- it was ComfyUI expanding into free memory, and the 8 GB
+    # proof already contradicted it.
+    #
+    # The TEXT ENCODER is the full qwen_3_4b, not the fp8 variant, and that is
+    # deliberate: the CLIP is NOT ranked -- it resolves by the exact filename
+    # `qwen_3_4b.safetensors` unless OTR_ZIMAGE_CLIP is set -- so shipping
+    # qwen_3_4b_fp8_mixed alone would resolve to nothing on a machine whose
+    # owner never set that variable.
+    #
+    # Fetch this INSTEAD of `z_image`, never alongside it: the DiT ranking is
+    # nvfp4 > fp8 > bf16 > other, and `z_image_turbo_int8_convrot` matches
+    # none of the first three, so it sorts LAST. With bf16 also present the
+    # ranking picks bf16 and the saving is lost.
+    "z_image_int8": [
+        ("Comfy-Org/z_image_turbo",
+         "split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
+         "diffusion_models"),                                       # 5.78 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/text_encoders/qwen_3_4b.safetensors",
+         "text_encoders"),                                          # 7.49 GB
+        ("Comfy-Org/z_image_turbo",
+         "split_files/vae/ae.safetensors", "vae"),                  # 0.31 GB
+    ],
     "z_image_blackwell": [
         ("Comfy-Org/z_image_turbo",
          "split_files/diffusion_models/z_image_turbo_nvfp4.safetensors",
@@ -239,6 +296,24 @@ def human(n: float) -> str:
 _WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".gguf", ".pth", ".bin", ".onnx")
 
 
+def _already_present(root, path_in_repo, subfolder):
+    """Is this exact file on disk already?
+
+    So the pick list can say what you ALREADY have. Someone choosing what to
+    download needs to see that half a lane is present, not be told a size and
+    left to guess whether they would be paying it again. Mirrors the naming
+    rule in fetch(): a destination ending in a weight suffix names the file.
+    """
+    if subfolder.endswith(_WEIGHT_SUFFIXES):
+        dest = os.path.join(root, subfolder)
+    else:
+        dest = os.path.join(root, subfolder, path_in_repo.split("/")[-1])
+    try:
+        return os.path.isfile(dest) and os.path.getsize(dest) > 1_000_000
+    except OSError:
+        return False
+
+
 def fetch(repo: str, path_in_repo: str, subfolder: str, root: str,
           dry_run: bool) -> bool:
     """Fetch one file. ``subfolder`` may name the destination FILE, not just
@@ -296,9 +371,22 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.list or not args.lane:
-        print("lanes:")
+        root = models_root()
+        print("PICK WHAT YOU NEED. Nothing here is fetched unless you name it.")
+        print("  %-20s %8s %7s  %s"
+              % ("lane", "size", "on disk", "what it gives you"))
+        print("  " + "-" * 96)
         for lane, files in LANES.items():
-            print("  %-24s %d file(s)" % (lane, len(files)))
+            gb, what = LANE_INFO.get(lane, (0.0, ""))
+            have = sum(1 for repo, path_in_repo, sub in files
+                       if _already_present(root, path_in_repo, sub))
+            mark = "all" if have == len(files) else "%d/%d" % (have, len(files))
+            size = ("%.1f GB" % gb) if gb else "varies"
+            print("  %-20s %8s %7s  %s" % (lane, size, mark, what[:52]))
+            if len(what) > 52:
+                print("  %-37s  %s" % ("", what[52:110]))
+        print("")
+        print("  minimum for one episode: %s" % MINIMUM_HINT)
         print("")
         print("profile bundles (fetch everything a profile needs):")
         for b, lanes in BUNDLES.items():

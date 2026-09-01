@@ -821,17 +821,25 @@ Diagnose it by reading the traceback rather than the runtime: the exception is
 raised from `wrapper_bridge`, names no file of yours, and the elapsed time will
 be long enough to look like an OOM that never happened.
 
-### "The bf16 image model fits a 20 GB card and not a 16 GB one"
+### "Which z_image precision should this machine fetch?"
 
-Measured on an A4500: `z_image_turbo_bf16` (11.46 GB) plus `qwen_3_4b` (7.49 GB)
-sat at 19.3 GB of 20 GB during the image stage -- about a gigabyte of headroom,
-and no room at all on a 16 GB card.
+z_image_turbo is the LOW-VRAM lane and it is proven at 8 GB -- the 4060 has
+published nine episodes on it. The adapter offloads the text encoder before the
+diffusion peak, so precision is a question of download size and offload
+pressure, NOT of whether the lane will run.
 
-This does not affect Blackwell, which runs `z_image_turbo_nvfp4` (4.20 GB) with
-the fp8 encoder. It affects a NON-Blackwell 16 GB card (4080, 4060 Ti 16 GB,
-A4000), which can execute neither nvfp4 nor the bf16 pair comfortably. The
-int8/fp8 variants exist for exactly that case -- but note the adapter's ranking
-is `nvfp4 > fp8 > bf16 > other`, and `z_image_turbo_int8_convrot` contains
-neither "fp8" nor "bf16", so it sorts LAST, below bf16. On such a card set
-`OTR_ZIMAGE_UNET` and `OTR_ZIMAGE_CLIP` explicitly rather than relying on the
-ranking to choose well.
+    z_image_blackwell   nvfp4  4.20 GB   sm_120 only -- hardware fp4
+    z_image             bf16  11.46 GB   any NVIDIA
+    z_image_int8        int8   5.78 GB   any NVIDIA, smallest universal option
+
+A CAUTION LEARNED BY GETTING IT WRONG HERE: do not read a card's memory.used
+during the image stage as the lane's requirement. On a 20 GB A4500 that figure
+reached 19.3 GB, which was written up as "bf16 does not fit 16 GB" -- and that
+was false. ComfyUI expands into whatever memory is free; the 8 GB proof already
+existed and contradicted it. Measure a floor by running on the small card, never
+by watching the big one fill up.
+
+The ranking is `nvfp4 > fp8 > bf16 > other`, and `z_image_turbo_int8_convrot`
+matches none of the first three, so it sorts LAST. Fetch ONE precision. If both
+int8 and bf16 are installed the ranking takes bf16 and the smaller download was
+wasted.
