@@ -77,7 +77,13 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": [],
+    "required_models": [
+      "LTX-2.5-Distilled-Q3_K_M.gguf",
+      "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+      "ltx-2.5-video-vae-bf16.safetensors",
+      "ltx-2.5-audio-vae-bf16.safetensors",
+      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+    ],
     "required_keys": []
   },
   "launch": {

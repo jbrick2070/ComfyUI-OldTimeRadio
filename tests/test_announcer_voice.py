@@ -264,8 +264,10 @@ def test_cross_widget_agreement_is_silent_when_engines_match(monkeypatch):
     from nodes.announcer_voice import AnnouncerVoice
 
     script = json.dumps({
-        "lines": [{"line_id": "a1", "speaker_role": "announcer",
-                   "text": "hello", "char_id": "announcer"}],
+        # This test owns cross-widget agreement, not sidecar startup. An empty
+        # work set still executes the agreement guard below while keeping the
+        # assertion deterministic on machines where Chatterbox is installed.
+        "lines": [],
         "cast": [{"char_id": "announcer", "name": "ANNOUNCER",
                   "tts_model": "kokoro", "voice_ref_path": "x.wav"}],
         "meta": {"announcer_voice_engine": "chatterbox"},

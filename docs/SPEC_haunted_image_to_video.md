@@ -28,8 +28,9 @@ constant a sibling silently inherits)". This spec follows that rule exactly.
 ## 2. Why it is worth building
 
 **Image-conditioned video on the cheap lane.** Today the only image-to-video
-lanes are expensive: MiniMax H3 is **~39.6 GB** of weights and LTX 2.5 is
-**gated**. The haunted stack is **~3.9 GB** and fully ungated. Adding a still
+lanes are expensive: the complete operator-local MiniMax H3 FL2VA+REF2VA lane
+is **63,440,965,087 bytes (59.084 GiB)** and LTX 2.5 is **gated**. The haunted
+stack is **~3.9 GB** and fully ungated. Adding a still
 input to it would give image-to-video on an 8 GB card with weights a user can
 obtain without a token.
 

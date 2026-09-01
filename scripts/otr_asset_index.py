@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import importlib.util
 import io
 import json
 import os
@@ -52,6 +53,7 @@ _GATED_RE = re.compile(r'requires_hf_token\s*=\s*True|HF_TOKEN')
 #: none. Cloud and procedural lanes genuinely need nothing; anything else with
 #: an empty list is a GAP in what the code declares, and must say so.
 _NO_ASSET_PREFIXES = ("cloud_", "google_", "viz_", "visualizer")
+_OPERATOR_ONLY_FETCH_LANES = {"minimax_h3"}
 
 
 def _imports_of(path: str, src: str) -> list:
@@ -148,14 +150,13 @@ def collect_profiles() -> dict:
 def _fetcher_lanes() -> dict:
     """Lanes `otr_fetch_lane_weights.py` can install with no manual steps."""
     path = os.path.join(_REPO, "scripts", "otr_fetch_lane_weights.py")
-    try:
-        src = io.open(path, encoding="utf-8", errors="replace").read()
-    except OSError:
+    spec = importlib.util.spec_from_file_location("otr_asset_index_fetcher", path)
+    if spec is None or spec.loader is None:
         return {}
-    lanes = {}
-    for m in re.finditer(r'^\s*["\']([a-z0-9_]+)["\']\s*:\s*\(?\s*\[', src, re.M):
-        lanes[m.group(1)] = True
-    return lanes
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    lanes = getattr(module, "LANES", {})
+    return {str(name): True for name in lanes} if isinstance(lanes, dict) else {}
 
 
 def render() -> str:
@@ -192,13 +193,17 @@ def render() -> str:
     A("Resolve the models root through `nodes/_otr_gguf_backend.py::_models_root()` "
       "rather than guessing -- a `find` under the ComfyUI tree proves nothing.\n")
 
-    A("## The one-command path\n")
+    A("## Public one-command paths\n")
     if fetchable:
-        A("`scripts/otr_fetch_lane_weights.py` installs these lanes with no "
-          "account and no manual step:\n")
+        A("`scripts/otr_fetch_lane_weights.py` installs these public lanes with "
+          "no account and no manual step:\n")
         A("```\n" + "\n".join(
             "python scripts/otr_fetch_lane_weights.py %s" % k
-            for k in sorted(fetchable)) + "\n```\n")
+            for k in sorted(set(fetchable) - _OPERATOR_ONLY_FETCH_LANES))
+          + "\n```\n")
+    A("The complete H3 manifest is deliberately explicit and operator-local; "
+      "it is never selected by a public profile or machine bundle:\n\n"
+      "```\npython scripts/otr_fetch_lane_weights.py minimax_h3\n```\n")
     A("Anything not listed there is a manual install -- see its row below.\n")
 
     for kind, title in (("video", "Video engines"), ("audio", "Audio and voice engines")):
@@ -221,7 +226,17 @@ def render() -> str:
                 else:
                     needs.append("**not declared in code -- verify**")
             how = "auto (HF cache)" if row["repos"] and not row["weights"] else ""
-            if row["engine"] in fetchable:
+            if row["engine"] == "humo":
+                # One module implements both tiers. The automatic lane is the
+                # complete 14B recipe only; claiming it installs the 1.7B DiT
+                # would recreate the wrong-artifact fresh-install trap.
+                how = ("14B: `otr_fetch_lane_weights.py humo`; 1.7B: "
+                       "[exact manual tier](RUNPOD_PORTABILITY_LAB.md)")
+            elif row["engine"].startswith("humo"):
+                how = "[exact manual tier](RUNPOD_PORTABILITY_LAB.md)"
+            elif row["engine"] == "minimax_h3":
+                how = "explicit operator-local `otr_fetch_lane_weights.py minimax_h3`"
+            elif row["engine"] in fetchable:
                 how = "`otr_fetch_lane_weights.py %s`" % row["engine"]
             elif row["external"]:
                 how = "manual, see below"
@@ -263,11 +278,11 @@ def render() -> str:
               "of compiled wheels for the wrong platform. On a new machine, "
               "clone the project, build its venv natively, fetch checkpoints, "
               "then point the three variables above at them.\n")
-            A("It also needs **reference WAVs** for cloning, one per cast voice, "
-              "at `<models_root>/TTS/refs/indextts2/*.wav`. Without a resolvable "
-              "ref the engine refuses by name -- `no usable voice reference for "
-              "cloning engine 'indextts2' ... (voice_ref_id=...)` -- and there "
-              "is no fallback. These clips are NOT shipped with the pack.\n")
+            A("It also needs an authorized male and female reference WAV plus a "
+              "full portable bank that preserves every non-Index row. The exact "
+              "recipe is in [RUNPOD_PORTABILITY_LAB.md](RUNPOD_PORTABILITY_LAB.md). "
+              "The clips are not shipped; a missing or mismatched registered ref "
+              "is a named refusal, never a fallback.\n")
     A("## Exactly which files each engine names\n")
     A("Copied from the engine module and the siblings it imports, so these are "
       "the literal strings the code looks for on disk.\n")

@@ -6,7 +6,7 @@ matrix_peers.py) to a real, in-stack engine with an implemented ``render_image``
 [type=flux2] + VAELoader + CLIPTextEncode + FluxGuidance -> BasicGuider;
 EmptyFlux2LatentImage + Flux2Scheduler + KSamplerSelect + RandomNoise ->
 SamplerCustomAdvanced -> VAEDecode). This file holds its dedicated CPU contract
-coverage (registry / opt-in / flag+weight gates / env constants / cold-import)
+coverage (registry / explicit selection / weight gate / env constants / cold-import)
 PLUS the graph-build + render-drive coverage, all without a GPU (the live render
 is the operator verify-on-5080).
 """
@@ -15,6 +15,7 @@ from __future__ import annotations
 import pathlib
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -34,6 +35,14 @@ def test_klein_registered_optin_clean():
 
 
 def test_klein_weight_gate(monkeypatch, tmp_path):
+    from nodes._otr_image_engines import flux2_klein as module
+
+    fake_folder_paths = types.ModuleType("folder_paths")
+    fake_folder_paths.get_full_path = lambda *_args: None
+    fake_folder_paths.add_model_folder_path = lambda *_args, **_kwargs: None
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_folder_paths)
+    monkeypatch.delenv("OTR_COMFYUI_MODELS_ROOT", raising=False)
+    monkeypatch.delenv("COMFYUI_MODELS_ROOT", raising=False)
     eng = ireg.get_engine("flux2_klein")
     # (1) Registry IS the menu: a registered engine is selectable, no flag gate.
     monkeypatch.delenv("OTR_ENABLE_FLUX2_KLEIN", raising=False)
@@ -48,6 +57,124 @@ def test_klein_weight_gate(monkeypatch, tmp_path):
     ck.write_bytes(b"\x00\x01\x02\x03")
     monkeypatch.setenv("OTR_FLUX2_KLEIN_CKPT", str(ck))
     assert eng.assert_usable({}, {"role": "music_visual"}) == "flux2_klein"
+
+
+def test_klein_default_checkpoint_resolves_through_folder_paths(
+        monkeypatch, tmp_path):
+    from nodes._otr_image_engines import flux2_klein as module
+
+    checkpoint = tmp_path / module._DEFAULT_CKPT
+    checkpoint.write_bytes(b"installed GGUF")
+    fake_folder_paths = types.ModuleType("folder_paths")
+    calls = []
+
+    def get_full_path(category, name):
+        calls.append((category, name))
+        return str(checkpoint) if category == "unet" else None
+
+    fake_folder_paths.get_full_path = get_full_path
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_folder_paths)
+    for name in (
+        module.MODEL_ENV, "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    eng = module.Flux2KleinEngine()
+    assert eng.assert_usable({}, {"role": "music_visual"}) == eng.name
+    assert eng._klein_params({"prompt": "x"})["unet_name"] == checkpoint.name
+    assert calls == [
+        ("unet", module._DEFAULT_CKPT),
+        ("unet", module._DEFAULT_CKPT),
+    ]
+
+
+def test_klein_default_checkpoint_falls_back_to_configured_models_root(
+        monkeypatch, tmp_path):
+    from nodes._otr_image_engines import flux2_klein as module
+
+    fake_folder_paths = types.ModuleType("folder_paths")
+    registered = []
+
+    def add_model_folder_path(category, path, is_default=False):
+        registered.append((category, path, is_default))
+
+    fake_folder_paths.get_full_path = lambda category, name: (
+        str(checkpoint) if registered and category == "unet" and
+        name == module._DEFAULT_CKPT else None)
+    fake_folder_paths.add_model_folder_path = add_model_folder_path
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_folder_paths)
+    monkeypatch.delenv(module.MODEL_ENV, raising=False)
+    monkeypatch.delenv("COMFYUI_MODELS_ROOT", raising=False)
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
+    checkpoint = tmp_path / "diffusion_models" / module._DEFAULT_CKPT
+    checkpoint.parent.mkdir()
+    checkpoint.write_bytes(b"installed GGUF")
+
+    eng = module.Flux2KleinEngine()
+    assert module._resolve_unet_path() == str(checkpoint)
+    assert eng.assert_usable({}, {"role": "music_visual"}) == eng.name
+    assert registered == [("unet", str(checkpoint.parent), True)]
+
+
+def test_klein_explicit_override_is_registered_and_wins(monkeypatch, tmp_path):
+    from nodes._otr_image_engines import flux2_klein as module
+
+    default = tmp_path / "default" / module._DEFAULT_CKPT
+    explicit = tmp_path / "outside" / module._DEFAULT_CKPT
+    default.parent.mkdir()
+    explicit.parent.mkdir()
+    default.write_bytes(b"default")
+    explicit.write_bytes(b"explicit")
+    search = [str(default.parent)]
+
+    fake_folder_paths = types.ModuleType("folder_paths")
+
+    def add_model_folder_path(category, path, is_default=False):
+        assert category == "unet"
+        if path in search:
+            search.remove(path)
+        search.insert(0 if is_default else len(search), path)
+
+    def get_full_path(category, name):
+        assert category == "unet"
+        for root in search:
+            candidate = pathlib.Path(root) / name
+            if candidate.is_file():
+                return str(candidate)
+        return None
+
+    fake_folder_paths.add_model_folder_path = add_model_folder_path
+    fake_folder_paths.get_full_path = get_full_path
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_folder_paths)
+    monkeypatch.setenv(module.MODEL_ENV, str(explicit))
+
+    eng = module.Flux2KleinEngine()
+    assert eng.assert_usable({}, {"role": "music_visual"}) == eng.name
+    assert module._resolve_unet_path() == str(explicit)
+    assert eng._klein_params({"prompt": "x"})["unet_name"] == explicit.name
+    assert search[0] == str(explicit.parent)
+
+
+@pytest.mark.parametrize("root_env", [
+    "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT",
+])
+def test_klein_models_root_fallbacks(monkeypatch, tmp_path, root_env):
+    from nodes._otr_image_engines import flux2_klein as module
+
+    checkpoint = tmp_path / "diffusion_models" / module._DEFAULT_CKPT
+    checkpoint.parent.mkdir()
+    checkpoint.write_bytes(b"installed")
+    fake_folder_paths = types.ModuleType("folder_paths")
+    fake_folder_paths.add_model_folder_path = lambda *_args, **_kwargs: None
+    fake_folder_paths.get_full_path = lambda category, name: (
+        str(checkpoint) if category == "unet" and checkpoint.is_file() else None)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake_folder_paths)
+    monkeypatch.delenv(module.MODEL_ENV, raising=False)
+    for name in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(root_env, str(tmp_path))
+
+    assert module._resolve_unet_path() == str(checkpoint)
 
 
 def test_klein_env_constants_exported():

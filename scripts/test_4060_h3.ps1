@@ -1,6 +1,9 @@
 <#
 .SYNOPSIS
-Proves the canonical workflow runs on 4060 (8GB) with H3 and Gemma E2B.
+Runs an UNQUALIFIED H3 experiment on the physical RTX 4060.
+
+This script records either outcome. It does not promote 8 GB support; only a
+legal-floor published episode plus its receipt can do that.
 #>
 $ErrorActionPreference = "Stop"
 
@@ -17,14 +20,14 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.Co
 
 Start-Sleep -Seconds 2
 
-# Boot in HUMO/H3 lane? Wait, _otr_soak_server_launch.cmd doesn't have an "H3" lane.
-# Let's check what lane H3 uses. Usually it just needs to be booted without LTX or WAN.
-Write-Host "Booting ComfyUI server..." -ForegroundColor Cyan
+Write-Host "Booting the unclamped default contract for the H3 profile..." -ForegroundColor Cyan
 $pinfo = New-Object System.Diagnostics.ProcessStartInfo
 $pinfo.FileName = $LAUNCHCMD
 $pinfo.Arguments = "`"otr_4060_h3_server.log`" FLOOR"
 $pinfo.UseShellExecute = $false
 $pinfo.WorkingDirectory = $REPO
+[void]$pinfo.EnvironmentVariables.Remove("OTR_HEADLESS_RESERVE_VRAM_GB")
+$pinfo.EnvironmentVariables["OTR_HEADLESS_DISABLE_PINNED"] = "1"
 $proc = [System.Diagnostics.Process]::Start($pinfo)
 
 Write-Host "Waiting up to 45s for port 8000..." -ForegroundColor Yellow
@@ -34,7 +37,7 @@ for ($i=0; $i -lt 45; $i++) {
     Start-Sleep -Seconds 1
 }
 
-Write-Host "Triggering 1-Act run with otr_4060_h3_nano profile..." -ForegroundColor Cyan
+Write-Host "Triggering one legal-floor lab run with otr_4060_h3_nano..." -ForegroundColor Cyan
 $runProc = Start-Process -FilePath $VenvPython -ArgumentList "$APIRUN --profile otr_4060_h3_nano --act-count 1" -NoNewWindow -PassThru -RedirectStandardOutput "otr_4060_h3_client.log"
 $runProc.WaitForExit()
 
@@ -42,9 +45,9 @@ Write-Host "Run finished. Looking for Episode ID to audit..." -ForegroundColor C
 $matches = (Select-String -Path "otr_4060_h3_client.log" -Pattern "\[ledger\] writing manifest to (.*\\episodes\\(.*?)\\).*")
 if ($matches) {
     $epId = $matches.Matches.Groups[2].Value
-    Write-Host "Auditing Episode: $epId"
+    Write-Host "Auditing unqualified experiment episode: $epId"
     $auditProc = Start-Process -FilePath $VenvPython -ArgumentList "$AUDIT --episode `"otr\episodes\$epId`"" -NoNewWindow -PassThru
     $auditProc.WaitForExit()
 } else {
-    Write-Host "Could not find episode ID. Check otr_4060_h3_client.log for errors." -ForegroundColor Red
+    Write-Host "No episode published; this remains an unqualified negative result. Check otr_4060_h3_client.log." -ForegroundColor Yellow
 }

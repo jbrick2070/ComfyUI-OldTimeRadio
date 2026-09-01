@@ -375,9 +375,13 @@ class CastLock:
         # pinning a concrete engine into a ledger it promised not to re-cast.
         # Loading the bank here would silently change that stamp.
         bank_entries = None
+        bank_unavailable_route_ids = None
         if cast_voice_policy == "auto_registry":
-            from ._otr_voice_bank import load_voice_bank
+            from ._otr_voice_bank import (
+                load_voice_bank, unavailable_qualified_route_ids)
             bank_entries, _bank_sha = load_voice_bank()
+            bank_unavailable_route_ids = unavailable_qualified_route_ids(
+                source_sha256=_bank_sha)
         target_engine, announcer_engine = self._stamp_voice_engine_selection(
             led, voice_bank, char_voice_engine, announcer_voice_engine,
             bank_entries=bank_entries, voice_device=voice_device)
@@ -390,7 +394,8 @@ class CastLock:
         # None here by design and the claim path loads its own only if a route is
         # actually selected -- which keeps the dormant case free of bank I/O.
         route_claims = self._resolve_route_claims(
-            voice_bank, target_engine, bank_entries=bank_entries, cast=cast)
+            voice_bank, target_engine, bank_entries=bank_entries, cast=cast,
+            bank_unavailable_route_ids=bank_unavailable_route_ids)
 
         if cast_voice_policy == "auto_registry":
             self._auto_registry(
@@ -401,7 +406,8 @@ class CastLock:
                 bank_entries=bank_entries,
                 target_engine=target_engine,
                 announcer_engine=announcer_engine,
-                route_claims=route_claims)
+                route_claims=route_claims,
+                bank_unavailable_route_ids=bank_unavailable_route_ids)
         else:
             # STEP 5 (plan 5.2): in preserve_ledger ONLY the claimed row changes.
             # Every other row keeps the bytes it arrived with -- that is the
@@ -891,7 +897,8 @@ class CastLock:
                        bank_entries=None,
                        target_engine=None,
                        announcer_engine=None,
-                       route_claims=None):
+                       route_claims=None,
+                       bank_unavailable_route_ids=None):
         """Re-cast the registry rows.
 
         ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
@@ -903,12 +910,22 @@ class CastLock:
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
             announcer_voice_ref, assign_voice_for_slot,
-            gender_agnostic_fallback_ref, load_voice_bank, voice_ref_usage_keys,
+            gender_agnostic_fallback_ref, load_voice_bank,
+            unavailable_qualified_route_ids as resolve_unavailable_route_ids,
+            voice_ref_usage_keys,
         )
         from ._otr_voice_node_common import coerce_int_seed
 
         if bank_entries is None:
             bank_entries, _bank_sha = load_voice_bank()
+            if bank_unavailable_route_ids is None:
+                bank_unavailable_route_ids = resolve_unavailable_route_ids(
+                    source_sha256=_bank_sha)
+        elif bank_unavailable_route_ids is None:
+            # Direct tests and compatibility callers may inject rows. Metadata
+            # from the environment-selected bank must never authorize an
+            # exception on unrelated injected entries.
+            bank_unavailable_route_ids = frozenset()
         meta = led.get("meta") or {}
         if meta.get("episode_seed") is None:
             # SILENCE IS HOW THIS HID. A missing seed folds through
@@ -943,7 +960,8 @@ class CastLock:
             if route_claims is None:
                 route_claims = self._resolve_route_claims(
                     voice_bank, target_engine, bank_entries=bank_entries,
-                    cast=cast)
+                    cast=cast,
+                    bank_unavailable_route_ids=bank_unavailable_route_ids)
         if route_claims is None:
             route_claims = _RouteClaims()
         policy_claim = route_claims.qualified
@@ -957,6 +975,9 @@ class CastLock:
         # "never recorded".
         provisional_reason = (
             provisional.reason_code
+            if isinstance(provisional, _ROUTE.ProvisionalRouteDegradation) else "")
+        provisional_route_id = (
+            provisional.route_id
             if isinstance(provisional, _ROUTE.ProvisionalRouteDegradation) else "")
         # The row this policy claims, resolved ONCE. Empty when both tiers are
         # dormant, which is what keeps a dormant policy byte-identical to the
@@ -1243,6 +1264,7 @@ class CastLock:
                             entry, tier_character_key)):
                     continue
                 _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_UNROUTED,
+                                  route_id=provisional_route_id,
                                   reason_code=provisional_reason)
                 report.append(
                     "  %s: no voice route applied -- ordinary draw (%s)"
@@ -1258,16 +1280,19 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     def _resolve_policy_claim(self, voice_bank, target_engine,
-                              bank_entries=None, cast=None):
+                              bank_entries=None, cast=None,
+                              bank_unavailable_route_ids=None):
         """The QUALIFIED claim only, or None. A compatibility face on
         ``_resolve_route_claims`` for callers that only ever wanted that tier."""
         return self._resolve_route_claims(
             voice_bank, target_engine, bank_entries=bank_entries,
-            cast=cast).qualified
+            cast=cast,
+            bank_unavailable_route_ids=bank_unavailable_route_ids).qualified
 
     # ------------------------------------------------------------------ #
     def _resolve_route_claims(self, voice_bank, target_engine,
-                              bank_entries=None, cast=None) -> _RouteClaims:
+                              bank_entries=None, cast=None,
+                              bank_unavailable_route_ids=None) -> _RouteClaims:
         """Consult both voice-route tiers, in order, for this lock.
 
         QUALIFIED FIRST, AND IT IS UNCHANGED. A route that IS selected and cannot
@@ -1322,8 +1347,17 @@ class CastLock:
         # engine stamp as "auto". Resolve one HERE, for the proof only -- this
         # must not write meta["char_voice_engine"].
         if bank_entries is None:
-            from ._otr_voice_bank import load_voice_bank
+            from ._otr_voice_bank import (
+                load_voice_bank, unavailable_qualified_route_ids)
             bank_entries, _bank_sha = load_voice_bank()
+            if bank_unavailable_route_ids is None:
+                bank_unavailable_route_ids = unavailable_qualified_route_ids(
+                    source_sha256=_bank_sha)
+        if bank_unavailable_route_ids is None:
+            # Explicit callers that inject entries retain the old fail-closed
+            # contract unless they also inject the bank's validated exception
+            # list. Missing rows and portable-looking ids imply nothing.
+            bank_unavailable_route_ids = frozenset()
         engine = target_engine
         if engine is None:
             engine = self._resolve_char_engine(voice_bank, bank_entries, "auto")
@@ -1396,6 +1430,43 @@ class CastLock:
                 "engine_unresolved",
                 "no character voice engine resolved for voice bank %r"
                 % (voice_bank,)))
+
+        # A portable bank cannot redistribute the operator's one private Lemmy
+        # reference. Honour that fact only for an exact SELECTED qualified route
+        # and only when its voice_ref_id is wholly absent from the bank.
+        # If a row exists, normal validation below still owns duplicates, rights,
+        # revocation, hashes, and bytes. A typo or unrelated route also falls
+        # through to the ordinary fail-closed resolver.
+        selected = _ROUTE.select_policy_route(policy, engine)
+        if isinstance(selected, dict):
+            route_id = str(selected.get("route_id") or "").strip()
+            qual = selected.get("qualification_record")
+            claimed_ref_id = str((qual or {}).get("voice_ref_id") or "").strip() \
+                if isinstance(qual, dict) else ""
+            claimed_rows = [
+                entry for entry in (bank_entries or ())
+                if str(getattr(entry, "voice_ref_id", "")) == claimed_ref_id
+            ]
+            if (route_id in bank_unavailable_route_ids and claimed_ref_id
+                    and not claimed_rows):
+                absence_reason = (
+                    "voice_ref_id %r is not present in the voice bank"
+                    % claimed_ref_id)
+                absence_validation = _ROUTE.validate_qualified_voice_route(
+                    selected, datetime.now(timezone.utc),
+                    active_engine=engine, bank_lookup=lambda _voice_id: None,
+                    require_local_bytes=False)
+                if absence_validation.reasons != (absence_reason,):
+                    raise _ROUTE.VoiceRouteError(
+                        "SELECTED voice route %r is declared unavailable in "
+                        "this bank, but its qualification has defect(s) beyond "
+                        "the intentional missing row: %s"
+                        % (route_id, absence_validation.summary))
+                return _RouteClaims(None, _ROUTE.ProvisionalRouteDegradation(
+                    "qualified_route_unavailable_in_bank",
+                    "qualified route %r intentionally has no redistributable "
+                    "reference in this voice bank" % route_id,
+                    engine=engine, route_id=route_id))
 
         # Resolve reference paths the SAME way the render path does. A bank
         # ref_path is relative to ComfyUI's MODELS root, not to this repo, so a

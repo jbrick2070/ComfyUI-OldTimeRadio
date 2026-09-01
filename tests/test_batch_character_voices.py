@@ -214,17 +214,16 @@ def test_announcer_engine_mismatch_guard_does_not_apply_to_characters(monkeypatc
     like the announcer-mismatch trigger (meta.announcer_voice_engine
     disagrees with the widget engine) but on a CHARACTER line, using a real
     usable char_voice engine (chatterbox) so dispatch actually reaches past
-    the role check and into real per-line rendering -- proving the guard
-    never even runs for char_voice, not just that this particular engine
-    choice happens to fail for an unrelated reason."""
+    the role check and into the shared per-line guard. The work set stays empty
+    because this test owns control scoping, not a real sidecar boot -- proving
+    the guard never even runs for char_voice without importing GPU state."""
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     import json
 
     from nodes.batch_character_voices import BatchCharacterVoices
 
     script = json.dumps({
-        "lines": [{"line_id": "c1", "speaker_role": "character",
-                   "text": "hi", "char_id": "x"}],
+        "lines": [],
         "cast": [{"char_id": "x", "name": "X",
                   "voice_ref_path": "x.wav"}],
         # Disagrees with engine="chatterbox" below -- exactly the shape that

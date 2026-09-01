@@ -140,6 +140,109 @@ _FLOOR_VIDEO_VAE = int(0.5 * _GiB)
 _FLOOR_AUDIO_VAE = int(0.1 * _GiB)
 _FLOOR_UPSCALER = int(0.5 * _GiB)
 
+# These three raw LTXV parameters bypass ComfyUI-GGUF's normal GGMLOps
+# materialization. The supported patch decodes their BF16 byte storage in the
+# loader itself; merely recognizing ``gemma4`` is not enough.
+_LTX25_GGUF_RAW_BF16 = frozenset({
+    "audio_embeddings_connector.learnable_registers",
+    "keyframes_abs_pos_embedding",
+    "video_embeddings_connector.learnable_registers",
+})
+
+
+def _inspect_ltx25_gguf_patch(loader_cls):
+    """Return ``(loader_path, missing_facts)`` for the registered GGUF pack.
+
+    The installed class owns provenance. We inspect its sibling ``loader.py``
+    semantically with the stdlib AST, so CRLF, whitespace, and a package name
+    containing a hyphen cannot turn this into a guessed-path or byte-hash
+    check. GGUF and torch remain unimported at module scope.
+    """
+    import ast
+    import sys
+
+    module_name = getattr(loader_cls, "__module__", "")
+    module = sys.modules.get(module_name)
+    module_file = getattr(module, "__file__", None)
+    if not module_file:
+        return "", (
+            "registered CLIPLoaderGGUF module %r has no readable __file__"
+            % module_name,
+        )
+
+    loader_path = os.path.realpath(os.path.join(
+        os.path.dirname(os.path.realpath(module_file)), "loader.py"))
+    try:
+        with open(loader_path, "r", encoding="utf-8-sig") as handle:
+            tree = ast.parse(handle.read(), filename=loader_path)
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        return loader_path, (
+            "cannot parse sibling loader.py: %s: %s"
+            % (type(exc).__name__, exc),
+        )
+
+    def literal_string_set(name):
+        for statement in tree.body:
+            value = None
+            if isinstance(statement, ast.Assign):
+                if any(isinstance(target, ast.Name) and target.id == name
+                       for target in statement.targets):
+                    value = statement.value
+            elif (isinstance(statement, ast.AnnAssign)
+                  and isinstance(statement.target, ast.Name)
+                  and statement.target.id == name):
+                value = statement.value
+            if value is None:
+                continue
+            try:
+                result = ast.literal_eval(value)
+            except (ValueError, TypeError):
+                return None
+            if not isinstance(result, (set, frozenset, list, tuple)):
+                return None
+            if not all(isinstance(item, str) for item in result):
+                return None
+            return set(result)
+        return None
+
+    expected_branch = ast.parse(
+        "if tensor.tensor_type == gguf.GGMLQuantizationType.BF16 and "
+        "(len(shape) <= 1 or (arch_str == 'ltxv' and "
+        "tensor_name in LTXV_BF16_PARAMETERS)):\n"
+        "    state_dict[sd_key] = dequantize_tensor("
+        "state_dict[sd_key], dtype=torch.float32)\n"
+    ).body[0]
+    loader_fn = next(
+        (node for node in tree.body
+         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+         and node.name == "gguf_sd_loader"),
+        None,
+    )
+    dump = lambda node: ast.dump(node, include_attributes=False)
+    branch_ok = bool(loader_fn) and any(
+        isinstance(node, ast.If)
+        and dump(node.test) == dump(expected_branch.test)
+        and any(dump(statement) == dump(expected_branch.body[0])
+                for statement in node.body)
+        for node in ast.walk(loader_fn)
+    )
+
+    missing = []
+    text_arches = literal_string_set("TXT_ARCH_LIST")
+    if not text_arches or "gemma4" not in text_arches:
+        missing.append("TXT_ARCH_LIST lacks gemma4")
+
+    raw_names = literal_string_set("LTXV_BF16_PARAMETERS")
+    absent_names = sorted(_LTX25_GGUF_RAW_BF16 - (raw_names or set()))
+    if absent_names:
+        missing.append("LTXV_BF16_PARAMETERS lacks %s" %
+                       ", ".join(absent_names))
+
+    if not branch_ok:
+        missing.append(
+            "gguf_sd_loader lacks the complete LTXV BF16 materialization branch")
+    return loader_path, tuple(missing)
+
 
 class CpuPinnedEncoderPlacementError(RuntimeError):
     """The text encoder did not end up on the CPU. FAIL LOUD, before any forward.
@@ -613,9 +716,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         mapping = _wb.node_class_mappings()
         absent = []
-        for _logical, candidates in self._node_candidates().items():
+        resolved = {}
+        for logical, candidates in self._node_candidates().items():
             try:
-                _wb.resolve_node_class(candidates, mapping)
+                resolved[logical] = _wb.resolve_node_class(candidates, mapping)
             except Exception:  # noqa: BLE001 - collect every miss
                 absent.append("/".join(candidates))
         if absent:
@@ -626,6 +730,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "nodes_lt_audio.py plus ComfyUI-GGUF for the two GGUF loaders; "
                 "update both and restart"
                 % (self.name, ", ".join(sorted(set(absent)))), kind="video")
+
+        loader_path, patch_gaps = _inspect_ltx25_gguf_patch(resolved["te"])
+        if patch_gaps:
+            patch_path = os.path.realpath(os.path.join(
+                os.path.dirname(__file__), "..", "..", "patches",
+                "ComfyUI-GGUF-ltx25-gemma4.patch"))
+            raise EngineUnusable(
+                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
+                "%s found CLIPLoaderGGUF, but %r is not LTX 2.5 compatible: "
+                "%s. Stop ComfyUI and apply %r, or rerun the pinned "
+                "provisioner with --packs-only"
+                % (self.name, loader_path, "; ".join(patch_gaps), patch_path),
+                kind="video")
 
         for label, path, floor in self._weight_paths():
             real = os.path.realpath(path) if path else ""

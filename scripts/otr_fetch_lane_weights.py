@@ -36,9 +36,9 @@ class WeightSpec(NamedTuple):
 
     Older lanes predate reproducible source receipts, so ``revision``,
     ``expected_bytes`` and ``expected_sha256`` remain optional for them. New
-    promoted lanes must fill all three. The HuMo lane is the first lane whose
-    downloader proves both remote identity and landed bytes before the final
-    filename becomes visible to ComfyUI.
+    promoted lanes must fill all three. Receipt-bearing lanes prove both remote
+    identity and landed bytes before the final filename becomes visible to
+    ComfyUI.
     """
 
     repo: str
@@ -71,8 +71,9 @@ LANE_INFO = {
                     "a 16 GB Blackwell 5080 at 13.06 GiB VRAM / 27.53 GiB "
                     "host RAM; use at least 32 GiB host RAM. Other NVIDIA "
                     "families remain lab candidates until a live receipt."),
-    "minimax_h3": (39.60, "MiniMax H3 with native audio. The largest lane, and "
-                          "its text encoder is nvfp4 (Blackwell only)."),
+    "minimax_h3": (59.084, "MiniMax H3 FL2VA + REF2VA operator-local lane. "
+                           "The NVFP4 text encoder is not Blackwell-only; "
+                           "physical 8 GB remains unqualified."),
 }
 
 #: The least you can install and still render an episode. Everything else is a
@@ -165,20 +166,54 @@ LANES = {
             "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
         ),
     ],
-    # ~39.6 GB total, but it carries NATIVE AUDIO and is proven at 8 GB by
-    # vram-recipe-lab/eightgb_bench (864x480, 90f, 24fps, requires_audio).
-    # I2V: needs a first frame, so it also wants an image lane.
+    # 63,440,965,087 bytes (59.084 GiB). COMPLETE operator-local H3 recipe for
+    # both OTR adapters: FL2VA and REF2VA DiTs, their shared NVFP4 encoder and
+    # video VAE, plus the audio VAE REF2VA uses for conditioning. The NVFP4
+    # encoder is explicitly documented by Comfy-Org as usable without
+    # Blackwell. The lawful local receipts are 124 model / 129 canvas frames;
+    # they do not qualify a physical 8 GB card. This lane is explicit only and
+    # is never selected by a public profile or machine bundle.
     "minimax_h3": [
-        ("Comfy-Org/MiniMax-H3",
-         "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-         "diffusion_models"),                                            # 19.5 GB
-        ("Comfy-Org/MiniMax-H3",
-         "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-         "text_encoders"),                                               # 14.6 GB
-        ("Comfy-Org/MiniMax-H3",
-         "vae/minimax_h3_video_vae_fp16.safetensors", "vae"),            # 4.9 GB
-        ("Comfy-Org/MiniMax-H3",
-         "vae/minimax_h3_audio_vae_fp32.safetensors", "vae"),            # 0.6 GB
+        WeightSpec(
+            "Comfy-Org/MiniMax-H3",
+            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+            "4cc1d817b6184899b41293954329f576cb5ae86b",
+            20_970_379_616,
+            "e889202c41dafb67b10d67b97f0d8541508036a6090af23425a5c2615d03c47a",
+        ),
+        WeightSpec(
+            "Comfy-Org/MiniMax-H3",
+            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+            "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+            "4cc1d817b6184899b41293954329f576cb5ae86b",
+            20_970_379_616,
+            "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779",
+        ),
+        WeightSpec(
+            "Comfy-Org/MiniMax-H3",
+            "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "4cc1d817b6184899b41293954329f576cb5ae86b",
+            15_687_142_551,
+            "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
+        ),
+        WeightSpec(
+            "Comfy-Org/MiniMax-H3",
+            "vae/minimax_h3_video_vae_fp16.safetensors",
+            "vae/minimax_h3_video_vae_fp16.safetensors",
+            "4cc1d817b6184899b41293954329f576cb5ae86b",
+            5_207_808_496,
+            "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522",
+        ),
+        WeightSpec(
+            "Comfy-Org/MiniMax-H3",
+            "vae/minimax_h3_audio_vae_fp32.safetensors",
+            "vae/minimax_h3_audio_vae_fp32.safetensors",
+            "4cc1d817b6184899b41293954329f576cb5ae86b",
+            605_254_808,
+            "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
+        ),
     ],
     # ~9 GB. Ungated Comfy-Org repackages.
     "wan_ti2v": [
@@ -320,7 +355,6 @@ LANES = {
 #: auto-fetched by transformers (writer, musicgen) on first use.
 BUNDLES = {
     "otr_nvidia_8gb_haunted": ["haunted"],
-    "otr_nvidia_8gb_h3": ["minimax_h3"],
 }
 
 

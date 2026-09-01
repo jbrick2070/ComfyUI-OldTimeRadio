@@ -1,6 +1,6 @@
 {
   "id": "otr_4060_h3_nano",
-  "display_name": "4060 H3 Nano (E2B + H3 Low Video)",
+  "display_name": "UNQUALIFIED LAB/HISTORICAL: RTX 4060 H3 legal-floor experiment",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",

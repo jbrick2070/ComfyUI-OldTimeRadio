@@ -107,7 +107,7 @@ class AudioEngineAdapter:
 def resolve_voice_ref_path(ref):
     """THE ONE resolver for a voice-bank ``ref_path`` (Lemmy chunk B).
 
-    Bank refs are stored relative to the ComfyUI root
+    Bank refs are stored relative to the logical models root
     (``models/TTS/refs/indextts2/x.wav``) and have to become an absolute path an
     ISOLATED WORKER can open regardless of its own cwd.
 
@@ -122,12 +122,12 @@ def resolve_voice_ref_path(ref):
     passed and the worker then failed to open a reference the check had just
     confirmed. Two resolvers over one fact, disagreeing exactly where it hurts.
 
-    ORDER IS THE CONTRACT: the first candidate that EXISTS wins, so a box with
-    the file in the historical location resolves exactly as it always did and
-    the extra candidates can only turn a miss into a hit. When nothing exists it
-    returns the absolute-path fallback -- a path the caller will fail LOUDLY on,
-    which is what the adapters already did and is better than a bare ``None``
-    the worker would report as an empty filename.
+    ORDER IS THE CONTRACT: an explicit models-root override wins because it is
+    the provisioner's location authority. With no override, the historical
+    candidate remains first, so an existing box resolves exactly as it always
+    did. When nothing exists it returns the absolute-path fallback -- a path the
+    caller will fail LOUDLY on, which is better than a bare ``None`` the worker
+    would report as an empty filename.
 
     Passthrough for empty and for an already-absolute path, matching every
     caller's existing expectation.
@@ -136,6 +136,17 @@ def resolve_voice_ref_path(ref):
         return ref
     rp = str(ref).replace("\\", "/")
     stripped = rp[len("models/"):] if rp.startswith("models/") else rp
+    if any(os.environ.get(name, "").strip() for name in (
+            "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")):
+        # Delegate precedence and expansion to the pack's one models-root
+        # authority. This is lazy so ordinary audio imports stay side-effect
+        # free and the GGUF backend is not imported when no override exists.
+        from .._otr_gguf_backend import _models_root
+        # An explicit root is EXCLUSIVE, not merely the first candidate. If its
+        # file is missing, return that named absolute miss so the caller fails
+        # loudly instead of opening a plausible stale reference elsewhere.
+        return os.path.abspath(os.path.join(
+            os.fspath(_models_root()), stripped))
     candidates = []
     try:
         import folder_paths                     # ComfyUI runtime only

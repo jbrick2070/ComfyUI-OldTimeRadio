@@ -28,11 +28,12 @@ against the official ComfyUI flux2 template + the live node schemas:
 ``Flux2Scheduler`` (sigmas) + ``KSamplerSelect`` (euler) + ``RandomNoise`` ->
 ``SamplerCustomAdvanced`` -> ``VAEDecode``.
 
-Flux gen-1 stays the in-stack default; klein is an OPT-IN peer
-(``default_roles=()`` -- no model is "primary"), greyed until
-``OTR_ENABLE_FLUX2_KLEIN=1`` AND its checkpoint exists. The fail-closed gate is the
-WEIGHTS FILE (``OTR_FLUX2_KLEIN_CKPT``): ``assert_usable`` raises MISSING_MODEL
-until it points at the downloaded GGUF (ABSENT/greyed, never a stub -- BUG-046).
+Flux gen-1 stays the in-stack default; klein is a selectable peer
+(``default_roles=()`` -- no model is "primary"). The registry is the menu, so
+there is no environment flag gate. The fail-closed gate is the WEIGHTS FILE:
+``assert_usable`` resolves the default GGUF through ComfyUI ``folder_paths``;
+``OTR_FLUX2_KLEIN_CKPT`` is only an explicit full-path override (ABSENT/greyed,
+never a stub -- BUG-046).
 The TE + VAE loaders fail LOUD at render if their files are absent (the dispatcher
 catches it fail-closed). The verify-on-5080 must also confirm SageAttention is NOT
 patched onto the FLUX-style attention before the first forward (BUG-070, sm_120).
@@ -52,7 +53,8 @@ from .._otr_shared.role_compat import ROLES
 
 log = logging.getLogger("OTR.image.flux2_klein")
 
-#: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
+#: Historical compatibility name. ``requires_flag`` is None; the registry is
+#: the menu and this variable does not gate selection.
 ENABLE_FLAG = "OTR_ENABLE_FLUX2_KLEIN"
 
 #: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
@@ -141,21 +143,80 @@ INSTALL-DAY VERIFY, for this engine: the **klein-4B embedder identity** (read th
 checkpoint config) and the **local negative surface** (expect none).
 """
 
-#: Env var pointing at the downloaded FLUX.2 klein diffusion GGUF. Absent / not a
-#: file -> ``assert_usable`` fails closed. The GGUF UnetLoader resolves a basename
-#: via ComfyUI folder_paths, so set this to the full path (gate) -- the loader uses
-#: its basename.
+#: Optional full-path override for the FLUX.2 klein diffusion GGUF. When unset,
+#: the standard filename resolves through ComfyUI ``folder_paths`` and then the
+#: configured models-root environment fallback.
 MODEL_ENV = "OTR_FLUX2_KLEIN_CKPT"
 
 #: Split-file companions: the Qwen-3-4B flux2 text encoder (CLIPLoader type flux2 --
 #: klein-4B's matched encoder, 7680-wide; NOT Mistral) and the flux2 VAE. Default to
-#: the Comfy-Org repackaged filenames in the standard model dirs; the loaders resolve
-#: a basename via folder_paths, so either an absolute path or a bare filename works.
+#: the Comfy-Org repackaged filenames in the standard model dirs. Absolute overrides
+#: are registered with ``folder_paths`` before their basename reaches the loader.
 CLIP_ENV = "OTR_FLUX2_KLEIN_TE"
 VAE_ENV = "OTR_FLUX2_KLEIN_VAE"
 _DEFAULT_CKPT = "flux-2-klein-4b-Q4_K_M.gguf"
 _DEFAULT_CLIP = "qwen_3_4b.safetensors"
 _DEFAULT_VAE = "flux2-vae.safetensors"
+
+
+def _register_loader_parent(category: str, path: str) -> str:
+    """Make an explicit file visible to the basename-only ComfyUI loader.
+
+    GGUF and stock loaders accept a model name, not an arbitrary path. Merely
+    checking an absolute override and then stripping it to a basename creates a
+    false-green preflight. Register its parent at highest priority and return
+    the exact path the loader now resolves.
+    """
+    path = os.path.abspath(path)
+    try:
+        import folder_paths
+        folder_paths.add_model_folder_path(
+            category, os.path.dirname(path), is_default=True)
+        found = folder_paths.get_full_path(category, os.path.basename(path))
+        if found and os.path.realpath(found) == os.path.realpath(path):
+            return os.path.abspath(found)
+    except Exception:
+        # ``assert_usable`` will still fail if the path itself is absent. A real
+        # ComfyUI process always supplies folder_paths; keeping import lazy makes
+        # cold module discovery side-effect free.
+        pass
+    return path
+
+
+def _loader_name(env_name: str, category: str, default: str) -> str:
+    selected = os.environ.get(env_name, "").strip() or default
+    expanded = os.path.abspath(os.path.expanduser(selected))
+    if os.path.isabs(os.path.expanduser(selected)) and os.path.isfile(expanded):
+        _register_loader_parent(category, expanded)
+    return os.path.basename(selected)
+
+
+def _resolve_unet_path() -> str:
+    """Resolve the selected GGUF through the same lazy path used by its loader."""
+    explicit = os.environ.get(MODEL_ENV, "").strip()
+    if explicit:
+        return _register_loader_parent(
+            "unet", os.path.abspath(os.path.expanduser(explicit)))
+
+    try:
+        import folder_paths
+        found = folder_paths.get_full_path("unet", _DEFAULT_CKPT)
+        if found:
+            return os.path.abspath(found)
+    except Exception:
+        pass
+
+    for env_name in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
+        root = os.environ.get(env_name, "").strip()
+        if root:
+            candidate = os.path.abspath(os.path.join(
+                os.path.expanduser(root), "diffusion_models", _DEFAULT_CKPT))
+            return _register_loader_parent("unet", candidate)
+    return _DEFAULT_CKPT
+
+
+def _resolve_unet_name() -> str:
+    return os.path.basename(_resolve_unet_path())
 
 
 def _role_of(profile) -> str:
@@ -209,9 +270,10 @@ class Flux2KleinEngine:
             return v - (v % 16)
 
         return {
-            "unet_name": os.path.basename(os.environ.get(MODEL_ENV, "") or _DEFAULT_CKPT),
-            "clip_name": os.path.basename(os.environ.get(CLIP_ENV, "") or _DEFAULT_CLIP),
-            "vae_name": os.path.basename(os.environ.get(VAE_ENV, "") or _DEFAULT_VAE),
+            "unet_name": _resolve_unet_name(),
+            "clip_name": _loader_name(
+                CLIP_ENV, "text_encoders", _DEFAULT_CLIP),
+            "vae_name": _loader_name(VAE_ENV, "vae", _DEFAULT_VAE),
             "prompt": str(get("prompt") or ""),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_FLUX2_KLEIN_STEPS", 20),
@@ -303,20 +365,20 @@ class Flux2KleinEngine:
 
     def assert_usable(self, host_caps, profile, request_template=None):
         """FAIL CLOSED until the FLUX.2 klein diffusion GGUF exists (BUG-046):
-        ABSENT/greyed, never a stub. The registry already gates on
-        ``requires_flag``; this is the deeper disk check (the WEIGHTS file). The
-        TE + VAE loaders fail LOUD at render if their files are absent. The
-        verify-on-5080 must also confirm SageAttention is not patched (BUG-070,
-        FLUX-style attn)."""
-        ckpt = os.getenv(MODEL_ENV, "").strip()
-        if not ckpt or not os.path.isfile(ckpt):
+        ABSENT/greyed, never a stub. The registry is the menu; this is the disk
+        gate. The TE + VAE loaders fail LOUD at render if their files are
+        absent. The verify-on-5080 must also confirm SageAttention is not
+        patched (BUG-070, FLUX-style attn)."""
+        ckpt = _resolve_unet_path()
+        if not os.path.isfile(ckpt):
             raise EngineUnusable(
                 self.name, _role_of(profile),
                 EngineUsabilityReason.MISSING_MODEL,
-                f"flux2_klein diffusion GGUF not found; set {MODEL_ENV} to the "
-                f"downloaded flux-2-klein-4b-Q4_K_M.gguf path (and {CLIP_ENV}"
-                f"/{VAE_ENV} for the Qwen-3-4B flux2 TE + flux2 VAE) after enabling "
-                f"{ENABLE_FLAG}=1 (confirm SageAttention not patched -- BUG-070)",
+                f"flux2_klein diffusion GGUF not found at {ckpt!r}; install "
+                f"{_DEFAULT_CKPT} under the configured diffusion_models folder "
+                f"or set {MODEL_ENV} to its full path (and {CLIP_ENV}"
+                f"/{VAE_ENV} for the Qwen-3-4B flux2 TE + flux2 VAE; "
+                f"confirm SageAttention is not patched -- BUG-070)",
                 kind="image",
             )
         return self.name

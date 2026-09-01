@@ -36,6 +36,11 @@ os.environ.setdefault("PYTORCH_NO_CUDA_MEMORY_CACHING", "1")
 # decorators. The decorators are guarded already, but pin the device
 # string for any module that reads it eagerly.
 os.environ.setdefault("OTR_TEST_MODE", "1")
+# Portable installs are expected to persist this override. The test suite still
+# needs the shipped bank as its deterministic baseline; individual portability
+# tests opt back in with monkeypatch so production inheritance cannot silently
+# change unrelated casting assertions.
+os.environ.pop("OTR_VOICE_REFERENCE_BANK", None)
 for _google_key_env in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
     os.environ.pop(_google_key_env, None)
 

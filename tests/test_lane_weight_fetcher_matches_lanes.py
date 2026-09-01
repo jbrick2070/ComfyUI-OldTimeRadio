@@ -69,8 +69,7 @@ def test_the_haunted_bundle_does_not_fetch_a_sibling_lanes_module():
             % (GOLDEN_MODULE, Haunted.name))
 
 
-@pytest.mark.parametrize("profile_id", ["otr_nvidia_8gb_haunted",
-                                        "otr_nvidia_8gb_h3"])
+@pytest.mark.parametrize("profile_id", ["otr_nvidia_8gb_haunted"])
 def test_every_weight_a_profile_demands_is_in_its_bundle(profile_id):
     """A profile's preflight is a promise; the bundle has to be able to keep it.
 
@@ -95,3 +94,9 @@ def test_every_weight_a_profile_demands_is_in_its_bundle(profile_id):
         "%s preflights %r, which its bundle %r never downloads -- the profile "
         "would fail preflight on a machine that ran the fetcher exactly as "
         "documented" % (profile_id, missing, fetcher.BUNDLES[profile_id]))
+
+
+def test_unqualified_8gb_h3_profile_has_no_public_bundle():
+    """A draft experiment must never become a one-command support promise."""
+    fetcher = _load_fetcher()
+    assert "otr_nvidia_8gb_h3" not in fetcher.BUNDLES

@@ -116,11 +116,10 @@ _PUBLIC_ENGINES = {
     # Lane 19, 2026-08-12 -- the first NEW ENGINE in the campaign rather than a
     # rename, so this is an ADD with no alias to move.
     #
-    # `low` is MEASURED on this box under this lane's own boot contract, and it
-    # is what DECIDED the canvas rather than a label applied after the fact:
-    # 7.28 GiB absolute at 864x480 (the mime I2V leg) against 9.15 GiB at H3's
-    # trained 1344x768. Under ~8 GiB is what the token means, so the lane
-    # declares the canvas where the token is true.
+    # `low` is MEASURED on the local 5080 under this lane's own boot contract:
+    # the controlling legal-floor receipt is 124 model / 129 canvas frames at
+    # 864x480 and 6,315 MB cold absolute. That measured allocation does not
+    # qualify a physical 8 GB card; 8 GB remains an explicit lab question.
     #
     # `video` and not `audio_in`: H3 natively produces audio, and this lane
     # deliberately does not decode it -- there is no audio VAE in its graph. The
@@ -134,9 +133,9 @@ _PUBLIC_ENGINES = {
     #
     # `audio_in` states the capability, matching `ltx23_low_audio_in`: this lane
     # conditions on the beat's own audio through MiniMaxH3ReferenceToVideo. Its
-    # `low` is the same measured bucket as its sibling -- the lab's ref2va leg
-    # at 864x480 model f124 measures 7.20 GiB, and the seed-43 lip-sync leg at
-    # 832x480 f192 measured 6.88 GiB cold.
+    # `low` is the same measured bucket as its sibling: the controlling REF2VA
+    # receipt is 864x480, 124 model / 129 canvas frames, 6,678 MB cold absolute
+    # on the 5080. This is not a physical-8-GB support receipt.
     "h3_low_audio_in": "minimax_h3_audio_in",
     # LTX 2.5 Chunk A, 2026-08-19. An ADD with no alias to move: this lane has
     # never shipped under any other id.

@@ -275,6 +275,7 @@ def _config_path(filename: str) -> str:
 
 
 _BANK_CACHE: dict = {}
+_BANK_UNAVAILABLE_ROUTE_IDS_CACHE: dict = {}
 
 
 def _entry_from_dict(d: dict) -> VoiceBankEntry:
@@ -309,7 +310,12 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
     corrupt one. Owning the contract here means every consumer gets it, rather
     than each one widening its own except clause and guessing at the list.
     """
-    bank_path = path or _config_path(_BANK_FILENAME)
+    # Portable machines may carry their own authorized reference recordings.
+    # Provisioning and runtime share this one authority; without it a setup
+    # could verify a two-voice portable bank and then cast from the unrelated
+    # historical bank at render time.
+    bank_path = path or os.getenv("OTR_VOICE_REFERENCE_BANK") or _config_path(
+        _BANK_FILENAME)
     try:
         with open(bank_path, "r", encoding="utf-8") as fh:
             text = fh.read()
@@ -327,6 +333,18 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
     except (OSError, ValueError) as exc:   # ValueError covers JSONDecodeError
         raise VoiceBankError(
             f"voice_reference_bank or its schema is unparseable: {exc}") from exc
+    unavailable_route_ids = frozenset()
+    if isinstance(data, dict):
+        raw_unavailable = data.get("unavailable_qualified_route_ids", [])
+        if (not isinstance(raw_unavailable, list)
+                or any(not isinstance(value, str) or not value.strip()
+                       or value != value.strip()
+                       for value in raw_unavailable)
+                or len(raw_unavailable) != len(set(raw_unavailable))):
+            raise VoiceBankError(
+                "voice_reference_bank: 'unavailable_qualified_route_ids' must "
+                "be a duplicate-free list of non-empty route-id strings")
+        unavailable_route_ids = frozenset(raw_unavailable)
     rows = data.get("voices") if isinstance(data, dict) else data
     if not isinstance(rows, list) or not rows:
         raise VoiceBankError("voice_reference_bank: 'voices' must be a non-empty list")
@@ -341,7 +359,29 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
         entries.append(entry)
     result = (tuple(entries), sha)
     _BANK_CACHE[sha] = result
+    _BANK_UNAVAILABLE_ROUTE_IDS_CACHE[sha] = unavailable_route_ids
     return result
+
+
+def unavailable_qualified_route_ids(
+        path: Optional[str] = None, *, source_sha256: Optional[str] = None
+) -> frozenset:
+    """Qualified routes this bank explicitly and intentionally cannot carry.
+
+    This is a narrow exception list, not a portable-mode switch. CastLock only
+    honours an id after that exact route is selected for the active engine and
+    its exact reference row is absent. Every other qualification check remains
+    fail-closed.
+    """
+    if source_sha256 is not None:
+        try:
+            return _BANK_UNAVAILABLE_ROUTE_IDS_CACHE[source_sha256]
+        except KeyError as exc:
+            raise VoiceBankError(
+                "voice bank metadata requested for an unloaded source SHA-256 "
+                "%r" % source_sha256) from exc
+    _entries, sha = load_voice_bank(path)
+    return _BANK_UNAVAILABLE_ROUTE_IDS_CACHE[sha]
 
 
 def get_all_registered_voices(bank: Optional[Tuple[VoiceBankEntry, ...]] = None) -> List[VoiceBankEntry]:

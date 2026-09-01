@@ -17,7 +17,7 @@ details); the primary record is retained in the operator's mail archive.
   and representations set forth in its request email."
 - Message id retained in the operator's archive for audit.
 
-## 2. TWO DEFECTS IN THE GRANT -- both should be resolved with MiniMax
+## 2. Two defects recorded; operator ruled the existing grant sufficient
 
 **2a. The grantee name is misspelled.** The grant says "Blueberrky Kale Yoga
 Books" (transposed extra `r`); the actual entity is Blueberry Kale Yoga Books.
@@ -39,8 +39,9 @@ operating standard; this file is signed and closed.
 
 ## 3. Operating constraints this build honors
 
-Adopted as the working standard while 2b is open -- deliberately the NARROW
-reading, so the build cannot exceed whatever was actually promised:
+Adopted as the working standard despite the recorded 2b ambiguity --
+deliberately the NARROW reading, so the build cannot exceed whatever was
+actually promised:
 
 - H3 inference runs only on the operator's own hardware, offline. No hosted
   service, no shared or public inference endpoint.
@@ -68,8 +69,8 @@ copy (see 2b).
 
 This records terms; it is not legal advice and expands nothing. Where the
 authorization's actual text conflicts with anything here, the authorization
-governs. Prepared from the grant text on 2026-08-11 and pending the operator's
-confirmation of section 3.
+governs. Prepared from the grant text on 2026-08-11; section 3 was confirmed by
+the operator sign-off below.
 
 **Operator sign-off: Jeffrey Brick -- 2026-08-11.** Reviewed, ruled
 sufficient, closed. H3 lanes (19-21) are unblocked on the licence axis.

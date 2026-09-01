@@ -1,8 +1,9 @@
 # Standing up OTR on a rented GPU
 
-**This is the manual.** Read it top to bottom the first time; after that, jump
-to what you need. Every claim is either MEASURED on real hardware and labelled
-so, or marked UNPROVEN.
+For the reproducible HuMo/LTX 2.5 high-RAM qualification sequence, use
+[`RUNPOD_PORTABILITY_LAB.md`](RUNPOD_PORTABILITY_LAB.md). This file is the
+supporting RunPod history, template guide, and failure atlas. Every claim is
+either MEASURED on real hardware and labelled so, or marked UNPROVEN.
 
 **The diary is in git history.** This file used to record what was learned in
 what order, which meant a reader met 625 lines of superseded conclusions --
@@ -206,7 +207,9 @@ console states plainly that environment variables are not encrypted. Create the
 secret under the account; its detail page prints the exact
 `{{ RUNPOD_SECRET_<NAME> }}` string -- the secret's name upper-cased behind that
 prefix. Only gated repos need it: writer, voices, music, the haunted lane,
-`minimax_h3` and `wan_ti2v` are all ungated.
+`minimax_h3` and `wan_ti2v` are all ungated. For H3, "ungated" means only
+that Hugging Face does not require a token; it grants no authorization. OTR
+never selects H3 in public provisioning.
 
 **SSH keys and secrets both inject at POD CREATION.** Adding either to a running
 pod does not reach it; redeploy. (A token can still be delivered to a live pod --
@@ -282,11 +285,11 @@ answers "to use engine X, download Z". Closing a lane means resolving its files
 on the Hub, verifying repo AND path AND size, reading the destination folder off
 the engine's own resolver, and adding a row to the fetcher.
 
-**Do not guess a repo to close a lane faster.** `humo` is left deliberately
-unresolved for exactly this reason: four of its six files resolve, but the
-engine asks for `humo_1.7B_fp16.safetensors` while the Hub ships
-`Wan2_1-HuMo-1_7B_fp16.safetensors`, and 3.48 GB fetched under a guessed name
-produces a lane that still refuses.
+**Do not guess a repo to close a lane faster.** HuMo 14B is now closed by the
+five-file, commit-pinned, SHA-256-verified `humo` lane; it downloads the exact
+Kijai `...scaled_KJ` UNET the engine resolves. HuMo 1.7B stays separate and its
+exact rename/destination is documented in the portability lab. A 1.7B profile
+never downloads the 14B DiT or LoRA.
 
 ### THE HF CACHE CAN EXIST TWICE, AND EACH COPY LOOKS CORRECT
 
@@ -331,9 +334,15 @@ isolation prevents.
       checkpoints/      11.06 GB   portable, fetch on the target
       .venv/             7.78 GB   39,759 files of WINDOWS wheels -- rebuild
 
-It also needs **reference WAVs** at `<models_root>/TTS/refs/indextts2/*.wav`,
-one per cast voice, which ship with nothing. Missing one is a named refusal:
-`no usable voice reference for cloning engine 'indextts2' ... (voice_ref_id=...)`.
+It also needs a **registered portable voice bank**, not merely WAVs copied into
+a directory. `scripts/otr_make_portable_voice_bank.py` takes two distinct,
+authorized PCM speech WAVs (male and female, each at least one second),
+preserves every shipped non-Index row,
+replaces the unavailable operator-local Index rows, copies the references under
+`<models_root>/TTS/refs/indextts2/`, and writes their exact SHA-256 values. The
+bank's absolute path must be exported as `OTR_VOICE_REFERENCE_BANK` for both
+provisioning and the ComfyUI launch. The complete command is below and in
+[`RUNPOD_PORTABILITY_LAB.md`](RUNPOD_PORTABILITY_LAB.md#5-indextts2-reference-voices).
 
 **This is what stops the w45 campaign on a fresh machine:** those profiles cast
 `indextts2`, so every lane fails identically at `OTR_BatchCharacterVoices`,
@@ -397,57 +406,62 @@ for un-accepted terms, so a single probe that returns OK rules out both at once.
 start, so a gated model loaded during a RENDER needs the process restarted with
 `HF_TOKEN` exported -- fetching weights from a shell is a separate matter.
 
-### index-tts: the isolated venv needs a DIFFERENT PYTHON, not just a second venv
+### index-tts: use the pinned owner, then keep runtime and provision paths equal
 
-This is the step that actually blocks `indextts2` on a rented box, and none of
-it is guessable from OTR's side.
+Do not reconstruct this environment with `uv venv`, `uv pip install .`, or the
+pod's system Python. The audited provisioner checks out IndexTTS2 commit
+`830f6f8f94a51fea23ab1d639027a86200075a4e`, resolves Python 3.10, runs
+`uv sync --frozen`, downloads the exact pinned model manifest, warms and pins
+all four runtime repositories under `checkpoints/hf_cache`, validates every
+artifact, then boots the real worker offline and requires its ready response.
+It explicitly installs a managed Python 3.10 with `only-managed` discovery and
+places it under `<index-root>/.uv-python`; the venv and the interpreter it links
+to therefore survive together when that root is on a network volume. If you set
+`UV_PYTHON_INSTALL_DIR` yourself, it must also name a persistent-volume
+directory.
 
-**1. The project pins a Python the pod does not have.**
+On Linux, export the runtime layout explicitly. `OTR_INDEXTTS2_ROOT` is a
+provisioner source-root setting; the qualified engine adapter intentionally
+uses its own `_VENV`, `_DIR`, and `_WORKER` paths, so setting ROOT alone does
+not redirect the running engine. Keep the source beside the pinned ComfyUI
+checkout, not inside it, so a second provision pass does not correctly reject
+the core as dirty:
 
-    requires-python = ">=3.10,<3.12"          # index-tts pyproject.toml
-    /usr/bin/python3.12                       # the only interpreter on the image
+```bash
+export OTR_INDEXTTS2_ROOT=/workspace/index-tts
+export OTR_INDEXTTS2_VENV="$OTR_INDEXTTS2_ROOT/.venv/Scripts/python.exe"
+export OTR_INDEXTTS2_DIR="$OTR_INDEXTTS2_ROOT/checkpoints"
+export OTR_INDEXTTS2_WORKER="$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio/scripts/_otr_indextts2_worker.py"
 
-    ERROR: Package 'indextts' requires a different Python: 3.12.3 not in '<3.12,>=3.10'
+mkdir -p /workspace/otr-config
+"$OTR_COMFY_ROOT/.venv/bin/python" \
+  scripts/otr_make_portable_voice_bank.py \
+  --models-root "$OTR_COMFYUI_MODELS_ROOT" \
+  --male-wav /absolute/path/to/authorized-male.wav \
+  --female-wav /absolute/path/to/authorized-female.wav \
+  --output /workspace/otr-config/voice_reference_bank.portable.json
+export OTR_VOICE_REFERENCE_BANK=/workspace/otr-config/voice_reference_bank.portable.json
 
-So `python3 -m venv` from the host interpreter produces a venv that can never
-install the package. **`uv` is the fix, and it is the project's own tooling** --
-its pyproject tells you to run `uv lock` -- because it can fetch a 3.11:
+"$OTR_COMFY_ROOT/.venv/bin/python" scripts/otr_provision.py \
+  --profile otr_w45_humo_14b_169 --with-indextts2
+```
 
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="/root/.local/bin:$PATH"
-    uv venv --python 3.11 /workspace/index-tts/.venv
-    VIRTUAL_ENV=/workspace/index-tts/.venv uv pip install .
+Use the exact profile being installed in the last command. Preserve all five
+exports in the ComfyUI service environment too. The generated bank contains
+one lower-case `male` and one lower-case `female` Index character reference
+while retaining Kokoro and the other non-Index rows. The private
+Lemmy-specific qualified route is deliberately unavailable on a stranger's
+bank; generic character casting remains available. `--commercial-clean`
+describes only verified rights in the supplied recordings and does not change
+the non-commercial IndexTTS2 model profile. The generated bank names that one
+unavailable qualified route exactly; it does not waive invalid evidence,
+revoked rights, corrupt bytes, or any other character route.
 
-**2. There is no `requirements.txt`.** The project ships only `pyproject.toml`.
-A provision step guarding on `[ -f requirements.txt ]` installs NOTHING and
-leaves a venv with no torch, reporting success the whole way -- a guard that
-silently skips is worse than one that fails loudly.
-
-**3. torch belongs in THAT venv, not in the template.** The pod image already
-has torch for ComfyUI. What is missing is torch inside index-tts's isolated
-environment, which is a per-project dependency resolved by `uv pip install .`.
-No template env var can supply it.
-
-**4. `snapshot_download` of the checkpoints is NOT the whole model.** It gives
-about 5.6 GB; the reference machine has 11.06 GB. The difference is
-`checkpoints/hf_cache`, 5.57 GB across four more repos that index-tts pulls at
-runtime:
-
-    facebook/w2v-bert-2.0     amphion/MaskGCT
-    funasr/campplus           nvidia/bigvgan_v2_22khz_80band_256x
-
-**Pre-fetch them.** Left to the first render they download inside a node with a
-wall-clock timeout, and the failure surfaces as `_LLMTimeoutWorkflowPause` -- a
-message about the model, for a problem that is a missing download.
-
-**5. OTR looks for it at `<comfy_root>/index-tts`.** `eng_indextts2._default()`
-resolves there. Install on the VOLUME so it survives the pod, then symlink:
-
-    ln -sfn /workspace/index-tts /workspace/runpod-slim/ComfyUI/index-tts
-
-That satisfies the engine without duplicating 11 GB and without baking an
-absolute path into a template. `OTR_INDEXTTS2_DIR` / `_VENV` / `_WORKER` remain
-available if a layout genuinely differs.
+If a persistent volume layout requires `/workspace/index-tts`, set ROOT, VENV,
+and DIR to that same tree (or symlink it to `<comfy_root>/index-tts`) and keep
+WORKER pointed at this repository. The final `checkpoints` path component is
+mandatory because pinned vendor code resolves `./checkpoints/hf_cache` from
+the worker's launch directory. A first render must never download these caches.
 
 ---
 
@@ -549,31 +563,53 @@ gate. The provisioner now exports it and appends it to `/root/.bashrc`.
 
 ### Why LTX 2.5 is NOT in the starter
 
-Two independent reasons, either of which is sufficient:
+The clean-machine loader path now exists: the provisioner pins ComfyUI-GGUF and
+ComfyUI-LTXVideo, applies OTR's in-repo Gemma-4/BF16 patch, and the engine
+semantically verifies the registered loader. The remaining starter gate is a
+full remote receipt. The earlier Ampere pod cleared the loader but was SIGKILLed
+at its 57.7 GiB container limit during the two-stage 1664x960 decode. That is a
+negative receipt for that RAM cap, not proof against Ampere or RunPod.
 
-1. **A stranger cannot obtain it.** Its Gemma-4 encoder needs a ComfyUI-GGUF that
-   does not exist publicly -- upstream `main` rejects the architecture outright
-   with `Unexpected text model architecture type in GGUF file: 'gemma4'`.
-2. **Clearing the loader is not rendering an episode.** With the patch applied,
-   ComfyUI was still SIGKILLed at the container's cgroup limit (57.7 GiB) during
-   the two-stage decode at 1664x960.
+The five LTX weights are also intentionally not a blind public bundle: four are
+gated by the Lightricks terms. `MANUAL_TIERS["ltx25"]` owns their exact paths,
+revisions, byte counts, and SHA-256 values, while
+`docs/RUNPOD_PORTABILITY_LAB.md` gives the post-terms copy/paste procedure.
 
 LTX 2.5 enters the starter when a clean pod publishes an episode with it, and not
 before.
 
-### H3 is operator-only, permanently, and this is not an engineering question
+### H3: technically portable, but excluded from this operator's RunPod policy
 
-`docs/H3_LICENSE_ATTESTATION.md` is signed: H3 inference runs only on the
-operator's own hardware, offline, and the weights are never redistributed "in any
-form, quantized included." Separately, the only fetchable H3 text encoder is
-**nvfp4, which requires hardware fp4 (sm_120)** -- so it cannot execute on Ampere
-or Ada regardless. Do not spend time hunting an upstream for the node pack; the
-answer is already written down.
+Under the current signed operating standard in
+`docs/H3_LICENSE_ATTESTATION.md`, this operator runs H3 only on owned hardware,
+offline, and never redistributes its weights. That is an authorization boundary,
+not a GPU limitation; third parties must review and obtain whatever authorization
+applies to them.
+
+OTR uses `comfy_extras/nodes_minimax_h3.py` from current ComfyUI core. It does
+not require the optional Larry Turbo pack. Comfy-Org explicitly documents its
+NVFP4 H3 encoder as usable without Blackwell and also publishes other H3
+artifacts. The complete explicit operator-local lane is:
+
+    python scripts/otr_fetch_lane_weights.py minimax_h3
+
+It pins five files totaling 63,440,965,087 bytes (59.084 GiB) and is never
+auto-selected by a profile or machine bundle. Legal local 5080 receipts at 124
+model / 129 canvas frames measured 6,315 MB FL2VA and 6,678 MB REF2VA absolute
+VRAM; host RAM was not captured. The physical RTX 4060 separately produced
+receipt-bearing 864x480x90 cold/warm/warm H3 clips and retained 864x480x124
+Ref2VA A/V artifacts. That makes isolated H3 clips LAB-PROVEN on the card; the
+full canonical OTR episode remains unqualified, not proven impossible. The
+public `mkhamra/quibble-h3` repository is a Ref2VA workflow/case study, not an
+OTR node provider or qualification receipt.
 
 ### humo is not blocked and never was
 
-The ledger records **32 published humo episodes** across four engine variants. The
-only gap is that no fetch lane exists yet. That is a download chore, not a blocker.
+The ledger records **32 published humo episodes** across four engine variants.
+The 14B download gap is now closed by
+`python scripts/otr_fetch_lane_weights.py humo`; the remaining portability gate
+is a live canonical episode on the rented hardware, not missing download
+provenance.
 (An earlier draft of the blockers document claimed humo had never produced an
 episode. That claim came from grepping the wrong file -- `episode_canon.json`
 records no engines at all. The authority is
@@ -618,8 +654,8 @@ But understand what migrate actually preserves:
     NETWORK VOLUME   kept entirely       167 GB models, 90 GB cache, refs, index-tts
     CONTAINER DISK   gone                /root/.hf_token, uv, any scripts in /root
 
-**AND THAT COMBINATION BREAKS A `uv` VENV THAT LIVES ON THE VOLUME.** Measured
-on a real migration, 2026-08-31:
+**Older installs split the venv from its interpreter.** Measured on a real
+migration, 2026-08-31:
 
     /workspace/index-tts/.venv/lib          14 GB   survived
     /workspace/index-tts/checkpoints        25 GB   survived
@@ -627,16 +663,20 @@ on a real migration, 2026-08-31:
                                                 cpython-3.11-.../bin/python3.11
                                             DANGLING
 
-`uv` does not copy an interpreter into the venv; it SYMLINKS to its own managed
-Python, which lives on the container disk. So 39 GB of expensive install sits
-intact on the volume and is unusable because a ~50 MB interpreter vanished.
-Nothing reports this until something tries to run the venv.
+`uv` does not copy an interpreter into the venv; it symlinks to its managed
+Python. The old installer left that interpreter on container disk, so 39 GB of
+expensive install survived on the volume while the small interpreter vanished.
+The current provisioner defaults `UV_PYTHON_INSTALL_DIR` to `.uv-python` inside
+each persistent engine root, preventing that split for new installs.
 
-**The repair is trivial once you know, and the path is deterministic:**
+**For a legacy dangling venv, repair the interpreter version named by its
+symlink; do not rebuild the packages:**
 
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="/root/.local/bin:$PATH"
-    uv python install 3.11        # 2.15 s -- the dangling symlink resolves
+    readlink .venv/bin/python
+    uv python install 3.10        # current pinned IndexTTS2 runtime
+    uv python install 3.11        # chatterbox/dia; legacy Index only if its link says 3.11
 
 Do NOT rebuild the venv. `--allow-existing` is the fallback if the version no
 longer matches; reinstalling from scratch would re-download 14 GB of wheels to
@@ -832,15 +872,19 @@ overlay cannot hold a 176 GB model tree, so "download it again" is not an option
 
 ### "Three isolated voice venvs report missing, but their packages are all there"
 
-Their site-packages live on the network volume -- tens of GB, fully intact --
-while `.venv/bin/python` is a symlink to an interpreter `uv` installed under
-`/root`, which is CONTAINER disk. A recreate wipes it and leaves three dangling
-venvs. The repair is not a reinstall:
+This describes venvs created by the older installer. Their site-packages live
+on the network volume while `.venv/bin/python` points to a managed interpreter
+under `/root`, which is container disk. A recreate wipes it and leaves the
+packages intact but unreachable. Repair both required Python lines, not the
+packages:
 
-    uv python install 3.11        # about two seconds, fixes all three
+    uv python install 3.10        # IndexTTS2
+    uv python install 3.11        # chatterbox and dia
 
-`scripts/otr_pod_provision.sh` now does this on every run. Before assuming a
-33 GB rebuild, check whether `readlink -f .venv/bin/python` resolves at all.
+New installs made by `scripts/otr_provision.py` keep each managed interpreter
+inside that engine's `.uv-python` directory on the same persistent root, so a
+recreate does not need this repair. Before assuming a 33 GB rebuild, check
+whether `readlink -f .venv/bin/python` resolves at all.
 
 ### "chatterbox and dia die with 'no kernel image is available'"
 
@@ -925,21 +969,12 @@ wasted.
 
 ### "h3 fails with WrapperNodeMissing and no amount of weights fixes it"
 
-The MiniMax H3 lane needs the **ComfyUI-MiniMax-H3-Turbo** node pack, and that
-pack has no public clone URL in this project's configuration -- on the reference
-machine its git origin is a LOCAL path under `C:\ComfyUI-Models\quarantine\`.
-So `scripts/otr_provision.py` cannot install it, and h3 is not provisionable on
-a fresh machine from the repo alone. The weights being present changes nothing:
-the failure is a missing node CLASS, raised at render time from wrapper_bridge.
-
-Recorded as a limitation rather than fixed, because inventing a clone URL for a
-vendored pack would produce a provisioner that fails later and less clearly.
-
-Worth noting how this was misdiagnosed first: h3 was PREDICTED to fail because
-its text encoder is nvfp4 and the test card was sm_86. It never got that far.
-A missing wrapper pack and an unexecutable kernel look identical from a distance
--- both are late failures on a lane that "should" work -- and only the traceback
-tells them apart. Read it before naming a cause.
+OTR resolves H3 from `comfy_extras/nodes_minimax_h3.py` in current ComfyUI core
+and does not use `ComfyUI-MiniMax-H3-Turbo`. If
+`MiniMaxH3ImageToVideo` or `MiniMaxH3ReferenceToVideo` is absent, update the
+ComfyUI core, restart it, and verify the live `/object_info`; do not install an
+unrelated Turbo pack. A missing wrapper class is not evidence of an NVFP4
+architecture failure.
 
 ### "wan_ti2v gets past the missing pack and then says sentencepiece"
 
@@ -1180,11 +1215,9 @@ The reference machine's copy is modified, and the delta is small and specific:
     nodes.py    76 lines
     ops.py, dequant.py     identical to upstream
 
-So this is not "install a node pack" -- it is "install a node pack and then
-apply changes that exist nowhere public", which is the same shape as the
-MiniMax H3 pack. Both are the honest limit on how portable the pack currently
-is, and both are worth solving by getting the changes upstreamed or published
-rather than by copying files between machines.
+So this is not merely "install a node pack" -- the pinned ComfyUI-GGUF checkout
+also needs OTR's in-repo loader patch. This portability limit is specific to
+LTX's GGUF text encoder. H3's required node classes are already in ComfyUI core.
 
 **The symptom arrives late and blames the file.** The error names the GGUF, so
 the instinct is to suspect a bad download or the wrong quant. The weights are
@@ -1223,7 +1256,7 @@ believes it has 193 GiB will never warn before a kill at 57.7.
 What crossed it here: `ltx25_foley_plus` on its TWO-STAGE PASS, decoding at
 1664x960. The video and mime lanes at the same canvas did not. So the two-stage
 decode is the expensive step, and 57.7 GiB is not enough for it -- a real
-number for the matrix, and one the lab's own H3 receipts hint at with their
-27-33 GiB host-RAM figures.
+number for the matrix. The legal-length H3 receipts did not capture host RAM
+and provide no H3 host-memory sizing signal.
 
 If a pod must run that lane, size the CONTAINER's memory, not the instance's.

@@ -1,5 +1,25 @@
 # Three engines, and no answer for anyone who is not us
 
+> **RESOLVED / SUPERSEDED 2026-09-01.** This file preserves the original
+> problem statement, not current installation truth. The controlling answer is
+> [`2026-09-01-three-engines-portability-PLAN.md`](2026-09-01-three-engines-portability-PLAN.md).
+> HuMo now has a complete pinned five-file lane; LTX 2.5 has a pinned in-repo
+> Gemma-4/BF16 GGUF patch plus a complete gated manual recipe; and H3 uses node
+> classes from current ComfyUI core. Comfy-Org states its H3 NVFP4 encoder does
+> not require Blackwell. Legal H3 124-model / 129-canvas-frame receipts measured
+> 6,315 MB FL2VA and 6,678 MB REF2VA absolute VRAM on the RTX 5080, with host RAM
+> unmeasured. The separate physical RTX 4060 lab has receipt-bearing 90-frame
+> H3 runs and exported 124-frame Ref2VA A/V artifacts, but no canonical H3
+> episode. Physical-4060 LTX 2.5 remains unqualified: its exact plan is staged
+> but unrun. The earlier 15.47-15.60 GiB observations were 5080 reserve/clamp
+> pressure tests, not a physical-8GB surrogate.
+> The explicit H3 lane pins five files totaling 63,440,965,087 bytes (59.084
+> GiB) but is never publicly auto-selected. The optional Larry Turbo pack is not
+> OTR's node source.
+
+<details>
+<summary>Original problem statement (historical evidence snapshot)</summary>
+
 **Problem statement, 2026-09-01. Open-ended by intent -- it states what is known
 and what is not, and does not propose a fix.**
 
@@ -24,7 +44,7 @@ already produced one wrong answer.
 | platform | hardware in evidence | status |
 |---|---|---|
 | Windows + NVIDIA Blackwell | RTX 5080 Laptop, 16 GB, sm_120 | the only machine all three have ever run on |
-| Windows + NVIDIA Ada, 8 GB | RTX 4060 Laptop, 7.99 GB, 31.70 GB host RAM | h3 and LTX 2.5 both ruled out by measurement |
+| Windows + NVIDIA Ada, 8 GB | RTX 4060 Laptop, 7.99 GB, 31.70 GB host RAM | **SUPERSEDED:** isolated H3 is now lab-proven; physical LTX 2.5 remains UNKNOWN/unqualified |
 | Linux + NVIDIA Ampere | rented RTX A4500, 19.6 GB, sm_86, container | LTX 2.5 blocked at the loader; h3 and HuMo never attempted |
 | Linux + AMD (ROCm) | none | UNKNOWN -- never attempted |
 | macOS + Apple Silicon (MPS) | none | UNKNOWN -- never attempted |
@@ -113,9 +133,9 @@ at 1664x960. No episode has ever been published by LTX 2.5 on hardware other
 than the 5080 (where it has 13 `ltx25_video`, 7 `ltx25_foley_plus` and 3
 `ltx25_mime` episodes).
 
-**Ruled out by measurement, do not re-litigate:** the 8 GB tier. Sixteen runs put
-the VRAM floor at **15.47-15.60 GiB** and it did not move with quant, steps, or
-lane. That is roughly 7.5 GiB over an 8 GB card and is not a tuning problem.
+**SUPERSEDED interpretation:** sixteen 5080 reserve/clamp runs stayed near
+**15.47-15.60 GiB**. They are pressure evidence, not a physical-8GB surrogate;
+the prepared physical-4060 LTX 2.5 plan remains unrun and UNKNOWN/unqualified.
 
 **UNKNOWN:** the host-RAM envelope the two-stage decode actually needs at each
 canvas; whether a smaller canvas clears the cgroup ceiling and at what quality
@@ -131,7 +151,9 @@ thing that killed the run?
 
 ## Engine 3 -- MiniMax H3: two independent blocks, either one sufficient
 
-**Status: cannot be offered to anyone else, and this is settled.**
+**SUPERSEDED status:** current ComfyUI core supplies OTR's H3 node classes and
+the explicit five-file lane is complete. This operator's signed offline/owned-
+hardware policy still applies; third parties must establish their own authority.
 
 `minimax_h3_video` needs `MiniMaxH3ImageToVideo`, supplied by a node pack whose
 git origin on the reference machine is a local path:
@@ -147,9 +169,9 @@ Two blocks, and they are independent:
    inference runs only on the operator's own hardware, offline; no hosted or
    shared endpoint; weights never redistributed, republished, mirrored or bundled
    "in any form, quantized included"; commercial scope not established in writing.
-2. **Silicon.** The only fetchable H3 text encoder is **nvfp4**, which requires
-   hardware fp4 (**sm_120**). It therefore cannot execute on Ampere (the pod) or
-   Ada (the 4060) at all, irrespective of the licence.
+2. **SUPERSEDED silicon inference.** Comfy-Org documents the supplied H3 NVFP4
+   encoder as not requiring Blackwell, and the exact encoder loaded in the
+   physical Ada RTX 4060 lab.
 
 **Proven:** 3 published episodes on the 5080.
 
@@ -188,3 +210,5 @@ else can run?
 * **An honest "no."** A lane that fits only under settings nobody would ship is a
   worse answer than a measured refusal. The matrix records failures as readily as
   successes.
+
+</details>

@@ -21,6 +21,7 @@ hold is agreement: every caller must answer the same question the same way.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -34,6 +35,13 @@ CLONING_ENGINES = ("indextts2", "chatterbox", "dia")
 
 #: A bank-relative ref in the canonical stored form.
 BANK_REF = "models/TTS/refs/indextts2/vz_donor_marshal_indian.wav"
+
+
+@pytest.fixture(autouse=True)
+def _no_inherited_models_root_override(monkeypatch):
+    """Tests without an explicit root exercise the actual fallback contract."""
+    monkeypatch.delenv("OTR_COMFYUI_MODELS_ROOT", raising=False)
+    monkeypatch.delenv("COMFYUI_MODELS_ROOT", raising=False)
 
 
 def _old_private_resolver(ref):
@@ -191,6 +199,68 @@ def test_the_historical_candidate_is_still_tried_FIRST(monkeypatch, tmp_path):
     assert os.path.samefile(resolved, hist_dir / shared_name), (
         "the migrated root won over the historical one, which would MOVE a "
         "reference that already resolved on a shipping box")
+
+
+def test_explicit_models_root_is_shared_by_node_and_adapter(
+        monkeypatch, tmp_path):
+    """Provision and render must agree when a pod pins a volume models root."""
+    import sys
+    import types
+
+    relative = Path("TTS") / "refs" / "indextts2" / "portable.wav"
+    explicit_root = tmp_path / "volume-models"
+    explicit = explicit_root / relative
+    explicit.parent.mkdir(parents=True)
+    explicit.write_bytes(b"explicit")
+
+    configured_root = tmp_path / "folder-paths-models"
+    configured = configured_root / relative
+    configured.parent.mkdir(parents=True)
+    configured.write_bytes(b"configured")
+    fake = types.ModuleType("folder_paths")
+    fake.models_dir = str(configured_root)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(explicit_root))
+    monkeypatch.delenv("COMFYUI_MODELS_ROOT", raising=False)
+    bank_ref = "models/" + relative.as_posix()
+
+    node_path = _resolve_ref_to_disk(bank_ref)
+    adapter_path = get_engine("indextts2")._resolve_ref(bank_ref)
+
+    assert os.path.samefile(node_path, explicit)
+    assert os.path.samefile(adapter_path, explicit)
+    assert os.path.samefile(node_path, adapter_path)
+
+
+def test_missing_explicit_ref_never_falls_back_to_a_stale_historical_tree(
+        monkeypatch, tmp_path):
+    """An explicit pod volume owns both hits and misses; fallback would lie."""
+    import sys
+    import types
+
+    relative = Path("TTS") / "refs" / "indextts2" / "missing.wav"
+    explicit_root = tmp_path / "volume-models"
+    explicit_root.mkdir()
+
+    historical_root = tmp_path / "historical-models"
+    stale = historical_root / relative
+    stale.parent.mkdir(parents=True)
+    stale.write_bytes(b"stale unrelated reference")
+    fake = types.ModuleType("folder_paths")
+    fake.models_dir = str(historical_root)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(explicit_root))
+    monkeypatch.delenv("COMFYUI_MODELS_ROOT", raising=False)
+    bank_ref = "models/" + relative.as_posix()
+
+    expected_miss = explicit_root / relative
+    node_path = _resolve_ref_to_disk(bank_ref)
+    adapter_path = get_engine("indextts2")._resolve_ref(bank_ref)
+
+    assert Path(node_path) == expected_miss
+    assert Path(adapter_path) == expected_miss
+    assert not os.path.exists(node_path)
+    assert Path(node_path) != stale
 
 
 def test_a_ref_that_exists_nowhere_returns_a_loud_absolute_path():

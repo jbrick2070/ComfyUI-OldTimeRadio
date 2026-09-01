@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
+import types
 
 import pytest
 
@@ -51,6 +53,24 @@ def _comfy(tmp_path: Path) -> Path:
     return root
 
 
+def test_runpod_ltx_manual_recipe_carries_authoritative_manifest():
+    """The copy/paste recipe may not drift from the executable manifest."""
+    provision = _load_provision()
+    lab = (REPO / "docs" / "RUNPOD_PORTABILITY_LAB.md").read_text(
+        encoding="utf-8"
+    )
+    artifacts = provision.MANUAL_TIERS["ltx25"]
+
+    assert len(artifacts) == 5
+    for artifact in artifacts:
+        for field in ("repo", "revision", "path", "destination", "sha256"):
+            assert artifact[field] in lab, (
+                f"LTX 2.5 manual recipe is missing {field}="
+                f"{artifact[field]!r}"
+            )
+        assert str(artifact["bytes"]) in lab
+
+
 @pytest.mark.parametrize("line_ending", [b"\n", b"\r\n"])
 def test_gguf_patch_applies_to_exact_normalized_preimage(tmp_path, monkeypatch, line_ending):
     provision = _load_provision()
@@ -72,6 +92,19 @@ def test_gguf_patch_applies_to_exact_normalized_preimage(tmp_path, monkeypatch, 
     assert provision._git_changed_paths(str(dest)) == ["loader.py"]
     assert provision._git_untracked_paths(str(dest)) == []
     assert installed == [(provision.GGUF_PACK_NAME, True)]
+
+    # The runtime gate must recognize the exact source the provisioner just
+    # produced, not a hand-built approximation or guessed install path.
+    from nodes._otr_video_engines import eng_ltx25
+    module_name = "_otr_provisioned_gguf_fixture"
+    registered_module = types.ModuleType(module_name)
+    registered_module.__file__ = str(dest / "nodes.py")
+    monkeypatch.setitem(sys.modules, module_name, registered_module)
+    registered_cls = type(
+        "CLIPLoaderGGUF", (), {"__module__": module_name})
+    loader_path, gaps = eng_ltx25._inspect_ltx25_gguf_patch(registered_cls)
+    assert loader_path == str((dest / "loader.py").resolve())
+    assert gaps == ()
 
 
 def test_gguf_already_patched_is_idempotent(tmp_path, monkeypatch):

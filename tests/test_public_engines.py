@@ -64,9 +64,9 @@ _TIER = {
     "ltx23_high_video": "ltx_video",
     # Lane 19, 2026-08-12: the first ADD rather than a rename or a move -- a new
     # engine, so there is no old public id to retire and no alias row. `low` is
-    # measured and it is what chose the canvas: 7.28 GiB at 864x480 against 9.15
-    # at H3's trained 1344x768, so the lane declares the canvas where the token
-    # is true rather than applying the token to whatever it renders.
+    # measured at H3's legal 124-model / 129-canvas-frame floor: 6,315 MB cold
+    # absolute at 864x480 on the 5080. That does not qualify a physical 8 GB
+    # card; the public id records recipe cost, not a card guarantee.
     "h3_low_video": "minimax_h3_video",
     # Lane 20, 2026-08-12: the second H3 public id, and it maps to a SEPARATE
     # internal engine. That separation is the whole reason lane 19 registered

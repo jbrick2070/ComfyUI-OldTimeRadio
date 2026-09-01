@@ -428,26 +428,13 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     #: canvas. So the trained numbers describe training, not enforcement, and
     #: the choice is genuinely ours.
     #:
-    #: It is decided by the PUBLIC ID this lane was assigned. The naming
-    #: convention is ``<model><version>_<low|high>_<capability>`` where ``low``
-    #: means measured under ~8 GiB, and the corpus named this lane
-    #: ``h3_low_video``. Against the lab receipts on THIS box, under this lane's
-    #: own boot contract:
-    #:
-    #:   * 864x480 -- ``h3_mime_i2v`` model f90, **7.28 GiB** absolute, 178.9 s;
-    #:     the ref2va sibling at model f124 measures 7.20 GiB. Both ``low``.
-    #:   * 1344x768 (the trained shape) -- ``h3_i2v_best`` model f124,
-    #:     **9.15 GiB** absolute, 1182.5 s. Not ``low``, and 6.6x the wall clock
-    #:     for one 5 s beat.
-    #:   * 832x480 -- the ONE canvas with no passing receipt: model f107 peaked
-    #:     **15.39 GiB** and FAILED the 14.5 GiB gate. That leg was also below
-    #:     the trained floor AND on a boot lane without the reserve clamp, so it
-    #:     is evidence of a failure, never evidence for a number.
-    #:
-    #: 864x480 is the only value with a passing I2V receipt at which the id's
-    #: own ``low`` token is true, and it is /32-legal on both axes (27 x 15).
-    #: ``tests/test_minimax_h3_video.py`` pins it, and its profile carries the
-    #: same pair as a drift guard.
+    #: The controlling receipts use H3's legal floor, not the older 90-frame
+    #: probe: FL2VA at 124 model / 129 canvas frames, 864x480, measured 6,315 MB
+    #: cold absolute on the local RTX 5080; the REF2VA sibling measured 6,678 MB
+    #: at the same legal floor. ``low`` therefore describes the measured recipe
+    #: allocation on that machine. It does NOT qualify a physical 8 GB GPU, and
+    #: host RAM was not measured in those receipts. The canvas is /32-legal on
+    #: both axes (27 x 15); tests pin it and the legal-frame conversion.
     render_canvas = (864, 480)
 
     still_plan = _H3_STILL_PLAN

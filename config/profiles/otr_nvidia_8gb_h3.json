@@ -1,6 +1,6 @@
 {
   "id": "otr_nvidia_8gb_h3",
-  "display_name": "8GB NVIDIA: MiniMax H3 low-VRAM (7.3GiB @864x480, ~39.6GB weights, needs a first frame so an image lane too; video lane is silent -- voices + music still muxed in) -- no HF token REQUIRED (set one anyway: anonymous pulls get throttled)",
+  "display_name": "UNQUALIFIED LAB/HISTORICAL: 8GB NVIDIA MiniMax H3 experiment (legal floor not yet proven on a physical 8GB card; explicit 59.084GiB operator lane)",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -58,7 +58,7 @@
   },
   "video": {
     "device_policy": "cuda",
-    "dtype_policy": "no_fp8_no_fp4"
+    "dtype_policy": "fp8_ok"
   },
   "image": {
     "dtype_policy": "fp8_ok"
@@ -83,8 +83,13 @@
     "required_keys": []
   },
   "launch": {
+    "boot_contract": "h3",
     "sage_attention": false,
-    "extra_args": [],
-    "env": {}
+    "extra_args": [
+      "--disable-pinned-memory"
+    ],
+    "env": {
+      "OTR_HEADLESS_DISABLE_PINNED": "1"
+    }
   }
 }

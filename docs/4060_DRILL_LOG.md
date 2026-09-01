@@ -2,9 +2,9 @@
 
 Written by the working session ON the 4060 laptop (MRKT). Earlier relayed
 entries claiming "all models present" and pushed squawks were from a session
-that never verified against this disk; treat everything below as the ground
-truth baseline. Central tracking file per operator order -- every step lands
-here and is pushed.
+that never verified against this disk. This is a chronological lab log: later
+dated corrections supersede earlier entries. Central tracking file per operator
+order -- every step lands here and is pushed.
 
 ## Box fingerprint
 
@@ -35,8 +35,22 @@ Missing was exactly the video/image stack. Fetched:
 | kokoro-v1_0.pth | 0.33 | TTS/KokoroTTS | hexgrad/Kokoro-82M |
 
 int8_convrot (not nvfp4) chosen for the image UNET: nvfp4 is
-Blackwell-native, this card is Ada. LTX 2.5 / MiniMax H3 ruled out on this
-box (14.5+ GB VRAM class).
+Blackwell-native, this card is Ada. **SUPERSEDED 2026-09-01:** the original
+drill inference that this also ruled out LTX 2.5 / MiniMax H3 was not a physical
+test of either current lane; use the correction below.
+
+**2026-09-01 correction:** the NVFP4 sentence above describes the selected
+Z-Image artifact, not H3's Qwen encoder. Comfy-Org explicitly documents the H3
+NVFP4 encoder as usable without Blackwell. No canonical H3 episode was run in
+this drill. The separate `vram-recipe-lab/eightgb_bench` did run physical-4060
+H3 cells: a hash-bound 864x480x90 cold/warm/warm ladder at 7.21/6.79/6.79 GiB
+VRAM, plus exported 864x480x124 Ref2VA A/V artifacts. That is isolated-clip
+proof, not `otr_4060_h3_nano` `RESULT SUCCESS + obs_publish OK` proof; the full
+OTR H3 episode remains unqualified on this card. Sixteen LTX 2.5 runs on the
+5080 stayed near 15.47-15.60 GiB under reserve/clamp pressure, but that is not a
+physical-8GB surrogate: GPU allocators can change behavior with real capacity.
+The physical-4060 LTX 2.5 plan is staged but has no completed receipt, so its
+status on this card remains UNKNOWN/unqualified.
 
 ## Step 2 -- profile + launch
 
@@ -1095,4 +1109,3 @@ Open on this box: PBUG-20 (news-read validator rejects real people named in
 the source) is independent of this fix and still kills scifi_news_pro legs at
 the writer. PBUG-11 (GGUF cache epoch) still blocks the 12B in-pipeline;
 repro at `scripts/repro_pbug11_gguf_cache.py`, 16 s, deterministic.
-

@@ -77,7 +77,12 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": [],
+    "required_models": [
+      "humo_1.7B_fp16.safetensors",
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "wan_2.1_vae.safetensors",
+      "whisper_large_v3_fp16.safetensors"
+    ],
     "required_keys": []
   },
   "launch": {
