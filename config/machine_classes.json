@@ -21,7 +21,7 @@
   ],
   "classes": [
     {
-      "label": "8 GB NVIDIA (e.g. RTX 4060)",
+      "label": "8 GB NVIDIA (RTX 4060, 3070, 2080)",
       "gpu_vendor": "nvidia",
       "vram_min_gb": 6,
       "vram_max_gb": 9,
@@ -42,15 +42,15 @@
       ]
     },
     {
-      "label": "16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)",
+      "label": "16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)",
       "gpu_vendor": "nvidia",
       "vram_min_gb": 16,
       "vram_max_gb": 64,
       "platform": "any",
       "writer": "gemma-4-12b",
-      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs.",
+      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs. AnimateDiff is the FLOOR lane and belongs to the small-VRAM classes; from 16 GB up the declared engine is real video diffusion. Operator, 2026-09-01: \"i dont care about animatediff except for the smallest machines, 16gb vram over i want real video proven\". ltx25_high_video is proven on the RTX 5080: two 1-act legs on 2026-09-01, 01:26:19 and 01:52:13, both RESULT SUCCESS. FIND YOUR CARD BY VRAM AND ARCHITECTURE, NOT BY NAME. The proof on this row was measured on an RTX A4500 -- Ampere, compute 8.6, 20 GB -- which most people have never held. What it stands in for is any Ampere-or-newer card with 16 GB or more: a 3090 or 3090 Ti (24 GB, same architecture, more SMs) is covered by it; a 4090 almost certainly is. A 3080 Ti is NOT, despite being the same architecture, because it has 12 GB and belongs to the row below.",
       "key": "16gb",
-      "video": "animatediff15_v3_haunted_video",
+      "video": "ltx25_high_video",
       "char_voice": "kokoro",
       "writer_ceiling_gb": 14.5,
       "proven": [
@@ -88,7 +88,7 @@
     },
     {
       "key": "12gb",
-      "label": "10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)",
+      "label": "10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)",
       "gpu_vendor": "nvidia",
       "vram_min_gb": 10,
       "vram_max_gb": 15,

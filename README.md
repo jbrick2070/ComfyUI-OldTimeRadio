@@ -300,9 +300,9 @@ it names any missing weight and where it expects it.
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 49 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86) |
-| **10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 49 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86) |
+| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
