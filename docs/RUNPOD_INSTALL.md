@@ -931,3 +931,19 @@ version. It surfaces at render time, seventeen minutes in.
 
 A pod image is a snapshot. Treat its ComfyUI version as a fact to check, not a
 given -- the template that boots fastest is often the one furthest behind.
+
+### "upscale_engine is off -- is that a mistake somebody should fix?"
+
+No. It is OFF ON PURPOSE in `workflows/otr_canonical.json`, and it should stay
+that way until somebody deliberately turns it on for a measured test.
+
+Operator, 2026-09-01: an upscaler once tried to **infinitely upscale stills**.
+That is why the default is `off` rather than an oversight nobody got round to.
+
+There are only two engines -- `off` and `spandrel_esrgan` -- so the untested
+surface here is one option behind a default-off switch, not a family. Turning it
+on also needs ESRGAN weights, which are not on disk on the reference machine, so
+flipping the widget alone would fail at load rather than upscale anything.
+
+If it is ever tested: bound it. A runaway is not a quality problem, it is a
+resource problem, and the thing to measure first is whether it terminates.
