@@ -160,6 +160,28 @@ def install_node_packs(comfy: str) -> None:
         r = run(cmd + [url, dest])
         say("OK" if r.returncode == 0 else "FAILED", name,
             "" if r.returncode == 0 else r.stderr.strip()[:60])
+        if r.returncode == 0:
+            install_pack_requirements(name, dest)
+
+
+def install_pack_requirements(name: str, dest: str) -> None:
+    """A cloned pack whose own dependencies are missing does not load.
+
+    Cloning was treated as installing, and it is not: ComfyUI-GGUF needs the
+    `gguf` wheel, and without it the pack registers nothing -- so
+    UnetLoaderGGUF is absent and wan_ti2v and ltx25 both fail at render time
+    with WrapperNodeMissing, exactly as if the pack had never been cloned.
+
+    Into sys.executable deliberately: this script is run BY the interpreter
+    ComfyUI uses, and installing a node pack anywhere else is the same
+    mistake this file exists to prevent.
+    """
+    req = os.path.join(dest, "requirements.txt")
+    if not os.path.isfile(req):
+        return
+    r = run([sys.executable, "-m", "pip", "install", "-q", "-r", req])
+    say("OK" if r.returncode == 0 else "FAILED", "%s deps" % name,
+        "" if r.returncode == 0 else (r.stderr or "").strip()[:60])
 
 
 def install_requirements() -> None:
