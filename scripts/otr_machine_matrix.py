@@ -386,6 +386,20 @@ def render() -> str:
       "27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with "
       "16 GiB of RAM will struggle regardless of its GPU, and no VRAM table "
       "warns you.\n")
+    # KNOWN LIMITS ARE DECLARED IN config/machine_classes.json AND WERE A DEAD
+    # CHANNEL: the field was read by nothing and rendered nowhere, so a limit
+    # someone took the trouble to write down never reached the person it was
+    # written for. A limit nobody sees is not a limit.
+    try:
+        with open(_CLASS_FILE, encoding="utf-8") as fh:
+            _limits = (json.load(fh) or {}).get("known_limits") or []
+    except Exception:  # noqa: BLE001 -- the doc still renders without them
+        _limits = []
+    if _limits:
+        A("## Known limits, written down when they were found\n")
+        for _lim in _limits:
+            A("* %s\n" % _lim)
+
     A("## What is NOT here\n")
     A("* No row means an episode will look good -- only that the combination "
       "loads and runs. Output quality is a separate judgement.\n")

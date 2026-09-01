@@ -36,7 +36,7 @@ Both are queued in the 5080 rotation, so these rows should move up to the table 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 50 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86), RTX 5080 Laptop 16 GB (Blackwell sm_120) |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 50 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86), RTX 5080 Laptop 16 GB (Blackwell sm_120) |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 
@@ -237,6 +237,22 @@ A VRAM number without its conditions is how somebody buys the wrong card.
 The honest use of these numbers is COMPARATIVE -- which lane is heavier than which -- not a shopping threshold. A lane marked PROVEN on 8 GB is worth more than any peak figure, because a card actually did it.
 
 **Host RAM is the limit people miss.** The clamped H3 run peaked at 27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with 16 GiB of RAM will struggle regardless of its GPU, and no VRAM table warns you.
+
+## Known limits, written down when they were found
+
+* indextts2 is NOT selectable as the announcer voice -- OTR_CastLock's announcer combo is (auto, kokoro, chatterbox, dia, elevenlabs, google_tts, bark). It IS selectable as the character voice. Recorded here rather than worked around: the dropdown decides, the workflow runs it, and a failure gets written down.
+
+* chatterbox and dia are announcer-capable cloning engines but each needs its own isolated venv; neither is installed on the rented pod.
+
+* OTR_ImageDirector dtype_policy accepts fp8_ok / no_fp8 / no_fp8_no_fp4 only. 'fp16' is not a choice -- it was invented here once and failed at apply time, which is the intended behaviour.
+
+* scifi_news_pro on a rented pod: the RSS bank works, and two wrong diagnoses were recorded here before the right one. It is NOT datacenter IP blocking -- with a real User-Agent, sciencedaily/BBC/MIT all return 200 from the pod and only cosmosmagazine 403s. It is NOT partial feed failure either; the fetcher already skips a refusing feed. The cause was `feedparser` missing from ComfyUI's own venv, declared in requirements.txt and pyproject.toml but installed by the provisioner into the SYSTEM python. Same root as the `accelerate` failure. Fixed in scripts/otr_pod_provision.sh.
+
+* voice_bank must match the voice engine: kokoro accepts only 'kokoro_builtin'. Setting 'default' with char_voice=kokoro raises VoiceCastingError at OTR_CastLock, 12 minutes into a leg. Found by running it, 2026-08-31.
+
+* ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by a stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'), and the 17-line loader patch that fixes it is not public. On a rented A4500 with the patch applied it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted to proven for a second machine only when a pod render publishes an episode.
+
+* humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching; what is missing is ~27 GiB of weights and a fetch lane. Qualification is queued behind ltx25 on a high-RAM pod.
 
 ## What is NOT here
 
