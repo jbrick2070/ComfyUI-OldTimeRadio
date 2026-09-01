@@ -85,9 +85,15 @@ def models_root(comfy: str) -> str:
     `nodes/_otr_gguf_backend.py::_models_root()` is the single owner of this
     question. Ask it, and only fall back when it cannot be imported at all.
     """
-    code = ("import sys;sys.path.insert(0,%r)\n"
-            "from nodes._otr_gguf_backend import _models_root\n"
-            "print(_models_root())\n" % _REPO)
+    # BOTH paths go in: the repo so the pack imports, and ComfyUI's root so
+    # `folder_paths` does. Without the second, the pack's friendly default
+    # cannot reach its folder_paths step -- it would try to import from a cwd
+    # of <comfy>/custom_nodes, fail, and fall through to the Windows literal.
+    # On a fresh Linux box that literal is a RELATIVE directory name, and this
+    # function would accept it as a successful answer.
+    code = ("import sys;sys.path.insert(0,%r);sys.path.insert(0,%r)" + chr(10) +
+            "from nodes._otr_gguf_backend import _models_root" + chr(10) +
+            "print(_models_root())" + chr(10)) % (_REPO, comfy)
     r = run([sys.executable, "-c", code], cwd=os.path.dirname(_REPO))
     if r.returncode == 0 and r.stdout.strip():
         return r.stdout.strip()

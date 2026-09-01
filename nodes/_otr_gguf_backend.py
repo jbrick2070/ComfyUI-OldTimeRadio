@@ -885,12 +885,45 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 def _models_root() -> Path:
+    r"""Where the weights live: env, then this box's tree, then ComfyUI's own.
+
+    The order matters and each step is here for a reason.
+
+    1. The env vars win outright. That is how anyone puts weights wherever
+       they like, and how every pod run is pinned.
+    2. Then the legacy literal, BUT ONLY IF IT EXISTS. It is the reference
+       machine's real 55-entry tree and neither env var is set there, so
+       dropping it would relocate that machine's entire model root. Guarding
+       it on existence keeps that box working while making the literal
+       invisible to everybody else.
+    3. Then ComfyUI's own folder_paths -- the USER'S configuration, including
+       extra_model_paths.yaml, which is the documented way to relocate
+       models. This is the friendly default a fresh install should get, on
+       any OS, and on POSIX it also avoids creating a directory literally
+       named "C:\\ComfyUI-Models" under the working directory.
+
+    WHAT MUST NEVER HAPPEN: preferring <comfy>/models over an existing tree at
+    step 2. That machine has BOTH, the second holds a plausible 34 entries,
+    and an earlier version guessed it and returned the wrong root while
+    looking verified.
+    """
     raw = (
         os.environ.get("OTR_COMFYUI_MODELS_ROOT")
         or os.environ.get("COMFYUI_MODELS_ROOT")
-        or r"C:\ComfyUI-Models"
     )
-    return Path(raw).expanduser()
+    if raw:
+        return Path(raw).expanduser()
+    legacy = Path(r"C:\ComfyUI-Models")
+    if legacy.is_dir():
+        return legacy
+    try:
+        import folder_paths  # ComfyUI runtime only
+        base = getattr(folder_paths, "models_dir", None)
+        if base:
+            return Path(base).expanduser()
+    except Exception:  # noqa: BLE001 -- outside ComfyUI, fall through
+        pass
+    return legacy
 
 
 def default_gguf_path(quant: str = "Q8_0") -> Path:
