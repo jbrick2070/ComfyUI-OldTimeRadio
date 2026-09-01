@@ -947,3 +947,107 @@ flipping the widget alone would fail at load rather than upscale anything.
 
 If it is ever tested: bound it. A runaway is not a quality problem, it is a
 resource problem, and the thing to measure first is whether it terminates.
+
+## Appendix -- a fresh pod with NO persistent storage
+
+The playbook above deploys with a network volume, which is the right default:
+weights survive, and a recreate costs two apt packages and a token. This
+appendix covers the other case -- a pod with nothing but its container disk,
+where everything is downloaded every time and lost when the pod dies.
+
+It works, and the provisioner does all of it. The constraint is disk, and it is
+tighter than it looks.
+
+### Measured sizes, on a 70 GB container disk
+
+    ComfyUI itself                 0.7 GB
+    ComfyUI venv                   3.1 GB
+    node packs (3)                 0.9 GB
+    haunted lane (AnimateDiff)     3.7 GB
+    z_image_int8 (image)          13.6 GB
+    stable_audio_3 (music)         3.5 GB
+    writer model                3 - 12 GB   depending on the class
+    ------------------------------------------------------------
+    a working install          ~29 - 38 GB   comfortable on 70 GB
+
+    index-tts venv                39 GB   <-- does NOT fit alongside the above
+    chatterbox venv               10 GB
+    dia venv                      8.9 GB
+
+**THE VOICE DECISION IS THE WHOLE BUDGET.** index-tts is 39 GB on its own, so on
+a 70 GB disk it cannot coexist with the models. A no-volume pod should run
+kokoro, which loads in ComfyUI's own venv and needs no isolated environment at
+all; chatterbox (10 GB) fits if a cloning voice is required. Reaching for
+index-tts here is what fills the disk, and the failure arrives as
+`Errno 122` mid-download rather than as a clear refusal.
+
+### The sequence
+
+    # 1. clone the pack into the tree ComfyUI actually scans
+    cd <comfy>/custom_nodes
+    git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+
+    # 2. the token, before any gated fetch
+    printf '%s' "$HF_TOKEN" > /root/.hf_token && chmod 600 /root/.hf_token
+
+    # 3. everything else, in one command
+    cd ComfyUI-OldTimeRadio && bash scripts/otr_pod_provision.sh
+
+That single command upgrades ComfyUI if it is below v0.32.0, installs the system
+libraries, clones the node packs AND their own requirements, repairs any
+dangling venv interpreter, picks the image lane from compute capability and
+VRAM, and fetches the minimum weights. Every one of those steps exists because
+skipping it cost a leg.
+
+Choose the weights explicitly if the defaults are wrong for the box:
+
+    OTR_PROVISION_LANES="haunted" OTR_PROVISION_IMAGE_LANE=z_image_int8 \
+        bash scripts/otr_pod_provision.sh
+
+`python scripts/otr_fetch_lane_weights.py --list` prints every lane with its
+size and how much is already on disk.
+
+### What you give up
+
+Nothing about correctness -- a no-volume pod renders the same episodes. What you
+lose is the ability to stop and resume: every model is re-downloaded on the next
+pod, which for the base install is roughly 25 GB of transfer before the first
+frame. If you expect to run more than one pod, the volume pays for itself on the
+second.
+
+### The starter workflow -- one good everything, dropdowns already set
+
+`workflows/variants/otr_runpod_starter.json` is the from-scratch answer for a
+RunPod box with **16 GB of VRAM or more**. Load it and every dropdown is already
+on a choice that has produced a real episode -- no picking, no guessing:
+
+    video    ltx25_high_video (16:9)   LTX 2.5, the flagship lane
+    image    z_image_turbo             482 episodes
+    voice    indextts2 (characters)    1430 episodes
+             kokoro (announcer)        64 of the last 64
+    music    stable_audio_3            925 episodes
+    writer   Mistral-Nemo-Instruct     what the proven LTX 2.5 episodes used
+    bank     default                   mixed cast; kokoro_builtin would force
+                                       every voice to kokoro and contradict the
+                                       character engine above
+
+Nothing there is aspirational. Each value is the one carried by episodes on
+disk, which is why the writer is Mistral-Nemo rather than the gemma-4-12b the
+machine matrix declares for this class -- the matrix states a class default, the
+starter ships what actually rendered.
+
+**It is GENERATED, never hand-edited.** Change `config/profiles/
+otr_runpod_starter.json` and re-run:
+
+    python scripts/build_variants.py --profiles otr_runpod_starter
+
+Editing the variant directly survives a diff and then fails regeneration.
+
+Weights for exactly this set, and nothing else:
+
+    python scripts/otr_fetch_lane_weights.py z_image      # or z_image_blackwell
+    python scripts/otr_fetch_lane_weights.py stable_audio_3
+
+LTX 2.5's own weights are gated -- accept the terms on Hugging Face, set
+HF_TOKEN, and note that ComfyUI must be **v0.32.0 or newer** or the lane cannot
+resolve its nodes at all (section 0 of DEPENDENCIES).

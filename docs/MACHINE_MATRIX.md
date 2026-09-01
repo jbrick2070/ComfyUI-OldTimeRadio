@@ -83,7 +83,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 16 GB+  --  93 profile(s), 41 shipping, 0 proven
+## 16 GB+  --  94 profile(s), 41 shipping, 0 proven
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
@@ -129,7 +129,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` |
 
-<details><summary>52 draft profile(s) here -- not vouched for</summary>
+<details><summary>53 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `viz_camera`, `wan_ti2v`, `word_razzle`
 
@@ -163,6 +163,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_rot_tts_dia` | ltx25_high_video | dia |
 | `otr_rot_wan_ideogram4` | wan_ti2v | indextts2 |
 | `otr_rot_wan_klein` | wan_ti2v | indextts2 |
+| `otr_runpod_starter` | ltx25_high_video | indextts2 |
 | `otr_sbcov_1` | still_pan | indextts2 |
 | `otr_sbcov_2` | still_flat | indextts2 |
 | `otr_sbcov_3` | still_motion | indextts2 |
