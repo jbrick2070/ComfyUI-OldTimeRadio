@@ -71,6 +71,12 @@
           "episodes": 1,
           "date": "2026-08-31",
           "evidence": "animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality."
+        },
+        {
+          "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
+          "episodes": 1,
+          "date": "2026-09-01",
+          "evidence": "ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute."
         }
       ]
     },

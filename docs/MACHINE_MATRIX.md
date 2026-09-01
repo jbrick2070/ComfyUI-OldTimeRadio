@@ -9,7 +9,7 @@ Find your machine in the first table. That is the whole answer; everything after
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
 | **8 GB NVIDIA (e.g. RTX 4060)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 47 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented) |
+| **16 GB or more NVIDIA (RTX 5080, rented 24 GB, ...)** | gemma-4-12b | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 48 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86) |
 | **10-15 GB NVIDIA (e.g. RTX 4070, 3080 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 | **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
 
