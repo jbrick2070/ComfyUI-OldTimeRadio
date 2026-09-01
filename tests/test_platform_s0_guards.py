@@ -305,26 +305,49 @@ def test_cast_lock_stamps_voice_device():
 # HuMo artifact alignment: script vs engine default vs registry label
 # --------------------------------------------------------------------------
 
-def test_humo_download_script_fetches_engine_default_unet():
-    """Fresh-install alignment (S0): the download script fetched Comfy-Org's
-    humo_17B file while the engine default resolves Kijai's 14B_KJ file --
-    ~16 GB downloaded, engine still reported not-installed."""
+def test_humo_fetch_lane_fetches_engine_default_unet():
+    """Fresh-install alignment (S0) stays executable after script retirement.
+
+    The retired PowerShell script once fetched Comfy-Org's humo_17B file while
+    the engine resolved Kijai's 14B_KJ file: ~16 GB downloaded, then an honest
+    not-installed refusal. The cross-platform lane now owns that fact.
+    """
+    import importlib.util
     import re
     from pathlib import Path
 
     from nodes._otr_video_engines import eng_humo
 
+    path = (Path(__file__).resolve().parents[1] / "scripts"
+            / "otr_fetch_lane_weights.py")
+    spec = importlib.util.spec_from_file_location("_otr_humo_fetch_guard", path)
+    fetcher = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fetcher)
+
+    entries = fetcher.LANES["humo"]
+    landed = {fetcher.destination_name(row): fetcher.weight_spec(row)
+              for row in entries}
+    assert eng_humo._HUMO_DEFAULT_UNET in landed, (
+        "LANES['humo'] no longer fetches the engine default UNET "
+        f"({eng_humo._HUMO_DEFAULT_UNET}) -- fresh installs will break")
+    assert "humo_17B_fp8_e4m3fn.safetensors" not in landed, (
+        "the misaligned Comfy-Org 17B entry is back")
+
+    unet = landed[eng_humo._HUMO_DEFAULT_UNET]
+    assert unet.repo == "Kijai/WanVideo_comfy_fp8_scaled"
+    assert re.fullmatch(r"[0-9a-f]{40}", unet.revision)
+    assert unet.expected_bytes == 17_892_294_098
+    assert re.fullmatch(r"[0-9a-f]{64}", unet.expected_sha256)
+
+
+def test_retired_humo_script_points_at_the_executable_lane():
+    from pathlib import Path
+
     script = (Path(__file__).resolve().parents[1] / "scripts"
               / "download_humo_models.ps1")
     text = script.read_text(encoding="utf-8")
-    assert eng_humo._HUMO_DEFAULT_UNET in text, (
-        "download_humo_models.ps1 no longer fetches the engine default UNET "
-        f"({eng_humo._HUMO_DEFAULT_UNET}) -- fresh installs will break")
-    assert "humo_17B_fp8_e4m3fn.safetensors" not in text, (
-        "the misaligned Comfy-Org 17B entry is back")
-    m = re.search(r"url = '([^']*HuMo[^']*)'", text)
-    assert m is not None and eng_humo._HUMO_DEFAULT_UNET in m.group(1), (
-        "HuMo download URL does not point at the engine default artifact")
+    assert "scripts/otr_fetch_lane_weights.py humo" in text
+    assert "manual recipe" not in text.lower()
 
 
 def test_humo_registry_labels_name_the_kijai_artifact_family():

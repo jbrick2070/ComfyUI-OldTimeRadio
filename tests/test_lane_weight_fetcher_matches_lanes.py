@@ -31,9 +31,9 @@ def _load_fetcher():
     return mod
 
 
-def _filenames(entries):
+def _filenames(fetcher, entries):
     """The basename each entry lands on disk as."""
-    return {path_in_repo.rsplit("/", 1)[-1] for _repo, path_in_repo, _sub in entries}
+    return {fetcher.destination_name(entry) for entry in entries}
 
 
 def test_haunted_bundle_fetches_what_the_haunted_engine_declares():
@@ -41,7 +41,8 @@ def test_haunted_bundle_fetches_what_the_haunted_engine_declares():
     from nodes._otr_video_engines.eng_ghost_signal_official import (
         GhostSignalV3HauntedEngine as Haunted)
 
-    fetched = _filenames(_load_fetcher().LANES["haunted"])
+    fetcher = _load_fetcher()
+    fetched = _filenames(fetcher, fetcher.LANES["haunted"])
 
     assert Haunted.motion_module_name in fetched, (
         "the haunted lane loads %r but the bundle does not fetch it -- this is "
@@ -59,7 +60,8 @@ def test_the_haunted_bundle_does_not_fetch_a_sibling_lanes_module():
     from nodes._otr_video_engines.eng_ghost_signal_official import (
         GhostSignalV3HauntedEngine as Haunted)
 
-    fetched = _filenames(_load_fetcher().LANES["haunted"])
+    fetcher = _load_fetcher()
+    fetched = _filenames(fetcher, fetcher.LANES["haunted"])
     if GOLDEN_MODULE != Haunted.motion_module_name:
         assert GOLDEN_MODULE not in fetched, (
             "the haunted bundle fetches %r, which belongs to the GOLDEN lane "
@@ -82,7 +84,7 @@ def test_every_weight_a_profile_demands_is_in_its_bundle(profile_id):
 
     fetched = set()
     for lane in fetcher.BUNDLES[profile_id]:
-        fetched |= _filenames(fetcher.LANES[lane])
+        fetched |= _filenames(fetcher, fetcher.LANES[lane])
 
     profile = json.loads(
         (ROOT / "config" / "profiles" / ("%s.json" % profile_id)).read_text("utf-8"))

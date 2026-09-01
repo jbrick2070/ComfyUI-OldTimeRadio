@@ -23,9 +23,30 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import sys
+import urllib.parse
 import urllib.request
+from typing import NamedTuple
+
+
+class WeightSpec(NamedTuple):
+    """One fetchable artifact.
+
+    Older lanes predate reproducible source receipts, so ``revision``,
+    ``expected_bytes`` and ``expected_sha256`` remain optional for them. New
+    promoted lanes must fill all three. The HuMo lane is the first lane whose
+    downloader proves both remote identity and landed bytes before the final
+    filename becomes visible to ComfyUI.
+    """
+
+    repo: str
+    path_in_repo: str
+    destination: str
+    revision: str = "main"
+    expected_bytes: int | None = None
+    expected_sha256: str | None = None
 
 #: lane -> list of (hf_repo, path_in_repo, models_subfolder)
 #: Sizes in the comments are the real blob sizes read from the HF API.
@@ -46,6 +67,10 @@ LANE_INFO = {
     "wan_ti2v": (0.0, "Wan 2.2 TI2V, safetensors. An ALTERNATIVE to the GGUF "
                       "set above -- fetch one or the other, never both."),
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
+    "humo": (26.74, "HuMo 14B talking-face lane. Locally episode-proven on "
+                    "a 16 GB Blackwell 5080 at 13.06 GiB VRAM / 27.53 GiB "
+                    "host RAM; use at least 32 GiB host RAM. Other NVIDIA "
+                    "families remain lab candidates until a live receipt."),
     "minimax_h3": (39.60, "MiniMax H3 with native audio. The largest lane, and "
                           "its text encoder is nvfp4 (Blackwell only)."),
 }
@@ -86,6 +111,59 @@ LANES = {
          "v3_sd15_mm.ckpt", "animatediff_models"),                      # 1.67 GB
         ("guoyww/animatediff",
          "v3_sd15_adapter.ckpt", "loras"),                              # 0.10 GB
+    ],
+    # 26.74 GiB. COMPLETE 14B HuMo recipe: every destination is read from
+    # HuMoEngine._loader_names(), and the primary UNET is exactly
+    # eng_humo._HUMO_DEFAULT_UNET. This is intentionally Kijai's
+    # `...scaled_KJ` file, not Comfy-Org's similarly named humo_17B artifact.
+    # That wrong download was a fresh-install breaker: it consumed ~16 GB and
+    # the engine still reported not installed.
+    #
+    # Unlike the legacy lane rows below, every HuMo source is revision-pinned
+    # and carries exact bytes + SHA-256. fetch() verifies the temporary file
+    # before os.replace(), so neither a moved upstream ref nor an interrupted
+    # transfer can become a loadable final checkpoint.
+    "humo": [
+        WeightSpec(
+            "Kijai/WanVideo_comfy_fp8_scaled",
+            "HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+            "diffusion_models/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+            "033a4e487f60220b3d6e469599a6aebc46e13cee",
+            17_892_294_098,
+            "a67ed82a7c008892f9192cdc5b23bbfe2e2a8e2f87d0b5b8dfb0226fafec022d",
+        ),
+        WeightSpec(
+            "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+            "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "617a7633e636506f850e043bc4605f290a466a8e",
+            6_735_906_897,
+            "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+        ),
+        WeightSpec(
+            "Comfy-Org/HuMo_ComfyUI",
+            "split_files/audio_encoders/whisper_large_v3_fp16.safetensors",
+            "audio_encoders/whisper_large_v3_fp16.safetensors",
+            "3a5e6947d865c3910cb2407cf2dac6a8df506b5a",
+            3_087_130_976,
+            "a8e94b85976e5864ba3e9525c7e6c83b2a1eca42d4b797a0c7c24d778e40fd95",
+        ),
+        WeightSpec(
+            "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+            "split_files/vae/wan_2.1_vae.safetensors",
+            "vae/wan_2.1_vae.safetensors",
+            "c4f60d30c55a624e35427060fdd217579a6c1d77",
+            253_815_318,
+            "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b",
+        ),
+        WeightSpec(
+            "Kijai/WanVideo_comfy",
+            "Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+            "loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+            "8260d429d19fd7a72304cad059160b95d843913f",
+            738_005_744,
+            "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
+        ),
     ],
     # ~39.6 GB total, but it carries NATIVE AUDIO and is proven at 8 GB by
     # vram-recipe-lab/eightgb_bench (864x480, 90f, 24fps, requires_audio).
@@ -238,35 +316,6 @@ LANES = {
     ],
 }
 
-#: Lanes whose sources are only PARTLY known. Deliberately not in LANES: a lane
-#: that fetches four of its six files hands somebody a broken engine and a
-#: receipt that looks complete, which is worse than a lane that is honestly
-#: absent. Resolve the remaining rows, verify them on the Hub, then promote.
-UNRESOLVED = {
-    "humo": [
-        # RESOLVED, ready to promote once the two below are settled:
-        #   Kijai/WanVideo_comfy_fp8_scaled
-        #     HuMo/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors  17.9 GB
-        #   Kijai/WanVideo_comfy
-        #     Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16
-        #                                                            0.74 GB
-        #   umt5_xxl_fp8_e4m3fn_scaled.safetensors  -- same row as `wan_ti2v`
-        #   wan_2.1_vae.safetensors                 -- same row as `wan_ti2v`
-        #
-        # NAME MISMATCH, do not guess: the engine asks for
-        # `humo_1.7B_fp16.safetensors`; the Hub ships
-        # `Wan2_1-HuMo-1_7B_fp16.safetensors` (3.48 GB) at
-        # Kijai/WanVideo_comfy HuMo/. Whether the engine expects the file
-        # RENAMED or a different artifact entirely is not answerable from the
-        # engine source, and fetching 3.48 GB under the wrong name yields a lane
-        # that still refuses.
-        "humo_1.7B_fp16.safetensors",
-        # NOT FOUND on the Hub under this name in the repos the other HuMo
-        # files come from.
-        "whisper_large_v3_fp16.safetensors",
-    ],
-}
-
 #: Convenience bundles: everything a named profile needs that is not already
 #: auto-fetched by transformers (writer, musicgen) on first use.
 BUNDLES = {
@@ -296,7 +345,62 @@ def human(n: float) -> str:
 _WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".gguf", ".pth", ".bin", ".onnx")
 
 
-def _already_present(root, path_in_repo, subfolder):
+def weight_spec(entry) -> WeightSpec:
+    """Normalize a legacy three-tuple or a receipt-bearing WeightSpec."""
+    if isinstance(entry, WeightSpec):
+        return entry
+    if len(entry) != 3:
+        raise ValueError("lane artifact rows must be WeightSpec or legacy 3-tuples")
+    return WeightSpec(*entry)
+
+
+def destination_path(root: str, entry) -> str:
+    """Return the exact final path this manifest row lands on."""
+    spec = weight_spec(entry)
+    if spec.destination.endswith(_WEIGHT_SUFFIXES):
+        return os.path.join(root, *spec.destination.replace("\\", "/").split("/"))
+    return os.path.join(root, spec.destination,
+                        spec.path_in_repo.rsplit("/", 1)[-1])
+
+
+def destination_name(entry) -> str:
+    """The exact basename ComfyUI will resolve after a successful fetch."""
+    spec = weight_spec(entry)
+    if spec.destination.endswith(_WEIGHT_SUFFIXES):
+        return os.path.basename(spec.destination)
+    return spec.path_in_repo.rsplit("/", 1)[-1]
+
+
+def _sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            block = fh.read(8 * 1024 * 1024)
+            if not block:
+                break
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _validate_file(path: str, entry, *, verify_hash: bool) -> tuple[bool, str]:
+    spec = weight_spec(entry)
+    try:
+        actual_bytes = os.path.getsize(path)
+    except OSError:
+        return False, "missing"
+    if spec.expected_bytes is not None and actual_bytes != spec.expected_bytes:
+        return False, "wrong bytes %d != %d" % (actual_bytes, spec.expected_bytes)
+    if spec.expected_bytes is None and actual_bytes <= 1_000_000:
+        return False, "file is too small (%d bytes)" % actual_bytes
+    if verify_hash and spec.expected_sha256:
+        actual_sha = _sha256_file(path)
+        if actual_sha.lower() != spec.expected_sha256.lower():
+            return False, "SHA-256 %s != %s" % (actual_sha, spec.expected_sha256)
+    return True, "%d bytes%s" % (
+        actual_bytes, ", SHA-256 verified" if verify_hash and spec.expected_sha256 else "")
+
+
+def _already_present(root, entry, *, verify_hash=False):
     """Is this exact file on disk already?
 
     So the pick list can say what you ALREADY have. Someone choosing what to
@@ -304,53 +408,54 @@ def _already_present(root, path_in_repo, subfolder):
     left to guess whether they would be paying it again. Mirrors the naming
     rule in fetch(): a destination ending in a weight suffix names the file.
     """
-    if subfolder.endswith(_WEIGHT_SUFFIXES):
-        dest = os.path.join(root, subfolder)
-    else:
-        dest = os.path.join(root, subfolder, path_in_repo.split("/")[-1])
-    try:
-        return os.path.isfile(dest) and os.path.getsize(dest) > 1_000_000
-    except OSError:
-        return False
+    ok, _detail = _validate_file(
+        destination_path(root, entry), entry, verify_hash=verify_hash)
+    return ok
 
 
-def fetch(repo: str, path_in_repo: str, subfolder: str, root: str,
-          dry_run: bool) -> bool:
-    """Fetch one file. ``subfolder`` may name the destination FILE, not just
-    the folder.
+def fetch(entry, root: str, dry_run: bool) -> bool:
+    """Fetch one manifest row into its exact destination.
 
     Some engines look for names upstream does not use -- Stable Audio 3 ships
     ``model.safetensors`` and OTR asks for ``stable_audio_3_small_music.safetensors``
-    -- so a manifest row has to be able to rename on the way in. Writing
-    ``"checkpoints/stable_audio_3_small_music.safetensors"`` does that; a bare
-    ``"checkpoints"`` keeps the old behaviour of taking the upstream basename,
-    which is what every pre-existing row relies on.
+    -- so a row can name the final file directly. A bare directory such as
+    ``"checkpoints"`` keeps the legacy behaviour of taking the upstream
+    basename, which is what every pre-existing lane row relies on.
     """
-    if subfolder.endswith(_WEIGHT_SUFFIXES):
-        dest_dir = os.path.join(root, os.path.dirname(subfolder))
-        name = os.path.basename(subfolder)
-    else:
-        dest_dir = os.path.join(root, subfolder)
-        name = path_in_repo.split("/")[-1]
-    dest = os.path.join(dest_dir, name)
-    url = "https://huggingface.co/%s/resolve/main/%s" % (repo, path_in_repo)
+    spec = weight_spec(entry)
+    dest = destination_path(root, spec)
+    dest_dir = os.path.dirname(dest)
+    name = os.path.basename(dest)
+    url = "https://huggingface.co/%s/resolve/%s/%s" % (
+        spec.repo,
+        urllib.parse.quote(spec.revision, safe=""),
+        urllib.parse.quote(spec.path_in_repo, safe="/"),
+    )
 
-    if os.path.isfile(dest) and os.path.getsize(dest) > 1_000_000:
-        print("  PRESENT  %-52s %s" % (name[:52], human(os.path.getsize(dest))))
+    present, present_detail = _validate_file(dest, spec, verify_hash=True)
+    if present:
+        print("  PRESENT  %-52s %s" % (name[:52], present_detail))
         return True
+    if os.path.isfile(dest):
+        print("  MISMATCH %-52s %s" % (name[:52], present_detail))
     if dry_run:
-        print("  WOULD GET %-51s <- %s" % (name[:51], repo))
+        print("  WOULD GET %-51s <- %s@%s" %
+              (name[:51], spec.repo, spec.revision))
         return True
 
     os.makedirs(dest_dir, exist_ok=True)
     tmp = dest + ".part"
-    print("  FETCHING %-52s <- %s" % (name[:52], repo), flush=True)
+    print("  FETCHING %-52s <- %s@%s" %
+          (name[:52], spec.repo, spec.revision), flush=True)
     try:
         # Download to .part and rename only on success, so an interrupted
         # fetch never leaves a truncated file the engine would load.
         urllib.request.urlretrieve(url, tmp)
+        valid, detail = _validate_file(tmp, spec, verify_hash=True)
+        if not valid:
+            raise ValueError("download integrity check failed: %s" % detail)
         os.replace(tmp, dest)
-        print("  OK       %-52s %s" % (name[:52], human(os.path.getsize(dest))))
+        print("  OK       %-52s %s" % (name[:52], detail))
         return True
     except Exception as exc:
         for leftover in (tmp,):
@@ -378,8 +483,10 @@ def main() -> int:
         print("  " + "-" * 96)
         for lane, files in LANES.items():
             gb, what = LANE_INFO.get(lane, (0.0, ""))
-            have = sum(1 for repo, path_in_repo, sub in files
-                       if _already_present(root, path_in_repo, sub))
+            # Listing is intentionally cheap: exact byte count when supplied,
+            # never a multi-gigabyte SHA pass. Naming a lane performs the full
+            # hash verification before it reports PRESENT.
+            have = sum(1 for entry in files if _already_present(root, entry))
             mark = "all" if have == len(files) else "%d/%d" % (have, len(files))
             size = ("%.1f GB" % gb) if gb else "varies"
             print("  %-20s %8s %7s  %s" % (lane, size, mark, what[:52]))
@@ -408,8 +515,8 @@ def main() -> int:
     print("target: %s -> %s" % (args.lane, ", ".join(lanes)))
     ok = True
     for lane in lanes:
-        for repo, path_in_repo, subfolder in LANES[lane]:
-            ok = fetch(repo, path_in_repo, subfolder, root, args.dry_run) and ok
+        for entry in LANES[lane]:
+            ok = fetch(entry, root, args.dry_run) and ok
     print("DONE" if ok else "INCOMPLETE -- see failures above")
     return 0 if ok else 1
 
