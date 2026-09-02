@@ -309,6 +309,55 @@ def test_ltxvideo_fresh_exact_checkout_and_drift_refusal(tmp_path, monkeypatch):
         provision.ensure_ltxvideo_pack(str(comfy))
 
 
+def test_animatediff_pin_is_a_full_sha():
+    provision = _load_provision()
+    assert len(provision.ANIMATEDIFF_PIN) == 40
+    assert set(provision.ANIMATEDIFF_PIN) <= set("0123456789abcdef")
+
+
+def test_animatediff_fresh_exact_checkout_and_wrong_commit_refusal(tmp_path, monkeypatch):
+    provision = _load_provision()
+    comfy = _comfy(tmp_path)
+    upstream = tmp_path / "ade-upstream"
+    pin = _make_repo(upstream, {"requirements.txt": b"torch\n", "node.py": b"VALUE = 1\n"})
+    installed = []
+    monkeypatch.setattr(provision, "ANIMATEDIFF_URL", str(upstream))
+    monkeypatch.setattr(provision, "ANIMATEDIFF_PIN", pin)
+    monkeypatch.setattr(
+        provision,
+        "install_pack_requirements",
+        lambda name, root, required=False: installed.append((name, required)),
+    )
+
+    provision.ensure_animatediff_pack(str(comfy))
+    dest = comfy / "custom_nodes" / provision.ANIMATEDIFF_PACK_NAME
+    assert _git(dest, "rev-parse", "HEAD") == pin           # exact detached checkout
+    assert installed == [(provision.ANIMATEDIFF_PACK_NAME, False)]
+
+    provision.ensure_animatediff_pack(str(comfy))          # PRESENT at the pin: idempotent
+    assert len(installed) == 2
+
+    monkeypatch.setattr(provision, "ANIMATEDIFF_PIN", "0" * 40)
+    with pytest.raises(provision.ProvisionFailure, match="required 0000"):
+        provision.ensure_animatediff_pack(str(comfy))      # a different commit is refused
+
+
+def test_animatediff_manager_install_is_present_but_unverifiable(tmp_path, monkeypatch):
+    provision = _load_provision()
+    comfy = _comfy(tmp_path)
+    dest = comfy / "custom_nodes" / provision.ANIMATEDIFF_PACK_NAME
+    dest.mkdir(parents=True)
+    (dest / "node.py").write_text("VALUE = 1\n", encoding="utf-8")   # no .git: a Manager install
+    installed = []
+    monkeypatch.setattr(
+        provision,
+        "install_pack_requirements",
+        lambda name, root, required=False: installed.append(name),
+    )
+    provision.ensure_animatediff_pack(str(comfy))
+    assert installed == [provision.ANIMATEDIFF_PACK_NAME]
+
+
 def test_packs_only_never_resolves_models_or_fetches_weights(tmp_path, monkeypatch):
     provision = _load_provision()
     comfy = _comfy(tmp_path)

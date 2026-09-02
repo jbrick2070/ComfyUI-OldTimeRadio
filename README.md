@@ -93,16 +93,16 @@ ComfyUI.
 
 | lane / profile | needs | why |
 |---|---|---|
-| `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | provides the `ADE_*` classes the haunted lane samples through |
+| `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) at commit `92576512` (release 1.6.0, the checkout behind the published receipts) | provides the `ADE_*` classes the haunted lane samples through |
 | `ltx25_*` (LTX 2.5 video, foley, mime) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at commit `6ea2651e`, **plus** the one-file patch in `patches/` (see `patches/README.md` for the exact `git apply` line), then its `requirements.txt` | the two GGUF loaders (`UnetLoaderGGUF`, `CLIPLoaderGGUF`); every other LTX 2.5 class is already in ComfyUI 0.34+. Measured on a clean Windows install 2026-09-01: without the pack the render refuses at the video stage and names both classes |
 | `flux2_klein` (image; **the 8 GB / 12 GB / AMD default**) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
 | `wan22_*` / `wan_ti2v` (Wan 2.2 video) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its shipped DiT and umt5 text encoder are GGUF files (`UnetLoaderGGUF`, `CLIPLoaderGGUF`) |
 | `ltx_8gb`, `ltx_video`, `ltx_audio_in` (the LTX 0.9.x lanes) | [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde`, **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports) | the `LTXV*` node classes those lanes sample through; the engine's own preflight names this pack if it is missing |
 | `humo_1.7B*`, `humo*`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
 
-`scripts/otr_provision.py` installs GGUF and LTXVideo at their pinned commits and
-clones AnimateDiff-Evolved unpinned (its current HEAD) for you on Linux pods; on
-Windows, install the row you need by hand as above.
+`scripts/otr_provision.py` installs all three packs at their pinned commits for you
+on Linux pods (GGUF `6ea2651e`, LTXVideo `3b9c5cde`, AnimateDiff-Evolved `92576512`,
+release 1.6.0); on Windows, install the row you need by hand as above.
 
 > **Python 3.13 and the Kokoro voice (read this if you use ComfyUI Desktop or the
 > portable build, which both ship Python 3.13).** `kokoro`, the shipped default

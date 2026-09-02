@@ -61,6 +61,13 @@ LTXVIDEO_PATCH_PATH = os.path.join(
     _REPO, "patches", "ComfyUI-LTXVideo-kornia-pad.patch"
 )
 
+ANIMATEDIFF_PACK_NAME = "ComfyUI-AnimateDiff-Evolved"
+ANIMATEDIFF_URL = "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"
+# Release 1.6.0 (2026-07-28): the checkout on the RTX 5080 behind every published
+# AnimateDiff receipt. Until 2026-09-02 this pack was the one node pack cloned at
+# whatever HEAD was current that day, so two provisioned machines could differ.
+ANIMATEDIFF_PIN = "9257651221002dcba0a12f9cff37e1944e58fb60"
+
 INDEXTTS2_URL = "https://github.com/index-tts/index-tts.git"
 INDEXTTS2_PIN = "830f6f8f94a51fea23ab1d639027a86200075a4e"
 INDEXTTS2_PYTHON = "3.10"
@@ -529,6 +536,38 @@ def ensure_ltxvideo_pack(comfy: str) -> None:
     )
 
 
+def ensure_animatediff_pack(comfy: str) -> None:
+    """Install or verify the AnimateDiff pack at its pinned commit.
+
+    Same wrong-commit discipline as the GGUF and LTXVideo packs: a fresh install
+    is an exact detached checkout of ANIMATEDIFF_PIN, and an existing git checkout
+    must be AT that commit (a different commit is named and refused, never reset).
+    A Manager install has no .git and cannot be verified, so it is accepted as
+    PRESENT and said so (GGUF accepts one only when its patched loader hashes
+    match; LTXVideo refuses any). This pack carries no patch to hash, and calling
+    a working Manager install absent used to make the provisioner clone into a
+    non-empty directory and report FAILED for it.
+    """
+    dest = os.path.join(comfy, "custom_nodes", ANIMATEDIFF_PACK_NAME)
+    fresh = not os.path.isdir(dest) or not os.listdir(dest)
+    if fresh:
+        _fetch_exact_repo(ANIMATEDIFF_URL, ANIMATEDIFF_PIN, dest)
+        install_pack_requirements(ANIMATEDIFF_PACK_NAME, dest)
+        say("OK", ANIMATEDIFF_PACK_NAME, ANIMATEDIFF_PIN[:12])
+        return
+    if not os.path.isdir(os.path.join(dest, ".git")):
+        install_pack_requirements(ANIMATEDIFF_PACK_NAME, dest)
+        say("PRESENT", ANIMATEDIFF_PACK_NAME, "non-git install, commit unverifiable")
+        return
+    head = _git_head(dest)
+    if head != ANIMATEDIFF_PIN:
+        raise ProvisionFailure(
+            "%s is at %s, required %s; move it aside and rerun --packs-only"
+            % (ANIMATEDIFF_PACK_NAME, head, ANIMATEDIFF_PIN))
+    install_pack_requirements(ANIMATEDIFF_PACK_NAME, dest)
+    say("PRESENT", ANIMATEDIFF_PACK_NAME, ANIMATEDIFF_PIN[:12])
+
+
 def install_node_packs(comfy: str) -> None:
     cn = os.path.join(comfy, "custom_nodes")
     os.makedirs(cn, exist_ok=True)
@@ -540,32 +579,7 @@ def install_node_packs(comfy: str) -> None:
     # failure arrives late and looks nothing like a missing install.
     ensure_gguf_pack(comfy)
     ensure_ltxvideo_pack(comfy)
-    packs = [
-        # AnimateDiff lane.
-        ("ComfyUI-AnimateDiff-Evolved",
-         "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved", None),
-    ]
-    for name, url, branch in packs:
-        dest = os.path.join(cn, name)
-        # PRESENT means the directory is there with something in it, NOT that
-        # it is a git clone. ComfyUI-Manager installs packs without a .git
-        # directory -- the reference 5080 carries ComfyUI-GGUF exactly that
-        # way -- and the old .git test called such a pack absent, then tried
-        # to clone into a non-empty directory, failed, and reported FAILED for
-        # a pack that was installed and working.
-        if os.path.isdir(dest) and os.listdir(dest):
-            say("PRESENT", name)
-            install_pack_requirements(name, dest)
-            continue
-        cmd = ["git", "clone", "--depth", "1"]
-        if branch:
-            cmd += ["-b", branch]
-        r = run(cmd + [url, dest])
-        if r.returncode != 0:
-            raise ProvisionFailure("clone failed for %s: %s" %
-                                   (name, (r.stderr or "").strip()[:300]))
-        say("OK", name)
-        install_pack_requirements(name, dest)
+    ensure_animatediff_pack(comfy)
 
 
 def install_pack_requirements(name: str, dest: str, required: bool = False) -> None:
