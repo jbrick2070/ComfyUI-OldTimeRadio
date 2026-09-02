@@ -409,8 +409,20 @@ else:
 # exists. Registering
 # nodes is not the deliverable -- the workflow is. Point at it from the one place
 # they are already looking on first boot.
+# ComfyUI's template gallery serves ONE folder per pack: it registers a static
+# mount at the same URL for every folder named example_workflows / example /
+# examples / workflow / workflows, and the first mount wins. This pack's
+# templates therefore all live in workflows/ (otr_4060_floor, otr_canonical,
+# otr_story_only); an example_workflows/ folder beside it made otr_canonical
+# list in the gallery and 404 on click (2026-09-01 ship audit; the trap is
+# spelled out in docs/2026-08-23-workflow-discoverability-PROBLEM.md).
+# otr_4060_floor is the zero-download floor (viz video, bark voices,
+# musicgen, E2B writer); name it and the 16 GB canonical so a first boot
+# never points at a template that is not there.
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-      "EXTENSIONS > comfyui-old-time-radio > otr_canonical")
+      "EXTENSIONS > comfyui-old-time-radio > otr_4060_floor  (first episode, "
+      "any card) -- or drag workflows/otr_canonical.json onto the canvas "
+      "(16 GB graph)")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger

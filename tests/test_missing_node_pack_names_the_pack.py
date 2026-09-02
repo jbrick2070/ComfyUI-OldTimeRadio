@@ -37,6 +37,21 @@ def test_single_class_resolution_names_the_pack_too():
     assert ADE_PACK in str(ei.value)
 
 
+GGUF_PACK = "ComfyUI-GGUF"
+
+
+def test_gguf_loader_resolution_names_the_gguf_pack():
+    """2026-09-01 ship audit: ltx25_* and flux2_klein resolve UnetLoaderGGUF /
+    CLIPLoaderGGUF from city96/ComfyUI-GGUF, which was named nowhere on
+    failure. Both class names must map to the pack and its URL."""
+    for cls in ("UnetLoaderGGUF", "CLIPLoaderGGUF"):
+        with pytest.raises(WrapperNodeMissing) as ei:
+            resolve_node_class((cls,), mapping={})
+        msg = str(ei.value)
+        assert GGUF_PACK in msg, "error does not name the pack for %s: %s" % (cls, msg)
+        assert "github.com/city96/ComfyUI-GGUF" in msg, msg
+
+
 def test_an_unknown_prefix_still_errors_without_inventing_a_pack():
     """No pack hint is better than a wrong one."""
     with pytest.raises(WrapperNodeMissing) as ei:

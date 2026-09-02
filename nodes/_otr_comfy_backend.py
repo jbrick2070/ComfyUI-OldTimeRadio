@@ -438,7 +438,9 @@ class ComfyCreditsBackend:
             raise ComfyCreditsConfigError(
                 f"{repo_id} selected but Comfy Credits is not enabled. Set "
                 f"OTR_ENABLE_COMFY_CREDITS=1 and log in to a Comfy account "
-                f"with credits (see docs/comfy-credits-setup.md)."
+                f"with credits (see "
+                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                f"v2.0-alpha/docs/comfy-credits-setup.md)."
             )
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
@@ -498,7 +500,9 @@ class ComfyCreditsBackend:
             raise ComfyCreditsConfigError(
                 "No Comfy credential available. Log in to a Comfy account "
                 "(or set a Comfy API key) so ComfyUI injects the hidden "
-                "auth into the writer node. See docs/comfy-credits-setup.md."
+                "auth into the writer node. See "
+                "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "v2.0-alpha/docs/comfy-credits-setup.md."
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
 

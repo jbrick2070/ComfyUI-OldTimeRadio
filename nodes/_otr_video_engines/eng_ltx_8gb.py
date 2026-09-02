@@ -730,8 +730,13 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if ckpt is None:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "ltx_8gb checkpoint %r not found; fetch it via "
-                "scripts/download_ltx_0_9_8.ps1 (or drop it in models/checkpoints)"
+                "ltx_8gb checkpoint %r not found; fetch "
+                "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
+                "into models/checkpoints (the shared t5xxl_fp16.safetensors "
+                "from comfyanonymous/flux_text_encoders belongs in "
+                "models/text_encoders), or run the script at "
+                "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1"
                 % self._ckpt_name(), kind="video")
         t5 = self._loader_token_path(
             ("text_encoders", "clip"), self._t5_name(), "OTR_LTX_8GB_T5_DIR")
@@ -1084,8 +1089,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "ltx_8gb checkpoint %r is only %d bytes (< %d floor) -- this is not "
-                "the 0.9.8 distilled 2B all-in-one weight; re-fetch via "
-                "scripts/download_ltx_0_9_8.ps1"
+                "the 0.9.8 distilled 2B all-in-one weight; re-fetch "
+                "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
+                "into models/checkpoints, or run the script at "
+                "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1"
                 % (ckpt, size, _LTX8_CKPT_MIN_BYTES), kind="video")
 
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -1111,9 +1119,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         if ckpt is None:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "ltx_8gb checkpoint %r not found; fetch it via "
-                "scripts/download_ltx_0_9_8.ps1, drop it in models/checkpoints, or "
-                "register its folder in extra_model_paths.yaml -- OTR_LTX_8GB_CKPT "
+                "ltx_8gb checkpoint %r not found; fetch "
+                "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
+                "into models/checkpoints (the shared t5xxl_fp16.safetensors "
+                "from comfyanonymous/flux_text_encoders belongs in "
+                "models/text_encoders), register its folder in "
+                "extra_model_paths.yaml, or run the script at "
+                "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1 -- OTR_LTX_8GB_CKPT "
                 "only names a file, it cannot make the loader find one"
                 % self._ckpt_name(), kind="video")
         self._assert_checkpoint_integrity(ckpt)
@@ -1276,8 +1289,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         load when its ``CLIPLoader`` executes inside each segment's graph."""
         if not self._installed():
             raise RuntimeError(
-                "ltx_8gb not installed: checkpoint %r missing -- fetch it via "
-                "scripts/download_ltx_0_9_8.ps1" % self._ckpt_name())
+                "ltx_8gb not installed: checkpoint %r missing -- fetch "
+                "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
+                "into models/checkpoints, or run the script at "
+                "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1" % self._ckpt_name())
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._loaded = True

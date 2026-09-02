@@ -92,8 +92,12 @@ class ChatterboxEngine:
             if not os.path.exists(path):
                 raise RuntimeError(
                     "Chatterbox Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_chatterbox_install.ps1 (isolated venv) "
-                    "before rendering with chatterbox" % (label, path))
+                    "the installer at https://github.com/jbrick2070/"
+                    "ComfyUI-OldTimeRadio/blob/v2.0-alpha/scripts/"
+                    "_otr_chatterbox_install.ps1 (creates an isolated Python "
+                    "venv and installs chatterbox-tts into it, separate from "
+                    "the main ComfyUI venv) before rendering with chatterbox"
+                    % (label, path))
         err_path = os.path.join(_REPO_ROOT, "_otr_chatterbox_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:

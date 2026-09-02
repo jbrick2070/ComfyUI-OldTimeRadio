@@ -275,7 +275,9 @@ class _CloudImageBase:
             raise EngineUnusable(
                 self.name, "", EngineUsabilityReason.MALFORMED_CONFIG,
                 f"partner pin row {self.node_key!r} missing or not OK -- "
-                f"re-pin via scripts/otr_pin_partner_nodes.py", kind="image")
+                f"re-pin via the script at "
+                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                f"v2.0-alpha/scripts/otr_pin_partner_nodes.py", kind="image")
         return self.name
 
     def prepare(self, host_caps, profile, session_ctx):

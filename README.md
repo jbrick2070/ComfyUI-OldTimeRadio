@@ -14,8 +14,10 @@ HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) →
 routes exist; they stay off unless you turn them on.
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
-> EXTENSIONS → comfyui-old-time-radio → otr_canonical**, then **Queue Prompt**.
-> The 25 `OTR_` nodes are the parts; that workflow is the thing you actually run.
+> EXTENSIONS → comfyui-old-time-radio → otr_4060_floor**, then **Queue Prompt**.
+> That template is the zero-extra-download first episode for any NVIDIA card; the
+> 16 GB graph is `workflows/otr_canonical.json` inside the pack (drag it onto the
+> canvas). The 25 `OTR_` nodes are the parts; the workflow is the thing you run.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
@@ -101,8 +103,8 @@ it — it does not fail silently or half-render. But it stops at render time,
 The video lane itself is only ~3.9 GB (SD1.5 1.99, `v3_sd15_mm` 1.56, the
 domain adapter 0.10, kokoro voices 0.30). The rest arrives through the
 Hugging Face cache the first time the pipeline runs — the writer
-(`gemma-4-E2B-it`, ~9.6 GB), `musicgen-small` (~2.2 GB) and `Kokoro-82M`
-(~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
+(`gemma-4-E2B-it`, 6.0 GB measured on a clean install 2026-09-01), `musicgen-small`
+(~2.2 GB) and `Kokoro-82M` (~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
 before you start it on a metered connection.
 
 ### 2b-ii. The GGUF writer lane — install 0.3.33, not the latest
@@ -283,11 +285,17 @@ it names any missing weight and where it expects it.
 
 ### 5. Run it
 
-1. Open **Workflow → Browse Templates**, scroll the left sidebar to **EXTENSIONS**,
-   click **comfyui-old-time-radio**, and pick **otr_canonical**. (The console prints
-   this same path on every start, right under the `[OldTimeRadio]` load banner.)
-   *Prefer files? `workflows/otr_canonical.json` inside the installed pack is the
-   same graph — drag it onto the canvas.*
+**Pick the graph that matches your card.** It is one workflow with different dropdown
+values saved, so nothing below is a different program, only a different set of choices:
+
+| you have | load this | what it renders |
+|---|---|---|
+| any NVIDIA card, first episode ever | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | zero extra downloads beyond the writer, voices and music: procedural `viz_camera` video, **bark** voices, `musicgen`, the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). Slow-ish, guaranteed to finish, the safest first run on 8 GB and on Python 3.13 |
+| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | AnimateDiff haunted video, kokoro voices (Python 3.12 or older; on 3.13 switch the two voice dropdowns to **bark**), ~16 GB of first-run downloads, plus the AnimateDiff-Evolved pack from section 2b |
+| 16 GB or more | `workflows/otr_canonical.json` (drag it onto the canvas) | the full 12B writer at a 14.5 GB ceiling, `indextts2` character voices (needs reference WAVs you supply, see the console), still-image video by default; switch the video dropdowns to a real engine from the table below once it runs |
+
+1. Load the graph from the table. (The console prints the Browse Templates path on every
+   start, right under the `[OldTimeRadio]` load banner.)
 2. Hit **Queue Prompt**.
 3. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
    graph rolls a random story bank each run and renders through the procedural still/CRT floor

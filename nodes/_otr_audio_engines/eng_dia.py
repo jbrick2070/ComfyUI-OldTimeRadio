@@ -97,8 +97,12 @@ class DiaEngine:
             if not os.path.exists(path):
                 raise RuntimeError(
                     "Dia Path B not installed: %s missing at %s -- run "
-                    "scripts\\_otr_dia_install.ps1 (isolated venv + weights) "
-                    "before rendering with dia" % (label, path))
+                    "the installer at https://github.com/jbrick2070/"
+                    "ComfyUI-OldTimeRadio/blob/v2.0-alpha/scripts/"
+                    "_otr_dia_install.ps1 (creates an isolated Python venv, "
+                    "installs Dia from source, and fetches its weights, "
+                    "separate from the main ComfyUI venv) before rendering "
+                    "with dia" % (label, path))
         err_path = os.path.join(_REPO_ROOT, "_otr_dia_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:

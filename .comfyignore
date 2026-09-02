@@ -76,7 +76,36 @@ kibitz-runs/
 # `import scripts` anywhere in nodes/ or __init__.py. It is correct hygiene.
 # It was simply never the fix, and the next session should not re-run this
 # experiment expecting a different answer.
-scripts/
+scripts/*
+
+# 2026-09-01 (ship audit finding registry-flag-08): the scripts/ exclusion
+# above silently broke three shipped TTS engines. eng_chatterbox.py (~line
+# 76), eng_dia.py (~line 78) and eng_indextts2.py (~line 183), all under
+# nodes/_otr_audio_engines/, each resolve their Path B subprocess worker as
+# os.path.join(_REPO_ROOT, "scripts", "_otr_<engine>_worker.py") at runtime
+# -- on a registry install those files never existed, so none of the three
+# engines could ever start (RuntimeError: "worker script ... missing").
+# Checked each worker for its own scripts/ dependencies: _otr_chatterbox_
+# worker.py, _otr_dia_worker.py and _otr_indextts2_worker.py import only
+# stdlib plus third-party packages (torch, torchaudio, chatterbox, dia,
+# indextts, soundfile, numpy) resolved from the engine's own ISOLATED venv,
+# never a sibling file under scripts/ -- no other scripts/ file needs to
+# ship. The *_install.ps1 installers and _otr_idx_download_weights.py are
+# named only inside RuntimeError message text telling the operator what to
+# run by hand; nothing opens or executes them, so they correctly stay
+# excluded with the rest of scripts/.
+#
+# scripts/ is rewritten to scripts/* (excludes the directory's CONTENTS,
+# not the directory itself) because a gitignore-style negation cannot
+# re-include a file whose PARENT DIRECTORY is excluded. Verified against
+# real git semantics in a scratch repo: with a bare "scripts/" line,
+# `git check-ignore -v` still matched all three worker files against the
+# "scripts/" rule even with the negations below present (never reached to
+# decide); with "scripts/*", `git add -A` staged exactly the three worker
+# files and nothing else under scripts/.
+!scripts/_otr_chatterbox_worker.py
+!scripts/_otr_dia_worker.py
+!scripts/_otr_indextts2_worker.py
 
 # 2026-08-22: internal-only material that was shipping to every installer --
 # ~23 MB of it, including the operator's own directives file. None of it is
@@ -90,3 +119,19 @@ session_handoff.md
 docs/
 kibitz-plugin/
 tmp/
+
+# 2026-09-01 (ship audit, registry-flag-06 / -12, fresh-install-docs-03 / -04):
+# build metadata and maintainer-only files that were shipping to every
+# installer. None of it is read at runtime (verified: no module under nodes/
+# opens these paths). _START_HERE.md is the maintainer's own build routing
+# with an absolute path on the operator's box; SKILL.md is the AI-assistant
+# sprint process; workflows/external_examples/ are vendored third-party
+# graphs carrying a stranger's absolute path, and nothing in nodes/ loads
+# them (~380 KB). This file itself narrates the pack's scanner history and has
+# no business in the scanned zip.
+.comfyignore
+.gitignore
+.gitattributes
+SKILL.md
+_START_HERE.md
+workflows/external_examples/

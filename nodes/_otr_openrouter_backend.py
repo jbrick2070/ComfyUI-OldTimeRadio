@@ -449,7 +449,9 @@ def resolve_slug(repo_id: str) -> str:
     raise OpenRouterConfigError(
         f"{repo_id} selected but no slug is bound: set the "
         f"openrouter_slot_{letter.lower()}_model widget, OPENROUTER_MODEL_{letter}, "
-        f"or OTR_OPENROUTER_SLOT_{letter}_DEFAULT. See docs/openrouter-setup.md."
+        f"or OTR_OPENROUTER_SLOT_{letter}_DEFAULT. See "
+        f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+        f"v2.0-alpha/docs/openrouter-setup.md."
     )
 
 
@@ -1136,8 +1138,9 @@ class OpenRouterBackend:
         if not openrouter_enabled():
             raise OpenRouterConfigError(
                 f"{repo_id} selected but OpenRouter is not enabled. Set "
-                f"OPENROUTER_API_KEY "
-                f"(see docs/openrouter-setup.md)."
+                f"OPENROUTER_API_KEY (see "
+                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                f"v2.0-alpha/docs/openrouter-setup.md)."
             )
         letter = _slot_letter(repo_id)
         # Resolve the slug AND its provider-routing sort together: a ':nitro'/

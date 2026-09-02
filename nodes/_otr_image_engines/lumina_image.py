@@ -409,8 +409,7 @@ class LuminaImage2Engine:
                 EngineUsabilityReason.MISSING_MODEL,
                 f"lumina_image diffusion model not found; set {MODEL_ENV} to the "
                 f"downloaded lumina_2_model_bf16.safetensors path (and {CLIP_ENV}"
-                f"/{VAE_ENV} for the Gemma-2 TE + ae VAE) after enabling "
-                f"{ENABLE_FLAG}=1",
+                f"/{VAE_ENV} for the Gemma-2 TE + ae VAE)",
                 kind="image",
             )
         return self.name

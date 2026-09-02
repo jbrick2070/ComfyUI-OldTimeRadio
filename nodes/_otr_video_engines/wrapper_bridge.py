@@ -91,6 +91,10 @@ _PACK_FOR_PREFIX = (
      "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"),
     ("VHS_", "ComfyUI-VideoHelperSuite",
      "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"),
+    ("UnetLoaderGGUF", "ComfyUI-GGUF",
+     "https://github.com/city96/ComfyUI-GGUF"),
+    ("CLIPLoaderGGUF", "ComfyUI-GGUF",
+     "https://github.com/city96/ComfyUI-GGUF"),
 )
 
 

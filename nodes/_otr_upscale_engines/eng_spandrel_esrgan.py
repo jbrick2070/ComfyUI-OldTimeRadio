@@ -245,8 +245,12 @@ class SpandrelEsrgan:
                 self.name, "upscale_stage",
                 EngineUsabilityReason.MISSING_MODEL,
                 f"{self._model_filename} not found under any of "
-                f"{list(candidates)}. "
-                f"Run `python scripts/ensure_upscale_models.py` to download it.",
+                f"{list(candidates)}. Download it from "
+                f"https://github.com/xinntao/Real-ESRGAN/releases/download/"
+                f"v0.2.1/RealESRGAN_x2plus.pth into models/upscale_models "
+                f"(sha256 {self._model_sha256}), or run the script at "
+                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
+                f"v2.0-alpha/scripts/ensure_upscale_models.py",
                 kind="upscale")
 
         # SHA-256 verify if pinned. Empty string = skip (dev mode / first run).

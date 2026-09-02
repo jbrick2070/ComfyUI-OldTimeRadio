@@ -2110,8 +2110,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "and [NOT DOWNLOADED] are "
                             "stripped before HF lookup. To use a remote "
                             "OpenRouter model, set OPENROUTER_API_KEY and "
-                            "pick OpenRouter A/B "
-                            "(see docs/openrouter-setup.md)."
+                            "pick OpenRouter A/B (see "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "openrouter-setup.md)."
                         ),
                     },
                 ),
@@ -2131,7 +2133,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "here when you want Slot 1 != Slot 2 routing "
                             "for VRAM headroom. To use a remote OpenRouter "
                             "model, set OPENROUTER_API_KEY and pick "
-                            "OpenRouter A/B (see docs/openrouter-setup.md)."
+                            "OpenRouter A/B (see "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "openrouter-setup.md)."
                         ),
                     },
                 ),
@@ -2418,7 +2423,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "to browse every cached slug. Shows "
                             "'(enable OpenRouter)' until OPENROUTER_API_KEY is "
                             "set. A saved slug is preserved even if absent "
-                            "from a stale cache. See docs/openrouter-setup.md."
+                            "from a stale cache. See "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "openrouter-setup.md."
                         ),
                     },
                 ),
@@ -2439,7 +2447,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "the curated aliases are policy, not catalog "
                             "discovery, so they are still offered -- check the "
                             "family before binding one here. See "
-                            "docs/openrouter-setup.md."
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "openrouter-setup.md."
                         ),
                     },
                 ),
@@ -2466,7 +2476,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "ComfyUI partner-node catalog; shows '(enable "
                             "Comfy Credits)' until OTR_ENABLE_COMFY_CREDITS=1 "
                             "and a Comfy account with credits is logged in. "
-                            "Credit-billed. See docs/comfy-credits-setup.md."
+                            "Credit-billed. See "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "comfy-credits-setup.md."
                         ),
                     },
                 ),
@@ -2481,7 +2494,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "to 'comfy:slot-b'. Choices are the pinned "
                             "ComfyUI partner-node catalog; shows '(enable "
                             "Comfy Credits)' until the lane is enabled. "
-                            "Credit-billed. See docs/comfy-credits-setup.md."
+                            "Credit-billed. See "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/v2.0-alpha/docs/"
+                            "comfy-credits-setup.md."
                         ),
                     },
                 ),
