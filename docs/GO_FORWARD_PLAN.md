@@ -146,7 +146,9 @@ verdict is not polluted by known-open defects):**
    mean the round is not optional).
 2. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
    GPU, do not contend with a render).
-3. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
+3. **The kokoro-onnx backend** (1.11 below) -- the operator's ruled default voice; a
+   design item, so its kibitz arc comes first.
+3b. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
 4. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
    recipe; no new guides.
@@ -570,6 +572,34 @@ settings, VRAM, canvas, frame counts) that no profile or engine adapter carries 
 those recipes move INTO the adapter comment or `docs/MACHINE_MATRIX.md` first. No new
 guide gets written. One commit per batch, deletions only, with the list in the message.
 
+### 1.11 KOKORO-ONNX BACKEND -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
+
+Proven 2026-09-01 on a fresh Python 3.13 venv on the 5080: `pip install kokoro-onnx
+onnxruntime-gpu` with no cache resolves in one go (onnxruntime 1.29, phonemizer 3.4.0,
+espeakng-loader with bundled espeak-ng wheels for win_amd64/arm64, macOS arm64/x86, manylinux
+x86_64/aarch64), imports, and reports CUDA, TensorRT and CPU providers. kokoro-onnx 0.6.1 pins
+`>=3.10,<3.14`; the torch `kokoro` package stays `<3.13` on PyPI and drags spacy through
+`misaki[en]`.
+
+Shape (settle the details in the arc, do not re-derive these):
+* A second backend inside `nodes/_otr_audio_engines/eng_kokoro.py` (247 lines; today it loads
+  `KPipeline`). ONNX path: load model + voices, phonemize with espeak-ng, run onnxruntime,
+  return 24 kHz audio. Prefer the torch backend only when `kokoro` is importable (3.12 boxes);
+  ONNX everywhere else; bark stays the zero-dependency fallback.
+* Weights: kokoro-onnx expects `kokoro-v1.0.onnx` + one `voices-v1.0.bin` (an npz keyed by
+  voice, GitHub release `model-files-v1.1`); the HF mirror `onnx-community/Kokoro-82M-v1.0-ONNX`
+  (ungated; model 86 MB q8f16 to 326 MB full, 55 per-voice `.bin` files at 0.5 MB) uses a
+  different per-voice format. Pick ONE source, fetch it with the pack's existing
+  `_otr_kokoro_voice_prefetch` machinery, and make the announcer/character voice ids map onto
+  the same names the torch path uses so the cast ledger does not change.
+* Registry deps: `kokoro-onnx>=0.6.1` and `onnxruntime>=1.20.1` in both manifests (plain
+  PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video
+  engine holds the GPU; it is an 82M model and faster than realtime on CPU.
+* DONE WHEN: a clean 3.13 portable install renders a 1-act episode with kokoro voices for
+  announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`,
+  and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
+
+
 ---
 
 ## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least)
@@ -848,17 +878,12 @@ Active, no rollback target (the node hard-delete freed alpha.8's string).
   result is the evidence to hand Comfy-Org. Never version-delete (soft delete burns
   the string).
 
-### K. DEFAULT VOICE ON PYTHON 3.13 (ComfyUI Desktop and the portable both ship it)
+### K. DEFAULT VOICE -- RULED 2026-09-01: kokoro-onnx is the go-to
 
-Kokoro cannot be pip-installed on 3.13 by any route (numpy==1.26.4 pin on 0.7.16;
-`Requires-Python <3.13` on every newer kokoro/misaki; spacy/thinc/blis source builds
-behind `misaki[en]`). The install half is fixed (marker, PBUG-20260901-04); the
-shipped announcer default and the 8 GB class char voice now silently do not exist on
-every mainstream Windows install. Options, cheapest first: (a) bark for both voices
-in the 8 GB / 3.13 dropdown sets (installs everywhere, auto-downloads, slower,
-older sound; the clean room used it); (b) a `kokoro-onnx` backend for the kokoro
-engine (pure onnxruntime, supports 3.13, same voices; new code, a design item ->
-kibitz arc); (c) tell 3.13 users to use 3.12 (not possible on Desktop/portable).
+Operator: *"kokoro onnx is our new go-to."* Same Kokoro-82M voices, ONNX Runtime instead of
+the torch `kokoro` package, so it installs on Python 3.13 (the interpreter ComfyUI Desktop and
+the portable ship) and on Linux and Mac. Build row: Section 1.11. Until it lands, the 3.13
+sets run bark. Nothing else is open here.
 
 ### L. THE 8 GB IMAGE ENGINE ABORTS THE PROCESS UNDER A STOCK LAUNCH
 
