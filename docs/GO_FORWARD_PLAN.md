@@ -1047,6 +1047,27 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; promotion to the
 tracked in the Bible repo's `otr_coverage_index.yaml` (CLAUDE.md, delta-scrape discipline);
 no plan review or invented fixture creates a row.
 
+### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 2026-09-02; awaits his pick)
+
+Operator, 2026-09-02: a fresh set of eyes on whether the AnimateDiff v3 (+ adapter) lane takes
+advantage of the ledger and the per-beat stills, with the VISUAL STYLE obeyed ("I think we lost
+the visual style" -- confirmed: the style reaches that lane as a two-word cue on a fixed base
+checkpoint under a photographic-grime adapter, no still) and stills-in among the first one to
+three arms. The self-contained statement is
+`docs/2026-09-02-animatediff-ledger-experiments/PROBLEM_STATEMENT.md` (11,000 words, grounded by
+a five-reader workflow); four fresh reads (Fable 5.1 cold, Codex, Cursor, Antigravity) and the
+driver's grounded judgment are in `fresh-eyes/`. The judged order: (0) the instrument -- durable
+prompt + seed + request hash on the ledger, a canonical REPLAY mode (today the writer node always
+mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
+adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
+LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
+engine's contract, never a Klein gate on the 4060), cycle frozen to figure; (3) the pack's
+language back into the prompt under a 77-token budget; (4) one timeline per shot (a
+FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
+FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the
+shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
+(Section 4) until then.
+
 ## SECTION 6 -- Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite
