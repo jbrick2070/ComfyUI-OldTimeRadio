@@ -204,3 +204,88 @@ Open for r2: the exact stub return values for each bypassed node's `RETURN_TYPES
 batches, strings, done signals) so downstream sockets stay typed; whether the still dispatcher
 (91) reuses bundle rows or re-mints (it re-resolves and must find the SAME freeze receipt, so
 the bundle's `images[]` and files must be copied into the new episode dir before 91 runs).
+
+## 8. r2 fold (Codex gpt-5.6-sol, coding plan, `kibitz-runs/2026-09-02-replay-instrument/r2`) -- nine must-fixes, all grounded, eight taken, one scoped
+
+* **D2 was wrong to leave `render_driver` alone.** Node 92 calls `run_real_episode` once and never
+  sees a request; requests are built inside the driver, segment requests inside
+  `render_beat_coverage` (`render_driver.py:4192-4197`), and the driver returns only
+  `{ledger, clips, trace, vram_peak_mb, audio_motion_rows}` (`:4870-4873`). **D2''**: the driver
+  emits one normalized ACTUAL receipt per rendered segment at the adapter's final graph
+  boundary and returns them; node 92 persists what it is handed and reconstructs nothing.
+* **The receipt is versioned and canonical.** `receipt_version`, a common envelope (engine id,
+  recipe id, implementation version, shot id, segment index, role, final positive and negative
+  text, seed, frames, canvas, fps, denoise, adapter id and resolved strength, context and
+  injection values, still content hash or null, `model_artifacts` digest references,
+  `comparison_seed_hash`, `render_run_id`, completion status, monotonic wall seconds, segment
+  peak VRAM) plus an engine-specific `sampler_inputs` dict with explicit nulls;
+  `actual_request_sha` = SHA-256 over the canonical JSON of that receipt. Model files are
+  hashed ONCE per run into a `model_artifacts` table (never per clip). Peak VRAM and wall time
+  are per physical segment; beat and episode aggregates are derived.
+* **Nodes 7 and 4 cannot read `meta`.** Node 7 takes AUDIO, a title, themes, the cue manifest
+  and the video policy (`scene_sequencer.py:1151-1232`, optional `forceInput` sockets already
+  exist at :1192/:1215); node 4 takes AUDIO only (`audio_enhance.py:294-348`). **D3''**: node 7
+  gains ONE appended optional `forceInput` socket (`replay_descriptor`, STRING) wired from the
+  freeze cascade's `v2_ledger_json` (or the writer's `script_json`) in the canonical -- a link
+  addition, so the four workflow tests and `build_variants --check` run; node 3 emits a tiny
+  typed CPU AUDIO placeholder on replay; node 4 is NOT branched (it processes the placeholder);
+  node 7 byte-copies the frozen master, verifies its SHA against the manifest BEFORE emitting
+  `audio_done`, and loads the copied file only for its AUDIO return -- never a decode/re-encode.
+* **CastLock's replay return is before the revision increment.** `cast_lock.py:331-365` bumps
+  `cast_lock_revision` and reassigns Bark voices before the policy branch, so "forced
+  preserve_ledger" would still mutate. The replay return sits before the freeze gate, the
+  increment, the voice assignment and the model resolution, and returns the original ledger,
+  the original revision, an explicit replay report and a non-empty done token.
+* **The clone is a validated import, not a dict assignment.** The ledger already owns
+  `_rebase_episode_local_paths` (`production_ledger.py:371`), `_rebase_publication_eligibility`
+  (:736) and `rename_episode` (:774); the publisher fails closed on a receipt for another
+  episode (`otr_master_audio_mux.py:808+`). **D3''** adds ONE `import_replay_bundle(bundle, new_id)`
+  operation: deep-copy, set the new root `episode_id`, keep the source identity under
+  `meta.replay_of_episode`, materialize the bundle's assets into the new episode dir, rebase every
+  episode-local path, re-evaluate publication eligibility for the new id, clear the source's
+  terminal / obs pointers, reset run-volatile telemetry, CLEAR the source `meta.render_trace`,
+  then save atomically. `freeze_timestamp` is kept for the freeze-receipt consumers, and the
+  merge's `_same_durable_run` (:1585-1587) is checked so two workspaces cannot be mistaken for one
+  run -- a separate `content_freeze_id` if they can (r3 verifies).
+* **`meta.render_trace` is built complete and stamped ONCE**, after every segment succeeds, with
+  `render_run_id`, `shot_id`, `segment_index` and status on every row; `stamp_durable` is a
+  shallow meta update (:527-558), never an append; a failed trace stamp fails the publish.
+  `video_revision` rides in the same ShotLock `stamp_durable` call as `meta_updates`.
+* **Bundle images do not hit the cache by themselves.** The dispatcher follows `cache_index`,
+  prefers `pool_path` over `path` (`otr_image_gen_dispatcher.py:1528-1543`), regenerates on a
+  missing file, and bumps `image_revision` (:1160, :2016). **D3''**: the import materializes the
+  bundle's image bytes into the new episode's stills/portraits dirs, rebases every row and cache
+  reference, and node 91 on replay verifies those exact bytes and re-stamps them WITHOUT calling
+  `gen_fn`. Peer-engine re-minting is outside item 0 (it belongs to the candidate arm).
+* **The manifest is a safe import format**: `schema_version`, `source_episode_id`, source
+  commit, normalized RELATIVE paths only (absolute paths, `..`, escaping links / reparse points
+  and case-folded duplicates rejected), sizes and SHA-256, built in a temporary sibling directory
+  and renamed into place only after every check; replay consumes manifested files only.
+* **Scoped, not taken as written (must-fix 9):** the local profile's LTX 2.5 two-stage evidence
+  applies when that adapter's graph boundary changes; item 0 edits the driver's receipt
+  assembly generically and no engine adapter. The acceptance therefore adds one leg of the
+  shipping canonical defaults (still_flat, no diffusion) proving receipts stamp on the cheap
+  family too, and the LTX loader/decode receipts are required if r3 finds the LTX boundary
+  touched. Tests add the negative paths Codex listed (traversal, digest mismatch, zero-byte
+  assets, copy failure, no CUDA/LLM/TTS/image calls on replay, multi-segment trace order,
+  recomputable `actual_request_sha`, receipt rebasing, bundle immutability, publish refused
+  when the trace stamp fails). Optional taken: a standalone verifier script that recomputes
+  manifest hashes, `actual_request_sha`, seeds and original-vs-replay equality without ComfyUI.
+Cuts agreed: no node-4 branch; no peer re-minting in item 0; no per-line WAV copy; no top-level
+`render_trace` / `TOP_PRESERVE` entry for it (only `"video"` is added).
+
+## 9. What r3 (wiring) must settle
+
+1. The exact canonical edit: node 7's appended optional `forceInput` socket and its link source
+   (`62.v2_ledger_json` vs `1.script_json`), the widget/input index it lands at, and the four
+   workflow tests plus `build_variants --check` passing; the writer's trailing `replay_from`
+   widget and its `CREATIVE_WHITELIST` entries in both copies (`scripts/otr_api.py:831`,
+   `nodes/_otr_workflow_apply.py:681`).
+2. The stub return values, typed, for nodes 62 / 80 / 81 / 82 / 83 / 3 on replay, and how each
+   reads the replay flag (from its ledger-json input; 81/82/83 get `ledger_json` from 62/80).
+3. The receipt's `sampler_inputs` for the haunted engine (the eight fields of section 2's
+   recipe table) and for the cheap family (null sampler, still path hash).
+4. Whether `freeze_timestamp` may identify two workspaces (`_same_durable_run`), and every
+   consumer of it on the replay path.
+5. Node 91's verify-and-restamp path for materialized rows, and the `_still_index` preference on
+   rows whose `pool_path` and `path` now both point inside the new episode dir.
