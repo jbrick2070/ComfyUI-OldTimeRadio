@@ -63,8 +63,10 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
         "announcer_voice": _widgets(_node(workflow, "OTR_AnnouncerVoice"))["engine"],
         "music": _widgets(_node(workflow, "OTR_StableAudioTheme"))["engine"],
     }
+    # Operator ruling 2026-09-01/02: kokoro voices BOTH slots on the one shipped
+    # graph (least-friction default; the cloning engines stay in the dropdowns).
     assert audio_nodes == {
-        "char_voice": "indextts2",
+        "char_voice": "kokoro",
         "announcer_voice": "kokoro",
         "music": "stable_audio_3",
     }

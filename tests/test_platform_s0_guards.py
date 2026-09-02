@@ -223,7 +223,10 @@ def test_cpu_floor_profile_is_runnable_on_cpu():
         eng = prof["slot_overrides"][slot]
         assert avail.get(eng) == cp.REASON_OK, (slot, eng)
     assert prof["slot_overrides"]["char_voice_engine"] == "kokoro"
-    assert prof["slot_overrides"]["voice_bank"] == "default"
+    # kokoro casts from its preset bank only (char_kokoro_v1 allows exactly
+    # kokoro_builtin); "default" with kokoro is the VoiceCastingError that
+    # tests/test_profile_bank_matches_char_engine.py guards against.
+    assert prof["slot_overrides"]["voice_bank"] == "kokoro_builtin"
     # Post-ship audit (2026-07-10): the IMAGE roles must be overridden too
     # -- inheriting canonical's cuda-only z_image_turbo shipped a GPU
     # engine on the no-GPU tier. Every image override must fit cpu.

@@ -37,7 +37,6 @@ import hashlib
 import logging
 import os
 import re
-import tempfile
 
 log = logging.getLogger("OTR")
 
@@ -180,7 +179,7 @@ def ensure_voices_npz(voices_dir: str) -> str:
     target = npz_path_for(voices_dir, digest)
     if os.path.exists(target):
         return target
-    fallback = npz_path_for(os.path.join(tempfile.gettempdir(), "otr_kokoro_voices"), digest)
+    fallback = npz_path_for(_fallback_voices_dir(), digest)
     if os.path.exists(fallback):
         return fallback
 
@@ -214,6 +213,18 @@ def ensure_voices_npz(voices_dir: str) -> str:
         _remove_stale_npz(voices_dir, keep=target)
     log.info("[OTR.kokoro] ONNX voice table built: %d voices -> %s", len(arrays), written)
     return written
+
+
+def _fallback_voices_dir() -> str:
+    """Where the voice table goes when the voices folder refuses the write:
+    OTR's own scratch tier (``<output>/otr/episodes/_shared/tmp/kokoro_voices``),
+    which the janitor sweeps -- never the ambient system TEMP, which nothing
+    sweeps (tests/test_node_temp_hygiene.py)."""
+    try:
+        from .._otr_paths import otr_shared_tmp_dir
+    except ImportError:                       # imported straight from nodes/
+        from _otr_paths import otr_shared_tmp_dir  # type: ignore
+    return os.path.join(str(otr_shared_tmp_dir()), "kokoro_voices")
 
 
 def _write_npz(target: str, arrays: dict):
