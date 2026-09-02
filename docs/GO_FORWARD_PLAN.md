@@ -349,6 +349,16 @@ image-stage exposure but does not build the registry.
   is narrower, and the `--check` drift gate cannot notice because it diffs the registry.
   Owed at the prequalification step, not before.
 
+#### Voice engines
+
+- **bark renders a 17-19 word line as a steady 1.4 kHz tone** (PBUG-20260902-03, the
+  4060 Leg C5 episode: both announcer lines, 13-14.5 s each, were a tone; the 7-10 word
+  character lines spoke). `eng_bark.py` has no long-line chunking and bark's generation
+  window is ~13-14 s. Fix: split a line at sentence / clause boundaries into generations
+  under the window and concatenate, with a test that a 19-word line yields speech-shaped
+  audio (envelope modulation, no single dominant tone). bark stays the zero-setup
+  fallback in the dropdowns, so this is owed even though kokoro is the shipped default.
+
 #### Routing, env-capture and the credits card
 
 - **`wants_talking_prompt()` escapes any routing freeze.** It calls
@@ -425,6 +435,12 @@ Owed, in order:
   `obs_publish OK`, zero hand steps. Any hand step is a bug: file it in
   `docs/PROD_BUG_LOG.md`, fix it at the root, retry. A pass promotes `otr_4060_floor`
   from `draft` in the matrix. Section 2, Batch R7.
+* **Move `otr_4060_floor` off bark** (`voice_bank kokoro_builtin`, both voice slots
+  `kokoro`) as soon as proof B publishes: the template pinned bark only because kokoro
+  could not install on Python 3.13, and bark renders a long announcer line as a tone
+  (PBUG-20260902-03) -- a stranger's first episode must not open with a 1.4 kHz hum.
+  Regenerate the variant, re-copy the template, update the README rows that say "bark
+  voices" for the floor.
 * `config/profiles/otr_4060_floor.json` carries `quant_policy: bnb_nf4` (so does its
   variant); the E2B writer ran unquantized on 8 GB in the clean room (~2-4 tok/s). Leave
   it; the test decides.

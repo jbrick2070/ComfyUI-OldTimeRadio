@@ -10222,3 +10222,43 @@ transformers LLM, a TTS) between the host's tracked stages must release it
 through its own cache before the next GPU stage; the host's model registry
 cannot see it, so the host's own eviction never will. On the big card the
 overlap only costs speed; on the small card it costs the stage.
+
+## PBUG-20260902-03 -- bark renders a 17-19 word announcer line as a steady 1.4 kHz tone; the 7-10 word character lines speak
+
+**Verified on a published episode (RTX 4060 clean room, portable v0.34.0, Python
+3.13.14, pack at da2b7a36, profile `otr_cleanroom_8gb_klein_ltx25`, bark for both
+voice slots, 2026-09-02 12:10):**
+`signal_lost_rationed_breath_20260902_060027_silent_procgen_blended_captioned_with_credits_final.mp4`.
+The operator watched it: "no announcer voice, just harsh tone; the char beats worked,
+the announcer did not."
+
+Measured on the episode's master mix (`audio/pending_20260902_053505_master.wav`,
+71.6 s, 48 kHz): seconds 10-21, the `b001` announcer slot, sit at RMS 0.04 with a
+dominant peak at 1397-1404 Hz, spectral flatness 0.04 and envelope modulation 0.07 (a
+steady tone); seconds 23-39, the four character lines, show peaks at 94-267 Hz and
+envelope modulation 0.5-1.4 (speech). From the ledger
+(`audio/signal_lost_rationed_breath_20260902_060027_ledger.json`): `b001` announcer
+99 chars / 17 words, 12.95 s; `b006` announcer 122 chars / 19 words, 14.51 s; the
+character lines `b002-b005` 59-61 chars / 7-10 words, 4.8-8.5 s. The server log shows
+nothing abnormal: both announcer lines rendered on `en_speaker_7` with the
+`announcer_bark_v1` profile (semantic 0.7 / coarse 0.5 / fine 0.5), the model loaded
+"gen-config patched", no warning. `nodes/_otr_audio_engines/eng_bark.py` has no
+long-line chunking: a line is one generation, and bark's semantic window is about
+13-14 s -- exactly where both announcer lines sit and where neither character line
+does. The announcer clips carry no audio stream (`shot_b001_announcer_visual_ltx25_video.mp4`
+is video-only), so the tone is bark's output, not clip audio mixed in.
+
+**STATUS:** ROOT-OPEN. Two fixes, both on `docs/GO_FORWARD_PLAN.md`:
+1. The shipped answer is the operator's ruling: kokoro for both voice slots on every
+   lane (queue item 2, kokoro-onnx on Python 3.13 -- landed 70a1d33b; proof B is the
+   same clean room rendering the same shape with kokoro). `otr_4060_floor`, the
+   first-episode template, still pins bark for both slots because kokoro was not
+   installable on 3.13 when it was written; it moves to kokoro after proof B publishes.
+2. bark stays in the dropdowns as the zero-setup fallback, so it needs long-line
+   chunking (split a line at sentence / clause boundaries into generations under the
+   window, concatenate) with a test that a 19-word line produces speech-shaped audio
+   (envelope modulation, no single dominant tone). Section 1.4.
+
+**Bug Bible:** candidate -- an autoregressive TTS with a fixed generation window must
+chunk its input to that window, or the longest lines (announcer intros) fail first and
+silently, as a tone rather than an error.
