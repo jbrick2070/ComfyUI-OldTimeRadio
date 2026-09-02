@@ -164,3 +164,46 @@ control experiment (**yes -- it is docs and ledger plumbing, and the registry co
 separate, operator-triggered push**); one timeline per shot inside the first still week or
 after (**phase 2, after the peer is judged**); the 8 GB profiles stay on the empty-latent peer
 until a Klein-then-AnimateDiff episode publishes on that box (**unchanged until proven**).
+
+## 8. Codex's second read (the operator's other window, pasted 2026-09-02 ~16:10) -- folded
+
+Read-only, file-grounded, and it agrees with the order (instrument before pixels; E0 the first
+pixel arm WITH 0.0 as a diagnostic; the still arm a named lab peer). Four specifics the driver
+verified and takes:
+* **The instrument is an immutable node-92 ingress bundle plus two receipts.** Freeze what node
+  92 (`OTR_VideoRenderBatch`) receives -- the wire ledger, the master and per-line audio, the
+  still files, the episode identity -- under a SHA-256 manifest; ShotLock owns the durable
+  PLANNED `video`, VideoRenderBatch owns a bounded `render_trace[]` of what was ACTUALLY
+  sampled (final positive and negative text, the seed that reached the sampler, adapter id and
+  strength, engine and recipe id, model hashes, denoise / injection / context settings, still
+  content hash, per-clip peak VRAM). The existing content-derived hash stays the A/B seed
+  basis; a separate actual-request SHA covers everything that reached the sampler. Replay runs
+  through the canonical downstream tail and counts only with `obs_publish OK` and the file on
+  disk. Grounded: the existing visual smoke submits ONLY node 92
+  (`scripts/otr_visual_smoke.py:8-19`), so it proves the render, not the composite-to-obs path.
+* **The peer's still routing follows `ghost_prompt.mode`**: figure -> the portrait-derived
+  `scene_character`; object -> an object still with no person; signal -> an environment still;
+  the bookend -> `scene_open`. (Cursor's "prop still for object beats", made exact.)
+* **The latent repeat node.** Core `RepeatLatentBatch` caps `amount` at 64
+  (`ComfyUI/nodes.py:1310`), below this lane's 95 and 125-frame beats; the installed
+  VideoHelperSuite 1.7.9 registers `VHS_DuplicateLatents` (`videohelpersuite/nodes.py:1056`,
+  "Repeat Latents") with `multiply_by`, so the peer's graph is
+  `IMAGE -> resize (policy stamped on the receipt) -> VAEEncode -> VHS_DuplicateLatents(U) ->
+  KSampler.latent_image`, denoise 0.75 first, 0.9 only if motion is damped.
+* **E2 is not the near-zero-cost twin of E1.** ADE's `perform_image_injection`
+  (`animatediff/sampling.py:645-681`) decodes the whole x0 batch through the VAE, composites,
+  and re-encodes it at each injection point -- on a 95-frame beat that is a full-batch decode
+  and encode mid-sample. E2 moves behind E1 in the order (it already was) and gets its own
+  VRAM probe before it is scheduled at all.
+Also taken: state the portrait cost honestly (either `portrait required = never` for a true
+one-still-per-beat trial, or count the portrait renders), and review the raw still first, then
+synchronized per-beat A/A/candidate cards, with style, identity, setting, motion and flicker
+scored diagnostically and the operator's blinded "overall better" decisive.
+
+Its seven open builder questions join Cursor's five on the operator's list: the exact frozen
+canonical boundary for replay; whether a named non-shipping engine/profile is acceptable for
+all still experiments (the driver: yes); per-beat vs per-scene anchor for object/signal modes;
+crop / pad / stretch for any resize and where it is stamped (the driver: pad, stamped on the
+receipt); the frozen compact corpus (anime, engraving, sci-fi, all three modes, one 95+ frame
+beat); whether an improvement must ship on both cards or may stay a 5080-only experimental
+option; and where the blinded key lives so filenames and receipts do not disclose the arm.
