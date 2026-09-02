@@ -216,8 +216,9 @@ def test_engine_evidence_separates_published_and_lab_proof():
     assert "| `minimax_h3_fl2va_raw_recipe` (MiniMax H3 FL2VA raw ComfyUI recipe with native audio) | **LAB-PROVEN** | RTX 4060 Laptop, 8 GB, Ada |" in text
     assert "setup, model load, queued prompt, reserve clamp" in text
     assert "## Hardware episode receipts, with their exact scope" in text
-    assert "RTX 4060 8 GB -- 6 episode(s)" in text
-    assert "image lane unexercised" in text
+    # 2026-09-02: the seventh 4060 episode exercised the row's image lane (Klein).
+    assert "RTX 4060 8 GB -- 7 episode(s)" in text
+    assert "image lane (Klein) proven" in text
     assert "exact row tuple and unlisted cards unproven" in text
 
 

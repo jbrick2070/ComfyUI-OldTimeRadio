@@ -452,8 +452,9 @@ than guessed, because a guessed VRAM number is the one thing a user cannot
 recover from.
 
 **Read each 8 GB claim at its stated proof level.** A physical RTX 4060 8 GB
-has published 7 documented full OTR episodes using AnimateDiff, so the invoked
-writer/video/voice/music episode path is **EPISODE PATH PROVEN**. Separately, a
+has published 7 documented full OTR episodes (six on AnimateDiff video, one with Klein
+stills and still-motion video on a fresh Python 3.13 portable), so the invoked
+writer/video/voice/music episode path AND the row's image lane are **PROVEN**. Separately, a
 raw MiniMax H3 FL2VA ComfyUI recipe produced
 three valid 864x480x90 clips with native audio on the same physical card, with
 7.147/6.788/6.788 GiB peaks. That is **LAB-PROVEN true diffusion**, but it is
