@@ -1,5 +1,5 @@
-"""The template gallery serves ONE folder per pack, and the floor template must
-stay byte-equal to the variant it was copied from.
+"""The template gallery serves ONE folder per pack, and the shipped graph set is
+exactly what the operator ruled.
 
 ComfyUI's app/custom_node_manager.py registers a static mount at
 ``/api/workflow_templates/<pack>`` for EVERY folder named example_workflows,
@@ -11,10 +11,11 @@ present (2026-08-29 to 2026-09-01) the gallery listed ``otr_canonical`` and
 own docs/2026-08-23-workflow-discoverability-PROBLEM.md had warned about
 exactly this. This test keeps the pack to a single template folder.
 
-The gallery template ``workflows/otr_4060_floor.json`` is a copy of the
-generated ``workflows/variants/otr_4060_floor.json`` (scripts/build_variants.py
-owns the variant). A regenerated variant that is not copied forward would ship
-a stale template, so the two must match in structure and every saved widget.
+Operator ruling 2026-09-02: ONE JSON for now -- ``otr_canonical`` (kokoro on both
+voice slots) -- plus the script-only graph. The 4060 floor template that shipped
+2026-08-29 to 2026-09-02 is gone from the gallery; per-machine saved dropdowns
+live in ``workflows/variants/`` (generated, never hand-edited), and a 4060
+dropdown-friendly JSON is saved only after that testing is done.
 """
 from __future__ import annotations
 
@@ -32,23 +33,18 @@ def test_exactly_one_template_folder_exists():
         "the first wins; keep a single folder: found %r" % (present,))
 
 
-def test_gallery_lists_the_three_shipped_graphs():
+def test_gallery_lists_exactly_the_ruled_graphs():
     listed = sorted(p.stem for p in (REPO / "workflows").glob("*.json"))
-    assert listed == ["otr_4060_floor", "otr_canonical", "otr_story_only"], listed
+    assert listed == ["otr_canonical", "otr_story_only"], listed
 
 
-def _graph_shape(path: pathlib.Path):
-    data = json.loads(path.read_text(encoding="utf-8"))
-    nodes = {(n["id"], n["type"]): n.get("widgets_values") for n in data["nodes"]}
-    return nodes, data["links"]
-
-
-def test_floor_template_matches_its_generated_variant():
-    template = _graph_shape(REPO / "workflows" / "otr_4060_floor.json")
-    variant = _graph_shape(REPO / "workflows" / "variants" / "otr_4060_floor.json")
-    assert template[0].keys() == variant[0].keys(), "node set differs"
-    for key in template[0]:
-        assert template[0][key] == variant[0][key], (
-            "widgets differ on node %r: regenerate the variant, then copy it "
-            "over workflows/otr_4060_floor.json" % (key,))
-    assert template[1] == variant[1], "links differ"
+def test_canonical_ships_kokoro_on_both_voice_slots():
+    """Operator ruling 2026-09-01/02: the one shipped graph voices announcer AND
+    characters on kokoro from the preset bank, so a fresh install needs no
+    reference WAV, sidecar or key."""
+    data = json.loads((REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
+    by_id = {n["id"]: n for n in data["nodes"]}
+    assert by_id[80]["type"] == "OTR_CastLock"
+    assert by_id[80]["widgets_values"][0] == "kokoro_builtin"
+    assert by_id[80]["widgets_values"][3] == "kokoro" and by_id[80]["widgets_values"][4] == "kokoro"
+    assert by_id[81]["widgets_values"] == ["kokoro"] and by_id[82]["widgets_values"] == ["kokoro"]

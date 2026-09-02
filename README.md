@@ -17,10 +17,11 @@ up yet, so its pictures come from Google's paid image API and need a key -- see 
 Mac row in "Pick the graph" below.
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
-> EXTENSIONS → comfyui-old-time-radio**. You will see three entries:
-> **`otr_4060_floor`** (the zero-extra-download first episode for any NVIDIA card:
-> pick it, then **Queue Prompt**), **`otr_canonical`** (the 16 GB graph, one click
-> away in the same menu -- or drag `workflows/otr_canonical.json` onto the canvas),
+> EXTENSIONS → comfyui-old-time-radio**. You will see two entries:
+> **`otr_canonical`** (the one shipped graph: Kokoro voices for announcer and
+> characters, Gemma-4-12B writer, Z-Image stills -- pick it, then **Queue Prompt**; or
+> drag `workflows/otr_canonical.json` onto the canvas; on an 8 GB card load the matching
+> saved-dropdown variant from "Pick the graph" instead),
 > and `otr_story_only` (skip it for a first episode: it only writes the script, no
 > voices, music or video; it exists for comparing writer models). The 25 `OTR_`
 > nodes are the parts; the workflow is the thing you run.
@@ -320,9 +321,8 @@ repo and the two steps it is missing.
 
 ### 4. Install the models
 
-**If you are loading `otr_4060_floor` (the first-episode template), skip this section.**
-That path downloads only bark, musicgen and the small `gemma-4-E2B` writer (about 6 GB),
-and needs no image or video model at all.
+**If you are on an 8 GB card, load the 8 GB variant named in "Pick the graph" below;
+its downloads are listed there.**
 
 The shipped 16 GB canonical workflow (`otr_canonical`) is lighter than you'd expect: its
 video-role dropdowns default to the **procedural still/CRT floor** (`still_flat`, no GPU
@@ -354,7 +354,6 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 | you have | load this | what it renders |
 |---|---|---|
-| any NVIDIA card, first episode attempt | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | the procedural floor: no video or still-image weights; **bark** voices, `musicgen`, and the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). Works on Python 3.13 as-is. Still a `draft` profile in the matrix (no published receipt yet), but it is the path built for a first run |
 | 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, IndexTTS2 + Kokoro voices, Stable Audio 3 music. Read the IndexTTS2 note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |

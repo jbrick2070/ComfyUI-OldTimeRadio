@@ -41,12 +41,14 @@ string, so the operator says go. Never version-delete. DONE WHEN a version reads
 BUILT 2026-09-02 after a four-round arc (r1 Fable cold, r2 Cursor, r3 Antigravity, r4
 Sonnet convergence; anchor and records in `docs/2026-09-02-kokoro-onnx/`). The 5080's
 torch path is byte-identical (two fixed-seed lines, sha256 before == after); the ONNX
-path renders in-process on CPU. Full row: Section 1.1. DONE WHEN the two live proofs
-land: (A) a 1-act canonical episode on the 5080 (3.12, `backend=torch` in the log) to
-`otr/obs/`; (B) the 4060 clean room (portable Python 3.13.14): `pip install -r
-requirements.txt` installs kokoro-onnx, the boot prefetch places the ONNX model, and a
-1-act canonical leg with BOTH voice slots on kokoro publishes to its obs with
-`backend=onnx` in the log. Registry installs get the kokoro-onnx line on the next
+path renders in-process on CPU. Full row: Section 1.1. Proof A DONE 2026-09-02 13:43:
+`signal_lost_the_tectal_echo_20260902_131902` published from the 5080 (3.12) on
+`otr_nvidia_8gb_haunted`, `backend=torch device=cuda` on both voice nodes, kokoro
+characters and announcer. Proof B (the 4060 clean room, portable Python 3.13.14):
+`pip install -r requirements.txt` installed kokoro-onnx (torch kokoro absent), the boot
+prefetch fetched the 310 MB ONNX model on its own, and the leg logged `backend=onnx
+provider=CPUExecutionProvider` with kokoro on both slots -- DONE WHEN its episode
+publishes to the clean room's obs (in flight). Registry installs get the kokoro-onnx line on the next
 `pyproject.toml` bump after alpha.15 resolves.
 
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
@@ -71,10 +73,11 @@ pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships.
 1.5.
 
 **5. THE 4060 TEMPLATE TEST -- the frictionless capstone.** Runs once, after items 1 and
-2, on a tree with the bugs above closed: install from the registry on the 4060, open the
-`otr_4060_floor` template, click run, one published episode with zero hand steps. What is
-still open on the set is in Section 1.6. The template test is what promotes
-`otr_4060_floor` from `draft`.
+2, on a tree with the bugs above closed: install from the registry on the 4060, load the
+8 GB saved-dropdown variant, click run, one published episode with zero hand steps. ONE
+JSON ships for now (`otr_canonical`, kokoro on both voice slots -- operator 2026-09-02); a
+4060 dropdown-friendly JSON is saved only after this testing is done, and that save is
+what the test promotes. What is still open on the set is in Section 1.6.
 
 **6. THE LOCAL-LLM ACCEPTANCE SWEEP** -- Leg 0 in-process preflight (Section 1.7,
 ~15-20 min, idle GPU), then the four canonical legs of Batch R3.
@@ -439,20 +442,18 @@ Owed, in order:
 
 ### 1.6 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
 
+* **One JSON for now (operator 2026-09-02).** `workflows/otr_4060_floor.json` is
+  removed from the gallery (it shipped 2026-08-29 to 2026-09-02 as a bark-voiced
+  zero-download floor, before kokoro ran on 3.13); `config/profiles/otr_4060_floor.json`
+  and its generated variant stay as lab presets. The 4060 dropdown-friendly JSON is
+  saved AFTER the testing below, with kokoro on both voice slots (never bark: bark
+  renders a long announcer line as a tone, PBUG-20260902-03).
 * **The test itself:** a clean portable (Python 3.13) on the 4060 -> Manager install of
-  the Active registry version -> `otr_4060_floor` template from Browse Templates -> run ->
-  `obs_publish OK`, zero hand steps. Any hand step is a bug: file it in
-  `docs/PROD_BUG_LOG.md`, fix it at the root, retry. A pass promotes `otr_4060_floor`
-  from `draft` in the matrix. Section 2, Batch R7.
-* **Move `otr_4060_floor` off bark** (`voice_bank kokoro_builtin`, both voice slots
-  `kokoro`) as soon as proof B publishes: the template pinned bark only because kokoro
-  could not install on Python 3.13, and bark renders a long announcer line as a tone
-  (PBUG-20260902-03) -- a stranger's first episode must not open with a 1.4 kHz hum.
-  Regenerate the variant, re-copy the template, update the README rows that say "bark
-  voices" for the floor.
-* `config/profiles/otr_4060_floor.json` carries `quant_policy: bnb_nf4` (so does its
-  variant); the E2B writer ran unquantized on 8 GB in the clean room (~2-4 tok/s). Leave
-  it; the test decides.
+  the Active registry version -> the 8 GB saved-dropdown variant (`workflows/variants/
+  otr_nvidia_8gb_haunted.json`, kokoro on both slots, or the Klein + LTX 2.5 profile from
+  Section 1.5 once it ships) -> run -> `obs_publish OK`, zero hand steps. Any hand step
+  is a bug: file it in `docs/PROD_BUG_LOG.md`, fix it at the root, retry. A pass is what
+  earns the saved 4060 JSON. Section 2, Batch R7.
 * **README model table** from the compatibility workbook's Baseline Combos tab
   (`outputs/20260828-ungated-models/`, the LIVING fact sheet: edit cells in place, never
   add a changelog tab) -- or the operator rules that README's injected class table and

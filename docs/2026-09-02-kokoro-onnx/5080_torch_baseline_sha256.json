@@ -22,6 +22,15 @@
  "after_change": {
   "backend": "torch",
   "sha_identical": true,
-  "commit": "pending"
+  "commit": "70a1d33b"
+ },
+ "proof_A": {
+  "machine": "RTX 5080 Laptop, Python 3.12 venv, torch backend",
+  "profile": "otr_nvidia_8gb_haunted (kokoro both voice slots, kokoro_builtin)",
+  "wrapper": "scripts/otr_headless_canonical.ps1 -Acts 1",
+  "result": "RESULT SUCCESS in 1742 s; obs_publish OK",
+  "episode": "signal_lost_the_tectal_echo_20260902_131902 (110 MB, obs 13:43)",
+  "log": "[OTR.kokoro] backend=torch device=cuda on both voice nodes; char voices bm_lewis / am_michael, announcer bf_emma, engine=kokoro",
+  "date": "2026-09-02"
  }
 }
