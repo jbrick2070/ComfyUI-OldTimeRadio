@@ -1568,6 +1568,62 @@ findings, ranked), NOVELTY_DELTA.md (32 new to the record, 14 known-open, 25 adj
 17. Image input for the AnimateDiff haunted lane (an i2v anchor for the 8 GB floor). Not
     started; ship-readiness first.
 
+### ADDENDUM 2026-09-01 (evening) -- what landed after items 1-17, and what is left
+
+Reviewed from HEAD 93a37aa1 (Codex's consolidation) after its all-clear. Docs-only commit.
+
+**Landed and pushed (each reviewed by one independent Sonnet pass, lockstep-verified):**
+- `64d81ca7` -- items 2, 4, 5, 6 above: README token literal, three platform guards,
+  kokoro `python_version < "3.13"` marker, README 2b node-pack table, ship-audit receipts.
+  Tests: 207 + 44 targeted, Bug Bible regression 22 passed.
+- `8cfe0007` -- one template folder (`example_workflows/` collided with `workflows/` at the
+  same gallery URL, first mount won, `otr_canonical` listed and 404'd on click; now
+  `workflows/otr_4060_floor.json` + `tests/test_workflow_templates_single_folder.py`);
+  the three TTS worker scripts ship (`.comfyignore` `scripts/*` + negations, bundle
+  simulated with pathspec: exactly three scripts/ files ship); `.comfyignore`, `.gitignore`,
+  `.gitattributes`, `SKILL.md`, `_START_HERE.md`, `workflows/external_examples/` stop
+  shipping; item 14 DONE (12 nodes/ files stop citing unshipped scripts/ and docs/, GitHub
+  URLs + inlined steps; wrapper_bridge names ComfyUI-GGUF for the GGUF loaders, test added).
+  Tests: 20 + 164 targeted, `build_variants --check` 90/0.
+  CORRECTION by Codex (`bef7928d`): that commit also re-worded eng_indextts2.py, which is a
+  signed voice-route fingerprint (9 guards failed). Codex restored the file byte-for-byte
+  and ships the installer instead (`!scripts/_otr_indextts2_install.ps1`). Lesson kept in
+  memory: grep tests/ for sha256 before touching anything under nodes/, run the full suite.
+- `6e54f9ae` -- item 16 mostly DONE: `OTR_CREDITS_FONT` override + macOS font candidates
+  (5080 still resolves consola.ttf), platform-aware llama-cpp-python hint (darwin/linux,
+  upstream's `GGML_METAL` / `GGML_HIP` flags, pin labelled a Windows measurement) + README
+  table, BOM-safe HF token-file read. Tests: 161 + 22 targeted.
+- Bug Bible `8956de15` (Bible repo main): entry 12.144 + coverage-index row for
+  PBUG-20260901-04 (interpreter-capped optional dependency vetoes the whole install).
+
+**4060 clean-room leg results (item 11):** fresh portable v0.34.0, Python 3.13.14, stock
+launch. Writer (E2B, 26 min incl. 6 GB download), bark voices, image prompts all ran. The
+FIRST z_image_turbo still (int8 convrot) aborted the whole ComfyUI process at sampler step
+5/8 under DynamicVRAM (`Fatal Python error: Aborted`, stack in comfy/ldm/lumina/model.py;
+log kept at C:\OTR-CleanRoom\server_run1_zimage_abort.log). Same shape as the drill's
+PBUG-03, now reproduced on a never-touched install. The video stage never started, so
+LTX 2.5 and HuMo 1.7B on 8 GB remain UNMEASURED. A retry with `--disable-dynamic-vram
+--lowvram` was queued and then stopped on the operator's instruction; the clean room stays
+on disk (70.9 GB) for that retry. Matrix unchanged: nothing rendered end to end.
+
+**Remaining blockers, ranked:**
+1. Registry: apply `docs/ship-audit-2026-09-01/pyproject_alpha15.patch` and push (operator;
+   release trigger). If Flagged again, republish the alpha.8 tree byte-identical as the
+   control (item 3).
+2. Default voice on Python 3.13 (item 7) -- unchanged, operator decision.
+3. 8 GB: the shipped default image engine aborts the process under a stock launch. Either
+   the 8 GB dropdown set avoids z_image stills, or the launch flags become documented
+   requirements. Needs the ComfyUI-side report with the faulthandler stack.
+4. `otr_canonical.json` default char voice is indextts2 with reference WAVs that never ship
+   (item 13); the `ltx_8gb` profiles pair an 8 GB engine with a 14.5 GB writer (item 13).
+5. Design items still needing an arc: `needs_fp8_te`/`needs_fp4_te` in `_fit_reason`; the
+   janitor `audio_slices` sweep (9.3 GB, 6.7 s per boot); cloud spend ceilings on the
+   cpu_floor / otr_mac_mps Google routes (SHIP_LIST.md sections 2, 3, 5).
+
+**Next action:** operator pushes alpha.15. Then, when the 4060 is free, rerun
+`otr_cleanroom_8gb_ltx25` from C:\OTR-CleanRoom with the low-VRAM flags and record the
+first measured 8 GB result for a non-AnimateDiff video lane.
+
 ## After this queue
 
 One coder window at a time; every chunk = focused tests + full suite + Bug Bible
