@@ -10,14 +10,20 @@ swappable 7-voice / 5-music engine roster; IndexTTS2 + Kokoro + Stable Audio 3 s
 defaults) → 48 kHz master mix → model-agnostic video (procedural CRT floor by default, or
 HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) → final MP4.
 
-100% local by default. No API keys required. Optional hosted LLM and all-cloud
-routes exist; they stay off unless you turn them on.
+100% local by default. No API keys required on NVIDIA and AMD. Optional hosted LLM
+and all-cloud routes exist; they stay off unless you turn them on. One exception as
+of this writing: the Apple Silicon **draft** profile has no local image engine wired
+up yet, so its pictures come from Google's paid image API and need a key -- see the
+Mac row in "Pick the graph" below.
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
-> EXTENSIONS → comfyui-old-time-radio → otr_4060_floor**, then **Queue Prompt**.
-> That template is the zero-extra-download first episode for any NVIDIA card; the
-> 16 GB graph is `workflows/otr_canonical.json` inside the pack (drag it onto the
-> canvas). The 25 `OTR_` nodes are the parts; the workflow is the thing you run.
+> EXTENSIONS → comfyui-old-time-radio**. You will see three entries:
+> **`otr_4060_floor`** (the zero-extra-download first episode for any NVIDIA card:
+> pick it, then **Queue Prompt**), **`otr_canonical`** (the 16 GB graph, one click
+> away in the same menu -- or drag `workflows/otr_canonical.json` onto the canvas),
+> and `otr_story_only` (skip it for a first episode: it only writes the script, no
+> voices, music or video; it exists for comparing writer models). The 25 `OTR_`
+> nodes are the parts; the workflow is the thing you run.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
@@ -58,6 +64,16 @@ Then restart ComfyUI so it loads the nodes.
 > missing from the menu, that line is where to look. Use the same Python that runs
 > ComfyUI (for portable installs: `python_embeded\python.exe -m pip install -r requirements.txt`).
 
+> **Two system tools pip cannot install for you.** `ffmpeg` must already be on your
+> PATH with the libx264 and aac encoders built in (Windows: the ComfyUI portable and
+> Desktop builds bundle one; Mac: `brew install ffmpeg`; Linux: your package manager's
+> ffmpeg). OTR mixes and muxes every episode through it, and a missing ffmpeg fails at
+> render time with no earlier warning. On Linux (including the AMD profile) the
+> `pycairo` package in `requirements.txt` needs the system Cairo library to build:
+> install `libcairo2-dev` (Debian/Ubuntu) or your distro's equivalent, plus
+> `pkg-config`, before running pip. Skip it and the announcer/music visualizer lanes
+> stop partway through a render with an ImportError naming `cairo`.
+
 **The ComfyUI Registry route does not currently work, and Manager cannot install
 this pack by any route.** Both published versions are `Flagged`
 ([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)),
@@ -79,8 +95,14 @@ ComfyUI.
 |---|---|---|
 | `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | provides the `ADE_*` classes the haunted lane samples through |
 | `ltx25_*` (LTX 2.5 video, foley, mime) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at commit `6ea2651e`, **plus** the one-file patch in `patches/` (see `patches/README.md` for the exact `git apply` line), then its `requirements.txt` | the two GGUF loaders (`UnetLoaderGGUF`, `CLIPLoaderGGUF`); every other LTX 2.5 class is already in ComfyUI 0.34+. Measured on a clean Windows install 2026-09-01: without the pack the render refuses at the video stage and names both classes |
-| `flux2_klein` (image) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its DiT is a GGUF file loaded through `UnetLoaderGGUF` |
-| `humo_1.7B*`, `humo*`, `wan*`, `ltx_8gb`, `ltx_video`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
+| `flux2_klein` (image; **the 8 GB / 12 GB / AMD default**) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
+| `wan22_*` / `wan_ti2v` (Wan 2.2 video) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its shipped DiT and umt5 text encoder are GGUF files (`UnetLoaderGGUF`, `CLIPLoaderGGUF`) |
+| `ltx_8gb`, `ltx_video`, `ltx_audio_in` (the LTX 0.9.x lanes) | [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde`, **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports) | the `LTXV*` node classes those lanes sample through; the engine's own preflight names this pack if it is missing |
+| `humo_1.7B*`, `humo*`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
+
+`scripts/otr_provision.py` installs GGUF and LTXVideo at their pinned commits and
+clones AnimateDiff-Evolved unpinned (its current HEAD) for you on Linux pods; on
+Windows, install the row you need by hand as above.
 
 > **Python 3.13 and the Kokoro voice (read this if you use ComfyUI Desktop or the
 > portable build, which both ship Python 3.13).** `kokoro`, the shipped default
@@ -90,9 +112,14 @@ ComfyUI.
 > a plain `pip install -r requirements.txt` used to fail outright and install
 > **none** of the pack's libraries. As of 2026-09-01 the kokoro line carries a
 > `python_version < "3.13"` marker, so the install succeeds and only the Kokoro
-> engine is absent; pick **bark** for the announcer and character voices in the
-> dropdowns (bark installs everywhere and downloads its own weights). On Python
-> 3.12 or older nothing changes.
+> engine is absent. **What to click:** the `otr_4060_floor` template already uses
+> **bark** for every voice, so it needs nothing. If you load `otr_canonical` or the
+> 8 GB haunted graph instead, open the **OTR_CastLock** node on the canvas before you
+> queue and set three dropdowns to the bark values: `voice_bank` -> `bark_legacy`,
+> `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` (bark installs
+> everywhere and downloads its own weights). Skip that and the render runs the writer
+> for several minutes, then stops with `kokoro is not installed` at the announcer
+> step. On Python 3.12 or older nothing changes.
 
 **You do not have to memorise this.** If a pack is missing, the render stops
 with a named error that now tells you which pack to install and where to get
@@ -292,11 +319,24 @@ repo and the two steps it is missing.
 
 ### 4. Install the models
 
-The shipped canonical workflow is lighter than you'd expect: its video-role dropdowns default
-to the **procedural still/CRT floor** (no GPU video checkpoint required at all), and its image
-role defaults to **Z-Image-Turbo** (Apache-2.0, no license friction). So a first run needs only:
-the local writer LLM (Gemma or your own choice), Z-Image-Turbo, and the default voice/music
-weights (IndexTTS2, Kokoro, Stable Audio 3). The heavier local video checkpoints — HuMo, LTX,
+**If you are loading `otr_4060_floor` (the first-episode template), skip this section.**
+That path downloads only bark, musicgen and the small `gemma-4-E2B` writer (about 6 GB),
+and needs no image or video model at all.
+
+The shipped 16 GB canonical workflow (`otr_canonical`) is lighter than you'd expect: its
+video-role dropdowns default to the **procedural still/CRT floor** (`still_flat`, no GPU
+video checkpoint required at all), and its image role defaults to **Z-Image-Turbo**
+(Apache-2.0, no license friction). So a first run needs only: the local writer LLM
+(`gemma-4-12b-it` as shipped, or your own choice), Z-Image-Turbo, and the default voice
+and music weights. Two of those fetch themselves on first use (Kokoro, Stable Audio 3).
+**One does not: IndexTTS2**, the character voice the canonical graph ships with. It runs
+in its own separate Python (3.10 + torch 2.8), so before your first Queue Prompt on
+`otr_canonical` either run its one-time installer from a terminal in the pack folder
+(`powershell -ExecutionPolicy Bypass -File scripts\_otr_indextts2_install.ps1`, which
+builds that environment and downloads its own multi-gigabyte model), or open the
+**OTR_CastLock** node and switch `char_voice_engine` to `bark` (or `kokoro` on Python
+3.12). Skip both and the render runs the writer, then stops with
+`IndexTTS2 Path B not installed`. The heavier local video checkpoints — HuMo, LTX,
 Wan, AnimateDiff, MiniMax H3 — are **optional upgrades** you dial in later via the
 `OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
 before downloading any of them. If a model is missing, the engine fails **loudly** and stops —
@@ -313,9 +353,12 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 | you have | load this | what it renders |
 |---|---|---|
-| any NVIDIA card, first episode attempt | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | intended procedural floor: no video or still-image weights; **bark** voices, `musicgen`, and the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). This profile is still `draft`, not a guaranteed or published Python-3.13 receipt |
-| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | The exact 8 GB matrix tuple: AnimateDiff haunted video and Kokoro voices on Python 3.12 or older; about 16 GB for the proven invoked path. Klein remains selectable but is not consumed or downloaded by this video path |
-| 16 GB or more, GUI authoring baseline | `workflows/otr_canonical.json` (drag it onto the canvas) | Mistral/viz-camera/IndexTTS2/Stable Audio baseline. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
+| any NVIDIA card, first episode attempt | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | the procedural floor: no video or still-image weights; **bark** voices, `musicgen`, and the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). Works on Python 3.13 as-is. Still a `draft` profile in the matrix (no published receipt yet), but it is the path built for a first run |
+| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro needs Python 3.12 or older; on Python 3.13 open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
+| 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
+| 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, IndexTTS2 + Kokoro voices, Stable Audio 3 music. Read the IndexTTS2 note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
+| AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (Python 3.12) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
+| Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
@@ -353,10 +396,19 @@ it does not silently rewrite the graph currently open in ComfyUI.
   workflow renders through the procedural still/CRT floor by default (no GPU video model
   required); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
   explicit profile overrides. Episode length is set by act count, not a word target.
-- **OS:** Windows or Linux. Tested heavily on Windows + RTX (Blackwell/sm_120).
+- **OS:** Windows or Linux for the proven NVIDIA paths (RTX 4060 8 GB and RTX 5080 16 GB
+  have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as an
+  unverified draft profile (`otr_mac_mps`) whose pictures come from a paid Google API
+  today -- read the Mac row in "Pick the graph" before you start.
+- **Python:** ComfyUI Desktop and the portable build ship Python 3.13. Everything installs
+  there except the Kokoro voice; bark replaces it with three dropdown changes (section 2b).
 - **Other setups:** per-platform workflow variants + recipes ship in-repo (16 GB NVIDIA
-  canonical, cloud-lane variant, Mac ~10 GB ceiling, AMD). The Mac/AMD variants are
-  drafts — not yet verified on real hardware.
+  canonical, cloud-lane variant, Mac, AMD). The Mac/AMD variants are drafts — not yet
+  verified on real hardware.
+- **RAM:** 32 GB of system memory is the comfortable floor for the video lanes; the 8 GB
+  card streams model weights from host RAM. The measured host-RAM peaks so far are on the
+  5080 (the H3 clamped run at 27.56 GiB, the HuMo 14B lane at 27.53 GiB); LTX 2.5 on the
+  4060 has not had its host-RAM peak measured yet.
 - **Disk:** the model set is large (tens of GB). Episodes are a few dozen MB each.
 
 ---
@@ -379,7 +431,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 * **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
 * **AMD / ROCm (Linux only)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
 
-Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive.
+Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice, which needs Python 3.12 or older; on the Python 3.13 that ComfyUI Desktop and the portable build ship, run `--profile otr_4060_floor` for the bark route instead, or switch the OTR_CastLock voice dropdowns to bark on the loaded graph.
 
 Apple Silicon is still the unproven experimental `otr_mac_mps` profile; CPU-only is `cpu_floor`. Neither is promoted to a machine key or PROVEN until a named physical system publishes an episode.
 
@@ -438,9 +490,15 @@ is now GENERATED -- see
 claim goes stale in the direction that costs a user the most: telling them their
 card cannot do a thing it has already done.
 
-For contrast, `ltx25_high_video` measured **14.48 GiB** on the 16 GB card --
-roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
-5080-only rather than "high VRAM".
+`ltx25_high_video` peaks at **14.48 GiB** on the 16 GB card, but a peak is what
+the allocator grabbed, not a hard floor: on 2026-09-02 a physical RTX 4060 8 GB
+clean-room install rendered real LTX 2.5 clips end to end under plain stock launch
+flags, about 14 minutes a clip (the text encoder pinned to CPU by the engine, the
+video model half streamed from host RAM). It works on 8 GB; it is slow, and no
+shipped 8 GB profile wires it up yet. Receipt: `docs/ship-audit-2026-09-01/
+4060_CLEANROOM.md`, Leg C5. The same run fixed why every 8 GB still used to take
+about 42 minutes: the writer LLM was still on the card when the image stage began.
+Update to commit `da2b7a36` or later if your stills are that slow.
 
 ### Local video models
 
@@ -457,7 +515,7 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB @ 480x832x97 | no | no | yes |
 | `ltx23_high_video (16:9)` | 13.3 GiB @ 1024x576x169 | no | no | yes |
 | `wan22_high_fast (16:9)` | 12.8 GiB measured 2026-08-22 | no | maybe | yes |
-| `ltx25_high_video (16:9)` | **14.48 GiB measured** | no | no | **5080-only** |
+| `ltx25_high_video (16:9)` | **14.48 GiB peak on a 16 GB card** (what the allocator grabbed, not a floor) | works, slow: ~14 min a clip on a physical RTX 4060 under stock flags, 2026-09-02; no shipped 8 GB profile yet | yes | **PROVEN on the 5080** |
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |
 
@@ -731,6 +789,20 @@ appear there as they render.
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
   branch.
+- **`kokoro is not installed` after the writer finished** — you are on Python 3.13 (ComfyUI
+  Desktop, the portable build). Open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`,
+  `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark`, then queue again.
+- **`IndexTTS2 Path B not installed`** — the 16 GB canonical graph's character voice needs its
+  own one-time installer (`scripts\_otr_indextts2_install.ps1`, section 4), or switch
+  `char_voice_engine` to `bark`.
+- **A still takes about 42 minutes on an 8 GB card, and the log says `loaded partially;
+  0.00 MB usable`** — the writer LLM was still on the card when the image stage began.
+  Fixed in commit `da2b7a36` (2026-09-02); update the pack. Nothing in the launch line
+  fixes it.
+- **The render says a node class is missing (`UnetLoaderGGUF`, `LTXV*`, `ADE_*`)** — that lane
+  needs one of the node packs in section 2b; the message names which.
+- **A gated model returns HTTP 401** — the LTX 2.5 weights and `gemma-2-2b-it` need a terms
+  click on Hugging Face plus a read token (section 3); every default weight is ungated.
 
 ---
 
@@ -738,7 +810,7 @@ appear there as they render.
 
 Development runs under a sibling QA harness — the
 [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a machine-readable Bug Bible (319 entries and growing) distilled from this project's live production
+a machine-readable Bug Bible (325 entries and growing) distilled from this project's live production
 incidents, plus a static regression suite that runs against this pack after every change.
 Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —

@@ -395,7 +395,11 @@ def render() -> str:
       "--machine 8gb --act-count 1 --source-bank original --visual-style "
       "sci_fi_radio --timeout 0`, replacing only the exact machine key. To use "
       "an explicit profile instead, replace `--machine 8gb` with `--profile "
-      "<exact-profile-id>`; the two selectors are intentionally exclusive.")
+      "<exact-profile-id>`; the two selectors are intentionally exclusive. "
+      "Every machine row selects the Kokoro voice, which needs Python 3.12 or "
+      "older; on the Python 3.13 that ComfyUI Desktop and the portable build "
+      "ship, run `--profile otr_4060_floor` for the bark route instead, or "
+      "switch the OTR_CastLock voice dropdowns to bark on the loaded graph.")
     A("\nApple Silicon is still the unproven experimental `otr_mac_mps` profile; "
       "CPU-only is `cpu_floor`. Neither is promoted to a machine key or "
       "PROVEN until a named physical system publishes an episode.\n")
