@@ -10169,3 +10169,56 @@ DynamicVRAM faster. The 8 GB proof of the SHIPPED shape is PENDING at the push:
 it is Leg C4 in `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`, appended when
 the clean room has run it (the in-process 9.4 s receipt above used a crude
 all-registry eviction, not the shipped node-scoped one).
+
+**ADDENDUM 2026-09-02 05:1x -- Leg C4 FAILED the same way, and the instrumented
+Leg C4b showed why: this was the SECOND-ORDER defect.** With ad6a635f the eviction
+fired and the DiT still loaded with 0 MB usable. An instrumented executor on the
+clone logged, at the encoder's drop, `free=48MB ... loaded=0MB ... vbar_pages=255
+resident=0`: the encoder had never occupied the card (it streamed through pinned
+host staging into a card that was already full). The occupant is the writer LLM
+-- see PBUG-20260902-02. The encoder-eviction fix stands as a real, measured
+improvement (the 5080 numbers above), but it is not what makes Klein render on
+8 GB.
+
+## PBUG-20260902-02 -- the image stage renders with the writer LLM still on the card (8 GB: 48 MB free at the first still; 16 GB: a 7.4 GB writer co-resident with every still)
+
+**Verified on two live headless legs, one per box, 2026-09-02.** 4060 clean room
+(8 GB, stock flags, Leg C4b, instrumented executor on the clone only,
+`docs/2026-09-02-encoder-eviction/4060_server_legC4b_instrumented.log` lines
+374-375): at the first Klein still the card had 48 MB free with the text encoder
+holding zero resident pages. RTX 5080 (16 GB, headless :8000, working tree at
+da2b7a36, `otr_soak_still_motion_flux2_klein`, 1 act, 05:22): at the first still
+the new preflight logged `free_otr_pipeline_residue (image engine load preflight
+(z_image_turbo)) OK: unload_llm, _unload_bark, ... | allocated 7387 -> 6` --
+the 12B writer, 7.4 GB, was still resident, so every 5080 still before this
+change rendered next to it (17 GB of models on a 16 GB card, paged by
+DynamicVRAM, silently slower) and every 8 GB still had nothing to load into
+(~42 min per Klein still from host RAM: Legs C, C2, C3, C4).
+
+The writer LLM (transformers, `_otr_model_loader.LLM_CACHE`, outside ComfyUI's
+model registry) composes the still prompts in ShotLock moments before the
+dispatcher renders them. The canonical residue freer,
+`_otr_vram_levers.free_otr_pipeline_residue()` (writer LLM + Bark + a surgical
+detach of tracked patchers + the allocator flush), was called only by the
+LTX 2.5 engine and the GGUF backend in their load preflight, and the ghost lane
+had its own `_ghost_unload_writer`; `OTR_ImageGenDispatcher` had nothing.
+`OTR_LedgerFreezeCascade` does unload the writer after the script, but
+ShotLock reloads it for the visual briefs and the still prompts, and no node
+between ShotLock and the image render releases it again.
+
+**FIX (da2b7a36):** `dispatch_images` calls `free_otr_pipeline_residue(reason=
+"image engine load preflight (<engine>)")` once per dispatch, right before the
+first LOCAL still's GPU lease (cloud adapters and cache-hit-only dispatches
+never trigger it), and logs the report. No LLM slot is requested after the image
+stage (cast_lock, FreezeCascade, ScriptWriter, ShotLock, bark_lib, llm_policy,
+writer_inputs are the only users), so there is no reload cost; the video
+preflights that call the same freer stay idempotent.
+
+**LIVE VERIFY:** the 5080 leg above (five Z-Image stills in sequence after the
+release, then video); the 8 GB verify is Leg C5 in the clean-room log.
+
+**Bug Bible:** promoted (12.146). A pipeline that runs an out-of-band model (a
+transformers LLM, a TTS) between the host's tracked stages must release it
+through its own cache before the next GPU stage; the host's model registry
+cannot see it, so the host's own eviction never will. On the big card the
+overlap only costs speed; on the small card it costs the stage.

@@ -158,10 +158,11 @@ verdict is not polluted by known-open defects):**
    GPU, do not contend with a render).
 4. **Image defaults** (1.12 below) -- APPLIED 2026-09-01: Klein in every 8 GB / 12 GB /
    AMD profile, AMD images-only, Z-Image cfg 2.0 -> 1.0 on the operator's A/B. Batch R7
-   Leg C then found and fixed the 8 GB residency defect (9b90189a + ad6a635f: the text
-   encoder now leaves the card before the sampler, DynamicVRAM included); Leg C4 is the
-   8 GB measurement of the shipped code. **Auto-download** (1.13 below) -- design row,
-   confirm to schedule.
+   Leg C then found and fixed the 8 GB residency defects (9b90189a + ad6a635f: the text
+   encoder leaves the card before the sampler; da2b7a36: the dispatcher releases the
+   writer LLM before the first local still -- the first-order cause, on the 5080 too);
+   Leg C5 is the 8 GB measurement of the shipped code. **Auto-download** (1.13 below)
+   -- design row, confirm to schedule.
 5. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
 6. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
@@ -660,11 +661,15 @@ Still owed:
   qualifies (presents as cuda).
 * Batch R7 Leg C (RAN 2026-09-02, see Batch R7): Klein renders on 8 GB under the stock
   loader and the Z-Image abort is engine-specific; the 42-min-per-still residency defect it
-  exposed is fixed in two commits -- 9b90189a (free the encoder at its drop; enough on the
-  classic path) and ad6a635f (unload it through ComfyUI's registry at that drop; required
-  under DynamicVRAM, which every stock NVIDIA install runs). The matrix says PROVEN only
-  for what PUBLISHED; the 8 GB row's image column stays a ruled default until a Klein leg
-  reaches obs (Leg C4 is that leg).
+  exposed is fixed in three commits -- 9b90189a and ad6a635f (the encoder leaves the card
+  at its drop, classic and DynamicVRAM paths; a real second-order defect, proven on the
+  5080) and da2b7a36 (the first-order one: the dispatcher releases the writer LLM before
+  the first local still; the 5080 had a 7.4 GB writer co-resident with every still too).
+  Klein on 8 GB under stock launch flags is now MEASURED (Leg C5: ~21 s a still, 1.07 s
+  per step, two stills in one process). The matrix says PROVEN only for what PUBLISHED;
+  the 8 GB row's image column flips when a Klein episode reaches obs, which now depends
+  on the video lane behind it (LTX 2.5 on 8 GB: Leg A's question, being answered by the
+  same Leg C5 as it runs on).
 * The cfg 1.0 promotion step: the same four A/B cells on three real episode prompts
   (announcer portrait, character portrait, scene beat), operator eyeball. One seed is a
   strong lead, not a proof; this confirms it on real content or sends it back.
@@ -943,8 +948,19 @@ session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
   {"clip"})` unloads the named dynamic patcher through ComfyUI's own registry at its drop
   (free 620 MB -> 6998 MB; a 2-step Klein render 9.4 s vs ~4 min). Four-round arc on two
   substitute seats, `docs/2026-09-02-encoder-eviction/driver_anchor.md`; 5080 proof on both
-  paths byte-identical. Leg C4 = ad6a635f under STOCK flags on the 4060, the first 8 GB
-  measurement of the shipped shape; its result is in the clean-room log (Leg results).
+  paths byte-identical. Leg C4 (ad6a635f, STOCK flags) FAILED the same way, and the
+  instrumented Leg C4b showed why: the encoder had never occupied the card (0 resident
+  pages at its drop; 48 MB free) -- the WRITER LLM that composed the still prompts was
+  still resident, and nothing in the general path released it before the image stage
+  (PBUG-20260902-02). Fixed in da2b7a36: `OTR_ImageGenDispatcher` calls the canonical
+  `free_otr_pipeline_residue()` once per dispatch before the first local still. Measured
+  on the 5080 first: the 12B writer (7.4 GB) had been co-resident with every still there
+  too (`allocated 7387 -> 6`, `free 14.4 GB after`, five stills then minted cleanly). Leg C5
+  (da2b7a36, STOCK flags, 06:09) PASSED on the 4060: `free 6.9 GB after`, `Requested to
+  load Flux2 / loaded completely; 5560.68 MB usable, 2591.65 MB loaded`, 1.07 s per step
+  (~21 s a still, was ~42 min), two stills in one server process, then on into LTX 2.5.
+  Klein on 8 GB under stock launch flags is MEASURED. PROVEN (matrix) still waits for the
+  episode to reach obs, which is the LTX 2.5 lane's own 8 GB question (Leg A).
 * Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
   `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
   `docs/MACHINE_MATRIX.md`, then the README newbie pass. Do not advertise a lane the

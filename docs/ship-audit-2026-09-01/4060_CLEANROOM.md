@@ -205,7 +205,20 @@ LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
     before the first local still: free 14.4 GB after`. Five Z-Image stills then minted in
     sequence (cfg 1.0, 8 steps) with no errors; the leg continued into video. Until this
     change the 5080 was rendering stills with a 7.4 GB writer co-resident (17 GB of
-    models on a 16 GB card, paged by DynamicVRAM, silently slower). (4060 result below)
+    models on a 16 GB card, paged by DynamicVRAM, silently slower).
+    4060 RESULT (05:35-, da2b7a36, STOCK flags, DynamicVRAM on, bf16 encoder): PASS.
+    Server log line 360 `pipeline residue freed before the first local still: free 6.9 GB
+    after; ran=unload_llm,_unload_bark,gc.collect,soft_empty_cache,cuda.synchronize,
+    cuda.empty_cache,cuda.ipc_collect`, then line 373-374 `Requested to load Flux2 /
+    loaded completely; 5560.68 MB usable, 2591.65 MB loaded, full load: True`, then the
+    sampler at 1.07 s per step (20 steps, ~21 s a still; it was 120-143 s per step, ~42 min
+    a still, in Legs C, C2, C3, C4), `minted still 832x480 seed=701221525`, GPU 4150 MiB
+    during sampling. The SECOND still loaded the same way (line 395, `5558.68 MB usable,
+    2591.65 MB loaded, full load: True`) -- the multi-still condition met in one server
+    process. The leg then continued into the LTX 2.5 video stage (its own, separate
+    8 GB question; see below). Klein 4B Q4 GGUF on an 8 GB card under stock launch flags
+    is MEASURED at ~21 s a still. Log: server_legC5_da2b7a36_stock_klein.log (the running
+    server.log at the time of writing).
 LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
     staged; `_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
 (The fp8-encoder fallback formerly listed here as Leg C5 is Leg C6 above: 5.6 GB

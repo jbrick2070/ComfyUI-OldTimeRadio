@@ -223,6 +223,18 @@ Z-Image stills minted in sequence with no errors and the leg went on into video.
 still before this change rendered next to a 7.4 GB writer (17 GB of models on 16 GB, paged
 by DynamicVRAM). The 8 GB proof is Leg C5 in the clean-room log.
 
+## Leg C5 outcome (06:09) -- PASS on the 4060 under stock flags
+
+da2b7a36, stock launch, DynamicVRAM on, bf16 encoder. `pipeline residue freed before the first
+local still: free 6.9 GB after` -> `Requested to load Flux2 / loaded completely; 5560.68 MB
+usable, 2591.65 MB loaded, full load: True` -> 1.07 s per step (20 steps, ~21 s a still,
+against 120-143 s per step before) -> `minted still 832x480 seed=701221525`; the second still
+loaded the same way (5558.68 MB usable). Klein 4B Q4 GGUF renders on an 8 GB card with nothing
+special in the launch line. The three commits stand together: 9b90189a + ad6a635f (the encoder
+leaves the card at its drop -- measured, real, second-order) and da2b7a36 (the writer leaves
+the card before the first still -- first-order, on both boxes). The arc's own lesson is in
+memory: probe from the real process state, not from an empty card.
+
 ## What is NOT in scope
 
 The recipe (20 steps, guidance 4.0), the encoder choice (bf16 vs fp8), the video engines'
