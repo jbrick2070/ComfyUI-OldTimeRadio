@@ -86,8 +86,11 @@ what the test promotes. What is still open on the set is in Section 1.6.
 **6. THE LOCAL-LLM ACCEPTANCE SWEEP** -- Leg 0 in-process preflight (Section 1.7,
 ~15-20 min, idle GPU), then the four canonical legs of Batch R3.
 
-**7. DOCS DELETION PASS** -- deletions only, one commit per batch, per the ruling in
-Section 1.8. Do this after item 5 so the receipts the template test cites still exist.
+**7. DOCS DELETION PASS -- DONE 2026-09-02** (operator asked for it early: "any further
+cleanup ... to get rid of really stale docs"). Three deletion-only commits, lists in the
+messages: 45895801 (34 named handoffs / kickoffs / prompts / bakeoff logs), 2bf15784
+(193 dated July docs), 607a5ee7 (180 dated August docs). `docs/` went from 644 tracked
+files to 237. Details and the kept set in Section 1.8.
 
 **8. DESIGN ROWS -- each gets a full arc before code, and none is the next coder
 window:** the one-manifest auto-download (1.9), the ship-audit survivors (1.10), the
@@ -358,13 +361,19 @@ image-stage exposure but does not build the registry.
 
 #### Voice engines
 
-- **bark renders a 17-19 word line as a steady 1.4 kHz tone** (PBUG-20260902-03, the
-  4060 Leg C5 episode: both announcer lines, 13-14.5 s each, were a tone; the 7-10 word
-  character lines spoke). `eng_bark.py` has no long-line chunking and bark's generation
-  window is ~13-14 s. Fix: split a line at sentence / clause boundaries into generations
-  under the window and concatenate, with a test that a 19-word line yields speech-shaped
-  audio (envelope modulation, no single dominant tone). bark stays the zero-setup
-  fallback in the dropdowns, so this is owed even though kokoro is the shipped default.
+- **bark rolls non-speech (a steady tone or a noise floor) on some lines and returns
+  success** (PBUG-20260902-03; ROOT-PINNED 2026-09-02 14:20). The 4060 Leg C5 episode
+  lost both announcer lines to a 1.4 kHz tone; a direct engine probe on the same box
+  then rendered the exact announcer line as speech and a 9-word character line as
+  seven seconds of noise plus a 2.5 kHz tone. So it is the engine's roll, not the
+  announcer graph, not the knobs, not line length (the 180-character chunker already
+  exists). Fix: an OUTPUT GUARD in `eng_bark.py` -- score each take for speech shape
+  (dominant frequency 70-400 Hz with low flatness in most one-second windows), re-roll
+  with `seed + 1` up to twice on a failing score, WARNING-log every re-roll, keep the
+  best take if all fail (the ledger field is always filled). Design choice (threshold,
+  retry count) -> full arc before code; test = a stub engine that returns a tone first
+  and speech second yields speech in one retry. bark is opt-in now (kokoro is the
+  shipped default on both slots), so this is a dropdown-fallback fix, not a ship gate.
 - **Remember, do not build (operator 2026-09-02): the 5080's overnight runs ROTATE voice
   engines on purpose** ("for overnight runs I like to rotate voice models, to be honest,
   since the 5080 can handle them all"; "there's probably no rotation machinery, just
@@ -485,6 +494,28 @@ settings, VRAM, canvas, frame counts) that no profile or engine adapter carries 
 those recipes move INTO the adapter comment or `docs/MACHINE_MATRIX.md` first. No new
 guide gets written. One commit per batch, deletions only, with the list in the message.
 Runs AFTER this plan rewrite has landed, so no pointer the plan keeps is orphaned.
+
+**DONE 2026-09-02 (45895801, 2bf15784, 607a5ee7; 644 -> 237 tracked docs).** How it
+was run: a scripted citation scan over tests, the Bible coverage index, `nodes/`,
+`scripts/`, README, CLAUDE.md, this plan, the rulings and the ship audit produced 378
+uncited dated docs plus 98 uncited named ones; a 13-agent read of every dated candidate
+returned 373 DELETE / 5 KEEP; the driver then grounded the list against the real tree.
+Citations from the append-only history logs (`HANDOFF_LOG`, `PROD_BUG_LOG`,
+`GO_FORWARD_ARCHIVE`) did not keep a doc -- git history holds all of them. Kept on
+purpose: the five recipe carriers (`2026-07-31-PROBLEM-STATEMENT-under-8gb-still-to-video`
+bench table, `2026-08-02-MEASUREMENT-M2-humo-vram-ladder`,
+`2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames`, `2026-08-16-video-sprint-PLAN` LTX 2.3
+distilled recipe, `2026-08-01-fastwan-8gb-MODEL-MANIFEST` with the LoRA sha256 and the
+licence gap -- these still owe a move into the adapter comments or the matrix); the
+08-26 foley-bed operator rulings; every doc a test, the code, this plan, the ship audit,
+`WRITER_INPUT_MATRIX` or `LANE_BUILD_LESSONS` cites (the 09-02 kokoro-onnx and
+encoder-eviction receipts among them); `CFG_PROBLEM_STATEMENT`,
+`COMFY_TEMPLATE_DIFF_PROTOCOL`, `WIDGET_OWNERSHIP_LEGEND`, `SPEC_haunted_image_to_video`
+and its design review, `DEAD_CODE_EXECUTION_PLAN`, the licence attestations, the lane
+receipts, the ship-audit folder, the schema examples and the skills backup. Still
+open from this pass: `workflows/otr_story_only.json` (operator to say whether the
+one-JSON ruling removes it too) and the ~170 dated docs that survived only because a
+history log cites them (a second pass, same rule, if he wants `docs/` smaller still).
 
 ### 1.9 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
 

@@ -10269,3 +10269,44 @@ is video-only), so the tone is bark's output, not clip audio mixed in.
 **Bug Bible:** candidate -- an autoregressive TTS with a fixed generation window must
 chunk its input to that window, or the longest lines (announcer intros) fail first and
 silently, as a tone rather than an error.
+
+**FOLLOW-UP 2026-09-02 14:20 -- the length theory above is WRONG on two counts; the
+cause is bark's own non-speech roll, not the graph, the knobs or the line length.**
+1. `eng_bark.py` DOES chunk: `_chunk_text_for_bark(text, max_len=180)` in
+   `nodes/_otr_bark_lib.py` splits a line at 180 characters, so the 99- and 122-character
+   announcer lines were single chunks either way and "no long-line chunking" was a
+   misread of the adapter.
+2. A direct render on the same 4060 clean room (no graph, `bark_probe_4060.py`, the
+   engine's own `generate_voice`, `announcer_bark_v1` temperatures, fixed seed
+   2096336087, server down) gave: the EXACT `b001` line on `en_speaker_7` -> speech
+   (10.1 s, dominant 105-248 Hz in the voiced seconds, flatness 0.05-0.10 there, two
+   near-silent seconds); the same line on `en_speaker_3` -> speech (13.3 s, 95-158 Hz);
+   and the 9-word character line "That's an order, CHALLENGER. Distribution starts
+   immediately." on `en_speaker_7` -> SEVEN seconds of noise (dominant bin 0 Hz,
+   flatness 0.47-0.56) followed by two seconds of a steady tone at 2524-2679 Hz
+   (flatness 0.038). A short line failed and the long line spoke: the window theory is
+   dead. The same three renders on the 5080 earlier today were all speech.
+   The 4060 runs bark in float16 on CUDA like the 5080 (`_load_bark`, dtype keyed on
+   the device, no small-model switch), so the difference is the roll, not the load.
+   Bark's semantic stage can derail into non-speech tokens on any roll; the odds are
+   per-line and, on this card, high enough to hit two of six lines in one episode.
+
+**STATUS:** ROOT-PINNED (engine roll), FIX-OPEN. What changes in the two fixes above:
+1. unchanged and now shipped: kokoro on both voice slots is the canonical default
+   (`otr_canonical.json` nodes 80-82, commit 00d4b72b), and the bark-voiced floor
+   template is gone from the gallery, so no first episode opens on bark.
+2. REPLACES the chunking item: bark needs an OUTPUT GUARD, not a chunker -- score
+   each generation for speech shape (fraction of one-second windows whose dominant
+   frequency sits in 70-400 Hz with spectral flatness under 0.2; a steady tone or a
+   noise floor scores near zero), re-roll with `seed + 1` up to two more times when it
+   fails, log every re-roll at WARNING with the score, and keep the best-scoring take
+   if all three fail (the ledger field is still filled; a hole is never the answer).
+   This is a legitimate guard by the standing rule -- the alternative is a silent wrong
+   render -- and it is a design choice (threshold, retry count), so it gets the arc
+   before code. Section 1.4 of `docs/GO_FORWARD_PLAN.md`.
+
+**Bug Bible (revised candidate):** an autoregressive TTS can emit non-speech (a tone
+or a noise floor) on any roll and still return success; validate the output's shape
+and re-roll a bounded number of times, never trust the generation's return code.
+Verify condition for coverage: a stub engine that returns a pure tone on the first
+call and speech on the second must produce speech from the guarded path in one retry.
