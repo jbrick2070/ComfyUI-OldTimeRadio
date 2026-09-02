@@ -538,11 +538,11 @@ Receipts and every file:line: `docs/ship-audit-2026-09-01/SHIP_LIST.md` (71 conf
 51 disputed for the operator to rule, section 8). The mechanical items are landed; these
 are not mechanical and each wants a kibitz arc before code:
 
-1. **`workflows/otr_canonical.json` ships `indextts2` as the character voice**, which
-   validates at queue time and dies at render for want of reference WAVs that never
-   ship (`config/voice_reference_bank.json`). Options: ship license-clean WAVs, make the
-   shipped dropdown sets use kokoro/bark, or preflight the resolved `ref_path` files in
-   `OTR_CastLock` BEFORE the writer call. Couples to Section 3 K.
+1. **RULED 2026-09-01, rides Section 1.11:** every shipped voice slot defaults to kokoro;
+   indextts2 (which dies at render for want of reference WAVs that never ship) becomes an
+   install-it-yourself upgrade. What survives as work: preflight the resolved `ref_path`
+   files in `OTR_CastLock` BEFORE the writer call whenever a cloning engine IS selected,
+   so an opt-in user fails in seconds, not after a whole script.
 2. **The `ltx_8gb` profiles pair the only genuinely 8 GB video engine with a 14.5 GB
    writer** (`otr_g4_ltx_8gb.json`, `otr_w45_ltx_8gb.json`). Ship an 8 GB writer with it.
 3. **`_fit_reason` never consults `needs_fp8_te` / `needs_fp4_te`**
@@ -603,6 +603,18 @@ Shape (settle the details in the arc, do not re-derive these):
 * Registry deps: `kokoro-onnx>=0.6.1` and `onnxruntime>=1.20.1` in both manifests (plain
   PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video
   engine holds the GPU; it is an 82M model and faster than realtime on CPU.
+* SHIP SCOPE (operator ruling 2026-09-01: "we can ship all audio lanes with kokoro"): in
+  the same change, `workflows/otr_canonical.json` and every generated variant default BOTH
+  voice slots to kokoro (`char_voice_engine`, `announcer_voice_engine`, `voice_bank`
+  `kokoro_builtin`); indextts2, chatterbox, dia and bark stay in the dropdowns as
+  install-it-yourself upgrades. That dissolves Section 1.9 item 1 (the indextts2 default
+  that dies for want of reference WAVs) and the Section 5 voice-bank item stays parked.
+* THE COMPATIBILITY TABLE IS GENERATED, NOT HAND-KEPT: extend
+  `scripts/otr_machine_matrix.py` to emit a "Voice engines" table into
+  `docs/MACHINE_MATRIX.md` from `nodes/_otr_audio_engines/registry.py` (device_backends,
+  requires_sidecar, requires_vendor, practical_without_gpu, model_requirements) plus a
+  per-engine "ships with the pack / install on your own" column, so README can say "want a
+  better TTS, install it yourself, here is what runs where" and point at one table.
 * DONE WHEN: a clean 3.13 portable install renders a 1-act episode with kokoro voices for
   announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`,
   and the same commit passes on the 5080's 3.12 venv with the torch path still selected.

@@ -2077,3 +2077,21 @@ asking a human**, via Comfy-Org's Discord (`discord.gg/comfyorg`) or a
 GitHub issue on the public `Comfy-Org/registry-backend` tracker (issues
 enabled, 24 open) -- pointing at the two facts above and asking for a manual
 backfill run scoped to `comfyui-old-time-radio`.
+
+## ALL AUDIO LANES SHIP ON KOKORO (operator ruling 2026-09-01, hard)
+
+Operator: *"we can ship all audio lanes with kokoro and let people know: hey, you want a
+better TTS, you can install them on your own, with a matrix of what's compatible."* And,
+the same day: *"kokoro onnx is our new go-to."*
+
+* The shipped default for BOTH voice slots (announcer and character), in the canonical
+  workflow and every generated variant, is kokoro through the kokoro-onnx backend
+  (Section 1.11 of the plan), because it is the only local voice that pip-installs on the
+  Python 3.13 that ComfyUI Desktop and the portable ship, on Linux, and on Mac.
+* indextts2, chatterbox, dia and bark stay in the dropdowns as upgrades the user installs
+  on their own. They are not defaults anywhere, and no shipped graph may depend on a
+  reference WAV that does not ship.
+* What "compatible" means is published as ONE generated table in `docs/MACHINE_MATRIX.md`
+  from the audio engine registry, never a hand-kept list; README points at it.
+* This closes the 2026-09-01 ship-audit blocker about the indextts2 default without
+  shipping WAVs, and it makes the Python 3.12 / 3.13 split irrelevant to voices.
