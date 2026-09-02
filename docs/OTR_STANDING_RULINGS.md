@@ -2206,3 +2206,21 @@ three of the four had not been. They are the authority now; the plan keeps a poi
 * From the archived GGUF generation-deadline row (CLOSED 2026-08-25), the reusable
   lesson: **"A reachability question answered against the default path only is not
   answered."**
+
+## CFG ON THE LTX 2.5 LANE: LOCKED AT 1.0, AND NEVER REASON ABOUT ITS COST (operator 2026-08-20, folded from docs/CFG_PROBLEM_STATEMENT.md on 2026-09-02)
+
+Operator, in his words: *"WOAH BE CAREFUL W/ CFG THAT WAS A LOT OF TROUBLE IN THE VRAM AND
+WE FOUND OUT LATER."* The three LTX 2.5 values (`LTX25_CFG_VIDEO`, `LTX25_CFG_AUDIO`,
+`LTX25_CFG_MODALITY`) are 1.0 and locked; the lab measured that raising any of them pushes
+the render past 16 GiB. That measurement stands. The EXPLANATION that used to sit beside it
+("cfg 1.0 evaluates batch 1, above 1.0 doubles the batch") is FALSE on this lane: the locked
+sampler is `euler_ancestral_cfg_pp`, a CFG++ sampler, and CFG++ passes
+`disable_cfg1_optimization=True` (`comfy/k_diffusion/sampling.py:1284`) and consumes the
+unconditioned pass in its own step maths (:1297), so BOTH passes already run at cfg 1.0.
+Rules: (1) no CFG value changes without a measured receipt; (2) never reason about CFG
+memory from the "1.0 means one pass" rule -- check which sampler is selected first, any
+`*_cfg_pp` sampler forces the second pass back on; (3) never "optimise away" the negative
+conditioning on this lane -- it is live (a reviewer approved exactly that during the OOM
+panel and it was killed one seat from shipping); (4) a CFG belief needs a file and a line.
+Still unmeasured: the true VRAM cost of cfg > 1.0 with this sampler, and whether the CFG++
+double pass is part of why the text encode straddles the card.
