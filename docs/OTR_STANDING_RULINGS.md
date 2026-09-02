@@ -2108,3 +2108,17 @@ JSON."*
 * The machine matrix marks a class PROVEN on Klein only after a measured render on that
   class (Batch R7 Leg C for 8 GB NVIDIA; Apple Silicon and ROCm each need their own). Until
   then the row reads "ruled default, unmeasured".
+
+## MAC AND AMD SHIP IMAGES ONLY (operator ruling 2026-09-01)
+
+Operator: *"I know most video models we have won't work at all on Mac and AMD, so I am
+fine only giving them images if that's the case."*
+
+* The Mac and AMD saved dropdown sets carry NO video-diffusion engine. Their video roles
+  use the still and procedural lanes (`still_*`, `viz_*`) driven by the image engine ruled
+  for the low tier (Klein 4B Q4 GGUF). Nothing in the video registry declares `mps`, and
+  ROCm has no measured render; that is the fact behind the ruling, and it stands until a
+  video engine publishes an episode on one of those machines.
+* `config/machine_classes.json` says so explicitly for the amd class (today it advertises
+  `wan_ti2v`, which is unproven there) and the mac profile; the matrix reads "images only"
+  rather than an unproven video engine.

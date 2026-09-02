@@ -640,6 +640,11 @@ Work, mechanical once the leg below measures it:
   and `docs/MACHINE_MATRIX.md`. The canonical keeps `z_image_turbo`.
 * Registry: `nodes/_otr_image_engines/registry.py` gains `mps` on the `flux2_klein` row ONLY
   after one measured render on Apple Silicon; ROCm already qualifies (presents as cuda).
+* RULED the same day: Mac and AMD ship IMAGES ONLY -- their video roles run the still and
+  procedural lanes over Klein stills; no video-diffusion engine is advertised there until one
+  publishes an episode on that hardware. `machine_classes.json` amd `video` (today `wan_ti2v`,
+  unproven) and the mac profile change with the image flip above; the matrix reads
+  "images only".
 * Batch R7 gets Leg C: `flux2_klein` stills on the 4060 clean room under the stock loader,
   which also tells whether the Z-Image abort (Section 3 L) is engine-specific.
 * The matrix says PROVEN only for what rendered; until then the row reads "ruled default,

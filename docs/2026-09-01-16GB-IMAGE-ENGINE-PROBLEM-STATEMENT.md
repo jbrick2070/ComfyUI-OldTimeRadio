@@ -74,8 +74,15 @@ engine (`image-jury/zab_nvfp4_cfg2.0.png` vs `zab_nvfp4_cfg1.0.png`):
 * cfg 1.0: natural skin, cleaner period grade, more scene detail, and it rendered in half
   the time (7 s vs 13 s for 8 steps).
 
-That is one seed, so it is a lead, not a proof. The bf16 cells at both cfg values follow
-below once the 12.3 GB weight lands, which separates "the recipe" from "the 4-bit weight".
+The bf16 cells (`zab_bf16_cfg2.0.png`, `zab_bf16_cfg1.0.png`, 22 s and 18 s) settle which
+axis it is: at the same cfg the bf16 and nvfp4 frames are near-identical in composition,
+skin tone and grade, while the cfg axis moves both precisions the same way -- cfg 2.0 is
+redder, harder and more crushed in both weights; cfg 1.0 is natural in both. **The
+"bloody faces" look tracks the shipped cfg 2.0 recipe, not the 4-bit weight.** One seed and
+one prompt, so it is a strong lead rather than a proof; the three-prompt operator eyeball
+in "Next actions" is what promotes it. It also means the nvfp4 file (4.5 GB) stays a
+legitimate Blackwell choice and the 16 GB non-Blackwell path can use bf16 without a
+quality argument against it.
 
 ## Options
 
@@ -106,4 +113,9 @@ D. **Retire the notion of a separate 16 GB image tier** and let video engines ca
 4. Text on stills: route every text-bearing card through `still_word`, never through a
    scene engine; this is the defect the jury found on all five engines.
 
-Receipts: `docs/ship-audit-2026-09-01/image-jury/` (jury result, sample map, A/B frames).
+Receipts: `docs/ship-audit-2026-09-01/image-jury/` (jury result, sample map, the four A/B
+frames `zab_{nvfp4,bf16}_cfg{2.0,1.0}.png`).
+
+Related ruling the same day: Mac and AMD ship IMAGES ONLY (no video-diffusion engine
+advertised there until one publishes an episode on that hardware); recorded in
+`docs/OTR_STANDING_RULINGS.md`.
