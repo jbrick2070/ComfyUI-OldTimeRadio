@@ -411,3 +411,7 @@ Files and the one change each carries:
     parity, the signature parity; live proof: render one canonical episode on the shipping
     defaults, freeze it, replay it twice, publish all three, verify seeds equal and the master
     byte-identical, and that the cheap family's receipts stamp too.
+
+## 12. r4 convergence (Sonnet 5, in-process; roster: Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- one seat per round, as the operator ruled 2026-09-02)
+
+CONVERGED. All 21 must-fixes (4 + 9 + 8) traced into sections 6 / 8 / 10 / 11 as taken, with r2 must-fix 9 scoped and the reason confirmed at the files (the per-segment request loop is engine-generic; no LTX boundary is edited). No contradiction between the folds. No new must-fix: no other node between 62 and 92 calls the writer LLM or mints a freeze timestamp; the dispatcher has no IS_CHANGED override and the replay path short-circuits before its cache lookup; ShotLock strict post-audio overlay passes only because the import rebinds the singleton before any peek, which section 10 already requires. **The one thing to settle at coding time:** the haunted engine sampler_inputs field list is read from the live `_build_render_request` and `_recipe_receipt` of `eng_ghost_signal.py` / `eng_ghost_signal_official.py` and pinned in section 13 before `actual_request_sha` is written -- a wrong field set is exactly how two A/A nulls would differ by construction.
