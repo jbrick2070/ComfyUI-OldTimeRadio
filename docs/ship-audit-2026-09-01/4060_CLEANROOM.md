@@ -205,7 +205,10 @@ LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
     before the first local still: free 14.4 GB after`. Five Z-Image stills then minted in
     sequence (cfg 1.0, 8 steps) with no errors; the leg continued into video. Until this
     change the 5080 was rendering stills with a 7.4 GB writer co-resident (17 GB of
-    models on a 16 GB card, paged by DynamicVRAM, silently slower).
+    models on a 16 GB card, paged by DynamicVRAM, silently slower). That leg finished:
+    `RESULT SUCCESS`, 22 LTX 2.5 clips at ~265 s each (the soak profile's own shape),
+    `obs_publish OK -> otr/obs/signal_lost_the_weaver_of_dreams_20260902_052849_..._
+    final.mp4`, prompt executed in 1:57:56; the server was released afterwards.
     4060 RESULT (05:35-, da2b7a36, STOCK flags, DynamicVRAM on, bf16 encoder): PASS.
     Server log line 360 `pipeline residue freed before the first local still: free 6.9 GB
     after; ran=unload_llm,_unload_bark,gc.collect,soft_empty_cache,cuda.synchronize,
@@ -219,6 +222,15 @@ LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
     8 GB question; see below). Klein 4B Q4 GGUF on an 8 GB card under stock launch flags
     is MEASURED at ~21 s a still. Log: server_legC5_da2b7a36_stock_klein.log (the running
     server.log at the time of writing).
+    Nine stills in all (three portraits at 832x480, six scene beats at 1472x832), every
+    one `loaded completely`. Then the LTX 2.5 stage -- Leg A's own question, answered by
+    the same leg: the 12B encoder GGUF pinned to CPU by the engine (`text encoder pinned
+    to CPU; GPU encode spike avoided`), the Q3_K_M DiT `loaded partially; 5418.31 MB
+    usable, 5391.26 MB loaded, 5708.43 MB offloaded`, and the FIRST CLIP PASSED:
+    `ltx25_video TWO-STAGE PASS nodes=3 decode=1664x960 render_elapsed_s=1018.258` --
+    17 min a clip on the 4060 under stock flags, half the DiT streaming from host RAM.
+    The first LTX 2.5 clip ever rendered on an 8 GB card in this project. Seven clips
+    to go at that pace (~2 h) before obs decides PROVEN. (episode result below)
 LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
     staged; `_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
 (The fp8-encoder fallback formerly listed here as Leg C5 is Leg C6 above: 5.6 GB
