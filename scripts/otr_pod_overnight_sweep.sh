@@ -7,8 +7,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=otr_pod_runtime.sh
 source "$SCRIPT_DIR/otr_pod_runtime.sh"
 otr_load_runtime || exit 1
+otr_acquire_campaign_lock "overnight sweep" || exit 1
 
-RESULTS="${OTR_SWEEP_RESULTS:-/root/overnight_results.txt}"
+RESULTS="${OTR_SWEEP_RESULTS:-$OTR_POD_LOG_DIR/overnight_results.txt}"
 ROSTER_FILE=$(mktemp) || exit 1
 if ! otr_profile_roster > "$ROSTER_FILE"; then
   rm -f "$ROSTER_FILE"
@@ -23,7 +24,7 @@ echo "  profiles: ${#PROFILES[@]}" | tee -a "$RESULTS"
 
 run_leg() {
   local profile="$1" acts="$2" log t0 t1 rc result reason
-  log="/root/leg_${profile}_${acts}act.log"
+  log="$OTR_POD_LOG_DIR/leg_${profile}_${acts}act.log"
   if ! otr_ensure_profile_server "$profile"; then
     printf "  %-38s %s-act BOOT_FAILED\n" "$profile" "$acts" | tee -a "$RESULTS"
     return 1

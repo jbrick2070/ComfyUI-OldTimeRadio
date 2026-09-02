@@ -68,7 +68,7 @@ Anything not listed there is a manual install -- see its row below.
 | `viz_camera` | nothing on disk | - | 7 profile(s) |
 | `viz_mandala` | nothing on disk | - | - |
 | `viz_rainbow` | nothing on disk | - | - |
-| `wan_ti2v` | 4 weight file(s) | `otr_fetch_lane_weights.py wan_ti2v` | 10 profile(s) |
+| `wan_ti2v` | 4 weight file(s) | `otr_fetch_lane_weights.py wan_ti2v` | 9 profile(s) |
 
 ## Audio and voice engines
 

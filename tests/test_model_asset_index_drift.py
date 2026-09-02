@@ -55,6 +55,15 @@ def test_h3_command_is_segregated_as_explicit_operator_local():
     assert "python scripts/otr_fetch_lane_weights.py minimax_h3" not in public_block
 
 
+def test_profile_usage_counts_resolve_public_video_ids_to_internal_owners():
+    index = _load("scripts/otr_asset_index.py", "_otr_asset_index_alias_test")
+    profiles = index.collect_profiles()
+
+    assert "otr_runpod_starter" in profiles["wan_ti2v"]
+    assert len(profiles["wan_ti2v"]) == 9
+    assert "wan22_high_video" not in profiles
+
+
 def test_committed_asset_index_has_no_generator_drift():
     index = _load("scripts/otr_asset_index.py", "_otr_asset_index_drift_test")
     committed = (ROOT / "docs" / "MODEL_ASSET_INDEX.md").read_text("utf-8")

@@ -35,7 +35,7 @@ You need four things: ComfyUI, a GPU, the models, and this node pack. ~20 minute
 Use the official [ComfyUI Desktop installer](https://www.comfy.org/download) (easiest), or a
 manual/portable ComfyUI install. Launch it once to confirm it opens in your browser.
 
-**Renting a GPU instead?** Follow [docs/RUNPOD_INSTALL.md](docs/RUNPOD_INSTALL.md) -- it covers any remote Linux host, not only RunPod.
+**Renting a GPU instead?** Follow [docs/RUNPOD_INSTALL.md](docs/RUNPOD_INSTALL.md) -- it covers RunPod and similar NVIDIA CUDA Linux hosts.
 
 ### 2. Install this node pack
 
@@ -99,22 +99,28 @@ with a named error that now tells you which pack to install and where to get
 it — it does not fail silently or half-render. But it stops at render time,
 *after* the model weights have downloaded, which is why it is written here too.
 
-**What the 8 GB haunted profile actually downloads on a clean machine: ~16 GB.**
-The video lane itself is only ~3.9 GB (SD1.5 1.99, `v3_sd15_mm` 1.56, the
+**What the proven 8 GB episode path downloads on a clean machine: about 16
+GB.** The invoked video lane itself is
+only ~3.9 GB (SD1.5 1.99, `v3_sd15_mm` 1.56, the
 domain adapter 0.10, kokoro voices 0.30). The rest arrives through the
 Hugging Face cache the first time the pipeline runs — the writer
 (`gemma-4-E2B-it`, 6.0 GB measured on a clean install 2026-09-01), `musicgen-small`
-(~2.2 GB) and `Kokoro-82M` (~0.3 GB). Every one of them is ungated and needs no token. Worth knowing
-before you start it on a metered connection.
+(~2.2 GB) and `Kokoro-82M` (~0.3 GB). The row also offers Klein as its image
+selection, but AnimateDiff accepts no init still, so provisioning does not
+download or gate the proven episode path on those extra 10,985,506,708 bytes.
+The exact optional Klein recipe is in `docs/RUNPOD_INSTALL.md` for people who
+want to qualify a still-consuming profile.
 
 ### 2b-ii. The GGUF writer lane — install 0.3.33, not the latest
 
-Only needed if you select a `*-GGUF` writer row. It is the lane that runs a
-large writer on a small card, and **it is the only local writer lane that works
-off NVIDIA at all** — bitsandbytes NF4 is CUDA-only, so every Mac, AMD and CPU
-profile in this pack (`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm`,
-`cpu_floor`) runs GGUF through in-process llama.cpp. No Ollama, no sidecar
-process, no extra port.
+Only needed if you select a `*-GGUF` writer row. It is the established lane
+for running a large writer on a small card off NVIDIA: bitsandbytes NF4 is
+CUDA-only, so the committed Mac, AMD and CPU experimental profiles
+(`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm`, `cpu_floor`) use GGUF
+through in-process llama.cpp. The new `--machine amd` front door instead uses
+the smaller E2B Transformers writer with `quant_policy=none`; that route is a
+draft candidate until physical AMD hardware publishes an episode. No Ollama,
+no sidecar process, no extra port.
 
 ```bash
 pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
@@ -301,23 +307,43 @@ it names any missing weight and where it expects it.
 
 ### 5. Run it
 
-**Pick the graph that matches your card.** It is one workflow with different dropdown
-values saved, so nothing below is a different program, only a different set of choices:
+**Pick the graph that matches your card.** Saved GUI graphs and `--machine`
+recipes use the same canonical workflow, but provisioning installs assets only;
+it does not silently rewrite the graph currently open in ComfyUI.
 
 | you have | load this | what it renders |
 |---|---|---|
-| any NVIDIA card, first episode ever | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | zero extra downloads beyond the writer, voices and music: procedural `viz_camera` video, **bark** voices, `musicgen`, the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). Slow-ish, guaranteed to finish, the safest first run on 8 GB and on Python 3.13 |
-| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | AnimateDiff haunted video, kokoro voices (Python 3.12 or older; on 3.13 switch the two voice dropdowns to **bark**), ~16 GB of first-run downloads, plus the AnimateDiff-Evolved pack from section 2b |
-| 16 GB or more | `workflows/otr_canonical.json` (drag it onto the canvas) | the full 12B writer at a 14.5 GB ceiling, `indextts2` character voices (needs reference WAVs you supply, see the console), still-image video by default; switch the video dropdowns to a real engine from the table below once it runs |
+| any NVIDIA card, first episode attempt | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | intended procedural floor: no video or still-image weights; **bark** voices, `musicgen`, and the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). This profile is still `draft`, not a guaranteed or published Python-3.13 receipt |
+| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | The exact 8 GB matrix tuple: AnimateDiff haunted video and Kokoro voices on Python 3.12 or older; about 16 GB for the proven invoked path. Klein remains selectable but is not consumed or downloaded by this video path |
+| 16 GB or more, GUI authoring baseline | `workflows/otr_canonical.json` (drag it onto the canvas) | Mistral/viz-camera/IndexTTS2/Stable Audio baseline. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
-2. Hit **Queue Prompt**.
-3. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
+2. For the exact matrix row without hand-editing dropdowns, leave ComfyUI
+   running and execute this command, replacing only the exact machine key:
+
+   ```powershell
+   # Desktop/source example. Portable users point this at python_embeded\python.exe.
+   $ComfyPython = 'C:\path\to\ComfyUI\.venv\Scripts\python.exe'
+   & $ComfyPython scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0
+   ```
+
+   This loads `workflows/otr_canonical.json` and applies every matrix value
+   before Queue. Change the URL only if your running ComfyUI uses another port.
+   Use the interpreter that launches ComfyUI, never an arbitrary system
+   Python; a standard portable install uses
+   `ComfyUI_windows_portable\python_embeded\python.exe`.
+   Machine rows select Kokoro and therefore require Python 3.12 or earlier. On
+   NVIDIA with Python 3.13 replace `--machine 8gb` with
+   `--profile otr_4060_floor` for the Bark route (the selectors cannot be
+   combined).
+   AMD has no supported Python-3.13 machine route yet.
+3. For a saved GUI graph, hit **Queue Prompt**.
+4. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
    graph rolls a random story bank each run and renders through the procedural still/CRT floor
    — the fast, guaranteed-to-complete path. Swap dropdowns once you're ready for a specific bank
    or a GPU video engine.
-4. Find the finished episode in **`output/otr/obs/`**.
+5. Find the finished episode in **`output/otr/obs/`**.
 
 ---
 
@@ -341,18 +367,27 @@ values saved, so nothing below is a different program, only a different set of c
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 50 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86), RTX 5080 Laptop 16 GB (Blackwell sm_120) |
-| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping`, unproven |
-| **AMD / ROCm** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `shipping`, unproven |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
+| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `draft`, unproven |
+| **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `draft`, unproven |
 
-**Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
+**Use the machine key, not an experimental profile name.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
+
+* **8 GB NVIDIA (RTX 4060, 3070, 2080)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 8gb --list`
+* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 16gb --list`
+* **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
+* **AMD / ROCm (Linux only)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
+
+Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive.
+
+Apple Silicon is still the unproven experimental `otr_mac_mps` profile; CPU-only is `cpu_floor`. Neither is promoted to a machine key or PROVEN until a named physical system publishes an episode.
 
 <!-- END GENERATED: machine-matrix -->
 
 ## Which video models fit your card
 
-**For the full picture -- writer, video, voice, music and image per machine, with what is PROVEN versus merely shipping -- see [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md).** It is generated from the profiles themselves, so it cannot drift from what the code actually offers. The section below is the video-specific detail behind it.
+**For the full picture -- writer, video, voice, music and image per machine, with what is PROVEN versus merely shipping -- see [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md).** Its machine rows and proof receipts come from `config/machine_classes.json`; experimental profile inventory comes from `config/profiles/`. The section below is the video-specific detail behind it.
 
 
 **This table is the profile.** Pick your card, read the column, choose that name
@@ -364,13 +399,17 @@ blank verdict means nobody has measured it -- that is recorded as unknown rather
 than guessed, because a guessed VRAM number is the one thing a user cannot
 recover from.
 
-**Read the 8 GB column as CANDIDATES, not promises**, and here is exactly how
-far the evidence goes.
+**Read each 8 GB claim at its stated proof level.** A physical RTX 4060 8 GB
+has published 6 documented full OTR episodes using AnimateDiff, so the invoked
+writer/video/voice/music episode path is **EPISODE PATH PROVEN**. Separately, a
+raw MiniMax H3 FL2VA ComfyUI recipe produced
+three valid 864x480x90 clips with native audio on the same physical card, with
+7.147/6.788/6.788 GiB peaks. That is **LAB-PROVEN true diffusion**, but it is
+below OTR's canonical 124-model-frame floor and did not use OTR's silent H3
+adapter, so the OTR H3 lanes remain candidates pending their own canonical run.
 
-The strongest 8 GB evidence is a **CLAMPED SIMULATION**, not a run on an 8 GB
-card. `MiniMax H3 MIME I2V` was rendered on the 16 GB card under a
-`--reserve-vram 12` clamp, which forces ComfyUI to operate inside roughly an
-8 GB budget:
+A 5080 `--reserve-vram 12` H3 MIME render is useful comparative evidence, but
+it is a **CLAMPED SIMULATION**, not physical-8-GB proof:
 
 | | measured |
 |---|---|
@@ -393,7 +432,7 @@ otherwise.** It reported the card inventoried (**8,188 MiB VRAM, 31.7 GiB host
 RAM**) but having "rendered nothing" -- true when written, false within days,
 and left standing while an 8 GB RTX 4060 published **five of five source banks**
 on `animatediff15_v3_haunted_video` (`docs/4060_DRILL_LOG.md`, steps 7-19). That
-is why the row above reads PROVEN rather than `?`, and why the per-machine table
+is why the row above reads **EPISODE PATH PROVEN** rather than `?`, and why the per-machine table
 is now GENERATED -- see
 [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md). A hand-kept compatibility
 claim goes stale in the direction that costs a user the most: telling them their
@@ -408,8 +447,8 @@ roughly 6.5 GiB past an 8 GB card's entire capacity, which is why its label says
 | Dropdown name | Measured VRAM | 8 GB | 12 GB | 16 GB |
 |---|---|:--:|:--:|:--:|
 | `ltx098_low_video (16:9)` | 6.8 GiB @ 512x288x161 | maybe | yes | yes |
-| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480 | **likely** | yes | yes |
-| `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | **likely** | yes | yes |
+| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480x90 in the raw recipe lab | candidate: raw 90-frame **LAB-PROVEN**, not an OTR episode | yes | yes |
+| `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | unknown: clamp only, not physical 8 GB proof | yes | yes |
 | `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
 | `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights, hold-2 cadence | **PROVEN** | yes | **PROVEN** |
 | `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |

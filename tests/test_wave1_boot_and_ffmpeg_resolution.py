@@ -75,24 +75,24 @@ def test_a_stock_server_is_still_not_an_h3_boot(monkeypatch):
     assert bc.contract_from_running_server() == bc.DEFAULT
 
 
-def test_h3_asserts_its_OWN_contract_not_the_stripped_policy(monkeypatch):
+def test_h3_asserts_the_matching_8gb_contract_not_the_stripped_policy(monkeypatch):
     """On a real leg the policy adapters see is rebuilt from the ledger's
     `video` section and carries no `launch`, so `contract_for_profile` answers
     `default` -- which constrains nothing. Asserting THAT verified nothing while
-    reading like a defense. H3 declares exactly one compatible contract, so its
-    second check must name it."""
+    reading like a defense. The engine must resolve the physical 8 GB server to
+    its no-reserve contract and assert that exact state."""
     from nodes._otr_video_engines.eng_minimax_h3 import MiniMaxH3VideoEngine
 
     engine = MiniMaxH3VideoEngine()
-    assert tuple(engine.compatible_boot_contracts) == (bc.H3,)
+    assert tuple(engine.compatible_boot_contracts) == (bc.H3, bc.H3_8GB_LAB)
 
     seen = []
+    monkeypatch.setattr(bc, "running_server_boot_state",
+                        lambda: _state(None, True, False))
     monkeypatch.setattr(bc, "assert_running_server",
                         lambda name, state=None: seen.append(name))
-    monkeypatch.setattr(bc, "check_engine_against_profile",
-                        lambda engine, profile: [])
     engine._assert_boot_contract({})  # a stripped, launch-less production policy
-    assert seen == [bc.H3]
+    assert seen == [bc.H3_8GB_LAB]
 
 
 # --------------------------------------------------------------------------- #

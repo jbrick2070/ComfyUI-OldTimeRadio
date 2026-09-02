@@ -115,6 +115,35 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     assert str(director["inputs"]["announcer_image_model"]).startswith("cloud_")
 
 
+def test_runner_accepts_an_explicit_desktop_comfyui_url(tmp_path, monkeypatch):
+    import otr_api
+
+    monkeypatch.setattr(canonical, "COMFYUI_URL", "http://127.0.0.1:8000")
+    monkeypatch.setattr(otr_api, "COMFYUI_URL", "http://127.0.0.1:8000")
+    dump = tmp_path / "prompt.json"
+    rc, out = _run_main([
+        "--offline-schemas", "--dry-run",
+        "--comfyui-url", "http://127.0.0.1:8188/",
+        "--dump-prompt", str(dump),
+    ])
+
+    assert rc == 0
+    assert "comfy_url=http://127.0.0.1:8188" in out
+    assert canonical.COMFYUI_URL == "http://127.0.0.1:8188"
+    assert otr_api.COMFYUI_URL == "http://127.0.0.1:8188"
+
+
+def test_runner_rejects_machine_and_profile_as_competing_selectors():
+    with pytest.raises(SystemExit) as exc:
+        canonical.main([
+            "--offline-schemas", "--dry-run",
+            "--machine", "8gb",
+            "--profile", "otr_4060_floor",
+        ])
+
+    assert exc.value.code == 2
+
+
 ## TOMBSTONE (2026-08-14): test_canonical_words_override_preserves_auto_act_count
 ## used to assert that --words 320 patched OTR_LedgerScriptWriter.target_words
 ## to 320 while leaving act_count untouched at its "auto" default -- proving

@@ -880,11 +880,18 @@ def apply_profile_to_workflow(workflow: dict, profile, schemas: dict) -> dict:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from nodes._otr_shared.capability_profiles import load_profile, load_widget_mapping, cross_validate_profile
+    from nodes._otr_shared.capability_profiles import (
+        load_profile, load_widget_mapping, validate_profile_shape,
+    )
     from nodes._otr_workflow_apply import apply_profile
 
     if isinstance(profile, str):
         profile = load_profile(profile)
+    else:
+        # Machine rows are built in memory rather than loaded through
+        # load_profile(), so this is their production shape boundary. This is
+        # schema validation only, not the removed capability/VRAM gate below.
+        profile = validate_profile_shape(profile, source="machine profile")
     # CAPABILITY CROSS-VALIDATION REMOVED 2026-08-31, by operator directive:
     # "I don't want to maintain any warning gate either", after "let's power
     # through testing without inviting some artificial profile gate".

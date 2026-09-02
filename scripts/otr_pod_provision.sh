@@ -60,6 +60,65 @@ done
 [ -n "$COMFY_PY" ] || fail "no Python interpreter imports folder_paths from $COMFY_ROOT"
 echo "  comfy python: $COMFY_PY"
 
+# Validate the requested OTR recipe before changing ComfyUI core, installing
+# packs, downloading weights, or replacing a prior good runtime receipt. The
+# OTR checkout is the only input this plan check needs, so fetch it first and
+# fail a typo/incompatible Python selection while the pod is still cheap.
+OTR_ROOT="$CUSTOM_NODES/ComfyUI-OldTimeRadio"
+if [ -d "$OTR_ROOT/.git" ]; then
+  git -C "$OTR_ROOT" fetch -q origin v2.0-alpha \
+    || fail "could not fetch OTR v2.0-alpha"
+  git -C "$OTR_ROOT" checkout -q v2.0-alpha \
+    || fail "could not select OTR v2.0-alpha (check local changes)"
+  git -C "$OTR_ROOT" pull -q --ff-only origin v2.0-alpha \
+    || fail "could not fast-forward OTR v2.0-alpha"
+elif [ -e "$OTR_ROOT" ]; then
+  fail "$OTR_ROOT exists but is not a git checkout; move it aside explicitly"
+else
+  git clone -q -b v2.0-alpha "$OTR_REPO_URL" "$OTR_ROOT" \
+    || fail "could not clone OTR v2.0-alpha"
+fi
+cd "$OTR_ROOT" || fail "cannot enter OTR checkout"
+
+# The matrix is the ordinary stranger-facing owner. Explicit profiles remain
+# an override for named HuMo/LTX qualification labs; they are never the hidden
+# default for a new renter.
+VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null \
+  | head -1 | tr -dc '0-9')
+PROFILE="${OTR_PROVISION_PROFILE:-}"
+MACHINE=""
+if [ -n "$PROFILE" ]; then
+  PROVISION_ARGS=(--profile "$PROFILE")
+  SELECTOR="$PROFILE"
+else
+  MACHINE="${OTR_PROVISION_MACHINE:-}"
+  if [ -z "$MACHINE" ]; then
+    [ -n "${VRAM_MIB:-}" ] \
+      || fail "could not detect NVIDIA VRAM; set an exact OTR_PROVISION_MACHINE or OTR_PROVISION_PROFILE"
+    if [ "$VRAM_MIB" -lt 8000 ] 2>/dev/null; then
+      fail "detected ${VRAM_MIB} MiB VRAM, below the supported 8 GB machine floor"
+    fi
+    if [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then
+      MACHINE="16gb"
+    elif [ "${VRAM_MIB:-0}" -ge 10000 ] 2>/dev/null; then
+      MACHINE="12gb"
+    else
+      MACHINE="8gb"
+    fi
+  fi
+  PROVISION_ARGS=(--machine "$MACHINE")
+  SELECTOR="machine:$MACHINE"
+fi
+VOICE_ARGS=()
+[ "${OTR_WITH_INDEXTTS2:-0}" = "1" ] && VOICE_ARGS+=(--with-indextts2)
+[ "${OTR_WITH_ALL_VOICES:-0}" = "1" ] && VOICE_ARGS=(--with-all-voices)
+echo "  selection   : $SELECTOR (VRAM ${VRAM_MIB:-unknown} MiB)"
+if ! "$COMFY_PY" scripts/otr_provision.py \
+    "${PROVISION_ARGS[@]}" "${VOICE_ARGS[@]}" --check-plan; then
+  fail "requested recipe has no complete provision plan; runtime receipt was not changed"
+fi
+echo "  plan verified before core, packs, weights, and receipt publication"
+
 probe_comfy_cuda() {
   "$COMFY_PY" - <<'PY'
 import torch
@@ -175,10 +234,21 @@ fi
 
 # Recover template-scoped model/token settings; SSH does not inherit pid 1's
 # environment on common RunPod images. Secrets are never printed.
+otr_pid1_env() {
+  local wanted="$1" entry
+  [[ -r /proc/1/environ ]] || return 1
+  while IFS= read -r -d '' entry; do
+    if [[ "$entry" == "$wanted="* ]]; then
+      printf '%s' "${entry#*=}"
+      return 0
+    fi
+  done < /proc/1/environ
+  return 1
+}
+
 MODELS_ROOT="${OTR_COMFYUI_MODELS_ROOT:-}"
 if [ -z "$MODELS_ROOT" ]; then
-  MODELS_ROOT=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null \
-    | sed -n 's/^OTR_COMFYUI_MODELS_ROOT=//p' | head -1)
+  MODELS_ROOT=$(otr_pid1_env OTR_COMFYUI_MODELS_ROOT 2>/dev/null || true)
 fi
 [ -n "$MODELS_ROOT" ] || MODELS_ROOT="$COMFY_ROOT/models"
 export OTR_COMFYUI_MODELS_ROOT="$MODELS_ROOT"
@@ -187,18 +257,20 @@ mkdir -p "$HF_HOME"
 echo "  models root: $OTR_COMFYUI_MODELS_ROOT"
 echo "  HF_HOME    : $HF_HOME"
 
-HF_TOKEN_FILE=/root/.hf_token
+HF_TOKEN_FILE="${OTR_HF_TOKEN_FILE:-/root/.hf_token}"
 TOKEN_VALUE=""
 TOKEN_SOURCE=""
-if [ -s "$HF_TOKEN_FILE" ]; then
-  TOKEN_VALUE=$(tr -d ' \t\r\n' < "$HF_TOKEN_FILE")
-  TOKEN_SOURCE="$HF_TOKEN_FILE"
-elif [ -n "${HF_TOKEN:-}" ]; then
+TOKEN_XTRACE_WAS_ON=0
+[[ $- == *x* ]] && { TOKEN_XTRACE_WAS_ON=1; set +x; }
+if [ -n "${HF_TOKEN:-}" ]; then
   TOKEN_VALUE=$(printf '%s' "$HF_TOKEN" | tr -d ' \t\r\n')
   TOKEN_SOURCE="this shell"
+elif [ -s "$HF_TOKEN_FILE" ]; then
+  TOKEN_VALUE=$(tr -d ' \t\r\n' < "$HF_TOKEN_FILE")
+  TOKEN_SOURCE="$HF_TOKEN_FILE"
 else
-  TOKEN_VALUE=$(tr '\0' '\n' < /proc/1/environ 2>/dev/null \
-    | sed -n 's/^HF_TOKEN=//p' | head -1 | tr -d ' \t\r\n')
+  TOKEN_VALUE=$(otr_pid1_env HF_TOKEN 2>/dev/null \
+    | tr -d ' \t\r\n' || true)
   [ -n "$TOKEN_VALUE" ] && TOKEN_SOURCE="the pod template"
 fi
 if [ -n "$TOKEN_VALUE" ]; then
@@ -210,72 +282,103 @@ else
   echo "  HF token   : not found; public lanes work, gated manual files need a token"
 fi
 unset TOKEN_VALUE TOKEN_SOURCE
+[[ "$TOKEN_XTRACE_WAS_ON" -eq 1 ]] && set -x
+unset TOKEN_XTRACE_WAS_ON
 
 # Bash owns only the OTR checkout. Python below owns every partner pack,
 # dependency, automatic lane, and manual-tier verification.
-OTR_ROOT="$CUSTOM_NODES/ComfyUI-OldTimeRadio"
-if [ -d "$OTR_ROOT/.git" ]; then
-  git -C "$OTR_ROOT" fetch -q origin v2.0-alpha \
-    || fail "could not fetch OTR v2.0-alpha"
-  git -C "$OTR_ROOT" checkout -q v2.0-alpha \
-    || fail "could not select OTR v2.0-alpha (check local changes)"
-  git -C "$OTR_ROOT" pull -q --ff-only origin v2.0-alpha \
-    || fail "could not fast-forward OTR v2.0-alpha"
-elif [ -e "$OTR_ROOT" ]; then
-  fail "$OTR_ROOT exists but is not a git checkout; move it aside explicitly"
-else
-  git clone -q -b v2.0-alpha "$OTR_REPO_URL" "$OTR_ROOT" \
-    || fail "could not clone OTR v2.0-alpha"
-fi
-cd "$OTR_ROOT" || fail "cannot enter OTR checkout"
-
 if ! "$COMFY_PY" scripts/otr_provision.py --packs-only; then
   fail "required node packs or dependencies are incomplete"
 fi
 
-# The Python profile router is the sole source of weight ownership. A default
-# keeps the entry point useful for strangers; explicit profiles are encouraged
-# for HuMo and LTX qualification labs.
-VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null \
-  | head -1 | tr -dc '0-9')
-if [ -n "${OTR_PROVISION_PROFILE:-}" ]; then
-  PROFILE="$OTR_PROVISION_PROFILE"
-elif [ "${VRAM_MIB:-0}" -ge 16000 ] 2>/dev/null; then
-  PROFILE="otr_runpod_starter"
-else
-  PROFILE="otr_nvidia_8gb_haunted"
-fi
-VOICE_ARGS=()
-[ "${OTR_WITH_INDEXTTS2:-0}" = "1" ] && VOICE_ARGS+=(--with-indextts2)
-[ "${OTR_WITH_ALL_VOICES:-0}" = "1" ] && VOICE_ARGS=(--with-all-voices)
-echo "  profile     : $PROFILE (VRAM ${VRAM_MIB:-unknown} MiB)"
-
-# Publish one non-secret runtime receipt for every later pod command. Keep
-# explicit operator paths, but derive the ordinary RunPod layout from the
-# ComfyUI tree that was actually proved above. OTR_INDEXTTS2_VENV is
+# Publish one non-secret runtime receipt for every later pod command. The OTR
+# repository path is the exact checkout just fetched and executed above; an
+# ambient/template value cannot redirect later runtime commands to a second
+# tree. Keep the other explicit operator paths, but derive the ordinary RunPod
+# layout from the ComfyUI tree that was actually proved above. OTR_INDEXTTS2_VENV is
 # deliberately absent: on Linux the runtime adapter resolves the offline
 # wrapper through ComfyUI/index-tts, while the online provisioner must use the
 # real vendor venv during downloads.
-OTR_REPO_ROOT="${OTR_REPO_ROOT:-$OTR_ROOT}"
+OTR_REPO_ROOT="$OTR_ROOT"
 OTR_INDEXTTS2_ROOT="${OTR_INDEXTTS2_ROOT:-$(dirname "$COMFY_ROOT")/index-tts}"
 OTR_INDEXTTS2_DIR="${OTR_INDEXTTS2_DIR:-$OTR_INDEXTTS2_ROOT/checkpoints}"
 OTR_INDEXTTS2_WORKER="${OTR_INDEXTTS2_WORKER:-$OTR_ROOT/scripts/_otr_indextts2_worker.py}"
 OTR_VOICE_REFERENCE_BANK="${OTR_VOICE_REFERENCE_BANK:-/workspace/otr-config/voice_reference_bank.portable.json}"
 OTR_PROVISION_PROFILE="$PROFILE"
+OTR_PROVISION_MACHINE="$MACHINE"
+OTR_PROVISION_SELECTOR="$SELECTOR"
+OTR_PROVISION_GENERATION=$(cat /proc/sys/kernel/random/uuid 2>/dev/null \
+  || printf '%s-%s' "$(date -u +%Y%m%dT%H%M%SZ)" "$$")
 OTR_HEADLESS_PORT="${OTR_HEADLESS_PORT:-8188}"
+OTR_RUNTIME_SECRETS_FILE="${OTR_RUNTIME_SECRETS_FILE:-/workspace/otr-config/otr-secrets.env}"
 export OTR_REPO_ROOT COMFY_PY OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR
 export OTR_INDEXTTS2_WORKER OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE
-export OTR_HEADLESS_PORT
+export OTR_PROVISION_MACHINE OTR_PROVISION_SELECTOR OTR_PROVISION_GENERATION
+export OTR_HEADLESS_PORT OTR_RUNTIME_SECRETS_FILE
 
 OTR_RUNTIME_ENV="${OTR_RUNTIME_ENV:-/workspace/otr-config/otr-runtime.env}"
 RUNTIME_DIR=$(dirname "$OTR_RUNTIME_ENV")
 mkdir -p "$RUNTIME_DIR" || fail "could not create runtime receipt directory $RUNTIME_DIR"
+
+# Persist only an audited allowlist in a separate protected file. The ordinary
+# runtime receipt contains the path, never a credential value. This bridges
+# both RunPod template secrets (pid 1) and a one-time no-echo SSH export into
+# later sweep shells without making provider credentials profile requirements:
+# logged-in Desktop users may instead supply hidden prompt auth.
+SECRETS_DIR=$(dirname "$OTR_RUNTIME_SECRETS_FILE")
+mkdir -p "$SECRETS_DIR" || fail "could not create runtime secret directory $SECRETS_DIR"
+SECRETS_XTRACE_WAS_ON=0
+[[ $- == *x* ]] && { SECRETS_XTRACE_WAS_ON=1; set +x; }
+SECRET_KEYS=(HF_TOKEN OTR_COMFY_API_KEY OTR_GOOGLE_API_KEY OPENROUTER_API_KEY)
+declare -A STORED_SECRETS=()
+if [ -s "$OTR_RUNTIME_SECRETS_FILE" ]; then
+  for SECRET_KEY in "${SECRET_KEYS[@]}"; do
+    STORED_SECRETS["$SECRET_KEY"]=$(
+      OTR_SECRET_LOOKUP_KEY="$SECRET_KEY" bash -c '
+        set +x
+        unset HF_TOKEN OTR_COMFY_API_KEY OTR_GOOGLE_API_KEY OPENROUTER_API_KEY
+        source "$1" || exit 1
+        printf "%s" "${!OTR_SECRET_LOOKUP_KEY:-}"
+      ' otr-secret-read "$OTR_RUNTIME_SECRETS_FILE"
+    ) || fail "could not read the existing protected runtime secrets"
+  done
+fi
+SECRETS_TMP=$(mktemp "$SECRETS_DIR/.otr-secrets.env.XXXXXX") \
+  || fail "could not create an atomic runtime secret file"
+SECRET_COUNT=0
+for SECRET_KEY in "${SECRET_KEYS[@]}"; do
+  SECRET_VALUE="${!SECRET_KEY:-}"
+  if [ -z "$SECRET_VALUE" ]; then
+    SECRET_VALUE=$(otr_pid1_env "$SECRET_KEY" 2>/dev/null || true)
+  fi
+  if [ -z "$SECRET_VALUE" ]; then
+    SECRET_VALUE="${STORED_SECRETS[$SECRET_KEY]:-}"
+  fi
+  if [ -n "$SECRET_VALUE" ]; then
+    printf -v "$SECRET_KEY" '%s' "$SECRET_VALUE"
+    export "$SECRET_KEY"
+    printf 'export %s=%q\n' "$SECRET_KEY" "$SECRET_VALUE" >> "$SECRETS_TMP" \
+      || { rm -f "$SECRETS_TMP"; fail "could not write protected runtime secrets"; }
+    SECRET_COUNT=$((SECRET_COUNT + 1))
+  fi
+done
+unset SECRET_KEY SECRET_VALUE SECRET_KEYS STORED_SECRETS
+chmod 600 "$SECRETS_TMP" \
+  || { rm -f "$SECRETS_TMP"; fail "could not protect runtime secrets"; }
+mv -f "$SECRETS_TMP" "$OTR_RUNTIME_SECRETS_FILE" \
+  || { rm -f "$SECRETS_TMP"; fail "could not publish runtime secrets"; }
+echo "  runtime keys: $OTR_RUNTIME_SECRETS_FILE ($SECRET_COUNT credential name(s), mode 0600)"
+[[ "$SECRETS_XTRACE_WAS_ON" -eq 1 ]] && set -x
+unset SECRETS_XTRACE_WAS_ON
+
 RUNTIME_TMP=$(mktemp "$RUNTIME_DIR/.otr-runtime.env.XXXXXX") \
   || fail "could not create an atomic runtime receipt"
 RUNTIME_KEYS=(
   OTR_COMFY_ROOT OTR_REPO_ROOT COMFY_PY OTR_COMFYUI_MODELS_ROOT HF_HOME
   OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR OTR_INDEXTTS2_WORKER
-  OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE OTR_HEADLESS_PORT
+  OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE OTR_PROVISION_MACHINE
+  OTR_PROVISION_SELECTOR OTR_PROVISION_GENERATION OTR_HEADLESS_PORT
+  OTR_RUNTIME_SECRETS_FILE
 )
 for RUNTIME_KEY in "${RUNTIME_KEYS[@]}"; do
   if ! printf 'export %s=%q\n' "$RUNTIME_KEY" "${!RUNTIME_KEY}" >> "$RUNTIME_TMP"; then
@@ -289,7 +392,7 @@ mv -f "$RUNTIME_TMP" "$OTR_RUNTIME_ENV" \
   || { rm -f "$RUNTIME_TMP"; fail "could not publish runtime receipt"; }
 echo "  runtime env : $OTR_RUNTIME_ENV (non-secret)"
 
-if ! "$COMFY_PY" scripts/otr_provision.py --profile "$PROFILE" "${VOICE_ARGS[@]}"; then
+if ! "$COMFY_PY" scripts/otr_provision.py "${PROVISION_ARGS[@]}" "${VOICE_ARGS[@]}"; then
   echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ') ===" >&2
   echo "Read docs/RUNPOD_INSTALL.md for every named manual file." >&2
   exit 1

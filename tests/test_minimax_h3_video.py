@@ -387,10 +387,25 @@ def test_a_truncated_weight_is_refused_by_SIZE_not_traced_by_the_loader(
 
 def test_the_lane_REQUIRES_its_own_boot_contract_and_refuses_the_stock_one(
         engine):
-    assert engine.compatible_boot_contracts == ("h3",)
+    assert engine.compatible_boot_contracts == ("h3", "h3_8gb_lab")
     assert bc.check_engine_against_profile(engine, H3_PROFILE) == []
     problems = bc.check_engine_against_profile(engine, {"launch": {}})
     assert problems and "h3" in problems[0]
+
+
+def test_the_8gb_lab_contract_still_fails_closed_when_sage_is_unknown(
+        engine, monkeypatch):
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True,
+        "reserve_vram_gb": None,
+        "disable_pinned_memory": True,
+        "sage_attention": None,
+        "sage_probe_error": "fixture unknown",
+        "cpu": False,
+    })
+    with pytest.raises(bc.BootContractError, match="SageAttention"):
+        engine._assert_boot_contract({
+            "launch": {"boot_contract": "h3_8gb_lab"}})
 
 
 def test_a_wrong_boot_is_refused_at_PREFLIGHT_by_name(engine, monkeypatch):
@@ -435,13 +450,13 @@ def test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it():
     assert launch["env"] == env
 
 
-def test_the_solo_smoke_path_SELECTS_this_lanes_contract_instead_of_default():
+def test_the_solo_smoke_path_leaves_multi_contract_h3_for_live_resolution():
     """``render_single`` is how every lane smoke runs, and it invents its own
     request -- so anything it does not ask for is absent from every smoke.
 
-    It passed ``profile=None``, which selects ``default``, so the first lane to
-    REQUIRE its own boot could not be smoked on the boot it declares. Same seam
-    and same shape as lane 7's canvas fix one commit earlier.
+    H3 now accepts the measured 16 GB streaming contract and the 8 GB lab
+    contract. Choosing either here would be a guess; the adapter resolves the
+    real running server against those two contracts before it renders.
     """
     from nodes._otr_video_engines import render_driver as rd
 
@@ -458,7 +473,7 @@ def test_the_solo_smoke_path_SELECTS_this_lanes_contract_instead_of_default():
     finally:
         rd._render_one = real
     assert out["ok"] is False               # the deliberate stop, not a render
-    assert captured["profile"] == {"launch": {"boot_contract": "h3"}}
+    assert captured["profile"] is None
 
 
 def test_a_lane_with_more_than_one_contract_is_left_alone_by_that_selection():

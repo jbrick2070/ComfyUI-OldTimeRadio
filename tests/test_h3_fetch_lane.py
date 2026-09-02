@@ -105,6 +105,8 @@ def test_every_h3_profile_stays_operator_only():
     provision = _provisioner()
     profiles = []
     for path in sorted((ROOT / "config" / "profiles").glob("*.json")):
+        if path.stem == "widget_mapping":
+            continue
         profile = provision.load_profile(path.stem)
         roles = profile.get("role_overrides") or {}
         slots = profile.get("slot_overrides") or {}
@@ -125,17 +127,24 @@ def test_every_h3_profile_stays_operator_only():
                 provision.profile_lanes(profile)
             continue
 
-        expected_automatic = [
-            "z_image_int8"
-            if float(profile["llm"]["vram_ceiling_gb"]) <= 8.0
-            else "z_image"
-        ]
+        expected_automatic = []
+        expected_manual = ["h3_operator_only"]
+        if images == {"flux2_klein"}:
+            expected_manual.append("flux2_klein")
+        elif images == {"z_image_turbo"}:
+            expected_automatic.append(
+                "z_image_int8"
+                if float(profile["llm"]["vram_ceiling_gb"]) <= 8.0
+                else "z_image"
+            )
+        else:
+            pytest.fail("H3 profile has an unowned image route: %r" % images)
         if profile["slot_overrides"].get("music_engine") == "stable_audio_3":
             expected_automatic.append("stable_audio_3")
         routes = provision.profile_lanes(profile)
         assert routes == {
             "automatic": expected_automatic,
-            "manual": ["h3_operator_only"],
+            "manual": expected_manual,
         }
         assert "minimax_h3" not in routes["automatic"]
 
@@ -208,6 +217,6 @@ def test_main_fetches_h3_profile_dependencies_then_verifies_operator_lane(
     rc = provision.main(["--profile", "otr_4060_h3_nano"])
 
     assert rc == 0
-    assert fetched == [["z_image_int8", "stable_audio_3"]]
-    assert verified == ["h3_operator_only"]
+    assert fetched == [["stable_audio_3"]]
+    assert verified == ["h3_operator_only", "flux2_klein"]
     assert all("minimax_h3" not in lanes for lanes in fetched)

@@ -170,10 +170,11 @@ _UPSCALE_STAGE_OPTIONAL_KEYS = {
 #: stock ``default`` boot, which is exactly what every one of them meant before
 #: this key existed.
 #:
-#: The NAME is the contract; the knobs it implies still ride ``launch.env``,
-#: which is the only channel a launcher reads. Naming it separately is what
-#: lets preflight say "this profile asked for humo_diet and the server was not
-#: started for it" instead of diffing env dictionaries and guessing intent.
+#: The NAME is the contract. Launchers resolve its real argv through
+#: ``boot_contracts.launch_args_for``; ``launch.env`` remains only the Windows
+#: headless compatibility channel for supported clamp knobs. Naming the
+#: contract is what lets preflight compare against the running server instead
+#: of diffing config dictionaries and guessing intent.
 _LAUNCH_OPTIONAL_KEYS = {
     "boot_contract": lambda v: isinstance(v, str) and bool(v),
 }

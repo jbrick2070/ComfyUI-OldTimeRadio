@@ -18,7 +18,7 @@ the matrix is one file a person can read.
 
 WHY THAT MATTERS beyond tidiness: a value in a .py file is a value nobody
 maintains and nobody can see. This project already shipped a README claiming an
-8 GB card had "rendered nothing" while nine episodes had published from one,
+8 GB card had "rendered nothing" while six documented episodes had published,
 because the claim lived somewhere nobody re-read. Values in data are values a
 reader can check.
 
@@ -58,7 +58,16 @@ def _merged(matrix, row) -> dict:
     """defaults <- row. The row wins. No third source exists."""
     out = copy.deepcopy(matrix.get("defaults") or {})
     out.pop("_comment", None)
-    out.update(copy.deepcopy(row))
+    for key, value in copy.deepcopy(row).items():
+        # Sections are partial overrides in the readable matrix. Merge their
+        # fields so an 8 GB canvas override does not erase fps/beats, and an
+        # AMD dtype override does not erase the device policy.
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            section = copy.deepcopy(out[key])
+            section.update(value)
+            out[key] = section
+        else:
+            out[key] = value
     return out
 
 
@@ -73,6 +82,8 @@ def build_profile(row, matrix=None) -> dict:
     video, image = m.get("video"), m.get("image")
 
     llm = copy.deepcopy(m.get("llm") or {})
+    llm["creative_model"] = m.get("writer_model")
+    llm["technical_model"] = m.get("writer_model")
     llm["vram_ceiling_gb"] = m.get("writer_ceiling_gb")
     llm["quant_policy"] = m.get("quant_policy")
 
@@ -111,28 +122,20 @@ def build_profile(row, matrix=None) -> dict:
         "render": m.get("render"),
         "preflight": {"required_models": [], "required_keys": []},
         "launch": {"sage_attention": False, "extra_args": [], "env": {}},
-        "proven": m.get("proven") or [],
     }
 
 
 def resolve(name: str, matrix=None):
-    """Find a row by key, or by a distinctive fragment of its label.
-
-    Refuses an ambiguous match instead of picking one. A machine guide that
-    quietly selects the wrong row is the failure mode worth avoiding here.
-    """
+    """Find a row by its exact public key; never infer from a GPU label."""
     matrix = matrix or load_matrix()
-    want = str(name or "").strip().lower()
+    # CLI keys are receipt identities, not search terms. Accepting case or
+    # whitespace variants here lets provisioning store a selector that the
+    # launch owner later (correctly) rejects as a different identity.
+    want = str(name or "")
     all_rows = rows(matrix)
     for row in all_rows:
         if key_of(row) == want:
             return row
-    hits = [r for r in all_rows if want and want in str(r.get("label", "")).lower()]
-    if len(hits) == 1:
-        return hits[0]
-    if len(hits) > 1:
-        raise SystemExit("  %r matches %d machines: %s -- name one exactly"
-                         % (name, len(hits), ", ".join(key_of(r) for r in hits)))
     raise SystemExit("  no machine %r. Known: %s"
                      % (name, ", ".join(key_of(r) for r in all_rows)))
 
@@ -148,10 +151,13 @@ def main(argv=None) -> int:
     if args.list or not args.machine:
         print("machines (config/machine_classes.json):")
         for row in rows(matrix):
-            print("  %-6s %-46s %s-%s GB  video=%s"
+            upper = row.get("vram_max_gb")
+            vram_range = ("%s+" % row.get("vram_min_gb")
+                          if upper is None else "%s-%s" % (
+                              row.get("vram_min_gb"), upper))
+            print("  %-6s %-46s %s GB  video=%s"
                   % (key_of(row), str(row.get("label"))[:46],
-                     row.get("vram_min_gb"), row.get("vram_max_gb"),
-                     row.get("video")))
+                     vram_range, row.get("video")))
         return 0
 
     prof = build_profile(resolve(args.machine, matrix), matrix)

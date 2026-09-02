@@ -56,6 +56,27 @@ _NO_ASSET_PREFIXES = ("cloud_", "google_", "viz_", "visualizer")
 _OPERATOR_ONLY_FETCH_LANES = {"minimax_h3"}
 
 
+def _public_engine_resolver():
+    """Load the dependency-free public-id resolver from its sole owner.
+
+    Profiles intentionally save public menu ids (for example
+    ``wan22_high_video``), while asset rows are keyed by the internal engine
+    module (``wan_ti2v``). Counting the raw strings drops those profiles from
+    the generated index even though they select that exact engine.
+    """
+    path = os.path.join(_REPO, "nodes", "_otr_shared", "public_engines.py")
+    spec = importlib.util.spec_from_file_location(
+        "otr_asset_index_public_engines", path)
+    if spec is None or spec.loader is None:
+        raise ImportError("cannot load the public engine resolver from %s" % path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    resolver = getattr(module, "resolve_engine_id", None)
+    if not callable(resolver):
+        raise ImportError("public_engines.py has no callable resolve_engine_id")
+    return resolver
+
+
 def _imports_of(path: str, src: str) -> list:
     pkg = os.path.dirname(path)
     out = []
@@ -130,6 +151,11 @@ def collect_engines() -> list:
 def collect_profiles() -> dict:
     """profile id -> the engines it selects, so a user can start from a profile."""
     by_engine = {}
+    resolve_engine_id = _public_engine_resolver()
+    video_keys = {
+        "character_visual", "announcer_visual", "music_visual",
+        "video_render_engine",
+    }
     for path in sorted(glob.glob(os.path.join(_REPO, "config/profiles/*.json"))):
         try:
             doc = json.load(io.open(path, encoding="utf-8"))
@@ -143,7 +169,10 @@ def collect_profiles() -> dict:
                     "music_engine", "video_render_engine"):
             eng = roles.get(key) or slots.get(key)
             if eng:
-                by_engine.setdefault(str(eng), set()).add(pid)
+                # Public-id resolution owns the VIDEO surface only. Voice and
+                # music ids have separate registries and must pass unchanged.
+                internal = resolve_engine_id(eng) if key in video_keys else eng
+                by_engine.setdefault(str(internal), set()).add(pid)
     return {k: sorted(v) for k, v in by_engine.items()}
 
 

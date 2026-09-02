@@ -75,7 +75,7 @@
     "required_keys": []
   },
   "launch": {
-    "boot_contract": "h3",
+    "boot_contract": "h3_8gb_lab",
     "sage_attention": false,
     "extra_args": [
       "--disable-pinned-memory"

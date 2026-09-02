@@ -20,7 +20,7 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.Co
 
 Start-Sleep -Seconds 2
 
-Write-Host "Booting the unclamped default contract for the H3 profile..." -ForegroundColor Cyan
+Write-Host "Booting the H3 8 GB lab contract (no reserve clamp)..." -ForegroundColor Cyan
 $pinfo = New-Object System.Diagnostics.ProcessStartInfo
 $pinfo.FileName = $LAUNCHCMD
 $pinfo.Arguments = "`"otr_4060_h3_server.log`" FLOOR"

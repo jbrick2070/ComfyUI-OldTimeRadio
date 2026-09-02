@@ -112,6 +112,28 @@ def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
     assert "NEVER stored" in recipe
 
 
+@pytest.mark.parametrize("profile_id", [
+    "otr_4060_h3_nano",
+    "otr_nvidia_8gb_h3",
+])
+def test_8gb_h3_launch_recipe_emits_no_reserve_clamp(
+        profile_id, canonical, schemas, mapping):
+    _variant, _rel, recipe = bv.build_variant(
+        profile_id, schemas=schemas, mapping=mapping, canonical=canonical)
+    args_line = next(line for line in recipe.splitlines()
+                     if line.startswith("- args:"))
+    assert args_line == "- args: `--disable-pinned-memory`"
+    assert "--reserve-vram" not in args_line
+
+    _control, _control_rel, control_recipe = bv.build_variant(
+        "otr_w45_minimax_h3_video", schemas=schemas, mapping=mapping,
+        canonical=canonical)
+    control_args = next(line for line in control_recipe.splitlines()
+                        if line.startswith("- args:"))
+    assert control_args == \
+        "- args: `--reserve-vram 12 --disable-pinned-memory`"
+
+
 def test_build_variant_leaves_canonical_untouched(canonical, schemas,
                                                   mapping):
     before = json.dumps(canonical, sort_keys=True)
@@ -125,8 +147,17 @@ def test_build_variant_leaves_canonical_untouched(canonical, schemas,
 # ---------------------------------------------------------------------------
 
 def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
-                                       mapping):
+                                       mapping, monkeypatch):
     from nodes._otr_workflow_validator import WorkflowValidator
+    from nodes._otr_shared import boot_contracts as bc
+
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True,
+        "reserve_vram_gb": None,
+        "disable_pinned_memory": False,
+        "sage_attention": False,
+        "cpu": True,
+    })
 
     variant, rel, _recipe = bv.build_variant(
         "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
@@ -149,6 +180,32 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
     with pytest.raises(ValueError, match="MASTER-HASH MISMATCH"):
         v._assert_stamp(str(bad), "cpu_floor", stamped_hash,
                         bv.GENERATED_BY)
+
+
+def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
+        tmp_path, canonical, schemas, mapping, monkeypatch):
+    from nodes._otr_workflow_validator import WorkflowValidator
+    from nodes._otr_shared import boot_contracts as bc
+
+    variant, _rel, _recipe = bv.build_variant(
+        "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
+    vnode = next(n for n in variant["nodes"]
+                 if n["type"] == "OTR_WorkflowValidator")
+    path = tmp_path / "otr_cpu_floor.json"
+    path.write_text(bv._dump(variant), encoding="utf-8")
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True,
+        "reserve_vram_gb": None,
+        "disable_pinned_memory": False,
+        "sage_attention": False,
+        "cpu": False,
+    })
+
+    with pytest.raises(ValueError, match="needs --cpu ON"):
+        WorkflowValidator()._assert_stamp(
+            str(path), "cpu_floor", vnode["widgets_values"][4],
+            bv.GENERATED_BY,
+        )
 
 
 # ---------------------------------------------------------------------------

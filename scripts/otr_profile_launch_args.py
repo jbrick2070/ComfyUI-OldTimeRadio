@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve one OTR profile into the exact ComfyUI launch contract.
+"""Resolve one OTR profile or ``machine:<key>`` into a launch contract.
 
 The output is data, never shell code.  Pod launchers consume it through a
 checked temporary file so a failed resolver cannot look like an empty/default
@@ -13,6 +13,7 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,10 +23,56 @@ PROFILES = ROOT / "config" / "profiles"
 BOOT_CONTRACTS_PATH = ROOT / "nodes" / "_otr_shared" / "boot_contracts.py"
 PROFILE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+RUNTIME_IDENTITY_KEYS = (
+    "OTR_COMFY_ROOT", "OTR_REPO_ROOT", "COMFY_PY",
+    "OTR_COMFYUI_MODELS_ROOT", "HF_HOME", "OTR_INDEXTTS2_ROOT",
+    "OTR_INDEXTTS2_DIR", "OTR_INDEXTTS2_WORKER",
+    "OTR_VOICE_REFERENCE_BANK", "OTR_OUTPUT_ROOT", "OTR_OUTPUT_DIR",
+    "OTR_OBS_DIR", "OTR_TMP", "TMP", "TEMP", "OTR_GPU_LEASE_DIR",
+    "OTR_HEADLESS_PORT", "COMFYUI_URL", "OTR_PROVISION_GENERATION",
+    "OTR_RUNTIME_SECRETS_FILE",
+)
+SECRET_IDENTITY_KEYS = (
+    "HF_TOKEN", "OTR_COMFY_API_KEY", "OTR_GOOGLE_API_KEY",
+    "OPENROUTER_API_KEY",
+)
 
 
 class LaunchConfigError(RuntimeError):
     """A profile cannot be represented by the audited launch channel."""
+
+
+def _git_head(path: str) -> str:
+    """Return a checkout identity without making git availability a gate."""
+    if not path:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "-C", path, "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _runtime_identity() -> dict:
+    """Non-secret server inputs plus hashes of inherited credentials."""
+    values = {key: os.environ.get(key, "") for key in RUNTIME_IDENTITY_KEYS}
+    secrets = {}
+    for key in SECRET_IDENTITY_KEYS:
+        value = os.environ.get(key, "")
+        secrets[key] = (hashlib.sha256(value.encode("utf-8")).hexdigest()
+                        if value else "")
+    otr_root = values.get("OTR_REPO_ROOT") or str(ROOT)
+    return {
+        "env": values,
+        "secret_hashes": secrets,
+        "revisions": {
+            "comfyui": _git_head(values.get("OTR_COMFY_ROOT", "")),
+            "otr": _git_head(otr_root),
+        },
+    }
 
 
 def _load_boot_contracts():
@@ -42,6 +89,28 @@ def _load_boot_contracts():
 
 
 def load_profile(profile_id: str) -> dict:
+    if str(profile_id or "").startswith("machine:"):
+        machine_key = str(profile_id).split(":", 1)[1]
+        if not PROFILE_ID_RE.fullmatch(machine_key):
+            raise LaunchConfigError(f"invalid machine key: {machine_key!r}")
+        helper_path = ROOT / "scripts" / "otr_machine_profile.py"
+        spec = importlib.util.spec_from_file_location(
+            "otr_launch_machine_profile", helper_path)
+        if spec is None or spec.loader is None:
+            raise LaunchConfigError(
+                f"cannot load machine-profile owner: {helper_path}")
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        try:
+            matrix = helper.load_matrix()
+            profile = helper.build_profile(helper.resolve(machine_key, matrix), matrix)
+        except SystemExit as exc:
+            raise LaunchConfigError(str(exc)) from exc
+        if str(profile.get("id") or "") != profile_id:
+            raise LaunchConfigError(
+                f"machine selector drift: requested {profile_id!r}, "
+                f"builder returned {profile.get('id')!r}")
+        return profile
     if not PROFILE_ID_RE.fullmatch(profile_id or ""):
         raise LaunchConfigError(f"invalid profile id: {profile_id!r}")
     path = PROFILES / f"{profile_id}.json"
@@ -112,18 +181,14 @@ def resolve_launch(profile: dict) -> dict:
             "expected %r, got %r" % (contract_name, wanted_sage, sage)
         )
 
-    argv: list[str] = []
-    reserve = contract_spec.get("reserve_vram_gb")
-    if reserve is not None:
-        argv.extend(("--reserve-vram", "%g" % float(reserve)))
-    if contract_spec.get("disable_pinned_memory") is True:
-        argv.append("--disable-pinned-memory")
+    argv = contracts.launch_args_for(contract_name)
 
     fingerprint_doc = {
         "argv": argv,
         "boot_contract": contract_name,
         "env": {key: env[key] for key in sorted(env)},
         "sage_attention": sage,
+        "runtime": _runtime_identity(),
     }
     fingerprint = hashlib.sha256(
         json.dumps(
@@ -146,7 +211,8 @@ def resolve_launch(profile: dict) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("profile", help="exact config/profiles id")
+    parser.add_argument(
+        "profile", help="exact config/profiles id or machine:<matrix-key>")
     parser.add_argument(
         "--mode",
         choices=("args", "env", "contract", "fingerprint", "requires-indextts2"),
@@ -160,7 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.mode == "args":
-        print("\n".join(resolved["argv"]))
+        rows = resolved["argv"]
+        sys.stdout.write("\n".join(rows) + ("\n" if rows else ""))
     elif args.mode == "env":
         for key in sorted(resolved["env"]):
             print(f"{key}={resolved['env'][key]}")

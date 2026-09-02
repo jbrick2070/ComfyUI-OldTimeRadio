@@ -342,6 +342,9 @@ class WorkflowValidator:
         are overwritten). The VRAM OOM budget is owned by the operator's
         tier JSON now, so no ceiling is exported."""
         from ._otr_shared.capability_profiles import ProfileError, load_profile
+        from ._otr_shared.boot_contracts import (
+            BootContractError, assert_running_server, contract_for_profile,
+        )
         try:
             profile = load_profile(profile_id)
         except ProfileError as e:
@@ -377,6 +380,10 @@ class WorkflowValidator:
                 f"profile {profile_id!r} targets platform "
                 f"{profile['platform']!r}; this host is "
                 f"{host['platform']!r} -> suggested tier: cpu_floor")
+        try:
+            assert_running_server(contract_for_profile(profile))
+        except BootContractError as exc:
+            problems.append(str(exc))
         if problems:
             raise ValueError(
                 "OTR_WorkflowValidator: STAMP ASSERTION FAILED (the stamped "

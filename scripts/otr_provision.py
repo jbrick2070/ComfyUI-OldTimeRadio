@@ -35,6 +35,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1505,10 +1506,63 @@ _ANIMATEDIFF_ENGINES = {
     "animatediff15_video",
     "ghost_signal_official",
 }
+# Registered OTR-native video routes that own no downloadable video weights.
+# They still consume the separately routed image/music lanes below. Keeping
+# this explicit avoids importing ComfyUI's registry before dependencies are
+# installed while ensuring an exact no-weight selection is not mistaken for an
+# unknown engine or silently replaced with another lane.
+_NO_WEIGHT_VIDEO_ENGINES = {
+    "still_flat",
+    "still_motion",
+    "still_pan",
+    "still_word",
+    "viz_camera",
+    "viz_green",
+    "viz_mxc_cpu",
+    "viz_mxc_mandala",
+}
+# These engines explicitly consume no init still. Keep the capability beside
+# the lightweight install-routing table: importing their ComfyUI adapters
+# before packs and weights exist would make provisioning depend on the thing it
+# is meant to install. AnimateDiff Ghost Signal owns its subject from text
+# (`required_inputs=("text_prompt",)`, `accepts_still=False`), so its proven
+# 4060 path must not be gated on an ~11 GB Klein bundle it cannot invoke.
+# Still/pan/motion routes remain image consumers despite owning no video
+# weights.
+_NO_STILL_VIDEO_ENGINES = _ANIMATEDIFF_ENGINES | {
+    "viz_camera",
+    "viz_green",
+    "viz_mxc_cpu",
+    "viz_mxc_mandala",
+}
+# Provider-side routes own no local video weights. Keep them distinct from the
+# OTR-native set: provisioning can truthfully skip a download, while the
+# selected adapter still fails loud at invocation when its provider key is
+# absent. Only routes exercised by a shipping profile belong here.
+_REMOTE_NO_WEIGHT_VIDEO_ENGINES = {
+    "cloud_wan_i2v",
+    "cloud_wan_i2v_audio",
+    "google_omni_video",
+    "google_veo_video",
+    "word_razzle",
+}
+_REMOTE_NO_WEIGHT_IMAGE_ENGINES = {
+    "cloud_flux_pro",
+    "cloud_nano_banana_2",
+    "cloud_seedream_2",
+    "cloud_krea_2_turbo",
+    "cloud_luma_photon_flash",
+    "ideo",
+    "google_image",
+}
+_PROFILE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 def load_profile(profile_id: str) -> dict:
-    path = os.path.join(_REPO, "config", "profiles", str(profile_id) + ".json")
+    profile_id = str(profile_id or "")
+    if not _PROFILE_ID_RE.fullmatch(profile_id):
+        raise ProvisionFailure("invalid profile id: %r" % profile_id)
+    path = os.path.join(_REPO, "config", "profiles", profile_id + ".json")
     if not os.path.isfile(path):
         raise ProvisionFailure(
             "profile %r does not exist; use an exact config/profiles id" % profile_id)
@@ -1518,6 +1572,10 @@ def load_profile(profile_id: str) -> dict:
         raise ProvisionFailure("cannot load profile %r: %s" % (profile_id, exc))
     if not isinstance(profile, dict):
         raise ProvisionFailure("profile %r is not a JSON object" % profile_id)
+    if str(profile.get("id") or "") != profile_id:
+        raise ProvisionFailure(
+            "profile filename/id drift: requested %r, document says %r"
+            % (profile_id, profile.get("id")))
     return profile
 
 
@@ -1545,50 +1603,71 @@ def profile_lanes(profile) -> dict:
     pid = str(profile.get("id") or "").strip()
     roles = profile.get("role_overrides", {}) or {}
     slots = profile.get("slot_overrides", {}) or {}
-    video = str(slots.get("video_render_engine") or
-                roles.get("character_visual") or "").strip()
-    video = _PUBLIC_VIDEO_IDS.get(video, video)
+    slot_video = str(slots.get("video_render_engine") or "").strip()
+    role_pairs = (
+        ("announcer_visual", "announcer_image"),
+        ("music_visual", "music_image"),
+        ("character_visual", "character_image"),
+    )
+    selected_role_videos = {}
+    for video_key, image_key in role_pairs:
+        raw = str(roles.get(video_key) or slot_video).strip()
+        selected_role_videos[image_key] = _PUBLIC_VIDEO_IDS.get(raw, raw)
+    selected_videos = {
+        selected for selected in selected_role_videos.values() if selected
+    }
+    if slot_video:
+        selected_videos.add(_PUBLIC_VIDEO_IDS.get(slot_video, slot_video))
     images = {
-        str(roles.get(key) or "").strip()
-        for key in ("announcer_image", "music_image", "character_image")
-        if str(roles.get(key) or "").strip()
+        str(roles.get(image_key) or "").strip()
+        for _video_key, image_key in role_pairs
+        if (str(roles.get(image_key) or "").strip()
+            and selected_role_videos[image_key]
+            not in _NO_STILL_VIDEO_ENGINES)
     }
     music = str(slots.get("music_engine") or "").strip()
 
     automatic = []
     manual = []
-    if video in _H3_ENGINES:
-        manual.append("h3_operator_only")
-    elif video in _LTX25_ENGINES:
-        manual.append("ltx25")
-    elif video in _HUMO14_ENGINES:
-        automatic.append("humo")
-    elif video in _HUMO17_ENGINES:
-        manual.append("humo_1_7b")
-    elif video == "wan_ti2v":
-        automatic.append("wan_ti2v_gguf")
-    elif video == "ltx_8gb":
-        automatic.append("ltx_8gb")
-    elif video in _ANIMATEDIFF_ENGINES:
-        automatic.append("haunted")
-    else:
-        raise ProvisionFailure(
-            "profile %r selects unrecognized video engine %r; no fallback was chosen"
-            % (pid, video))
+    for video in sorted(selected_videos):
+        if video in _H3_ENGINES:
+            manual.append("h3_operator_only")
+        elif video in _LTX25_ENGINES:
+            manual.append("ltx25")
+        elif video in _HUMO14_ENGINES:
+            automatic.append("humo")
+        elif video in _HUMO17_ENGINES:
+            manual.append("humo_1_7b")
+        elif video == "wan_ti2v":
+            automatic.append("wan_ti2v_gguf")
+        elif video == "ltx_8gb":
+            automatic.append("ltx_8gb")
+        elif video in _ANIMATEDIFF_ENGINES:
+            automatic.append("haunted")
+        elif video in (_NO_WEIGHT_VIDEO_ENGINES |
+                       _REMOTE_NO_WEIGHT_VIDEO_ENGINES):
+            pass
+        else:
+            raise ProvisionFailure(
+                "profile %r selects unrecognized video engine %r; "
+                "no fallback was chosen" % (pid, video))
 
-    if "flux2_klein" in images:
-        manual.append("flux2_klein")
-    elif "z_image_turbo" in images:
-        try:
-            low_vram = float(
-                (profile.get("llm", {}) or {}).get("vram_ceiling_gb")) <= 8.0
-        except (TypeError, ValueError):
-            low_vram = False
-        automatic.append("z_image_int8" if low_vram else "z_image")
-    elif images:
-        raise ProvisionFailure(
-            "profile %r selects unrecognized image engine(s): %s"
-            % (pid, ", ".join(sorted(images))))
+    try:
+        low_vram = float(
+            (profile.get("llm", {}) or {}).get("vram_ceiling_gb")) <= 8.0
+    except (TypeError, ValueError):
+        low_vram = False
+    for image in sorted(images):
+        if image == "flux2_klein":
+            manual.append("flux2_klein")
+        elif image == "z_image_turbo":
+            automatic.append("z_image_int8" if low_vram else "z_image")
+        elif image in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
+            pass
+        else:
+            raise ProvisionFailure(
+                "profile %r selects unrecognized image engine %r; "
+                "no fallback was chosen" % (pid, image))
 
     if music == "stable_audio_3":
         automatic.append("stable_audio_3")
@@ -1612,6 +1691,23 @@ def profile_requires_indextts2(profile: dict) -> bool:
         str(slots.get(name) or "").strip() == "indextts2"
         for name in ("char_voice_engine", "announcer_voice_engine")
     )
+
+
+def profile_python_issue(profile: dict, version_info=None) -> str:
+    """Return the deterministic interpreter/voice incompatibility, if any."""
+    version_info = sys.version_info if version_info is None else version_info
+    slots = profile.get("slot_overrides", {}) or {}
+    voices = {
+        str(slots.get(name) or "").strip()
+        for name in ("char_voice_engine", "announcer_voice_engine")
+    }
+    if "kokoro" in voices and tuple(version_info[:2]) >= (3, 13):
+        return (
+            "selected Kokoro voice cannot be installed on Python 3.13; "
+            "use Python 3.12 or earlier; on NVIDIA, the Bark-based "
+            "otr_4060_floor profile is the supported Python 3.13 floor"
+        )
+    return ""
 
 
 def _print_receipt(success: str = "everything installed.") -> int:
@@ -1640,8 +1736,14 @@ def main(argv=None) -> int:
                          "chatterbox, dia. Large; each gets its own venv.")
     ap.add_argument("--with-indextts2", action="store_true",
                     help="build the isolated voice-cloning environment (large)")
-    ap.add_argument("--list", action="store_true",
-                    help="show what would be installed, install nothing")
+    plan_mode = ap.add_mutually_exclusive_group()
+    plan_mode.add_argument("--list", action="store_true",
+                           help="show what would be installed, install nothing")
+    plan_mode.add_argument(
+        "--check-plan", action="store_true",
+        help="validate exact route ownership and interpreter compatibility; "
+             "install nothing and return nonzero when the plan cannot run",
+    )
     ap.add_argument("--packs-only", action="store_true",
                     help="install/verify node packs and OTR dependencies only")
     args = ap.parse_args(argv)
@@ -1659,15 +1761,29 @@ def main(argv=None) -> int:
             say("FAILED", "profile selection", str(exc))
             return _print_receipt()
 
+        if args.check_plan:
+            issue = profile_python_issue(profile)
+            if issue:
+                say("MISSING", "selected voice runtime", issue)
+                return _print_receipt()
+            print("READY: complete provision plan for %s" % profile.get("id", "?"))
+            return 0
+
         if args.list:
             print("OTR provision plan (nothing installed or hashed)")
             print("  selector     : %s" % profile.get("id", "?"))
             print("  automatic    : %s" %
                   (", ".join(routes["automatic"]) or "none"))
             print("  manual tiers : %s" % (", ".join(routes["manual"]) or "none"))
+            required_keys = list(
+                (profile.get("preflight") or {}).get("required_keys") or [])
+            print("  required keys: %s" %
+                  (", ".join(required_keys) or "none"))
             print("  IndexTTS2    : %s" %
                   ("required by profile" if profile_requires_indextts2(profile)
                    else "not selected by profile"))
+            issue = profile_python_issue(profile)
+            print("  Python       : %s" % (issue or "compatible"))
             for tier_id in routes["manual"]:
                 if tier_id in OPERATOR_ONLY_TIERS:
                     print("\n  %s: %s" % (tier_id, OPERATOR_ONLY_TIERS[tier_id]))
@@ -1683,6 +1799,11 @@ def main(argv=None) -> int:
                           (item["bytes"], item["sha256"],
                            "  TERMS/TOKEN" if item.get("gated") else ""))
             return 0
+
+        issue = profile_python_issue(profile)
+        if issue:
+            say("MISSING", "selected voice runtime", issue)
+            return _print_receipt()
 
     try:
         comfy = comfy_root()

@@ -59,12 +59,52 @@ def test_the_default_contract_constrains_nothing():
     assert bc.launch_env_for(bc.DEFAULT) == {}
 
 
+def test_cpu_contract_owns_the_real_comfyui_argv():
+    assert bc.contract_spec(bc.CPU)["cpu"] is True
+    assert bc.launch_args_for(bc.CPU) == ["--cpu"]
+    assert bc.launch_env_for(bc.CPU) == {}
+    assert bc.check_running_server(
+        bc.CPU, {"available": True, "cpu": True}) == []
+    assert "--cpu" in " ".join(bc.check_running_server(
+        bc.CPU, {"available": True, "cpu": False}))
+    with pytest.raises(bc.BootContractError, match="generated launch recipe"):
+        bc.assert_running_server(
+            bc.CPU, {"available": True, "cpu": False})
+
+
+def test_cpu_contract_is_identified_from_the_running_server(monkeypatch):
+    monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
+        "available": True,
+        "reserve_vram_gb": None,
+        "disable_pinned_memory": False,
+        "sage_attention": False,
+        "cpu": True,
+    })
+    assert bc.contract_from_running_server() == bc.CPU
+
+
+@pytest.mark.parametrize(
+    "contract", [bc.HUMO_DIET, bc.H3, bc.H3_8GB_LAB, bc.LTX_AV_DIET])
+def test_gpu_diet_contracts_reject_a_conflicting_cpu_only_boot(contract):
+    state = {
+        "available": True,
+        "reserve_vram_gb": 12.0,
+        "disable_pinned_memory": True,
+        "sage_attention": False,
+        "cpu": True,
+    }
+
+    assert "CPU-only mode ON" in " ".join(
+        bc.check_running_server(contract, state))
+
+
 def test_dont_care_is_distinct_from_required_off():
     """`None` means the contract does not constrain that knob; `False` would
     mean it REQUIRES it off. Collapsing the two would let a contract silently
     forbid an unrelated flag."""
     assert bc.BOOT_CONTRACTS[bc.HUMO_DIET]["sage_attention"] is None
     assert bc.BOOT_CONTRACTS[bc.H3]["sage_attention"] is False
+    assert bc.BOOT_CONTRACTS[bc.H3_8GB_LAB]["sage_attention"] is False
 
 
 def test_the_humo_diet_is_the_measured_pair_not_a_round_number():
@@ -73,6 +113,17 @@ def test_the_humo_diet_is_the_measured_pair_not_a_round_number():
     spec = bc.contract_spec(bc.HUMO_DIET)
     assert spec["reserve_vram_gb"] == 2.921
     assert spec["disable_pinned_memory"] is True
+
+
+def test_the_physical_8gb_h3_lab_launch_emits_no_reserve_clamp():
+    """A 12 GiB reserve on an 8 GiB card is impossible, not conservative."""
+    spec = bc.contract_spec(bc.H3_8GB_LAB)
+    assert spec["reserve_vram_gb"] is None
+    assert spec["disable_pinned_memory"] is True
+    assert spec["sage_attention"] is False
+    assert bc.launch_args_for(bc.H3_8GB_LAB) == ["--disable-pinned-memory"]
+    assert bc.launch_env_for(bc.H3_8GB_LAB) == {
+        "OTR_HEADLESS_DISABLE_PINNED": "1"}
 
 
 def test_an_unknown_contract_raises_rather_than_meaning_no_constraints():
@@ -254,10 +305,10 @@ def test_sage_is_checked_only_when_the_contract_names_it():
 # REQUIRE a contract
 # ---------------------------------------------------------------------------
 
-def test_an_engine_that_declares_nothing_is_compatible_with_everything():
-    """Every lane that shipped before this mechanism keeps working."""
+def test_an_engine_that_declares_nothing_keeps_legacy_boots_not_cpu():
+    """Legacy tuning remains compatible; a device change is never implied."""
     assert set(bc.compatible_contracts_for_engine(
-        vreg.get_engine("wan_ti2v"))) == set(bc.BOOT_CONTRACTS)
+        vreg.get_engine("wan_ti2v"))) == set(bc.BOOT_CONTRACTS) - {bc.CPU}
 
 
 def test_the_hero_tier_keeps_default_because_it_has_shipped_under_it(engine):

@@ -54,22 +54,24 @@ def _comfy(tmp_path: Path) -> Path:
     return root
 
 
-def test_runpod_ltx_manual_recipe_carries_authoritative_manifest():
-    """The copy/paste recipe may not drift from the executable manifest."""
+def test_runpod_manual_recipes_carry_every_authoritative_manifest():
+    """No manual receipt may point at a playbook that omits its exact files."""
     provision = _load_provision()
     playbook = (REPO / "docs" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8"
     )
-    artifacts = provision.MANUAL_TIERS["ltx25"]
-
-    assert len(artifacts) == 5
-    for artifact in artifacts:
-        for field in ("repo", "revision", "path", "destination", "sha256"):
-            assert artifact[field] in playbook, (
-                f"LTX 2.5 manual recipe is missing {field}="
-                f"{artifact[field]!r}"
-            )
-        assert str(artifact["bytes"]) in playbook
+    assert set(provision.MANUAL_TIERS) == {
+        "ltx25", "humo_1_7b", "flux2_klein",
+    }
+    for tier_id, artifacts in provision.MANUAL_TIERS.items():
+        assert artifacts, f"manual tier {tier_id} has no artifacts"
+        for artifact in artifacts:
+            for field in ("repo", "revision", "path", "destination", "sha256"):
+                assert artifact[field] in playbook, (
+                    f"{tier_id} manual recipe is missing {field}="
+                    f"{artifact[field]!r}"
+                )
+            assert str(artifact["bytes"]) in playbook
     assert 'mv -f "$part" "$dest" || {' in playbook
     assert 'rm -f "$part"' in playbook
 

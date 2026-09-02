@@ -23,7 +23,7 @@
     D  h3              2 lanes  reserve 12 GB + no pinned host memory
 
   Group D is the only one the ENGINE itself forces apart -- minimax_h3
-  declares `compatible_boot_contracts = ("h3",)` and enforces it. B and C are
+  accepts only its named `h3` / `h3_8gb_lab` contracts and enforces them. B and C are
   separated because their shipping profiles ask for a different boot, not
   because the engine refuses one.
 

@@ -40,6 +40,9 @@ sys.path.insert(0, str(REPO))
 from nodes._otr_shared.capability_profiles import (  # noqa: E402
     PROFILE_DIR, load_profile,
 )
+from nodes._otr_shared.boot_contracts import (  # noqa: E402
+    contract_for_profile, launch_args_for,
+)
 from nodes._otr_workflow_apply import (  # noqa: E402
     apply_profile, build_offline_schemas, load_widget_mapping,
     patch_widget_by_name, semantic_master_hash,
@@ -213,7 +216,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
     preflight = profile.get("preflight") or {}
     backend = profile.get("device_backend")
     vendor = profile.get("gpu_vendor")
-    args = list(launch.get("extra_args") or [])
+    args = launch_args_for(contract_for_profile(profile))
     env = dict(launch.get("env") or {})
 
     if backend == "cuda" and vendor == "amd":
@@ -241,6 +244,15 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         f"- platform/backend/vendor: {profile.get('platform')}/"
         f"{backend}/{vendor}",
         f"- master_hash: `{master_hash}`",
+    ]
+    if profile_id == "otr_runpod_starter":
+        lines += [
+            "",
+            "This file is a generated profile manifest, not a second RunPod "
+            "guide. Use the single canonical install, launch, qualification, "
+            "and recovery playbook: `docs/RUNPOD_INSTALL.md`.",
+        ]
+    lines += [
         "",
         "## ComfyUI launch",
         "",

@@ -108,7 +108,8 @@ PROFILES = ("otr_soak_llmsweep_01", "otr_soak_llmsweep_02")
 #: wan_i2v was RETIRED 2026-08-26 (19.82 GiB of weights vs a 14.5 GiB
 #: target); the lane type survives on-card as wan_ti2v.
 #:   * minimax_h3_video / minimax_h3_audio_in -- the only lanes the ENGINE
-#:     itself refuses to share a boot with: `compatible_boot_contracts = ("h3",)`
+#:     itself refuses to run on the stock boot; it accepts the measured `h3`
+#:     streaming boot or the physical-8-GB `h3_8gb_lab` launch shape
 #: Cloud lanes (word_razzle, cloud_*, google_*) are excluded outright: the
 #: render happens provider-side, so they prove nothing about a local model.
 VIDEO_LANES = (

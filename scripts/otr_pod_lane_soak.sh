@@ -7,8 +7,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # shellcheck source=otr_pod_runtime.sh
 source "$SCRIPT_DIR/otr_pod_runtime.sh"
 otr_load_runtime || exit 1
+otr_acquire_campaign_lock "continuous soak" || exit 1
 
-RESULTS="${OTR_SOAK_RESULTS:-/root/soak_results.txt}"
+RESULTS="${OTR_SOAK_RESULTS:-$OTR_POD_LOG_DIR/soak_results.txt}"
 ACTS="${SOAK_ACTS:-1}"
 MAX_ROUNDS="${SOAK_MAX_ROUNDS:-0}"
 [[ "$ACTS" =~ ^[1-5]$ ]] || { echo "SOAK_ACTS must be 1..5" >&2; exit 2; }
@@ -31,7 +32,7 @@ while true; do
   round=$((round + 1))
   echo "--- ROUND $round $(date -u '+%H:%M:%SZ') ---" | tee -a "$RESULTS"
   for profile in "${PROFILES[@]}"; do
-    log="/root/soak_r${round}_${profile}.log"
+    log="$OTR_POD_LOG_DIR/soak_r${round}_${profile}.log"
     if ! otr_ensure_profile_server "$profile"; then
       printf "  r%-3s %-38s BOOT_FAILED\n" "$round" "$profile" | tee -a "$RESULTS"
       continue
@@ -58,7 +59,7 @@ while true; do
     fi
     # Keep only the last three logs for this exact profile.
     mapfile -t old_logs < <(
-      find /root -maxdepth 1 -type f -name "soak_r*_${profile}.log" \
+      find "$OTR_POD_LOG_DIR" -maxdepth 1 -type f -name "soak_r*_${profile}.log" \
         -printf '%T@ %p\n' 2>/dev/null | sort -rn | tail -n +4 | cut -d' ' -f2-
     )
     for old_log in "${old_logs[@]:-}"; do

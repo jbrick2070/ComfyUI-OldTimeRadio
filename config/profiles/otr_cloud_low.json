@@ -79,8 +79,9 @@
     "required_keys": ["OPENROUTER_API_KEY", "OTR_GOOGLE_API_KEY", "OTR_COMFY_API_KEY"]
   },
   "launch": {
+    "boot_contract": "cpu",
     "sage_attention": false,
-    "extra_args": ["--cpu"],
+    "extra_args": [],
     "env": {}
   }
 }

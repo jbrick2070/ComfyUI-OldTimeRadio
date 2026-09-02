@@ -1,43 +1,171 @@
 {
   "_comment": [
-    "WHICH PROFILE A GIVEN MACHINE SHOULD USE. This file is JUDGEMENT, declared",
-    "once, in data. `scripts/otr_machine_matrix.py` VALIDATES every row against",
-    "the named profile's own fields and REFUSES to generate on a contradiction --",
-    "so the opinion lives here and the facts are enforced mechanically.",
+    "WHAT A GIVEN MACHINE SHOULD RUN. This file is JUDGEMENT, declared once,",
+    "in data. Each class row is self-contained and its `key` is the exact value",
+    "accepted by `--machine`; there is no hidden per-machine profile file.",
     "",
-    "IT IS NEVER DERIVED. Several profiles fit any class, and choosing between",
+    "IT IS NEVER DERIVED. Several recipes may fit any class, and choosing between",
     "them is operator judgement about recipe quality, not arithmetic on a VRAM",
-    "number. A generator that computed this would ship guesses carrying the",
-    "authority of facts.",
+    "number. A generator that computed this would ship guesses as facts.",
     "",
-    "MEMBERSHIP HERE IS THE AUDIENCE MARKER. A profile is user-facing if and only",
-    "if a row below names it. `status` does NOT decide this: 41 profiles are",
-    "`shipping` at the 16 GB tier and 18 of them are `otr_w45_*` harness",
-    "instruments -- mature, and not something to hand a stranger. A new harness",
-    "profile nobody classifies stays internal, which is the safe direction to",
-    "fail.",
-    "",
-    "`recommended` may be null. A declared gap is better than a rediscovered one."
+    "MEMBERSHIP HERE IS THE AUDIENCE MARKER. Experimental config/profiles files",
+    "remain available to the lab, but this class list is the stranger-facing",
+    "machine answer. Proof rows record what actually ran; blank proof stays blank."
+  ],
+  "engine_evidence": [
+    {
+      "engine": "animatediff15_v3_haunted_video",
+      "label": "AnimateDiff haunted video",
+      "level": "PROVEN",
+      "hardware": "RTX 4060 Laptop, 8 GB, Ada",
+      "date": "2026-08-29",
+      "episodes": 6,
+      "scope": "full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine",
+      "evidence": "docs/4060_DRILL_LOG.md steps 7-19"
+    },
+    {
+      "engine": "ltx25_high_video",
+      "label": "LTX 2.5",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-09-01",
+      "episodes": 1,
+      "scope": "full published OTR episode",
+      "evidence": "signal_lost_feline_visitor_a_space_oddity_20260831_191928; 1 act; 01:26:19; episode ledger records delivered_engine ltx25_video"
+    },
+    {
+      "engine": "wan_ti2v",
+      "label": "Wan 2.2 TI2V-5B",
+      "level": "PROVEN",
+      "hardware": "RTX A4500, 20 GB, Ampere",
+      "date": "2026-09-01",
+      "episodes": 1,
+      "scope": "full published OTR episode",
+      "evidence": "signal_lost_gleaming_in_ruby_20260901_030818; 1 act; 3949 s; obs_publish OK"
+    },
+    {
+      "engine": "wan_ti2v",
+      "label": "Wan 2.2 TI2V-5B",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-08-23",
+      "episodes": 1,
+      "scope": "full published OTR episode from profile otr_g4_wan_ti2v; 17 Wan clips",
+      "evidence": "signal_lost_the_weeping_valve_20260823_001152; docs/HANDOFF_LOG.md lines 1059-1062; 1920x1080, 25 fps, 166.6 s, obs output"
+    },
+    {
+      "engine": "ltx25_high_foley_plus",
+      "label": "LTX 2.5 foley",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-09-01",
+      "episodes": 4,
+      "scope": "full published OTR episodes",
+      "evidence": "four finished episodes in the five days through 2026-09-01; episode-ledger delivered_engine is ltx25_foley_plus"
+    },
+    {
+      "engine": "ltx25_high_mime",
+      "label": "LTX 2.5 mime",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-09-01",
+      "episodes": 3,
+      "scope": "full published OTR episodes",
+      "evidence": "three finished episodes in the five days through 2026-09-01; episode-ledger delivered_engine is ltx25_mime"
+    },
+    {
+      "engine": "minimax_h3_video",
+      "label": "MiniMax H3",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-08-28",
+      "episodes": 2,
+      "scope": "full published OTR episodes",
+      "evidence": "signal_lost_reel_of_resistance_20260828_121427 and signal_lost_the_poise_of_stone_20260827_143538"
+    },
+    {
+      "engine": "ltx_8gb",
+      "label": "LTX-2b 0.9.8 distilled",
+      "level": "PROVEN",
+      "hardware": "RTX A4500, 20 GB, Ampere",
+      "date": "2026-09-01",
+      "episodes": 1,
+      "scope": "full published OTR episode",
+      "evidence": "signal_lost_static_whispers_20260901_001028; 1 act; 1925 s; 63.8 s at 1920x1080"
+    },
+    {
+      "engine": "humo",
+      "label": "HuMo family",
+      "level": "PROVEN",
+      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
+      "date": "2026-09-01",
+      "episodes": 32,
+      "scope": "full published OTR episodes",
+      "evidence": "32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B, and humo; episode-ledger delivered_engine evidence"
+    },
+    {
+      "engine": "minimax_h3_fl2va_raw_recipe",
+      "label": "MiniMax H3 FL2VA raw ComfyUI recipe with native audio",
+      "level": "LAB-PROVEN",
+      "hardware": "RTX 4060 Laptop, 8 GB, Ada",
+      "date": "2026-08-14",
+      "artifacts": 3,
+      "scope": "isolated 864x480x90 cold, warm-1, and warm-2 model-family clips below the canonical 124-model-frame floor; not the OTR engine adapter or a canonical episode",
+      "evidence": "vram-recipe-lab cell h3-mime-i2v-action-demo-f90/20260814T012207Z-ff39579c4625; run SHA-256 28beec62e28e372d85ae011a9f789bff7c15cb8ff4f39d1779f11842e2f60501; media and machine gates passed; peaks 7.147/6.788/6.788 GiB; human-approved"
+    }
+  ],
+  "measurements": [
+    {
+      "engine": "animatediff15_v3_haunted_video",
+      "conditions": "1 act, 8 clips, 24 GB rented card",
+      "measured": "2058 s, peak 15,990 MB, published"
+    },
+    {
+      "engine": "ltx25_high_video",
+      "conditions": "RTX 5080 Laptop 16 GB",
+      "measured": "peak 14.48 GiB; published 1-act episode in 01:26:19"
+    },
+    {
+      "engine": "humo",
+      "conditions": "RTX 5080, 832x480x97",
+      "measured": "13.06 GiB VRAM / 27.53 GiB host RAM; published episode family"
+    },
+    {
+      "engine": "minimax_h3_video",
+      "conditions": "RTX 5080, legal 124-model / 129-canvas frames",
+      "measured": "6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured"
+    }
   ],
   "classes": [
     {
       "label": "8 GB NVIDIA (RTX 4060, 3070, 2080)",
       "gpu_vendor": "nvidia",
-      "vram_min_gb": 6,
+      "vram_min_gb": 8,
       "vram_max_gb": 9,
       "platform": "any",
       "writer": "gemma-4-E2B",
-      "note": "The portability floor. Proven, and the reason it is proven is that a second machine exists.",
+      "writer_model": "google/gemma-4-E2B-it",
+      "note": "The physical RTX 4060 published six documented episodes through the invoked writer/video/voice/music path. The configured still-image engine was not invoked and remains unproven on 8 GB. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13.",
+      "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised",
       "key": "8gb",
       "video": "animatediff15_v3_haunted_video",
       "image": "flux2_klein",
       "char_voice": "kokoro",
-      "writer_ceiling_gb": 7.5,
+      "writer_ceiling_gb": 6.8,
+      "quant_policy": "none",
+      "llm": {
+        "gguf_n_ctx": 2048
+      },
+      "render": {
+        "canvas_w": 512,
+        "canvas_h": 288
+      },
       "proven": [
         {
           "hardware": "RTX 4060 8 GB",
-          "episodes": 9,
+          "episodes": 6,
           "date": "2026-08-29",
+          "scope": "current E2B writer, AnimateDiff video, kokoro voices, and musicgen published; configured image lane was not invoked",
           "evidence": "docs/4060_DRILL_LOG.md steps 7-19; five of five banks published"
         }
       ]
@@ -46,10 +174,12 @@
       "label": "16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)",
       "gpu_vendor": "nvidia",
       "vram_min_gb": 16,
-      "vram_max_gb": 64,
+      "vram_max_gb": null,
       "platform": "any",
       "writer": "gemma-4-12b",
-      "note": "One class, not three. Nothing sized ABOVE 16 GB was proven, so a 24 GB card runs what a 16 GB card runs. `otr_rented24_heavy` is the draft that asks for more -- unproven, and the instrument the next rental needs. AnimateDiff is the FLOOR lane and belongs to the small-VRAM classes; from 16 GB up the declared engine is real video diffusion. Operator, 2026-09-01: \"i dont care about animatediff except for the smallest machines, 16gb vram over i want real video proven\". ltx25_high_video is proven on the RTX 5080: two 1-act legs on 2026-09-01, 01:26:19 and 01:52:13, both RESULT SUCCESS. FIND YOUR CARD BY VRAM AND ARCHITECTURE, NOT BY NAME. The proof on this row was measured on an RTX A4500 -- Ampere, compute 8.6, 20 GB -- which most people have never held. What it stands in for is any Ampere-or-newer card with 16 GB or more: a 3090 or 3090 Ti (24 GB, same architecture, more SMs) is covered by it; a 4090 almost certainly is. A 3080 Ti is NOT, despite being the same architecture, because it has 12 GB and belongs to the row below. The class engine is the one proven across the WHOLE class, not the best one on the fastest member: wan22_high_video has published episodes on both Blackwell (RTX 5080) and Ampere (rented A4500), and its weights are publicly fetchable. ltx25_high_video is the better picture on the 5080 and stays in the dropdown, but it has never rendered on any other machine, so advertising it as the class default would tell a 3090 or A4500 owner that a blocked lane is PROVEN.",
+      "writer_model": "google/gemma-4-12b-it",
+      "note": "One 16 GB+ class. Wan is the public default because it published on named Blackwell and Ampere hardware; that establishes cross-architecture reach, not proof for every GPU model or for this entire row as one exact tuple. RTX 3090/4090 remain candidates until they have named receipts. LTX 2.5 is separately proven on the RTX 5080 only. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13.",
+      "proof_summary": "**COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven",
       "key": "16gb",
       "video": "wan22_high_video",
       "char_voice": "kokoro",
@@ -59,37 +189,43 @@
           "hardware": "RTX 5080 16 GB",
           "episodes": 45,
           "date": "2026-08-31",
+          "scope": "published episodes across multiple engine/profile tuples; not proof of the current row as one exact tuple",
           "evidence": "continuous overnight 5-act loops published to otr/obs"
         },
         {
           "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
           "episodes": 1,
           "date": "2026-08-30",
+          "scope": "AnimateDiff haunted-profile episode; not the current Wan tuple",
           "evidence": "1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK"
         },
         {
           "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
           "episodes": 1,
           "date": "2026-08-31",
+          "scope": "AnimateDiff haunted-profile episode; not the current Wan tuple",
           "evidence": "animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality."
         },
         {
           "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
           "episodes": 1,
           "date": "2026-09-01",
+          "scope": "LTX-2b episode with the z_image bf16 image path exercised; not the current Wan tuple",
           "evidence": "ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute."
         },
         {
           "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
           "episodes": 1,
           "date": "2026-09-01",
+          "scope": "Wan 2.2 TI2V episode; current video family, but the receipt does not certify every other field of the current row",
           "evidence": "wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here."
         },
         {
           "hardware": "RTX 5080 Laptop 16 GB (Blackwell sm_120)",
           "episodes": 1,
           "date": "2026-09-01",
-          "evidence": "ltx25_high_video, 1 act: episode signal_lost_feline_visitor_a_space_oddity_20260831_191928, Prompt executed in 01:26:19. The episode's own canon records render engine ltx25_video. First OTR-published LTX 2.5 episode."
+          "scope": "LTX 2.5 episode; not the current Wan tuple",
+          "evidence": "ltx25_high_video, 1 act: episode signal_lost_feline_visitor_a_space_oddity_20260831_191928, Prompt executed in 01:26:19. The episode ledger records delivered_engine ltx25_video. First OTR-published LTX 2.5 episode."
         }
       ]
     },
@@ -102,23 +238,39 @@
       "video": "animatediff15_v3_haunted_video",
       "image": "flux2_klein",
       "char_voice": "kokoro",
+      "writer": "gemma-4-E2B",
+      "writer_model": "google/gemma-4-E2B-it",
       "writer_ceiling_gb": 10.0,
-      "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling."
+      "quant_policy": "none",
+      "status": "draft",
+      "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13."
     },
     {
-      "label": "AMD / ROCm",
+      "label": "AMD / ROCm (Linux only)",
       "gpu_vendor": "amd",
       "vram_min_gb": 6,
-      "vram_max_gb": 64,
-      "platform": "any",
+      "vram_max_gb": null,
+      "platform": "linux",
       "writer": "gemma-4-E2B",
-      "note": "Largely unexplored. The profile exists; no episode has published from it. RULED 2026-09-01: Mac and AMD ship IMAGES ONLY (still and procedural lanes over Klein stills); no video-diffusion engine is advertised here until one publishes an episode on this hardware.",
+      "writer_model": "google/gemma-4-E2B-it",
+      "note": "Largely unexplored and Linux-only. PyTorch ROCm presents through the cuda API, but no episode has published from AMD hardware. This row deliberately uses the small unquantized E2B writer and no-FP8 policies; these are candidates, not borrowed NVIDIA proof. AMD ships still/procedural motion over Klein images until a video-diffusion lane publishes on AMD. This Kokoro tuple requires Python 3.12 or earlier; there is no supported AMD Python 3.13 machine route yet.",
       "key": "amd",
-      "device_backend": "rocm",
+      "device_backend": "cuda",
       "video": "still_motion",
       "image": "flux2_klein",
       "char_voice": "kokoro",
-      "writer_ceiling_gb": 7.5
+      "writer_ceiling_gb": 6.8,
+      "quant_policy": "none",
+      "status": "draft",
+      "llm": {
+        "gguf_n_ctx": 2048
+      },
+      "video_policy": {
+        "dtype_policy": "no_fp8"
+      },
+      "image_policy": {
+        "dtype_policy": "no_fp8"
+      }
     }
   ],
   "defaults": {
@@ -139,7 +291,9 @@
     },
     "seed_policy": {
       "request_seed": 42,
-      "seed_mode": "request_hash"
+      "seed_mode": "request_hash",
+      "cast_seed_env": null,
+      "style_seed_env": null
     },
     "video_policy": {
       "device_policy": "cuda",
@@ -157,13 +311,28 @@
       "canvas_h": 480,
       "composite_res": "1920x1080",
       "composite_w": 1920,
-      "composite_h": 1080
+      "composite_h": 1080,
+      "frame_budget": 25,
+      "beats": 40
     },
     "llm": {
       "device": "cuda",
       "attn_impl": "sdpa",
       "gguf_n_ctx": 8192,
-      "gguf_quant": "Q4_K_M"
+      "gguf_quant": "Q4_K_M",
+      "openrouter_slot_a_model": "(enable OpenRouter)",
+      "openrouter_slot_b_model": "(enable OpenRouter)",
+      "comfy_slot_a_model": "(enable Comfy Credits)",
+      "comfy_slot_b_model": "(enable Comfy Credits)",
+      "google_api_slot_a_model": "(select Google API model)",
+      "google_api_slot_b_model": "(select Google API model)",
+      "lane_allowlist": [
+        "transformers",
+        "gguf",
+        "openrouter",
+        "comfy_credits",
+        "google_api"
+      ]
     }
   },
   "known_limits": [
@@ -174,6 +343,6 @@
     "voice_bank must match the voice engine: kokoro accepts only 'kokoro_builtin'. Setting 'default' with char_voice=kokoro raises VoiceCastingError at OTR_CastLock, 12 minutes into a leg. Found by running it, 2026-08-31.",
     "ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'); the provisioner now pins that pack and applies OTR's public in-repo, hash-verified loader patch. On a rented A4500 it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted for a second machine only when that exact tuple publishes an episode.",
     "humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching, and the public `humo` fetch lane now owns all five 14B files (26.7356 GiB) with pinned revisions, sizes, SHA-256 values, and atomic `.part` handling. Only the remote canonical receipt remains.",
-    "Image engine defaults (operator rulings 2026-09-01): Klein 4B Q4 GGUF for the 8 GB, 12 GB and AMD classes and for Mac; Z-Image-Turbo stays the 16 GB NVIDIA default at cfg 1.0 (cfg 2.0 rendered reddened, crushed skin in both nvfp4 and bf16 on a same-seed A/B; the operator chose the cfg 1.0 frames). Weight follows the card: nvfp4 on Blackwell, bf16 on Ampere/Ada, by the existing compute-capability ranking. Klein on 8 GB is the ruled default and is UNMEASURED until Batch R7 Leg C renders it on the 4060."
+    "Image engine defaults (operator rulings 2026-09-01): Klein 4B Q4 GGUF for the 8 GB, 12 GB and AMD classes and for Mac; Z-Image-Turbo stays the 16 GB NVIDIA default at cfg 1.0 (cfg 2.0 rendered reddened, crushed skin in both nvfp4 and bf16 on a same-seed A/B; the operator chose the cfg 1.0 frames). Weight follows the card: nvfp4 on Blackwell, bf16 on Ampere/Ada, by the existing compute-capability ranking. AnimateDiff accepts no init still, so the 8/12 GB NVIDIA episode planner does not download or gate on Klein; it remains a separately selectable image lane. A physical 8 GB clean-room Leg C minted one 832x480 Klein still before the residency fix, but took about 42 minutes and did not publish an OTR episode. The fixed 4060 retest remains pending, so the matrix keeps this image lane candidate/unproven."
   ]
 }

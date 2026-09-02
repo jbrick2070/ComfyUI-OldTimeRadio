@@ -458,12 +458,14 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     declared_isolation = _MC.ISOLATION_IN_PROCESS
     target_fps = H3_CANVAS_FPS
 
-    #: BOTH lanes REQUIRE the named ``h3`` boot contract, which they are allowed
-    #: to do because neither has ever shipped under ``default`` (boot_contracts'
-    #: own rule -- requiring a contract on a lane that already ships would
-    #: regress it). Sage-free is non-negotiable here: Sage does not degrade H3,
-    #: it replaces the output with noise and reports success.
-    compatible_boot_contracts = ("h3",)
+    #: BOTH lanes REQUIRE a named H3 boot contract, which they are allowed to do
+    #: because neither has ever shipped under ``default`` (boot_contracts' own
+    #: rule -- requiring a contract on a lane that already ships would regress
+    #: it). ``h3`` is the measured 16 GB streaming boot; ``h3_8gb_lab`` is the
+    #: physical-8-GB lab launch that emits no reserve. Sage-free is non-negotiable in both:
+    #: Sage does not degrade H3, it replaces the output with noise and reports
+    #: success.
+    compatible_boot_contracts = ("h3", "h3_8gb_lab")
 
     #: Terminal node of the graph (its IMAGE output becomes the clip).
     _TERMINAL = "decode"
@@ -786,13 +788,11 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         config the launcher was supposed to honour cannot tell "applied" from
         "written down" (lesson L6).
 
-        THE SECOND CHECK ASSERTS THIS LANE'S OWN CONTRACT, not whatever the
-        profile happens to name. On a real episode leg the policy every adapter
-        sees is rebuilt from the ledger's ``video`` section and carries NO
-        ``launch`` key, so ``contract_for_profile`` answers ``default`` -- a
-        contract that constrains nothing. Asserting that verified NOTHING while
-        reading like a defense: the reserve, pinned-memory and Sage-absence
-        clamps H3 requires were never actually checked here.
+        THE SECOND CHECK ASSERTS THE EFFECTIVE H3 CONTRACT, not the stripped
+        policy's ``default``. On a real episode leg the policy every adapter sees
+        is rebuilt from the ledger's ``video`` section and carries NO ``launch``
+        key, so the live server is matched against only this engine's compatible
+        H3 contracts. The chosen contract is then checked knob by knob.
         """
         from .._otr_shared import boot_contracts as _bc
         problems = _bc.check_engine_against_profile(self, profile or {})
@@ -801,10 +801,8 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 self.name, self.family,
                 EngineUsabilityReason.INCOMPATIBLE_PROFILE,
                 "; ".join(problems), kind="video")
-        declared = tuple(getattr(self, "compatible_boot_contracts", ()) or ())
         _bc.assert_running_server(
-            declared[0] if len(declared) == 1
-            else _bc.contract_for_profile(profile or {}))
+            _bc.contract_for_engine_runtime(self, profile or {}))
 
     # ---- residency ----------------------------------------------------- #
     def load(self):

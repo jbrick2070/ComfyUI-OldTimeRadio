@@ -343,15 +343,26 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
 
 
 def main(argv: list[str] | None = None) -> int:
+    global COMFYUI_URL
     parser = argparse.ArgumentParser(
         description="Run the canonical OTR workflow through the ComfyUI API."
     )
-    parser.add_argument("--profile", default="none",
-                        help="explicit capability profile id, e.g. none or otr_cloud_lanes")
-    parser.add_argument("--machine", default=None,
-                        help="a machine key from config/machine_classes.json "
-                             "(8gb, 12gb, 16gb, amd). Expands to settings IN "
-                             "MEMORY -- there is no per-machine profile file.")
+    parser.add_argument(
+        "--comfyui-url", default=None,
+        help="running ComfyUI base URL (Desktop normally "
+             "http://127.0.0.1:8188; env/default remains available)",
+    )
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument(
+        "--profile", default="none",
+        help="explicit capability profile id, e.g. none or otr_cloud_lanes",
+    )
+    selector.add_argument(
+        "--machine", default=None,
+        help="a machine key from config/machine_classes.json "
+             "(8gb, 12gb, 16gb, amd). Expands to settings IN MEMORY -- "
+             "there is no per-machine profile file.",
+    )
     parser.add_argument("--title", default=None)
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)
@@ -386,6 +397,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--poll-s", type=int, default=5)
     args = parser.parse_args(argv)
+
+    if args.comfyui_url is not None:
+        candidate = str(args.comfyui_url).strip().rstrip("/")
+        if not candidate.startswith(("http://", "https://")):
+            raise SystemExit("--comfyui-url must start with http:// or https://")
+        import otr_api as _otr_api
+        _otr_api.COMFYUI_URL = candidate
+        COMFYUI_URL = candidate
 
     prompt, applied = build_api_prompt(args)
     dump_path = pathlib.Path(args.dump_prompt)

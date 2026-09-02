@@ -10,18 +10,19 @@ all computers -- they don't need a story, just a matrix of what we think will
 work and what has been tested."* He is right. A reader arriving with a card in
 their machine wants one row, not a narrative of how the row was discovered.
 
-WHY IT IS GENERATED. Every cell comes from `config/profiles/*.json`, which
-already carries `status`, `platform`, `gpu_vendor`, `device_backend` and
-`llm.vram_ceiling_gb` alongside the actual engine picks. A hand-written
-compatibility table is the single most rot-prone document a project can own; a
-generated one cannot disagree with the profiles because it IS the profiles.
+WHY IT IS GENERATED. The stranger-facing machine answer, proof receipts, and
+measurements come from `config/machine_classes.json`; experimental profile
+detail comes from `config/profiles/*.json`. A hand-written compatibility table
+is the single most rot-prone document a project can own.
 
-THE TWO CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:
+THE CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:
   * `shipping` / `draft` come from the profile's own `status` field -- the
     project's standing judgement about whether a combination is ready.
   * PROVEN means an episode actually rendered and published, with the evidence
     named in the notes below the table. That is a much stronger claim than
     `shipping`, and only a handful of rows have it.
+  * LAB-PROVEN means an isolated recipe produced receipt-bearing media on the
+    named physical hardware. It does not promote a full OTR profile.
 Nothing here is inferred from "it looks like it should fit". A blank is an
 honest unknown.
 """
@@ -48,52 +49,159 @@ _NOT_PROFILES = {"widget_mapping"}
 
 
 class ClassValidationError(Exception):
-    """A declared class contradicts the profile it names.
+    """A declared machine class is incomplete, duplicated, or impossible.
 
     Raised rather than warned. A compatibility table that quietly disagrees
     with the profiles is worse than no table: README told users an 8 GB card
-    had "rendered nothing" for days after nine episodes published from one.
+    had "rendered nothing" after six documented episodes published from one.
     """
 
 
-def load_classes(profiles):
-    """Declared classes, each validated against the profile it names."""
+class EvidenceValidationError(Exception):
+    """An engine proof row is incomplete, duplicated, or overclaims its scope."""
+
+
+_EVIDENCE_LEVELS = {"PROVEN", "LAB-PROVEN"}
+
+
+def load_engine_evidence() -> list:
+    """Load and validate receipt-backed engine/hardware proof rows.
+
+    This is deliberately separate from machine-class proof. A class receipt
+    says its recommended full profile published; an engine evidence row can
+    also preserve a narrower isolated lab result without promoting that profile.
+    """
     try:
         doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
     except OSError:
         return []
-    by_id = {p["id"]: p for p in profiles}
-    out, problems = [], []
-    for row in doc.get("classes", []):
-        pid = row.get("recommended")
-        if not pid:
-            out.append((row, None))          # a DECLARED gap, which is allowed
+    out, problems, seen = [], [], set()
+    for index, row in enumerate(doc.get("engine_evidence", [])):
+        if not isinstance(row, dict):
+            problems.append("engine_evidence[%d] is not an object" % index)
             continue
-        prof = by_id.get(pid)
-        if prof is None:
-            problems.append("%r names profile %r, which does not exist"
-                            % (row.get("label"), pid))
+        missing = [key for key in (
+            "engine", "label", "level", "hardware", "date", "scope", "evidence"
+        ) if not row.get(key)]
+        if missing:
+            problems.append("engine_evidence[%d] is missing %s"
+                            % (index, ", ".join(missing)))
             continue
-        want_vendor = row.get("gpu_vendor")
-        if want_vendor and prof["vendor"] not in (want_vendor, "?"):
-            problems.append("%r is %s but %r declares gpu_vendor %s"
-                            % (pid, prof["vendor"], row.get("label"), want_vendor))
-        vram = prof.get("vram")
-        lo, hi = row.get("vram_min_gb"), row.get("vram_max_gb")
-        if vram and lo is not None and hi is not None and not (lo <= float(vram) <= hi):
-            problems.append("%r has vram_ceiling_gb %s, outside %r's %s-%s"
-                            % (pid, vram, row.get("label"), lo, hi))
-        out.append((row, prof))
+        level = str(row["level"]).upper()
+        if level not in _EVIDENCE_LEVELS:
+            problems.append("engine_evidence[%d] has unsupported level %r"
+                            % (index, row["level"]))
+            continue
+        count_key = "episodes" if level == "PROVEN" else "artifacts"
+        try:
+            count = int(row.get(count_key) or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count <= 0:
+            problems.append("engine_evidence[%d] %s needs a positive %s count"
+                            % (index, level, count_key))
+            continue
+        identity = (row["engine"], level, row["hardware"], row["date"])
+        if identity in seen:
+            problems.append("duplicate engine evidence row %r" % (identity,))
+            continue
+        seen.add(identity)
+        item = dict(row)
+        item["level"] = level
+        out.append(item)
     if problems:
-        raise ClassValidationError(
-            "config/machine_classes.json contradicts the profiles:\n  - "
+        raise EvidenceValidationError(
+            "config/machine_classes.json has invalid engine evidence:\n  - "
             + "\n  - ".join(problems))
     return out
 
-#: Proof now lives on the PROFILE, in its `proven` list, not here. It is a fact
-#: about the profile, it accrues per-hardware (the haunted lane is proven on 8,
-#: 16 and 24 GB), and under the two-box ownership split the machine that proved
-#: it owns that file anyway. This module only reads and renders it.
+
+def _md_cell(value) -> str:
+    """Keep config prose inside one Markdown table cell."""
+    return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def load_classes(_profiles=None):
+    """Load complete, self-contained machine rows; no profile indirection."""
+    try:
+        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+    except OSError:
+        return []
+    out, problems, seen = [], [], set()
+    defaults = doc.get("defaults") or {}
+    required = (
+        "key", "label", "gpu_vendor", "vram_min_gb",
+        "writer", "writer_model", "writer_ceiling_gb", "video", "image",
+        "char_voice",
+    )
+    for index, row in enumerate(doc.get("classes", [])):
+        if not isinstance(row, dict):
+            problems.append("classes[%d] is not an object" % index)
+            continue
+        merged = dict(defaults)
+        merged.update(row)
+        missing = [name for name in required if merged.get(name) in (None, "")]
+        if missing:
+            problems.append("classes[%d] is missing %s"
+                            % (index, ", ".join(missing)))
+            continue
+        if "vram_max_gb" not in row:
+            problems.append(
+                "classes[%d] is missing vram_max_gb (use null for open-ended)"
+                % index)
+            continue
+        key = str(row["key"])
+        if key in seen:
+            problems.append("duplicate machine key %r" % key)
+            continue
+        seen.add(key)
+        try:
+            lo = float(row["vram_min_gb"])
+            hi = (None if row["vram_max_gb"] is None
+                  else float(row["vram_max_gb"]))
+        except (TypeError, ValueError):
+            problems.append("machine %r has a non-numeric VRAM range" % key)
+            continue
+        if lo <= 0 or (hi is not None and hi < lo):
+            problems.append("machine %r has impossible VRAM range %s-%s"
+                            % (key, row["vram_min_gb"], row["vram_max_gb"]))
+            continue
+        receipts = row.get("proven") or []
+        if receipts and not row.get("proof_summary"):
+            problems.append("machine %r has receipts but no proof_summary" % key)
+            continue
+        bad_receipt = False
+        for receipt_index, receipt in enumerate(receipts):
+            if not isinstance(receipt, dict):
+                problems.append("machine %r receipt[%d] is not an object"
+                                % (key, receipt_index))
+                bad_receipt = True
+                continue
+            receipt_missing = [name for name in (
+                "hardware", "episodes", "date", "scope", "evidence"
+            ) if not receipt.get(name)]
+            try:
+                episode_count = int(receipt.get("episodes") or 0)
+            except (TypeError, ValueError):
+                episode_count = 0
+            if receipt_missing or episode_count <= 0:
+                detail = ("missing %s" % ", ".join(receipt_missing)
+                          if receipt_missing else "non-positive episode count")
+                problems.append("machine %r receipt[%d] has %s"
+                                % (key, receipt_index, detail))
+                bad_receipt = True
+        if bad_receipt:
+            continue
+        out.append(row)
+    if problems:
+        raise ClassValidationError(
+            "config/machine_classes.json has invalid machine rows:\n  - "
+            + "\n  - ".join(problems))
+    return out
+
+#: Hardware episode receipts live on the declared class row, in its `proven`
+#: list. Each one carries an exact scope; their presence does NOT silently
+#: certify the complete current tuple. Engine-level evidence remains separate.
 #:
 #: Keeping it honest matters more than keeping it full: PROVEN is the difference
 #: between "we think" and "we know", and a padded list destroys the only reason
@@ -125,39 +233,63 @@ def proven_receipts(obj) -> list:
     return [r for r in ((obj or {}).get("proven") or []) if isinstance(r, dict)]
 
 
-def proven_summary(prof) -> str:
-    rows = proven_receipts(prof)
-    if not rows:
-        return ""
-    total = sum(int(r.get("episodes") or 0) for r in rows)
-    hw = ", ".join(str(r.get("hardware", "?")) for r in rows)
-    return "%d episode(s) on %s" % (total, hw)
-
-#: Measured peaks worth stating, and the exact conditions. A VRAM number without
-#: its conditions is how somebody buys the wrong card.
-MEASURED = [
-    ("animatediff15_v3_haunted_video", "1 act, 8 clips, 24 GB rented card",
-     "2058 s, peak 15,990 MB, published"),
-    ("ltx25_high_video", "RTX 5080 Laptop 16 GB",
-     "peak 14.48 GiB; published 1-act episode in 01:26:19"),
-    ("humo", "RTX 5080, 832x480x97",
-     "13.06 GiB VRAM / 27.53 GiB host RAM; published episode family"),
-    ("minimax_h3_video", "RTX 5080, legal 124-model / 129-canvas frames",
-     "6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured"),
-]
+def load_measurements() -> list:
+    """Load exact measured values and their conditions from matrix data."""
+    try:
+        doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))
+    except OSError:
+        return []
+    out, problems = [], []
+    for index, row in enumerate(doc.get("measurements", [])):
+        if not isinstance(row, dict):
+            problems.append("measurements[%d] is not an object" % index)
+            continue
+        missing = [name for name in ("engine", "conditions", "measured")
+                   if not row.get(name)]
+        if missing:
+            problems.append("measurements[%d] is missing %s"
+                            % (index, ", ".join(missing)))
+            continue
+        out.append(dict(row))
+    if problems:
+        raise EvidenceValidationError(
+            "config/machine_classes.json has invalid measurements:\n  - "
+            + "\n  - ".join(problems))
+    return out
 
 
 def load_profiles() -> list:
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+    import otr_provision as provision
+
     out = []
     for path in sorted(glob.glob(os.path.join(_REPO, "config/profiles/*.json"))):
         try:
             d = json.load(io.open(path, encoding="utf-8"))
         except Exception:
             continue
+        pid = d.get("id") or os.path.basename(path)[:-5]
+        if pid in _NOT_PROFILES:
+            continue
         ro = d.get("role_overrides", {}) or {}
         so = d.get("slot_overrides", {}) or {}
+        try:
+            routes = provision.profile_lanes(d)
+        except provision.ProvisionFailure:
+            install_recipe = "missing exact owner"
+        else:
+            manual = set(routes.get("manual") or [])
+            if "h3_operator_only" in manual:
+                install_recipe = "operator-only files"
+            elif manual:
+                install_recipe = "complete; manual tier"
+            else:
+                install_recipe = "complete"
+            if provision.profile_python_issue(d, (3, 13)):
+                install_recipe += "; Python <=3.12"
         out.append({
-            "id": d.get("id") or os.path.basename(path)[:-5],
+            "id": pid,
             "status": d.get("status", "?"),
             "vram": (d.get("llm", {}) or {}).get("vram_ceiling_gb"),
             "vendor": d.get("gpu_vendor", "?"),
@@ -168,35 +300,28 @@ def load_profiles() -> list:
             "voice": so.get("char_voice_engine") or "-",
             "music": so.get("music_engine") or "-",
             "proven": d.get("proven") or [],
+            "install_recipe": install_recipe,
         })
     return out
 
 
-def _proven_ids(classes) -> set:
-    """Profile ids a matrix row vouches for. Empty now that classes are
-    self-contained, kept so the per-tier tables still mark a proven row."""
-    return {row.get("recommended") for row, _p in (classes or [])
-            if row.get("proven") and row.get("recommended")}
-
-
 def _tier(vram):
-    """Two tiers, deliberately.
-
-    Splitting 16 / 24 / 32 GB invents a distinction the profiles do not make:
-    nothing declares a ceiling above 16, so a 24 GB card runs exactly what a
-    16 GB card runs and a separate row for it is an empty promise. Operator,
-    2026-08-31: *"i'd rather just a 16+ tier."*
-
-    The real question a bigger card raises is not "which tier" but "does
-    anything here actually SPEND the extra memory" -- which is a profile
-    question, called out under the table rather than faked as a tier.
-    """
+    """Group experimental profiles by their declared writer VRAM ceiling."""
     if not vram:
         return "unstated"
-    return "8 GB" if float(vram) <= 9 else "16 GB+"
+    ceiling = float(vram)
+    if ceiling <= 9:
+        return "8 GB"
+    # A 14.5 GB writer ceiling is the established 16 GB-card class: the
+    # process still needs allocator/headroom outside that declared writer
+    # budget. The middle machine row deliberately caps its writer at 10 GB;
+    # experimental 10-12 GB ceilings stay in that detail band.
+    if ceiling <= 12:
+        return "10-15 GB"
+    return "16 GB+"
 
 
-_ORDER = ["8 GB", "16 GB+", "unstated"]
+_ORDER = ["8 GB", "10-15 GB", "16 GB+", "unstated"]
 
 
 def render() -> str:
@@ -205,50 +330,42 @@ def render() -> str:
     A = L.append
     A("# Machine matrix -- what runs where\n")
     A("**GENERATED by `scripts/otr_machine_matrix.py` from "
-      "`config/profiles/*.json`. Do not hand-edit; regenerate.**\n")
-    A("Find your machine in the first table. That is the whole answer; "
-      "everything after it is detail you only need if the answer is no.\n")
+      "`config/machine_classes.json` and `config/profiles/*.json`. "
+      "Do not hand-edit; regenerate.**\n")
+    A("Find your listed machine in **What works on what machine**. Apple "
+      "Silicon and CPU-only systems still have experimental profiles rather "
+      "than a stranger-facing machine key; find those in the tier details.\n")
 
-    # ---- the one table anybody actually needs ------------------------------
-    classes = load_classes(profs)
-    A("## Video engines with a published episode\n")
-    A("Only engines that have produced a real OTR episode on named hardware "
-      "appear here. An engine that loads, or benches well, or has a profile "
-      "written for it, is not on this list. The artifact is the claim.\n")
-    A("| engine | proven on | receipt |")
-    A("|---|---|---|")
-    A("| `ltx25_high_video` (LTX 2.5) | RTX 5080 Laptop, 16 GB, Blackwell | "
-      "`signal_lost_feline_visitor_a_space_oddity_20260831_191928`, 1 act, "
-      "01:26:19; canon records engine `ltx25_video` |")
-    A("| `wan_ti2v` (Wan 2.2 TI2V-5B) | RTX A4500, 20 GB, Ampere | "
-      "`signal_lost_gleaming_in_ruby_20260901_030818`, 1 act, 3949 s, "
-      "obs_publish OK |")
-    A("| `ltx25_high_foley_plus` (LTX 2.5 foley) | RTX 5080, 16 GB | "
-      "4 finished episodes in the 5 days to 2026-09-01, "
-      "delivered_engine `ltx25_foley_plus` |")
-    A("| `ltx25_high_mime` (LTX 2.5 mime) | RTX 5080, 16 GB | "
-      "3 finished episodes in the same window, "
-      "delivered_engine `ltx25_mime` |")
-    A("| `minimax_h3_video` (MiniMax H3) | RTX 5080, 16 GB | "
-      "`signal_lost_reel_of_resistance_20260828_121427` and "
-      "`signal_lost_the_poise_of_stone_20260827_143538` |")
-    A("| `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | "
-      "`signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, "
-      "63.8 s at 1920x1080 |")
-    A("| `humo` family (HuMo) | RTX 5080, 16 GB | 32 published episodes "
-      "across `humo_14B_169`, `humo_1.7B_169`, `humo_1.7B`, and `humo`; "
-      "episode-ledger `delivered_engine` evidence |")
-    A("\nCOUNTED FROM `delivered_engine` IN THE EPISODE LEDGER, over episodes "
-      "that have a final mp4, in the LAST 5 DAYS. Not from a list kept by "
-      "hand. Recency is the measure because the code moves -- an engine "
-      "proven in June is proven against June.\n")
+    # ---- evidence first, then the front-door machine answer ----------------
+    classes = load_classes()
+    A("## Engine proof by hardware\n")
+    A("Only receipt-backed rows appear here. **PROVEN** means a full OTR "
+      "episode published on the named hardware. **LAB-PROVEN** means an "
+      "isolated recipe produced valid media there; it does not promote the "
+      "full OTR profile. A setup, model load, queued prompt, reserve clamp, or "
+      "run still in progress is unqualified and does not appear.\n")
+    A("| engine | proof | hardware | exact scope | receipt |")
+    A("|---|---|---|---|---|")
+    level_order = {"PROVEN": 0, "LAB-PROVEN": 1}
+    for row in sorted(load_engine_evidence(),
+                      key=lambda r: (level_order[r["level"]], r["engine"],
+                                     r["hardware"], r["date"])):
+        A("| `%s` (%s) | **%s** | %s | %s | %s |" % (
+            _md_cell(row["engine"]), _md_cell(row["label"]), row["level"],
+            _md_cell(row["hardware"]), _md_cell(row["scope"]),
+            _md_cell(row["evidence"])))
+    A("\nPROVEN episode counts come from `delivered_engine` in the episode "
+      "ledger for episodes with a final mp4. LAB-PROVEN rows instead cite "
+      "their immutable runner receipt and exact artifact scope. Recency "
+      "matters because the code moves -- an engine proven in June is proven "
+      "against June.\n")
     A("Do not grep `episode_canon.json` for engine names: it records none, "
       "and matches land in PROSE -- searching it for `humo` finds the word "
       "`humorous` and invents a receipt.\n")
     A("## What works on what machine\n")
     A("| your machine | writer | video | voice | music | image | status |")
     A("|---|---|---|---|---|---|---|")
-    for row, prof in classes:
+    for row in classes:
         label = row.get("label", "?")
         # Read the ROW, never a profile it may not name. Every machine value
         # lives in config/machine_classes.json now (operator, 2026-08-31: "no
@@ -257,29 +374,41 @@ def render() -> str:
         # while the matrix held real, proven values. The front-door table of
         # the guide told every newcomer that nothing runs anywhere.
         cells = merged_row(row)
-        conf = ("**PROVEN** -- %s" % proven_summary(row)
-                if proven_receipts(row)
-                else "`%s`, unproven" % cells.get("status", "draft"))
+        conf = (row.get("proof_summary")
+                or "`%s`, unproven" % cells.get("status", "draft"))
         A("| **%s** | %s | %s | %s | %s | %s | %s |" % (
             label, cells.get("writer", "--"), cells.get("video", "--"),
             cells.get("char_voice", "--"), cells.get("music", "--"),
             cells.get("image", "--"), conf))
     A("")
-    A("**Use the profile named for your machine** -- pass it to `--profile`, or "
-      "pick the matching entries in the dropdowns. The engine names above are "
-      "exactly the dropdown text.\n")
-    for row, prof in classes:
-        if prof is not None:
-            A("* **%s** -> `%s`" % (row.get("label"), prof["id"]))
-            if row.get("note"):
-                A("  %s" % row["note"])
+    A("**Use the machine key, not an experimental profile name.** Run these "
+      "with the exact Python executable that launches ComfyUI (shown as "
+      "`<ComfyUI Python>`). Preview the install plan first, then run the same "
+      "command without `--list` to install it.\n")
+    for row in classes:
+        A("* **%s** -> `<ComfyUI Python> scripts/otr_provision.py --machine %s --list`"
+          % (row.get("label"), row.get("key")))
+    A("\nProvisioning installs and verifies artifacts; it does not rewrite the "
+      "saved graph. To apply one row atomically to the real canonical workflow "
+      "on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/"
+      "otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 "
+      "--machine 8gb --act-count 1 --source-bank original --visual-style "
+      "sci_fi_radio --timeout 0`, replacing only the exact machine key. To use "
+      "an explicit profile instead, replace `--machine 8gb` with `--profile "
+      "<exact-profile-id>`; the two selectors are intentionally exclusive.")
+    A("\nApple Silicon is still the unproven experimental `otr_mac_mps` profile; "
+      "CPU-only is `cpu_floor`. Neither is promoted to a machine key or "
+      "PROVEN until a named physical system publishes an episode.\n")
     A("")
 
     A("## How to read the confidence column\n")
     A("| value | means |")
     A("|---|---|")
     A("| **PROVEN** | an episode actually rendered and published. Evidence named below. |")
-    A("| `shipping` | the profile is considered ready. Not the same as proven. |")
+    A("| **LAB-PROVEN** | an isolated recipe produced receipt-bearing media on named physical hardware; not a full OTR episode. |")
+    A("| **EPISODE PATH PROVEN** | the components actually invoked by the named episode path published; an unused configured lane is not included. |")
+    A("| **COMPONENTS PROVEN** | named components published on named hardware, but this exact row as one tuple is not certified. |")
+    A("| `shipping` | the profile is considered runtime-ready on a preloaded machine. It is neither hardware proof nor a complete clean-install claim. |")
     A("| `draft` | exists, not vouched for. Try it; expect to debug. |")
     A("")
     A("Nothing here is inferred from \"it looks like it should fit\". A blank is "
@@ -293,29 +422,26 @@ def render() -> str:
         rows = by.get(tier) or []
         if not rows:
             continue
-        prov = sum(1 for r in rows if r["id"] in _proven_ids(classes))
         ship = sum(1 for r in rows if r["status"] == "shipping")
-        A("## %s  --  %d profile(s), %d shipping, %d proven\n"
-          % (tier, len(rows), ship, prov))
+        A("## %s  --  %d experimental profile(s), %d shipping\n"
+          % (tier, len(rows), ship))
         # Only PROVEN and shipping rows are tabled. A tier holding 76 drafts is
         # a dump, not a guide: a reader picking a row cannot tell which of 76 to
         # trust. Drafts are counted and folded away, listed by the engine they
         # select, which is the only thing anyone scans them for.
-        headline = [r for r in rows
-                    if r["id"] in _proven_ids(classes) or r["status"] == "shipping"]
+        headline = [r for r in rows if r["status"] == "shipping"]
         drafts = [r for r in rows if r not in headline]
         if headline:
-            A("| profile | video | voice | music | image | confidence |")
-            A("|---|---|---|---|---|---|")
-            for r in sorted(headline,
-                            key=lambda x: (x["id"] not in _proven_ids(classes), x["id"])):
-                conf = "**PROVEN**" if r["id"] in _proven_ids(classes) else "`%s`" % r["status"]
-                A("| `%s` | %s | %s | %s | %s | %s |" % (
+            A("| profile | video | voice | music | image | confidence | install recipe |")
+            A("|---|---|---|---|---|---|---|")
+            for r in sorted(headline, key=lambda x: x["id"]):
+                conf = "`%s`" % r["status"]
+                A("| `%s` | %s | %s | %s | %s | %s | %s |" % (
                     r["id"], r["video"], r["voice"], r["music"], r["image"],
-                    conf))
+                    conf, r["install_recipe"]))
             A("")
         else:
-            A("**No shipping or proven profile at this tier.**\n")
+            A("**No shipping experimental profile at this tier.**\n")
         if drafts:
             eng = sorted({r["video"] for r in drafts})
             A("<details><summary>%d draft profile(s) here -- not vouched for"
@@ -332,13 +458,10 @@ def render() -> str:
     A("The tier is `16 GB+` because that is the truth: nothing in "
       "`config/profiles/` declares a VRAM ceiling above 16, so a 24 GB or "
       "32 GB card runs exactly what a 16 GB one runs.\n")
-    A("**A draft now exists that asks for more.** `otr_rented24_heavy` raises "
-      "the writer ceiling 14.5 -> 22 GB and drops NF4 quantisation so the 12b "
-      "writer sits resident, lifts the render frame cap 81 -> 121, and uses "
-      "`indextts2` cloning for BOTH character and announcer where the 16 GB "
-      "tier settles for kokoro on the announcer. It is `draft` and nothing has "
-      "published from it -- proof follows the profile, never the reverse, "
-      "because a lane is proven BY running under one.\n")
+    A("There is currently no separate 24/32 GB machine key or heavy-rental "
+      "profile. More memory gives headroom, but the install planner still "
+      "selects the 16 GB+ row. A future larger recipe belongs here only after "
+      "its config and reproducible receipt both exist.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
       "ran the 16 GB haunted profile and peaked at 15,990 MB. Rented Ampere "
       "has since published both Wan 2.2 TI2V and LTX-2b, proving useful reach "
@@ -346,20 +469,23 @@ def render() -> str:
       "LTX 2.5: choose an explicit qualification profile and preserve its exact "
       "hardware/software/RAM receipt.\n")
 
-    A("## The proven rows, and what proves them\n")
-    for prof in sorted(profs, key=lambda x: x["id"]):
-        for r in proven_receipts(prof):
-            A("* **`%s`** on %s -- %s episode(s), %s. %s"
-              % (prof["id"], r.get("hardware", "?"),
-                 r.get("episodes", "?"), r.get("date", "?"),
+    A("## Hardware episode receipts, with their exact scope\n")
+    for row in classes:
+        for r in proven_receipts(row):
+            A("* **%s** on %s -- %s episode(s), %s. Scope: %s. Evidence: %s"
+              % (row.get("label", row.get("key", "?")),
+                 r.get("hardware", "?"), r.get("episodes", "?"),
+                 r.get("date", "?"), r.get("scope", "?"),
                  r.get("evidence", "")))
     A("")
     A("## Measured peaks, with their conditions\n")
     A("A VRAM number without its conditions is how somebody buys the wrong card.\n")
     A("| engine | conditions | measured |")
     A("|---|---|---|")
-    for eng, cond, meas in MEASURED:
-        A("| `%s` | %s | %s |" % (eng, cond, meas))
+    for row in load_measurements():
+        A("| `%s` | %s | %s |" % (
+            _md_cell(row["engine"]), _md_cell(row["conditions"]),
+            _md_cell(row["measured"])))
     A("")
     A("### Read every VRAM number with suspicion\n")
     A("**A peak is mostly what the allocator GRABBED, not what the model "
@@ -394,12 +520,15 @@ def render() -> str:
     A("* No row means an episode will look good -- only that the combination "
       "loads and runs. Output quality is a separate judgement.\n")
     A("* A `draft` row is not a promise. Most have never been run end to end.\n")
+    A("* `install recipe` describes whether every selected artifact has one "
+      "exact automatic or manual owner. It is not a hardware result.\n")
     A("* Non-NVIDIA is largely unexplored. Profiles exist "
       "(`otr_amd8_rocm`); none is proven.\n")
     A("* Where a lane needs weights, see "
       "[MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) for the exact files and "
-      "where to get them. That file is generated too, and is the only place "
-      "file names and sizes are recorded.\n")
+      "where to get them. That generated index is the cross-reference owner; "
+      "the single RunPod playbook may repeat exact manual recipes where a "
+      "stranger needs them at install time.\n")
     return "\n".join(L) + "\n"
 
 
@@ -412,7 +541,7 @@ def headline_block() -> str:
 
     README is the universal front door and already answers "what do I run on my
     machine". Two hand-eyed surfaces answering one question is how it came to
-    claim an 8 GB card had "rendered nothing" while nine episodes had published
+    claim an 8 GB card had "rendered nothing" while six documented episodes had published
     from one. So the answer is generated ONCE and injected, rather than told
     twice.
     """

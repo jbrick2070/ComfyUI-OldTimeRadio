@@ -13,11 +13,12 @@ preflight PROVES it -- against the running server, never against the config.
 Three rules this module exists to enforce, each of them a defect that already
 happened:
 
-**The contract rides `launch.env`, never `launch.extra_args`.** `extra_args` is
-written only into a markdown documentation string by `scripts/build_variants.py`;
-no launcher ever turns it into argv, and `--disable-pinned-memory` appeared in
-ZERO non-doc files repo-wide before this build. A boot pin placed there clamps
-nothing while looking configured (lesson L6).
+**The contract rides `launch.boot_contract`, never `launch.extra_args`.** A
+launcher derives argv from the named contract through :func:`launch_args_for`;
+the Windows headless launcher receives the compatible clamp subset through
+``launch.env``. `extra_args` used to be written only into a markdown string, so
+a load-bearing flag placed there changed no process while looking configured
+(lesson L6).
 
 **Enforcement probes the RUNNING SERVER, not the profile text.** A check that
 reads the same config file the launcher was supposed to honour cannot tell
@@ -78,6 +79,14 @@ HUMO_DIET = "humo_diet"
 #: the one that decides the outcome.
 H3 = "h3"
 
+#: Physical 8 GB MiniMax H3 lab launch shape. It emits NO
+#: ``--reserve-vram``: the physical-lab contract forbids that flag, and asking
+#: for the 16 GB recipe's 12 GiB reserve on an 8 GiB card is not conservative.
+#: ``None`` deliberately means "do not constrain" at preflight rather than a
+#: new manual-launch gate. Pinned host memory remains disabled and Sage remains
+#: forbidden. This names a lab candidate, not a published OTR H3 episode.
+H3_8GB_LAB = "h3_8gb_lab"
+
 #: The LTX-AV diet (row 7b, operator ruling 2026-08-11). `ltx_audio_in` cleared
 #: the 14.5 GiB gate on the stock boot by **35 MB (0.24%)** at 1024x576x193 --
 #: a property of that minute on a lived-in desktop, not a property of the lane,
@@ -101,6 +110,12 @@ H3 = "h3"
 #: needs become another lane's mystery refusal).
 LTX_AV_DIET = "ltx_av_diet"
 
+#: CPU-only ComfyUI. Several CPU/cloud profiles used to put ``--cpu`` only in
+#: ``launch.extra_args``; that field was rendered into prose but ignored by
+#: every launcher. Naming the process state makes the resolver emit the real
+#: argv and lets preflight verify the server rather than trust its profile.
+CPU = "cpu"
+
 #: name -> the boot state a server must be in. ``None`` means "this contract
 #: does not constrain that knob" -- distinct from False, which would REQUIRE it
 #: off. Being able to say "don't care" is what keeps a contract from silently
@@ -110,27 +125,44 @@ BOOT_CONTRACTS = {
         "reserve_vram_gb": None,
         "disable_pinned_memory": None,
         "sage_attention": None,
+        "cpu": None,
     },
     HUMO_DIET: {
         "reserve_vram_gb": 2.921,
         "disable_pinned_memory": True,
         "sage_attention": None,
+        "cpu": False,
     },
     H3: {
         "reserve_vram_gb": 12.0,     # see the H3 note above: measured, not tidy
         "disable_pinned_memory": True,
         "sage_attention": False,
+        "cpu": False,
+    },
+    H3_8GB_LAB: {
+        "reserve_vram_gb": None,     # generated lab launch emits no reserve
+        "disable_pinned_memory": True,
+        "sage_attention": False,
+        "cpu": False,
     },
     LTX_AV_DIET: {
         "reserve_vram_gb": None,     # the adapter's own in-process 4.0 dominates
         "disable_pinned_memory": True,
         "sage_attention": None,
+        "cpu": False,
+    },
+    CPU: {
+        "reserve_vram_gb": None,
+        "disable_pinned_memory": None,
+        "sage_attention": None,
+        "cpu": True,
     },
 }
 
-#: The LIVE launcher channel: `scripts/_otr_soak_server_launch.cmd` turns these
-#: into argv. Any contract knob that has no env row here is unreachable, which
-#: is the whole point of keeping the mapping in one visible place.
+#: The compatibility channel used by the Windows headless launcher for clamp
+#: knobs. General launchers derive every argv row through ``launch_args_for``;
+#: CPU therefore needs no env alias. Keeping the legacy mapping visible still
+#: prevents a clamp profile from claiming an env row no launcher consumes.
 CONTRACT_ENV = {
     "reserve_vram_gb": "OTR_HEADLESS_RESERVE_VRAM_GB",
     "disable_pinned_memory": "OTR_HEADLESS_DISABLE_PINNED",
@@ -165,14 +197,12 @@ def contract_spec(name) -> dict:
 
 
 def launch_env_for(name) -> dict:
-    """The ``launch.env`` rows a profile must carry to REACH this contract.
+    """Clamp rows the Windows headless env channel needs for this contract.
 
     Values are strings because that is what the env channel and the profile
-    schema both hold. `sage_attention` is deliberately absent: no launcher
-    passes an attention flag today, so emitting an env row for it would be
-    another configured-knob-that-reaches-nothing (lesson L6). A sage-sensitive
-    lane refuses at `assert_usable` via `assert_sage_not_patched` instead, which
-    is enforcement that actually runs.
+    schema both hold. CPU is emitted directly by :func:`launch_args_for`, and
+    `sage_attention` is deliberately absent because no launcher passes an
+    attention flag. A sage-sensitive lane refuses through live preflight.
     """
     spec = contract_spec(name)
     env = {}
@@ -181,6 +211,23 @@ def launch_env_for(name) -> dict:
     if spec["disable_pinned_memory"]:
         env[CONTRACT_ENV["disable_pinned_memory"]] = "1"
     return env
+
+
+def launch_args_for(name) -> list:
+    """Exact ComfyUI argv required by a named contract.
+
+    This is the executable owner shared by local generated recipes and the pod
+    launcher. It deliberately does not consult ``launch.extra_args``.
+    """
+    spec = contract_spec(name)
+    argv = []
+    if spec["reserve_vram_gb"] is not None:
+        argv.extend(("--reserve-vram", "%g" % spec["reserve_vram_gb"]))
+    if spec["disable_pinned_memory"]:
+        argv.append("--disable-pinned-memory")
+    if spec["cpu"]:
+        argv.append("--cpu")
+    return argv
 
 
 def running_server_boot_state() -> dict:
@@ -201,6 +248,7 @@ def running_server_boot_state() -> dict:
     state["reserve_vram_gb"] = None if reserve is None else float(reserve)
     state["disable_pinned_memory"] = bool(
         getattr(args, "disable_pinned_memory", False))
+    state["cpu"] = bool(getattr(args, "cpu", False))
     try:
         # RELATIVE, and it has to be (lane 19, 2026-08-12 -- found by a live
         # smoke, not by a test). This read `from nodes._otr_video_engines...`,
@@ -241,7 +289,8 @@ def check_running_server(name, state=None) -> list:
     spec = contract_spec(name)
     state = running_server_boot_state() if state is None else dict(state)
     constrained = [k for k in ("reserve_vram_gb", "disable_pinned_memory",
-                               "sage_attention") if spec.get(k) is not None]
+                               "sage_attention", "cpu")
+                   if spec.get(k) is not None]
     if not state.get("available"):
         # UNKNOWN IS NOT SATISFIED (retro bug hunt r1, 2026-08-11 -- both
         # reviewers reached this independently). This returned a bare `[]` and
@@ -299,6 +348,12 @@ def check_running_server(name, state=None) -> list:
                 "boot contract %r needs SageAttention %s; it is %s on this "
                 "server" % (name, "ACTIVE" if want else "ABSENT",
                             "ACTIVE" if got else "ABSENT"))
+    want = spec["cpu"]
+    if want is not None and bool(state.get("cpu")) != bool(want):
+        problems.append(
+            "boot contract %r needs --cpu %s; the server has CPU-only mode %s"
+            % (name, "ON" if want else "OFF",
+               "ON" if state.get("cpu") else "OFF"))
     return problems
 
 
@@ -309,7 +364,8 @@ def assert_running_server(name, state=None) -> None:
         raise BootContractError(
             "the running server does not satisfy boot contract %r -- this is "
             "not fixable at render time, the server must be restarted with the "
-            "contract's launch.env applied: %s" % (name, "; ".join(problems)))
+            "argv from launch_args_for() (shown in the generated launch "
+            "recipe): %s" % (name, "; ".join(problems)))
 
 
 def contract_for_profile(profile) -> str:
@@ -325,25 +381,30 @@ def contract_for_profile(profile) -> str:
 def compatible_contracts_for_engine(engine) -> tuple:
     """The contracts an ENGINE will run under.
 
-    An adapter that declares nothing is compatible with everything, which
-    preserves every lane that shipped before this mechanism existed. An adapter
-    that declares a tuple is stating the boots it has been proven on -- and only
-    a lane that never shipped under ``default`` may leave ``default`` out.
+    An adapter that declares nothing is compatible with every legacy GPU boot
+    tuning contract, which preserves lanes that shipped before this mechanism.
+    It does *not* implicitly gain the device-changing CPU-only contract; CPU
+    compatibility must be an explicit capability, not a side effect of adding
+    a contract name. An adapter that declares a tuple is stating the boots it
+    has been proven on -- and only a lane that never shipped under ``default``
+    may leave ``default`` out.
     """
     declared = getattr(engine, "compatible_boot_contracts", None)
     if not declared:
-        return tuple(sorted(BOOT_CONTRACTS))
+        return tuple(sorted(set(BOOT_CONTRACTS) - {CPU}))
     return tuple(declared)
 
 
-def contract_from_running_server():
+def contract_from_running_server(candidates=None):
     """The contract name this process was ACTUALLY booted for, or ``None``.
 
     Matches the live ``comfy.cli_args`` state against the contract table on the
     knobs a contract can pin. ``None`` in a contract means "does not constrain
     that knob", so it matches anything -- only a stated value has to agree.
     Returns ``None`` off a ComfyUI server, or when the observed state matches no
-    contract. Never raises.
+    contract. ``candidates`` can narrow identification to the contracts one
+    engine accepts; this matters when a more-specific unrelated diet also
+    happens to satisfy a less-constrained lane. Never raises.
 
     ``DEFAULT`` is checked LAST. It constrains nothing, so it matches every
     server and would shadow a real diet boot if it were tried first.
@@ -372,6 +433,7 @@ def contract_from_running_server():
     got_reserve = state.get("reserve_vram_gb")
     got_pinned = state.get("disable_pinned_memory")
     got_sage = state.get("sage_attention")
+    got_cpu = state.get("cpu")
 
     def _is_candidate(spec) -> bool:
         want = spec["reserve_vram_gb"]
@@ -385,20 +447,45 @@ def contract_from_running_server():
         want = spec["sage_attention"]
         if want is not None and got_sage is not None and bool(got_sage) != bool(want):
             return False
+        want = spec["cpu"]
+        if want is not None and bool(got_cpu) != bool(want):
+            return False
         return True
 
     def _specificity(name):
         spec = BOOT_CONTRACTS[name]
         pinned_knobs = sum(
             1 for k in ("reserve_vram_gb", "disable_pinned_memory",
-                        "sage_attention") if spec[k] is not None)
+                        "sage_attention", "cpu") if spec[k] is not None)
         floor = spec["reserve_vram_gb"] or 0.0
         return (name == DEFAULT, -float(floor), -pinned_knobs, name)
 
-    for name in sorted(BOOT_CONTRACTS, key=_specificity):
+    names = BOOT_CONTRACTS if candidates is None else tuple(
+        name for name in candidates if name in BOOT_CONTRACTS)
+    for name in sorted(names, key=_specificity):
         if _is_candidate(BOOT_CONTRACTS[name]):
             return name
     return None
+
+
+def contract_for_engine_runtime(engine, profile) -> str:
+    """The named contract this engine must verify against the live server.
+
+    Explicit profile declarations always win. A production render policy loses
+    ``launch`` in transport, however, so an engine that does not accept
+    ``default`` must identify the live server among only its own compatible
+    contracts. This supports several measured boots for one engine without
+    letting an unrelated, more-specific contract shadow the one it can use.
+    """
+    selected = contract_for_profile(profile)
+    allowed = compatible_contracts_for_engine(engine)
+    if selected in allowed:
+        return selected
+    declared = ((profile or {}).get("launch") or {}).get("boot_contract")
+    if declared:
+        return selected
+    observed = contract_from_running_server(candidates=allowed)
+    return observed or selected
 
 
 def check_engine_against_profile(engine, profile) -> list:
@@ -437,24 +524,21 @@ def check_engine_against_profile(engine, profile) -> list:
         return ["profile selects unknown boot contract %r; known contracts are "
                 "%s" % (name, ", ".join(sorted(BOOT_CONTRACTS)))]
     allowed = compatible_contracts_for_engine(engine)
-    if name in allowed:
+    effective = contract_for_engine_runtime(engine, profile)
+    if effective in allowed:
         return []
-    declared = ((profile or {}).get("launch") or {}).get("boot_contract")
-    if not declared:
-        observed = contract_from_running_server()
-        if observed in allowed:
-            return []
-        if observed and observed != name:
-            name = observed
     return ["engine %r is proven on boot contract(s) %s, and this profile "
-            "selects %r" % (getattr(engine, "name", "?"),
-                            ", ".join(allowed), name)]
+            "selects or resolves to %r" % (getattr(engine, "name", "?"),
+                                           ", ".join(allowed), effective)]
 
 
 __all__ = [
-    "DEFAULT", "HUMO_DIET", "H3", "BOOT_CONTRACTS", "CONTRACT_ENV",
+    "DEFAULT", "HUMO_DIET", "H3", "H3_8GB_LAB", "LTX_AV_DIET", "CPU",
+    "BOOT_CONTRACTS", "CONTRACT_ENV",
     "BootContractError", "known_contract", "contract_spec", "launch_env_for",
+    "launch_args_for",
     "running_server_boot_state", "check_running_server",
     "assert_running_server", "contract_for_profile",
-    "compatible_contracts_for_engine", "check_engine_against_profile",
+    "compatible_contracts_for_engine", "contract_for_engine_runtime",
+    "check_engine_against_profile",
 ]

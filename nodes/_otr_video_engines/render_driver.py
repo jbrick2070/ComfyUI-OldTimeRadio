@@ -6288,7 +6288,9 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     that legitimately requires its own boot (lane 19's ``minimax_h3_video``, the
     first such lane) could never be smoked on the boot it declares. When the
     caller names no profile and the engine declares exactly ONE compatible
-    contract, that contract is selected here.
+    contract, that contract is selected here. An engine with several named
+    contracts is left unset here; its adapter matches the live server against
+    only its own compatible contracts before asserting the selected state.
 
     THIS IS NOT A BYPASS, and the distinction is the whole reason it is safe:
     selecting a contract is a CLAIM, and the claim is still proved against
@@ -6297,7 +6299,8 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
     for the true reason ("this server has no reserve clamp") instead of the
     false one ("you asked for the stock boot"). An engine declaring two or more
     contracts is left alone: there the selection is a real choice and inventing
-    one would be guessing.
+    one would be guessing. MiniMax H3 now exercises that path because its 16 GB
+    streaming and physical-8-GB lab launches intentionally differ.
     """
     if profile is None:
         try:

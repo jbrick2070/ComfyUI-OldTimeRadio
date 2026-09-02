@@ -286,7 +286,7 @@ def test_profile_apply_writes_public_menu_option():
     canonical = json.load(open(os.path.join(root, "workflows", "otr_canonical.json"),
                                encoding="utf-8"))
     schemas = build_offline_schemas()
-    applied = apply_profile(canonical, "otr_amd16_rocm", schemas=schemas)
+    applied = apply_profile(canonical, "otr_8gb_wan", schemas=schemas)
     director = [n for n in applied["nodes"]
                 if n.get("type") == "OTR_VideoDirector"][0]
     wv = director.get("widgets_values") or []
@@ -347,20 +347,23 @@ def test_cross_validate_resolves_public_id():
     decls = {"video": vreg.CAPABILITIES, "audio": areg.CAPABILITIES,
              "image": ireg.CAPABILITIES}
     mapping = cp.load_widget_mapping()
-    prof = dict(cp.load_profile("otr_amd16_rocm"))
-    # baseline: the committed profile already cross-validates (carries wan_ti2v).
+    prof = dict(cp.load_profile("otr_8gb_wan"))
+    # Baseline: this committed NVIDIA profile deliberately carries wan_ti2v.
+    # AMD profiles are images-only, so they are not a valid fixture for this
+    # public-video-id boundary.
     cp.cross_validate_profile(prof, mapping, decls)
-    # swap every wan_ti2v override to the PUBLIC id; it must STILL validate
-    # (cross_validate resolves wan_8gb -> wan_ti2v, the enabled internal engine).
+    # Swap every wan_ti2v override to the LIVE PUBLIC id; it must STILL
+    # validate. Legacy `wan_8gb` alias coverage lives in the dedicated alias
+    # boundary below.
     swapped = 0
     for section in ("role_overrides", "slot_overrides"):
         sec = dict(prof.get(section) or {})
         for k, v in list(sec.items()):
             if v == "wan_ti2v":
-                sec[k] = "wan_8gb"
+                sec[k] = "wan22_high_video"
                 swapped += 1
         prof[section] = sec
-    assert swapped >= 1, "otr_amd16_rocm should carry a wan_ti2v override"
+    assert swapped >= 1, "otr_8gb_wan should carry a wan_ti2v override"
     cp.cross_validate_profile(prof, mapping, decls)   # public id resolves -> OK
 
 
