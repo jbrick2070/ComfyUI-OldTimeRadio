@@ -27,22 +27,27 @@ tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per
 owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
 AND push + `HEAD == origin/v2.0-alpha`.
 
-**1. alpha.15 IS PUSHED -- wait for it to go Active.** Pushed `13696c1e` on the
-operator's word 2026-09-02 18:51Z; the publish action succeeded and the registry shows
-`2.0.0-alpha.15` as `Pending` with 18 dependencies (the kokoro `python_version < '3.13'`
-and bitsandbytes `sys_platform != 'darwin'` markers, plus pycairo / pillow / aiohttp).
-Comfy-Org's scanner only considers versions older than 30 minutes and may run nightly.
-DONE WHEN the version reads `Active` (`curl https://api.comfy.org/nodes/comfyui-old-time-radio/versions`)
-and a Manager install on the 4060 lands the OTR nodes. If it FLAGS, run the control in
-Section 3 J (republish the alpha.8 tree byte-identical as alpha.16) -- that result is the
-evidence for Comfy-Org; never version-delete.
+**1. alpha.15 FLAGGED -- the control experiment is next, on the operator's word.** Pushed
+`13696c1e` 2026-09-02 18:51Z with 18 dependencies recorded; the registry scanner resolved
+it to `Flagged` at 20:07Z, the same verdict as alpha.9 through alpha.14, so no Active
+version exists and `latest_version` still resolves to nothing installable. Next move,
+Section 3 J: republish the alpha.8 tree (`e44235f5`) byte-identical as alpha.16. Active
+means the trigger is in the alpha.9+ delta and can be bisected; Flagged means their
+ruleset moved and that result is the evidence to hand Comfy-Org. It burns a version
+string, so the operator says go. Never version-delete. DONE WHEN a version reads
+`Active` and a Manager install on the 4060 lands the OTR nodes.
 
 **2. THE KOKORO-ONNX BACKEND -- the default voice that installs everywhere.**
-Design item: kibitz arc FIRST (substitute seats are fine, state the roster), then code,
-then the two live proofs. Full row: Section 1.1. DONE WHEN a clean Python 3.13 portable
-renders a 1-act kokoro-voiced episode through `workflows/otr_canonical.json` to
-`otr/obs/`, and the 5080's 3.12 venv still selects the torch path on the same commit.
-Until it lands the 3.13 sets run bark (README section 3).
+BUILT 2026-09-02 after a four-round arc (r1 Fable cold, r2 Cursor, r3 Antigravity, r4
+Sonnet convergence; anchor and records in `docs/2026-09-02-kokoro-onnx/`). The 5080's
+torch path is byte-identical (two fixed-seed lines, sha256 before == after); the ONNX
+path renders in-process on CPU. Full row: Section 1.1. DONE WHEN the two live proofs
+land: (A) a 1-act canonical episode on the 5080 (3.12, `backend=torch` in the log) to
+`otr/obs/`; (B) the 4060 clean room (portable Python 3.13.14): `pip install -r
+requirements.txt` installs kokoro-onnx, the boot prefetch places the ONNX model, and a
+1-act canonical leg with BOTH voice slots on kokoro publishes to its obs with
+`backend=onnx` in the log. Registry installs get the kokoro-onnx line on the next
+`pyproject.toml` bump after alpha.15 resolves.
 
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
 correctness defects (a gender or voice contradicting the source, a beat that renders the
@@ -130,6 +135,16 @@ The knob census (`docs/KNOB_CENSUS_PROMPT.md`) is a separate pre-ship pass: the 
 rules per row and the census informs what the 4060 template pins.
 
 ### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
+
+**STATUS 2026-09-02: BUILT, proofs pending (see queue item 2).** Shape as shipped:
+`nodes/_otr_audio_engines/_kokoro_backends.py` (torch path moved verbatim; ONNX path
+CPU by design, explicit provider, 4-thread cap, voices from the existing `.pt` files
+through a digest-named npz); `eng_kokoro.py` selects per `load()` via
+`OTR_KOKORO_BACKEND=auto|torch|onnx`; the prefetch fetches `onnx/model.onnx` at boot only
+when the ONNX backend will be used; canonical nodes 80/81 default both voice slots to
+kokoro on `kokoro_builtin`; a character-side engine-agreement guard; five profiles fixed;
+complementary `kokoro` / `kokoro-onnx` markers in `requirements.txt`; the generated "Voice
+engines" table in the matrix. Design record: `docs/2026-09-02-kokoro-onnx/`.
 
 Measured 2026-09-01: `kokoro-onnx>=0.6.1` + `onnxruntime` pip-install clean on Python 3.13
 (kokoro-onnx pins `>=3.10,<3.14`; espeak-ng ships bundled for win / mac / linux; the torch

@@ -39,6 +39,18 @@ log = logging.getLogger("OTR")
 #: the engine then cannot see.
 KOKORO_REPO_ID = "hexgrad/Kokoro-82M"
 
+#: The ONNX model for the kokoro-onnx backend (Python 3.13 boxes, where the torch
+#: `kokoro` package cannot install -- PBUG-20260901-04). One file, fp32, 326 MB:
+#: the export kokoro-onnx targets, size parity with the torch `.pth`. Fetched here
+#: at boot ONLY when that backend will be used (see `onnx_backend_wanted`), never
+#: inside a render.
+KOKORO_ONNX_REPO_ID = "onnx-community/Kokoro-82M-v1.0-ONNX"
+KOKORO_ONNX_FILENAME = "onnx/model.onnx"
+#: Where `eng_kokoro` looks for it, relative to the model dir. Duplicated from
+#: that module ON PURPOSE (same reason as `_KOKORO_MODEL_SUBDIR` below); the
+#: prefetch test pins the two equal.
+_KOKORO_ONNX_REL_PATH = os.path.join("onnx", "model.onnx")
+
 #: ENGLISH ONLY, and deliberately so. The repo ships 54 voices; 26 of them are
 #: Spanish, French, Italian, Hindi, Japanese, Portuguese and Chinese, which
 #: this show has no use for. Fetching the 28 English ones costs ~15 MB against
@@ -78,12 +90,26 @@ _KOKORO_MODEL_SUBDIR = os.path.join("TTS", "KokoroTTS")
 
 
 def _models_dir() -> "str | None":
-    """ComfyUI's models/ directory, without importing ComfyUI.
+    """ComfyUI's models/ directory, the way the ENGINE will resolve it.
 
-    `folder_paths` is not importable this early, so the path is derived the
-    same way `prestartup_script.py` already derives HF_HOME: this file sits at
-    <comfy>/custom_nodes/<pack>/nodes/, so three levels up is <comfy>.
+    ComfyUI imports `folder_paths` at the top of main.py and applies
+    `--base-directory` / custom paths BEFORE it runs prestartup scripts
+    (main.py: apply_custom_paths() then execute_prestartup_script()), so
+    `folder_paths.models_dir` is importable and already final here -- and it is
+    exactly what `eng_kokoro._kokoro_model_dir()` reads. That keeps a Desktop
+    install with a relocated models tree coherent: the file lands where the
+    engine looks. Fallback: three levels up from this file (this file sits at
+    <comfy>/custom_nodes/<pack>/nodes/), the same derivation
+    `prestartup_script.py` uses for HF_HOME.
     """
+    try:
+        import folder_paths  # type: ignore
+
+        models = getattr(folder_paths, "models_dir", None)
+        if models and os.path.isdir(models):
+            return models
+    except Exception:  # noqa: BLE001 -- not a Comfy process (tests / CLI)
+        pass
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         comfy_base = os.path.dirname(os.path.dirname(os.path.dirname(here)))
@@ -91,6 +117,89 @@ def _models_dir() -> "str | None":
         return models if os.path.isdir(models) else None
     except Exception:  # noqa: BLE001 -- boot must never die here
         return None
+
+
+def _spec_exists(name: str) -> bool:
+    """`importlib.util.find_spec` that never raises and never imports: a
+    `sys.modules` fake without `__spec__` (the adapter tests do that) makes
+    find_spec raise ValueError, and prestartup must not die for a test fixture."""
+    try:
+        import importlib.util
+
+        return importlib.util.find_spec(name) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def onnx_backend_wanted() -> bool:
+    """Will `eng_kokoro` select the ONNX backend on this interpreter? True when
+    forced by OTR_KOKORO_BACKEND=onnx, or when the torch `kokoro` package is
+    absent and `kokoro_onnx` is present. Nothing is imported to decide."""
+    mode = os.environ.get("OTR_KOKORO_BACKEND", "auto").strip().lower()
+    if mode == "onnx":
+        return True
+    if mode == "torch":
+        return False
+    return (not _spec_exists("kokoro")) and _spec_exists("kokoro_onnx")
+
+
+def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
+    """Fetch the ONNX model once, at boot, when the ONNX backend will be used.
+
+    Same contract as the voice prefetch: returns a receipt, never raises,
+    honours HF_HUB_OFFLINE / OTR_SKIP_KOKORO_PREFETCH, and logs BEFORE the 326 MB
+    download starts so a first boot never reads as a hang. `local_dir` is the
+    engine's own KokoroTTS dir, so the file lands at
+    <models>/TTS/KokoroTTS/onnx/model.onnx with no second copy in the hub cache.
+    """
+    receipt = {"attempted": 0, "fetched": 0, "skipped_offline": False,
+               "present": False, "reason": "", "path": ""}
+    models = _models_dir()
+    if not models:
+        receipt["reason"] = "could not locate ComfyUI models/ directory"
+        return receipt
+    kokoro_dir = os.path.join(models, _KOKORO_MODEL_SUBDIR)
+    dest = os.path.join(kokoro_dir, _KOKORO_ONNX_REL_PATH)
+    receipt["path"] = dest
+    if os.path.exists(dest) and not force:
+        receipt["present"] = True
+        return receipt
+    if not force and not onnx_backend_wanted():
+        receipt["reason"] = "ONNX backend not selected on this interpreter"
+        return receipt
+    if not force and os.environ.get("HF_HUB_OFFLINE") == "1":
+        receipt["skipped_offline"] = True
+        receipt["reason"] = "HF_HUB_OFFLINE=1"
+        return receipt
+    if os.environ.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
+        receipt["skipped_offline"] = True
+        receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
+        return receipt
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as exc:  # noqa: BLE001
+        receipt["reason"] = f"huggingface_hub unavailable: {exc}"
+        return receipt
+    receipt["attempted"] = 1
+    log.info(
+        "OldTimeRadio: fetching the Kokoro ONNX model (%s %s, ~326 MB, one-time) "
+        "into %s -- this can take a few minutes on a slow link",
+        KOKORO_ONNX_REPO_ID, KOKORO_ONNX_FILENAME, kokoro_dir)
+    try:
+        os.makedirs(kokoro_dir, exist_ok=True)
+        got = hf_hub_download(
+            repo_id=KOKORO_ONNX_REPO_ID, filename=KOKORO_ONNX_FILENAME,
+            local_dir=kokoro_dir)
+        if not os.path.exists(dest):
+            # A hub version that resolved elsewhere: copy, never symlink (the
+            # engine checks this exact path with os.path.exists).
+            import shutil
+
+            shutil.copyfile(got, dest)
+        receipt["fetched"] = 1
+    except Exception as exc:  # noqa: BLE001 -- no internet, a 404, a full disk
+        receipt["reason"] = f"{KOKORO_ONNX_FILENAME}: {exc}"
+    return receipt
 
 
 def missing_voices(voices_dir: str) -> "list[str]":
@@ -172,6 +281,20 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
 
 def prefetch_at_boot() -> None:
     """The prestartup entry point. Logs, never raises, never prints non-ASCII."""
+    # The two fetches are independent: a voice-prefetch failure must not skip
+    # the ONNX model, and vice versa.
+    try:
+        onnx_receipt = prefetch_kokoro_onnx_model()
+        if onnx_receipt.get("fetched"):
+            log.info("OldTimeRadio: fetched the Kokoro ONNX model into %s (one-time)",
+                     onnx_receipt.get("path"))
+        elif onnx_receipt.get("attempted") and onnx_receipt.get("reason"):
+            log.info(
+                "OldTimeRadio: Kokoro ONNX model prefetch incomplete (%s). The kokoro "
+                "engine will name the fetch command at the first voice line; Bark "
+                "needs nothing.", onnx_receipt["reason"])
+    except Exception as exc:  # noqa: BLE001 -- belt and braces
+        log.info("OldTimeRadio kokoro ONNX model prefetch skipped: %s", exc)
     try:
         receipt = prefetch_kokoro_voices()
     except Exception as exc:  # noqa: BLE001 -- belt and braces

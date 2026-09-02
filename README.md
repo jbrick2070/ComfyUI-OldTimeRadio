@@ -104,22 +104,23 @@ ComfyUI.
 on Linux pods (GGUF `6ea2651e`, LTXVideo `3b9c5cde`, AnimateDiff-Evolved `92576512`,
 release 1.6.0); on Windows, install the row you need by hand as above.
 
-> **Python 3.13 and the Kokoro voice (read this if you use ComfyUI Desktop or the
-> portable build, which both ship Python 3.13).** `kokoro`, the shipped default
-> announcer voice, cannot be pip-installed on Python 3.13 today: kokoro 0.7.16 pins
-> `numpy==1.26.4` (no 3.13 wheel) and every newer kokoro/misaki release declares
-> `Requires-Python <3.13`. Because pip resolves a requirements file all-or-nothing,
-> a plain `pip install -r requirements.txt` used to fail outright and install
-> **none** of the pack's libraries. As of 2026-09-01 the kokoro line carries a
-> `python_version < "3.13"` marker, so the install succeeds and only the Kokoro
-> engine is absent. **What to click:** the `otr_4060_floor` template already uses
-> **bark** for every voice, so it needs nothing. If you load `otr_canonical` or the
-> 8 GB haunted graph instead, open the **OTR_CastLock** node on the canvas before you
-> queue and set three dropdowns to the bark values: `voice_bank` -> `bark_legacy`,
+> **Python 3.13 and the Kokoro voice (ComfyUI Desktop and the portable build both
+> ship Python 3.13).** The torch `kokoro` package cannot be pip-installed on 3.13
+> (its newest releases declare `Requires-Python <3.13`), so since 2026-09-02 the
+> same Kokoro voices run there through **kokoro-onnx** on the CPU: `requirements.txt`
+> carries `kokoro>=0.7.16` for Python 3.12 and `kokoro-onnx>=0.6.1` for 3.13, one line
+> installs per interpreter, and the engine picks whichever is present (same engine
+> name, same 28 voices, about six times faster than realtime on a laptop CPU, no GPU
+> contention with the video). The 326 MB ONNX model is fetched once at boot into
+> `models/TTS/KokoroTTS/onnx/` when that backend will be used, never during a render.
+> **Registry installs older than 2.0.0-alpha.16 do not carry the kokoro-onnx line
+> yet:** on those, run `python -m pip install kokoro-onnx` with ComfyUI's own
+> interpreter once, or open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`,
 > `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` (bark installs
-> everywhere and downloads its own weights). Skip that and the render runs the writer
-> for several minutes, then stops with `kokoro is not installed` at the announcer
-> step. On Python 3.12 or older nothing changes.
+> everywhere and downloads its own weights). A missing backend fails at the first
+> voice line with the exact pip line to run. Python 3.14 has no Kokoro backend
+> packaged yet; use bark there. On Python 3.12 nothing changes. Every voice engine and what it needs, generated from the code:
+> `docs/MACHINE_MATRIX.md`, section "Voice engines".
 
 **You do not have to memorise this.** If a pack is missing, the render stops
 with a named error that now tells you which pack to install and where to get
@@ -354,10 +355,10 @@ it does not silently rewrite the graph currently open in ComfyUI.
 | you have | load this | what it renders |
 |---|---|---|
 | any NVIDIA card, first episode attempt | **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio → `otr_4060_floor`** | the procedural floor: no video or still-image weights; **bark** voices, `musicgen`, and the `gemma-4-E2B` writer (a 6 GB download, about 3 GB resident). Works on Python 3.13 as-is. Still a `draft` profile in the matrix (no published receipt yet), but it is the path built for a first run |
-| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro needs Python 3.12 or older; on Python 3.13 open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
+| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, IndexTTS2 + Kokoro voices, Stable Audio 3 music. Read the IndexTTS2 note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
-| AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (Python 3.12) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
+| AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
 | Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
@@ -376,11 +377,10 @@ it does not silently rewrite the graph currently open in ComfyUI.
    Use the interpreter that launches ComfyUI, never an arbitrary system
    Python; a standard portable install uses
    `ComfyUI_windows_portable\python_embeded\python.exe`.
-   Machine rows select Kokoro and therefore require Python 3.12 or earlier. On
-   NVIDIA with Python 3.13 replace `--machine 8gb` with
-   `--profile otr_4060_floor` for the Bark route (the selectors cannot be
-   combined).
-   AMD has no supported Python-3.13 machine route yet.
+   Machine rows select Kokoro, which runs on Python 3.12 (torch) and 3.13
+   (kokoro-onnx, CPU). Only Python 3.14 has no Kokoro backend packaged yet: there,
+   replace `--machine 8gb` with `--profile otr_4060_floor` for the Bark route
+   (the selectors cannot be combined).
 3. For a saved GUI graph, hit **Queue Prompt**.
 4. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
    graph rolls a random story bank each run and renders through the procedural still/CRT floor
@@ -400,8 +400,9 @@ it does not silently rewrite the graph currently open in ComfyUI.
   have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as an
   unverified draft profile (`otr_mac_mps`) whose pictures come from a paid Google API
   today -- read the Mac row in "Pick the graph" before you start.
-- **Python:** ComfyUI Desktop and the portable build ship Python 3.13. Everything installs
-  there except the Kokoro voice; bark replaces it with three dropdown changes (section 2b).
+- **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
+  Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
+  backend yet (bark replaces it with three dropdown changes).
 - **Other setups:** per-platform workflow variants + recipes ship in-repo (16 GB NVIDIA
   canonical, cloud-lane variant, Mac, AMD). The Mac/AMD variants are drafts — not yet
   verified on real hardware.
@@ -431,7 +432,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 * **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
 * **AMD / ROCm (Linux only)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
 
-Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice, which needs Python 3.12 or older; on the Python 3.13 that ComfyUI Desktop and the portable build ship, run `--profile otr_4060_floor` for the bark route instead, or switch the OTR_CastLock voice dropdowns to bark on the loaded graph.
+Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
 Apple Silicon is still the unproven experimental `otr_mac_mps` profile; CPU-only is `cpu_floor`. Neither is promoted to a machine key or PROVEN until a named physical system publishes an episode.
 
@@ -789,9 +790,15 @@ appear there as they render.
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
   branch.
-- **`kokoro is not installed` after the writer finished** — you are on Python 3.13 (ComfyUI
-  Desktop, the portable build). Open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`,
-  `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark`, then queue again.
+- **`neither kokoro backend is installed` (or `kokoro is not installed`) at the first voice
+  line** — on Python 3.13 run `python -m pip install kokoro-onnx` with ComfyUI's own
+  interpreter (a registry install older than 2.0.0-alpha.16 does not carry it); on 3.12
+  `pip install kokoro`. The message names the exact line. Or open **OTR_CastLock** and set
+  `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine`
+  -> `bark`, then queue again.
+- **`kokoro ONNX model not found`** — the one-time boot fetch of the 326 MB model did not
+  complete (offline boot, or `HF_HUB_OFFLINE=1`). Run the `huggingface-cli download`
+  line the message prints, then queue again; nothing downloads during a render.
 - **`IndexTTS2 Path B not installed`** — the 16 GB canonical graph's character voice needs its
   own one-time installer (`scripts\_otr_indextts2_install.ps1`, section 4), or switch
   `char_voice_engine` to `bark`.

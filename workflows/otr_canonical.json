@@ -1287,10 +1287,10 @@
         "Node name for S&R": "OTR_CastLock"
       },
       "widgets_values": [
-        "default",
+        "kokoro_builtin",
         "auto_registry",
         true,
-        "indextts2",
+        "kokoro",
         "kokoro",
         "cuda"
       ],
@@ -1374,7 +1374,7 @@
         "Node name for S&R": "OTR_BatchCharacterVoices"
       },
       "widgets_values": [
-        "indextts2"
+        "kokoro"
       ],
       "color": "#234035",
       "bgcolor": "#162821"

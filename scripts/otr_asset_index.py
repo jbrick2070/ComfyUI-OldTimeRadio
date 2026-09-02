@@ -265,6 +265,11 @@ def render() -> str:
                 how = "[exact manual tier](RUNPOD_INSTALL.md)"
             elif row["engine"] == "minimax_h3":
                 how = "explicit operator-local `otr_fetch_lane_weights.py minimax_h3`"
+            elif row["engine"] == "kokoro":
+                # Voices and the ONNX model are fetched by the boot prefetch
+                # (`_otr_kokoro_voice_prefetch`); the torch model rides the HF
+                # cache. Nothing is placed by hand and nothing fetches mid-render.
+                how = "auto (boot prefetch: voices + ONNX model; torch model via HF cache)"
             elif row["engine"] in fetchable:
                 how = "`otr_fetch_lane_weights.py %s`" % row["engine"]
             elif row["external"]:

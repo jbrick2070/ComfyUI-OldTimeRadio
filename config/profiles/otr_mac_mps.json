@@ -16,7 +16,7 @@
     "character_image": "google_image"
   },
   "slot_overrides": {
-    "voice_bank": "default",
+    "voice_bank": "kokoro_builtin",
     "cast_voice_policy": "auto_registry",
     "char_voice_engine": "kokoro",
     "announcer_voice_engine": "kokoro",

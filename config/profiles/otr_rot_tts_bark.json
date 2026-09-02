@@ -16,7 +16,7 @@
     "character_image": "z_image_turbo"
   },
   "slot_overrides": {
-    "voice_bank": "default",
+    "voice_bank": "bark_legacy",
     "cast_voice_policy": "auto_registry",
     "char_voice_engine": "bark",
     "announcer_voice_engine": "kokoro",

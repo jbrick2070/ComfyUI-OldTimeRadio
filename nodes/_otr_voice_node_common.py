@@ -962,6 +962,25 @@ class OTRVoiceNodeBase:
                     f"disagree. Set both OTR_CastLock.announcer_voice_engine "
                     f"and this node's 'engine' widget to the same value.",
                 )
+        elif self.ROLE == "char_voice":
+            # The character-side twin of the guard above (2026-09-02, kokoro-onnx
+            # r1): CastLock stamps char_voice_engine and this node carries its own
+            # 'engine' widget; nothing compared them, so a graph with the two set
+            # differently rendered one engine while the ledger and credits named
+            # the other. "auto" is stamped LITERALLY when CastLock resolved nothing
+            # (a preset bank under an auto request -- cast_lock.py
+            # _stamp_voice_engine_selection), so it is never a disagreement.
+            stamped = str(meta.get("char_voice_engine") or "")
+            if stamped and stamped != "auto" and stamped != engine:
+                raise EngineUnusable(
+                    engine, self.ROLE,
+                    EngineUsabilityReason.MALFORMED_CONFIG,
+                    f"OTR_CastLock resolved char_voice_engine={stamped!r} but "
+                    f"this node's own 'engine' widget is {engine!r} -- the two "
+                    f"character-engine controls disagree. Set both "
+                    f"OTR_CastLock.char_voice_engine and this node's 'engine' "
+                    f"widget to the same value.",
+                )
 
         episode_seed = coerce_int_seed(meta.get("episode_seed"))
         cast_lock_revision = int(meta.get("cast_lock_revision") or 0)

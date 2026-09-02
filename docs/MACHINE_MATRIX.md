@@ -41,7 +41,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 * **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
 * **AMD / ROCm (Linux only)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
 
-Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice, which needs Python 3.12 or older; on the Python 3.13 that ComfyUI Desktop and the portable build ship, run `--profile otr_4060_floor` for the bark route instead, or switch the OTR_CastLock voice dropdowns to bark on the loaded graph.
+Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
 Apple Silicon is still the unproven experimental `otr_mac_mps` profile; CPU-only is `cpu_floor`. Neither is promoted to a machine key or PROVEN until a named physical system publishes an episode.
 
@@ -63,8 +63,8 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.12 |
-| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.12 |
+| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
+| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 
 <details><summary>14 draft profile(s) here -- not vouched for</summary>
 
@@ -110,47 +110,47 @@ Video engines they select: `animatediff15_v3_haunted_video`, `still_motion`, `vi
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `16gb_full` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
+| `16gb_full` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_bark_announcer_acceptance` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete |
 | `otr_g4_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_g4_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
+| `otr_g4_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_g4_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_g4_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_g4_ltx_video` | ltx_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_h3_low_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.12 |
-| `otr_h3_low_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.12 |
-| `otr_ltx25_foley_flux2klein` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | flux2_klein | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_ltx25_high_foley_plus` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_ltx25_high_mime` | ltx25_high_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_ltx25_high_video` | ltx25_high_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
+| `otr_g4_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_h3_low_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_h3_low_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_ltx25_foley_flux2klein` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | flux2_klein | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_foley_plus` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_mime` | ltx25_high_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_video` | ltx25_high_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_humo_14b_169` | humo_14B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_humo_1_7b` | humo_1.7B | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_w45_humo_1_7b_169` | humo_1.7B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_w45_ltx25_foley_plus` | ltx25_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_w45_ltx25_mime` | ltx25_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.12 |
-| `otr_w45_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
+| `otr_w45_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_humo_14b_169` | humo_14B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_humo_1_7b` | humo_1.7B | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_humo_1_7b_169` | humo_1.7B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_foley_plus` | ltx25_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_mime` | ltx25_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_ltx_video` | ltx_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_mesh_stage` | mesh_stage | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_minimax_h3_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.12 |
-| `otr_w45_minimax_h3_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.12 |
-| `otr_w45_still_flat` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_still_motion` | still_motion | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_still_pan` | still_pan | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_still_word` | still_word | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_viz_camera` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_viz_camera_kokoro_all` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_viz_green` | viz_green | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_viz_mxc_cpu` | viz_mxc_cpu | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_viz_mxc_mandala` | viz_mxc_mandala | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
-| `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.12 |
+| `otr_w45_minimax_h3_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_w45_minimax_h3_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_w45_still_flat` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_still_motion` | still_motion | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_still_pan` | still_pan | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_still_word` | still_word | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_viz_camera` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_viz_camera_kokoro_all` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_viz_green` | viz_green | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_viz_mxc_cpu` | viz_mxc_cpu | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_viz_mxc_mandala` | viz_mxc_mandala | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
 <details><summary>49 draft profile(s) here -- not vouched for</summary>
 
@@ -226,6 +226,20 @@ Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_v
 | `otr_cloud_low` | cloud_wan_i2v | google_tts |
 
 </details>
+
+## Voice engines
+
+What each voice engine needs, read from the audio registry. Kokoro is the shipped default for both voice slots on every machine row; the others stay in the `OTR_CastLock` dropdowns as install-it-yourself upgrades.
+
+| engine | roles | runs on | usable without a GPU | sidecar / vendor | ships with the pack |
+|---|---|---|---|---|---|
+| `bark` | char, announcer | cuda, cpu | no | in-process | ships: weights download on first use (about 4 GB) |
+| `chatterbox` | char, announcer | cuda | no | sidecar, nvidia only | install it yourself: isolated sidecar venv, reference WAVs |
+| `dia` | char, announcer | cuda | no | sidecar, nvidia only | install it yourself: isolated sidecar venv, reference WAVs |
+| `elevenlabs` | char, announcer | cuda, cpu, mps | yes | in-process | your own API key (cloud) |
+| `google_tts` | char, announcer | cuda, cpu, mps | yes | in-process | your own API key (cloud) |
+| `indextts2` | char | cuda | no | sidecar, nvidia only | install it yourself: `scripts/_otr_indextts2_install.ps1` plus your own reference WAVs (voice cloning) |
+| `kokoro` | announcer, char | cuda, cpu, mps | yes | in-process | ships: `kokoro` (torch) on Python 3.12, `kokoro-onnx` (CPU) on 3.13; voices and the ONNX model fetch once at boot |
 
 ## A bigger card does not currently get you more
 

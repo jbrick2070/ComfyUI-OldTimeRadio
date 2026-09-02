@@ -145,7 +145,7 @@
       "platform": "any",
       "writer": "gemma-4-E2B",
       "writer_model": "google/gemma-4-E2B-it",
-      "note": "The physical RTX 4060 published six documented episodes through the invoked writer/video/voice/music path. The configured still-image engine was not invoked and remains unproven on 8 GB. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13.",
+      "note": "The physical RTX 4060 published six documented episodes through the invoked writer/video/voice/music path. The configured still-image engine was not invoked and remains unproven on 8 GB. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
       "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised",
       "key": "8gb",
       "video": "animatediff15_v3_haunted_video",
@@ -178,7 +178,7 @@
       "platform": "any",
       "writer": "gemma-4-12b",
       "writer_model": "google/gemma-4-12b-it",
-      "note": "One 16 GB+ class. Wan is the public default because it published on named Blackwell and Ampere hardware; that establishes cross-architecture reach, not proof for every GPU model or for this entire row as one exact tuple. RTX 3090/4090 remain candidates until they have named receipts. LTX 2.5 is separately proven on the RTX 5080 only. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13.",
+      "note": "One 16 GB+ class. Wan is the public default because it published on named Blackwell and Ampere hardware; that establishes cross-architecture reach, not proof for every GPU model or for this entire row as one exact tuple. RTX 3090/4090 remain candidates until they have named receipts. LTX 2.5 is separately proven on the RTX 5080 only. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
       "proof_summary": "**COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven",
       "key": "16gb",
       "video": "wan22_high_video",
@@ -243,7 +243,7 @@
       "writer_ceiling_gb": 10.0,
       "quant_policy": "none",
       "status": "draft",
-      "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling. This Kokoro tuple requires Python 3.12 or earlier; use the Bark floor profile on Python 3.13."
+      "note": "UNTESTED. Sized between the two proven bands rather than absorbed into 16 GB+, which would hand a 12 GB card a 14.5 GB writer ceiling. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package."
     },
     {
       "label": "AMD / ROCm (Linux only)",
@@ -253,7 +253,7 @@
       "platform": "linux",
       "writer": "gemma-4-E2B",
       "writer_model": "google/gemma-4-E2B-it",
-      "note": "Largely unexplored and Linux-only. PyTorch ROCm presents through the cuda API, but no episode has published from AMD hardware. This row deliberately uses the small unquantized E2B writer and no-FP8 policies; these are candidates, not borrowed NVIDIA proof. AMD ships still/procedural motion over Klein images until a video-diffusion lane publishes on AMD. This Kokoro tuple requires Python 3.12 or earlier; there is no supported AMD Python 3.13 machine route yet.",
+      "note": "Largely unexplored and Linux-only. PyTorch ROCm presents through the cuda API, but no episode has published from AMD hardware. This row deliberately uses the small unquantized E2B writer and no-FP8 policies; these are candidates, not borrowed NVIDIA proof. AMD ships still/procedural motion over Klein images until a video-diffusion lane publishes on AMD. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package. No AMD episode has published on either.",
       "key": "amd",
       "device_backend": "cuda",
       "video": "still_motion",

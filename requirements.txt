@@ -105,6 +105,16 @@ PyYAML>=6.0
 # should be is an open operator decision -- see docs/GO_FORWARD_PLAN.md
 # 2026-09-01. Mirror this marker into pyproject.toml on the next bump.
 kokoro>=0.7.16; python_version < "3.13"
+# 2026-09-02 (queue item 2): the SAME kokoro voices on Python 3.13, through ONNX
+# Runtime instead of torch -- `nodes/_otr_audio_engines/_kokoro_backends.py`. The
+# engine stays "kokoro" in every dropdown; it selects the torch package when that
+# imports and kokoro-onnx otherwise. The two markers are COMPLEMENTARY on purpose:
+# each interpreter gets exactly one backend, and the upper bound is there because
+# kokoro-onnx 0.6.x declares Requires-Python <3.14 -- a bare line would repeat
+# PBUG-20260901-04 on the day ComfyUI ships 3.14 (pip resolves this file
+# all-or-nothing). onnxruntime, phonemizer and the bundled espeak-ng come with it.
+# The ONNX model (326 MB) is fetched once at boot by the prefetch, never mid-render.
+kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 
 # pyloudnorm was declared NOWHERE -- not here, not in pyproject.toml -- while
 # `scene_sequencer.py` imports it to measure integrated loudness and master

@@ -50,6 +50,25 @@ def test_kokoro_is_marker_guarded_below_python_313():
     assert marker.evaluate({"python_version": "3.13"}) is False
 
 
+def test_kokoro_onnx_is_the_313_backend_and_is_bounded_below_314():
+    """The kokoro-onnx line is COMPLEMENTARY to the kokoro line: exactly one of
+    the two backends installs on 3.12 and on 3.13, and neither on 3.14 (kokoro-onnx
+    declares Requires-Python <3.14; a bare line would repeat PBUG-20260901-04 the
+    day ComfyUI ships 3.14)."""
+    reqs = _parsed()
+    assert "kokoro-onnx" in reqs, "kokoro-onnx is the Python 3.13 kokoro backend"
+    onnx = reqs["kokoro-onnx"].marker
+    torch_line = reqs["kokoro"].marker
+    assert onnx is not None
+    for version, expect_onnx in (("3.12", False), ("3.13", True), ("3.14", False)):
+        env = {"python_version": version}
+        assert onnx.evaluate(env) is expect_onnx, version
+        installs = int(onnx.evaluate(env)) + int(torch_line.evaluate(env))
+        assert installs == (0 if version == "3.14" else 1), (
+            "%s: %d kokoro backend lines install; want exactly one below 3.14, none on 3.14"
+            % (version, installs))
+
+
 @pytest.mark.parametrize("python_version", ["3.12", "3.13"])
 def test_requirements_resolve_to_a_nonempty_set_on_shipped_interpreters(python_version):
     """A marker may exclude a line on an interpreter; it must never exclude

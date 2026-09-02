@@ -286,8 +286,8 @@ def load_profiles() -> list:
                 install_recipe = "complete; manual tier"
             else:
                 install_recipe = "complete"
-            if provision.profile_python_issue(d, (3, 13)):
-                install_recipe += "; Python <=3.12"
+            if provision.profile_python_issue(d, (3, 14)):
+                install_recipe += "; Python <=3.13"
         out.append({
             "id": pid,
             "status": d.get("status", "?"),
@@ -396,10 +396,12 @@ def render() -> str:
       "sci_fi_radio --timeout 0`, replacing only the exact machine key. To use "
       "an explicit profile instead, replace `--machine 8gb` with `--profile "
       "<exact-profile-id>`; the two selectors are intentionally exclusive. "
-      "Every machine row selects the Kokoro voice, which needs Python 3.12 or "
-      "older; on the Python 3.13 that ComfyUI Desktop and the portable build "
-      "ship, run `--profile otr_4060_floor` for the bark route instead, or "
-      "switch the OTR_CastLock voice dropdowns to bark on the loaded graph.")
+      "Every machine row selects the Kokoro voice. On the Python 3.13 that "
+      "ComfyUI Desktop and the portable build ship it runs through kokoro-onnx "
+      "on the CPU (the same voices, about six times faster than realtime); on "
+      "Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro "
+      "backend packaged yet; there, run `--profile otr_4060_floor` for the bark "
+      "route or switch the OTR_CastLock voice dropdowns to bark.")
     A("\nApple Silicon is still the unproven experimental `otr_mac_mps` profile; "
       "CPU-only is `cpu_floor`. Neither is promoted to a machine key or "
       "PROVEN until a named physical system publishes an episode.\n")
@@ -457,6 +459,8 @@ def render() -> str:
             for r in sorted(drafts, key=lambda x: x["id"]):
                 A("| `%s` | %s | %s |" % (r["id"], r["video"], r["voice"]))
             A("\n</details>\n")
+
+    _voice_engines_table(A)
 
     A("## A bigger card does not currently get you more\n")
     A("The tier is `16 GB+` because that is the truth: nothing in "
@@ -577,6 +581,60 @@ def inject_readme(check_only: bool = False) -> bool:
     io.open(path, "w", encoding="utf-8", newline="\n").write(out)
     return False
 
+
+
+# Which voice engines a fresh install can use without doing anything, and what
+# the others need. GENERATED from the audio registry so the table cannot drift
+# from the code; the ships column is the one hand-kept fact per engine, and it
+# is a fact about packaging, not about capability.
+_VOICE_SHIP_NOTES = {
+    "kokoro": "ships: `kokoro` (torch) on Python 3.12, `kokoro-onnx` (CPU) on 3.13; "
+              "voices and the ONNX model fetch once at boot",
+    "bark": "ships: weights download on first use (about 4 GB)",
+    "indextts2": "install it yourself: `scripts/_otr_indextts2_install.ps1` plus your "
+                 "own reference WAVs (voice cloning)",
+    "chatterbox": "install it yourself: isolated sidecar venv, reference WAVs",
+    "dia": "install it yourself: isolated sidecar venv, reference WAVs",
+    "elevenlabs": "your own API key (cloud)",
+    "google_tts": "your own API key (cloud)",
+}
+
+
+def _voice_engines_table(A) -> None:
+    """Every registered voice engine, from `nodes/_otr_audio_engines/registry.py`."""
+    try:
+        import os as _os
+        import sys as _sys
+
+        _root = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+        if _root not in _sys.path:
+            _sys.path.insert(0, _root)
+        from nodes._otr_audio_engines.registry import CAPABILITIES, _REGISTRY
+    except Exception as exc:  # noqa: BLE001 -- the matrix must still generate
+        A("## Voice engines\n")
+        A("(registry unavailable in this interpreter: %s)\n" % exc)
+        return
+    A("## Voice engines\n")
+    A("What each voice engine needs, read from the audio registry. Kokoro is the "
+      "shipped default for both voice slots on every machine row; the others stay in "
+      "the `OTR_CastLock` dropdowns as install-it-yourself upgrades.\n")
+    A("| engine | roles | runs on | usable without a GPU | sidecar / vendor | ships with the pack |")
+    A("|---|---|---|---|---|---|")
+    names = sorted(
+        n for n, e in _REGISTRY.items()
+        if {"char_voice", "announcer_voice"} & set(getattr(e, "roles", ()) or ()))
+    for name in names:
+        cap = CAPABILITIES.get(name) or {}
+        roles = ", ".join(r.replace("_voice", "") for r in getattr(_REGISTRY[name], "roles", ()))
+        backends = ", ".join(cap.get("device_backends") or []) or "-"
+        cpu_ok = "yes" if cap.get("practical_without_gpu") else "no"
+        side = "sidecar" if cap.get("requires_sidecar") else "in-process"
+        if cap.get("requires_vendor"):
+            side += ", %s only" % cap["requires_vendor"]
+        A("| `%s` | %s | %s | %s | %s | %s |" % (
+            name, roles, backends, cpu_ok, side,
+            _VOICE_SHIP_NOTES.get(name, "install it yourself")))
+    A("")
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()

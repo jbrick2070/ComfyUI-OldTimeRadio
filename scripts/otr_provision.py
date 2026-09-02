@@ -1715,11 +1715,14 @@ def profile_python_issue(profile: dict, version_info=None) -> str:
         str(slots.get(name) or "").strip()
         for name in ("char_voice_engine", "announcer_voice_engine")
     }
-    if "kokoro" in voices and tuple(version_info[:2]) >= (3, 13):
+    # 2026-09-02: Python 3.13 runs kokoro through kokoro-onnx (CPU, the same
+    # voices), so only 3.14+ has no kokoro backend packaged yet.
+    if "kokoro" in voices and tuple(version_info[:2]) >= (3, 14):
         return (
-            "selected Kokoro voice cannot be installed on Python 3.13; "
-            "use Python 3.12 or earlier; on NVIDIA, the Bark-based "
-            "otr_4060_floor profile is the supported Python 3.13 floor"
+            "selected Kokoro voice has no backend packaged for Python 3.14 yet "
+            "(kokoro needs <=3.12, kokoro-onnx needs <=3.13); use Python 3.13 "
+            "(kokoro-onnx, CPU) or 3.12 (kokoro), or the Bark-based otr_4060_floor "
+            "profile"
         )
     return ""
 

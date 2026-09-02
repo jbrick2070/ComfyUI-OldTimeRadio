@@ -102,21 +102,24 @@ def test_kokoro_profiles_fail_early_on_python_313_but_bark_does_not():
     kokoro = provision.load_machine_profile("8gb")
     bark = provision.load_profile("otr_4060_floor")
 
-    assert "Kokoro voice cannot be installed on Python 3.13" in \
-        provision.profile_python_issue(kokoro, (3, 13))
+    # 2026-09-02: 3.13 runs kokoro through kokoro-onnx; only 3.14+ is flagged.
+    assert provision.profile_python_issue(kokoro, (3, 13)) == ""
+    assert "no backend packaged for Python 3.14" in \
+        provision.profile_python_issue(kokoro, (3, 14))
     assert provision.profile_python_issue(kokoro, (3, 12)) == ""
     assert provision.profile_python_issue(bark, (3, 13)) == ""
+    assert provision.profile_python_issue(bark, (3, 14)) == ""
 
 
-def test_machine_readable_plan_check_rejects_kokoro_on_python_313(
+def test_machine_readable_plan_check_rejects_kokoro_on_python_314(
         monkeypatch, capsys):
     provision = _provisioner()
-    monkeypatch.setattr(provision.sys, "version_info", (3, 13, 0))
+    monkeypatch.setattr(provision.sys, "version_info", (3, 14, 0))
 
     assert provision.main(["--machine", "8gb", "--check-plan"]) == 1
     rejected = capsys.readouterr().out
     assert "MISSING" in rejected
-    assert "Kokoro voice cannot be installed on Python 3.13" in rejected
+    assert "no backend packaged for Python 3.14" in rejected
 
     assert provision.main([
         "--profile", "otr_4060_floor", "--check-plan"

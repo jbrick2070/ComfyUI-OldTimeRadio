@@ -1,0 +1,27 @@
+{
+ "text": "Good evening. This is the Signal Lost radio hour, and tonight's story begins in a lighthouse that should have been empty.",
+ "seed": 1234,
+ "device": "cuda",
+ "backend": "torch (pre-change)",
+ "python": "3.12.11",
+ "kokoro": "0.9.4",
+ "results": {
+  "bm_george": {
+   "sha256": "1aac53d5f4c46b29b27397df4c73289c6d67df1765ce21b4cf2fa921dc539e15",
+   "samples": 201600,
+   "sr": 24000,
+   "wall_s": 10.64
+  },
+  "bf_emma": {
+   "sha256": "4811d6b897cb13173c5ebcabf7fc7087a6c00e80137e852bf1c2457c0488d1ed",
+   "samples": 175800,
+   "sr": 24000,
+   "wall_s": 0.2
+  }
+ },
+ "after_change": {
+  "backend": "torch",
+  "sha_identical": true,
+  "commit": "pending"
+ }
+}
