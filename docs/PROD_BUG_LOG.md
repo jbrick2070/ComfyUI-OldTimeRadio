@@ -10061,3 +10061,47 @@ and refusal of unrelated checkout drift.
 
 **Bug Bible:** promoted as 12.143; a pinned upstream revision still needs an
 owned compatibility patch when a transitive dependency removes an API.
+
+---
+
+## PBUG-20260901-04 -- `pip install -r requirements.txt` installs NOTHING on Python 3.13 because of kokoro
+
+**Verified on a live clean-room install (RTX 4060 laptop, fresh
+ComfyUI_windows_portable v0.34.0, Python 3.13.14, fresh HF cache, pack by git
+clone at d4e1d5af, 2026-09-01).** The README's own install step failed before a
+single package landed:
+
+    ERROR: Could not find a version that satisfies the requirement
+    misaki>=0.7.16 (from kokoro)
+    ERROR: No matching distribution found for misaki>=0.7.16
+
+`pip freeze` before and after were byte-identical: pip resolves a requirements
+file all-or-nothing, so one unsatisfiable line took the other seventeen with
+it. The cause is entirely upstream metadata, checked against PyPI the same
+night: kokoro 0.7.16 (the only release with `Requires-Python >=3.7`) pins
+`numpy==1.26.4`, which has no 3.13 wheel; kokoro 0.8.x/0.9.x and every
+misaki>=0.7.5 declare `Requires-Python <3.13`; and `misaki[en]` drags
+spacy/thinc/blis, which have no 3.13 wheels, so `--ignore-requires-python`
+ends in a Cython source build. ComfyUI Desktop and the portable build both ship
+Python 3.13 today, so this was every mainstream Windows install, and kokoro is
+the shipped default announcer voice. The earlier 4060 drill (2026-08-29) ran
+kokoro on a Desktop env that has since been rebuilt without it; that env no
+longer carries kokoro or misaki either.
+
+**FIX:** `requirements.txt` now reads `kokoro>=0.7.16; python_version < "3.13"`
+with the measurement recorded beside it. The other seventeen requirements
+install on 3.13; the kokoro engine reports itself unusable by name and the
+voice falls to the dropdown choice (bark installs everywhere). The same marker
+is queued for `pyproject.toml` in `docs/ship-audit-2026-09-01/pyproject_alpha15.patch`
+(release trigger, one deliberate bump). What the DEFAULT voice should be on
+3.13 is an open operator decision, logged in GO_FORWARD_PLAN.md 2026-09-01.
+
+**LIVE VERIFY:** the same clean room, same interpreter: the requirements file
+minus the kokoro line installed cleanly (`PIP4_OK`), the server booted with all
+25 OTR nodes, and a 1-act leg proceeded past the writer on bark voices.
+`tests/test_requirements_python_markers.py` guards the marker.
+
+**Bug Bible:** candidate; a dependency whose newest releases cap
+`Requires-Python` below the interpreter the host application ships must carry a
+version marker, or pip's all-or-nothing resolve turns one optional engine into
+a total install failure.

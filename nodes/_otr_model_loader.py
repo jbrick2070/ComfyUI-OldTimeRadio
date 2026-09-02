@@ -736,8 +736,19 @@ def load_llm(
 
         import gc
         gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
+        # CUDA-only reclaim, guarded (2026-09-01 ship audit): ipc_collect()
+        # calls _lazy_init() and raises "Torch not compiled with CUDA enabled"
+        # on a CUDA-less torch (Mac, CPU floor), killing the writer stage
+        # before device selection is even consulted. On a CUDA box this branch
+        # is byte-identical to the unguarded pair it replaces.
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+            except Exception as wash_err:  # noqa: BLE001 -- reclaim is best-effort
+                _runtime_log(
+                    f"[StoryOrchestrator] Zero-Prime: CUDA cache reclaim skipped "
+                    f"({type(wash_err).__name__}: {wash_err})")
 
         # Post-Wash Analytics
         if torch.cuda.is_available():

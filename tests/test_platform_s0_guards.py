@@ -172,7 +172,7 @@ def test_detect_host_shape_and_vendor_consistency():
     host = WorkflowValidator._detect_host()
     assert set(host) == {"platform", "has_cuda", "has_mps", "vendor",
                          "vram_mb"}
-    assert host["platform"] in ("win", "mac", "any")
+    assert host["platform"] in ("win", "mac", "linux", "any")
     assert isinstance(host["has_cuda"], bool)
     assert isinstance(host["has_mps"], bool)
     assert isinstance(host["vram_mb"], int)

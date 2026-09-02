@@ -705,7 +705,11 @@ def build_gguf_load_config(
         "OTR_GGUF_N_BATCH", "GEMMA4_12B_N_BATCH" if is_gemma else None,
         DEFAULT_N_BATCH,
     )
-    default_layers = DEFAULT_N_GPU_LAYERS if policy.device == "cuda" else 0
+    # cuda AND mps offload by default (2026-09-01 ship audit): llama.cpp's
+    # Metal backend takes n_gpu_layers exactly like CUDA does, and forcing 0
+    # off-cuda left the Mac profile's only local writer running on CPU while
+    # the GPU idled. cpu stays 0. The env overrides above still win.
+    default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0
     n_gpu_layers = _resolve_int_override(
         "OTR_GGUF_N_GPU_LAYERS", "GEMMA4_12B_N_GPU_LAYERS" if is_gemma else None,
         default_layers,
@@ -1179,7 +1183,8 @@ class GGUFNativeBackend:
             model_path = resolve_gguf_path(quant)
             eff_n_ctx = _int_env("GEMMA4_12B_N_CTX", _policy.gguf_n_ctx)
             eff_n_batch = _int_env("GEMMA4_12B_N_BATCH", DEFAULT_N_BATCH)
-            _default_layers = DEFAULT_N_GPU_LAYERS if _policy.device == "cuda" else 0
+            _default_layers = (DEFAULT_N_GPU_LAYERS
+                               if _policy.device in ("cuda", "mps") else 0)
             eff_n_gpu_layers = _int_env("GEMMA4_12B_N_GPU_LAYERS", _default_layers)
             eff_kv_rate = _float_env("GEMMA4_12B_KV_GB_PER_1K", KV_GB_PER_1K_CTX)
             think_policy = _registry_row.think_policy if _registry_row else "none"

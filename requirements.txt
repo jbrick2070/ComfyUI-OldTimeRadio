@@ -88,7 +88,21 @@ PyYAML>=6.0
 # actually receives. A bump today would publish alpha.13 into the same wall
 # and deliver nothing, so the bump waits on the flag being cleared -- which
 # needs Comfy-Org, not us. When it clears, bump ONCE carrying both lines.
-kokoro>=0.7.16
+#
+# 2026-09-01, MEASURED ON A CLEAN WINDOWS PORTABLE INSTALL (Python 3.13.14):
+# kokoro cannot be pip-installed on Python 3.13 at all. 0.7.16 pins
+# numpy==1.26.4 (no 3.13 wheel); 0.8.x/0.9.x and every misaki>=0.7.5 declare
+# Requires-Python <3.13, and misaki[en] drags spacy/thinc/blis with no 3.13
+# wheels. pip resolves this file all-or-nothing, so the bare kokoro line made
+# `pip install -r requirements.txt` fail and install NONE of the 18 packages
+# (verified: pip freeze before == after). ComfyUI Desktop and the portable
+# build both ship Python 3.13, so that was every mainstream Windows install.
+# The marker lets the other 17 install; the kokoro ENGINE then reports itself
+# unusable by name and the announcer/character voice falls to the operator's
+# dropdown choice (bark installs everywhere). What the 3.13 DEFAULT voice
+# should be is an open operator decision -- see docs/GO_FORWARD_PLAN.md
+# 2026-09-01. Mirror this marker into pyproject.toml on the next bump.
+kokoro>=0.7.16; python_version < "3.13"
 
 # pyloudnorm was declared NOWHERE -- not here, not in pyproject.toml -- while
 # `scene_sequencer.py` imports it to measure integrated loudness and master

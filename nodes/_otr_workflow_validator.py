@@ -289,9 +289,14 @@ class WorkflowValidator:
         the vendor tell; Apple Silicon reports via torch.backends.mps."""
         import platform as _platform
         sysname = _platform.system()
+        # "linux" is a real token (2026-09-01 ship audit): before this branch
+        # a Linux host reported "any", so a profile declaring
+        # platform="linux" (both ROCm profiles) failed its own stamp assertion
+        # on the exact host it targets. Profiles declaring "any" are unaffected.
         info = {
             "platform": ("mac" if sysname == "Darwin"
-                         else "win" if sysname == "Windows" else "any"),
+                         else "win" if sysname == "Windows"
+                         else "linux" if sysname == "Linux" else "any"),
             "has_cuda": False,
             "has_mps": False,
             "vendor": "none",

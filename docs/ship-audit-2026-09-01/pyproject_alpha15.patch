@@ -1,0 +1,45 @@
+--- a/pyproject.toml	2026-08-30 00:54:45.960123700 -0700
++++ b/pyproject.toml
+@@ -1,6 +1,6 @@
+ [project]
+ name = "comfyui-old-time-radio"
+-version = "2.0.0-alpha.14"
++version = "2.0.0-alpha.15"
+ description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
+ readme = "README.md"
+ license = {file = "LICENSE"}
+@@ -19,7 +19,10 @@
+     "beautifulsoup4>=4.12",
+     "tokenizers>=0.22,<=0.23",
+     "sentencepiece>=0.1.99",
+-    "bitsandbytes>=0.42.0",
++    # CUDA-only library; no marker here blocked the whole registry install on
++    # macOS (2026-09-01 ship audit). The loader already fails loud when bnb is
++    # missing while quant_policy demands it.
++    "bitsandbytes>=0.42.0; sys_platform != 'darwin'",
+     # See requirements.txt for the full note: the loader passes
+     # low_cpu_mem_usage / device_map / max_memory / quantization_config, all of
+     # which transformers routes through accelerate, yet it was never declared.
+@@ -36,13 +39,21 @@
+     # kokoro is the DEFAULT announcer voice in the shipped canonical workflow.
+     # Without it a fresh install reaches its FIRST SPOKEN LINE and dies on
+     # KPipeline.__init__() got an unexpected keyword argument 'repo_id'.
+-    "kokoro>=0.7.16",
++    # Not installable on Python 3.13 (numpy==1.26.4 pin on 0.7.16; Requires-
++    # Python <3.13 on every newer kokoro/misaki). Mirrors requirements.txt.
++    "kokoro>=0.7.16; python_version < '3.13'",
+     # pyloudnorm is imported by scene_sequencer to master every episode to
+     # -14 LUFS. Its import is try/except with a deliberate fallback, so a
+     # missing install does not crash -- it quietly ships a differently
+     # mastered, quieter episode and says so only in one warning line. That
+     # silence is why it went unnoticed for so long.
+     "pyloudnorm>=0.1.1",
++    # Imported by shipped nodes, declared only in requirements.txt until now
++    # (2026-09-01 ship audit: pycairo unguarded in scope_draw.py and
++    # eng_viz_mandala.py; Pillow 16 unguarded sites; aiohttp in __init__.py).
++    "pycairo>=1.24",
++    "pillow>=10.0",
++    "aiohttp>=3.9",
+ ]
+ authors = [
+     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},

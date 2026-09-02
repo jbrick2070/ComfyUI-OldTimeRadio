@@ -1482,6 +1482,92 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval que
 - Lean-mean has one current ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.
   The retired FRONT/TAIL and SW-1 execution model must not be revived.
 
+## 2026-09-01 -- Ship audit, registry flag, and the 4060 clean-room install (Fable 5.1 session)
+
+Receipts: `docs/ship-audit-2026-09-01/` -- SHIP_LIST.md (71 confirmed + 51 disputed
+findings, ranked), NOVELTY_DELTA.md (32 new to the record, 14 known-open, 25 adjacent,
+0 regressions), FINDINGS.json (every finding with file:line and both reviewers' notes),
+4060_CLEANROOM.md (the friction log), pyproject_alpha15.patch (the release commit, NOT applied).
+
+### DECISIONS (settled by evidence, no operator input needed)
+1. **The registry gate is a SECRET scanner, not an exec linter.** Comfy-Org's own backend
+   (`registry_svc.go:1392-1455`) posts the zip to a `SecretScannerURL`; any non-empty
+   response = Flagged, and the reason goes to their private Discord. This is why the
+   08-28/08-29 exec/subprocess hunt in `.comfyignore` found nothing.
+2. The one shipped string that matches a published secret rule was README.md:164
+   (`hf_` + 38 x's, gitleaks' huggingface window). It entered on 2026-08-29, so it cannot
+   explain the FIRST flags (alpha.9-.11, 08-25/26), but it IS in flagged alpha.14 and absent
+   from Active alpha.8. FIXED: now `hf_your_token_here` with a one-line reason.
+3. alpha.15 = ONE operator push (pyproject.toml is a release trigger): the prepared patch
+   bumps the version, adds pycairo/pillow/aiohttp (imported by shipped nodes, declared only in
+   requirements.txt), marks bitsandbytes `sys_platform != 'darwin'` and kokoro
+   `python_version < '3.13'`. If alpha.15 is Flagged too, republish the alpha.8 tree
+   (commit e44235f5) byte-identical as alpha.16 as the control: Active means the trigger is
+   in the alpha.9+ delta and can be bisected; Flagged means the ruleset moved and that is
+   the evidence to hand Comfy-Org. Never version-delete (soft delete burns the string).
+4. LANDED this session (mechanical, one right answer, 207 targeted tests + Bug Bible green,
+   5080 path proven unchanged by printing before/after): unguarded `torch.cuda.ipc_collect()`
+   in `load_llm` (`_otr_model_loader.py`, killed every CUDA-less writer), `_detect_host()`
+   now emits "linux" (`_otr_workflow_validator.py`, both ROCm profiles failed their own stamp
+   on the host they target; "any" profiles unaffected), GGUF `n_gpu_layers` default now
+   offloads on mps as well as cuda (`_otr_gguf_backend.py`, two sites; cuda still -1, cpu 0).
+5. README 2b now names ComfyUI-GGUF (pinned commit + `patches/` patch) for `ltx25_*` and
+   `flux2_klein`, states that HuMo 1.7B / Wan / ltx_8gb / H3 / still / viz need NO extra pack
+   on ComfyUI 0.34+ (verified on a clean portable), and carries the Python 3.13 kokoro note.
+
+### THE 4060 CLEAN ROOM (fresh portable v0.34.0, Python 3.13.14, fresh HF cache, git clone)
+6. **BLOCKER, NEW: `pip install -r requirements.txt` failed outright on Python 3.13** --
+   the interpreter ComfyUI Desktop and the portable both ship. `kokoro>=0.7.16` is not
+   installable on 3.13 by any pip route (numpy==1.26.4 pin on 0.7.16; Requires-Python <3.13
+   on every newer kokoro/misaki; spacy/thinc/blis source builds behind `misaki[en]`). pip is
+   all-or-nothing, so NOTHING installed. FIXED the install half: the kokoro line now carries
+   `python_version < "3.13"`; the other 17 requirements install.
+7. **OPERATOR DECISION -- what is the default voice on Python 3.13?** Kokoro is the shipped
+   announcer default and the 8 GB class char voice, and it now silently does not exist on
+   every mainstream Windows install. Options, in rough order of effort: (a) bark for both
+   voices in the 8 GB / 3.13 variants (installs everywhere, auto-downloads, slower, older
+   sound); (b) a `kokoro-onnx` backend for the kokoro engine (pure onnxruntime, supports
+   3.13, same voices, new code, a design item -> kibitz arc); (c) tell 3.13 users to use
+   Python 3.12 (not possible on Desktop/portable). The clean-room leg used (a).
+8. Stock boot is clean on a stock console (no PYTHONUTF8): 25/25 nodes, 23.6 s prestartup
+   (it fetches 28 Kokoro voice files at boot even when kokoro cannot be installed), 4.6 s
+   import. The pack's weight preflight refused the queue BEFORE the writer and named every
+   missing file -- good; its restart hint cites `scripts/_otr_headless_model_paths.yaml`,
+   which registry installs do not carry.
+9. Node packs: LTX 2.5 needs ComfyUI-GGUF at 6ea2651e + the patch + a restart (README said
+   nothing until now). HuMo 1.7B needs no pack at all. H3 is operator-only and not a
+   from-nothing candidate.
+10. Weights: no 8 GB profile exists for LTX 2.5 / HuMo 1.7B; their pinned tiers live only in
+    the pod provisioner (does not ship) and the Windows fetcher has no lane for them and
+    defaults its models root to C:\ComfyUI-Models. This test fetched them with the
+    provisioner's pins (bytes + sha256 verified): LTX 2.5 23.9 GB, HuMo 1.7B 13.6 GB,
+    z_image int8 14.6 GB, writer E2B 6.0 GB.
+11. Leg results: see 4060_CLEANROOM.md "Leg results" (appended as they land).
+
+### NEXT STEPS
+12. 5080: apply `pyproject_alpha15.patch` and push (the release commit; operator's call on
+    timing). Then the alpha.8 control if Flagged.
+13. 5080: the remaining blockers from SHIP_LIST.md section 2 that are NOT mechanical and
+    want a kibitz arc: indextts2 as the canonical default char voice with reference WAVs
+    that never ship; the 8 GB `ltx_8gb` profiles paired with a 14.5 GB writer;
+    `needs_fp8_te`/`needs_fp4_te` never consulted by `_fit_reason`; the janitor
+    `audio_slices` sweep (9.3 GB, 6.7 s per boot -- three lines, but it widens what gets
+    auto-deleted, so it needs a test).
+14. 5080: stop citing scripts/ and docs/ in shipped error text -- 8 LTX sites, 3 TTS worker
+    paths, spandrel, cloud image, 16 OpenRouter/credits sites (SHIP_LIST.md section 3).
+15. 4060: after the clean-room legs, fold the measured 8 GB results into
+    `config/machine_classes.json` (only what actually rendered), regenerate
+    docs/MACHINE_MATRIX.md, and the README newbie pass. Do not advertise a lane the
+    clean room did not finish.
+16. Mac/AMD (horizon, operator not hopeful): SHIP_LIST.md section 6 lists the six-step
+    audio-only Mac path; four of the six are now landed or prepared (guards above, bnb
+    marker, pyproject deps). Still open: llama-cpp-python install text per platform,
+    the credits font resolver on macOS.
+
+### PARKED (operator idea, 2026-09-01)
+17. Image input for the AnimateDiff haunted lane (an i2v anchor for the 8 GB floor). Not
+    started; ship-readiness first.
+
 ## After this queue
 
 One coder window at a time; every chunk = focused tests + full suite + Bug Bible

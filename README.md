@@ -76,6 +76,21 @@ ComfyUI.
 | lane / profile | needs | why |
 |---|---|---|
 | `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | provides the `ADE_*` classes the haunted lane samples through |
+| `ltx25_*` (LTX 2.5 video, foley, mime) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at commit `6ea2651e`, **plus** the one-file patch in `patches/` (see `patches/README.md` for the exact `git apply` line), then its `requirements.txt` | the two GGUF loaders (`UnetLoaderGGUF`, `CLIPLoaderGGUF`); every other LTX 2.5 class is already in ComfyUI 0.34+. Measured on a clean Windows install 2026-09-01: without the pack the render refuses at the video stage and names both classes |
+| `flux2_klein` (image) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its DiT is a GGUF file loaded through `UnetLoaderGGUF` |
+| `humo_1.7B*`, `humo*`, `wan*`, `ltx_8gb`, `ltx_video`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
+
+> **Python 3.13 and the Kokoro voice (read this if you use ComfyUI Desktop or the
+> portable build, which both ship Python 3.13).** `kokoro`, the shipped default
+> announcer voice, cannot be pip-installed on Python 3.13 today: kokoro 0.7.16 pins
+> `numpy==1.26.4` (no 3.13 wheel) and every newer kokoro/misaki release declares
+> `Requires-Python <3.13`. Because pip resolves a requirements file all-or-nothing,
+> a plain `pip install -r requirements.txt` used to fail outright and install
+> **none** of the pack's libraries. As of 2026-09-01 the kokoro line carries a
+> `python_version < "3.13"` marker, so the install succeeds and only the Kokoro
+> engine is absent; pick **bark** for the announcer and character voices in the
+> dropdowns (bark installs everywhere and downloads its own weights). On Python
+> 3.12 or older nothing changes.
 
 **You do not have to memorise this.** If a pack is missing, the render stops
 with a named error that now tells you which pack to install and where to get
@@ -161,10 +176,12 @@ Linux     ~/.cache/huggingface/token
 and the entire contents are one line:
 
 ```
-hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+hf_your_token_here
 ```
 
-That is the whole file. OTR reads this location *and* the one your `HF_HOME`
+That is the whole file (your real token is longer; the example is kept short on
+purpose, because the registry's publish gate is a secret scanner and a
+token-shaped placeholder trips it). OTR reads this location *and* the one your `HF_HOME`
 points at, so it works whether you logged in before or after installing OTR.
 
 **3. Or an environment variable**, if you prefer or you are running headless:
