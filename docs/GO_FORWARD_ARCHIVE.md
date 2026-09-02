@@ -2009,3 +2009,547 @@ admission rule reserves the Bible for defects verified by a live artifact.
 `12.108`, whose tag list literally includes `prompt-audit-cannot-see-pixels`.
 Bible stays **287**, README stays 287 in all three places; the Three-File
 Contract is intact.
+
+# ARCHIVED 2026-09-01 -- the forward-only pass
+
+Cut from `docs/GO_FORWARD_PLAN.md` on the operator's instruction ("clean up the go
+forward so it's strategized, clean and only go forward, not a log"). Every block below
+is VERBATIM; nothing was deleted. Open work that these blocks carried was re-homed in
+the live plan before the cut (the block headings say where).
+
+## 1. Plan header history (the 2026-08-23 split note, the 2026-08-28 lean-and-mean note, and the HOW TO READ THIS FILE block; their surviving rule is the new header's one paragraph)
+
+Split 2026-08-23 on the operator's instruction: *"go forward should only have the
+go forward plans. Only."*
+
+**Reorganized 2026-08-28 (the lean-and-mean pass)** on the operator's
+instruction: *"clean up the go forward so it's lean and mean, and then analyze
+and reorganize it on the most logical [basis] so we can code the most and test
+the least."* The organizing fact: most items here need a LIVE RENDER LEG to
+prove, and a leg costs 1-3 HOURS on one GPU -- testing is the bottleneck,
+coding is not. So the file is now three working queues plus support sections:
+
+* **Section 1 -- NO-RENDER WORK.** Everything provable without a GPU leg,
+  front-loaded so it can all ship in coding sittings.
+* **Section 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT.** One leg
+  proves several items; each batch says so explicitly.
+* **Section 3 -- WAITING ON THE OPERATOR.** Every open question in one list,
+  answerable in one pass instead of interrupt-by-interrupt.
+* **Section 4** -- rulings lifted verbatim from archived blocks.
+  **Section 5** -- parked/deferred. **Section 6** -- standing traps.
+
+Receipts from the 2026-08-27/28 sessions and superseded queue blocks moved to
+the archive VERBATIM, nothing deleted; every operator ruling they carried was
+lifted into Section 4 FIRST. The standing warning from the 2026-08-24 prune
+(now itself in the archive) still binds: **recording what you just finished
+inside a section headed OPEN is the easiest way to make this file lie.**
+Receipts belong in `docs/PROD_BUG_LOG.md` and the archive; rulings belong in
+`docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
+
+## HOW TO READ THIS FILE (three files since 2026-08-23)
+
+**THE PLAN IS THIS FILE AND IT IS ONLY OPEN WORK.** Operator: *"go forward
+should only have the go forward plans. Only."* Two companions carry what used to
+be tangled in here:
+
+* `docs/OTR_STANDING_RULINGS.md` -- the laws, the standing operator rulings, the
+  review routing, the model/credit ladder, how to talk to the operator, the
+  obs-path override, window packing, tombstones and pointers. **Read it. It is
+  not optional and it is not history** -- it is the set of constraints the next
+  piece of work has to satisfy. When something in this plan says "THE LAW" or
+  "the REVIEW ROUTING block", that is where it now lives.
+* `docs/GO_FORWARD_ARCHIVE.md` -- closed receipts, verbatim. **Not read to
+  resume.**
+
+`CLAUDE.md` is unchanged and remains the highest authority.
+
+## 2. THE CURRENT STEP preamble of 2026-08-31 (two days on rented hardware; the constraints and the queue stayed live)
+
+*Rewritten 2026-08-31. Receipts live in `docs/PROD_BUG_LOG.md` and the archive.
+Pod knowledge: `docs/RUNPOD_INSTALL.md`. Machine guide: `docs/MACHINE_MATRIX.md`.*
+
+Two days on rented hardware found three OTR bugs the dev box cannot surface
+about itself -- all fixed, receipts filed -- left the provisioner incomplete,
+and measured nothing of the lane matrix. The 5080 kept shipping throughout.
+
+## 3. Coding-order rows 1-2 (sanctioned gap C0-C7 and Spandrel), both DONE 2026-08-28
+
+1. ~~Sanctioned gap~~ **DONE 2026-08-28, fully.** C0-C6 shipped `cd96e9b3`;
+   C7 proved the chain END TO END (`83be6c74`) -- an all-refused episode
+   floors every beat and publishes degraded, an unsanctioned absence still
+   fails loud at the spine. The predicted hole was already closed by C2.
+2. ~~Spandrel~~ **DONE 2026-08-28** -- neither edge case reproduced; the
+   untested warn-cap got tests (`ef957ecf`).
+
+## 4. The dead-code campaign narrative (rounds 1-4 and the V4 adjudication receipts; the live rule and the V5 pointer stayed in the plan)
+
+**RUNNING BESIDE THE ORDER -- THE DEAD-CODE CAMPAIGN (operator standing
+instruction 2026-08-28: keep hunting "until there are no more dead code
+candidates"; STOP RULE = two independent blind deep sweeps returning zero
+CONFIRMED findings).** FIVE rounds done through 2026-08-28 evening: rounds
+1-3 (~2,600 lines, eleven lying comments, two real bug fixes, seven widget
+migrations verified by the operator's own UI open), round 4 (`d084585d` --
+`_voice_backends` deleted, Chatterbox/Dia `_load_wav` consolidated,
+cue-manifest helpers retired), and the V4 master report fully adjudicated
+and executed (`18ff0533` + `0ce621a0`: 18/19 findings CONFIRMED by a
+7-verifier grounding pass, ten ready findings + six operator-ruled
+retirements executed, three operator-ruled KEEPs recorded, the 3D spike lab
+deferred to the 3D-retirement boundary). The V5 sweep (18 findings,
+`docs/2026-08-28-dead-code-hunt-v5/`) is under adjudication. The live hunt
+prompt is `docs/DEAD_CODE_HUNT_PROMPT_V5.md`. A SEPARATE pre-ship pass, the
+KNOB CENSUS (`docs/KNOB_CENSUS_PROMPT.md`), tables every WORKING widget
+against corpus evidence + a think-like-a-human judgment; the operator rules
+per row -- census informs what the 4060 template pins.
+
+## 16. Section 1.0 THE 4060 FRICTIONLESS SET as it stood on 2026-08-28 (kokoro was declared 2026-08-29, the template shipped 2026-08-29 and moved into workflows/ on 2026-09-01; the two remaining bullets were restated in the live plan)
+
+Four small items, all verified against the tree on 2026-08-28, plus one trap:
+
+* **`workflows/variants/otr_4060_floor.json`: `"quant_policy": "none"` ->
+  `"bnb_nf4"`.** One line. The single thing blocking the 4060 from loading
+  its 10 GB writer; the old justification for "none" is provably stale
+  (accelerate + bitsandbytes are declared deps now).
+* **Declare `kokoro` in `requirements.txt`** and fix the stale repo hint at
+  `nodes/_otr_audio_engines/eng_kokoro.py:139` (`1038lab/KokoroTTS` in the
+  error message vs `hexgrad/Kokoro-82M` actually loaded at `:159`). Two
+  lines; removes the biggest fresh-install voice friction.
+* **Ship a template in `example_workflows/`** -- the 4060 floor graph
+  already exists as a variant; it just does not ship where "download and
+  click run" looks.
+* **README model table** from the compatibility workbook's Baseline Combos
+  tab (`outputs/20260828-ungated-models/` -- the LIVING fact sheet: edit
+  cells in place, never add a changelog tab). Include the HF-token
+  two-tier story: defaults need no account ever; gated upgrades = account +
+  license click-through + `HF_TOKEN` once (the resolver already finds it).
+* **THE TRAP: `pyproject.toml` edits AUTO-FIRE a registry publish.** The
+  `kokoro` line also belongs in its static deps -- but that edit WAITS and
+  rides the deliberate republish: operator deletes the flagged node entry
+  (his click, not ours) -> ONE commit bumps the version + adds kokoro to
+  pyproject -> clean publish -> clean 4060 install of the shipped template.
+
+Waiting on externals, not on us: Codex deep research on the HF-token
+problem statement (`docs/2026-08-28-hf-token-feature/PROBLEM_STATEMENT.md`)
+and the operator's registry node-delete click.
+
+## 5. Section 1.1 THE SANCTIONED-GAP CONTROL PATH (C0-C6 shipped cd96e9b3, C7 proven 83be6c74; the row said 'archive on the next tidy')
+
+### 1.1 THE SANCTIONED-GAP CONTROL PATH -- r2, the coding plan, is the next step
+
+**Live-proven necessary on 2026-08-26.** Ideogram is not seed-deterministic:
+after the music-card fix it went from refusing every music card to **6 of 7**,
+and that ONE refusal still killed a 30-minute episode at the still-spine gate.
+No amount of prompt work takes a stochastic refusal to zero.
+
+The dispatcher already says "the episode continues" and the composite already
+floors an `exists=False` row -- **nothing in between mints that row**. Spec and
+r1 judgment: `kibitz-runs/2026-08-25-model-refusal-required-still/`.
+Accounting for it landed 2026-08-26 (`a2837b05`) and is deliberately inert
+until this exists.
+
+**THE BLOCKER IS CLEARED -- r2 CAN RUN (2026-08-27).** r1 ended on one open
+item it refused to decide for the operator: what an episode should do when
+EVERY required still is sanctioned-gapped, given that node 92's success check
+is `clip_count > 0`. **Asked and ruled 2026-08-27: it PUBLISHES.** The full
+ruling, its reasoning and -- importantly -- what it does NOT license are in
+`docs/OTR_STANDING_RULINGS.md` under *"AN ALL-REFUSED EPISODE STILL PUBLISHES"*.
+Read it there before r2, because the ruling is narrower than its headline: it
+permits publishing an all-refused episode, it does NOT permit REPORTING one as
+a clean render, and the `required_scene_targets` ledger-completeness law is
+untouched.
+
+**SHIPPED 2026-08-28 (`cd96e9b3`). The control path EXISTS.** C0-C6 of the
+hardened plan landed together, full suite 12390 passed / 121 skipped /
+1 xfailed, no regressions. **SUPERSEDED: C7 was proven END TO END in `83be6c74` (verified 2026-08-31) -- this row's remaining work is closed. Archive on the next tidy.** The original text follows: what remained on this row was C7 ONLY -- the
+end-to-end test through the real spine and composite, which is EXPECTED to
+find a hole (`assemble_silent_timeline` raises "manifest has no renderable
+beats" on an all-gap episode; that hole is the work). Everything else here is
+history and moves to the archive on the next tidy.
+
+The panel earned its keep: all three lanes independently returned NO on the
+same finding -- `validate_and_repair_still_spine` runs ONE LINE before
+`run_real_episode`, so every downstream change was dead code until C0 taught
+the validator to accept a gap. They also caught the driver's own claim that
+the `a2837b05` accounting was correct and out of scope: it is correct only
+while no gap row can arrive, and the proposed predicate would have reported a
+crashed all-missing render as publishable-degraded.
+
+**The original next step was r2, the coding plan**, per r1's own stated roster
+(r1 Codex+Fable -> r2 Codex -> r3 Codex+Cursor -> r4 agy Pro). Nothing else
+about this row is waiting on the operator.
+
+**r1 WAS WRITTEN 2026-08-25 AND THE TREE MOVED THE NEXT DAY. RE-GROUNDED
+2026-08-27 against HEAD -- do not hand r2 the stale finding list.** `a2837b05`
+landed on 2026-08-26 and added 85 lines to `otr_video_render_batch.py`, so one
+of r1's four findings is already closed and one of the survivors got SHARPER.
+
+| r1 finding | status at HEAD, verified by reading the file |
+|---|---|
+| 1. Nothing mints the `exists=False` row between a sanctioned dispatch and the spine | **STILL THE ROW.** This is the item itself. |
+| 2. The skip branch never reaches the renderer loop | **STILL OPEN**, unverified in this pass -- r2 grounds it. |
+| 3a. The manifest loop counts a gap as a delivered receipt (`:146-150`) | **ALREADY FIXED** by `a2837b05`. `_clip_delivered_motion(clip)` (`:134-153`, `exists` alone, deliberately) now routes an undelivered beat to `sanctioned_gap_shot_ids` at `:213` instead of minting a receipt for it. Do NOT re-fix this. |
+| 3b. `delivered_frames_ok` is True over an absent clip (`:750-770`) | **STILL LIVE**, and here is the exact mechanism: a gap has no `source == "clip"` segment, so `segs` is empty, `status` becomes `no_clip_segment` -- and `no_clip_segment` is the one status that flips NOTHING. `ok_all` is only cleared by `held_last_frame`, or by `not positioned and segs and delivered != tgt`, whose `segs` guard is falsy for exactly this case (`otr_silent_composite.py:766-769`). |
+| 4. An all-refused episode reports FAILURE (`clip_count > 0`) | **STILL LIVE, now at `otr_video_render_batch.py:640`** -- and `a2837b05` made it BITE rather than merely lurk. |
+
+**FINDING 4 DESERVES ITS OWN PARAGRAPH, because the fix for 3a is what armed
+it.** `clip_count` is `len(receipts)` (`:129`), and since `a2837b05` receipts
+correctly EXCLUDE sanctioned gaps. So an all-refused episode now has a genuinely
+empty receipt list and `"ok": manifest["clip_count"] > 0` genuinely evaluates
+False. Before that commit the gap rows were counted as receipts, so the same
+episode would have reported ok=True by ACCIDENT -- for the wrong reason, off a
+receipt that lied. **The correct accounting collides head-on with the 2026-08-27
+ruling that such an episode must publish**, which is not a regression in
+`a2837b05` but the point at which an existing contradiction became honest enough
+to see. r2 fixes the success predicate, NOT the accounting.
+
+**The payload-never-empty guarantee already anticipates this** and is worth
+reading before designing (`otr_video_render_batch.py:203-209`):
+`OTR_CreditsRoll._require` rejects `{}`/`[]`/`None`/`""`, so an all-gap episode
+returning an empty payload would convert a publishable degraded episode into a
+hard mux-time failure -- "the exact outcome the sanctioned gap exists to
+prevent", in the code's own words. Whoever writes r2 starts from there.
+
+## 6. Section 1.3 gender ladder: the r2 and r3 review narratives and the answered Section 3 question B cross-reference (the spec pointer, the two 2026-08-28 rulings and the next step stayed live)
+
+**Codex r2 verdict: NO. Eleven must-fixes, at `kibitz-runs/2026-08-05-gender-ladder/r2/codex.md`.**
+The diagnosis survived; the mechanism did not. The three that matter:
+
+1. **The web search would silently do nothing.** The spec passes a tools/plugins
+   argument to `OpenRouterBackend.generate`, which swallows unknown kwargs through
+   `**_ignored` -- no error, no search, a confident answer from a model that never
+   looked. That is the same silent-no-op class as the defect above.
+2. **"LLM extraction over the FULL unit text" cannot run.** `beckoning_fair_one.txt`
+   is 143,176 bytes and 58 of 65 source files exceed 12,000 bytes, against a
+   32,768 estimated-token per-call cap.
+3. **Blanket surname aliases are identity-unsafe.** Two rows sharing a surname
+   with the same gender currently produce a confident pin rather than an
+   abstention.
+
+**r3 RAN 2026-08-06 and it is STILL NO** -- Codex NO with 7 must-fixes, agy
+yes-with-fixes with 9. That is three NOs across two rounds, and r3's findings invalidate
+the CODING PLAN rather than its line numbers, so the standing re-ground rule applies:
+**the next step is a SPEC REWRITE folding r2 + r3, then r3 again. Not r4.**
+
+Both lanes independently found (a) a manifest sequencing deadlock -- the stamper is
+specced to run per-unit inside the vendor fetch loop, but the manifest is written only
+AFTER the loop, so it can never see the unit it was called for; and (b)
+`RosterGenderVerdict` has no `gender_source` / `gender_confidence` fields, so the
+ladder's whole output cannot be carried without changing every verdict-construction
+path. Codex also confirmed the r2 finding that the OpenRouter backend still has no
+web/plugin parameter, so the web-search tier would silently do nothing.
+
+Judgment: `kibitz-runs/2026-08-06-2026-08-06-gender-ladder-r3/r3/judgment.md` (LOCAL
+ONLY). **Trap: commit `496d9d57` inserted ~90 lines near the top of
+`nodes/_otr_roster_gender.py`, so every cite into that file in the r3 review has
+SHIFTED. Re-pin before acting.** The rewrite should also CONSUME the
+`normalize_gender` boundary item 8 installed there rather than adding a second
+normalization path.
+
+**Found while grounding, and it reopens an operator ruling:** 32 of 85 Shakespeare
+roster rows are `unknown` TODAY -- 38% of the lane assumed solved. Comedy of Errors
+ships 7 characters, every one unknown. The narrower ruling that fits the evidence:
+Shakespeare's KNOWN rows stay untouchable, but tiers 3-4 may fill only its
+`unknown` rows. That fixes 32 rows without ever second-guessing a parsed
+dramatis personae. **Operator decision, not a driver call** -- cross-listed as
+Section 3, question B.
+
+## 7. Sections 1.4 (OTR_ENABLE_LTX_I2V retired 2026-08-28) and 1.5 (learned-upscale hardening closed 2026-08-28; its ruling is in Section 4)
+
+### 1.4 ~~RETIRE `OTR_ENABLE_LTX_I2V`~~ -- DONE 2026-08-28, tombstone
+
+Shipped the same night it was scoped: `192d3aa2` (family = image_to_video,
+declarative still requirement, both driver maps, the enum token, content
+oracle) + `f9eab3f6` and `063e8c0b` (the seven test sites the full suite then
+found, including two prompt-only fixtures that now SUPPLY a still instead of
+disabling the requirement, and the soak rotation's text_to_video chair
+re-seated with `animatediff15_v3_haunted_video`). Full suite green. The
+operator's ruling is now simply how the lane works; there is no flag to
+retire and no text-only LTX path to reason about.
+
+### 1.5 ~~NARROW LEARNED-UPSCALE HARDENING~~ -- CLOSED 2026-08-28: NEITHER EDGE CASE REPRODUCES
+
+The row was conditional -- "harden the two `SpandrelEsrgan._resolve_model`
+edge cases **if still reproducible**" -- so the first step was the
+reproduction, not a fix. Both were attempted on the real module (CPU, no
+model load) and both behave correctly at HEAD:
+
+| edge case | result |
+|---|---|
+| `folder_paths.get_folder_paths` raises a non-ImportError | Resolver survives and falls back to the repo-relative dir. **One warning across five calls**, not five -- the `_RESOLVE_WARNED` cap works. |
+| An unreadable candidate (`PermissionError`) | **Propagates** rather than masquerading as absence, exactly as the docstring claims. Already pinned by `test_upscale_cache_fingerprint.py:243-249`. |
+| (checked while there) shallow checkout, <5 path parents | No `IndexError`; resolves. |
+
+The hardening this row asked for was done in earlier passes and the code
+documents it -- including an explicit note that a classification pass was
+written, found unreachable, and REMOVED rather than kept as reassuring dead
+code.
+
+**What the verification did surface, and it is now fixed:** the warn cap
+itself had NO test. Removing the guard that keeps a broken `folder_paths`
+from logging once per prompt evaluation (it is called from `IS_CHANGED`)
+would have failed nothing. Three tests added in
+`tests/test_upscale_cache_fingerprint.py`: warns once not once-per-call, the
+set stays bounded, and the repo fallback still resolves.
+
+The ruling attached to this row stands and is lifted into Section 4: **the
+multi-GPU learned-upscale stage itself is CLOSED and must not be reopened.**
+
+## 8. Section 2 Batch R0 (the six overnight 1-act legs; closed 2026-08-31)
+
+### Batch R0 -- CLOSED (2026-08-31). Those legs published and were judged; the pointer to THE CURRENT STEP is dead because the rewrite removed that content. Archive on the next tidy.
+
+### Batch R0 -- ALREADY RENDERED: the six overnight 1-act legs. One morning pass over `otr/obs/` proves six lanes
+
+See THE CURRENT STEP at the top of this file. One pass proves: the mime
+prompt, the foley bed under dialogue, plain ltx25 video, H3 silent, H3
+audio-in, and the ltx_audio_in baseline -- and may satisfy Batch R1 for free
+(check the H3 legs' prompt receipts before spending R1's leg).
+
+## 9. Section 2 Batch R2: the 2026-08-27 re-grounding narrative (what was measured, where the SCENE/PORTRAIT claim came from, two corrections); the measurement step and the preserved fork stayed live
+
+**THIS ROW USED TO ORDER A FULL ARC. IT NO LONGER DOES, because the premise it
+rested on was never measured.** Re-grounded 2026-08-27 against the evidence
+file, the PBUG and the canonical JSON, after the operator asked the reasonable
+question -- *"i am not aware of this bug, maybe it has been fixed, i wonder when
+it came up"* -- and the honest answer turned out to be worth the check.
+
+**WHAT IS ACTUALLY MEASURED.** All SIX refusal events in
+`docs/2026-08-26-ideogram4-card-refusal-evidence.md` are the same beat type:
+
+```
+ideogram4_local still_music_opening_001 min=79.0 std=10.5
+ideogram4_local still_music_closing_001 min=80.0 std=10.5
+ideogram4_local still_music_closing_001 min=78.0 std=10.2
+ideogram4_local still_music_opening_001 min=80.0 std=10.2
+ideogram4_local still_music_closing_001 min=80.0 std=10.3
+ideogram4_local still_music_opening_001 min=87.0 std=10.5
+```
+
+Zero SCENE refusals. Zero PORTRAIT refusals. **And the music route -- the only
+route that ever refused -- was FIXED on 2026-08-26 (`ae7e7b6a`) and proven on
+two published episodes with zero refusals, on the weakest writer and the
+strongest alike.**
+
+**WHERE THE SCENE/PORTRAIT CLAIM CAME FROM.** `ae7e7b6a`'s own message: the two
+routes are *"still `elements: []` and therefore still expected to refuse"*.
+**Expected to. Not observed to.** It is an inference from structural similarity
+to a route that has since been repaired, and it hardened into this row as
+though it were a finding.
+
+**TWO MORE CORRECTIONS TO WHAT THIS ROW USED TO SAY.**
+* *"the three lanes production renders with"* is wrong. `ideogram4_local`
+  appears **ZERO times** in `workflows/otr_canonical.json`; the canonical names
+  `z_image_turbo`, three times. The engine is OPT-IN by construction --
+  `default_roles = ()`, and its own comment says *"z_image_turbo stays the
+  shipped default; no model is 'primary'"*. It ran in the sweep only because
+  profile `otr_soak_llmsweep_02` selects it deliberately.
+* The other four local engines went **91 mints, zero refusals** across that same
+  sweep (flux2_klein 35/0, z_image_turbo 32/0, flux_gen1 16/0, lumina_image
+  8/0). Nothing about this is a general stills defect.
+
+## 10. Section 3 question J as it stood on 2026-08-31 (delete-and-republish, who finds out why; superseded by the 2026-09-01 secret-scanner finding)
+
+### J. THE REGISTRY IS FLAGGED -- two questions, and this is the third time it has been raised
+
+**Verified live 2026-08-31:** `latest_version` is NULL, two versions, **zero
+Active**, both `NodeVersionStatusFlagged`. Nobody can install OTR through
+ComfyUI-Manager by any route -- not on a pod, not on a desktop. For a pack
+intended to go open source, that is the single largest adoption blocker, and it
+has been sitting as a sub-bullet of the capstone behind every other bug.
+
+README now leads with the git clone instead (`786b3fa4`), so a new user has a
+route that works. These two remain, and neither is scheduled because neither has
+been asked:
+
+* **J1. Delete and republish now, yes or no?** Node-delete is a HARD delete that
+  frees every version string for reuse; version-delete is soft and BURNS the
+  string. Only the operator's browser session can do it -- the publish token
+  returns 401.
+* **J2. Who owns finding out WHY alpha.13 and alpha.14 were flagged?** The
+  scanner is a private repo and its findings are not visible to us. Without an
+  answer, a republish may simply be flagged again for the same unknown reason,
+  and we would have spent a version string to learn nothing. (answer these in ONE pass)
+
+Nothing in this section needs a render or a coder until answered. Defaults are
+stated where a default exists; silence keeps the default.
+
+## 11. Section 3 questions B and C (both answered 2026-08-28; the rulings live at the top of Section 1.3 and in Batch R3)
+
+* **(B) ANSWERED 2026-08-28: YES -- fill only the unknowns.** KNOWN rows stay
+  untouchable. Ruling recorded at the top of Section 1.3 together with the
+  web-tier replacement (LLM decides, cached name index).
+* **(C) ANSWERED BY EVENTS 2026-08-28: the numbering is retired.** The LEMMY
+  trio it tracked is fully closed on live evidence (see Batch R3's note);
+  nothing remains for a phase number to point at.
+
+## 12. The 2026-09-01 ship-audit session entry and its evening addendum (decisions, landed commits 64d81ca7 / 8cfe0007 / bef7928d / 6e54f9ae, Bible 12.144, the clean-room leg result). Every open item was re-homed: registry -> Section 3 J; the 3.13 voice -> Section 3 K; the 8 GB abort -> Section 3 L and Batch R7; the non-mechanical blockers -> Section 1.9; the parked AnimateDiff image input -> Section 5
+
+## 2026-09-01 -- Ship audit, registry flag, and the 4060 clean-room install (Fable 5.1 session)
+
+Receipts: `docs/ship-audit-2026-09-01/` -- SHIP_LIST.md (71 confirmed + 51 disputed
+findings, ranked), NOVELTY_DELTA.md (32 new to the record, 14 known-open, 25 adjacent,
+0 regressions), FINDINGS.json (every finding with file:line and both reviewers' notes),
+4060_CLEANROOM.md (the friction log), pyproject_alpha15.patch (the release commit, NOT applied).
+
+### DECISIONS (settled by evidence, no operator input needed)
+1. **The registry gate is a SECRET scanner, not an exec linter.** Comfy-Org's own backend
+   (`registry_svc.go:1392-1455`) posts the zip to a `SecretScannerURL`; any non-empty
+   response = Flagged, and the reason goes to their private Discord. This is why the
+   08-28/08-29 exec/subprocess hunt in `.comfyignore` found nothing.
+2. The one shipped string that matches a published secret rule was README.md:164
+   (`hf_` + 38 x's, gitleaks' huggingface window). It entered on 2026-08-29, so it cannot
+   explain the FIRST flags (alpha.9-.11, 08-25/26), but it IS in flagged alpha.14 and absent
+   from Active alpha.8. FIXED: now `hf_your_token_here` with a one-line reason.
+3. alpha.15 = ONE operator push (pyproject.toml is a release trigger): the prepared patch
+   bumps the version, adds pycairo/pillow/aiohttp (imported by shipped nodes, declared only in
+   requirements.txt), marks bitsandbytes `sys_platform != 'darwin'` and kokoro
+   `python_version < '3.13'`. If alpha.15 is Flagged too, republish the alpha.8 tree
+   (commit e44235f5) byte-identical as alpha.16 as the control: Active means the trigger is
+   in the alpha.9+ delta and can be bisected; Flagged means the ruleset moved and that is
+   the evidence to hand Comfy-Org. Never version-delete (soft delete burns the string).
+4. LANDED this session (mechanical, one right answer, 207 targeted tests + Bug Bible green,
+   5080 path proven unchanged by printing before/after): unguarded `torch.cuda.ipc_collect()`
+   in `load_llm` (`_otr_model_loader.py`, killed every CUDA-less writer), `_detect_host()`
+   now emits "linux" (`_otr_workflow_validator.py`, both ROCm profiles failed their own stamp
+   on the host they target; "any" profiles unaffected), GGUF `n_gpu_layers` default now
+   offloads on mps as well as cuda (`_otr_gguf_backend.py`, two sites; cuda still -1, cpu 0).
+5. README 2b now names ComfyUI-GGUF (pinned commit + `patches/` patch) for `ltx25_*` and
+   `flux2_klein`, states that HuMo 1.7B / Wan / ltx_8gb / H3 / still / viz need NO extra pack
+   on ComfyUI 0.34+ (verified on a clean portable), and carries the Python 3.13 kokoro note.
+
+### THE 4060 CLEAN ROOM (fresh portable v0.34.0, Python 3.13.14, fresh HF cache, git clone)
+6. **BLOCKER, NEW: `pip install -r requirements.txt` failed outright on Python 3.13** --
+   the interpreter ComfyUI Desktop and the portable both ship. `kokoro>=0.7.16` is not
+   installable on 3.13 by any pip route (numpy==1.26.4 pin on 0.7.16; Requires-Python <3.13
+   on every newer kokoro/misaki; spacy/thinc/blis source builds behind `misaki[en]`). pip is
+   all-or-nothing, so NOTHING installed. FIXED the install half: the kokoro line now carries
+   `python_version < "3.13"`; the other 17 requirements install.
+7. **OPERATOR DECISION -- what is the default voice on Python 3.13?** Kokoro is the shipped
+   announcer default and the 8 GB class char voice, and it now silently does not exist on
+   every mainstream Windows install. Options, in rough order of effort: (a) bark for both
+   voices in the 8 GB / 3.13 variants (installs everywhere, auto-downloads, slower, older
+   sound); (b) a `kokoro-onnx` backend for the kokoro engine (pure onnxruntime, supports
+   3.13, same voices, new code, a design item -> kibitz arc); (c) tell 3.13 users to use
+   Python 3.12 (not possible on Desktop/portable). The clean-room leg used (a).
+8. Stock boot is clean on a stock console (no PYTHONUTF8): 25/25 nodes, 23.6 s prestartup
+   (it fetches 28 Kokoro voice files at boot even when kokoro cannot be installed), 4.6 s
+   import. The pack's weight preflight refused the queue BEFORE the writer and named every
+   missing file -- good; its restart hint cites `scripts/_otr_headless_model_paths.yaml`,
+   which registry installs do not carry.
+9. Node packs: LTX 2.5 needs ComfyUI-GGUF at 6ea2651e + the patch + a restart (README said
+   nothing until now). HuMo 1.7B needs no pack at all. H3 is operator-only and not a
+   from-nothing candidate.
+10. Weights: no 8 GB profile exists for LTX 2.5 / HuMo 1.7B; their pinned tiers live only in
+    the pod provisioner (does not ship) and the Windows fetcher has no lane for them and
+    defaults its models root to C:\ComfyUI-Models. This test fetched them with the
+    provisioner's pins (bytes + sha256 verified): LTX 2.5 23.9 GB, HuMo 1.7B 13.6 GB,
+    z_image int8 14.6 GB, writer E2B 6.0 GB.
+11. Leg results: see 4060_CLEANROOM.md "Leg results" (appended as they land).
+
+### NEXT STEPS
+12. 5080: apply `pyproject_alpha15.patch` and push (the release commit; operator's call on
+    timing). Then the alpha.8 control if Flagged.
+13. 5080: the remaining blockers from SHIP_LIST.md section 2 that are NOT mechanical and
+    want a kibitz arc: indextts2 as the canonical default char voice with reference WAVs
+    that never ship; the 8 GB `ltx_8gb` profiles paired with a 14.5 GB writer;
+    `needs_fp8_te`/`needs_fp4_te` never consulted by `_fit_reason`; the janitor
+    `audio_slices` sweep (9.3 GB, 6.7 s per boot -- three lines, but it widens what gets
+    auto-deleted, so it needs a test).
+14. 5080: stop citing scripts/ and docs/ in shipped error text -- 8 LTX sites, 3 TTS worker
+    paths, spandrel, cloud image, 16 OpenRouter/credits sites (SHIP_LIST.md section 3).
+15. 4060: after the clean-room legs, fold the measured 8 GB results into
+    `config/machine_classes.json` (only what actually rendered), regenerate
+    docs/MACHINE_MATRIX.md, and the README newbie pass. Do not advertise a lane the
+    clean room did not finish.
+16. Mac/AMD (horizon, operator not hopeful): SHIP_LIST.md section 6 lists the six-step
+    audio-only Mac path; four of the six are now landed or prepared (guards above, bnb
+    marker, pyproject deps). Still open: llama-cpp-python install text per platform,
+    the credits font resolver on macOS.
+
+### PARKED (operator idea, 2026-09-01)
+17. Image input for the AnimateDiff haunted lane (an i2v anchor for the 8 GB floor). Not
+    started; ship-readiness first.
+
+### ADDENDUM 2026-09-01 (evening) -- what landed after items 1-17, and what is left
+
+Reviewed from HEAD 93a37aa1 (Codex's consolidation) after its all-clear. Docs-only commit.
+
+**Landed and pushed (each reviewed by one independent Sonnet pass, lockstep-verified):**
+- `64d81ca7` -- items 2, 4, 5, 6 above: README token literal, three platform guards,
+  kokoro `python_version < "3.13"` marker, README 2b node-pack table, ship-audit receipts.
+  Tests: 207 + 44 targeted, Bug Bible regression 22 passed.
+- `8cfe0007` -- one template folder (`example_workflows/` collided with `workflows/` at the
+  same gallery URL, first mount won, `otr_canonical` listed and 404'd on click; now
+  `workflows/otr_4060_floor.json` + `tests/test_workflow_templates_single_folder.py`);
+  the three TTS worker scripts ship (`.comfyignore` `scripts/*` + negations, bundle
+  simulated with pathspec: exactly three scripts/ files ship); `.comfyignore`, `.gitignore`,
+  `.gitattributes`, `SKILL.md`, `_START_HERE.md`, `workflows/external_examples/` stop
+  shipping; item 14 DONE (12 nodes/ files stop citing unshipped scripts/ and docs/, GitHub
+  URLs + inlined steps; wrapper_bridge names ComfyUI-GGUF for the GGUF loaders, test added).
+  Tests: 20 + 164 targeted, `build_variants --check` 90/0.
+  CORRECTION by Codex (`bef7928d`): that commit also re-worded eng_indextts2.py, which is a
+  signed voice-route fingerprint (9 guards failed). Codex restored the file byte-for-byte
+  and ships the installer instead (`!scripts/_otr_indextts2_install.ps1`). Lesson kept in
+  memory: grep tests/ for sha256 before touching anything under nodes/, run the full suite.
+- `6e54f9ae` -- item 16 mostly DONE: `OTR_CREDITS_FONT` override + macOS font candidates
+  (5080 still resolves consola.ttf), platform-aware llama-cpp-python hint (darwin/linux,
+  upstream's `GGML_METAL` / `GGML_HIP` flags, pin labelled a Windows measurement) + README
+  table, BOM-safe HF token-file read. Tests: 161 + 22 targeted.
+- Bug Bible `8956de15` (Bible repo main): entry 12.144 + coverage-index row for
+  PBUG-20260901-04 (interpreter-capped optional dependency vetoes the whole install).
+
+**4060 clean-room leg results (item 11):** fresh portable v0.34.0, Python 3.13.14, stock
+launch. Writer (E2B, 26 min incl. 6 GB download), bark voices, image prompts all ran. The
+FIRST z_image_turbo still (int8 convrot) aborted the whole ComfyUI process at sampler step
+5/8 under DynamicVRAM (`Fatal Python error: Aborted`, stack in comfy/ldm/lumina/model.py;
+log kept at C:\OTR-CleanRoom\server_run1_zimage_abort.log). Same shape as the drill's
+PBUG-03, now reproduced on a never-touched install. The video stage never started, so
+LTX 2.5 and HuMo 1.7B on 8 GB remain UNMEASURED. A retry with `--disable-dynamic-vram
+--lowvram` was queued and then stopped on the operator's instruction; the clean room stays
+on disk (70.9 GB) for that retry. Matrix unchanged: nothing rendered end to end.
+
+**Remaining blockers, ranked:**
+1. Registry: apply `docs/ship-audit-2026-09-01/pyproject_alpha15.patch` and push (operator;
+   release trigger). If Flagged again, republish the alpha.8 tree byte-identical as the
+   control (item 3).
+2. Default voice on Python 3.13 (item 7) -- unchanged, operator decision.
+3. 8 GB: the shipped default image engine aborts the process under a stock launch. Either
+   the 8 GB dropdown set avoids z_image stills, or the launch flags become documented
+   requirements. Needs the ComfyUI-side report with the faulthandler stack.
+4. `otr_canonical.json` default char voice is indextts2 with reference WAVs that never ship
+   (item 13); the `ltx_8gb` profiles pair an 8 GB engine with a 14.5 GB writer (item 13).
+5. Design items still needing an arc: `needs_fp8_te`/`needs_fp4_te` in `_fit_reason`; the
+   janitor `audio_slices` sweep (9.3 GB, 6.7 s per boot); cloud spend ceilings on the
+   cpu_floor / otr_mac_mps Google routes (SHIP_LIST.md sections 2, 3, 5).
+
+**Next action:** operator pushes alpha.15. Then, when the 4060 is free, rerun
+`otr_cleanroom_8gb_ltx25` from C:\OTR-CleanRoom with the low-VRAM flags and record the
+first measured 8 GB result for a non-AnimateDiff video lane.
+
+## 13. Batch R3: the ALREADY DONE paragraph (clean sweep, PASS-tier gate, LLM preflight guide, Q6_K removal; ruling in OTR_STANDING_RULINGS)
+
+**ALREADY DONE (pushed, green, lockstep-verified):** the clean sweep itself
+(`Qwen/Qwen2.5-14B-Instruct` ripped with its blast radius), the PASS-tier
+invariant gate, `docs/LLM_PREFLIGHT_GUIDE.md`, and the `Q6_K` dropdown removal.
+The ruling is recorded in `docs/OTR_STANDING_RULINGS.md` ("ONLY EASY-TO-LOAD
+LLMs SHIP"). All 7 surviving local rows are verified present on disk.
+
+## 14. Batch R3 tail: the retired LEMMY Phases 2-4 numbering note (the trio closed on live evidence; PBUG-02 has its own exit condition in Batch R4)
+
+**The old LEMMY "Phases 2-4" numbering is RETIRED (2026-08-28).** The trio it
+tracked collapsed on live evidence: -01 closed 08-16 (mis-attributed), -03
+closed 08-18, -03 EXTENDED closed 08-28 (`a469ffb2` -- 48 post-fix
+scifi_news_pro ledgers, zero empty cast contracts, and a natural-roll LEMMY
+with 8 lines published to obs on 08-26). Nothing remains for a phase number
+to point at; PBUG-02 below is the sole survivor and has its own exit
+condition.
+
+## 15. Section 6: the moot bake-off runner note (both runners deleted 2026-08-23; the one-sentence lesson stayed live)
+
+- **MOOT since 2026-08-23 -- kept as one line so the finding is not re-derived.**
+  This row noted that two `scripts/` bake-off runners aborted a whole sweep on an
+  encoder count mismatch, and called it the correct direction that an operator
+  should know before an overnight run. **Both runners were deleted with every
+  other bake-off** ("delete any animatediff..." was the Ghost half; "I think I am
+  done with all bakeoffs" was this one). The finding still generalises: a runner
+  that discards the encoder's return value and recomputes the count independently
+  will disagree with it silently. Worth carrying into any replacement sweep.
