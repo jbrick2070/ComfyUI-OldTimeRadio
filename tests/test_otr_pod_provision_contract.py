@@ -111,6 +111,29 @@ def test_pod_script_allows_template_owned_untracked_entries(tmp_path):
     assert "folder_paths.py" in status.stdout
 
 
+def test_pod_script_repairs_the_runpod_cu130_driver_mismatch():
+    text = POD.read_text(encoding="utf-8")
+
+    assert 'COMFY_TORCH_CU128="2.10.0+cu128"' in text
+    assert 'COMFY_TORCHVISION_CU128="0.25.0+cu128"' in text
+    assert 'COMFY_TORCHAUDIO_CU128="2.10.0+cu128"' in text
+    assert 'COMFY_TORCH_CU128_INDEX="https://download.pytorch.org/whl/cu128"' in text
+    assert 'env -u PIP_CONSTRAINT "$COMFY_PY" -m pip install' in text
+    assert 'unset PIP_CONSTRAINT' in text
+    assert 'torch.cuda.is_available()' in text
+    assert 'sample = torch.ones((64, 64)' in text
+    assert 'result = sample @ sample' in text
+    assert text.index("ensure_compatible_comfy_torch") < text.index(
+        '"$COMFY_PY" -m pip install -q -r "$COMFY_ROOT/requirements.txt"'
+    )
+    final_probe = "FINAL_CUDA_PROBE=$(probe_comfy_cuda 2>&1)"
+    assert final_probe in text
+    assert text.index(final_probe) > text.index(
+        'scripts/otr_provision.py --profile "$PROFILE"'
+    )
+    assert text.index(final_probe) < text.index("=== provision complete")
+
+
 def test_legacy_cloud_scripts_cannot_bypass_the_owner():
     setup = (REPO / "scripts" / "setup_cloud.sh").read_text(encoding="utf-8")
     download = (REPO / "scripts" / "download_models.sh").read_text(encoding="utf-8")

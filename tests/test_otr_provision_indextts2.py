@@ -444,14 +444,14 @@ def test_posix_default_index_root_is_a_persistent_sibling_not_core_drift(
               "eng_indextts2.py").read_text(encoding="utf-8")
     downloader = (ROOT / "scripts" /
                   "_otr_idx_download_weights.py").read_text(encoding="utf-8")
-    lab = (ROOT / "docs" / "RUNPOD_PORTABILITY_LAB.md").read_text(
+    playbook = (ROOT / "docs" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8")
 
     assert 'Join-Path $ComfyRoot "index-tts"' in installer
     assert 'os.path.join(_COMFY_ROOT, "index-tts", *parts)' in engine
     assert 'base = comfy_root if os.name == "nt"' in downloader
-    assert "export OTR_INDEXTTS2_ROOT=/workspace/index-tts" in lab
-    assert '$OTR_COMFY_ROOT/index-tts' not in lab
+    assert "export OTR_INDEXTTS2_ROOT=/workspace/index-tts" in playbook
+    assert '$OTR_COMFY_ROOT/index-tts' not in playbook
 
 
 def test_index_root_local_exclusion_makes_second_core_check_clean(tmp_path):

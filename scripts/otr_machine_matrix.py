@@ -138,9 +138,12 @@ def proven_summary(prof) -> str:
 MEASURED = [
     ("animatediff15_v3_haunted_video", "1 act, 8 clips, 24 GB rented card",
      "2058 s, peak 15,990 MB, published"),
-    ("ltx25_high_video", "16 GB card", "peak 14.48 GiB -- 5080-class only"),
-    ("minimax_h3_video", "16 GB card clamped to --reserve-vram 12",
-     "peak 7.28 GiB VRAM, 27.56 GiB HOST RAM, cold pass"),
+    ("ltx25_high_video", "RTX 5080 Laptop 16 GB",
+     "peak 14.48 GiB; published 1-act episode in 01:26:19"),
+    ("humo", "RTX 5080, 832x480x97",
+     "13.06 GiB VRAM / 27.53 GiB host RAM; published episode family"),
+    ("minimax_h3_video", "RTX 5080, legal 124-model / 129-canvas frames",
+     "6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured"),
 ]
 
 
@@ -232,6 +235,9 @@ def render() -> str:
     A("| `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | "
       "`signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, "
       "63.8 s at 1920x1080 |")
+    A("| `humo` family (HuMo) | RTX 5080, 16 GB | 32 published episodes "
+      "across `humo_14B_169`, `humo_1.7B_169`, `humo_1.7B`, and `humo`; "
+      "episode-ledger `delivered_engine` evidence |")
     A("\nCOUNTED FROM `delivered_engine` IN THE EPISODE LEDGER, over episodes "
       "that have a final mp4, in the LAST 5 DAYS. Not from a list kept by "
       "hand. Recency is the measure because the code moves -- an engine "
@@ -239,19 +245,6 @@ def render() -> str:
     A("Do not grep `episode_canon.json` for engine names: it records none, "
       "and matches land in PROSE -- searching it for `humo` finds the word "
       "`humorous` and invents a receipt.\n")
-    A("### Proven as an ENGINE, but not yet as an episode\n")
-    A("These passed a measured bench on named hardware and have never run "
-      "the full OTR pipeline to a published episode. Both facts are worth "
-      "having, and they are not the same fact: an engine that samples "
-      "cleanly can still fail on cast, voices, captions or the mux.\n")
-    A("| engine | bench receipt | still missing |")
-    A("|---|---|---|")
-    A("| `humo` (HuMo 14B) | RTX 5080: **PASS**, peak 13.06 GiB VRAM / "
-      "27.53 GiB host RAM, 97 frames at 832x480 "
-      "(`vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97.json`) "
-      "| an OTR episode |")
-    A("\nBoth are queued in the 5080 rotation, so these rows should move up "
-      "to the table above on their own.\n")
     A("## What works on what machine\n")
     A("| your machine | writer | video | voice | music | image | status |")
     A("|---|---|---|---|---|---|---|")
@@ -347,12 +340,11 @@ def render() -> str:
       "published from it -- proof follows the profile, never the reverse, "
       "because a lane is proven BY running under one.\n")
     A("**That matters when you are paying by the hour.** A rented 24 GB card "
-      "ran the 16 GB haunted profile and peaked at 15,990 MB -- two thirds of "
-      "the memory it was being billed for. A bigger card earns its cost only by "
-      "running what a smaller one cannot: the large video lanes, voice cloning "
-      "rather than the cheap fallback, the better image engines. None of that "
-      "is proven yet, so this is a note about what to build, not a setting to "
-      "change.\n")
+      "ran the 16 GB haunted profile and peaked at 15,990 MB. Rented Ampere "
+      "has since published both Wan 2.2 TI2V and LTX-2b, proving useful reach "
+      "beyond the floor lane. A bigger card still does not auto-select HuMo or "
+      "LTX 2.5: choose an explicit qualification profile and preserve its exact "
+      "hardware/software/RAM receipt.\n")
 
     A("## The proven rows, and what proves them\n")
     for prof in sorted(profs, key=lambda x: x["id"]):
@@ -371,21 +363,19 @@ def render() -> str:
     A("")
     A("### Read every VRAM number with suspicion\n")
     A("**A peak is mostly what the allocator GRABBED, not what the model "
-      "NEEDED.** These cards are built for games: they take as much as is "
-      "going, most of them grab close to the maximum available AT LOAD, and "
-      "they recover from pressure rather than refusing. Torch's caching "
-      "allocator then never hands it back. So a run that peaked at 15,990 MB "
-      "on a 24 GB card is NOT evidence it needs 16 GB -- the same graph under "
-      "`--reserve-vram` fits in far less, which is exactly how the H3 row "
-      "below was measured.\n")
+      "NEEDED.** Engines often take available VRAM and recover under real "
+      "pressure; Torch's caching allocator may then retain it. A reserve clamp "
+      "on a larger card is not a physical smaller-card receipt. Prefer actual "
+      "card runs such as the retained RTX 4060 H3 artifacts when making a "
+      "compatibility claim.\n")
     A("The honest use of these numbers is COMPARATIVE -- which lane is "
       "heavier than which -- not a shopping threshold. A lane marked "
       "PROVEN on 8 GB is worth more than any peak figure, because a card "
       "actually did it.\n")
-    A("**Host RAM is the limit people miss.** The clamped H3 run peaked at "
-      "27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with "
-      "16 GiB of RAM will struggle regardless of its GPU, and no VRAM table "
-      "warns you.\n")
+    A("**Host RAM is the limit people miss.** The HuMo 14B receipt used "
+      "27.53 GiB of system RAM while using 13.06 GiB VRAM. Its public recipe "
+      "therefore asks for at least 32 GiB host RAM. The legal-length H3 receipt "
+      "did not capture host RAM, so it provides no H3 host-memory minimum.\n")
     # KNOWN LIMITS ARE DECLARED IN config/machine_classes.json AND WERE A DEAD
     # CHANNEL: the field was read by nothing and rendered nowhere, so a limit
     # someone took the trouble to write down never reached the person it was

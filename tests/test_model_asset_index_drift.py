@@ -30,7 +30,7 @@ def test_humo_row_names_the_14b_lane_and_keeps_1_7b_manual():
     row = next(line for line in rendered.splitlines()
                if line.startswith("| `humo` |"))
     assert "14B: `otr_fetch_lane_weights.py humo`" in row
-    assert "1.7B: [exact manual tier](RUNPOD_PORTABILITY_LAB.md)" in row
+    assert "1.7B: [exact manual tier](RUNPOD_INSTALL.md)" in row
 
 
 def test_bundle_and_unresolved_names_never_become_fake_commands():

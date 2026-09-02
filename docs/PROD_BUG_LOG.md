@@ -9979,3 +9979,85 @@ must then pass this boundary before the HuMo/LTX qualification continues.
 
 **Bug Bible:** promoted as 12.141; the generalized class is a safety gate whose
 input population is broader than the destructive operation it claims to guard.
+
+---
+
+## PBUG-20260901-02 -- a CUDA-labelled template can import torch and still be unable to execute CUDA
+
+**Verified on the live secure RunPod** `jaq27diu24jt1p` (RTX 4090, NVIDIA
+driver `570.172.08`, template image `runpod/comfyui:cuda13.0`, 2026-09-01).
+The template's `.venv-cu128` included system site packages, so its name did not
+describe the runtime it actually imported: torch was `2.10.0+cu130` from the
+image. ComfyUI then failed during CUDA initialisation with:
+
+    CUDA initialization: The NVIDIA driver on your system is too old
+    (found version 12080)
+    RuntimeError: The NVIDIA driver on your system is too old
+
+This was not an LTX VRAM failure and changing the episode canvas could not
+help. The host exposed a real RTX 4090, but the CUDA 13 wheel required a newer
+driver than that host supplied. A second template-owned constraint,
+`/opt/comfyui-runtime-constraints.txt`, pinned the CUDA 13 torch trio and would
+silently reinstall it during later requirements work even after a manual
+repair.
+
+**FIX:** `scripts/otr_pod_provision.sh` now executes a CUDA tensor matmul in the
+exact Python selected for ComfyUI. Only the measured tuple -- torch
+`2.10.0+cu130` plus a 570-series driver -- has an automatic repair: install the
+exact `2.10.0+cu128` / `0.25.0+cu128` / `2.10.0+cu128` torch, torchvision and
+torchaudio trio from PyTorch's cu128 index with the template constraint removed.
+If the tuple does not match, provisioning fails closed instead of guessing.
+After repair it probes CUDA again and drops a conflicting process-wide torch
+constraint before any pack requirements can undo the repair. There is no VRAM
+reserve, frame clamp or engine gate in this path.
+
+Because core and pack requirements run after that repair, the provisioner also
+repeats the real CUDA matmul after every dependency and selected-profile step.
+It cannot print `provision complete` if a later resolver changed torch back to
+an importable but non-executable build.
+
+**LIVE VERIFY:** the repaired venv reported torch `2.10.0+cu128`, CUDA 12.8,
+torchvision `0.25.0+cu128`, torchaudio `2.10.0+cu128`; `cuda.is_available()` was
+true and an RTX 4090 tensor matmul completed. The same server then loaded all 25
+OTR nodes and accepted the untouched canonical LTX 2.5 graph. Source-contract
+coverage in `tests/test_otr_pod_provision_contract.py` pins the tuple, index,
+constraint escape, post-repair execution probe, and the final post-dependency
+probe before the success receipt.
+
+**Bug Bible:** promoted as 12.142; an environment label or successful import is
+not a device-runtime receipt.
+
+---
+
+## PBUG-20260901-03 -- the pinned LTXVideo commit imports an API Kornia 0.8.3 removed
+
+**Verified on the same live RunPod after the CUDA runtime was repaired.** The
+server reached custom-node import and rejected the exact pinned
+ComfyUI-LTXVideo commit `3b9c5cde4700917074823d45e25401d81049f8fc`:
+
+    ImportError: cannot import name 'pad' from
+    'kornia.geometry.transform.pyramid'
+    Cannot import .../ComfyUI-LTXVideo module for custom nodes
+
+The pack imported `pad` from Kornia's pyramid module, but the operation was
+only torch padding and the file already imported `torch.nn.functional as F`.
+This was a source/dependency API mismatch, not a missing model or a GPU-memory
+limit. It is also documented upstream in Lightricks/ComfyUI-LTXVideo issue 525
+and pull request 551.
+
+**FIX:** provisioning applies an in-repo patch that removes the dead Kornia
+export and changes the three call sites to `F.pad`. The owner pins four
+identities: upstream commit, clean-file SHA-256, patch SHA-256 and patched-file
+SHA-256. It accepts only the exact clean preimage or the exact already-patched
+postimage, and only `pyramid_blending.py` may be dirty afterward. Unknown drift
+fails closed. Downgrading all of Kornia was rejected because it would widen the
+dependency blast radius to preserve one re-export.
+
+**LIVE VERIFY:** after applying the exact patch, the server imported
+ComfyUI-LTXVideo in 3.0 seconds, imported GGUF and all 25 OTR nodes, and exposed
+the healthy queue endpoint. `tests/test_otr_provision_pinned_packs.py` verifies
+the patch identity, exact synthetic pre/post images, idempotent reprovisioning,
+and refusal of unrelated checkout drift.
+
+**Bug Bible:** promoted as 12.143; a pinned upstream revision still needs an
+owned compatibility patch when a transitive dependency removes an API.

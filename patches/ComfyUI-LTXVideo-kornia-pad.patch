@@ -1,0 +1,23 @@
+diff --git a/pyramid_blending.py b/pyramid_blending.py
+index afc4bac..7c3cd6b 100644
+--- a/pyramid_blending.py
++++ b/pyramid_blending.py
+@@ -12,3 +12,2 @@ from kornia.geometry.transform.pyramid import (
+     is_powerof_two,
+-    pad,
+ )
+@@ -30,3 +29,3 @@ def _pad_for_laplacian(image: torch.Tensor) -> tuple[torch.Tensor, tuple[int, in
+         pad_down = find_next_powerof_two(h) - h
+-        image = pad(image, (0, pad_right, 0, pad_down), "reflect")
++        image = F.pad(image, (0, pad_right, 0, pad_down), "reflect")
+     return image, (pad_right, pad_down)
+@@ -43,3 +42,3 @@ def _gaussian_pyramid(
+         padding = (0, find_next_powerof_two(w) - w, 0, find_next_powerof_two(h) - h)
+-        images = pad(images, padding, border_type)
++        images = F.pad(images, padding, border_type)
+     return build_pyramid(images, max_level, border_type, align_corners)
+@@ -143,3 +142,3 @@ def _pyramid_blend(
+     if any(padding):
+-        mask = torch.nn.functional.pad(
++        mask = F.pad(
+             mask, (0, padding[0], 0, padding[1]), mode="reflect"

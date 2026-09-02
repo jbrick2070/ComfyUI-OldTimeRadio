@@ -8,6 +8,10 @@ set -uo pipefail
 
 CORE_PIN_DEFAULT="169fcf35a2fc163fec31338b816503ddac0d3fcf"
 OTR_REPO_URL="https://github.com/jbrick2070/ComfyUI-OldTimeRadio.git"
+COMFY_TORCH_CU128="2.10.0+cu128"
+COMFY_TORCHVISION_CU128="0.25.0+cu128"
+COMFY_TORCHAUDIO_CU128="2.10.0+cu128"
+COMFY_TORCH_CU128_INDEX="https://download.pytorch.org/whl/cu128"
 
 fail() {
   echo "FATAL: $*" >&2
@@ -56,6 +60,82 @@ done
 [ -n "$COMFY_PY" ] || fail "no Python interpreter imports folder_paths from $COMFY_ROOT"
 echo "  comfy python: $COMFY_PY"
 
+probe_comfy_cuda() {
+  "$COMFY_PY" - <<'PY'
+import torch
+
+if not torch.cuda.is_available():
+    raise RuntimeError("torch cannot see the NVIDIA GPU")
+device = torch.cuda.get_device_name(0)
+sample = torch.ones((64, 64), dtype=torch.float32, device="cuda")
+result = sample @ sample
+torch.cuda.synchronize()
+print(
+    "%s | CUDA %s | %s | matmul %.1f"
+    % (torch.__version__, torch.version.cuda, device, result[0, 0].item())
+)
+PY
+}
+
+ensure_compatible_comfy_torch() {
+  command -v nvidia-smi >/dev/null 2>&1 || return 0
+  nvidia-smi -L >/dev/null 2>&1 || fail "nvidia-smi is installed but no GPU is visible"
+  if [ "${CUDA_VISIBLE_DEVICES+x}" = x ] && [ -z "${CUDA_VISIBLE_DEVICES}" ]; then
+    fail "CUDA_VISIBLE_DEVICES is empty; refusing to rewrite torch for a deliberately hidden GPU"
+  fi
+
+  local torch_version driver_version driver_major probe_output probe_rc constraint_pin
+  torch_version=$(
+    "$COMFY_PY" - <<'PY' 2>/dev/null || true
+import torch
+print(torch.__version__)
+PY
+  )
+  [ -n "$torch_version" ] || fail "the selected ComfyUI Python cannot import torch"
+  driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader \
+    | head -1 | tr -d '[:space:]')
+  driver_major=${driver_version%%.*}
+
+  probe_output=$(probe_comfy_cuda 2>&1)
+  probe_rc=$?
+  if [ "$probe_rc" -ne 0 ]; then
+    if [ "$torch_version" = "2.10.0+cu130" ] \
+      && [[ "$driver_major" =~ ^[0-9]+$ ]] \
+      && [ "$driver_major" -ge 570 ] \
+      && [ "$driver_major" -lt 580 ]; then
+      echo "  repair torch: template cu130 cannot initialize on NVIDIA driver $driver_version"
+      echo "                install the exact 2.10.0 cu128 trio in $COMFY_PY"
+      env -u PIP_CONSTRAINT "$COMFY_PY" -m pip install --upgrade --no-cache-dir \
+        --index-url "$COMFY_TORCH_CU128_INDEX" \
+        "torch==$COMFY_TORCH_CU128" \
+        "torchvision==$COMFY_TORCHVISION_CU128" \
+        "torchaudio==$COMFY_TORCHAUDIO_CU128" \
+        || fail "driver-compatible ComfyUI torch install failed"
+      torch_version="$COMFY_TORCH_CU128"
+    else
+      echo "$probe_output" >&2
+      fail "ComfyUI torch $torch_version cannot initialize driver $driver_version; no audited automatic repair matches this tuple"
+    fi
+  fi
+
+  # Some RunPod CUDA 13 templates export a process-wide pip constraint even
+  # when their persistent venv now contains the audited cu128 build. Leaving
+  # it active makes the next unpinned pack requirement silently reinstall the
+  # incompatible cu130 wheel.
+  if [ -n "${PIP_CONSTRAINT:-}" ] && [ -f "$PIP_CONSTRAINT" ]; then
+    constraint_pin=$(sed -n 's/[[:space:]]//g; /^torch==/p' "$PIP_CONSTRAINT" \
+      | head -1)
+    if [ -n "$constraint_pin" ] && [ "$constraint_pin" != "torch==$torch_version" ]; then
+      echo "  ignore template pip constraint: $constraint_pin conflicts with torch==$torch_version"
+      unset PIP_CONSTRAINT
+    fi
+  fi
+
+  probe_output=$(probe_comfy_cuda 2>&1) \
+    || fail "ComfyUI torch CUDA verification failed after repair: $probe_output"
+  echo "  torch verified: $probe_output"
+}
+
 # The portability lab is defined against one exact ComfyUI core. Never replace
 # a template's non-git tree or reset local work. A non-git image gets a clear
 # side-by-side recipe instead.
@@ -81,6 +161,7 @@ if [ "$CURRENT_CORE" != "$CORE_PIN" ]; then
 fi
 [ "$(git -C "$COMFY_ROOT" rev-parse HEAD 2>/dev/null)" = "$CORE_PIN" ] \
   || fail "ComfyUI core verification failed"
+ensure_compatible_comfy_torch
 "$COMFY_PY" -m pip install -q -r "$COMFY_ROOT/requirements.txt" \
   || fail "ComfyUI core requirements failed"
 echo "  core verified: $CORE_PIN"
@@ -170,8 +251,15 @@ VOICE_ARGS=()
 echo "  profile     : $PROFILE (VRAM ${VRAM_MIB:-unknown} MiB)"
 if ! "$COMFY_PY" scripts/otr_provision.py --profile "$PROFILE" "${VOICE_ARGS[@]}"; then
   echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ') ===" >&2
-  echo "Read docs/RUNPOD_PORTABILITY_LAB.md for every named manual file." >&2
+  echo "Read docs/RUNPOD_INSTALL.md for every named manual file." >&2
   exit 1
 fi
+
+# Core and partner-pack requirements run after the first repair probe. Prove
+# that none of them changed torch back to a build that imports but cannot
+# execute on this driver before claiming the machine is complete.
+FINAL_CUDA_PROBE=$(probe_comfy_cuda 2>&1) \
+  || fail "final ComfyUI CUDA verification failed after all dependencies: $FINAL_CUDA_PROBE"
+echo "  final torch verified: $FINAL_CUDA_PROBE"
 
 echo "=== provision complete  $(date -u '+%H:%M:%SZ') ==="

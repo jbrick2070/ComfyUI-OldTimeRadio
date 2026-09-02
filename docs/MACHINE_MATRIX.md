@@ -16,20 +16,11 @@ Only engines that have produced a real OTR episode on named hardware appear here
 | `ltx25_high_mime` (LTX 2.5 mime) | RTX 5080, 16 GB | 3 finished episodes in the same window, delivered_engine `ltx25_mime` |
 | `minimax_h3_video` (MiniMax H3) | RTX 5080, 16 GB | `signal_lost_reel_of_resistance_20260828_121427` and `signal_lost_the_poise_of_stone_20260827_143538` |
 | `ltx_8gb` (LTX-2b 0.9.8 distilled) | RTX A4500, 20 GB, Ampere | `signal_lost_static_whispers_20260901_001028`, 1 act, 1925 s, 63.8 s at 1920x1080 |
+| `humo` family (HuMo) | RTX 5080, 16 GB | 32 published episodes across `humo_14B_169`, `humo_1.7B_169`, `humo_1.7B`, and `humo`; episode-ledger `delivered_engine` evidence |
 
 COUNTED FROM `delivered_engine` IN THE EPISODE LEDGER, over episodes that have a final mp4, in the LAST 5 DAYS. Not from a list kept by hand. Recency is the measure because the code moves -- an engine proven in June is proven against June.
 
 Do not grep `episode_canon.json` for engine names: it records none, and matches land in PROSE -- searching it for `humo` finds the word `humorous` and invents a receipt.
-
-### Proven as an ENGINE, but not yet as an episode
-
-These passed a measured bench on named hardware and have never run the full OTR pipeline to a published episode. Both facts are worth having, and they are not the same fact: an engine that samples cleanly can still fail on cast, voices, captions or the mux.
-
-| engine | bench receipt | still missing |
-|---|---|---|
-| `humo` (HuMo 14B) | RTX 5080: **PASS**, peak 13.06 GiB VRAM / 27.53 GiB host RAM, 97 frames at 832x480 (`vram-recipe-lab/results/humo_14b_diet_landscape_832x480_f97.json`) | an OTR episode |
-
-Both are queued in the 5080 rotation, so these rows should move up to the table above on their own.
 
 ## What works on what machine
 
@@ -215,7 +206,7 @@ The tier is `16 GB+` because that is the truth: nothing in `config/profiles/` de
 
 **A draft now exists that asks for more.** `otr_rented24_heavy` raises the writer ceiling 14.5 -> 22 GB and drops NF4 quantisation so the 12b writer sits resident, lifts the render frame cap 81 -> 121, and uses `indextts2` cloning for BOTH character and announcer where the 16 GB tier settles for kokoro on the announcer. It is `draft` and nothing has published from it -- proof follows the profile, never the reverse, because a lane is proven BY running under one.
 
-**That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted profile and peaked at 15,990 MB -- two thirds of the memory it was being billed for. A bigger card earns its cost only by running what a smaller one cannot: the large video lanes, voice cloning rather than the cheap fallback, the better image engines. None of that is proven yet, so this is a note about what to build, not a setting to change.
+**That matters when you are paying by the hour.** A rented 24 GB card ran the 16 GB haunted profile and peaked at 15,990 MB. Rented Ampere has since published both Wan 2.2 TI2V and LTX-2b, proving useful reach beyond the floor lane. A bigger card still does not auto-select HuMo or LTX 2.5: choose an explicit qualification profile and preserve its exact hardware/software/RAM receipt.
 
 ## The proven rows, and what proves them
 
@@ -227,16 +218,17 @@ A VRAM number without its conditions is how somebody buys the wrong card.
 | engine | conditions | measured |
 |---|---|---|
 | `animatediff15_v3_haunted_video` | 1 act, 8 clips, 24 GB rented card | 2058 s, peak 15,990 MB, published |
-| `ltx25_high_video` | 16 GB card | peak 14.48 GiB -- 5080-class only |
-| `minimax_h3_video` | 16 GB card clamped to --reserve-vram 12 | peak 7.28 GiB VRAM, 27.56 GiB HOST RAM, cold pass |
+| `ltx25_high_video` | RTX 5080 Laptop 16 GB | peak 14.48 GiB; published 1-act episode in 01:26:19 |
+| `humo` | RTX 5080, 832x480x97 | 13.06 GiB VRAM / 27.53 GiB host RAM; published episode family |
+| `minimax_h3_video` | RTX 5080, legal 124-model / 129-canvas frames | 6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured |
 
 ### Read every VRAM number with suspicion
 
-**A peak is mostly what the allocator GRABBED, not what the model NEEDED.** These cards are built for games: they take as much as is going, most of them grab close to the maximum available AT LOAD, and they recover from pressure rather than refusing. Torch's caching allocator then never hands it back. So a run that peaked at 15,990 MB on a 24 GB card is NOT evidence it needs 16 GB -- the same graph under `--reserve-vram` fits in far less, which is exactly how the H3 row below was measured.
+**A peak is mostly what the allocator GRABBED, not what the model NEEDED.** Engines often take available VRAM and recover under real pressure; Torch's caching allocator may then retain it. A reserve clamp on a larger card is not a physical smaller-card receipt. Prefer actual card runs such as the retained RTX 4060 H3 artifacts when making a compatibility claim.
 
 The honest use of these numbers is COMPARATIVE -- which lane is heavier than which -- not a shopping threshold. A lane marked PROVEN on 8 GB is worth more than any peak figure, because a card actually did it.
 
-**Host RAM is the limit people miss.** The clamped H3 run peaked at 27.56 GiB of SYSTEM memory against 7.28 GiB of VRAM. A machine with 16 GiB of RAM will struggle regardless of its GPU, and no VRAM table warns you.
+**Host RAM is the limit people miss.** The HuMo 14B receipt used 27.53 GiB of system RAM while using 13.06 GiB VRAM. Its public recipe therefore asks for at least 32 GiB host RAM. The legal-length H3 receipt did not capture host RAM, so it provides no H3 host-memory minimum.
 
 ## Known limits, written down when they were found
 
@@ -250,9 +242,9 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 
 * voice_bank must match the voice engine: kokoro accepts only 'kokoro_builtin'. Setting 'default' with char_voice=kokoro raises VoiceCastingError at OTR_CastLock, 12 minutes into a leg. Found by running it, 2026-08-31.
 
-* ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by a stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'), and the 17-line loader patch that fixes it is not public. On a rented A4500 with the patch applied it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted to proven for a second machine only when a pod render publishes an episode.
+* ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'); the provisioner now pins that pack and applies OTR's public in-repo, hash-verified loader patch. On a rented A4500 it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted for a second machine only when that exact tuple publishes an episode.
 
-* humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching; what is missing is ~27 GiB of weights and a fetch lane. Qualification is queued behind ltx25 on a high-RAM pod.
+* humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching, and the public `humo` fetch lane now owns all five 14B files (26.7356 GiB) with pinned revisions, sizes, SHA-256 values, and atomic `.part` handling. Only the remote canonical receipt remains.
 
 ## What is NOT here
 

@@ -231,9 +231,9 @@ def render() -> str:
                 # complete 14B recipe only; claiming it installs the 1.7B DiT
                 # would recreate the wrong-artifact fresh-install trap.
                 how = ("14B: `otr_fetch_lane_weights.py humo`; 1.7B: "
-                       "[exact manual tier](RUNPOD_PORTABILITY_LAB.md)")
+                       "[exact manual tier](RUNPOD_INSTALL.md)")
             elif row["engine"].startswith("humo"):
-                how = "[exact manual tier](RUNPOD_PORTABILITY_LAB.md)"
+                how = "[exact manual tier](RUNPOD_INSTALL.md)"
             elif row["engine"] == "minimax_h3":
                 how = "explicit operator-local `otr_fetch_lane_weights.py minimax_h3`"
             elif row["engine"] in fetchable:
@@ -280,7 +280,7 @@ def render() -> str:
               "then point the three variables above at them.\n")
             A("It also needs an authorized male and female reference WAV plus a "
               "full portable bank that preserves every non-Index row. The exact "
-              "recipe is in [RUNPOD_PORTABILITY_LAB.md](RUNPOD_PORTABILITY_LAB.md). "
+              "recipe is in [RUNPOD_INSTALL.md](RUNPOD_INSTALL.md). "
               "The clips are not shipped; a missing or mismatched registered ref "
               "is a named refusal, never a fallback.\n")
     A("## Exactly which files each engine names\n")

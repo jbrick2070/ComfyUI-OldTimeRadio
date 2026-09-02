@@ -57,7 +57,7 @@ Anything not listed there is a manual install -- see its row below.
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | 2 profile(s) |
 | `google_veo_video` | nothing on disk | - | 3 profile(s) |
-| `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_PORTABILITY_LAB.md) | 3 profile(s) |
+| `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_INSTALL.md) | 3 profile(s) |
 | `ltx25` | **not declared in code -- verify** | - | - |
 | `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 5 profile(s) |
 | `ltx_av` | 8 weight file(s) | manual download | - |
@@ -126,7 +126,7 @@ index-tts/                18.93 GB total
 
 The venv is **not portable**: a Windows venv has `Scripts/python.exe`, a Linux one `bin/python`, and 39,759 files of compiled wheels for the wrong platform. On a new machine, clone the project, build its venv natively, fetch checkpoints, then point the three variables above at them.
 
-It also needs an authorized male and female reference WAV plus a full portable bank that preserves every non-Index row. The exact recipe is in [RUNPOD_PORTABILITY_LAB.md](RUNPOD_PORTABILITY_LAB.md). The clips are not shipped; a missing or mismatched registered ref is a named refusal, never a fallback.
+It also needs an authorized male and female reference WAV plus a full portable bank that preserves every non-Index row. The exact recipe is in [RUNPOD_INSTALL.md](RUNPOD_INSTALL.md). The clips are not shipped; a missing or mismatched registered ref is a named refusal, never a fallback.
 
 ## Exactly which files each engine names
 

@@ -1,8 +1,9 @@
-# Standing up OTR on a rented GPU
+# OTR RunPod playbook: install, run, qualify, troubleshoot
 
-For the reproducible HuMo/LTX 2.5 high-RAM qualification sequence, use
-[`RUNPOD_PORTABILITY_LAB.md`](RUNPOD_PORTABILITY_LAB.md). This file is the
-supporting RunPod history, template guide, and failure atlas. Every claim is
+This is the **single canonical RunPod playbook**: first deployment, template,
+models, HuMo/LTX 2.5/H3 boundaries, canonical qualification, unattended runs,
+and the failure atlas all live here. `RUNPOD_PORTABILITY_LAB.md` is retained
+only as a compatibility redirect and owns no procedure. Every claim below is
 either MEASURED on real hardware and labelled so, or marked UNPROVEN.
 
 **The diary is in git history.** This file used to record what was learned in
@@ -27,6 +28,7 @@ something changes, EDIT THE CELL. Do not append a v3.
 | build or edit the template | 2. Template spec |
 | get models onto the machine | 3. Models and assets |
 | run a sweep overnight | 4. Running unattended |
+| qualify HuMo, LTX 2.5, or understand H3 | 4A. Heavy-engine qualification |
 | something is broken | 5. Failure atlas, by symptom |
 
 ---
@@ -82,11 +84,12 @@ Two separate caches, and missing either wastes the drive:
 
 | what | variable | why |
 |---|---|---|
-| video weights | `OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models` | set in the TEMPLATE; without it `_models_root()` falls back to `C:\ComfyUI-Models`, which on Linux becomes a literal directory nothing scans -- and reports success |
+| video weights | `OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models` | set in the TEMPLATE so fetcher and server share one explicit persistent root; otherwise the current resolver uses `folder_paths.models_dir`, which is template-dependent and may be disposable |
 | writer / voice / music | `HF_HOME=<models_root>/huggingface` | **defaults to `/root/.cache`, which is on the 55 GB CONTAINER disk and is erased on stop.** Without this the 24 GB writer re-downloads every session even with a volume attached. **Use the models root, not an invented path -- see below.** |
 
-**The expensive half is the one that defaults to the disposable place.** Video
-weights are 3.7 GB; the HF cache with both writers is **38 GB**.
+**The expensive half is the one that defaults to the disposable place.** The
+current 16 GB+ starter's three automatic model lanes total about 32.1 GB before
+writer and voice caches; the HF cache with both writers is **38 GB**.
 
 **THE VALUE IS `<models_root>/huggingface`, AND PICKING ANY OTHER PATH COSTS
 YOU THE CACHE TWICE.** That is OTR's convention, not a preference: the reference
@@ -111,8 +114,21 @@ it. Symlink the default path at the convention rather than inventing a new one:
 
 ### Step 4 — provision, in one command, from the repo
 
+The 16 GB+ starter uses IndexTTS2, whose authorized reference WAVs cannot ship
+with the project. On a clean pod, use an honest two-pass provision: the first
+pass clones everything and fetches the public lanes, then exits **INCOMPLETE**
+at the named voice-bank boundary.
+
     ssh <pod> 'cat > /root/provision.sh' < scripts/otr_pod_provision.sh
-    ssh <pod> 'nohup bash /root/provision.sh > /root/prov.log 2>&1 &'
+    ssh <pod> 'OTR_PROVISION_PROFILE=otr_runpod_starter \
+      nohup bash /root/provision.sh > /root/prov.log 2>&1 &'
+
+After that pass, complete section 3's reference-WAV and portable-bank recipe.
+It writes `/workspace/otr-config/otr-runtime.env`. The completing pass is:
+
+    ssh <pod> '. /workspace/otr-config/otr-runtime.env; \
+      OTR_PROVISION_PROFILE=otr_runpod_starter OTR_WITH_INDEXTTS2=1 \
+      nohup bash /root/provision.sh > /root/prov.log 2>&1 &'
 
 **Run it DETACHED.** A foreground SSH session dies on any client-side timeout
 and takes the install with it -- this cost one full run mid-`pip install`.
@@ -120,8 +136,10 @@ and takes the install with it -- this cost one full run mid-`pip install`.
 The script locates the tree ComfyUI actually scans (**do not assume
 `/workspace/ComfyUI`; this image uses `/workspace/runpod-slim/ComfyUI`**),
 recovers `OTR_COMFYUI_MODELS_ROOT` from `/proc/1/environ` because **SSH sessions
-do not inherit container env**, clones both packs, installs deps, and fetches
-the ungated bundle.
+do not inherit container env**, pins ComfyUI core and both packs, installs deps,
+and routes the exact selected profile. The starter automatically fetches
+`wan_ti2v_gguf`, `z_image`, and `stable_audio_3`; an incomplete voice bank makes
+the command return nonzero rather than pretending the pod can render.
 
 ### Step 5 — warm the HF models BEFORE rendering
 
@@ -156,10 +174,9 @@ the lesson: it landed **7-18 minutes in**, after the script and audio were done.
     RTX PRO 4000 Blackwell 24 GB   $0.58/hr
     RTX 5090 32 GB                 $0.69/hr
     network volume 200 GB          $0.019/hr  (~$14/mo, billed regardless)
-    first provision                ~6 min     (packs + 3.7 GB weights)
+    CUDA13/driver-570 repair       ~8 min     (only on that measured mismatch)
+    starter automatic lanes        ~32.1 GB   (Wan + Z-Image + Stable Audio)
     HF warm, both writers          38 GB, once per VOLUME -- not per pod
-
----
 
 ---
 
@@ -174,7 +191,9 @@ a template needs TODAY.
 |---|---|---|
 | Region | **EU-RO-1** | where GPUs actually schedule; US-CA-2 never gave one |
 | Network volume | mounted at `/workspace` | weights re-download every boot without it. Selecting a network volume REPLACES the volume-disk setting -- do not set both |
-| Container disk | **60 GB** | pack, torch deps and a native index-tts venv land here, not on the volume |
+| Container disk | **70 GB tested** | pack, torch deps and a native index-tts venv land here, not on the volume |
+| Effective cgroup RAM | **at least 100 GiB for the heavy-engine lab** | read the cgroup limit, not `free`; this is conservative rental headroom, not an engine minimum |
+| Free model-volume space | **at least 150 GiB for the heavy-engine lab** | complete weights, HF caches, voices, images, and receipts must coexist |
 | HTTP port | `8188` **ComfyUI** | the only load-bearing port; everything drives through it |
 | HTTP port | `8888` JupyterLab | browser shell |
 | HTTP port | `8080` FileBrowser | optional; returned 401 all session |
@@ -191,10 +210,11 @@ a template needs TODAY.
 | `HF_TOKEN` | `{{ RUNPOD_SECRET_HF_TOKEN }}` |
 | `PYTHONUNBUFFERED` | `1` |
 
-**`OTR_COMFYUI_MODELS_ROOT` is not optional.** Without it `_models_root()` falls
-through to its Windows default and the fetcher writes gigabytes into a literal
-directory named `C:\ComfyUI-Models`, which ComfyUI never scans -- reporting
-success the whole way.
+**Set `OTR_COMFYUI_MODELS_ROOT` explicitly even though the current resolver has
+a safe fallback.** Without it, `_models_root()` uses ComfyUI's
+`folder_paths.models_dir`; that avoids the historical literal-Windows-path bug,
+but the location remains template-dependent and may be disposable or different
+from the mounted volume you intend to preserve.
 
 **`HF_HOME` must be the MODELS ROOT, not a path of your choosing.** That is
 OTR's convention: the reference machine runs
@@ -245,19 +265,29 @@ Read this before concluding the pod works.
              2058 s (34.3 min), VRAM peak 15,990 MB, published to obs
              writer gemma-4-12b, voices kokoro, music musicgen
 
-    UNPROVEN everything else. No episode has completed on a pod using
-             LTX 2.5, wan_ti2v, ltx_8gb, HuMo, indextts2 voice cloning,
-             Stable Audio 3, or ANY image engine.
+    PROVEN   ltx_8gb, 1 act, 9 beats / 1100 frames
+             RTX A4500 20 GB, Ampere sm_86
+             1925 s, 63.8 s final 1920x1080 h264+aac, obs_publish OK
 
-**And the proven one is the lane you would not rent a big card for.**
-AnimateDiff SD1.5 is the 8 GB FLOOR lane -- it exists so a small card can
-produce anything at all, and a 16 GB dev box runs it overnight for the cost of
-electricity. Renting 24 GB to run it is paying for headroom and then not using
-it. A rented tier earns its cost by running what the local box CANNOT: the large
-video lanes, voice cloning rather than the cheap fallback, and the better image
-engines. **None of that is proven yet**, so do not read the PROVEN line above as
-"the pod works" -- read it as "the pod works for the one case that needed it
-least."
+    PROVEN   wan_ti2v, 1 act
+             RTX A4500 20 GB, Ampere sm_86
+             3949 s, RESULT SUCCESS, obs_publish OK
+
+    NEGATIVE 2026-09-01: RTX 4090 24 GB, LTX 2.5 high-video canonical episode.
+             CUDA execution, all weights/packs, IndexTTS, Stable Audio,
+             image dispatch, canonical validation, and queue submission passed.
+             Node 92 decode GPU-OOMed after 39:56 at the shipped 1664x960
+             two-stage canvas; the 116.42 GiB cgroup recorded no OOM event.
+
+    UNPROVEN on a pod: HuMo and a completed LTX 2.5 canonical episode.
+             H3 is excluded from this operator's cloud policy rather than
+             classified as a GPU refusal.
+
+AnimateDiff SD1.5 remains the 8 GB floor, while the A4500 receipts prove two
+meatier public lanes on rented Ampere: LTX-2b and Wan 2.2 TI2V. Those receipts
+do not automatically transfer to LTX 2.5, HuMo, a different RAM cap, or a new
+starter combination. Qualify each exact profile and tuple rather than treating
+"RunPod works" as one global fact.
 
 ---
 
@@ -268,17 +298,12 @@ turned out to be the harder half.
 
 ### THE REAL PORTABILITY GAP: engines name FILES, not SOURCES
 
-Exactly **three** Hugging Face repo ids exist in all of OTR's engine code
-(`hexgrad/Kokoro-82M`, `facebook/musicgen-small`,
-`stabilityai/stable-audio-open-1.0`). Every video and image engine names the
-FILENAME it wants and nothing about where to get it. Only the three lanes in
-`scripts/otr_fetch_lane_weights.py` had a recorded provenance.
-
-**So every other weight on the reference machine was placed there by hand, and
-nobody else could obtain it from anything in this repository.** That is the
-single biggest barrier to somebody else running OTR -- larger than the registry
-being flagged, larger than any install step -- and it is invisible from the dev
-box, where the files have simply always been present.
+The runtime-downloaded audio engines carry their own Hugging Face repo ids, but
+most video and image engines resolve a FILENAME and know nothing about its
+source. The reference machine once hid that gap because manually placed files
+had always been present. Today `otr_fetch_lane_weights.py` owns closed public
+lanes and `otr_provision.py` owns exact gated/manual tiers; a filename without
+one of those provenance owners remains an install gap.
 
 `docs/MODEL_ASSET_INDEX.md` (generated by `scripts/otr_asset_index.py`) now
 answers "to use engine X, download Z". Closing a lane means resolving its files
@@ -288,8 +313,9 @@ the engine's own resolver, and adding a row to the fetcher.
 **Do not guess a repo to close a lane faster.** HuMo 14B is now closed by the
 five-file, commit-pinned, SHA-256-verified `humo` lane; it downloads the exact
 Kijai `...scaled_KJ` UNET the engine resolves. HuMo 1.7B stays separate and its
-exact rename/destination is documented in the portability lab. A 1.7B profile
-never downloads the 14B DiT or LoRA.
+exact rename/destination is printed by
+`python scripts/otr_provision.py --profile otr_w45_humo_1_7b --list`. A 1.7B
+profile never downloads the 14B DiT or LoRA.
 
 ### THE HF CACHE CAN EXIST TWICE, AND EACH COPY LOOKS CORRECT
 
@@ -341,8 +367,8 @@ preserves every shipped non-Index row,
 replaces the unavailable operator-local Index rows, copies the references under
 `<models_root>/TTS/refs/indextts2/`, and writes their exact SHA-256 values. The
 bank's absolute path must be exported as `OTR_VOICE_REFERENCE_BANK` for both
-provisioning and the ComfyUI launch. The complete command is below and in
-[`RUNPOD_PORTABILITY_LAB.md`](RUNPOD_PORTABILITY_LAB.md#5-indextts2-reference-voices).
+provisioning and the ComfyUI launch. The complete command is below; this file
+is its sole documentation owner.
 
 **This is what stops the w45 campaign on a fresh machine:** those profiles cast
 `indextts2`, so every lane fails identically at `OTR_BatchCharacterVoices`,
@@ -428,13 +454,18 @@ checkout, not inside it, so a second provision pass does not correctly reject
 the core as dirty:
 
 ```bash
+export OTR_COMFY_ROOT=/workspace/runpod-slim/ComfyUI
+export OTR_COMFYUI_MODELS_ROOT="$OTR_COMFY_ROOT/models"
+export HF_HOME="$OTR_COMFYUI_MODELS_ROOT/huggingface"
+export COMFY_PY="$OTR_COMFY_ROOT/.venv-cu128/bin/python"
 export OTR_INDEXTTS2_ROOT=/workspace/index-tts
 export OTR_INDEXTTS2_VENV="$OTR_INDEXTTS2_ROOT/.venv/Scripts/python.exe"
 export OTR_INDEXTTS2_DIR="$OTR_INDEXTTS2_ROOT/checkpoints"
 export OTR_INDEXTTS2_WORKER="$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio/scripts/_otr_indextts2_worker.py"
 
 mkdir -p /workspace/otr-config
-"$OTR_COMFY_ROOT/.venv/bin/python" \
+cd "$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio"
+"$COMFY_PY" \
   scripts/otr_make_portable_voice_bank.py \
   --models-root "$OTR_COMFYUI_MODELS_ROOT" \
   --male-wav /absolute/path/to/authorized-male.wav \
@@ -442,12 +473,27 @@ mkdir -p /workspace/otr-config
   --output /workspace/otr-config/voice_reference_bank.portable.json
 export OTR_VOICE_REFERENCE_BANK=/workspace/otr-config/voice_reference_bank.portable.json
 
-"$OTR_COMFY_ROOT/.venv/bin/python" scripts/otr_provision.py \
-  --profile otr_w45_humo_14b_169 --with-indextts2
+cat > /workspace/otr-config/otr-runtime.env <<EOF
+export OTR_COMFY_ROOT="$OTR_COMFY_ROOT"
+export OTR_COMFYUI_MODELS_ROOT="$OTR_COMFYUI_MODELS_ROOT"
+export HF_HOME="$HF_HOME"
+export COMFY_PY="$COMFY_PY"
+export OTR_INDEXTTS2_ROOT="$OTR_INDEXTTS2_ROOT"
+export OTR_INDEXTTS2_VENV="$OTR_INDEXTTS2_VENV"
+export OTR_INDEXTTS2_DIR="$OTR_INDEXTTS2_DIR"
+export OTR_INDEXTTS2_WORKER="$OTR_INDEXTTS2_WORKER"
+export OTR_VOICE_REFERENCE_BANK="$OTR_VOICE_REFERENCE_BANK"
+EOF
+chmod 600 /workspace/otr-config/otr-runtime.env
+
+"$COMFY_PY" scripts/otr_provision.py \
+  --profile otr_runpod_starter --with-indextts2
 ```
 
-Use the exact profile being installed in the last command. Preserve all five
-exports in the ComfyUI service environment too. The generated bank contains
+Use the exact `comfy python:` path printed by the first provision pass for
+`COMFY_PY`, and use the exact profile being installed in the last command.
+Source `otr-runtime.env` before every later provisioner and ComfyUI launch. The
+generated bank contains
 one lower-case `male` and one lower-case `female` Index character reference
 while retaining Kokoro and the other non-Index rows. The private
 Lemmy-specific qualified route is deliberately unavailable on a stranger's
@@ -539,106 +585,329 @@ a change to how often the model is unloaded -- not a silent substitution.
 
 ---
 
-## 4A. What the starter ships, and why it is not LTX 2.5
+## 4A. Heavy-engine canonical qualification: HuMo, LTX 2.5, and H3
 
-**Settled 2026-09-01 by a kibitz round on the three pod blockers.** Everything in
-this section is a decision with a receipt, not a preference.
+This is the one complete heavy-engine procedure. Do not create a second lab
+document or replace the canonical graph with a hand-built workflow.
 
-### The starter ships `wan22_high_video`
+### Evidence boundary and tested high-RAM tuple
 
-`config/profiles/otr_runpod_starter.json` selects **`wan22_high_video`**
-(internally `wan_ti2v`), because it is the only lane that is simultaneously:
+HuMo 14B and LTX 2.5 have published canonical receipts on the local RTX 5080.
+The first high-RAM remote qualification used this exact tuple:
 
-* **proven off the development machine** -- rendered end to end on a rented RTX
-  A4500 (Ampere, 20 GB) in 3,949 s, and carrying **eight published episodes** in
-  the ledger;
-* **completely fetchable by a stranger** -- the `wan_ti2v_gguf` lane is 9.37 GB
-  and self-contained (GGUF unet + GGUF encoder + Wan 2.2 VAE);
-* **honest about its canvas** -- the engine declares `render_canvas = (832, 480)`
-  and the profile declares the same pair, so the config an operator reads is the
-  canvas that renders.
+- secure RunPod `jaq27diu24jt1p`, RTX 4090, 24,564 MiB VRAM, driver
+  `570.172.08`;
+- template `runpod/comfyui:cuda13.0`, ComfyUI at
+  `/workspace/runpod-slim/ComfyUI`;
+- 125 GB API RAM allocation, cgroup-v1 limit `124999999488` bytes
+  (116.42 GiB effective), 70 GB container disk, 437 GB network volume;
+- pinned ComfyUI core `169fcf35a2fc163fec31338b816503ddac0d3fcf`.
 
-The engine's `OTR_ENABLE_WAN_TI2V` flag is a vestigial opt-in, not a hardware
-gate. The provisioner now exports it and appends it to `/root/.bashrc`.
+CUDA execution, all five LTX weights, both pinned node packs, IndexTTS worker,
+all 25 OTR nodes, the real canonical validator, and queue submission passed.
+After 39:56 the shipped 1664x960 two-stage decode failed at node 92 with a GPU
+`OutOfMemoryError`; cgroup `memory.failcnt` and `oom_kill` remained zero. This is
+a negative receipt for the exact 24 GB RTX 4090 tuple, not a host-RAM failure
+and not a global claim that LTX 2.5 cannot run on RunPod. A clean 48 GB L40S
+qualification is the next tuple. Promotion still requires `RESULT SUCCESS`,
+`obs_publish OK`, delivered-engine evidence, zero new cgroup OOM events, and
+the final file under `otr/obs/`.
 
-### Why LTX 2.5 is NOT in the starter
+The lab requires at least 100 GiB effective cgroup RAM and 150 GiB free on the
+resolved model volume. Those are conservative rental requirements for the
+whole episode and its caches, not claims that either video engine intrinsically
+uses 100 GiB. The previous Ampere pod reached LTX's two-stage 1664x960 decode
+and was SIGKILLed at a 57.7 GiB cgroup cap; that is a negative receipt for that
+RAM cap, not for Ampere or RunPod.
 
-The clean-machine loader path now exists: the provisioner pins ComfyUI-GGUF and
-ComfyUI-LTXVideo, applies OTR's in-repo Gemma-4/BF16 patch, and the engine
-semantically verifies the registered loader. The remaining starter gate is a
-full remote receipt. The earlier Ampere pod cleared the loader but was SIGKILLed
-at its 57.7 GiB container limit during the two-stage 1664x960 decode. That is a
-negative receipt for that RAM cap, not proof against Ampere or RunPod.
+### Starter versus qualification profiles
 
-The five LTX weights are also intentionally not a blind public bundle: four are
-gated by the Lightricks terms. `MANUAL_TIERS["ltx25"]` owns their exact paths,
-revisions, byte counts, and SHA-256 values, while
-`docs/RUNPOD_PORTABILITY_LAB.md` gives the post-terms copy/paste procedure.
+The newcomer starter remains `wan22_high_video` (`wan_ti2v`). It is proven on a
+rented RTX A4500, completely fetchable, and honest about its 832x480 canvas.
+LTX 2.5 does not enter the starter until a clean pod publishes a canonical
+episode. Heavy qualification is explicit:
 
-LTX 2.5 enters the starter when a clean pod publishes an episode with it, and not
-before.
+| lane | profile | download policy |
+|---|---|---|
+| HuMo 14B | `otr_w45_humo_14b_169` | automatic pinned five-file `humo` lane |
+| LTX 2.5 high video | `otr_ltx25_high_video` | terms click, then exact five-file manual tier |
+| H3 | `otr_w45_minimax_h3_video` | operator-owned offline hardware only |
 
-### H3: technically portable, but excluded from this operator's RunPod policy
+Before HuMo or LTX provision can claim render-ready, complete the IndexTTS
+section above and export all five IndexTTS variables plus
+`OTR_VOICE_REFERENCE_BANK` in both the provisioning and server environments.
 
-Under the current signed operating standard in
-`docs/H3_LICENSE_ATTESTATION.md`, this operator runs H3 only on owned hardware,
-offline, and never redistributes its weights. That is an authorization boundary,
-not a GPU limitation; third parties must review and obtain whatever authorization
-applies to them.
+### CUDA 13 template on a 570-series driver
 
-OTR uses `comfy_extras/nodes_minimax_h3.py` from current ComfyUI core. It does
-not require the optional Larry Turbo pack. Comfy-Org explicitly documents its
-NVFP4 H3 encoder as usable without Blackwell and also publishes other H3
-artifacts. The complete explicit operator-local lane is:
+An image tag, venv name, and successful `import torch` are not runtime receipts.
+On the tested pod, `.venv-cu128` inherited system site packages and actually
+imported torch `2.10.0+cu130`. Driver 570 exposed CUDA capability 12.8 to that
+wheel, so CUDA initialisation failed with `found version 12080`. The template
+also exported `/opt/comfyui-runtime-constraints.txt`, pinning the CUDA 13 trio
+and silently undoing a manual repair during later requirements work.
 
-    python scripts/otr_fetch_lane_weights.py minimax_h3
+`scripts/otr_pod_provision.sh` now runs a real CUDA tensor matrix multiply in
+the exact ComfyUI Python. It has one measured automatic repair: torch
+`2.10.0+cu130` on a 570-579 driver receives this exact cu128 trio from PyTorch's
+cu128 index, outside the conflicting constraint:
 
-It pins five files totaling 63,440,965,087 bytes (59.084 GiB) and is never
-auto-selected by a profile or machine bundle. Legal local 5080 receipts at 124
-model / 129 canvas frames measured 6,315 MB FL2VA and 6,678 MB REF2VA absolute
-VRAM; host RAM was not captured. The physical RTX 4060 separately produced
-receipt-bearing 864x480x90 cold/warm/warm H3 clips and retained 864x480x124
-Ref2VA A/V artifacts. That makes isolated H3 clips LAB-PROVEN on the card; the
-full canonical OTR episode remains unqualified, not proven impossible. The
-public `mkhamra/quibble-h3` repository is a Ref2VA workflow/case study, not an
-OTR node provider or qualification receipt.
+```text
+torch==2.10.0+cu128
+torchvision==0.25.0+cu128
+torchaudio==2.10.0+cu128
+```
 
-### humo is not blocked and never was
+It probes real CUDA work again and prevents the same template constraint from
+reverting the repair during later installs. After every core, pack, and profile
+dependency is installed, it repeats the device matmul before printing
+`provision complete`. Unknown tuples fail closed. The measured wheel
+replacement took about eight minutes. Prefer an otherwise
+equivalent CUDA 12.8 image on a 570-series host to avoid that setup time; the
+CUDA 13 template remains supported through this narrow repair. No VRAM reserve,
+frame reduction, or workflow change is involved.
 
-The ledger records **32 published humo episodes** across four engine variants.
-The 14B download gap is now closed by
-`python scripts/otr_fetch_lane_weights.py humo`; the remaining portability gate
-is a live canonical episode on the rented hardware, not missing download
-provenance.
-(An earlier draft of the blockers document claimed humo had never produced an
-episode. That claim came from grepping the wrong file -- `episode_canon.json`
-records no engines at all. The authority is
-`meta.render_engines.per_clip[].delivered_engine` in the episode ledger.)
+### Clone once, then provision the chosen profile
 
-### THE DEFECT THIS ROUND ACTUALLY FOUND -- a provisioned pod could not render
+```bash
+export OTR_COMFY_ROOT=/workspace/runpod-slim/ComfyUI
+export OTR_COMFYUI_MODELS_ROOT="$OTR_COMFY_ROOT/models"
+export HF_HOME="$OTR_COMFYUI_MODELS_ROOT/huggingface"
+mkdir -p "$OTR_COMFY_ROOT/custom_nodes" "$HF_HOME"
 
-Three faults, all fixed, all invisible to a green log:
+if [ ! -d "$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio/.git" ]; then
+  git clone -b v2.0-alpha \
+    https://github.com/jbrick2070/ComfyUI-OldTimeRadio.git \
+    "$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio"
+fi
+cd "$OTR_COMFY_ROOT/custom_nodes/ComfyUI-OldTimeRadio"
+```
 
-1. **The music model was never fetched.** The provisioner fetched one video lane
-   and one image precision and called that "the minimum that renders an episode."
-   `otr_fetch_lane_weights.py`'s own `MINIMUM_HINT` names
-   **haunted + one z_image precision + stable_audio_3**, and the `stable_audio_3`
-   lane note reads *"without it EVERY profile fails at the music node."* The
-   provisioner now fetches it by default (`OTR_PROVISION_AUDIO_LANE` to override).
-2. **A failed required download still exited 0.** The script is `set -uo pipefail`
-   with no `-e` -- deliberately, so benign non-zero does not abort a long
-   provision. But required weight lanes now increment a failure counter and the
-   script exits 1 with `provision INCOMPLETE`.
-3. **The starter had no preflight.** `preflight.required_models` was `[]`; it now
-   names seven real checkable filenames. The z_image DIFFUSION model is
-   deliberately excluded -- the provisioner picks its precision from the card, so
-   pinning one variant would fail the check on hardware that correctly chose
-   another.
+For LTX 2.5, accept the terms while signed in at
+<https://huggingface.co/Lightricks/LTX-2.5>. Set `HF_TOKEN` as a RunPod secret,
+or use the no-echo live-pod recipe in section 3. HuMo is public.
 
-**The provisioner's default video lane now matches the starter profile** (chosen
-by VRAM: >= 16 GB gets `wan_ti2v_gguf`, smaller cards get the AnimateDiff floor).
-A default that disagrees with the one profile written for newcomers is the same
-bug as the missing music model.
+HuMo 14B:
+
+```bash
+export OTR_PROVISION_PROFILE=otr_w45_humo_14b_169
+export OTR_WITH_INDEXTTS2=1
+bash scripts/otr_pod_provision.sh
+```
+
+The `humo` lane pins every revision, destination, byte count and SHA-256,
+downloads through `.part`, and fetches the engine's real
+`Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`, not Comfy-Org's unrelated
+`humo_17B` lookalike. The five files total 28,707,153,033 bytes (26.7356 GiB).
+The local 5080 receipt measured 13.06 GiB VRAM and 27.53 GiB host RAM at
+832x480x97; use at least 32 GiB host RAM outside this roomier lab.
+
+LTX 2.5:
+
+```bash
+export OTR_PROVISION_PROFILE=otr_ltx25_high_video
+export OTR_WITH_INDEXTTS2=1
+bash scripts/otr_pod_provision.sh
+```
+
+The provisioner pins ComfyUI-GGUF and applies the exact Gemma-4/BF16 loader
+patch. It also pins ComfyUI-LTXVideo at
+`3b9c5cde4700917074823d45e25401d81049f8fc` and applies
+`patches/ComfyUI-LTXVideo-kornia-pad.patch`. Kornia 0.8.3 removed the `pad`
+re-export used by that commit; the patch calls the file's existing `F.pad` at
+three sites. Clean preimage, patch, patched postimage and the sole allowed
+dirty path are hash-pinned. Do not downgrade Kornia or hand-edit the pack.
+
+The first LTX provision may exit nonzero while the gated weights are absent.
+That is an honest incomplete receipt. After the terms click, use this exact
+manual helper; `.part` never counts as installed:
+
+```bash
+fetch_exact () {
+  repo=$1; revision=$2; remote=$3; relative_dest=$4
+  expected_bytes=$5; expected_sha=$6
+  dest="$OTR_COMFYUI_MODELS_ROOT/$relative_dest"
+  part="$dest.part"
+  mkdir -p "$(dirname "$dest")"
+
+  if [ -f "$dest" ] \
+     && [ "$(stat -Lc '%s' "$dest")" = "$expected_bytes" ] \
+     && printf '%s  %s\n' "$expected_sha" "$dest" | sha256sum -c -; then
+    echo "PRESENT $relative_dest"
+    return 0
+  fi
+
+  auth=()
+  [ -n "${HF_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $HF_TOKEN")
+  if ! curl -fL --retry 4 "${auth[@]}" -o "$part" \
+      "https://huggingface.co/$repo/resolve/$revision/$remote"; then
+    rm -f "$part"
+    return 1
+  fi
+  [ "$(stat -Lc '%s' "$part")" = "$expected_bytes" ] || {
+    rm -f "$part"
+    return 1
+  }
+  printf '%s  %s\n' "$expected_sha" "$part" | sha256sum -c - || {
+    rm -f "$part"
+    return 1
+  }
+  mv -f "$part" "$dest" || {
+    rm -f "$part"
+    return 1
+  }
+}
+
+fetch_exact realrebelai/LTX-2.5_GGUFs \
+  112436f97aaf99ce13ecb7b7eca7e2f6c128d3ec \
+  LTX-2.5-Distilled-Q3_K_M.gguf \
+  diffusion_models/LTX-2.5-Distilled-Q3_K_M.gguf \
+  11525623808 4286f8de1074c0c4fddfb92f38bd7df9161782b53c1717ebd69f1189c7933265
+
+fetch_exact elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF \
+  085ceddbbac3c0370de7f59ebec8bef4763f04b5 \
+  gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf \
+  text_encoders/gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf \
+  9514920864 1d35d4fbfa34cca1513d8e9fdd77c0573778b21ffdcbe4ca9c906f37a8c502f9
+
+fetch_exact Lightricks/LTX-2.5 \
+  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
+  vae/ltx-2.5-video-vae-bf16.safetensors \
+  vae/ltx-2.5-video-vae-bf16.safetensors \
+  1472223346 847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3
+
+fetch_exact Lightricks/LTX-2.5 \
+  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
+  vae/ltx-2.5-audio-vae-bf16.safetensors \
+  vae/ltx-2.5-audio-vae-bf16.safetensors \
+  364866540 c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5
+
+fetch_exact Lightricks/LTX-2.5 \
+  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
+  latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors \
+  latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors \
+  995778752 eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8
+```
+
+The LTX tier totals 23,873,413,310 bytes. Rerun the same profile provision
+until every final file and dependency verifies and the command returns zero.
+
+### H3 authorization and hardware boundary
+
+This operator does **not** put H3 weights on RunPod. Under
+`docs/H3_LICENSE_ATTESTATION.md`, H3 stays on owned offline hardware and its
+weights are never redistributed. That is an authorization boundary, not a GPU
+limitation. An authorized third party can inspect the same exact five-file lane:
+
+```bash
+python scripts/otr_provision.py --profile otr_w45_minimax_h3_video --list
+python scripts/otr_fetch_lane_weights.py minimax_h3
+```
+
+It totals 63,440,965,087 bytes (59.084 GiB) and is never auto-selected by a
+public machine class. Current ComfyUI core supplies H3 nodes; the public
+`mkhamra/quibble-h3` repository is a Ref2VA workflow/case study, not an OTR node
+provider. Legal local 5080 receipts at 124 model / 129 canvas frames measured
+6,315 MB FL2VA and 6,678 MB REF2VA. The physical RTX 4060 has isolated H3 clip
+receipts, including a retained 864x480x124 Ref2VA artifact; its full canonical
+H3 episode remains unqualified, not proven impossible.
+
+### Launch the exact profile contract and canonical graph
+
+Use the Python path printed as `comfy python:` by the provisioner. On the tested
+template it is `/workspace/runpod-slim/ComfyUI/.venv-cu128/bin/python`. Stop only
+the existing ComfyUI listener; never `pkill python`. Export the IndexTTS values
+from section 3 and the token before boot.
+
+LTX has no artificial VRAM reserve:
+
+```bash
+export COMFY_PY=/workspace/runpod-slim/ComfyUI/.venv-cu128/bin/python
+export HF_TOKEN="$(tr -d '\r\n' < /root/.hf_token)"
+env -u PIP_CONSTRAINT "$COMFY_PY" "$OTR_COMFY_ROOT/main.py" \
+  --listen 127.0.0.1 --port 8000 \
+  --output-directory "$OTR_COMFY_ROOT/output" \
+  > /workspace/otr-ltx25-server.log 2>&1 &
+SERVER_PID=$!
+
+until curl -fsS http://127.0.0.1:8000/object_info >/dev/null; do sleep 2; done
+curl -fsS http://127.0.0.1:8000/queue >/dev/null
+
+COMFYUI_URL=http://127.0.0.1:8000 \
+  "$COMFY_PY" scripts/otr_canonical_api_run.py \
+  --profile otr_ltx25_high_video --act-count 1 \
+  --source-bank original --visual-style sci_fi_radio --timeout 0
+```
+
+HuMo wide uses its shipped `humo_diet` launch contract. These are runtime
+offload controls for the proven HuMo recipe, not a pretend smaller-GPU test:
+
+```bash
+env -u PIP_CONSTRAINT "$COMFY_PY" "$OTR_COMFY_ROOT/main.py" \
+  --listen 127.0.0.1 --port 8000 \
+  --output-directory "$OTR_COMFY_ROOT/output" \
+  --reserve-vram 2.921 --disable-pinned-memory \
+  > /workspace/otr-humo-server.log 2>&1 &
+
+until curl -fsS http://127.0.0.1:8000/object_info >/dev/null; do sleep 2; done
+COMFYUI_URL=http://127.0.0.1:8000 \
+  "$COMFY_PY" scripts/otr_canonical_api_run.py \
+  --profile otr_w45_humo_14b_169 --act-count 1 \
+  --source-bank original --visual-style sci_fi_radio --timeout 0
+```
+
+Omit `--workflow`: the runner must load `workflows/otr_canonical.json` itself.
+Do not reuse one resident server between LTX and HuMo. A finished render leaves
+the server resident with VRAM allocated; `Prompt executed`, `obs_publish OK`,
+and the final file distinguish completion from a crash.
+
+### Qualification receipt and telemetry
+
+Success requires all of these:
+
+- `RESULT SUCCESS` and `obs_publish OK`;
+- final file under the actual `$OTR_COMFY_ROOT/output/otr/obs/`;
+- delivered engine matches the selected profile;
+- zero new cgroup `memory.failcnt` or `oom_kill` events;
+- exact GPU, driver, torch/CUDA build, core/pack commits, patch hashes, cgroup
+  limit/peak, GPU peak, elapsed time, server log, runner log, and artifact path;
+- LTX's shipped 1664x960 tiled decode and upsample/refine evidence remains
+  present. Do not shrink the canonical canvas to manufacture a pass.
+
+For cgroup v1 telemetry:
+
+```bash
+while kill -0 "$RUNNER_PID" 2>/dev/null; do
+  printf '%s,' "$(date -u +%FT%TZ)"
+  paste -sd, \
+    /sys/fs/cgroup/memory/memory.usage_in_bytes \
+    /sys/fs/cgroup/memory/memory.max_usage_in_bytes \
+    /sys/fs/cgroup/memory/memory.failcnt
+  nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu \
+    --format=csv,noheader,nounits
+  sleep 1
+done
+awk '/oom_kill/{print}' /sys/fs/cgroup/memory/memory.oom_control
+```
+
+Large downloads and wheel installs can leave tens of GiB in reclaimable page
+cache. `memory.usage_in_bytes` alone is not an engine working-set measurement;
+judge it together with process survival, fail counters, queue/history, and the
+artifact. The active pod exceeded 100 GB headline usage with zero failcnt and
+OOM kills, so the healthy run continued.
+
+### Lessons that must remain in this playbook
+
+1. Record the full software/hardware tuple. A GPU name or venv directory name
+   cannot substitute for executable CUDA evidence.
+2. Require real device work before downloading tens of GiB. `import torch` is
+   not a CUDA test.
+3. Inspect inherited pip constraints; they can silently undo a correct repair.
+4. A pinned pack commit does not pin every dependency API. Own the smallest
+   exact patch with preimage, patch, postimage, and dirty-path guards.
+5. Do not use VRAM clamps or a reduced canvas as a physical-card receipt. Rent
+   enough host RAM and run the canonical workflow unchanged.
+6. Installation success is not render success. Preserve provisioning, server,
+   runner, telemetry, cgroup, delivered-engine, and final-artifact evidence.
 
 ## 5. Failure atlas -- indexed by SYMPTOM
 
@@ -1106,14 +1375,20 @@ index-tts here is what fills the disk, and the failure arrives as
     #    it by itself. Only needed if you did not:
     printf '%s' "$HF_TOKEN" > /root/.hf_token && chmod 600 /root/.hf_token
 
-    # 3. everything else, in one command
-    cd ComfyUI-OldTimeRadio && bash scripts/otr_pod_provision.sh
+    # 3. first pass: public packs/lanes; expected INCOMPLETE at IndexTTS2
+    cd ComfyUI-OldTimeRadio
+    OTR_PROVISION_PROFILE=otr_runpod_starter bash scripts/otr_pod_provision.sh
 
-That single command upgrades ComfyUI if it is below v0.32.0, installs the system
-libraries, clones the node packs AND their own requirements, repairs any
-dangling venv interpreter, picks the image lane from compute capability and
-VRAM, and fetches the minimum weights. Every one of those steps exists because
-skipping it cost a leg.
+    # 4. complete section 3's authorized voice-bank recipe, then finish
+    . /workspace/otr-config/otr-runtime.env
+    OTR_PROVISION_PROFILE=otr_runpod_starter OTR_WITH_INDEXTTS2=1 \
+        bash scripts/otr_pod_provision.sh
+
+That single command pins ComfyUI to the audited core commit, proves real CUDA
+execution, installs the system libraries, clones the exact node-pack commits
+and their requirements, repairs supported runtime drift, routes the selected
+profile, and fetches its automatic lanes. Every one of those steps exists
+because skipping it cost a leg.
 
 Choose the weights explicitly if the defaults are wrong for the box:
 
@@ -1127,30 +1402,31 @@ size and how much is already on disk.
 
 Nothing about correctness -- a no-volume pod renders the same episodes. What you
 lose is the ability to stop and resume: every model is re-downloaded on the next
-pod, which for the base install is roughly 25 GB of transfer before the first
-frame. If you expect to run more than one pod, the volume pays for itself on the
-second.
+pod. The current starter's automatic lanes alone total about 32.1 GB, before
+writer, IndexTTS2, and other Hugging Face caches. If you expect to run more than
+one pod, the volume pays for itself quickly.
 
 ### The starter workflow -- one good everything, dropdowns already set
 
 `workflows/variants/otr_runpod_starter.json` is the from-scratch answer for a
-RunPod box with **16 GB of VRAM or more**. Load it and every dropdown is already
-on a choice that has produced a real episode -- no picking, no guessing:
+RunPod box with **16 GB of VRAM or more**. It is generated from the current
+profile and ships these exact selectors:
 
-    video    ltx25_high_video (16:9)   LTX 2.5, the flagship lane
-    image    z_image_turbo             482 episodes
-    voice    indextts2 (characters)    1430 episodes
-             kokoro (announcer)        64 of the last 64
-    music    stable_audio_3            925 episodes
-    writer   Mistral-Nemo-Instruct     what the proven LTX 2.5 episodes used
+    video    wan22_high_video (16:9)   Wan 2.2 TI2V at 832x480
+    image    z_image_turbo             bf16 automatic lane
+    voice    indextts2 (characters)    authorized reference bank required
+             kokoro (announcer)
+    music    stable_audio_3
+    writer   Mistral-Nemo-Instruct
     bank     default                   mixed cast; kokoro_builtin would force
                                        every voice to kokoro and contradict the
                                        character engine above
 
-Nothing there is aspirational. Each value is the one carried by episodes on
-disk, which is why the writer is Mistral-Nemo rather than the gemma-4-12b the
-machine matrix declares for this class -- the matrix states a class default, the
-starter ships what actually rendered.
+Wan is the starter because it has a published rented-A4500 receipt and every
+weight is public and automatically fetchable. The complete generated starter
+combination is still a qualification target on a new pod; individual selector
+history is not a substitute for `RESULT SUCCESS`, `obs_publish OK`, and a final
+artifact from this exact profile.
 
 **It is GENERATED, never hand-edited.** Change `config/profiles/
 otr_runpod_starter.json` and re-run:
@@ -1159,14 +1435,16 @@ otr_runpod_starter.json` and re-run:
 
 Editing the variant directly survives a diff and then fails regeneration.
 
-Weights for exactly this set, and nothing else:
+The provisioner fetches these three lanes automatically. These are the exact
+manual retry commands if a transfer was interrupted:
 
-    python scripts/otr_fetch_lane_weights.py z_image      # or z_image_blackwell
+    python scripts/otr_fetch_lane_weights.py wan_ti2v_gguf
+    python scripts/otr_fetch_lane_weights.py z_image
     python scripts/otr_fetch_lane_weights.py stable_audio_3
 
-LTX 2.5's own weights are gated -- accept the terms on Hugging Face, set
-HF_TOKEN, and note that ComfyUI must be **v0.32.0 or newer** or the lane cannot
-resolve its nodes at all (section 0 of DEPENDENCIES).
+LTX 2.5 is an explicit heavy qualification profile, not the newcomer starter.
+Its terms click, exact five-file tier, pack patches, and canonical command are
+all in section 4A of this same playbook.
 
 ### Giving the pod your Hugging Face token, the easy way
 
@@ -1207,13 +1485,11 @@ load. Cloned fresh from upstream on 2026-09-01, HEAD `6ea2651` dated
 2026-01-12 -- that IS the current release; the pack simply has not gained the
 architecture.
 
-The reference machine's copy is modified, and the delta is small and specific:
-
-    loader.py   17 lines   "gemma4" added to TXT_ARCH_LIST;
-                           LTXV_BF16_PARAMETERS; a BF16 dequant path for raw
-                           LTXAV parameters that GGMLOps does not handle
-    nodes.py    76 lines
-    ops.py, dequant.py     identical to upstream
+OTR pins that pack at `6ea2651e7df66d7585f6ffee804b20e92fb38b8a`, then
+applies one hash-pinned in-repo patch to `loader.py`: `gemma4` enters
+`TXT_ARCH_LIST`, the three raw LTXAV BF16 parameters are named, and their byte
+storage is dequantized on load. Clean preimage, patch, patched postimage, and
+the sole allowed dirty path are all verified; unknown drift fails closed.
 
 So this is not merely "install a node pack" -- the pinned ComfyUI-GGUF checkout
 also needs OTR's in-repo loader patch. This portability limit is specific to

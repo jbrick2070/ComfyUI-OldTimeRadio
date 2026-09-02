@@ -53,6 +53,12 @@ GGUF_PATCH_PATH = os.path.join(_REPO, "patches", "ComfyUI-GGUF-ltx25-gemma4.patc
 LTXVIDEO_PACK_NAME = "ComfyUI-LTXVideo"
 LTXVIDEO_URL = "https://github.com/Lightricks/ComfyUI-LTXVideo"
 LTXVIDEO_PIN = "3b9c5cde4700917074823d45e25401d81049f8fc"
+LTXVIDEO_CLEAN_SHA256 = "08d2b18cfd325a3610683abc574e058fd209ddc7453c19b47cc108a8882a7dc1"
+LTXVIDEO_PATCHED_SHA256 = "19ac341bad75f8ea03988aef664924896fc24960accd2a79f415536c2833997e"
+LTXVIDEO_PATCH_SHA256 = "109fbe2927b9c07d95d431470f7449942094fc6047dcbc9ad4a519a57ac0c993"
+LTXVIDEO_PATCH_PATH = os.path.join(
+    _REPO, "patches", "ComfyUI-LTXVideo-kornia-pad.patch"
+)
 
 INDEXTTS2_URL = "https://github.com/index-tts/index-tts.git"
 INDEXTTS2_PIN = "830f6f8f94a51fea23ab1d639027a86200075a4e"
@@ -63,7 +69,7 @@ INDEXTTS2_PYTHON = "3.10"
 # belong only to ``otr_fetch_lane_weights.py``; in particular, HuMo 14B is the
 # receipt-bearing ``humo`` lane there and is not duplicated here. Manual
 # downloads use `<destination>.part`, verification, then rename; see
-# docs/RUNPOD_PORTABILITY_LAB.md.
+# docs/RUNPOD_INSTALL.md.
 MANUAL_TIERS = {
     "ltx25": [
         {
@@ -385,6 +391,46 @@ def _verify_patched_gguf_git(dest: str) -> None:
             % (changed, untracked))
 
 
+def _apply_ltxvideo_patch(dest: str) -> None:
+    target = os.path.join(dest, "pyramid_blending.py")
+    if not os.path.isfile(LTXVIDEO_PATCH_PATH):
+        raise ProvisionFailure(
+            "required LTXVideo patch is missing: %s" % LTXVIDEO_PATCH_PATH
+        )
+    if _normalized_sha256(LTXVIDEO_PATCH_PATH) != LTXVIDEO_PATCH_SHA256:
+        raise ProvisionFailure(
+            "LTXVideo patch identity does not match the pinned SHA-256"
+        )
+    if _normalized_sha256(target) != LTXVIDEO_CLEAN_SHA256:
+        raise ProvisionFailure(
+            "LTXVideo pyramid_blending.py preimage is not the pinned clean file"
+        )
+    r = run([
+        "git", "-C", dest, "apply", "--ignore-space-change",
+        "--ignore-whitespace", os.path.abspath(LTXVIDEO_PATCH_PATH),
+    ])
+    if r.returncode != 0:
+        raise ProvisionFailure(
+            "LTXVideo Kornia pad patch failed: %s"
+            % ((r.stderr or r.stdout or "unknown error").strip()[:300])
+        )
+
+
+def _verify_patched_ltxvideo_git(dest: str) -> None:
+    target = os.path.join(dest, "pyramid_blending.py")
+    if _normalized_sha256(target) != LTXVIDEO_PATCHED_SHA256:
+        raise ProvisionFailure(
+            "LTXVideo patched pyramid_blending.py does not match the pinned SHA-256"
+        )
+    changed = _git_changed_paths(dest)
+    untracked = _git_untracked_paths(dest)
+    if changed != ["pyramid_blending.py"] or untracked:
+        raise ProvisionFailure(
+            "LTXVideo checkout drift: expected only pyramid_blending.py changed; "
+            "changed=%s untracked=%s" % (changed, untracked)
+        )
+
+
 def ensure_gguf_pack(comfy: str) -> None:
     """Install or verify the one supported GGUF base plus the LTX 2.5 patch."""
     dest = os.path.join(comfy, "custom_nodes", GGUF_PACK_NAME)
@@ -435,7 +481,7 @@ def ensure_gguf_pack(comfy: str) -> None:
 
 
 def ensure_ltxvideo_pack(comfy: str) -> None:
-    """Install or verify the exact LTXVideo node-pack commit."""
+    """Install the exact LTXVideo commit plus its Kornia 0.8.3 API repair."""
     dest = os.path.join(comfy, "custom_nodes", LTXVIDEO_PACK_NAME)
     fresh = not os.path.isdir(dest) or not os.listdir(dest)
     if fresh:
@@ -444,14 +490,42 @@ def ensure_ltxvideo_pack(comfy: str) -> None:
         raise ProvisionFailure(
             "ComfyUI-LTXVideo is not a verifiable git checkout; move it aside and rerun --packs-only")
     head = _git_head(dest)
+    if head != LTXVIDEO_PIN:
+        raise ProvisionFailure(
+            "ComfyUI-LTXVideo is at %s, required %s; move it aside and rerun --packs-only"
+            % (head, LTXVIDEO_PIN)
+        )
+    target = os.path.join(dest, "pyramid_blending.py")
+    if not os.path.isfile(target):
+        raise ProvisionFailure(
+            "ComfyUI-LTXVideo is missing pyramid_blending.py"
+        )
+    target_sha = _normalized_sha256(target)
     changed = _git_changed_paths(dest)
     untracked = _git_untracked_paths(dest)
-    if head != LTXVIDEO_PIN or changed or untracked:
+    if target_sha == LTXVIDEO_CLEAN_SHA256:
+        if changed or untracked:
+            raise ProvisionFailure(
+                "LTXVideo clean pyramid_blending.py sits in a dirty checkout; "
+                "refusing to overwrite drift"
+            )
+        _apply_ltxvideo_patch(dest)
+        _verify_patched_ltxvideo_git(dest)
+        state = "PATCHED"
+    elif target_sha == LTXVIDEO_PATCHED_SHA256:
+        _verify_patched_ltxvideo_git(dest)
+        state = "PRESENT"
+    else:
         raise ProvisionFailure(
-            "ComfyUI-LTXVideo must be clean at %s; found head=%s changed=%s untracked=%s"
-            % (LTXVIDEO_PIN, head, changed, untracked))
+            "LTXVideo pyramid_blending.py is neither the pinned clean nor "
+            "pinned patched file; refusing partial drift"
+        )
     install_pack_requirements(LTXVIDEO_PACK_NAME, dest, required=True)
-    say("OK" if fresh else "PRESENT", LTXVIDEO_PACK_NAME, LTXVIDEO_PIN[:12])
+    say(
+        state,
+        LTXVIDEO_PACK_NAME,
+        "%s + Kornia 0.8.3 pad patch" % LTXVIDEO_PIN[:12],
+    )
 
 
 def install_node_packs(comfy: str) -> None:

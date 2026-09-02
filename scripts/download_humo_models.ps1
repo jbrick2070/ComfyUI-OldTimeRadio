@@ -10,6 +10,6 @@ For a complete profile install, use:
 
   <ComfyUI Python> scripts/otr_provision.py --profile <exact-humo-profile>
 
-See docs/RUNPOD_PORTABILITY_LAB.md for the RunPod qualification sequence.
+See docs/RUNPOD_INSTALL.md for the single canonical RunPod playbook.
 '@)
 exit 2
