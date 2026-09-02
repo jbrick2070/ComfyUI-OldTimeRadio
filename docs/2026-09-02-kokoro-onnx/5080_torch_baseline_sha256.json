@@ -32,5 +32,15 @@
   "episode": "signal_lost_the_tectal_echo_20260902_131902 (110 MB, obs 13:43)",
   "log": "[OTR.kokoro] backend=torch device=cuda on both voice nodes; char voices bm_lewis / am_michael, announcer bf_emma, engine=kokoro",
   "date": "2026-09-02"
+ },
+ "proof_B": {
+  "machine": "RTX 4060 Laptop 8 GB clean room, portable v0.34.0, Python 3.13.14, kokoro-onnx 0.6.1 (torch kokoro absent)",
+  "profile": "otr_cleanroom_8gb_kokoro_still (kokoro both slots, kokoro_builtin; Klein stills; still_motion video; musicgen; E2B writer; stock flags)",
+  "install": "pip install -r requirements.txt on the portable interpreter installed kokoro-onnx (pip's PATH scan needed --no-warn-script-location on that box, WinError 448 on a junction); boot prefetch fetched onnx/model.onnx (310 MB) on its own",
+  "log": "[OTR.kokoro] ONNX voice table built: 28 voices; backend=onnx provider=CPUExecutionProvider threads=4; announcer bf_lily, characters am_puck / am_liam, engine=kokoro",
+  "result": "RESULT SUCCESS, Prompt executed in 00:37:39, obs_publish OK",
+  "episode": "signal_lost_the_ledger_of_shadows_20260902_134447 (48.5 MB), pulled into the 5080 obs 14:03",
+  "audio_check": "master mix 51.3 s: envelope modulation 0.4-1.6 and 90-230 Hz peaks across the announcer and character slots (speech-shaped; no tone)",
+  "date": "2026-09-02"
  }
 }

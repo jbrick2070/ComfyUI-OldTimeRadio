@@ -260,3 +260,23 @@ LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetens
   (the matrix `known_limits` line carries the pace). The 8 GB row's image column flips to
   PROVEN in `config/machine_classes.json` after the operator watches this episode
   (`docs/GO_FORWARD_PLAN.md` Section 1.5 item 1).
+
+### PROOF B -- kokoro-onnx on the clean room's Python 3.13 (2026-09-02)
+
+* Pack at `70a1d33b`. `pip install -r requirements.txt` with the portable interpreter
+  installed `kokoro-onnx 0.6.1` + onnxruntime + phonemizer + espeakng-loader (the torch
+  `kokoro` package is absent on 3.13 by the marker). Friction: pip's post-install PATH
+  scan hit `WinError 448` (untrusted mount point) on the Codex junction in this user's
+  profile; `--no-warn-script-location` sidesteps the scan, nothing else changes.
+* Boot (stock flags): the prefetch logged the fetch BEFORE downloading and placed
+  `models/TTS/KokoroTTS/onnx/model.onnx` (310 MB) in the same boot; the server listened
+  17 s after the task started.
+* Leg `otr_cleanroom_8gb_kokoro_still` (kokoro both slots, `kokoro_builtin`; Klein
+  stills; still_motion video): `[OTR.kokoro] ONNX voice table built: 28 voices`,
+  `backend=onnx provider=CPUExecutionProvider threads=4`, announcer `bf_lily`,
+  characters `am_puck` / `am_liam`; eight Klein stills at ~20 s each (the writer freed
+  before the first still: `free 6.9 GB after`); `RESULT SUCCESS`, `Prompt executed in
+  00:37:39`, `obs_publish OK` -> `signal_lost_the_ledger_of_shadows_20260902_134447`
+  (48.5 MB), copied into the 5080's obs at 14:03. Master mix: speech-shaped in every
+  voice slot (envelope modulation 0.4-1.6), unlike Leg C5's bark announcer (PBUG-20260902-03).
+

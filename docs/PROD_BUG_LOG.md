@@ -10106,6 +10106,13 @@ minus the kokoro line installed cleanly (`PIP4_OK`), the server booted with all
 version marker, or pip's all-or-nothing resolve turns one optional engine into
 a total install failure.
 
+**FOLLOW-UP 2026-09-02 (70a1d33b):** the DEFAULT voice on 3.13 is settled -- the same
+Kokoro voices through kokoro-onnx on the CPU (`requirements.txt` carries complementary
+`kokoro` / `kokoro-onnx` markers, one backend per interpreter). Live: the same clean
+room, `pip install -r requirements.txt` on the portable 3.13 installed kokoro-onnx, the
+boot prefetch placed the ONNX model, and `signal_lost_the_ledger_of_shadows_20260902_134447`
+published with kokoro announcer and characters (`backend=onnx provider=CPUExecutionProvider`).
+
 ## PBUG-20260902-01 -- image engines kept the text encoder on the card through sampling: ~42 min per Klein still on 8 GB
 
 **Verified on two live headless legs in the 4060 clean room (RTX 4060 Laptop

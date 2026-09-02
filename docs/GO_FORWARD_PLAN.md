@@ -47,8 +47,10 @@ path renders in-process on CPU. Full row: Section 1.1. Proof A DONE 2026-09-02 1
 characters and announcer. Proof B (the 4060 clean room, portable Python 3.13.14):
 `pip install -r requirements.txt` installed kokoro-onnx (torch kokoro absent), the boot
 prefetch fetched the 310 MB ONNX model on its own, and the leg logged `backend=onnx
-provider=CPUExecutionProvider` with kokoro on both slots -- DONE WHEN its episode
-publishes to the clean room's obs (in flight). Registry installs get the kokoro-onnx line on the next
+provider=CPUExecutionProvider` with kokoro on both slots; Proof B DONE 2026-09-02 14:02:
+`signal_lost_the_ledger_of_shadows_20260902_134447` published (37 min), master mix
+speech-shaped in every voice slot (no tone). DONE WHEN the operator's eyeball on that
+episode confirms both voices; then this item closes. Registry installs get the kokoro-onnx line on the next
 `pyproject.toml` bump after alpha.15 resolves.
 
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
