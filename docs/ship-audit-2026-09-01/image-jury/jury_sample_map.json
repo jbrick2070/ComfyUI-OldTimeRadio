@@ -1,0 +1,224 @@
+[
+ {
+  "file": "j01.png",
+  "engine": "flux_gen1",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_last_reading_20260901_061848"
+ },
+ {
+  "file": "j02.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_character",
+  "episode": "signal_lost_moonlights_grace_20260829_181534"
+ },
+ {
+  "file": "j03.png",
+  "engine": "flux2_klein",
+  "kind": "scene_beat",
+  "episode": "signal_lost_soak03_scifi_news_pro_shakespeare_stage_20260816_163356"
+ },
+ {
+  "file": "j04.png",
+  "engine": "z_image_turbo",
+  "kind": "portrait",
+  "episode": "signal_lost_the_lullaby_reel_20260829_011351"
+ },
+ {
+  "file": "j05.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_beat",
+  "episode": "signal_lost_marginalia_of_truth_20260829_161642"
+ },
+ {
+  "file": "j06.png",
+  "engine": "flux_gen1",
+  "kind": "portrait",
+  "episode": "signal_lost_the_last_reading_20260901_061848"
+ },
+ {
+  "file": "j07.png",
+  "engine": "flux_gen1",
+  "kind": "portrait",
+  "episode": "signal_lost_a_blur_of_grey_light_20260901_184215"
+ },
+ {
+  "file": "j08.png",
+  "engine": "ideogram4_local",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_weight_of_weeping_silk_20260826_150522"
+ },
+ {
+  "file": "j09.png",
+  "engine": "z_image_turbo",
+  "kind": "portrait",
+  "episode": "signal_lost_hatpins_hold_20260828_161131"
+ },
+ {
+  "file": "j10.png",
+  "engine": "flux_gen1",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_marrows_call_20260829_165436"
+ },
+ {
+  "file": "j11.png",
+  "engine": "flux2_klein",
+  "kind": "scene_beat",
+  "episode": "signal_lost_soak02_public_domain_paper_origami_still_20260816_155358"
+ },
+ {
+  "file": "j12.png",
+  "engine": "z_image_turbo",
+  "kind": "portrait",
+  "episode": "signal_lost_the_curdling_of_memory_20260828_060512"
+ },
+ {
+  "file": "j13.png",
+  "engine": "ideogram4_local",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_weight_of_weeping_silk_20260826_150522"
+ },
+ {
+  "file": "j14.png",
+  "engine": "flux_gen1",
+  "kind": "scene_character",
+  "episode": "signal_lost_soak05_scifi_news_pro_visual_storybased_20260816_175457"
+ },
+ {
+  "file": "j15.png",
+  "engine": "lumina_image",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_slow_ash_of_abernethy_20260825_204343"
+ },
+ {
+  "file": "j16.png",
+  "engine": "flux_gen1",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_loose_clasp_20260829_164211"
+ },
+ {
+  "file": "j17.png",
+  "engine": "flux2_klein",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_irreversible_highway_20260826_005826"
+ },
+ {
+  "file": "j18.png",
+  "engine": "flux2_klein",
+  "kind": "scene_character",
+  "episode": "signal_lost_echoes_of_the_chemical_sea_20260826_003631"
+ },
+ {
+  "file": "j19.png",
+  "engine": "flux_gen1",
+  "kind": "scene_beat",
+  "episode": "signal_lost_a_blur_of_grey_light_20260901_184215"
+ },
+ {
+  "file": "j20.png",
+  "engine": "flux2_klein",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_brittle_pages_of_the_ledger_20260826_020247"
+ },
+ {
+  "file": "j21.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_salt_of_the_frame_20260831_231948"
+ },
+ {
+  "file": "j22.png",
+  "engine": "flux_gen1",
+  "kind": "scene_character",
+  "episode": "signal_lost_soak04_shakespeare_sci_fi_radio_still_pa_20260816_171416"
+ },
+ {
+  "file": "j23.png",
+  "engine": "lumina_image",
+  "kind": "scene_character",
+  "episode": "signal_lost_malvolio_unmasked_20260831_211201"
+ },
+ {
+  "file": "j24.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_character",
+  "episode": "signal_lost_shadows_in_the_casket_20260829_180847"
+ },
+ {
+  "file": "j25.png",
+  "engine": "lumina_image",
+  "kind": "portrait",
+  "episode": "signal_lost_malvolio_unmasked_20260831_211201"
+ },
+ {
+  "file": "j26.png",
+  "engine": "ideogram4_local",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_chamber_of_uncertainty_20260826_023538"
+ },
+ {
+  "file": "j27.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_beat",
+  "episode": "signal_lost_a_garden_of_thorns_20260829_194915"
+ },
+ {
+  "file": "j28.png",
+  "engine": "flux2_klein",
+  "kind": "portrait",
+  "episode": "signal_lost_feline_visitor_a_space_oddity_20260831_191928"
+ },
+ {
+  "file": "j29.png",
+  "engine": "flux_gen1",
+  "kind": "portrait",
+  "episode": "signal_lost_soak04_shakespeare_sci_fi_radio_still_pa_20260816_171416"
+ },
+ {
+  "file": "j30.png",
+  "engine": "lumina_image",
+  "kind": "scene_beat",
+  "episode": "signal_lost_malvolio_unmasked_20260831_211201"
+ },
+ {
+  "file": "j31.png",
+  "engine": "lumina_image",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_negatives_label_20260829_162931"
+ },
+ {
+  "file": "j32.png",
+  "engine": "flux2_klein",
+  "kind": "scene_beat",
+  "episode": "signal_lost_the_thaw_resonance_20260901_014645"
+ },
+ {
+  "file": "j33.png",
+  "engine": "flux2_klein",
+  "kind": "portrait",
+  "episode": "signal_lost_the_thaw_resonance_20260901_014645"
+ },
+ {
+  "file": "j34.png",
+  "engine": "ideogram4_local",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_caretakers_clause_20260826_152822"
+ },
+ {
+  "file": "j35.png",
+  "engine": "z_image_turbo",
+  "kind": "scene_character",
+  "episode": "signal_lost_the_last_reading_20260901_114235"
+ },
+ {
+  "file": "j36.png",
+  "engine": "lumina_image",
+  "kind": "scene_beat",
+  "episode": "signal_lost_rivers_ownership_20260826_021413"
+ },
+ {
+  "file": "j37.png",
+  "engine": "flux2_klein",
+  "kind": "portrait",
+  "episode": "signal_lost_soak03_scifi_news_pro_shakespeare_stage_20260816_163356"
+ }
+]

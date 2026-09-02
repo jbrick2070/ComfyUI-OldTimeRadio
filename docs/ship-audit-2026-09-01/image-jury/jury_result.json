@@ -1,0 +1,167 @@
+{
+ "judges": [
+  {
+   "judge": "radio-producer",
+   "model": "fable",
+   "notes": "Blind read of all 37 PNGs by pixels only. For images with no people, the figure score grades plausibility of the main object (cabinet layout, tubes, dials) rather than anatomy; for pure text cards it grades the absence of any subject. Best on-air candidates: j26 (ensemble), j37 and j05 (cover radios), j18 and j20 (character cards), j10 and j11 (poster art). Do not air: j31, j36, j13, j34, j08 (text failures), j30 (too dark). The big era leak is in the clean cinematic cluster, which keeps producing modern rooms, monitors, RGB screens and contemporary clothes; that is a prompting or model bias t"
+  },
+  {
+   "judge": "art-director",
+   "model": "fable",
+   "notes": "Best on-air candidates as-is: j26, j18, j22, j23, j37, j20. Unusable: j31, j36 (garbage text), j33, j06, j32 (no period). Several prompts were clearly run across two models, which is the strongest clustering evidence: j32/j33 (neon radio), j25/j29 (radio on a plate), j04/j37 (candle radio), j05/j21 (tabletop tube radio). For a 1930s-50s radio-drama show, the high-res photoreal cluster is the only one that consistently delivers period wardrobe, correct hands and readable dials; the letterbox-grain cluster has the best faces but keeps drifting into present-day settings; the 832x480 cluster is pe"
+  },
+  {
+   "judge": "defect-hunter",
+   "model": "opus",
+   "notes": "Blind pass over all 37 stills, opened individually, nothing else read.\n\nHeadline: the batch splits cleanly into a strong period-photoreal lane and a long tail of off-brief or text-broken material. Only four images I would put on air unchanged - j26 (ensemble, best in show: five distinct plausible faces, correct eyelines, correct wardrobe, coherent set), j22, j37 and j05. j18 and j04 are close behind.\n\nDominant defect class by a wide margin is TEXT. Twenty-plus images carry garbled lettering somewhere. Where the text is small (dial scales on j04, j05, j10, j21, j29, j37) it is cosmetic and I sc"
+  },
+  {
+   "judge": "viewer",
+   "model": "fable",
+   "notes": "Viewed all 37 PNGs and nothing else. Scored as a phone viewer: readability at a glance, pleasant faces, nothing off-putting. Air-ready tier (overall 8): j02, j11, j18, j20, j22, j24, j26, j37. Solid but off-era or minor flaws (6-7): j01, j03, j04, j05, j10, j14, j15, j16, j17, j19, j21, j29. Weak (4-5): j06, j07, j08, j12, j13, j23, j25, j27, j28, j30, j35. Unairable (2-3): j09 (melted face), j31, j36 (garbled text), j32, j33, j34 (wrong era or bare text). Biggest cross-model failure is small-print text on dials and panels; only the engraving and text-card lanes made large text, and it was wro"
+  },
+  {
+   "judge": "cinematographer",
+   "model": "opus",
+   "notes": "Blind test, pixels only; all 37 files opened individually with no other file in the tree consulted. Scoring anchors: overall 9 means it goes to air untouched (j05, j22, j26, j37), 7-8 means airable with a grade or a crop, 4-6 means a fallback slate, 1-3 means reject. For images with no human subject the figure score rates the plausibility and internal consistency of the depicted object instead, so it is never a null. Period is scored against 1930s-1950s radio-drama fidelity, which is why several technically excellent frames (j01, j15, j17, j32, j33) score high on craft and low overall. Cutting"
+  }
+ ],
+ "ranking": [
+  "flux2_klein 6.09",
+  "z_image_turbo 5.93",
+  "flux_gen1 5.87",
+  "ideogram4_local 5.15",
+  "lumina_image 4"
+ ],
+ "engineMeans": {
+  "flux_gen1": {
+   "n": 45,
+   "period": 5.51,
+   "figure": 6.96,
+   "composition": 7.56,
+   "artifacts": 7.09,
+   "overall": 5.87,
+   "byKind": {
+    "scene_character": 6.07,
+    "portrait": 4.93,
+    "scene_beat": 6.6
+   }
+  },
+  "z_image_turbo": {
+   "n": 45,
+   "period": 6.13,
+   "figure": 6.62,
+   "composition": 7.49,
+   "artifacts": 7.33,
+   "overall": 5.93,
+   "byKind": {
+    "scene_character": 6.07,
+    "portrait": 5.13,
+    "scene_beat": 6.6
+   }
+  },
+  "flux2_klein": {
+   "n": 45,
+   "period": 5.98,
+   "figure": 7.07,
+   "composition": 7.64,
+   "artifacts": 6.49,
+   "overall": 6.09,
+   "byKind": {
+    "scene_beat": 5.6,
+    "scene_character": 7.27,
+    "portrait": 5.4
+   }
+  },
+  "ideogram4_local": {
+   "n": 20,
+   "period": 5.95,
+   "figure": 6,
+   "composition": 6.3,
+   "artifacts": 6,
+   "overall": 5.15,
+   "byKind": {
+    "scene_beat": 6.8,
+    "scene_character": 3.5
+   }
+  },
+  "lumina_image": {
+   "n": 30,
+   "period": 6,
+   "figure": 5.77,
+   "composition": 6.17,
+   "artifacts": 5,
+   "overall": 4,
+   "byKind": {
+    "scene_character": 5.8,
+    "portrait": 4.6,
+    "scene_beat": 2.6
+   }
+  }
+ },
+ "perJudgeRanking": {
+  "radio-producer": [
+   "flux2_klein 6.33",
+   "z_image_turbo 5.78",
+   "flux_gen1 5.67",
+   "ideogram4_local 4",
+   "lumina_image 4"
+  ],
+  "art-director": [
+   "flux2_klein 5.78",
+   "ideogram4_local 5.75",
+   "z_image_turbo 5.33",
+   "flux_gen1 5.22",
+   "lumina_image 4.17"
+  ],
+  "defect-hunter": [
+   "z_image_turbo 6.67",
+   "ideogram4_local 6.25",
+   "flux_gen1 6",
+   "flux2_klein 6",
+   "lumina_image 3.83"
+  ],
+  "viewer": [
+   "flux_gen1 6.11",
+   "flux2_klein 6.11",
+   "z_image_turbo 5.78",
+   "ideogram4_local 4.75",
+   "lumina_image 4"
+  ],
+  "cinematographer": [
+   "flux_gen1 6.33",
+   "flux2_klein 6.22",
+   "z_image_turbo 6.11",
+   "ideogram4_local 5",
+   "lumina_image 4"
+  ]
+ },
+ "clusterPurity": {
+  "radio-producer": 0.35,
+  "art-director": 0.32,
+  "defect-hunter": 0.59,
+  "viewer": 0.47,
+  "cinematographer": 0.49
+ },
+ "worstArtifacts": [
+  "j08.png (ideogram4_local, scene_beat) by radio-producer: Strongest: tasteful archival collage palette. Weakest: subject is a postage stamp at 832 wide and the caption is doubled and misspelled.",
+  "j13.png (ideogram4_local, scene_character) by radio-producer: Strongest: headline typography is legible and well set. Weakest: subtitle is garbage letters and there is no image at all, just a gradient.",
+  "j31.png (lumina_image, scene_beat) by radio-producer: Strongest: sepia signboard framing is on-brand. Weakest: SEGIAL LOST and three lines of garbage, unairable.",
+  "j36.png (lumina_image, scene_beat) by radio-producer: Strongest: woodcut poster layout and red-gold palette are right. Weakest: every word is garbage and the figures are smeared silhouettes.",
+  "j31.png (lumina_image, scene_beat) by art-director: Strong: sepia vignette. Weak: every line of text is misspelled garbage, unusable on air.",
+  "j36.png (lumina_image, scene_beat) by art-director: Strong: pulp woodcut palette is right. Weak: title and every caption are garbage letters, silhouettes melt.",
+  "j08.png (ideogram4_local, scene_beat) by defect-hunter: Strongest: genuinely elegant mid-century paper collage with a disciplined grid and real tonal restraint. Weakest: the one line of type in frame reads The Weight of weight of unsoken secrets - a duplicated word and a misspelling, dead center.",
+  "j13.png (ideogram4_local, scene_character) by defect-hunter: Strongest: the headline sets cleanly - correct serif letterforms, correct spelling, good leading. Weakest: the subtitle renders as The gindte tisbt, total garbage directly under readable copy, which is worse than no subtitle.",
+  "j28.png (flux2_klein, portrait) by defect-hunter: Strongest: warm sepia ink-and-wash with convincing period props - reels and stacked discs dress the frame well. Weakest: the dial banner is prominent garbage type reading roughly QUISHL S HAESPE, and the reel hubs repeat as near-identical stamps.",
+  "j31.png (lumina_image, scene_beat) by defect-hunter: Strongest: the lightbox framing and vignette are at least period-plausible. Weakest: the entire image is text and the entire text is broken - Welcome bakc to SEGIAL LOST over two lines of pure gibberish. Unusable as-is.",
+  "j36.png (lumina_image, scene_beat) by defect-hunter: Strongest: strong pulp-woodcut poster energy with good red-and-cream separation and real crosshatch discipline. Weakest: the title is complete garbage - TONGHE SONOEE SUGIE BOOK - plus two more garbled banner lines, and the crowd figures are undifferentiated blobs.",
+  "j08.png (ideogram4_local, scene_beat) by viewer: Strong: tasteful paper collage texture. Weak: subject is postage-stamp small and the typed caption is misspelled and duplicated.",
+  "j31.png (lumina_image, scene_beat) by viewer: Strong: sepia signage vignette is on-tone. Weak: every line is misspelled gibberish, unairable.",
+  "j36.png (lumina_image, scene_beat) by viewer: Strong: strong pulp woodcut poster energy. Weak: the huge title is nonsense words, cannot be shown.",
+  "j13.png (ideogram4_local, scene_character) by cinematographer: Strongest: the headline itself is correctly spelled and well set. Weakest: the subtitle is garbage letterforms and the whole card is an empty gradient.",
+  "j25.png (lumina_image, portrait) by cinematographer: Strongest: nice dim single-source mood on the wooden case. Weakest: the grille cloth aliases into a moire mesh and the set sits absurdly on a dinner plate.",
+  "j28.png (flux2_klein, portrait) by cinematographer: Strongest: warm sepia crosshatch style with reels framing the set nicely. Weakest: the dial carries invented letterforms straight across the front.",
+  "j31.png (lumina_image, scene_beat) by cinematographer: Strongest: the sign shape and lightbox glow are at least period-plausible. Weakest: every line of text is scrambled, 'Welccome bakc to SEGIAL LOST' is unairable.",
+  "j36.png (lumina_image, scene_beat) by cinematographer: Strongest: handsome pulp woodcut poster style with a strong red field. Weakest: the entire title is nonsense words, which is the worst possible failure on a title card."
+ ]
+}
