@@ -52,6 +52,7 @@ def test_main_delegates_humo_once_for_a_selected_14b_profile(monkeypatch):
     monkeypatch.setattr(provision, "install_requirements", lambda: None)
     monkeypatch.setattr(provision, "fetch_lane_weights",
                         lambda lanes: calls.append(list(lanes)))
+    monkeypatch.setattr(provision, "warm_profile_writer_models", lambda _profile: None)
     monkeypatch.setattr(provision, "install_indextts2", lambda *_args: None)
 
     rc = provision.main([

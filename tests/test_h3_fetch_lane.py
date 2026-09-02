@@ -197,6 +197,7 @@ def test_main_fetches_h3_profile_dependencies_then_verifies_operator_lane(
     monkeypatch.setattr(provision, "install_requirements", lambda: None)
     monkeypatch.setattr(
         provision, "fetch_lane_weights", lambda lanes: fetched.append(list(lanes)))
+    monkeypatch.setattr(provision, "warm_profile_writer_models", lambda _profile: None)
 
     def verify(_root, tier_id):
         verified.append(tier_id)

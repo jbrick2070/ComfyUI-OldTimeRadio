@@ -134,6 +134,31 @@ def test_pod_script_repairs_the_runpod_cu130_driver_mismatch():
     assert text.index(final_probe) < text.index("=== provision complete")
 
 
+def test_pod_script_publishes_one_atomic_non_secret_runtime_receipt():
+    text = POD.read_text(encoding="utf-8")
+    keys_start = text.index("RUNTIME_KEYS=(")
+    keys_end = text.index(")", keys_start)
+    keys = text[keys_start:keys_end]
+    profile_call = text.index('scripts/otr_provision.py --profile "$PROFILE"')
+
+    expected = [
+        "OTR_COMFY_ROOT", "OTR_REPO_ROOT", "COMFY_PY",
+        "OTR_COMFYUI_MODELS_ROOT", "HF_HOME", "OTR_INDEXTTS2_ROOT",
+        "OTR_INDEXTTS2_DIR", "OTR_INDEXTTS2_WORKER",
+        "OTR_VOICE_REFERENCE_BANK", "OTR_PROVISION_PROFILE",
+        "OTR_HEADLESS_PORT",
+    ]
+    positions = [keys.index(name) for name in expected]
+    assert positions == sorted(positions)
+    assert "HF_TOKEN" not in keys
+    assert "COMFYUI_URL" not in keys
+    assert "OTR_INDEXTTS2_VENV" not in keys
+    assert "printf 'export %s=%q\\n'" in text
+    assert 'chmod 600 "$RUNTIME_TMP"' in text
+    assert 'mv -f "$RUNTIME_TMP" "$OTR_RUNTIME_ENV"' in text
+    assert keys_start < profile_call
+
+
 def test_legacy_cloud_scripts_cannot_bypass_the_owner():
     setup = (REPO / "scripts" / "setup_cloud.sh").read_text(encoding="utf-8")
     download = (REPO / "scripts" / "download_models.sh").read_text(encoding="utf-8")

@@ -613,6 +613,95 @@ def fetch_lane_weights(lanes) -> None:
             tail[0].strip()[:60])
 
 
+WRITER_TRANSFORMERS_BACKENDS = frozenset({
+    "transformers_safetensors",
+    "transformers_multimodal_text_only",
+    "transformers_gptq_int4",
+})
+
+
+def _load_writer_catalog():
+    """Load the pure catalog without importing the ComfyUI node package."""
+    path = os.path.join(_REPO, "nodes", "_otr_model_catalog.py")
+    name = "otr_provision_writer_catalog"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ProvisionFailure("cannot load writer model catalog: %s" % path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        if sys.modules.get(name) is module:
+            del sys.modules[name]
+        raise
+    return module
+
+
+def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
+    """Download the selected local Transformers writer rows before render.
+
+    The creative and technical slots commonly select the same model; preserve
+    order and fetch it once. Remote providers have no local payload, and the
+    GGUF-native lane has its own explicitly managed artifact, so both receive
+    an honest receipt rather than an accidental Hub download.
+    """
+    llm = profile.get("llm") or {}
+    selected = list(dict.fromkeys(
+        str(llm.get(key) or "").strip()
+        for key in ("creative_model", "technical_model")
+        if str(llm.get(key) or "").strip()
+    ))
+    if not selected:
+        say("SKIP", "writer model warm", "profile selects no writer models")
+        return
+    catalog = _load_writer_catalog()
+    rows = {row.repo_id: row for row in catalog.CURATED_LLM_MODELS}
+    cache_dir = os.path.join(os.environ["HF_HOME"], "hub")
+    os.makedirs(cache_dir, exist_ok=True)
+    token = os.environ.get("HF_TOKEN") or None
+    if _snapshot_download is None:
+        from huggingface_hub import snapshot_download as _snapshot_download
+
+    for model_id in selected:
+        row = rows.get(model_id)
+        if row is None:
+            lowered = model_id.lower()
+            if "gguf" in lowered:
+                say("SKIP", "writer: %s" % model_id,
+                    "GGUF-native artifact is managed by its explicit lane")
+            else:
+                say("SKIP", "writer: %s" % model_id,
+                    "not a static local Transformers catalog row")
+            continue
+        provider = getattr(row, "provider", "local")
+        if provider == "gguf_native" or row.loader_backend == "gguf_native":
+            say("SKIP", "writer: %s" % model_id,
+                "GGUF-native artifact is managed by its explicit lane")
+            continue
+        if provider != "local":
+            say("SKIP", "writer: %s" % model_id,
+                "provider %s has no local Hub payload" % provider)
+            continue
+        if row.loader_backend not in WRITER_TRANSFORMERS_BACKENDS:
+            say("SKIP", "writer: %s" % model_id,
+                "backend %s is not a local Transformers lane" %
+                row.loader_backend)
+            continue
+        try:
+            local_path = _snapshot_download(
+                repo_id=model_id,
+                allow_patterns=list(catalog.ALLOW_PATTERNS),
+                cache_dir=cache_dir,
+                token=token,
+            )
+        except Exception as exc:  # noqa: BLE001 - receipt owns provider detail
+            say("FAILED", "writer: %s" % model_id,
+                "%s: %s" % (type(exc).__name__, str(exc)[:180]))
+            continue
+        say("OK", "writer: %s" % model_id, str(local_path))
+
+
 def _sha256_file(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as fh:
@@ -1629,6 +1718,7 @@ def main(argv=None) -> int:
         install_node_packs(comfy)
         install_requirements()
         fetch_lane_weights(routes["automatic"])
+        warm_profile_writer_models(profile)
         manual_results = [
             verify_manual_tier(root, tier_id) for tier_id in routes["manual"]
         ]

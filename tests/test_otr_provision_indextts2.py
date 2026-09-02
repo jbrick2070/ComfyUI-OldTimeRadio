@@ -446,11 +446,16 @@ def test_posix_default_index_root_is_a_persistent_sibling_not_core_drift(
                   "_otr_idx_download_weights.py").read_text(encoding="utf-8")
     playbook = (ROOT / "docs" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8")
+    pod_owner = (ROOT / "scripts" / "otr_pod_provision.sh").read_text(
+        encoding="utf-8")
 
     assert 'Join-Path $ComfyRoot "index-tts"' in installer
     assert 'os.path.join(_COMFY_ROOT, "index-tts", *parts)' in engine
     assert 'base = comfy_root if os.name == "nt"' in downloader
-    assert "export OTR_INDEXTTS2_ROOT=/workspace/index-tts" in playbook
+    assert '$(dirname "$COMFY_ROOT")/index-tts' in pod_owner
+    assert "/workspace/otr-config/otr-runtime.env" in playbook
+    assert "Do not export the Linux offline wrapper as `OTR_INDEXTTS2_VENV`" \
+        in playbook
     assert '$OTR_COMFY_ROOT/index-tts' not in playbook
 
 
@@ -646,6 +651,7 @@ def _wire_main_stubs(provision, monkeypatch, profile, *, verify_result=True):
     monkeypatch.setattr(provision, "install_node_packs", lambda _root: None)
     monkeypatch.setattr(provision, "install_requirements", lambda: None)
     monkeypatch.setattr(provision, "fetch_lane_weights", lambda _lanes: None)
+    monkeypatch.setattr(provision, "warm_profile_writer_models", lambda _profile: None)
 
     def install(*_args):
         calls["install"] += 1

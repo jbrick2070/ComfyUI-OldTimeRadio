@@ -249,6 +249,46 @@ VOICE_ARGS=()
 [ "${OTR_WITH_INDEXTTS2:-0}" = "1" ] && VOICE_ARGS+=(--with-indextts2)
 [ "${OTR_WITH_ALL_VOICES:-0}" = "1" ] && VOICE_ARGS=(--with-all-voices)
 echo "  profile     : $PROFILE (VRAM ${VRAM_MIB:-unknown} MiB)"
+
+# Publish one non-secret runtime receipt for every later pod command. Keep
+# explicit operator paths, but derive the ordinary RunPod layout from the
+# ComfyUI tree that was actually proved above. OTR_INDEXTTS2_VENV is
+# deliberately absent: on Linux the runtime adapter resolves the offline
+# wrapper through ComfyUI/index-tts, while the online provisioner must use the
+# real vendor venv during downloads.
+OTR_REPO_ROOT="${OTR_REPO_ROOT:-$OTR_ROOT}"
+OTR_INDEXTTS2_ROOT="${OTR_INDEXTTS2_ROOT:-$(dirname "$COMFY_ROOT")/index-tts}"
+OTR_INDEXTTS2_DIR="${OTR_INDEXTTS2_DIR:-$OTR_INDEXTTS2_ROOT/checkpoints}"
+OTR_INDEXTTS2_WORKER="${OTR_INDEXTTS2_WORKER:-$OTR_ROOT/scripts/_otr_indextts2_worker.py}"
+OTR_VOICE_REFERENCE_BANK="${OTR_VOICE_REFERENCE_BANK:-/workspace/otr-config/voice_reference_bank.portable.json}"
+OTR_PROVISION_PROFILE="$PROFILE"
+OTR_HEADLESS_PORT="${OTR_HEADLESS_PORT:-8188}"
+export OTR_REPO_ROOT COMFY_PY OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR
+export OTR_INDEXTTS2_WORKER OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE
+export OTR_HEADLESS_PORT
+
+OTR_RUNTIME_ENV="${OTR_RUNTIME_ENV:-/workspace/otr-config/otr-runtime.env}"
+RUNTIME_DIR=$(dirname "$OTR_RUNTIME_ENV")
+mkdir -p "$RUNTIME_DIR" || fail "could not create runtime receipt directory $RUNTIME_DIR"
+RUNTIME_TMP=$(mktemp "$RUNTIME_DIR/.otr-runtime.env.XXXXXX") \
+  || fail "could not create an atomic runtime receipt"
+RUNTIME_KEYS=(
+  OTR_COMFY_ROOT OTR_REPO_ROOT COMFY_PY OTR_COMFYUI_MODELS_ROOT HF_HOME
+  OTR_INDEXTTS2_ROOT OTR_INDEXTTS2_DIR OTR_INDEXTTS2_WORKER
+  OTR_VOICE_REFERENCE_BANK OTR_PROVISION_PROFILE OTR_HEADLESS_PORT
+)
+for RUNTIME_KEY in "${RUNTIME_KEYS[@]}"; do
+  if ! printf 'export %s=%q\n' "$RUNTIME_KEY" "${!RUNTIME_KEY}" >> "$RUNTIME_TMP"; then
+    rm -f "$RUNTIME_TMP"
+    fail "could not write runtime receipt $OTR_RUNTIME_ENV"
+  fi
+done
+chmod 600 "$RUNTIME_TMP" \
+  || { rm -f "$RUNTIME_TMP"; fail "could not protect runtime receipt"; }
+mv -f "$RUNTIME_TMP" "$OTR_RUNTIME_ENV" \
+  || { rm -f "$RUNTIME_TMP"; fail "could not publish runtime receipt"; }
+echo "  runtime env : $OTR_RUNTIME_ENV (non-secret)"
+
 if ! "$COMFY_PY" scripts/otr_provision.py --profile "$PROFILE" "${VOICE_ARGS[@]}"; then
   echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ') ===" >&2
   echo "Read docs/RUNPOD_INSTALL.md for every named manual file." >&2
