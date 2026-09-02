@@ -1676,7 +1676,7 @@ here because each has been re-proposed at least once:
 - `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 11 pointer-not-proof; 24 lost-anchor; 25 bank-teardown)
 - `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate + the Teardown protocol
-- `docs/PROD_BUG_LOG.md` / `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
+- `docs/PROD_BUG_LOG.md` (promotion is tracked in the Bible repo's `otr_coverage_index.yaml`)
 - `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md` / `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`
 - `docs/2026-08-03-fidelity-pass-ownership.md` (the ownership table the verbatim executor is gated on)
 - `docs/2026-08-03-script-parse-repair-CODE-READY.md` (writer scaffolding repair increments 1-5)

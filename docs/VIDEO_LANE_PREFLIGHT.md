@@ -85,7 +85,8 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   free - feed the positive conditioning into both guider slots and skip a whole
   12B encode per shot - which would have silently changed every render. It was
   proposed during a panel, SURVIVED one reviewer, and died only because another
-  checked which sampler was selected. Full write-up: `docs/CFG_PROBLEM_STATEMENT.md`.*
+  checked which sampler was selected. Full write-up: `docs/OTR_STANDING_RULINGS.md`, section
+  "CFG ON THE LTX 2.5 LANE".*
 
 - G3.6 **`accepts_still` declared explicitly on every adapter, never left to
   the `required_inputs` fallback.** The operator picks a video model and an

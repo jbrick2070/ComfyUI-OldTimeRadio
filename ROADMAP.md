@@ -135,7 +135,6 @@ remain operator-gated.
 ## References
 
 - `docs/GO_FORWARD_PLAN.md`
-- `docs/BUG_BIBLE_PROMOTION_QUEUE.md`
 - `docs/LEAN_MEAN_CLEANUP.md`
 - `workflows/otr_canonical.json`
 - `workflows/variants/`

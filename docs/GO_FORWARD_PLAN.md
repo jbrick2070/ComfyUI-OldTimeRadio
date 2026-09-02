@@ -509,8 +509,7 @@ distilled recipe, `2026-08-01-fastwan-8gb-MODEL-MANIFEST` with the LoRA sha256 a
 licence gap -- these still owe a move into the adapter comments or the matrix); the
 08-26 foley-bed operator rulings; every doc a test, the code, this plan, the ship audit,
 `WRITER_INPUT_MATRIX` or `LANE_BUILD_LESSONS` cites (the 09-02 kokoro-onnx and
-encoder-eviction receipts among them); `CFG_PROBLEM_STATEMENT`,
-`COMFY_TEMPLATE_DIFF_PROTOCOL`, `WIDGET_OWNERSHIP_LEGEND`, `SPEC_haunted_image_to_video`
+encoder-eviction receipts among them); `COMFY_TEMPLATE_DIFF_PROTOCOL`, `WIDGET_OWNERSHIP_LEGEND`, `SPEC_haunted_image_to_video`
 and its design review, `DEAD_CODE_EXECUTION_PLAN`, the licence attestations, the lane
 receipts, the ship-audit folder, the schema examples and the skills backup. Still
 open from this pass: `workflows/otr_story_only.json` (operator to say whether the
@@ -1034,8 +1033,9 @@ An i2v anchor for the 8 GB floor lane. Not started; ship-readiness first.
 (The 12.139 / 12.140 promotions completed 2026-08-28 and the 2026-08-25 /
 2026-08-18 / 2026-08-17 promotion receipts are in the archive.)
 
-The active production-fix owner updates `docs/PROD_BUG_LOG.md`; the approval queue is
-`docs/BUG_BIBLE_PROMOTION_QUEUE.md`; no plan review or invented fixture creates a row.
+The active production-fix owner updates `docs/PROD_BUG_LOG.md`; promotion to the Bible is
+tracked in the Bible repo's `otr_coverage_index.yaml` (CLAUDE.md, delta-scrape discipline);
+no plan review or invented fixture creates a row.
 
 ## SECTION 6 -- Open risks
 
