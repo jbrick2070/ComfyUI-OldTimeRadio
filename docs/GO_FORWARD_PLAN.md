@@ -55,9 +55,11 @@ wrong picture, a leg that dies late).
 
 **4. THE 8 GB SHIP SET -- what the clean room proved becomes a saved dropdown set.**
 Klein stills run on 8 GB under stock launch flags (Leg C5: ~21 s a still) and LTX 2.5
-renders there at ~14 min a clip; receipts in `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
-Owed: (a) the 8 GB row's image column flips to PROVEN in `config/machine_classes.json`
-when the operator has watched the published Leg C5 episode -- then regenerate the matrix;
+renders there at ~14 min a clip; the Leg C5 episode PUBLISHED 2026-09-02 12:10
+(`signal_lost_rationed_breath_20260902_060027`, 24 clips, 6 h 35 min; receipt in
+`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`). Owed: (a) the operator watches it, then
+the 8 GB row's image column flips to PROVEN in `config/machine_classes.json` and the
+matrix regenerates;
 (b) a shipped `otr_8gb_klein_ltx25` profile and variant (the clean-room profile is
 untracked on the 4060 -- promote it, do not rewrite it); (c) the eight profiles that still
 pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships. Section
@@ -372,8 +374,9 @@ on 8 GB; it is not a daily driver at that pace. Klein is already the image defau
 `docs/OTR_STANDING_RULINGS.md` "IMAGE ENGINE DEFAULTS BY MACHINE CLASS").
 
 Owed, in order:
-1. **The PROVEN flip.** When the Leg C5 episode is in the clean room's obs AND the
-   operator has watched it: add the receipt to `config/machine_classes.json` (`proven[]`
+1. **The PROVEN flip.** The Leg C5 episode is in the clean room's obs
+   (`signal_lost_rationed_breath_20260902_060027`, published 2026-09-02 12:10, 24 LTX 2.5
+   clips, 12 Klein stills, 6 h 35 min). When the operator has watched it: add the receipt to `config/machine_classes.json` (`proven[]`
    on the 8gb class, image column included; `known_limits` keeps the pace), regenerate
    `docs/MACHINE_MATRIX.md` and the README block (`scripts/otr_machine_matrix.py`), and
    the 8gb `proof_summary` stops saying "image lane unexercised". Record only what
@@ -713,8 +716,8 @@ clean-room profiles are untracked stand-ins on the 4060; the shipped equivalent 
 Section 1.5 item 2. Friction log and every leg receipt (R1, R2, C through C6):
 `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
 
-* **Leg C5** (Klein + LTX 2.5, stock flags): rendered 2026-09-02, ~20 clips; the episode's
-  publish to obs and the operator eyeball are Section 1.5 item 1. Leg A's question is
+* **Leg C5** (Klein + LTX 2.5, stock flags): PUBLISHED 2026-09-02 12:10, 24 clips,
+  `RESULT SUCCESS` + `obs_publish OK`; the operator eyeball is Section 1.5 item 1. Leg A's question is
   answered by this leg (LTX 2.5 works on 8 GB, not a daily driver); Leg C6 (fp8 encoder)
   is not needed.
 * **Leg B -- OPEN:** `otr_cleanroom_8gb_humo17` (HuMo 1.7B, 13.6 GB of Comfy-Org weights,

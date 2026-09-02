@@ -235,9 +235,28 @@ LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
     is ~20 clips, not 8 -- the 5080 leg of the same shape ran 22 -- which puts the 4060's
     obs publish about five hours after the leg started (~10:30-11:00), at ~14 min a clip.
     The leg is left running; the episode lands in the clean room's own
-    `ComfyUI\output\otr\obs\` when it finishes. (episode result below)
+    `ComfyUI\output\otr\obs\` when it finishes. (episode result: PUBLISHED 2026-09-02 12:10 -- see LEG C5 EPISODE RECEIPT below)
 LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
     staged; `_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
 (The fp8-encoder fallback formerly listed here as Leg C5 is Leg C6 above: 5.6 GB
     `qwen_3_4b_fp8_mixed.safetensors`, staged in the clean room, through the engine's
     `OTR_FLUX2_KLEIN_TE` knob in the server's launch environment.)
+
+### LEG C5 EPISODE RECEIPT -- the first 8 GB episode with Klein stills and LTX 2.5 video (2026-09-02)
+
+* Leg started 05:35:04, `RESULT SUCCESS` and `LEG_END` 12:10:21; server `Prompt executed
+  in 06:35:13`; `obs_publish OK` ->
+  `C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\obs\signal_lost_rationed_breath_20260902_060027_silent_procgen_blended_captioned_with_credits_final.mp4`
+  (144.3 MB). Profile `otr_cleanroom_8gb_klein_ltx25`, `public_domain`, 1 act, stock launch
+  flags (no `--lowvram`, no `--disable-dynamic-vram`), pack at `da2b7a36`, bark voices.
+* Writer: gemma-4-E2B, 6 lines / 70 words (`episode_id=pending_20260902_053505`).
+* Stills: 12 Klein 4B Q4 GGUF loads (`Requested to load Flux2` x 24 = 12 stills, each a
+  TE + DiT pair), ~21 s a still after `da2b7a36` freed the writer first.
+* Video: 24 `ltx25_video TWO-STAGE PASS` clips at 1664x960 (Q3_K_M DiT half offloaded,
+  12B encoder pinned to CPU), 1018 s for the first clip and 821-859 s after -- ~14 min a
+  clip, so ~5.5 h of the 6.6 h episode is LTX 2.5 render time. No errors, no retries.
+* Reading: Klein on 8 GB is the ruled default and now has a PUBLISHED episode behind
+  it; LTX 2.5 on 8 GB WORKS under stock flags and is not a daily driver at this pace
+  (the matrix `known_limits` line carries the pace). The 8 GB row's image column flips to
+  PROVEN in `config/machine_classes.json` after the operator watches this episode
+  (`docs/GO_FORWARD_PLAN.md` Section 1.5 item 1).
