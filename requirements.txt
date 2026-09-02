@@ -27,7 +27,9 @@ beautifulsoup4>=4.12
 tokenizers>=0.22,<=0.23
 sentencepiece>=0.1.99
 
-bitsandbytes>=0.42.0
+# CUDA-only; the bare line blocked the whole registry install on macOS (2026-09-01
+# ship audit). Mirrors the marker in pyproject.toml (alpha.15).
+bitsandbytes>=0.42.0; sys_platform != 'darwin'
 
 # 2026-08-25: accelerate was NEVER declared, in either this file or
 # pyproject.toml, and it is only a transformers EXTRA -- never a base

@@ -27,14 +27,15 @@ tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per
 owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
 AND push + `HEAD == origin/v2.0-alpha`.
 
-**1. PUSH alpha.15 -- the registry version people can install.**
-Apply `docs/ship-audit-2026-09-01/pyproject_alpha15.patch` (version bump; pycairo,
-pillow, aiohttp; bitsandbytes `sys_platform != 'darwin'`; kokoro `python_version <
-'3.13'`) and push. `pyproject.toml` is a release trigger: that push IS the publish.
-Operator's push, or Claude on the operator's word. DONE WHEN the version reads `Active`
-on registry.comfy.org and a Manager install on the 4060 lands the OTR nodes. If it
-FLAGS, run the control in Section 3 J2 (republish the alpha.8 tree byte-identical) --
-that result is the evidence for Comfy-Org, and never version-delete.
+**1. alpha.15 IS PUSHED -- wait for it to go Active.** Pushed `13696c1e` on the
+operator's word 2026-09-02 18:51Z; the publish action succeeded and the registry shows
+`2.0.0-alpha.15` as `Pending` with 18 dependencies (the kokoro `python_version < '3.13'`
+and bitsandbytes `sys_platform != 'darwin'` markers, plus pycairo / pillow / aiohttp).
+Comfy-Org's scanner only considers versions older than 30 minutes and may run nightly.
+DONE WHEN the version reads `Active` (`curl https://api.comfy.org/nodes/comfyui-old-time-radio/versions`)
+and a Manager install on the 4060 lands the OTR nodes. If it FLAGS, run the control in
+Section 3 J (republish the alpha.8 tree byte-identical as alpha.16) -- that result is the
+evidence for Comfy-Org; never version-delete.
 
 **2. THE KOKORO-ONNX BACKEND -- the default voice that installs everywhere.**
 Design item: kibitz arc FIRST (substitute seats are fine, state the roster), then code,
