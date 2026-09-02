@@ -358,6 +358,15 @@ image-stage exposure but does not build the registry.
   under the window and concatenate, with a test that a 19-word line yields speech-shaped
   audio (envelope modulation, no single dominant tone). bark stays the zero-setup
   fallback in the dropdowns, so this is owed even though kokoro is the shipped default.
+- **Remember, do not build (operator 2026-09-02): the 5080's overnight runs ROTATE voice
+  engines on purpose** ("for overnight runs I like to rotate voice models, to be honest,
+  since the 5080 can handle them all"; "there's probably no rotation machinery, just
+  something you need to remember"). The `config/profiles/otr_rot_tts_*` profiles are the
+  instrument (bark / chatterbox / dia characters, chatterbox / dia announcers, and
+  `otr_rot_tts_kokoro`, kokoro on both slots -- the stranger default belongs in the
+  rotation too); whoever queues overnight legs cycles them by hand. Never fix his
+  overnight profile to kokoro-only in the name of the ruling; the stranger-facing default
+  stays kokoro on both slots.
 
 #### Routing, env-capture and the credits card
 

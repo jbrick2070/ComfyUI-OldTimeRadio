@@ -106,7 +106,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `still_motion`, `vi
 
 </details>
 
-## 16 GB+  --  90 experimental profile(s), 41 shipping
+## 16 GB+  --  91 experimental profile(s), 41 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -152,7 +152,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `still_motion`, `vi
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>49 draft profile(s) here -- not vouched for</summary>
+<details><summary>50 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`, `word_razzle`
 
@@ -180,6 +180,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_rot_tts_bark` | ltx25_high_video | bark |
 | `otr_rot_tts_chatterbox` | ltx25_high_video | chatterbox |
 | `otr_rot_tts_dia` | ltx25_high_video | dia |
+| `otr_rot_tts_kokoro` | ltx25_high_video | kokoro |
 | `otr_rot_wan_ideogram4` | wan_ti2v | indextts2 |
 | `otr_rot_wan_klein` | wan_ti2v | indextts2 |
 | `otr_runpod_starter` | wan22_high_video | indextts2 |
