@@ -255,6 +255,20 @@ def test_indextts2_named_install_scripts_exist():
             f"scripts/{name} is named by eng_indextts2 error text (or is the "
             "worker) but does not exist")
 
+    import subprocess
+
+    installer = "scripts/_otr_indextts2_install.ps1"
+    subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", installer],
+        cwd=repo, text=True, capture_output=True, check=True)
+    ignored = subprocess.run(
+        ["git", "ls-files", "-ci", "--exclude-from=.comfyignore", "--",
+         installer],
+        cwd=repo, text=True, capture_output=True, check=True)
+    assert not ignored.stdout.strip(), (
+        "the shipped IndexTTS2 error names its installer, but the complete "
+        f".comfyignore rules still exclude {installer}")
+
 
 # --------------------------------------------------------------------------
 # S4: host_caps shape + the CastLock voice_device ledger stamp

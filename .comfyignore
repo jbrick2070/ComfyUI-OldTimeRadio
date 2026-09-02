@@ -90,10 +90,13 @@ scripts/*
 # stdlib plus third-party packages (torch, torchaudio, chatterbox, dia,
 # indextts, soundfile, numpy) resolved from the engine's own ISOLATED venv,
 # never a sibling file under scripts/ -- no other scripts/ file needs to
-# ship. The *_install.ps1 installers and _otr_idx_download_weights.py are
-# named only inside RuntimeError message text telling the operator what to
-# run by hand; nothing opens or executes them, so they correctly stay
-# excluded with the rest of scripts/.
+# ship. The IndexTTS2 adapter is a special case. Its qualified voice-route
+# runtime fingerprint intentionally hashes the whole adapter, so changing only
+# its recovery wording would withdraw a human-audited route even though
+# synthesis is byte-identical. Ship the exact installer its stable error names
+# instead. The other installers and _otr_idx_download_weights.py remain
+# GitHub-only; their adapters can name a URL without changing a qualified
+# runtime receipt.
 #
 # scripts/ is rewritten to scripts/* (excludes the directory's CONTENTS,
 # not the directory itself) because a gitignore-style negation cannot
@@ -106,6 +109,7 @@ scripts/*
 !scripts/_otr_chatterbox_worker.py
 !scripts/_otr_dia_worker.py
 !scripts/_otr_indextts2_worker.py
+!scripts/_otr_indextts2_install.ps1
 
 # 2026-08-22: internal-only material that was shipping to every installer --
 # ~23 MB of it, including the operator's own directives file. None of it is

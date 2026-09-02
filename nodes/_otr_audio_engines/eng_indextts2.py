@@ -198,13 +198,8 @@ class IndexTTS2Engine:
             if not os.path.exists(path):
                 raise RuntimeError(
                     "IndexTTS2 Path B not installed: %s missing at %s -- run "
-                    "the installer at https://github.com/jbrick2070/"
-                    "ComfyUI-OldTimeRadio/blob/v2.0-alpha/scripts/"
-                    "_otr_indextts2_install.ps1 (creates an isolated venv via "
-                    "uv, clones and pins index-tts, and downloads its "
-                    "weights, separate from the main ComfyUI venv) before "
-                    "rendering with indextts2 (the default char voice)"
-                    % (label, path))
+                    "scripts\\_otr_indextts2_install.ps1 (isolated venv + weights) "
+                    "before rendering with indextts2 (the default char voice)" % (label, path))
         cfg = os.path.join(model_dir, "config.yaml")
         if not os.path.exists(cfg):
             raise RuntimeError(
