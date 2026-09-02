@@ -2095,3 +2095,16 @@ the same day: *"kokoro onnx is our new go-to."*
   from the audio engine registry, never a hand-kept list; README points at it.
 * This closes the 2026-09-01 ship-audit blocker about the indextts2 default without
   shipping WAVs, and it makes the Python 3.12 / 3.13 split irrelevant to voices.
+
+## IMAGE ENGINE DEFAULTS BY MACHINE CLASS (operator ruling 2026-09-01)
+
+Operator: *"Klein 4B Q4 GGUF can be the default for Mac / AMD and 30/40/50 series low VRAM
+JSON."*
+
+* The low-VRAM saved dropdown set (Mac, AMD, and NVIDIA cards below the 16 GB class) uses
+  `flux2_klein` with the Q4 GGUF DiT for every image slot. Z-Image-Turbo remains the 16 GB
+  NVIDIA default. The canonical workflow keeps Z-Image; the variants carry the class default.
+* ComfyUI-GGUF is therefore a documented prerequisite of the low-VRAM set, alongside LTX 2.5.
+* The machine matrix marks a class PROVEN on Klein only after a measured render on that
+  class (Batch R7 Leg C for 8 GB NVIDIA; Apple Silicon and ROCm each need their own). Until
+  then the row reads "ruled default, unmeasured".

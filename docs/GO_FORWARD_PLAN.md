@@ -156,14 +156,16 @@ verdict is not polluted by known-open defects):**
    mean the round is not optional).
 3. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
    GPU, do not contend with a render).
-4. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
+4. **Image defaults** (1.12 below) -- ruled; mechanical config once Batch R7 Leg C
+   measures it. **Auto-download** (1.13 below) -- design row, confirm to schedule.
+5. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
-5. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
+6. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
    recipe; no new guides.
-6. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
+7. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
    republish sequence it gates: operator applies the alpha.15 patch -> clean
    publish -> the 4060 template test.
-7. Handoff bookkeeping.
+8. Handoff bookkeeping.
 
 **RUNNING BESIDE THE ORDER -- THE DEAD-CODE CAMPAIGN** (operator standing
 instruction 2026-08-28: keep hunting "until there are no more dead code
@@ -620,6 +622,52 @@ Shape (settle the details in the arc, do not re-derive these):
   and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
 
 
+### 1.12 IMAGE ENGINE DEFAULTS -- RULED 2026-09-01: Klein 4B Q4 GGUF for the low-VRAM set
+
+Operator: *"Klein 4B Q4 GGUF can be the default for Mac / AMD and 30/40/50 series low VRAM
+JSON."* Z-Image-Turbo stays the 16 GB NVIDIA default (45 published episodes; nvfp4 on
+Blackwell). Facts the row rests on: Klein is 4B, Apache-2.0, a Comfy-Org repackage, zero
+refusals across 35 stills in the last sweep; the Q4 GGUF DiT is 2.6 GB
+(`Latentiq/FLUX.2-klein-4B-GGUF`, ungated) plus the 8 GB `qwen_3_4b` encoder (offloads before
+sampling) and the 0.34 GB VAE; it loads through `UnetLoaderGGUF`, so the ComfyUI-GGUF pack the
+LTX 2.5 lane already requires is the one prerequisite (README 2b names it).
+
+Work, mechanical once the leg below measures it:
+* Flip the image slots (`announcer_image`, `music_image`, `character_image`) to `flux2_klein`
+  in the low-VRAM profiles (`otr_nvidia_8gb_*`, `otr_8gb_*`, `otr_4060_*`, `otr_amd8_rocm`,
+  `otr_amd16_rocm`, `otr_mac_mps`, `cpu_floor` where an image engine is wanted at all) and in
+  `config/machine_classes.json` (`image` for the 8gb, 12gb, amd classes), regenerate variants
+  and `docs/MACHINE_MATRIX.md`. The canonical keeps `z_image_turbo`.
+* Registry: `nodes/_otr_image_engines/registry.py` gains `mps` on the `flux2_klein` row ONLY
+  after one measured render on Apple Silicon; ROCm already qualifies (presents as cuda).
+* Batch R7 gets Leg C: `flux2_klein` stills on the 4060 clean room under the stock loader,
+  which also tells whether the Z-Image abort (Section 3 L) is engine-specific.
+* The matrix says PROVEN only for what rendered; until then the row reads "ruled default,
+  unmeasured on this class".
+
+### 1.13 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
+
+Today only the writer LLMs, bark, musicgen and the kokoro voices fetch themselves; every
+image engine, every video engine, Stable Audio 3, the cloning TTS engines and the reference
+WAVs are manual placement behind two fetchers under `scripts/` that the registry bundle does
+not ship, and README's "auto-fetch" wording for the 8 GB lane is what the drill measured as
+manual. Keep the rule that nothing downloads DURING a render; move the fetch to the
+queue-time preflight that already refuses with "PREFLIGHT FAIL: the running server cannot
+see: <files>":
+1. One manifest, `config/model_manifest.json` (repo, revision, path, destination, bytes,
+   sha256, gated), merging the provisioner's pinned tiers and the fetcher's lanes (12 rows
+   each today), read by the preflight, the pod provisioner and the matrix generator.
+2. Preflight resolves the selected dropdowns to artifacts, prints the total, refuses early
+   if disk is short, downloads into the running ComfyUI's models tree through `folder_paths`
+   (never `C:\ComfyUI-Models`) with `.part` files, hash verification and resume; the fetcher
+   already has that code and moves under `nodes/` so it ships.
+3. Gated rows (LTX 2.5) refuse BEFORE downloading, naming the terms URL and the token step.
+4. A `download_policy` widget: auto (default), ask (list sizes only), never (air-gapped).
+First-run bills for the shipped sets: floor ~9 GB; 8 GB haunted +3.9; 16 GB canonical
++4.5 to 12 for Z-Image plus its encoder; Klein +11; HuMo 1.7B +13.6; LTX 2.5 +24 (gated).
+Design item: kibitz arc before code.
+
+
 ---
 
 ## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least)
@@ -856,6 +904,10 @@ session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
   itself fits after the still is out of the way.
 * Leg B: `otr_cleanroom_8gb_humo17` behind it (no extra node pack; 13.6 GB of
   Comfy-Org weights).
+* Leg C: the same clean room with the image slots on `flux2_klein` (Q4 GGUF, the
+  ComfyUI-GGUF pack is already installed there) under the STOCK loader: the ruled low-VRAM
+  image default (Section 1.12) gets its first 8 GB measurement, and the result says whether
+  the Z-Image abort (Section 3 L) is engine-specific.
 * Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
   `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
   `docs/MACHINE_MATRIX.md`, then the README newbie pass. Do not advertise a lane the
