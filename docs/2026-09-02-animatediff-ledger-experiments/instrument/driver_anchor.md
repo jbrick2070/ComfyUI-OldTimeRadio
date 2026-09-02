@@ -131,3 +131,76 @@ tests. Out of scope: any engine recipe, any pixel arm, any change to the 4060 pr
    get different SHAs while two A/A nulls get the same one?
 5. Anything in the ownership split (which node writes which key) that would let a re-render
    silently overwrite a planned record or vice versa?
+
+## 6. r1 fold (Antigravity, Gemini 3.7 Flash High, `kibitz-runs/2026-09-02-replay-instrument/r1`) -- every claim re-read at the files
+
+Verdict NO with four must-fixes; all four grounded, all four taken. The design changes shape:
+
+* **The audio chain is longer than D3 said, and replay must bypass ALL of it at one seam.** The
+  canonical audio path is node 1 -> 62 `OTR_LedgerFreezeCascade` -> 80 `OTR_CastLock` -> 81/82
+  (voices) and 83 `OTR_StableAudioTheme` -> 3 `OTR_SceneSequencer` -> 4 `OTR_AudioEnhance` ->
+  7 `OTR_EpisodeAssembler`, and node 7 owns the master mix (`scene_sequencer.py:1451`,
+  `RETURN_NAMES = (episode_audio, output_path, episode_info, audio_done)`). Node 62 loads the
+  technical LLM and re-mints `meta.freeze_timestamp` (`_otr_ledger_freeze.py:1097`), and both
+  the still dispatcher (`otr_image_gen_dispatcher.py:590-597`) and ShotLock
+  (`otr_shot_lock.py:180-188`) hard-reject a wire/disk freeze mismatch; node 83 loads the music
+  model; node 4 re-applies DSP. **D3 becomes:** when `meta.replay_from` is set, nodes 62, 80,
+  81, 82, 83, 3 and 4 return pass-through stubs (no model load, no meta mutation, the frozen
+  `freeze_timestamp` preserved), and node 7 copies the bundle's master WAV into the new
+  episode dir, assigns `output_path`, loads it as `episode_audio`, and emits `audio_done`.
+  Per-line WAV copying is CUT: `OTR_VideoRenderBatch` already slices beat audio from the
+  master (`otr_video_render_batch.py:420-426`). The driver's audio-cache idea (the cache key
+  carries `episode_seed`, `cast_lock_revision`, `line_id`; `OTR_AUDIO_CACHE_DIR` overrides the
+  dir) would only ever cover the voice nodes and still leave 62, 83, 3 and 4 running; it is
+  dropped in favour of the node-7 seam.
+* **ShotLock calls an LLM.** `_resolve_writer_llm` + `llm_fn(prompt)` derive the creative
+  directives (`otr_shot_lock.py:1312-1338`), so a replayed ShotLock is NOT deterministic.
+  **D3 gains:** on `meta.replay_from`, ShotLock skips `llm_fn` and the creative derivation and
+  reuses the PLANNED `video` section from the bundle ledger, re-verifying route consistency
+  against the live video policy only. (This is also why D1 must persist the planned section:
+  without it there is nothing to reuse.)
+* **Write through the singleton, loudly.** `stamp_durable(sections=..., source=...)`
+  (`production_ledger.py:527`) copies wire-parsed sections into the process singleton and
+  saves, raising `LedgerStampError` on failure; disk-only `save_ledger_safe` would desync the
+  singleton that later `Ledger.save()` calls (e.g. `OTR_SignalLostVideo`) merge from. **D1
+  becomes:** ShotLock stamps `{"video": section}` through `stamp_durable`; `TOP_PRESERVE` gains
+  `"video"` so intermediate saves keep it.
+* **The writer's replay branch must mint the workspace.** `production_ledger.new_ledger(
+  episode_id=<slug>_replay_<stamp>)` before the randomizer rolls, populate `led.data` from the
+  bundle, keep the original bank/style rolls and `freeze_timestamp`, record
+  `meta.replay_from` / `meta.replay_of_episode`, save the skeleton, then emit the wire outputs;
+  otherwise `in_flight_ledger_path()` binds to a stale directory.
+
+Should-fixes taken: the ACTUAL trace lives under `meta` (`meta.render_trace[]`, stamped by
+`OTR_VideoRenderBatch` beside the `meta.render_engines` it already stamps through
+`stamp_durable`), so `render_trace` needs no `TOP_PRESERVE` entry and no schema bump -- only
+`"video"` does; CastLock forces `preserve_ledger` internally on replay regardless of the
+`auto_registry` widget (node 80 in the canonical), logging the enforcement; **item 0 is scoped
+to `--replay-from` and the A/A equality proof** -- the blinding key file and the scorecard are
+the evaluation campaign's, not this item's. Optional taken: the freeze script verifies every
+referenced file exists and is non-empty before writing the manifest.
+
+## 7. Revised decisions after r1 (what r2 plans the code for)
+
+* **D1'** ShotLock -> `stamp_durable({"video": ...})`; `TOP_PRESERVE` += `"video"`.
+* **D2'** `OTR_VideoRenderBatch` builds `meta.render_trace[]` from the request objects it hands
+  to `render_shot` (`req["text_prompt"]`, `req["negative_prompt"]`, `req["seed_bundle"]`,
+  `req["observability"]` -- `prompt_sha8`, `negative_sha8`, `prompt_version` are already set
+  by the driver at `render_driver.py:1674-1681, 2911-2925`) plus the clip dict the engine
+  returns (`recipe`, `domain_adapter_strength`, `render_canvas`, cadence fields) and the
+  per-clip peak; adds `prompt_sha8` and `request_seed` to `per_clip`. `render_driver` is not
+  edited.
+* **D3'** Writer replay branch (workspace + wire outputs from the bundle) + pass-through stubs
+  on 62 / 80 / 81 / 82 / 83 / 3 / 4 + the node-7 seam (master WAV copy) + ShotLock reuse of the
+  planned section + CastLock forced `preserve_ledger`.
+* **D4'** `scripts/otr_freeze_replay_bundle.py` with existence/size checks and SHA-256 manifest.
+* **D5'** `otr_canonical_api_run.py --replay-from <bundle>` only; `--title` already exists.
+* **D6'** Tests as before, plus: every bypassed node returns its stub without touching CUDA
+  (assert no model load under `OTR_TEST_MODE`), the freeze timestamp survives replay unchanged,
+  ShotLock on replay never calls `llm_fn`, and the replayed ledger's `render_request_hash` and
+  `request_seed` equal the original's for every beat.
+
+Open for r2: the exact stub return values for each bypassed node's `RETURN_TYPES` (AUDIO
+batches, strings, done signals) so downstream sockets stay typed; whether the still dispatcher
+(91) reuses bundle rows or re-mints (it re-resolves and must find the SAME freeze receipt, so
+the bundle's `images[]` and files must be copied into the new episode dir before 91 runs).
