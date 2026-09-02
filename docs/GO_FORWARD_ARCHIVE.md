@@ -2553,3 +2553,860 @@ condition.
   done with all bakeoffs" was this one). The finding still generalises: a runner
   that discards the encoder's return value and recomputes the count independently
   will disagree with it silently. Worth carrying into any replacement sweep.
+
+## 17. 2026-09-02 -- the forward-only rewrite: blocks removed from the plan (verbatim, for the record)
+
+The plan was cut to a queue in the operator's order (alpha.15 push -> kokoro-onnx -> the
+correctness bugs -> the 8 GB ship set -> the 4060 template test) and every narrative,
+receipt and settled ruling moved out. Rulings and standing traps went to
+`docs/OTR_STANDING_RULINGS.md`; the blocks below had no other home and are kept here
+as they stood, under the heading each carried in the plan.
+
+### Section 1.3 gender ladder: the 2026-08-05 live evidence, the split-is-the-diagnosis paragraph and the SPEC v1 summary (v2 folds it)
+
+Live 2026-08-05: `EBENEZER SCROOGE` = female, `JACOB MARLEY` = other,
+`HENRY HARTWICK OGLETHORPE` = female. Meanwhile MACBETH, BANQUO, PROSPERO and
+MIRANDA are all correct.
+
+**The split IS the diagnosis, and it means the render code is not broken.**
+Shakespeare ships 14 provenance sidecars carrying `characters` with genders; the
+prose lane has ONE tracked sidecar and its `characters` key is `None`. The pin
+chain already exists and is lane-neutral (`_otr_roster_gender.py`, 12.6 KB, on
+disk). Shakespeare is right because the DATA is there. Prose is rolled because it
+is not. **This is a vendor-time data gap with a working consumer** -- the exact
+inverse of the Item 7 bug, where the value existed and nothing read it.
+
+Spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` (Fable, driver-grounded).
+A four-tier TOTAL ladder -- roster -> pronouns in the source text ->
+character-in-work web lookup -> name-frequency percentage -- stamping `gender`
+(always populated, never `unknown`, because a voice must still be cast) plus
+`gender_source` and a confidence. Operator rulings baked in: Shakespeare's KNOWN
+rows are untouchable, the announcer stays randomly male/female by design, and the
+invented lanes (`original`, `scifi_news`, `scifi_news_pro`, `media_archive`) keep
+rolling -- their characters do not exist, so a name search there risks matching a
+real person.
+
+### Section 1.3 gender ladder: the spec-rewrite re-grounding narrative
+
+**THE REWRITE IS WRITTEN: `docs/2026-08-28-character-gender-ladder-SPEC-v2.md`
+(local; `docs/2026-*` is gitignored).** It folds r2 + r3 and answers B1-B4
+explicitly. Two of the four blockers are DISSOLVED by the rulings below rather
+than engineered around, and one shrank on re-grounding: r3 said carrying the
+ladder's output meant changing every verdict-construction path, but there are
+exactly SIX and all six are in `nodes/_otr_roster_gender.py` (298, 310, 311,
+334, 364, 468), with ZERO in `tests/` -- so with defaults the change is
+additive. Next step is ONE review round against the r2+r3 finding lists, then
+code.
+
+### Section 1.6 header: the 2026-07-27 cite-drift examples
+
+**EVERY LINE CITE IN THIS SECTION IS SUSPECT.** Each one checked during the
+2026-07-27 triage had moved: `_is_cloud_video_engine` is `render_driver.py:1599` not
+`1274-1295`; the "NO FALLBACK to text-only" refusal is `:2148` not `1801-1817`;
+`_use_i2v` is `eng_ltx_video.py:583` not `559-572`. The defects are mostly still
+real; their coordinates are not. **Re-pin a row's cite when you touch it.**
+Path note (verified 2026-08-04): engine adapters live under
+`nodes/_otr_video_engines/` (and `_otr_audio_engines/`, `_otr_image_engines/`)
+-- bare `eng_*.py` cites in these rows are shorthand for those paths.
+
+### Section 1.6 P0 cluster: the campaign-log measurement of the HTML block-join defect
+
+- **`full_text` reaches the span coordinate system carrying HTML BLOCK JOINS WITH
+  NO SEPARATOR, and on the live evidence this is the DOMINANT P0 failure cause.**
+  Measured in the campaign logs: `'...Field of Martian PolygonsNASA/JPL-'`,
+  `'...and the School ofEngine'`, `'...what you're doing.Let's s'`, `'...(AMR).The
+  resea'`. The RSS adapter strips tags without inserting whitespace, so two elements
+  fuse into one token. `_normalize_span_source_text` collapses whitespace RUNS but
+  cannot insert a space that was never there, so the model quotes the sentences a
+  reader sees and they are not byte-exact in the stored text -- exactly the
+  "non-literal source span" rejection that killed 12 of the 15 P0 legs.
+  **Deliberately NOT fixed by A-3:** inserting separators is a WIDER change to the
+  coordinate system `source_digest` pins -- an operator decision, and it belongs in
+  the source adapter rather than the codex normalizer. Owed: which adapter builds
+  `full_text`, whether a separator can be inserted at admission without breaking any
+  accepted ledger, and a fixture from these four strings. (Cross-listed as
+  Section 3, question D.)
+
+### Section 1.6 orphan-occupancy registry: the PBUG-20260825-04 arc history and what the closed fixes bought
+
+##### The orphan-occupancy registry (design item -- full arc BEFORE code)
+
+Falls out of PBUG-20260825-04, whose four landed fixes shipped in
+`fb67d059` after a full kibitz r1-r4 arc (Codex r2/r3, Cursor r4, Fable r1).
+The arc found a new race in each of the first two cuts of the same fix, so
+**do not treat this item as mechanical** -- it is a genuine design
+choice with more than one defensible answer, which per CLAUDE.md means a full
+arc BEFORE code, not after. (Its sibling, the GGUF generation deadline, CLOSED
+2026-08-25 -- receipt in the archive; its lesson is lifted into Section 4.)
+
+- **THE ORPHAN-OCCUPANCY REGISTRY -- still deferred, now on its third
+  independent confirmation.** `has_local_resident_llm()` reports "nothing
+  resident" the instant a timeout invalidates the cache dict, even while the
+  orphan worker is still actively running CUDA kernels on the model that
+  entry described. `nodes/otr_shot_lock.py:1781` and
+  `nodes/otr_video_render_batch.py:289` both trust that signal before
+  starting visual/video work. The r1 panel (Codex + Cursor + Fable) deferred
+  this unanimously; r3 and r4 each re-raised it and each time it was
+  re-confirmed as correctly out of scope for the cache-bookkeeping fixes.
+  Shape: a process-global, lock-protected registry of in-flight generations,
+  registered before invalidation and cleared via `Future.add_done_callback`,
+  with fail-fast admission on `request_slot` and the visual-entry guards
+  reading real occupancy instead of the dict's cleared-or-not state.
+  **What this session's fixes did and did not buy:** they close the concrete
+  cache-bookkeeping windows (no abandoned publish, no laundered
+  invalidation, no torn read, no unconditional teardown of a foreign live
+  entry); they do NOT make orphan GPU occupancy visible to a downstream
+  visual stage. That remains exactly as exposed as before.
+
+### Section 1.6 coverage cluster: the three-silent-mechanisms row and the _should_loop_fill row (CLOSED on re-verification 2026-09-02: the loop-fill and held-frame paths were RETIRED 2026-08-02 -- `_should_loop_fill` is a named no-op and a short clip now raises `ClipUnderrunsItsBeat`; `encode_frames_to_silent_mp4` proves its count through `proven_frame_count`)
+
+- **THREE silent coverage mechanisms exist, not one** (found 2026-07-25).
+  Mechanism 1, the engine mirror/ping-pong (`wrapper_bridge.extend_frames_to_target`),
+  is GONE from `eng_ltx_8gb` -- pinned behaviourally by a test that detonates the
+  helper and renders successfully. It REMAINS in `eng_wan_ti2v`, deliberately and
+  permanently: WAN renders a short native clip on purpose and fills the beat with it,
+  which is the shipped 8GB tier contract `PBUG-20260723-02` protects. **Still open:**
+  composite loop-fill (`otr_silent_composite._should_loop_fill`, which also SUPPRESSES
+  its own underrun warning once it activates) and held-last-frame. For `ltx_8gb` the
+  composite path is now de facto unreachable -- the adapter returns exactly the
+  requested count or raises -- but not structurally impossible:
+  `encode_frames_to_silent_mp4` reports the size of the array it piped into ffmpeg
+  rather than re-probing what ffmpeg wrote, so an encode-side drop could still
+  under-report. PRE-EXISTING; close it when the assembly boundary is next opened.
+- **`_should_loop_fill` names the permanent fix and it is now being built**
+  (`otr_silent_composite.py:244-266`): *"The real fix is phrase-chunking (render the
+  beat's correct duration so it never underruns) -- tracked as a follow-up."* The
+  coverage block IS that follow-up.
+
+### Section 1.6 coverage cluster: the CanonicalClip.frame_count row (CLOSED on re-verification 2026-09-02: every clip writer ffprobes, tests/test_terminal_frame.py gates the roster 17/17, the residual self-declared surface was empty) and the ping-pong cross-list (its live proof is the deferred capped-14B HuMo leg)
+
+- **`CanonicalClip.frame_count` -- "the integer timing authority" -- HALF CLOSED**
+  (`58e288af` + `40780b82`, count closed @ `48e3c6fb` without paying a decode). Every
+  module that writes a clip now ffprobes it, and a roster gate in
+  `tests/test_terminal_frame.py` fails by name for any module that writes a clip
+  without proving it. What this proves and what it does not: it proves the muxer wrote
+  what it was piped, which is the right question for a clip written by ONE ffmpeg
+  pass; it does NOT prove decodability, which is why `assemble_beat_segments` still
+  decode-counts every ASSEMBLED beat and must keep doing so. **Re-verify before
+  acting:** this row's "still self-declared elsewhere" pointers (the four `viz_*` and
+  four `still_*` engines) were both closed afterwards, so the remaining open surface
+  may be empty.
+- **Ping-pong on a capped HuMo beat played lip sync BACKWARDS** -- FIXED in code @
+  `a1d810f1`, but the finding is STATIC (no live artifact), so it is NOT a PBUG row. A
+  capped-14B leg would reproduce it. Kept here so the live proof is not forgotten
+  (listed under Section 2, deferred render items).
+
+### Section 1.6 coverage cluster: three recorded limits moved to OTR_STANDING_RULINGS.md KNOWN OPEN (the 7d-preflight canvas trap, odd-canvas evenness, the roster-gate string-constant limit)
+
+- **THE 7d-PREFLIGHT THAT "PROVED THE GPU" RAN AT THE WRONG CANVAS** (found
+  2026-07-27, B5 panel; verified -- and it corrects a claim this file once made).
+  `render_single` and both HTTP entry points use the older ledger-free `build_request`,
+  which never reaches the canvas seam and defaults to `OTR_VIDEO_RENDER_CANVAS`
+  (832x480). So the "GPU IS PROVEN" leg (`ltx_8gb`, 25 frames, 3004 MB) exercised
+  832x480, not the production canvas. `render_single` parity is explicitly deferred by
+  the O1 judgment; what must NOT happen is another "proof" through that harness being
+  read as a production proof. (The 512x288 canvas itself HAS since rendered live --
+  bench arm D, three cells -- but through a DIRECT-NODE graph, which proves the canvas
+  and the recipe, not the seam.)
+- **Odd-canvas evenness is validated at the ENCODER, not where the canvas is chosen.**
+  The stride defect itself is closed (`b1f2ee86`): `ffmpeg_silent_mp4_cmd` declares the
+  REAL width/height and `encode_frames_to_silent_mp4` REFUSES an odd canvas by name,
+  because yuv420p subsamples chroma 2x2 and cannot represent an odd dimension. Still
+  true and NOT fixed: neither `WanInitImageMixin._dims()` nor the `Canvas` schema
+  validates evenness, so an odd canvas is caught late rather than at the choice. No
+  live producer builds one today (832x480, 512x288, 1472x832 are all even).
+- **KNOWN LIMIT of the widened roster gate**, recorded so it is not rediscovered as a
+  surprise: the codec flag is matched as a STRING CONSTANT, so a flag assembled at
+  runtime (an f-string, `"-c:%s" % stream`) or the stream-index spelling `-c:0` is
+  invisible to the sweep. Nothing in the tree does that today; an encoder that ever
+  needs to must be pinned in `_ENTRY_POINT_PROOFS` by hand, which the inventory test
+  makes a visible decision. Separately, ONE mutant survives the round by construction:
+  deleting the self-proving membership assertion is catchable only by a meta-test of
+  that assertion.
+
+### Section 1.7 adaptation design: the keystone-correction rationale
+
+Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md`.
+
+**The keystone correction: compile source speech, do not generate it.** A ledger row
+that merely POINTS at a source segment proves structure, not meaning --
+`PRODUCTION_SPRINT_LESSONS.md` lesson 11 documents that exact failure class.
+Source-owned text must be materialized deterministically from an authenticated
+segmented artifact and verified against it. "Summarize into X words" then means
+SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not paraphrasing -- which also removes
+the VRAM hazard, since no model sits in the source-speech path.
+
+Settled by arithmetic: an episode cannot exceed **1,520 words** (19 voiced beats at
+act_count 7, `BEAT_WORD_HARD_MAX` 80), so full-scene performance is impossible
+without redesigning beat topology. Build target is the 300-word unit.
+
+### Batch R2: the fork argument preserved for the arc that may not be needed
+
+**THE FORK, PRESERVED FOR THE ARC THAT MAY NOT BE NEEDED.** The lens receives
+only three things -- the prose, `kind` and `role`
+(`ideogram4_local.py:644-646`). There is no subject field to derive an anchor
+from, and this repo has ALREADY ruled on extracting one from the prose:
+`_wrapped_caption` (`ideogram4_local.py:372`) says the composer emits *"a
+comma-joined five-layer string behind a style prefix, which is a convention, not
+a grammar, so any attempt to re-extract subject / setting / elements from it
+mis-fires."* Two defensible answers, not equal:
+* **(a)** extract a subject noun from the prose -- lens-local and small, but it
+  is the option the codebase already tried and wrote off, and a wrong noun
+  INVENTS CONTENT, which the source-fidelity rule forbids in as many words;
+* **(b)** a new metadata channel so the producer hands the lens a real subject
+  -- more wiring, but the anchor is derived rather than guessed.
+
+Evidence: `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` and
+PBUG-20260826-01.
+
+### Batch R3: the operator-quote charter and the done-before-this-row paragraph
+
+**One sweep of four legs (after Leg 0, Section 1.2) proves all 7 surviving
+local LLM rows in BOTH slots, plus the gemma Q8_0 negative probe -- and each
+leg doubles as a ledger-cleanup live-watch and an eyeball re-observation
+chance.**
+
+**THE OPERATOR'S WORDS, which are this item's charter:**
+*"when all this LLM coding is done we should look and do more coding and retest
+all local LLMs on a 1 runthrough that should catch it"*; *"if it doesn't fit
+nicely or requires Ollama rip it from the dropdown and blast radius"*; *"clean
+sweep I only want easy to load LLMs"*; *"there should be an LLM preflight guide
+-- preflight guides for adding all your own components"*; *"all models should
+live out here `C:\ComfyUI-Models`"*; and *"all LLMs should either be able to
+play creative or technical equally. If they're not, and they were not tested or
+not implemented, and they serve no worth, we should rip them out."*
+
+Done before this row: the clean sweep, the PASS-tier invariant gate,
+`docs/LLM_PREFLIGHT_GUIDE.md`, the `Q6_K` removal (ruling: `docs/OTR_STANDING_RULINGS.md`,
+"ONLY EASY-TO-LOAD LLMs SHIP"); all 7 surviving local rows are on disk.
+
+### Batch R5: the D2 statistics, the 08-04 postmortem recap and the story-engine preamble
+
+### Batch R5 -- OPPORTUNISTIC: D2 fail-hunting still legs; every clean leg is also an eyeball re-observation
+
+Run when a render window is free and nothing above needs the box.
+
+**D2 (from the long-standing parked row -- renders have resumed):**
+Reset per AGENTS.md section 4, boot headless, run **320-word `public_domain` or
+`shakespeare` still legs until one fails** (~1 in 6). Three legs on 08-04 all
+published, which at that rate is a ~58% chance of zero -- neither confirmed nor
+cleared.
+
+**Either outcome is valid.** A publish is a clean leg; a **fail-closed with
+complete evidence is the PROOF D1 WORKS** and is the outcome you want. When it
+fails the server log names the branch itself -- arm, token, index, canonical
+`prompt_hash`, repr-escaped excerpt -- plus a compact JSON `MISSING_TARGET`
+record emitted BEFORE the raise (the canonical runner truncates the exception at
+500 chars, `scripts/otr_api.py:749`). The log survives reboot;
+`scripts/otr_rotate_log.ps1` rotates instead of truncating. D3 then fixes THAT
+branch at its root and `PROD_BUG_LOG.md` gets a mechanism, not a guess.
+
+**Do NOT:** weaken the completion gate, revive the portrait-init fallback, or
+rebuild the withdrawn "give the collapse guard a still owner" fix -- the 08-04
+postmortem disproved that chain (70 whiffs and 69 cast-time deferrals across 11
+passes that ALL published).
+
+Record: `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
+`docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
+
+**The two eyeball re-observations that RIDE these legs (and any other real
+render leg -- they cost zero extra legs):**
+
+Both were eyeball observations against a story engine that has since had its LLM
+vetoes ripped, THE LAW imposed, six banks renamed onto new packs, word-fit ceilings
+retired, the repair-first plan landed, and a ledger cleanup pass added. Neither has a
+reproduction at current HEAD, and under the standing rule a finding with no
+reproduction is not a row. **Do NOT schedule coder time against either.** They are
+settled by the operator eyeballing a real render leg: still there -> re-admit
+as a FRESH dated row with that leg as evidence; gone -> the LAW-era work already fixed
+it, tombstone it.
+
+- **Announcer framing defect** (`docs/2026-07-11-announcer-framing-defect.md`).
+  Episodes START a story instead of admitting you into one; the announcer takes debate
+  turns instead of framing. Operator eyeball 2026-07-11. If it survives re-observation
+  the fix is still seam + score contract + fail-closed validator, never Python
+  authorship.
+- **Name-splice defect #2.** v4-campaign Phase 0 record in HANDOFF_LOG; its timebox
+  predates THE LAW.
+
+### Batch R6 as it stood (seven 45-word proofs from a broken cross-reference)
+
+### Batch R6 -- SEVEN 45-word engine proofs (from the archived 2026-08-13 runway table, row 3 -- CONFIRM STILL OWED before spending seven legs)
+
+Lifted verbatim from the archived table: **Run seven fresh post-change 45-word
+render proofs.** Exit condition: All seven exact public engine IDs pass against
+the post-bugfix/post-Lemmy HEAD with `COVERS`, `RESULT SUCCESS`, server
+`Prompt executed` + `obs_publish OK`, and the canonical OBS asset on disk.
+
+**Flagged 2026-08-28:** the row's "See WHAT IS ACTUALLY LEFT below" pointer is
+one of the eleven cross-references the 2026-08-16 audit already recorded as
+BROKEN (target removed before the audit; see the archive). The engine list must
+be re-derived from the live registry, and whether all seven proofs are still
+owed at current HEAD has not been re-verified. Confirm before rendering.
+
+### Batch R7: the clip-by-clip Leg C .. C5 narrative and the README-pass DONE block (receipts: 4060_CLEANROOM.md, PBUG-20260902-01/-02, 66da15da, 756c64f4)
+
+### Batch R7 -- THE 4060 CLEAN-ROOM RETRY: first measured 8 GB result for a non-AnimateDiff video lane
+
+The clean room is built and stays on disk: `C:\OTR-CleanRoom` on the 4060 (fresh
+portable v0.34.0, Python 3.13.14, OTR clone, ComfyUI-GGUF pinned + patched, 52 GB of
+pinned weights placed, two headless profiles `otr_cleanroom_8gb_ltx25` and
+`otr_cleanroom_8gb_humo17` on bark voices). Server and legs start through Task
+Scheduler (`_boot_stock.cmd STOCK LOWVRAM`, `_leg_stock.cmd`), never from an SSH
+session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
+
+* Leg A: `otr_cleanroom_8gb_ltx25`, `public_domain`, 1 act, with
+  `--disable-dynamic-vram --lowvram --disable-pinned-memory`. The stock launch aborted
+  in the first z_image still (Section 3 L); this leg is what tells whether the lane
+  itself fits after the still is out of the way.
+* Leg B: `otr_cleanroom_8gb_humo17` behind it (no extra node pack; 13.6 GB of
+  Comfy-Org weights).
+* Leg C: RAN 2026-09-02 (profile `otr_cleanroom_8gb_klein_ltx25`, Klein Q4 GGUF stills +
+  LTX 2.5). Under the STOCK loader Klein did NOT abort -- the Z-Image abort is
+  engine-specific -- and minted a clean 832x480 still, but ONE still took ~42 min: the
+  7.7 GB bf16 Qwen3-4B encoder stayed on the card and the DiT loaded with "0.00 MB usable"
+  (120 s per step). The lowvram flag pair (Leg C2) was IDENTICAL (143 s per step), so the
+  flags were never the answer. ROOT CAUSE FIXED in 9b90189a: the three local image engines
+  ran the graph without `free_after_use` (every video engine has it), so the encoder never
+  left the card before the sampler; fix proven byte-identical on the 5080 with 5-7 GB lower
+  peak (PBUG-20260902-01, Bible 12.145). Leg C3 (that fix, STOCK flags) was UNCHANGED:
+  under ComfyUI 0.34 DynamicVRAM the dropped encoder leaves an orphaned VBAR that only
+  another dynamic model's pressure reclaims, and the GGUF DiT is a classic patcher. Measured
+  in-process on the clean room and fixed in ad6a635f: `run_graph(..., evict_after_use=
+  {"clip"})` unloads the named dynamic patcher through ComfyUI's own registry at its drop
+  (free 620 MB -> 6998 MB; a 2-step Klein render 9.4 s vs ~4 min). Four-round arc on two
+  substitute seats, `docs/2026-09-02-encoder-eviction/driver_anchor.md`; 5080 proof on both
+  paths byte-identical. Leg C4 (ad6a635f, STOCK flags) FAILED the same way, and the
+  instrumented Leg C4b showed why: the encoder had never occupied the card (0 resident
+  pages at its drop; 48 MB free) -- the WRITER LLM that composed the still prompts was
+  still resident, and nothing in the general path released it before the image stage
+  (PBUG-20260902-02). Fixed in da2b7a36: `OTR_ImageGenDispatcher` calls the canonical
+  `free_otr_pipeline_residue()` once per dispatch before the first local still. Measured
+  on the 5080 first: the 12B writer (7.4 GB) had been co-resident with every still there
+  too (`allocated 7387 -> 6`, `free 14.4 GB after`, five stills then minted cleanly). Leg C5
+  (da2b7a36, STOCK flags, 06:09) PASSED on the 4060: `free 6.9 GB after`, `Requested to
+  load Flux2 / loaded completely; 5560.68 MB usable, 2591.65 MB loaded`, 1.07 s per step
+  (~21 s a still, was ~42 min), nine stills in one server process, then on into LTX 2.5.
+  Klein on 8 GB under stock launch flags is MEASURED. And Leg A's own question got its
+  first answer on the same leg: LTX 2.5 (Q3_K_M DiT, 12B encoder pinned to CPU by the
+  engine) renders on the 4060 under stock flags -- two-stage passes at 1664x960, 1018 s
+  for the first clip and 827-851 s after (DiT half offloaded), six clips by 07:47 with
+  ~20 in the episode, so ~14 min a clip and a five-hour episode. It WORKS on 8 GB; it is
+  not a daily driver at that pace. PROVEN (matrix) waits for that episode to reach the
+  clean room's obs (~10:30-11:00 on 2026-09-02) and for an operator eyeball.
+* Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
+  `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
+  `docs/MACHINE_MATRIX.md`. Do not advertise a lane the clean room did not finish.
+  DONE 2026-09-02 (66da15da, 756c64f4): the README newbie pass landed from a four-reader
+  audit (three templates named, the Python 3.13 voice fix by node and dropdown, IndexTTS2's
+  own installer, the 8 GB Klein / LTX 2.5 facts, AMD and Mac rows, the LTXVideo pin and
+  patch, the measured `known_limits` line and a regenerated matrix); the provisioner now
+  pins AnimateDiff-Evolved (release 1.6.0) like the other two packs. Still owed from the
+  audit: `pyproject.toml`'s kokoro marker (in the alpha.15 patch, the operator's registry
+  push) and a shipped 8 GB Klein + LTX 2.5 profile (Section 1.0).
+
+### Batch R1 as it stood: the H3 leg command and its 2026-08-27 correction (the leg was spent by two post-fix episodes)
+
+### Batch R1 -- ONE leg on `otr_w45_minimax_h3_video` proves the H3 prompt-policy fix
+
+**The code is shipped, green and pushed (`e923a9f3`, suite 12332/121/1). What
+is missing is the one thing CPU tests cannot supply: a published episode.**
+
+A vanilla canonical run does NOT prove it -- the canonical defaults to the
+still floor, so no character beat reaches H3 at all. The leg has to select
+`minimax_h3_video` deliberately.
+
+**THE COMMAND IS READY -- do not improvise a harness.**
+`scripts/otr_headless_canonical.ps1` is the sanctioned wrapper: it resets
+selectively, boots the UTF-8 launcher, and ALWAYS loads the real canonical.
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile otr_w45_minimax_h3_video -Acts 1
+```
+
+**CORRECTED 2026-08-27, after the wrong version of this command failed a live
+leg.** The first version here said to pin the engine with
+`-Set "OTR_VideoDirector.character_video_model=..."`. That is REFUSED by
+design: `patch_creative` whitelists CREATIVE widgets only (writers, seeds,
+banks), and the video-model widgets are MANAGED -- engine routing goes through
+a PROFILE (`scripts/otr_api.py:831`, `CREATIVE_WHITELIST`).
+`otr_w45_minimax_h3_video` is the sanctioned profile: all three roles on
+`h3_low_video` AND the h3 boot contract the engine ENFORCES
+(`--reserve-vram 12`, `--disable-pinned-memory`) -- a default boot would have
+been refused even if the patch had landed. Writers DO ride as `-Set`
+(whitelisted), e.g.
+`-Set "OTR_LedgerScriptWriter.technical_model=google/gemma-4-12b-it (11.9 GB)"`.
+
+* Reset per `CLAUDE.md` section 4 (selective kill by CommandLine, port 8000
+  empty, GPU back to ~1.5 GB); the wrapper does this, but verify it happened.
+* **A FRESH EPISODE ID IS MANDATORY.** `request_hash` excludes prompt bytes, so
+  an existing clip is cache-eligible and an old SPEAKING clip would be reused
+  -- a false pass that looks exactly like a real one.
+* Publish to `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` and confirm the
+  asset on disk with a current timestamp plus `obs_publish OK`.
+* **Read the prompt receipt, which is the actual verdict:** nonverbal action
+  and camera PRESENT; the beat's exact dialogue and any speaking / lip-sync /
+  mouth anchor ABSENT.
+
+**The BEFORE sample already exists and must be preserved:**
+`signal_lost_the_caretakers_clause_20260826_155835` in `otr/obs/` -- every beat
+on `minimax_h3_video`, rendered before the fix. Do not overwrite it or reuse
+its episode identity; it is half of the A/B.
+
+### Deferred render items: the LOCAL mistral/gemma writer matrix (forbidden by the 2026-08-04 story-quality directive)
+
+- **The LOCAL mistral/gemma writer matrix** (render-window judgment question,
+  not a coder slot). The Sonnet arm of the creative-writer question is answered
+  (`docs/2026-07-17-model-bakeoff-scoreboard.md`); the local roster comparison
+  never ran.
+
+### Section 3 (F) detail: the hop-by-hop WAN chain, the July 8 GB writer diagnosis and the A2 causal-chain correction
+
+- **WAN 8-GB low-VRAM launch contract -- CODE-COMPLETE and PROOF-INCOMPLETE. It is
+  not a coding item; the one thing blocking it is an OPERATOR DECISION.**
+
+  **Already BUILT and WIRED end to end** (verified hop by hop): `otr_8gb_wan.json`
+  `video.max_render_frames=17` -> `capability_profiles` optional-key validator ->
+  `_otr_workflow_apply.py:532` flatten -> `workflows/variants/otr_8gb_wan.json`
+  node-87 widget slot 14 = 17 -> `otr_video_director.py:423` policy stamp ->
+  `otr_shot_lock.py:1722` `ledger.video.max_render_frames` ->
+  `render_driver.py:3328` per-adapter policy -> `motion_common.profile_max_render_frames()`
+  -> `eng_wan_ti2v._floor_length` hard cap (`:730`) and `_planned_length` refusal
+  (`:785`), with `render_driver.py:3845` refusing on drift. Landed `f914f0a4`, dead
+  node-87 widget repaired `7f4644a1` + `8f41af27`, WAN deliberately excluded from
+  `frame_contract.PLANNING_CAP_ENGINES` by `b23fc035`, recipe frozen `71753cb4` /
+  `8424f369`, whole-beat single-UNET-load `439ce8c7`. Regression net:
+  `tests/test_remaining_video_contracts.py:16-194` (nine hop-by-hop tests) plus
+  `tests/test_multiclip_effective_contract.py:216,234`.
+
+  **THE ONE OPERATOR DECISION (the actual blocker).** The ceiling reaches a leg ONLY
+  through a variant workflow or a hand-set widget: `otr_canonical.json` node 87 ships
+  `max_render_frames=0`, so a plain canonical WAN run is UNPINNED and inherits
+  `_TI2V_MAX_FRAMES = 177` -- exactly the 2026-07-23 failure shape. The obvious patch
+  (pin 17 in the canonical) is WRONG: the canonical serves every tier, and 17 is the
+  8-GB tier's number, so pinning it would cap LTX/HuMo 16-GB legs too. The channel
+  that carries 17 today is `config/profiles/*.json`, which is on the RETIREMENT list
+  -- so writing new behaviour onto it is forbidden. **Decision needed: after profile
+  retirement, who owns a tier's native render ceiling?** The shape that fits the
+  per-adapter-ownership doctrine is that `eng_wan_ti2v` DECLARES its own tier ceiling
+  (a capability-row field), the widget becomes an operator OVERRIDE with 0 meaning
+  "use the adapter's own contract", and the profile channel stops mattering. That is
+  a real design change with a live-behaviour blast radius on any card with headroom
+  (the VRAM predictor currently gets to ask for more than 17 and often can), so it is
+  NOT being written on assumption. Ratify the shape first.
+
+  **Also open, all PROOF obligations rather than build work:** the 18-engine GPU
+  campaign is engine COVERAGE, not an 8-GB qualification; and a render on a PHYSICAL
+  8 GB card is still owed -- the four-arm bench PREQUALIFIED on a 16 GB card told to
+  reserve 8 GiB, which is not the same claim.
+
+  **One untested edge, cheap to close whenever this reopens:** WAN is out of
+  `PLANNING_CAP_ENGINES`, so a tier ceiling and a multi-clip plan CAN contradict by
+  design, and `_planned_length` hard-refuses mid-episode when they do -- but no test
+  asserts a 17-frame tier survives a multi-segment beat. `:216`/`:234` in
+  `test_multiclip_effective_contract.py` pin the topology, not that outcome.
+- **THE 8 GB PROFILE FAMILY CANNOT RUN ITS OWN WRITER** (found 2026-07-27;
+  LIVE-REPRODUCED TWICE on two different banks, then confirmed by a two-strikes
+  kibitz panel -- codex `gpt-5.6-sol` high and agy independently reached the same
+  diagnosis). `config/profiles/otr_8gb_ltx.json` pairs a 12B GGUF writer
+  (`gemma-4-12b-it-Q4_K_M`, 6.63 GB of weights) with `llm.gguf_n_ctx: 2048` under a
+  declared `vram_ceiling_gb: 6.8`. The pipeline's own smallest prompt needs **2064
+  input tokens** and P0 reserves 2800 output (`_P0_BASE_OUTPUT_TOKENS`), so the leg
+  dies in `OTR_LedgerScriptWriter` before any render. Live preflight, verbatim:
+  `Needed=8.13 GB (weights=6.63, kv=1.40 @ n_ctx=2048)`. **ctx is the SYMPTOM; the
+  writer MODEL is the cause** -- 4096 puts it near 9.4-9.5 GB, OOM on the very card
+  the tier exists for. Every 2048-ctx profile (`otr_8gb_ltx`, `otr_8gb_wan`,
+  `8gb_lite`, `cpu_floor`, `otr_amd8_rocm`, `otr_cloud_lanes`) is `status=draft` and
+  every one pairs 2048 with the 12B; the only `status=shipping` profile is
+  `16gb_full` (4096 + Mistral-Nemo). **NOT a one-line profile edit:** the GGUF
+  registry ships exactly two rows (`unsloth/gemma-4-12b-it-GGUF`,
+  `unsloth/Qwen3-8B-GGUF`); `google/gemma-2-2b-it` is in the TRANSFORMERS catalog, a
+  different lane -- agy proposed it and was wrong, recorded so nobody re-derives it.
+  **Largely mooted by profile retirement:** with no profile passed, the canonical
+  JSON's own `gguf_n_ctx=4096` / Q8_0 binds and the leg runs. **Fix the profiles or
+  finish retiring them; do not leave both.**
+- **A2 -- HELD pending the profile retire-now vs retire-later scope. The profile's
+  `llm` section silently overrides the canonical JSON, and the applied-overrides echo
+  HIDES it.** Held because its entire subject is `apply_profile_to_workflow` and the
+  printed echo -- a channel directed to be retired, so building on it now may be work
+  on something scheduled for deletion. The fix SHAPE is correct and ready when the
+  scope is settled. The profile's `llm.*` values win over the widgets the operator set
+  in `otr_canonical.json` (which ships `creative`/`technical` = `google/gemma-4-12b-it`,
+  `gguf_n_ctx=4096`, `gguf_quant=Q8_0`, `llm_vram_ceiling_gb=14.5`), while
+  `scripts/otr_api.py:817` flattens only `role_overrides` / `slot_overrides` /
+  `features` + two `seed_policy` keys for the printed summary -- so the run reports
+  "16 overrides" while ALSO having replaced the entire LLM configuration. **Causal
+  chain corrected** (triage 2026-07-27, codex; grounded): the override does NOT come
+  from the validator's `OTR_ACTIVE_PROFILE` export -- it happens at submission,
+  `scripts/otr_canonical_api_run.py:157` -> `apply_profile_to_workflow`; and the real
+  applier (`nodes/_otr_workflow_apply.py:492-540`) ALREADY flattens `llm`; only the
+  printed echo is stale. **Fix: generate the echo FROM the applier's flattened map.**
+  Adding `llm` to the echo by hand leaves the next drift intact.
+
+### Section 3 J preamble, K (ruled) and L (measured) as they stood
+
+#### J. THE REGISTRY -- one push, then one control experiment
+
+The gate is a SECRET scanner, not an exec linter (Comfy-Org backend,
+`registry_svc.go:1392-1455`): any non-empty scanner response flags the version and
+the reason goes to their private Discord. Two versions exist, both Flagged, no
+Active, no rollback target (the node hard-delete freed alpha.8's string).
+
+* **J1. Push alpha.15** -- `docs/ship-audit-2026-09-01/pyproject_alpha15.patch`
+  applies cleanly (version bump, pycairo/pillow/aiohttp, bitsandbytes
+  `sys_platform != 'darwin'`, kokoro `python_version < '3.13'`). The README's
+  token-shaped literal, the only shipped string matching a published secret rule,
+  is already gone (`64d81ca7`). Operator's push; the file is a release trigger.
+* **J2. If alpha.15 flags, run the control:** republish the alpha.8 tree
+  (`e44235f5`) byte-identical as alpha.16. Active means the trigger is in the
+  alpha.9+ delta and can be bisected; Flagged means the ruleset moved and that
+  result is the evidence to hand Comfy-Org. Never version-delete (soft delete burns
+  the string).
+
+#### K. DEFAULT VOICE -- RULED 2026-09-01: kokoro-onnx is the go-to
+
+Operator: *"kokoro onnx is our new go-to."* Same Kokoro-82M voices, ONNX Runtime instead of
+the torch `kokoro` package, so it installs on Python 3.13 (the interpreter ComfyUI Desktop and
+the portable ship) and on Linux and Mac. Build row: Section 1.11. Until it lands, the 3.13
+sets run bark. Nothing else is open here.
+
+#### L. THE 8 GB IMAGE ENGINE ABORTS THE PROCESS UNDER A STOCK LAUNCH
+
+On a never-touched portable install with stock flags, the first z_image_turbo still
+(int8 convrot) aborted the whole ComfyUI process at sampler step 5/8 under
+DynamicVRAM (`Fatal Python error: Aborted`, stack in comfy/ldm/lumina/model.py; the
+drill's PBUG-03 shape). The known workaround is a launch flag pair
+(`--disable-dynamic-vram --lowvram`), i.e. a special thing a newcomer does not know.
+Decide: the 8 GB dropdown set avoids z_image stills, or the launch flags become a
+documented requirement for 8 GB, or both until ComfyUI answers the faulthandler
+report. Default if unruled: the flags are documented in README for 8 GB and the
+retry (Batch R7) measures the lanes behind them.
+Half-answered by 1.12 (2026-09-01): the 8 GB set now runs Klein stills, so it avoids
+z_image by ruling rather than by this abort; whether the abort is engine-specific is
+what Leg C measures. The launch-flag question stays open for anyone who picks Z-Image
+on 8 GB from the dropdown.
+
+### Section 3 question (A) shipping history and the (I) reframing narrative
+
+* **(A) Arm `defaults.scene_coherence_check` on any bank?** The G15 vacuity fix
+  shipped 2026-08-28 (`e2807dcc`; receipt in the archive) but nothing arms the
+  gate today -- the fix changed a function with zero live callers in current
+  production, by design, so it shipped at zero risk. GO_FORWARD's original text
+  said "measure OFFLINE over the published corpus first, then arm in ONE
+  change" -- that measurement was never attempted and stays open. Whoever picks
+  this up next decides first whether any bank should arm it at all before
+  running that measurement. (The measurement itself is no-render work once
+  ruled.)
+
+### Section 3 standing context for (I) as it stood
+
+#### Standing context for question (I): MINIMAX H3 -- A SPRINT SERIES ON THE VIDEO PATHS (operator, 2026-08-09)
+
+**THE RULING IS IN, AND IT DISSOLVES THE OLD QUESTION.** This section used to
+say the next step was an operator ruling on "does H3 belong in the video
+dropdown given the 4 s floor vs the sub-4 s beats". That framing is RETIRED.
+The operator's 2026-08-09 direction: H3 is **"a series of sprints all to refine
+the video paths"** -- scope TBA.
+
+**What that changes for a window picking this up:**
+* It is NOT a yes/no dropdown admission any more, so do not go looking for a
+  verdict to record. There is nothing blocked on the operator here.
+* The unit of work is a SPRINT against the video paths, not a one-shot chunk.
+  Expect several, each with its own kibitz gate, each landing green and pushed
+  on its own.
+* The 4 s floor is now an INPUT to that refinement -- a constraint the video
+  paths have to accommodate or explicitly route around -- rather than a
+  disqualifier that settles admission.
+
+**Scope is TBA and that is deliberate.** Do NOT invent the sprint list. When the
+operator names the first sprint, write it into Section 1 or 2 of this file as
+its own row, and leave this section as the standing context.
+
+**Grounding that survives the reframing:**
+* Problem statement `docs/2026-08-03-PROBLEM-STATEMENT-minimax-h3.md` is
+  UNTRACKED and another window's working file -- never stage, edit or delete it
+  from a different window. Read it; do not touch it.
+* The matrix-pattern spec already names MiniMax as a churn driver
+  (`docs/2026-08-06-SPEC-subsystem-matrix-pattern.md` section 5), so a video-path
+  sprint will likely collide with the un-converged matrix work (section 0). Read
+  that section's "what survived all four rounds" before designing anything.
+* The recipes are NOT on the table (standing directive). A video-path sprint
+  refines PATHS -- routing, canvas negotiation, admission, extension -- never
+  the shipped render recipe.
+
+### THE QUEUE item 2 as it stood: the ghost pool r1 judgment with code excerpts
+
+**2. GHOST POOL -- r1 IS IN, AND IT DISSOLVES THE BUG.** Panel fired
+2026-08-31 (Codex `no`, Antigravity `yes-with-fixes`, Cursor `no`); artifacts in
+`kibitz-runs/2026-08-31-ghost-clause-pool/r1/` (gitignored, local only).
+
+**Uniqueness is measured on the wrong thing.** Verified against the files, not
+taken on the panel's word:
+
+    GHOST_V2_SLOTS = ("pack_cue", "motif", "leaf", "law")   prompt.py:824
+    motif_for_character(components, mode, seed_int)          author.py:644
+    key = leaf.casefold()                                    shot_lock.py:2313
+
+The picture is four slots; the duplicate check reads one. Two beats with the
+same leaf but different CHARACTERS compose different prompts and render
+different pictures -- and the rule rejects them anyway. That is why 6 -> 18
+failed and why 50 would fail too. **The pool is not too small; the test is too
+strict, in a way that does not match what a viewer would notice.**
+
+**BUILD:** uniqueness on the FINALIZED POSITIVE PROMPT, applied identically to
+writer output, replay and the deterministic path -- capacity becomes clauses x
+motifs and the arithmetic failure stops existing. Then a bounded progression,
+total by construction: unused finalized prompt -> reuse a leaf where a different
+motif keeps the prompt new -> reuse the least-recent signature, deterministic on
+`episode_seed + beat_id`, never adjacent. The allocator returns a PER-BEAT reuse
+disposition appended to that beat's existing `fallback_reason` (ShotLock
+currently stamps one batch-wide reason over every object, which would erase the
+original model-failure reason).
+
+**Only pool exhaustion becomes recoverable.** My anchor said "a fallback that
+can raise is not a fallback" and that was overbroad: `GhostAuthorError` has 10
+raise sites covering unknown mode, missing bookend motif, invalid role and an
+empty `motif_cue`. Those are structural corruption and stay loud --
+OOM-or-nothing governs render refusals, not schema violations.
+
+**CUT, so nobody rebuilds them:** the combinatorial generator (a second grammar
+engine before the proxy is fixed), act-scoped uniqueness (verified: no
+authoritative act field exists -- the spec carries beat, role, mode, motif,
+ordinal and arc cue; ShotLock supplies only a mapped `arc_phase`), and "loud
+handover" (it is controlled reuse under a second name).
+
+**DONE WHEN:** >18 same-mode beats complete; mixed replay plus fresh authoring
+completes; all three paths share the invariant; adjacent finalized prompts never
+repeat; same seed gives identical output AND receipts; every beat keeps a valid
+`ghost_prompt`; then the failing five-act topology through
+`workflows/otr_canonical.json` with `obs_publish OK` and the file verified on
+disk. **Existing tests encode the obsolete absolute-leaf rule
+(`test_ghost_prompt_v2_lane.py:399-405, 437-451`;
+`test_ghost_signal_author.py:925-931`) and must be REPLACED with the new
+invariant, not deleted.**
+
+*Open from r1:* whether the anchor's "roughly 70 minutes" belongs to this
+failure or to a `GhostCadenceError` (unseparated); and the panel's own
+assumption that "no adjacent repeat" is the right viewer threshold, which wants
+checking against frames rather than more reasoning.
+
+### Section 1 coding order (2026-08-28) and its reordering rationale
+
+**THE CODING ORDER (2026-08-28, operator-set and REORDERED the same day on
+his instruction: the 4060 set moves LAST -- "I don't want to test [the] 4060
+until we are done with all other bugs." The 4060 test is the CAPSTONE: it
+runs once, on a tree with every other bug already closed, so the frictionless
+verdict is not polluted by known-open defects):**
+
+1. **The kokoro-onnx backend** (1.11 below, and item 1 of THE CURRENT STEP) -- the
+   operator's ruled default voice; a design item, so its kibitz arc comes first.
+2. **Gender-ladder: SPEC v2 -> one review round -> CODE** (1.3; the spec is
+   written and pushed, the code is not started; three NOs in its history
+   mean the round is not optional).
+3. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
+   GPU, do not contend with a render).
+4. **Image defaults** (1.12 below) -- APPLIED 2026-09-01: Klein in every 8 GB / 12 GB /
+   AMD profile, AMD images-only, Z-Image cfg 2.0 -> 1.0 on the operator's A/B. Batch R7
+   Leg C then found and fixed the 8 GB residency defects (9b90189a + ad6a635f: the text
+   encoder leaves the card before the sampler; da2b7a36: the dispatcher releases the
+   writer LLM before the first local still -- the first-order cause, on the 5080 too);
+   Leg C5 is the 8 GB measurement of the shipped code. **Auto-download** (1.13 below)
+   -- design row, confirm to schedule.
+5. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
+   2026-09-01 audit; each is a design item with more than one defensible answer.
+6. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
+   recipe; no new guides.
+7. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
+   republish sequence it gates: operator applies the alpha.15 patch -> clean
+   publish -> the 4060 template test.
+8. Handoff bookkeeping.
+
+### Section 1.0 the 4060 frictionless set as it stood
+
+#### 1.0 THE 4060 FRICTIONLESS SET (the CAPSTONE -- runs LAST, after every other bug closes; the path to "download the template, click run" on his 4060)
+
+What is still open on this set (the kokoro declaration, the shipped template and the
+README table landed 2026-08-29 to 2026-09-01; receipts in the archive):
+
+* **`workflows/variants/otr_4060_floor.json` `quant_policy`** -- verify what the
+  variant carries today before touching it; the 2026-08-28 note said `"none"` ->
+  `"bnb_nf4"` was the one line blocking the 10 GB writer, and the 2026-09-01
+  clean room ran the floor's E2B writer unquantized at ~2-4 tok/s on 8 GB.
+* **README model table** from the compatibility workbook's Baseline Combos tab
+  (`outputs/20260828-ungated-models/`, the LIVING fact sheet: edit cells in place,
+  never add a changelog tab). The HF-token two-tier story is now in README 2c/3.
+* **THE TRAP: `pyproject.toml` edits AUTO-FIRE a registry publish.** The prepared
+  release commit is `docs/ship-audit-2026-09-01/pyproject_alpha15.patch` (version
+  bump, pycairo/pillow/aiohttp, bitsandbytes and kokoro markers). ONE operator push.
+* **The clean-room retry** (Section 2, Batch R7) is what proves this set.
+
+### Section 1.12 image engine defaults: the ruling facts, the DONE 2026-09-01 block and the Leg C bullet
+
+#### 1.12 IMAGE ENGINE DEFAULTS -- RULED 2026-09-01: Klein 4B Q4 GGUF for the low-VRAM set
+
+Operator: *"Klein 4B Q4 GGUF can be the default for Mac / AMD and 30/40/50 series low VRAM
+JSON."* Z-Image-Turbo stays the 16 GB NVIDIA default (45 published episodes; nvfp4 on
+Blackwell). Facts the row rests on: Klein is 4B, Apache-2.0, a Comfy-Org repackage, zero
+refusals across 35 stills in the last sweep; the Q4 GGUF DiT is 2.6 GB
+(`Latentiq/FLUX.2-klein-4B-GGUF`, ungated) plus the 8 GB `qwen_3_4b` encoder (offloads before
+sampling) and the 0.34 GB VAE; it loads through `UnetLoaderGGUF`, so the ComfyUI-GGUF pack the
+LTX 2.5 lane already requires is the one prerequisite (README 2b names it).
+
+DONE 2026-09-01 (the 5080 window, one commit; the canonical keeps `z_image_turbo`):
+* Image slots (`announcer_image`, `music_image`, `character_image`) are `flux2_klein` in all
+  19 low-VRAM profiles (`otr_nvidia_8gb_*`, `otr_8gb_*`, `8gb_lite`, `otr_4060_*`,
+  `otr_nv40_12gb`, `otr_amd8_rocm`, `otr_amd16_rocm`) and `config/machine_classes.json`
+  carries `image: flux2_klein` for the 8gb, 12gb and amd classes; variants and
+  `docs/MACHINE_MATRIX.md` regenerated. `otr_mac_mps` and `cpu_floor` are untouched: both
+  are `draft`, already images-only (`still_motion`), and run `google_image` because no local
+  image engine declares `mps` or `cpu` in the registry yet (next bullet).
+* Mac and AMD ship IMAGES ONLY: both AMD profiles run `still_motion` for the character lane
+  and the procedural viz lanes for announcer and music; the amd class `video` is
+  `still_motion` and the matrix reads it.
+* **Z-Image recipe: cfg 2.0 -> 1.0** (`nodes/_otr_image_engines/z_image_turbo.py`, the
+  reference A/B harness pin, and its tests). A same-seed A/B on nvfp4 AND bf16 showed the
+  "bloody faces" look tracks cfg 2.0, not the 4-bit weight; the operator picked the cfg 1.0
+  frames. The negative is inert at cfg 1.0, as it is for Flux; `OTR_ZIMAGE_CFG` overrides.
+  Receipts: `docs/2026-09-01-16GB-IMAGE-ENGINE-PROBLEM-STATEMENT.md`,
+  `docs/ship-audit-2026-09-01/image-jury/zab_*.png`.
+
+Still owed:
+* Registry: `nodes/_otr_image_engines/registry.py` gains `mps` on the `flux2_klein` row ONLY
+  after one measured render on Apple Silicon; then `otr_mac_mps` flips to Klein. ROCm already
+  qualifies (presents as cuda).
+* Batch R7 Leg C (RAN 2026-09-02, see Batch R7): Klein renders on 8 GB under the stock
+  loader and the Z-Image abort is engine-specific; the 42-min-per-still residency defect it
+  exposed is fixed in three commits -- 9b90189a and ad6a635f (the encoder leaves the card
+  at its drop, classic and DynamicVRAM paths; a real second-order defect, proven on the
+  5080) and da2b7a36 (the first-order one: the dispatcher releases the writer LLM before
+  the first local still; the 5080 had a 7.4 GB writer co-resident with every still too).
+  Klein on 8 GB under stock launch flags is now MEASURED (Leg C5: ~21 s a still, 1.07 s
+  per step, two stills in one process). The matrix says PROVEN only for what PUBLISHED;
+  the 8 GB row's image column flips when a Klein episode reaches obs, which now depends
+  on the video lane behind it (LTX 2.5 on 8 GB: Leg A's question, being answered by the
+  same Leg C5 as it runs on).
+* The cfg 1.0 promotion step: the same four A/B cells on three real episode prompts
+
+### Section 4 as it stood (the four lifted rulings; now in OTR_STANDING_RULINGS.md)
+
+## SECTION 4 -- STANDING RULINGS LIFTED FROM ARCHIVED BLOCKS (2026-08-28)
+
+Lifted VERBATIM before their blocks moved to the archive. The full
+standing-rulings authority remains `docs/OTR_STANDING_RULINGS.md`.
+
+* From the archived 2026-08-13 runway table, row 4: **"The multi-GPU
+  learned-upscale stage itself is CLOSED and must not be reopened."** (The
+  narrow `SpandrelEsrgan._resolve_model` hardening closed 2026-08-28; archived.)
+* From the same table, row 1: **"Do NOT restart from the Story Lab."** (The lab
+  is parked, read-only and being retired; the story work happens in
+  production.)
+* **Operator acceptance 2026-08-28: LTX 2.5 vocalizing its prompt is CLOSED --
+  it is not an open investigation.** Do not re-open it from older text. The
+  named-sounds cue table, the joint-AV identity/prose removal, the runtime
+  identity-leak guard and the ASR stem auditor are the shipped answer; receipts
+  in the archive, `docs/PROD_BUG_LOG.md` and `git log` (`d3cca496`..`5cd4dcc8`).
+* From the archived GGUF generation-deadline row (CLOSED 2026-08-25), the
+  reusable lesson the row was kept for: **"A reachability question answered
+  against the default path only is not answered."**
+
+---
+
+### Section 5 parked voice reference bank: the measured table and why-parked narrative
+
+#### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+
+**Status: PARKED, not rejected.** Operator: *"park it on go forward."* Raised
+after the operator observed we should have far more voices than the writer is
+being offered. He was right, by a wide margin.
+
+##### The finding, measured live
+
+| pool | count | what it serves |
+|------|-------|----------------|
+| Bark `VOICE_PROFILES` (`config/cast_pools.py`) | **10** (6M/4F) | what the writer's casting menu offers |
+| Kokoro presets on disk | 4 | ANNOUNCER only, a separate namespace |
+| **Voice reference bank** (`config/voice_reference_bank.json`) | **204 declared, 153 resolvable on disk** (97M/106F/1N) | IndexTTS2 / Dia / Chatterbox cloning |
+
+`_otr_voice_bank.default_char_engine()` returns **`indextts2`**, promoted to the
+shipped character-voice default on 2026-06-04. It is a zero-shot CLONING engine:
+`requires_voice_ref = True`, `voice_ref_kind = "wav_path"`. Every reference clip
+is a distinct voice.
+
+So the writer casts from **10 Bark presets** while the engine that actually
+speaks the characters draws from a **153-voice reference bank**.
+`_otr_casting.py` states it outright -- *"Open-character voices are always drawn
+from the Bark pool (VOICE_PROFILES in config/cast_pools.py), so the tts_model is
+Bark by construction"* -- and `_assert_unique_bark_voices` enforces uniqueness
+across those 10.
+
+##### Why this is parked rather than done
+
+`MAX_SPEAKING_CAST = 10` was set from the Bark pool and is therefore a Bark
+artifact, not a real ceiling. But raising the constant alone achieves NOTHING:
+`_deal_voice_menu` builds the menu from `VOICE_PROFILES` and refuses with
+*"voice stock capacity 10 < cast size N"*. The actual work is pointing the
+casting menu at the reference bank when the character engine is a cloning
+engine.
+
+**That is why it is parked and not done unilaterally.** It changes what
+`voice_preset` and `tts_model` MEAN on every cast row, and cast rows are ledger
+JOIN KEYS -- `cast[].name` / `char_id` / `voice_preset` / `voice_ref_id` /
+`voice_engine`, joined from `lines[].speaker` and `beats[].char_id`. Under the
+operator's hard rule (*the writer must OBEY the ledger for downstream content; a
+hole in the ledger is a broken render*), a change of that shape needs every
+field's owner enumerated BEFORE the call is moved, not after.
+
+### Section 6 standing traps as they stood (now in OTR_STANDING_RULINGS.md KNOWN OPEN)
+
+## SECTION 6 -- STANDING TRAPS AND RECORDED LIMITS (carried knowledge; no scheduled work)
+
+#### Test-harness and tooling
+
+- **The B7 forbidden sweep cannot see an UNTRACKED file, so a new test file passes the
+  gate and fails one commit later.** `tests/test_b7_forbidden_sweep.py` builds its
+  input from `git diff s29-clean-slate-gate -- *.py`, which covers tracked files only.
+  A new test file added and gated in the same session is green; the moment it is
+  committed it enters the diff, and a forbidden runtime identifier in it turns HEAD red
+  with nothing else changed. Cost one red HEAD. **Not fixed, because the fix is a
+  judgment call:** sweeping the working tree instead of the diff would widen the gate
+  to every untouched file in the repo. Cheap mitigation until then -- re-run the full
+  suite once after the FIRST commit of any new test file.
+- A runner that discards the encoder's return value and recomputes the frame count
+  independently will disagree with it silently (the 2026-08-23 bake-off finding; the
+  runners are gone, the lesson carries into any replacement sweep).
+- **LATENT, not reachable today: the fewest-segments partitioner can accept a
+  disproportionate trim on a WIDE discrete menu.** WIRE-W1 makes `partition_beat` take
+  the lowest segment count that covers, including via a permitted tail trim. On a
+  ladder that is always the right trade; on a DISCRETE menu whose largest entry dwarfs
+  its smallest it need not be -- covering 1019 frames from a `(10, 999)` menu, two
+  segments give `[999, 999]` and discard 979 frames where three give `[999, 10, 10]`
+  exactly. **A bound was written, MEASURED and REVERTED, and the measurement is the
+  point:** rejecting a trim of a whole smallest-clip turned `[12, 12]` into
+  `[12, 4, 4]` on a `min=4 max=12 quantum=8` ladder -- a third render and a third model
+  load to recover four frames -- across 4,885 cases in the sweep grid. The widest
+  shipped menus are Veo's `(100, 150, 200)` and Pixverse's `(125, 200)`, whose worst
+  real trim is 25 frames. Revisit only if an adapter declares a menu with an extreme
+  ratio; the reasoning is recorded in `coverage_plan.partition_beat` so the next reader
+  does not re-derive the bound and re-ship the regression.
+
+---
+
+### Open risks: the check_compatibility argument in full (now Section 3 question K)
+
+- **`check_compatibility` is RESERVED, not wired** -- operator/planner decision flagged,
+  with a 2-of-2 recommendation to RIP (codex and Fable independently, Claude grounded
+  both). The argument that decided it: the "it reserves the name" benefit is FALSE --
+  `BUNDLE_ENTRY_ATTRS` constrains what OTR-side code may request from
+  `bundle_entry_point()`, it reserves nothing against clients, and activation provably
+  ignores whatever a client puts under that name (`tests/test_otr_check_cli.py:335`
+  asserts a bundle whose `check_compatibility` is a plain integer activates). The only
+  artifact that reserves the name is the `EXTENDING_OTR.md` paragraph, which exists
+  either way. Case AGAINST: churn on landed green code for zero behaviour change, and the
+  plan of record already names the future consumer (randomizer eligibility). Blast radius
+  if ripped: ~5 code sites, 2 test files, 3 docs; no workflow JSON, no routing, no
+  source-payload consumer. **Not a coder chunk** -- either ratify the inert constant or
+  schedule the rip as a planner chunk. Proposed doctrine line: a name published to
+  clients before its consumer exists lives in the client-facing DOC as "reserved, no
+  contract, ignored if defined" and nowhere in executable code, because code that names
+  an interface is read as enforcing it.

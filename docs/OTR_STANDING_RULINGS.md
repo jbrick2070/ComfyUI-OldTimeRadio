@@ -1821,6 +1821,46 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
   move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
   `OTR_CastLock` freeze cascade (`wan_ti2v`).
 
+**Standing traps and recorded limits moved here from `docs/GO_FORWARD_PLAN.md` on
+2026-09-02 (carried knowledge; no scheduled work):**
+
+* **The B7 forbidden sweep cannot see an UNTRACKED file**, so a new test file passes the
+  gate and fails one commit later: `tests/test_b7_forbidden_sweep.py` builds its input
+  from `git diff s29-clean-slate-gate -- *.py`, tracked files only. Not fixed because the
+  fix is a judgment call (sweeping the working tree widens the gate to every untouched
+  file). Mitigation: re-run the full suite once after the FIRST commit of any new test
+  file.
+* A runner that discards the encoder's return value and recomputes the frame count
+  independently will disagree with it silently (the 2026-08-23 bake-off finding; the
+  runners are gone, the lesson carries into any replacement sweep).
+* **LATENT, not reachable today: the fewest-segments partitioner can accept a
+  disproportionate trim on a WIDE discrete menu.** `partition_beat` takes the lowest
+  segment count that covers, including via a permitted tail trim; on a discrete menu
+  whose largest entry dwarfs its smallest (`(10, 999)` covering 1019 frames) two segments
+  discard 979 frames where three cover exactly. A bound was written, MEASURED and
+  REVERTED: rejecting a whole-smallest-clip trim turned `[12, 12]` into `[12, 4, 4]` on a
+  `min=4 max=12 quantum=8` ladder across 4,885 sweep cases -- a third render to recover
+  four frames. The widest shipped menus (Veo `(100, 150, 200)`, Pixverse `(125, 200)`)
+  trim at most 25 frames. Revisit only for an adapter with an extreme ratio; the
+  reasoning is in `coverage_plan.partition_beat`.
+* **`render_single` and both HTTP entry points use the ledger-free `build_request`** and
+  default to `OTR_VIDEO_RENDER_CANVAS` (832x480); they never reach the canvas seam, so a
+  "GPU proven" leg through that harness is never a production-canvas proof. Parity is
+  deferred (O1 judgment); close when the general canvas resolver lands.
+* **Odd-canvas evenness is validated at the ENCODER, not where the canvas is chosen:**
+  `encode_frames_to_silent_mp4` refuses an odd canvas by name (yuv420p cannot represent
+  one), but neither `WanInitImageMixin._dims()` nor the `Canvas` schema checks it, so an
+  odd canvas is caught late. No live producer builds one (832x480, 512x288, 1472x832).
+* **The widened roster gate matches the codec flag as a STRING CONSTANT:** a flag
+  assembled at runtime (`"-c:%s" % stream`) or the `-c:0` spelling is invisible to the
+  sweep. Nothing in the tree does that; an encoder that ever needs to must be pinned in
+  `_ENTRY_POINT_PROOFS` by hand. One mutant survives by construction: deleting the
+  self-proving membership assertion is catchable only by a meta-test of that assertion.
+* **`assemble_beat_segments` must keep decode-counting every ASSEMBLED beat.** The
+  per-module ffprobe (`proven_frame_count`) proves the muxer wrote what it was piped,
+  which is the right question for a clip written by ONE ffmpeg pass; it does not prove
+  decodability.
+
 ## THE REGISTRY AND COMFYUI-MANAGER ARE TWO DIFFERENT SYSTEMS (measured 2026-08-23)
 ### >>> PARTLY SUPERSEDED 2026-08-24: points 2 and 4's conclusions are WRONG -- see THE REAL NODE-EXTRACTION PIPELINE below. The Manager half (point 3) still stands. <<<
 
@@ -2145,3 +2185,24 @@ fine only giving them images if that's the case."*
   character lane and the procedural viz lanes for announcer and music, and the matrix reads
   it. The mac profile was already images-only (`still_motion`, `draft`); it stays on
   `google_image` until a local image engine declares `mps` in the registry.
+
+## FOUR RULINGS LIFTED FROM ARCHIVED PLAN BLOCKS (2026-08-28; moved here from the plan 2026-09-02)
+
+The plan carried these under its own "Section 4" and said they had been copied here;
+three of the four had not been. They are the authority now; the plan keeps a pointer.
+
+* From the archived 2026-08-13 runway table, row 4: **"The multi-GPU learned-upscale
+  stage itself is CLOSED and must not be reopened."** (The narrow
+  `SpandrelEsrgan._resolve_model` hardening closed 2026-08-28; archived.)
+* From the same table, row 1: **"Do NOT restart from the Story Lab."** The lab is parked,
+  read-only and being retired; the story work happens in production.
+* **Operator acceptance 2026-08-28: LTX 2.5 vocalizing its prompt is CLOSED as an
+  investigation -- do not re-open it from older text.** The named-sounds cue table, the
+  joint-AV identity/prose removal, the runtime identity-leak guard and the ASR stem auditor
+  are the shipped answer (receipts in `docs/GO_FORWARD_ARCHIVE.md`, `docs/PROD_BUG_LOG.md`
+  and `git log` `d3cca496`..`5cd4dcc8`). AMENDED 2026-08-29 by the operator for the
+  loudness fix: golden-shaped foley prose IS allowed in the joint-AV prompt; dialogue,
+  identity and voice words stay banned.
+* From the archived GGUF generation-deadline row (CLOSED 2026-08-25), the reusable
+  lesson: **"A reachability question answered against the default path only is not
+  answered."**
