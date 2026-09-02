@@ -289,3 +289,125 @@ Cuts agreed: no node-4 branch; no peer re-minting in item 0; no per-line WAV cop
    consumer of it on the replay path.
 5. Node 91's verify-and-restamp path for materialized rows, and the `_still_index` preference on
    rows whose `pool_path` and `path` now both point inside the new episode dir.
+
+## 10. r3 fold (Cursor grok-4.6-high, wiring, `kibitz-runs/2026-09-02-replay-instrument/r3`) -- eight must-fixes, all grounded at the canonical and the nodes, all taken
+
+* **Node 7's cue-pair check raises before any replay branch could run.** `assemble()` raises
+  `CueManifestError` when `music_cue_audio` is present and the manifest is blank
+  (`scene_sequencer.py:1244-1250`), and links 282/283 always deliver node 83's AUDIO. **The
+  replay branch sits BEFORE that check.** The socket: a trailing optional `forceInput` STRING
+  `replay_descriptor` at INPUT_TYPES optional end, canonical input index 10 (today's last is
+  `video_policy_json` at 9, link 286); new link `[289, 62, 6, 7, 10, "STRING"]` from
+  `OTR_LedgerFreezeCascade.v2_ledger_json` (output slot 6), `last_link_id` 288 -> 289; no
+  `widgets_values` slot (forceInput); `replay_descriptor=""` added to `assemble()` so
+  `tests/test_input_types_signature_parity.py` stays green. Not from node 1's `script_json`
+  (pre-freeze; it fans only to 62 via link 230).
+* **The writer's replay branch is the FIRST statement of `run()`**, before the bank and style
+  rolls (`:2919-2924`), `require_runnable_bank` (`:2925`), the visual-style resolve
+  (`:2930-2931`) and `_preflight_llm_selection` (`:2955-2964`), all of which bind the live
+  widgets. The widget appends AFTER `gate_in` in optional; `gate_in` is canonical input index
+  32 (link 279), the new widget-backed input is index 33; `widgets_values` gains one trailing
+  `""` (today 32 values ending `[14.5, 4096, "Q8_0"]`; the exact index is asserted by the
+  four workflow tests and `build_variants --check`, never assumed). `replay_from=""` on `run()`
+  before the hidden auth kwargs; `replay_from` added to BOTH `CREATIVE_WHITELIST` copies
+  (equality pinned by `tests/test_workflow_apply.py`); `otr_canonical_api_run.py --replay-from`
+  patches the widget through `patch_creative` and bypasses `_parse_value` (a path that happens
+  to parse as JSON must stay a string). `IS_CHANGED` stays `time.time()` (a digest-less hash
+  would serve a stale short-circuit); ShotLock's fingerprint and the freeze cascade's
+  `time.time()` invalidate 90 on the new episode id.
+* **Node 89 (`OTR_MetaBriefImagePromptGen`) joins the bypass list.** It runs after ShotLock
+  (link 255, 90 -> 89) and always resolves the writer LLM (`otr_meta_brief_image_prompt.py:2530`)
+  -- an LLM/VRAM hit on every replay and a `prompt_hash` cache miss at 91. On `meta.replay_from`
+  89 returns a typed JSON stub with no LLM; 91 verifies and re-stamps the imported
+  `ledger["images"]` files first and never iterates MetaBrief objects or calls `gen_fn`.
+* **Identity: a workspace id, not a second freeze receipt.** `_same_durable_run`
+  (`production_ledger.py:444-466`) and `_same_frozen_episode` (`otr_shot_lock.py:167-186`)
+  compare `freeze_timestamp` alone when either side has one; a replay that keeps the source
+  receipt would be the source's durable run at ShotLock's strict post-audio overlay
+  (`:2928`) and at every `stamp_durable`. A second freeze timestamp is CUT (it would break the
+  banana variety at `otr_image_gen_dispatcher.py:1172-1176` and the freeze-mismatch rejects).
+  **Fix:** `import_replay_bundle` stamps a workspace-unique `meta.replay_workspace_id`; both
+  identity helpers require it to match when either side carries it; `freeze_timestamp` stays
+  byte-identical; `new_ledger(new_id)` rebinds `_CURRENT` before any downstream peek.
+* **Node 3's placeholder must be DSP-safe.** `empty_audio_batch` (`[1,1,0]`,
+  `_otr_resolved_request.py:183-187`) cannot feed node 4's resample + Haas + LPF
+  (`audio_enhance.py:388-408`, canonical Haas 0.8 ms). Node 3 returns a CPU float32 AUDIO
+  `{waveform: [1, C, T], sample_rate: 48000}` with T large enough for that DSP; 81 / 82 / 83 may
+  return `empty_audio_batch` with `done = "replay:passthrough"` because 3 and 7 do not consume
+  their audio, and 83's `cue_manifest_json` may be `""` only because node 7's replay branch
+  precedes the cue check.
+* **One owner for `<ep>_master.wav`.** The import rebases stills / portraits / ledger paths only;
+  node 7 copies the manifest's master entry onto the canonical filename it derives today
+  (`scene_sequencer.py:1436-1451`), verifies SHA-256 against the manifest, THEN emits
+  `audio_done`; on a mismatch it raises and never emits `audio_done` (ShotLock is gated by link
+  253); the copy is loaded only for the AUDIO return; never re-encoded.
+* **`actual_request_sha` hashes causal sampler inputs only:** final positive and negative text,
+  seed, frames, canvas, fps, denoise, adapter id and resolved strength, context / injection
+  values, still content hash, `model_artifacts` digests, `comparison_seed_hash`, engine /
+  recipe / implementation ids, `sampler_inputs` (explicit nulls on the cheap family) -- never
+  wall seconds, peak VRAM, `render_run_id` or timestamps, or two A/A nulls would differ by
+  construction. The haunted `sampler_inputs` field list is read from the live adapter's
+  `_build_render_request` and recipe receipt at coding time (checkpoint, motion module, adapter
+  + strength, sampler, scheduler, steps, cfg, denoise, canvas, context length / overlap /
+  fuse, seed), not from the campaign statement. `meta.render_trace` is stamped once, after every
+  segment, and `LedgerStampError` is not caught in node 92.
+* **The live proof needs a NEW frozen episode.** No ledger on disk carries `video.shots`
+  today, so Tectal Echo cannot exercise planned-section reuse. Sequence: ship D1' first,
+  render one canonical episode, freeze THAT, replay it twice. `TOP_PRESERVE` gains only
+  `"video"`.
+
+Should-fixes taken: the import rebases `path` (not only `pool_path`) because `_still_index`
+reads `im["path"]` (`render_driver.py:618`) and node 92 would otherwise open the source
+episode's stills; skip `_materialize_episode_copy` when the source already equals the hashed
+destination (Windows `copyfile` onto itself fails); the freeze-cascade stub returns the same
+JSON on slots 1 and 6 (HEAD already does at `:400-408`) and returns BEFORE the
+`needs_full_rerun` check (`:213-227`) and before Phase 10; the CastLock replay return sits
+BEFORE `_enforce_freeze_gate` and the revision increment (`cast_lock.py:336, 349-355`); the
+freeze script resolves its output root through the same resolver as `_default_out_dir`
+(the live tree is `C:\Users\jeffr\Documents\ComfyUI\output\otr\...`), so the bundle root is
+`<output>/otr/episodes/_replay/<episode_id>/`; regenerate variants and run the four workflow
+tests after the two canonical edits, repairing links by identity; `--title` cannot survive the
+short-circuit, so a distinct title card (a later arm's need) is stamped by the import, not the
+widget. Optional taken: the replay descriptor on node 7 is a tiny `{replay_from, episode_id,
+replay_workspace_id}` JSON (parsed from `v2_ledger_json`'s meta, so no new upstream field);
+the replay episode id carries microseconds (`rename_episode` hard-fails on an existing dir);
+`video_revision` is left unchanged on replay.
+
+## 11. The coding contract (what r4 converges on and one window builds)
+
+Files and the one change each carries:
+1. `nodes/production_ledger.py`: `TOP_PRESERVE += ("video",)`; `import_replay_bundle(bundle_dir,
+   new_episode_id)` (validated import: manifest checks, deep copy, new root id,
+   `meta.replay_of_episode`, `meta.replay_from`, `meta.replay_workspace_id`, asset
+   materialization into the new dir, `path` and `pool_path` rebased, publication eligibility
+   re-evaluated for the new id, source terminal / obs pointers cleared, `meta.render_trace`
+   cleared, atomic save); `_same_durable_run` honours `replay_workspace_id`.
+2. `nodes/otr_shot_lock.py`: `_same_frozen_episode` honours `replay_workspace_id`; on
+   `meta.replay_from` skip `llm_fn` and the creative derivation and reuse the planned `video`
+   section; always `stamp_durable(sections={"video": section}, meta_updates={"video_revision":
+   revision}, source="OTR_ShotLock")`.
+3. `nodes/_otr_video_engines/render_driver.py`: one versioned ACTUAL receipt per rendered
+   segment (`receipt_version`, envelope, `sampler_inputs`, `actual_request_sha` over causal
+   inputs), returned in `ep["receipts"]`; `model_artifacts` hashed once per run.
+4. `nodes/otr_video_render_batch.py`: `_stamp_render_trace(ep["receipts"])` once after every
+   segment via `stamp_durable(meta_updates={"render_trace": rows})`; `per_clip` gains
+   `prompt_sha8` and `request_seed`.
+5. `nodes/OTR_LedgerScriptWriter.py`: trailing optional `replay_from` widget; the replay branch
+   as the first statement of `run()`: `import_replay_bundle` -> `new_ledger` rebound -> wire
+   outputs `(script_text, script_json, news_used, estimated_minutes, technical_model)` from the
+   imported ledger.
+6. `nodes/OTR_LedgerFreezeCascade.py`, `nodes/cast_lock.py`, `nodes/batch_character_voices.py`,
+   `nodes/announcer_voice.py`, `nodes/stable_audio_theme.py`, `nodes/scene_sequencer.py`
+   (SceneSequencer + EpisodeAssembler), `nodes/otr_meta_brief_image_prompt.py`,
+   `nodes/otr_image_gen_dispatcher.py`: the typed replay returns described above, each reading
+   the flag from its own ledger-json input, none touching CUDA, an LLM, TTS or an image model.
+7. `workflows/otr_canonical.json` (+ variants regenerated): node 1's trailing widget and input;
+   node 7's input 10 and link 289.
+8. `scripts/otr_api.py` + `nodes/_otr_workflow_apply.py`: `replay_from` in both whitelists;
+   `scripts/otr_canonical_api_run.py --replay-from`.
+9. `scripts/otr_freeze_replay_bundle.py` (new) and `scripts/otr_verify_replay.py` (new, offline
+   verifier of manifest, receipts, seeds and original-vs-replay equality).
+10. Tests: the offline set in D6' plus the negative paths, the workflow four, the whitelist
+    parity, the signature parity; live proof: render one canonical episode on the shipping
+    defaults, freeze it, replay it twice, publish all three, verify seeds equal and the master
+    byte-identical, and that the cheap family's receipts stamp too.
