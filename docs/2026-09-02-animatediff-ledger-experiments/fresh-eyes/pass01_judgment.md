@@ -207,3 +207,24 @@ crop / pad / stretch for any resize and where it is stamped (the driver: pad, st
 receipt); the frozen compact corpus (anime, engraving, sci-fi, all three modes, one 95+ frame
 beat); whether an improvement must ship on both cards or may stay a 5080-only experimental
 option; and where the blinded key lives so filenames and receipts do not disclose the arm.
+
+## 9. Gemini "deep research" (pasted by the operator 2026-09-02 ~16:20) -- folded
+
+A long restatement of the problem statement in report form; it does not touch the repository
+and it does not know the two findings the grounded reads produced (the replay gap and the
+peer-engine rule), so its roadmap flips `accepts_still` on the shipping engine and puts E2
+ahead of E1, both of which the verified reads reject (sections 3 and 8). It also keeps E13
+(cut) and gives the adapter sweep as 0.5 / 0.75 / 1.0 with a side note that non-photographic
+styles "require a significantly lower strength (0.4 to 0.6)" -- consistent with sweeping
+0.25 and a 0.0 diagnostic. One wrong attribution: the two-word video style cue is composed
+by `compact_style_cue` in `_otr_visual_styles.py` through `ghost_signal_prompt.py`, not by
+`otr_meta_brief_image_prompt.py` (that file composes the STILL prompts).
+
+What it adds, and the driver verified on the Hub (2026-09-02): `CameraCtrl_pruned.safetensors`
+is exactly 873,372,736 B (its number); `v3_sd15_sparsectrl_rgb.ckpt` is 1,988,040,333 B and
+`v3_sd15_sparsectrl_scribble.ckpt` 1,992,335,697 B; `pia.ckpt` is 1,673,373,725 B; the v2 motion
+LoRAs are about 77 MB each (`v2_lora_ZoomIn.ckpt` 77,474,499 B); the Hub copies of
+`v3_sd15_mm.ckpt` and `v3_sd15_adapter.ckpt` match the dev box byte for byte. The statement's
+"not established" size rows are now filled. Its VRAM reading of E7 -- a 1.99 GB encoder
+beside a 2.13 GB checkpoint and a 1.67 GB module against 323 MB of overnight headroom -- is
+the same reason E7 sits after the peer with its own probe.
