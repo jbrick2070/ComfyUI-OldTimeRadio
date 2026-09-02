@@ -1,0 +1,380 @@
+[INFO] setup plugin alembic.autogenerate.schemas
+[INFO] setup plugin alembic.autogenerate.tables
+[INFO] setup plugin alembic.autogenerate.types
+[INFO] setup plugin alembic.autogenerate.constraints
+[INFO] setup plugin alembic.autogenerate.defaults
+[INFO] setup plugin alembic.autogenerate.comments
+[INFO] setup plugin alembic.autogenerate.checkconstraint_byname
+[INFO] OldTimeRadio prestartup: HF_HOME=C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface | safetensors_conversion mocked EARLY
+[INFO] 
+Prestartup times for custom nodes:
+[INFO]    0.0 seconds: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[INFO] 
+[INFO] Found comfy_kitchen backend cuda: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[INFO] Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+[INFO] Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[INFO] Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[INFO] Checkpoint files will always be loaded safely.
+[INFO] Total VRAM 8188 MB, total RAM 32461 MB
+[INFO] pytorch version: 2.13.0+cu130
+[INFO] Set vram state to: NORMAL_VRAM
+[INFO] Device: cuda:0 NVIDIA GeForce RTX 4060 Laptop GPU : cudaMallocAsync
+[INFO] Using async weight offloading with 2 streams
+[INFO] Enabled pinned memory 12984.0
+[INFO] Using pytorch attention
+[INFO] aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+[INFO] aimdo: src/control.c:262:INFO:comfy-aimdo NVML pressure enabled
+[INFO] aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 4060 Laptop GPU runtime_luid=00000000:859136d1 dxgi_luid=00000000:859136d1
+[INFO] aimdo: src/control.c:277:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 4060 Laptop GPU (VRAM: 8187 MB)
+[INFO] DynamicVRAM support detected and enabled
+[INFO] Python version: 3.13.14 (tags/v3.13.14:fd17997, Jun 10 2026, 13:03:48) [MSC v.1944 64 bit (AMD64)]
+[INFO] ComfyUI version: 0.34.0
+[INFO] comfy-aimdo version: 0.4.15
+[INFO] comfy-kitchen version: 0.2.31
+[INFO] comfyui-frontend-package version: 1.49.6
+[INFO] comfyui-workflow-templates version: 0.11.48
+[INFO] comfyui-embedded-docs version: 0.5.10
+[INFO] comfy-kitchen version: 0.2.31
+[INFO] comfy-aimdo version: 0.4.15
+[INFO] [Prompt Server] web root: C:\OTR-CleanRoom\ComfyUI_windows_portable\python_embeded\Lib\site-packages\comfyui_frontend_package\static
+[INFO] Asset seeder disabled
+[INFO] No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+[INFO] ComfyUI-GGUF: Allowing full torch compile
+[INFO] [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[INFO] [OldTimeRadio] OTR_OUTPUT_DIR pinned (node-relative): C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output
+[INFO] 
+Import times for custom nodes:
+[INFO]    0.0 seconds: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\custom_nodes\websocket_image_save.py
+[INFO]    0.0 seconds: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI-GGUF
+[INFO]    0.2 seconds: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[INFO] 
+[INFO] Context impl SQLiteImpl.
+[INFO] Will assume non-transactional DDL.
+[INFO] Using RAM pressure cache.
+[INFO] Starting server
+
+[INFO] To see the GUI go to: http://127.0.0.1:8001
+[INFO] got prompt
+[INFO] OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[INFO] OTR_WorkflowValidator: OK -- 23 nodes, 60 links, strict_unknown_types=True, path='C:\\OTR-CleanRoom\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json', widget_vector_drift=0
+[INFO] [OTR_LedgerScriptWriter] start: creative_model='google/gemma-4-E2B-it', technical_model='google/gemma-4-E2B-it', act_count=1, num_characters=2, creativity='balanced' (temp=0.85 top_p=0.95), seed_source=public_domain_source, episode_title='', perfect_run_spacesaver=False
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (0 lines, 0 words)
+[INFO] [OTR_LedgerScriptWriter] skeleton ledger saved up front: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\audio\pending_20260902_043820_ledger.json
+[INFO] [OTR_StructuredCall] 'build_public_domain_briefs' attempt 1/3: base call at temperature=0.350
+[INFO] [OTR_HF_ENV] HF_HOME='C:\\OTR-CleanRoom\\ComfyUI_windows_portable\\ComfyUI\\models\\huggingface' HF_HUB_CACHE='C:\\OTR-CleanRoom\\ComfyUI_windows_portable\\ComfyUI\\models\\huggingface\\hub' (source=os.environ); exported to os.environ
+[INFO] Loading LLM model: google/gemma-4-E2B-it (quantized=False)
+[INFO] [OTR_HF_ENV] snapshot resolved google/gemma-4-E2B-it -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface\hub\models--google--gemma-4-E2B-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_4060_floor  (first episode, any card) -- or drag workflows/otr_canonical.json onto the canvas (16 GB graph)
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+[OldTimeRadio] HTTP routes registered: POST /otr/video_render_single, POST /otr/video_render_soak
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  35%|###4      | 682/1951 [00:00<00:00, 6787.32it/s]Loading weights:  70%|######9   | 1361/1951 [00:00<00:00, 4655.25it/s]Loading weights: 100%|##########| 1951/1951 [00:00<00:00, 5209.94it/s]
+[INFO] [StoryOrchestrator] CUDA warmup complete (0.8s) - first generate will not stall
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 0.5 tok/s | 126.4s | ...haunting, anxious); Bob Cratchit (not present in this excerpt).",   "script_brief": "Scene
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 128 tok | 0.9 tok/s | 137.5s | ... whistling starts, sounds like a devil laughing, leads to a terrifying confrontation where
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 192 tok | 1.3 tok/s | 148.2s | ... further.",   "news_close_brief": "Source attribution note: Project Gutenberg, 1910.",   "
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 256 tok | 1.6 tok/s | 158.9s | ...nfernal Whistling"   ],   "character_names": [     "Carnacki",     "Jessop",     "Arkright
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 320 tok | 1.9 tok/s | 169.8s | ...10 Carnacki Whistling Room",   "prompt_version": "1.0",   "schema_version": "V1",   "model
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 338 tok | 2.0 tok/s | 172.8s | ...rompt_version": "1.0",   "schema_version": "V1",   "model_id": "Gemma4",   "attempts": 1 }
+[INFO] [OTR_LedgerScriptWriter] news_interpreter OK: 4 key_terms in 1 attempt(s)
+[INFO] [OTR_LedgerScriptWriter] cast RNG seed=4284293321 (OS entropy) -- cast + voices + music randomized per episode (BUG-LOCAL-269)
+[INFO] [OTR_StructuredCall] 'llm_write_description:CARNACKI' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.4 tok/s | 26.5s | ...er hair combed back haphazardly. Distinctive detail: A faint, permanent tremor in his left
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 128 tok | 3.4 tok/s | 37.4s | ...a man who has seen too much darkness but refuses to yield." ,"speech_signature":"Measured,
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 149 tok | 3.6 tok/s | 41.0s | ..., punctuated by thoughtful pauses and a slight, almost imperceptible gravel to the tone."}
+[INFO] [OTR_Casting] cast CARNACKI -> voice= gender=male (timbre=warm role=lead)
+[INFO] [OTR_StructuredCall] 'llm_write_description:JESSOP' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.5 tok/s | 25.2s | ...: A faint, almost invisible scar tracing the line of his left eyebrow. Presence: Bristling
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 113 tok | 3.4 tok/s | 33.1s | ...ith clipped, rapid-fire articulation, often cutting off others to challenge assumptions."}
+[INFO] [OTR_Casting] cast JESSOP -> voice= gender=male (timbre=sharp role=foil)
+[INFO] [OTR_LedgerScriptWriter] cast locked: 3 rows (announcer + 2 characters, lemmy_hit=False)
+[INFO] [OTR_LedgerScriptWriter] act topology: act_count=1, arc_phases=['scene'], per_phase_beats=[4], music_inter=0
+[INFO] [OTR_StructuredCall] 'OTR_Outline.macro' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.0 tok/s | 31.9s | ...g that culminates in a realization of 'Hell.'",   "setting": "A dining room within Iastrae
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 107 tok | 2.8 tok/s | 38.8s | ...al_tension": "Does the infernal whistling sound signify a true confrontation with Hell?" }
+[INFO] [OTR_StructuredCall] 'OTR_Outline.phase[scene]' attempt 1/3: base call at temperature=0.350
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.6 tok/s | 24.5s | ...  "speaker": "JESSOP"     },     {       "speaker": "CARNACKI"     },     {       "speaker
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 79 tok | 2.9 tok/s | 27.0s | ...   },     {       "speaker": "CARNACKI"     },     {       "speaker": "JESSOP"     }   ] }
+[INFO] [OTR_StructuredCall] 'OTR_Outline.beat[scene.1]' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 40 tok | 2.3 tok/s | 17.7s | ...ation regarding the nature of the haunting to Jessop.",   "mood": "Intense apprehension" }
+[INFO] [OTR_StructuredCall] 'OTR_Outline.beat[scene.2]' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 42 tok | 2.2 tok/s | 19.1s | ...infernal presence by issuing a direct, chilling threat.",   "mood": "Intense accusation" }
+[INFO] [OTR_StructuredCall] 'OTR_Outline.beat[scene.3]' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 44 tok | 2.2 tok/s | 19.7s | ... immediate, tangible danger of the infernal presence.",   "mood": "Intense and menacing" }
+[INFO] [OTR_StructuredCall] 'OTR_Outline.beat[scene.4]' attempt 1/3: base call at temperature=0.700
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 43 tok | 2.3 tok/s | 18.5s | ... the immediate, paralyzing terror of the haunting.",   "mood": "Terrified and desperate" }
+[INFO] [OTR_Outline] success: 6 beats (4 voiced, 2 announcer, 0 music_inter); calls used: 1 macro + 1 phase + 4 beat = 6 total
+[INFO] [OTR_LedgerScriptWriter] injected 4 optional source term(s) into the composition prompt
+[INFO] [OTR_LedgerScriptWriter] episode_canon built; composition header carries EPISODE_TITLE: TBD (late title binding, Sprint 3E); disk write deferred to post-composition title regen
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 0 words)
+[INFO] [OTR_LedgerScriptWriter] phase 2B skeleton stamped: 6 line rows
+[INFO] [OTR_StructuredCall] 'derive_dramatic_state' attempt 1/3: base call at temperature=0.500
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 3.1 tok/s | 20.4s | ...stence of the 'Infernal Whistling' as a supernatural entity, solidifying a new category of
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 128 tok | 4.2 tok/s | 30.7s | ...ting the room, finds a hidden inscription confirming the whistling was a deliberate, coded
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 157 tok | 4.4 tok/s | 35.9s | ...Iastrae Castle, suggesting the haunting wasn't a random attack but a calculated message."}
+[INFO] [B1] news-derived DramaticState built from the LLM.
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 0 words)
+[INFO] [OTR_LedgerScriptWriter] B1: news-derived dramatic_state stamped (source=llm, costly_choice_beat=d004, voice_slots=4).
+[INFO] [OTR_StructuredCall] 'build_continuity_ledger' attempt 1/3: base call at temperature=0.300
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 1.8 tok/s | 36.6s | ...s a terrifying experience from Iastrae Castle involving an infernal whistling haunting.", 
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 128 tok | 2.6 tok/s | 48.6s | ...rom": [         "JESSOP"       ],       "established_beat": 1     },     {       "fact": "
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 192 tok | 3.2 tok/s | 60.0s | ...         "ANNOUNCER"       ],       "hidden_from": []       ,       "established_beat": 4 
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 200 tok | 3.2 tok/s | 61.6s | ...NNOUNCER"       ],       "hidden_from": []       ,       "established_beat": 4     }   ] }
+[INFO] [OTR_Continuity] build_continuity_ledger: extracted 2 fact(s), location='Iastrae Castle', 1 active prop(s) (technical_repo_id=google/gemma-4-E2B-it).
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 0 words)
+[INFO] [OTR_LedgerScriptWriter] Sprint 5A continuity ledger: 2 fact(s), location='Iastrae Castle', 1 active prop(s)
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [SlotContract] heartbeat: 47 tok | 2.2 tok/s | 20.9s | ..._pressure": "force the listener to immediately choose a side in the ontological debate" } 
+[INFO] [SlotContract] heartbeat: 39 tok | 2.5 tok/s | 15.6s | ...ena",   "hidden_pressure": "demand immediate acknowledgment of the supernatural threat" } 
+[INFO] [SlotContract] heartbeat: 43 tok | 2.7 tok/s | 15.7s | ...dden_pressure": "compel a definitive, terrifying admission of the infernal's existence" } 
+[INFO] [SlotContract] heartbeat: 42 tok | 2.3 tok/s | 18.1s | ...en_pressure": "force the investigator to accept the supernatural as intentional design" } 
+[INFO] [SlotContract] heartbeat: 43 tok | 2.7 tok/s | 15.9s | ...",   "hidden_pressure": "confess the absolute vulnerability to the supernatural threat" } 
+[INFO] [SlotContract] heartbeat: 36 tok | 2.5 tok/s | 14.4s | ..."Conclude the sonic assault",   "hidden_pressure": "Imply the listener's own fragility" } 
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 0 words)
+[INFO] [OTR_LedgerScriptWriter] Build 3 slot drama contracts: 6 slot(s), sources={'llm': 6}, episode_valid=True
+[INFO] [OTR_LedgerScriptWriter] phase 1 prompt context built: spine=913 chars, voice_cards=3 entries
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.6 tok/s | 24.2s | ...truly infernal. d003|JESSOP: Then you better watch your tongue, Carnacki, 'cause I'll show
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 74 tok | 2.8 tok/s | 26.0s | ...er watch your tongue, Carnacki, 'cause I'll show you what happens when you cross the line.
+[INFO] [ComposeExchange] slots=['d002', 'd003'] ok (attempts=1)
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.6 tok/s | 25.0s | ...omething truly infernal. d005|JESSOP: I feel that whistling now, Carnacki... I'm gonna see
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 73 tok | 2.7 tok/s | 26.9s | ...I feel that whistling now, Carnacki... I'm gonna see what happens when you cross the line.
+[INFO] [ComposeExchange] slots=['d004', 'd005'] ok (attempts=1)
+[INFO] [OTR_LedgerScriptWriter] Build 4 use_exchange: 4 beat(s) composed via grouped exchange.
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 44 tok | 2.8 tok/s | 15.5s | ...tle where Carnacki confronts Jessop with a growing dread about the nature of the haunting.
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 35 words)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 52 words)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 70 words)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 89 words)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 105 words)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 117 words)
+[INFO] [OTR_StructuredCall] 'derive_produced_open_brief' attempt 1/3: base call at temperature=0.300
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.7 tok/s | 23.7s | ...ntation regarding something infernal and crossing a line.",   "cast": [     "Jessop",     
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 81 tok | 3.0 tok/s | 26.8s | ...nal and crossing a line.",   "cast": [     "Jessop",     "Carnacki",     "ANNOUNCER"   ] }
+[INFO] [OTR_ProducedOpen] derive ok (model=google/gemma-4-E2B-it, cast=3, setting='unspecified')
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 41 tok | 2.9 tok/s | 14.2s | ...onfrontation. A whisper from the shadows suggests a boundary has been irrevocably crossed.
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 116 words)
+[INFO] [OTR_LedgerScriptWriter] announcer intro rewrite: announcer_intro_rewritten (line b001)
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 14 tok | 1.3 tok/s | 10.8s | ...From tonight's infernal whistling at Iastrae Castle:
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 123 words)
+[INFO] [OTR_LedgerScriptWriter] announcer outro pass wrote closing line b006 (flags=('news_coda_bridge', 'protected_fact_component'))
+[INFO] [OTR_LedgerScriptWriter] optional post-assembly key-term telemetry: 2/4 landed (missing=['Whistling Room', 'Haunting'])
+[INFO] [OTR_LedgerScriptWriter] phase 0 compose_flag_summary: {'announcer_intro': 1, 'announcer_intro_rewritten': 1, 'news_coda_bridge': 1, 'protected_fact_component': 1}
+[INFO] [OTR_LedgerScriptWriter] §6.G word counts: character=70 announcer=53 total=123
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 123 words)
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.7 tok/s | 23.6s | ...eling of an air shift and an infernal whistling.  [CANDIDATES] The Infernal Whistling at I
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 96 tok | 3.5 tok/s | 27.8s | ...Iastrae Castle. Shadows and the Infernal Whisper.  TITLE: Shadows and the Infernal Whisper
+[INFO] [OTR_LedgerScriptWriter] title regen -> 'Shadows and the Infernal Whisper' (scratchpad pass, from 1005-char script)
+[INFO] [OTR_LedgerScriptWriter] episode_canon written with title='Shadows and the Infernal Whisper' (source=llm_post_composition) at C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\episode_canon.json
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 121 words)
+[INFO] [OTR_StructuredCall] 'run_story_brief_reflection' attempt 1/3: base call at temperature=0.300
+[INFO] Loading LLM model: google/gemma-4-E2B-it (quantized=False)
+[INFO] [OTR_HF_ENV] snapshot resolved google/gemma-4-E2B-it -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface\hub\models--google--gemma-4-E2B-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  25%|##5       | 496/1951 [00:00<00:00, 4957.92it/s]Loading weights:  51%|#####     | 992/1951 [00:00<00:00, 4476.17it/s]Loading weights:  77%|#######7  | 1508/1951 [00:00<00:00, 4768.91it/s]Loading weights: 100%|##########| 1951/1951 [00:00<00:00, 4948.51it/s]
+[INFO] [StoryOrchestrator] CUDA warmup complete (0.4s) - first generate will not stall
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 2.5 tok/s | 25.5s | ...y.",   "setting_terms": [     "Iastrae Castle"   ],   "lighting_terms": [     "storm-lit" 
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 128 tok | 3.6 tok/s | 35.2s | ...ng air"   ],   "music_mood_terms": [     "tense",     "sombre"   ],   "visual_palette": [ 
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 192 tok | 4.3 tok/s | 45.0s | ...  "tempo_hint": "Slow and building tension",   "atmosphere_line": "The air itself seems to
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 204 tok | 4.4 tok/s | 46.8s | ...,   "atmosphere_line": "The air itself seems to warp with an unseen, infernal presence." }
+[INFO] [OTR_StructuredCall] 'run_produced_story_summary' attempt 1/3: base call at temperature=0.300
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 64 tok | 3.7 tok/s | 17.2s | ... indicating a boundary has been crossed.",   "subject": "Shadows and the Infernal Whisper"
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 67 tok | 3.8 tok/s | 17.7s | ...ndicating a boundary has been crossed.",   "subject": "Shadows and the Infernal Whisper" }
+[INFO] [OTR_StructuredCall] 'ledger_clean_act_summary' attempt 1/2: base call at temperature=0.300
+[INFO] Loading LLM model: google/gemma-4-E2B-it (quantized=False)
+[INFO] [OTR_HF_ENV] snapshot resolved google/gemma-4-E2B-it -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface\hub\models--google--gemma-4-E2B-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  25%|##4       | 485/1951 [00:00<00:00, 4821.95it/s]Loading weights:  50%|####9     | 968/1951 [00:00<00:00, 3257.88it/s]Loading weights:  68%|######7   | 1323/1951 [00:00<00:00, 2802.93it/s]Loading weights:  86%|########6 | 1682/1951 [00:00<00:00, 3039.50it/s]Loading weights: 100%|##########| 1951/1951 [00:00<00:00, 3257.37it/s]
+[INFO] [StoryOrchestrator] CUDA warmup complete (0.5s) - first generate will not stall
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 23 tok | 1.1 tok/s | 20.4s | ...going_on": "Carnacki and Jessop argue about crossing a boundary, escalating the tension."}
+[INFO] [ledger_clean] the scene: Carnacki and Jessop argue about crossing a boundary, escalating the tension.
+[INFO] [ledger_clean] b001 carries a Python-owned fact component; skipped before judging (protected_fact_component)
+[INFO] [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 16 tok | 0.9 tok/s | 18.1s | ...{"segments_read": 1, "not_speech": []}
+[INFO] [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 16 tok | 0.9 tok/s | 18.3s | ...{"segments_read": 1, "not_speech": []}
+[INFO] [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 16 tok | 0.9 tok/s | 18.2s | ...{"segments_read": 1, "not_speech": []}
+[INFO] [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[INFO] [Selector] slot=creative reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerScriptWriter] heartbeat: 16 tok | 0.9 tok/s | 18.2s | ...{"segments_read": 1, "not_speech": []}
+[INFO] [ledger_clean] b006 carries a Python-owned fact component; skipped before judging (protected_fact_component)
+[INFO] [ledger_clean] context 11111 sha 6ed77c76 across 4 prompt(s) (line speaker act around complaint)
+[INFO] [ledger_clean] 6 voiced row(s) read by the judge, nothing to clean (otr.spoken-text-only.v1)
+[INFO] [ledger_cleanup] complete: 6 deterministic fill(s), 0 prose fill(s), safety=retired
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 121 words)
+[INFO] [OTR_LedgerScriptWriter] DONE: episode_id=pending_20260902_043820, lines=6, words=121, est_minutes=1, ledger=C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\audio\pending_20260902_043820_ledger.json
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [OTR_LedgerFreezeCascade] running cascade on ledger pending_20260902_043820 (6 lines)
+[INFO] [LFC:phase_0] 2 soft gap(s) detected; advancing.
+[INFO] [LFC:phase_7] scanned=6 normalized=0 (abbrev=0 sym=0 num=0)
+[INFO] [LFC:phase_8] cast=0/3 with portrait, voiced=0/6 with visual
+[INFO] [LFC:phase_10] frozen_with_warns -- 2 soft gap(s).
+[INFO] [LFC] freeze landed: verdict=frozen_with_warns cleanup=retired_no_content_policy pre_warns=2 post_warns=2
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 121 words)
+[INFO] [OTR_LedgerFreezeCascade] freeze_verdict=frozen_with_warns (pre_warns=2 post_warns=2 cleanup=retired_no_content_policy)
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 121 words)
+[INFO] [OTR voice P-OBS] char_voice: line=b002 char=c02 -> voice_ref_id=- ref=en_speaker_5 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=1784147976500492594 policy=line_v1 seed_ref=en_speaker_5
+[INFO] Loading Bark model: suno/bark on cuda
+[INFO] Bark processor loaded from cache (no HTTP checks)
+Loading weights:   0%|          | 0/806 [00:00<?, ?it/s]Loading weights:   0%|          | 1/806 [00:00<07:45,  1.73it/s]Loading weights:   2%|2         | 19/806 [00:00<00:24, 31.70it/s]Loading weights:   3%|3         | 25/806 [00:00<00:22, 34.47it/s]Loading weights:   4%|3         | 31/806 [00:01<00:24, 31.84it/s]Loading weights:   4%|4         | 36/806 [00:01<00:27, 28.14it/s]Loading weights:   5%|5         | 43/806 [00:01<00:26, 29.16it/s]Loading weights:   6%|6         | 50/806 [00:01<00:25, 29.68it/s]Loading weights:   7%|7         | 57/806 [00:02<00:28, 26.29it/s]Loading weights:   8%|7         | 64/806 [00:02<00:28, 26.16it/s]Loading weights:   8%|8         | 68/806 [00:02<00:27, 26.74it/s]Loading weights:   9%|8         | 71/806 [00:02<00:29, 25.20it/s]Loading weights:  10%|9         | 78/806 [00:02<00:27, 26.65it/s]Loading weights:  11%|#         | 85/806 [00:03<00:27, 26.21it/s]Loading weights:  11%|#1        | 89/806 [00:03<00:27, 26.54it/s]Loading weights:  11%|#1        | 92/806 [00:03<00:30, 23.13it/s]Loading weights:  12%|#2        | 99/806 [00:03<00:27, 25.30it/s]Loading weights:  13%|#3        | 106/806 [00:04<00:27, 25.78it/s]Loading weights:  14%|#4        | 113/806 [00:04<00:25, 26.71it/s]Loading weights:  15%|#4        | 117/806 [00:04<00:25, 27.00it/s]Loading weights:  15%|#4        | 120/806 [00:04<00:26, 25.50it/s]Loading weights:  16%|#5        | 127/806 [00:04<00:25, 27.15it/s]Loading weights:  17%|#6        | 134/806 [00:05<00:23, 28.33it/s]Loading weights:  17%|#7        | 141/806 [00:05<00:23, 28.66it/s]Loading weights:  18%|#8        | 148/806 [00:05<00:22, 29.30it/s]Loading weights:  19%|#9        | 155/806 [00:05<00:21, 29.84it/s]Loading weights:  20%|##        | 162/806 [00:05<00:21, 30.32it/s]Loading weights:  21%|##        | 169/806 [00:06<00:22, 28.42it/s]Loading weights:  21%|##1       | 172/806 [00:06<00:30, 20.46it/s]Loading weights:  48%|####7     | 383/806 [00:06<00:01, 299.80it/s]Loading weights:  56%|#####5    | 448/806 [00:07<00:01, 223.06it/s]Loading weights:  62%|######1   | 498/806 [00:08<00:03, 94.76it/s] Loading weights:  66%|######6   | 534/806 [00:09<00:03, 78.24it/s]Loading weights:  70%|######9   | 561/806 [00:10<00:03, 64.49it/s]Loading weights:  72%|#######2  | 581/806 [00:10<00:03, 61.23it/s]Loading weights:  74%|#######4  | 597/806 [00:11<00:03, 54.92it/s]Loading weights:  76%|#######5  | 609/806 [00:11<00:03, 50.98it/s]Loading weights:  77%|#######6  | 619/806 [00:11<00:03, 48.52it/s]Loading weights:  78%|#######7  | 627/806 [00:11<00:03, 46.91it/s]Loading weights:  79%|#######8  | 635/806 [00:17<00:22,  7.71it/s]Loading weights:  93%|#########2| 747/806 [00:17<00:01, 31.98it/s]Loading weights:  95%|#########5| 767/806 [00:17<00:01, 33.10it/s]Loading weights:  97%|#########7| 782/806 [00:18<00:00, 31.45it/s]Loading weights:  99%|#########8| 794/806 [00:18<00:00, 32.40it/s]Loading weights: 100%|#########9| 803/806 [00:19<00:00, 30.39it/s]Loading weights: 100%|##########| 806/806 [00:19<00:00, 41.61it/s]
+[INFO] Bark model loaded from cache on cuda (no HTTP checks)
+[INFO] Bark loaded: BarkModel on cuda (gen-config patched)
+[INFO] [OTR voice P-OBS] char_voice: line=b003 char=c03 -> voice_ref_id=- ref=en_speaker_2 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=7063137890791113612 policy=line_v1 seed_ref=en_speaker_2
+[INFO] [OTR voice P-OBS] char_voice: line=b004 char=c02 -> voice_ref_id=- ref=en_speaker_5 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=363082252590451571 policy=line_v1 seed_ref=en_speaker_5
+[INFO] [OTR voice P-OBS] char_voice: line=b005 char=c03 -> voice_ref_id=- ref=en_speaker_2 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=1729256079138881436 policy=line_v1 seed_ref=en_speaker_2
+[INFO] Bark unloaded, VRAM freed (gc.collect + empty_cache)
+[INFO] [OTR voice P-OBS] announcer_voice: line=b001 char=announcer -> voice_ref_id=- ref=en_speaker_9 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=59484394931220541 policy=line_v1 seed_ref=en_speaker_9
+[INFO] Loading Bark model: suno/bark on cuda
+[INFO] Bark processor loaded from cache (no HTTP checks)
+Loading weights:   0%|          | 0/806 [00:00<?, ?it/s]Loading weights:   8%|7         | 64/806 [00:00<00:01, 604.85it/s]Loading weights:  16%|#5        | 125/806 [00:00<00:01, 487.53it/s]Loading weights:  22%|##1       | 176/806 [00:00<00:01, 433.00it/s]Loading weights:  54%|#####3    | 435/806 [00:00<00:00, 1126.03it/s]Loading weights:  69%|######9   | 559/806 [00:00<00:00, 769.63it/s] Loading weights:  81%|########1 | 656/806 [00:01<00:00, 458.70it/s]Loading weights:  90%|######### | 728/806 [00:01<00:00, 482.02it/s]Loading weights:  99%|#########8| 795/806 [00:01<00:00, 468.61it/s]Loading weights: 100%|##########| 806/806 [00:01<00:00, 534.37it/s]
+[INFO] Bark model loaded from cache on cuda (no HTTP checks)
+[INFO] Bark loaded: BarkModel on cuda (gen-config patched)
+C:\OTR-CleanRoom\ComfyUI_windows_portable\python_embeded\Lib\site-packages\huggingface_hub\file_download.py:141: UserWarning: `huggingface_hub` cache-system uses symlinks by default to efficiently store duplicated files but your machine does not support them in C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface\hub\models--suno--bark. Caching files will still work but in a degraded version that might require more space on your disk. This warning can be disabled by setting the `HF_HUB_DISABLE_SYMLINKS_WARNING` environment variable. For more details, see https://huggingface.co/docs/huggingface_hub/how-to-cache#limitations.
+To support symlinks on Windows, you either need to activate Developer Mode or to run Python as an administrator. In order to activate developer mode, see this article: https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development
+  warnings.warn(message)
+[INFO] [OTR voice P-OBS] announcer_voice: line=b006 char=announcer -> voice_ref_id=- ref=en_speaker_9 engine=bark alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=5794529033032495164 policy=line_v1 seed_ref=en_speaker_9
+[INFO] Bark unloaded, VRAM freed (gc.collect + empty_cache)
+Loading weights:   0%|          | 0/611 [00:00<?, ?it/s]Loading weights:   1%|1         | 9/611 [00:00<00:13, 43.01it/s]Loading weights:   2%|2         | 14/611 [00:00<00:18, 31.73it/s]Loading weights:  15%|#4        | 89/611 [00:00<00:04, 123.16it/s]Loading weights:  19%|#9        | 117/611 [00:00<00:03, 140.03it/s]Loading weights:  21%|##1       | 131/611 [00:01<00:04, 105.33it/s]Loading weights:  23%|##3       | 142/611 [00:01<00:05, 93.79it/s] Loading weights:  25%|##4       | 152/611 [00:01<00:06, 71.12it/s]Loading weights:  27%|##7       | 165/611 [00:02<00:07, 61.47it/s]Loading weights:  30%|##9       | 181/611 [00:02<00:06, 62.04it/s]Loading weights:  32%|###2      | 197/611 [00:02<00:06, 60.85it/s]Loading weights:  34%|###4      | 210/611 [00:02<00:05, 70.50it/s]Loading weights:  36%|###5      | 219/611 [00:02<00:06, 63.20it/s]Loading weights:  37%|###7      | 229/611 [00:03<00:06, 54.61it/s]Loading weights:  40%|####      | 245/611 [00:03<00:06, 53.94it/s]Loading weights:  43%|####2     | 261/611 [00:03<00:06, 56.39it/s]Loading weights:  45%|####5     | 277/611 [00:04<00:06, 52.76it/s]Loading weights:  48%|####7     | 293/611 [00:04<00:06, 52.94it/s]Loading weights:  51%|#####     | 309/611 [00:04<00:05, 54.35it/s]Loading weights:  53%|#####3    | 325/611 [00:04<00:05, 55.56it/s]Loading weights:  55%|#####5    | 338/611 [00:04<00:04, 65.40it/s]Loading weights:  57%|#####6    | 346/611 [00:05<00:04, 57.31it/s]Loading weights:  58%|#####8    | 357/611 [00:05<00:04, 52.19it/s]Loading weights:  61%|######1   | 373/611 [00:05<00:04, 52.71it/s]Loading weights:  64%|######3   | 389/611 [00:06<00:04, 53.39it/s]Loading weights:  66%|######5   | 402/611 [00:06<00:03, 63.51it/s]Loading weights:  67%|######7   | 410/611 [00:06<00:03, 59.80it/s]Loading weights:  69%|######8   | 421/611 [00:06<00:03, 52.98it/s]Loading weights:  71%|#######1  | 434/611 [00:06<00:02, 61.02it/s]Loading weights:  72%|#######2  | 441/611 [00:06<00:03, 51.58it/s]Loading weights:  74%|#######4  | 453/611 [00:07<00:03, 49.52it/s]Loading weights:  77%|#######6  | 469/611 [00:07<00:02, 51.23it/s]Loading weights:  79%|#######9  | 485/611 [00:07<00:02, 51.94it/s]Loading weights:  82%|########1 | 501/611 [00:08<00:02, 54.72it/s]Loading weights:  85%|########4 | 519/611 [00:08<00:01, 66.14it/s]Loading weights:  88%|########7 | 535/611 [00:08<00:01, 72.47it/s]Loading weights:  90%|######### | 551/611 [00:08<00:00, 79.20it/s]Loading weights:  93%|#########2| 567/611 [00:08<00:00, 74.05it/s]Loading weights:  94%|#########4| 575/611 [00:09<00:00, 60.06it/s]Loading weights:  97%|#########6| 591/611 [00:09<00:00, 68.47it/s]Loading weights:  99%|#########9| 607/611 [00:09<00:00, 79.97it/s]Loading weights: 100%|##########| 611/611 [00:09<00:00, 62.93it/s]
+[INFO] [Ledger] saved pending_20260902_043820_ledger.json (6 lines, 121 words)
+[INFO] [SceneSequencer] No local LLM VRAM to free
+[INFO] [SceneSequencer] Pre-rendered clips: 4 TTS, 2 ANNOUNCER
+[INFO] [SceneSequencer] Rendering ledger lines 0-6
+[INFO] [loudnorm] per-segment RMS leveling ON (default) -- target=-16.0 dBFS boost<=9.0 cut>=-12.0 gate=-50.0 ceiling=0.95
+[INFO] [SceneSequencer] wrote ledger audio metadata. phase_ms=411 total_sec=64.55 lines_positioned=6/6
+[INFO] [OTR_AudioEnhance] Input: 48000Hz 1ch 3098400 samples (64.5s)
+[INFO] [OTR_AudioEnhance] Resampled 48000Hz -> 48000Hz (3098400 samples)
+[INFO] [OTR_AudioEnhance] Channels: 1 -> 2
+[INFO] [OTR_AudioEnhance] Bass warmth 0.15 applied
+[INFO] [OTR_AudioEnhance] LPF at 16000Hz applied (chirp cleanup)
+[INFO] [OTR_AudioEnhance] Haas delay 0.8ms applied
+[INFO] [OTR_AudioEnhance] Tape emulation 'subtle' applied
+[INFO] [OTR_AudioEnhance] Stereo width 0.30 applied
+[INFO] [OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)
+[INFO] [OTR_AudioEnhance] Output: 48000Hz 2ch 3098400 samples (64.5s) spatial=0.30 Haas=0.8ms warmth=0.15
+[INFO] [OTR_AudioEnhance] schema-l3 ledger update: phase_ms=1258 gate=post_audio_enhance dur=64.5s
+[INFO] [EpisodeAssembler] cue-manifest ledger reconciliation: matched=0 created=2 paths=2 total=2
+[INFO] [EpisodeAssembler] Resampled theme 32000 Hz -> 48000 Hz
+[INFO] [EpisodeAssembler] Resampled theme 32000 Hz -> 48000 Hz
+[INFO] [EpisodeAssembler] Assembled 3 segments with 500ms crossfades
+[INFO] [EpisodeAssembler] Final loudness master: measured -12.34 LUFS -> target -14.0 LUFS (gain -1.66 dB), true-peak ceiling -1.0 dBFS [peak-limited] (post-crossfade)
+[INFO] [EpisodeAssembler] master WAV saved -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\audio\pending_20260902_043820_master.wav (sha256=f6e5a8f8caeb)
+[INFO] [EpisodeAssembler] '' - 1.4 min
+[INFO] [EpisodeAssembler] music_rows=2 segments=3 (BUG-LOCAL-130 diagnostic)
+[INFO] [EpisodeAssembler] music mirror outcome: music_rows=2 appended=2 chunked_cues=0 stale_removed=0 existing_music_ids=6
+[INFO] [EpisodeAssembler] music mirror: appended=2, chunked_cues=0, stale_removed=0, total_lines=8 (post-BUG-117e: music chunks <= 22.0s to fit the LTX 22B 25s safe envelope)
+[INFO] [EpisodeAssembler] BUG-106 master-mix shift: +9.500s applied to 6 line(s) + 0 clip(s)
+[INFO] [EpisodeAssembler] schema-l3 ledger update: phase_ms=659 gate=post_episode_assembler dur=81.5s
+[INFO] [EpisodeAssembler] emit audio_done signal: audio_done:length_sec=81.55;sample_rate=48000;length_samples=3914400;segments=3
+[INFO] [OTR_ShotLock] post-audio ledger overlay from pending_20260902_043820_ledger.json (freeze_timestamp=2026-09-02T11:54:48.697757+00:00, rows=6, music=2, mirrors=2, master_sha=f6e5a8f8caeb)
+[INFO] [Video] Starting render: 81.5s audio -> 2039 frames @ 25fps (1920x1080)
+[INFO] [Video] Encoder: NVIDIA h264_nvenc
+[INFO] [Video] Launching ffmpeg: C:\Users\jeffr\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0-full_build\bin\ffmpeg.EXE -y -f rawvideo -vcodec rawvideo ...
+[INFO] [Video] Encoding: frame 0/2039 (0%) -- 0.9s elapsed
+[INFO] [Video] Encoding: frame 250/2039 (12%) -- 12.4s elapsed
+[INFO] [Video] Encoding: frame 500/2039 (24%) -- 20.5s elapsed
+[INFO] [Video] Encoding: frame 750/2039 (36%) -- 27.8s elapsed
+[INFO] [Video] Encoding: frame 1000/2039 (49%) -- 34.5s elapsed
+[INFO] [Video] Encoding: frame 1250/2039 (61%) -- 41.8s elapsed
+[INFO] [Video] Encoding: frame 1500/2039 (73%) -- 48.0s elapsed
+[INFO] [Video] Encoding: frame 1750/2039 (85%) -- 54.3s elapsed
+[INFO] [Video] Encoding: frame 2000/2039 (98%) -- 60.8s elapsed
+[INFO] [Video] Encode complete: 2039 frames in 61.8s (33.0 fps)
+[INFO] [Video] Saved: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\audio\signal_lost_shadows_and_the_infernal_whisper_20260902_050320.mp4 (55.5 MB, 81.5s, 2039 frames total)
+[INFO] [Video] Treatment saved: signal_lost_shadows_and_the_infernal_whisper_20260902_050320_treatment.txt
+[INFO] [Ledger] per-episode dir moved pending_20260902_043820 -> signal_lost_shadows_and_the_infernal_whisper_20260902_050320 (attempt 1)
+[INFO] [Ledger] ledger file moved pending_20260902_043820_ledger.json -> signal_lost_shadows_and_the_infernal_whisper_20260902_050320_ledger.json
+[INFO] [Ledger] renamed pending_20260902_043820 -> signal_lost_shadows_and_the_infernal_whisper_20260902_050320 (dir_moved=True, durable_paths_rebased=9, memory_paths_rebased=7)
+[INFO] [Video] post-rename mp4 path: C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\pending_20260902_043820\audio\signal_lost_shadows_and_the_infernal_whisper_20260902_050320.mp4 -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\output\otr\episodes\signal_lost_shadows_and_the_infernal_whisper_20260902_050320\audio\signal_lost_shadows_and_the_infernal_whisper_20260902_050320.mp4
+[INFO] [Ledger] disk-only assembler mirrors: preserved=2 rejected=0 existing=0
+[INFO] [Ledger] saved signal_lost_shadows_and_the_infernal_whisper_20260902_050320_ledger.json (6 lines, 121 words)
+[INFO] [OTR_ShotLock] post-audio ledger overlay from signal_lost_shadows_and_the_infernal_whisper_20260902_050320_ledger.json (freeze_timestamp=2026-09-02T11:54:48.697757+00:00, rows=6, music=2, mirrors=2, master_sha=f6e5a8f8caeb)
+[INFO] [story_brief:shotlock_m4] status=ok brief_chars=120 terms=setting=1/lighting=1/atmosphere=3
+[INFO] Loading LLM model: google/gemma-4-E2B-it (quantized=False)
+[INFO] [OTR_HF_ENV] snapshot resolved google/gemma-4-E2B-it -> C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\models\huggingface\hub\models--google--gemma-4-E2B-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  34%|###4      | 664/1951 [00:00<00:00, 6628.53it/s]Loading weights:  68%|######8   | 1327/1951 [00:00<00:00, 6174.87it/s]Loading weights: 100%|##########| 1951/1951 [00:00<00:00, 7037.31it/s]
+[INFO] [StoryOrchestrator] CUDA warmup complete (0.1s) - first generate will not stall
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.1 tok/s | 30.6s | ...",     "motion": "The subject takes two heavy, measured steps forward, then abruptly stops
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 128 tok | 3.2 tok/s | 39.6s | ...on the subject's face."   },   {     "beat_id": "b003",     "expression": "A sudden, sharp
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 192 tok | 3.9 tok/s | 48.7s | ... surface, causing a stack of papers to scatter.",     "camera": "Medium close-up, slightly
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 256 tok | 4.4 tok/s | 58.5s | ...brow deeply furrowed in alarm.",     "motion": "The subject stumbles backward quickly, his
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 300 tok | 4.6 tok/s | 65.6s | ... an invisible force.",     "camera": "Wide shot, tracking the subject's rapid retreat."   
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.0 tok/s | 31.7s | ...",     "motion": "The subject takes two heavy, measured steps forward, then abruptly stops
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 128 tok | 3.0 tok/s | 42.3s | ...n on the subject's face."   },   {     "beat_id": "b003",     "expression": "The subject's
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 192 tok | 3.6 tok/s | 53.2s | ...t and grips the edge of a nearby ledger, pulling it taut.",     "camera": "Rack focus from
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 256 tok | 3.9 tok/s | 65.7s | ...rk terror, the brow deeply furrowed as if bracing against an unseen force.",     "motion":
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 300 tok | 4.0 tok/s | 74.5s | ...cross the air, momentarily displacing the surrounding shadows.",     "camera": "Wide shot,
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 1.9 tok/s | 33.5s | ...",     "motion": "The subject takes two heavy, measured steps forward, then abruptly stops
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 128 tok | 2.8 tok/s | 45.2s | ...on the subject's face."   },   {     "beat_id": "b003",     "expression": "A sudden, sharp
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 192 tok | 3.4 tok/s | 56.8s | ... table onto the floor.",     "camera": "Low angle tracking shot following the sweep of the
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 256 tok | 3.7 tok/s | 68.3s | ...hift in the air.",     "motion": "The subject stumbles backward rapidly, his arms flailing
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 300 tok | 3.9 tok/s | 76.7s | ...",     "camera": "Quick whip pan following the subject's backward movement."   },   {     
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat music_opening_001: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot music_opening_001 beat music_opening_001 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b001: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b001 beat b001 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b002: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b002 beat b002 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b003: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b003 beat b003 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b004: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b004 beat b004 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b005: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b005 beat b005 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat b006: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot b006 beat b006 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[WARNING] [OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx25_video' beat music_closing_001: [OTR.render_driver] image_to_video-family engine 'ltx25_video' shot music_closing_001 beat music_closing_001 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.
+[INFO] [OTR_ShotLock] the set speaks throughout: no overheard human face in this episode
+[WARNING] [OTR_ShotLock] empty/unparseable derivation for batch ['b002']..; reseed 1/2
+[WARNING] [OTR_ShotLock] empty/unparseable derivation for batch ['b002']..; reseed 2/2
+[WARNING] [OTR_ShotLock] writer LLM produced no usable nonverbal directive for beat b002 after 2 reseeds; using the deterministic acting fallbacks
+[WARNING] [OTR_ShotLock] writer LLM produced no usable nonverbal directive for beat b003 after 2 reseeds; using the deterministic acting fallbacks
+[WARNING] [OTR_ShotLock] writer LLM produced no usable nonverbal directive for beat b004 after 2 reseeds; using the deterministic acting fallbacks
+[WARNING] [OTR_ShotLock] writer LLM produced no usable nonverbal directive for beat b005 after 2 reseeds; using the deterministic acting fallbacks
+[INFO] [story_brief:flux_portrait] status=ok brief_chars=120 terms=setting=1/lighting=1/atmosphere=3
+[INFO] [Selector] slot=technical reuse cache for google/gemma-4-E2B-it
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.4 tok/s | 26.3s | ...mped under pressure, gripping a polished wooden cane with a faint tremor in his left hand,
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 128 tok | 3.2 tok/s | 39.8s | ...and shoulders, face clearly visible, subject centred with natural headroom above the head,
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 137 tok | 3.3 tok/s | 41.0s | ...th natural headroom above the head, documentary-real, restored archival photograph texture
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 3.3 tok/s | 19.2s | ...lled impatience while scanning the deep shadows of a stone corridor inside Iastrae Castle,
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 88 tok | 3.4 tok/s | 25.7s | ... woolen attire, documentary-real, period-consistent, restored archival photograph texture.
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.2 tok/s | 29.2s | ...ely apprehensive expression, leaning forward with a tense, accusatory gesture directed off
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 100 tok | 2.8 tok/s | 35.7s | ...randeur of Iastrae Castle, grounded natural lighting, restored archival photograph texture
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.1 tok/s | 30.0s | ...astrae Castle, his gaze locked directly and menacingly at the viewer, a faint scar tracing
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 84 tok | 2.4 tok/s | 34.6s | ...riod-accurate dark attire, grounded natural lighting, restored archival photograph texture
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.7 tok/s | 23.8s | ...nder pressure, gripping a cane with a faint tremor in his left hand, intensely staring off
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 93 tok | 3.2 tok/s | 28.9s | ...randeur of Iastrae Castle, grounded natural lighting, restored archival photograph texture
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 64 tok | 2.5 tok/s | 25.3s | ..., frozen mid-turn, eyes darting frantically toward unseen shadows, mouth slightly agape in
+[INFO] [llm:google/gemma-4-E2B-it] heartbeat: 87 tok | 2.9 tok/s | 30.5s | ...randeur of Iastrae Castle, grounded natural lighting, restored archival photograph texture
+[INFO] [OTR_ImageGenDispatcher] resolve: object=c01 kind=portrait role=announcer_visual -> slot=announcer_image_model engine=flux2_klein
+[WARNING] [gpu_residency] reclaiming stale lease from dead pid=4548
+[INFO] [gpu_residency] lease acquired pid=21688 token=818c1033
+[INFO] CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[INFO] gguf qtypes: F32 (60), Q5_K (30), Q4_K (50), BF16 (9)
+[INFO] model weight dtype torch.bfloat16, manual cast: None
+[INFO] model_type FLUX
+[INFO] Using pytorch attention in VAE
+[INFO] Using pytorch attention in VAE
+[INFO] VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[INFO] Requested to load Flux2TEModel_
+[INFO] 0 models unloaded.
+[INFO] Model Flux2TEModel_ prepared for dynamic VRAM loading. 7671MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[WARNING] [OTR graph-exec] EVICT PROBE 'clip' before: free=48MB patcher=5e976af3 dyn=True loaded=0MB registry=['Flux2TEModel_:5e976af3:0MB'] vbar_pages=255 resident=0 pinned=0
+[WARNING] [OTR graph-exec] EVICT PROBE 'clip' after: free=16MB patcher=5e976af3 dyn=True loaded=0MB registry=[] vbar_pages=255 resident=0 pinned=0
+[INFO] [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[INFO] Requested to load Flux2
+[INFO] 0 models unloaded.
+[INFO] loaded partially; 0.00 MB usable, 0.00 MB loaded, 2591.65 MB offloaded, 379.69 MB buffer reserved, lowvram patches: 0
+  0%|          | 0/20 [00:00<?, ?it/s]  0%|          | 0/20 [00:00<?, ?it/s,   Model Initializing ...  ]

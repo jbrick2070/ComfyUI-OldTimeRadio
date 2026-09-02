@@ -51,6 +51,10 @@ from ._otr_story_brief_helpers import (
 # content hash, gated by env + the fidelity-bank idiom. Cold-import clean.
 from . import _otr_banana_route as _banana
 from ._otr_image_engines import registry as _ireg
+# The single canonical residue-freer (writer LLM + Bark, then a surgical detach of any
+# ComfyUI-tracked patcher, then the allocator flush). Cold-import clean: stdlib only at
+# module scope; torch / comfy are imported lazily inside the call.
+from . import _otr_vram_levers as _levers
 
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
 #: smaller off the cross-process disk handoff is a 0-byte / truncated write,
@@ -1224,6 +1228,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     #: only on the wire between two nodes and were never persisted, so nothing
     #: on disk recorded what was actually rendered.
     _visual_rows: list = []
+    # Leg C4b (4060 clean room, 2026-09-02): the writer LLM that composed the still
+    # prompts moments earlier was STILL on the card when the first local still rendered
+    # (48 MB free, the encoder's VBAR at 0 resident pages), so the image engine had no
+    # VRAM to load into. The ghost lane already releases the writer before its image
+    # phase; the general path did not. Freed ONCE per dispatch, right before the first
+    # LOCAL render (cloud adapters never touch the local GPU), through the same
+    # canonical call the LTX 2.5 engine and the GGUF backend make in their preflight.
+    # Nothing after the image stage requests an LLM slot, so there is no reload cost.
+    _residue_freed = False
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -1659,6 +1672,16 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         }
         lease = None
         cloud_image_engine = _is_cloud_image_engine(engine_id)
+        if not cloud_image_engine and not _residue_freed:
+            _residue_freed = True
+            _residue = _levers.free_otr_pipeline_residue(
+                reason="image engine load preflight (%s)" % engine_id)
+            log.info(
+                "[OTR_ImageGenDispatcher] pipeline residue freed before the first local "
+                "still: free %.1f GB after; ran=%s failed=%s",
+                _residue.get("free_gb_after", float("nan")),
+                ",".join(_residue.get("steps_run", []) or []) or "-",
+                ",".join(_residue.get("steps_failed", []) or []) or "-")
         try:
             if not cloud_image_engine:
                 lease = _lease.acquire(timeout_s=lease_timeout_s, lockdir=lockdir)

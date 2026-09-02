@@ -149,13 +149,65 @@ PROBE, DynamicVRAM (aimdo initialised in-process exactly as main.py does, pinned
     within run-to-run noise; DynamicVRAM 13.8/4.8/12.1 s. Receipts
     `legC/5080_probe_after2*.json` (`after2_classic` is the cold first-touch run,
     `after2b_classic_warm` the warm re-measure).
-LEG C4  PENDING at the time of the push: the shipped evict_after_use code under STOCK flags
-    on the clean room (DynamicVRAM on, bf16 encoder). Pass condition verbatim from the
-    server log: `Requested to load Flux2` followed by `loaded completely; <nonzero> MB
-    usable, <nonzero> MB loaded, full load: True` (never `loaded partially; 0.00 MB
-    usable`), seconds per step, and MORE THAN ONE still minted in the same server process.
-    (result below, appended when the leg has run)
-LEG C5  only if C4 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
-    5.6 GB, staged in the clean room; the 4060 drill already used it for Z-Image) through
-    the engine's `OTR_FLUX2_KLEIN_TE` knob in the server's launch environment
-    (`_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
+LEG C4  2026-09-02 03:57-04:34  ad6a635f under STOCK flags (DynamicVRAM on, bf16 encoder).
+    Pass condition was: `Requested to load Flux2` followed by `loaded completely; <nonzero>
+    MB usable, <nonzero> MB loaded, full load: True`, seconds per step, more than one still.
+    RESULT: FAIL. The eviction FIRED -- server log line 366 `[OTR graph-exec]
+    evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through
+    comfy.model_management before the drop` -- and the very next lines were `Requested to
+    load Flux2 / 0 models unloaded / loaded partially; 0.00 MB usable`, GPU at 7896 MiB
+    during sampling, `Model Initializing ...` again. So on the SERVER the unload ran and the
+    encoder's pages stayed on the card, while in-process the identical call freed them
+    (free 620 MB -> 6998 MB). The one remaining difference between the two, read from the
+    two logs: the server runs torch's cudaMallocAsync allocator (`Device: cuda:0 ... :
+    cudaMallocAsync`, set by main.py's `cuda_malloc` import before torch loads) and the
+    probe ran the native allocator (`Device: cuda:0 ... : native`); both had aimdo hooks,
+    NVML pressure and pinned staging. Stopped at the first still (no second still, so the
+    multi-still condition was not reached either). Log: server_legC4_ad6a635f_stock_klein.log.
+PROBE, DynamicVRAM + cudaMallocAsync (the server's exact allocator state), 04:36  In-process
+    the SHIPPED engine code (no monkeypatch) worked here too: after encode free=583 MB;
+    `unload_model_and_clones` alone -> free 6998 MB (the extra release calls changed nothing,
+    there was nothing left to release); the engine's own `evict_after_use` then loaded the
+    DiT with 2592 MB resident and rendered 2 steps in 10.8 s. So the allocator is NOT the
+    difference. Whatever keeps the encoder's pages on the card in the SERVER is something the
+    in-process probe cannot reproduce; the next leg (C4b) runs the server with an
+    INSTRUMENTED bridge on the clone only (registry entries with clone ids, free VRAM and
+    VBAR page residency logged before and after the unload). Log:
+    `docs/2026-09-02-encoder-eviction/4060_probe_residency_aimdo_async.log`.
+LEG C4b  2026-09-02 04:38-05:14  same as C4 with the instrumented bridge (uncommitted, clone
+    only; restored with `git checkout` afterwards). THE ANSWER, server log lines 374-375:
+    `EVICT PROBE 'clip' before: free=48MB ... loaded=0MB registry=['Flux2TEModel_:...:0MB']
+    vbar_pages=255 resident=0 pinned=0` and `after: free=16MB ... registry=[] resident=0`.
+    The encoder was NEVER what filled the card inside the server: its VBAR had zero
+    resident pages (the encode streamed through pinned host staging) and the whole 8 GB
+    was already taken before it loaded. The only heavy thing loaded right before the
+    stills is the WRITER LLM (gemma-4-E2B, transformers, out of ComfyUI's registry): it
+    composed the still prompts at lines 348-360 and nothing in the general path releases
+    it before the image stage -- `_otr_vram_levers.free_otr_pipeline_residue()` (the
+    canonical residue freer: writer LLM + Bark + flush) is called only by the LTX 2.5
+    engine and the GGUF backend in their load preflight, and the ghost lane has its own
+    `_ghost_unload_writer`; the ImageGenDispatcher never calls it. On 16 GB the E2B
+    writer (~5 GB) co-resides with the stills unnoticed; on 8 GB it leaves nothing. So the
+    encoder-eviction work (9b90189a + ad6a635f) was a real defect but the SECOND one; the
+    first is the resident writer. Logs: `docs/2026-09-02-encoder-eviction/
+    4060_server_legC4b_instrumented.log`.
+LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
+    preflight")` once per dispatch before the first LOCAL still (the same call the video
+    preflights make), under STOCK flags on the clean room. Pass condition as C4, plus the
+    dispatcher's own line `pipeline residue freed before the first local still: free
+    <several> GB after`.
+    5080 MEASUREMENT FIRST (the other box, before the push; headless :8000, working tree,
+    `otr_soak_still_motion_flux2_klein`, 1 act, 05:22): the same defect was live on the
+    16 GB card -- at the first still the 12B writer was still resident:
+    `[VRAMLevers] free_otr_pipeline_residue (image engine load preflight (z_image_turbo))
+    OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache, cuda.synchronize,
+    cuda.empty_cache, cuda.ipc_collect | allocated 7387 -> 6` and `pipeline residue freed
+    before the first local still: free 14.4 GB after`. Five Z-Image stills then minted in
+    sequence (cfg 1.0, 8 steps) with no errors; the leg continued into video. Until this
+    change the 5080 was rendering stills with a 7.4 GB writer co-resident (17 GB of
+    models on a 16 GB card, paged by DynamicVRAM, silently slower). (4060 result below)
+LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
+    staged; `_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
+(The fp8-encoder fallback formerly listed here as Leg C5 is Leg C6 above: 5.6 GB
+    `qwen_3_4b_fp8_mixed.safetensors`, staged in the clean room, through the engine's
+    `OTR_FLUX2_KLEIN_TE` knob in the server's launch environment.)

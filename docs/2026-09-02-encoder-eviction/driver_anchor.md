@@ -172,6 +172,57 @@ Provenance, stated exactly: every round on Opus + Sonnet as Cowork subagents; no
 Antigravity lane in any round; the driver grounded each claim against ComfyUI 0.34.2 and the
 real files before adopting it.
 
+## Leg C4 outcome (04:34) -- the shipped shape did NOT release on the server: FAIL
+
+ad6a635f under stock flags on the clean room. The eviction fired (server log: `[OTR graph-exec]
+evict_after_use 'clip': unloaded 1 dynamic model patcher(s) ...`) and the DiT still loaded
+with `0.00 MB usable`; nvidia-smi read 7896 MiB during sampling, so the encoder's pages never
+left the card. The identical call in-process freed them (Phase A1b). The one difference left
+between the two runs, read from both logs: the SERVER's torch allocator is cudaMallocAsync
+(main.py imports `cuda_malloc` before torch, which sets `PYTORCH_CUDA_ALLOC_CONF=backend:
+cudaMallocAsync`); the probe ran the native allocator. Both had the aimdo hooks, NVML
+pressure and pinned staging. The probe is being re-run with the async allocator and the
+release calls tried one at a time after the unload (`torch.cuda.synchronize`, `empty_cache`,
+`soft_empty_cache(force=True)`, `comfy_aimdo.control.analyze()`,
+`vbars_reset_watermark_limits()`), then the shipped engine code end to end
+(`4060_probe_residency_aimdo_async.log`). Until that lands, ad6a635f is correct in intent,
+proven harmless on the 5080 on both paths, and NOT yet the fix on a stock 8 GB server.
+
+## Leg C4b outcome (05:14) -- the card was full of the WRITER, not the encoder
+
+Instrumented bridge on the clone only (registry entries with clone ids, free VRAM, VBAR page
+residency before/after the unload; `4060_server_legC4b_instrumented.log` lines 374-375):
+`before: free=48MB ... loaded=0MB registry=['Flux2TEModel_:5e976af3:0MB'] vbar_pages=255
+resident=0 pinned=0` / `after: free=16MB ... registry=[] resident=0`. The encoder's VBAR held
+ZERO resident pages inside the server (the encode streamed through pinned host staging into
+a card that was already full), so evicting it could not free what it never held. The in-process
+probes all started from an empty card, which is why every one of them "worked". What fills the
+card on the server is the WRITER LLM (gemma-4-E2B, transformers, outside ComfyUI's registry):
+it composes the still prompts at lines 348-360, and the general path never releases it before
+the image stage. The canonical residue freer (`_otr_vram_levers.free_otr_pipeline_residue`:
+writer LLM + Bark + surgical detach + flush) is called only by the LTX 2.5 engine and the GGUF
+backend in their load preflight; the ghost lane has `_ghost_unload_writer`; the
+ImageGenDispatcher has nothing. On 16 GB an E2B writer (~5 GB) co-resides with the stills
+unnoticed; on 8 GB it leaves nothing.
+
+Ruling on the two commits: 9b90189a + ad6a635f fixed a real, measured, second-order defect
+(encoder co-residency; proven on the 5080 with byte-identical stills and lower peaks) and are
+kept. The first-order 8 GB defect is the resident writer, fixed in the dispatcher: one
+`free_otr_pipeline_residue(reason="image engine load preflight (<engine>)")` before the first
+LOCAL still of a dispatch, the same call the video preflights make. No LLM slot is requested
+after the image stage (cast_lock, FreezeCascade, ScriptWriter, ShotLock, bark_lib, llm_policy,
+writer_inputs are the only slot users), so there is no reload cost. Wiring conformance to the
+existing canonical call: one Sonnet QA on the diff (CLEAN), a 5080 leg with the change, then
+Leg C5.
+
+5080 leg (05:22, headless :8000, `otr_soak_still_motion_flux2_klein`, 1 act): the same defect
+was live on the 16 GB card. At the first still the 12B writer was resident and the new call
+released it -- `free_otr_pipeline_residue (image engine load preflight (z_image_turbo)) OK:
+unload_llm, _unload_bark, ... | allocated 7387 -> 6`, `free 14.4 GB after` -- then five
+Z-Image stills minted in sequence with no errors and the leg went on into video. Every 5080
+still before this change rendered next to a 7.4 GB writer (17 GB of models on 16 GB, paged
+by DynamicVRAM). The 8 GB proof is Leg C5 in the clean-room log.
+
 ## What is NOT in scope
 
 The recipe (20 steps, guidance 4.0), the encoder choice (bf16 vs fp8), the video engines'

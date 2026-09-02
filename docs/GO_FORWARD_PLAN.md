@@ -158,8 +158,10 @@ verdict is not polluted by known-open defects):**
    GPU, do not contend with a render).
 4. **Image defaults** (1.12 below) -- APPLIED 2026-09-01: Klein in every 8 GB / 12 GB /
    AMD profile, AMD images-only, Z-Image cfg 2.0 -> 1.0 on the operator's A/B. Batch R7
-   Leg C still owes the first 8 GB Klein measurement. **Auto-download** (1.13 below) --
-   design row, confirm to schedule.
+   Leg C then found and fixed the 8 GB residency defect (9b90189a + ad6a635f: the text
+   encoder now leaves the card before the sampler, DynamicVRAM included); Leg C4 is the
+   8 GB measurement of the shipped code. **Auto-download** (1.13 below) -- design row,
+   confirm to schedule.
 5. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
 6. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
@@ -656,10 +658,13 @@ Still owed:
 * Registry: `nodes/_otr_image_engines/registry.py` gains `mps` on the `flux2_klein` row ONLY
   after one measured render on Apple Silicon; then `otr_mac_mps` flips to Klein. ROCm already
   qualifies (presents as cuda).
-* Batch R7 Leg C: `flux2_klein` stills on the 4060 clean room under the stock loader -- the
-  first 8 GB Klein measurement, and it tells whether the Z-Image abort (Section 3 L) is
-  engine-specific. The matrix says PROVEN only for what rendered; until then the 8 GB row's
-  image column is a ruled default, unmeasured.
+* Batch R7 Leg C (RAN 2026-09-02, see Batch R7): Klein renders on 8 GB under the stock
+  loader and the Z-Image abort is engine-specific; the 42-min-per-still residency defect it
+  exposed is fixed in two commits -- 9b90189a (free the encoder at its drop; enough on the
+  classic path) and ad6a635f (unload it through ComfyUI's registry at that drop; required
+  under DynamicVRAM, which every stock NVIDIA install runs). The matrix says PROVEN only
+  for what PUBLISHED; the 8 GB row's image column stays a ruled default until a Klein leg
+  reaches obs (Leg C4 is that leg).
 * The cfg 1.0 promotion step: the same four A/B cells on three real episode prompts
   (announcer portrait, character portrait, scene beat), operator eyeball. One seed is a
   strong lead, not a proof; this confirms it on real content or sends it back.
@@ -923,10 +928,23 @@ session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
   itself fits after the still is out of the way.
 * Leg B: `otr_cleanroom_8gb_humo17` behind it (no extra node pack; 13.6 GB of
   Comfy-Org weights).
-* Leg C: the same clean room with the image slots on `flux2_klein` (Q4 GGUF, the
-  ComfyUI-GGUF pack is already installed there) under the STOCK loader: the ruled low-VRAM
-  image default (Section 1.12) gets its first 8 GB measurement, and the result says whether
-  the Z-Image abort (Section 3 L) is engine-specific.
+* Leg C: RAN 2026-09-02 (profile `otr_cleanroom_8gb_klein_ltx25`, Klein Q4 GGUF stills +
+  LTX 2.5). Under the STOCK loader Klein did NOT abort -- the Z-Image abort is
+  engine-specific -- and minted a clean 832x480 still, but ONE still took ~42 min: the
+  7.7 GB bf16 Qwen3-4B encoder stayed on the card and the DiT loaded with "0.00 MB usable"
+  (120 s per step). The lowvram flag pair (Leg C2) was IDENTICAL (143 s per step), so the
+  flags were never the answer. ROOT CAUSE FIXED in 9b90189a: the three local image engines
+  ran the graph without `free_after_use` (every video engine has it), so the encoder never
+  left the card before the sampler; fix proven byte-identical on the 5080 with 5-7 GB lower
+  peak (PBUG-20260902-01, Bible 12.145). Leg C3 (that fix, STOCK flags) was UNCHANGED:
+  under ComfyUI 0.34 DynamicVRAM the dropped encoder leaves an orphaned VBAR that only
+  another dynamic model's pressure reclaims, and the GGUF DiT is a classic patcher. Measured
+  in-process on the clean room and fixed in ad6a635f: `run_graph(..., evict_after_use=
+  {"clip"})` unloads the named dynamic patcher through ComfyUI's own registry at its drop
+  (free 620 MB -> 6998 MB; a 2-step Klein render 9.4 s vs ~4 min). Four-round arc on two
+  substitute seats, `docs/2026-09-02-encoder-eviction/driver_anchor.md`; 5080 proof on both
+  paths byte-identical. Leg C4 = ad6a635f under STOCK flags on the 4060, the first 8 GB
+  measurement of the shipped shape; its result is in the clean-room log (Leg results).
 * Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
   `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
   `docs/MACHINE_MATRIX.md`, then the README newbie pass. Do not advertise a lane the
