@@ -215,7 +215,7 @@ fetch_exact () {
   mkdir -p "$(dirname "$dest")"
 
   if [ -f "$dest" ] \
-     && [ "$(stat -c '%s' "$dest")" = "$expected_bytes" ] \
+     && [ "$(stat -Lc '%s' "$dest")" = "$expected_bytes" ] \
      && printf '%s  %s\n' "$expected_sha" "$dest" | sha256sum -c -; then
     echo "PRESENT $relative_dest"
     return 0
@@ -228,7 +228,7 @@ fetch_exact () {
     rm -f "$part"
     return 1
   fi
-  actual_bytes=$(stat -c '%s' "$part") || {
+  actual_bytes=$(stat -Lc '%s' "$part") || {
     rm -f "$part"
     return 1
   }
@@ -247,6 +247,10 @@ fetch_exact () {
   }
 }
 ```
+
+`stat -L` is intentional: a template may expose a verified Hugging Face cache
+object through a symlink, and the artifact's target bytes are the owned fact.
+The SHA-256 check still reads the complete target.
 
 Run the five exact LTX 2.5 rows:
 
@@ -322,8 +326,10 @@ export OTR_VOICE_REFERENCE_BANK=/workspace/otr-config/voice_reference_bank.porta
 ```
 
 The IndexTTS source is deliberately a persistent sibling of the pinned ComfyUI
-checkout. Putting it under `$OTR_COMFY_ROOT` creates an untracked nested checkout
-and makes the next core-integrity gate refuse the rerun.
+checkout so the two lifecycles stay independent. The core-integrity gate ignores
+untracked template-owned paths, but Git still refuses a checkout that would
+overwrite one; do not nest an engine repository under the core and create a
+future path collision.
 
 The utility validates complete PCM payloads, copies the references under
 `models/TTS/refs/indextts2/`, records their exact SHA-256 values, preserves

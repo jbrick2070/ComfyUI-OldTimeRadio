@@ -9945,3 +9945,37 @@ The helper is only consulted when `dur_s` is falsy, so a row with any duration
 cannot change. The only rows affected are ones that currently produce zero
 frames -- i.e. rows that currently kill the leg. Both machines gain; neither can
 regress. 37 shot-lock/budget tests pass.
+
+---
+
+## PBUG-20260901-01 -- RunPod provisioner rejects a clean template because its venv is untracked
+
+**Verified on a live secure RunPod** (`jaq27diu24jt1p`, RTX 4090, 2026-09-01).
+The pod passed the actual capacity gate (125 GB API allocation,
+`memory.max=124999999488`) and the OTR checkout was clean at
+`c383e92679d8257e9d9b9bf73dedb6b195bab3be`. Provisioning stopped before pack
+or weight work with:
+
+    FATAL: ComfyUI core has tracked changes; refusing to overwrite them
+
+The core had no tracked or staged changes. The RunPod ComfyUI template normally
+keeps `.venv-cu128/` plus sibling-engine links (`chatterbox`, `dia`, and
+`index-tts`) as untracked entries inside the checkout. The provisioner asked
+`git status --porcelain --untracked-files=all`, so its clean-core safety check
+silently widened from “tracked work that checkout could replace” to “anything
+the template owns but Git does not.” The diagnostic then mislabeled those
+untracked entries as tracked changes.
+
+**FIX:** the guard now uses `git status --porcelain --untracked-files=no` and
+names both tracked and staged changes in its refusal. This preserves the safety
+boundary that matters while allowing normal template-owned venvs and links.
+Git's checkout operation remains a second fail-closed boundary: it refuses if
+an untracked path would actually be overwritten by the pinned commit.
+
+**VERIFY:** `tests/test_otr_pod_provision_contract.py` pins the exact production
+flag, creates a real temporary Git checkout, proves an untracked `.venv-cu128`
+does not trip the guard, and proves a tracked edit still does. The same paid pod
+must then pass this boundary before the HuMo/LTX qualification continues.
+
+**Bug Bible:** promoted as 12.141; the generalized class is a safety gate whose
+input population is broader than the destructive operation it claims to guard.

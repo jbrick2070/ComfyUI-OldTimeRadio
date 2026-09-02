@@ -35,6 +35,82 @@ def test_pod_script_has_one_pack_and_weight_owner():
     assert "OTR_COMFY_ROOT" in text
 
 
+def test_pod_script_allows_template_owned_untracked_entries(tmp_path):
+    text = POD.read_text(encoding="utf-8")
+    assert 'status --porcelain --untracked-files=no' in text
+    assert 'status --porcelain --untracked-files=all' not in text
+
+    repo = tmp_path / "comfy-core"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "OTR test"],
+        check=True,
+    )
+    tracked = repo / "folder_paths.py"
+    tracked.write_text("CORE = True\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "folder_paths.py"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+
+    (repo / ".venv-cu128").mkdir()
+    (repo / ".venv-cu128" / "pyvenv.cfg").write_text(
+        "home = /usr/bin\n", encoding="utf-8"
+    )
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout == ""
+
+    tracked.write_text("CORE = False\n", encoding="utf-8")
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "folder_paths.py" in status.stdout
+
+    subprocess.run(["git", "-C", str(repo), "add", "folder_paths.py"], check=True)
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "folder_paths.py" in status.stdout
+
+
 def test_legacy_cloud_scripts_cannot_bypass_the_owner():
     setup = (REPO / "scripts" / "setup_cloud.sh").read_text(encoding="utf-8")
     download = (REPO / "scripts" / "download_models.sh").read_text(encoding="utf-8")

@@ -68,8 +68,8 @@ if [ ! -d "$COMFY_ROOT/.git" ]; then
   echo "  # create/use that tree's Python environment, then rerun this script" >&2
   exit 1
 fi
-if [ -n "$(git -C "$COMFY_ROOT" status --porcelain --untracked-files=all)" ]; then
-  fail "ComfyUI core has tracked changes; refusing to overwrite them"
+if [ -n "$(git -C "$COMFY_ROOT" status --porcelain --untracked-files=no)" ]; then
+  fail "ComfyUI core has tracked or staged changes; refusing to overwrite them"
 fi
 CURRENT_CORE=$(git -C "$COMFY_ROOT" rev-parse HEAD 2>/dev/null || true)
 if [ "$CURRENT_CORE" != "$CORE_PIN" ]; then
