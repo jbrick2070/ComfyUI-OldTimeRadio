@@ -229,8 +229,13 @@ LEG C5  the dispatcher fix: `free_otr_pipeline_residue(reason="image engine load
     usable, 5391.26 MB loaded, 5708.43 MB offloaded`, and the FIRST CLIP PASSED:
     `ltx25_video TWO-STAGE PASS nodes=3 decode=1664x960 render_elapsed_s=1018.258` --
     17 min a clip on the 4060 under stock flags, half the DiT streaming from host RAM.
-    The first LTX 2.5 clip ever rendered on an 8 GB card in this project. Seven clips
-    to go at that pace (~2 h) before obs decides PROVEN. (episode result below)
+    The first LTX 2.5 clip ever rendered on an 8 GB card in this project. Clips 2-6 then
+    passed at 827-851 s each (the encoder cache warm), every one a two-stage pass at
+    1664x960. The beats are multi-segment (`shot_b001 has 4 segments`), so the episode
+    is ~20 clips, not 8 -- the 5080 leg of the same shape ran 22 -- which puts the 4060's
+    obs publish about five hours after the leg started (~10:30-11:00), at ~14 min a clip.
+    The leg is left running; the episode lands in the clean room's own
+    `ComfyUI\output\otr\obs\` when it finishes. (episode result below)
 LEG C6  only if C5 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
     staged; `_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
 (The fp8-encoder fallback formerly listed here as Leg C5 is Leg C6 above: 5.6 GB

@@ -958,9 +958,14 @@ session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
   too (`allocated 7387 -> 6`, `free 14.4 GB after`, five stills then minted cleanly). Leg C5
   (da2b7a36, STOCK flags, 06:09) PASSED on the 4060: `free 6.9 GB after`, `Requested to
   load Flux2 / loaded completely; 5560.68 MB usable, 2591.65 MB loaded`, 1.07 s per step
-  (~21 s a still, was ~42 min), two stills in one server process, then on into LTX 2.5.
-  Klein on 8 GB under stock launch flags is MEASURED. PROVEN (matrix) still waits for the
-  episode to reach obs, which is the LTX 2.5 lane's own 8 GB question (Leg A).
+  (~21 s a still, was ~42 min), nine stills in one server process, then on into LTX 2.5.
+  Klein on 8 GB under stock launch flags is MEASURED. And Leg A's own question got its
+  first answer on the same leg: LTX 2.5 (Q3_K_M DiT, 12B encoder pinned to CPU by the
+  engine) renders on the 4060 under stock flags -- two-stage passes at 1664x960, 1018 s
+  for the first clip and 827-851 s after (DiT half offloaded), six clips by 07:47 with
+  ~20 in the episode, so ~14 min a clip and a five-hour episode. It WORKS on 8 GB; it is
+  not a daily driver at that pace. PROVEN (matrix) waits for that episode to reach the
+  clean room's obs (~10:30-11:00 on 2026-09-02) and for an operator eyeball.
 * Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
   `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
   `docs/MACHINE_MATRIX.md`, then the README newbie pass. Do not advertise a lane the
