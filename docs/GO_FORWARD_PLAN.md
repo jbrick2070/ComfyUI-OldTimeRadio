@@ -49,8 +49,9 @@ characters and announcer. Proof B (the 4060 clean room, portable Python 3.13.14)
 prefetch fetched the 310 MB ONNX model on its own, and the leg logged `backend=onnx
 provider=CPUExecutionProvider` with kokoro on both slots; Proof B DONE 2026-09-02 14:02:
 `signal_lost_the_ledger_of_shadows_20260902_134447` published (37 min), master mix
-speech-shaped in every voice slot (no tone). DONE WHEN the operator's eyeball on that
-episode confirms both voices; then this item closes. Registry installs get the kokoro-onnx line on the next
+speech-shaped in every voice slot (no tone). Operator eyeball 2026-09-02 14:10: "this
+episode is perfect, voices great". **ITEM 2 DONE.** Left over from it, not blocking: the
+kokoro-onnx line rides the next `pyproject.toml` bump. Registry installs get the kokoro-onnx line on the next
 `pyproject.toml` bump after alpha.15 resolves.
 
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
@@ -66,9 +67,10 @@ wrong picture, a leg that dies late).
 Klein stills run on 8 GB under stock launch flags (Leg C5: ~21 s a still) and LTX 2.5
 renders there at ~14 min a clip; the Leg C5 episode PUBLISHED 2026-09-02 12:10
 (`signal_lost_rationed_breath_20260902_060027`, 24 clips, 6 h 35 min; receipt in
-`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`). Owed: (a) the operator watches it, then
-the 8 GB row's image column flips to PROVEN in `config/machine_classes.json` and the
-matrix regenerates;
+`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`). (a) DONE 2026-09-02: the 8 GB row is PROVEN with its image lane on the
+all-kokoro clean-room episode `signal_lost_the_ledger_of_shadows_20260902_134447` (the
+operator's eyeball), receipt merged into the row's 4060 entry (7 episodes), matrix
+regenerated;
 (b) a shipped `otr_8gb_klein_ltx25` profile and variant (the clean-room profile is
 untracked on the 4060 -- promote it, do not rewrite it); (c) the eight profiles that still
 pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships. Section

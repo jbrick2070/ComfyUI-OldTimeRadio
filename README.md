@@ -419,7 +419,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `draft`, unproven |
 | **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `draft`, unproven |
@@ -452,7 +452,7 @@ than guessed, because a guessed VRAM number is the one thing a user cannot
 recover from.
 
 **Read each 8 GB claim at its stated proof level.** A physical RTX 4060 8 GB
-has published 6 documented full OTR episodes using AnimateDiff, so the invoked
+has published 7 documented full OTR episodes using AnimateDiff, so the invoked
 writer/video/voice/music episode path is **EPISODE PATH PROVEN**. Separately, a
 raw MiniMax H3 FL2VA ComfyUI recipe produced
 three valid 864x480x90 clips with native audio on the same physical card, with

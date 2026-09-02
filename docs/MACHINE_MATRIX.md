@@ -29,7 +29,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `draft`, unproven |
 | **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `draft`, unproven |
@@ -252,7 +252,7 @@ There is currently no separate 24/32 GB machine key or heavy-rental profile. Mor
 
 ## Hardware episode receipts, with their exact scope
 
-* **8 GB NVIDIA (RTX 4060, 3070, 2080)** on RTX 4060 8 GB -- 6 episode(s), 2026-08-29. Scope: current E2B writer, AnimateDiff video, kokoro voices, and musicgen published; configured image lane was not invoked. Evidence: docs/4060_DRILL_LOG.md steps 7-19; five of five banks published
+* **8 GB NVIDIA (RTX 4060, 3070, 2080)** on RTX 4060 8 GB -- 7 episode(s), 2026-09-02. Scope: six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great). Evidence: docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX 5080 16 GB -- 45 episode(s), 2026-08-31. Scope: published episodes across multiple engine/profile tuples; not proof of the current row as one exact tuple. Evidence: continuous overnight 5-act loops published to otr/obs
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.

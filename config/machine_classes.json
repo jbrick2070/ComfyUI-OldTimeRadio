@@ -145,8 +145,8 @@
       "platform": "any",
       "writer": "gemma-4-E2B",
       "writer_model": "google/gemma-4-E2B-it",
-      "note": "The physical RTX 4060 published six documented episodes through the invoked writer/video/voice/music path. The configured still-image engine was not invoked and remains unproven on 8 GB. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
-      "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane unexercised",
+      "note": "The physical RTX 4060 published six documented episodes through the writer/video/voice/music path (2026-08-29) and, on 2026-09-02, a clean-room episode with THIS row's image lane (Klein 4B Q4 GGUF stills, ~20 s each under stock flags) and kokoro voices on a fresh Python 3.13 portable. LTX 2.5 also renders on 8 GB (~14 min a clip; known_limits) but is not the row's video default. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
+      "proof_summary": "**EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room",
       "key": "8gb",
       "video": "animatediff15_v3_haunted_video",
       "image": "flux2_klein",
@@ -163,10 +163,10 @@
       "proven": [
         {
           "hardware": "RTX 4060 8 GB",
-          "episodes": 6,
-          "date": "2026-08-29",
-          "scope": "current E2B writer, AnimateDiff video, kokoro voices, and musicgen published; configured image lane was not invoked",
-          "evidence": "docs/4060_DRILL_LOG.md steps 7-19; five of five banks published"
+          "episodes": 7,
+          "date": "2026-09-02",
+          "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great)",
+          "evidence": "docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B"
         }
       ]
     },
