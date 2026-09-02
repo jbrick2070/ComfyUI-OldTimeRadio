@@ -156,8 +156,10 @@ verdict is not polluted by known-open defects):**
    mean the round is not optional).
 3. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
    GPU, do not contend with a render).
-4. **Image defaults** (1.12 below) -- ruled; mechanical config once Batch R7 Leg C
-   measures it. **Auto-download** (1.13 below) -- design row, confirm to schedule.
+4. **Image defaults** (1.12 below) -- APPLIED 2026-09-01: Klein in every 8 GB / 12 GB /
+   AMD profile, AMD images-only, Z-Image cfg 2.0 -> 1.0 on the operator's A/B. Batch R7
+   Leg C still owes the first 8 GB Klein measurement. **Auto-download** (1.13 below) --
+   design row, confirm to schedule.
 5. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
 6. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
@@ -632,23 +634,35 @@ refusals across 35 stills in the last sweep; the Q4 GGUF DiT is 2.6 GB
 sampling) and the 0.34 GB VAE; it loads through `UnetLoaderGGUF`, so the ComfyUI-GGUF pack the
 LTX 2.5 lane already requires is the one prerequisite (README 2b names it).
 
-Work, mechanical once the leg below measures it:
-* Flip the image slots (`announcer_image`, `music_image`, `character_image`) to `flux2_klein`
-  in the low-VRAM profiles (`otr_nvidia_8gb_*`, `otr_8gb_*`, `otr_4060_*`, `otr_amd8_rocm`,
-  `otr_amd16_rocm`, `otr_mac_mps`, `cpu_floor` where an image engine is wanted at all) and in
-  `config/machine_classes.json` (`image` for the 8gb, 12gb, amd classes), regenerate variants
-  and `docs/MACHINE_MATRIX.md`. The canonical keeps `z_image_turbo`.
+DONE 2026-09-01 (the 5080 window, one commit; the canonical keeps `z_image_turbo`):
+* Image slots (`announcer_image`, `music_image`, `character_image`) are `flux2_klein` in all
+  19 low-VRAM profiles (`otr_nvidia_8gb_*`, `otr_8gb_*`, `8gb_lite`, `otr_4060_*`,
+  `otr_nv40_12gb`, `otr_amd8_rocm`, `otr_amd16_rocm`) and `config/machine_classes.json`
+  carries `image: flux2_klein` for the 8gb, 12gb and amd classes; variants and
+  `docs/MACHINE_MATRIX.md` regenerated. `otr_mac_mps` and `cpu_floor` are untouched: both
+  are `draft`, already images-only (`still_motion`), and run `google_image` because no local
+  image engine declares `mps` or `cpu` in the registry yet (next bullet).
+* Mac and AMD ship IMAGES ONLY: both AMD profiles run `still_motion` for the character lane
+  and the procedural viz lanes for announcer and music; the amd class `video` is
+  `still_motion` and the matrix reads it.
+* **Z-Image recipe: cfg 2.0 -> 1.0** (`nodes/_otr_image_engines/z_image_turbo.py`, the
+  reference A/B harness pin, and its tests). A same-seed A/B on nvfp4 AND bf16 showed the
+  "bloody faces" look tracks cfg 2.0, not the 4-bit weight; the operator picked the cfg 1.0
+  frames. The negative is inert at cfg 1.0, as it is for Flux; `OTR_ZIMAGE_CFG` overrides.
+  Receipts: `docs/2026-09-01-16GB-IMAGE-ENGINE-PROBLEM-STATEMENT.md`,
+  `docs/ship-audit-2026-09-01/image-jury/zab_*.png`.
+
+Still owed:
 * Registry: `nodes/_otr_image_engines/registry.py` gains `mps` on the `flux2_klein` row ONLY
-  after one measured render on Apple Silicon; ROCm already qualifies (presents as cuda).
-* RULED the same day: Mac and AMD ship IMAGES ONLY -- their video roles run the still and
-  procedural lanes over Klein stills; no video-diffusion engine is advertised there until one
-  publishes an episode on that hardware. `machine_classes.json` amd `video` (today `wan_ti2v`,
-  unproven) and the mac profile change with the image flip above; the matrix reads
-  "images only".
-* Batch R7 gets Leg C: `flux2_klein` stills on the 4060 clean room under the stock loader,
-  which also tells whether the Z-Image abort (Section 3 L) is engine-specific.
-* The matrix says PROVEN only for what rendered; until then the row reads "ruled default,
-  unmeasured on this class".
+  after one measured render on Apple Silicon; then `otr_mac_mps` flips to Klein. ROCm already
+  qualifies (presents as cuda).
+* Batch R7 Leg C: `flux2_klein` stills on the 4060 clean room under the stock loader -- the
+  first 8 GB Klein measurement, and it tells whether the Z-Image abort (Section 3 L) is
+  engine-specific. The matrix says PROVEN only for what rendered; until then the 8 GB row's
+  image column is a ruled default, unmeasured.
+* The cfg 1.0 promotion step: the same four A/B cells on three real episode prompts
+  (announcer portrait, character portrait, scene beat), operator eyeball. One seed is a
+  strong lead, not a proof; this confirms it on real content or sends it back.
 
 ### 1.13 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
 
@@ -973,6 +987,10 @@ Decide: the 8 GB dropdown set avoids z_image stills, or the launch flags become 
 documented requirement for 8 GB, or both until ComfyUI answers the faulthandler
 report. Default if unruled: the flags are documented in README for 8 GB and the
 retry (Batch R7) measures the lanes behind them.
+Half-answered by 1.12 (2026-09-01): the 8 GB set now runs Klein stills, so it avoids
+z_image by ruling rather than by this abort; whether the abort is engine-specific is
+what Leg C measures. The launch-flag question stays open for anyone who picks Z-Image
+on 8 GB from the dropdown.
 
 ### The question list
 

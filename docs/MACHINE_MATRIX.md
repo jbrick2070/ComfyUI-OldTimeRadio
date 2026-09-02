@@ -26,10 +26,10 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 | your machine | writer | video | voice | music | image | status |
 |---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **PROVEN** -- 9 episode(s) on RTX 4060 8 GB |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **PROVEN** -- 50 episode(s) on RTX 5080 16 GB, RTX PRO 4000 Blackwell 24 GB (rented), RTX PRO 4000 Blackwell 24 GB (rented), RTX A4500 20 GB (rented, Ampere sm_86), RTX A4500 20 GB (rented, Ampere sm_86), RTX 5080 Laptop 16 GB (Blackwell sm_120) |
-| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
-| **AMD / ROCm** | gemma-4-E2B | wan_ti2v | kokoro | musicgen | z_image_turbo | `shipping`, unproven |
+| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | -- | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping`, unproven |
+| **AMD / ROCm** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `shipping`, unproven |
 
 **Use the profile named for your machine** -- pass it to `--profile`, or pick the matching entries in the dropdowns. The engine names above are exactly the dropdown text.
 
@@ -48,8 +48,8 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 
 | profile | video | voice | music | image | confidence |
 |---|---|---|---|---|---|
-| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping` |
-| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | `shipping` |
+| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` |
+| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` |
 
 <details><summary>14 draft profile(s) here -- not vouched for</summary>
 
@@ -68,7 +68,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_8gb_fastwan` | fastwan_8gb | bark |
 | `otr_8gb_ltx` | ltx_8gb | bark |
 | `otr_8gb_wan` | wan_ti2v | bark |
-| `otr_amd8_rocm` | wan_ti2v | kokoro |
+| `otr_amd8_rocm` | still_motion | kokoro |
 | `otr_nvidia_8gb_h3` | minimax_h3_video | kokoro |
 | `otr_qwen2507_haunted_proof` | animatediff15_v3_haunted_video | kokoro |
 
@@ -135,7 +135,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | kokoro |
 | `otr_4060_viz_12b` | viz_camera | kokoro |
 | `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | kokoro |
-| `otr_amd16_rocm` | wan_ti2v | kokoro |
+| `otr_amd16_rocm` | still_motion | kokoro |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
 | `otr_ideogram4_local_still_word` | still_word | kokoro |
 | `otr_lemmy_kokoro_diag` | still_flat | kokoro |
@@ -245,6 +245,8 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 * ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'); the provisioner now pins that pack and applies OTR's public in-repo, hash-verified loader patch. On a rented A4500 it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted for a second machine only when that exact tuple publishes an episode.
 
 * humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching, and the public `humo` fetch lane now owns all five 14B files (26.7356 GiB) with pinned revisions, sizes, SHA-256 values, and atomic `.part` handling. Only the remote canonical receipt remains.
+
+* Image engine defaults (operator rulings 2026-09-01): Klein 4B Q4 GGUF for the 8 GB, 12 GB and AMD classes and for Mac; Z-Image-Turbo stays the 16 GB NVIDIA default at cfg 1.0 (cfg 2.0 rendered reddened, crushed skin in both nvfp4 and bf16 on a same-seed A/B; the operator chose the cfg 1.0 frames). Weight follows the card: nvfp4 on Blackwell, bf16 on Ampere/Ada, by the existing compute-capability ranking. Klein on 8 GB is the ruled default and is UNMEASURED until Batch R7 Leg C renders it on the 4060.
 
 ## What is NOT here
 

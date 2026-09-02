@@ -100,14 +100,38 @@ C. **Klein 4B bf16 everywhere (one engine for all tiers).** Passes every criteri
 D. **Retire the notion of a separate 16 GB image tier** and let video engines carry the
    16 GB distinction (they do; stills are conditioning). C without the branding.
 
+## Decision (operator, 2026-09-01 evening) -- option A, shipped
+
+The operator eyeballed the four A/B frames and picked the cfg 1.0 cells ("I like the
+last one because it's the brightest", "2nd one is good too"), with the brief that it
+"work, be less friction and fit VRAM for our 8 GB and 16 GB default tiers". Applied:
+
+* `nodes/_otr_image_engines/z_image_turbo.py`: default cfg 2.0 -> 1.0 (the distilled
+  model's own guidance point). The negative is now inert, as it is for Flux; the grade
+  tail in the positive prompt carries the filmic look. `OTR_ZIMAGE_CFG` still overrides.
+  The reference A/B harness pin and its tests follow the shipped default.
+* Z-Image-Turbo stays the 16 GB NVIDIA default (`config/machine_classes.json` default
+  `image`). Weight follows the card through the existing compute-capability ranking:
+  nvfp4 on Blackwell, bf16 on Ampere/Ada.
+* Klein 4B Q4 GGUF is the image engine in every 8 GB, 12 GB and AMD profile (19 profiles,
+  all three image roles) and the `image` field of those classes; variants regenerated.
+* Mac and AMD ship images only: both AMD profiles now run `still_motion` for the
+  character lane and the procedural viz lanes for announcer and music; the AMD class
+  `video` is `still_motion`.
+
+Still open from the list below: the three-prompt eyeball on real episode stills is the
+promotion step for the single-seed A/B (it is a strong lead, not a proof), Klein on 8 GB is
+unmeasured until Batch R7 Leg C, and the Flux.1-dev and `still_word` items stand.
+
 ## Next actions (in order)
 
-1. Finish the A/B: bf16 at cfg 2.0 and 1.0, same seed; then the same four cells on three
-   real episode prompts (announcer portrait, character portrait, scene beat). Operator
-   eyeballs the eight frames. If cfg 1.0 wins, that is a one-line recipe change behind the
-   existing `OTR_ZIMAGE_CFG` knob and a profile default, reviewed as a recipe change.
-2. Decide A vs C (or D) on the eyeball. Record it in `docs/OTR_STANDING_RULINGS.md` next to
-   the Klein ruling, and update `config/machine_classes.json` `image` for the 16gb class.
+1. DONE 2026-09-01 (single seed). Remaining: the same four cells on three real episode
+   prompts (announcer portrait, character portrait, scene beat), operator eyeball. The
+   recipe change is already live behind `OTR_ZIMAGE_CFG`; this step confirms it on real
+   content or sends it back.
+2. DONE 2026-09-01: option A. Recorded in `docs/OTR_STANDING_RULINGS.md` next to the Klein
+   ruling; `config/machine_classes.json` carries the class defaults and the ruling in
+   `known_limits`.
 3. Flux.1-dev: keep in the dropdown, keep `commercial_clean = False`, document as an
    upgrade with the license note. No default anywhere.
 4. Text on stills: route every text-bearing card through `still_word`, never through a

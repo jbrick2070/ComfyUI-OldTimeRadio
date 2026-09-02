@@ -2108,6 +2108,27 @@ JSON."*
 * The machine matrix marks a class PROVEN on Klein only after a measured render on that
   class (Batch R7 Leg C for 8 GB NVIDIA; Apple Silicon and ROCm each need their own). Until
   then the row reads "ruled default, unmeasured".
+* APPLIED 2026-09-01: all 19 8 GB / 12 GB / AMD profiles carry `flux2_klein` in every image
+  slot; `config/machine_classes.json` says so for the 8gb, 12gb and amd classes.
+
+## Z-IMAGE-TURBO RUNS AT cfg 1.0 (operator ruling 2026-09-01, on a same-seed A/B)
+
+Operator, choosing among the four A/B frames: *"I like the last one because it's the
+brightest"* (cfg 1.0) and *"2nd one is good too"* (the other cfg 1.0 cell); the brief is that
+the 16 GB default "work, be less friction and fit VRAM for our 8 GB and 16 GB default tiers".
+
+* The shipped Z-Image-Turbo recipe is 8 steps / cfg 1.0 / shift 3.0 / euler / normal. The
+  old cfg 2.0 (kept to make the pack's style negative live) rendered reddened, harder,
+  crushed skin in BOTH the nvfp4 and the bf16 weight -- the "bloody faces" the operator had
+  been seeing since 2026-08 -- and cfg 1.0 rendered natural skin in both. The 4-bit weight
+  was not the cause. `OTR_ZIMAGE_CFG` still overrides per run.
+* At cfg 1.0 the negative prompt is inert, exactly as it is for Flux at cfg 1.0; the grade
+  tail in the positive prompt carries the filmic look.
+* Z-Image-Turbo stays the 16 GB NVIDIA default. Weight follows the card through the existing
+  compute-capability ranking: nvfp4 on Blackwell, bf16 on Ampere/Ada.
+* Receipts: `docs/2026-09-01-16GB-IMAGE-ENGINE-PROBLEM-STATEMENT.md` and
+  `docs/ship-audit-2026-09-01/image-jury/zab_{nvfp4,bf16}_cfg{2.0,1.0}.png`. One seed and
+  one prompt; the three-prompt eyeball on real episode stills is the promotion step.
 
 ## MAC AND AMD SHIP IMAGES ONLY (operator ruling 2026-09-01)
 
@@ -2119,6 +2140,8 @@ fine only giving them images if that's the case."*
   for the low tier (Klein 4B Q4 GGUF). Nothing in the video registry declares `mps`, and
   ROCm has no measured render; that is the fact behind the ruling, and it stands until a
   video engine publishes an episode on one of those machines.
-* `config/machine_classes.json` says so explicitly for the amd class (today it advertises
-  `wan_ti2v`, which is unproven there) and the mac profile; the matrix reads "images only"
-  rather than an unproven video engine.
+* APPLIED 2026-09-01: `config/machine_classes.json` amd `video` is `still_motion` (it had
+  advertised `wan_ti2v`, unproven there), both AMD profiles run `still_motion` for the
+  character lane and the procedural viz lanes for announcer and music, and the matrix reads
+  it. The mac profile was already images-only (`still_motion`, `draft`); it stays on
+  `google_image` until a local image engine declares `mps` in the registry.

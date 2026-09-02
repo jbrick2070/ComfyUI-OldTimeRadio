@@ -18,11 +18,17 @@ goal: the DEFAULTS here point at the **fp8** diffusion model + **fp8** Qwen3 TE
 TE before the diffusion sampling peak, so the resident peak is the diffusion
 model, not TE+diffusion co-resident. Point the env knobs at bf16/GGUF to taste.
 
-LOW-VRAM DEFAULTS: 8 steps / cfg 2.0 (keeps the NEGATIVE live -- a lever Flux@cfg
-1.0 lacks) / ModelSamplingAuraFlow shift 3.0 / euler / normal. The composed
+LOW-VRAM DEFAULTS: 8 steps / cfg 1.0 (the distilled model's own guidance point; the
+negative is INERT here, exactly as it is for Flux@cfg 1.0) / ModelSamplingAuraFlow
+shift 3.0 / euler / normal. cfg was 2.0 until 2026-09-01: a same-seed A/B on both the
+nvfp4 and bf16 weights showed cfg 2.0 rendering redder, harder, crushed skin (the
+operator's long-standing "bloody faces" complaint) and cfg 1.0 rendering natural skin in
+both weights, and the operator picked the cfg 1.0 frames. The 4-bit weight was not the
+cause. OTR_ZIMAGE_CFG still overrides. The composed
 prompt is REUSED AS-IS from ``compose_still_prompt`` (same grade tails as Flux ->
-same filmic look); the live negative pushes Z-Image off its clean-digital default
-toward the muted Flux grade.
+same filmic look); with the negative inert, the positive prompt's grade tail is
+what pulls Z-Image off its clean-digital default toward the muted Flux grade, and
+the 2026-09-01 A/B frames show it does.
 
 VERIFY-AT-BUILD (capture from a live ``/object_info`` on the installed Z-Image
 nodes before the first real render -- these cannot be confirmed from the repo and
@@ -116,7 +122,7 @@ PROMPT_STYLE_DIRECTIVE = (
 
 #: Humans only -- never injected, never sent to a model.
 PROMPT_STYLE_NOTES = """\
-CONFIG AS SHIPPED: distilled 6B S3-DiT, 8 steps, cfg 2.0, euler/normal,
+CONFIG AS SHIPPED: distilled 6B S3-DiT, 8 steps, cfg 1.0, euler/normal,
 ModelSamplingAuraFlow shift 3.0, 1024x1024. The text encoder is Qwen3-4B -- an
 LLM, not CLIP and not T5. On weights, be precise: ``_installed_unets`` RANKS
 nvfp4 > fp8 > bf16 and this box runs nvfp4, but the hardcoded fallback
@@ -131,8 +137,9 @@ without buying adherence. "Materials, surfaces and light direction" is the one
 place extra words earn their keep at 8 steps, because a distilled sampler
 resolves texture early and has few steps left to correct it.
 
-THE NEGATIVE IS LIVE AT cfg 2.0 -- AND THIS DIRECTIVE DELIBERATELY SAYS NOTHING
-ABOUT IT. Struck on operator instruction, and the repo agrees three ways:
+THE NEGATIVE IS INERT AT cfg 1.0 (since 2026-09-01; it was live at the old cfg 2.0),
+AND THIS DIRECTIVE DELIBERATELY SAYS NOTHING ABOUT IT. Struck on operator
+instruction, and the repo agrees three ways:
   * PBUG-20260817-01 is exactly what engine-side negative authoring produces --
     this file's own negative used to carry "clean digital, cartoon,
     illustration" and vetoed the style the episode had selected. A directive
@@ -149,12 +156,12 @@ ownership question, and it already has an answer.
 EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's
 2026-08-15 ruling, the RSS precedent):
   * **THE UPSTREAM DEFAULT IS guidance 0.0, WHERE THE NEGATIVE IS IGNORED. OURS
-    IS cfg 2.0, WHERE IT IS LIVE.** Every public Z-Image-Turbo guide therefore says
-    "negative prompts do nothing, phrase everything positively" -- and that is TRUE
-    UPSTREAM AND FALSE HERE. This module's own docstring says why we depart: cfg 2.0
-    "keeps the NEGATIVE live -- a lever Flux@cfg 1.0 lacks". A future reader who
-    reconciles this engine to a public guide will silently delete a deliberate
-    departure, so it is written down here instead.
+    IS NOW cfg 1.0, WHERE IT IS IGNORED TOO.** Every public Z-Image-Turbo guide says
+    "negative prompts do nothing, phrase everything positively", and since 2026-09-01
+    that is true here as well. The earlier deliberate departure (cfg 2.0 to keep the
+    pack's style negative live) was measured on 2026-09-01 and reversed by the
+    operator: it bought a live negative at the price of reddened, crushed skin on
+    every face. The grade tail in the POSITIVE prompt carries the filmic look now.
   * CONFIRMED, independently: describe in natural language, a scene rather than
     tag soup ("1girl, 8k"), and skip weight/parenthesis syntax. That is exactly
     what the directive says, and the reason given upstream is ours too -- the text
@@ -306,8 +313,8 @@ class ZImageTurboEngine:
         """Pure: resolve the Z-Image sampler params from the request + env. The
         model / TE / VAE / steps / cfg / shift / sampler / clip-type / latent-node
         are env-overridable; the seed + prompt + dims come from the request so a
-        re-gen is deterministic (V-7). Low-VRAM fp8 defaults; 8 steps / cfg 2.0 /
-        shift 3.0 / euler / normal (the roundtable-converged starting config)."""
+        re-gen is deterministic (V-7). Low-VRAM fp8 defaults; 8 steps / cfg 1.0 /
+        shift 3.0 / euler / normal (cfg 2.0 -> 1.0 on the operator's 2026-09-01 A/B)."""
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
 
@@ -337,7 +344,7 @@ class ZImageTurboEngine:
             "negative": _resolve_negative(get("negative_prompt")),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_ZIMAGE_STEPS", 8),       # distilled design point
-            "cfg": _efloat("OTR_ZIMAGE_CFG", 2.0),       # keeps the negative live
+            "cfg": _efloat("OTR_ZIMAGE_CFG", 1.0),       # operator A/B 2026-09-01; negative inert
             "shift": _efloat("OTR_ZIMAGE_SHIFT", 3.0),   # ModelSamplingAuraFlow
             "sampler_name": os.environ.get("OTR_ZIMAGE_SAMPLER", "euler"),
             "scheduler": os.environ.get("OTR_ZIMAGE_SCHEDULER", "normal"),
@@ -452,9 +459,10 @@ class ZImageTurboEngine:
         graph["encode_ref"] = {
             "class": "encode_ref",
             "inputs": {"pixels": W("scale_ref", 0), "vae": W("vae", 0)}}
-        # BOTH conditionings. z_image runs cfg=2.0 with a live negative, and the
-        # model doubles its timesteps only on the omni path -- referencing the
-        # positive alone would take the CFG delta between two structurally
+        # BOTH conditionings, even at the shipped cfg 1.0 where the negative is
+        # inert: the model doubles its timesteps only on the omni path, and an
+        # operator can raise OTR_ZIMAGE_CFG back above 1.0 -- referencing the
+        # positive alone would then take the CFG delta between two structurally
         # different forward passes.
         graph["ref_pos"] = {
             "class": "ref_pos",

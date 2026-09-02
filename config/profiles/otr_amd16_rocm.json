@@ -10,10 +10,10 @@
   "role_overrides": {
     "announcer_visual": "viz_mxc_cpu",
     "music_visual": "viz_mxc_mandala",
-    "character_visual": "wan_ti2v",
-    "announcer_image": "z_image_turbo",
-    "music_image": "z_image_turbo",
-    "character_image": "z_image_turbo"
+    "character_visual": "still_motion",
+    "announcer_image": "flux2_klein",
+    "music_image": "flux2_klein",
+    "character_image": "flux2_klein"
   },
   "slot_overrides": {
     "voice_bank": "default",
@@ -21,7 +21,7 @@
     "char_voice_engine": "kokoro",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "wan_ti2v"
+    "video_render_engine": "still_motion"
   },
   "features": {
     "burn_captions": true,

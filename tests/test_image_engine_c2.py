@@ -141,9 +141,9 @@ def test_z_image_graph_is_well_formed():
     GPU smoke."""
     eng = ireg.get_engine("z_image_turbo")
     params = eng._zimage_params({"prompt": "p", "seed": 7, "width": 832, "height": 1216})
-    assert params["steps"] == 8 and params["cfg"] == 2.0 and params["shift"] == 3.0
+    assert params["steps"] == 8 and params["cfg"] == 1.0 and params["shift"] == 3.0
     assert params["scheduler"] == "normal" and params["sampler_name"] == "euler"
-    assert params["negative"]                       # live negative default
+    assert params["negative"]                       # still resolved; inert at cfg 1.0, live if OTR_ZIMAGE_CFG is raised
     assert params["width"] == 832 and params["height"] == 1216   # request dims honored
 
     class _W:

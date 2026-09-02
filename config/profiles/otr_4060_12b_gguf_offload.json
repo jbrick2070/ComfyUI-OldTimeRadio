@@ -11,9 +11,9 @@
     "announcer_visual": "animatediff15_v3_haunted_video",
     "music_visual": "animatediff15_v3_haunted_video",
     "character_visual": "animatediff15_v3_haunted_video",
-    "announcer_image": "z_image_turbo",
-    "music_image": "z_image_turbo",
-    "character_image": "z_image_turbo"
+    "announcer_image": "flux2_klein",
+    "music_image": "flux2_klein",
+    "character_image": "flux2_klein"
   },
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",

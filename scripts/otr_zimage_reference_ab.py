@@ -80,7 +80,7 @@ _PINNED_PARAMS = {
     "negative": FIXED_NEGATIVE,
     "seed": FIXED_SEED,
     "steps": 8,
-    "cfg": 2.0,
+    "cfg": 1.0,
     "shift": 3.0,
     "sampler_name": "euler",
     "scheduler": "normal",

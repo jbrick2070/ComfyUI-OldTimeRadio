@@ -150,7 +150,7 @@ is no longer misreported by it.
 Giving lumina a hygiene floor changes conditioning at cfg 4.0 on a live engine, so
 the recipes directive applies and a render is owed. Three options are parked for
 him: no floor, copy z_image's string, or a lumina-specific one. Do NOT copy
-z_image's by reflex while editing nearby -- z_image runs cfg 2.0 and is a different
+z_image's by reflex while editing nearby -- z_image runs cfg 1.0 and is a different
 model with its own artifact profile.
 
 EXTERNAL RESEARCH (2026-08-17, web lookup -- allowed per the operator's

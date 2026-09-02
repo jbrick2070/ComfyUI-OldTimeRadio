@@ -25,7 +25,7 @@ def _pin_recipe_env(monkeypatch):
         "OTR_ZIMAGE_LATENT_NODE": "EmptySD3LatentImage",
         "OTR_ZIMAGE_UNET_DTYPE": "default",
         "OTR_ZIMAGE_STEPS": "8",
-        "OTR_ZIMAGE_CFG": "2.0",
+        "OTR_ZIMAGE_CFG": "1.0",
         "OTR_ZIMAGE_SHIFT": "3.0",
         "OTR_ZIMAGE_SAMPLER": "euler",
         "OTR_ZIMAGE_SCHEDULER": "normal",
@@ -132,8 +132,8 @@ def test_live_resolution_fails_closed_without_reference_latent(tmp_path):
 
 
 def test_recipe_env_drift_fails_closed(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_ZIMAGE_CFG", "1.0")
-    with pytest.raises(ab.HarnessError, match="cfg=1.0"):
+    monkeypatch.setenv("OTR_ZIMAGE_CFG", "2.0")
+    with pytest.raises(ab.HarnessError, match="cfg=2.0"):
         ab.build_arm_graph("off", _ref(tmp_path), "ab/off/out")
 
 
