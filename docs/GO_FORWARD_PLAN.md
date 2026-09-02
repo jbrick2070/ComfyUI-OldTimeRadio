@@ -25,13 +25,21 @@ Section 6 standing traps -> Bible promotion field -> Open risks.
 
 * **The 5080 loop is untouched.** Nothing ships that reduces tomorrow's `obs`
   count.
-* **The pod stays STOPPED** until queue item 2 completes. The volume stays --
+* **The pod stays STOPPED** until queue item 3 completes. The volume stays --
   it holds the warm cache, which is the expensive thing to recreate.
 * **This queue outranks Section 1's coding order** until it is cleared.
 
 ### THE QUEUE
 
-**1. GHOST POOL -- r1 IS IN, AND IT DISSOLVES THE BUG.** Panel fired
+**1. THE KOKORO-ONNX BACKEND -- the default voice that installs everywhere**
+(operator ruling 2026-09-01: "kokoro onnx is our new go-to"; "maybe it's one on our
+go forward build plan"). Full row: Section 1.11 -- the measured 3.13 proof, the backend
+shape inside `eng_kokoro.py`, the weight-source decision to settle, the registry deps,
+and the DONE WHEN (a clean 3.13 portable publishes a kokoro-voiced episode; the 5080's
+3.12 venv still selects the torch path). It is a design item: kibitz arc FIRST, then
+code, then the two live proofs. Either window may take it; the plan is the handoff.
+
+**2. GHOST POOL -- r1 IS IN, AND IT DISSOLVES THE BUG.** Panel fired
 2026-08-31 (Codex `no`, Antigravity `yes-with-fixes`, Cursor `no`); artifacts in
 `kibitz-runs/2026-08-31-ghost-clause-pool/r1/` (gitignored, local only).
 
@@ -85,7 +93,7 @@ failure or to a `GhostCadenceError` (unseparated); and the panel's own
 assumption that "no adjacent repeat" is the right viewer threshold, which wants
 checking against frames rather than more reasoning.
 
-**2. THE PROVISIONER IS THE DOER** (operator steer 2026-08-31: "a DOER or an
+**3. THE PROVISIONER IS THE DOER** (operator steer 2026-08-31: "a DOER or an
 instruction manual... not a checker"). **Codex owns this item and the sole RunPod
 playbook (`docs/RUNPOD_INSTALL.md`, consolidated `93a37aa1`).** Scope unchanged:
 `scripts/otr_provision.py` + the thin pod wrapper install Stable Audio 3 (the
@@ -94,7 +102,7 @@ symlink and the four `hf_cache` repos, and the reference WAVs.
 **DONE WHEN** the acid test passes: saved template -> provision -> one published
 episode, zero hand steps.
 
-**3. ZERO-FRAME BEAT** -- kills a leg roughly 70 minutes in, after the writer,
+**4. ZERO-FRAME BEAT** -- kills a leg roughly 70 minutes in, after the writer,
 cast, voices and audio master are done. Fix UPSTREAM of
 `otr_shot_lock.py:803`; the helper already warns and correctly does not raise
 (OOM-or-nothing). The question is why a beat arrives with no duration. Leading
@@ -104,19 +112,19 @@ suspect, named in the code's own comment: a cue duration that never crossed
 and assuming it is would waste the investigation.
 **DONE WHEN** the root fix lands and the failing leg shape passes live.
 
-**4. MACHINE-CLASS REFACTOR** (spec: the 2026-08-31 Fable judgment). The
+**5. MACHINE-CLASS REFACTOR** (spec: the 2026-08-31 Fable judgment). The
 README injection markers and `scripts/otr_machine_matrix.py --check` exist and are
 in sync. Remaining: move PROVEN receipts onto the profiles themselves so the matrix
 reads them from one place.
 
-**5. 24 GB DRAFT PROFILE** -- the instrument the next rental needs. Proof
+**6. 24 GB DRAFT PROFILE** -- the instrument the next rental needs. Proof
 follows the profile, never the reverse: a lane is proven BY running under one,
 so waiting for a proven lane before authoring the profile is a deadlock. Spends
 headroom on what a small card cannot -- `indextts2`, the ungated heavy video
 lanes, the 12b writer resident. Stays `draft` until an episode publishes from
 it; fill its `machine_classes.json` row so the gap reads as scheduled work.
 
-**6. NEXT POD SESSION -- one rental, only after item 2.** The acid test AND a
+**7. NEXT POD SESSION -- one rental, only after item 3.** The acid test AND a
 LOOPED lane sweep on the same dollar: the merit verdict and the unmeasured lane
 matrix together, rather than another debugging round.
 
@@ -141,21 +149,21 @@ until we are done with all other bugs." The 4060 test is the CAPSTONE: it
 runs once, on a tree with every other bug already closed, so the frictionless
 verdict is not polluted by known-open defects):**
 
-1. **Gender-ladder: SPEC v2 -> one review round -> CODE** (1.3; the spec is
+1. **The kokoro-onnx backend** (1.11 below, and item 1 of THE CURRENT STEP) -- the
+   operator's ruled default voice; a design item, so its kibitz arc comes first.
+2. **Gender-ladder: SPEC v2 -> one review round -> CODE** (1.3; the spec is
    written and pushed, the code is not started; three NOs in its history
    mean the round is not optional).
-2. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
+3. **Local-LLM sweep Leg 0** (1.2 -- ~15-20 min, in-process; needs an IDLE
    GPU, do not contend with a render).
-3. **The kokoro-onnx backend** (1.11 below) -- the operator's ruled default voice; a
-   design item, so its kibitz arc comes first.
-3b. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
+4. **Ship-audit blockers** (1.9 below) -- the non-mechanical survivors of the
    2026-09-01 audit; each is a design item with more than one defensible answer.
-4. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
+5. **Docs deletion pass** (1.10 below): stale docs go unless they carry a video-model
    recipe; no new guides.
-5. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
+6. **The 4060 frictionless set** (1.0 below) -- LAST coding item, then the
    republish sequence it gates: operator applies the alpha.15 patch -> clean
    publish -> the 4060 template test.
-6. Handoff bookkeeping.
+7. Handoff bookkeeping.
 
 **RUNNING BESIDE THE ORDER -- THE DEAD-CODE CAMPAIGN** (operator standing
 instruction 2026-08-28: keep hunting "until there are no more dead code
