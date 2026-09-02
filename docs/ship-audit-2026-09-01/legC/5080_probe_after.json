@@ -1,0 +1,20 @@
+{
+  "flux2_klein": {
+    "png": "after_flux2_klein.png",
+    "sha256": "441880cd54fb79089db5962a47a15dec9d3575f5e1d258d4f2d55d930b7db86f",
+    "seconds": 15.3,
+    "peak_mib": 7901
+  },
+  "z_image_turbo": {
+    "png": "after_z_image_turbo.png",
+    "sha256": "9a327547b343f6729a2fa84052ef170e7a860f30c80f31dd126605fb990cb92f",
+    "seconds": 7.8,
+    "peak_mib": 9015
+  },
+  "lumina_image": {
+    "png": "after_lumina_image.png",
+    "sha256": "73408a8777df30e1a35ddcc709d66d3fea542c262884c60e729c38104fb98f13",
+    "seconds": 14.4,
+    "peak_mib": 9634
+  }
+}

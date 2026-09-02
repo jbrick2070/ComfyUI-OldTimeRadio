@@ -85,9 +85,12 @@ def test_lumina_render_builds_lumina2_graph(monkeypatch):
     monkeypatch.setattr(eng, "_classes", None, raising=False)
     captured = {}
 
-    def fake_run_graph(graph, classes, terminal=None):
+    def fake_run_graph(graph, classes, terminal=None, **kwargs):
         captured["graph"] = graph
         captured["terminal"] = terminal
+        # The text encoder must be droppable before the sampler (4060 clean room,
+        # 2026-09-02: 0 MB usable for the DiT without it); the MODEL node is kept.
+        assert kwargs == {"free_after_use": True, "keep": {"unet"}}, kwargs
         return [object()]
 
     monkeypatch.setattr(wb, "resolve_graph_classes", lambda cands: {k: k for k in cands})

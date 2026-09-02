@@ -432,7 +432,15 @@ class LuminaImage2Engine:
         self._classes = classes
         graph = self._build_lumina_graph(params, _wb.Wire)
         try:
-            images = _wb.run_graph(graph, classes, terminal=self._TERMINAL)[0]
+            # free_after_use (the video-engine pattern, eng_wan_ti2v / eng_ltx_8gb):
+            # the text encoder is dropped the moment its only consumer has run, so
+            # the sampler starts with the encoder OFF the card. Without it an 8 GB
+            # card kept the 7.7 GB Qwen3-4B encoder resident and loaded the DiT with
+            # "0.00 MB usable" (~2 min per step; 4060 clean room, 2026-09-02). The
+            # MODEL node stays in ``keep`` so the patcher the sampler holds is never
+            # dropped under it; the terminal is kept by run_graph itself.
+            images = _wb.run_graph(graph, classes, terminal=self._TERMINAL,
+                                   free_after_use=True, keep={"unet"})[0]
             frames = _wb.images_to_uint8(images)          # (B,H,W,3) uint8
         finally:
             # Single-resident discipline: free the model so the next heavy engine

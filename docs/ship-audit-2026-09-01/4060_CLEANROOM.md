@@ -64,4 +64,55 @@ F10 BOX QUIRK  pip's console-script PATH scan tripped WinError 448 on a junction
 
 ## Leg results
 
-(in progress -- see the dated entries appended below)
+All legs: one act, `public_domain` bank, the pack's own headless runner
+(`scripts/otr_canonical_api_run.py`) against the clean-room server on port 8001, started
+through Task Scheduler. Profiles are clean-room copies (`otr_cleanroom_8gb_*`, untracked)
+because no shipped 8 GB profile carries LTX 2.5 or HuMo; voices are Bark because kokoro
+cannot pip-install on the portable's Python 3.13 (PBUG-20260901-04).
+
+R1  2026-09-01 20:5x  `otr_cleanroom_8gb_ltx25`, STOCK flags (DynamicVRAM on). Writer,
+    cast and Bark voices completed. The first `z_image_turbo` still (int8 convrot) killed the
+    whole ComfyUI process at sampler step 5/8: `Fatal Python error: Aborted`, stack in
+    comfy/ldm/lumina/model.py (PBUG-03 shape). Log: server_run1_zimage_abort.log.
+R2  2026-09-01 21:0x  Same profile with the lowvram flag pair
+    (`--disable-dynamic-vram --lowvram --disable-pinned-memory`). Queued, sat `pending`
+    for ~4 min while the writer ran, then stopped on operator instruction before any
+    still. No result.
+LEG C (stock)  2026-09-02 00:18-01:38  `otr_cleanroom_8gb_klein_ltx25` (the ruled
+    low-VRAM image default: `flux2_klein` for all three image roles, LTX 2.5 video), STOCK
+    flags, tree at c0ebe31f. Writer 00:18-00:32 (6 lines / 66 words on gemma-4-E2B),
+    Bark voices + musicgen cues + master mix by 00:43, ShotLock passed. Klein DID NOT
+    ABORT -- the Z-Image abort is engine-specific, which is what this leg was for -- and
+    minted a clean 832x480 still (receipt: `legC/legC_stock_klein_c01_832x480.png`, the
+    announcer's set: a 1940s radio, dial detail intact, no artifacts). But ONE still took
+    ~42 minutes: DynamicVRAM staged the 7.7 GB bf16 Qwen3-4B text encoder
+    (`Model Flux2TEModel_ prepared for dynamic VRAM loading. 7671MB Staged`), then loaded
+    the 2.6 GB Klein DiT with `0 models unloaded ... loaded partially; 0.00 MB usable,
+    0.00 MB loaded, 2591.65 MB offloaded`, 2 min 13 s of "Model Initializing" and then
+    ~120 s per step for 20 steps, GPU pinned at 7.9 GB / 100 %. The second still began the
+    same way. Stopped after the first still to run the flag pair instead. Verdict for the
+    stock path on 8 GB: WORKS, UNUSABLE (an episode with 8 stills would take ~6 hours
+    before any video). Log: server_legC_stock_klein.log.
+LEG C2  2026-09-02 01:38-02:3x  Same profile, the lowvram flag pair, bf16 encoder. SAME
+    SHAPE: the encoder loaded fully (`loaded completely; 7672.25 MB loaded`), then
+    `Requested to load Flux2 / 0 models unloaded / loaded partially; 0.00 MB usable`, and
+    the first step took 143 s. The flag pair is NOT the fix; the encoder simply never leaves
+    the card before the sampler. Stopped at the first still once the root cause was found.
+ROOT CAUSE (read in the engine code, 02:0x)  The three local image engines with a separate
+    CLIPLoader node (flux2_klein, z_image_turbo, lumina_image) ran their graphs WITHOUT
+    `free_after_use`, unlike every video engine (eng_wan_ti2v, eng_ltx_8gb, eng_minimax_h3
+    all pass `free_after_use=True` so the text encoder is dropped before the diffusion
+    peak). On 16 GB the encoder and the DiT co-reside, so nothing showed. Fix: the same
+    one-line pattern (`free_after_use=True, keep={"unet"}`) in all three, measured on the
+    RTX 5080 before/after with a fixed seed: byte-identical stills in all three engines
+    (same sha256), peak VRAM 14.9/14.4/14.6 GB -> 7.9/9.0/9.6 GB, times 18.2/7.3/16.6 s
+    -> 15.3/7.8/14.4 s (within single-run noise; no slowdown on the 16 GB card).
+    Receipts: `legC/5080_probe_before.json`, `legC/5080_probe_after.json`. This is also
+    the likeliest root of R1's Z-Image abort (the same 0-MB-usable partial load, one
+    engine over): Leg C3 tells.
+LEG C3  the fix under STOCK flags: same profile, bf16 encoder, the pushed fix pulled into
+    the clean room, `_boot_stock.cmd STOCK` (DynamicVRAM on, nothing special). (result below)
+LEG C4  only if C3 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
+    5.6 GB, staged in the clean room; the 4060 drill already used it for Z-Image) through
+    the engine's `OTR_FLUX2_KLEIN_TE` knob in the server's launch environment
+    (`_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).
