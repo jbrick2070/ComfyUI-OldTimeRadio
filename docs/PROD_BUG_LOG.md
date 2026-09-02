@@ -10310,3 +10310,57 @@ or a noise floor) on any roll and still return success; validate the output's sh
 and re-roll a bounded number of times, never trust the generation's return code.
 Verify condition for coverage: a stub engine that returns a pure tone on the first
 call and speech on the second must produce speech from the guarded path in one retry.
+
+## PBUG-20260815-04 -- FOLLOW-UP 2026-09-02: tiers 3-4 of the gender ladder landed, and the join now reads the aliases
+
+**Verified on two published episodes (RTX 5080, canonical graph through `otr_canonical_api_run.py`,
+profile `otr_soak_still_motion_flux2_klein`, one act, `source_bank public_domain`,
+`source_ref pride_prejudice_proposal:main`, kokoro announcer, IndexTTS2 characters):**
+* `signal_lost_unhand_me_sir_20260902_151527` (15:22, 11:32 wall) -- the BEFORE picture on the join:
+  `meta.cast_source_contract.evidence` pinned ELIZABETH BENNET female (`llm_recall` / `recalled`,
+  tier `exact`), but the writer named him "Mr. Darcy" while the sidecar row is "Fitzwilliam Darcy",
+  and `_candidate_names` never read the row's `aliases`, so MR. DARCY missed the join, rolled, and
+  was cast FEMALE (`cast[]` row gender female, a female bark voice). Exactly the operator's
+  concern of the day: "if it's male and looks male but sounds female, that's the problem."
+* `signal_lost_intensity_in_the_drawingroom_20260902_152901` (the AFTER, join fixed, server
+  rebooted so the module reloaded): ELIZABETH BENNET female (`exact`), MR. DARCY male (`short_form`
+  through the alias "darcy"), COLONEL FITZWILLIAM male (`short_form` through the alias
+  "fitzwilliam"), all three `llm_recall` / `recalled`; cast rows: Elizabeth female on a female
+  IndexTTS2 reference, Darcy male on a male one. `audit_voice_gender_consistency.py` on the first
+  episode: 0 violations (name / label / voice / portrait agree with each other; the defect was the
+  SOURCE truth, which is what the ladder supplies).
+
+**What landed (commit follows this entry):**
+* `scripts/otr_stamp_character_genders.py`: tier 3 `llm_recall` (one constrained question to the
+  local `google/gemma-4-E4B-it` naming the WORK and the character, temperature 0.0, cached forever
+  in a committed per-bank `character_gender_index.json`; locked entries are operator rulings --
+  ARIEL, PUCK and ROBIN locked empty, Dr. Lira Kell locked female by the operator on 2026-09-02),
+  tier 4 `name_frequency` (the curated first-name pool; declines unlisted, unisex, descriptive and
+  title-plus-surname names -- "Dr. Kelly" was measured pinning FEMALE from the surname before that
+  rule), the monotonic merge anchored on `body_sha256` (equal rung refreshes, lower never demotes,
+  declined keeps the old row, a name no longer hinted is carried forward), `--fresh`, `--bank`,
+  `--no-llm`, and a Shakespeare scene stamper that fills ONLY `unknown` rows (supplement first,
+  then recall, then the pool; NO pronoun scan on scene text -- it called LUCE male from her own
+  lines). Corpus after the stamp: 202 of 249 candidates decided (81%; was 132), 57 by recall;
+  the 11 Shakespeare rows still unknown are the fairies and mechanicals the model was unsure
+  about plus the three operator-locked names and the ALL group speaker.
+* `nodes/_otr_roster_gender.py`: `RosterGenderVerdict.gender_source` / `gender_confidence`
+  (defaults; read-through `confidence_for_source` for rows that predate the field), carried by
+  `gender_map_for_names` into `lock_cast` -> `meta.cast_source_contract.evidence[<NAME>]`;
+  `strip_honorifics` public with the corpus's real titles ("Miss", "Dr.", "Uncle" ...);
+  `_candidate_names` reads the stamped `aliases` (the fix the two legs bracket).
+* `nodes/_otr_constrained_generate.py`: `temperature <= 0` is greedy (`do_sample=False`) instead
+  of a transformers ValueError; every existing caller passes > 0 and is byte-identical.
+* `config/source_banks/shakespeare/roster_gender_supplement.json`: LUCE (female, kitchen maid)
+  and BALTHASAR (male, merchant) for The Comedy of Errors, both facts from the dramatis personae.
+
+**Known limitation, recorded not fixed:** a GIVEN-name alias can match a different character whose
+surname is that word -- COLONEL FITZWILLIAM (Darcy's cousin) resolved through Darcy's alias
+"fitzwilliam". Same gender here, so the pin was right by coincidence. A collision across genders
+is possible in principle (two rows sharing an alias already abstain; a different row with a
+different name does not). The honest fix is a surname-only alias for the short_form tier, or a
+character-count check; it is a design fork for the next round, not a silent patch.
+
+**Bug Bible:** covered by the existing entries for this PBUG (source-stated gender, sidecar
+carry-forward); the new verify condition worth promoting is "a stamped alias that no consumer
+reads" -- a producer/consumer key mismatch of the 12.86 shape, caught only by a live leg.

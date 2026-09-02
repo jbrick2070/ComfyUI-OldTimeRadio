@@ -10,21 +10,48 @@
   "body_bytes": 13516,
   "body_words": 2287,
   "text_path": "config/source_banks/public_domain_story/sources/alice_tea_party.txt",
-  "characters": [],
+  "characters": [
+    {
+      "name": "Alice",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Alice's Adventures in Wonderland\" by Lewis Carroll: Alice is consistently referred to as a young girl. (google/gemma-4-E4B-it, 2026-09-02)"
+    },
+    {
+      "name": "the Hatter",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Alice's Adventures in Wonderland\" by Lewis Carroll: He is referred to as 'the Hatter' in the text. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "hatter"
+      ]
+    },
+    {
+      "name": "the March Hare",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Alice's Adventures in Wonderland\" by Lewis Carroll: The text refers to him as a male character. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "march hare",
+        "hare"
+      ]
+    }
+  ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 0,
-      "llm_web": 0,
+      "llm_recall": 3,
       "name_frequency": 0
     },
     "candidates": 4,
     "declined": [
-      "Alice",
-      "the Hatter",
-      "the March Hare",
       "the Dormouse"
-    ]
+    ],
+    "ran_utc": "2026-09-02T22:00:14+00:00"
   }
 }

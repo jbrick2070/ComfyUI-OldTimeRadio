@@ -240,8 +240,14 @@ class TestVendoredCorpus:
             data = json.loads(path.read_text(encoding="utf-8"))
             for row in data.get("characters") or []:
                 assert row["gender"] in ("male", "female"), path.name
+                # "supplement" on a prose row = an operator-LOCKED index entry (his
+                # word about his own work, e.g. Dr. Lira Kell, 2026-09-02).
                 assert row["gender_source"] in (
-                    "roster", "pronouns", "llm_web", "name_frequency")
+                    "roster", "pronouns", "llm_recall", "name_frequency", "supplement")
+                assert row["gender_confidence"] == {
+                    "roster": "known", "pronouns": "known", "supplement": "known",
+                    "llm_recall": "recalled", "name_frequency": "inferred",
+                }[row["gender_source"]], (path.name, row["name"])
                 assert str(row.get("evidence") or "").strip(), path.name
 
     def test_the_body_hash_matches_the_text_on_disk(self):

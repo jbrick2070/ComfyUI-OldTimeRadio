@@ -191,3 +191,19 @@ with more than one defensible answer -- so it gets a real round, not a
 finished-diff review. Run it against the r2 + r3 finding lists explicitly:
 a reviewer should be asked whether each of B1-B4 is genuinely answered or
 merely restated.
+
+## Amendments, 2026-09-02 (after the one review round; see docs/2026-09-02-gender-ladder/driver_anchor.md section 8)
+
+* **Tier 4 is NOT total.** It is the curated first-name pool (`config/cast_pools.gender_of_first_name`)
+  on the honorific-stripped first token; unlisted, unisex and descriptive names ("the Creature")
+  DECLINE and the render-time 40/40/20 roll remains. Totality of the SYSTEM comes from the roll,
+  which is castable; the ladder itself is conservative by design.
+* **Every tier-3 ask carries the work's title.** The `asked_as: bare` form is cut; no caller exists.
+* **No pronoun scan on scene text.** Measured on the real Folger text the scan mis-gendered LUCE
+  from her own lines. Shakespeare unknown rows go supplement -> recall -> name pool.
+* **ARIEL and PUCK (and ROBIN, Puck's Folger speech prefix) stay on the roll** as operator-locked
+  index entries with an empty gender; the corpus test keeps asserting 40 of 42.
+* **The receipt lives in `meta.cast_source_contract.evidence[<NAME>]`** (`gender_source`,
+  `gender_confidence`), not on the cast row; `Ledger.set_cast` keeps its fixed row.
+* **Confidence vocabulary:** `known` (roster / pronouns / supplement / the fetcher's relation,
+  title, group, back_reference), `recalled` (llm_recall), `inferred` (name_frequency).

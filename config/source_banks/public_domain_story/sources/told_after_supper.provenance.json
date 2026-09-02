@@ -12,6 +12,16 @@
   "text_path": "config/source_banks/public_domain_story/sources/told_after_supper.txt",
   "characters": [
     {
+      "name": "the narrator",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Told After Supper\" by Jerome K. Jerome: The narrator is clearly male throughout the text. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "narrator"
+      ]
+    },
+    {
       "name": "the uncle",
       "gender": "male",
       "gender_source": "pronouns",
@@ -43,16 +53,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "the narrator"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:02:30+00:00"
   }
 }

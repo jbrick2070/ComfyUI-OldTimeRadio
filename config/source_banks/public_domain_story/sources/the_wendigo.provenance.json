@@ -37,16 +37,17 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 0,
       "name_frequency": 0
     },
     "candidates": 4,
     "declined": [
       "Defago"
-    ]
+    ],
+    "ran_utc": "2026-09-02T22:00:46+00:00"
   }
 }

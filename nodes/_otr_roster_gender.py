@@ -45,6 +45,17 @@ _HONORIFICS = frozenset({
     "sir", "lady", "lord", "king", "queen", "duke", "duchess", "prince",
     "princess", "don", "friar", "master", "mistress", "doctor", "captain",
     "saint", "st", "mr", "mrs", "ms",
+    # The titles the prose corpus actually carries ("Miss Mix", "Uncle Silas",
+    # "Countess Olenska", "Reverend Hooper"); a first-name lookup that keeps the
+    # title as the first token answers "unknown" for a person the pool knows.
+    "miss", "madam", "madame", "mademoiselle", "monsieur", "herr", "frau",
+    "signor", "signora", "senor", "senora", "dame", "sire", "uncle", "aunt",
+    "father", "mother", "sister", "brother", "count", "countess", "baron",
+    "baroness", "earl", "general", "colonel", "major", "sergeant", "professor",
+    "reverend", "rev", "nurse", "widow",
+    # the abbreviations the prose cast hints actually use ("Dr. Watson",
+    # "Dr. Grimesby Roylott", "Prof. Challenger") -- seven live hints carry "Dr."
+    "dr", "prof", "capt", "col", "gen", "lt", "sgt", "hon", "mme", "mlle",
 })
 
 _BINARY = ("male", "female")
@@ -213,6 +224,13 @@ class RosterGenderVerdict:
     evidence: str        # a quotable reason, or the abstention code
     tier: str            # exact | alias | qualified | contains | supplement | none
     matched: tuple       # the roster names that produced this verdict
+    # WHICH LADDER RUNG answered (roster / pronouns / llm_recall / name_frequency /
+    # supplement, or the fetcher's relation / title / group / back_reference) and
+    # how much to trust it (known / recalled / inferred). A different axis from
+    # `tier`, which describes HOW the roster join matched. Defaults keep every
+    # construction site that predates the fields working unchanged.
+    gender_source: str = ""
+    gender_confidence: str = ""
 
     @property
     def is_pinned(self) -> bool:
@@ -271,19 +289,54 @@ def _norm(value) -> str:
     return str(value or "").strip().upper()
 
 
-def _strip_honorifics(name: str) -> str:
+def strip_honorifics(name: str) -> str:
+    """The name without its titles: "SIR TOBY" -> "TOBY", "Miss Mix" -> "Mix".
+    A name that is ONLY titles comes back unchanged."""
     words = [w for w in str(name or "").split() if w]
     kept = [w for w in words if w.lower().strip(".,'") not in _HONORIFICS]
     return " ".join(kept) if kept else " ".join(words)
 
 
+_strip_honorifics = strip_honorifics
+
+#: `gender_confidence` for a row written before the field existed (the
+#: Shakespeare fetcher's rows, the first prose stamp). Everything the SOURCE
+#: states is "known"; a model's recall is "recalled"; a name-pool lookup is
+#: "inferred". One table, read-through only -- the stamper writes the field on
+#: every row it touches, so committed rows stay byte-identical.
+_CONFIDENCE_FOR_SOURCE = {
+    "roster": "known", "relation": "known", "title": "known", "group": "known",
+    "back_reference": "known", "pronouns": "known", "supplement": "known",
+    "llm_recall": "recalled", "name_frequency": "inferred",
+}
+
+
+def confidence_for_source(gender_source) -> str:
+    return _CONFIDENCE_FOR_SOURCE.get(str(gender_source or ""), "")
+
+
 def _candidate_names(row: Mapping) -> tuple:
-    """The names a slot might legitimately match this roster row by."""
+    """The names a slot might legitimately match this roster row by: the
+    row's own names AND the aliases the stamper wrote for it.
+
+    The aliases exist because the writer extracts "MR. DARCY" or "SCROOGE" while
+    the sidecar row is "Fitzwilliam Darcy" / "Ebenezer Scrooge". Until 2026-09-02
+    the join never read them (measured on the first pride_prejudice_proposal leg:
+    ELIZABETH BENNET pinned female, MR. DARCY missed the join and rolled FEMALE).
+    A surname alias shared by two rows makes both rows match, which is the
+    ambiguous_join abstention by construction -- never a coin flip.
+    """
     names = []
     for key in ("name", "roster_name"):
         n = _norm(row.get(key))
         if n and n not in names:
             names.append(n)
+    aliases = row.get("aliases")
+    if isinstance(aliases, (list, tuple)):
+        for a in aliases:
+            n = _norm(a)
+            if n and n not in names:
+                names.append(n)
     return tuple(names)
 
 
@@ -299,15 +352,22 @@ def _verdict_from(rows: Sequence, tier: str) -> RosterGenderVerdict:
     if len(binary) == 1:
         gender = binary.pop()
         reason = ""
+        source = confidence = ""
         for r in rows:
             if str(r.get("gender") or "").strip().lower() == gender:
                 reason = str(r.get("description") or "").strip()
                 if not reason:
+                    reason = str(r.get("evidence") or "").strip()
+                if not reason:
                     reason = "sidecar gender_source=%s" % (
                         str(r.get("gender_source") or "unknown"),
                     )
+                source = str(r.get("gender_source") or "").strip()
+                confidence = (str(r.get("gender_confidence") or "").strip()
+                              or confidence_for_source(source))
                 break
-        return RosterGenderVerdict(gender, reason, tier, matched)
+        return RosterGenderVerdict(gender, reason, tier, matched,
+                                   gender_source=source, gender_confidence=confidence)
     return RosterGenderVerdict("unknown", "roster_unknown", tier, matched)
 
 
@@ -467,6 +527,7 @@ def resolve_with_supplement(
         return verdict
     return RosterGenderVerdict(
         entry["gender"], entry["evidence"], "supplement", verdict.matched,
+        gender_source="supplement", gender_confidence="known",
     )
 
 
@@ -496,5 +557,10 @@ def gender_map_for_names(
                 "evidence": verdict.evidence,
                 "tier": verdict.tier,
                 "roster_name": verdict.matched[0] if verdict.matched else key,
+                # The ladder rung and its trust level travel with the pin into
+                # lock_cast -> meta.cast_source_contract.evidence[<NAME>], so a
+                # ledger says WHY a voice is the gender it is.
+                "gender_source": verdict.gender_source,
+                "gender_confidence": verdict.gender_confidence,
             }
     return out

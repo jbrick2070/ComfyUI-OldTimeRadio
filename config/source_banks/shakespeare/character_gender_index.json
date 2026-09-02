@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "notes": [
+    "The stamper's memory for tier 3 (scripts/otr_stamp_character_genders.py):",
+    "one entry per (play, name) the local model was asked about, asked ONCE, ever.",
+    "Edit an entry's gender and set locked: true to make it an operator ruling.",
+    "A locked entry with an EMPTY gender means: leave this one to the roll.",
+    "ARIEL and PUCK (Folger's scene text names him ROBIN) are editorial calls that",
+    "belong to the operator (2026-08-28); the corpus test asserts 40 of 42 for them."
+  ],
+  "entries": {
+    "A MIDSUMMER NIGHT'S DREAM|COBWEB": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:51+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|FLUTE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a character in the play.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:47+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|MOTE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "The character MOTE is not in the play.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:54+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|MUSTARDSEED": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:56+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|PEASEBLOSSOM": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is a fairy character in the play",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:49+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|PUCK": {
+      "gender": "",
+      "answer": "",
+      "reason": "operator: editorial call, stays on the roll",
+      "asked_as": "title",
+      "model": "",
+      "prompt_version": "",
+      "asked_utc": "",
+      "locked": true
+    },
+    "A MIDSUMMER NIGHT'S DREAM|QUINCE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:39+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|ROBIN": {
+      "gender": "",
+      "answer": "",
+      "reason": "operator: PUCK under his Folger speech prefix, stays on the roll",
+      "asked_as": "title",
+      "model": "",
+      "prompt_version": "",
+      "asked_utc": "",
+      "locked": true
+    },
+    "A MIDSUMMER NIGHT'S DREAM|SNOUT": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:41+00:00",
+      "locked": false
+    },
+    "A MIDSUMMER NIGHT'S DREAM|STARVELING": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:43+00:00",
+      "locked": false
+    },
+    "MUCH ADO ABOUT NOTHING|BALTHASAR": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a known character in the play",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:07+00:00",
+      "locked": false
+    },
+    "MUCH ADO ABOUT NOTHING|BOY": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a young man in the play",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:02+00:00",
+      "locked": false
+    },
+    "MUCH ADO ABOUT NOTHING|PRINCE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a prominent figure in the play's plot.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:05+00:00",
+      "locked": false
+    },
+    "THE COMEDY OF ERRORS|ANGELO": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is one of the twin characters in the play",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:16+00:00",
+      "locked": false
+    },
+    "THE COMEDY OF ERRORS|BALTHASAR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:10+00:00",
+      "locked": false
+    },
+    "THE COMEDY OF ERRORS|LUCE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "The character Luce does not appear in The Comedy of Errors.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:03:13+00:00",
+      "locked": false
+    },
+    "THE TEMPEST|ARIEL": {
+      "gender": "",
+      "answer": "",
+      "reason": "operator: editorial call, stays on the roll",
+      "asked_as": "title",
+      "model": "",
+      "prompt_version": "",
+      "asked_utc": "",
+      "locked": true
+    },
+    "THE TEMPEST|CALIBAN": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to as a male figure in the play.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:37+00:00",
+      "locked": false
+    },
+    "TWELFTH NIGHT|ANDREW": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a known character in the play",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:59+00:00",
+      "locked": false
+    }
+  }
+}

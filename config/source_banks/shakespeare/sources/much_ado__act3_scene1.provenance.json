@@ -48,5 +48,17 @@
       "gender": "female",
       "gender_source": "relation"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 4,
+      "pronouns": 0,
+      "llm_recall": 0,
+      "name_frequency": 0
+    },
+    "candidates": 0,
+    "declined": [],
+    "ran_utc": "2026-09-02T22:03:07+00:00"
+  }
 }

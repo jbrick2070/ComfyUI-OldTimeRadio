@@ -31,20 +31,39 @@
       "aliases": [
         "watson"
       ]
+    },
+    {
+      "name": "Helen Stoner",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Adventures of Sherlock Holmes\" by Arthur Conan Doyle: She is a central character in the story. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "stoner",
+        "helen"
+      ]
+    },
+    {
+      "name": "Dr. Grimesby Roylott",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Adventures of Sherlock Holmes\" by Arthur Conan Doyle: He is a recurring character in the stories. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "roylott"
+      ]
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Helen Stoner",
-      "Dr. Grimesby Roylott"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:28+00:00"
   }
 }

@@ -57,8 +57,9 @@ kokoro-onnx line rides the next `pyproject.toml` bump. Registry installs get the
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
 correctness defects (a gender or voice contradicting the source, a beat that renders the
 wrong picture, a leg that dies late).
-* **3a. Character gender ladder** -- spec v2 is written; ONE review round, then code.
-  Section 1.2.
+* **3a. Character gender ladder -- DONE 2026-09-02.** One review round (Antigravity), code,
+  Sonnet QA, the corpus re-stamped (202/249 decided, was 132), two published legs; the join now
+  reads the stamped aliases (the second leg's fix). Section 1.2.
 * **3b. Ghost pool: uniqueness on the finalized prompt** -- r1 is in; build. Section 1.3.
 * **3c. The open defect list** -- the P0 / source-span cluster, the orphan-occupancy
   registry (full arc before code), the coverage and routing rows. Section 1.4.
@@ -200,12 +201,21 @@ Shape (settle the details in the arc, do not re-derive these):
 
 ### 1.2 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review round, then code
 
-**NEXT:** one review round of `docs/2026-08-28-character-gender-ladder-SPEC-v2.md`
-(5080-local; `docs/2026-*/` is gitignored) against the r2 + r3 finding lists, then code.
-The six verdict-construction sites are all in `nodes/_otr_roster_gender.py` (298, 310,
-311, 334, 364, 468), zero in `tests/`, so with defaults the change is additive. DONE WHEN a
-prose-lane episode stamps `gender`, `gender_source` and a confidence on every cast row
-and no `unknown` survives.
+**DONE 2026-09-02.** Round: Antigravity r2 on the driver anchor
+(`docs/2026-09-02-gender-ladder/driver_anchor.md`, sections 8 and 9 carry the fold and the
+proof) -- 7 must-fixes, all grounded and taken. Code: tiers 3-4 in
+`scripts/otr_stamp_character_genders.py` (recall into a committed per-bank
+`character_gender_index.json`, the first-name pool, the body-hash-anchored merge, the
+Shakespeare scene stamper), the verdict fields and the alias-aware join in
+`nodes/_otr_roster_gender.py`, greedy decoding at temperature 0 in the constrained closure.
+Proof: `signal_lost_intensity_in_the_drawingroom_20260902_152901` -- ELIZABETH BENNET female,
+MR. DARCY male, COLONEL FITZWILLIAM male, all `llm_recall` / `recalled` in
+`meta.cast_source_contract.evidence`; the leg before it (`unhand_me_sir_20260902_151527`) is
+the before-picture where Darcy rolled female because the join ignored the aliases. Operator
+rulings folded: ARIEL / PUCK / ROBIN stay on the roll (locked index entries); Dr. Lira Kell is
+female (locked). Left open, recorded in PBUG-20260815-04's follow-up: a given-name alias can
+match a different character with that surname (COLONEL FITZWILLIAM via "fitzwilliam"; right
+here by coincidence) -- a surname-only alias for the short_form tier is the next fork.
 
 **TWO OPERATOR RULINGS, 2026-08-28, and they reshape the spec:**
 

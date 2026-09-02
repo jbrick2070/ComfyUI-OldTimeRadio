@@ -40,29 +40,51 @@
       "name": "DEMETRIUS",
       "roster_name": "DEMETRIUS",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "The other Athenian suitor, whom Egeus prefers for Hermia; sidecar carries roster_name='DEMETRIUS' with an empty description."
     },
     {
       "name": "HERMIA",
       "roster_name": "HERMIA",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "female",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Egeus's daughter, in love with Lysander; sidecar carries roster_name='HERMIA' with an empty description."
     },
     {
       "name": "LYSANDER",
       "roster_name": "LYSANDER",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "One of the two Athenian young men in love with Hermia; the sidecar carries roster_name='LYSANDER' with an empty description, so the fetched Folger text simply never gendered the entry."
     },
     {
       "name": "HELENA",
       "roster_name": "HELENA",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "female",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "In love with Demetrius and Hermia's childhood friend; sidecar carries roster_name='HELENA' with an empty description."
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 5,
+      "pronouns": 0,
+      "llm_recall": 0,
+      "name_frequency": 0
+    },
+    "candidates": 5,
+    "declined": [
+      "ROBIN"
+    ],
+    "ran_utc": "2026-09-02T22:02:56+00:00"
+  }
 }

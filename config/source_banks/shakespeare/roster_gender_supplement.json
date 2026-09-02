@@ -40,6 +40,14 @@
       "DROMIO": {
         "gender": "male",
         "evidence": "Both Dromio twins are the bondmen attending the Antipholus twins; the sidecar records DROMIO OF EPHESUS and DROMIO OF SYRACUSE as gender='unknown', so the shared prefix abstains at the join."
+      },
+      "LUCE": {
+        "gender": "female",
+        "evidence": "Folger dramatis personae: Luce (also called Nell), kitchen maid to Adriana; Dromio of Syracuse calls her 'the kitchen wench'"
+      },
+      "BALTHASAR": {
+        "gender": "male",
+        "evidence": "Folger dramatis personae: Balthasar, a merchant; Antipholus of Ephesus addresses him as 'good Signior Balthasar'"
       }
     },
     "MND": {

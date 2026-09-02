@@ -12,6 +12,17 @@
   "text_path": "config/source_banks/public_domain_story/sources/jane_eyre_wedding.txt",
   "characters": [
     {
+      "name": "Jane Eyre",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Jane Eyre\" by Charlotte Bronte: Jane is the protagonist of the novel (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "eyre",
+        "jane"
+      ]
+    },
+    {
       "name": "Mr. Rochester",
       "gender": "male",
       "gender_source": "pronouns",
@@ -44,16 +55,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Jane Eyre"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:52+00:00"
   }
 }

@@ -46,8 +46,10 @@
       "name": "CALIBAN",
       "roster_name": "CALIBAN",
       "description": "an inhabitant of the island, servant to Prospero",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Tempest\" by William Shakespeare: He is consistently referred to as a male figure in the play. (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "FERDINAND",
@@ -56,5 +58,19 @@
       "gender": "male",
       "gender_source": "title"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 3,
+      "pronouns": 0,
+      "llm_recall": 1,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [
+      "ARIEL"
+    ],
+    "ran_utc": "2026-09-02T22:02:37+00:00"
+  }
 }

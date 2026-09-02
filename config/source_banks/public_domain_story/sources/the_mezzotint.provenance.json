@@ -24,20 +24,27 @@
       "gender_source": "pronouns",
       "gender_confidence": "known",
       "evidence": "pronoun scan: he/him/his 19 vs she/her/hers 0 across 14 mention window(s) for 'nisbet'"
+    },
+    {
+      "name": "Filcher",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Ghost Stories of an Antiquary\" by M. R. James: Filcher is a recurring character in the stories. (google/gemma-4-E4B-it, 2026-09-02)"
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 4,
     "declined": [
-      "a colleague",
-      "Filcher"
-    ]
+      "a colleague"
+    ],
+    "ran_utc": "2026-09-02T22:00:53+00:00"
   }
 }

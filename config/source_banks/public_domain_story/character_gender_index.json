@@ -1,0 +1,846 @@
+{
+  "schema_version": 1,
+  "notes": [],
+  "entries": {
+    "A CHRISTMAS CAROL|BOB CRATCHIT": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:02+00:00",
+      "locked": false
+    },
+    "A CHRISTMAS CAROL|FRED": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is Fred, Scrooge's nephew",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:00+00:00",
+      "locked": false
+    },
+    "A CHRISTMAS GARLAND|EVA": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:55+00:00",
+      "locked": false
+    },
+    "A CHRISTMAS GARLAND|SANTA CLAUS": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:59+00:00",
+      "locked": false
+    },
+    "A CHRISTMAS GARLAND|THE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:57+00:00",
+      "locked": false
+    },
+    "A DREAMER'S TALES|THE DREAMER": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:09+00:00",
+      "locked": false
+    },
+    "ADVENTURES OF HUCKLEBERRY FINN|HUCK FINN": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a young boy.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:36+00:00",
+      "locked": false
+    },
+    "ALICE'S ADVENTURES IN WONDERLAND|ALICE": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "Alice is consistently referred to as a young girl.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:06+00:00",
+      "locked": false
+    },
+    "ALICE'S ADVENTURES IN WONDERLAND|THE DORMOUSE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "The text does not specify the Dormouse's gender.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:14+00:00",
+      "locked": false
+    },
+    "ALICE'S ADVENTURES IN WONDERLAND|THE HATTER": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as 'the Hatter' in the text.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:08+00:00",
+      "locked": false
+    },
+    "ALICE'S ADVENTURES IN WONDERLAND|THE MARCH HARE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The text refers to him as a male character.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:11+00:00",
+      "locked": false
+    },
+    "ANNE OF GREEN GABLES|MATTHEW CUTHBERT": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as Mr. Cuthbert",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:39+00:00",
+      "locked": false
+    },
+    "ARMAGEDDON 2419 A.D.|A HAN PATROL": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:33+00:00",
+      "locked": false
+    },
+    "ARMAGEDDON 2419 A.D.|ANTHONY ROGERS": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:31+00:00",
+      "locked": false
+    },
+    "BEASTS AND SUPER-BEASTS|FRAMTON NUTTEL": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to with male pronouns throughout the story.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:21+00:00",
+      "locked": false
+    },
+    "BEASTS AND SUPER-BEASTS|VERA": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:18+00:00",
+      "locked": false
+    },
+    "CARNACKI, THE GHOST-FINDER|A CLUB LISTENER": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:07+00:00",
+      "locked": false
+    },
+    "CONDENSED NOVELS|THE HOUSEKEEPER": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:52+00:00",
+      "locked": false
+    },
+    "CRADLE PROTOCOL|ARIA": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:13+00:00",
+      "locked": false
+    },
+    "CRADLE PROTOCOL|DR. LIRA KELL": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "operator 2026-09-02: 'Lira, I would say female' (his own story; the model had guessed from the name)",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:11+00:00",
+      "locked": true
+    },
+    "DON QUIXOTE|DON QUIXOTE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a knight-errant",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:23+00:00",
+      "locked": false
+    },
+    "DON QUIXOTE|SANCHO PANZA": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a prominent male character in the novel.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:25+00:00",
+      "locked": false
+    },
+    "FRANKENSTEIN|THE CREATURE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The Creature is consistently referred to with male pronouns.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:18+00:00",
+      "locked": false
+    },
+    "FRANKENSTEIN|VICTOR FRANKENSTEIN": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as Victor throughout the novel.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:16+00:00",
+      "locked": false
+    },
+    "GHOST STORIES OF AN ANTIQUARY|A COLLEAGUE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "The specific 'colleague' is not identified in the provided context.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:50+00:00",
+      "locked": false
+    },
+    "GHOST STORIES OF AN ANTIQUARY|FILCHER": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "Filcher is a recurring character in the stories.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:53+00:00",
+      "locked": false
+    },
+    "GRIM TALES|DR. KELLY": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:01+00:00",
+      "locked": false
+    },
+    "GRIM TALES|JACK": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:56+00:00",
+      "locked": false
+    },
+    "GRIM TALES|LAURA": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "Laura is a recurring female character in the series",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:59+00:00",
+      "locked": false
+    },
+    "JANE EYRE|JANE EYRE": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "Jane is the protagonist of the novel",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:52+00:00",
+      "locked": false
+    },
+    "LIVING ALONE|SARAH BROWN": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "The character is female",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:27+00:00",
+      "locked": false
+    },
+    "LIVING ALONE|TWO COMMITTEE LADIES": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "The title suggests a female context",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:29+00:00",
+      "locked": false
+    },
+    "NONSENSE NOVELS|THE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:44+00:00",
+      "locked": false
+    },
+    "PIGS IS PIGS|THE HEAD-OFFICE CLERK": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:20+00:00",
+      "locked": false
+    },
+    "PRIDE AND PREJUDICE|ELIZABETH BENNET": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is a central female protagonist",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:48+00:00",
+      "locked": false
+    },
+    "PRIDE AND PREJUDICE|FITZWILLIAM DARCY": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a prominent male character in the novel.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:51+00:00",
+      "locked": false
+    },
+    "SEVEN MEN|MAX": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:25+00:00",
+      "locked": false
+    },
+    "SKETCHES NEW AND OLD|ARMED CALLERS": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:10+00:00",
+      "locked": false
+    },
+    "SKETCHES NEW AND OLD|THE COURTLY STRANGER": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The character is described as a male figure.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:05+00:00",
+      "locked": false
+    },
+    "SKETCHES NEW AND OLD|THE NARRATOR": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The narrator adopts a distinctly male voice throughout the sketches.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:03+00:00",
+      "locked": false
+    },
+    "SKETCHES NEW AND OLD|THE NEW ASSOCIATE EDITOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:08+00:00",
+      "locked": false
+    },
+    "THE ADVENTURES OF SHERLOCK HOLMES|DR. GRIMESBY ROYLOTT": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a recurring character in the stories.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:28+00:00",
+      "locked": false
+    },
+    "THE ADVENTURES OF SHERLOCK HOLMES|HELEN STONER": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is a central character in the story.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:25+00:00",
+      "locked": false
+    },
+    "THE AWAKENING AND SELECTED SHORT STORIES|ARMAND AUBIGNY": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a recurring male character in the stories.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:46+00:00",
+      "locked": false
+    },
+    "THE AWAKENING AND SELECTED SHORT STORIES|DESIREE": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is the protagonist of the novella",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:44+00:00",
+      "locked": false
+    },
+    "THE CANTERVILLE GHOST|THE GHOST": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The ghost is explicitly referred to as a male spirit.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:15+00:00",
+      "locked": false
+    },
+    "THE CANTERVILLE GHOST|VIRGINIA": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is the central female character of the story",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:18+00:00",
+      "locked": false
+    },
+    "THE CASK OF AMONTILLADO|MONTRESOR": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to with male pronouns.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:20+00:00",
+      "locked": false
+    },
+    "THE ETERNAL MOMENT AND OTHER STORIES|KUNO": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:42+00:00",
+      "locked": false
+    },
+    "THE ETERNAL MOMENT AND OTHER STORIES|THE VOICE OF THE MACHINE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:44+00:00",
+      "locked": false
+    },
+    "THE INIMITABLE JEEVES|BERTIE WOOSTER": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a recurring character in Wodehouse's works.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:23+00:00",
+      "locked": false
+    },
+    "THE INNOCENCE OF FATHER BROWN|FLAMBEAU": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:30+00:00",
+      "locked": false
+    },
+    "THE JUNGLE BOOK|DARZEE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to as a male bird.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:31+00:00",
+      "locked": false
+    },
+    "THE JUNGLE BOOK|NAGAINA": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:29+00:00",
+      "locked": false
+    },
+    "THE JUNGLE BOOK|RIKKI-TIKKI": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is a mongoose",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:27+00:00",
+      "locked": false
+    },
+    "THE MONKEY'S PAW|HERBERT WHITE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as a male character in the story.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:23+00:00",
+      "locked": false
+    },
+    "THE POISON BELT|PROFESSOR CHALLENGER": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:16+00:00",
+      "locked": false
+    },
+    "THE SECRET SHARER|LEGGATT": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:32+00:00",
+      "locked": false
+    },
+    "THE STOLEN WHITE ELEPHANT|THE SIAMESE FUNCTIONARY": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:12+00:00",
+      "locked": false
+    },
+    "THE SURPRISING ADVENTURES OF BARON MUNCHAUSEN|A CREDULOUS LISTENER": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:33+00:00",
+      "locked": false
+    },
+    "THE WATER GHOST AND OTHERS|THE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:27+00:00",
+      "locked": false
+    },
+    "THE WATER GHOST AND OTHERS|THE WATER GHOST": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:25+00:00",
+      "locked": false
+    },
+    "THE WENDIGO|DEFAGO": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:46+00:00",
+      "locked": false
+    },
+    "THE WONDERFUL WIZARD OF OZ|A MUNCHKIN": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "Munchkins are a group, not a single gendered character",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:37+00:00",
+      "locked": false
+    },
+    "THE WONDERFUL WIZARD OF OZ|DOROTHY": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "She is the protagonist of the story",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:33+00:00",
+      "locked": false
+    },
+    "THE WONDERFUL WIZARD OF OZ|THE LION": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as a lion.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:39+00:00",
+      "locked": false
+    },
+    "THE WONDERFUL WIZARD OF OZ|THE SCARECROW": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as a scarecrow.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:36+00:00",
+      "locked": false
+    },
+    "THE WONDERFUL WIZARD OF OZ|THE TIN WOODMAN": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to as a woodman.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:42+00:00",
+      "locked": false
+    },
+    "THEODORE SAVAGE|A CAMP OFFICIAL": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:23+00:00",
+      "locked": false
+    },
+    "THEODORE SAVAGE|ADA": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:21+00:00",
+      "locked": false
+    },
+    "THREE MEN IN A BOAT|J.": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is one of the three main characters.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:00:16+00:00",
+      "locked": false
+    },
+    "TOLD AFTER SUPPER|THE NARRATOR": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The narrator is clearly male throughout the text.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:02:30+00:00",
+      "locked": false
+    },
+    "TRAFFICS AND DISCOVERIES|THE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:19+00:00",
+      "locked": false
+    },
+    "TREASURE ISLAND|JIM HAWKINS": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to as a boy throughout the book.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:34+00:00",
+      "locked": false
+    },
+    "UNCANNY STORIES|HARRIOTT LEIGH": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "The character is female",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:12+00:00",
+      "locked": false
+    },
+    "UNCANNY STORIES|OSCAR WADE": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:14+00:00",
+      "locked": false
+    },
+    "WHIRLIGIGS|EBENEZER DORSET": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:41+00:00",
+      "locked": false
+    },
+    "WHIRLIGIGS|JOHNNY": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "Johnny is consistently referred to as a young boy.",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:39+00:00",
+      "locked": false
+    },
+    "WIDDERSHINS|ELSIE BENGOUGH": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "Elsie is a female name",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:03+00:00",
+      "locked": false
+    },
+    "WIDDERSHINS|THE LANDLADY": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:05+00:00",
+      "locked": false
+    },
+    "WINSOME WINNIE AND OTHER NEW NONSENSE NOVELS|THE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:47+00:00",
+      "locked": false
+    },
+    "WINSOME WINNIE AND OTHER NEW NONSENSE NOVELS|THE PHANTASM": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure of the character's gender",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T22:01:50+00:00",
+      "locked": false
+    },
+    "WUTHERING HEIGHTS|HEATHCLIFF": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is consistently referred to as a man in the text",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:55+00:00",
+      "locked": false
+    },
+    "WUTHERING HEIGHTS|THE VOICE AT THE GLASS": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "The character is not explicitly gendered in the text",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-02T21:59:57+00:00",
+      "locked": false
+    }
+  }
+}

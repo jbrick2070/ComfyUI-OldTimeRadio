@@ -28,20 +28,36 @@
         "driscoll",
         "bill"
       ]
+    },
+    {
+      "name": "Johnny",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Whirligigs\" by O. Henry: Johnny is consistently referred to as a young boy. (google/gemma-4-E4B-it, 2026-09-02)"
+    },
+    {
+      "name": "Ebenezer Dorset",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Whirligigs\" by O. Henry: He is referred to with male pronouns (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "dorset",
+        "ebenezer"
+      ]
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Johnny",
-      "Ebenezer Dorset"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:41+00:00"
   }
 }

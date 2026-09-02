@@ -10,19 +10,39 @@
   "body_bytes": 16036,
   "body_words": 2909,
   "text_path": "config/source_banks/public_domain_story/sources/don_quixote_windmills.txt",
-  "characters": [],
+  "characters": [
+    {
+      "name": "Don Quixote",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Don Quixote\" by Miguel de Cervantes: He is a knight-errant (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "quixote"
+      ]
+    },
+    {
+      "name": "Sancho Panza",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Don Quixote\" by Miguel de Cervantes: He is a prominent male character in the novel. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "panza",
+        "sancho"
+      ]
+    }
+  ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 0,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 2,
-    "declined": [
-      "Don Quixote",
-      "Sancho Panza"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:00:25+00:00"
   }
 }

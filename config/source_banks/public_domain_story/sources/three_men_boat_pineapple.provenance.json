@@ -12,6 +12,13 @@
   "text_path": "config/source_banks/public_domain_story/sources/three_men_boat_pineapple.txt",
   "characters": [
     {
+      "name": "J.",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Three Men in a Boat\" by Jerome K. Jerome: He is one of the three main characters. (google/gemma-4-E4B-it, 2026-09-02)"
+    },
+    {
       "name": "George",
       "gender": "male",
       "gender_source": "pronouns",
@@ -27,16 +34,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 3,
-    "declined": [
-      "J."
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:00:16+00:00"
   }
 }

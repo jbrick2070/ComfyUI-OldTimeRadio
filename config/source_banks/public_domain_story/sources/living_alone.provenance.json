@@ -20,20 +20,39 @@
       "aliases": [
         "witch"
       ]
+    },
+    {
+      "name": "Sarah Brown",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Living Alone\" by Stella Benson: The character is female (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "brown",
+        "sarah"
+      ]
+    },
+    {
+      "name": "two committee ladies",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Living Alone\" by Stella Benson: The title suggests a female context (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "ladies"
+      ]
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 1,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 3,
-    "declined": [
-      "Sarah Brown",
-      "two committee ladies"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:01:29+00:00"
   }
 }

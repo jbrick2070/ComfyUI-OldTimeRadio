@@ -12,6 +12,24 @@
   "text_path": "config/source_banks/public_domain_story/sources/desiree_baby.txt",
   "characters": [
     {
+      "name": "Desiree",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Awakening and Selected Short Stories\" by Kate Chopin: She is the protagonist of the novella (google/gemma-4-E4B-it, 2026-09-02)"
+    },
+    {
+      "name": "Armand Aubigny",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Awakening and Selected Short Stories\" by Kate Chopin: He is a recurring male character in the stories. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "aubigny",
+        "armand"
+      ]
+    },
+    {
       "name": "Madame Valmonde",
       "gender": "female",
       "gender_source": "pronouns",
@@ -24,17 +42,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 1,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 3,
-    "declined": [
-      "Desiree",
-      "Armand Aubigny"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:46+00:00"
   }
 }

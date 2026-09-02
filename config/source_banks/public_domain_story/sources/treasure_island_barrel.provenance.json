@@ -12,6 +12,17 @@
   "text_path": "config/source_banks/public_domain_story/sources/treasure_island_barrel.txt",
   "characters": [
     {
+      "name": "Jim Hawkins",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Treasure Island\" by Robert Louis Stevenson: He is consistently referred to as a boy throughout the book. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "hawkins",
+        "jim"
+      ]
+    },
+    {
       "name": "Long John Silver",
       "gender": "male",
       "gender_source": "pronouns",
@@ -42,16 +53,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Jim Hawkins"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:34+00:00"
   }
 }

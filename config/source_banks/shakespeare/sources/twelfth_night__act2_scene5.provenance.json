@@ -25,8 +25,10 @@
       "name": "TOBY",
       "roster_name": "",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "absent_from_roster"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Sir Toby Belch, Olivia's kinsman; the manifest hint drops the honorific so the prefix TOBY is recorded absent_from_roster with an empty roster_name."
     },
     {
       "name": "FABIAN",
@@ -39,8 +41,10 @@
       "name": "ANDREW",
       "roster_name": "",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "absent_from_roster"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Twelfth Night\" by William Shakespeare: He is a known character in the play (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "MARIA",
@@ -56,5 +60,17 @@
       "gender": "male",
       "gender_source": "title"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 4,
+      "pronouns": 0,
+      "llm_recall": 1,
+      "name_frequency": 0
+    },
+    "candidates": 2,
+    "declined": [],
+    "ran_utc": "2026-09-02T22:02:59+00:00"
+  }
 }

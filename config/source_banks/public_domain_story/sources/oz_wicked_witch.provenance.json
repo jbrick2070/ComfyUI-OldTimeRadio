@@ -28,21 +28,49 @@
         "wicked witch of the west",
         "west"
       ]
+    },
+    {
+      "name": "the Lion",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Wonderful Wizard of Oz\" by L. Frank Baum: He is referred to as a lion. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "lion"
+      ]
+    },
+    {
+      "name": "the Scarecrow",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Wonderful Wizard of Oz\" by L. Frank Baum: He is referred to as a scarecrow. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "scarecrow"
+      ]
+    },
+    {
+      "name": "the Tin Woodman",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Wonderful Wizard of Oz\" by L. Frank Baum: He is referred to as a woodman. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "tin woodman",
+        "woodman"
+      ]
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 3,
       "name_frequency": 0
     },
     "candidates": 5,
-    "declined": [
-      "the Lion",
-      "the Scarecrow",
-      "the Tin Woodman"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:01:42+00:00"
   }
 }

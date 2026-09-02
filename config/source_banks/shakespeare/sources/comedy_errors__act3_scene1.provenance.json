@@ -27,36 +27,46 @@
       "name": "ANTIPHOLUS OF EPHESUS",
       "roster_name": "ANTIPHOLUS OF EPHESUS",
       "description": "a citizen of Ephesus",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Both Antipholus twins are sons of Egeon and Emilia; the sidecar records ANTIPHOLUS OF EPHESUS and ANTIPHOLUS OF SYRACUSE with gender_source=unknown, so the shared speech prefix cannot be joined, but neither brother is a woman."
     },
     {
       "name": "DROMIO OF EPHESUS",
       "roster_name": "DROMIO OF EPHESUS",
       "description": "Antipholus of Ephesus's servant",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Both Dromio twins are the bondmen attending the Antipholus twins; the sidecar records DROMIO OF EPHESUS and DROMIO OF SYRACUSE as gender='unknown', so the shared prefix abstains at the join."
     },
     {
       "name": "BALTHASAR",
       "roster_name": "BALTHASAR",
       "description": "an Ephesian merchant invited to dinner by Antipholus of Ephesus",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Folger dramatis personae: Balthasar, a merchant; Antipholus of Ephesus addresses him as 'good Signior Balthasar'"
     },
     {
       "name": "DROMIO OF SYRACUSE",
       "roster_name": "DROMIO OF SYRACUSE",
       "description": "Antipholus of Syracuse's servant",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Both Dromio twins are the bondmen attending the Antipholus twins; the sidecar records DROMIO OF EPHESUS and DROMIO OF SYRACUSE as gender='unknown', so the shared prefix abstains at the join."
     },
     {
       "name": "LUCE",
       "roster_name": "",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "absent_from_roster"
+      "gender": "female",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Folger dramatis personae: Luce (also called Nell), kitchen maid to Adriana; Dromio of Syracuse calls her 'the kitchen wench'"
     },
     {
       "name": "ADRIANA",
@@ -69,8 +79,22 @@
       "name": "ANGELO",
       "roster_name": "ANGELO",
       "description": "an Ephesian goldsmith",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Comedy of Errors\" by William Shakespeare: He is one of the twin characters in the play (google/gemma-4-E4B-it, 2026-09-02)"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 6,
+      "pronouns": 0,
+      "llm_recall": 1,
+      "name_frequency": 0
+    },
+    "candidates": 6,
+    "declined": [],
+    "ran_utc": "2026-09-02T22:04:20+00:00"
+  }
 }

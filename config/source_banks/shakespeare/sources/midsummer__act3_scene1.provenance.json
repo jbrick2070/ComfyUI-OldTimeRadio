@@ -32,8 +32,10 @@
       "name": "BOTTOM",
       "roster_name": "NICK BOTTOM",
       "description": "weaver",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "Nick Bottom the weaver, one of the Athenian mechanicals; addressed throughout as a man and cast as Pyramus in their play."
     },
     {
       "name": "QUINCE",
@@ -67,8 +69,10 @@
       "name": "FLUTE",
       "roster_name": "FRANCIS FLUTE",
       "description": "bellows-mender",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"A Midsummer Night's Dream\" by William Shakespeare: He is a character in the play. (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "TITANIA",
@@ -81,8 +85,10 @@
       "name": "PEASEBLOSSOM",
       "roster_name": "PEASEBLOSSOM",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"A Midsummer Night's Dream\" by William Shakespeare: She is a fairy character in the play (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "COBWEB",
@@ -112,5 +118,25 @@
       "gender": "unknown",
       "gender_source": "absent_from_roster"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 2,
+      "pronouns": 0,
+      "llm_recall": 2,
+      "name_frequency": 0
+    },
+    "candidates": 11,
+    "declined": [
+      "QUINCE",
+      "SNOUT",
+      "STARVELING",
+      "ROBIN",
+      "COBWEB",
+      "MOTE",
+      "MUSTARDSEED"
+    ],
+    "ran_utc": "2026-09-02T22:02:56+00:00"
+  }
 }

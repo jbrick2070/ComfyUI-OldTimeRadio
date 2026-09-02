@@ -12,6 +12,27 @@
   "text_path": "config/source_banks/public_domain_story/sources/cannibalism_in_the_cars.txt",
   "characters": [
     {
+      "name": "the narrator",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Sketches New and Old\" by Mark Twain: The narrator adopts a distinctly male voice throughout the sketches. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "narrator"
+      ]
+    },
+    {
+      "name": "the courtly stranger",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Sketches New and Old\" by Mark Twain: The character is described as a male figure. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "courtly stranger",
+        "stranger"
+      ]
+    },
+    {
       "name": "Mr. Bascom",
       "gender": "male",
       "gender_source": "pronouns",
@@ -33,17 +54,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "the narrator",
-      "the courtly stranger"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:02:05+00:00"
   }
 }

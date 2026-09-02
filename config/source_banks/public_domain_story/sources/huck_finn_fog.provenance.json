@@ -12,6 +12,17 @@
   "text_path": "config/source_banks/public_domain_story/sources/huck_finn_fog.txt",
   "characters": [
     {
+      "name": "Huck Finn",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Adventures of Huckleberry Finn\" by Mark Twain: He is a young boy. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "finn",
+        "huck"
+      ]
+    },
+    {
       "name": "Jim",
       "gender": "male",
       "gender_source": "pronouns",
@@ -20,16 +31,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 1,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 2,
-    "declined": [
-      "Huck Finn"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:36+00:00"
   }
 }

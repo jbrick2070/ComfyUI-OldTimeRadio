@@ -17,20 +17,27 @@
       "gender_source": "pronouns",
       "gender_confidence": "known",
       "evidence": "pronoun scan: he/him/his 12 vs she/her/hers 0 across 2 mention window(s) for 'lockwood'"
+    },
+    {
+      "name": "Heathcliff",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Wuthering Heights\" by Emily Bronte: He is consistently referred to as a man in the text (google/gemma-4-E4B-it, 2026-09-02)"
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 1,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 3,
     "declined": [
-      "Heathcliff",
       "the voice at the glass"
-    ]
+    ],
+    "ran_utc": "2026-09-02T21:59:57+00:00"
   }
 }

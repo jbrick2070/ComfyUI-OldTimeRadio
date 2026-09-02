@@ -32,6 +32,17 @@
       ]
     },
     {
+      "name": "Herbert White",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Monkey's Paw\" by W. W. Jacobs: He is referred to as a male character in the story. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "white",
+        "herbert"
+      ]
+    },
+    {
       "name": "Sergeant-Major Morris",
       "gender": "male",
       "gender_source": "pronouns",
@@ -44,16 +55,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 1,
       "name_frequency": 0
     },
     "candidates": 4,
-    "declined": [
-      "Herbert White"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:23+00:00"
   }
 }

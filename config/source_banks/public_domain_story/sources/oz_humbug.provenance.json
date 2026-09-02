@@ -12,6 +12,23 @@
   "text_path": "config/source_banks/public_domain_story/sources/oz_humbug.txt",
   "characters": [
     {
+      "name": "Dorothy",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Wonderful Wizard of Oz\" by L. Frank Baum: She is the protagonist of the story (google/gemma-4-E4B-it, 2026-09-02)"
+    },
+    {
+      "name": "the Scarecrow",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"The Wonderful Wizard of Oz\" by L. Frank Baum: He is referred to as a scarecrow. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "scarecrow"
+      ]
+    },
+    {
       "name": "the Tin Woodman",
       "gender": "male",
       "gender_source": "pronouns",
@@ -41,17 +58,15 @@
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 3,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 5,
-    "declined": [
-      "Dorothy",
-      "the Scarecrow"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T22:00:36+00:00"
   }
 }

@@ -290,12 +290,19 @@ def make_constrained_generate_fn(
             inputs["input_ids"].shape[1], tokenizer=tokenizer,
         )
 
+        # temperature 0.0 means GREEDY. transformers raises on
+        # do_sample=True with temperature 0.0 (story_orchestrator worked around
+        # it with 0.05 in 2026-04); the honest shape is to switch sampling off,
+        # which is what a caller asking for 0.0 means. Every temperature > 0
+        # call keeps the exact kwargs it always had.
+        if temperature and temperature > 0.0:
+            sampling = {"do_sample": True, "temperature": temperature, "top_p": 0.92}
+        else:
+            sampling = {"do_sample": False}
         with torch.no_grad():
             out = model.generate(
                 **inputs,
-                do_sample=True,
-                temperature=temperature,
-                top_p=0.92,
+                **sampling,
                 max_new_tokens=max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
                 stopping_criteria=StoppingCriteriaList([_guard]),

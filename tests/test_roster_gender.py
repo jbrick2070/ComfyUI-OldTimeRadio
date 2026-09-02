@@ -40,10 +40,15 @@ def test_exact_tier_resolves_a_named_character():
 
 
 def test_qualified_tier_abstains_for_a_single_unknown_candidate():
-    """ANTIPHOLUS matches ANTIPHOLUS OF EPHESUS, which the sidecar records as
-    gender='unknown'. The tier matched; the source still declined to gender him.
+    """ANTIPHOLUS matches ANTIPHOLUS OF EPHESUS; when the roster records him as
+    gender='unknown' the tier matched but the source declined to gender him.
+    (Synthetic rows: since the 2026-09-02 stamp the live sidecar carries the
+    supplement's answer for this row, see the test below.)
     """
-    v = RG.resolve_roster_gender("ANTIPHOLUS", _chars("comedy_errors__act3_scene1"))
+    rows = [{"name": "ANTIPHOLUS OF EPHESUS", "roster_name": "ANTIPHOLUS OF EPHESUS",
+             "description": "a citizen of Ephesus", "gender": "unknown",
+             "gender_source": "unknown"}]
+    v = RG.resolve_roster_gender("ANTIPHOLUS", rows)
     assert v.tier == "qualified"
     assert v.gender == "unknown"
 
@@ -53,10 +58,15 @@ def test_both_dromios_abstain_rather_than_agreeing():
     know which Dromio to know he is a man' -- but BOTH Dromios are recorded
     gender='unknown', so the join has nothing to agree about and must abstain.
     """
-    chars = _chars("comedy_errors__act3_scene1")
-    v = RG.resolve_roster_gender("DROMIO", chars)
+    rows = [{"name": n, "roster_name": n, "description": "", "gender": "unknown",
+             "gender_source": "unknown"} for n in ("DROMIO OF EPHESUS", "DROMIO OF SYRACUSE")]
+    v = RG.resolve_roster_gender("DROMIO", rows)
     assert v.gender == "unknown"
     assert len(v.matched) == 2, v.matched
+    # Since the 2026-09-02 stamp the LIVE rows carry the supplement's answer, and
+    # two rows that AGREE are a pin, not an abstention.
+    live = RG.resolve_roster_gender("DROMIO", _chars("comedy_errors__act3_scene1"))
+    assert (live.gender, live.gender_source, len(live.matched)) == ("male", "supplement", 2)
 
 
 def test_disagreeing_candidates_are_reported_as_ambiguous():
@@ -98,7 +108,8 @@ def test_supplement_loads_and_every_entry_carries_evidence():
             total += 1
             assert spec["gender"] in ("male", "female"), (play_code, name)
             assert spec["evidence"].strip(), (play_code, name)
-    assert total == 10, "10 curated entries; ARIEL and PUCK are excluded by design"
+    assert total == 12, ("12 curated entries (LUCE and BALTHASAR of Comedy of Errors "
+                         "added 2026-09-02); ARIEL and PUCK are excluded by design")
 
 
 def test_supplement_may_not_overrule_a_confirmed_sidecar_gender():
@@ -110,14 +121,23 @@ def test_supplement_may_not_overrule_a_confirmed_sidecar_gender():
 
 
 def test_supplement_closes_the_names_the_roster_cannot_reach():
+    """Two layers, both live. The stamper (2026-09-02) writes the supplement's
+    answer INTO the sidecar row (gender_source 'supplement'), so the roster join
+    alone now pins ANTIPHOLUS and DROMIO; and on a roster that still says unknown,
+    the render-time supplement closes the same names."""
     chars = _chars("comedy_errors__act3_scene1")
     supp = RG.load_gender_supplement(BANK_DIR)
     for name in ("ANTIPHOLUS", "DROMIO"):
-        assert RG.resolve_roster_gender(name, chars).gender == "unknown"
+        v = RG.resolve_roster_gender(name, chars)
+        assert (v.gender, v.gender_source, v.gender_confidence) == ("male", "supplement", "known"), name
+    unknown_rows = [dict(r, gender="unknown", gender_source="unknown") for r in chars]
+    for name in ("ANTIPHOLUS", "DROMIO"):
+        assert RG.resolve_roster_gender(name, unknown_rows).gender == "unknown"
         v = RG.resolve_with_supplement(
-            name, chars, play_code="Err", supplement=supp)
+            name, unknown_rows, play_code="Err", supplement=supp)
         assert v.gender == "male", name
         assert v.tier == "supplement"
+        assert (v.gender_source, v.gender_confidence) == ("supplement", "known")
 
 
 def test_supplement_does_not_adjudicate_an_ambiguous_join():

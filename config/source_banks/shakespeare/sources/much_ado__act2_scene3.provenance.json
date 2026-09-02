@@ -34,15 +34,19 @@
       "name": "BOY",
       "roster_name": "BOY",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Much Ado About Nothing\" by William Shakespeare: He is a young man in the play (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "PRINCE",
       "roster_name": "",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "absent_from_roster"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Much Ado About Nothing\" by William Shakespeare: He is a prominent figure in the play's plot. (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "CLAUDIO",
@@ -55,8 +59,10 @@
       "name": "BALTHASAR",
       "roster_name": "BALTHASAR",
       "description": "",
-      "gender": "unknown",
-      "gender_source": "unknown"
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Much Ado About Nothing\" by William Shakespeare: He is a known character in the play (google/gemma-4-E4B-it, 2026-09-02)"
     },
     {
       "name": "LEONATO",
@@ -72,5 +78,17 @@
       "gender": "female",
       "gender_source": "relation"
     }
-  ]
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 4,
+      "pronouns": 0,
+      "llm_recall": 3,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [],
+    "ran_utc": "2026-09-02T22:03:07+00:00"
+  }
 }

@@ -10,19 +10,39 @@
   "body_bytes": 13060,
   "body_words": 2359,
   "text_path": "config/source_banks/public_domain_story/sources/frankenstein.txt",
-  "characters": [],
+  "characters": [
+    {
+      "name": "Victor Frankenstein",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Frankenstein\" by Mary Shelley: He is referred to as Victor throughout the novel. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "frankenstein",
+        "victor"
+      ]
+    },
+    {
+      "name": "the Creature",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"Frankenstein\" by Mary Shelley: The Creature is consistently referred to with male pronouns. (google/gemma-4-E4B-it, 2026-09-02)",
+      "aliases": [
+        "creature"
+      ]
+    }
+  ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
       "roster": 0,
       "pronouns": 0,
-      "llm_web": 0,
+      "llm_recall": 2,
       "name_frequency": 0
     },
     "candidates": 2,
-    "declined": [
-      "Victor Frankenstein",
-      "the Creature"
-    ]
+    "declined": [],
+    "ran_utc": "2026-09-02T21:59:18+00:00"
   }
 }

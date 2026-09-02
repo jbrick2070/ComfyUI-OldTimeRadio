@@ -28,20 +28,30 @@
       "gender_source": "pronouns",
       "gender_confidence": "known",
       "evidence": "pronoun scan: he/him/his 16 vs she/her/hers 0 across 14 mention window(s) for 'toby'"
+    },
+    {
+      "name": "Dr. Lira Kell",
+      "gender": "female",
+      "gender_source": "supplement",
+      "gender_confidence": "known",
+      "evidence": "operator-locked index entry: operator 2026-09-02: 'Lira, I would say female' (his own story; the model had guessed from the name)",
+      "aliases": [
+        "kell"
+      ]
     }
   ],
   "gender_ladder": {
-    "version": "gender_ladder_v1",
+    "version": "gender_ladder_v2",
     "tier_counts": {
-      "roster": 0,
+      "roster": 1,
       "pronouns": 2,
-      "llm_web": 0,
+      "llm_recall": 0,
       "name_frequency": 0
     },
     "candidates": 4,
     "declined": [
-      "Dr. Lira Kell",
       "ARIA"
-    ]
+    ],
+    "ran_utc": "2026-09-02T22:08:54+00:00"
   }
 }
