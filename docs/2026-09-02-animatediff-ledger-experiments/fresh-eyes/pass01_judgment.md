@@ -129,3 +129,38 @@ a blinded two-null comparison: (A) build the instrument first (E9 + replay + sco
 (B) sweep the adapter per style, which needs no code and can start tonight on fresh episodes as
 a look-see, (C) the still-in lab peer with the lane's own in-family plate. The statement and the
 four reads are in this folder; nothing in the shipping recipe changes until he says which.
+
+## 7. Cursor's planner read (the operator's other window, pasted 2026-09-02 ~16:00) -- folded
+
+Cursor, working as a grounded planner in its own window (its file `r1_cursor_grounded.md` is
+that window's to commit), agrees with the order above and adds three corrections the driver
+takes: (a) the overnight headroom is **323 MB** (14,177 MB peak against the 14,500 MB target),
+not the 300 MB to 1.2 GB range the statement gave -- one-clip VRAM probes precede ContextRef or
+FreeInit; (b) the existing haunted ledgers carry `images.images = []`, so a same-ledger A/A on
+Tectal Echo cannot consume stills that were never minted -- the still protocol is "mint once,
+freeze `images[]`, then the video A/A"; (c) object and signal beats take a PROP still, figure
+beats the character still (Zhang's overcoat cannot seed Boyden's amber key) -- a variant of the
+mode decision in section 3, and the driver prefers it to freezing the cycle. It also names the
+receipt-side E9 shape precisely: a `render_trace` stamped by `OTR_VideoRenderBatch` of what was
+actually sampled (prompt, seed, adapter strength, still hash), with `prompt_sha8` and
+`request_seed` on the clip receipt; ShotLock's `video.shots` stays the director's ask. Taken.
+
+Two points the driver reads differently:
+* **The adapter sweep and 0.0.** Cursor excludes 0.0 because a zero adapter under the haunted
+  receipt is a lie (the engine itself logs "clean picture under a haunted receipt"). Right about
+  the receipt, and the driver keeps 0.0 as a DIAGNOSTIC render under an honest label (not the
+  haunted receipt id), because it is the one render that says whether the adapter is what
+  kills anime. The published sweep is 0.25 / 0.5 / 0.75 / 1.0 on both `anime` and
+  `storybook_engraving`.
+* **"E0 on two frozen ledgers" needs the replay too.** Nothing in the canonical graph can hand
+  a frozen ledger to the render phase a second time (section 2), so the frozen-ledger sweep
+  waits on the replay exactly as the still arms do; an unblinded look-see on fresh episodes is
+  the only thing that can start before it.
+
+Cursor's five operator calls, with the driver's recommendation beside each: peer engine, not a
+flag on the shipping lane (**peer**); native 512x288 stills, not a 1472x832 downscale
+(**native**); whether E9 may start as a design arc while alpha.16 waits on the operator's
+control experiment (**yes -- it is docs and ledger plumbing, and the registry control is a
+separate, operator-triggered push**); one timeline per shot inside the first still week or
+after (**phase 2, after the peer is judged**); the 8 GB profiles stay on the empty-latent peer
+until a Klein-then-AnimateDiff episode publishes on that box (**unchanged until proven**).
