@@ -968,8 +968,14 @@ session. Friction log: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
   clean room's obs (~10:30-11:00 on 2026-09-02) and for an operator eyeball.
 * Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
   `config/machine_classes.json` (`proven[]` or `known_limits`), regenerate
-  `docs/MACHINE_MATRIX.md`, then the README newbie pass. Do not advertise a lane the
-  clean room did not finish.
+  `docs/MACHINE_MATRIX.md`. Do not advertise a lane the clean room did not finish.
+  DONE 2026-09-02 (66da15da, 756c64f4): the README newbie pass landed from a four-reader
+  audit (three templates named, the Python 3.13 voice fix by node and dropdown, IndexTTS2's
+  own installer, the 8 GB Klein / LTX 2.5 facts, AMD and Mac rows, the LTXVideo pin and
+  patch, the measured `known_limits` line and a regenerated matrix); the provisioner now
+  pins AnimateDiff-Evolved (release 1.6.0) like the other two packs. Still owed from the
+  audit: `pyproject.toml`'s kokoro marker (in the alpha.15 patch, the operator's registry
+  push) and a shipped 8 GB Klein + LTX 2.5 profile (Section 1.0).
 
 ### Deferred render items (each blocked, or waiting on something else first)
 
