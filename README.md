@@ -137,6 +137,22 @@ pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12
 These coexist safely with a CUDA 13 torch — measured on both Blackwell and Ada,
 loading llama.cpp first and then running a real CUDA matmul through torch.
 
+**Not on Windows?** The line above is the Windows CUDA recipe and the only one this
+project has measured. The GGUF lane is the only local writer the Mac, AMD and CPU
+profiles allow, so use upstream llama-cpp-python's own build flags for your backend
+(these are upstream's documented commands, not something this pack has proven yet;
+please report what worked):
+
+| platform | install |
+|---|---|
+| Linux, NVIDIA | try the same `--extra-index-url .../whl/cu124` wheel line as above first (unmeasured here on Linux) |
+| macOS, Apple Silicon | `CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python==0.3.33 --no-cache-dir` |
+| Linux, AMD ROCm | `CMAKE_ARGS="-DGGML_HIP=on" pip install llama-cpp-python==0.3.33 --no-cache-dir` (upstream's current flag name) |
+| CPU only | `pip install llama-cpp-python==0.3.33 --no-cache-dir` |
+
+The `0.3.33` pin is a Windows measurement. If it will not build on your platform,
+the newest release is the next thing to try.
+
 > **Test it the way OTR does.** A bare `import llama_cpp` fails even on a
 > *working* install, because OTR preloads the CUDA DLLs and extends the DLL
 > search path first. Use the pack's own path instead:

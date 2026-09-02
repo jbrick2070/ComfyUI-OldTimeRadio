@@ -614,7 +614,14 @@ def _load_font(pt: int):
     if key in _FONT_CACHE:
         return _FONT_CACHE[key]
     fd = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
-    for path in (
+    # OTR_CREDITS_FONT (2026-09-01 ship audit, hardcoded-paths-01): an explicit
+    # path wins outright. It is tried FIRST and only when set, so a box that
+    # never sets it resolves exactly as before. The macOS candidates sit AFTER
+    # the Windows and Linux ones for the same reason: unreachable on the boxes
+    # that already resolve, and the difference between a credits tail and a
+    # CreditsDataError on Apple Silicon, which ships no DejaVu and no consola.
+    explicit = os.environ.get("OTR_CREDITS_FONT", "").strip()
+    candidates = ([explicit] if explicit else []) + [
         os.path.join(fd, "JetBrainsMono-Bold.ttf"),
         os.path.join(fd, "consola.ttf"),
         os.path.join(fd, "cour.ttf"),
@@ -623,7 +630,12 @@ def _load_font(pt: int):
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         "DejaVuSansMono.ttf",
-    ):
+        "/System/Library/Fonts/Menlo.ttc",
+        "/System/Library/Fonts/Monaco.ttf",
+        "/System/Library/Fonts/Supplemental/Courier New Bold.ttf",
+        "/Library/Fonts/Courier New Bold.ttf",
+    ]
+    for path in candidates:
         try:
             f = ImageFont.truetype(path, key)
             _FONT_CACHE[key] = f
@@ -632,7 +644,9 @@ def _load_font(pt: int):
             continue
     raise CreditsDataError(
         "no monospace truetype font resolved -- refusing to render a "
-        "point-size-less bitmap hero (no-fallback)")
+        "point-size-less bitmap hero (no-fallback). Set OTR_CREDITS_FONT to "
+        "the absolute path of any monospace .ttf/.ttc on this machine"
+        + (f" (OTR_CREDITS_FONT={explicit!r} did not load)" if explicit else ""))
 
 
 def _fw(draw, s, font) -> int:

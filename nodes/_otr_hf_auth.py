@@ -93,11 +93,15 @@ def resolve_hf_token_runtime() -> str | None:
         default_token_file = os.path.join(
             os.path.expanduser("~"), ".cache", "huggingface", "token")
         if os.path.isfile(default_token_file):
-            with open(default_token_file, "r", encoding="utf-8") as fh:
+            # utf-8-sig swallows a BOM that a Windows editor may have stamped
+            # on the token file; a non-UTF-8 file raises UnicodeDecodeError
+            # (a ValueError, not an OSError), which used to escape this
+            # best-effort read (2026-09-01 ship audit, encoding-os-03).
+            with open(default_token_file, "r", encoding="utf-8-sig") as fh:
                 token = fh.read().strip()
             if token:
                 return token
-    except OSError:
+    except (OSError, ValueError):
         pass
 
     return None

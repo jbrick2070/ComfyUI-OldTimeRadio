@@ -1026,6 +1026,30 @@ def _prepare_windows_llama_dll_runtime() -> None:
                     raise exc
 
 
+def _llama_cpp_platform_hint() -> str:
+    """The install line above is the Windows CUDA recipe, and it is the only one
+    this project has measured. The GGUF lane is also the ONLY local writer lane
+    the Mac, AMD and CPU profiles allow, so an off-Windows user who hits this
+    error needs the build flags for THEIR backend, stated as what they are:
+    upstream llama-cpp-python's documented source-build flags, not something
+    this pack has proven (2026-09-01 ship audit, mac-amd-04)."""
+    import sys as _sys
+    if _sys.platform == "darwin":
+        return (" On macOS (Apple Silicon) there is no prebuilt CUDA wheel; build "
+                "with Metal per upstream: CMAKE_ARGS=\"-DGGML_METAL=on\" pip install "
+                "llama-cpp-python==0.3.33 --no-cache-dir. The 0.3.33 pin is a "
+                "Windows measurement; if 0.3.33 will not build on your macOS, the "
+                "newest release is the next thing to try, and please report which "
+                "one worked.")
+    if _sys.platform.startswith("linux"):
+        return (" On Linux with NVIDIA try the same cu124 wheel index first "
+                "(unmeasured by this project on Linux). On AMD/ROCm build per "
+                "upstream: CMAKE_ARGS=\"-DGGML_HIP=on\" pip install "
+                "llama-cpp-python==0.3.33 --no-cache-dir (unmeasured by this "
+                "project; the pin is a Windows measurement).")
+    return ""
+
+
 def _import_llama_cpp():
     try:
         _prepare_windows_llama_dll_runtime()
@@ -1046,6 +1070,7 @@ def _import_llama_cpp():
             "DLLs: pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 "
             "(these coexist safely with a CUDA 13 torch -- measured on both "
             "Blackwell and Ada)."
+            + _llama_cpp_platform_hint()
         ) from exc
     return Llama
 
