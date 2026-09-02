@@ -228,3 +228,7 @@ LoRAs are about 77 MB each (`v2_lora_ZoomIn.ckpt` 77,474,499 B); the Hub copies 
 "not established" size rows are now filled. Its VRAM reading of E7 -- a 1.99 GB encoder
 beside a 2.13 GB checkpoint and a 1.67 GB module against 323 MB of overnight headroom -- is
 the same reason E7 sits after the peer with its own probe.
+
+## 10. Standing rule for every new lane in this campaign (operator 2026-09-02)
+
+"Always remember when adding a new video pack to follow the preflight video guide." The still-in lab peer engine (item 2), any per-style checkpoint arm and any Gen2 arm are NEW LANES: each runs `docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 (weights resolve, canvas truth, contract matches runtime, admission honesty, the audio law, guards by name, public surface, solo smoke) and `tests/test_lane_preflight_matrix.py`, and saves the `ID | status | evidence` receipt beside its anchor, BEFORE its id is registered or a profile names it. README links the guide under the extend section (the preflight table and "start at docs/EXTENDING_OTR.md, then run the matching preflight").
