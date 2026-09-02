@@ -10105,3 +10105,67 @@ minus the kokoro line installed cleanly (`PIP4_OK`), the server booted with all
 `Requires-Python` below the interpreter the host application ships must carry a
 version marker, or pip's all-or-nothing resolve turns one optional engine into
 a total install failure.
+
+## PBUG-20260902-01 -- image engines kept the text encoder on the card through sampling: ~42 min per Klein still on 8 GB
+
+**Verified on two live headless legs in the 4060 clean room (RTX 4060 Laptop
+8 GB, portable v0.34.0, Python 3.13, pack at c0ebe31f, profile
+`otr_cleanroom_8gb_klein_ltx25`, 2026-09-02 00:18 and 01:38).** Klein 4B Q4
+GGUF, the ruled low-VRAM image default, minted a clean 832x480 still but took
+~42 minutes to do it. The server log shows why, identically under stock flags
+(DynamicVRAM on) and under the lowvram flag pair:
+
+    Requested to load Flux2TEModel_        (7671 MB staged / 7672 MB loaded)
+    Requested to load Flux2
+    0 models unloaded.
+    loaded partially; 0.00 MB usable, 0.00 MB loaded, 2591.65 MB offloaded
+
+The 7.7 GB bf16 Qwen3-4B text encoder stayed resident after encoding, so the
+2.6 GB Klein DiT was loaded with nothing usable and every sampler step ran from
+system RAM at 120-143 s per step (GPU at 7.9 GB / 100 %). ComfyUI's smart-memory
+path does not evict the encoder because the DiT's minimum partial-load fits in
+the sliver that is left; the pack had to release it. The three local image
+engines with a separate CLIPLoader node (`flux2_klein`, `z_image_turbo`,
+`lumina_image`) ran `wrapper_bridge.run_graph` WITHOUT `free_after_use`,
+unlike every video engine (eng_wan_ti2v, eng_ltx_8gb, eng_minimax_h3 all pass it
+so the encoder is dropped before the diffusion peak). On the 16 GB box the
+encoder and the DiT co-reside (peak ~14.5 GB), so nothing ever showed there.
+
+**FIX (9b90189a):** `run_graph(..., free_after_use=True, keep={"unet"})` in all
+three engines; the three render tests assert the residency contract.
+
+**LIVE VERIFY:** on the RTX 5080, a fixed-seed in-process render per engine
+before and after: byte-identical PNGs (same sha256) in all three, peak VRAM
+14855/14423/14627 MiB -> 7901/9015/9634 MiB, wall time 18.2/7.3/16.6 s ->
+15.3/7.8/14.4 s. Receipts in `docs/ship-audit-2026-09-01/legC/`. The 8 GB
+measurement of the fix is Leg C3 in `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
+
+**Bug Bible:** promoted (12.145). An in-process graph executor that keeps every
+intermediate alive until the graph ends pins the text encoder next to the
+diffusion model; on a card where the two do not fit together the sampler runs
+from host memory at 10-50x the normal step time without any error. Free the
+encoder the moment its last consumer has run, and prove the change with a
+same-seed before/after that is byte-identical on the box where both fit.
+
+**ADDENDUM 2026-09-02 03:5x -- the reference drop is NOT enough under DynamicVRAM.**
+Leg C3 (the 9b90189a tree, stock flags, DynamicVRAM on) logged the identical
+`0 models unloaded / loaded partially; 0.00 MB usable`. Measured in-process on
+the clean room with aimdo initialised exactly as main.py does it
+(`docs/2026-09-02-encoder-eviction/4060_probe_residency_aimdo.log`): a
+`ModelPatcherDynamic` keeps its weights in an aimdo VBAR owned by the nn.Module;
+dropping the pack's last reference cleans the weakref out of
+`current_loaded_models` but the VBAR pages stay allocated (`ModelPatcherDynamic.
+__del__` calls `detach(unpatch_all=False)`, which never reaches `unpatch_model`),
+and only pressure from ANOTHER dynamic model reclaims them. The GGUF DiT is a
+classic patcher, so it never applies that pressure. The one call that releases
+the encoder mid-prompt is `comfy.model_management.unload_model_and_clones(
+clip.patcher)` while it is still registered: free 620 MB -> 6998 MB, the DiT then
+loads 2592 MB resident and 2 steps render in 9.4 s (the server took ~4 min).
+Shipped as `run_graph(..., evict_after_use={"clip"})` in the three image engines
+(explicit node ids, dynamic patchers only, ComfyUI API guarded; design arc in
+`docs/2026-09-02-encoder-eviction/driver_anchor.md`, both seats approve). 5080
+proof on both paths: byte-identical stills; classic peaks and times unchanged;
+DynamicVRAM faster. The 8 GB proof of the SHIPPED shape is PENDING at the push:
+it is Leg C4 in `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`, appended when
+the clean room has run it (the in-process 9.4 s receipt above used a crude
+all-registry eviction, not the shipped node-scoped one).

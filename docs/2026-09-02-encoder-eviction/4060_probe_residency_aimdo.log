@@ -1,0 +1,71 @@
+PROBE_START Wed 09/02/2026  3:15:38.52 
+aimdo control.init done; lib=True
+INFO Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+INFO Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+INFO Found comfy_kitchen backend cuda: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+INFO Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+INFO Checkpoint files will always be loaded safely.
+INFO Total VRAM 8188 MB, total RAM 32461 MB
+INFO pytorch version: 2.13.0+cu130
+INFO Set vram state to: NORMAL_VRAM
+INFO Device: cuda:0 NVIDIA GeForce RTX 4060 Laptop GPU : native
+INFO Using async weight offloading with 2 streams
+INFO Enabled pinned memory 12984.0
+INFO Using pytorch attention
+INFO setup plugin alembic.autogenerate.schemas
+INFO setup plugin alembic.autogenerate.tables
+INFO setup plugin alembic.autogenerate.types
+INFO setup plugin alembic.autogenerate.constraints
+INFO setup plugin alembic.autogenerate.defaults
+INFO setup plugin alembic.autogenerate.comments
+INFO setup plugin alembic.autogenerate.checkconstraint_byname
+INFO No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+WARNING Error while calling comfy_entrypoint in C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\comfy_extras\nodes_replacements.py: type object 'PromptServer' has no attribute 'instance'
+INFO ComfyUI-GGUF: Allowing full torch compile
+INFO aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+INFO aimdo: src/control.c:262:INFO:comfy-aimdo NVML pressure enabled
+INFO aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 4060 Laptop GPU runtime_luid=00000000:859136d1 dxgi_luid=00000000:859136d1
+INFO aimdo: src/control.c:277:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 4060 Laptop GPU (VRAM: 8187 MB)
+DynamicVRAM enabled in-process (aimdo)
+aimdo_enabled=True vram_state=VRAMState.NORMAL_VRAM
+[start] free=7106MB alloc=0MB reserved=0MB 660 MiB(smi) loaded=[]
+INFO CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+INFO Requested to load Flux2TEModel_
+INFO Model Flux2TEModel_ prepared for dynamic VRAM loading. 7671MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+encode took 3.2s
+[A1 after encode (clip referenced)] free=620MB alloc=9MB reserved=220MB 7188 MiB(smi) loaded=['Flux2TEModel_[loaded=6208MB dyn=True]']
+[A1b after unload_model_and_clones(clip.patcher) (clip still referenced)] free=6998MB alloc=8MB reserved=22MB 782 MiB(smi) loaded=[]
+[A2 after del clip + gc + soft_empty_cache] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+[A2b after cleanup_models_gc + cleanup_models] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+[A3 after free_memory(64GiB)] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+[A4 after unload_all_models] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+[A5 after del cond] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+INFO CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+INFO gguf qtypes: F32 (60), Q5_K (30), Q4_K (50), BF16 (9)
+INFO model weight dtype torch.bfloat16, manual cast: None
+INFO model_type FLUX
+INFO Using pytorch attention in VAE
+INFO Using pytorch attention in VAE
+INFO VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[B before load_models_gpu(['Flux2TEModel_'])] free=6998MB alloc=8MB reserved=20MB 780 MiB(smi) loaded=[]
+INFO Requested to load Flux2TEModel_
+INFO Model Flux2TEModel_ prepared for dynamic VRAM loading. 7671MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[B after load_models_gpu(['Flux2TEModel_'])] free=6997MB alloc=9MB reserved=22MB 782 MiB(smi) loaded=['Flux2TEModel_[loaded=0MB dyn=True]']
+[probe] _soft_free evicted registered models: ['Flux2TEModel_']
+[B before load_models_gpu(['Flux2'])] free=6998MB alloc=8MB reserved=20MB 781 MiB(smi) loaded=[]
+INFO Requested to load Flux2
+INFO loaded completely; 5578.68 MB usable, 2591.65 MB loaded, full load: True
+[B after load_models_gpu(['Flux2'])] free=4496MB alloc=2510MB reserved=2588MB 3349 MiB(smi) loaded=['Flux2[loaded=2592MB dyn=False]']
+  0%|          | 0/2 [00:00<?, ?it/s]  0%|          | 0/2 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/2 [00:01<?, ?it/s,  Model Initialization complete!  ] 50%|█████     | 1/2 [00:01<00:01,  1.51s/it,  Model Initialization complete!  ] 50%|█████     | 1/2 [00:02<00:01,  1.51s/it]                                   100%|██████████| 2/2 [00:02<00:00,  1.09s/it]100%|██████████| 2/2 [00:02<00:00,  1.09s/it]
+[probe] _soft_free evicted registered models: ['Flux2']
+[B before load_models_gpu(['AutoencoderKL'])] free=6992MB alloc=8MB reserved=20MB 788 MiB(smi) loaded=[]
+INFO Requested to load AutoencoderKL
+INFO Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[B after load_models_gpu(['AutoencoderKL'])] free=6992MB alloc=8MB reserved=22MB 790 MiB(smi) loaded=['AutoencoderKL[loaded=0MB dyn=True]']
+[probe] _soft_free evicted registered models: ['AutoencoderKL']
+WARNING [OTR video] LOUD VRAM reclaim (flux2_klein post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+INFO [OTR.image.flux2_klein] minted still 832x480 seed=4242 steps=2 guidance=4.00
+B render (480, 832, 3) took 9.4s (2 steps)
+[B after render] free=6990MB alloc=8MB reserved=20MB 790 MiB(smi) loaded=[]
+PROBE_DONE
+PROBE_END Wed 09/02/2026  3:16:02.08 exit=0 

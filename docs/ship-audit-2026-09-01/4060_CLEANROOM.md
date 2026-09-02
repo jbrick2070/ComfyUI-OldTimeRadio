@@ -110,9 +110,52 @@ ROOT CAUSE (read in the engine code, 02:0x)  The three local image engines with 
     Receipts: `legC/5080_probe_before.json`, `legC/5080_probe_after.json`. This is also
     the likeliest root of R1's Z-Image abort (the same 0-MB-usable partial load, one
     engine over): Leg C3 tells.
-LEG C3  the fix under STOCK flags: same profile, bf16 encoder, the pushed fix pulled into
-    the clean room, `_boot_stock.cmd STOCK` (DynamicVRAM on, nothing special). (result below)
-LEG C4  only if C3 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
+LEG C3  2026-09-02 02:31-03:08  the fix (9b90189a) under STOCK flags, DynamicVRAM on, bf16
+    encoder. SAME SHAPE AGAIN: `Model Flux2TEModel_ prepared for dynamic VRAM loading.
+    7671MB Staged` then `Requested to load Flux2 / 0 models unloaded / loaded partially;
+    0.00 MB usable`. Under DynamicVRAM the encoder's staged weights are not released by
+    dropping the pack's reference. Stopped at the first still.
+PROBE (in-process on the clean room's own portable python, 03:08)  Classic path (no
+    aimdo): after CLIPLoader + CLIPTextEncode the encoder held 5.6 GB (free 1297 MB);
+    `del clip; gc.collect(); soft_empty_cache()` released ALL of it (free 6966 MB,
+    current_loaded_models empty). Then the pack's Klein engine WITH the fix: at
+    "Requested to load Flux2" free=6966 MB, loaded=[] -> the DiT loaded 2592 MB resident;
+    a 2-step render took 17.7 s end to end. So the fix is correct and sufficient on the
+    classic path (`--disable-dynamic-vram`), which is also what ComfyUI < 0.3x and every
+    non-NVIDIA box run. Logs: `docs/2026-09-02-encoder-eviction/4060_probe_residency.log`
+    (classic) and `4060_probe_residency_aimdo.log` (DynamicVRAM).
+PROBE, DynamicVRAM (aimdo initialised in-process exactly as main.py does, pinned staging
+    on: `Model Flux2TEModel_ prepared for dynamic VRAM loading. 7671MB Staged`, 03:15)
+    After encode the encoder held 6.2 GB (free 620 MB). Dropping every reference + gc +
+    soft_empty_cache + cleanup_models + free_memory + unload_all_models: NOTHING released
+    (free stayed at ~640 MB; the registry was already empty -- the VBAR pages are an orphan
+    that only another DYNAMIC model's pressure reclaims, and the GGUF DiT is a classic
+    patcher). That drop-everything-first sequence was the FIRST aimdo run (03:11), whose
+    log was overwritten by the re-run that added the A1b line; the committed aimdo log
+    shows the same calls as no-ops AFTER A1b (free already 6998 MB), which is the same
+    fact from the other side.
+    `comfy.model_management.unload_model_and_clones(clip.patcher)` WHILE still registered:
+    free 620 MB -> 6998 MB. End to end, same probe, with a CRUDE all-registry eviction
+    (`free_memory(1e30)`) monkeypatched into the executor's drop step -- not the shipped
+    node-scoped form: `Requested to load Flux2` -> `loaded completely; 5578.68 MB usable,
+    2591.65 MB loaded`, 2 steps in 9.4 s (the server took ~4 min for the same two steps).
+    This is the root cause of Leg C / C2 / C3 and the likely root of R1's Z-Image abort.
+    Design arc + receipts: `docs/2026-09-02-encoder-eviction/` (the classic log there
+    predates the probe's A1b line and the Phase B patch; the aimdo log is the full run).
+    Shipped as `run_graph(..., evict_after_use={"clip"})` in the three image engines
+    (both arc seats APPROVE A2; classic patchers keep the reference drop by an
+    `is_dynamic()` gate). 5080 proof on that tree: sha256 identical in all three engines on
+    BOTH paths; classic peaks identical (7901/9015/9634 MiB) and warm times unchanged
+    within run-to-run noise; DynamicVRAM 13.8/4.8/12.1 s. Receipts
+    `legC/5080_probe_after2*.json` (`after2_classic` is the cold first-touch run,
+    `after2b_classic_warm` the warm re-measure).
+LEG C4  PENDING at the time of the push: the shipped evict_after_use code under STOCK flags
+    on the clean room (DynamicVRAM on, bf16 encoder). Pass condition verbatim from the
+    server log: `Requested to load Flux2` followed by `loaded completely; <nonzero> MB
+    usable, <nonzero> MB loaded, full load: True` (never `loaded partially; 0.00 MB
+    usable`), seconds per step, and MORE THAN ONE still minted in the same server process.
+    (result below, appended when the leg has run)
+LEG C5  only if C4 is still slow: the fp8 encoder (`qwen_3_4b_fp8_mixed.safetensors`,
     5.6 GB, staged in the clean room; the 4060 drill already used it for Z-Image) through
     the engine's `OTR_FLUX2_KLEIN_TE` knob in the server's launch environment
     (`_boot_klein_fp8.cmd`, task OTRCleanRoomServerFP8).

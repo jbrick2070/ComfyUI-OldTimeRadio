@@ -307,6 +307,73 @@ def _soft_free():
         pass
 
 
+def _evict_dropped_models(node_id, out_tuple):
+    """Unload every ComfyUI model a dropped node output carries, THROUGH ComfyUI's own
+    registry, while it is still registered (``comfy.model_management.
+    unload_model_and_clones``). This is the DynamicVRAM-safe eviction: under aimdo a
+    ``ModelPatcherDynamic`` keeps its weights in a VBAR owned by the nn.Module, and
+    dropping the pack's last reference only cleans the weakref out of
+    ``current_loaded_models`` -- the VBAR pages stay allocated until ANOTHER dynamic
+    model applies pressure. A classic (non-dynamic) diffusion model, e.g. a GGUF UNet
+    from ComfyUI-GGUF, never applies that pressure, so it is loaded with
+    ``0.00 MB usable`` and streamed from host RAM every step (4060 clean room,
+    2026-09-02: ~2 min per step, ~42 min per still). ``unload_model_and_clones`` runs
+    ``free_memory(1e30, device, keep_loaded=<every OTHER model>)`` -> ``model_unload``
+    -> ``detach(unpatch_weights=True)`` -> the dynamic patcher's ``unpatch_model`` ->
+    ``partially_unload`` -> ``vbar.free_memory`` (measured: free 620 MB -> 6998 MB on
+    the 8 GB card). Nothing else resident is touched. A no-op off the ComfyUI box.
+
+    Gated on ``patcher.is_dynamic()``: a CLASSIC patcher is released by the reference
+    drop alone (measured on the 8 GB card with aimdo off and on the 5080), and the
+    explicit unload would only add a device-to-host copy of the whole encoder
+    (``ModelPatcher.unpatch_model`` -> ``model.to(offload_device)``), so classic-path
+    boxes keep exactly the pre-existing behaviour. ``unload_model_and_clones`` is a
+    public but multigpu-scoped entry point (ComfyUI 0.34.0 / 0.34.2 proven); if a
+    future ComfyUI renames it the executor degrades to the reference drop with a LOUD
+    warning rather than failing the render. Returns the number of patchers unloaded."""
+    try:
+        import comfy.model_management as _mm
+    except Exception:  # noqa: BLE001 -- not inside ComfyUI -> nothing registered
+        return 0
+    unload = getattr(_mm, "unload_model_and_clones", None)
+    if not callable(unload):
+        _LOG.warning("[OTR graph-exec] evict_after_use %r: this ComfyUI has no "
+                     "comfy.model_management.unload_model_and_clones; falling back to "
+                     "the reference drop (a DynamicVRAM encoder may stay resident)", node_id)
+        return 0
+    unloaded = 0
+    for value in (out_tuple if isinstance(out_tuple, tuple) else (out_tuple,)):
+        patcher = value if callable(getattr(value, "detach", None)) and hasattr(value, "model") \
+            else getattr(value, "patcher", None)
+        if patcher is None or not callable(getattr(patcher, "detach", None)):
+            continue
+        is_dynamic = getattr(patcher, "is_dynamic", None)
+        if callable(is_dynamic) and not is_dynamic():
+            _LOG.info("[OTR graph-exec] evict_after_use %r: classic patcher %s -- the "
+                      "reference drop releases it; no explicit unload", node_id,
+                      type(getattr(patcher, "model", patcher)).__name__)
+            continue
+        if not callable(is_dynamic):
+            # A ComfyUI old enough to lack is_dynamic() (pre-DynamicVRAM) cannot have an
+            # orphaned VBAR, so the unload is a whole-encoder device-to-host copy it
+            # would not otherwise pay. Unload anyway (correct, never silent) rather than
+            # skip (which would reintroduce the 42-minute still on a box that needs it).
+            _LOG.warning("[OTR graph-exec] evict_after_use %r: patcher %s has no "
+                         "is_dynamic(); unloading unconditionally", node_id,
+                         type(getattr(patcher, "model", patcher)).__name__)
+        try:
+            unload(patcher)
+            unloaded += 1
+        except Exception as exc:  # noqa: BLE001 -- LOUD, never silent
+            _LOG.warning("[OTR graph-exec] evict_after_use %r: unload_model_and_clones "
+                         "raised %s: %s", node_id, type(exc).__name__, exc)
+    if unloaded:
+        _LOG.info("[OTR graph-exec] evict_after_use %r: unloaded %d dynamic model "
+                  "patcher(s) through comfy.model_management before the drop",
+                  node_id, unloaded)
+    return unloaded
+
+
 def _execution_shape(value):
     """JSON-safe tensor-shape tree for executor evidence, without torch.
 
@@ -392,7 +459,7 @@ def reclaim_idle_models(reason=""):
 
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
               keep=None, external_results=None, on_result=None,
-              audit_node_ids=None, execution_records=None):
+              audit_node_ids=None, execution_records=None, evict_after_use=None):
     """Execute a declarative node graph in dependency order; return the results.
 
     ``graph`` maps ``node_id -> {"class": <class|name>, "inputs": {name: literal |
@@ -410,6 +477,17 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
     the sampler instead of pinning the whole graph resident (the A-S7.5
     single-resident-engine VRAM ceiling). ``keep`` is the set of node ids never
     freed (the terminal + the MODEL nodes an engine retains for V-4 teardown).
+
+    ``evict_after_use`` names node ids (a text-encoder loader, typically ``"clip"``)
+    whose outputs, when ``free_after_use`` drops them, are first UNLOADED through
+    ComfyUI's registry (``_evict_dropped_models``) so the weights leave the GPU even
+    under DynamicVRAM, where a plain reference drop leaves an orphaned VBAR resident.
+    Explicit by node id, never by type: the Z-Image / Lumina ``sampling`` output is a
+    clone of the diffusion model and the VAE also carries a patcher, and neither must
+    be evicted mid-graph. Only DYNAMIC patchers are unloaded (``is_dynamic()``); a
+    classic patcher is released by the reference drop alone, so the classic path is
+    unchanged. Requires ``free_after_use``; every id must exist in the graph and must
+    not be in ``keep`` -- both are NAMED errors, not silent no-ops.
 
     ``external_results`` maps node id -> an ALREADY-PRODUCED output tuple the
     caller owns (a BeatSession's beat-scoped MODEL/CLIP/VAE handles). Those ids
@@ -450,6 +528,21 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
     keep = set(keep or ())
     if terminal is not None:
         keep.add(terminal)
+    evict = set(evict_after_use or ())
+    if evict:
+        if not free_after_use:
+            raise GraphExecutionError(
+                "evict_after_use=%r requires free_after_use=True -- eviction happens "
+                "at the drop, and nothing is dropped otherwise" % (sorted(evict),))
+        missing = sorted(n for n in evict if n not in graph)
+        if missing:
+            raise GraphExecutionError(
+                "evict_after_use names node(s) not in the graph: %r" % (missing,))
+        kept = sorted(evict & keep)
+        if kept:
+            raise GraphExecutionError(
+                "evict_after_use and keep both name %r -- a node cannot be evicted at "
+                "its drop and never dropped" % (kept,))
     ext = {}
     for nid, out in (external_results or {}).items():
         if nid in graph:
@@ -522,6 +615,8 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
             for s in node_srcs.get(nid, ()):
                 remaining[s] -= 1
                 if remaining[s] <= 0 and s not in keep and s in results:
+                    if s in evict:
+                        _evict_dropped_models(s, results[s])
                     del results[s]
                     did_free = True
             if did_free:

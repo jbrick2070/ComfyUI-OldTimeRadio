@@ -408,8 +408,13 @@ class Flux2KleinEngine:
             # "0.00 MB usable" (~2 min per step; 4060 clean room, 2026-09-02). The
             # MODEL node stays in ``keep`` so the patcher the sampler holds is never
             # dropped under it; the terminal is kept by run_graph itself.
+            # evict_after_use: under DynamicVRAM (ComfyUI 0.34 + comfy-aimdo) the
+            # reference drop alone leaves the encoder's VBAR resident (4060 clean
+            # room Leg C3, 2026-09-02), so the "clip" output is unloaded through
+            # ComfyUI's registry at its drop. Named by node id on purpose.
             images = _wb.run_graph(graph, classes, terminal=self._TERMINAL,
-                                   free_after_use=True, keep={"unet"})[0]
+                                   free_after_use=True, keep={"unet"},
+                                   evict_after_use={"clip"})[0]
             frames = _wb.images_to_uint8(images)          # (B,H,W,3) uint8
         finally:
             # Single-resident discipline: free the model so the next heavy engine

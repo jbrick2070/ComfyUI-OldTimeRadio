@@ -227,7 +227,8 @@ def test_klein_render_builds_flux2_graph(monkeypatch):
         captured["terminal"] = terminal
         # The text encoder must be droppable before the sampler (4060 clean room,
         # 2026-09-02: 0 MB usable for the DiT without it); the MODEL node is kept.
-        assert kwargs == {"free_after_use": True, "keep": {"unet"}}, kwargs
+        assert kwargs == {"free_after_use": True, "keep": {"unet"},
+                          "evict_after_use": {"clip"}}, kwargs
         return [object()]
 
     monkeypatch.setattr(wb, "resolve_graph_classes", lambda cands: {k: k for k in cands})
