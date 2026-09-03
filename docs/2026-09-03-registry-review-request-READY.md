@@ -85,6 +85,25 @@ working node pack.
 We are not asking for an exception to the rules. If any of these findings
 represents a real risk, we would rather change the code -- please tell us which.
 
+### There is precedent for exactly this, and we are asking for the same thing
+
+`comfyui-video-xy-plot` has four versions Active today (1.0.1, 1.0.2, 1.0.4,
+1.0.5). Their `status_reason` carries a `statusHistory` showing
+`NodeVersionStatusFlagged` followed by a review note:
+
+```json
+{"message": "subprocess: ffprobe", "by": "dr.lt.data@gmail.com", ...}
+```
+
+So a pack flagged for shelling out to ffprobe was reviewed by hand and
+activated, with the reason recorded on the version. That is the same finding
+class as our largest subprocess group and the same remedy we are asking for. We
+are not requesting a new policy or an exception — only the review that this
+process already provides.
+
+(Checked live on 2026-09-03 via
+`GET https://api.comfy.org/nodes/comfyui-video-xy-plot/versions?include_status_reason=true`.)
+
 ### Request
 
 Please review and activate `2.0.0-alpha.17`. If any finding above needs a code change or a
