@@ -77,15 +77,20 @@ def test_workflow_new_ports_episode_seed_unwired_v2ledger_to_castlock():
     # R0a appended out[5]=episode_seed + out[6]=v2_ledger_json, both unwired.
     # Wave 2b wired out[6] -> OTR_CastLock.script_json (the cast-lock ledger
     # authority); out[5] episode_seed stays unwired.
+    # CANONICAL REPLAY (campaign item 0, 2026-09-02): out[6] ALSO fans out to
+    # OTR_EpisodeAssembler.replay_descriptor on link 289, so node 7 can copy
+    # the frozen master on a replay. The CastLock link is unchanged (234).
     outs = _node62()["outputs"]
     assert outs[5]["name"] == "episode_seed" and outs[5]["links"] == []
     assert outs[6]["name"] == "v2_ledger_json"
     v2_links = outs[6]["links"] or []
-    assert len(v2_links) == 1
+    assert len(v2_links) == 2
     by_id = {n["id"]: n for n in WF["nodes"]}
     links_by_id = {lk[0]: lk for lk in WF["links"]}
-    dst = by_id[links_by_id[v2_links[0]][3]]
-    assert dst["type"] == "OTR_CastLock"
+    dst_types = {by_id[links_by_id[lid][3]]["type"] for lid in v2_links}
+    assert dst_types == {"OTR_CastLock", "OTR_EpisodeAssembler"}
+    assert by_id[links_by_id[234][3]]["type"] == "OTR_CastLock"
+    assert by_id[links_by_id[289][3]]["type"] == "OTR_EpisodeAssembler"
 
 
 if __name__ == "__main__":

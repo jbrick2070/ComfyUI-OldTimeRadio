@@ -121,7 +121,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # NOTE for whoever bumps this next -- retiring the global-counter line in
     # favour of the scoped assertions would be a deliberate contract change and
     # belongs in its own commit, not in passing.
-    assert wf["last_link_id"] == 288
+    # 289 since 2026-09-02: CANONICAL REPLAY (campaign item 0) appended link
+    # 289, node 62 v2_ledger_json -> node 7 replay_descriptor. Additive: every
+    # scoped assertion below still holds byte for byte.
+    assert wf["last_link_id"] == 289
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",

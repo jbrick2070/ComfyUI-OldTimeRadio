@@ -1082,6 +1082,36 @@ sweep releases the GPU, then item 2, the still-in lab peer -- registered only af
 `docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
 operator's standing rule for any new video pack requires.
 
+**Title-card leak, 2026-09-02 17:45 (operator: "your attempt at a video plan bled into my
+title").** The first three sweep legs were launched with `--title "Adapter <k> anime"` so the
+leg could be told apart in `otr/obs/`; that flag rides the writer's `episode_title` widget and
+so became the on-screen TITLE CARD of three published episodes (the known harness-label path,
+CLAUDE.md "fix the title at the source"). Standing rule from the operator, same minute: every
+canonical leg runs the CLEAN runner, title generated from the story (public_domain: the
+source's own title). Legs 4-8 run without `--title`; a leg is identified by its log, its
+publish timestamp and, now that item 0 is merged, durably by
+`meta.render_trace[*].sampler_inputs.adapter_strength`. The three already-published episodes
+stay in `otr/obs/` (nothing is ever tidied out of it). SOURCE FIX, still open: give the harness a
+`run_label` of its own that reaches the log and the ledger meta but never `episode_title` -- a
+small design item (touches the API runner, the whitelist and the mux's filename), arc before code.
+
+**Every style, not anime (operator, 2026-09-02 evening): "anime is not the only target; all
+visual styles need to craft the episode as well when selected."** The registry carries nine
+(`nodes/_otr_visual_styles.list_style_ids()`: anime, archival_documentary, cartoon,
+paper_origami, recur_frac, sci_fi_radio, shakespeare_stage_realism, storybook_engraving,
+video_art). The two-word-cue defect is style-blind, so every arm of this campaign -- the
+adapter sweep (already anime + storybook_engraving), the still-in lab peer, the pack language
+under the 77-token budget -- is designed and proven PER STYLE, with a non-anime style in every
+proof leg, and judged by one question: is the SELECTED style visibly the episode's style on the
+stills and the video alike.
+
+**First read of the sweep (operator, 2026-09-02 evening, on the three anime legs 1.0 / 0.5 /
+0.25):** "the anime looks improved; which one is better, not sure at the moment." He reviews
+the full candidate set when he is back; the driver's standing instruction meanwhile is "keep
+coding, do your best" and to decide whether a blinded A/B is needed. The instrument's
+render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
+attributable; the first three legs pre-date the merge and carry no trace.
+
 ## SECTION 6 -- Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite

@@ -499,6 +499,17 @@ test file touching a changed node module (284 files; the only failures left are 
 artefacts). The full suite and the Bible run in the main checkout after the merge, and the live
 proof (render, freeze, replay twice, verify) runs when the adapter sweep releases the GPU.
 
+**After the merge (main checkout, 969f2578 on v2.0-alpha, pushed 17:45 at the sweep's leg-3
+boundary):** the Bible regression is green (22 passed, 27 skipped, 3 xfailed); the full suite
+ran to completion with exactly four failures, all append canaries that pin what sits LAST on
+node 7 / node 62 / the link counter and fired, as designed, on the additive edit:
+`test_freeze_cascade_v2_ports` (v2_ledger_json now fans out to CastLock AND the assembler),
+`test_google_video_sfx_workflow` (`last_link_id` 288 -> 289), and two in `test_ltx25_foley_bed`
+(`video_policy_json` is second to last on the assembler, `replay_descriptor` last). The pins
+were moved with dated notes, re-run green (38 passed), and the full suite re-run on the fixed
+tree is the receipt recorded below when it lands. The three worktree-only artefacts of 13.4
+did not reproduce in the main checkout.
+
 ### 13.6 Finished-diff review
 
 Sonnet 5, one pass, scoped to the named functions of the diff (roster: Antigravity r1, Codex r2,

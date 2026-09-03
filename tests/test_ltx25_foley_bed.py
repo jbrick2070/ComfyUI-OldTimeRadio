@@ -485,8 +485,13 @@ def test_the_assembler_connector_is_APPENDED_and_defaults_to_the_old_path():
     """Absent / empty -> the historical behaviour, byte for byte. Every
     non-foley episode must be unaffected by this build."""
     optional = SEQ.EpisodeAssembler.INPUT_TYPES()["optional"]
-    assert list(optional)[-1] == "video_policy_json"
+    # 2026-09-02: CANONICAL REPLAY (campaign item 0) appended one more
+    # forceInput socket, replay_descriptor, AFTER this one -- the same
+    # append-only rule this test enforces, applied once more.
+    assert list(optional)[-2] == "video_policy_json"
+    assert list(optional)[-1] == "replay_descriptor"
     assert optional["video_policy_json"][1]["forceInput"] is True
+    assert optional["replay_descriptor"][1]["forceInput"] is True
     sig = inspect.signature(SEQ.EpisodeAssembler.assemble)
     assert sig.parameters["video_policy_json"].default == ""
 
@@ -515,7 +520,12 @@ def test_the_canonical_workflow_wires_all_three_new_links():
     assert (87, 85, slot(85, "video_policy_json")) in wired
     assert (92, 85, slot(85, "foley_receipts_json")) in wired
     # APPENDED, not inserted: each new input is the last on its node.
-    assert slot(7, "video_policy_json") == len(by_id[7]["inputs"]) - 1
+    # 2026-09-02: node 7 gained one more appended socket after this one,
+    # replay_descriptor (CANONICAL REPLAY, link 289 from node 62 output 6), so
+    # video_policy_json is now second to last there and the new one is last.
+    assert slot(7, "video_policy_json") == len(by_id[7]["inputs"]) - 2
+    assert slot(7, "replay_descriptor") == len(by_id[7]["inputs"]) - 1
+    assert (62, 7, slot(7, "replay_descriptor")) in wired
     assert slot(85, "foley_receipts_json") == len(by_id[85]["inputs"]) - 1
     # The retired connector is still fed, and still by link 278.
     assert any(l[0] == 278 and l[3] == 85 for l in doc["links"])
