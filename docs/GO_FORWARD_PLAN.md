@@ -1243,3 +1243,47 @@ publish to `otr/obs/` today, the last at 21:08.
 
 Whoever owns that window should read its own launcher output; from outside the process there
 is nothing further to learn.
+
+**ITEM 3 -- PROMPT v3 HALF A IS BUILT AND REVIEWED (2026-09-03, overnight).** The
+four-round arc closed CONVERGED and the code followed it: r1 Fable cold plus
+Antigravity, r2 Codex, r3 Cursor, r4 Sonnet, then a scoped finished-diff QA. Eight
+grounded reversals of the driver's own plan, of which three would have shipped a
+broken or pointless change:
+
+* **the coat is in the LEAF, not only in the motif** (r3) -- dropping the motif
+  alone would have changed the prompt and not the picture, and read as a null
+  result for the wrong reason;
+* **the mode law was never framing boilerplate** (r4) -- the comment above it
+  records 4-of-4 recognisable subjects with a concrete noun in the prompt and
+  0-of-4 without, so deleting it is only safe because the crux kernel is a total
+  ladder that can never come back empty;
+* **the seed is not derived from the prompt** (r2) -- `request_hash` mixes brief,
+  cast, beat and character, so the A/B is same-seed by construction and needs no
+  derivation machinery at all. The corollary trap: the crux must never be written
+  into `story_brief_terms`, which IS hashed.
+
+**What it composes:** pack cue, crux kernel (the episode's own `key_objects` in
+its own setting), the episode's light, a world motion, and a vantage mapped from
+the stored mode. It reads no `motif_cue`, no `drawable_beat` and no mode law, and
+it changes nothing the author stored -- so a frozen episode replays with a
+byte-identical seed and a different picture. Measured 32.9 tokens against v2's
+40.2, inside a 77-token window.
+
+**Proven on CPU:** the full suite (only the three known worktree artefacts, all
+94 of them green in the main checkout), 5,314 fuzz combinations over hostile
+ledger shapes, the real render path driven with four ledger variants, and 363
+targeted tests.
+
+**The GPU freeze lifts by its own terms** -- the prompting is fixed -- and the
+first run is ONE leg, not two: the published "The Faded Ledger" already IS the v2
+arm (same plan, same seeds, same engine), so only the v3 replay has to render.
+Bundle frozen and the runner dry-run clean. `otr_verify_replay --ab` asserts
+equal seeds and different prompt shas.
+
+**Half B remains open** and is where the operator's motion rule lands: the beat's
+own dialogue in front of the writer, `world/thing/hand` vocabulary, subject
+coverage. Half A buys the story's object, place and light on every beat; Half B
+buys its motion. Item 3b (the other lanes) is amended -- ADD a crux clause beside
+the appearance on silent image-to-video lanes, never drop the face on redundancy
+alone; `wan_ti2v`'s 83-word face inside a 100-word cap is the one place something
+must give.
