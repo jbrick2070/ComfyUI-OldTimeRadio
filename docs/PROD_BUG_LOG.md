@@ -10491,3 +10491,63 @@ fail, removing it makes it pass.
 contain only keys the new run actually re-stamps; test what SURVIVES a clone,
 not only what is cleared, or a required receipt goes missing at the last step of
 a long job." Verify condition is automatable (the new test is the pattern).
+
+---
+
+## PBUG-20260903-02 -- a replay published a green, broken episode: one second of picture
+
+**Status:** FIXED 2026-09-03. **Verified by:** a live leg and the published file.
+
+**What happened.** After PBUG-20260903-01 was fixed, the replay ran clean to the
+end: eight clips, `obs_publish OK`, and an episode in `otr/obs/`. The file is
+broken. Measured:
+
+| stage | v2 arm | v3 replay |
+|---|---|---|
+| `_silent.mp4` (the render) | 160.3 MB / 85.7s | 153.9 MB / 85.7s |
+| `_silent_procgen_blended.mp4` | 156.5 MB / 85.7s | **1.5 MB / 1.0s** |
+| published final | 145.4 MB / 107.0s | 7.9 MB / 85.7s |
+
+The clips were fine. The **procgen blend truncated the episode to one second of
+picture**, and everything downstream inherited it. It published green.
+
+**Root cause, and it was ours.** `SceneSequencer.sequence` returned
+`torch.zeros(1, 2, 48000)` on a replay -- one second of silence -- described in
+its own comment as a "DSP-safe placeholder", on the reasoning that no mix is
+built because node 7 copies the frozen master onto disk. That reasoning missed a
+consumer that measures the WIRE rather than the file: the procgen visualizer
+computes `duration = len(audio_np) / sr` and renders one frame per audio frame
+(`nodes/video_engine.py:1783-1785`). One second of wire, one second of overlay,
+and `PostUpscaleProcgenBlend` takes the shorter input.
+
+**The fix.** The pass-through now passes the real audio through, which is what
+the name always claimed: `_replay_master_audio` reads the frozen master named by
+`meta.replay_from` + `meta.replay_master_audio` and returns its samples, so every
+downstream consumer sees exactly what a normal run sees, because it IS what the
+normal run produced. It degrades loudly and in order -- silence of the master's
+true LENGTH read from the WAV header, then the old one-second batch -- and names
+the fallback in the leg log.
+
+**Why the unit tests missed it, and this is the sharp part.**
+`test_voices_music_and_sequencer_pass_through_on_replay` asserted
+`audio["waveform"].shape == (1, 2, 48000)`. **The test encoded the bug**: it
+pinned the placeholder's length as the contract. And the fixture's master was
+`b"RIFF frozen master " * 50`, a byte blob no WAV reader can open, so even a
+correct implementation would have fallen back and passed.
+
+**Coverage.** The fixture now writes a REAL 3-second 16-bit stereo WAV, the
+pass-through assertion follows the master's length, and two new tests pin the
+property that matters -- the wire is longer than a placeholder, and every
+degenerate meta degrades without raising.
+
+**The lesson, and it is bigger than this bug.** Both replay defects found on the
+first live leg are the same shape: *a replay skips a stage, and something
+downstream still needs what that stage produced.* One was a receipt
+(`image_engines`), one was a waveform. Neither is visible to a unit test that
+asserts the skip happened. **A pass-through must pass the real thing through,
+and a "placeholder" is a promise to break something later.**
+
+**Bug Bible:** candidate -- "when a replay/short-circuit path emits a placeholder
+for a typed wire, give it the REAL value or at minimum the real DIMENSIONS;
+downstream consumers measure the wire, not the file, and a length-shaped
+placeholder silently truncates the product." Verify condition is automatable.

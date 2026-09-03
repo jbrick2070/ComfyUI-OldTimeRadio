@@ -39,7 +39,18 @@ def _make_episode(root: Path, ep_id="signal_lost_frozen_20260902_000000", with_p
     (ep / "portraits").mkdir()
     still = ep / "stills" / "scene_b001.png"; still.write_bytes(b"\x89PNG still bytes")
     portrait = ep / "portraits" / "c02.png"; portrait.write_bytes(b"\x89PNG portrait")
-    master = ep / "audio" / (ep_id + "_master.wav"); master.write_bytes(b"RIFF frozen master " * 50)
+    # A REAL 3-second 16-bit stereo WAV, not a byte blob. The sequencer's replay
+    # pass-through reads this file and hands its samples to the whole downstream
+    # chain, and the procgen visualizer renders one frame per audio frame -- so
+    # a fixture that is not openable by `wave` would silently exercise only the
+    # fallback and PBUG-20260903-02 would pass unnoticed here.
+    master = ep / "audio" / (ep_id + "_master.wav")
+    import wave as _wave
+    with _wave.open(str(master), "wb") as _fh:
+        _fh.setnchannels(2)
+        _fh.setsampwidth(2)
+        _fh.setframerate(48000)
+        _fh.writeframes(b"\x00\x10" * 2 * 48000 * 3)
     ledger = {
         "schema_version": "l4-2026-08-07", "episode_id": ep_id, "commit": "abc",
         "total_episode_dur_s": 90.0,
@@ -206,6 +217,45 @@ def test_the_replay_keeps_every_receipt_the_credits_roll_requires(frozen):
         assert key not in meta, key
 
 
+def test_the_replay_passes_the_REAL_master_through_not_a_short_placeholder(frozen):
+    """PBUG-20260903-02: a one-second placeholder truncated the whole episode.
+
+    The sequencer's replay branch returned one second of silence, on the
+    reasoning that no mix is built when node 7 copies the frozen master. One
+    consumer measures THIS wire rather than the file: the procgen visualizer
+    renders `len(audio) / sample_rate` frames, so it produced a 1.00s overlay
+    and `PostUpscaleProcgenBlend` cut an 85.7s episode down to one second of
+    picture. It published green -- `obs_publish OK` -- and the episode was
+    broken.
+
+    The property that matters is the LENGTH, so that is what this asserts.
+    """
+    from nodes.scene_sequencer import _replay_master_audio
+
+    led = PL.import_replay_bundle(str(frozen["bundle"]))
+    meta = led.data["meta"]
+    out, note = _replay_master_audio(meta)
+    seconds = out["waveform"].shape[-1] / out["sample_rate"]
+    assert seconds > 1.5, (
+        "the replay wire is %.2fs -- anything that measures duration from it "
+        "(the procgen visualizer, the blend) will truncate the episode: %s"
+        % (seconds, note))
+    assert out["waveform"].dim() == 3 and out["waveform"].shape[1] == 2
+
+
+@pytest.mark.parametrize("meta", [
+    None, {}, {"replay_from": "/nope"},
+    {"replay_from": "/nope", "replay_master_audio": "audio/missing.wav"},
+])
+def test_the_master_passthrough_degrades_safely_and_never_raises(meta):
+    """A missing or unreadable master costs the LENGTH, never the run."""
+    from nodes.scene_sequencer import _replay_master_audio
+
+    out, note = _replay_master_audio(meta)
+    assert out["waveform"].dim() == 3 and out["sample_rate"] > 0
+    assert "fallback" in note
+
+
 def test_two_imports_get_two_workspaces(frozen):
     a = PL.import_replay_bundle(str(frozen["bundle"]))
     a_id, a_ws = a.data["episode_id"], a.data["meta"]["replay_workspace_id"]
@@ -283,7 +333,14 @@ def test_voices_music_and_sequencer_pass_through_on_replay(frozen):
     cue_audio, manifest, log_, done = StableAudioTheme().generate(sj, "stable_audio_3", ledger_json=sj)
     assert done == "replay:passthrough" and manifest == ""
     audio, log_ = SceneSequencer().sequence(sj)
-    assert audio["sample_rate"] == 48000 and audio["waveform"].shape == (1, 2, 48000)
+    # THE SEQUENCER PASSES THE FROZEN MASTER, NOT A ONE-SECOND STUB. This line
+    # used to assert `(1, 2, 48000)` -- exactly one second -- which is the
+    # contract that shipped PBUG-20260903-02: the procgen visualizer renders one
+    # frame per audio frame off this wire, so a one-second batch cut the whole
+    # published episode down to one second of picture. The fixture's master is
+    # three seconds, so the shape follows it.
+    assert audio["sample_rate"] == 48000
+    assert audio["waveform"].shape == (1, 2, 48000 * 3)
     assert audio["waveform"].device.type == "cpu"
     assert "replay" in log_
 

@@ -38,6 +38,91 @@ from .story_orchestrator import _runtime_log
 log = logging.getLogger("OTR")
 
 
+def _replay_master_audio(meta):
+    """The frozen master, as an AUDIO batch, for a canonical replay.
+
+    PBUG-20260903-02. This used to return one second of silence -- a "DSP-safe
+    placeholder", on the reasoning that no mix is built on a replay because node
+    7 copies the frozen master onto disk. That reasoning missed a consumer:
+    the procgen visualizer renders ``len(audio) / sample_rate`` frames from THIS
+    wire, so it made a 1.00-second overlay, and `PostUpscaleProcgenBlend` then
+    truncated an 85.7-second episode to one second of picture. It published
+    green, with `obs_publish OK`, and the operator would have opened a broken
+    episode.
+
+    So the pass-through passes the REAL AUDIO through, which is what the name
+    always claimed. Every downstream consumer -- the enhance chain, the
+    visualizer, anything that measures duration -- then sees exactly what a
+    normal run sees, because it IS what a normal run produced.
+
+    Falls back, loudly and in this order: silence of the master's true LENGTH
+    (read from the WAV header, which costs nothing and keeps every duration
+    correct even if the samples cannot be read), then the old one-second batch.
+    A fallback is named in the returned note so the leg log says which ran.
+    """
+    import torch as _torch
+
+    def _silence(seconds, rate=48000):
+        n = max(int(round(float(seconds) * rate)), 1)
+        return {"waveform": _torch.zeros(1, 2, n, dtype=_torch.float32),
+                "sample_rate": rate}
+
+    bundle = str((meta or {}).get("replay_from") or "").strip()
+    rel = str((meta or {}).get("replay_master_audio") or "").strip()
+    if not bundle or not rel:
+        log.warning("[SceneSequencer] REPLAY: the meta names no master audio "
+                    "(replay_from=%r, replay_master_audio=%r); falling back to "
+                    "a one-second batch, which will shorten anything that "
+                    "measures this wire", bundle, rel)
+        return _silence(1.0), "no master named; 1s fallback"
+
+    path = os.path.join(bundle, *rel.split("/"))
+    if not os.path.isfile(path):
+        log.warning("[SceneSequencer] REPLAY: frozen master not found at %s; "
+                    "falling back to a one-second batch", path)
+        return _silence(1.0), "master missing; 1s fallback"
+
+    import wave as _wave
+    try:
+        with _wave.open(path, "rb") as fh:
+            channels = fh.getnchannels()
+            width = fh.getsampwidth()
+            rate = fh.getframerate()
+            frames = fh.getnframes()
+            raw = fh.readframes(frames)
+    except Exception as exc:  # noqa: BLE001 -- an unreadable master is not fatal
+        log.warning("[SceneSequencer] REPLAY: cannot read the frozen master "
+                    "%s (%s); falling back to a one-second batch", path, exc)
+        return _silence(1.0), "master unreadable; 1s fallback"
+
+    seconds = (float(frames) / float(rate)) if rate else 0.0
+    if width != 2:
+        # 16-bit PCM is what the mix writes. Anything else keeps the LENGTH,
+        # which is the property the visualizer and the blend actually depend on.
+        log.warning("[SceneSequencer] REPLAY: frozen master is %d-bit, not 16; "
+                    "passing silence of its true length (%.2fs) instead",
+                    width * 8, seconds)
+        return _silence(seconds, rate), "%.2fs silence (unsupported %d-bit)" % (
+            seconds, width * 8)
+
+    import numpy as _np
+    samples = _np.frombuffer(raw, dtype=_np.int16).astype(_np.float32) / 32768.0
+    if channels > 1:
+        usable = (samples.size // channels) * channels
+        samples = samples[:usable].reshape(-1, channels).T
+    else:
+        samples = _np.stack([samples, samples])
+    if samples.shape[0] == 1:
+        samples = _np.repeat(samples, 2, axis=0)
+    elif samples.shape[0] > 2:
+        samples = samples[:2]
+    wave_t = _torch.from_numpy(_np.ascontiguousarray(samples)).unsqueeze(0)
+    log.info("[SceneSequencer] REPLAY: frozen master passed through "
+             "(%.2fs, %d ch, %d Hz) from %s", seconds, channels, rate, path)
+    return ({"waveform": wave_t.to(_torch.float32), "sample_rate": rate},
+            "frozen master %.2fs @ %dHz" % (seconds, rate))
+
+
 def _sha256_file(path, *, chunk_bytes: int = 1024 * 1024) -> str:
     """Return a streaming SHA-256 for an on-disk asset.
 
@@ -771,12 +856,9 @@ class SceneSequencer:
         except (ValueError, TypeError, ImportError):
             _rmeta = {}
         if _rmeta and _replay_descriptor(_rmeta):
-            import torch as _torch
-            _runtime_log("SceneSequencer: REPLAY pass-through (frozen master); "
-                         "emitting a silent placeholder for the enhance stage")
-            return ({"waveform": _torch.zeros(1, 2, 48000, dtype=_torch.float32),
-                     "sample_rate": 48000},
-                    "replay: pass-through (frozen master)")
+            wave_out, note = _replay_master_audio(_rmeta)
+            _runtime_log("SceneSequencer: REPLAY pass-through -- %s" % note)
+            return (wave_out, "replay: pass-through (%s)" % note)
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         # Schema l3 (2026-04-28): track wall-clock for meta.phase_ms.scene_sequencer.
