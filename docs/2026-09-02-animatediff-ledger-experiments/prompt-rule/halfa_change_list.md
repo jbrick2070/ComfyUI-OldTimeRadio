@@ -136,3 +136,44 @@ brief schema, `crux_subject`, and any deletion of the v2 author constants.
    control.
 4. Arm 1: replay the same bundle on v3. `otr_verify_replay --ab`.
 5. Publish both to `otr/obs/`. His eye decides.
+
+---
+
+## AS BUILT (2026-09-03, after the QA pass)
+
+Four things came out differently from the plan above, and all four were found by
+running the code rather than by reading it.
+
+**1. The bookends keep the radio, and the plan had lost it.** The first build
+gave the announcer and music beds a `key_objects` subject like every other beat,
+so "The Faded Ledger" opened on handwritten ledgers and the programme's own radio
+disappeared. That contradicts the operator's rule 6 -- *"radio objects stay on the
+announcer and music beds, but placed in the setting"* -- so `resolve_crux_kernel`
+now takes the SUBJECT from `GHOST_BOOKEND_MOTIFS` on a non-character role and the
+PLACE from the episode: *"a bakelite radio set in the high-security archive"*.
+`kernel_source` reports `bookend_radio` for it.
+
+**2. The odometer, not modulo on both wheels.** Cycling the object and the place
+on the same index makes the pair repeat every `len(objects)` beats -- four
+objects and four settings produced seven byte-identical kernels in a 29-beat
+episode. The place now advances only when the object wraps, and the light sits on
+a wheel slower still, so one episode reads as one place.
+
+**3. The world-motion pool is stateless and ordinal-keyed.** The plan had a
+collision-probing walk over a set of already-used clauses, which cannot work: the
+driver builds each clip's request independently and shares no per-episode state.
+A hashed start plus the beat ordinal gives every beat in a bucket a different
+clause outright.
+
+**4. The light slot is dropped on `signal` mode.** That vantage already says
+"lit against the dark, the light moving", and composing the pack's own lighting
+term beside it produced two contradictory lighting statements on the same beat.
+
+**And one thing the plan did not anticipate at all:** the drop receipt has to
+skip units that were never present, or an over-budget `signal` beat publishes
+that it dropped a light clause it never had. `dropped` is therefore a
+SUBSEQUENCE of `GHOST_V3_DROP_ORDER`, not a prefix.
+
+**Still true from the plan:** no ledger field added, no author output changed, no
+LLM, no bundle flag, no plate change, no other-lane change, no workflow change,
+and the v2 constants all still standing for the author-time admission path.
