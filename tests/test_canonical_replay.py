@@ -243,6 +243,37 @@ def test_the_replay_passes_the_REAL_master_through_not_a_short_placeholder(froze
     assert out["waveform"].dim() == 3 and out["waveform"].shape[1] == 2
 
 
+def test_the_wav_reader_does_not_need_torchaudio(frozen, monkeypatch):
+    """PBUG-20260903-03: the assembler's torchaudio load ALWAYS raises here.
+
+    `torchaudio.load` on this stack raises `ImportError: TorchCodec is required
+    for load_with_torchcodec` -- torchaudio 2.10 moved decoding to torchcodec,
+    which is not installed. The assembler wrapped it in a bare
+    `except Exception` that fell through to one second of silence, so every
+    replay handed the video node a one-second wire and the published episode
+    came out with one second of picture.
+
+    The stdlib reader is the one that has to work, so this asserts it directly
+    with torchaudio made unavailable.
+    """
+    import builtins
+    from nodes.scene_sequencer import wav_file_as_audio
+
+    real_import = builtins.__import__
+
+    def _no_torchaudio(name, *a, **k):
+        if name == "torchaudio":
+            raise ImportError("TorchCodec is required for load_with_torchcodec")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", _no_torchaudio)
+    master = frozen["ep"] / "audio" / (frozen["ep"].name + "_master.wav")
+    audio, note = wav_file_as_audio(str(master))
+    seconds = audio["waveform"].shape[-1] / audio["sample_rate"]
+    assert abs(seconds - 3.0) < 0.01, note
+    assert audio["waveform"].shape[1] == 2
+
+
 @pytest.mark.parametrize("meta", [
     None, {}, {"replay_from": "/nope"},
     {"replay_from": "/nope", "replay_master_audio": "audio/missing.wav"},

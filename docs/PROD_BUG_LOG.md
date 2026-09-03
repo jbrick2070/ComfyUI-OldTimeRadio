@@ -10551,3 +10551,62 @@ and a "placeholder" is a promise to break something later.**
 for a typed wire, give it the REAL value or at minimum the real DIMENSIONS;
 downstream consumers measure the wire, not the file, and a length-shaped
 placeholder silently truncates the product." Verify condition is automatable.
+
+---
+
+## PBUG-20260903-03 -- the same truncation, one node further down: torchaudio always raises
+
+**Status:** FIXED 2026-09-03. **Verified by:** a live leg, and by reproducing the
+import failure directly.
+
+**What happened.** After PBUG-20260903-02 the sequencer passed the real 85.66s
+master (`REPLAY: frozen master passed through (85.66s, 2 ch, 48000 Hz)` in the
+leg log) -- and the next replay STILL published one second of picture. The video
+node's own line said why: `[Video] Starting render: 1.0s audio -> 25 frames`.
+
+**Root cause.** The wire that reaches the procgen visualizer comes from
+`OTR_EpisodeAssembler`, not the sequencer, and its replay branch read:
+
+```
+try:
+    import torchaudio as _ta
+    wave, sr = _ta.load(_master_wav)
+    ...
+except Exception:   # the file is the deliverable; the tensor is a courtesy
+    episode_audio = {"waveform": torch.zeros(1, 2, 48000), "sample_rate": 48000}
+```
+
+On this stack that load **always** raises:
+
+```
+ImportError: TorchCodec is required for load_with_torchcodec.
+Please install torchcodec to use this function.
+```
+
+torchaudio 2.10 moved decoding to torchcodec, which is not installed. The bare
+`except Exception` swallowed it with no log line at all, so the leg log showed
+nothing between a healthy sequencer and a one-second render.
+
+**And the comment was the bug.** "the tensor is a courtesy" -- it is not. The
+procgen visualizer measures that tensor and renders one frame per audio frame.
+
+**The fix.** A stdlib WAV reader (`wave` + numpy) shared by both replay sites.
+torchaudio is still tried first because it is cheaper when it works; the stdlib
+reader is the fallback that actually runs here; and a total failure now logs at
+ERROR naming the consequence instead of silently shortening the episode.
+
+**Coverage.** `test_the_wav_reader_does_not_need_torchaudio` asserts the stdlib
+path with torchaudio forced to raise, and the fixture's master is a real WAV so
+the assertion is about samples rather than about a fallback.
+
+**The pattern, third time tonight.** All three of the night's replay defects are
+one shape: *a replay skips a stage, and something downstream still needs what
+that stage produced.* A missing receipt refused loudly and cost sixteen minutes;
+two placeholder wires published green and cost an episode each. **A bare
+`except Exception` around an optional dependency turns a missing library into a
+silently wrong product.**
+
+**Bug Bible:** candidate -- "never let a fallback change a DIMENSION downstream
+consumers measure (length, count, resolution) without logging at ERROR; and
+never wrap an optional-dependency import in a bare except that yields a
+differently-shaped value."

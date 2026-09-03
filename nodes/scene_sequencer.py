@@ -82,30 +82,50 @@ def _replay_master_audio(meta):
                     "falling back to a one-second batch", path)
         return _silence(1.0), "master missing; 1s fallback"
 
-    import wave as _wave
     try:
-        with _wave.open(path, "rb") as fh:
-            channels = fh.getnchannels()
-            width = fh.getsampwidth()
-            rate = fh.getframerate()
-            frames = fh.getnframes()
-            raw = fh.readframes(frames)
+        audio, note = wav_file_as_audio(path)
     except Exception as exc:  # noqa: BLE001 -- an unreadable master is not fatal
         log.warning("[SceneSequencer] REPLAY: cannot read the frozen master "
                     "%s (%s); falling back to a one-second batch", path, exc)
         return _silence(1.0), "master unreadable; 1s fallback"
+    log.info("[SceneSequencer] REPLAY: %s from %s", note, path)
+    return audio, note
+
+
+def wav_file_as_audio(path):
+    """A 16-bit PCM WAV on disk as a ComfyUI AUDIO batch. Stdlib only.
+
+    NOT torchaudio, and that is the point (PBUG-20260903-03). On this stack
+    `torchaudio.load` raises `ImportError: TorchCodec is required for
+    load_with_torchcodec` -- torchaudio 2.10 moved decoding to torchcodec, which
+    is not installed -- so every caller that wrapped it in a bare
+    ``except Exception`` fell through to a placeholder without saying so.
+
+    Returns ``(audio_dict, note)``. Raises only on a genuinely unreadable file;
+    an unsupported sample width returns silence of the file's TRUE LENGTH,
+    because length is the property downstream consumers actually measure.
+    """
+    import wave as _wave
+    import numpy as _np
+    import torch as _torch
+
+    with _wave.open(str(path), "rb") as fh:
+        channels = fh.getnchannels()
+        width = fh.getsampwidth()
+        rate = fh.getframerate()
+        frames = fh.getnframes()
+        raw = fh.readframes(frames)
 
     seconds = (float(frames) / float(rate)) if rate else 0.0
     if width != 2:
-        # 16-bit PCM is what the mix writes. Anything else keeps the LENGTH,
-        # which is the property the visualizer and the blend actually depend on.
-        log.warning("[SceneSequencer] REPLAY: frozen master is %d-bit, not 16; "
-                    "passing silence of its true length (%.2fs) instead",
-                    width * 8, seconds)
-        return _silence(seconds, rate), "%.2fs silence (unsupported %d-bit)" % (
-            seconds, width * 8)
+        log.warning("[OTR] %s is %d-bit, not 16; using silence of its true "
+                    "length (%.2fs) so nothing downstream is truncated",
+                    path, width * 8, seconds)
+        n = max(int(round(seconds * (rate or 48000))), 1)
+        return ({"waveform": _torch.zeros(1, 2, n, dtype=_torch.float32),
+                 "sample_rate": rate or 48000},
+                "%.2fs silence (unsupported %d-bit)" % (seconds, width * 8))
 
-    import numpy as _np
     samples = _np.frombuffer(raw, dtype=_np.int16).astype(_np.float32) / 32768.0
     if channels > 1:
         usable = (samples.size // channels) * channels
@@ -117,10 +137,8 @@ def _replay_master_audio(meta):
     elif samples.shape[0] > 2:
         samples = samples[:2]
     wave_t = _torch.from_numpy(_np.ascontiguousarray(samples)).unsqueeze(0)
-    log.info("[SceneSequencer] REPLAY: frozen master passed through "
-             "(%.2fs, %d ch, %d Hz) from %s", seconds, channels, rate, path)
     return ({"waveform": wave_t.to(_torch.float32), "sample_rate": rate},
-            "frozen master %.2fs @ %dHz" % (seconds, rate))
+            "frozen master %.2fs @ %dHz, %d ch" % (seconds, rate, channels))
 
 
 def _sha256_file(path, *, chunk_bytes: int = 1024 * 1024) -> str:
@@ -1307,13 +1325,39 @@ class EpisodeAssembler:
         saved = led.save()
         if saved is None:
             raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: ledger did not save after the master copy")
+        # PBUG-20260903-03. This read `torchaudio.load` inside a bare
+        # `except Exception` that fell through to ONE SECOND of silence -- and
+        # on this stack the load always raises (`TorchCodec is required for
+        # load_with_torchcodec`; torchaudio 2.10 moved decoding to torchcodec,
+        # which is not installed). So every replay handed the video node a
+        # one-second wire, the procgen visualizer rendered one frame per audio
+        # frame, and the blend truncated the published episode to one second of
+        # picture. It said `obs_publish OK` on the way out.
+        #
+        # The tensor is NOT "a courtesy": the procgen measures it. So the WAV is
+        # read with the stdlib, torchaudio is tried first only because it is
+        # cheaper when it works, and a fallback is LOUD.
+        episode_audio = None
         try:
             import torchaudio as _ta
             wave, sr = _ta.load(_master_wav)
             episode_audio = {"waveform": wave.unsqueeze(0), "sample_rate": int(sr)}
-        except Exception:  # noqa: BLE001 -- the file is the deliverable; the tensor is a courtesy
-            import torch as _torch
-            episode_audio = {"waveform": _torch.zeros(1, 2, 48000), "sample_rate": 48000}
+        except Exception as _ta_exc:  # noqa: BLE001
+            try:
+                episode_audio, _note = wav_file_as_audio(_master_wav)
+                log.info("[OTR_EpisodeAssembler] REPLAY: master read with the "
+                         "stdlib reader (%s); torchaudio said: %s",
+                         _note, _ta_exc)
+            except Exception as _wav_exc:  # noqa: BLE001
+                import torch as _torch
+                log.error("[OTR_EpisodeAssembler] REPLAY: the master could not "
+                          "be read by torchaudio (%s) OR the stdlib reader "
+                          "(%s). Emitting a one-second batch -- anything that "
+                          "measures this wire, the procgen visualizer above "
+                          "all, will truncate the episode.",
+                          _ta_exc, _wav_exc)
+                episode_audio = {"waveform": _torch.zeros(1, 2, 48000),
+                                 "sample_rate": 48000}
         info = json.dumps({"episode_id": _ep_id, "replay_of_episode": meta.get("replay_of_episode"),
                            "master_sha256": want, "title": str(episode_title or "")})
         log.warning("[OTR_EpisodeAssembler] REPLAY: frozen master copied and verified -> %s",
