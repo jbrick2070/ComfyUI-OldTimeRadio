@@ -10707,3 +10707,86 @@ server, grep for its clients.* A bundling change that is correct about the file
 it names can still orphan a file it does not name, and neither a test suite nor
 an import graph sees it, because the coupling is an HTTP route rather than an
 import.
+
+---
+
+## PBUG-20260903-06 -- two thirds of an episode rendered with no motion prompt at all, because a live engine was missing from a hardcoded allowlist
+
+**Status:** DIAGNOSED and GATED 2026-09-03; the prompt fix itself is OWED (see
+below -- it is deliberately not the obvious one-liner). **Verified by:** the
+published episode `signal_lost_whispers_in_the_park_20260903_101222`
+(`otr/obs/`, 11:14) and its own ledger.
+
+**What the operator saw.** *"Way too bland for video, announcer and music had
+basically no movement, and character movement was ok but buggy and
+constrained."*
+
+**What the ledger says.** Every announcer and music beat carries, byte-identical:
+
+```
+engine_id   : wan_ti2v
+text_prompt : a 1940s radio studio, on air sign illuminated, period broadcast set
+creative    : {}
+```
+
+That is `build_request`'s hardcoded seed (`render_driver.py:532`). No motion
+clause, no style -- the episode's style was `cartoon` and the prompt never says
+so -- and `_stamp_prompt_meta` never runs, so `observability` stays `{}`.
+
+**IT IS NOT "FOUR OF EIGHT BEATS". IT IS 65.6% OF THE RUNTIME.** Measured from
+the render trace's frame counts: the four bookends are 250 + 455 + 165 + 200 =
+**1,070 of the episode's 1,630 frames**. The character beats -- the ones that DID
+get authored prompts -- are 22.4 s of a 65.2 s episode. The static-prompt beats
+are the majority of what he watched, which is why "bland" was the whole-episode
+verdict rather than a note about the bookends.
+
+**Root cause.** The scene-prompt branch that hands a beat the style pack's
+kinetic motion register is gated on a hardcoded engine-id tuple. That tuple
+contained `wan_i2v` -- RETIRED, absent from the registry, unable to match any
+shot -- while `wan_ti2v`, its live 2026-08-26 replacement and three of the
+sixteen rotation lanes, was never added. `fastwan_8gb`, `ltx_8gb`,
+`minimax_h3_video` and `minimax_h3_audio_in` are absent too.
+
+**THE SAME BUG WAS FIXED ONCE BEFORE, FOR TWO ENGINES, AND NOT GENERALISED.**
+The comment under that tuple describes the failure verbatim for the LTX 2.5
+lanes added 2026-08-26: *"Omitted, they matched no branch at all ... so the beat
+shipped `build_request`'s hardcoded 'a 1940s radio studio' default with
+`prompt_source` never stamped."* Written a week before this episode.
+
+**Why the fix is NOT to add the missing ids to that tuple.** The branch passes
+the pack's motion register through UNCHANGED, and those registers are authored
+as five sentences -- a framing constraint, three subject motions and a camera
+move. `wan_ti2v` runs at **cfg 5.0, the highest guidance in the stack**, and its
+own directive asks for *"one subject, one action, one speed. Do not restate the
+set"* because *"each modifier is honoured"*. Handing it the LTX register would
+trade no motion for five competing instructions at maximum adherence. Caught in
+review before it shipped. `fastwan_8gb` needs a different shape again -- it runs
+cfg 1.0, where the negative is inert and its directive is the opposite: state
+everything positively, keep it short.
+
+**What shipped instead of a wrong fix.** The tuple became four NAMED, disjoint
+sets whose union must cover the registry or the suite fails
+(`tests/test_bookend_scene_prompt_roster.py`): engines that compose the prompt,
+engines that compose their own, engines whose motion is not text-driven, and
+KNOWN-RED debts that must each state what is owed. Per the operator's ruling the
+same day -- *"we test all engines and lanes; if one doesn't work we fix it or rip
+it, not hide it"* -- the affected engines are recorded as debts with named
+profiles and statuses, not as blessed exemptions. A dead id in any set now fails
+a test; that is what would have caught this a week ago.
+
+**Still owed:** an engine-appropriate bookend formatter per lane, which lands
+behind the stored-not-wired gate on the per-engine style overlays (a 2026-08-17
+decision, enforced by `tests/test_prompt_style_directives.py`, gated on
+`scripts/otr_talking_radio_probe_eval.py` at a fixed seed).
+
+**Also found, unfixed here:** `build_actual_receipt` never persists
+`observability.prompt_source` into the durable per-clip receipt (only
+`prompt_sha8`), so this exact regression class -- an engine quietly falling
+through to a static default -- is invisible to ledger inspection. It has to be
+found by grepping render-trace text by hand, which is how it was found.
+
+**Bug Bible:** candidate. The portable rule is about the SHAPE of the gate, not
+this engine: *a hardcoded allowlist that decides behaviour by identity will go
+stale silently, and the staleness is invisible precisely because the omitted
+member still renders successfully.* The corollary is the test that makes the
+union of decisions cover the registry.

@@ -11,6 +11,8 @@ make that safe:
 * the fitter drops WHOLE units and never slices a subject;
 * the world-motion pool does not repeat inside a real episode.
 """
+import re
+
 import pytest
 
 from nodes._otr_video_engines import ghost_signal_author as gsa
@@ -607,3 +609,108 @@ def test_the_lighting_term_is_spoken_like_the_setting_and_the_objects():
             ledger_meta=meta, ordinal=0)
         assert "_" not in out["positive"], (style_id, out["positive"])
         assert "storm light" in out["positive"], style_id
+
+
+# ---------------------------------------------------------------------------
+# THE BOOKENDS GET THE PACK'S OWN KINETIC DIRECTION (operator report 2026-09-03)
+#
+# He watched a published episode and said the announcer and music beats "had
+# basically no movement". They were composing from GHOST_WORLD_MOTION_V3, whose
+# clauses are atmospheric by design ("cooling into shadow"), while every style
+# pack had already authored a kinetic register for exactly those four roles,
+# ending in a camera move -- which the live v3 path never read.
+# ---------------------------------------------------------------------------
+
+def test_a_bookend_prefers_the_packs_kinetic_register_over_the_generic_pool():
+    style = _style_obj("storybook_engraving")
+    pack = _vs.bounded_motion_register(
+        dict(style.motion_registers)["announcer"])
+    assert pack, "the pack authored an announcer register"
+
+    generic = gsa.finalize_ghost_prompt_v3(
+        role="announcer_visual", style=style, mode="object",
+        ledger_meta=REAL_META, ordinal=1)
+    kinetic = gsa.finalize_ghost_prompt_v3(
+        role="announcer_visual", style=style, mode="object",
+        ledger_meta=REAL_META, ordinal=1, pack_motion=pack)
+
+    assert generic["components"]["motion"] != kinetic["components"]["motion"]
+    assert kinetic["components"]["motion"] == pack
+    assert pack in kinetic["positive"]
+
+
+def test_a_character_beat_is_untouched_by_the_register():
+    """Scoped to bookends on purpose -- character motion is a separate report."""
+    style = _style_obj("storybook_engraving")
+    before = gsa.finalize_ghost_prompt_v3(
+        role="character_video", style=style, mode="figure",
+        ledger_meta=REAL_META, ordinal=2)
+    after = gsa.finalize_ghost_prompt_v3(
+        role="character_video", style=style, mode="figure",
+        ledger_meta=REAL_META, ordinal=2, pack_motion="")
+    assert before["positive"] == after["positive"]
+
+
+def test_an_absent_or_oversized_register_still_leaves_the_beat_moving():
+    """A missing register must never cost the beat its motion slot."""
+    style = _style_obj("storybook_engraving")
+    out = gsa.finalize_ghost_prompt_v3(
+        role="announcer_visual", style=style, mode="object",
+        ledger_meta=REAL_META, ordinal=1, pack_motion="")
+    assert out["components"]["motion"], "the generic pool must still supply one"
+    assert "motion" in out["slots"]
+
+    assert _vs.bounded_motion_register(None) == ""
+    assert _vs.bounded_motion_register("") == ""
+    assert _vs.bounded_motion_register("Continuous shot, same console throughout.") == ""
+
+
+def test_the_register_drops_the_static_framing_line_and_keeps_the_camera():
+    """The leading "Continuous shot" clause is a shot RULE, not a movement, and
+    telling a model to hold still is the opposite of the defect being fixed."""
+    got = _vs.bounded_motion_register(
+        "Continuous shot, same console throughout. Etched dial needle glides. "
+        "Hand-tinted highlights shimmer. Paper grain breathes softly. "
+        "Slow illustrated dolly forward.")
+    # The static camera instruction goes...
+    assert "continuous shot" not in got.lower()
+    # ...but the SUBJECT it named is carried onto the kinetic clause rather than
+    # discarded with it, or the dial has no antecedent (operator 2026-09-03).
+    assert got.startswith("radio console etched dial needle glides")
+    assert got.endswith("slow illustrated dolly forward")
+    assert len(got.split()) <= _vs.MOTION_REGISTER_MAX_WORDS
+
+
+def test_the_compacted_register_never_orphans_the_dial():
+    """Operator, 2026-09-03: *"'dial' -- you'd have to say radio system dial."*
+
+    The packs author "Continuous shot, same console throughout. Dial needle
+    sweeps in crisp arcs..." -- the framing sentence carries the ANTECEDENT.
+    Dropping it as a damping instruction (which it is) left "dial needle sweeps"
+    attachable to a telephone, a clock face or a gauge. The subject is now
+    re-anchored onto the kinetic clause instead of being discarded with it.
+    """
+    for style_id in _vs.list_style_ids():
+        style = _style_obj(style_id)
+        registers = dict(getattr(style, "motion_registers", {}) or {})
+        for key, raw in registers.items():
+            got = _vs.bounded_motion_register(raw)
+            if not got:
+                continue
+            if "dial" not in got.lower():
+                continue
+            assert re.search(r"\b(radio|console|set)\b", got.lower()), (
+                "%s/%s emits a bare dial with no radio antecedent: %r"
+                % (style_id, key, got))
+
+
+def test_the_anchor_check_matches_whole_words_not_substrings():
+    """"set" is inside "settles" -- the first cut of this guard read
+    "dial settles" as already-anchored and left it bare. It is the same defect
+    as `"close" in "closing"` in the driver's register selector, committed
+    minutes after fixing that one."""
+    got = _vs.bounded_motion_register(
+        "Continuous shot, same console throughout. Dial settles. "
+        "Slow dolly pull back.")
+    assert got.startswith("radio console"), got
+    assert "settles" in got

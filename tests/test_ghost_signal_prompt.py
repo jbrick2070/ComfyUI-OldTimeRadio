@@ -577,21 +577,42 @@ def test_the_ltx_motion_prompt_max_is_not_touched():
 
 
 def test_ghost_is_not_added_to_the_ltx_tuple():
+    """Ghost must never be handed a scene prompt -- it composes its own.
+
+    REWRITTEN 2026-09-03 to assert MEMBERSHIP rather than grep the function's
+    source text. The tuple this used to search for moved out of
+    `build_request_from_shot` and became the module-level
+    `BOOKEND_SCENE_PROMPT_ENGINES`, so the old substring assertion started
+    failing on a change that was strictly an improvement.
+
+    And the substring it pinned was
+    `'"ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in"'` -- which means
+    this guard was holding the `wan_i2v` staleness IN PLACE: a test asserting
+    the literal presence of a retired engine id. Membership says what was
+    actually meant and cannot rot the same way.
+    """
     from nodes._otr_video_engines import render_driver as rd
-    src = inspect.getsource(rd.build_request_from_shot)
-    assert '"ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in"' in src
-    ltx_tuple_line = [ln for ln in src.splitlines()
-                      if '"ltx_video", "ltx25_video"' in ln][0]
-    assert "animatediff15_v3_haunted_video" not in ltx_tuple_line
+
+    # Ghost owns its prompt; being handed one would overwrite its positive and
+    # orphan the negative it composed from the same authorities.
+    assert "animatediff15_v3_haunted_video" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
+    assert ("animatediff15_v3_haunted_video"
+            in rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED)
+
     # THE TWO JOINT-AV LANES ARE ON THE ALLOWLIST ON PURPOSE (2026-08-26).
     # They render the LTX 2.5 picture graph, so they compose scene prompts the
     # same way; without them a foley/mime announcer or music open matched no
     # branch at all and shipped build_request's hardcoded radio-studio default.
-    # Pinned here so the pair cannot be dropped while this guard still passes.
-    for joint_av in ('"ltx25_foley_plus"', '"ltx25_mime"'):
-        assert joint_av in src, joint_av
-    # ...and Ghost is still not one of them, on any line of the tuple.
-    assert "animatediff15_v3_haunted_video" not in src
+    for joint_av in ("ltx25_foley_plus", "ltx25_mime"):
+        assert joint_av in rd.BOOKEND_SCENE_PROMPT_ENGINES, joint_av
+
+    # The retired id is GONE. `wan_ti2v` is deliberately NOT here: this branch
+    # emits an LTX-shaped five-clause register, and wan's own directive asks for
+    # one subject/action/speed at cfg 5.0. It is tracked in KNOWN_RED with the
+    # engine-appropriate formatter it is owed (PBUG-20260903-06).
+    assert "wan_i2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
+    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
+    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED
 
 
 def test_an_all_ghost_policy_spends_no_writer_llm_call():

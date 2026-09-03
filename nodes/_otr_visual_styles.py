@@ -711,6 +711,87 @@ def trailing_style_cue(vstyle, *, max_words: int = TRAILING_STYLE_MAX_WORDS) -> 
     return ", ".join(kept)
 
 
+#: How many WORDS of a pack's motion register may ride in a bookend prompt.
+#: The registers were authored for the LTX lane and run 20-29 words across the
+#: nine packs, which is 26-37 CLIP tokens -- enough on its own to push an
+#: AnimateDiff prompt past the ~75-token point where that model stops moving
+#: altogether. Twelve buys the two sentences that carry the movement.
+MOTION_REGISTER_MAX_WORDS = 12
+
+
+def bounded_motion_register(register, *, max_words: int = MOTION_REGISTER_MAX_WORDS) -> str:
+    """The MOVEMENT out of a pack's motion register, compacted, or "".
+
+    Every register is authored as five sentences in the same shape: a static
+    framing constraint, three clauses of subject motion, and a CAMERA move --
+    e.g. storybook_engraving's announcer reads "Continuous shot, same console
+    throughout. Etched dial needle glides. Hand-tinted highlights shimmer.
+    Paper grain breathes softly. Slow illustrated dolly forward."
+
+    Two deliberate choices, both from the operator's 2026-09-03 report that the
+    announcer and music beats "had basically no movement":
+
+    * **The leading "Continuous shot" constraint is DROPPED.** It is a shot rule
+      rather than a movement, and telling a model to hold still is the opposite
+      of the defect this exists to fix.
+    * **The CAMERA sentence is kept even when the middle ones are not.** It is
+      the last sentence in every pack and the one an image-to-video model
+      actually acts on; "slow dolly push forward" moves a shot that "paper
+      texture shimmers" only decorates.
+
+    Returns "" for an absent, empty or unusable register -- a bookend then keeps
+    the generic world-motion clause it has today rather than losing its motion
+    slot entirely.
+    """
+    parts = [p.strip().rstrip(".").strip()
+             for p in " ".join(str(register or "").split()).split(".")]
+    parts = [p for p in parts if p]
+
+    # THE FRAMING SENTENCE CARRIES THE ANTECEDENT, so dropping it silently
+    # orphans the noun that follows. Every pack authors "Continuous shot, same
+    # console throughout. Dial needle sweeps in crisp arcs..." -- the console
+    # establishes what the dial BELONGS to. Strip the sentence and the clause
+    # reads "dial needle sweeps", which an image model may attach to a
+    # telephone, a clock face or a gauge. Operator, 2026-09-03: *"'dial' -- you'd
+    # have to say radio system dial or such."*
+    #
+    # So the static camera instruction still goes (telling a model to hold still
+    # is the defect this exists to fix), and the SUBJECT it named is re-anchored
+    # onto the kinetic clause instead of being thrown away with it.
+    subject = ""
+    if parts and parts[0].lower().startswith("continuous shot"):
+        head = parts[0]
+        for noun in ("console", "radio set", "radio"):
+            if noun in head.lower():
+                subject = "radio console" if noun == "console" else noun
+                break
+        parts = parts[1:]
+    if not parts:
+        return ""
+    # WHOLE WORDS. A substring test here got "dial settles" wrong on its first
+    # run -- "set" is inside "set-tles" -- which is the identical mistake that
+    # made `"close" in "closing"` fail in the driver's register selector, made
+    # minutes after fixing that one. Membership by substring is how a token test
+    # quietly stops meaning what it says.
+    _already_anchored = re.search(r"\b(radio|console|set)\b", parts[0].lower())
+    if subject and not _already_anchored:
+        parts[0] = "%s %s" % (subject, parts[0][:1].lower() + parts[0][1:])
+    def _lead_lower(phrase):
+        # Sentence case becomes clause case: these were authored as standalone
+        # sentences and are being joined into one comma-separated clause, where
+        # a mid-phrase capital reads as a proper noun to a text encoder.
+        return phrase[:1].lower() + phrase[1:] if phrase else ""
+
+    kinetic = _lead_lower(parts[0])
+    camera = _lead_lower(parts[-1]) if len(parts) > 1 else ""
+    text = ", ".join([kinetic] + ([camera] if camera and camera != kinetic else []))
+    if len(text.split()) > max(int(max_words), 1):
+        text = kinetic
+    if len(text.split()) > max(int(max_words), 1):
+        return ""
+    return text
+
+
 def prefix_style_cue(vstyle, prompt: str) -> str:
     """Front-anchor the pack's style token on ``prompt``. ADDITIVE ONLY.
 
@@ -831,7 +912,9 @@ __all__ = [
     "VisualStyleCardModel",
     "VisualStyleError",
     "VisualStyleValidationError",
+    "MOTION_REGISTER_MAX_WORDS",
     "TRAILING_STYLE_MAX_WORDS",
+    "bounded_motion_register",
     "compose_pack_from_card",
     "get_visual_style",
     "list_style_ids",

@@ -108,6 +108,61 @@ GHOST_CONTEXT_USE_ON_EQUAL_LENGTH = False
 GHOST_CONTEXT_START_PERCENT = 0.0
 GHOST_CONTEXT_GUARANTEE_STEPS = 1
 
+#: THE CADENCE SWEEP KNOB, following the `lora_strength` override pattern on
+#: the haunted peer. UNSET IS UNCHANGED: absent, the lane renders the frozen
+#: hold and every golden pin stays green.
+GHOST_HOLD_FACTOR_ENV = "OTR_GHOST_HOLD_FACTOR"
+
+#: A ceiling on that knob, so a typo cannot render four unique frames for a
+#: whole beat. Hold 5 already delivers 5 fps of fresh picture; nothing sane
+#: lives above it, and 0 would divide by zero in the source-fps derivation.
+GHOST_HOLD_FACTOR_MAX = 5
+
+def _resolve_hold_factor(class_default):
+    """The cadence for THIS instance: the class's value, or a deliberate sweep.
+
+    UNSET IS UNCHANGED. Absent `OTR_GHOST_HOLD_FACTOR`, this returns the class
+    attribute untouched, so the golden lane is byte-identical and every hold-2
+    pin stays green. A junk or out-of-range value falls back the same way and
+    says so, because a typo in a shell must not silently re-cadence a render.
+
+    WHY AN ENV KNOB RATHER THAN A NEW ENGINE ID. "Is a slower cadence better"
+    is answerable by one same-bundle A/B, while a peer engine id costs the
+    eight-item registration surface in `docs/VIDEO_LANE_PREFLIGHT.md` BEFORE
+    anyone knows the answer. This mirrors `GhostSignalV3HauntedEngine
+    .lora_strength`, which exists for exactly the same reason. Once there is a
+    verdict, the permanent shape -- a peer lane, or a deliberate re-baseline of
+    the golden pins -- is a decision made with evidence instead of ahead of it.
+
+    IT MUST NOT BE LEFT SET. Two cadences behind one engine id is the identity
+    hazard the sibling lane's G7.4 note warns about: a receipt should never need
+    an environment variable to be interpretable. The receipt at least stays
+    honest -- `sampler_inputs_for` derives `source_fps` from the resolved value
+    -- but honest is not self-describing.
+    """
+    default = int(class_default)
+    raw = os.environ.get(GHOST_HOLD_FACTOR_ENV)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        _LOG.warning("[OTR.video.ghost_signal] %s=%r is not an integer; using "
+                     "the frozen hold %d", GHOST_HOLD_FACTOR_ENV, raw, default)
+        return default
+    if not (1 <= value <= GHOST_HOLD_FACTOR_MAX):
+        _LOG.warning("[OTR.video.ghost_signal] %s=%d is outside 1..%d; using "
+                     "the frozen hold %d", GHOST_HOLD_FACTOR_ENV, value,
+                     GHOST_HOLD_FACTOR_MAX, default)
+        return default
+    if value != default:
+        _LOG.warning(
+            "[OTR.video.ghost_signal] CADENCE SWEEP ACTIVE: hold=%d against the "
+            "frozen %d. Exploratory override -- must not be left set for a "
+            "production render.", value, default)
+    return value
+
+
 #: THE STRUCTURAL SOURCE FLOOR. Sixteen is the pinned upstream SD1.5 AnimateDiff
 #: context length this fixed recipe uses, NOT a measured Ghost quality claim.
 #: With ``use_on_equal_length=False`` an exact 16-frame request uses the motion
@@ -116,21 +171,101 @@ GHOST_SOURCE_FLOOR = 16
 
 #: THE DEFAULT HOLD. Every delivered frame count T is filled by
 #: ``U = ceil(T / hold)`` freshly generated frames, each shown ``hold`` times.
-#: 2 is what the golden lane shipped and what the published episode rendered at;
-#: it is a CLASS attribute on the engine so a cadence peer can differ without
+#: It is a CLASS attribute on the engine so a cadence peer can differ without
 #: this constant moving (preflight G1.3).
 #:
 #: THE HOLD DOES NOT TOUCH DURATION. T comes from the beat's audio and nothing
 #: here can change it, so the beat/audio sync survives every value -- what
 #: changes is how much of the model's motion is traversed inside that fixed
 #: window, and how finely.
+#:
+#: WHAT WAS ACTUALLY DECIDED, in the operator's own words 2026-09-03: *"I was
+#: thinking ahh 25 fps, let's get to that -- and then later I realised we were
+#: doing high speed, faster than what eyes usually are used to."*
+#:
+#: SO THE DECISION WAS THE DELIVERY RATE, AND THE CADENCE WAS ITS ARITHMETIC.
+#: 25 fps was chosen deliberately; hold 2 is simply what reaches 25 from 12.5,
+#: and the motion-speed consequence was never separately examined. Both of the
+#: readings this file briefly carried were wrong: an r1 reviewer searched the
+#: coding plan and bug log, found no rationale, and inferred nobody had chosen
+#: anything -- absence of a record is not absence of a decision -- while the
+#: correction that followed treated the CADENCE as the thing decided. Neither.
+#: The target was decided; the cadence rode along.
+#:
+#: THAT IS WHY HOLD 3 DOES NOT CONTRADICT THE ORIGINAL DECISION. Delivery stays
+#: at exactly 25 fps -- the whole point of `U = ceil(T/hold)` is that T is
+#: untouched -- so what he asked for is preserved, and only the rate the model's
+#: motion is traversed at changes. *"I'd like the fps for AnimateDiff to be more
+#: natural."*
+#:
+#: The knob is `OTR_GHOST_HOLD_FACTOR` below -- unset is unchanged, so the
+#: golden cadence stays byte-identical unless someone deliberately asks for
+#: another, and no engine id is registered to find out whether 3 is better. Flipping this constant instead turned 20 tests red, correctly:
+#: `test_the_golden_lane_still_declares_hold_2` and
+#: `test_hold2_is_byte_identical_to_the_pre_seam_arithmetic` (17 frame counts,
+#: recomputed from first principles) pin hold-2 as the GOLDEN CONTRACT.
+#:
+#: WHAT THE KNOB ACTUALLY CHANGES, stated without a training-rate claim.
+#: At hold 2 the lane generates **12.5 unique source positions per displayed
+#: second**; at hold 3, **8.33**. Fewer fresh positions per second means the
+#: model's motion is traversed more slowly, which is the direction the operator
+#: asked for: *"almost 100% certain it's rendering way too fast for human
+#: eyes."* That framing is arithmetic and needs nothing else to be true.
+#:
+#: AN EARLIER VERSION OF THIS COMMENT ASSERTED MORE THAN IT COULD PROVE. It
+#: claimed the SD1.5 motion modules are trained at 8 fps, so a 16-frame window
+#: IS two seconds of motion, so hold 2 runs "1.56x faster than trained" and
+#: hold 3 is "1.04x, native". One reviewer confirmed 8 fps from published
+#: guides; a second pointed out those cite a RECOMMENDED output rate, that the
+#: upstream dataset samples 16 frames at a CONFIGURABLE stride, and that this
+#: lane feeds no fps into AnimateDiff or the sampler at all -- so no training
+#: timebase is established and the ratios were dressed-up convention. The
+#: experiment is unchanged and still worth running; only the justification
+#: needed to stop overclaiming.
+#:
+#: What moves with it, separated by how well each is actually evidenced:
+#:   * MEASURED: motion plays at the rate the model was trained to draw
+#:     (1.56x -> 1.04x), and `U = ceil(T / hold)` means ~33% fewer latents to
+#:     sample, so the lane also renders faster.
+#:   * ARITHMETIC: a long beat needs fewer sliding-context windows, 18 -> 12 on
+#:     the longest shot measured. Reproducible from the ADE static-context
+#:     formula; not in dispute.
+#:   * HYPOTHESIS ONLY, riding the same A/B: that fewer windows also reduces
+#:     pyramid-fusion damping and therefore helps "bland" by a second mechanism.
+#:     Architecturally plausible -- the fuse does blend overlapping-window
+#:     predictions -- but NOTHING in this repo has ever measured it, and an
+#:     earlier draft of this comment asserted it as a third proven win. It is
+#:     not. `GHOST_CONTEXT_OVERLAP` stays put: overlap operates in U-space and
+#:     the 4/16 ratio is unchanged by hold, so moving it would only confound the
+#:     A/B.
+#: The cost is coarseness: each source frame would be shown three times rather
+#: than two. The operator, watching the output, called the current cadence
+#: "way too fast for human eyes" -- which is exactly what 1.56x predicts.
+#:
+#: 25/3 is not an integer rate, which is why `source_fps` below is DERIVED
+#: rather than asserted. That derivation IS applied -- at hold 2 it yields the
+#: same 12.5 the literal used to assert, so it changes nothing today and stops
+#: the receipt lying the moment a peer runs a different hold.
 GHOST_DEFAULT_HOLD = 2
 
-#: The source rate. 12.5 into 25 is exactly hold-2, which is why this lane can
-#: promise an EXACT duration with no resampling arithmetic at all. A lane at a
-#: different hold reports ``target_fps / hold`` instead -- see ``source_fps``.
-GHOST_SOURCE_FPS = 12.5
+#: THE MODULE-LEVEL source rate: the DEFAULT lane's rate, and nothing more.
+#: It was the literal 12.5 until 2026-09-03; deriving it from the constants at
+#: least keeps it honest when the default hold moves.
+#:
+#: IT IS NOT THE VALUE A RECEIPT MAY USE, and an earlier version of this comment
+#: wrongly claimed it was ("a derived value cannot drift from the cadence it
+#: describes" -- it can, because this one is frozen at import from the MODULE
+#: constant, not read from the instance). A subclass declaring `hold_factor = 3`
+#: would sample at 8.33 fps and stamp 12 here. `sampler_inputs_for` therefore
+#: computes its receipt value from `self.hold_factor`; see the note there.
+#: Caught in r1 review, after the first fix claimed to have closed it.
+#: The DELIVERED rate, and the only one anything outside this lane sees: the
+#: frame contract declares it, the silent-clip contract validates against it,
+#: and the mux, captions, credits and workflow JSON are all built on it. It is
+#: defined BEFORE the source rate because the source rate is derived from it.
 GHOST_TARGET_FPS = 25
+
+GHOST_SOURCE_FPS = GHOST_TARGET_FPS / GHOST_DEFAULT_HOLD
 
 #: THE EIGHT NODE INSTANCES. Ids are stable strings because the tests, the
 #: executor aliases and the audit records all name them.
@@ -331,6 +466,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: A peer overrides this alone; the render path reads it through ``self`` so
     #: a declared value cannot be ignored while its receipt claims otherwise.
     hold_factor = GHOST_DEFAULT_HOLD
+
     required_inputs = ("text_prompt",)
     optional_inputs = ()
     roles = ("announcer_visual", "music_visual", "character_video")
@@ -393,6 +529,19 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     )
 
     def __init__(self):
+        # THE CADENCE OVERRIDE, resolved per instance.
+        #
+        # NOT A PROPERTY, and that is deliberate: a property makes
+        # `GhostSignalEngine.hold_factor` return a <property object> at CLASS
+        # level instead of the number, which is a silent footgun for any reader
+        # that does not happen to have an instance. Setting the instance
+        # attribute keeps class access honest AND lets a subclass declare its
+        # own cadence, because the class value is what we fall back to.
+        #
+        # UNSET IS UNCHANGED: with `OTR_GHOST_HOLD_FACTOR` absent this is the
+        # class attribute, so the golden lane is byte-identical and every
+        # hold-2 pin stays green.
+        self.hold_factor = _resolve_hold_factor(type(self).hold_factor)
         super().__init__()
         self._classes = None
         self._artifacts = None
@@ -423,7 +572,16 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "context_use_on_equal_length": GHOST_CONTEXT_USE_ON_EQUAL_LENGTH,
             "context_start_percent": GHOST_CONTEXT_START_PERCENT,
             "context_guarantee_steps": GHOST_CONTEXT_GUARANTEE_STEPS,
-            "source_fps": int(GHOST_SOURCE_FPS), "target_fps": int(self.target_fps),
+            # PER-INSTANCE, like `hold_factor` beside it. This read the frozen
+            # module constant until 2026-09-03, so a subclass declaring its own
+            # cadence would have sampled at one rate and stamped its receipt
+            # with the parent's -- the exact "receipt claims the parent's
+            # recipe" defect this file already guards against for
+            # `motion_module_name`. Dormant while every registered lane is
+            # hold-2; wrong the instant one is not, which is the whole point of
+            # a cadence peer.
+            "source_fps": int(self.target_fps / max(int(self.hold_factor), 1)),
+            "target_fps": int(self.target_fps),
             "hold_factor": int(self.hold_factor),
             "source_request": plan["source_request"],
             "unique_source_count": plan["unique_source_count"],

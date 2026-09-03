@@ -142,6 +142,182 @@ _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
 #: set narrows to the silent set.
 _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 
+#: ENGINES THAT COMPOSE A SCENE PROMPT ON THE ANNOUNCER AND MUSIC BOOKENDS.
+#:
+#: Matching this set is what earns a beat the style pack's own kinetic motion
+#: register; missing it means the beat keeps `build_request`'s static seed --
+#: "a 1940s radio studio, on air sign illuminated, period broadcast set" -- with
+#: no motion clause, no style, and `prompt_source` never stamped.
+#:
+#: EXTRACTED FROM AN INLINE TUPLE 2026-09-03, AND THE EXTRACTION IS THE POINT.
+#: As an inline literal this list went stale three times. `ltx25_foley_plus` and
+#: `ltx25_mime` were added 2026-08-26 with a comment describing the exact
+#: silent-degrade they had been suffering; the same comment was not read across
+#: to the other omissions. It still carried `wan_i2v`, an id RETIRED that same
+#: week and no longer in the registry at all, so that entry could never match a
+#: shot -- while `wan_ti2v`, its live replacement and three of the sixteen
+#: rotation lanes, was absent. The operator found it by watching:
+#: `signal_lost_whispers_in_the_park_20260903_101222` published with four of its
+#: eight beats on that static seed and he reported "basically no movement"
+#: (PBUG-20260903-06).
+#:
+#: `tests/test_bookend_scene_prompt_roster.py` now fails when a live text-driven
+#: engine is missing from this set, and when a member is not a registered
+#: engine. A NAME is cheap to add and free to forget; a failing test is not.
+#: THIS BRANCH SPEAKS LTX. It passes the style pack's motion register through
+#: UNCHANGED, and those registers are authored as five sentences -- a framing
+#: constraint, three subject motions, and a camera move. That is the shape LTX
+#: wants and it is NOT the shape every text-driven engine wants, so membership
+#: here is "this engine reads an LTX-shaped scene prompt", not "this engine
+#: deserves motion". The non-LTX lanes need an engine-appropriate formatter
+#: instead; see BOOKEND_SCENE_PROMPT_KNOWN_RED, where they now sit with that
+#: reason written down rather than being handed a prompt that would violate
+#: their own documented directives.
+BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
+    "ltx_video",
+    "ltx_audio_in",
+    "ltx25_video",
+    "ltx25_foley_plus",
+    "ltx25_mime",
+})
+
+#: Engines that compose their OWN bookend prompt and must not be handed one.
+#: The Ghost/AnimateDiff family composes BOTH its positive and its negative from
+#: the same authorities; letting the scene branch run would overwrite the
+#: positive and silently orphan the negative, which is why the condition below
+#: also carries `and not _ghost_composed`.
+#: (`animatediff15_video` and `animatediff15_v3_video` were in this set for one
+#: draft and are NOT registered -- tombstoned 2026-08-23. That is the same
+#: dead-id-reads-as-coverage defect this whole file exists to stop, reproduced
+#: inside its own fix and caught by review. The roster test now checks EVERY
+#: set for registration, not just the prompt set, so it cannot recur quietly.)
+BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
+    "animatediff15_v3_haunted_video",
+    "animatediff15_v3_stillin_lab_video",
+})
+
+#: Engines whose motion is not text-driven at all, so a scene prompt would be
+#: meaningless rather than missing. The still families hold or Ken-Burns the
+#: conditioned image, `mesh_stage` orbits a Blender turntable, and the four
+#: `viz_*` lanes are procedural and audio-reactive. Named rather than detected,
+#: because a heuristic that silently mis-scopes a lane is the same class of
+#: defect this whole file exists to stop.
+BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN = frozenset({
+    "still_flat",
+    "still_word",
+    "still_motion",
+    "still_pan",
+    "mesh_stage",
+    "viz_green",
+    "viz_mxc_cpu",
+    "viz_mxc_mandala",
+    "viz_camera",
+})
+
+#: Live engines that DO NOT compose a bookend scene prompt today, each owing a
+#: decision. **These are KNOWN-RED, not blessed exemptions** -- operator ruling
+#: 2026-09-03: *"we test all engines and lanes; if one doesn't work we fix it or
+#: rip it, not hide it."*
+#:
+#: The distinction is the whole point and the repo already learned it once, in
+#: `tests/test_lane_preflight_matrix.py`, whose own message says a stale
+#: expected-red "rots the ledger into a rubber stamp and hides the next real
+#: regression behind it". An entry here is a debt with an owner, and the roster
+#: test prints it on every run so it cannot go quiet. Emptying this dict --
+#: by fixing each lane or retiring it -- is the goal.
+#: A GATE EVERY ENTRY BELOW INHERITS, found by a test rather than remembered.
+#: Each engine carries two per-engine prompt-style overlay constants describing
+#: what its model wants from a prompt. They are STORED AND DELIBERATELY NOT
+#: WIRED -- a 2026-08-17 decision recorded in
+#: `docs/2026-08-17-per-engine-prompt-style-guide-RESEARCH.md` and enforced by
+#: `tests/test_prompt_style_directives.py`, which fails if the constant names
+#: appear anywhere outside their owning engine modules. Acting on them is a
+#: separate, measured change gated on `scripts/otr_talking_radio_probe_eval.py`
+#: at a fixed seed, because the still-prompt writer does not know its target
+#: engine: binding happens at dispatch and roles drift under OTR_FORCE_ENGINE_MAP.
+#:
+#: SO "give this lane a formatter shaped to its own model" IS NOT A FREE FIX.
+#: It is correct, and it lands behind that probe A/B, not before it.
+BOOKEND_SCENE_PROMPT_KNOWN_RED = {
+    "wan_ti2v": "PROVEN DEFECT, and the fix is NOT to add it above. It shipped "
+                "signal_lost_whispers_in_the_park_20260903_101222 with all four "
+                "bookends on build_request's static seed and the operator "
+                "reported 'basically no movement' (PBUG-20260903-06). But its "
+                "own directive is 'state ONE subject, ONE action, ONE speed. Do "
+                "not restate the set' at cfg 5.0 -- the highest guidance in the "
+                "stack, where 'each modifier is honoured'. The LTX branch would "
+                "hand it a five-clause register containing multiple actions, a "
+                "camera move AND a set restatement, which is worse than "
+                "silence at that guidance. OWED: an engine-appropriate bookend "
+                "formatter emitting one subject/action/speed -- roughly what "
+                "`_otr_visual_styles.bounded_motion_register` already produces "
+                "for the Ghost lane. This is the top row.",
+    "fastwan_8gb": "same family and same directive as wan_ti2v (one subject, "
+                   "one action, one speed; no set restatement). OWED: the same "
+                   "engine-appropriate formatter, and it inherits wan_ti2v's.",
+    "ltx_8gb": "LTX-family but NOT on the LTX scene branch. OWED: confirm "
+               "whether its prompt contract matches ltx_video's closely enough "
+               "to join BOOKEND_SCENE_PROMPT_ENGINES directly, or whether the "
+               "8gb recipe needs its own shorter form.",
+    "minimax_h3_video": "OWED: an engine-appropriate bookend formatter; it is "
+                        "not an LTX-shaped lane. See the note below on the "
+                        "stored-not-wired per-engine style overlays -- that "
+                        "gate applies to every entry in this dict.",
+    "minimax_h3_audio_in": "DO NOT simply add this one. It requires audio_ref "
+                           "AND init_image, is intentionally excluded from "
+                           "scene-init attachment, and has an open production "
+                           "bug where music-bookend routing cannot supply the "
+                           "required portrait. OWED: mark it unsupported for "
+                           "bookends and fix its routing separately -- giving "
+                           "it a prompt does not give it a portrait.",
+    "humo": "audio-driven face lane. Its bookends keep the static radio seed by "
+            "a policy commented in the audio_driven_face branch below "
+            "('radio-styled by design') -- but that 'policy' resolves to "
+            "build_request's static string with a style cue prefixed, not a "
+            "considered motion decision, and it predates the pack motion "
+            "registers existing. VERIFIED 2026-09-03: wired to BOTH bookend "
+            "roles in otr_g4_humo.json and otr_w45_humo.json, both "
+            "status=SHIPPING -- it ships this defect today, it is not "
+            "theoretical. OWED: decide whether a face lane should be "
+            "selectable for a console bookend at all; fix it or rip it from "
+            "those roles. Do not leave it silently motionless.",
+    "humo_1.7B": "audio-driven face lane in the humo family. OWED: the same "
+                 "fix-or-rip decision as humo, and it inherits humo's answer.",
+    "humo_1.7B_169": "audio-driven face lane in the humo family. OWED: the same "
+                     "fix-or-rip decision as humo, and it inherits its answer.",
+    "humo_14B_169": "audio-driven face lane in the humo family. OWED: the same "
+                    "fix-or-rip decision as humo, and it inherits its answer.",
+    "cloud_kling_avatar": "cloud audio-driven face lane; same owed decision as "
+                          "humo, and additionally verify it is ever actually "
+                          "selected for a bookend role by a shipping profile",
+    "cloud_seedance_2": "cloud text-driven lane. VERIFIED 2026-09-03: appears "
+                        "in ZERO profiles, so it is unreachable on a bookend "
+                        "today. OWED: keep it here until it is either wired "
+                        "and fixed, or retired.",
+    "cloud_wan_i2v": "cloud text-driven lane. VERIFIED 2026-09-03: wired to "
+                     "both bookend roles in otr_cloud_low.json and "
+                     "otr_cloud_lanes.json, both status=draft. OWED: fix the "
+                     "prompt path before either profile is promoted.",
+    "cloud_wan_i2v_audio": "cloud text-driven lane. VERIFIED 2026-09-03: wired "
+                           "to both bookend roles in the same two draft "
+                           "profiles as cloud_wan_i2v. OWED: same fix, same "
+                           "deadline -- before promotion.",
+    "cloud_vidu_q2_pro_fast_720p": "cloud text-driven lane. VERIFIED "
+                                   "2026-09-03: appears in ZERO profiles, "
+                                   "unreachable on a bookend today. OWED: wire "
+                                   "and fix, or retire.",
+    "word_razzle": "title/word lane, and IT IS TEXT-DRIVEN -- `eng_cloud_video` "
+                   "declares required_inputs ('init_image', 'text_prompt') and "
+                   "`_razzle_prompt` already composes its own motion clause "
+                   "then appends whatever text_prompt arrives. VERIFIED "
+                   "2026-09-03: wired to BOTH bookend roles in "
+                   "otr_w45_word_razzle.json, status=SHIPPING -- so it ships "
+                   "this defect today. OWED: its repair shape differs from the "
+                   "others; stacking the pack register after razzle's own "
+                   "motion clause may read as two motion instructions, so "
+                   "check the composed text before adding it to the prompt set.",
+}
+
 
 class OomSignal(RuntimeError):
     """Stand-in for a render-time CUDA OOM (a HARD failure) -- the soak forces it
@@ -1582,7 +1758,21 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     role = str(shot_role or "")
     # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
     # b000_music_open structure is definitive, NOT the role) -- check it first.
-    if is_synthetic_open or sid.endswith(_OPENING_MUSIC_SUFFIX):
+    # `shot_music_opening_001` IS THE SHAPE PRODUCTION MINTS, and it does not
+    # end with `b000_music_open`. Measured 2026-09-03 across every music_visual
+    # shot on disk: 100% are `shot_music_opening_001` / `shot_music_closing_001`
+    # and 0% match the legacy suffix, so this branch had stopped firing entirely
+    # and every cold open fell through to the flat `music_inter` register.
+    #
+    # THAT SILENTLY REVERTED A DECISION THE OPERATOR HAD ALREADY MADE. The note
+    # below records a GPU A/B that restored the dynamic open as the default
+    # ("moves ~9x more", operator: "moving grooving"). A naming drift then
+    # un-restored it without touching the line that expresses the choice --
+    # which is why the drift was invisible: nothing looked wrong, the register
+    # simply never got asked for.
+    if (is_synthetic_open
+            or sid.endswith(_OPENING_MUSIC_SUFFIX)
+            or "music_opening" in sid):
         # Operator 2026-06-12 had retargeted this to the calm music_inter because
         # the aggressive music_open verbs (whip-pans / "vibrates aggressively" /
         # dynamic dolly push) SMEARED on the 2B LTX model. 2026-06-15: that smear
@@ -1599,7 +1789,15 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
     if role == "announcer_visual":
         return "announcer"
     if role == "music_visual":
-        if any(t in sid for t in ("close", "outro", "_end", "tag", "sign_off")):
+        # "closing" DOES NOT CONTAIN "close" -- c-l-o-s-i-n-g. That one missing
+        # letter is why every sign-off in production selected `music_inter`.
+        # Production mints `shot_music_closing_001`; the token list below was
+        # written for an older id shape and matched none of it. Measured
+        # 2026-09-03 across the music_visual shots on disk: 100% are
+        # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the old
+        # tokens. See the opening half above for the same drift.
+        if any(t in sid for t in ("closing", "close", "outro", "_end", "tag",
+                                  "sign_off")):
             return "music_close"
         return "music_inter"
     return ""
@@ -1607,9 +1805,16 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
 
 #: Deterministic fallback for a CHARACTER face beat whose shot carries no M4
 #: creative prompt. It stays world-neutral; authored prompts are preserved.
+#:
+#: "SUBTLE" REMOVED 2026-09-03. PBUG-20260827-04 root-caused inert renders to
+#: damping adjectives in the authored prompts and named THIS STRING verbatim as
+#: one of the offenders ("a person speaking, subtle facial motion"). Its sibling
+#: `_IA2V_TALKING_CLAUSE_CHARACTER` was rewritten at the time; this one was
+#: missed and the damping word stayed live. Telling a model to be subtle is
+#: telling it to hold still, which is the defect, not the safety rail.
 _CHAR_FACE_FALLBACK_PROMPT = (
-    "close-up cinematic portrait of a person speaking, face centered, subtle "
-    "facial motion, attire from the story world, dramatic film lighting")
+    "close-up cinematic portrait of a person speaking, face centered, one clear "
+    "change of expression, attire from the story world, dramatic film lighting")
 
 #: Round 5 F2 -- beat_intent -> scene clause. Unmapped intents fall back to a
 #: loose "a beat of <intent>" clause + one INFO line (never a silent skip).
@@ -2932,10 +3137,35 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # leaf authored from it, which is what put people and bags in an
             # episode about film canisters in an archive. They stay on the row
             # as the beat's authored provenance and Half B re-authors them.
+            # THE PACK'S KINETIC REGISTER FOR A BOOKEND BEAT. Resolved HERE and
+            # passed down, because the role-to-register key needs the shot id
+            # and the driver is where that table is deliberately kept (see the
+            # v1 path below). `_ltx_motion_role_key` returns "" for a character
+            # beat, and `bounded_motion_register` returns "" for an absent or
+            # over-long register -- in both cases the composer falls back to its
+            # generic world-motion pool and the beat keeps a motion clause.
+            _g_sids_live = shot.get("source_line_ids")
+            _g_synth_live = (
+                str(shot.get("shot_id") or "").endswith(_OPENING_MUSIC_SUFFIX)
+                or (isinstance(_g_sids_live, list) and not _g_sids_live
+                    and _shot_role in ("announcer_visual", "music_visual")))
+            _g_reg_key = _ltx_motion_role_key(
+                _shot_role, shot.get("shot_id"), _g_synth_live)
+            _g_pack_motion = ""
+            if _g_reg_key:
+                try:
+                    from .._otr_visual_styles import (  # type: ignore
+                        bounded_motion_register as _bounded_register)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_visual_styles import (  # type: ignore
+                        bounded_motion_register as _bounded_register)
+                _g_registers = getattr(_vstyle, "motion_registers", None) or {}
+                _g_pack_motion = _bounded_register(
+                    dict(_g_registers).get(_g_reg_key))
             _g_final = _gsa.finalize_ghost_prompt_v3(
                 role=_shot_role, style=_vstyle, mode=_g_obj["mode"],
                 ledger_meta=(ledger or {}).get("meta") or {},
-                ordinal=_g_ordinal)
+                ordinal=_g_ordinal, pack_motion=_g_pack_motion)
             _g_positive = str(_g_final["positive"]).strip()
             _g_negative = str(_g_final["negative"]).strip()
             req["text_prompt"] = _g_positive
@@ -3393,20 +3623,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _strict_text_only = _is_strict_text_only_engine(_engine_id)
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
-    if ((_engine_id in ("ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in",
-                        # THE TWO LANES THAT KEEP THE MODEL'S OWN AUDIO
-                        # (2026-08-26). They ARE the LTX 2.5 picture graph, so
-                        # they compose scene prompts exactly like ltx25_video.
-                        # Omitted, they matched no branch at all: `roles =
-                        # ROLES` makes them legal on the announcer and music
-                        # bookends, those roles arrive with `text_prompt`
-                        # cleared, and `_is_char_face_beat` is False -- so the
-                        # beat shipped `build_request`'s hardcoded "a 1940s
-                        # radio studio" default with `prompt_source` never
-                        # stamped. That is the exact degrade
-                        # `test_ltx25_HQ_open_keeps_the_role_motion_prompt`
-                        # was written to stop for `ltx25_video`.
-                        "ltx25_foley_plus", "ltx25_mime")
+    # THE MEMBERSHIP TEST IS A NAMED SET NOW, not an inline literal. The list
+    # this replaced went stale three times: `ltx25_foley_plus` and `ltx25_mime`
+    # were added 2026-08-26 with a comment describing the exact silent degrade
+    # they had been suffering -- "the beat shipped `build_request`'s hardcoded
+    # 'a 1940s radio studio' default with `prompt_source` never stamped" -- and
+    # that reasoning was never carried across to `wan_ti2v`, `ltx_8gb`,
+    # `fastwan_8gb` or either `minimax_h3` lane. It also still carried
+    # `wan_i2v`, retired the same week and absent from the registry, so that
+    # entry could not match a shot. `tests/test_bookend_scene_prompt_roster.py`
+    # is what stops the fourth occurrence.
+    if ((_engine_id in BOOKEND_SCENE_PROMPT_ENGINES
             or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat

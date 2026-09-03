@@ -1762,7 +1762,7 @@ GHOST_V3_DROP_ORDER = ("trailing_style", "light", "vantage", "motion",
 
 def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
                              ordinal=0, token_measure_fn=None,
-                             banana_enabled=None) -> dict:
+                             banana_enabled=None, pack_motion="") -> dict:
     """Resolve, compose, transform, FIT and measure one Ghost v3 prompt.
 
     The v3 sibling of :func:`finalize_ghost_prompt_v2`, and deliberately a
@@ -1804,7 +1804,22 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
     kernel, kernel_source = resolve_crux_kernel(
         meta, ordinal=ordinal, role=role, mode=mode)
     light = resolve_world_light(meta, ordinal=ordinal, mode=mode)
-    motion = resolve_world_motion(
+    # THE PACK'S OWN KINETIC DIRECTION WINS ON A BOOKEND BEAT (2026-09-03).
+    # The operator watched a published episode and reported that the announcer
+    # and music beats "had basically no movement". They were composing from
+    # `GHOST_WORLD_MOTION_V3`, whose clauses are atmospheric by design -- "the
+    # glow steadying and then thinning", "cooling into shadow" -- while every
+    # style pack had ALREADY authored a kinetic register for exactly these four
+    # roles, ending in a camera move ("slow illustrated dolly forward"), which
+    # the live v3 path never read.
+    #
+    # Passed IN by the driver rather than resolved here: the role-to-register
+    # key needs the shot id, and `render_driver` states outright that a second
+    # role-to-register table in a pure module is a table that drifts once.
+    # Empty on a character beat, and empty whenever the pack has no usable
+    # register -- either way the generic pool still supplies a motion clause,
+    # so a beat never loses the slot entirely.
+    motion = str(pack_motion or "").strip() or resolve_world_motion(
         mode=mode, episode_seed=meta.get("episode_seed"), ordinal=ordinal)
     # The pack's own style vocabulary for the END of the prompt. Resolved ONCE
     # here rather than inside `_compose`, which the fitter may call five times.
