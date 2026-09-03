@@ -7,17 +7,22 @@ ComfyUI's credit-billed text path *is* the OpenRouter partner node, so both
 lanes expose the same frontier catalog — they differ only in **who pays**.
 
 - **OpenRouter lane** → billed to your `OPENROUTER_API_KEY`.
-- **Comfy Credits lane** → billed to your logged-in Comfy account's prepaid credits.
+- **Comfy Credits lane** → billed to the prepaid credits of the Comfy account whose API key you sign in with.
 
 The lane is **opt-in and default-off**. With it disabled, nothing changes: the
 dropdowns, the offline baseline, and the byte-identical audio path are untouched.
 
 ## Enable it
 
-1. **Log in to a Comfy account with credits.** In ComfyUI: `Settings → User`
-   to log in, `Settings → Credits` to top up (prepaid — no surprise charges).
-   API access requires `127.0.0.1` / `localhost` (or a Comfy API key on a
-   non-whitelisted host). See ComfyUI's *Partner Nodes Overview*.
+1. **Sign in to ComfyUI with a Comfy API key.** Create the key on your Comfy
+   account and use the API-key option on ComfyUI's sign-in dialog (see
+   ComfyUI's *Partner Nodes Overview*), then `Settings → Credits` to top up
+   (prepaid -- no surprise charges). A key works on any host, `localhost` or
+   not. The writer reads only the API key ComfyUI injects
+   (`api_key_comfy_org`); it does **not** request the logged-in session token,
+   because the Comfy Registry security scan flags any third-party pack that
+   declares that hidden input (2026-09-02). A plain email / Google sign-in
+   without an API key therefore does not enable this lane.
 2. **Set the OTR opt-in flag**, then restart ComfyUI in a fresh terminal so the
    process sees it:
 

@@ -11,10 +11,12 @@ Qwen / Mistral / GLM / Kimi / Perplexity). So this backend is, in shape,
   * Catalog: a PINNED constant (`COMFY_LLM_MODELS`) -- the partner node's
     curated model list. No disk cache / refresh script (unlike the
     own-key OpenRouter lane, whose catalog is fetched).
-  * Auth: NOT an env key. ComfyUI injects the logged-in account's bearer
-    token (or the configured Comfy API key) into a node via the hidden
-    inputs `auth_token_comfy_org` / `api_key_comfy_org`. The writer node
-    captures them at run() and hands them here via `set_auth(...)`.
+  * Auth: NOT an env key. ComfyUI injects the configured Comfy API key
+    into a node via the hidden input `api_key_comfy_org`. The writer node
+    captures it at run() and hands it here via `set_auth(...)`. The
+    logged-in account's session bearer is never requested: the Comfy
+    Registry scan treats a third-party pack declaring that hidden input
+    as credential access and flags the version (PBUG-20260902-04).
   * Gate: `OTR_ENABLE_COMFY_CREDITS=1` (opt-in, default-off) -- mirrors
     the OpenRouter enable gate so the offline baseline + the dropdowns
     stay untouched until the operator opts in (C3 parity, no surprise
@@ -303,16 +305,13 @@ def resolve_slug(repo_id: str) -> str:
 _auth: dict[str, str] = {}
 
 
-def set_auth(*, auth_token: Any = None, api_key: Any = None) -> None:
-    """Record the ComfyUI-injected credentials for the credit-billed call.
+def set_auth(*, api_key: Any = None) -> None:
+    """Record the ComfyUI-injected credential for the credit-billed call.
 
-    ComfyUI fills the writer's hidden inputs `auth_token_comfy_org` (the
-    logged-in account bearer) and `api_key_comfy_org` (a configured Comfy
-    API key) at execution time. The writer threads them here. Best-effort:
-    non-string / empty values are ignored. The token is never logged or
-    stamped into run meta."""
-    if isinstance(auth_token, str) and auth_token:
-        _auth["auth_token"] = auth_token
+    ComfyUI fills the writer's hidden input `api_key_comfy_org` (a configured
+    Comfy API key) at execution time. The writer threads it here. Best-effort:
+    a non-string / empty value is ignored. The key is never logged or stamped
+    into run meta."""
     if isinstance(api_key, str) and api_key:
         _auth["api_key"] = api_key
 
@@ -322,16 +321,17 @@ def clear_auth() -> None:
 
 
 def _bearer() -> str | None:
-    """The credential to send. A configured Comfy API key wins over the
-    session bearer (it works on non-whitelisted hosts too).
+    """The credential to send: the configured Comfy API key (it works on
+    non-whitelisted hosts too).
 
     API-KEY-RESPECTFUL (2026-07-04): the Comfy Credits LLM chat proxy authenticates
-    ONLY via ComfyUI's own injected credential (the writer's hidden inputs
-    auth_token_comfy_org / api_key_comfy_org). We do NOT repurpose the media-lane
-    OTR_COMFY_API_KEY here -- it is rejected by the chat proxy (HTTP 401) and mixing
-    key surfaces confuses users. Headless cloud LLM = the OpenRouter own-key lane;
-    Comfy Credits LLM = the logged-in Desktop app."""
-    return _auth.get("api_key") or _auth.get("auth_token")
+    ONLY via ComfyUI's own injected credential (the writer's hidden input
+    api_key_comfy_org). We do NOT repurpose the media-lane OTR_COMFY_API_KEY here
+    -- it is rejected by the chat proxy (HTTP 401) and mixing key surfaces
+    confuses users. Headless cloud LLM = the OpenRouter own-key lane; Comfy
+    Credits LLM = the Desktop app signed in with a Comfy API key. The session
+    bearer is no longer requested (PBUG-20260902-04)."""
+    return _auth.get("api_key")
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ class ComfyCreditsBackend:
         # S1 policy contract: remote lane -- asserts the lane_allowlist
         # admits it (defense in depth behind request_slot's backstop) and
         # deliberately IGNORES every hardware field; zero local compute.
-        # Auth stays the hidden comfy-org inputs captured by set_auth()
+        # Auth stays the hidden comfy-org API-key input captured by set_auth()
         # from the writer's run() -- the policy carries NO credentials.
         if policy is not None and not policy.admits_lane("comfy_credits"):
             raise ComfyCreditsConfigError(

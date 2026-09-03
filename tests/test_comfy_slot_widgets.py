@@ -179,7 +179,7 @@ def test_backend_generate_posts_and_extracts(comfy_on, monkeypatch):
         }
 
     monkeypatch.setattr(occ, "_post_comfy_chat_completion", _fake_post)
-    occ.set_auth(auth_token="tok-abc")
+    occ.set_auth(api_key="key-abc")
     row = types.SimpleNamespace(context_window=8192)
     backend = occ.ComfyCreditsBackend()
     entry = backend.load(occ.SLOT_A_ID, row)
@@ -187,7 +187,7 @@ def test_backend_generate_posts_and_extracts(comfy_on, monkeypatch):
         entry, [{"role": "user", "content": "hi"}], max_new_tokens=64,
     )
     assert out == "a quiet signal"
-    assert captured["bearer"] == "tok-abc"
+    assert captured["bearer"] == "key-abc"
     assert captured["payload"]["model"] == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
 
 
@@ -218,7 +218,7 @@ def test_min_output_tokens_floored_bug301(comfy_on, monkeypatch):
                 "text": ""}
 
     monkeypatch.setattr(occ, "_post_comfy_chat_completion", _fake_post)
-    occ.set_auth(auth_token="tok-abc")
+    occ.set_auth(api_key="key-abc")
     backend = occ.ComfyCreditsBackend()
     entry = backend.load(occ.SLOT_B_ID, types.SimpleNamespace(context_window=8192))
     backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=64)
@@ -259,10 +259,12 @@ def test_writer_appends_comfy_slots_after_openrouter():
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order[18] == "comfy_slot_a_model"
     assert order[19] == "comfy_slot_b_model"
-    # Hidden auth inputs are declared but are NOT widgets (absent from order).
-    assert "auth_token_comfy_org" in spec.get("hidden", {})
+    # The hidden auth input is declared but is NOT a widget (absent from order).
     assert "api_key_comfy_org" in spec.get("hidden", {})
-    assert "auth_token_comfy_org" not in order
+    assert "api_key_comfy_org" not in order
+    # PBUG-20260902-04: the session-bearer hidden input is a Comfy Registry
+    # prohibited string (critical, credential-access). It must never return.
+    assert "auth_token_comfy_org" not in spec.get("hidden", {})
 
 
 def test_comfy_slot_defaults_selectable_when_enabled(comfy_on):

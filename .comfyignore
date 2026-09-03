@@ -76,6 +76,21 @@ kibitz-runs/
 # `import scripts` anywhere in nodes/ or __init__.py. It is correct hygiene.
 # It was simply never the fix, and the next session should not re-run this
 # experiment expecting a different answer.
+#
+# 2026-09-02, RESOLVED (PBUG-20260902-04). The API now returns the reason:
+# GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true.
+# Every flagged version carries 2 CRITICAL pylint findings -- "Prohibited
+# string detected" for the session-bearer hidden input the writer's
+# INPUT_TYPES declared (admin tags any-code-execute, credential-access) --
+# plus ~156 INFO YARA findings (env reads, subprocess for ffmpeg, the opt-in
+# cloud requests). That hidden input had been in the tree since 2026-06-01;
+# alpha.8 shipped it and went Active, so the prohibition post-dates alpha.8's
+# scan. Bundle CONTENTS were never the cause, which is exactly what the
+# comparison above measured. The critical finding is fixed in code. The info
+# findings are how every other pack on Comfy-Org/registry-backend's tracker
+# reads too, and a version with ANY finding stays Flagged until an admin
+# batch-approves it -- so after the next publish the move is a manual review
+# request (docs/2026-09-02-registry-manual-review-request.md), not more diffs.
 scripts/*
 
 # 2026-09-01 (ship audit finding registry-flag-08): the scripts/ exclusion

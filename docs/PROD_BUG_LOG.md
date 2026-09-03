@@ -10364,3 +10364,70 @@ character-count check; it is a design fork for the next round, not a silent patc
 **Bug Bible:** covered by the existing entries for this PBUG (source-stated gender, sidecar
 carry-forward); the new verify condition worth promoting is "a stamped alias that no consumer
 reads" -- a producer/consumer key mismatch of the 12.86 shape, caught only by a live leg.
+
+
+## PBUG-20260902-04 -- every registry version since alpha.9 is Flagged: the writer declared the logged-in account's session-bearer hidden input, which the registry scanner now treats as credential access
+
+**Verified on the production registry (2026-09-02,
+`GET https://api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`):**
+`2.0.0-alpha.13`, `.14` and `.15` are all `NodeVersionStatusFlagged`; the node's `latest_version`
+is null, so ComfyUI Manager cannot resolve an install target. Each version carries 158 findings:
+2 `critical` from `pylint-scanner`, both `prohibited-string` on `nodes/OTR_LedgerScriptWriter.py`
+lines 2770-2771 (the `"hidden"` dict of `INPUT_TYPES` and its `auth_token_comfy_org` entry; admin
+tags `any-code-execute`, `credential-access`), plus 156 `info` YARA findings (101 environment
+reads/writes, 35 `subprocess` calls for ffmpeg/ffprobe and the isolated TTS workers, 12 ffmpeg
+argument-list matches, 5 network calls on the opt-in cloud lanes and the RSS fetcher, 1
+`kernel32.OpenProcess(SYNCHRONIZE)` liveness check, 1 sha256 of a model file, 1 `sys.modules`
+lookup). The sibling entry `api_key_comfy_org` on the next line is NOT flagged.
+
+**Root cause.** Commit fa812808 (2026-06-01, the Comfy Credits writer lane) declared both API-nodes
+hidden inputs on the writer so ComfyUI would inject the account bearer or the configured API key.
+alpha.8 (2026-08-25) shipped that dict and went Active, so the prohibition was added on the
+registry side after alpha.8's scan; every later version tripped it. The 2026-08-28/29 bundle-diff
+experiment recorded in `.comfyignore` could not have found this: the string was identical in the
+Active and the Flagged bundles, and the scanner exposed no reason at the time.
+
+**What the tracker shows (Comfy-Org/registry-backend issues #184-#220, read 2026-09-02):** a
+version with ANY finding, even one `info`, stays Flagged (comfyui-amdmonitor 1.6.0-1.7.1: 5 info
+each; comfyui-easyuse-anima 1.1.3-1.1.5: 3 info each; indextts25-t8 0.20.7: 1 info). Active comes
+only from a zero-finding scan (indextts25-t8 0.20.9+ after its author removed the last
+`subprocess.Popen`) or from an admin batch approval (`"Batch approved by admin", "by":
+"dr.lt.data@gmail.com"` on the older easyuse-anima versions). `openapi.yml` exposes exactly one
+status-changing route, `/admin/nodes/{nodeId}/versions/{versionNumber}` ("Only admins can approve a
+node version"); there is no publisher-facing review trigger and no issue template. Publishers open
+a "Manual review request" issue by convention, and none of the 20 open ones has a Comfy-Org reply
+(the one "response" on #220 is the author's own update). Admin review can also end in `Banned`
+under `policy-v0.2` (SSRF through a URL widget, an unauthenticated side-effect route). OTR
+exposes no URL/host widgets, but `__init__.py` DOES register HTTP routes: a read-only
+`GET /otr/latest_ledger` and two hand-built harness endpoints, `POST /otr/video_render_single`
+and `POST /otr/video_render_soak`, that start a render from an unauthenticated JSON body carrying
+caller-supplied file paths -- the easyuse-anima ban's class. The driver's own grep missed them
+(the output was truncated through `head`); the Sonnet QA pass on the finished diff caught the
+false "no routes" claim in the review draft. The draft now discloses them, and whether to gate
+them off by default (`OTR_ENABLE_HTTP_RENDER_ROUTES`) or drop them is an operator decision
+recorded at the top of the draft; the 09-01 ship audit's registry-flag-04 had refuted them only
+as the flag's cause.
+
+**What landed (commit follows this entry):**
+* `nodes/OTR_LedgerScriptWriter.py`: the `hidden` dict declares only `api_key_comfy_org`; the
+  `auth_token_comfy_org` kwarg and its `set_auth` threading are gone.
+* `nodes/_otr_comfy_backend.py`: `set_auth(*, api_key=None)`; `_bearer()` returns the API key
+  only. It already won over the bearer, so a user signed in with a key is byte-identical; a user
+  signed in without one now fails closed at the existing `ComfyCreditsConfigError` instead of
+  billing the session.
+* `tests/test_registry_prohibited_strings.py`: walks every Python file the bundle ships (mirrors
+  `.comfyignore`) and refuses the session-bearer type name anywhere, assembled at runtime so the
+  test never spells it. `tests/test_comfy_slot_widgets.py` asserts the hidden input stays absent.
+* `docs/comfy-credits-setup.md`: the lane requires signing in with a Comfy API key; a plain
+  account sign-in no longer enables it.
+* `docs/2026-09-02-registry-manual-review-request.md`: the review request to file on the tracker
+  once the fixed version is published (the 156 info findings will keep it Flagged until an admin
+  approves).
+
+**Next step (operator):** bump `pyproject.toml` to `2.0.0-alpha.16`, push, wait for the scan,
+confirm via the API that the two criticals are gone, then open the manual review request.
+
+**Bug Bible:** candidate -- "a registry scanner can add a prohibited pattern after a version went
+Active; diff the scanner's REPORTED REASON, never the bundle contents, and never declare the
+account session-token hidden input in a third-party pack." Verify condition is automatable (the
+new test).

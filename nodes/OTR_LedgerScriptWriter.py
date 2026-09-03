@@ -2762,13 +2762,20 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                                "OTR_WorkflowValidator.validation_report).",
                 }),
             },
-            # ComfyUI injects the logged-in account's credentials into these
-            # hidden inputs at execution time (the API-nodes auth convention).
-            # The writer threads them to _otr_comfy_backend.set_auth() so the
-            # Comfy Credits lane can make the credit-billed call. They are NOT
-            # widgets (absent from widgets_values) and are never logged.
+            # ComfyUI injects the configured Comfy API key into this hidden
+            # input at execution time (the API-nodes auth convention). The
+            # writer threads it to _otr_comfy_backend.set_auth() so the Comfy
+            # Credits lane can make the credit-billed call. It is NOT a widget
+            # (absent from widgets_values) and is never logged.
+            #
+            # The logged-in account's SESSION BEARER is deliberately not
+            # requested here. The Comfy Registry security scan treats a
+            # third-party pack that declares that hidden input as credential
+            # access and marks the version critical / Flagged: alpha.13
+            # through alpha.15 all carried exactly that finding on this dict
+            # (PBUG-20260902-04). The API key is the credential ComfyUI
+            # provides for this use, and the backend already preferred it.
             "hidden": {
-                "auth_token_comfy_org": "AUTH_TOKEN_COMFY_ORG",
                 "api_key_comfy_org": "API_KEY_COMFY_ORG",
             },
         }
@@ -2848,9 +2855,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # OpenRouter pair. Default "" => unset (resolves to recommended).
         comfy_slot_a_model="",
         comfy_slot_b_model="",
-        # ComfyUI-injected hidden auth (API-nodes convention). None when the
-        # operator is not logged in / the Comfy Credits lane is unused.
-        auth_token_comfy_org=None,
+        # ComfyUI-injected hidden auth (API-nodes convention): the configured
+        # Comfy API key. None when no key is configured / the Comfy Credits
+        # lane is unused.
         api_key_comfy_org=None,
         # Story-scaffold UI toggle (2026-06-24): auto/on/off. Governs the whole
         # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
@@ -3008,10 +3015,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 slot_a=comfy_slot_a_model,
                 slot_b=comfy_slot_b_model,
             )
-            _occ_budget.set_auth(
-                auth_token=auth_token_comfy_org,
-                api_key=api_key_comfy_org,
-            )
+            _occ_budget.set_auth(api_key=api_key_comfy_org)
         except Exception:  # noqa: BLE001 -- budget/binding setup is best-effort
             pass
 
