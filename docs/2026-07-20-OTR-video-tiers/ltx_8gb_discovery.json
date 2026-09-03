@@ -1,0 +1,3695 @@
+{
+  "server": "http://127.0.0.1:54684",
+  "total_object_info_classes": 1653,
+  "ltx_related_class_names": [
+    "EmptyLTXVLatentVideo",
+    "LTX2AttentionTunerPatch",
+    "LTX2AudioLatentNormalizingSampling",
+    "LTX2BlockLoraSelect",
+    "LTX2LoraLoaderAdvanced",
+    "LTX2MemoryEfficientSageAttentionPatch",
+    "LTX2SamplingPreviewOverride",
+    "LTX2_NAG",
+    "LTXAVTextEncoderLoader",
+    "LTXAddVideoICLoRAGuide",
+    "LTXAddVideoICLoRAGuideAdvanced",
+    "LTXAttentioOverride",
+    "LTXAttentionBank",
+    "LTXAttnOverride",
+    "LTXFetaEnhance",
+    "LTXFloatToInt",
+    "LTXFlowEditCFGGuider",
+    "LTXFlowEditSampler",
+    "LTXForwardModelSamplingPred",
+    "LTXICLoRALoaderModelOnly",
+    "LTXPerturbedAttention",
+    "LTXPrepareAttnInjections",
+    "LTXQ8Patch",
+    "LTXRFForwardODESampler",
+    "LTXRFReverseODESampler",
+    "LTXReverseModelSamplingPred",
+    "LTXVAdainLatent",
+    "LTXVAddGuide",
+    "LTXVAddGuideAdvanced",
+    "LTXVAddGuideAdvancedAttention",
+    "LTXVAddGuideMulti",
+    "LTXVAddGuidesFromBatch",
+    "LTXVAddLatentGuide",
+    "LTXVAddLatents",
+    "LTXVApplySTG",
+    "LTXVAudioVAEDecode",
+    "LTXVAudioVAEEncode",
+    "LTXVAudioVAELoader",
+    "LTXVAudioVideoMask",
+    "LTXVBaseSampler",
+    "LTXVChunkFeedForward",
+    "LTXVConcatAVLatent",
+    "LTXVConditioning",
+    "LTXVContextWindows",
+    "LTXVCropGuides",
+    "LTXVDilateLatent",
+    "LTXVDilateVideoMask",
+    "LTXVDrawTracks",
+    "LTXVEmptyLatentAudio",
+    "LTXVEnhanceAVideoKJ",
+    "LTXVExtendSampler",
+    "LTXVGemmaCLIPModelLoader",
+    "LTXVGemmaEnhancePrompt",
+    "LTXVHDRDecodePostprocess",
+    "LTXVImgToVideo",
+    "LTXVImgToVideoAdvanced",
+    "LTXVImgToVideoConditionOnly",
+    "LTXVImgToVideoInplace",
+    "LTXVImgToVideoInplaceKJ",
+    "LTXVInContextSampler",
+    "LTXVInpaintPreprocess",
+    "LTXVLaplacianPyramidBlend",
+    "LTXVLatentUpsampler",
+    "LTXVLinearOverlapLatentTransition",
+    "LTXVLoadConditioning",
+    "LTXVLoopingSampler",
+    "LTXVMultiPromptProvider",
+    "LTXVNormalizingSampler",
+    "LTXVPatcherVAE",
+    "LTXVPerStepAdainPatcher",
+    "LTXVPerStepStatNormPatcher",
+    "LTXVPreprocess",
+    "LTXVPreprocessMasks",
+    "LTXVPromptEnhancer",
+    "LTXVPromptEnhancerLoader",
+    "LTXVQ8LoraModelLoader",
+    "LTXVReferenceAudio",
+    "LTXVSaveConditioning",
+    "LTXVScheduler",
+    "LTXVSelectLatents",
+    "LTXVSeparateAVLatent",
+    "LTXVSetAudioVideoMaskByTime",
+    "LTXVSetVideoLatentNoiseMasks",
+    "LTXVSparseTrackEditor",
+    "LTXVSpatioTemporalTiledVAEDecode",
+    "LTXVStatNormLatent",
+    "LTXVTiledSampler",
+    "LTXVTiledVAEDecode",
+    "LtxvApiImageToVideo",
+    "LtxvApiTextToVideo",
+    "ModelMergeLTXV",
+    "ModelSamplingLTXV",
+    "ModifyLTXModel",
+    "ReLTXVPatcher",
+    "ReLTXVPatcherAdvanced",
+    "TextGenerateLTX2Prompt",
+    "TorchCompileLTXModel"
+  ],
+  "targets_present": [
+    "CheckpointLoaderSimple",
+    "UNETLoader",
+    "VAELoader",
+    "CLIPLoader",
+    "CLIPLoaderGGUF",
+    "DualCLIPLoader",
+    "EmptyLTXVLatentVideo",
+    "LTXVConditioning",
+    "LTXVImgToVideo",
+    "LTXVImgToVideoConditionOnly",
+    "LTXVScheduler",
+    "ModelSamplingLTXV",
+    "VAEDecode",
+    "VAEDecodeTiled",
+    "LTXVTiledVAEDecode",
+    "LTXQ8Patch",
+    "SamplerCustom",
+    "SamplerCustomAdvanced",
+    "KSamplerSelect",
+    "KSampler",
+    "LTXVBaseSampler",
+    "LTXVPreprocess",
+    "LTXVAddGuide",
+    "LTXVCropGuides"
+  ],
+  "targets_missing": [],
+  "normalized_hash_sha256": "4bde945eade1cf8f57519eecfd74ac64e1f2272a4ba4aeadfccb3f4594d87eb4",
+  "detail": {
+    "CheckpointLoaderSimple": {
+      "category": "model/loaders",
+      "output": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "output_name": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "input_required": {
+        "ckpt_name": {
+          "type": "COMBO",
+          "choices": [
+            "flux1-dev-fp8.safetensors",
+            "hunyuan3d-dit-v2-mv.safetensors",
+            "ltx-2.3-22b-dev.safetensors",
+            "ltx-video-2b-v0.9.safetensors",
+            "ltxv-2b-0.9.8-distilled.safetensors",
+            "stable-audio-open-1.0.safetensors",
+            "stable_audio_3_small_music.safetensors"
+          ],
+          "opts": {
+            "tooltip": "The name of the checkpoint (model) to load."
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "UNETLoader": {
+      "category": "model/loaders",
+      "output": [
+        "MODEL"
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "unet_name": {
+          "type": "COMBO",
+          "choices": [
+            "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+            "humo_1.7B_fp16.safetensors",
+            "humo_17B_fp8_e4m3fn.safetensors",
+            "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+            "lumina_2_model_bf16.safetensors",
+            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+            "z_image_turbo_nvfp4.safetensors"
+          ],
+          "opts": {}
+        },
+        "weight_dtype": {
+          "type": "COMBO",
+          "choices": [
+            "default",
+            "fp8_e4m3fn",
+            "fp8_e4m3fn_fast",
+            "fp8_e5m2"
+          ],
+          "opts": {
+            "advanced": true
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "VAELoader": {
+      "category": "model/loaders",
+      "output": [
+        "VAE"
+      ],
+      "output_name": [
+        "VAE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "vae_name": {
+          "type": "COMBO",
+          "choices": [
+            "ae.safetensors",
+            "flux2-vae.safetensors",
+            "ltx-2.3-22b-dev_audio_vae.safetensors",
+            "ltx-2.3-22b-dev_video_vae.safetensors",
+            "lumina2_ae.safetensors",
+            "vae\\ltx-2.3-22b-distilled_audio_vae.safetensors",
+            "vae\\ltx-2.3-22b-distilled_video_vae.safetensors",
+            "wan2.2_vae.safetensors",
+            "wan_2.1_vae.safetensors",
+            "pixel_space"
+          ],
+          "opts": {}
+        }
+      },
+      "input_optional": {}
+    },
+    "CLIPLoader": {
+      "category": "model/loaders",
+      "output": [
+        "CLIP"
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "clip_name": {
+          "type": "COMBO",
+          "choices": [
+            "gemma_2_2b_fp16.safetensors",
+            "gemma_3_12B_it_fp4_mixed.safetensors",
+            "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+            "mistral_3_small_flux2_fp4_mixed.safetensors",
+            "qwen_3_4b.safetensors",
+            "qwen_3_4b_fp8_mixed.safetensors",
+            "t5-base.safetensors",
+            "t5gemma_b_b_ul2.safetensors",
+            "t5xxl_fp16.safetensors",
+            "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+          ],
+          "opts": {}
+        },
+        "type": {
+          "type": "COMBO",
+          "choices": [
+            "stable_diffusion",
+            "stable_cascade",
+            "sd3",
+            "stable_audio",
+            "mochi",
+            "ltxv",
+            "pixart",
+            "cosmos",
+            "lumina2",
+            "wan",
+            "hidream",
+            "chroma",
+            "ace",
+            "omnigen2",
+            "qwen_image",
+            "hunyuan_image",
+            "flux2",
+            "ovis",
+            "longcat_image",
+            "cogvideox",
+            "lens",
+            "pixeldit",
+            "ideogram4",
+            "boogu",
+            "krea2"
+          ],
+          "opts": {}
+        }
+      },
+      "input_optional": {
+        "device": {
+          "type": "COMBO",
+          "choices": [
+            "default",
+            "cpu"
+          ],
+          "opts": {
+            "advanced": true
+          }
+        }
+      }
+    },
+    "CLIPLoaderGGUF": {
+      "category": "bootleg",
+      "output": [
+        "CLIP"
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "clip_name": {
+          "type": "COMBO",
+          "choices": [
+            "gemma_2_2b_fp16.safetensors",
+            "gemma_3_12B_it_fp4_mixed.safetensors",
+            "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+            "mistral_3_small_flux2_fp4_mixed.safetensors",
+            "qwen_3_4b.safetensors",
+            "qwen_3_4b_fp8_mixed.safetensors",
+            "t5-base.safetensors",
+            "t5gemma_b_b_ul2.safetensors",
+            "t5xxl_fp16.safetensors",
+            "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+            "umt5-xxl-encoder-Q5_K_M.gguf",
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+          ],
+          "opts": {}
+        },
+        "type": {
+          "type": "COMBO",
+          "choices": [
+            "stable_diffusion",
+            "stable_cascade",
+            "sd3",
+            "stable_audio",
+            "mochi",
+            "ltxv",
+            "pixart",
+            "cosmos",
+            "lumina2",
+            "wan",
+            "hidream",
+            "chroma",
+            "ace",
+            "omnigen2",
+            "qwen_image",
+            "hunyuan_image",
+            "flux2",
+            "ovis",
+            "longcat_image",
+            "cogvideox",
+            "lens",
+            "pixeldit",
+            "ideogram4",
+            "boogu",
+            "krea2"
+          ],
+          "opts": {}
+        }
+      },
+      "input_optional": {}
+    },
+    "DualCLIPLoader": {
+      "category": "model/loaders",
+      "output": [
+        "CLIP"
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "clip_name1": {
+          "type": "COMBO",
+          "choices": [
+            "gemma_2_2b_fp16.safetensors",
+            "gemma_3_12B_it_fp4_mixed.safetensors",
+            "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+            "mistral_3_small_flux2_fp4_mixed.safetensors",
+            "qwen_3_4b.safetensors",
+            "qwen_3_4b_fp8_mixed.safetensors",
+            "t5-base.safetensors",
+            "t5gemma_b_b_ul2.safetensors",
+            "t5xxl_fp16.safetensors",
+            "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+          ],
+          "opts": {}
+        },
+        "clip_name2": {
+          "type": "COMBO",
+          "choices": [
+            "gemma_2_2b_fp16.safetensors",
+            "gemma_3_12B_it_fp4_mixed.safetensors",
+            "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+            "mistral_3_small_flux2_fp4_mixed.safetensors",
+            "qwen_3_4b.safetensors",
+            "qwen_3_4b_fp8_mixed.safetensors",
+            "t5-base.safetensors",
+            "t5gemma_b_b_ul2.safetensors",
+            "t5xxl_fp16.safetensors",
+            "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+          ],
+          "opts": {}
+        },
+        "type": {
+          "type": "COMBO",
+          "choices": [
+            "sdxl",
+            "sd3",
+            "flux",
+            "hunyuan_video",
+            "hidream",
+            "hunyuan_image",
+            "hunyuan_video_15",
+            "kandinsky5",
+            "kandinsky5_image",
+            "ltxv",
+            "newbie",
+            "ace"
+          ],
+          "opts": {}
+        }
+      },
+      "input_optional": {
+        "device": {
+          "type": "COMBO",
+          "choices": [
+            "default",
+            "cpu"
+          ],
+          "opts": {
+            "advanced": true
+          }
+        }
+      }
+    },
+    "EmptyLTXVLatentVideo": {
+      "category": "model/latent/ltxv",
+      "output": [
+        "LATENT"
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "width": {
+          "type": "INT",
+          "opts": {
+            "default": 768,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "height": {
+          "type": "INT",
+          "opts": {
+            "default": 512,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "length": {
+          "type": "INT",
+          "opts": {
+            "default": 97,
+            "min": 1,
+            "max": 16384,
+            "step": 8
+          }
+        },
+        "batch_size": {
+          "type": "INT",
+          "opts": {
+            "default": 1,
+            "min": 1,
+            "max": 4096
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVConditioning": {
+      "category": "model/conditioning/ltxv",
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "output_name": [
+        "positive",
+        "negative"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "input_required": {
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "frame_rate": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 25.0,
+            "min": 0.0,
+            "max": 1000.0,
+            "step": 0.01
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVImgToVideo": {
+      "category": "model/conditioning/ltxv",
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "input_required": {
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "vae": {
+          "type": "VAE",
+          "opts": {}
+        },
+        "image": {
+          "type": "IMAGE",
+          "opts": {}
+        },
+        "width": {
+          "type": "INT",
+          "opts": {
+            "default": 768,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "height": {
+          "type": "INT",
+          "opts": {
+            "default": 512,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "length": {
+          "type": "INT",
+          "opts": {
+            "default": 97,
+            "min": 9,
+            "max": 16384,
+            "step": 8
+          }
+        },
+        "batch_size": {
+          "type": "INT",
+          "opts": {
+            "default": 1,
+            "min": 1,
+            "max": 4096
+          }
+        },
+        "strength": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVImgToVideoConditionOnly": {
+      "category": "conditioning/video_models",
+      "output": [
+        "LATENT"
+      ],
+      "output_name": [
+        "latent"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "vae": {
+          "type": "VAE",
+          "opts": {}
+        },
+        "image": {
+          "type": "IMAGE",
+          "opts": {}
+        },
+        "latent": {
+          "type": "LATENT",
+          "opts": {}
+        },
+        "strength": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0
+          }
+        }
+      },
+      "input_optional": {
+        "bypass": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": false,
+            "tooltip": "Bypass the conditioning."
+          }
+        }
+      }
+    },
+    "LTXVScheduler": {
+      "category": "model/sampling/schedulers",
+      "output": [
+        "SIGMAS"
+      ],
+      "output_name": [
+        "SIGMAS"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "steps": {
+          "type": "INT",
+          "opts": {
+            "default": 20,
+            "min": 1,
+            "max": 10000
+          }
+        },
+        "max_shift": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 2.05,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.01
+          }
+        },
+        "base_shift": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 0.95,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.01
+          }
+        },
+        "stretch": {
+          "type": "BOOLEAN",
+          "opts": {
+            "tooltip": "Stretch the sigmas to be in the range [terminal, 1].",
+            "advanced": true,
+            "default": true
+          }
+        },
+        "terminal": {
+          "type": "FLOAT",
+          "opts": {
+            "tooltip": "The terminal value of the sigmas after stretching.",
+            "advanced": true,
+            "default": 0.1,
+            "min": 0.0,
+            "max": 0.99,
+            "step": 0.01
+          }
+        }
+      },
+      "input_optional": {
+        "latent": {
+          "type": "LATENT",
+          "opts": {}
+        }
+      }
+    },
+    "ModelSamplingLTXV": {
+      "category": "model/patch/ltxv",
+      "output": [
+        "MODEL"
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "model": {
+          "type": "MODEL",
+          "opts": {}
+        },
+        "max_shift": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 2.05,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.01
+          }
+        },
+        "base_shift": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 0.95,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.01
+          }
+        }
+      },
+      "input_optional": {
+        "latent": {
+          "type": "LATENT",
+          "opts": {}
+        }
+      }
+    },
+    "VAEDecode": {
+      "category": "model/latent",
+      "output": [
+        "IMAGE"
+      ],
+      "output_name": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "samples": {
+          "type": "LATENT",
+          "opts": {
+            "tooltip": "The latent to be decoded."
+          }
+        },
+        "vae": {
+          "type": "VAE",
+          "opts": {
+            "tooltip": "The VAE model used for decoding the latent."
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "VAEDecodeTiled": {
+      "category": "model/latent",
+      "output": [
+        "IMAGE"
+      ],
+      "output_name": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "samples": {
+          "type": "LATENT",
+          "opts": {}
+        },
+        "vae": {
+          "type": "VAE",
+          "opts": {}
+        },
+        "tile_size": {
+          "type": "INT",
+          "opts": {
+            "default": 512,
+            "min": 64,
+            "max": 4096,
+            "step": 32,
+            "advanced": true
+          }
+        },
+        "overlap": {
+          "type": "INT",
+          "opts": {
+            "default": 64,
+            "min": 0,
+            "max": 4096,
+            "step": 32,
+            "advanced": true
+          }
+        },
+        "temporal_size": {
+          "type": "INT",
+          "opts": {
+            "default": 64,
+            "min": 8,
+            "max": 4096,
+            "step": 4,
+            "tooltip": "Only used for video VAEs: Amount of frames to decode at a time.",
+            "advanced": true
+          }
+        },
+        "temporal_overlap": {
+          "type": "INT",
+          "opts": {
+            "default": 8,
+            "min": 4,
+            "max": 4096,
+            "step": 4,
+            "tooltip": "Only used for video VAEs: Amount of frames to overlap.",
+            "advanced": true
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVTiledVAEDecode": {
+      "category": "latent",
+      "output": [
+        "IMAGE"
+      ],
+      "output_name": [
+        "image"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "vae": {
+          "type": "VAE",
+          "opts": {}
+        },
+        "latents": {
+          "type": "LATENT",
+          "opts": {}
+        },
+        "horizontal_tiles": {
+          "type": "INT",
+          "opts": {
+            "default": 1,
+            "min": 1,
+            "max": 6
+          }
+        },
+        "vertical_tiles": {
+          "type": "INT",
+          "opts": {
+            "default": 1,
+            "min": 1,
+            "max": 6
+          }
+        },
+        "overlap": {
+          "type": "INT",
+          "opts": {
+            "default": 1,
+            "min": 1,
+            "max": 8
+          }
+        },
+        "last_frame_fix": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": false
+          }
+        }
+      },
+      "input_optional": {
+        "working_device": {
+          "type": "COMBO",
+          "choices": [
+            "cpu",
+            "auto"
+          ],
+          "opts": {
+            "default": "auto"
+          }
+        },
+        "working_dtype": {
+          "type": "COMBO",
+          "choices": [
+            "float16",
+            "float32",
+            "auto"
+          ],
+          "opts": {
+            "default": "auto"
+          }
+        }
+      }
+    },
+    "LTXQ8Patch": {
+      "category": "lightricks/LTXV",
+      "output": [
+        "MODEL"
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "model": {
+          "type": "MODEL",
+          "opts": {}
+        },
+        "use_fp8_attention": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": false,
+            "tooltip": "Use FP8 attention."
+          }
+        },
+        "quantization_preset": {
+          "type": "COMBO",
+          "choices": [
+            "0.9.8",
+            "ltxv2",
+            "full_bf16",
+            "custom"
+          ],
+          "opts": {
+            "default": "0.9.8"
+          }
+        },
+        "quantize_self_attn": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": true,
+            "tooltip": "Quantize Self Attention Layer"
+          }
+        },
+        "quantize_cross_attn": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": true,
+            "tooltip": "Quantize Cross Attention Layer"
+          }
+        },
+        "quantize_ffn": {
+          "type": "BOOLEAN",
+          "opts": {
+            "default": true,
+            "tooltip": "Quantize Feed Forward Layer"
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "SamplerCustom": {
+      "category": "model/sampling/custom",
+      "output": [
+        "LATENT",
+        "LATENT"
+      ],
+      "output_name": [
+        "output",
+        "denoised_output"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "input_required": {
+        "model": {
+          "type": "MODEL",
+          "opts": {}
+        },
+        "add_noise": {
+          "type": "BOOLEAN",
+          "opts": {
+            "advanced": true,
+            "default": true
+          }
+        },
+        "noise_seed": {
+          "type": "INT",
+          "opts": {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true
+          }
+        },
+        "cfg": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 8.0,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.1,
+            "round": 0.01
+          }
+        },
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "sampler": {
+          "type": "SAMPLER",
+          "opts": {}
+        },
+        "sigmas": {
+          "type": "SIGMAS",
+          "opts": {}
+        },
+        "latent_image": {
+          "type": "LATENT",
+          "opts": {}
+        }
+      },
+      "input_optional": {}
+    },
+    "SamplerCustomAdvanced": {
+      "category": "model/sampling/custom",
+      "output": [
+        "LATENT",
+        "LATENT"
+      ],
+      "output_name": [
+        "output",
+        "denoised_output"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "input_required": {
+        "noise": {
+          "type": "NOISE",
+          "opts": {}
+        },
+        "guider": {
+          "type": "GUIDER",
+          "opts": {}
+        },
+        "sampler": {
+          "type": "SAMPLER",
+          "opts": {}
+        },
+        "sigmas": {
+          "type": "SIGMAS",
+          "opts": {}
+        },
+        "latent_image": {
+          "type": "LATENT",
+          "opts": {}
+        }
+      },
+      "input_optional": {}
+    },
+    "KSamplerSelect": {
+      "category": "model/sampling/samplers",
+      "output": [
+        "SAMPLER"
+      ],
+      "output_name": [
+        "SAMPLER"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "sampler_name": {
+          "type": "COMBO",
+          "opts": {
+            "multiselect": false,
+            "options": [
+              "euler",
+              "euler_cfg_pp",
+              "euler_ancestral",
+              "euler_ancestral_cfg_pp",
+              "heun",
+              "heunpp2",
+              "exp_heun_2_x0",
+              "exp_heun_2_x0_sde",
+              "dpm_2",
+              "dpm_2_ancestral",
+              "lms",
+              "dpm_fast",
+              "dpm_adaptive",
+              "dpmpp_2s_ancestral",
+              "dpmpp_2s_ancestral_cfg_pp",
+              "dpmpp_sde",
+              "dpmpp_sde_gpu",
+              "dpmpp_2m",
+              "dpmpp_2m_cfg_pp",
+              "dpmpp_2m_sde",
+              "dpmpp_2m_sde_gpu",
+              "dpmpp_2m_sde_heun",
+              "dpmpp_2m_sde_heun_gpu",
+              "dpmpp_3m_sde",
+              "dpmpp_3m_sde_gpu",
+              "ddpm",
+              "lcm",
+              "ipndm",
+              "ipndm_v",
+              "deis",
+              "res_multistep",
+              "res_multistep_cfg_pp",
+              "res_multistep_ancestral",
+              "res_multistep_ancestral_cfg_pp",
+              "gradient_estimation",
+              "gradient_estimation_cfg_pp",
+              "er_sde",
+              "seeds_2",
+              "seeds_3",
+              "sa_solver",
+              "sa_solver_pece",
+              "ddim",
+              "uni_pc",
+              "uni_pc_bh2",
+              "legacy_rk",
+              "rk",
+              "rk_beta",
+              "deis_3m_ode",
+              "deis_2m_ode",
+              "deis_3m",
+              "deis_2m",
+              "res_6s_ode",
+              "res_5s_ode",
+              "res_3s_ode",
+              "res_2s_ode",
+              "res_3m_ode",
+              "res_2m_ode",
+              "res_6s",
+              "res_5s",
+              "res_3s",
+              "res_2s",
+              "res_3m",
+              "res_2m"
+            ]
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "KSampler": {
+      "category": "model/sampling",
+      "output": [
+        "LATENT"
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "model": {
+          "type": "MODEL",
+          "opts": {
+            "tooltip": "The model used for denoising the input latent."
+          }
+        },
+        "seed": {
+          "type": "INT",
+          "opts": {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true,
+            "tooltip": "The random seed used for creating the noise."
+          }
+        },
+        "steps": {
+          "type": "INT",
+          "opts": {
+            "default": 20,
+            "min": 1,
+            "max": 10000,
+            "tooltip": "The number of steps used in the denoising process."
+          }
+        },
+        "cfg": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 8.0,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.1,
+            "round": 0.01,
+            "tooltip": "The Classifier-Free Guidance scale balances creativity and adherence to the prompt. Higher values result in images more closely matching the prompt however too high values will negatively impact quality."
+          }
+        },
+        "sampler_name": {
+          "type": "COMBO",
+          "choices": [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2",
+            "legacy_rk",
+            "rk",
+            "rk_beta",
+            "deis_3m_ode",
+            "deis_2m_ode",
+            "deis_3m",
+            "deis_2m",
+            "res_6s_ode",
+            "res_5s_ode",
+            "res_3s_ode",
+            "res_2s_ode",
+            "res_3m_ode",
+            "res_2m_ode",
+            "res_6s",
+            "res_5s",
+            "res_3s",
+            "res_2s",
+            "res_3m",
+            "res_2m"
+          ],
+          "opts": {
+            "tooltip": "The algorithm used when sampling, this can affect the quality, speed, and style of the generated output."
+          }
+        },
+        "scheduler": {
+          "type": "COMBO",
+          "choices": [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal",
+            "bong_tangent",
+            "beta57"
+          ],
+          "opts": {
+            "tooltip": "The scheduler controls how noise is gradually removed to form the image."
+          }
+        },
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {
+            "tooltip": "The conditioning describing the attributes you want to include in the image."
+          }
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {
+            "tooltip": "The conditioning describing the attributes you want to exclude from the image."
+          }
+        },
+        "latent_image": {
+          "type": "LATENT",
+          "opts": {
+            "tooltip": "The latent image to denoise."
+          }
+        },
+        "denoise": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "tooltip": "The amount of denoising applied, lower values will maintain the structure of the initial image allowing for image to image sampling."
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVBaseSampler": {
+      "category": "sampling",
+      "output": [
+        "LATENT",
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "output_name": [
+        "denoised",
+        "positive",
+        "negative"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "input_required": {
+        "model": {
+          "type": "MODEL",
+          "opts": {
+            "tooltip": "The diffusion model to use."
+          }
+        },
+        "vae": {
+          "type": "VAE",
+          "opts": {
+            "tooltip": "The VAE to use."
+          }
+        },
+        "width": {
+          "type": "INT",
+          "opts": {
+            "default": 768,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "height": {
+          "type": "INT",
+          "opts": {
+            "default": 512,
+            "min": 64,
+            "max": 16384,
+            "step": 32
+          }
+        },
+        "num_frames": {
+          "type": "INT",
+          "opts": {
+            "default": 97,
+            "min": 1,
+            "max": 16384,
+            "step": 8
+          }
+        },
+        "guider": {
+          "type": "GUIDER",
+          "opts": {
+            "tooltip": "The guider to use, must be a STGGuiderAdvanced."
+          }
+        },
+        "sampler": {
+          "type": "SAMPLER",
+          "opts": {
+            "tooltip": "The sampler to use."
+          }
+        },
+        "sigmas": {
+          "type": "SIGMAS",
+          "opts": {
+            "tooltip": "The sigmas to use."
+          }
+        },
+        "noise": {
+          "type": "NOISE",
+          "opts": {
+            "tooltip": "The noise to use for the sampling."
+          }
+        }
+      },
+      "input_optional": {
+        "optional_cond_images": {
+          "type": "IMAGE",
+          "opts": {
+            "tooltip": "The images to use for conditioning the sampling."
+          }
+        },
+        "optional_cond_indices": {
+          "type": "STRING",
+          "opts": {
+            "tooltip": "The indices of the images to use for conditioning the sampling."
+          }
+        },
+        "strength": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 0.9,
+            "min": 0,
+            "max": 1,
+            "tooltip": "The strength of the conditioning on the images."
+          }
+        },
+        "crop": {
+          "type": "COMBO",
+          "choices": [
+            "center",
+            "disabled"
+          ],
+          "opts": {
+            "default": "disabled",
+            "tooltip": "The crop mode to use for the images."
+          }
+        },
+        "crf": {
+          "type": "INT",
+          "opts": {
+            "default": 35,
+            "min": 0,
+            "max": 100,
+            "tooltip": "The CRF value to use for preprocessing the images."
+          }
+        },
+        "blur": {
+          "type": "INT",
+          "opts": {
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "tooltip": "The blur value to use for preprocessing the images."
+          }
+        }
+      }
+    },
+    "LTXVPreprocess": {
+      "category": "video/preprocessors",
+      "output": [
+        "IMAGE"
+      ],
+      "output_name": [
+        "output_image"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "input_required": {
+        "image": {
+          "type": "IMAGE",
+          "opts": {}
+        },
+        "img_compression": {
+          "type": "INT",
+          "opts": {
+            "tooltip": "Amount of compression to apply on image.",
+            "default": 35,
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "input_optional": {}
+    },
+    "LTXVAddGuide": {
+      "category": "model/conditioning/ltxv",
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "input_required": {
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "vae": {
+          "type": "VAE",
+          "opts": {}
+        },
+        "latent": {
+          "type": "LATENT",
+          "opts": {}
+        },
+        "image": {
+          "type": "IMAGE",
+          "opts": {
+            "tooltip": "Image or video to condition the latent video on. Must be 8*n + 1 frames. If the video is not 8*n + 1 frames, it will be cropped to the nearest 8*n + 1 frames."
+          }
+        },
+        "frame_idx": {
+          "type": "INT",
+          "opts": {
+            "tooltip": "Frame index to start the conditioning at. For single-frame images or videos with 1-8 frames, any frame_idx value is acceptable. For videos with 9+ frames, frame_idx must be divisible by 8, otherwise it will be rounded down to the nearest multiple of 8. Negative values are counted from the end of the video.",
+            "default": 0,
+            "min": -9999,
+            "max": 9999
+          }
+        },
+        "strength": {
+          "type": "FLOAT",
+          "opts": {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.01
+          }
+        }
+      },
+      "input_optional": {
+        "attention_mask": {
+          "type": "MASK",
+          "opts": {
+            "tooltip": "Optional pixel-space spatial mask. Controls per-region conditioning influence via self-attention, multiplied by strength."
+          }
+        },
+        "iclora_parameters": {
+          "type": "IC_LORA_PARAMETERS",
+          "opts": {
+            "tooltip": "Optional IC-LoRA parameters from a Get IC-LoRA Parameters node. Used for adjusting guide processing as required by certain IC-LoRAs (eg. those with a reference_downscale_factor > 1). When chained, each LTXVAddGuide uses only the parameters connected to it."
+          }
+        }
+      }
+    },
+    "LTXVCropGuides": {
+      "category": "model/conditioning/ltxv",
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "input_required": {
+        "positive": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "negative": {
+          "type": "CONDITIONING",
+          "opts": {}
+        },
+        "latent": {
+          "type": "LATENT",
+          "opts": {}
+        }
+      },
+      "input_optional": {}
+    }
+  },
+  "raw_targets": {
+    "CheckpointLoaderSimple": {
+      "input": {
+        "required": {
+          "ckpt_name": [
+            [
+              "flux1-dev-fp8.safetensors",
+              "hunyuan3d-dit-v2-mv.safetensors",
+              "ltx-2.3-22b-dev.safetensors",
+              "ltx-video-2b-v0.9.safetensors",
+              "ltxv-2b-0.9.8-distilled.safetensors",
+              "stable-audio-open-1.0.safetensors",
+              "stable_audio_3_small_music.safetensors"
+            ],
+            {
+              "tooltip": "The name of the checkpoint (model) to load."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "ckpt_name"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "MODEL",
+        "CLIP",
+        "VAE"
+      ],
+      "name": "CheckpointLoaderSimple",
+      "display_name": "Load Checkpoint",
+      "description": "Loads a diffusion model checkpoint, diffusion models are used to denoise latents.",
+      "python_module": "nodes",
+      "category": "model/loaders",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "output_tooltips": [
+        "The model used for denoising latents.",
+        "The CLIP model used for encoding text prompts.",
+        "The VAE model used for encoding and decoding images to and from latent space."
+      ],
+      "search_aliases": [
+        "load model",
+        "checkpoint",
+        "model loader",
+        "load checkpoint",
+        "ckpt",
+        "model"
+      ]
+    },
+    "UNETLoader": {
+      "input": {
+        "required": {
+          "unet_name": [
+            [
+              "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+              "humo_1.7B_fp16.safetensors",
+              "humo_17B_fp8_e4m3fn.safetensors",
+              "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+              "lumina_2_model_bf16.safetensors",
+              "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+              "z_image_turbo_nvfp4.safetensors"
+            ]
+          ],
+          "weight_dtype": [
+            [
+              "default",
+              "fp8_e4m3fn",
+              "fp8_e4m3fn_fast",
+              "fp8_e5m2"
+            ],
+            {
+              "advanced": true
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "unet_name",
+          "weight_dtype"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "name": "UNETLoader",
+      "display_name": "Load Diffusion Model",
+      "description": "",
+      "python_module": "nodes",
+      "category": "model/loaders",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "VAELoader": {
+      "input": {
+        "required": {
+          "vae_name": [
+            [
+              "ae.safetensors",
+              "flux2-vae.safetensors",
+              "ltx-2.3-22b-dev_audio_vae.safetensors",
+              "ltx-2.3-22b-dev_video_vae.safetensors",
+              "lumina2_ae.safetensors",
+              "vae\\ltx-2.3-22b-distilled_audio_vae.safetensors",
+              "vae\\ltx-2.3-22b-distilled_video_vae.safetensors",
+              "wan2.2_vae.safetensors",
+              "wan_2.1_vae.safetensors",
+              "pixel_space"
+            ]
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "vae_name"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "VAE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "VAE"
+      ],
+      "name": "VAELoader",
+      "display_name": "Load VAE",
+      "description": "",
+      "python_module": "nodes",
+      "category": "model/loaders",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "CLIPLoader": {
+      "input": {
+        "required": {
+          "clip_name": [
+            [
+              "gemma_2_2b_fp16.safetensors",
+              "gemma_3_12B_it_fp4_mixed.safetensors",
+              "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+              "mistral_3_small_flux2_fp4_mixed.safetensors",
+              "qwen_3_4b.safetensors",
+              "qwen_3_4b_fp8_mixed.safetensors",
+              "t5-base.safetensors",
+              "t5gemma_b_b_ul2.safetensors",
+              "t5xxl_fp16.safetensors",
+              "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+              "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+            ]
+          ],
+          "type": [
+            [
+              "stable_diffusion",
+              "stable_cascade",
+              "sd3",
+              "stable_audio",
+              "mochi",
+              "ltxv",
+              "pixart",
+              "cosmos",
+              "lumina2",
+              "wan",
+              "hidream",
+              "chroma",
+              "ace",
+              "omnigen2",
+              "qwen_image",
+              "hunyuan_image",
+              "flux2",
+              "ovis",
+              "longcat_image",
+              "cogvideox",
+              "lens",
+              "pixeldit",
+              "ideogram4",
+              "boogu",
+              "krea2"
+            ]
+          ]
+        },
+        "optional": {
+          "device": [
+            [
+              "default",
+              "cpu"
+            ],
+            {
+              "advanced": true
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "clip_name",
+          "type"
+        ],
+        "optional": [
+          "device"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "name": "CLIPLoader",
+      "display_name": "Load CLIP",
+      "description": "Recipes:\nsd: clip-l\nstable cascade: clip-g\nsd3: t5 xxl / clip-g / clip-l\nstable audio: t5 base\nmochi: t5 xxl\ncogvideox: t5 xxl (226-token padding)\ncosmos: old t5 xxl\nlumina2: gemma 2 2B\nwan: umt5 xxl\nhidream: llama-3.1 (Recommend) or t5\nomnigen2: qwen vl 2.5 3B\nlens: gpt-oss-20b\npixeldit: gemma 2 2B elm",
+      "python_module": "nodes",
+      "category": "model/loaders",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "CLIPLoaderGGUF": {
+      "input": {
+        "required": {
+          "clip_name": [
+            [
+              "gemma_2_2b_fp16.safetensors",
+              "gemma_3_12B_it_fp4_mixed.safetensors",
+              "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+              "mistral_3_small_flux2_fp4_mixed.safetensors",
+              "qwen_3_4b.safetensors",
+              "qwen_3_4b_fp8_mixed.safetensors",
+              "t5-base.safetensors",
+              "t5gemma_b_b_ul2.safetensors",
+              "t5xxl_fp16.safetensors",
+              "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+              "umt5-xxl-encoder-Q5_K_M.gguf",
+              "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+            ]
+          ],
+          "type": [
+            [
+              "stable_diffusion",
+              "stable_cascade",
+              "sd3",
+              "stable_audio",
+              "mochi",
+              "ltxv",
+              "pixart",
+              "cosmos",
+              "lumina2",
+              "wan",
+              "hidream",
+              "chroma",
+              "ace",
+              "omnigen2",
+              "qwen_image",
+              "hunyuan_image",
+              "flux2",
+              "ovis",
+              "longcat_image",
+              "cogvideox",
+              "lens",
+              "pixeldit",
+              "ideogram4",
+              "boogu",
+              "krea2"
+            ]
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "clip_name",
+          "type"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "name": "CLIPLoaderGGUF",
+      "display_name": "CLIPLoader (GGUF)",
+      "description": "",
+      "python_module": "custom_nodes.ComfyUI-GGUF",
+      "category": "bootleg",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "DualCLIPLoader": {
+      "input": {
+        "required": {
+          "clip_name1": [
+            [
+              "gemma_2_2b_fp16.safetensors",
+              "gemma_3_12B_it_fp4_mixed.safetensors",
+              "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+              "mistral_3_small_flux2_fp4_mixed.safetensors",
+              "qwen_3_4b.safetensors",
+              "qwen_3_4b_fp8_mixed.safetensors",
+              "t5-base.safetensors",
+              "t5gemma_b_b_ul2.safetensors",
+              "t5xxl_fp16.safetensors",
+              "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+              "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+            ]
+          ],
+          "clip_name2": [
+            [
+              "gemma_2_2b_fp16.safetensors",
+              "gemma_3_12B_it_fp4_mixed.safetensors",
+              "ltx-2.3-22b-dev_embeddings_connectors.safetensors",
+              "mistral_3_small_flux2_fp4_mixed.safetensors",
+              "qwen_3_4b.safetensors",
+              "qwen_3_4b_fp8_mixed.safetensors",
+              "t5-base.safetensors",
+              "t5gemma_b_b_ul2.safetensors",
+              "t5xxl_fp16.safetensors",
+              "text_encoders\\ltx-2.3-22b-distilled_embeddings_connectors.safetensors",
+              "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+            ]
+          ],
+          "type": [
+            [
+              "sdxl",
+              "sd3",
+              "flux",
+              "hunyuan_video",
+              "hidream",
+              "hunyuan_image",
+              "hunyuan_video_15",
+              "kandinsky5",
+              "kandinsky5_image",
+              "ltxv",
+              "newbie",
+              "ace"
+            ]
+          ]
+        },
+        "optional": {
+          "device": [
+            [
+              "default",
+              "cpu"
+            ],
+            {
+              "advanced": true
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "clip_name1",
+          "clip_name2",
+          "type"
+        ],
+        "optional": [
+          "device"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CLIP"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "CLIP"
+      ],
+      "name": "DualCLIPLoader",
+      "display_name": "Load CLIP (Dual)",
+      "description": "Recipes:\nsdxl: clip-l, clip-g\nsd3: clip-l, clip-g / clip-l, t5 / clip-g, t5\nflux: clip-l, t5\nhidream: at least one of t5 or llama, recommended t5 and llama\nhunyuan_image: qwen2.5vl 7b and byt5 small\nnewbie: gemma-3-4b-it, jina clip v2",
+      "python_module": "nodes",
+      "category": "model/loaders",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "EmptyLTXVLatentVideo": {
+      "input": {
+        "required": {
+          "width": [
+            "INT",
+            {
+              "default": 768,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "height": [
+            "INT",
+            {
+              "default": 512,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "length": [
+            "INT",
+            {
+              "default": 97,
+              "min": 1,
+              "max": 16384,
+              "step": 8
+            }
+          ],
+          "batch_size": [
+            "INT",
+            {
+              "default": 1,
+              "min": 1,
+              "max": 4096
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "width",
+          "height",
+          "length",
+          "batch_size"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "output_tooltips": [
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "EmptyLTXVLatentVideo",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/latent/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "LTXVConditioning": {
+      "input": {
+        "required": {
+          "positive": [
+            "CONDITIONING",
+            {}
+          ],
+          "negative": [
+            "CONDITIONING",
+            {}
+          ],
+          "frame_rate": [
+            "FLOAT",
+            {
+              "default": 25.0,
+              "min": 0.0,
+              "max": 1000.0,
+              "step": 0.01
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "positive",
+          "negative",
+          "frame_rate"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "output_name": [
+        "positive",
+        "negative"
+      ],
+      "output_tooltips": [
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVConditioning",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/conditioning/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "LTXVImgToVideo": {
+      "input": {
+        "required": {
+          "positive": [
+            "CONDITIONING",
+            {}
+          ],
+          "negative": [
+            "CONDITIONING",
+            {}
+          ],
+          "vae": [
+            "VAE",
+            {}
+          ],
+          "image": [
+            "IMAGE",
+            {}
+          ],
+          "width": [
+            "INT",
+            {
+              "default": 768,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "height": [
+            "INT",
+            {
+              "default": 512,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "length": [
+            "INT",
+            {
+              "default": 97,
+              "min": 9,
+              "max": 16384,
+              "step": 8
+            }
+          ],
+          "batch_size": [
+            "INT",
+            {
+              "default": 1,
+              "min": 1,
+              "max": 4096
+            }
+          ],
+          "strength": [
+            "FLOAT",
+            {
+              "default": 1.0,
+              "min": 0.0,
+              "max": 1.0
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "positive",
+          "negative",
+          "vae",
+          "image",
+          "width",
+          "height",
+          "length",
+          "batch_size",
+          "strength"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_tooltips": [
+        null,
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVImgToVideo",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/conditioning/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "LTXVImgToVideoConditionOnly": {
+      "input": {
+        "required": {
+          "vae": [
+            "VAE"
+          ],
+          "image": [
+            "IMAGE"
+          ],
+          "latent": [
+            "LATENT"
+          ],
+          "strength": [
+            "FLOAT",
+            {
+              "default": 1.0,
+              "min": 0.0,
+              "max": 1.0
+            }
+          ]
+        },
+        "optional": {
+          "bypass": [
+            "BOOLEAN",
+            {
+              "default": false,
+              "tooltip": "Bypass the conditioning."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "vae",
+          "image",
+          "latent",
+          "strength"
+        ],
+        "optional": [
+          "bypass"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "latent"
+      ],
+      "name": "LTXVImgToVideoConditionOnly",
+      "display_name": "🅛🅣🅧 LTXV Img To Video Condition Only",
+      "description": "Applies image conditioning to the first frames of an existing latent. Creates a noise mask to control conditioning strength.",
+      "python_module": "custom_nodes.ComfyUI-LTXVideo",
+      "category": "conditioning/video_models",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "LTXVScheduler": {
+      "input": {
+        "required": {
+          "steps": [
+            "INT",
+            {
+              "default": 20,
+              "min": 1,
+              "max": 10000
+            }
+          ],
+          "max_shift": [
+            "FLOAT",
+            {
+              "default": 2.05,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.01
+            }
+          ],
+          "base_shift": [
+            "FLOAT",
+            {
+              "default": 0.95,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.01
+            }
+          ],
+          "stretch": [
+            "BOOLEAN",
+            {
+              "tooltip": "Stretch the sigmas to be in the range [terminal, 1].",
+              "advanced": true,
+              "default": true
+            }
+          ],
+          "terminal": [
+            "FLOAT",
+            {
+              "tooltip": "The terminal value of the sigmas after stretching.",
+              "advanced": true,
+              "default": 0.1,
+              "min": 0.0,
+              "max": 0.99,
+              "step": 0.01
+            }
+          ]
+        },
+        "optional": {
+          "latent": [
+            "LATENT",
+            {}
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "steps",
+          "max_shift",
+          "base_shift",
+          "stretch",
+          "terminal"
+        ],
+        "optional": [
+          "latent"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "SIGMAS"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "SIGMAS"
+      ],
+      "output_tooltips": [
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVScheduler",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/sampling/schedulers",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "ModelSamplingLTXV": {
+      "input": {
+        "required": {
+          "model": [
+            "MODEL",
+            {}
+          ],
+          "max_shift": [
+            "FLOAT",
+            {
+              "default": 2.05,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.01
+            }
+          ],
+          "base_shift": [
+            "FLOAT",
+            {
+              "default": 0.95,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.01
+            }
+          ]
+        },
+        "optional": {
+          "latent": [
+            "LATENT",
+            {}
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "max_shift",
+          "base_shift"
+        ],
+        "optional": [
+          "latent"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "output_tooltips": [
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "ModelSamplingLTXV",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/patch/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "VAEDecode": {
+      "input": {
+        "required": {
+          "samples": [
+            "LATENT",
+            {
+              "tooltip": "The latent to be decoded."
+            }
+          ],
+          "vae": [
+            "VAE",
+            {
+              "tooltip": "The VAE model used for decoding the latent."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "samples",
+          "vae"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "IMAGE"
+      ],
+      "name": "VAEDecode",
+      "display_name": "VAE Decode",
+      "description": "Decodes latent images back into pixel space images.",
+      "python_module": "nodes",
+      "category": "model/latent",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "output_tooltips": [
+        "The decoded image."
+      ],
+      "search_aliases": [
+        "decode",
+        "decode latent",
+        "latent to image",
+        "render latent"
+      ]
+    },
+    "VAEDecodeTiled": {
+      "input": {
+        "required": {
+          "samples": [
+            "LATENT"
+          ],
+          "vae": [
+            "VAE"
+          ],
+          "tile_size": [
+            "INT",
+            {
+              "default": 512,
+              "min": 64,
+              "max": 4096,
+              "step": 32,
+              "advanced": true
+            }
+          ],
+          "overlap": [
+            "INT",
+            {
+              "default": 64,
+              "min": 0,
+              "max": 4096,
+              "step": 32,
+              "advanced": true
+            }
+          ],
+          "temporal_size": [
+            "INT",
+            {
+              "default": 64,
+              "min": 8,
+              "max": 4096,
+              "step": 4,
+              "tooltip": "Only used for video VAEs: Amount of frames to decode at a time.",
+              "advanced": true
+            }
+          ],
+          "temporal_overlap": [
+            "INT",
+            {
+              "default": 8,
+              "min": 4,
+              "max": 4096,
+              "step": 4,
+              "tooltip": "Only used for video VAEs: Amount of frames to overlap.",
+              "advanced": true
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "samples",
+          "vae",
+          "tile_size",
+          "overlap",
+          "temporal_size",
+          "temporal_overlap"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "IMAGE"
+      ],
+      "name": "VAEDecodeTiled",
+      "display_name": "VAE Decode (Tiled)",
+      "description": "",
+      "python_module": "nodes",
+      "category": "model/latent",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "LTXVTiledVAEDecode": {
+      "input": {
+        "required": {
+          "vae": [
+            "VAE"
+          ],
+          "latents": [
+            "LATENT"
+          ],
+          "horizontal_tiles": [
+            "INT",
+            {
+              "default": 1,
+              "min": 1,
+              "max": 6
+            }
+          ],
+          "vertical_tiles": [
+            "INT",
+            {
+              "default": 1,
+              "min": 1,
+              "max": 6
+            }
+          ],
+          "overlap": [
+            "INT",
+            {
+              "default": 1,
+              "min": 1,
+              "max": 8
+            }
+          ],
+          "last_frame_fix": [
+            "BOOLEAN",
+            {
+              "default": false
+            }
+          ]
+        },
+        "optional": {
+          "working_device": [
+            [
+              "cpu",
+              "auto"
+            ],
+            {
+              "default": "auto"
+            }
+          ],
+          "working_dtype": [
+            [
+              "float16",
+              "float32",
+              "auto"
+            ],
+            {
+              "default": "auto"
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "vae",
+          "latents",
+          "horizontal_tiles",
+          "vertical_tiles",
+          "overlap",
+          "last_frame_fix"
+        ],
+        "optional": [
+          "working_device",
+          "working_dtype"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "image"
+      ],
+      "name": "LTXVTiledVAEDecode",
+      "display_name": "🅛🅣🅧 LTXV Tiled VAE Decode",
+      "description": "",
+      "python_module": "custom_nodes.ComfyUI-LTXVideo",
+      "category": "latent",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "LTXQ8Patch": {
+      "input": {
+        "required": {
+          "model": [
+            "MODEL"
+          ],
+          "use_fp8_attention": [
+            "BOOLEAN",
+            {
+              "default": false,
+              "tooltip": "Use FP8 attention."
+            }
+          ],
+          "quantization_preset": [
+            [
+              "0.9.8",
+              "ltxv2",
+              "full_bf16",
+              "custom"
+            ],
+            {
+              "default": "0.9.8"
+            }
+          ],
+          "quantize_self_attn": [
+            "BOOLEAN",
+            {
+              "default": true,
+              "tooltip": "Quantize Self Attention Layer"
+            }
+          ],
+          "quantize_cross_attn": [
+            "BOOLEAN",
+            {
+              "default": true,
+              "tooltip": "Quantize Cross Attention Layer"
+            }
+          ],
+          "quantize_ffn": [
+            "BOOLEAN",
+            {
+              "default": true,
+              "tooltip": "Quantize Feed Forward Layer"
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "use_fp8_attention",
+          "quantization_preset",
+          "quantize_self_attn",
+          "quantize_cross_attn",
+          "quantize_ffn"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "MODEL"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "MODEL"
+      ],
+      "name": "LTXQ8Patch",
+      "display_name": "🅛🅣🅧 LTXQ8Patch",
+      "description": "",
+      "python_module": "custom_nodes.ComfyUI-LTXVideo",
+      "category": "lightricks/LTXV",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "SamplerCustom": {
+      "input": {
+        "required": {
+          "model": [
+            "MODEL",
+            {}
+          ],
+          "add_noise": [
+            "BOOLEAN",
+            {
+              "advanced": true,
+              "default": true
+            }
+          ],
+          "noise_seed": [
+            "INT",
+            {
+              "default": 0,
+              "min": 0,
+              "max": 18446744073709551615,
+              "control_after_generate": true
+            }
+          ],
+          "cfg": [
+            "FLOAT",
+            {
+              "default": 8.0,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.1,
+              "round": 0.01
+            }
+          ],
+          "positive": [
+            "CONDITIONING",
+            {}
+          ],
+          "negative": [
+            "CONDITIONING",
+            {}
+          ],
+          "sampler": [
+            "SAMPLER",
+            {}
+          ],
+          "sigmas": [
+            "SIGMAS",
+            {}
+          ],
+          "latent_image": [
+            "LATENT",
+            {}
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "add_noise",
+          "noise_seed",
+          "cfg",
+          "positive",
+          "negative",
+          "sampler",
+          "sigmas",
+          "latent_image"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT",
+        "LATENT"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "output_name": [
+        "output",
+        "denoised_output"
+      ],
+      "output_tooltips": [
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "SamplerCustom",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_custom_sampler",
+      "category": "model/sampling/custom",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "SamplerCustomAdvanced": {
+      "input": {
+        "required": {
+          "noise": [
+            "NOISE",
+            {}
+          ],
+          "guider": [
+            "GUIDER",
+            {}
+          ],
+          "sampler": [
+            "SAMPLER",
+            {}
+          ],
+          "sigmas": [
+            "SIGMAS",
+            {}
+          ],
+          "latent_image": [
+            "LATENT",
+            {}
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "noise",
+          "guider",
+          "sampler",
+          "sigmas",
+          "latent_image"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT",
+        "LATENT"
+      ],
+      "output_is_list": [
+        false,
+        false
+      ],
+      "output_name": [
+        "output",
+        "denoised_output"
+      ],
+      "output_tooltips": [
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "SamplerCustomAdvanced",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_custom_sampler",
+      "category": "model/sampling/custom",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "KSamplerSelect": {
+      "input": {
+        "required": {
+          "sampler_name": [
+            "COMBO",
+            {
+              "multiselect": false,
+              "options": [
+                "euler",
+                "euler_cfg_pp",
+                "euler_ancestral",
+                "euler_ancestral_cfg_pp",
+                "heun",
+                "heunpp2",
+                "exp_heun_2_x0",
+                "exp_heun_2_x0_sde",
+                "dpm_2",
+                "dpm_2_ancestral",
+                "lms",
+                "dpm_fast",
+                "dpm_adaptive",
+                "dpmpp_2s_ancestral",
+                "dpmpp_2s_ancestral_cfg_pp",
+                "dpmpp_sde",
+                "dpmpp_sde_gpu",
+                "dpmpp_2m",
+                "dpmpp_2m_cfg_pp",
+                "dpmpp_2m_sde",
+                "dpmpp_2m_sde_gpu",
+                "dpmpp_2m_sde_heun",
+                "dpmpp_2m_sde_heun_gpu",
+                "dpmpp_3m_sde",
+                "dpmpp_3m_sde_gpu",
+                "ddpm",
+                "lcm",
+                "ipndm",
+                "ipndm_v",
+                "deis",
+                "res_multistep",
+                "res_multistep_cfg_pp",
+                "res_multistep_ancestral",
+                "res_multistep_ancestral_cfg_pp",
+                "gradient_estimation",
+                "gradient_estimation_cfg_pp",
+                "er_sde",
+                "seeds_2",
+                "seeds_3",
+                "sa_solver",
+                "sa_solver_pece",
+                "ddim",
+                "uni_pc",
+                "uni_pc_bh2",
+                "legacy_rk",
+                "rk",
+                "rk_beta",
+                "deis_3m_ode",
+                "deis_2m_ode",
+                "deis_3m",
+                "deis_2m",
+                "res_6s_ode",
+                "res_5s_ode",
+                "res_3s_ode",
+                "res_2s_ode",
+                "res_3m_ode",
+                "res_2m_ode",
+                "res_6s",
+                "res_5s",
+                "res_3s",
+                "res_2s",
+                "res_3m",
+                "res_2m"
+              ]
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "sampler_name"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "SAMPLER"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "SAMPLER"
+      ],
+      "output_tooltips": [
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "KSamplerSelect",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_custom_sampler",
+      "category": "model/sampling/samplers",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "KSampler": {
+      "input": {
+        "required": {
+          "model": [
+            "MODEL",
+            {
+              "tooltip": "The model used for denoising the input latent."
+            }
+          ],
+          "seed": [
+            "INT",
+            {
+              "default": 0,
+              "min": 0,
+              "max": 18446744073709551615,
+              "control_after_generate": true,
+              "tooltip": "The random seed used for creating the noise."
+            }
+          ],
+          "steps": [
+            "INT",
+            {
+              "default": 20,
+              "min": 1,
+              "max": 10000,
+              "tooltip": "The number of steps used in the denoising process."
+            }
+          ],
+          "cfg": [
+            "FLOAT",
+            {
+              "default": 8.0,
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.1,
+              "round": 0.01,
+              "tooltip": "The Classifier-Free Guidance scale balances creativity and adherence to the prompt. Higher values result in images more closely matching the prompt however too high values will negatively impact quality."
+            }
+          ],
+          "sampler_name": [
+            [
+              "euler",
+              "euler_cfg_pp",
+              "euler_ancestral",
+              "euler_ancestral_cfg_pp",
+              "heun",
+              "heunpp2",
+              "exp_heun_2_x0",
+              "exp_heun_2_x0_sde",
+              "dpm_2",
+              "dpm_2_ancestral",
+              "lms",
+              "dpm_fast",
+              "dpm_adaptive",
+              "dpmpp_2s_ancestral",
+              "dpmpp_2s_ancestral_cfg_pp",
+              "dpmpp_sde",
+              "dpmpp_sde_gpu",
+              "dpmpp_2m",
+              "dpmpp_2m_cfg_pp",
+              "dpmpp_2m_sde",
+              "dpmpp_2m_sde_gpu",
+              "dpmpp_2m_sde_heun",
+              "dpmpp_2m_sde_heun_gpu",
+              "dpmpp_3m_sde",
+              "dpmpp_3m_sde_gpu",
+              "ddpm",
+              "lcm",
+              "ipndm",
+              "ipndm_v",
+              "deis",
+              "res_multistep",
+              "res_multistep_cfg_pp",
+              "res_multistep_ancestral",
+              "res_multistep_ancestral_cfg_pp",
+              "gradient_estimation",
+              "gradient_estimation_cfg_pp",
+              "er_sde",
+              "seeds_2",
+              "seeds_3",
+              "sa_solver",
+              "sa_solver_pece",
+              "ddim",
+              "uni_pc",
+              "uni_pc_bh2",
+              "legacy_rk",
+              "rk",
+              "rk_beta",
+              "deis_3m_ode",
+              "deis_2m_ode",
+              "deis_3m",
+              "deis_2m",
+              "res_6s_ode",
+              "res_5s_ode",
+              "res_3s_ode",
+              "res_2s_ode",
+              "res_3m_ode",
+              "res_2m_ode",
+              "res_6s",
+              "res_5s",
+              "res_3s",
+              "res_2s",
+              "res_3m",
+              "res_2m"
+            ],
+            {
+              "tooltip": "The algorithm used when sampling, this can affect the quality, speed, and style of the generated output."
+            }
+          ],
+          "scheduler": [
+            [
+              "simple",
+              "sgm_uniform",
+              "karras",
+              "exponential",
+              "ddim_uniform",
+              "beta",
+              "normal",
+              "linear_quadratic",
+              "kl_optimal",
+              "bong_tangent",
+              "beta57"
+            ],
+            {
+              "tooltip": "The scheduler controls how noise is gradually removed to form the image."
+            }
+          ],
+          "positive": [
+            "CONDITIONING",
+            {
+              "tooltip": "The conditioning describing the attributes you want to include in the image."
+            }
+          ],
+          "negative": [
+            "CONDITIONING",
+            {
+              "tooltip": "The conditioning describing the attributes you want to exclude from the image."
+            }
+          ],
+          "latent_image": [
+            "LATENT",
+            {
+              "tooltip": "The latent image to denoise."
+            }
+          ],
+          "denoise": [
+            "FLOAT",
+            {
+              "default": 1.0,
+              "min": 0.0,
+              "max": 1.0,
+              "step": 0.01,
+              "tooltip": "The amount of denoising applied, lower values will maintain the structure of the initial image allowing for image to image sampling."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "seed",
+          "steps",
+          "cfg",
+          "sampler_name",
+          "scheduler",
+          "positive",
+          "negative",
+          "latent_image",
+          "denoise"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "LATENT"
+      ],
+      "name": "KSampler",
+      "display_name": "KSampler",
+      "description": "Uses the provided model, positive and negative conditioning to denoise the latent image.",
+      "python_module": "nodes",
+      "category": "model/sampling",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "output_tooltips": [
+        "The denoised latent."
+      ],
+      "search_aliases": [
+        "sampler",
+        "sample",
+        "generate",
+        "denoise",
+        "diffuse",
+        "txt2img",
+        "img2img"
+      ]
+    },
+    "LTXVBaseSampler": {
+      "input": {
+        "required": {
+          "model": [
+            "MODEL",
+            {
+              "tooltip": "The diffusion model to use."
+            }
+          ],
+          "vae": [
+            "VAE",
+            {
+              "tooltip": "The VAE to use."
+            }
+          ],
+          "width": [
+            "INT",
+            {
+              "default": 768,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "height": [
+            "INT",
+            {
+              "default": 512,
+              "min": 64,
+              "max": 16384,
+              "step": 32
+            }
+          ],
+          "num_frames": [
+            "INT",
+            {
+              "default": 97,
+              "min": 1,
+              "max": 16384,
+              "step": 8
+            }
+          ],
+          "guider": [
+            "GUIDER",
+            {
+              "tooltip": "The guider to use, must be a STGGuiderAdvanced."
+            }
+          ],
+          "sampler": [
+            "SAMPLER",
+            {
+              "tooltip": "The sampler to use."
+            }
+          ],
+          "sigmas": [
+            "SIGMAS",
+            {
+              "tooltip": "The sigmas to use."
+            }
+          ],
+          "noise": [
+            "NOISE",
+            {
+              "tooltip": "The noise to use for the sampling."
+            }
+          ]
+        },
+        "optional": {
+          "optional_cond_images": [
+            "IMAGE",
+            {
+              "tooltip": "The images to use for conditioning the sampling."
+            }
+          ],
+          "optional_cond_indices": [
+            "STRING",
+            {
+              "tooltip": "The indices of the images to use for conditioning the sampling."
+            }
+          ],
+          "strength": [
+            "FLOAT",
+            {
+              "default": 0.9,
+              "min": 0,
+              "max": 1,
+              "tooltip": "The strength of the conditioning on the images."
+            }
+          ],
+          "crop": [
+            [
+              "center",
+              "disabled"
+            ],
+            {
+              "default": "disabled",
+              "tooltip": "The crop mode to use for the images."
+            }
+          ],
+          "crf": [
+            "INT",
+            {
+              "default": 35,
+              "min": 0,
+              "max": 100,
+              "tooltip": "The CRF value to use for preprocessing the images."
+            }
+          ],
+          "blur": [
+            "INT",
+            {
+              "default": 0,
+              "min": 0,
+              "max": 10,
+              "tooltip": "The blur value to use for preprocessing the images."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "model",
+          "vae",
+          "width",
+          "height",
+          "num_frames",
+          "guider",
+          "sampler",
+          "sigmas",
+          "noise"
+        ],
+        "optional": [
+          "optional_cond_images",
+          "optional_cond_indices",
+          "strength",
+          "crop",
+          "crf",
+          "blur"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "LATENT",
+        "CONDITIONING",
+        "CONDITIONING"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "denoised",
+        "positive",
+        "negative"
+      ],
+      "name": "LTXVBaseSampler",
+      "display_name": "🅛🅣🅧 LTXV Base Sampler",
+      "description": "",
+      "python_module": "custom_nodes.ComfyUI-LTXVideo",
+      "category": "sampling",
+      "output_node": false,
+      "has_intermediate_output": false,
+      "search_aliases": []
+    },
+    "LTXVPreprocess": {
+      "input": {
+        "required": {
+          "image": [
+            "IMAGE",
+            {}
+          ],
+          "img_compression": [
+            "INT",
+            {
+              "tooltip": "Amount of compression to apply on image.",
+              "default": 35,
+              "min": 0,
+              "max": 100
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "image",
+          "img_compression"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "IMAGE"
+      ],
+      "output_is_list": [
+        false
+      ],
+      "output_name": [
+        "output_image"
+      ],
+      "output_tooltips": [
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVPreprocess",
+      "display_name": "LTXV Preprocess",
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "video/preprocessors",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "LTXVAddGuide": {
+      "input": {
+        "required": {
+          "positive": [
+            "CONDITIONING",
+            {}
+          ],
+          "negative": [
+            "CONDITIONING",
+            {}
+          ],
+          "vae": [
+            "VAE",
+            {}
+          ],
+          "latent": [
+            "LATENT",
+            {}
+          ],
+          "image": [
+            "IMAGE",
+            {
+              "tooltip": "Image or video to condition the latent video on. Must be 8*n + 1 frames. If the video is not 8*n + 1 frames, it will be cropped to the nearest 8*n + 1 frames."
+            }
+          ],
+          "frame_idx": [
+            "INT",
+            {
+              "tooltip": "Frame index to start the conditioning at. For single-frame images or videos with 1-8 frames, any frame_idx value is acceptable. For videos with 9+ frames, frame_idx must be divisible by 8, otherwise it will be rounded down to the nearest multiple of 8. Negative values are counted from the end of the video.",
+              "default": 0,
+              "min": -9999,
+              "max": 9999
+            }
+          ],
+          "strength": [
+            "FLOAT",
+            {
+              "default": 1.0,
+              "min": 0.0,
+              "max": 10.0,
+              "step": 0.01
+            }
+          ]
+        },
+        "optional": {
+          "attention_mask": [
+            "MASK",
+            {
+              "tooltip": "Optional pixel-space spatial mask. Controls per-region conditioning influence via self-attention, multiplied by strength."
+            }
+          ],
+          "iclora_parameters": [
+            "IC_LORA_PARAMETERS",
+            {
+              "tooltip": "Optional IC-LoRA parameters from a Get IC-LoRA Parameters node. Used for adjusting guide processing as required by certain IC-LoRAs (eg. those with a reference_downscale_factor > 1). When chained, each LTXVAddGuide uses only the parameters connected to it."
+            }
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "positive",
+          "negative",
+          "vae",
+          "latent",
+          "image",
+          "frame_idx",
+          "strength"
+        ],
+        "optional": [
+          "attention_mask",
+          "iclora_parameters"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_tooltips": [
+        null,
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVAddGuide",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/conditioning/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    },
+    "LTXVCropGuides": {
+      "input": {
+        "required": {
+          "positive": [
+            "CONDITIONING",
+            {}
+          ],
+          "negative": [
+            "CONDITIONING",
+            {}
+          ],
+          "latent": [
+            "LATENT",
+            {}
+          ]
+        }
+      },
+      "input_order": {
+        "required": [
+          "positive",
+          "negative",
+          "latent"
+        ]
+      },
+      "is_input_list": false,
+      "output": [
+        "CONDITIONING",
+        "CONDITIONING",
+        "LATENT"
+      ],
+      "output_is_list": [
+        false,
+        false,
+        false
+      ],
+      "output_name": [
+        "positive",
+        "negative",
+        "latent"
+      ],
+      "output_tooltips": [
+        null,
+        null,
+        null
+      ],
+      "output_matchtypes": null,
+      "name": "LTXVCropGuides",
+      "display_name": null,
+      "description": "",
+      "python_module": "comfy_extras.nodes_lt",
+      "category": "model/conditioning/ltxv",
+      "output_node": false,
+      "deprecated": false,
+      "experimental": false,
+      "dev_only": false,
+      "api_node": false,
+      "price_badge": null,
+      "search_aliases": null,
+      "essentials_category": null,
+      "has_intermediate_output": false
+    }
+  }
+}
