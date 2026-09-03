@@ -27,42 +27,84 @@ tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per
 owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
 AND push + `HEAD == origin/v2.0-alpha`.
 
-**1. alpha.15 FLAGGED -- the control experiment is next, on the operator's word.** Pushed
-`13696c1e` 2026-09-02 18:51Z with 18 dependencies recorded; the registry scanner resolved
-it to `Flagged` at 20:07Z, the same verdict as alpha.9 through alpha.14, so no Active
-version exists and `latest_version` still resolves to nothing installable. Next move,
-Section 3 J: republish the alpha.8 tree (`e44235f5`) byte-identical as alpha.16. Active
-means the trigger is in the alpha.9+ delta and can be bisected; Flagged means their
-ruleset moved and that result is the evidence to hand Comfy-Org. It burns a version
-string, so the operator says go. Never version-delete. DONE WHEN a version reads
-`Active` and a Manager install on the 4060 lands the OTR nodes.
+**1. THE REGISTRY -- the criticals are gone; alpha.17 carries the route gate; the manual
+review request is the last lever.** The control experiment in the old wording (republish
+alpha.8 byte-identical) was overtaken and is CANCELLED -- the cause was found directly
+instead.
 
-**2. THE KOKORO-ONNX BACKEND -- the default voice that installs everywhere.**
-BUILT 2026-09-02 after a four-round arc (r1 Fable cold, r2 Cursor, r3 Antigravity, r4
-Sonnet convergence; anchor and records in `docs/2026-09-02-kokoro-onnx/`). The 5080's
-torch path is byte-identical (two fixed-seed lines, sha256 before == after); the ONNX
-path renders in-process on CPU. Full row: Section 1.1. Proof A DONE 2026-09-02 13:43:
-`signal_lost_the_tectal_echo_20260902_131902` published from the 5080 (3.12) on
-`otr_nvidia_8gb_haunted`, `backend=torch device=cuda` on both voice nodes, kokoro
-characters and announcer. Proof B (the 4060 clean room, portable Python 3.13.14):
-`pip install -r requirements.txt` installed kokoro-onnx (torch kokoro absent), the boot
-prefetch fetched the 310 MB ONNX model on its own, and the leg logged `backend=onnx
-provider=CPUExecutionProvider` with kokoro on both slots; Proof B DONE 2026-09-02 14:02:
-`signal_lost_the_ledger_of_shadows_20260902_134447` published (37 min), master mix
-speech-shaped in every voice slot (no tone). Operator eyeball 2026-09-02 14:10: "this
-episode is perfect, voices great". **ITEM 2 DONE.** Left over from it, not blocking: the
-kokoro-onnx line rides the next `pyproject.toml` bump. Registry installs get the kokoro-onnx line on the next
-`pyproject.toml` bump after alpha.15 resolves.
+* **alpha.16 scanned 0 critical / 157 info (2026-09-03), the first zero-critical scan
+  since alpha.8.** The two `critical` `prohibited-string` findings that flagged alpha.9
+  through alpha.15 were the writer declaring the session-bearer hidden input beside
+  `api_key_comfy_org` (PBUG-20260902-04); removing it cleared both
+  (`nodes/OTR_LedgerScriptWriter.py:2770-2771` in the alpha.15 scan, absent from
+  alpha.16). `tests/test_registry_prohibited_strings.py` guards every shipped file.
+* **alpha.17 is the one that carries the route gate.** `b198026a` put
+  `POST /otr/video_render_single` and `/otr/video_render_soak` behind
+  `OTR_ENABLE_HTTP_RENDER_ROUTES=1`, default off, so a registry install registers only the
+  read-only ledger GET -- the `UNAUTHENTICATED_SIDE_EFFECT` class the registry banned
+  another pack for. It landed AFTER alpha.16 was cut, and `(node_id, version)` is unique
+  server-side, so publishing alpha.17 is the only way the gate ever reaches the registry.
+  Operator said go 2026-09-03; the peer window owns the bump.
+* **STILL FLAGGED IS THE EXPECTED OUTCOME, not a failure.** Active needs ZERO findings of
+  any severity or an admin batch approval; 157 info-level YARA hits (env reads, ffmpeg
+  subprocess, opt-in cloud lanes) will keep it Flagged forever on the automated path.
+  There is no publisher self-service route to Active -- confirmed by reading
+  `Comfy-Org/registry-backend`.
+* **NEXT: file the manual review request**, draft ready and retargeted at alpha.17 in
+  `docs/2026-09-02-registry-manual-review-request.md`. Its own preconditions first:
+  alpha.17 scans 0 critical, AND the published CDN zip is downloaded and grepped for
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` -- a reviewer greps the artifact, not the commit.
+  Filing is a public post on Comfy-Org's tracker and needs the operator's explicit go.
+* DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes.
+  Never version-delete: a soft delete burns the string permanently.
+
+**2. THE KOKORO-ONNX BACKEND -- DONE 2026-09-02, receipts archived.** Both proofs
+published and eyeballed ("this episode is perfect, voices great"). Its one leftover, the
+kokoro-onnx dependency line reaching registry installs, rides the alpha.17 bump in item 1.
+Detail in `docs/GO_FORWARD_ARCHIVE.md` and `docs/2026-09-02-kokoro-onnx/`; row in
+Section 1.1.
 
 **3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
 correctness defects (a gender or voice contradicting the source, a beat that renders the
 wrong picture, a leg that dies late).
-* **3a. Character gender ladder -- DONE 2026-09-02.** One review round (Antigravity), code,
-  Sonnet QA, the corpus re-stamped (202/249 decided, was 132), two published legs; the join now
-  reads the stamped aliases (the second leg's fix). Section 1.2.
-* **3b. Ghost pool: uniqueness on the finalized prompt** -- r1 is in; build. Section 1.3.
+* **3a. Character gender ladder -- DONE 2026-09-02.** Receipt archived; row in Section 1.2.
+* **3b. PROMPT v3 "DRAW THE CRUX" -- HALF A SHIPPED AND PROVEN 2026-09-03. HALF B IS OPEN
+  AND IS THE NEXT CODER WINDOW ON THIS LANE.** The AnimateDiff lane was composing an
+  invented costume plus a leaf written from that costume plus a framing law -- none of the
+  three knew the story, which is why it drew a charcoal coat and a satchel for an episode
+  about film canisters. Half A (`b198026a`'s parent merge `b97cce6d`) composes pack cue +
+  crux kernel (the episode's own `key_objects` in its own setting) + light + world motion +
+  a vantage mapped from the stored mode, reading neither the stored motif nor the leaf nor
+  the law. Render-time only, so a frozen episode replays with a byte-identical seed --
+  `render_request_hash` never included the prompt. **Proven:** same-seed A/B in `otr/obs/`
+  (21:08 old vs 23:59 new, seeds identical 8/8, prompts differ 8/8), every prompt composed
+  live at exactly the token count predicted on CPU, 32.9 tokens against v2's 40.2.
+  Operator verdict on the video_art leg: "surprisingly good... it's about Huckleberry Finn
+  and there's actually a river!"
+  **HALF B, still open:** subject-appropriate motion needs the beat's own dialogue in front
+  of the writer -- Half A buys the story's object, place and light on every beat and cannot
+  buy its motion. He named the gap himself on the ledger episode: "I don't see any trucks
+  though, it does mention a truck once" -- `truck` is in one spoken line and not in
+  `key_objects`, so Half A had no path to it. Half B changes the STORED object, so it needs
+  the version-dispatch discipline r2 specified and a re-author path for replay. Full arc
+  before code. Anchor and the four-round records:
+  `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` and
+  `kibitz-runs/2026-09-02-prompt-v3-crux/`.
+  **Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"`,
+  which reads wrong on a few settings ("a spinning turntable **in the** riverbank"). One
+  small preposition fix; waiting only on his eye, not on Half B.
 * **3c. The open defect list** -- the P0 / source-span cluster, the orphan-occupancy
   registry (full arc before code), the coverage and routing rows. Section 1.4.
+* **3d. Item 3b-of-the-old-numbering, the OTHER video lanes -- measured, not started.**
+  Ten of eleven lanes lead their prompt with the cast's face paragraph (83 words on one
+  real episode) via `motion_common.compose_parts`. On `wan_ti2v` that is 83 of a hard
+  100-word cap that truncates mid-sentence, so the camera clause silently falls off.
+  **AMENDED by the r3 reviewer:** ADD a crux clause beside `appearance` on the silent
+  image-to-video lanes; do NOT drop the face on redundancy alone -- the foley/mime lanes
+  drop it because their joint latent SPEAKS the prompt, which is not a general I2V rule.
+  Audio-in lanes (HuMo, the h3 audio lane, `ltx_audio_in`) and the two Google
+  text-to-video lanes keep the face unconditionally. Runs after his eye on Half A.
+  Measurements: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/other_lanes_audit.md`.
 
 **4. THE 8 GB SHIP SET -- what the clean room proved becomes a saved dropdown set.**
 Klein stills run on 8 GB under stock launch flags (Leg C5: ~21 s a still) and LTX 2.5
@@ -87,11 +129,8 @@ what the test promotes. What is still open on the set is in Section 1.6.
 **6. THE LOCAL-LLM ACCEPTANCE SWEEP** -- Leg 0 in-process preflight (Section 1.7,
 ~15-20 min, idle GPU), then the four canonical legs of Batch R3.
 
-**7. DOCS DELETION PASS -- DONE 2026-09-02** (operator asked for it early: "any further
-cleanup ... to get rid of really stale docs"). Three deletion-only commits, lists in the
-messages: 45895801 (34 named handoffs / kickoffs / prompts / bakeoff logs), 2bf15784
-(193 dated July docs), 607a5ee7 (180 dated August docs). `docs/` went from 644 tracked
-files to 237. Details and the kept set in Section 1.8.
+**7. DOCS DELETION PASS -- DONE 2026-09-02.** `docs/` went 644 tracked files to 237 across
+three deletion-only commits (45895801, 2bf15784, 607a5ee7). Kept set in Section 1.8.
 
 **8. DESIGN ROWS -- each gets a full arc before code, and none is the next coder
 window:** the one-manifest auto-download (1.9), the ship-audit survivors (1.10), the
@@ -110,6 +149,20 @@ dollar. Receipts file under the 16gb class; there is no 24 GB class or profile b
 * The Section 3 question list (A)-(L), each with its default if unruled.
 
 **WATCH -- recorded, not scheduled:**
+* **`obs_publish OK` is not proof of an episode (2026-09-03, cost two GPU legs).** Three
+  replay bugs shipped that morning; TWO of them published green with a broken file --
+  one second of picture in an 85-second episode, because a placeholder wire set the
+  procgen overlay's length and `PostUpscaleProcgenBlend` takes the shorter input. What
+  caught it was measuring the published file's DURATION at every pipeline stage (render /
+  blend / caption / credits / mux), never the log. A stage that changes the duration is
+  the defect. PBUG-20260903-01/02/03; two 7.5 MB casualties are still in `otr/obs/` and are
+  deliberately not swept -- `..._231401` and `..._233738`, both "The Faded Ledger".
+* **An unrelated rotation loop owns the box's spare cycles.** `video_rotation.sh` has run
+  since 2026-08-31 out of session `8a385813`, cycling 16 engine/image lane combos one act
+  at a time, forever, and it deliberately skips AnimateDiff. It is Jeffrey's daily obs
+  proof; leave it running. It does not block a registry publish (that runs in GitHub
+  Actions against the repo, not this box) and holds the resident server on :8000, which
+  only matters for a local boot check.
 * Zero-frame beat: the root fix landed (`415b1ba0`, PBUG-20260831-01: an untimed
   `music_open`/`music_close` with no timed mirror got no duration; it was also the ghost
   pool r1's "roughly 70 minutes" death). Owed: one canonical leg of that shape reaches
@@ -1224,123 +1277,3 @@ When the sections above are exhausted, continue with `ROADMAP.md`: lean-mean ->
 RunPod/AMD/Mac -> install -> product docs/v2 release. That is a pointer, not work that
 precedes lean-mean. Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md`
 is its sole current scope, blast-radius, coding-order, and verification authority.
-
-**A HUNG CANONICAL LEG WAS FOUND RUNNING AND LEFT ALONE (5080 window, 2026-09-02 22:00).**
-`scripts/otr_canonical_api_run.py --profile otr_ltx25_high_foley_plus --act-count 1
---source-bank "roll (any eligible bank)" --visual-style "roll (any style)" --timeout 10800`
-started at 20:32 and is still resident, but it is doing nothing: the worker has used
-**1.8 CPU-seconds in ninety minutes**, holds a 48 MB working set (it never imported torch),
-has **no child process**, and nothing is listening on port 8000. It created
-`otr/episodes/pending_20260902_213847/` at 21:38 and has written not one file since. By the
-operator's own five-minute rule that leg is a fail.
-
-**Not killed, deliberately.** It is the other window's process, it holds no VRAM (the GPU sat
-at ~3 GB desktop baseline throughout), and it blocks nothing -- so killing it would destroy
-someone else's context for no gain. It will expire on its own `--timeout 10800` at 23:32.
-It also costs no expected episodes: the operator froze GPU work tonight ("don't waste any GPU
-runs until the prompting is fixed"), so an idle box is what he asked for. Fifteen episodes did
-publish to `otr/obs/` today, the last at 21:08.
-
-Whoever owns that window should read its own launcher output; from outside the process there
-is nothing further to learn.
-
-**ITEM 3 -- PROMPT v3 HALF A IS BUILT AND REVIEWED (2026-09-03, overnight).** The
-four-round arc closed CONVERGED and the code followed it: r1 Fable cold plus
-Antigravity, r2 Codex, r3 Cursor, r4 Sonnet, then a scoped finished-diff QA. Eight
-grounded reversals of the driver's own plan, of which three would have shipped a
-broken or pointless change:
-
-* **the coat is in the LEAF, not only in the motif** (r3) -- dropping the motif
-  alone would have changed the prompt and not the picture, and read as a null
-  result for the wrong reason;
-* **the mode law was never framing boilerplate** (r4) -- the comment above it
-  records 4-of-4 recognisable subjects with a concrete noun in the prompt and
-  0-of-4 without, so deleting it is only safe because the crux kernel is a total
-  ladder that can never come back empty;
-* **the seed is not derived from the prompt** (r2) -- `request_hash` mixes brief,
-  cast, beat and character, so the A/B is same-seed by construction and needs no
-  derivation machinery at all. The corollary trap: the crux must never be written
-  into `story_brief_terms`, which IS hashed.
-
-**What it composes:** pack cue, crux kernel (the episode's own `key_objects` in
-its own setting), the episode's light, a world motion, and a vantage mapped from
-the stored mode. It reads no `motif_cue`, no `drawable_beat` and no mode law, and
-it changes nothing the author stored -- so a frozen episode replays with a
-byte-identical seed and a different picture. Measured 32.9 tokens against v2's
-40.2, inside a 77-token window.
-
-**Proven on CPU:** the full suite (only the three known worktree artefacts, all
-94 of them green in the main checkout), 5,314 fuzz combinations over hostile
-ledger shapes, the real render path driven with four ledger variants, and 363
-targeted tests.
-
-**The GPU freeze lifts by its own terms** -- the prompting is fixed -- and the
-first run is ONE leg, not two: the published "The Faded Ledger" already IS the v2
-arm (same plan, same seeds, same engine), so only the v3 replay has to render.
-Bundle frozen and the runner dry-run clean. `otr_verify_replay --ab` asserts
-equal seeds and different prompt shas.
-
-**Half B remains open** and is where the operator's motion rule lands: the beat's
-own dialogue in front of the writer, `world/thing/hand` vocabulary, subject
-coverage. Half A buys the story's object, place and light on every beat; Half B
-buys its motion. Item 3b (the other lanes) is amended -- ADD a crux clause beside
-the appearance on silent image-to-video lanes, never drop the face on redundancy
-alone; `wan_ti2v`'s 83-word face inside a 100-word cap is the one place something
-must give.
-
-**THE A/B IS ON SCREEN (2026-09-03 00:20).** Two episodes in `otr/obs/` under the
-same title, told apart by their timestamp:
-
-* **21:08** -- the old prompt (`signal_lost_the_faded_ledger_20260902_210812...`), 145.4 MB
-* **23:59** -- Prompt v3 (`signal_lost_the_faded_ledger_20260902_235930...`), 146.8 MB
-
-Same plan, same seeds, same 107.0s, comparable size at every pipeline stage.
-`scripts/otr_prompt_ab_report.py` returns **seeds identical on 8 of 8, prompts
-differ on 8 of 8**, and every prompt composed live at exactly the token count
-predicted on CPU. Whatever differs on screen differs because of the words.
-
-**It took four legs, and three of them were bug reports** -- PBUG-20260903-01,
--02 and -03, all in replay code written for the instrument this week, all the
-same shape: a replay skips a stage and something downstream still needs what
-that stage produced. **Two of the three published green**, which is the finding
-worth carrying: `obs_publish OK` is not proof of an episode. The stage table
-(render / blend / caption / credits / mux, each with its duration) is what
-caught them, and a stage that changes the DURATION was the defect every time.
-
-**Queued behind it:** fresh 1-act episodes on `video_art` and `recur_frac`, the
-two packs the operator asked about. Those are new stories rather than the same
-one twice, so they show v3 under a different pack; they are not a comparison.
-
-**Next, in order:** his eye on the pair; then Half B (the beat's own dialogue in
-front of the writer, which is where his motion rule lands); then item 3b on the
-other lanes as amended. The first thing to tune if the pictures read as busy is
-the LIGHT slot -- his own rewrites carry three units where v3 carries four, and
-the light is already first in the drop order.
-
-**THE TWO STYLE LEGS LANDED (2026-09-03 01:42).** Fresh 1-act episodes on the two
-packs the operator asked about, both `RESULT SUCCESS`, both verified as real
-full-length episodes rather than trusted on their exit code:
-
-* **The Strain of a Sleeve** -- `video_art`, public_domain, 8 clips, 100.2s, 118.5 MB.
-  *"video-art feedback style. a spinning turntable in the riverbank, a low
-  shimmer moving on it, lit against the dark, the light moving"*
-* **The Weight of Grief** -- `recur_frac`, scifi_news_pro, 25 clips, 247.3s, 339.1 MB.
-  *"recursive fractal light field. a bakelite radio set in the clinical
-  laboratory, fluorescent hum, turning a slow quarter and stopping, the object
-  large in the frame"*
-
-Both carry their pack cue, both draw the story's own `key_objects`, and both
-titles came from the story -- no harness label reached a title card.
-
-**FIVE FILES ARE IN `otr/obs/` AND TWO OF THEM ARE THE KNOWN-BROKEN ONES.** The
-7.9 MB `..._231401` and `..._233738` are the PBUG-20260903-02 and -03 casualties:
-one second of picture each. They are LEFT IN PLACE deliberately -- nothing is
-swept out of obs -- but they are named here so nobody opens one and concludes
-Prompt v3 is broken. **The v3 arm to watch is `..._235930`, 146.8 MB.**
-
-**One wart worth a line, not a fix tonight.** The kernel joins subject and place
-with a fixed `"in the"`, which reads correctly almost everywhere and awkwardly on
-a few settings ("a spinning turntable **in the** riverbank"). The operator's own
-rewrites vary the preposition ("at a reservoir", "in a large water reservoir").
-A small per-setting preposition choice would fix it; it is cosmetic and it waits
-for his eye on the pictures first.

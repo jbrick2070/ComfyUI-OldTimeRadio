@@ -3410,3 +3410,132 @@ field's owner enumerated BEFORE the call is moved, not after.
   clients before its consumer exists lives in the client-facing DOC as "reserved, no
   contract, ignored if defined" and nowhere in executable code, because code that names
   an interface is read as enforcing it.
+
+---
+
+## 2026-09-03 -- Prompt v3 Half A, the registry route gate, and three replay bugs
+
+Moved out of GO_FORWARD_PLAN 2026-09-03 (forward-only rule). Closed receipts; not read to resume.
+Full records: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` (driver anchor,
+operator rewrites, measured slot budget, as-built change list, lane audit),
+`kibitz-runs/2026-09-02-prompt-v3-crux/` (r1-r4 + QA judgments), and PBUG-20260903-01/02/03.
+
+**A HUNG CANONICAL LEG WAS FOUND RUNNING AND LEFT ALONE (5080 window, 2026-09-02 22:00).**
+`scripts/otr_canonical_api_run.py --profile otr_ltx25_high_foley_plus --act-count 1
+--source-bank "roll (any eligible bank)" --visual-style "roll (any style)" --timeout 10800`
+started at 20:32 and is still resident, but it is doing nothing: the worker has used
+**1.8 CPU-seconds in ninety minutes**, holds a 48 MB working set (it never imported torch),
+has **no child process**, and nothing is listening on port 8000. It created
+`otr/episodes/pending_20260902_213847/` at 21:38 and has written not one file since. By the
+operator's own five-minute rule that leg is a fail.
+
+**Not killed, deliberately.** It is the other window's process, it holds no VRAM (the GPU sat
+at ~3 GB desktop baseline throughout), and it blocks nothing -- so killing it would destroy
+someone else's context for no gain. It will expire on its own `--timeout 10800` at 23:32.
+It also costs no expected episodes: the operator froze GPU work tonight ("don't waste any GPU
+runs until the prompting is fixed"), so an idle box is what he asked for. Fifteen episodes did
+publish to `otr/obs/` today, the last at 21:08.
+
+Whoever owns that window should read its own launcher output; from outside the process there
+is nothing further to learn.
+
+**ITEM 3 -- PROMPT v3 HALF A IS BUILT AND REVIEWED (2026-09-03, overnight).** The
+four-round arc closed CONVERGED and the code followed it: r1 Fable cold plus
+Antigravity, r2 Codex, r3 Cursor, r4 Sonnet, then a scoped finished-diff QA. Eight
+grounded reversals of the driver's own plan, of which three would have shipped a
+broken or pointless change:
+
+* **the coat is in the LEAF, not only in the motif** (r3) -- dropping the motif
+  alone would have changed the prompt and not the picture, and read as a null
+  result for the wrong reason;
+* **the mode law was never framing boilerplate** (r4) -- the comment above it
+  records 4-of-4 recognisable subjects with a concrete noun in the prompt and
+  0-of-4 without, so deleting it is only safe because the crux kernel is a total
+  ladder that can never come back empty;
+* **the seed is not derived from the prompt** (r2) -- `request_hash` mixes brief,
+  cast, beat and character, so the A/B is same-seed by construction and needs no
+  derivation machinery at all. The corollary trap: the crux must never be written
+  into `story_brief_terms`, which IS hashed.
+
+**What it composes:** pack cue, crux kernel (the episode's own `key_objects` in
+its own setting), the episode's light, a world motion, and a vantage mapped from
+the stored mode. It reads no `motif_cue`, no `drawable_beat` and no mode law, and
+it changes nothing the author stored -- so a frozen episode replays with a
+byte-identical seed and a different picture. Measured 32.9 tokens against v2's
+40.2, inside a 77-token window.
+
+**Proven on CPU:** the full suite (only the three known worktree artefacts, all
+94 of them green in the main checkout), 5,314 fuzz combinations over hostile
+ledger shapes, the real render path driven with four ledger variants, and 363
+targeted tests.
+
+**The GPU freeze lifts by its own terms** -- the prompting is fixed -- and the
+first run is ONE leg, not two: the published "The Faded Ledger" already IS the v2
+arm (same plan, same seeds, same engine), so only the v3 replay has to render.
+Bundle frozen and the runner dry-run clean. `otr_verify_replay --ab` asserts
+equal seeds and different prompt shas.
+
+**Half B remains open** and is where the operator's motion rule lands: the beat's
+own dialogue in front of the writer, `world/thing/hand` vocabulary, subject
+coverage. Half A buys the story's object, place and light on every beat; Half B
+buys its motion. Item 3b (the other lanes) is amended -- ADD a crux clause beside
+the appearance on silent image-to-video lanes, never drop the face on redundancy
+alone; `wan_ti2v`'s 83-word face inside a 100-word cap is the one place something
+must give.
+
+**THE A/B IS ON SCREEN (2026-09-03 00:20).** Two episodes in `otr/obs/` under the
+same title, told apart by their timestamp:
+
+* **21:08** -- the old prompt (`signal_lost_the_faded_ledger_20260902_210812...`), 145.4 MB
+* **23:59** -- Prompt v3 (`signal_lost_the_faded_ledger_20260902_235930...`), 146.8 MB
+
+Same plan, same seeds, same 107.0s, comparable size at every pipeline stage.
+`scripts/otr_prompt_ab_report.py` returns **seeds identical on 8 of 8, prompts
+differ on 8 of 8**, and every prompt composed live at exactly the token count
+predicted on CPU. Whatever differs on screen differs because of the words.
+
+**It took four legs, and three of them were bug reports** -- PBUG-20260903-01,
+-02 and -03, all in replay code written for the instrument this week, all the
+same shape: a replay skips a stage and something downstream still needs what
+that stage produced. **Two of the three published green**, which is the finding
+worth carrying: `obs_publish OK` is not proof of an episode. The stage table
+(render / blend / caption / credits / mux, each with its duration) is what
+caught them, and a stage that changes the DURATION was the defect every time.
+
+**Queued behind it:** fresh 1-act episodes on `video_art` and `recur_frac`, the
+two packs the operator asked about. Those are new stories rather than the same
+one twice, so they show v3 under a different pack; they are not a comparison.
+
+**Next, in order:** his eye on the pair; then Half B (the beat's own dialogue in
+front of the writer, which is where his motion rule lands); then item 3b on the
+other lanes as amended. The first thing to tune if the pictures read as busy is
+the LIGHT slot -- his own rewrites carry three units where v3 carries four, and
+the light is already first in the drop order.
+
+**THE TWO STYLE LEGS LANDED (2026-09-03 01:42).** Fresh 1-act episodes on the two
+packs the operator asked about, both `RESULT SUCCESS`, both verified as real
+full-length episodes rather than trusted on their exit code:
+
+* **The Strain of a Sleeve** -- `video_art`, public_domain, 8 clips, 100.2s, 118.5 MB.
+  *"video-art feedback style. a spinning turntable in the riverbank, a low
+  shimmer moving on it, lit against the dark, the light moving"*
+* **The Weight of Grief** -- `recur_frac`, scifi_news_pro, 25 clips, 247.3s, 339.1 MB.
+  *"recursive fractal light field. a bakelite radio set in the clinical
+  laboratory, fluorescent hum, turning a slow quarter and stopping, the object
+  large in the frame"*
+
+Both carry their pack cue, both draw the story's own `key_objects`, and both
+titles came from the story -- no harness label reached a title card.
+
+**FIVE FILES ARE IN `otr/obs/` AND TWO OF THEM ARE THE KNOWN-BROKEN ONES.** The
+7.9 MB `..._231401` and `..._233738` are the PBUG-20260903-02 and -03 casualties:
+one second of picture each. They are LEFT IN PLACE deliberately -- nothing is
+swept out of obs -- but they are named here so nobody opens one and concludes
+Prompt v3 is broken. **The v3 arm to watch is `..._235930`, 146.8 MB.**
+
+**One wart worth a line, not a fix tonight.** The kernel joins subject and place
+with a fixed `"in the"`, which reads correctly almost everywhere and awkwardly on
+a few settings ("a spinning turntable **in the** riverbank"). The operator's own
+rewrites vary the preposition ("at a reservoir", "in a large water reservoir").
+A small per-setting preposition choice would fix it; it is cosmetic and it waits
+for his eye on the pictures first.
