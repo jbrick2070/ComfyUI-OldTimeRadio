@@ -117,7 +117,26 @@ directly instead.
   corrected the issue's date window: extraction did not stop in February, it stopped
   **2026-04-28**, and 19 packs' newest success falls in April with nothing after. Do NOT
   open a second issue on this; comment on #203.
-* **NEXT: file the manual review request.** Draft ready and retargeted at alpha.17 in
+* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO,
+  AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision,
+  and the measurement behind it is that **admin approval is PER VERSION.** Verified
+  on `comfyui-video-xy-plot`: all five of its versions carry their own
+  `{"message": "subprocess: ffprobe", "by": "dr.lt.data@gmail.com"}` note, four of
+  them published on the same day. So approving alpha.17 buys nothing for
+  alpha.18, and this branch shipped five versions in five days. Asking now would
+  spend a reviewer's time on a version superseded within the week -- which is the
+  behaviour that actually annoys a maintainer, as distinct from asking at all.
+  **File it on the first NON-ALPHA version, the same day it publishes**, so the
+  version under review is the version a stranger would install. Include the
+  question about node-level review; it costs them less than five separate ones.
+  Everything is ready and needs no further work:
+  `docs/2026-09-03-registry-review-request-READY.md` carries the title, the body,
+  alpha.17's version id, counts read from its own scan, the zero-is-unreachable
+  measurement, and the video-xy-plot precedent. **Re-read it before posting** --
+  the version id, the counts and the "0 critical" claim all move with each new
+  publish, and a request quoting a superseded version is worse than none.
+* **The old NEXT line, kept so the parking is legible:** file the manual review
+  request. Draft ready and retargeted at alpha.17 in
   `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
   published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
   strike that step. **BOTH REMAINING PRECONDITIONS ARE NOW SATISFIED
