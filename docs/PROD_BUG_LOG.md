@@ -10487,10 +10487,12 @@ key, because the next member added to the volatile list would fail identically.
 Proven to catch it: re-inserting `image_engines` into the list makes the test
 fail, removing it makes it pass.
 
-**Bug Bible:** candidate -- "a 'clear the previous run's telemetry' list must
-contain only keys the new run actually re-stamps; test what SURVIVES a clone,
-not only what is cleared, or a required receipt goes missing at the last step of
-a long job." Verify condition is automatable (the new test is the pattern).
+**Bug Bible:** PROMOTED 2026-09-03 as **12.148** (`metadata-provenance`,
+legacy_id `OTR-PBUG-20260903-01`), Bible commit `20204c5`. The `verify` field
+carries the transferable rule: test what SURVIVES a clone, assert the whole
+requirement set the terminal consumer demands rather than the single key that
+broke, and prove the test bites by re-inserting the key. Index row appended to
+`otr_coverage_index.yaml` in the same change.
 
 ---
 
@@ -10547,10 +10549,12 @@ downstream still needs what that stage produced.* One was a receipt
 asserts the skip happened. **A pass-through must pass the real thing through,
 and a "placeholder" is a promise to break something later.**
 
-**Bug Bible:** candidate -- "when a replay/short-circuit path emits a placeholder
-for a typed wire, give it the REAL value or at minimum the real DIMENSIONS;
-downstream consumers measure the wire, not the file, and a length-shaped
-placeholder silently truncates the product." Verify condition is automatable.
+**Bug Bible:** PROMOTED 2026-09-03 as **12.149** (`tensors`, legacy_id
+`OTR-PBUG-20260903-02`), Bible commit `20204c5`. The entry carries both halves:
+a pass-through must pass the real thing through (or at minimum the real
+DIMENSIONS, read from the container header), and the fixture warning -- the
+existing test had ENCODED the bug by pinning the placeholder's shape as the
+contract, over a fixture no decoder could open.
 
 ---
 
@@ -10606,7 +10610,9 @@ two placeholder wires published green and cost an episode each. **A bare
 `except Exception` around an optional dependency turns a missing library into a
 silently wrong product.**
 
-**Bug Bible:** candidate -- "never let a fallback change a DIMENSION downstream
-consumers measure (length, count, resolution) without logging at ERROR; and
-never wrap an optional-dependency import in a bare except that yields a
-differently-shaped value."
+**Bug Bible:** PROMOTED 2026-09-03 as **12.150** (`deps`, legacy_id
+`OTR-PBUG-20260903-03`), Bible commit `20204c5`. It cross-references 05.14 and
+states the distinction explicitly: 05.14 is a bare except laundering an error
+into a plausible `None`; this is the case where the swallow is PERMANENT (the
+guarded call always raises on the target stack, so the fallback is the only path
+that has ever run) and changes a dimension something downstream measures.
