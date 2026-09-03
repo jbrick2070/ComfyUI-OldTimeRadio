@@ -38,11 +38,24 @@ RESET_PS1="$REPO/scripts/_otr_loop_server_reset.ps1"
 # four every pass. Empty/unset = every registered bank, same as before this.
 BANK_FILTER="${1:-}"
 
+# THE PROFILE IS THE DAILIES' VIDEO LANE, AND IT MUST BE STATED (2026-09-03).
+# This loop used to call the bank gate with no --profile, so it silently took
+# that script's own DEFAULT_PROFILE = "otr_w45_still_flat" -- the cheapest
+# visual lane, chosen there because the GATE's job is to prove the writer and
+# the source banks quickly. The consequence was invisible in every log and
+# obvious in the only place that matters: 88 of the 89 episodes in otr/obs were
+# rendered by `still_flat`, a static-image engine. The operator was judging
+# "bland video with no movement" on a lane that never ran a video model, and
+# no amount of prompt or directive work could have shown up there.
+# A dailies runner names its video lane. Every role_override in the profile
+# below is a real video engine -- announcer, character AND music.
+PROFILE="${OTR_LOOP_PROFILE:-otr_w45_wan_ti2v}"
+
 mkdir -p "$REPO/tmp"
 if [ -n "$BANK_FILTER" ]; then
-  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) (banks=$BANK_FILTER) ===" >> "$LOG"
+  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) (banks=$BANK_FILTER profile=$PROFILE) ===" >> "$LOG"
 else
-  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) ===" >> "$LOG"
+  echo "=== overnight loop started $(date -u +%Y-%m-%dT%H:%M:%SZ) (profile=$PROFILE) ===" >> "$LOG"
 fi
 
 pass_n=0
@@ -74,14 +87,15 @@ while true; do
   fi
 
   obs_before=$(ls "$OBS" 2>/dev/null | wc -l)
-  echo "[$(date -u +%H:%M:%SZ)] pass $pass_n: launching bank gate (obs=$obs_before)" >> "$LOG"
+  echo "[$(date -u +%H:%M:%SZ)] pass $pass_n: launching bank gate (profile=$PROFILE obs=$obs_before)" >> "$LOG"
 
   cd "$REPO"
   export PYTHONUTF8=1
   if [ -n "$BANK_FILTER" ]; then
-    "$PY" scripts/otr_writer_bank_gate.py --acts 1 --banks "$BANK_FILTER" >> "$LOG" 2>&1
+    "$PY" scripts/otr_writer_bank_gate.py --acts 1 --profile "$PROFILE" \
+        --banks "$BANK_FILTER" >> "$LOG" 2>&1
   else
-    "$PY" scripts/otr_writer_bank_gate.py --acts 1 >> "$LOG" 2>&1
+    "$PY" scripts/otr_writer_bank_gate.py --acts 1 --profile "$PROFILE" >> "$LOG" 2>&1
   fi
   gate_exit=$?
 
