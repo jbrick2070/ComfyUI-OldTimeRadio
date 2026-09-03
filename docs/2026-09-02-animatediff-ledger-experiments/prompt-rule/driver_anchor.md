@@ -662,3 +662,54 @@ Where V1-V6 and R1-R10 disagree with W1-W7, W1-W7 win.
    sooner than the plan admits? The v2 fallback pools exhausted at six clauses on
    a five-act episode, and this pool would run on every beat, not just fallbacks.
 3. Is anything in W1-W7 a build-breaker that r2 and r3 both missed?
+
+## 14. The V6 run plan, checked against the real episodes on disk
+
+Checked before r4, because a proof plan that cannot be executed is not a plan.
+
+**The instrument has never been replayed on the GPU.** Campaign item 0 shipped
+and is live-proven for the RECEIPTS (leg 4's ledger carries eight
+`meta.render_trace` rows), but `run_replay_proof.ps1` was deferred behind the
+GPU freeze. So the very first arm has to be a plain replay, not the experiment.
+
+**Three arms, in this order, all on a fresh server per arm** (r3 SF3: the render
+batch node has no `IS_CHANGED`, so a resident session can serve cached clips):
+
+| arm | what runs | what it proves |
+|---|---|---|
+| 0 | freeze "The Faded Ledger", replay it UNCHANGED on v2 | the instrument works live; and it is the A/B's control |
+| 1 | replay the same bundle on v3 | same seeds, different prompt, different picture |
+| 2 | the same pair on "The Last Reading" | the episode he actually rewrote, 29 shots |
+
+Arm 0 doubles as the deferred item-0 proof, so it costs nothing extra.
+
+**Both candidate sources verified freezable:**
+
+| episode | planned shots | image rows | master resolves |
+|---|---|---|---|
+| signal_lost_the_faded_ledger_20260902_210812 | 8 | 0 | yes |
+| signal_lost_the_last_reading_20260902_190630 | 29 | 0 | yes |
+
+Zero image rows on both, because the Ghost lane is text-to-video and mints no
+conditioning stills -- so `FROZEN_DIRS` finds nothing to copy and the image-row
+check (`otr_freeze_replay_bundle.py:155-160`) passes trivially. Nothing blocks
+the freeze.
+
+**"The Last Reading" is the better A/B and the Faded Ledger is the better first
+run.** The Last Reading (`..._190630`) is the exact episode the operator read
+beat by beat and rewrote ten prompts for, so v3 beside it is the most legible
+proof available -- but it is 29 shots. The Faded Ledger is 8 shots and carries
+the coat-and-satchel evidence, so it goes first and the longer pair follows if
+arm 1 looks right.
+
+**A latent trap found while checking, recorded and NOT fixed here.** Every real
+episode's master audio is named `pending_<stamp>_master.wav` -- the provisional
+name outlives the episode rename. `find_master` returns early on
+`ledger["final_audio_path"]`, which is set and valid on all four episodes
+checked, so freeze works today. But its fallback deliberately skips
+`pending_*` files (`otr_freeze_replay_bundle.py:92-96`), and since that is what
+every master is actually called, the fallback would find nothing on 100% of real
+episodes if `final_audio_path` were ever absent. Not a production bug -- no live
+failure has occurred, so it earns no PBUG entry -- but the fallback is dead code
+that looks like a safety net, and the honest fix is to rename the master with
+the episode rather than to widen the glob.
