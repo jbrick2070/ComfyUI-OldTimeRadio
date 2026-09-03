@@ -277,6 +277,25 @@ def test_reflection_prompt_requests_exact_context_preservation():
     assert "invented dates" in prompt
 
 
+def test_reflection_prompt_says_what_a_setting_term_is():
+    """`setting_terms` was the one list field the schema named and left alone.
+
+    Every other list carries its own definition -- key_objects are "concrete
+    nouns the scene contains", visual_palette is "colors / textures" -- and
+    `setting_terms` got only its own name back, so the model filled the gap with
+    whatever the episode felt like. Measured 2026-09-03 across the 1,955
+    episodes on disk: 273 carried a setting term that is not a place, and the
+    ghost composer joined them as "coffee cups in the sterile" and
+    "archive_reels in the concrete_floors". The render-time normaliser in
+    `ghost_signal_author._spoken_term` repairs the punctuation on episodes
+    already frozen; this rule is the root fix, and it is why new episodes stop
+    producing them.
+    """
+    for prompt in (sb._REFLECTION_PROMPT, sb._DYNAMIC_REFLECTION_PROMPT):
+        assert "setting_terms are PLACES" in prompt
+        assert "never underscores" in prompt
+
+
 # ---------------------------------------------------------------------------
 # 5-8. Authored content is preserved; only schema integrity can retry
 # ---------------------------------------------------------------------------

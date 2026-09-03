@@ -389,3 +389,42 @@ def test_detect_host_reports_mps(monkeypatch):
     assert host["has_mps"] is True
     assert host["has_cuda"] is False
     assert host["vendor"] == "apple"
+
+
+def test_the_ledger_viewer_does_not_ship_without_its_server():
+    """`viewer/index.html` is half a dev harness; the other half never ships.
+
+    The page fetches `/ledger?latest=1`, `/list` and `/ledger?path=`. The only
+    thing in this repo that serves those routes is `scripts/serve_ledger.py`,
+    which the `scripts/*` rule excludes from the registry bundle. The pack's own
+    registered route is `/otr/latest_ledger` -- a DIFFERENT path, and gated
+    behind `OTR_ENABLE_HTTP_RENDER_ROUTES=1` besides. So a registry install got
+    a page whose every fetch 404s.
+
+    This pins the PAIR rather than the one file: if a future change ships the
+    viewer again it must ship something that answers it, and if it ships the
+    server the viewer may come back with it.
+    """
+    import subprocess
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+
+    def ships(path):
+        excluded = subprocess.run(
+            ["git", "ls-files", "-ci", "--exclude-from=.comfyignore", "--", path],
+            cwd=repo, text=True, capture_output=True, check=True)
+        tracked = subprocess.run(
+            ["git", "ls-files", "--", path],
+            cwd=repo, text=True, capture_output=True, check=True)
+        return bool(tracked.stdout.strip()) and not excluded.stdout.strip()
+
+    viewer_ships = ships("viewer/index.html")
+    server_ships = ships("scripts/serve_ledger.py")
+    assert viewer_ships == server_ships, (
+        "the ledger viewer and the server that answers it must ship together "
+        f"or not at all -- viewer ships={viewer_ships}, "
+        f"server ships={server_ships}")
+    assert not viewer_ships, (
+        "viewer/index.html is shipping to registry installers again; its three "
+        "fetches cannot be answered by the installed pack")

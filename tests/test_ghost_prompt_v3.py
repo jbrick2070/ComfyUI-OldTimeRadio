@@ -374,3 +374,84 @@ def test_the_version_constant_is_not_the_capability_token():
     assert gsp.GHOST_PROMPT_VERSION_V3 == "ghost_signal_v3"
     assert gsp.GHOST_PROMPT_PROFILE == "ghost_signal_v1"
     assert gsp.GHOST_PROMPT_VERSION_V3 != gsp.GHOST_PROMPT_VERSION_V2
+
+
+# ---------------------------------------------------------------------------
+# The brief's own vocabulary reaches the prompt as prose, not as identifiers
+#
+# Measured 2026-09-03 across the 1,955 episodes on disk: 273 of them (14.0%)
+# carried at least one setting term nothing downstream could say out loud, and
+# 8.2% of composed kernels named one. `snake_case` was 690 of the 773 bad terms
+# -- `control_room`, `film_reel`, `petri_dish`, `concrete_floors` -- and the
+# composer emitted them verbatim, so a real episode rendered
+# "archive_reels in the concrete_floors". The rate fell to ~3% once the writer
+# changed in August, which is why this is normalisation and not a campaign: the
+# terms are RIGHT, their punctuation is the schema's, and a replay of any of
+# those 273 episodes still composes its prompt at render time.
+# ---------------------------------------------------------------------------
+
+IDENTIFIER_META = {
+    "episode_seed": 99,
+    "key_objects": ["archive_reels", "clipboards"],
+    "story_brief_terms": {"setting": ["control_room", "concrete_floors"]},
+}
+
+
+@pytest.mark.parametrize("raw, spoken", [
+    ("control_room", "control room"),
+    ("concrete_floors", "concrete floors"),
+    ("petri_dish", "petri dish"),
+    ("candlelit_period_chamber", "candlelit period chamber"),
+    ("high-security archive", "high-security archive"),   # prose is untouched
+    ("  padded  spacing  ", "padded spacing"),
+    ("", ""),
+    (None, ""),
+])
+def test_spoken_term_says_the_word_without_the_punctuation(raw, spoken):
+    assert gsa._spoken_term(raw) == spoken
+
+
+def test_setting_terms_are_spoken_not_identifiers():
+    assert gsa._setting_terms(IDENTIFIER_META) == ["control room", "concrete floors"]
+
+
+def test_kernel_carries_no_underscore_from_either_list():
+    """Both halves of the pair are normalised -- objects leak too."""
+    kernel, source = gsa.resolve_crux_kernel(IDENTIFIER_META, ordinal=0,
+                                             role="character_video", mode="object")
+    assert source == "key_object"
+    assert "_" not in kernel
+    assert kernel == "archive reels in the control room"
+
+
+def test_no_composed_kernel_of_a_real_episode_shape_carries_an_underscore():
+    for ordinal in range(14):
+        for role, mode in EVERY_MODE:
+            kernel, _source = gsa.resolve_crux_kernel(
+                IDENTIFIER_META, ordinal=ordinal, role=role, mode=mode)
+            assert "_" not in kernel, (ordinal, role, mode, kernel)
+
+
+def test_a_term_that_is_both_the_object_and_the_place_drops_the_place():
+    """"petri dish in the petri dish" was composed on a real episode.
+
+    A brief may list one term in `key_objects` and in `setting` both, and the
+    pair then says a thing is inside itself. The SUBJECT is the half the beat is
+    about, so the place drops -- the same resolution the over-long pair takes.
+    """
+    same = {"key_objects": ["petri_dish"],
+            "story_brief_terms": {"setting": ["petri_dish"]}}
+    kernel, source = gsa.resolve_crux_kernel(same, ordinal=0,
+                                             role="character_video", mode="object")
+    assert kernel == "petri dish"
+    assert source == "key_object"
+
+
+def test_the_tautology_guard_ignores_case_and_keeps_a_genuine_pair():
+    cased = {"key_objects": ["Control Room"],
+             "story_brief_terms": {"setting": ["control_room", "loading dock"]}}
+    assert gsa.resolve_crux_kernel(cased, ordinal=0, role="character_video",
+                                   mode="object")[0] == "Control Room"
+    assert gsa.resolve_crux_kernel(REAL_META, ordinal=0, role="character_video",
+                                   mode="object")[0] == (
+        "film canisters in the high-security archive")

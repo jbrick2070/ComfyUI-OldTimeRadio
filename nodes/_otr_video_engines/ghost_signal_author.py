@@ -1429,6 +1429,25 @@ GHOST_V3_TERM_LIMIT = 6
 GHOST_V3_KERNEL_MAX_WORDS = 9
 
 
+def _spoken_term(term) -> str:
+    """One brief term as a human would say it, for a prompt a model reads.
+
+    The brief's terms are authored by an LLM against a schema that asks for
+    "setting terms" and nothing more, so a share of them arrive in identifier
+    case -- ``control_room``, ``film_reel``, ``petri_dish``, ``concrete_floors``.
+    Nothing downstream ever undid that, and ``resolve_crux_kernel`` joined them
+    into the emitted prompt verbatim: measured across the 1,955 episodes on disk
+    2026-09-03, ``snake_case`` was 690 of the 773 mechanically-bad setting terms
+    and produced kernels reading "archive_reels in the concrete_floors".
+
+    An underscore is never part of what the author meant to say -- it is the
+    schema's punctuation leaking into prose -- so this is a normalisation and
+    not a judgement about the term.  Terms that were already prose are returned
+    unchanged, which is every term on a healthy episode.
+    """
+    return " ".join(str(term or "").replace("_", " ").split())
+
+
 def _setting_terms(meta) -> list:
     """The episode's setting terms as a LIST, bounded, possibly empty.
 
@@ -1440,7 +1459,7 @@ def _setting_terms(meta) -> list:
     """
     terms = (meta or {}).get("story_brief_terms") or {}
     raw = terms.get("setting") if isinstance(terms, dict) else None
-    out = [str(t).strip() for t in raw if str(t).strip()] if isinstance(raw, list) else []
+    out = [_spoken_term(t) for t in raw if _spoken_term(t)] if isinstance(raw, list) else []
     if out:
         return out[:GHOST_V3_TERM_LIMIT]
     try:
@@ -1455,9 +1474,9 @@ def _setting_terms(meta) -> list:
     except Exception:  # noqa: BLE001 -- an unreadable brief is an absent brief
         return []
     if isinstance(raw, list):
-        return [str(t).strip() for t in raw if str(t).strip()][:GHOST_V3_TERM_LIMIT]
-    if isinstance(raw, str) and raw.strip():
-        return [raw.strip()]
+        return [_spoken_term(t) for t in raw if _spoken_term(t)][:GHOST_V3_TERM_LIMIT]
+    if isinstance(raw, str) and _spoken_term(raw):
+        return [_spoken_term(raw)]
     return []
 
 
@@ -1494,8 +1513,8 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
     published episode says which tier fed it.
     """
     ordinal = max(int(ordinal or 0), 0)
-    objects = [str(o).strip() for o in ((meta or {}).get("key_objects") or [])
-               if str(o).strip()][:GHOST_V3_TERM_LIMIT]
+    objects = [_spoken_term(o) for o in ((meta or {}).get("key_objects") or [])
+               if _spoken_term(o)][:GHOST_V3_TERM_LIMIT]
     places = _setting_terms(meta)
 
     def _in_place(subject):
@@ -1503,6 +1522,13 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
         if not places:
             return subject
         place = places[(ordinal // max(len(objects), 1)) % len(places)]
+        # A BRIEF MAY LIST THE SAME TERM AS BOTH THE OBJECT AND THE PLACE, and
+        # then the pair says a thing is inside itself: "petri dish in the petri
+        # dish" was composed on a real episode. The subject is the half worth
+        # keeping -- it is what the beat is about -- so the place drops, exactly
+        # as it does for an over-long pair below.
+        if place.casefold() == subject.casefold():
+            return subject
         pair = "%s in the %s" % (subject, place)
         # WHOLE UNITS ONLY: an over-long pair drops the PLACE, never half of
         # either phrase.

@@ -154,3 +154,14 @@ tmp/
 SKILL.md
 _START_HERE.md
 workflows/external_examples/
+
+# 2026-09-03: the ledger viewer is HALF of a dev harness and the other half is
+# already excluded. `viewer/index.html` fetches `/ledger?latest=1`, `/list` and
+# `/ledger?path=`; the only thing that serves those routes is
+# `scripts/serve_ledger.py`, which `scripts/*` above stops shipping. The pack's
+# own registered route is `/otr/latest_ledger` (__init__.py) -- a DIFFERENT
+# path -- and it is gated behind OTR_ENABLE_HTTP_RENDER_ROUTES=1 besides. So on
+# a registry install every one of the page's three fetches 404s: it has shipped
+# to every installer as a page that cannot work. It stays in git for the
+# developers who run the server beside it.
+viewer/

@@ -210,6 +210,8 @@ RULES:
 - music_mood_terms are for instrumental scoring (tense, sombre,
   hopeful). visual_palette is colors / textures. key_objects are
   concrete nouns the scene contains.
+- setting_terms are PLACES (control room, riverbank), not adjectives.
+  Plain words, never underscores.
 
 Script context:
 """
@@ -248,6 +250,7 @@ RULES:
 - No dialogue verbs or plot verbs.
 - No invented dates, decades, centuries, cities, countries, or eras.
 - music_mood_terms are for scoring. visual_palette is colors / textures. key_objects are concrete nouns.
+- setting_terms are PLACES (control room, riverbank), not adjectives. Plain words, never underscores.
 - visual_card fields must be concise, expressive aesthetic descriptions. medium_short must be 1-3 words (max 40 chars).
 
 Script context:
