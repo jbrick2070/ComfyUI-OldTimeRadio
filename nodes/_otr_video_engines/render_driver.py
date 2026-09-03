@@ -2868,13 +2868,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # before every branch rather than inside one: ShotLock builds a request per
     # beat through this same function long before the durable rows are minted.
     _ghost_composed = False
-    #: TRUE ONLY on the Prompt v2 path. It suppresses the common banana funnel
-    #: below for this request and nothing else -- v2 has ALREADY applied the
+    #: TRUE ON THE COMPOSED-PROMPT PATH (v2 or v3). It suppresses the common
+    #: banana funnel
+    #: below for this request and nothing else -- the Ghost finalizer has
+    #: ALREADY applied the
     #: route inside its shared finalizer, and letting the funnel transform an
     #: already-transformed prompt would overwrite a real substitution receipt
     #: with a zero-substitution one (the transform is idempotent, so the second
     #: pass genuinely does nothing and would honestly report doing nothing).
-    _ghost_v2_finalized = False
+    _ghost_prompt_finalized = False
     _ghost_profile = (
         getattr(_vreg.get_engine(_eng_id), "prompt_profile", None)
         if _eng_id and _vreg.is_registered(_eng_id) else None)
@@ -2908,11 +2910,32 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     "would have a safety clause appended after finalization "
                     "and past every check this branch just made."
                     % (shot.get("shot_id"), _eng_id))
-            _g_final = _gsa.finalize_ghost_prompt_v2(
+            # THE BEAT'S ORDINAL, and it has to be derived here because the
+            # authored object never carried one. It is the shot's position in
+            # the ledger's own planned order -- durable, identical on every
+            # replay of a frozen plan, and therefore safe to cycle episode
+            # vocabulary with. A shot the plan does not list falls back to 0
+            # rather than guessing, which costs that one beat its variety and
+            # never its picture.
+            _g_planned = ((ledger or {}).get("video") or {}).get("shots") or []
+            _g_ordinal = 0
+            for _g_i, _g_row in enumerate(_g_planned):
+                if str((_g_row or {}).get("shot_id") or "") == str(
+                        shot.get("shot_id") or ""):
+                    _g_ordinal = _g_i
+                    break
+            # PROMPT v3 ("draw the crux"): composed from the EPISODE -- its
+            # `key_objects`, its setting, its light -- and from the stored
+            # object's MODE alone. The stored `motif_cue` and `drawable_beat`
+            # are deliberately not passed: they carry the invented costume
+            # ("a lean figure in a charcoal coat, carrying a satchel") and the
+            # leaf authored from it, which is what put people and bags in an
+            # episode about film canisters in an archive. They stay on the row
+            # as the beat's authored provenance and Half B re-authors them.
+            _g_final = _gsa.finalize_ghost_prompt_v3(
                 role=_shot_role, style=_vstyle, mode=_g_obj["mode"],
-                motif_cue=_g_obj["motif_cue"],
-                drawable_beat=_g_obj["drawable_beat"],
-                ledger_meta=(ledger or {}).get("meta") or {})
+                ledger_meta=(ledger or {}).get("meta") or {},
+                ordinal=_g_ordinal)
             _g_positive = str(_g_final["positive"]).strip()
             _g_negative = str(_g_final["negative"]).strip()
             req["text_prompt"] = _g_positive
@@ -2920,12 +2943,20 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _stamp_prompt_meta(req, _gsp.GHOST_PROMPT_SOURCE, _g_positive,
                                beat=_beat_id_for_shot(shot))
             _g_obs = req.setdefault("observability", {})
-            _g_obs["prompt_version"] = _gsp.GHOST_PROMPT_VERSION_V2
+            _g_obs["prompt_version"] = _gsp.GHOST_PROMPT_VERSION_V3
             _g_obs["negative_sha8"] = hashlib.sha256(
                 _g_negative.encode("utf-8")).hexdigest()[:8]
             _g_obs["negative_chars"] = len(_g_negative)
+            # STILL A LIST OF NAMES. The published /history report and its
+            # allowlist have carried this key as a name list since 2026-08-22;
+            # the per-slot COUNTS go in their own map beside it rather than
+            # changing this key's type under every existing reader.
             _g_obs["prompt_slots"] = list(_g_final.get("slots")
-                                          or _gsp.GHOST_V2_SLOTS)
+                                          or _gsp.GHOST_V3_SLOTS)
+            _g_obs["prompt_slot_tokens"] = dict(
+                _g_final.get("slot_tokens") or {})
+            _g_obs["prompt_dropped"] = list(_g_final.get("dropped") or ())
+            _g_obs["kernel_source"] = str(_g_final.get("kernel_source") or "")
             _g_obs["author_version"] = _g_obj["author_version"]
             _g_obs["ghost_schema_version"] = _g_obj["schema_version"]
             _g_obs["ghost_source"] = _g_obj["source"]
@@ -2934,6 +2965,15 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _g_obs["ghost_mode"] = _g_obj["mode"]
             _g_obs["ghost_request_sha8"] = _g_obj["request_sha256"][:8]
             _g_obs["ghost_output_sha8"] = _g_obj["output_sha256"][:8]
+            # THESE TWO DESCRIBE THE AUTHORED OBJECT, NOT THE RENDERED TEXT,
+            # and under Prompt v3 they deliberately disagree with it. v3
+            # composes from the episode and never reads the stored motif or
+            # leaf, so a beat whose picture contains no coat will still receipt
+            # `ghost_motif_cue = "a lean figure in a charcoal coat, carrying a
+            # satchel"`. That is the row's authored provenance and Prompt v3
+            # Half B re-authors exactly these fields, so they are kept and
+            # labelled rather than dropped -- read them beside `prompt_slots`
+            # and `kernel_source`, which describe what was actually sent.
             _g_obs["ghost_drawable_beat"] = _g_obj["drawable_beat"]
             _g_obs["ghost_drawable_beat_sha8"] = _g_obj["output_sha256"][:8]
             _g_obs["ghost_motif_cue"] = _g_obj["motif_cue"]
@@ -2946,10 +2986,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # The finalizer's OWN receipt, installed here so the funnel below
             # does not run a second, idempotent transform over the same text.
             _g_obs.update(_g_final["banana_receipt"])
-            _ghost_v2_finalized = True
+            _ghost_prompt_finalized = True
             _ghost_composed = True
             _LOG.warning(
-                "[OTR.render_driver] GHOST PROMPT v2: %s beat %s mode=%s "
+                "[OTR.render_driver] GHOST PROMPT v3: %s beat %s mode=%s "
                 "source=%s composed %d chars / %d SD1 tokens in %d window(s), "
                 "negative %d chars / %d tokens",
                 _shot_role, shot.get("shot_id"), _g_obj["mode"],
@@ -3690,7 +3730,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # UNSTRIPPED: the receipt digests must hash the literal prompt bytes the
     # request carries (Sonnet QA advisory) -- only the emptiness CHECK strips.
     _banana_prompt = str(req.get("text_prompt") or "")
-    if _banana_prompt.strip() and not _ghost_v2_finalized:
+    if _banana_prompt.strip() and not _ghost_prompt_finalized:
         try:
             from .._otr_banana_route import (
                 apply as _banana_apply, banana_gate as _banana_gate,
@@ -4992,6 +5032,15 @@ def run_episode(ledger, *, oom_shot_id=None,
                         # belong in this loop and the cadence keys below do not.
                         "prompt_version", "negative_sha8", "negative_chars",
                         "prompt_slots", "subject_sigil_sha8",
+                        # PROMPT v3 RECEIPTS (2026-09-02). `prompt_slots` stays
+                        # the name list it has always been; these three say how
+                        # many tokens each slot spent, which whole units the
+                        # fitter dropped, and which tier of the kernel ladder
+                        # fed the subject. Stamped and allowlisted in the same
+                        # change, because a key that is stamped and not listed
+                        # here never reaches the node-92 report at all.
+                        "prompt_slot_tokens", "prompt_dropped",
+                        "kernel_source",
                         # GHOST PROMPT v2 RECEIPTS (2026-08-22). A key that is
                         # stamped but not listed here never reaches the node-92
                         # /history report, which is the only place the operator

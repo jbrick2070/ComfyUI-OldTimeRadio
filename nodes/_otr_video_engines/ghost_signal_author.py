@@ -1281,6 +1281,326 @@ GHOST_CLIP_COUNTER = "comfy.sd1_clip.SD1Tokenizer/%s" % GHOST_AUTHOR_VERSION
 
 
 # --------------------------------------------------------------------------- #
+# PROMPT v3 -- "draw the crux". Resolvers for the three episode-derived slots.
+#
+# All of this is RENDER-TIME and reads only the ledger meta the driver already
+# holds. Nothing here writes to the ledger, changes an authored object, or calls
+# a model -- which is what lets a frozen episode replay under v3 with a
+# byte-identical `render_request_hash` and therefore a byte-identical seed.
+#
+# THE ONE FIELD THESE MUST NEVER TOUCH is `story_brief_terms` as a WRITE target:
+# `otr_shot_lock._derive_creative` hashes it into `brief_hash`, `brief_hash`
+# feeds the per-shot `request_hash`, and `request_hash` is what the render seed
+# is derived from. Reading it is free; adding a key to it would move every seed
+# in the episode and destroy the A/B this composer exists to make possible.
+# --------------------------------------------------------------------------- #
+
+#: WORLD MOTION, keyed by VANTAGE rather than by the stored mode identity.
+#:
+#: A SEPARATE POOL FROM `GHOST_FALLBACK_CLAUSES`, and that is the point. Those
+#: clauses are whole sentences with their own subject -- "a figure turns a page
+#: and holds the paper to the lamp", "it slides an inch across the wood and
+#: stops" -- so appending one after a crux kernel would read "a vast cold water
+#: reservoir, a figure turns a page ..." and re-introduce, at tabletop scale,
+#: exactly the unmentioned figure this composer exists to remove. Every clause
+#: here is a bare verb phrase with NO subject of its own, so it composes
+#: correctly after any kernel.
+#:
+#: SIZED AGAINST A REAL EXHAUSTION, not a round number. On 2026-08-30 a five-act
+#: overnight episode exhausted a six-clause pool on `figure` alone -- character
+#: beats are the most common under `GHOST_CHARACTER_CYCLE` -- and under v3 this
+#: pool fires on EVERY beat rather than only on a failed batch. The longest real
+#: episode observed is 29 shots, so each bucket carries comfortably more than
+#: that and `test_ghost_prompt_v3` pins the no-exhaustion claim against it.
+GHOST_WORLD_MOTION_V3 = {
+    "figure": (
+        "the air moving slowly through it",
+        "a slow drift across the space",
+        "dust turning in the light",
+        "the light shifting along the far wall",
+        "a stillness broken once and settling",
+        "shadows lengthening across the floor",
+        "a draught pulling through the room",
+        "the far end sinking into the dark",
+        "movement passing through and going quiet",
+        "the room settling into stillness",
+        "light sliding down the far wall",
+        "the space breathing once and holding",
+        "a slow shift toward the far side",
+        "the dark gathering at the edges",
+        "the air thickening across the room",
+        "a slow tide of shadow crossing it",
+        "the ceiling light swaying faintly",
+        "the far door standing open on nothing",
+        "a draught lifting the loose edges",
+        "the floor disappearing into shadow",
+        "a slow settling of everything in it",
+        "distance opening toward the back",
+        "the walls receding into grey",
+        "one slow pass of light across it",
+        "quiet closing over the space",
+        "the corners going soft and dark",
+        "a slow current running through it",
+        "the light failing gradually at the back",
+        "stillness spreading outward",
+        "the room holding its breath",
+        "shadow pooling toward the middle",
+        "a long slow exhale of dust",
+    ),
+    "object": (
+        "drifting slowly",
+        "settling in the still air",
+        "shifting as the light crosses it",
+        "stirring once and going still",
+        "moving with the draught",
+        "trembling faintly",
+        "turning slowly in place",
+        "tilting and settling back",
+        "gathering dust as it sits",
+        "catching the light along one edge",
+        "sliding a little and stopping",
+        "rocking once and steadying",
+        "darkening as the light moves off",
+        "shedding a thin fall of dust",
+        "leaning slowly out of true",
+        "brightening and dimming again",
+        "shivering under the draught",
+        "settling deeper where it rests",
+        "throwing a shadow that lengthens",
+        "creasing slowly under its own weight",
+        "loosening and lying still",
+        "warming under the lamp",
+        "cooling into shadow",
+        "shifting a fraction and holding",
+        "gleaming once and going dull",
+        "sagging slowly at one corner",
+        "turning a slow quarter and stopping",
+        "gathering a film of grey",
+        "flexing once in the moving air",
+        "coming slowly out of the dark",
+        "losing its edge to the shadow",
+        "holding a thin line of light",
+    ),
+    "signal": (
+        "the light sweeping slowly across it",
+        "a glow rising and falling on it",
+        "the beam crossing and leaving it dark",
+        "a slow pulse of light over its surface",
+        "light crawling along one edge",
+        "the glow steadying and then thinning",
+        "a bar of light passing over it",
+        "the dark closing in and opening again",
+        "light guttering across it",
+        "a slow bloom of light and its fade",
+        "the beam narrowing onto it",
+        "light sliding off it into the dark",
+        "a flicker travelling its length",
+        "the glow drifting off centre",
+        "light pooling and draining away",
+        "a slow strobe washing over it",
+        "the beam swinging wide and back",
+        "light climbing it and falling away",
+        "a dim wash rising on it",
+        "the light breaking up across its face",
+        "a slow scan of light down it",
+        "the glow tightening to a point",
+        "light rolling over it in waves",
+        "the dark taking it a piece at a time",
+        "a low shimmer moving on it",
+        "light drawing back off it slowly",
+        "a slow blink of brightness",
+        "the beam holding and then sliding",
+        "light spilling across and receding",
+        "a slow flare and its long decay",
+        "the glow crossing it end to end",
+        "light failing gradually off its edge",
+    ),
+}
+
+
+#: How many terms of any one list v3 will cycle. A brief that returns twenty
+#: settings is not twenty different places; it is one place described twenty
+#: ways, and cycling all of them would make consecutive beats look unrelated.
+GHOST_V3_TERM_LIMIT = 6
+
+#: The longest kernel v3 will compose, in words, before it drops the setting
+#: half. Whole units only -- a kernel is never word-sliced, because slicing
+#: "data logs" to "data" changes what is drawn.
+GHOST_V3_KERNEL_MAX_WORDS = 9
+
+
+def _setting_terms(meta) -> list:
+    """The episode's setting terms as a LIST, bounded, possibly empty.
+
+    ``otr_shot_lock._read_setting`` returns a JOINED string with a hard-coded
+    fallback, which is right for its caller and wrong for this one: v3 cycles
+    the terms across beats, so it needs them separately, and it must be able to
+    see that there are none (a failed brief stamps ``setting: []``) rather than
+    receive a stand-in that looks like real episode vocabulary.
+    """
+    terms = (meta or {}).get("story_brief_terms") or {}
+    raw = terms.get("setting") if isinstance(terms, dict) else None
+    out = [str(t).strip() for t in raw if str(t).strip()] if isinstance(raw, list) else []
+    if out:
+        return out[:GHOST_V3_TERM_LIMIT]
+    try:
+        from .._otr_brief_reader import _read_brief_field  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        try:
+            from _otr_brief_reader import _read_brief_field  # type: ignore
+        except ImportError:
+            return []
+    try:
+        raw = _read_brief_field(meta, "setting", default=[])
+    except Exception:  # noqa: BLE001 -- an unreadable brief is an absent brief
+        return []
+    if isinstance(raw, list):
+        return [str(t).strip() for t in raw if str(t).strip()][:GHOST_V3_TERM_LIMIT]
+    if isinstance(raw, str) and raw.strip():
+        return [raw.strip()]
+    return []
+
+
+def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
+    """The beat's SUBJECT: the story's own thing, in the story's own place.
+
+    TOTAL BY CONSTRUCTION -- four tiers, and the last one cannot fail. It never
+    raises and never returns an empty kernel, because the measured rule on this
+    lane is that legibility tracks concrete nouns: a prompt that names no thing
+    rendered a recognisable subject on 0 of 4 sampled beats. Returning "" here
+    would rebuild that condition on every brief-failed episode.
+
+    The tiers, in order:
+
+    1. ``meta.key_objects[i]`` in ``story_brief_terms.setting[j]`` -- the
+       story's own object in the story's own place. This is the whole point.
+    2. the setting term alone, when the brief gave a place but no objects.
+    3. a bounded slice of ``meta.story_brief``, when only the prose survived.
+    4. the beat's BOOKEND RADIO OBJECT -- a bakelite radio set, a glowing radio
+       dial, a broadcast console, a spinning turntable. Always present, always
+       drawable, always right for a radio programme, and never a costume or a
+       cast look. A brief-failed episode draws the radio world rather than a
+       field of nothing.
+
+    ODOMETER CYCLING, not modulo on both wheels. Cycling the object and the
+    place on the same index makes the PAIR repeat every ``len(objects)`` beats:
+    with four objects and four settings the design prototype produced seven
+    byte-identical kernels in a 29-beat episode. Rolling the place only when the
+    object wraps gives a period of ``len(objects) * len(settings)``, which no
+    real episode reaches.
+
+    Returns ``(kernel, source)`` where source is one of ``bookend_radio``,
+    ``key_object``, ``setting``, ``brief`` or ``bookend``, and is receipted so a
+    published episode says which tier fed it.
+    """
+    ordinal = max(int(ordinal or 0), 0)
+    objects = [str(o).strip() for o in ((meta or {}).get("key_objects") or [])
+               if str(o).strip()][:GHOST_V3_TERM_LIMIT]
+    places = _setting_terms(meta)
+
+    def _in_place(subject):
+        """``<subject> in the <place>``, or the subject alone if that is long."""
+        if not places:
+            return subject
+        place = places[(ordinal // max(len(objects), 1)) % len(places)]
+        pair = "%s in the %s" % (subject, place)
+        # WHOLE UNITS ONLY: an over-long pair drops the PLACE, never half of
+        # either phrase.
+        return pair if len(pair.split()) <= GHOST_V3_KERNEL_MAX_WORDS else subject
+
+    # THE RADIO STAYS ON THE BOOKENDS, and it is an operator rule rather than a
+    # fallback: "radio objects stay on the announcer and music beds, but placed
+    # in the setting (the radio set with the reservoir behind it), not on a
+    # table in a dark room". His own rewrite of one reads "a bakelite radio set,
+    # with a background of British Columbia's Williston Reservoir with floating
+    # driftwood" -- the programme's own object, standing in the story's place.
+    #
+    # So a bookend takes its SUBJECT from `GHOST_BOOKEND_MOTIFS` and its PLACE
+    # from the episode, exactly as a character beat takes both from the episode.
+    # Without this the announcer bed drew "handwritten ledgers in the
+    # high-security archive" and the radio disappeared from the programme.
+    if str(role or "") and str(role or "") != "character_video":
+        motif = (GHOST_BOOKEND_MOTIFS.get((str(role), str(mode or "")))
+                 or GHOST_BOOKEND_MOTIFS.get(("announcer_visual", str(mode or ""))))
+        if motif:
+            return _in_place(motif), "bookend_radio"
+
+    if objects:
+        return _in_place(objects[ordinal % len(objects)]), "key_object"
+
+    if places:
+        return places[ordinal % len(places)], "setting"
+
+    brief = " ".join(str((meta or {}).get("story_brief") or "").split())
+    if brief:
+        sliced = " ".join(brief.split()[:GHOST_V3_KERNEL_MAX_WORDS])
+        sliced = sliced.rstrip(",.;:").strip()
+        if sliced:
+            return sliced, "brief"
+
+    # Tier 4. `bookend_motif` refuses an unknown role/mode pairing, and a
+    # character beat has no bookend at all -- so this resolves the radio object
+    # for the beat's own mode and falls back to the announcer's, which every
+    # mode in `GHOST_VANTAGE_V3` except `figure` has. A `figure` beat on a
+    # brief-failed episode gets the announcer's radio set: not the story, but a
+    # real thing in a real programme, which is the whole claim tier 4 makes.
+    for key in ((str(role or ""), str(mode or "")),
+                ("announcer_visual", str(mode or "")),
+                ("announcer_visual", "object")):
+        motif = GHOST_BOOKEND_MOTIFS.get(key)
+        if motif:
+            return motif, "bookend"
+    return GHOST_BOOKEND_MOTIFS[("announcer_visual", "object")], "bookend"
+
+
+def resolve_world_light(meta, *, ordinal=0, mode="") -> str:
+    """The episode's own lighting term, on the SLOWEST wheel of the odometer.
+
+    Returns "" on ``signal`` mode: that vantage already says "lit against the
+    dark, the light moving", and composing a second lighting clause beside it
+    produced two contradictory statements in the design prototype.
+
+    The wheel is deliberately slower than the kernel's. One episode is one
+    place, and a light that changed every beat would read as a different room
+    every beat -- the operator's rule 2 is that the episode lives in ONE place
+    and every beat is a view of it.
+    """
+    if str(mode or "") == "signal":
+        return ""
+    terms = (meta or {}).get("story_brief_terms") or {}
+    raw = terms.get("lighting") if isinstance(terms, dict) else None
+    lights = [str(t).strip() for t in raw if str(t).strip()] if isinstance(raw, list) else []
+    if not lights:
+        return ""
+    objects = [o for o in ((meta or {}).get("key_objects") or []) if str(o).strip()]
+    places = _setting_terms(meta)
+    wheel = max(len(objects[:GHOST_V3_TERM_LIMIT]), 1) * max(len(places), 1)
+    return lights[:GHOST_V3_TERM_LIMIT][
+        (max(int(ordinal or 0), 0) // wheel) % len(lights[:GHOST_V3_TERM_LIMIT])]
+
+
+def resolve_world_motion(*, mode, episode_seed, ordinal=0) -> str:
+    """One world-motion clause for the beat, distinct within the episode.
+
+    STATELESS AND PROVABLY NON-REPEATING, which is why it walks the pool by
+    ORDINAL rather than by probing a set of already-used clauses. The render
+    driver builds each clip's request independently and shares no per-episode
+    state between them, so a collision-probing walk like ``deterministic_leaf``
+    has nothing to probe against here. Offsetting a hashed start by the beat
+    ordinal gives every beat in a bucket a different clause outright, for any
+    episode no longer than the bucket -- which is how the buckets were sized.
+
+    The episode seed only chooses WHERE in the pool the episode starts, so two
+    episodes do not open on the same clause; the ordinal does the rest.
+    """
+    pool = GHOST_WORLD_MOTION_V3.get(str(mode or "")) or ()
+    if not pool:
+        return ""
+    start = _hash_int(episode_seed, "ghost_world_motion_v3", mode) % len(pool)
+    return pool[(start + max(int(ordinal or 0), 0)) % len(pool)]
+
+
+# --------------------------------------------------------------------------- #
 # The shared finalizer -- ONE path for author-time admission and render.
 # --------------------------------------------------------------------------- #
 
@@ -1383,6 +1703,178 @@ def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,
     }
 
 
+#: The v3 DROP ORDER: whole optional units, cheapest meaning first.
+#:
+#: NEVER the kernel's subject noun and never the pack cue -- those two are what
+#: make the picture legible and what make it look like the pack. And never a
+#: WORD out of any unit: slicing "data logs" down to "data" changes the thing
+#: being drawn, which is worse than dropping a clause that only decorated it.
+#: The kernel's SETTING half is the last resort and is dropped as one piece.
+GHOST_V3_DROP_ORDER = ("light", "motion", "vantage", "kernel_setting")
+
+
+def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
+                             ordinal=0, token_measure_fn=None,
+                             banana_enabled=None) -> dict:
+    """Resolve, compose, transform, FIT and measure one Ghost v3 prompt.
+
+    The v3 sibling of :func:`finalize_ghost_prompt_v2`, and deliberately a
+    SEPARATE function rather than an edit of it. Two reasons, both load-bearing:
+
+    * v2 is still the author-time admission path. ``candidate_fits`` and
+      ``assert_shell_fits`` call it while ShotLock is planning, and
+      ``build_request_from_shot`` -- which is also ShotLock's cast-time
+      preflight -- catches only ``DeferredImageGapError``. A budget raise on
+      that path kills plan build for a new episode after the writer LLM has
+      already run.
+    * v2 is contracted never to trim. v3 MUST trim, because it composes from
+      episode vocabulary whose length nobody controls.
+
+    So the contracts differ on purpose, and the difference is the point:
+    **v3 never raises FOR BUDGET.** The valve is the drop order, not a refusal,
+    and `resolve_crux_kernel` is a total ladder so there is always something to
+    compose.
+
+    IT CAN STILL FAIL CLOSED, and deliberately: a row whose `role` is not a real
+    role, or whose `mode` has no vantage, raises out of
+    `compose_ghost_prompt_v3` exactly as it would out of the v2 composer, and an
+    unavailable SD1 tokenizer raises out of `resolve_token_measure` in
+    production exactly as it does for v2. Those are malformed input and missing
+    infrastructure, not length -- and the surrounding law on this lane is that a
+    malformed object fails closed rather than downgrading to something that
+    looks like a healthy render. Author and render no longer compose identical text for
+    a v3 beat, and that is intended -- v3 reads the ledger, which the author's
+    admission check does not have.
+
+    Order of operations, and it matters: fit toward
+    ``GHOST_AUTHOR_TOKEN_TARGET`` BEFORE the banana route, then apply the route
+    exactly ONCE, then re-measure. The transform can grow a token, so a prompt
+    fitted after it would be measured against the wrong text, and a prompt
+    transformed twice would overwrite a real substitution receipt with a
+    zero-substitution one.
+    """
+    meta = ledger_meta if isinstance(ledger_meta, dict) else {}
+    kernel, kernel_source = resolve_crux_kernel(
+        meta, ordinal=ordinal, role=role, mode=mode)
+    light = resolve_world_light(meta, ordinal=ordinal, mode=mode)
+    motion = resolve_world_motion(
+        mode=mode, episode_seed=meta.get("episode_seed"), ordinal=ordinal)
+
+    measure = resolve_token_measure(token_measure_fn)
+    dropped: list = []
+
+    def _compose(with_light, with_motion, with_vantage, with_place):
+        text_kernel = kernel
+        if not with_place and " in the " in kernel:
+            text_kernel = kernel.split(" in the ", 1)[0].strip()
+        composed = _gsp.compose_ghost_prompt_v3(
+            role=role, style=style, mode=mode, kernel=text_kernel,
+            light=light if with_light else "",
+            motion=motion if with_motion else "")
+        if not with_vantage:
+            # The vantage is composed by the pure function and removed here as
+            # ONE span whose bytes we hold -- never re-joined by hand, so the
+            # separators stay exactly what the composer produced.
+            #
+            # REMOVED FROM THE END, never by `replace`. The vantage is always
+            # the last unit, and a bare `.replace` would delete EVERY occurrence
+            # of that exact span: a future pack cue, a long setting phrase or a
+            # motion clause that happened to coincide would be silently cut out
+            # of the middle of the prompt. Trimming the suffix can only ever
+            # touch the one the composer just appended.
+            vantage = composed["components"]["vantage"]
+            suffix = ", " + vantage
+            positive = composed["positive"]
+            trimmed = (positive[:-len(suffix)] if positive.endswith(suffix)
+                       else positive)
+            composed = dict(composed)
+            composed["positive"] = trimmed
+            composed["components"] = dict(composed["components"])
+            composed["components"]["vantage"] = ""
+            composed["slots"] = [s for s in composed["slots"] if s != "vantage"]
+        return composed
+
+    flags = {"light": True, "motion": True, "vantage": True,
+             "kernel_setting": True}
+    composed = _compose(True, True, True, True)
+    if measure is not None:
+        for unit in GHOST_V3_DROP_ORDER:
+            tokens, windows = measure(composed["positive"])
+            if windows <= 1 and tokens <= GHOST_AUTHOR_TOKEN_TARGET:
+                break
+            flags[unit] = False
+            before = composed["positive"]
+            composed = _compose(flags["light"], flags["motion"],
+                                flags["vantage"], flags["kernel_setting"])
+            # ONLY RECEIPT A UNIT THAT WAS ACTUALLY THERE. `light` is
+            # structurally empty on `signal` mode and the kernel's setting half
+            # is absent whenever the brief gave no place, so walking the order
+            # blind would publish "prompt_dropped: light" for a beat that never
+            # had a light clause -- a receipt that reads as a budget decision
+            # when nothing was decided.
+            if composed["positive"] != before:
+                dropped.append(unit)
+
+    positive = str(composed["positive"])
+    negative = str(composed["negative"])
+    components = dict(composed["components"])
+
+    banana = _banana_module()
+    variety_key = str(meta.get("freeze_timestamp") or "")
+    gate_on = (banana.banana_gate(meta, lane="video")
+               if banana_enabled is None else bool(banana_enabled))
+    if gate_on:
+        result = banana.apply(positive, variety_key=variety_key,
+                              shield_quoted_card_text=False)
+        positive = result.text
+        receipt = banana.receipt_keys(result)
+        components = {
+            name: (banana.apply(text, variety_key=variety_key,
+                                shield_quoted_card_text=False).text
+                   if text else text)
+            for name, text in components.items()
+        }
+    else:
+        receipt = banana.off_receipt(positive, variety_key=variety_key)
+
+    for name, text in components.items():
+        if text and text not in positive:
+            raise GhostBudgetError(
+                "Ghost v3 component %r did not survive into the final positive "
+                "-- v3 drops WHOLE units before composing, so a missing "
+                "component is a composer or transform defect rather than a "
+                "budget outcome" % (name,))
+
+    slot_tokens = {}
+    if measure is not None:
+        pos_tokens, pos_windows = measure(positive)
+        neg_tokens, neg_windows = measure(negative)
+        slot_tokens = {name: int(measure(text)[0])
+                       for name, text in components.items() if text}
+    else:
+        pos_tokens = pos_windows = neg_tokens = neg_windows = 0
+
+    return {
+        "positive": positive,
+        "negative": negative,
+        "components": components,
+        "slots": list(composed.get("slots") or ()),
+        "dropped": list(dropped),
+        "slot_tokens": slot_tokens,
+        "kernel_source": kernel_source,
+        "world_motion": motion,
+        "banana_receipt": receipt,
+        "banana_gate": bool(gate_on),
+        "positive_clip_tokens": int(pos_tokens),
+        "positive_clip_windows": int(pos_windows),
+        "negative_clip_tokens": int(neg_tokens),
+        "negative_clip_windows": int(neg_windows),
+        "clip_window_max": GHOST_CLIP_WINDOW_TOKENS,
+        "clip_counter": GHOST_CLIP_COUNTER if measure is not None else "",
+        "measured": measure is not None,
+    }
+
+
 def candidate_fits(*, role, style, mode, motif_cue, drawable_beat,
                    ledger_meta=None, token_measure_fn=None,
                    target_tokens=GHOST_AUTHOR_TOKEN_TARGET) -> tuple:
@@ -1465,5 +1957,8 @@ __all__ = [
     "deterministic_leaf", "deterministic_batch", "build_ghost_prompt_object",
     "validate_ghost_prompt_object", "measure_clip_tokens",
     "resolve_token_measure", "finalize_ghost_prompt_v2", "candidate_fits",
+    "finalize_ghost_prompt_v3", "resolve_crux_kernel", "resolve_world_light",
+    "resolve_world_motion", "GHOST_WORLD_MOTION_V3", "GHOST_V3_DROP_ORDER",
+    "GHOST_V3_TERM_LIMIT", "GHOST_V3_KERNEL_MAX_WORDS",
     "assert_shell_fits",
 ]

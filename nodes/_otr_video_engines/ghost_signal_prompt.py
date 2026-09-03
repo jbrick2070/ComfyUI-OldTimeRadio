@@ -62,6 +62,15 @@ GHOST_PROMPT_VERSION = "ghost_signal_v1"
 #: while the adapter keeps advertising the capability it still has.
 GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
 
+#: THE PROMPT v3 COMPOSER VERSION ("draw the crux", 2026-09-02). Same reasoning
+#: as v2 above: the COMPOSER moves, the capability token does not. v3 is a
+#: render-time change only -- it reads the episode's own `key_objects`,
+#: `story_brief_terms` and the beat's stored mode, and it reads NEITHER the
+#: stored `motif_cue` NOR the stored `drawable_beat`. The authored object stays
+#: on the row untouched, which is what lets a frozen ledger replay under v3 with
+#: byte-identical seeds and a different picture.
+GHOST_PROMPT_VERSION_V3 = "ghost_signal_v3"
+
 #: ``prompt_source`` for :func:`render_driver._stamp_prompt_meta`.
 GHOST_PROMPT_SOURCE = "ghost_signal"
 
@@ -144,6 +153,39 @@ GHOST_MODE_LAWS_V2 = {
     "signal": ("the object lit against a dark room, moving light across it, "
                "unbroken shot"),
 }
+
+#: PROMPT v3 VANTAGE. The v3 replacement for the mode laws above, and a SEPARATE
+#: table on purpose -- it is never derived from `GHOST_MODE_LAWS_V2` and never
+#: falls back to it (kibitz r3 SF2, r4 X3).
+#:
+#: WHAT THE LAWS WERE ACTUALLY FOR, and why replacing them is safe here: the
+#: comment above records a measured same-seed pair -- 4 of 4 recognisable
+#: subjects when the prompt named a concrete thing, 0 of 4 when it asked for a
+#: field of texture. "Legibility tracks concrete nouns." The law was the slot
+#: that guaranteed a noun. Under v3 the CRUX KERNEL is that slot, and it names a
+#: better noun than the law ever did: "film canisters", "a handheld brass
+#: communicator" rather than the generic "the object". The kernel resolver is a
+#: total four-tier ladder for exactly this reason -- it may never come back
+#: empty, or this table would be all that is left and the 0-of-4 condition would
+#: be rebuilt on purpose.
+#:
+#: So a vantage clause owns FRAMING and nothing else, and it carries no noun, no
+#: medium word and no body part. `figure` follows the operator's own rewrite --
+#: "characters moving through a stagnant mass of water at a reservoir" -- people
+#: in the world at the world's scale, never a costume in close-up.
+GHOST_VANTAGE_V3 = {
+    "figure": "wide, the people small in the space",
+    "object": "the object large in the frame",
+    # THE LIGHT LANGUAGE STAYS HERE, and the LIGHT SLOT IS DROPPED ON THIS MODE.
+    # This mode's whole identity is a thing lit in a dark room. Composing the
+    # pack's own lighting term beside it produced two contradictory lighting
+    # statements in the design prototype -- "harsh fluorescent overheads, ...
+    # lit against the dark" on the same beat. One light statement per prompt.
+    "signal": "lit against the dark, the light moving",
+}
+
+#: The v3 slot names, in composition order. Reported as `prompt_slots`.
+GHOST_V3_SLOTS = ("pack_cue", "kernel", "light", "motion", "vantage")
 
 #: Role framing floors. The character floor is a MID-SHOT: closer than that and
 #: the model starts trying to render a face it cannot hold.
@@ -896,6 +938,78 @@ def compose_ghost_prompt_v2(role, style, mode, motif_cue,
     }
 
 
+def compose_ghost_prompt_v3(role, style, mode, kernel, light, motion) -> dict:
+    """Compose one Ghost PROMPT v3 positive plus its unchanged negative.
+
+    PURE AND SCALAR, exactly like its v2 sibling: no ledger, no shot, no cast
+    row, no engine. The caller resolves the kernel, the light and the motion
+    from the episode and hands over strings, so the render driver and any
+    author-time check compose identical text from identical inputs.
+
+    IT TAKES NO ``motif_cue`` AND NO ``drawable_beat``, and that is the whole
+    change. The stored costume motif and the leaf authored from it are what put
+    a charcoal coat and a satchel on four beats of an episode about film
+    canisters in an archive; neither word appears in this signature, so no
+    future edit can quietly reach for one. The stored fields stay on the ledger
+    row as the beat's authored provenance -- unread here, unrenamed, and still
+    what Prompt v3 Half B will re-author.
+
+    Slots, in order: pack cue, crux kernel, light, world motion, vantage. Only
+    the kernel and the vantage are required; the caller drops the optional ones
+    to fit and this function simply omits what it is not given.
+    """
+    role = str(role or "")
+    mode = str(mode or "")
+    kernel = _normalize_ws(kernel)
+    light = _normalize_ws(light)
+    motion = _normalize_ws(motion)
+
+    if role not in GHOST_FRAMING:
+        raise GhostPromptError(
+            "Ghost Prompt v3 does not compose for role %r" % (role,))
+    vantage = GHOST_VANTAGE_V3.get(mode)
+    if not vantage:
+        raise GhostPromptError(
+            "Ghost Prompt v3 mode %r is not one of %s"
+            % (mode, ", ".join(sorted(GHOST_VANTAGE_V3))))
+    if role != "character_video" and mode == "figure":
+        raise GhostPromptError(
+            "Ghost Prompt v3 refuses figure mode on the %s bookend -- a radio "
+            "console is not a person, and the mode scheduler never assigns "
+            "this pairing" % (role,))
+    if not kernel:
+        raise GhostPromptError(
+            "Ghost Prompt v3 has no crux kernel for a %s beat. The kernel is "
+            "the only slot that names a thing, and the measured rule on this "
+            "lane is that legibility tracks concrete nouns -- an empty kernel "
+            "is a picture of nothing. `resolve_crux_kernel` is a total ladder "
+            "ending in the beat's bookend radio object precisely so this "
+            "cannot happen; reaching here means the caller bypassed it."
+            % (role,))
+
+    body = ", ".join(t for t in (kernel, light, motion, vantage) if t)
+    positive = _prefix_pack_cue(style, body)
+
+    pack_cue = ""
+    if positive != body and positive.endswith(body):
+        pack_cue = positive[:len(positive) - len(body)].strip().rstrip(
+            ".").strip()
+
+    components = {
+        "pack_cue": pack_cue,
+        "kernel": kernel,
+        "light": light,
+        "motion": motion,
+        "vantage": vantage,
+    }
+    return {
+        "positive": positive,
+        "negative": compose_ghost_negative(style),
+        "components": components,
+        "slots": [name for name in GHOST_V3_SLOTS if components.get(name)],
+    }
+
+
 def _join(pieces) -> str:
     """Join the ordered slot pieces into one comma-separated prompt."""
     return ", ".join(text for _, text in pieces if _normalize_ws(text))
@@ -915,8 +1029,10 @@ def _prefix_pack_cue(style, prompt) -> str:
 
 __all__ = [
     "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_VERSION_V2",
+    "GHOST_PROMPT_VERSION_V3", "GHOST_VANTAGE_V3", "GHOST_V3_SLOTS",
     "GHOST_PROMPT_SOURCE", "GHOST_MODE_LAWS_V2", "GHOST_V2_SLOTS",
     "distill_sigil_components", "compose_ghost_prompt_v2",
+    "compose_ghost_prompt_v3",
     "GHOST_PROMPT_MAX_CHARS", "GHOST_NEGATIVE_MAX_CHARS",
     "GHOST_SIGIL_MAX_CHARS", "LANE_HYGIENE_NEGATIVE", "GHOST_SHOT_LAW",
     "GHOST_FRAMING", "GHOST_TRIM_ORDER", "GHOST_INTENT_ACTIONS",

@@ -208,18 +208,41 @@ def test_the_row_validates_against_the_extra_forbid_schema():
 # 3. The render request.
 # --------------------------------------------------------------------------- #
 
-def test_the_request_composes_v2_from_the_stored_leaf():
+def test_the_request_composes_v3_and_keeps_the_authored_object_on_the_receipt():
+    """The v2-object / v3-prompt SPLIT (Prompt v3 Half A, 2026-09-02).
+
+    This test used to assert the opposite -- that the stored ``motif_cue`` and
+    ``drawable_beat`` appear verbatim in the sent text -- because that WAS the
+    v2 contract. Prompt v3 composes from the episode instead, so the stored
+    fields must NOT reach the prompt while still riding the receipt as the
+    beat's authored provenance. Rewritten rather than deleted, because both
+    halves of that sentence are load-bearing and a deletion would stop
+    guarding either one.
+    """
     led, shots = _plan()
     for shot in shots:
         req = rd.build_request_from_shot(shot, led, master_audio_path="")
         obs = req["observability"]
         obj = shot["ghost_prompt"]
-        assert obs["prompt_version"] == gsp.GHOST_PROMPT_VERSION_V2
+        assert obs["prompt_version"] == gsp.GHOST_PROMPT_VERSION_V3
         assert obs["ghost_mode"] == obj["mode"]
+        # the authored object still rides the receipt, unchanged
         assert obs["ghost_drawable_beat"] == obj["drawable_beat"]
-        assert obj["motif_cue"] in req["text_prompt"]
-        assert obj["drawable_beat"] in req["text_prompt"]
+        assert obs["ghost_motif_cue"] == obj["motif_cue"]
+        # the authored LEAF never reaches the text -- v3 does not read it
+        assert obj["drawable_beat"] not in req["text_prompt"]
+        # THE COSTUME never reaches it either. Scoped to character beats on
+        # purpose: `motif_for_character` is what invents the coat and the
+        # satchel, while a BOOKEND's motif is a radio object from
+        # `GHOST_BOOKEND_MOTIFS` -- and the v3 kernel ladder's last tier reads
+        # that same table, so on a bookend beat whose episode carries no
+        # `key_objects` both paths legitimately arrive at "a broadcast
+        # console". That is the radio, not the costume.
+        if shot["role"] == "character_video":
+            assert obj["motif_cue"] not in req["text_prompt"]
         assert req["negative_prompt"]
+        assert obs["kernel_source"] in (
+            "bookend_radio", "key_object", "setting", "brief", "bookend")
 
 
 def test_no_raw_ledger_surface_reaches_a_v2_prompt():
@@ -266,7 +289,11 @@ def test_every_declared_receipt_is_on_the_trace_allowlist():
                 "ghost_drawable_beat", "ghost_drawable_beat_sha8",
                 "positive_clip_tokens", "positive_clip_windows",
                 "negative_clip_tokens", "negative_clip_windows",
-                "clip_window_max", "clip_counter"):
+                "clip_window_max", "clip_counter",
+                # Prompt v3 receipts. This test is the safety net for them:
+                # a key stamped and not allowlisted never reaches node 92.
+                "prompt_slots", "prompt_slot_tokens", "prompt_dropped",
+                "kernel_source"):
         assert key in obs, key
         assert '"%s"' % key in src, key
 
@@ -302,7 +329,18 @@ def test_the_banana_receipt_is_installed_exactly_once():
 # 4. Identity: the seed does not move; the cache identity does.
 # --------------------------------------------------------------------------- #
 
-def test_the_authored_leaf_changes_the_prompt_but_not_the_seed():
+def test_the_authored_leaf_changes_NEITHER_the_prompt_nor_the_seed():
+    """The v3 inversion of a v2 test, and it is the property the A/B rests on.
+
+    Under v2 the stored leaf WAS the prompt's only content slot, so rewriting it
+    rewrote the text. Under v3 the prompt is composed from the episode and the
+    stored leaf is never read -- so a rewritten leaf changes nothing that
+    reaches the sampler, while the receipt still records the new authored value.
+
+    The seed half never stopped mattering and is unchanged: `request_hash` mixes
+    the brief, the cast, the beat and the character, and has never included the
+    prompt.
+    """
     led, shots = _plan()
     shot = copy.deepcopy(_shot(shots, "shot_b002"))
     before = rd.build_request_from_shot(shot, led, master_audio_path="")
@@ -312,11 +350,14 @@ def test_the_authored_leaf_changes_the_prompt_but_not_the_seed():
     rewritten["ghost_prompt"]["output_sha256"] = gsa.output_sha256(
         rewritten["ghost_prompt"]["drawable_beat"])
     after = rd.build_request_from_shot(rewritten, led, master_audio_path="")
-    assert after["text_prompt"] != before["text_prompt"]
+    assert after["text_prompt"] == before["text_prompt"]
     assert after["seed_bundle"] == before["seed_bundle"]
     assert rewritten["render_request_hash"] == shot["render_request_hash"]
-    assert after["observability"]["prompt_sha8"] != \
+    assert after["observability"]["prompt_sha8"] == \
         before["observability"]["prompt_sha8"]
+    # the receipt still tells the truth about what was authored
+    assert after["observability"]["ghost_drawable_beat"] != \
+        before["observability"]["ghost_drawable_beat"]
 
 
 # --------------------------------------------------------------------------- #
