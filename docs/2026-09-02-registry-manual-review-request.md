@@ -1,9 +1,16 @@
 # Manual review request for the Comfy Registry -- draft (2026-09-02)
 
-**File this AFTER `2.0.0-alpha.17` is published and its scan has run.** Before posting:
+**PRECONDITIONS ARE NOW SATISFIED (2026-09-03 19:06Z). This is ready to file on the
+operator's go.** alpha.17's scan landed and measured **158 findings, all `info`, 0
+`critical`** -- the counts below have been updated to alpha.17's own scan and no longer
+quote alpha.16. The delta from alpha.16's 157 is exactly +1
+`python_environment_manipulation` (102 -> 103), which is the route gate's own
+`OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added.
+
+Historical checklist, kept because it records what was verified:
 1. `GET https://api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`
-   and confirm alpha.17 shows ZERO `critical` findings. alpha.16 already measured 0 critical /
-   157 info (2026-09-03), so a critical reappearing means the new version reintroduced one.
+   DONE 2026-09-03 19:06Z: alpha.17 measures 0 critical / 158 info. alpha.16 measured
+   0 critical / 157, so the credential fix held across the bump.
 2. **DONE 2026-09-03 -- verified against the PUBLISHED ARTIFACT, not the commit.**
    `https://cdn.comfy.org/fluxus/comfyui-old-time-radio/2.0.0-alpha.17/node.zip` was downloaded
    (6,397,276 bytes, 814 files) and its `__init__.py` contains `OTR_ENABLE_HTTP_RENDER_ROUTES`.
@@ -13,8 +20,8 @@
    `b198026a`, and the published alpha.16 zip therefore still carries the two unconditional POST
    routes -- so the Boundaries section below is FALSE of alpha.16 and TRUE from alpha.17 on.
    A reviewer greps the zip; now so have we.
-3. Update every finding count below against alpha.17's own scan. The counts are quoted from
-   alpha.16 and the scanner's line numbers shift whenever shipped code moves.
+3. DONE 2026-09-03: every count below is now alpha.17's own, re-read from
+   `?include_status_reason=true` rather than carried over from alpha.16.
 4. Paste the real version ID from that response where marked.
 5. Open it at https://github.com/Comfy-Org/registry-backend/issues/new (no template exists;
    the title shape below is the tracker's convention).
@@ -74,13 +81,13 @@ Boundaries behind an opt-in environment flag that is off by default. Every remai
 
 ### The info findings, grouped
 
-All 157 are `yara_scan`, `severity: info`; there are no `low`, `medium`, `high` or `critical`
+All 158 are `yara_scan`, `severity: info`; there are no `low`, `medium`, `high` or `critical`
 findings. Some carry admin tags including `credential-access` -- that tag is attached to
 `os.environ.get` reads of `HF_TOKEN` and similar, not to any credential the pack transmits.
 OldTimeRadio is a local radio-drama pipeline (script -> TTS -> mix -> optional video), and the
 findings are its ordinary machinery (counts from the alpha.16 scan; re-check against alpha.17):
 
-1. `python_environment_manipulation` (102): `os.environ.get` reads of documented `OTR_*`
+1. `python_environment_manipulation` (103): `os.environ.get` reads of documented `OTR_*`
    operator knobs and the standard `HF_HOME` / `HF_TOKEN` / `HF_HUB_OFFLINE`, plus a handful of
    process-local writes (`OTR_OUTPUT_DIR`, `HF_HOME`, `OTR_ACTIVE_PROFILE`, one feature flag).
    Nothing persists outside the ComfyUI process.
@@ -98,7 +105,7 @@ findings are its ordinary machinery (counts from the alpha.16 scan; re-check aga
    (sha256 of a downloaded model file to verify it), `python_bytecode_manipulation` (a
    `sys.modules` lookup; no bytecode is touched).
 
-Totals as scanned: 102 + 35 + 12 + 5 + 1 + 1 + 1 = 157.
+Totals as scanned (alpha.17, 2026-09-03): 103 + 35 + 12 + 5 + 1 + 1 + 1 = 158.
 
 ### Boundaries
 

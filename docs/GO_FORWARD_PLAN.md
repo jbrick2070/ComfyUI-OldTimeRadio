@@ -103,14 +103,28 @@ directly instead.
   reading `Comfy-Org/registry-backend`. Corroborated independently: rgthree's two newest
   publishes are Flagged too, so the ruleset tightened in late August and comparing against
   older Active versions of popular packs proves nothing.
+* **ALPHA.17 SCANNED 2026-09-03 19:06Z: 158 findings, ALL `info`, ZERO `critical`, status
+  `Flagged`.** The credential fix held across the bump. The delta from alpha.16's 157 is
+  exactly +1 `python_environment_manipulation` (102 -> 103), which is the route gate's own
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added -- i.e. the one new finding
+  is the feature we shipped, behaving as designed. Flagged with zero criticals is the
+  expected outcome, not a failure.
+* **THE NODE-COUNT HALF IS ALREADY FILED, AND HAS BEEN SINCE 2026-08-24: the operator
+  opened `Comfy-Org/registry-backend#203`.** It is still OPEN with no comments, labels or
+  assignee. It names a cause this window's 480-pack survey could not have found on its own
+  -- **a backfill cron scheduled for February 29th**, a date that does not occur in 2026 and
+  next occurs in 2028. The operator added the survey as a comment on 2026-09-03 and
+  corrected the issue's date window: extraction did not stop in February, it stopped
+  **2026-04-28**, and 19 packs' newest success falls in April with nothing after. Do NOT
+  open a second issue on this; comment on #203.
 * **NEXT: file the manual review request.** Draft ready and retargeted at alpha.17 in
   `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
   published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
-  strike that step. Remaining preconditions: alpha.17's scan lands and shows 0 critical,
-  and the 157 finding counts in the draft are re-checked against alpha.17's own scan
-  (`?include_status_reason=true`), because the scanner's line numbers shift whenever
-  shipped code moves. Filing is a public post on Comfy-Org's tracker and needs the
-  operator's explicit go.
+  strike that step. **BOTH REMAINING PRECONDITIONS ARE NOW SATISFIED
+  (2026-09-03):** alpha.17's scan landed at 0 critical, and every finding count in the
+  draft has been re-read from alpha.17's own scan (158, not alpha.16's 157). The draft is
+  ready to post as-is. Filing is a public post on Comfy-Org's tracker and needs the
+  operator's explicit go -- it is the only thing still holding it.
 * **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL
   verification, NOT for scanner probing.** Publishing a small pack under his own publisher
   to confirm a dependency set actually installs in their Linux container is ordinary use
