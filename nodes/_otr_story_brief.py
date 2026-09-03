@@ -89,6 +89,11 @@ _REFLECTION_STRUCTURAL_RETRY_TEMPERATURE: float = 0.15
 # stay untouched; v2 fields land alongside them as top-level meta
 # entries, so v1 consumers and the existing 8-key meta-shape tests
 # continue to pass.
+try:
+    from ._otr_brief_reader import spoken_term as _spoken_term
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_brief_reader import spoken_term as _spoken_term
+
 _PROMPT_VERSION: str = "v2"
 
 # Refinement section 4 source-tag stamped on every output -- documents
@@ -486,6 +491,23 @@ def _success_delta(
         if isinstance(brief_model.atmosphere_line, str)
         else ""
     )
+    # EVERY TERM LIST IS STAMPED AS PROSE, NOT AS IDENTIFIERS (2026-09-03,
+    # PBUG-20260903-04). The reflection model returns a share of terms in
+    # identifier case whatever the prompt asks -- measured across the 2,029
+    # briefs on disk, 2,989 terms carry an underscore, worst in
+    # `visual_palette` at 8.6% and present in all six lists. Consumers then
+    # join them straight into model-facing text, and the first fix went in
+    # consumer-side on `setting` and `key_objects` only, which left `lighting`
+    # leaking into the rendered video prompt (found by a source-bank sweep the
+    # same day) and `visual_palette` untouched.
+    #
+    # NORMALISING HERE FIXES THE CLASS: every consumer reads clean terms,
+    # including consumers nobody has enumerated. Seed-safe, because a brief is
+    # stamped once when the episode is authored -- a frozen ledger keeps the
+    # bytes it froze, so no `brief_hash` and no seed moves.
+    def _prose(terms):
+        return [t for t in (_spoken_term(x) for x in terms) if t]
+
     return {
         "story_brief":               text,
         "story_brief_status":        "ok",
@@ -495,14 +517,14 @@ def _success_delta(
         "story_brief_source":        _BRIEF_SOURCE,
         "story_brief_char_count":    len(text),
         "story_brief_terms": {
-            "setting":    list(brief_model.setting_terms),
-            "lighting":   list(brief_model.lighting_terms),
-            "atmosphere": list(brief_model.atmosphere_terms),
+            "setting":    _prose(brief_model.setting_terms),
+            "lighting":   _prose(brief_model.lighting_terms),
+            "atmosphere": _prose(brief_model.atmosphere_terms),
         },
         # Sprint 8.1 v2 fields -- top-level (A1 flat additive).
-        "music_mood_terms":          list(brief_model.music_mood_terms),
-        "visual_palette":            list(brief_model.visual_palette),
-        "key_objects":               list(brief_model.key_objects),
+        "music_mood_terms":          _prose(brief_model.music_mood_terms),
+        "visual_palette":            _prose(brief_model.visual_palette),
+        "key_objects":               _prose(brief_model.key_objects),
         "tempo_hint":                tempo_hint,
         "atmosphere_line":           atmosphere_line,
     }

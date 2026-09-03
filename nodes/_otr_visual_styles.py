@@ -653,6 +653,64 @@ def compact_style_cue(vstyle) -> str:
     return " ".join(words[:limit]).strip()
 
 
+#: How many WORDS of a pack's own style vocabulary may ride at the END of a
+#: prompt, beyond the blunt front cue. Sized against the nine shipped packs
+#: (2026-09-03): their trailing remainders run 4 to 22 words, median 9, so ten
+#: takes the whole remainder for five packs and trims the four long ones. In
+#: tokens that is roughly 13 against `GHOST_AUTHOR_TOKEN_TARGET` of 69 on a
+#: prompt measuring about 32 today -- deliberate headroom, because the fitter
+#: still has to fit the banana route after this.
+TRAILING_STYLE_MAX_WORDS = 10
+
+
+def trailing_style_cue(vstyle, *, max_words: int = TRAILING_STYLE_MAX_WORDS) -> str:
+    """The pack's own style vocabulary for the END of a prompt, or "".
+
+    The front cue (:func:`compact_style_cue`) is blunt on purpose -- two to four
+    words, stopping at "style" -- so a pack that authored
+    "anime style, expressive linework, cel-shaded color" contributes only
+    "anime style" today and the rest of what it authored is never asked for.
+    This returns that remainder, bounded.
+
+    **THE DEFAULT STYLE RETURNS "" EXPLICITLY, AND THAT GUARD IS THE POINT.**
+    `sci_fi_radio` IS the house look; its tails are byte-pinned to the shared
+    constants and it deliberately emits no front cue. Deriving the remainder by
+    subtracting the front cue would therefore hand back its ENTIRE
+    `positive_tail` ("cinematic, 35mm film look, subtle film grain, volumetric
+    lighting") and emit it at the back -- style text on the one style that must
+    have none, churning every default-lane golden. Caught in review before it
+    shipped; the guard is checked FIRST, never inferred from an empty cue.
+
+    **WHOLE COMMA UNITS ONLY, never a word slice.** Trimming "cel-shaded color"
+    to "cel-shaded" changes what is being asked for, which is the same rule
+    `GHOST_V3_DROP_ORDER` already follows for whole slots. A unit that does not
+    fit is dropped entire, and everything after it with it, so the result always
+    reads as authored prose rather than a truncated fragment.
+    """
+    if str(getattr(vstyle, "style_id", "") or "") == DEFAULT_STYLE_ID:
+        return ""
+    raw = str(getattr(vstyle, "positive_tail", "") or "").strip()
+    if not raw:
+        return ""
+    # compact_style_cue builds its words FROM positive_tail, so the front cue is
+    # a word-prefix of it and dropping that many words is exact rather than a
+    # string search that could match again later in the tail.
+    front_words = len(compact_style_cue(vstyle).split())
+    rest = " ".join(raw.split()[front_words:]).strip().strip(",").strip()
+    if not rest:
+        return ""
+    kept, used = [], 0
+    for unit in (u.strip().strip(",").strip() for u in rest.split(",")):
+        if not unit:
+            continue
+        length = len(unit.split())
+        if used + length > max(int(max_words), 0):
+            break
+        kept.append(unit)
+        used += length
+    return ", ".join(kept)
+
+
 def prefix_style_cue(vstyle, prompt: str) -> str:
     """Front-anchor the pack's style token on ``prompt``. ADDITIVE ONLY.
 
@@ -773,9 +831,11 @@ __all__ = [
     "VisualStyleCardModel",
     "VisualStyleError",
     "VisualStyleValidationError",
+    "TRAILING_STYLE_MAX_WORDS",
     "compose_pack_from_card",
     "get_visual_style",
     "list_style_ids",
     "resolve_visual_style",
+    "trailing_style_cue",
     "validate_pack",
 ]

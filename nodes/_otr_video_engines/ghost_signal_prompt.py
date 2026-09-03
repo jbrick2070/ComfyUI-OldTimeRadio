@@ -69,7 +69,7 @@ GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
 #: stored `motif_cue` NOR the stored `drawable_beat`. The authored object stays
 #: on the row untouched, which is what lets a frozen ledger replay under v3 with
 #: byte-identical seeds and a different picture.
-GHOST_PROMPT_VERSION_V3 = "ghost_signal_v3"
+GHOST_PROMPT_VERSION_V3 = "ghost_signal_v3.1"
 
 #: ``prompt_source`` for :func:`render_driver._stamp_prompt_meta`.
 GHOST_PROMPT_SOURCE = "ghost_signal"
@@ -185,7 +185,8 @@ GHOST_VANTAGE_V3 = {
 }
 
 #: The v3 slot names, in composition order. Reported as `prompt_slots`.
-GHOST_V3_SLOTS = ("pack_cue", "kernel", "light", "motion", "vantage")
+GHOST_V3_SLOTS = ("pack_cue", "kernel", "light", "motion", "vantage",
+                  "trailing_style")
 
 #: Role framing floors. The character floor is a MID-SHOT: closer than that and
 #: the model starts trying to render a face it cannot hold.
@@ -1015,6 +1016,22 @@ def _join(pieces) -> str:
     return ", ".join(text for _, text in pieces if _normalize_ws(text))
 
 
+def _trailing_pack_cue(style) -> str:
+    """The pack's own style vocabulary for the END of the prompt, or "".
+
+    Sibling of :func:`_prefix_pack_cue`, and like it a thin call into the shared
+    `_otr_visual_styles` authority rather than a second copy of the rule here.
+    The default style returns "" -- the guard lives in `trailing_style_cue`.
+    """
+    if style is None:
+        return ""
+    try:
+        from .._otr_visual_styles import trailing_style_cue  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_visual_styles import trailing_style_cue  # type: ignore
+    return trailing_style_cue(style)
+
+
 def _prefix_pack_cue(style, prompt) -> str:
     """Front-anchor the pack's style token. ADDITIVE ONLY -- the shared
     ``prefix_style_cue`` authority, never a second copy of it here."""
@@ -1030,6 +1047,7 @@ def _prefix_pack_cue(style, prompt) -> str:
 __all__ = [
     "GHOST_PROMPT_PROFILE", "GHOST_PROMPT_VERSION", "GHOST_PROMPT_VERSION_V2",
     "GHOST_PROMPT_VERSION_V3", "GHOST_VANTAGE_V3", "GHOST_V3_SLOTS",
+    "_trailing_pack_cue",
     "GHOST_PROMPT_SOURCE", "GHOST_MODE_LAWS_V2", "GHOST_V2_SLOTS",
     "distill_sigil_components", "compose_ghost_prompt_v2",
     "compose_ghost_prompt_v3",

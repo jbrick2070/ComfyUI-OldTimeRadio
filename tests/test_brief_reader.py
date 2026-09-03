@@ -398,3 +398,48 @@ def test_normalisation_alone_never_changes_how_many_terms_there_are():
 
     real = ["control_room", "high-security archive", "petri_dish", "riverbank"]
     assert len(_setting_terms({"story_brief_terms": {"setting": real}})) == len(real)
+
+
+def test_the_producer_stamps_every_term_list_as_prose():
+    """The class fix. Consumer-side normalisation kept missing siblings.
+
+    PBUG-20260903-04 was first fixed in the CONSUMERS, on `setting` and
+    `key_objects`. A source-bank sweep then found `lighting` still leaking into
+    rendered prompts ("handheld bronze communicator in the forest, storm_light")
+    and a corpus count found `visual_palette` was the worst of the six at 8.6%.
+    Measured across the 2,029 briefs on disk: 2,989 terms carry an underscore,
+    in ALL SIX lists.
+
+    Normalising where the brief is STAMPED covers every consumer, including the
+    ones nobody has enumerated. Seed-safe: a brief is stamped once when the
+    episode is authored, so a frozen ledger keeps the bytes it froze and no
+    `brief_hash` moves.
+    """
+    from nodes import _otr_story_brief as sb
+
+    class _Model:
+        story_brief = "A control room under pressure."
+        setting_terms = ["control_room", "server room"]
+        lighting_terms = ["storm_light", "moonbeam"]
+        atmosphere_terms = ["hushed_whispers"]
+        music_mood_terms = ["tense_strings"]
+        visual_palette = ["sterile_white"]
+        key_objects = ["computer_screen"]
+        tempo_hint = "slow"
+        atmosphere_line = "The room holds its breath."
+
+    delta = sb._success_delta(brief_model=_Model(), technical_model_id="m",
+                              prompt_version="v2")
+    terms = delta["story_brief_terms"]
+    assert terms["setting"] == ["control room", "server room"]
+    assert terms["lighting"] == ["storm light", "moonbeam"]
+    assert terms["atmosphere"] == ["hushed whispers"]
+    assert delta["music_mood_terms"] == ["tense strings"]
+    assert delta["visual_palette"] == ["sterile white"]
+    assert delta["key_objects"] == ["computer screen"]
+
+    for value in (list(terms.values()) + [delta["music_mood_terms"],
+                                          delta["visual_palette"],
+                                          delta["key_objects"]]):
+        for term in value:
+            assert "_" not in term, term

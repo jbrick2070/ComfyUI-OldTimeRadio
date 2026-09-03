@@ -1593,7 +1593,14 @@ def resolve_world_light(meta, *, ordinal=0, mode="") -> str:
         return ""
     terms = (meta or {}).get("story_brief_terms") or {}
     raw = terms.get("lighting") if isinstance(terms, dict) else None
-    lights = [str(t).strip() for t in raw if str(t).strip()] if isinstance(raw, list) else []
+    # SPOKEN, like the settings and the objects. `lighting` is the same
+    # LLM-authored list from the same brief and leaks identifier case at the
+    # same rate -- measured 481 of 7,978 terms (6.0%) across the episodes on
+    # disk, e.g. `storm_light`, `dim_glow`, `harsh_fluorescent`. The first pass
+    # at PBUG-20260903-04 normalised `setting` and `key_objects` and missed this
+    # sibling, which a source-bank sweep then found live in a rendered prompt:
+    # "handheld bronze communicator in the forest, storm_light, ...".
+    lights = [_spoken_term(t) for t in raw if _spoken_term(t)] if isinstance(raw, list) else []
     if not lights:
         return ""
     objects = [o for o in ((meta or {}).get("key_objects") or []) if str(o).strip()]
@@ -1734,7 +1741,23 @@ def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,
 #: WORD out of any unit: slicing "data logs" down to "data" changes the thing
 #: being drawn, which is worse than dropping a clause that only decorated it.
 #: The kernel's SETTING half is the last resort and is dropped as one piece.
-GHOST_V3_DROP_ORDER = ("light", "motion", "vantage", "kernel_setting")
+#:
+#: TRAILING STYLE GOES FIRST, AND MOTION MOVED BEHIND VANTAGE (2026-09-03).
+#: Two deliberate placements, both from the operator's ruling that the budget
+#: buys "visual style - key objects per beat story - + movement":
+#:
+#: * The trailing style clause is an ENRICHMENT, so it is the first thing
+#:   surrendered. Adding it must never cost a slot that was already earning its
+#:   place; if the prompt is tight, the prompt simply reverts to what it emitted
+#:   before this clause existed.
+#: * `motion` used to be dropped SECOND, which was harmless only because the
+#:   ladder never fired -- v3 measures ~32 tokens against a target of 69. This
+#:   clause lengthens prompts and could make it fire for the first time, and
+#:   deleting movement before framing directly contradicts the ruling. Framing
+#:   (`vantage`) is the cheaper loss: the shot still moves, it is just less
+#:   precisely staged.
+GHOST_V3_DROP_ORDER = ("trailing_style", "light", "vantage", "motion",
+                       "kernel_setting")
 
 
 def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
@@ -1783,11 +1806,15 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
     light = resolve_world_light(meta, ordinal=ordinal, mode=mode)
     motion = resolve_world_motion(
         mode=mode, episode_seed=meta.get("episode_seed"), ordinal=ordinal)
+    # The pack's own style vocabulary for the END of the prompt. Resolved ONCE
+    # here rather than inside `_compose`, which the fitter may call five times.
+    trailing = _gsp._trailing_pack_cue(style)
 
     measure = resolve_token_measure(token_measure_fn)
     dropped: list = []
 
-    def _compose(with_light, with_motion, with_vantage, with_place):
+    def _compose(with_light, with_motion, with_vantage, with_place,
+                 with_trailing):
         text_kernel = kernel
         if not with_place and " in the " in kernel:
             text_kernel = kernel.split(" in the ", 1)[0].strip()
@@ -1816,11 +1843,23 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
             composed["components"] = dict(composed["components"])
             composed["components"]["vantage"] = ""
             composed["slots"] = [s for s in composed["slots"] if s != "vantage"]
+        # APPENDED LAST, AND DELIBERATELY AFTER THE VANTAGE TRIM ABOVE. That
+        # trim removes the vantage as a SUFFIX of the composed text, so a style
+        # clause added before it would leave the vantage mid-string and the
+        # suffix match would silently fail -- the prompt would keep a vantage it
+        # was told to drop. Composing without the clause and adding it here
+        # keeps that match exact, and is why the pure composer is untouched.
+        if with_trailing and trailing:
+            composed = dict(composed)
+            composed["positive"] = "%s, %s" % (composed["positive"], trailing)
+            composed["components"] = dict(composed["components"])
+            composed["components"]["trailing_style"] = trailing
+            composed["slots"] = list(composed["slots"]) + ["trailing_style"]
         return composed
 
     flags = {"light": True, "motion": True, "vantage": True,
-             "kernel_setting": True}
-    composed = _compose(True, True, True, True)
+             "kernel_setting": True, "trailing_style": True}
+    composed = _compose(True, True, True, True, True)
     if measure is not None:
         for unit in GHOST_V3_DROP_ORDER:
             tokens, windows = measure(composed["positive"])
@@ -1829,7 +1868,8 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
             flags[unit] = False
             before = composed["positive"]
             composed = _compose(flags["light"], flags["motion"],
-                                flags["vantage"], flags["kernel_setting"])
+                                flags["vantage"], flags["kernel_setting"],
+                                flags["trailing_style"])
             # ONLY RECEIPT A UNIT THAT WAS ACTUALLY THERE. `light` is
             # structurally empty on `signal` mode and the kernel's setting half
             # is absent whenever the brief gave no place, so walking the order

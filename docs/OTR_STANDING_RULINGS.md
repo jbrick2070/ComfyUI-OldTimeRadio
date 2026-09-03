@@ -738,6 +738,24 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## FAN SONNET AGENTS ACROSS THE SOURCE BANKS TO CHECK PROMPTS (operator authorization 2026-09-03)
+
+> *"feel free to fan out Sonnet agents to check prompts in all source banks at
+> some point, when strategy calls for it."*
+
+Standing authorization, not an instruction to do it now. **The strategic moment
+is AFTER a prompt-composition change lands and before its GPU proof**, because a
+bank exercises vocabulary the others never produce: `shakespeare` carries
+verbatim source language, `public_domain` paraphrases, `media_archive` carries
+real proper nouns, and `original` has no catalog seed at all. A composer that
+reads clean on one bank can compose nonsense on another, and that is exactly the
+class of defect a single-bank spot check cannot see.
+
+Scope each agent to ONE bank and to NAMED functions -- a whole-tree reviewer hung
+for an hour once, while nine named functions returned in two minutes and found a
+real defect. Have each compose real prompts from real ledgers on disk rather than
+reasoning about the code, and report what it actually emitted.
+
 ## THE BEAT'S SUBJECT IS A PHYSICAL ARTIFACT, NEVER THE DIALOGUE'S FLUFF (operator ruling 2026-09-03 -- hard, and it settles Prompt v3 Half B)
 
 Asked whether Half B should be closed, built deterministically, or built by

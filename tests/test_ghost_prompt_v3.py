@@ -339,8 +339,10 @@ def test_a_generous_budget_drops_nothing():
         role="character_video", style=_style(), mode="figure",
         ledger_meta=REAL_META, ordinal=0, token_measure_fn=_word_measure(1))
     assert out["dropped"] == []
+    # `trailing_style` joined the set 2026-09-03: a generous budget keeps the
+    # pack's own style vocabulary at BOTH ends of the prompt.
     assert set(out["slots"]) == {"pack_cue", "kernel", "light", "motion",
-                                 "vantage"}
+                                 "vantage", "trailing_style"}
 
 
 def test_the_banana_route_is_applied_exactly_once():
@@ -371,7 +373,11 @@ def test_the_slot_receipts_name_only_slots_that_are_present():
 
 def test_the_version_constant_is_not_the_capability_token():
     """Bumping `GHOST_PROMPT_PROFILE` would unregister every peer from its lane."""
-    assert gsp.GHOST_PROMPT_VERSION_V3 == "ghost_signal_v3"
+    # BUMPED 2026-09-03 for the trailing style clause. The bump is REQUIRED,
+    # not cosmetic: `OTRVideoRenderBatch.IS_CHANGED` folds this constant into
+    # its cache key, so without it a resident ComfyUI session re-serves clips
+    # rendered by the previous composer and the change looks like a no-op.
+    assert gsp.GHOST_PROMPT_VERSION_V3 == "ghost_signal_v3.1"
     assert gsp.GHOST_PROMPT_PROFILE == "ghost_signal_v1"
     assert gsp.GHOST_PROMPT_VERSION_V3 != gsp.GHOST_PROMPT_VERSION_V2
 
@@ -455,3 +461,149 @@ def test_the_tautology_guard_ignores_case_and_keeps_a_genuine_pair():
     assert gsa.resolve_crux_kernel(REAL_META, ordinal=0, role="character_video",
                                    mode="object")[0] == (
         "film canisters in the high-security archive")
+
+
+# ---------------------------------------------------------------------------
+# THE STYLE BRACKETS THE PROMPT (operator ruling 2026-09-03)
+#
+# "visual style - key objects per beat story - + movement", and "if you can
+# spend more at start and end of prompt to highlight visual style but NO EXTRA
+# OBJECTS because that's where it gets tripped up".
+#
+# The packs authored more style vocabulary than v3 was asking for: anime wrote
+# "anime style, expressive linework, cel-shaded color" and the prompt carried
+# "anime style". The remainder now rides at the END, bounded, and no object
+# vocabulary is added anywhere.
+# ---------------------------------------------------------------------------
+
+from nodes import _otr_visual_styles as _vs
+
+
+def _style_obj(style_id):
+    return _vs.get_visual_style({"visual_style": style_id})
+
+
+def test_every_pack_but_the_house_style_brackets_the_prompt():
+    for style_id in _vs.list_style_ids():
+        out = gsa.finalize_ghost_prompt_v3(
+            role="character_video", style=_style_obj(style_id), mode="figure",
+            ledger_meta=REAL_META, ordinal=0)
+        positive = out["positive"]
+        if style_id == _vs.DEFAULT_STYLE_ID:
+            continue
+        front = _vs.compact_style_cue(_style_obj(style_id))
+        tail = _vs.trailing_style_cue(_style_obj(style_id))
+        assert positive.startswith(front), (style_id, positive[:40])
+        assert positive.endswith(tail), (style_id, positive[-40:])
+        assert "trailing_style" in out["slots"], style_id
+
+
+def test_the_house_style_gains_no_style_text_at_either_end():
+    """`sci_fi_radio` IS the house look and must emit none, front or back.
+
+    This is the defect the r2 reviewer caught in the spec before it shipped:
+    deriving the tail by subtracting the front cue from `positive_tail` hands
+    back the WHOLE tail when the front cue is empty, which is exactly the
+    default style's case -- it would have emitted "cinematic, 35mm film look,
+    subtle film grain, volumetric lighting" at the back of every house-look
+    prompt and churned every default-lane golden.
+    """
+    house = _style_obj(_vs.DEFAULT_STYLE_ID)
+    assert _vs.compact_style_cue(house) == ""
+    assert _vs.trailing_style_cue(house) == ""
+    out = gsa.finalize_ghost_prompt_v3(role="character_video", style=house,
+                                       mode="figure", ledger_meta=REAL_META,
+                                       ordinal=0)
+    assert "trailing_style" not in out["slots"]
+    assert out["positive"].startswith("film canisters")
+    for word in ("cinematic", "35mm", "film grain", "volumetric"):
+        assert word not in out["positive"], word
+
+
+def test_the_trailing_cue_keeps_whole_units_and_never_slices_one():
+    """A sliced unit changes what is asked for: "cel-shaded" is not a colour."""
+    for style_id in _vs.list_style_ids():
+        style = _style_obj(style_id)
+        tail = _vs.trailing_style_cue(style)
+        if not tail:
+            continue
+        authored = str(style.positive_tail or "")
+        for unit in tail.split(", "):
+            assert unit in authored, (style_id, unit)
+        assert len(tail.split()) <= _vs.TRAILING_STYLE_MAX_WORDS, style_id
+
+
+def test_the_two_longest_packs_are_capped_rather_than_dropped():
+    """`recur_frac` (22 words authored) and `video_art` (14) are the operator's
+    two packs of interest and the only ones that overflowed. They must be
+    TRIMMED to whole units, not left whole and then dropped by the fitter."""
+    for style_id in ("recur_frac", "video_art"):
+        style = _style_obj(style_id)
+        authored = len(str(style.positive_tail or "").split())
+        tail = _vs.trailing_style_cue(style)
+        assert tail, style_id
+        assert len(tail.split()) < authored, style_id
+        assert len(tail.split()) <= _vs.TRAILING_STYLE_MAX_WORDS, style_id
+
+
+def test_the_style_enrichment_is_surrendered_before_any_earning_slot():
+    """Adding the trailing clause must never COST a slot that was already there.
+
+    It is first in `GHOST_V3_DROP_ORDER` for exactly this reason: under budget
+    pressure the prompt reverts to what it emitted before the clause existed,
+    rather than trading away light or framing to keep decoration.
+    """
+    assert gsa.GHOST_V3_DROP_ORDER[0] == "trailing_style"
+    out = gsa.finalize_ghost_prompt_v3(
+        role="character_video", style=_style(), mode="figure",
+        ledger_meta=REAL_META, ordinal=0, token_measure_fn=_word_measure(3))
+    assert out["dropped"], "an over-budget prompt must shed something"
+    assert out["dropped"][0] == "trailing_style"
+    assert "trailing_style" not in out["slots"]
+
+
+def test_movement_outlives_framing_under_budget_pressure():
+    """Operator ruling 2026-09-03: the budget buys style, objects and MOVEMENT.
+
+    `motion` used to be dropped second, which was harmless only because the
+    ladder never fired (v3 measures ~32 tokens against a target of 69). The
+    trailing clause lengthens prompts, so the order now sheds framing before
+    movement -- a shot that still moves but is less precisely staged beats a
+    precisely staged still one.
+    """
+    order = list(gsa.GHOST_V3_DROP_ORDER)
+    assert order.index("vantage") < order.index("motion")
+    assert order.index("motion") < order.index("kernel_setting")
+
+    # Squeeze hard enough to shed several units, and confirm motion is still
+    # standing after framing has gone.
+    out = gsa.finalize_ghost_prompt_v3(
+        role="character_video", style=_style(), mode="figure",
+        ledger_meta=REAL_META, ordinal=0, token_measure_fn=_word_measure(5))
+    dropped = list(out["dropped"])
+    if "vantage" in dropped and "motion" not in dropped:
+        assert out["components"]["motion"] in out["positive"]
+    assert dropped == [u for u in order if u in dropped], dropped
+
+
+def test_the_lighting_term_is_spoken_like_the_setting_and_the_objects():
+    """Found live by a source-bank sweep, on a real episode, after the first fix.
+
+    `resolve_crux_kernel` and `_setting_terms` were normalised for
+    PBUG-20260903-04; `resolve_world_light` reads the SAME LLM-authored brief,
+    a different key, and was missed. Measured 481 of 7,978 lighting terms (6.0%)
+    carry an underscore, and the composer emitted them verbatim:
+    "handheld bronze communicator in the forest, storm_light, ...".
+    """
+    meta = dict(REAL_META)
+    meta["story_brief_terms"] = dict(meta["story_brief_terms"])
+    meta["story_brief_terms"]["lighting"] = ["storm_light", "dim_glow"]
+
+    assert gsa.resolve_world_light(meta, ordinal=0, mode="figure") == "storm light"
+
+    for style_id in ("anime", "sci_fi_radio"):
+        out = gsa.finalize_ghost_prompt_v3(
+            role="character_video", style=_style_obj(style_id), mode="figure",
+            ledger_meta=meta, ordinal=0)
+        assert "_" not in out["positive"], (style_id, out["positive"])
+        assert "storm light" in out["positive"], style_id
