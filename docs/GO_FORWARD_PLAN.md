@@ -1114,6 +1114,21 @@ coding, do your best" and to decide whether a blinded A/B is needed. The instrum
 render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
 attributable; the first three legs pre-date the merge and carry no trace.
 
+**Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
+Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
+`animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288
+plate minted in-graph from the pack's full language and the ledger's world, repeated in Python
+to the sampler batch, sampled at a strict `OTR_STILLIN_LAB_DENOISE` (default 0.65); a lab id
+on `otr_stillin_lab_5080` (`draft`, never a default); the replay instrument gained a derived
+bundle (`--derive-engine`) so ONE ledger renders on both Ghost siblings; the verifier gained
+the plate-hash rule; `scripts/otr_stillin_probe_report.py` measures motion energy against the
+lane's own A/A band. The design and receipts are `still-in-peer/driver_anchor.md` sections
+1-14. NEXT: merge, the full suite in the main checkout, then the live probe on the 5080 --
+one style per invocation, anime and storybook_engraving first, every leg to `otr/obs/` with
+the story's own title -- and the operator's eye on the triptychs. Stop rules stand (section 7
+D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
+and keeps the plate ends E1 (next arm the E2 probe).
+
 ## SECTION 6 -- Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite

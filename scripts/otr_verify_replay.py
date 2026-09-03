@@ -107,6 +107,19 @@ def main(argv=None) -> int:
             x.get("seed") == y.get("seed") and x.get("actual_request_sha") == y.get("actual_request_sha")
             for x, y in zip(a, b))
         ok &= check("A/A: replay 1 and replay 2 traces agree row for row", same)
+        # THE PLATE RULE (still-in lab peer, 2026-09-02): a row that minted a
+        # plate carries its rendered sha OUTSIDE the causal hash; two A/A rows
+        # must therefore agree on it too, or the kernel is not bit-stable and
+        # the video difference has a named cause. Applies only where BOTH rows
+        # carry a plate (the shipping lane carries none).
+        plated = [(x, y) for x, y in zip(a, b)
+                  if x.get("plate_sha256") or y.get("plate_sha256")]
+        if plated:
+            bad_plate = [x.get("shot_id") for x, y in plated
+                         if not (x.get("plate_sha256") and y.get("plate_sha256"))
+                         or x.get("plate_sha256") != y.get("plate_sha256")]
+            ok &= check("A/A: plate hashes present and equal (%d plated rows)" % len(plated),
+                        not bad_plate, ", ".join(map(str, bad_plate[:4])))
     print()
     print("%-28s %-12s %-10s %s" % ("shot", "seed", "sha8", "prompt"))
     for r in trace(reps[0]) if reps else []:

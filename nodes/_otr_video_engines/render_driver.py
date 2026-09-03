@@ -3805,6 +3805,32 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # char_id is a schema extra; VideoRequest is extra="forbid").
     if char_id:
         req["conditioning_refs"]["char_id"] = char_id
+    # THE STILL-IN LAB PEER'S PLATE (campaign item 2, 2026-09-02). A CAPABILITY
+    # branch, never an id compare: an engine declaring `wants_plate_prompt`
+    # gets the pack's full language + the ledger's world composed onto the
+    # declared request field `plate_prompt` (causal through sampler_inputs)
+    # and the DIRECTORY it writes the plate PNG into on `plate_path`
+    # (non-causal). Composed HERE because the engine has no ledger and no pack;
+    # `_vstyle` is the same resolved style the video prompt used above.
+    _plate_eng = (_vreg.get_engine(_eng_id)
+                  if _eng_id and _vreg.is_registered(_eng_id) else None)
+    if _plate_eng is not None and getattr(_plate_eng, "wants_plate_prompt", False):
+        from .ghost_plate_prompt import compose_plate_prompt
+        _plate = compose_plate_prompt(_vstyle, (ledger or {}).get("meta") or {})
+        req["plate_prompt"] = str(_plate["positive"])
+        _plate_episode = _still_spine_episode_id(ledger)
+        if _plate_episode:
+            from .._otr_paths import otr_stills_dir
+            req["plate_path"] = str(otr_stills_dir(_plate_episode) / "ghost_plates")
+        _p_obs = req.setdefault("observability", {})
+        _p_obs["plate_prompt_sha8"] = _plate["sha8"]
+        _p_obs["plate_clip_tokens"] = _plate["clip_tokens"]
+        _p_obs["plate_dropped"] = list(_plate["dropped"])
+        _LOG.warning(
+            "[OTR.render_driver] PLATE PROMPT: %s beat %s composed %d chars / %s "
+            "SD1 tokens (dropped: %s)",
+            _shot_role, shot.get("shot_id"), len(req["plate_prompt"]),
+            _plate["clip_tokens"], ", ".join(_plate["dropped"]) or "none")
     _prune_strict_text_only_request(req, shot.get("engine_id"))
     return req
 
@@ -4140,6 +4166,16 @@ def build_actual_receipt(engine, shot, request, clip, *, segment=None,
         "wall_s": (round(float(wall_s), 3) if wall_s is not None else None),
         "status": "rendered",
     }
+    # THE PLATE RECORD (still-in lab peer, 2026-09-02): OUTPUTS of the plate
+    # branch, projected from the clip's `qc` beside the hash and never into it
+    # -- a rendered sha in the causal set would make an A/A false the first
+    # time a kernel is not bit-stable. Absent on every other lane.
+    _qc = clip.get("qc") if isinstance(clip.get("qc"), dict) else {}
+    if _qc.get("plate_sha256"):
+        receipt["plate_sha256"] = str(_qc.get("plate_sha256") or "")
+        receipt["plate_name"] = str(_qc.get("plate_name") or "")
+        receipt["plate_source"] = str(_qc.get("plate_source") or "")
+        receipt["plate_identity_sha256"] = str(_qc.get("plate_identity_sha256") or "")
     causal = {k: receipt.get(k) for k in _RECEIPT_CAUSAL_KEYS}
     receipt["actual_request_sha"] = hashlib.sha256(
         json.dumps(causal, sort_keys=True, separators=(",", ":"), ensure_ascii=True,

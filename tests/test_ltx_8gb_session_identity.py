@@ -161,6 +161,9 @@ _ENGINES_WITH_A_SESSION = {
     # carries the adapter file and the STRENGTH applied, so a sweep across
     # strengths can never let one arm reuse another arm's patched model.
     "animatediff15_v3_haunted_video",
+    # the still-in LAB PEER (2026-09-02) inherits the haunted lane's session
+    # identity (engine, recipe, artifact receipts, adapter strength) unchanged
+    "animatediff15_v3_stillin_lab_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

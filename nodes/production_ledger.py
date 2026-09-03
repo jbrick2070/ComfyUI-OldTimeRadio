@@ -678,6 +678,13 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     meta["replay_workspace_id"] = uuid.uuid4().hex
     meta["replay_source_commit"] = str(manifest.get("source_commit") or "")
     meta["replay_master_audio"] = manifest["master_audio"]
+    # A DERIVED bundle (scripts/otr_freeze_replay_bundle.py --derive-engine)
+    # names the engine the replay must render on. Stamped RAW here -- this
+    # module imports no engine registry; OTR_ShotLock's replay branch validates
+    # the id (a registered Ghost sibling of the frozen plan's engine) and
+    # rewrites the whole plan atomically before its durable stamp.
+    meta["replay_engine_override"] = str(manifest.get("engine_override") or "")
+    meta["replay_derived_from"] = str(manifest.get("derived_from") or "")
     meta["replay_master_sha256"] = next(
         (str(r.get("sha256") or "") for r in manifest["files"]
          if _safe_relative(r.get("path")) == manifest["master_audio"]), "")

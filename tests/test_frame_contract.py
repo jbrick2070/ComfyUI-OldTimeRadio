@@ -110,6 +110,9 @@ def test_EVERY_BOUNDED_ENGINE_CAN_SPLIT_AND_UNBOUNDED_ONES_NEED_NOT():
         # the image model and touches no timing, so the unbounded contract that
         # covered them all is unchanged on the lane that survived.
         "animatediff15_v3_haunted_video",
+        # the still-in LAB PEER (2026-09-02) inherits the haunted lane's
+        # unbounded contract: one timeline per beat, max_frames 0, no split
+        "animatediff15_v3_stillin_lab_video",
         "mesh_stage", "still_flat", "still_motion", "still_pan", "still_word",
         "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
     }, sorted(unbounded)

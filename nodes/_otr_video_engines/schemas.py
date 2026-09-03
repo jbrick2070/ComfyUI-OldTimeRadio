@@ -167,6 +167,16 @@ class VideoRequest(_Forbid):
     #: extra="forbid" -- the old top-level ``_prompt_*``/``_init_*`` keys
     #: made every built request schema-invalid.
     observability: dict = Field(default_factory=dict)
+    #: THE STILL-IN LAB PEER'S PLATE (campaign item 2, 2026-09-02). Declared
+    #: conditioning, deliberately -- the one thing ``observability`` may never
+    #: carry. ``plate_prompt`` is the pack's full language plus the ledger's
+    #: world, composed by ``render_driver`` for engines declaring
+    #: ``wants_plate_prompt``; it is CAUSAL through ``sampler_inputs`` on the
+    #: render receipt. ``plate_path`` is the DIRECTORY the engine writes the
+    #: plate PNG into (non-causal; a path is never hashed). Both default to ""
+    #: and are absent from every other lane's request, byte for byte.
+    plate_prompt: str = ""
+    plate_path: str = ""
 
     @model_validator(mode="after")
     def _check_family_required_inputs(self) -> "VideoRequest":

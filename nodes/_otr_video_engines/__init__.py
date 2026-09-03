@@ -334,6 +334,14 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# The still-in LAB PEER (campaign item 2, 2026-09-02) subclasses the haunted
+# lane, so it imports after it and, like every sibling, before the roster
+# audit below. A lab id: never a default, never in a shipping profile.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ghost_signal_stillin_lab as _eng_ghost_signal_stillin_lab  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.

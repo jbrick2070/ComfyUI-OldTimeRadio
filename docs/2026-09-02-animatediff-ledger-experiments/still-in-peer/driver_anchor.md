@@ -463,8 +463,10 @@ per-engine prompt policy is re-applied without re-authoring.
   `still_plan`, `subject_ownership`, `prompt_profile`, `frame_contract`, `_node_candidates`
   INHERITED (seven classes, unchanged).
 * `assert_usable` (super first) resolves `OTR_STILLIN_LAB_DENOISE` once: finite float in
-  [0, 1] or a NAMED `EngineUnusable`; refuses a request whose `plate_prompt` is blank (the
-  plate is the lane's whole point) with a named error.
+  [0, 1] or a NAMED `EngineUnusable`. A blank `plate_prompt` is refused by name in
+  `render_clip`, beside the parent's own required-input refusals (a plain, named
+  `RuntimeError`, the same shape as a missing `text_prompt`) -- QA on the finished diff
+  noted the earlier wording put it in `assert_usable`; the code follows the parent's precedent.
 * `plate_identity(request, denoise)` -> `(dict, sha256)`: canonical sorted JSON of
   {checkpoint `(name, size, mtime_ns)` -- the `_file_receipt` the lane already uses for
   `session_identity`, NEVER a per-shot content digest of a 2 GB file (r3 S5); plate positive,
@@ -676,3 +678,65 @@ the finished diff (named functions), the targeted tests, `build_variants --check
 preflight matrix, the full suite in the main checkout, a merge at a sweep boundary or after
 the sweep, and the live probe on the 5080 (section 7 D9), every leg published to `otr/obs/`
 with the clean runner and the story's own title.
+
+## 14. Coding receipts (2026-09-02, one window, the `stillin-peer` worktree)
+
+**Shipped, against sections 10 + 12:** `nodes/_otr_video_engines/eng_ghost_signal_stillin_lab.py`
+(the engine, plus `repeat_latent` as a module function), `nodes/_otr_video_engines/
+ghost_plate_prompt.py` (the composer), the `VideoRequest` fields, the driver's
+`wants_plate_prompt` block and the receipt projection, the raw override stamp in
+`import_replay_bundle`, `_apply_replay_engine_override` in ShotLock's replay branch,
+`derive_engine_bundle` + `--derive-engine`, the verifier's plate rule,
+`scripts/otr_stillin_probe_report.py`, the registration surface (CAPABILITIES row, guarded
+import, `_ANIMATEDIFF_ENGINES`, the evidence sentence by hand, `docs/ENGINE_MATRIX.md`,
+`config/profiles/otr_stillin_lab_5080.json` + variants 92/0), and
+`tests/test_ghost_signal_stillin_lab.py` (27 tests).
+
+**Deviations from the contract, each deliberate:**
+* The plate prompt's PROTECTED head is the `positive_tail` alone; `plate_look` is the LAST
+  droppable clause. recur_frac's `positive_tail` + `plate_look` are 356 chars against the lane's
+  320-char ceiling, so a head that protected both would have refused a registered style by
+  construction (the operator's rule: every style crafts the episode). On recur_frac and
+  video_art the char ceiling, not the token window, is what bites; the receipt's `plate_prompt`
+  shows what survived.
+* The blank-plate refusal lives in `render_clip` beside the parent's required-input refusals,
+  not in `assert_usable` (QA note 4; the parent's precedent).
+* `canonicalize` is OWNED by the peer after all (a faithful copy of the parent's one-probe
+  body): `tests/test_terminal_frame.py` matches proof CALLS per module, so the module that calls
+  the encoder must itself call `validate_silent_clip_contract`; an inherited `canonicalize`
+  satisfied G5.1 and failed the terminal-frame gate.
+
+**Gates that fired on registration, and how each was met** (none of them named by the
+preflight guide's gate list; now recorded in `docs/VIDEO_LANE_PREFLIGHT.md`'s new
+"Registration surface" section): G2.2 canvas pin (the peer's test names `(512, 288)`); G5.1
+and the terminal-frame proof (own `canonicalize`); the unbounded-engine roster in
+`tests/test_frame_contract.py` and the beat-session-identity roster in
+`tests/test_ltx_8gb_session_identity.py` (literal lists, extended); the still-plan parity
+fixture, `docs/MODEL_ASSET_INDEX.md` and `docs/MACHINE_MATRIX.md` + README block
+(regenerated with their own generators); the evidence manifest (by hand).
+
+**Finished-diff review** (Sonnet 5, scoped to ten named functions, ~16 min): findings,
+non-blocking, two taken: `declared` now comes through `frame_contract.frame_contract_for`
+like the fresh-plan path and the render boundary; a frozen plan without `roles_effective` is
+refused whole instead of rewritten in part (test case added). One informational: the
+regenerated `docs/ENGINE_MATRIX.md` now prints `MISSING: docs/2026-07-20-OTR-video-tiers` on
+the ltx_8gb row -- that folder left in the 2026-09-02 docs cut, and the matrix had not been
+regenerated since; a citation sweep is a follow-up of the docs cut, not of this item. Verified
+correct by the reviewer: the base MODEL handle stays across STAGE 3a/3b and the plate decode
+needs only the VAE; nothing decodes twice; the batch-1 latent survives the repeat (a dict copy,
+the tensor untouched); every plate reference is cleared on every exit; `repeat_latent` is a
+line-for-line port of the live rule; no output value in the causal set; `qc` is a declared
+clip field; the driver's block sees every name it uses; the two request keys survive the
+pruner; the manifest validator passes the extra keys; the derivation never routes through
+`freeze()`; the verifier's existing A/A check is unchanged.
+
+**Tests:** the peer's 27; the gate set (`test_lane_preflight_matrix`, `test_terminal_frame`,
+`test_frame_contract`, `test_ltx_8gb_session_identity`, `test_still_plan_parity`,
+`test_machine_matrix_drift`, `test_model_asset_index_drift`, `test_ghost_signal_haunted`,
+`test_ghost_signal_lane`, `test_render_receipts`, `test_canonical_replay`, `test_engine_matrix_doc`,
+`test_capability_profiles`) green -- 188 passed in the widest run; the full suite in the
+worktree left only the worktree artefacts (credits-roll `.git`, the guardrail's registry
+resolution, the OpenRouter catalog cache -- verified passing in the main checkout). The
+shipping haunted lane's own tests pass unchanged. The full suite in the main checkout runs
+after the merge; the live probe (section 7 D9, `run_stillin_probe.ps1`, one style per
+invocation) runs when the GPU is free.

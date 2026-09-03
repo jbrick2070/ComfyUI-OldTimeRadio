@@ -1515,6 +1515,10 @@ _HUMO17_ENGINES = {"humo_1.7B", "humo_1.7B_169"}
 _H3_ENGINES = {"minimax_h3_video", "minimax_h3_audio_in", "minimax_h3_music"}
 _ANIMATEDIFF_ENGINES = {
     "animatediff15_v3_haunted_video",
+    # The still-in LAB PEER (2026-09-02) mints its own plate in-graph and
+    # consumes no dispatcher still, so it stays in the no-still set with its
+    # parent and never gates an 8 GB box on an image bundle.
+    "animatediff15_v3_stillin_lab_video",
     "animatediff15_v3_video",
     "animatediff15_v2_video",
     "animatediff15_video",

@@ -55,6 +55,7 @@ Anything not listed there is a manual install -- see its row below.
 | `fastwan_8gb` | 1 weight file(s) | manual download | 3 profile(s) |
 | `ghost_signal` | 2 weight file(s) | manual download | - |
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
+| `ghost_signal_stillin_lab` | 3 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | 2 profile(s) |
 | `google_veo_video` | nothing on disk | - | 3 profile(s) |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_INSTALL.md) | 3 profile(s) |
@@ -81,11 +82,11 @@ Anything not listed there is a manual install -- see its row below.
 | `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | 2 profile(s) |
 | `google_lyria` | nothing on disk | - | 4 profile(s) |
 | `google_tts` | nothing on disk | - | 4 profile(s) |
-| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 79 profile(s) |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 104 profile(s) |
+| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 80 profile(s) |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 105 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 15 profile(s) |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) | - |
-| `stable_audio_3` | 2 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 93 profile(s) |
+| `stable_audio_3` | 2 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 94 profile(s) |
 
 ## Engines that are a separate INSTALL, not a download
 
@@ -150,6 +151,12 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `mm-p_0.5.pth`
 - `mm_sd_v15_v2.ckpt`
 - `v1-5-pruned-emaonly-fp16.safetensors`
+- `v3_sd15_adapter.ckpt`
+- `v3_sd15_mm.ckpt`
+
+**`ghost_signal_stillin_lab`** -- `nodes/_otr_video_engines/eng_ghost_signal_stillin_lab.py`
+
+- `mm_sd_v15_v2.ckpt`
 - `v3_sd15_adapter.ckpt`
 - `v3_sd15_mm.ckpt`
 

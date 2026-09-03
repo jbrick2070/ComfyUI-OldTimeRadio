@@ -1938,6 +1938,102 @@ def _stamp_frame_bounded(shot):
     shot["frame_bounded"] = bool(_fc.can_split(engine))
 
 
+def _apply_replay_engine_override(planned: dict, override: str, policy: dict) -> None:
+    """Rewrite a FROZEN plan onto ``override`` -- whole plan, atomically, in place.
+
+    The still-in lab peer's A/B needs one ledger rendered on two Ghost siblings.
+    The frozen route wins at every reader (``build_request_from_shot`` verifies
+    ``shot.engine_id`` against ``video.roles_effective`` and refuses on any
+    disagreement), so the override must move four surfaces together: every
+    role in ``roles_effective`` that the plan routed to the source engine, every
+    shot's ``engine_id`` and ``family``, every ``execution_groups[*].engine_id``,
+    and each shot's coverage contract re-derived through the same function the
+    render boundary uses. Restricted to a registered Ghost SIBLING (equal family,
+    roles, prompt_profile and frame_contract) so prompts, seeds, beats and the
+    coverage plan stay exactly the frozen ones -- anything else would be a
+    re-plan wearing a replay's receipt. Refuses NAMED on any leftover mismatch.
+    """
+    from ._otr_video_engines import registry as _vreg
+    from ._otr_video_engines import frame_contract as _fc_mod
+
+    shots = [s for s in (planned.get("shots") or []) if isinstance(s, dict)]
+    if not shots:
+        raise ValueError("OTR_ShotLock: replay engine override on a plan with no shots")
+    sources = sorted({str(s.get("engine_id") or "") for s in shots} - {""})
+    if len(sources) != 1:
+        raise ValueError(
+            "OTR_ShotLock: replay engine override needs a plan rendered on ONE "
+            "engine; the frozen plan routes %r" % (sources,))
+    source = sources[0]
+    if override == source:
+        return
+    if not _vreg.is_registered(override):
+        raise ValueError(
+            "OTR_ShotLock: replay engine override %r is not a registered video "
+            "engine" % override)
+    if not _vreg.is_registered(source):
+        raise ValueError(
+            "OTR_ShotLock: the frozen plan's engine %r is not registered on this "
+            "tree, so sibling equality cannot be checked" % source)
+    src_eng, dst_eng = _vreg.get_engine(source), _vreg.get_engine(override)
+    for attr in ("family", "roles", "prompt_profile", "frame_contract"):
+        if getattr(src_eng, attr, None) != getattr(dst_eng, attr, None):
+            raise ValueError(
+                "OTR_ShotLock: replay engine override %r is not a sibling of %r: "
+                "%s differs (%r vs %r). A replay never re-plans; use a fresh "
+                "render for a different family."
+                % (override, source, attr, getattr(src_eng, attr, None),
+                   getattr(dst_eng, attr, None)))
+    family = str(getattr(dst_eng, "family", "") or "")
+    ceiling = _planning_ceiling(policy)
+    # Through the same resolver the fresh-plan path and the render boundary
+    # use (a callable-or-attribute contract, SINGLE_ONLY on anything else), so
+    # the re-derived coverage receipt can never disagree with the boundary's.
+    declared = _fc_mod.frame_contract_for(dst_eng)
+
+    roles_eff = planned.get("roles_effective")
+    if not isinstance(roles_eff, dict) or not roles_eff:
+        # A frozen plan always carries its effective route; without it the
+        # render boundary would skip its route check and a partial rewrite
+        # would ship unverified. Refuse rather than move three surfaces of four.
+        raise ValueError(
+            "OTR_ShotLock: replay engine override needs the frozen plan's "
+            "roles_effective map and it carries none -- freeze an episode "
+            "planned on a tree that stamps the effective route")
+    for role, eid in list(roles_eff.items()):
+        if str(eid) == source:
+            roles_eff[role] = override
+    roles = planned.get("roles")
+    if isinstance(roles, dict):
+        for role, eid in list(roles.items()):
+            if str(eid) == source:
+                roles[role] = override
+    for group in planned.get("execution_groups") or []:
+        if isinstance(group, dict) and str(group.get("engine_id") or "") == source:
+            group["engine_id"] = override
+    for shot in shots:
+        shot["engine_id"] = override
+        if family:
+            shot["family"] = family
+        receipt = _fc_mod.coverage_contract_receipt(override, declared, ceiling)
+        stamped = shot.get("coverage_contract")
+        if receipt is None:
+            shot.pop("coverage_contract", None)
+        else:
+            shot["coverage_contract"] = receipt
+        if (stamped is None) != (receipt is None) or (
+                stamped is not None and receipt is not None and stamped != receipt):
+            raise ValueError(
+                "OTR_ShotLock: replay engine override %r re-derives a coverage "
+                "contract for shot %s that differs from the frozen one (%r vs %r); "
+                "the siblings do not share a ceiling. NO FALLBACK."
+                % (override, shot.get("shot_id"), stamped, receipt))
+    leftover = [s.get("shot_id") for s in shots if str(s.get("engine_id")) != override]
+    if leftover:
+        raise ValueError("OTR_ShotLock: replay engine override left shots on the "
+                         "source engine: %r" % leftover[:5])
+
+
 def _stamp_coverage_plan(shot, beat_id, *, max_render_frames):
     """Attach this beat's durable ``coverage_plan`` to its shot row (chunk 3b).
 
@@ -3003,8 +3099,21 @@ class OTRShotLock:
                     "episode rendered after the durable planned stamp landed.")
             revision = int(planned.get("video_revision") or meta.get("video_revision") or 0)
             meta["video_revision"] = revision
+            # REPLAY ENGINE OVERRIDE (still-in lab peer, campaign item 2,
+            # 2026-09-02). A DERIVED bundle names the engine the replay must
+            # render on; the ledger import stamped it raw. Validated HERE (the
+            # only replay seat that imports the video registry) and applied to
+            # the WHOLE plan atomically before the durable stamp: the render
+            # boundary requires every shot to match roles_effective and its
+            # execution group, so a partial re-stamp would be refused there.
+            _override = str(meta.get("replay_engine_override") or "").strip()
+            if _override:
+                _apply_replay_engine_override(planned, _override, policy)
+                log.warning("[OTR_ShotLock] REPLAY: engine override -> %r on every "
+                            "shot, role and execution group", _override)
             _stamp_durable(sections={"video": planned},
-                           meta_updates={"video_revision": revision},
+                           meta_updates={"video_revision": revision,
+                                         "replay_engine_override": _override},
                            source="OTR_ShotLock:replay")
             patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
             log.warning("[OTR_ShotLock] REPLAY: planned section reused (revision %d, "

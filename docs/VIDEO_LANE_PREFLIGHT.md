@@ -242,6 +242,30 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
 `VIDEO_LANE_PREFLIGHT receipt: <lane> | <date> | matrix sha256 <...> |
 suite run <test output path> | smoke receipt <path> | verdict PASS/FAIL`
 
+## Registration surface (what a new engine id trips BEYOND the gates -- learned 2026-09-02)
+
+Registering `animatediff15_v3_stillin_lab_video` turned eight things red in the full suite
+that Gates 1-8 do not name. Budget them into every new-lane item and land them in the
+registration commit:
+
+- `tests/fixtures/still_plan_head_parity.json` -- regenerate:
+  `python tests/test_still_plan_parity.py --regenerate` (four parity tests).
+- `docs/MODEL_ASSET_INDEX.md` -- `python scripts/otr_asset_index.py`.
+- `docs/MACHINE_MATRIX.md` + the README's generated block -- `python scripts/otr_machine_matrix.py`
+  (fires when the lane's profile lands).
+- `docs/ENGINE_MATRIX.md` -- `python tools/engine_matrix.py` (writes; `--check` verifies; G7.3).
+- `docs/evidence/video_evidence_manifest.json` -- append the lane's `admission_unenforced`
+  sentence BY HAND (G4). The generator emits `manifest_version: 1` against the live version 7 and
+  refuses to overwrite; do not run it.
+- `tests/test_frame_contract.py` (the unbounded-engine roster) and
+  `tests/test_ltx_8gb_session_identity.py` (the beat-session-identity roster) are LITERAL lists.
+- `tests/test_terminal_frame.py`: the module that CALLS `encode_frames_to_silent_mp4` must itself
+  CALL `validate_silent_clip_contract(` -- calls are matched per module, so an INHERITED
+  `canonicalize` does not count. A subclass with its own `render_clip` owns its own
+  `canonicalize` (which also satisfies G5.1's module-that-defines rule).
+- A `render_canvas` declaration needs a test naming the engine id AND the literal canvas (G2.2);
+  a profile `status` is `shipping` or `draft` only, and `status` is not a CAPABILITIES key.
+
 ## The family (create each sibling when its subsystem is next touched,
 never as an empty paper checklist)
 

@@ -576,6 +576,18 @@ CAPABILITIES = {
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
                                "v3_sd15_mm.ckpt",
                                "v3_sd15_adapter.ckpt"]},
+    # THE STILL-IN LAB PEER (campaign item 2, 2026-09-02): the haunted lane
+    # started from an in-family plate at denoise < 1. Same three artifacts, no
+    # new weight; a LAB id (never a default, never in a shipping profile). No
+    # cost row: admission-unenforced in the evidence manifest, like its parent.
+    "animatediff15_v3_stillin_lab_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
+                               "v3_sd15_mm.ckpt",
+                               "v3_sd15_adapter.ckpt"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

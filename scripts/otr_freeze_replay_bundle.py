@@ -176,13 +176,77 @@ def freeze(ep_dir: pathlib.Path, out_root: pathlib.Path, *, allow_no_plan: bool 
     return final
 
 
+def derive_engine_bundle(bundle_dir: pathlib.Path, engine_id: str,
+                         out_root: pathlib.Path | None = None) -> pathlib.Path:
+    """A BUNDLE-TO-BUNDLE derivation: the same frozen files, a new manifest that
+    names the engine the replay must render on (still-in lab peer, campaign
+    item 2, 2026-09-02).
+
+    Never routes through :func:`freeze` -- that function is hard-wired to a live
+    episode directory and names its output after the episode id, which would
+    collide with the immutability guard on the very bundle being derived. This
+    one reads the source manifest through the same validator the import uses,
+    copies every listed file byte for byte into ``<bundle>__engine_<id>``,
+    re-verifies each SHA-256, and writes the source manifest plus
+    ``engine_override`` and ``derived_from``. The derived bundle is self-contained
+    and immutable like any other; ``production_ledger.import_replay_bundle``
+    stamps the override raw and ``OTR_ShotLock``'s replay branch validates and
+    applies it to the whole plan.
+    """
+    bundle_dir = pathlib.Path(bundle_dir).resolve()
+    engine_id = str(engine_id or "").strip()
+    if not engine_id:
+        raise SystemExit("derive: an engine id is required")
+    manifest = load_replay_manifest(str(bundle_dir))
+    if str(manifest.get("engine_override") or ""):
+        raise SystemExit("derive: %s already carries engine_override=%r -- derive "
+                         "from the ORIGINAL bundle" % (bundle_dir, manifest["engine_override"]))
+    safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in engine_id)
+    out_root = pathlib.Path(out_root) if out_root else bundle_dir.parent
+    final = out_root / ("%s__engine_%s" % (bundle_dir.name, safe))
+    if final.exists():
+        raise SystemExit("derived bundle already exists: %s (a bundle is immutable)" % final)
+    tmp = out_root / ("." + final.name + ".building")
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(parents=True)
+    for row in manifest["files"]:
+        rel = str(row["path"])
+        src = bundle_dir / pathlib.Path(rel)
+        dst = tmp / pathlib.Path(rel)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        if _sha256(dst) != str(row.get("sha256") or ""):
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise SystemExit("derive: copied file %s does not match its manifest sha256" % rel)
+    derived = dict(manifest)
+    derived["engine_override"] = engine_id
+    derived["derived_from"] = str(bundle_dir)
+    (tmp / REPLAY_MANIFEST_NAME).write_text(json.dumps(derived, indent=2, ensure_ascii=False) + "\n",
+                                            encoding="utf-8")
+    load_replay_manifest(str(tmp))            # the same validator the import runs
+    os.replace(tmp, final)
+    return final
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("episode", help="episode directory, or an episode id under the live episodes root")
+    ap.add_argument("episode", help="episode directory, or an episode id under the live episodes root; "
+                                    "with --derive-engine, an EXISTING bundle directory")
     ap.add_argument("--out", default="", help="bundle root (default: <episodes root>/_replay)")
     ap.add_argument("--allow-no-plan", action="store_true",
                     help="freeze a ledger without planned video.shots (diagnostic only)")
+    ap.add_argument("--derive-engine", default="", dest="derive_engine",
+                    help="derive a sibling bundle from an existing bundle that replays on the "
+                         "named engine (a registered Ghost sibling of the frozen plan's engine)")
     args = ap.parse_args(argv)
+    if args.derive_engine:
+        final = derive_engine_bundle(pathlib.Path(args.episode), args.derive_engine,
+                                     pathlib.Path(args.out) if args.out else None)
+        man = json.loads((final / REPLAY_MANIFEST_NAME).read_text(encoding="utf-8"))
+        print("[derive] %s -> %s (engine_override=%s, %d file(s))"
+              % (args.episode, final, man["engine_override"], len(man["files"])))
+        return 0
     ep_dir = resolve_episode_dir(args.episode)
     out_root = pathlib.Path(args.out) if args.out else (_episodes_root() / "_replay")
     out_root.mkdir(parents=True, exist_ok=True)
