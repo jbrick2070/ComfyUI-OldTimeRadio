@@ -746,3 +746,58 @@ on a beat that has none); the vantage table is written down explicitly with
 **Governing contract: X1-X6 in the r4 judgment, section 6.** The arc is closed --
 r1 Fable cold plus Antigravity, r2 Codex, r3 Cursor, r4 Sonnet. Four rounds, four
 seats, eight grounded reversals of the driver's own plan. Code starts.
+
+## 16. LIVE PROOF (2026-09-03) -- and what the first real replay cost
+
+Prompt v3 Half A is merged, and the canonical replay ran on the GPU for the
+first time. Both halves of that sentence produced evidence.
+
+**The composer is exact.** Every one of the eight prompts composed live at the
+token count predicted on CPU beforehand, with no drift:
+
+| beat | predicted | live |
+|---|---|---|
+| music open | 33 | 33 |
+| b001 announcer | 33 | 33 |
+| b002 figure | 35 | 35 |
+| b003 object | 33 | 33 |
+| b004 figure | 34 | 34 |
+| b005 signal | 30 | 30 |
+| b006 announcer | 32 | 32 |
+| music close | 33 | 33 |
+
+**The A/B is honest.** `scripts/otr_prompt_ab_report.py` against the published
+21:08 episode: **seeds identical on 8 of 8 shots, prompts differ on 8 of 8.**
+That is the whole claim -- the pictures can only have changed because of the
+words -- and it cost one render instead of two, because the published episode
+already was the first arm.
+
+**The replay cost three bugs, all ours, all now in the log.** They are one
+shape: *a replay skips a stage, and something downstream still needs what that
+stage produced.*
+
+* **PBUG-20260903-01** -- the import cleared `image_engines` as run-volatile,
+  but only the image dispatcher stamps it and a replay never runs one, so the
+  credits roll refused. Eight clips, sixteen minutes, nothing published. The
+  refusal was correct; the clearing was the defect.
+* **PBUG-20260903-02** -- the sequencer's replay branch returned one second of
+  silence as a "DSP-safe placeholder". The procgen visualizer renders one frame
+  per audio frame from that wire, so the blend truncated an 85.7-second episode
+  to one second of picture -- and it published, with `obs_publish OK`.
+* **PBUG-20260903-03** -- the same truncation one node further down. The episode
+  assembler loaded the master with `torchaudio.load` inside a bare
+  `except Exception`, and on this stack that load ALWAYS raises (`TorchCodec is
+  required`; torchaudio 2.10 moved decoding to torchcodec). Nothing was logged.
+  Its comment called the tensor "a courtesy"; the visualizer measures it.
+
+**Two of the three published green.** That is the part worth keeping: a leg that
+reaches `otr/obs/` is not the same as a leg that produced an episode, and the
+only thing that caught it was measuring the published file rather than reading
+the log. The stage table is the tool -- render, blend, caption, credits, mux,
+each with its duration -- and a stage that changes the DURATION is the defect
+every time.
+
+**A placeholder is a promise to break something later.** All three were written
+for the instrument by this driver, in the same week, with good reasons attached.
+The reasons were right about what a replay skips and wrong about what still
+reads it.
