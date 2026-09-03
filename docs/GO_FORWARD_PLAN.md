@@ -1147,6 +1147,25 @@ the story's own title -- and the operator's eye on the triptychs. Stop rules sta
 D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
 and keeps the plate ends E1 (next arm the E2 probe).
 
+**Item 3 REDEFINED and IN ARC -- Prompt v3, "draw the crux" (operator, 2026-09-02 21:00-22:00).**
+He read every beat of the storybook episode beside the prompt it got, rewrote ten by hand,
+and ruled: draw what the line is ABOUT in the story's one setting, mix the visual style with
+the CRUX of the story on every beat, the world's own motion, no costume or prop the dialogue
+never names, fewer variables ("too many variables -> humans and bags"), get creative, and
+"yes, I want to see more STORY, not just the characters." Mechanically confirmed: the lane's
+character motif is a costume template with fallback pools (coat; lantern / key / ledger /
+satchel), the object beats draw the carried prop, the leaf author is handed no dialogue and
+its one hint field was empty on all 27 beats, and the story brief plus `key_objects` sat unused
+by this lane. Source: `prompt-rule/operator_rewrites.md`; anchor: `prompt-rule/driver_anchor.md`
+(sections 1-7; r1 = Fable cold + Antigravity, five reversals, R1-R10 govern; r2 Codex running).
+**GPU FREEZE (operator, 21:50): "don't waste any GPU runs until the prompting is fixed."** The
+adapter sweep's last leg finished on its own (8/8 published); the overnight chain was NOT
+launched; nothing boots a server until v3 is merged and green. The first GPU run after is ONE
+episode, same seeds, v2 beside v3 (R9). The still-in peer (item 2) and the 0.5 adapter default
+(item 1) merged at 7c231e24 with the full suite queued on CPU; their probes wait behind v3.
+Item 3b (the other video lanes get the same SHAPE, per-lane budgets, talking-face lanes
+exempt) follows once v3 is judged on this lane.
+
 **Operator, 2026-09-02 20:45: "of course I'm really more interested in video art or
 recursive fractal, or both if they are separate."** They are separate packs (`video_art`,
 `recur_frac`), and they are the two LONGEST packs in the registry -- the ones the shipping

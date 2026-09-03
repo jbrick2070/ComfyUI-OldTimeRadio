@@ -291,7 +291,7 @@ and it read exactly like a measured number until someone looked.
 | ltx25_foley_plus | - | contract max | none cited |
 | ltx25_mime | - | contract max | none cited |
 | ltx25_video | - | contract max | none cited |
-| ltx_8gb | - | contract max | **MISSING: docs/2026-07-20-OTR-video-tiers** |
+| ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
 | ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
 | ltx_video | - | contract max | docs/evidence |
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
