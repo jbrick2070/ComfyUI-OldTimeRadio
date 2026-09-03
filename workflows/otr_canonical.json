@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 95,
-  "last_link_id": 288,
+  "last_link_id": 289,
   "nodes": [
     {
       "id": 63,
@@ -441,6 +441,16 @@
           "shape": 7,
           "type": "STRING",
           "link": 279
+        },
+        {
+          "localized_name": "replay_from",
+          "name": "replay_from",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "replay_from"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -526,7 +536,8 @@
         "bnb_nf4",
         14.5,
         4096,
-        "Q8_0"
+        "Q8_0",
+        ""
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -844,6 +855,13 @@
           "shape": 7,
           "type": "STRING",
           "link": 286
+        },
+        {
+          "localized_name": "replay_descriptor",
+          "name": "replay_descriptor",
+          "shape": 7,
+          "type": "STRING",
+          "link": 289
         }
       ],
       "outputs": [
@@ -1143,7 +1161,8 @@
           "type": "STRING",
           "slot_index": 6,
           "links": [
-            234
+            234,
+            289
           ]
         }
       ],
@@ -3440,6 +3459,14 @@
       1,
       85,
       9,
+      "STRING"
+    ],
+    [
+      289,
+      62,
+      6,
+      7,
+      10,
       "STRING"
     ]
   ],

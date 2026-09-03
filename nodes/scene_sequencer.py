@@ -758,6 +758,25 @@ class SceneSequencer:
                  dialogue_offset_ms=0.0,
                  ):
 
+        # CANONICAL REPLAY (campaign item 0): no mix is built; node 7 copies the
+        # frozen master. The placeholder is a DSP-SAFE CPU batch (node 4's
+        # resample + Haas + LPF run over it unbranched), not the empty batch.
+        try:
+            from .production_ledger import replay_descriptor as _replay_descriptor
+            _parsed = json.loads(script_json or "{}")
+            # a non-dict wire (the legacy parser LIST) is not a replay -- it
+            # falls through to load_ledger, which raises the loud ValueError
+            # this node has always raised for that shape.
+            _rmeta = (_parsed.get("meta") or {}) if isinstance(_parsed, dict) else {}
+        except (ValueError, TypeError, ImportError):
+            _rmeta = {}
+        if _rmeta and _replay_descriptor(_rmeta):
+            import torch as _torch
+            _runtime_log("SceneSequencer: REPLAY pass-through (frozen master); "
+                         "emitting a silent placeholder for the enhance stage")
+            return ({"waveform": _torch.zeros(1, 2, 48000, dtype=_torch.float32),
+                     "sample_rate": 48000},
+                    "replay: pass-through (frozen master)")
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         # Schema l3 (2026-04-28): track wall-clock for meta.phase_ms.scene_sequencer.
@@ -1141,6 +1160,85 @@ class EpisodeAssembler:
     starts. No more Bark-vs-FLUX VRAM contention.
     """
 
+    # ---- canonical replay (campaign item 0, 2026-09-02) ------------------- #
+    @staticmethod
+    def _replay_from_descriptor(replay_descriptor):
+        """The replay descriptor off the freeze cascade's v2_ledger_json (or an
+        explicit descriptor JSON); {} when this is not a replay."""
+        raw = str(replay_descriptor or "").strip()
+        if not raw:
+            return {}
+        try:
+            from .production_ledger import replay_descriptor as _rd
+            obj = json.loads(raw)
+        except (ValueError, TypeError, ImportError):
+            return {}
+        if not isinstance(obj, dict):
+            return {}
+        meta = obj.get("meta") if isinstance(obj.get("meta"), dict) else obj
+        return _rd(meta)
+
+    def _assemble_replay(self, replay, episode_title):
+        import hashlib as _hashlib
+        import shutil as _shutil
+
+        from . import production_ledger as _PL
+        led = _PL.peek_ledger()
+        if led is None:
+            raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: no ledger singleton bound")
+        meta = led.data.get("meta") or {}
+        if str(meta.get("replay_workspace_id") or "") != str(replay.get("replay_workspace_id") or ""):
+            raise RuntimeError(
+                "[OTR_EpisodeAssembler] REPLAY: descriptor workspace %r is not the bound "
+                "ledger's %r" % (replay.get("replay_workspace_id"), meta.get("replay_workspace_id")))
+        bundle = str(meta.get("replay_from") or "")
+        rel = str(meta.get("replay_master_audio") or "")
+        want = str(meta.get("replay_master_sha256") or "")
+        src = os.path.join(bundle, *rel.split("/")) if rel else ""
+        if not (src and os.path.isfile(src) and want):
+            raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: bundle master missing: %r" % (src,))
+        import pathlib as _pathlib
+        _ep_id = str(led.data.get("episode_id") or "")
+        _wav_dir = _pathlib.Path(led.out_dir)
+        _wav_dir.mkdir(parents=True, exist_ok=True)
+        _master_wav = str(_wav_dir / ("%s_master.wav" % _ep_id))
+        _shutil.copyfile(src, _master_wav)
+        h = _hashlib.sha256()
+        with open(_master_wav, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        got = h.hexdigest()
+        if got != want:
+            try:
+                os.remove(_master_wav)
+            except OSError:
+                pass
+            raise RuntimeError(
+                "[OTR_EpisodeAssembler] REPLAY: master copy digest %s != manifest %s; "
+                "audio_done withheld" % (got[:12], want[:12]))
+        # the frozen audio section travels with the ledger; re-assert the sha
+        audio = led.data.setdefault("audio", {})
+        if isinstance(audio, dict):
+            audio["master_audio_sha256"] = want
+            audio["ledger_frozen"] = True
+        led.data["final_audio_path"] = _master_wav
+        saved = led.save()
+        if saved is None:
+            raise RuntimeError("[OTR_EpisodeAssembler] REPLAY: ledger did not save after the master copy")
+        try:
+            import torchaudio as _ta
+            wave, sr = _ta.load(_master_wav)
+            episode_audio = {"waveform": wave.unsqueeze(0), "sample_rate": int(sr)}
+        except Exception:  # noqa: BLE001 -- the file is the deliverable; the tensor is a courtesy
+            import torch as _torch
+            episode_audio = {"waveform": _torch.zeros(1, 2, 48000), "sample_rate": 48000}
+        info = json.dumps({"episode_id": _ep_id, "replay_of_episode": meta.get("replay_of_episode"),
+                           "master_sha256": want, "title": str(episode_title or "")})
+        log.warning("[OTR_EpisodeAssembler] REPLAY: frozen master copied and verified -> %s",
+                    _master_wav)
+        return (episode_audio, _master_wav, info, "audio_done:replay:%s" % want[:12])
+
+
     CATEGORY = "OldTimeRadio"
     FUNCTION = "assemble"
     OUTPUT_NODE = True
@@ -1221,6 +1319,21 @@ class EpisodeAssembler:
                                "loudness pass after mixing the bed in. Empty "
                                "-> today's behaviour, unchanged."
                 }),
+                # CANONICAL REPLAY (campaign item 0, 2026-09-02): the freeze
+                # cascade's v2_ledger_json, wired on link 289. Read for ONE
+                # question: does meta carry a replay descriptor? If so the
+                # frozen master is byte-copied and SHA-verified instead of
+                # mixed (see _assemble_replay). forceInput: consumes NO
+                # widgets_values slot. ABSENT / EMPTY -> the historical path.
+                "replay_descriptor": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "forceInput": True,
+                    "tooltip": "v2_ledger_json from OTR_LedgerFreezeCascade. "
+                               "On a canonical replay the frozen master WAV "
+                               "is copied and verified against the bundle's "
+                               "SHA-256; otherwise ignored.",
+                }),
             },
         }
 
@@ -1229,8 +1342,20 @@ class EpisodeAssembler:
                  opening_theme_audio=None, closing_theme_audio=None,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
                  crossfade_ms=500, video_policy_json="",
+                 replay_descriptor="",
                  ):
 
+        # CANONICAL REPLAY (campaign item 0): THE ONE SEAM FOR THE FROZEN
+        # AUDIO, and it sits BEFORE the cue-pair check below (which would raise
+        # on the pass-through music node's blank manifest). The bundle's master
+        # WAV is byte-copied onto this episode's canonical master filename,
+        # its SHA-256 verified against the manifest BEFORE audio_done is
+        # emitted, and the copy is loaded only for the AUDIO return. Never
+        # decoded and re-encoded. On a digest mismatch it raises: no audio_done,
+        # so ShotLock never runs on a master that is not the frozen one.
+        _replay = self._replay_from_descriptor(replay_descriptor)
+        if _replay:
+            return self._assemble_replay(_replay, episode_title)
 
         # Schema l3: phase wall-clock for meta.phase_ms.episode_assembler.
         import time as _time

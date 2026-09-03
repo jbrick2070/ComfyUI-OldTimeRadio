@@ -175,6 +175,16 @@ def _same_frozen_episode(wire: dict, disk: dict) -> tuple[bool, str]:
     """
     wire_meta = wire.get("meta") if isinstance(wire.get("meta"), dict) else {}
     disk_meta = disk.get("meta") if isinstance(disk.get("meta"), dict) else {}
+    # A replay workspace shares its source's freeze receipt on purpose; the
+    # workspace id is what tells them apart (campaign item 0, 2026-09-02).
+    wire_ws = str(wire_meta.get("replay_workspace_id") or "").strip()
+    disk_ws = str(disk_meta.get("replay_workspace_id") or "").strip()
+    if wire_ws or disk_ws:
+        if not (wire_ws and disk_ws and wire_ws == disk_ws):
+            return False, (
+                "replay_workspace_id mismatch "
+                f"wire={wire_ws!r} disk={disk_ws!r}"
+            )
     wire_freeze = str(wire_meta.get("freeze_timestamp") or "").strip()
     disk_freeze = str(disk_meta.get("freeze_timestamp") or "").strip()
     if wire_freeze or disk_freeze:
@@ -2915,6 +2925,10 @@ class OTRShotLock:
     def lock(self, script_json, audio_done="", video_policy_json="{}",
              gate_in=""):
         from . import _otr_ledger_consumers as _OTRLC
+        try:
+            from .production_ledger import stamp_durable as _stamp_durable
+        except ImportError:  # pragma: no cover -- flat imports
+            from production_ledger import stamp_durable as _stamp_durable  # type: ignore
 
         led = _OTRLC.load_ledger(script_json)
         # STRICT HERE, AND ONLY HERE. This is the canonical graph join: it is
@@ -2976,6 +2990,29 @@ class OTRShotLock:
         fps = int(canvas.get("fps") or 25)
         report: list = []
         warnings: list = []
+        # CANONICAL REPLAY (campaign item 0): the PLANNED section is reused from
+        # the imported ledger -- no LLM derivation, no re-plan, no revision bump.
+        # The seeds are the same because the request hashes are the same rows.
+        from .production_ledger import replay_descriptor as _replay_descriptor
+        if _replay_descriptor(meta):
+            planned = led.get("video")
+            if not isinstance(planned, dict) or not planned.get("shots"):
+                raise ValueError(
+                    "OTR_ShotLock: REPLAY needs the frozen ledger's planned video "
+                    "section (video.shots) and the bundle carries none -- freeze an "
+                    "episode rendered after the durable planned stamp landed.")
+            revision = int(planned.get("video_revision") or meta.get("video_revision") or 0)
+            meta["video_revision"] = revision
+            _stamp_durable(sections={"video": planned},
+                           meta_updates={"video_revision": revision},
+                           source="OTR_ShotLock:replay")
+            patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
+            log.warning("[OTR_ShotLock] REPLAY: planned section reused (revision %d, "
+                        "%d shot(s)), no LLM", revision, len(planned.get("shots") or []))
+            return (patched, revision,
+                    "shot_lock: replay reuse of the planned section",
+                    f"shot_lock:done:rev={revision}",
+                    str(led.get("episode_id") or meta.get("episode_id") or ""))
 
         # Brief disposition, ONCE per run (gap-audit G4 restore).
         try:
@@ -3059,6 +3096,19 @@ class OTRShotLock:
         }
         led["video"] = video_section
         meta["video_revision"] = revision
+        # THE PLANNED SECTION IS DURABLE (campaign item 0, 2026-09-02). Until
+        # today it lived only on the wire: every later disk write started from
+        # the on-disk file and _merge_with_disk kept no "video" key, so 0 of the
+        # 60 newest ledgers carried what the director asked for. Stamped through
+        # the SINGLETON (a disk-only save would desync the state later saves
+        # merge from), LOUD on failure, and never in test mode.
+        try:
+            from .production_ledger import stamp_durable as _stamp_durable
+        except ImportError:  # pragma: no cover -- flat imports
+            from production_ledger import stamp_durable as _stamp_durable  # type: ignore
+        _stamp_durable(sections={"video": video_section},
+                       meta_updates={"video_revision": revision},
+                       source="OTR_ShotLock")
 
         report.append(f"shot_lock_revision={revision} beats={len(beats)} shots={len(shots)}")
         report.append(

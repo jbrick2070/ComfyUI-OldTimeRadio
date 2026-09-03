@@ -1068,6 +1068,20 @@ FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. N
 shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
 (Section 4) until then.
 
+**Status 2026-09-02 (evening).** Operator: "I leave it up to you to synthesize and code maybe
+1-3 of the best options." Item 0, the instrument, is CODED after a full four-round arc
+(`instrument/driver_anchor.md`, sections 1-13): every rendered clip carries a versioned ACTUAL
+receipt hashed into `actual_request_sha` and stamped durably as `meta.render_trace`; the writer's
+trailing `replay_from` widget (and `otr_canonical_api_run.py --replay-from`) re-renders a frozen
+bundle (`scripts/otr_freeze_replay_bundle.py`) through the whole canonical graph with no writer,
+TTS, music or stills, node 7 byte-copying the SHA-verified master; `scripts/otr_verify_replay.py`
+is the offline A/A verifier. Item 1, the adapter sweep, is RUNNING on the 5080 overnight profile
+(two styles x 1.0 / 0.5 / 0.25 / 0.0, titles "Adapter <k> <style>", published to `otr/obs/` for
+the operator's eye). Next: the live replay proof (render, freeze, replay twice, verify) once the
+sweep releases the GPU, then item 2, the still-in lab peer -- registered only after the
+`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
+operator's standing rule for any new video pack requires.
+
 ## SECTION 6 -- Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite

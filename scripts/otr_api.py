@@ -845,6 +845,8 @@ CREATIVE_WHITELIST = frozenset({
     # source_ref (Source Banks v2) -- optional source reference string for
     # bank fetchers; mirror of the package whitelist.
     "source_ref",
+    # CANONICAL REPLAY (campaign item 0, 2026-09-02): the writer's replay_from widget.
+    "replay_from",
     # Google BYO API concrete model pickers are pure headless bindings for
     # the virtual google_api:slot-a/b LLM rows, not managed media engines.
     "google_api_slot_a_model", "google_api_slot_b_model",

@@ -169,7 +169,7 @@ class TestHeadlessSurface:
         # and the vector tops out at 33. schemas comes from the LIVE
         # INPUT_TYPES() above, so this already reflects the new vector --
         # only the pin needed updating.
-        assert len(node1["widgets_values"]) == 32
+        assert len(node1["widgets_values"]) == 33  # 33 since 2026-09-02: trailing replay_from (campaign item 0)
         assert node1["widgets_values"][22] == "anime"
         # 2026-08-15 (operator): canonical ships the bank roll sentinel. This is
         # the NEIGHBOUR check proving the visual_style patch landed at 23 and

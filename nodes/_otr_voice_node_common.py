@@ -828,6 +828,20 @@ class OTRVoiceNodeBase:
     # ------------------------------------------------------------------ #
     def generate(self, script_json, engine, ledger_json="", gate_in="",
                  stereo_policy="mono_safe"):
+        # CANONICAL REPLAY (campaign item 0): the frozen master carries every
+        # take; nothing renders here. A typed empty AUDIO batch (nodes 3 and 7
+        # do not consume it on replay) and an explicit done token.
+        try:
+            from .production_ledger import replay_descriptor as _replay_descriptor
+            from ._otr_resolved_request import empty_audio_batch as _empty_audio
+            _rmeta = (json.loads(ledger_json or script_json or "{}") or {}).get("meta") or {}
+        except (ValueError, TypeError, ImportError, AttributeError):
+            # AttributeError: a non-dict wire (the legacy parser LIST) is not a replay
+            _rmeta = {}
+        if _rmeta and _replay_descriptor(_rmeta):
+            log.warning("[%s] REPLAY: pass-through, no TTS", type(self).__name__)
+            return (_empty_audio(), "replay: pass-through (frozen master)",
+                    "replay:passthrough")
         from ._otr_audio_engines import (
             EngineUnusable, EngineUsabilityReason, assert_usable, get_engine,
         )

@@ -23,6 +23,7 @@ from __future__ import annotations
 import copy
 import functools
 import hashlib
+import json
 import logging
 import math
 import os
@@ -4024,6 +4025,128 @@ def _assert_beat_affordable(shot, prebuilt):
     return record
 
 
+#: The ACTUAL render receipt (campaign item 0, 2026-09-02). One per rendered
+#: segment, built from what the engine CONSUMED (the request) and RETURNED (the
+#: canonical clip) plus the engine's own account of its sampler inputs and model
+#: artifacts. ``actual_request_sha`` hashes the CAUSAL fields only, so two A/A
+#: nulls of the same frozen ledger produce the same digest and a changed graph
+#: setting, still, adapter strength or prompt produces a different one; wall
+#: seconds, the peak and the run id ride beside it and never enter the hash.
+RENDER_RECEIPT_VERSION = "render_receipt_v1"
+_RECEIPT_CAUSAL_KEYS = (
+    "receipt_version", "engine_id", "recipe_id", "implementation_version", "family",
+    "role", "text_prompt", "negative_prompt", "seed", "comparison_seed_hash",
+    "target_frame_count", "canvas", "still_sha256", "sampler_inputs",
+    "model_artifacts",
+)
+_ARTIFACT_DIGESTS: dict = {}
+
+
+def _artifact_digest(path):
+    """sha256 of a model file, computed ONCE per process per (path, size, mtime)
+    -- a 2 GB checkpoint is hashed on the first clip and looked up after."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (os.path.abspath(path), st.st_size, st.st_mtime_ns)
+    hit = _ARTIFACT_DIGESTS.get(key)
+    if hit:
+        return hit
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    digest = {"sha256": h.hexdigest(), "bytes": int(st.st_size)}
+    _ARTIFACT_DIGESTS[key] = digest
+    return digest
+
+
+def _file_sha256(path):
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _req_get(request, key, default=None):
+    if isinstance(request, dict):
+        return request.get(key, default)
+    return getattr(request, key, default)
+
+
+def build_actual_receipt(engine, shot, request, clip, *, segment=None,
+                         wall_s=None):
+    """The ACTUAL receipt for one rendered segment. Pure over its inputs except
+    for the artifact digests, which are read from disk once per process."""
+    seeds = _req_get(request, "seed_bundle") or {}
+    timing = _req_get(request, "timing") or {}
+    canvas = _req_get(request, "canvas") or {}
+    refs = _req_get(request, "asset_refs") or {}
+    obs = _req_get(request, "observability") or {}
+    s_get = seeds.get if isinstance(seeds, dict) else (lambda k, d=None: getattr(seeds, k, d))
+    t_get = timing.get if isinstance(timing, dict) else (lambda k, d=None: getattr(timing, k, d))
+    c_get = canvas.get if isinstance(canvas, dict) else (lambda k, d=None: getattr(canvas, k, d))
+    r_get = refs.get if isinstance(refs, dict) else (lambda k, d=None: getattr(refs, k, d))
+    still = str(r_get("init_image") or "")
+    sampler_inputs = None
+    fn = getattr(engine, "sampler_inputs_for", None)
+    if callable(fn):
+        try:
+            sampler_inputs = fn(request)
+        except Exception as exc:  # noqa: BLE001 -- a receipt must not fail a render
+            sampler_inputs = {"error": "%s: %s" % (type(exc).__name__, exc)}
+    artifacts = []
+    afn = getattr(engine, "model_artifacts", None)
+    if callable(afn):
+        try:
+            for name, path in afn() or ():
+                if path:
+                    artifacts.append({"name": str(name), "path": os.path.basename(str(path)),
+                                      **(_artifact_digest(str(path)) or {"sha256": None, "bytes": None})})
+        except Exception as exc:  # noqa: BLE001
+            artifacts.append({"name": "error", "path": "", "sha256": None,
+                              "bytes": None, "error": "%s: %s" % (type(exc).__name__, exc)})
+    clip = clip if isinstance(clip, dict) else {}
+    receipt = {
+        "receipt_version": RENDER_RECEIPT_VERSION,
+        "engine_id": str(getattr(engine, "name", "") or shot.get("engine_id") or ""),
+        "recipe_id": clip.get("recipe") or getattr(engine, "recipe_receipt_id", None),
+        "implementation_version": str(getattr(engine, "implementation_version", "") or ""),
+        "family": str(clip.get("family") or getattr(engine, "family", "") or ""),
+        "shot_id": str(shot.get("shot_id") or ""),
+        "beat_id": str(shot.get("beat_id") or ""),
+        "segment_index": int(getattr(segment, "index", 0) or 0) if segment is not None else 0,
+        "role": str(_req_get(request, "role") or shot.get("role") or ""),
+        "text_prompt": str(_req_get(request, "text_prompt") or ""),
+        "negative_prompt": str(_req_get(request, "negative_prompt") or ""),
+        "prompt_sha8": str((obs.get("prompt_sha8") if isinstance(obs, dict) else "") or ""),
+        "seed": int(s_get("request_seed", 0) or 0),
+        "comparison_seed_hash": str(shot.get("render_request_hash") or ""),
+        "target_frame_count": int(t_get("target_frame_count", 0) or 0),
+        "canvas": {"w": c_get("w"), "h": c_get("h"), "fps": c_get("fps")},
+        "still_sha256": _file_sha256(still) if still and os.path.isfile(still) else None,
+        "still_name": os.path.basename(still) if still else None,
+        "sampler_inputs": sampler_inputs,
+        "model_artifacts": artifacts,
+        # non-causal, beside the hash
+        "clip_path": os.path.basename(str(clip.get("path") or "")),
+        "frame_count": clip.get("frame_count"),
+        "vram_peak_mb": clip.get("vram_peak_mb"),
+        "wall_s": (round(float(wall_s), 3) if wall_s is not None else None),
+        "status": "rendered",
+    }
+    causal = {k: receipt.get(k) for k in _RECEIPT_CAUSAL_KEYS}
+    receipt["actual_request_sha"] = hashlib.sha256(
+        json.dumps(causal, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                   default=str).encode("utf-8")).hexdigest()
+    return receipt
+
+
 def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
                 host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
@@ -4038,6 +4161,7 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     eng = shot["engine_id"]
     out_shot = dict(shot)
     force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
+    _t_render = time.monotonic()
     try:
         clip = _render_one(eng, request, force_oom=force,
                            host_caps=host_caps, profile=profile,
@@ -4055,6 +4179,18 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     # clip via VramPeakProbe) over the instantaneous post-render read, so the
     # episode report records the true render-phase peak; fall back when absent.
     clip_peak = clip.get("vram_peak_mb") if isinstance(clip, dict) else None
+    if isinstance(clip, dict):
+        # THE RECEIPT RIDES THE CLIP (campaign item 0): built here, where the
+        # engine, the request it consumed and the clip it returned are all in
+        # scope, and nowhere else.
+        try:
+            clip["receipt"] = build_actual_receipt(
+                _vreg.get_engine(eng) if _vreg.is_registered(eng) else None,
+                shot, request, clip, segment=segment,
+                wall_s=time.monotonic() - _t_render)
+        except Exception as exc:  # noqa: BLE001 -- never fail a render for a receipt
+            _LOG.warning("[OTR video] receipt for shot %s not built: %s: %s",
+                         sid, type(exc).__name__, exc)
     return clip, out_shot, [eng], (clip_peak or _mc.vram_used_mb())
 
 
@@ -4379,6 +4515,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                 "init_source": init_source,
                 "fear_cape": bool(cape_pending),
                 "path": os.path.basename(path),
+                "receipt": (clip or {}).get("receipt"),
             }
             segment_rows.append(segment_row)
             cape_pending = False
@@ -4448,6 +4585,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # audio" checkable after the fact instead of merely intended: sum the
     # visible_frames and it must equal the beat's target.
     beat_clip["segments"] = segment_rows
+    beat_clip["receipts"] = [r["receipt"] for r in segment_rows if r.get("receipt")]
     # THE FOLEY RECEIPTS ARE BEAT-SCOPE AND MUST BE OVERWRITTEN, never
     # inherited. `beat_clip` starts life as a copy of the LAST segment, so
     # leaving these alone would hand the manifest that segment's 97-frame stem
@@ -4869,8 +5007,17 @@ def run_episode(ledger, *, oom_shot_id=None,
             _end_engine_scope(_scoped_id)
     section["shots"] = new_shots
     ledger["video"] = section
+    receipts = []
+    for _s in new_shots:
+        _c = clips.get(_s.get("shot_id"))
+        if not isinstance(_c, dict):     # a cheap-family clip may be a bare path
+            continue
+        for _r in (_c.get("receipts") or ([_c["receipt"]] if _c.get("receipt") else [])):
+            if isinstance(_r, dict):
+                receipts.append(_r)
     return {"ledger": ledger, "clips": clips, "trace": trace,
-            "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows}
+            "vram_peak_mb": vram_peak, "audio_motion_rows": amp_rows,
+            "receipts": receipts}
 
 
 def _log_if_legacy_render_plan_present(ledger):
@@ -5830,6 +5977,17 @@ except ImportError:  # pragma: no cover -- flat test imports
     from foley_stems import FOLEY_RECEIPT_KEYS as _FOLEY_RECEIPT_KEYS
 
 
+def _first_receipt_field(clip, key):
+    """The first segment receipt's ``key`` on a clip, or None."""
+    if not isinstance(clip, dict):
+        return None
+    rows = clip.get("receipts") or ([clip["receipt"]] if isinstance(clip.get("receipt"), dict) else [])
+    for r in rows:
+        if isinstance(r, dict) and r.get(key) not in (None, ""):
+            return r.get(key)
+    return None
+
+
 def build_clip_manifest(result, *, episode_id=""):
     """Pure, beat-ordered per-beat clip manifest from a :func:`run_real_episode`
     result -- the STRING contract OTR_SilentComposite assembles. Shot order is
@@ -5951,6 +6109,12 @@ def build_clip_manifest(result, *, episode_id=""):
             # reported every honest multi-segment beat as padded.
             "native_frame_count": clip.get("native_frame_count"),
             "extension_mode": clip.get("extension_mode"),
+            # WHAT TEXT AND WHICH SEED MADE THIS CLIP (campaign item 0,
+            # 2026-09-02): from the segment receipt(s) the engine's render
+            # attached; None when no receipt was built.
+            "prompt_sha8": _first_receipt_field(clip, "prompt_sha8"),
+            "request_seed": _first_receipt_field(clip, "seed"),
+            "actual_request_sha": _first_receipt_field(clip, "actual_request_sha"),
             # THE CADENCE AND DELIVERY RECEIPTS (Ghost Signal, 2026-08-22).
             # PRESENT-KEY-ONLY, and that is the whole care in this block: a
             # legacy row that never carried these must not acquire six null
@@ -6155,6 +6319,7 @@ def _episode_facts(ep):
         "humo_14B_169_misrouted": humo_14b_169_misrouted,
         "vram_peak_mb": ep["vram_peak_mb"],
         "trace": ep["trace"],
+        "receipts": ep.get("receipts") or [],
         "clips": clips,
     }
 

@@ -401,6 +401,45 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     def _recipe_receipt(self):
         return self.recipe_receipt_id
 
+    def sampler_inputs_for(self, request):
+        """Every value that reaches the sampler for this request, from the SAME
+        constants and resolvers the graph builder uses (campaign item 0, the
+        pin r4 asked for): the render receipt hashes this dict, so two A/A
+        nulls agree and a changed cell disagrees by construction."""
+        plan = self._build_render_request(request)
+        return {
+            "checkpoint": GHOST_CHECKPOINT_NAME,
+            "motion_module": str(self.motion_module_name),
+            "adapter": str(getattr(self, "lora_name", "") or ""),
+            "adapter_strength": (float(self.lora_strength)
+                                 if getattr(self, "lora_name", "") else None),
+            "steps": GHOST_STEPS, "cfg": GHOST_CFG,
+            "sampler": GHOST_SAMPLER_NAME, "scheduler": GHOST_SCHEDULER,
+            "denoise": GHOST_DENOISE, "beta_schedule": GHOST_BETA_SCHEDULE,
+            "canvas_w": GHOST_CANVAS_W, "canvas_h": GHOST_CANVAS_H,
+            "context_length": GHOST_CONTEXT_LENGTH,
+            "context_overlap": GHOST_CONTEXT_OVERLAP,
+            "context_fuse_method": GHOST_CONTEXT_FUSE_METHOD,
+            "context_use_on_equal_length": GHOST_CONTEXT_USE_ON_EQUAL_LENGTH,
+            "context_start_percent": GHOST_CONTEXT_START_PERCENT,
+            "context_guarantee_steps": GHOST_CONTEXT_GUARANTEE_STEPS,
+            "source_fps": int(GHOST_SOURCE_FPS), "target_fps": int(self.target_fps),
+            "hold_factor": int(self.hold_factor),
+            "source_request": plan["source_request"],
+            "unique_source_count": plan["unique_source_count"],
+            "latent": "EmptyLatentImage", "init_image": None,
+        }
+
+    def model_artifacts(self):
+        """``[(name, path)]`` of the weight files this lane loads, for the render
+        receipt's once-per-run digest table."""
+        out = [("checkpoint", self._ckpt_path() or ""),
+               ("motion_module", self._motion_path() or "")]
+        lora = getattr(self, "lora_name", "")
+        if lora:
+            out.append(("adapter", self._lora_path() or ""))
+        return out
+
     @staticmethod
     def _file_receipt(path):
         """``(size, mtime_ns)`` for a resolved artifact, or ``None``.

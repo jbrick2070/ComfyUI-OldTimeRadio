@@ -329,6 +329,16 @@ class CastLock:
         )
 
         led = _OTRLC.load_ledger(script_json)
+        # CANONICAL REPLAY (campaign item 0): BEFORE the freeze gate, the
+        # revision increment, the Bark assignment and every model resolution.
+        # The imported ledger's cast rows are the source's; nothing changes.
+        from .production_ledger import replay_descriptor as _replay_descriptor
+        if _replay_descriptor(led.get("meta") or {}):
+            _rev = int((led.get("meta") or {}).get("cast_lock_revision") or 0)
+            log.warning("[OTR_CastLock] REPLAY: cast preserved as frozen "
+                        "(revision %d), no voice assignment, no model", _rev)
+            return (json.dumps(led, ensure_ascii=True, separators=(",", ":")),
+                    _rev, "cast_lock: replay pass-through", "cast_lock:replay")
         # Freeze-halt + VRAM-recovery gate, re-homed here from the legacy audio
         # nodes (audio clean-break). CastLock runs first in the v2 audio chain
         # (CastLock -> CharacterVoices -> Announcer -> Theme), so one gate covers

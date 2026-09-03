@@ -1033,6 +1033,34 @@ def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
                              _prompt_content_hash(prompt))
 
 
+def verify_replay_images(ledger: dict):
+    """REPLAY (campaign item 0): every imported image row's file must exist at
+    its rebased ``path`` with non-zero bytes; nothing is minted. Returns
+    ``(ledger, image_done, report)`` and stamps the unchanged images section
+    durably so the singleton and the wire agree."""
+    images = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
+    rows = images.get("images") if isinstance(images.get("images"), list) else []
+    missing = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        path = str(row.get("path") or "")
+        if not (path and os.path.isfile(path) and os.path.getsize(path) > 0):
+            missing.append(str(row.get("image_id") or path or "?"))
+    if missing:
+        raise RuntimeError(
+            "[OTR_ImageGenDispatcher] REPLAY: %d imported image row(s) have no file on "
+            "disk: %s" % (len(missing), ", ".join(missing[:6])))
+    try:
+        from .production_ledger import stamp_durable as _stamp_durable
+        _stamp_durable(sections={"images": images}, source="OTR_ImageGenDispatcher:replay")
+    except ImportError:  # pragma: no cover
+        pass
+    report = "replay: %d imported image row(s) verified on disk, nothing minted" % len(rows)
+    log.warning("[OTR_ImageGenDispatcher] %s", report)
+    return ledger, "image_done:replay", report
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
@@ -2239,6 +2267,13 @@ class OTRImageGenDispatcher:
         led = self._loads(script_json, {})
         policy = self._loads(image_policy_json, {})
         prompts = self._loads(image_prompts_json, {})
+        # CANONICAL REPLAY (campaign item 0): the imported ``images`` rows are
+        # verified on disk and re-stamped as they are; gen_fn is never called.
+        from .production_ledger import replay_descriptor as _replay_descriptor
+        if _replay_descriptor((led.get("meta") or {})):
+            led, image_done, report = verify_replay_images(led)
+            patched = json.dumps(led, ensure_ascii=True, separators=(",", ":"))
+            return (patched, image_done, report)
         # The in-graph node mints REAL portraits via the request's image engine
         # (in-process Flux gen-1) under the AS-3 GPU-residency lease. On a box
         # without the GPU / wrapper nodes / checkpoint the render fails closed and

@@ -115,6 +115,21 @@ class StableAudioTheme:
     # ------------------------------------------------------------------ #
     def generate(self, script_json, engine, ledger_json="", gate_in="",
                  stereo_policy="mono_safe"):
+        # CANONICAL REPLAY (campaign item 0): the cues are inside the frozen
+        # master; no music model loads. The manifest is "" on purpose -- node 7
+        # takes its replay branch BEFORE the cue-pair check.
+        try:
+            import json as _json
+            from .production_ledger import replay_descriptor as _replay_descriptor
+            from ._otr_resolved_request import empty_audio_batch as _empty_audio
+            _rmeta = (_json.loads(ledger_json or script_json or "{}") or {}).get("meta") or {}
+        except (ValueError, TypeError, ImportError, AttributeError):
+            # AttributeError: a non-dict wire (the legacy parser LIST) is not a replay
+            _rmeta = {}
+        if _rmeta and _replay_descriptor(_rmeta):
+            log.warning("[OTR_StableAudioTheme] REPLAY: pass-through, no music model")
+            return (_empty_audio(), "", "replay: pass-through (frozen master)",
+                    "replay:passthrough")
         from ._otr_audio_engines import (
             EngineUnusable, EngineUsabilityReason, assert_usable, get_engine,
             pack_audio_batch,

@@ -57,7 +57,11 @@ def test_source_ref_slot_pinned_with_llm_policy_tail():
     assert order[32] == "gate_in"
     # 33 since 2026-08-28: refine_target_grade (slot 20) was removed as an
     # inert widget and every pin below it shifted down one.
-    assert len(order) == 33
+    # 34 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
+    # was appended as the trailing widget AFTER the gate_in socket, so no
+    # earlier pin moved and the saved vector grew 33 -> 34 at its end.
+    assert order[33] == "replay_from"
+    assert len(order) == 34
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
@@ -125,7 +129,7 @@ def test_patch_widget_by_name_lands_source_ref_slot_25():
     # vector tops out at 33. schemas comes from the LIVE INPUT_TYPES()
     # above, so this already reflects the new vector -- only the pin
     # needed updating.
-    assert len(node1["widgets_values"]) == 32
+    assert len(node1["widgets_values"]) == 33  # 33 since 2026-09-02: trailing replay_from (campaign item 0)
     # 2026-08-15 (operator): canonical ships the roll sentinels on both slots so
     # an unattended run varies bank and style. These two lines are NEIGHBOUR
     # checks -- they exist to prove the source_ref patch landed at 26 without

@@ -415,3 +415,122 @@ Files and the one change each carries:
 ## 12. r4 convergence (Sonnet 5, in-process; roster: Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- one seat per round, as the operator ruled 2026-09-02)
 
 CONVERGED. All 21 must-fixes (4 + 9 + 8) traced into sections 6 / 8 / 10 / 11 as taken, with r2 must-fix 9 scoped and the reason confirmed at the files (the per-segment request loop is engine-generic; no LTX boundary is edited). No contradiction between the folds. No new must-fix: no other node between 62 and 92 calls the writer LLM or mints a freeze timestamp; the dispatcher has no IS_CHANGED override and the replay path short-circuits before its cache lookup; ShotLock strict post-audio overlay passes only because the import rebinds the singleton before any peek, which section 10 already requires. **The one thing to settle at coding time:** the haunted engine sampler_inputs field list is read from the live `_build_render_request` and `_recipe_receipt` of `eng_ghost_signal.py` / `eng_ghost_signal_official.py` and pinned in section 13 before `actual_request_sha` is written -- a wrong field set is exactly how two A/A nulls would differ by construction.
+
+## 13. Coding receipts (2026-09-02, one window, in the `instrument` git worktree)
+
+### 13.1 The pinned haunted `sampler_inputs` (the r4 open item)
+
+`GhostSignalEngine.sampler_inputs_for(request)` returns exactly these keys, every one read from
+the SAME constant or resolver the graph builder uses (no second copy of a number anywhere):
+
+| key | source |
+|---|---|
+| `checkpoint` | `GHOST_CHECKPOINT_NAME` |
+| `motion_module` | `self.motion_module_name` |
+| `adapter`, `adapter_strength` | `self.lora_name` / `self.lora_strength` (`None` strength when the lane carries no adapter -- the base engine) |
+| `steps`, `cfg`, `sampler`, `scheduler`, `denoise`, `beta_schedule` | `GHOST_STEPS`, `GHOST_CFG`, `GHOST_SAMPLER_NAME`, `GHOST_SCHEDULER`, `GHOST_DENOISE`, `GHOST_BETA_SCHEDULE` |
+| `canvas_w`, `canvas_h` | `GHOST_CANVAS_W`, `GHOST_CANVAS_H` |
+| `context_length`, `context_overlap`, `context_fuse_method`, `context_use_on_equal_length`, `context_start_percent`, `context_guarantee_steps` | the six `GHOST_CONTEXT_*` constants |
+| `source_fps`, `target_fps`, `hold_factor` | `GHOST_SOURCE_FPS`, `self.target_fps`, `self.hold_factor` |
+| `source_request`, `unique_source_count` | `self._build_render_request(request)` -- the plan the builder itself renders from |
+| `latent`, `init_image` | the literals `"EmptyLatentImage"` / `None` (the lane is text-to-video; a still-in peer will put a hash here, which is the point of carrying the key now) |
+
+`model_artifacts()` returns `[("checkpoint", path), ("motion_module", path)]` plus `("adapter",
+path)` when `lora_name` is set. Both are what `build_actual_receipt` hashes into
+`actual_request_sha` (through `sampler_inputs` and `model_artifacts`) alongside the request's
+text, negative, seed, target frame count, canvas and still hash. Wall time, peak VRAM and the
+run id are stamped on the receipt but excluded from the hash by construction
+(`_RECEIPT_CAUSAL_KEYS`). `tests/test_render_receipts.py` pins that two identical requests hash
+equal and a changed cell hashes different.
+
+### 13.2 What shipped, against the contract in section 11
+
+Items 1-9 as written. Deviations, each deliberate:
+
+* Section 11 item 6 names `nodes/batch_character_voices.py` and `nodes/announcer_voice.py`; the
+  pass-through lives once in `nodes/_otr_voice_node_common.py::generate`, which both nodes call
+  -- one seam, both nodes covered (`tests/test_canonical_replay.py` exercises both classes).
+* `EpisodeAssembler` grew the `replay_descriptor` forceInput socket in INPUT_TYPES as well as
+  the `assemble()` parameter (the first cut declared only the parameter; the contract validator
+  refused the canonical's link 289 as a rogue socket -- caught by
+  `tests/test_workflow_contract_validation.py`, fixed before merge).
+* The writer's `replay_from` is the LAST optional entry, after the `gate_in` socket, not before
+  `gguf_quant` where the first cut put it. INPUT_TYPES order IS the widgets_values order; the
+  first placement would have rebound `gguf_quant`'s saved value to `replay_from` on every graph
+  (BUG-LOCAL-097). Caught by `tests/test_workflow_json_guardrails.py::TestWidgetOrderVsInputTypes`
+  and the S5 tail pins, which now pin `order[33] == "replay_from"`, `len(order) == 34`, and the
+  saved vector at 33.
+* `workflows/otr_story_only.json` is hand-maintained (not a `build_variants` output) and is the
+  one other graph carrying the writer; it got the same trailing descriptor + `""` slot.
+* The four hand-kept `workflows/variants/*.env.json` recipes carry a copy of their variant's
+  `master_hash`; regenerating the variants moved every hash, so the copies were re-synced by
+  exact string replacement (`tests/test_remaining_video_contracts.py` is the pin).
+* Every replay check that parses `meta` off a wire treats a non-dict wire (the legacy parser
+  list) as "not a replay" and falls through to the node's historical loud path -- the sequencer
+  test `test_sequencer_legacy_list_raises` caught an `AttributeError` shadowing the ValueError.
+
+### 13.3 The build defect that never reached the tree
+
+The replay-node patch script tested "already applied" by the ANCHOR still being present. An
+insert-style hunk keeps its anchor inside the replacement, so every re-run (there were several,
+fixing anchors) re-inserted the block: four copies of the replay block in `production_ledger.py`,
+three in `scene_sequencer.py` and `otr_image_gen_dispatcher.py`, two in `OTR_LedgerFreezeCascade.py`.
+Python took the last definition each time, so the targeted tests were green over duplicated
+code. Found by counting definitions across the diff; fixed by reverting the ten files to HEAD
+and re-applying once with the correct test (the REPLACEMENT text present == applied). Rule
+recorded in memory; the receipt is `grep -c "def _assemble_replay"` == 1 and friends.
+
+### 13.4 Worktree-only test artefacts (verified in the main checkout after the merge, not here)
+
+* `tests/test_credits_roll_spec.py` (44): `_git_short_sha` reads `.git/HEAD`; a worktree's
+  `.git` is a file.
+* `tests/test_workflow_json_guardrails.py::TestWidgetOrderVsInputTypes`: `_resolve_ncm` imports
+  `custom_nodes.ComfyUI-OldTimeRadio` from `PACK_ROOT.parent.parent`, which from the worktree
+  is the MAIN checkout's registry (proven: it resolved
+  `custom_nodes\ComfyUI-OldTimeRadio\__init__.py` and reported no `replay_from`).
+* `tests/test_w45_campaign_bank_pinning.py` writes under `tmp/`, an untracked dir.
+
+### 13.5 Tests run before the merge
+
+Offline: `tests/test_canonical_replay.py` (24), `tests/test_render_receipts.py` (12), the
+workflow four (`build_variants --check` 91/0, link-target indexes, widget-value alignment,
+canonical widget-input parity), the whitelist parity (`tests/test_workflow_apply.py`), and every
+test file touching a changed node module (284 files; the only failures left are the 13.4
+artefacts). The full suite and the Bible run in the main checkout after the merge, and the live
+proof (render, freeze, replay twice, verify) runs when the adapter sweep releases the GPU.
+
+### 13.6 Finished-diff review
+
+Sonnet 5, one pass, scoped to the named functions of the diff (roster: Antigravity r1, Codex r2,
+Cursor r3, Sonnet r4, Sonnet QA). Verdict: findings, eight. Grounded and disposed:
+
+1-3. The writer widget order and the duplicated blocks (13.2, 13.3) -- the reviewer read the
+   pre-dedupe tree; both were already caught by the tests and fixed. Its independent check that
+   the first placement would have handed `"Q8_0"` to `replay_from` on every normal render (so
+   every canonical run would have died in `import_replay_bundle`) is the right reading of
+   BUG-LOCAL-097 and is why the placement rule is now a comment beside the widget.
+4. `EpisodeAssembler.__doc__` lost: the patch inserted the two replay methods as the first
+   statements of the class body, ahead of the docstring. TAKEN -- docstring moved back above
+   them, `ast.get_docstring` verified.
+5. The writer's replay branch returned a float on the INT `estimated_minutes` slot. TAKEN --
+   `int(round(...))`.
+6. Node 7's `replay_descriptor` and node 1's `replay_from` descriptors lacked the siblings'
+   `shape: 7` / `localized_name`. TAKEN -- normalised in the canonical and in
+   `otr_story_only.json`, variants regenerated, `--check` 91/0.
+7. `find_master`'s fallback glob could freeze a stale `pending_*_master.wav`. TAKEN --
+   `pending_*` excluded, the episode-id-named master preferred over mtime.
+8. `import_replay_bundle` rebinds the singleton before the asset copies, so a failed import
+   leaves `_CURRENT` on a half-built workspace. DECLINED, with the reviewer's own reason: the
+   graph aborts on the same exception and the next writer run rebinds through `new_ledger`
+   anyway; a rollback would add a second code path to the seam for a state nothing reads.
+
+Verified correct by the reviewer (kept as the receipt): the base engine carries `lora_name`,
+`lora_strength` and `_lora_path`, so `sampler_inputs_for` never raises on the plain lane;
+`still_sha256` hashes content, `model_artifacts` is an ordered list, so `actual_request_sha` is
+run-stable; every engine's `canonicalize()` returns a dict, so no clip is a bare path at the
+receipt; `_stamp_render_trace` is safe under `OTR_TEST_MODE` and on an empty receipt list, and
+lets `LedgerStampError` propagate as the neighbouring stamps do; the popped `meta.paths` is
+rebuilt unconditionally by `Ledger.save`; both `_same_durable_run` and `_same_frozen_episode`
+gate on `replay_workspace_id` before the timestamp; every pass-through returns the arity and
+types its node declares and runs before any model, LLM or GPU work; link 289 appends to node 62
+output 6 rather than replacing it.

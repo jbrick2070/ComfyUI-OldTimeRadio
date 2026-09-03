@@ -274,7 +274,7 @@ class TestHeadlessSurface:
         # style-engine consolidation, then 23 before the 2026-08-14
         # target_words removal). S5 platform-portability appended the six
         # llm runtime-policy widgets at 27-32 (vector = 33).
-        assert len(node1["widgets_values"]) == 32
+        assert len(node1["widgets_values"]) == 33  # 33 since 2026-09-02: trailing replay_from (campaign item 0)
         assert node1["widgets_values"][21] == "scifi_news_pro"
         assert node1["widgets_values"][23] == "(select Google API model)"
         assert node1["widgets_values"][24] == "(select Google API model)"
@@ -389,7 +389,7 @@ class TestClientBankReachesTheWidget:
         workflow = json.loads(
             _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 32
+        assert len(node1["widgets_values"]) == 33  # 33 since 2026-09-02: trailing replay_from (campaign item 0)
         # 2026-08-15 (operator): canonical ships the roll sentinel here. The
         # point of this assertion is that admitting a client bank does not
         # disturb slot 22, whatever legal value it holds.

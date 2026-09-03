@@ -208,6 +208,27 @@ class OTR_LedgerFreezeCascade:
         from . import _otr_model_inputs as _OTRMI
         from . import production_ledger as _PL
 
+        # CANONICAL REPLAY (campaign item 0): the bundle's ledger is already
+        # frozen (its freeze_timestamp is kept byte-identical by the import), so
+        # the cascade neither loads the technical LLM nor re-mints the receipt.
+        # Same JSON on script_json and v2_ledger_json, verdict "replay".
+        try:
+            _rmeta = (json.loads(script_json or "{}") or {}).get("meta") or {}
+        except (ValueError, TypeError, AttributeError):
+            # AttributeError: a non-dict wire (the legacy parser LIST) is not a replay
+            _rmeta = {}
+        if _PL.replay_descriptor(_rmeta):
+            log.warning("[OTR_LedgerFreezeCascade] REPLAY: pass-through, no freeze, "
+                        "no model (workspace %s)", _rmeta.get("replay_workspace_id"))
+            return (
+                script_text or "",
+                script_json or "{}",
+                news_used or "",
+                int(estimated_minutes or 0),
+                "replay",
+                _episode_seed_from_ledger(script_json or "{}"),
+                script_json or "{}",
+            )
         has_current = getattr(_PL, "has_current_ledger", None)
         peek = getattr(_PL, "peek_ledger", None)
         if callable(has_current) and not has_current():

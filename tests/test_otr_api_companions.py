@@ -212,6 +212,10 @@ def _writer_schemas_s5() -> dict:
     required["gate_in"] = (
         "STRING", {"default": "", "forceInput": True},
     )
+    # CANONICAL REPLAY (campaign item 0, 2026-09-02): replay_from is the
+    # trailing widget, declared AFTER the gate_in socket in the live
+    # INPUT_TYPES so it appends at the end of the saved vector (33 wide).
+    required["replay_from"] = ("STRING", {"default": ""})
     return schemas
 
 
@@ -526,7 +530,9 @@ def test_round_trip_canonical_node1_inputs_correct():
     # `target_words` (removed 2026-08-14) and MINUS `refine_target_grade`
     # (removed 2026-08-28 -- an inert widget whose revision loop was already
     # gone). gate_in is a forceInput socket and does not occupy a slot.
-    assert len(dump) == 32, f"node 1 widgets_values length drift: {len(dump)}"
+    # 33 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
+    # appended as the trailing widget, after gate_in, so no earlier slot moved.
+    assert len(dump) == 33, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

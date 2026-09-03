@@ -243,6 +243,12 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             "use_lora": clip.get("use_lora"),
             "render_canvas": clip.get("render_canvas"),
             "vram_peak_mb": clip.get("vram_peak_mb"),
+            # WHAT TEXT AND WHICH SEED (campaign item 0, 2026-09-02): carried from
+            # the manifest row so a published clip can be tied to its prompt by
+            # hash and to its seed by value. None when no receipt was built.
+            "prompt_sha8": clip.get("prompt_sha8"),
+            "request_seed": clip.get("request_seed"),
+            "actual_request_sha": clip.get("actual_request_sha"),
             # family = the engine's render family (audio_driven_face / text_to_video /
             # image_to_video ...) -- the human-readable suffix the credits MODELS.VIDEO
             # rows show (e.g. "visualizer . camera"). Sourced from the manifest
@@ -308,6 +314,32 @@ def _stamp_render_engines_meta(manifest, vram_peak_mb):
         meta_updates={"render_engines": payload},
         source="video_render_batch",
     )
+
+
+def _stamp_render_trace(receipts, *, render_run_id=""):
+    """Campaign item 0 (2026-09-02): the ACTUAL render trace -- one receipt per
+    rendered segment, in play order, built by ``render_driver.render_shot`` from
+    the request the engine consumed and the clip it returned -- stamped ONCE,
+    after every segment succeeded, under ``meta.render_trace`` through
+    ``stamp_durable`` (a shallow meta update, so the stamp REPLACES, never
+    appends; a re-render of the same episode dir replaces its trace). LOUD on
+    save failure like the render-engines receipt beside it: a trace that did not
+    persist is a run nobody can cite."""
+    rows = []
+    for i, r in enumerate(receipts or []):
+        if isinstance(r, dict):
+            row = dict(r)
+            row["render_run_id"] = str(render_run_id or "")
+            row["order"] = i
+            rows.append(row)
+    from .production_ledger import stamp_durable
+
+    stamp_durable(
+        meta_updates={"render_trace": rows,
+                      "render_trace_version": "render_trace_v1"},
+        source="video_render_batch",
+    )
+    return len(rows)
 
 
 def _stamp_audio_motion_profiles(amp_rows):
@@ -622,6 +654,11 @@ class OTRVideoRenderBatch:
         # save failure here would just move the crash to mux time with less
         # context. LedgerStampError propagates (no silent skip).
         _stamp_render_engines_meta(manifest, ep.get("vram_peak_mb"))
+        # THE ACTUAL TRACE (campaign item 0): every segment's receipt, once.
+        import uuid as _uuid
+        _n_trace = _stamp_render_trace(ep.get("receipts") or [],
+                                       render_run_id=_uuid.uuid4().hex[:12])
+        report["render_trace_rows"] = _n_trace
         # S-C C1: stamp the per-beat audio_motion_profile onto the production
         # ledger from the shots' resolved conditioning WAVs. Read-only analysis
         # (the frozen master is never touched); fail-soft -- a profiling error

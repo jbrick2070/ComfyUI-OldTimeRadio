@@ -440,6 +440,16 @@
           "shape": 7,
           "type": "STRING",
           "link": 279
+        },
+        {
+          "localized_name": "replay_from",
+          "name": "replay_from",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "replay_from"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -525,7 +535,8 @@
         "bnb_nf4",
         14.5,
         4096,
-        "Q8_0"
+        "Q8_0",
+        ""
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"

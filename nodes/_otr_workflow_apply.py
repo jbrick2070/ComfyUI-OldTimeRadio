@@ -702,6 +702,8 @@ CREATIVE_WHITELIST = frozenset({
     # bank fetchers. Blank is inert; nonblank semantics belong to the selected
     # bank and must fail loud there.
     "source_ref",
+    # CANONICAL REPLAY (campaign item 0, 2026-09-02): the writer's replay_from widget.
+    "replay_from",
     # Google BYO API concrete model pickers bind the virtual google_api:slot-a/b
     # LLM rows. They are content/model-selection widgets on the writer, not
     # managed audio/image/video engine widgets.

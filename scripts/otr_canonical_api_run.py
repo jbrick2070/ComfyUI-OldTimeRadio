@@ -96,6 +96,12 @@ def _apply_writer_shortcuts(workflow: dict, schemas: dict, args) -> list[str]:
     # shape is set with --act-count below; length is an observation.
     if args.title is not None:
         shortcuts.append(("episode_title", args.title))
+    if getattr(args, "replay_from", None):
+        # CANONICAL REPLAY (campaign item 0): a bundle directory, patched as a
+        # plain string through the creative whitelist -- never through the
+        # --set value parser, where a path that happens to parse as JSON would
+        # change type.
+        shortcuts.append(("replay_from", str(args.replay_from)))
     if args.premise is not None:
         shortcuts.append(("custom_premise", args.premise))
     if args.source_bank is not None:
@@ -364,6 +370,11 @@ def main(argv: list[str] | None = None) -> int:
              "there is no per-machine profile file.",
     )
     parser.add_argument("--title", default=None)
+    parser.add_argument("--replay-from", default=None, dest="replay_from",
+                        help="CANONICAL REPLAY: a frozen replay bundle directory "
+                             "(scripts/otr_freeze_replay_bundle.py). The writer, "
+                             "cast, TTS, music and stills pass through frozen; "
+                             "only the video phase and the publish tail run.")
     parser.add_argument("--premise", default=None)
     parser.add_argument("--source-bank", default=None)
     parser.add_argument("--visual-style", default=None)

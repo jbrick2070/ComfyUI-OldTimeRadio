@@ -53,6 +53,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
+import shutil
+import copy
 import logging
 import ntpath
 import os
@@ -453,6 +456,16 @@ def _same_durable_run(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
     """
     left_meta = left.get("meta") if isinstance(left.get("meta"), dict) else {}
     right_meta = right.get("meta") if isinstance(right.get("meta"), dict) else {}
+    # A REPLAY WORKSPACE keeps the source's freeze receipt byte-identical (the
+    # freeze consumers and the banana variety need it) and carries its own
+    # workspace id (campaign item 0, 2026-09-02). When either side carries the
+    # id, both must match -- otherwise a replay and its source would be one
+    # durable run and a replay's post-audio join would write the ORIGINAL.
+    left_ws = str(left_meta.get("replay_workspace_id") or "").strip()
+    right_ws = str(right_meta.get("replay_workspace_id") or "").strip()
+    if left_ws or right_ws:
+        if not (left_ws and right_ws and left_ws == right_ws):
+            return False
     left_freeze = str(left_meta.get("freeze_timestamp") or "").strip()
     right_freeze = str(right_meta.get("freeze_timestamp") or "").strip()
     if left_freeze or right_freeze:
@@ -503,6 +516,189 @@ def get_ledger() -> "Ledger":
 # nodes that should fail loud when called without a writer upstream.
 # The cascade (OTR_LedgerFreezeCascade) uses these instead of
 # get_ledger() so it never operates on an empty placeholder ledger.
+
+
+# --------------------------------------------------------------------------- #
+# CANONICAL REPLAY (campaign item 0, 2026-09-02)
+# --------------------------------------------------------------------------- #
+REPLAY_MANIFEST_NAME = "manifest.json"
+REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
+#: Sections and meta keys the replay must not carry over from the source run.
+_REPLAY_RUN_VOLATILE_META = (
+    "render_engines", "render_trace", "render_trace_version", "phase_ms",
+    "video_readiness", "audio_motion_profile", "image_engines", "paths",
+)
+
+
+class ReplayBundleError(RuntimeError):
+    """A replay bundle that cannot be trusted: manifest, digest or path fault."""
+
+
+def replay_descriptor(meta: Any) -> Dict[str, str]:
+    """The tiny replay descriptor a node reads off any ledger meta: empty when
+    this is not a replay. Nodes branch on ``bool(replay_descriptor(meta))``."""
+    if not isinstance(meta, dict):
+        return {}
+    src = str(meta.get("replay_from") or "").strip()
+    if not src:
+        return {}
+    return {
+        "replay_from": src,
+        "replay_of_episode": str(meta.get("replay_of_episode") or ""),
+        "replay_workspace_id": str(meta.get("replay_workspace_id") or ""),
+    }
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _safe_relative(rel: str) -> str:
+    """A manifest path must be relative, normalized, and inside the bundle."""
+    raw = str(rel or "")
+    if not raw or os.path.isabs(raw) or raw.startswith(("/", "\\")):
+        raise ReplayBundleError("manifest path is not relative: %r" % (raw,))
+    norm = os.path.normpath(raw).replace("\\", "/")
+    if norm.startswith("../") or norm == ".." or "/../" in norm or norm.startswith("/"):
+        raise ReplayBundleError("manifest path escapes the bundle: %r" % (raw,))
+    if ":" in norm:
+        raise ReplayBundleError("manifest path carries a drive or stream: %r" % (raw,))
+    return norm
+
+
+def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
+    """Read and validate a bundle's manifest: schema, relative paths, no
+    duplicates (case-folded), every file present with the recorded size and
+    SHA-256. Raises ReplayBundleError on any fault; never repairs."""
+    bundle = os.path.abspath(bundle_dir)
+    mpath = os.path.join(bundle, REPLAY_MANIFEST_NAME)
+    if not os.path.isfile(mpath):
+        raise ReplayBundleError("no %s under %s" % (REPLAY_MANIFEST_NAME, bundle))
+    with open(mpath, "r", encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != REPLAY_MANIFEST_SCHEMA:
+        raise ReplayBundleError("manifest schema is not %s" % REPLAY_MANIFEST_SCHEMA)
+    files = manifest.get("files")
+    if not isinstance(files, list) or not files:
+        raise ReplayBundleError("manifest lists no files")
+    seen = set()
+    for row in files:
+        rel = _safe_relative(row.get("path"))
+        key = rel.lower()
+        if key in seen:
+            raise ReplayBundleError("manifest lists %r twice (case-folded)" % (rel,))
+        seen.add(key)
+        full = os.path.join(bundle, *rel.split("/"))
+        if os.path.islink(full):
+            raise ReplayBundleError("manifest entry is a link: %r" % (rel,))
+        if not os.path.isfile(full):
+            raise ReplayBundleError("manifest entry missing on disk: %r" % (rel,))
+        size = os.path.getsize(full)
+        if int(row.get("bytes") or -1) != size or size <= 0:
+            raise ReplayBundleError("manifest size mismatch for %r: %s vs %s"
+                                    % (rel, row.get("bytes"), size))
+        if str(row.get("sha256") or "") != _sha256_file(full):
+            raise ReplayBundleError("manifest digest mismatch for %r" % (rel,))
+    for key in ("ledger", "master_audio", "source_episode_id"):
+        if not manifest.get(key):
+            raise ReplayBundleError("manifest lacks %r" % (key,))
+    _safe_relative(manifest["ledger"])
+    _safe_relative(manifest["master_audio"])
+    return manifest
+
+
+def replay_episode_id(source_episode_id: str) -> str:
+    """``<source>_replay_<stamp with microseconds>`` -- distinct per replay so
+    the output dir and the obs file never collide (rename_episode hard-fails on
+    an existing directory)."""
+    import datetime as _dt
+    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    base = str(source_episode_id or "episode").strip() or "episode"
+    return "%s_replay_%s" % (base, stamp)
+
+
+def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) -> "Ledger":
+    """ONE validated clone of a frozen episode into a NEW workspace, and the
+    process singleton rebound to it (campaign item 0, 2026-09-02).
+
+    What it does, in order: validate the manifest (schema, relative paths,
+    digests); deep-copy the bundle's ledger; give it the new root episode id
+    and remember the source under ``meta.replay_of_episode``; stamp
+    ``meta.replay_from`` and a workspace-unique ``meta.replay_workspace_id``
+    (the freeze receipt stays byte-identical); materialize the bundle's stills,
+    portraits and canon into the new episode dir; rebase every episode-local
+    path (``path`` AND ``pool_path``, and every other absolute pointer below
+    the old root) onto the new dir; re-file the publication receipt under the
+    new id; clear the source's terminal / obs pointers and its run-volatile
+    telemetry (render engines, render trace, phase timings); ``new_ledger``
+    so ``in_flight_ledger_path()`` binds the new workspace; save atomically.
+    The master WAV is NOT copied here: node 7 (EpisodeAssembler) owns that
+    file and copies it onto its canonical name, verified, before it emits
+    ``audio_done``."""
+    bundle = os.path.abspath(bundle_dir)
+    manifest = load_replay_manifest(bundle)
+    source_id = str(manifest["source_episode_id"])
+    new_id = str(new_episode_id or "").strip() or replay_episode_id(source_id)
+    ledger_path = os.path.join(bundle, *manifest["ledger"].split("/"))
+    with open(ledger_path, "r", encoding="utf-8") as fh:
+        source = json.load(fh)
+    if not isinstance(source, dict) or not source.get("lines"):
+        raise ReplayBundleError("bundle ledger carries no lines")
+    data = copy.deepcopy(source)
+    meta = data.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+        data["meta"] = meta
+    old_root = str(manifest.get("source_episode_root") or "")
+
+    led = new_ledger(episode_id=new_id)          # binds _CURRENT + makes the dir
+    new_audio_dir = led.out_dir
+    new_root = os.path.dirname(new_audio_dir)
+    # materialize the bundle's assets under the new episode dir, by relative path
+    materialized = {}
+    for row in manifest["files"]:
+        rel = _safe_relative(row["path"])
+        if rel in (manifest["ledger"], manifest["master_audio"]):
+            continue
+        src = os.path.join(bundle, *rel.split("/"))
+        dst = os.path.join(new_root, *rel.split("/"))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.abspath(src) != os.path.abspath(dst):
+            shutil.copyfile(src, dst)
+        materialized[rel] = dst
+    # identity + provenance
+    data["episode_id"] = new_id
+    meta["episode_id"] = new_id
+    meta["replay_of_episode"] = source_id
+    meta["replay_from"] = bundle
+    meta["replay_workspace_id"] = uuid.uuid4().hex
+    meta["replay_source_commit"] = str(manifest.get("source_commit") or "")
+    meta["replay_master_audio"] = manifest["master_audio"]
+    meta["replay_master_sha256"] = next(
+        (str(r.get("sha256") or "") for r in manifest["files"]
+         if _safe_relative(r.get("path")) == manifest["master_audio"]), "")
+    # the source's run-volatile telemetry and terminal pointers do not carry over
+    for key in _REPLAY_RUN_VOLATILE_META:
+        meta.pop(key, None)
+    for key in ("final_audio_path", "final_video_path"):
+        data[key] = None
+    for key in ("obs_publish", "obs_path", "published_path"):
+        meta.pop(key, None)
+    # rebase every episode-local absolute path onto the new root
+    if old_root:
+        data, _n = _rebase_episode_local_paths(data, old_root, new_root)
+    led.data = data
+    led._rebase_publication_eligibility(new_id)
+    path = led.save()
+    if path is None:
+        raise ReplayBundleError("import_replay_bundle: the imported ledger did not save")
+    log.info("[Ledger] replay workspace %s imported from %s (source %s, %d asset(s))",
+             new_id, bundle, source_id, len(materialized))
+    return led
 
 
 def peek_ledger() -> Optional["Ledger"]:
@@ -1592,6 +1788,9 @@ class Ledger:
         TOP_PRESERVE = (
             "schema_version", "audio", "audio_gates", "transitions",
             "radio_bookend_path",
+            # THE PLANNED VIDEO SECTION (campaign item 0, 2026-09-02): ShotLock
+            # stamps it durably through stamp_durable; every later save keeps it.
+            "video",
         )
         for k in TOP_PRESERVE:
             if k in on_disk and (k not in in_mem or in_mem.get(k) in (None, "", [], {})):

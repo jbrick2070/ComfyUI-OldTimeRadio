@@ -2495,6 +2495,17 @@ class OTRMetaBriefImagePromptGen:
 
     def generate(self, script_json, image_policy_json="{}",
                  gate_in=""):
+        # CANONICAL REPLAY (campaign item 0): the imported rows already carry
+        # their prompts; no writer LLM resolves here.
+        try:
+            from .production_ledger import replay_descriptor as _replay_descriptor
+            _rmeta = (json.loads(script_json or "{}") or {}).get("meta") or {}
+        except (ValueError, TypeError, ImportError, AttributeError):
+            # AttributeError: a non-dict wire (the legacy parser LIST) is not a replay
+            _rmeta = {}
+        if _rmeta and _replay_descriptor(_rmeta):
+            log.warning("[OTR_MetaBriefImagePromptGen] REPLAY: pass-through, no LLM")
+            return (json.dumps({"replay": True, "objects": []}), "replay: pass-through")
         try:
             led = json.loads(script_json or "{}")
             if not isinstance(led, dict):

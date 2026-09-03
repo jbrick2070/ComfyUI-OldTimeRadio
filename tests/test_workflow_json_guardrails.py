@@ -646,10 +646,11 @@ class TestWriterB2aSurface:
         # ["1".."8"] default "3": 'auto' meant "derive the act count from
         # target_words", which no longer exists, so there is no derive
         # path left to default to.
-        assert len(wv) == 32, (
-            f"writer widgets_values length drift: {len(wv)} (expected 32 "
-            f"after the 2026-08-14 target_words removal and the 2026-08-28 "
-            f"refine_target_grade removal)"
+        assert len(wv) == 33, (
+            f"writer widgets_values length drift: {len(wv)} (expected 33: "
+            f"32 after the 2026-08-14 target_words removal and the 2026-08-28 "
+            f"refine_target_grade removal, plus the trailing replay_from "
+            f"widget appended 2026-09-02 for the canonical replay)"
         )
         # Slot 6: act_count must ship as "3" (the classic setup/complication/
         # resolution shape) -- there is no 'auto' choice left to fall back to.

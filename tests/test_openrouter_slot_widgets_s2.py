@@ -92,7 +92,11 @@ def test_widget_order_appends_slots_at_end():
     assert order[32] == "gate_in"
     # 33 since 2026-08-28: refine_target_grade (was slot 20) was removed
     # as an inert widget, with all 62 saved graphs re-indexed.
-    assert len(order) == 33
+    # 34 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
+    # appended as the trailing widget after the gate_in socket -- the
+    # append-only rule this test exists to enforce.
+    assert order[33] == "replay_from"
+    assert len(order) == 34
 
 
 # --- conditional creative default; technical never flips --------------------

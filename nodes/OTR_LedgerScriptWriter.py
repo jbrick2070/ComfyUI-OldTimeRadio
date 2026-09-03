@@ -2761,6 +2761,21 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     "tooltip": "Ordering/validation signal (wire "
                                "OTR_WorkflowValidator.validation_report).",
                 }),
+                # CANONICAL REPLAY (campaign item 0, 2026-09-02). The LAST
+                # optional entry on purpose: it is the trailing widget, so its
+                # widgets_values slot is appended and every earlier saved
+                # value keeps its index (BUG-LOCAL-097); it also sits after
+                # gate_in so the canonical's inputs descriptor order matches.
+                "replay_from": ("STRING", {
+                    "default": "",
+                    "tooltip": (
+                        "CANONICAL REPLAY (2026-09-02). Empty = normal authorship. "
+                        "A frozen replay bundle directory (scripts/"
+                        "otr_freeze_replay_bundle.py) = re-render THAT episode's "
+                        "ledger through the whole canonical graph as a new episode: "
+                        "no writer, no TTS, no music, no stills minted; same seeds, "
+                        "same audio, only the video phase runs. The A/A null."),
+                }),
             },
             # ComfyUI injects the configured Comfy API key into this hidden
             # input at execution time (the API-nodes auth convention). The
@@ -2892,8 +2907,36 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # S5 gate_in (validation-order fix): opaque ordering signal from
         # OTR_WorkflowValidator -- never parsed, just sequenced.
         gate_in="",
+        replay_from="",
     ):
         """Generate one accepted v2.0 LPL story artifact."""
+        # ------------------------------------------------------------------ #
+        # CANONICAL REPLAY (campaign item 0, 2026-09-02). THE FIRST STATEMENT
+        # OF run(), before the bank and style rolls, require_runnable_bank, the
+        # visual-style resolve and the LLM preflight -- every one of those binds
+        # the LIVE widgets, and a replay must bind the frozen bundle instead.
+        # The import validates the bundle, clones the ledger into a NEW
+        # workspace (new episode id, the source's freeze receipt kept, a
+        # workspace id of its own), rebinds the singleton, and this node emits
+        # the same five wire outputs from that ledger. Nothing is authored, no
+        # model is loaded, nothing rolls.
+        # ------------------------------------------------------------------ #
+        _replay_src = str(replay_from or "").strip()
+        if _replay_src:
+            from . import production_ledger as _PLR
+            led = _PLR.import_replay_bundle(_replay_src)
+            data = led.data
+            meta = data.get("meta") or {}
+            script_json = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
+            script_text = "\n".join(
+                "%s: %s" % (str(r.get("speaker") or "").upper(), str(r.get("text") or ""))
+                for r in (data.get("lines") or []) if isinstance(r, dict))
+            # the wire slot is declared INT (RETURN_TYPES); round, never a float
+            est = int(round(float(data.get("total_episode_dur_s") or 0.0) / 60.0))
+            log.warning("[OTR_LedgerScriptWriter] REPLAY of %s -> workspace %s (bundle %s)",
+                        meta.get("replay_of_episode"), data.get("episode_id"), _replay_src)
+            return (script_text, script_json, "", est,
+                    str(meta.get("technical_model") or technical_model or ""))
         # Stage 2C run-intent gate -- the FIRST statement of the body, before
         # the story-scaffold env mutation, the refine gate, the budget resets,
         # and _resolve_inputs (RSS fetch): a non-runnable source_bank pick
