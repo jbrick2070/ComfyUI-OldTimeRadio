@@ -10431,3 +10431,63 @@ confirm via the API that the two criticals are gone, then open the manual review
 Active; diff the scanner's REPORTED REASON, never the bundle contents, and never declare the
 account session-token hidden input in a third-party pack." Verify condition is automatable (the
 new test).
+
+---
+
+## PBUG-20260903-01 -- a canonical REPLAY renders eight good clips and publishes nothing
+
+**Status:** FIXED 2026-09-03. **Verified by:** a live leg, not a review.
+
+**What happened.** The first live canonical replay (campaign item 0's proof, run
+as the Prompt v3 A/B) rendered all eight clips correctly under the new composer,
+took `Prompt executed in 00:16:09`, and then died at the credits:
+
+```
+!!! Exception during processing !!! required credits receipt missing:
+meta.image_engines -- the durable stamp for it never landed
+(no-fallback: refusing a placeholder)
+```
+
+Nothing reached `otr/obs/`. Sixteen minutes of GPU, eight finished clips on disk
+in `otr/episodes/signal_lost_the_faded_ledger_20260902_225056/`, and no episode.
+
+**Root cause, and it was ours.** `production_ledger._REPLAY_RUN_VOLATILE_META`
+listed `image_engines` among the keys `import_replay_bundle` clears, on the
+reasoning that the source's run telemetry must not be published as if it
+described this run. That reasoning is right for six of the seven members and
+wrong for this one: the ONLY thing that stamps `image_engines` is
+`OTR_ImageGenDispatcher` (`otr_image_gen_dispatcher.py:2060`), and **a replay
+does not run it** -- a replay IMPORTS the source's stills rather than minting
+new ones. So the key was cleared and never rebuilt, and
+`otr_credits_roll._require(meta, "image_engines", "meta")` refused, by design,
+rather than inventing a placeholder.
+
+The refusal was correct. The clearing was the defect.
+
+**Why it was invisible until a live leg.** The source episode publishes fine and
+carries `image_engines = {"by_role": {}, "image_revision": 1}` -- an EMPTY
+histogram, because the Ghost lane is text-to-video and mints no stills, but a
+PRESENT one, which is all `_require` asks. Every unit test of the import
+asserted what gets CLEARED. None asserted what must SURVIVE, and the failure
+only surfaces at mux time at the very end of a real render.
+
+**The fix.** `image_engines` comes out of the volatile list. Carrying it forward
+is the correct value rather than a stale one: the replay shows the imported
+stills, so the engines that made them are exactly the source's engines. The
+constant now carries the rule it violated -- every member must be something the
+replay actually re-stamps -- and the live leg's own evidence that the other six
+are (`render_engines`, `render_trace`, `render_trace_version`, `phase_ms`,
+`audio_motion_profile` and `paths` were all rebuilt; `video_readiness` is a
+freeze-cascade diagnostic nothing requires).
+
+**Coverage.** `tests/test_canonical_replay.py::test_the_replay_keeps_every_receipt_the_credits_roll_requires`
+pins the whole requirement SET the credits roll demands -- `episode_title`,
+`visual_style`, `image_engines`, `music_engine`, `source_bank` -- not the single
+key, because the next member added to the volatile list would fail identically.
+Proven to catch it: re-inserting `image_engines` into the list makes the test
+fail, removing it makes it pass.
+
+**Bug Bible:** candidate -- "a 'clear the previous run's telemetry' list must
+contain only keys the new run actually re-stamps; test what SURVIVES a clone,
+not only what is cleared, or a required receipt goes missing at the last step of
+a long job." Verify condition is automatable (the new test is the pattern).

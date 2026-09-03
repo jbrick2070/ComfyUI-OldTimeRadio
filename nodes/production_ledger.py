@@ -524,9 +524,27 @@ def get_ledger() -> "Ledger":
 REPLAY_MANIFEST_NAME = "manifest.json"
 REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
 #: Sections and meta keys the replay must not carry over from the source run.
+#: Meta a replay REMAKES for itself, so carrying the source's copy would
+#: publish the previous run's telemetry as if it described this one.
+#:
+#: EVERY MEMBER MUST BE SOMETHING THE REPLAY ACTUALLY RE-STAMPS, and that is the
+#: whole rule (learned on the first live replay, 2026-09-03). `image_engines`
+#: was in this list and had to come out: the credits roll REQUIRES it
+#: (`otr_credits_roll._require(meta, "image_engines", "meta")`), and the only
+#: thing that stamps it is `OTR_ImageGenDispatcher` -- which a replay does not
+#: run, because a replay IMPORTS the source's stills instead of minting new
+#: ones. So clearing it guaranteed a `CreditsDataError` at mux time on every
+#: replay: eight clips rendered, sixteen minutes spent, and nothing published.
+#:
+#: Carrying it forward is not a stale value, it is the CORRECT one. The replay
+#: shows the imported stills, so the engines that made them are exactly the
+#: source's engines. (Verified on that live leg: the other six members --
+#: `render_engines`, `render_trace`, `render_trace_version`, `phase_ms`,
+#: `audio_motion_profile`, `paths` -- were all rebuilt by the replay, and
+#: `video_readiness` is a freeze-cascade diagnostic that nothing requires.)
 _REPLAY_RUN_VOLATILE_META = (
     "render_engines", "render_trace", "render_trace_version", "phase_ms",
-    "video_readiness", "audio_motion_profile", "image_engines", "paths",
+    "video_readiness", "audio_motion_profile", "paths",
 )
 
 

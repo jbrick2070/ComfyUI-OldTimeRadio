@@ -53,6 +53,11 @@ def _make_episode(root: Path, ep_id="signal_lost_frozen_20260902_000000", with_p
                  "cast_lock_revision": 3, "video_revision": 2, "technical_model": "google/gemma-4-E2B-it",
                  "visual_style": "anime", "render_engines": {"histogram": {"x": 1}},
                  "render_trace": [{"shot_id": "old"}], "phase_ms": {"a": 1},
+                 # the receipts `otr_credits_roll` requires at mux time -- the
+                 # fixture carries them so a replay that drops one is caught
+                 # here rather than sixteen minutes into a real render
+                 "image_engines": {"by_role": {}, "image_revision": 1},
+                 "music_engine": "musicgen", "source_bank": "media_archive",
                  "paths": {"stills_dir": str(ep / "stills")}},
         "images": {"image_revision": 1, "images": [
             {"image_id": "i1", "kind": "scene_beat", "path": str(still), "pool_path": str(still),
@@ -169,6 +174,36 @@ def test_import_replay_bundle_clones_into_a_new_workspace(frozen):
     # durable on disk, with the planned section preserved
     on_disk = json.loads(Path(led.path).read_text(encoding="utf-8"))
     assert on_disk["video"]["shots"][0]["shot_id"] == "shot_b001"
+
+
+def test_the_replay_keeps_every_receipt_the_credits_roll_requires(frozen):
+    """PBUG-20260903-01: eight clips rendered and NOTHING published.
+
+    `import_replay_bundle` cleared `meta.image_engines` as run-volatile, but the
+    only thing that stamps it is `OTR_ImageGenDispatcher`, which a replay does
+    not run -- a replay IMPORTS the source's stills instead of minting new ones.
+    So `otr_credits_roll` raised `CreditsDataError: required credits receipt
+    missing: meta.image_engines` at mux time, after sixteen minutes of render
+    and eight good clips on disk.
+
+    Carrying it forward is the CORRECT value, not a stale one: the replay shows
+    the imported stills, so the engines that made them are the source's engines.
+
+    This pins the whole requirement SET rather than the one key, because the
+    next member added to the volatile list would fail exactly the same way, and
+    the failure only surfaces at the very end of a real render.
+    """
+    led = PL.import_replay_bundle(str(frozen["bundle"]))
+    meta = led.data["meta"]
+    # `otr_credits_roll` calls `_require(meta, key, "meta")` on each of these,
+    # which refuses None, "", {} and [].
+    for key in ("episode_title", "visual_style", "image_engines",
+                "music_engine", "source_bank"):
+        assert meta.get(key) not in (None, "", {}, []), key
+    # and the genuinely run-volatile ones are still cleared, because the replay
+    # rebuilds every one of them for itself
+    for key in ("render_engines", "render_trace", "phase_ms"):
+        assert key not in meta, key
 
 
 def test_two_imports_get_two_workspaces(frozen):
