@@ -1147,6 +1147,17 @@ the story's own title -- and the operator's eye on the triptychs. Stop rules sta
 D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
 and keeps the plate ends E1 (next arm the E2 probe).
 
+**Operator, 2026-09-02 20:45: "of course I'm really more interested in video art or
+recursive fractal, or both if they are separate."** They are separate packs (`video_art`,
+`recur_frac`), and they are the two LONGEST packs in the registry -- the ones the shipping
+lane's two-word cue serves worst and the ones the peer's full-language plate is built for
+(recur_frac's plate reduces to its positive_tail under the 320-char ceiling; the receipt shows
+what survived). Tonight's GPU chain leads with them on BOTH lanes: after the instrument's
+replay proof, four adapter legs (video_art and recur_frac at the shipped 0.5 and the
+contender 0.25), then the still-in probe on video_art, then on recur_frac. Anime and
+storybook_engraving probes follow on a later night. His eye on those two styles is the
+verdict that matters most to him; the per-style rule stands for the rest.
+
 ## SECTION 6 -- Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite
