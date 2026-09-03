@@ -98,7 +98,7 @@ represents a real risk, we would rather change the code -- please tell us which.
 So a pack flagged for shelling out to ffprobe was reviewed by hand and
 activated, with the reason recorded on the version. That is the same finding
 class as our largest subprocess group and the same remedy we are asking for. We
-are not requesting a new policy or an exception — only the review that this
+are not requesting a new policy or an exception -- only the review that this
 process already provides.
 
 (Checked live on 2026-09-03 via
