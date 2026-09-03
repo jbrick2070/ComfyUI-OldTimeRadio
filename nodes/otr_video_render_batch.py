@@ -392,6 +392,47 @@ class OTRVideoRenderBatch:
     OUTPUT_NODE = True
 
     @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Make the PROMPT COMPOSER part of this node's cache identity.
+
+        ComfyUI caches a node's result on its inputs alone, and this node had no
+        ``IS_CHANGED`` at all -- so a session that stayed resident across a code
+        change would re-serve the clips it rendered under the OLD composer for
+        an unchanged ledger, while the new code sat loaded and unused. That is
+        invisible in every log: the run reports success and publishes the wrong
+        arm. It matters most on exactly the run this exists for, a same-seed A/B
+        where both arms submit a byte-identical ledger and differ only in the
+        code that turns it into prompts.
+
+        A headless leg resets the server per section 4 and never hits this;
+        a GUI session after a node reload does. Returning the composer version
+        alongside a digest of the inputs costs nothing and closes it in both.
+
+        THE WHOLE INPUT IS HASHED, never a prefix: ``patched_ledger_json`` is a
+        full episode ledger whose first kilobytes are metadata, so two different
+        episodes can share a long identical opening and a truncated key would
+        throw away exactly the part that differs.
+        """
+        import hashlib
+
+        try:
+            from ._otr_video_engines import ghost_signal_prompt as _gsp
+            version = str(_gsp.GHOST_PROMPT_VERSION_V3)
+        except Exception:  # noqa: BLE001 -- a cache key is never worth a crash
+            # ComfyUI calls this during graph validation. An unreadable version
+            # means a less precise cache key, never a broken graph, so it
+            # degrades to the inputs alone rather than raising.
+            version = "unknown"
+
+        digest = hashlib.sha256()
+        for key in sorted(str(k) for k in (kwargs or {})):
+            digest.update(key.encode("utf-8", "replace"))
+            digest.update(b"=")
+            digest.update(str(kwargs[key]).encode("utf-8", "replace"))
+            digest.update(b";")
+        return "%s|%s" % (version, digest.hexdigest())
+
+    @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {

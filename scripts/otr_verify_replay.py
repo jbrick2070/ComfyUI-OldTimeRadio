@@ -14,6 +14,14 @@ Checks, and exits non-zero on the first that fails:
      given, their traces agree row for row on ``seed`` and ``actual_request_sha`` (the A/A
      null: identical by construction);
   6. a source trace, when present, is compared to the replay's on ``seed`` per shot.
+
+``--ab`` reads the two replays as an A/B PAIR instead: the same frozen episode composed by two
+PROMPT VERSIONS. Then the seeds and the planned request hashes must still match exactly -- the
+seed is derived from ``render_request_hash``, which mixes brief, cast, beat and character and
+has never included the prompt -- while the prompt text and ``actual_request_sha`` must DIFFER,
+because two arms that composed the same text tested nothing. The plate rule stays on the A/A
+path only: an A/B legitimately mints a different plate, since the plate follows the prompt.
+
 Prints a one-line verdict per check and a table of per-shot seeds.
 """
 from __future__ import annotations
@@ -69,6 +77,17 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source")
     ap.add_argument("replays", nargs="+")
+    ap.add_argument(
+        "--ab", action="store_true",
+        help=("Read two replays as an A/B PAIR rather than an A/A pair. The "
+              "default rule requires both replays to agree on the seed AND the "
+              "actual request sha; a prompt-version experiment agrees on the "
+              "seed and DIFFERS on the sha by design, so run as-is it would "
+              "report FAIL on a correct experiment. Under --ab the seeds and "
+              "planned request hashes must still match exactly -- that is what "
+              "makes it an honest comparison -- and the prompt text and its "
+              "sha must differ, because two arms that composed the same text "
+              "did not test anything."))
     args = ap.parse_args(argv)
     src = load_ledger(args.source)
     reps = [load_ledger(r) for r in args.replays]
@@ -101,7 +120,45 @@ def main(argv=None) -> int:
             diff = [r.get("shot_id") for r in rows
                     if by_shot.get((r.get("shot_id"), r.get("segment_index")), {}).get("seed") != r.get("seed")]
             ok &= check("%s seeds equal the source's per shot" % tag, not diff, ", ".join(map(str, diff[:4])))
-    if len(reps) >= 2:
+    if args.ab and len(reps) < 2:
+        # A FLAG THAT DID NOTHING MUST SAY SO. Silently skipping the whole A/B
+        # section would print a clean PASS for a run that never compared
+        # anything, which is the one failure mode a proof tool may not have.
+        ok &= check("A/B: --ab needs TWO replays to compare (%d given)"
+                    % len(reps), False)
+    if len(reps) >= 2 and args.ab:
+        # A/B: the SAME episode composed by two prompt versions. The seed is
+        # derived from `render_request_hash`, which mixes the brief, the cast,
+        # the beat and the character and has never included the prompt -- so a
+        # composer change moves the text and leaves the seed alone, and that is
+        # exactly the pair this mode asserts.
+        a, b = trace(reps[0]), trace(reps[1])
+        aligned = len(a) == len(b) and bool(a)
+        ok &= check("A/B: both arms rendered the same shots (%d vs %d)"
+                    % (len(a), len(b)), aligned)
+        if not aligned:
+            # THE PER-SHOT LINES ARE SKIPPED, NOT ZIPPED. `zip` stops at the
+            # shorter trace, so running them anyway would print three PASSes
+            # computed over a prefix while the arms disagree on how many shots
+            # they even rendered -- the verdict would be right and every line a
+            # reader skims would be wrong.
+            print("  (per-shot A/B checks skipped: the traces are different "
+                  "lengths, so any per-shot verdict would be computed over a "
+                  "prefix)")
+        else:
+            seed_diff = [x.get("shot_id") for x, y in zip(a, b)
+                         if x.get("seed") != y.get("seed")]
+            ok &= check("A/B: seeds identical per shot", not seed_diff,
+                        ", ".join(map(str, seed_diff[:4])))
+            same_text = [x.get("shot_id") for x, y in zip(a, b)
+                         if str(x.get("text_prompt") or "") == str(y.get("text_prompt") or "")]
+            ok &= check("A/B: every shot's prompt actually differs", not same_text,
+                        ", ".join(map(str, same_text[:4])))
+            same_sha = [x.get("shot_id") for x, y in zip(a, b)
+                        if x.get("actual_request_sha") == y.get("actual_request_sha")]
+            ok &= check("A/B: request shas differ (the prompt is causal)",
+                        not same_sha, ", ".join(map(str, same_sha[:4])))
+    elif len(reps) >= 2:
         a, b = trace(reps[0]), trace(reps[1])
         same = len(a) == len(b) and all(
             x.get("seed") == y.get("seed") and x.get("actual_request_sha") == y.get("actual_request_sha")
