@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.16"
+version = "2.0.0-alpha.17"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -42,16 +42,45 @@ dependencies = [
     # Not installable on Python 3.13 (numpy==1.26.4 pin on 0.7.16; Requires-
     # Python <3.13 on every newer kokoro/misaki). Mirrors requirements.txt.
     "kokoro>=0.7.16; python_version < '3.13'",
+    # The SAME kokoro voices on Python 3.13, through ONNX Runtime instead of
+    # torch. The engine stays "kokoro" in every dropdown and selects the torch
+    # package when that imports, kokoro-onnx otherwise, so the two markers are
+    # COMPLEMENTARY: each interpreter gets exactly one backend. The upper bound
+    # is real -- kokoro-onnx 0.6.x declares Requires-Python <3.14, and a bare
+    # line would repeat PBUG-20260901-04 the day ComfyUI ships 3.14, because pip
+    # resolves a requirement set all-or-nothing. Landed in code on 2026-09-02
+    # and unreachable from a registry install until this line existed.
+    "kokoro-onnx>=0.6.1; python_version >= '3.13' and python_version < '3.14'",
     # pyloudnorm is imported by scene_sequencer to master every episode to
     # -14 LUFS. Its import is try/except with a deliberate fallback, so a
     # missing install does not crash -- it quietly ships a differently
     # mastered, quieter episode and says so only in one warning line. That
     # silence is why it went unnoticed for so long.
     "pyloudnorm>=0.1.1",
-    # Imported by shipped nodes, declared only in requirements.txt until now
-    # (2026-09-01 ship audit: pycairo unguarded in scope_draw.py and
-    # eng_viz_mandala.py; Pillow 16 unguarded sites; aiohttp in __init__.py).
-    "pycairo>=1.24",
+    # Imported by shipped nodes, declared only in requirements.txt until
+    # alpha.16 (Pillow 16 unguarded sites; aiohttp in __init__.py).
+    #
+    # pycairo is WINDOWS-ONLY as of alpha.17, and the reason is this card's
+    # node count. pycairo publishes 21 Windows wheels, 1 sdist and zero Linux
+    # wheels, so on Linux pip must build from source against libcairo2-dev.
+    # Comfy-Org's node-pack-extract boots a headless CPU ComfyUI in a Linux
+    # container under `set -e`, installs this pack's requirements, and reads
+    # /object_info to publish the node list that Algolia renders as "N Nodes";
+    # the build failure killed that boot, which is why
+    # /versions/2.0.0-alpha.16/comfy-nodes returns
+    # {"comfy_nodes": null, "totalNumberOfPages": 0} while a working pack
+    # returns rows. That extractor is independent of Flagged/Active status.
+    #
+    # Measured cost: one function. The only `import cairo` in scope_draw.py is
+    # inside `paint_mandala`, so importing the module never imports cairo, and
+    # freq_bars_green / cfr_flags / find_ffmpeg / encode_silent_mp4 are all
+    # cairo-free -- scope overlays, caption burn, silent composite and encode
+    # sink are untouched. eng_viz_mandala guards load() and assert_usable() and
+    # raises EngineUnusable naming the pip command, and viz_mxc_mandala appears
+    # zero times in workflows/otr_canonical.json. The Linux pod keeps the engine
+    # because scripts/otr_pod_provision.sh apt-installs the headers and then
+    # pip-installs pycairo explicitly.
+    "pycairo>=1.24; sys_platform == 'win32'",
     "pillow>=10.0",
     "aiohttp>=3.9",
 ]
