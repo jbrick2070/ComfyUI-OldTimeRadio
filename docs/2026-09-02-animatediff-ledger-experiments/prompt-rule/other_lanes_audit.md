@@ -142,3 +142,39 @@ face in the text buys nothing and, on `wan_ti2v`, costs the camera clause.
 
 **None of this is done yet, and none of it should be until Half A has been seen
 on screen.** The measurement is the deliverable; the change follows the eye.
+
+---
+
+## 7. AMENDMENT (r3, Cursor) -- the driver's reasoning in section 5 was too broad
+
+Section 5 argued that `include_appearance=False` on the foley and mime lanes
+generalises to every silent image-to-video lane, on the grounds that the
+conditioning still already carries identity. **The reviewer corrected that, and
+the correction is right.**
+
+Those two lanes drop the appearance leaf because their JOINT LATENT SPEAKS THE
+PROMPT -- a `character_description` opening "30s, Queen of the Fairies" rendered
+a woman saying *"Queen of the Fairies"* out loud, live, on 2026-08-28
+(`eng_ltx25.py:2547-2560`). Redundancy was the second reason given, not the
+first, and the silent lanes were deliberately left alone at the time:
+`compose_ltx25_video` calls `_ltx25_parts(inputs)` with the default
+`include_appearance=True` (`eng_ltx25.py:2698`), and `ltx_video` restates the
+look because its text-to-video path is real (`eng_ltx_video.py:1903-1906`).
+
+**So item 3b is amended: ADD a crux clause beside `appearance` on the silent
+image-to-video lanes; do not DROP `appearance` there on redundancy alone.** The
+gain the operator asked for -- *"real action and motion that applies to the
+action at hand"*, *"more story, not just the characters"* -- comes from adding
+the story, not from deleting the face.
+
+**The one place something still has to give is `wan_ti2v`**, and that finding
+stands on its own evidence: its prompt is hard-capped at 100 words and truncated
+mid-sentence past it (`eng_wan_ti2v.py:1371`, `:1395-1398`), and the appearance
+leaf measured 83 words on the last published episode. There is no room to add a
+crux clause without dropping something, so that lane needs a decision rather
+than an addition. Nothing in this audit proposes one yet.
+
+**Lanes that keep the face paragraph unconditionally**, per the reviewer and
+confirmed against the registry: `minimax_h3_audio_in`, all four HuMo binders,
+`ltx_audio_in` -- the audio-in families, whose subject IS the face -- plus the
+two Google text-to-video lanes, which have no conditioning still at all.
