@@ -788,6 +788,39 @@ beat he actually complained about.
 
 Design record: `kibitz-runs/2026-09-03-prompt-v3-half-b/` (5080-local).
 
+**THE PROMPT FORMULA, IN HIS OWN WORDS (same ruling, 2026-09-03):**
+
+> *"visual style - key objects per beat story - + movement"*
+
+and, on the AnimateDiff lane specifically:
+
+> *"animate[diff] need to focus on the objects discussed and be sure they are in
+> the visual style (anime, storybook). That's what we should spend our precious
+> prompt char limits for."*
+
+**AND THE BUDGET IS NOT ACTUALLY SCARCE, WHICH CHANGES HOW TO READ THAT.**
+Measured: `GHOST_AUTHOR_TOKEN_TARGET = 69` against a 77-token CLIP window, and
+the Half A A/B measured live v3 prompts at **32.9 tokens** (v2 was 40.2). So
+roughly HALF the budget is unused on every beat and the drop ladder essentially
+never fires. All three of his priorities are already present today -- `pack_cue`
+(the style) and the kernel's subject noun are not in `GHOST_V3_DROP_ORDER` at all
+and cannot be dropped, and `motion` survives because nothing is being trimmed.
+What is missing from his formula is only the **per beat** part, which is exactly
+what Half B adds.
+
+**THE TRAP THAT CREATES, and Half B must close it in the same change:**
+`GHOST_V3_DROP_ORDER = ("light", "motion", "vantage", "kernel_setting")` --
+**`motion` is the SECOND thing dropped.** That is harmless today because the
+ladder never runs, but Half B adds a per-beat object clause, prompts grow, and
+the ladder may fire for the first time. At that moment the current order deletes
+movement before framing, which directly contradicts the ruling above. Reorder it
+WITH Half B, not speculatively before it.
+
+*Do not re-measure the token headroom on CPU: the fitter's measure is `None`
+without the real CLIP tokenizer, so an off-GPU run reports zero drops and 100%
+motion regardless of the constant, which looks like a clean result and is an
+artifact. The tokenizer needs a real device.*
+
 ## A BLOCKING DEPENDENCY IS A CLAIM, NOT A VERDICT -- CHECK UP A LEVEL (operator ruling 2026-08-28)
 
 **Operator, in his words:** *"it should check up a level -- if it says we
