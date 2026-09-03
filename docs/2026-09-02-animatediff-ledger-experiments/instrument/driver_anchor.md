@@ -507,7 +507,8 @@ node 7 / node 62 / the link counter and fired, as designed, on the additive edit
 `test_google_video_sfx_workflow` (`last_link_id` 288 -> 289), and two in `test_ltx25_foley_bed`
 (`video_policy_json` is second to last on the assembler, `replay_descriptor` last). The pins
 were moved with dated notes, re-run green (38 passed), and the full suite re-run on the fixed
-tree is the receipt recorded below when it lands. The three worktree-only artefacts of 13.4
+tree (dc4beea5) is the receipt: **12921 passed, 122 skipped, 1 xfailed, 0 failed in 10:19**
+(summary line read from the run file, not inferred). The three worktree-only artefacts of 13.4
 did not reproduce in the main checkout.
 
 ### 13.6 Finished-diff review
