@@ -1316,3 +1316,31 @@ front of the writer, which is where his motion rule lands); then item 3b on the
 other lanes as amended. The first thing to tune if the pictures read as busy is
 the LIGHT slot -- his own rewrites carry three units where v3 carries four, and
 the light is already first in the drop order.
+
+**THE TWO STYLE LEGS LANDED (2026-09-03 01:42).** Fresh 1-act episodes on the two
+packs the operator asked about, both `RESULT SUCCESS`, both verified as real
+full-length episodes rather than trusted on their exit code:
+
+* **The Strain of a Sleeve** -- `video_art`, public_domain, 8 clips, 100.2s, 118.5 MB.
+  *"video-art feedback style. a spinning turntable in the riverbank, a low
+  shimmer moving on it, lit against the dark, the light moving"*
+* **The Weight of Grief** -- `recur_frac`, scifi_news_pro, 25 clips, 247.3s, 339.1 MB.
+  *"recursive fractal light field. a bakelite radio set in the clinical
+  laboratory, fluorescent hum, turning a slow quarter and stopping, the object
+  large in the frame"*
+
+Both carry their pack cue, both draw the story's own `key_objects`, and both
+titles came from the story -- no harness label reached a title card.
+
+**FIVE FILES ARE IN `otr/obs/` AND TWO OF THEM ARE THE KNOWN-BROKEN ONES.** The
+7.9 MB `..._231401` and `..._233738` are the PBUG-20260903-02 and -03 casualties:
+one second of picture each. They are LEFT IN PLACE deliberately -- nothing is
+swept out of obs -- but they are named here so nobody opens one and concludes
+Prompt v3 is broken. **The v3 arm to watch is `..._235930`, 146.8 MB.**
+
+**One wart worth a line, not a fix tonight.** The kernel joins subject and place
+with a fixed `"in the"`, which reads correctly almost everywhere and awkwardly on
+a few settings ("a spinning turntable **in the** riverbank"). The operator's own
+rewrites vary the preposition ("at a reservoir", "in a large water reservoir").
+A small per-setting preposition choice would fix it; it is cosmetic and it waits
+for his eye on the pictures first.
