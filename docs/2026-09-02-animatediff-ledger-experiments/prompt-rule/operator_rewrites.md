@@ -56,6 +56,10 @@ just the ones he skipped.
    keep it real simple and think how do we mix the visual style with the crux of the subject
    in the story -- where even maybe if it's not being specifically mentioned in the beat."*
    The episode's central subject threads every beat, whether or not that beat's line names it.
+10. **The one-line version, after reading round one** (2026-09-02, late): *"yes, I want to
+    see more STORY, not just the characters."* The picture under a beat is the story
+    happening -- the world, the thing, the motion -- with people in it where the story puts
+    them, never the cast as the subject.
 9. **No costume or figure the dialogue never mentions**, verbatim: *"but definitely not some
    coat or figure that is not even mentioned in the dialogue -- unless the story is about a
    stolen coat and bag, then it's OK."* A prop or a garment earns its place only when the story
