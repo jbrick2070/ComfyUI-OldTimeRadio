@@ -158,7 +158,25 @@ wrong picture, a leg that dies late).
   live at exactly the token count predicted on CPU, 32.9 tokens against v2's 40.2.
   Operator verdict on the video_art leg: "surprisingly good... it's about Huckleberry Finn
   and there's actually a river!"
-  **HALF B, still open:** subject-appropriate motion needs the beat's own dialogue in front
+  **HALF B -- THE OPERATOR RULED ITS SHAPE 2026-09-03 AND r1 INVERTED ITS
+  MOTIVATING CASE. Read `docs/OTR_STANDING_RULINGS.md` "THE BEAT'S SUBJECT IS A
+  PHYSICAL ARTIFACT" before touching this.** In short: extend the EXISTING batched
+  Ghost author with the beat's dialogue (never a second pass), and have it name a
+  PHYSICAL ARTIFACT of the story, preferring one the beat refers to -- never an
+  abstraction and never a noun the dialogue mentions only to say it is absent.
+  **The truck must NOT be drawn:** "this isn't just some dusty list of truck
+  routes" is a rhetorical negative, Ellie is holding a ledger in an archive, and
+  the r1 panel caught that the item's own worked example had been read backwards.
+  The residual defect is that `resolve_crux_kernel` picks
+  `objects[ordinal % len(objects)]`, so the beat about the ledger drew `pen`
+  because it was the third row. r1 also corrected three inherited claims: the
+  render batch DOES have `IS_CHANGED` now, replay returns before the author runs
+  (so a migration needs an explicit seam at the replay boundary, not a version
+  check in the author), and the beat's own `text` projection is the accessor --
+  not a `_ghost_line_index` join, which silently misses synthesized beats. r2 is
+  running; records in `kibitz-runs/2026-09-03-prompt-v3-half-b/`.
+  **The old framing, kept only so a reader of the history understands what
+  changed:** subject-appropriate motion needs the beat's own dialogue in front
   of the writer -- Half A buys the story's object, place and light on every beat and cannot
   buy its motion. He named the gap himself on the ledger episode: "I don't see any trucks
   though, it does mention a truck once" -- `truck` is in one spoken line and not in

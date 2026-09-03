@@ -738,6 +738,56 @@ not exist in this document and windows answered from the prose paragraph beneath
 it instead. Seven rungs are now recovered from `ed8d5a6d` and refreshed to
 current fact; see the note directly under that table for exactly what changed.
 
+## THE BEAT'S SUBJECT IS A PHYSICAL ARTIFACT, NEVER THE DIALOGUE'S FLUFF (operator ruling 2026-09-03 -- hard, and it settles Prompt v3 Half B)
+
+Asked whether Half B should be closed, built deterministically, or built by
+extending the batched Ghost author with the beat's dialogue, the operator chose
+to extend -- with the constraint that IS the design:
+
+> *"extend, but I don't want all the fluff from dialogue. It should focus around
+> the PHYSICAL ARTIFACTS in the story, and especially if referred to in the beat."*
+
+**Three rules, and they are not the same rule:**
+
+* **The subject is a PHYSICAL ARTIFACT of the story world** -- a thing that could
+  be photographed. Never an abstraction ("the heartbeat of an entire community",
+  "stewardship", "the risks"), never an emotion, never an event.
+* **Beat reference RANKS candidates; it is not the source.** "Especially if
+  referred to in the beat" is a strong preference, and it does not license lifting
+  whatever noun the beat happens to contain.
+* **No fluff, and the worked case is a NEGATION.** A noun the dialogue mentions
+  only to say it is ABSENT is not an artifact of the scene.
+
+**THE CASE THAT MOTIVATED THE ITEM IS THE CASE THAT MUST NOT BE DRAWN, and this
+is worth reading twice because the operator's own first instinct and the driver's
+anchor both had it backwards.** On
+`signal_lost_the_municipal_ledger_20260721_020231` he said *"I don't see any
+trucks though, it does mention a truck once"*. The line in full:
+
+> "Look at these numbers, Maurice. **This isn't just** some dusty list of truck
+> routes and coal tonnages; it's the heartbeat of an entire community."
+
+Ellie is holding a LEDGER in an ARCHIVE. There is no truck in the scene -- the
+truck exists only inside a rhetorical negative about what the ledger is not. A
+dialogue-noun extractor draws a coal truck into an archive drama here, and radio
+dialogue is full of the same shape: "this isn't a game", "spill the beans", "a
+caged bird". Caught by the Antigravity lane in the Half B r1 round, grounded
+against the real ledger, and it inverted the item.
+
+**The residual defect is real and different.** `resolve_crux_kernel` picks
+`objects[ordinal % len(objects)]` -- the subject is chosen by the beat's POSITION
+in the episode, not its content -- so the beat about the ledger drew `pen`, purely
+because it was the third row. Swap two beats and the pictures swap with them.
+
+**Measured, so nobody re-derives it:** across 339 episodes and 3,643 beats with
+text, the dialogue names one of the episode's own `key_objects` on 26.3% of beats
+and 29.5% of character beats. That is the ceiling of any purely deterministic
+fix, and it is why the deterministic option was offered and NOT chosen -- it
+cannot reach b002, whose dialogue names no listed object at all, and b002 is the
+beat he actually complained about.
+
+Design record: `kibitz-runs/2026-09-03-prompt-v3-half-b/` (5080-local).
+
 ## A BLOCKING DEPENDENCY IS A CLAIM, NOT A VERDICT -- CHECK UP A LEVEL (operator ruling 2026-08-28)
 
 **Operator, in his words:** *"it should check up a level -- if it says we
