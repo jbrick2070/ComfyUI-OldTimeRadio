@@ -549,36 +549,48 @@ try:
         except Exception:  # noqa: BLE001
             return {}
 
-    @_otr_PS2.instance.routes.post("/otr/video_render_single")
-    async def _otr_video_render_single(request):
-        body = await _otr_body(request)
-        from .nodes._otr_video_engines import render_driver as _rd
-        assets = {"init_image": body.get("portrait", ""),
-                  "audio_ref": body.get("audio", "")}
-        engine = str(body.get("engine", "humo"))
-        fc = int(body.get("frame_count", 33))
-        path = _otr_run_render_async(
-            "single_%s.json" % engine,
-            lambda: _rd.render_single(engine, assets=assets, frame_count=fc))
-        return _otr_web2.json_response({"started": True, "report_path": path})
+    # UNAUTHENTICATED-SIDE-EFFECT GATE (registry manual review draft,
+    # docs/2026-09-02-registry-manual-review-request.md, option (a)). These two
+    # POST routes read caller-supplied file paths out of an unauthenticated JSON
+    # body and start a background render thread -- the same shape the registry
+    # banned another pack for under policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT.
+    # Nothing that ships calls them; they are a hand-built GPU-gate harness for
+    # the operator to poll during dev. Default OFF so a registry install
+    # registers only the read-only ledger GET above; the operator opts in.
+    if _otr_ro.environ.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1":
+        @_otr_PS2.instance.routes.post("/otr/video_render_single")
+        async def _otr_video_render_single(request):
+            body = await _otr_body(request)
+            from .nodes._otr_video_engines import render_driver as _rd
+            assets = {"init_image": body.get("portrait", ""),
+                      "audio_ref": body.get("audio", "")}
+            engine = str(body.get("engine", "humo"))
+            fc = int(body.get("frame_count", 33))
+            path = _otr_run_render_async(
+                "single_%s.json" % engine,
+                lambda: _rd.render_single(engine, assets=assets, frame_count=fc))
+            return _otr_web2.json_response({"started": True, "report_path": path})
 
-    @_otr_PS2.instance.routes.post("/otr/video_render_soak")
-    async def _otr_video_render_soak(request):
-        body = await _otr_body(request)
-        from .nodes._otr_video_engines import render_driver as _rd
-        assets = {"init_image": body.get("portrait", ""),
-                  "audio_ref": body.get("audio", "")}
-        beats = int(body.get("beats", 40))
-        oom = int(body.get("oom_index", 20))
-        fc = int(body.get("frame_count", 25))
-        path = _otr_run_render_async(
-            "soak_report.json",
-            lambda: _rd.run_gpu_soak(n_beats=beats, oom_index=oom,
-                                     frame_count=fc, assets=assets))
-        return _otr_web2.json_response({"started": True, "report_path": path})
+        @_otr_PS2.instance.routes.post("/otr/video_render_soak")
+        async def _otr_video_render_soak(request):
+            body = await _otr_body(request)
+            from .nodes._otr_video_engines import render_driver as _rd
+            assets = {"init_image": body.get("portrait", ""),
+                      "audio_ref": body.get("audio", "")}
+            beats = int(body.get("beats", 40))
+            oom = int(body.get("oom_index", 20))
+            fc = int(body.get("frame_count", 25))
+            path = _otr_run_render_async(
+                "soak_report.json",
+                lambda: _rd.run_gpu_soak(n_beats=beats, oom_index=oom,
+                                         frame_count=fc, assets=assets))
+            return _otr_web2.json_response({"started": True, "report_path": path})
 
-    print("[OldTimeRadio] HTTP routes registered: POST /otr/video_render_single,"
-          " POST /otr/video_render_soak")
+        print("[OldTimeRadio] HTTP routes registered: POST /otr/video_render_single,"
+              " POST /otr/video_render_soak")
+    else:
+        print("[OldTimeRadio] HTTP render routes disabled (set "
+              "OTR_ENABLE_HTTP_RENDER_ROUTES=1 to enable the GPU-gate harness)")
 except Exception as _otr_render_route_err:
     print(f"[OldTimeRadio] render route registration skipped: {_otr_render_route_err}")
 

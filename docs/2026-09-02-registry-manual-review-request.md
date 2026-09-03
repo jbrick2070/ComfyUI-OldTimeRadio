@@ -12,17 +12,20 @@ Context for whoever files it: every open "Manual review request" on that tracker
 is unanswered, but admin batch approvals do happen silently (`"Batch approved by admin"` in the
 API's `status_reason`), so the issue is the only lever there is. Keep it factual and short.
 
-**DECISION BEFORE FILING (operator).** `__init__.py` registers two unauthenticated POST routes,
-`/otr/video_render_single` and `/otr/video_render_soak`: a JSON body picks the engine and the
-portrait / audio file paths and a render thread starts. That is the class the registry banned
-comfyui-easyuse-anima 1.1.2 for (`policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT`), and the 09-01 ship
-audit (registry-flag-04) refuted them only as the CAUSE of the flag, leaving their merit open.
-Nothing that ships calls them; they are a hand-built GPU-gate harness. Options, best first:
-(a) stop registering them on a registry install (gate behind `OTR_ENABLE_HTTP_RENDER_ROUTES=1`,
-default off, so only the read-only ledger GET is registered), then say so in the Boundaries
-bullet below; (b) file as-is with the disclosure below and accept the ban risk. Never file
-without the disclosure: a reviewer who greps `routes.post` after reading "no routes" is done
-with us.
+**OPTION (a) LANDED 2026-09-03.** `__init__.py` used to register two unauthenticated POST
+routes, `/otr/video_render_single` and `/otr/video_render_soak`, unconditionally: a JSON body
+picked the engine and the portrait / audio file paths and a render thread started. That is the
+class the registry banned comfyui-easyuse-anima 1.1.2 for (`policy-v0.2:
+UNAUTHENTICATED_SIDE_EFFECT`), and the 09-01 ship audit (registry-flag-04) refuted them only as
+the CAUSE of the flag, leaving their merit open. Nothing that ships calls them; they are a
+hand-built GPU-gate harness. Both routes are now registered only when
+`OTR_ENABLE_HTTP_RENDER_ROUTES=1` is set (default off), so a registry install registers only the
+read-only ledger GET. Proven both ways -- exec'd the real route-registration block against fake
+`server`/`aiohttp` modules, unset/`"0"` registers nothing, `"1"` registers exactly the two POST
+routes -- in `tests/test_http_render_route_gate.py`. The Boundaries bullet below already carries
+the post-fix wording. Still needs a version bump (next is alpha.17) and a push before this is
+true of what's actually published; alpha.16 on the registry right now still carries the
+unconditional routes.
 
 ---
 
@@ -77,9 +80,9 @@ TTS -> mix -> optional video), and the findings are its ordinary machinery:
 - HTTP routes, all in `__init__.py`: `GET` / `OPTIONS /otr/latest_ledger` returns the newest
   episode ledger JSON so a local dashboard can poll it (read-only). `POST /otr/video_render_single`
   and `POST /otr/video_render_soak` are a hand-built GPU test harness that starts a local render
-  from a JSON body; nothing that ships calls them. (If option (a) above landed, replace this
-  sentence with: they are registered only when `OTR_ENABLE_HTTP_RENDER_ROUTES=1` is set, so a
-  registry install exposes only the read-only ledger GET.)
+  from a JSON body; nothing that ships calls them. They are registered only when
+  `OTR_ENABLE_HTTP_RENDER_ROUTES=1` is set, so a registry install exposes only the read-only
+  ledger GET.
 - No telemetry. The only outbound traffic is the opt-in lanes above, to their documented vendors.
 - Output is written under ComfyUI's output directory (`otr/episodes`, `otr/obs`).
 
