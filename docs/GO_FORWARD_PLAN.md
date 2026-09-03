@@ -30,7 +30,9 @@ AND push + `HEAD == origin/v2.0-alpha`.
 **1. THE REGISTRY -- alpha.17 IS PUBLISHED AND VERIFIED (2026-09-03). Two SEPARATE goals
 live here and conflating them is what made this feel stuck: (a) an INSTALLABLE listing,
 which needs an admin approval we cannot self-serve, and (b) the "N Nodes" count on the
-card, which is a different pipeline entirely and which we have now fixed.** The old
+card, which is a different pipeline entirely -- and which, MEASURED 2026-09-03, is
+STALLED ON COMFY-ORG'S SIDE and is not ours to fix at all (see the ANSWERED block
+below; the newest successful extract in a 360-pack sample is 2026-04-28).** The old
 control experiment (republish alpha.8 byte-identical) is CANCELLED -- the cause was found
 directly instead.
 
@@ -68,11 +70,31 @@ directly instead.
   `otr_canonical.json`. The Linux pod keeps the engine because
   `scripts/otr_pod_provision.sh` apt-installs the headers and now pip-installs pycairo
   explicitly -- do NOT "simplify" that line away.
-  **WATCH FOR: does alpha.17 extract?** Re-check
-  `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes`. Non-null means
-  the theory was right and the card should show ~34 Nodes. Still null means something
-  else in the install also fails on Linux -- the next suspects are `kokoro`'s
-  spacy/thinc/blis chain against the 600 s extract timeout.
+  **ANSWERED 2026-09-03 18:30Z, AND THE ANSWER CLOSES (b) AS NOT-OURS. DO NOT CHASE
+  KOKORO.** The re-check ran: `/versions/2.0.0-alpha.17/comfy-nodes` is still `null`.
+  The paragraph that stood here read that as "something else in the install also fails
+  on Linux -- next suspects are `kokoro`'s spacy/thinc/blis chain against the 600 s
+  extract timeout". **That is wrong, and acting on it would have burned a coder window
+  on infrastructure we do not own.** It offered a binary -- our fix worked, or our
+  install still fails -- and omitted the third option, which is the true one.
+  `?include_status_reason=true` exposes a field the theory was built without:
+  **`comfy_node_extract_status`**, which has TERMINAL values (`success` and
+  `invalid_format` both observed). Measured across **360 registry packs**: only 64 have
+  ever recorded a `success`, and **the most recent successful extract ANYWHERE in that
+  sample is 2026-04-28**. rgthree (Active, 47 prior successes) has versions sitting
+  `pending` since 2026-05-09; kjnodes (Active, 24 successes) since 2026-05-05;
+  florence2 since 2026-05-06. **Comfy-Org's `node-pack-extract` has produced no
+  successful extract for any pack in over four months.** OTR records zero successes
+  because OTR's first publish was 2026-08-22 -- four months AFTER the pipeline last
+  worked. It never had a chance, and no `requirements.txt` change reaches it.
+  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits -- a package
+  publishing 21 Windows wheels and zero Linux wheels genuinely does not install in that
+  container -- and it is what makes a Linux `pip install -r requirements.txt` work at
+  all, extract pipeline or no. It simply was not the node-count blocker.
+  **Reproduce before re-opening this:** compare the newest `success` timestamp across a
+  broad pack sample against OTR's first publish date. If a pack ever extracts
+  successfully again, the question becomes live and OUR deps become worth re-testing;
+  until then the card's node count is not a work item.
 * **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** Active needs ZERO
   findings of any severity or an admin batch approval; 157 info-level YARA hits (env
   reads, ffmpeg subprocess, opt-in cloud lanes) keep it Flagged forever on the automated
