@@ -10616,3 +10616,94 @@ states the distinction explicitly: 05.14 is a bare except laundering an error
 into a plausible `None`; this is the case where the swallow is PERMANENT (the
 guarded call always raises on the target stack, so the fallback is the only path
 that has ever run) and changes a dimension something downstream measures.
+
+---
+
+## PBUG-20260903-04 -- the brief's identifier case reached the rendered prompt
+
+**Status:** FIXED 2026-09-03 (`adbe4003`). **Verified by:** the 1,955 episode
+ledgers in `otr/episodes/`, replayed through the real composer.
+
+**What happened.** `resolve_crux_kernel` joins the episode's `key_objects` and
+`story_brief_terms.setting` with `"%s in the %s"`, and neither side was ever
+normalised. Real episodes therefore composed and rendered:
+
+```
+archive_reels in the concrete_floors
+computer_screen in the petri_dish
+petri_dish in the petri_dish
+coffee cups in the sterile
+```
+
+**Measured, not estimated.** Running the real `resolve_crux_kernel` and
+`_setting_terms` over every episode on disk: **273 of 1,955 (14.0%)** carried at
+least one setting term that cannot be said out loud, and **8.2% of composed
+kernels named one**. `snake_case` was **690 of the 773** bad terms; a bare
+adjective ("sterile") was 32 and a bare participle ("smoldering") 51. Split by
+month, the rate ran 16.2% in June and 23.1% in July, then fell to ~3% in August
+when the writer changed -- so the defect was largely historical by the time it
+was found, which is why it is a normalisation and not a campaign.
+
+**Root cause, and it is not in the composer.** `_REFLECTION_PROMPT`
+(`nodes/_otr_story_brief.py`) asks the model for `"setting_terms": ["setting
+terms"]` and defines it nowhere, while every neighbouring field defines itself --
+`key_objects` are "concrete nouns the scene contains", `visual_palette` is
+"colors / textures". The model filled the undefined field with adjectives,
+objects and identifier case. Nothing downstream undid it.
+
+**The fix, in two places.** `_spoken_term` normalises both lists at render time
+(`archive_reels` -> `archive reels`), plus a tautology guard that drops the place
+when it equals the subject. Both prompt bodies now say what a setting term is.
+After: **0.9% of kernels**, `snake_case` eliminated.
+
+**Why render-time is safe.** `request_hash = _content_hash([brief_hash,
+cast_hash, beat_id, char_id])` -- the prompt is not in it, so no seed moves and
+the 273 affected episodes replay repaired.
+
+**Deliberately not fixed.** The 32 adjectives and 51 participles used as places.
+Every candidate remedy is either a word list or a change to the join form on all
+~27,000 beats; that is a design fork and it goes to the Prompt v3 Half B arc
+rather than being guessed at here.
+
+**Coverage.** 14 tests in `tests/test_ghost_prompt_v3.py` and
+`tests/test_story_brief_c5a1.py`, including one asserting no composed kernel of a
+real episode shape carries an underscore across every ordinal and mode.
+
+**Bug Bible:** candidate. The portable rule is about the SCHEMA, not the string:
+*a list field whose siblings each define themselves and which defines only itself
+will be filled with whatever the model felt like* -- and the consumer that joins
+it into user-visible output is where you find out.
+
+---
+
+## PBUG-20260903-05 -- the ledger viewer shipped to every installer without its server
+
+**Status:** FIXED 2026-09-03 (`adbe4003`). **Verified by:** the published CDN
+zip for 2.0.0-alpha.17, which contains `viewer/index.html`.
+
+**What happened.** `viewer/index.html` is tracked, was not excluded by
+`.comfyignore`, and therefore shipped in every registry bundle. It fetches
+`/ledger?latest=1`, `/list` and `/ledger?path=`.
+
+**Root cause.** The only thing in the repo that serves those three routes is
+`scripts/serve_ledger.py`, and the `scripts/*` rule added 2026-08-28 stopped
+shipping it. The pack's own registered route is `/otr/latest_ledger`
+(`__init__.py:448`) -- a DIFFERENT path -- and it is gated behind
+`OTR_ENABLE_HTTP_RENDER_ROUTES=1` besides. So on a registry install every one of
+the page's three fetches 404s. It has been a page that cannot work since the
+`scripts/*` exclusion landed.
+
+**The fix.** `.comfyignore` excludes `viewer/`. It stays in git for developers
+who run `serve_ledger.py` beside it. This does not fire a publish --
+`.comfyignore` is not `pyproject.toml` -- so it takes effect on the next version
+the operator chooses to cut.
+
+**Coverage.** `test_the_ledger_viewer_does_not_ship_without_its_server` pins the
+PAIR rather than the file: viewer and server ship together or not at all, so a
+future change that ships one must ship the other.
+
+**Bug Bible:** candidate. The portable rule: *when an exclusion rule removes a
+server, grep for its clients.* A bundling change that is correct about the file
+it names can still orphan a file it does not name, and neither a test suite nor
+an import graph sees it, because the coupling is an HTTP route rather than an
+import.
