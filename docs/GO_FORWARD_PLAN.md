@@ -1114,6 +1114,24 @@ coding, do your best" and to decide whether a blinded A/B is needed. The instrum
 render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
 attributable; the first three legs pre-date the merge and carry no trace.
 
+**Item 1 CLOSED by the operator's eye (2026-09-02, ~20:30), six of eight legs watched.**
+Storybook engraving: 0.5 (`the_last_reading_190630`) "very storybook and did the best of
+maintaining the style"; 1.0 (`the_trembling_ground_182739`) "cool rendered 3D realistic
+storybook stuff but drifted into the army men in green coats". Anime: 1.0 "more anime than
+0.0 but drifted into real-life stuff for a while"; 0.5 "some anime but some people in blue
+coats"; 0.25 "maybe the most anime"; 0.0 "definitely animation, not strikingly anime, but
+cool". His delegation: "if you think any of them are an improvement to the haunted we have,
+take your best take." TAKEN: **`ADAPTER_V3_STRENGTH` 1.0 -> 0.5** (the shipped default on
+both boxes; the env override stays the sweep knob; every receipt stamps what ran). 0.25 is
+the standing contender on anime; if storybook 0.25 (leg 7) also beats 0.5 by his eye the
+default moves to 0.25 -- one constant. **The coats finding:** across the traced episodes the
+only prompts that say "coat" say "cream coat" and "charcoal coat" (the cast's own looks, both
+characters), never green or blue; the green army coats and blue uniforms are the base model's
+prior for "coat" under an engraving or anime medium, amplified by the adapter. The GARMENT
+WORD is a style lever -- an input to item 3 (pack language): the motif composer should map
+garments through the pack rather than pass the writer's word raw, and this is the first
+measured prompt-to-picture pair the instrument's trace made citable.
+
 **Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
 Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
 `animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288

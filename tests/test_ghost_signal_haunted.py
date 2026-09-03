@@ -362,8 +362,14 @@ def test_the_adapter_floor_is_not_a_copy_of_a_motion_module_floor():
 # THE STRENGTH DIAL
 # --------------------------------------------------------------------------- #
 
-def test_the_frozen_default_is_the_adapters_own_full_scale():
-    assert vreg.get_engine(HAUNTED).lora_strength == pytest.approx(1.0)
+def test_the_frozen_default_is_the_eye_qualified_strength(monkeypatch):
+    """1.0 (the adapter's own full scale) was the honest UNMEASURED default.
+    The 2026-09-02 sweep (1.0 / 0.5 / 0.25 / 0.0 on anime and
+    storybook_engraving, judged by the operator's eye) froze 0.5: 1.0 drifted
+    into photographic figures on both styles, 0.5 held the pack's medium."""
+    monkeypatch.delenv(peers.ADAPTER_V3_STRENGTH_ENV, raising=False)
+    assert peers.ADAPTER_V3_STRENGTH == pytest.approx(0.5)
+    assert vreg.get_engine(HAUNTED).lora_strength == pytest.approx(0.5)
 
 
 @pytest.mark.parametrize("raw,expected", [

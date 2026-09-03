@@ -106,11 +106,18 @@ ADAPTER_V3_MIN_BYTES = 95_000_000
 #: LESS of the dataset's grime. So 0.0 is the pristine image-model domain and
 #: 1.0 is the full video-dataset domain -- which is exactly the haunted end.
 #:
-#: 1.0 is the adapter's own full scale and therefore the honest default for a
-#: lane whose entire purpose is to be haunted. IT IS UNMEASURED: no strength
-#: has been qualified by eye yet, which is what the environment override below
-#: is for. Sweep it, look at the output, then freeze the number here.
-ADAPTER_V3_STRENGTH = 1.0
+#: QUALIFIED BY EYE 2026-09-02 (the adapter sweep, campaign item 1: 1.0 / 0.5 /
+#: 0.25 / 0.0 on anime and storybook_engraving, one act each, every leg
+#: published to otr/obs and judged by the operator as radio drama). 1.0 -- the
+#: adapter's full scale, the old default -- drifted into PHOTOGRAPHIC FIGURES
+#: on both styles ("army men in green coats" on a storybook episode whose
+#: prompts never said coat; "real life stuff" on anime). 0.5 held the style on
+#: both: "very storybook, the best at maintaining the style" on the engraving
+#: leg, and clearly anime on the anime leg. 0.25 read as "maybe the most
+#: anime"; 0.0 is the clean picture and the control. So the shipped number is
+#: 0.5: the haunt survives, the pack's medium wins. The environment override
+#: below stays the sweep knob, and the receipt stamps whatever ran.
+ADAPTER_V3_STRENGTH = 0.5
 
 #: The sweep knob, following the eng_fastwan_8gb recipe-override pattern.
 ADAPTER_V3_STRENGTH_ENV = "OTR_GHOST_HAUNTED_LORA_STRENGTH"
