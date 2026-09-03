@@ -360,3 +360,41 @@ def test_the_music_prompt_normalises_its_setting_terms():
     source = inspect.getsource(mp.compose_music_prompt)
     assert "spoken_term(t)" in source, (
         "compose_music_prompt stopped normalising setting_terms")
+
+
+def test_a_term_that_is_only_punctuation_is_dropped_not_rendered():
+    """`spoken_term` filters as well as transforms, and that is deliberate.
+
+    Post-code QA on `adbe4003` observed that a term which normalises to empty
+    changes the LENGTH of the list, not just its contents -- and both
+    `resolve_crux_kernel` (which cycles `objects` and `places` on an odometer)
+    and `resolve_world_light` (whose wheel is `len(objects) * len(places)`) read
+    those lengths. So this is a real behaviour change and it is pinned here
+    rather than left to be rediscovered.
+
+    It is the CORRECT change: the old `str(t).strip()` filter kept a bare "_",
+    which then rendered as a literal underscore where a place should be. A term
+    that says nothing is not a place, and dropping it is what every other empty
+    term already gets.
+    """
+    from nodes._otr_brief_reader import spoken_term
+    from nodes._otr_video_engines.ghost_signal_author import _setting_terms
+
+    assert spoken_term("_") == ""
+    assert spoken_term("___") == ""
+
+    meta = {"story_brief_terms": {"setting": ["control_room", "_", "loading dock"]}}
+    assert _setting_terms(meta) == ["control room", "loading dock"], (
+        "a punctuation-only term must be dropped, not rendered as a place")
+
+
+def test_normalisation_alone_never_changes_how_many_terms_there_are():
+    """The length change is confined to terms that were never sayable.
+
+    Every real term -- prose or identifier case -- survives, so the odometer
+    period of a healthy episode is identical before and after normalisation.
+    """
+    from nodes._otr_video_engines.ghost_signal_author import _setting_terms
+
+    real = ["control_room", "high-security archive", "petri_dish", "riverbank"]
+    assert len(_setting_terms({"story_brief_terms": {"setting": real}})) == len(real)
