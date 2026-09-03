@@ -1061,7 +1061,9 @@ prompt + seed + request hash on the ledger, a canonical REPLAY mode (today the w
 mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
 adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
 LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
-engine's contract, never a Klein gate on the 4060), cycle frozen to figure; (3) the pack's
+engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
+plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
+`still-in-peer/driver_anchor.md` section 7 D4); (3) the pack's
 language back into the prompt under a 77-token budget; (4) one timeline per shot (a
 FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
 FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the

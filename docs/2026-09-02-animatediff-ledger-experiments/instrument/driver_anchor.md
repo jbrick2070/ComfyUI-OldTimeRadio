@@ -511,6 +511,16 @@ tree (dc4beea5) is the receipt: **12921 passed, 122 skipped, 1 xfailed, 0 failed
 (summary line read from the run file, not inferred). The three worktree-only artefacts of 13.4
 did not reproduce in the main checkout.
 
+**First live episode on the merged tree (sweep leg 4, `signal_lost_the_scream_of_the_gears_
+20260902_175555`, haunted lane at adapter 0.0, clean runner, story-generated title):** the
+ledger carries `meta.render_trace_version = render_trace_v1` with 8 rows, one per planned shot
+(`video.shots` = 8, `video_revision` = 1, stamped durably by ShotLock); each row has the request
+seed, `actual_request_sha`, `sampler_inputs` (adapter `v3_sd15_adapter.ckpt` at 0.0, latent
+`EmptyLatentImage`, the pinned context and sampler cells) and the three weight digests
+(checkpoint e9476a13..., motion module 24127118..., adapter fd2d8e26...) with byte sizes. Read
+from the saved ledger before the leg's publish tail finished -- the stamp is durable, not a
+report field.
+
 ### 13.6 Finished-diff review
 
 Sonnet 5, one pass, scoped to the named functions of the diff (roster: Antigravity r1, Codex r2,
