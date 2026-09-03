@@ -158,3 +158,47 @@ def test_the_ghost_family_is_never_handed_a_scene_prompt():
     """
     for engine_id in rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED:
         assert engine_id not in rd.BOOKEND_SCENE_PROMPT_ENGINES, engine_id
+
+
+# ---------------------------------------------------------------------------
+# THE MOTION-REGISTER SELECTOR, PINNED ON THE IDS PRODUCTION ACTUALLY MINTS
+#
+# Nothing pinned this before. `tests/test_visual_styles_b.py` uses
+# `shot_b000_music_open`, which matched the OLD `endswith` check too -- so the
+# 2026-09-03 fix could be reverted whole and the suite would stay green while
+# every cold open and sign-off silently fell back to `music_inter`.
+#
+# Measured across the music_visual shots on disk: 100% are
+# `shot_music_opening_001` / `shot_music_closing_001`.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("shot_id,expected", [
+    ("shot_music_opening_001", "music_open"),
+    ("shot_music_closing_001", "music_close"),
+    ("shot_music_inter_01_001", "music_inter"),
+    ("shot_b000_music_open", "music_open"),      # the synthetic opener, legacy shape
+])
+def test_the_selector_resolves_the_ids_production_mints(shot_id, expected):
+    assert rd._ltx_motion_role_key("music_visual", shot_id, False) == expected
+
+
+def test_close_is_matched_by_token_not_by_substring():
+    """`"close"` is not inside `"closing"` -- that one missing letter is why
+    every sign-off used the flat register. And the reverse hazard is real too:
+    `"tag"` IS inside "montage" and "stage", so the list is tested against the
+    id's own "_"-separated segments rather than as substrings."""
+    assert rd._ltx_motion_role_key(
+        "music_visual", "shot_music_closing_001", False) == "music_close"
+    # A word merely CONTAINING a token must not fire it.
+    for innocent in ("shot_music_montage_001", "shot_music_backstage_002"):
+        assert rd._ltx_motion_role_key(
+            "music_visual", innocent, False) == "music_inter", innocent
+
+
+def test_a_character_beat_gets_no_register_from_the_driver():
+    """The driver is what scopes the pack register to bookends -- the finalizer
+    does NOT ignore a non-empty `pack_motion` by role. An earlier version of
+    this test passed `pack_motion=""` twice and compared them, which would have
+    passed with the whole feature removed."""
+    assert rd._ltx_motion_role_key("character_video", "shot_b002", False) == ""
+    assert rd._ltx_motion_role_key("announcer_visual", "shot_b001", False) == "announcer"

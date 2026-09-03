@@ -639,16 +639,29 @@ def test_a_bookend_prefers_the_packs_kinetic_register_over_the_generic_pool():
     assert pack in kinetic["positive"]
 
 
-def test_a_character_beat_is_untouched_by_the_register():
-    """Scoped to bookends on purpose -- character motion is a separate report."""
+def test_the_finalizer_does_not_itself_scope_the_register_by_role():
+    """REWRITTEN: the first version compared `pack_motion=""` to the DEFAULT
+    (also ""), so it would have passed with the kwarg deleted entirely.
+
+    The honest statement is the opposite of what it implied: the finalizer does
+    NOT ignore a non-empty register on a character beat -- it will happily use
+    one. The scoping lives in the DRIVER, where `_ltx_motion_role_key` returns
+    "" for `character_video`, and that is pinned in
+    `tests/test_bookend_scene_prompt_roster.py`. Stating it here stops someone
+    "simplifying" the driver check on the belief the finalizer guards it.
+    """
     style = _style_obj("storybook_engraving")
-    before = gsa.finalize_ghost_prompt_v3(
+    default = gsa.finalize_ghost_prompt_v3(
         role="character_video", style=style, mode="figure",
         ledger_meta=REAL_META, ordinal=2)
-    after = gsa.finalize_ghost_prompt_v3(
+    forced = gsa.finalize_ghost_prompt_v3(
         role="character_video", style=style, mode="figure",
-        ledger_meta=REAL_META, ordinal=2, pack_motion="")
-    assert before["positive"] == after["positive"]
+        ledger_meta=REAL_META, ordinal=2, pack_motion="a deliberate intruder")
+    assert default["components"]["motion"] != "a deliberate intruder"
+    assert forced["components"]["motion"] == "a deliberate intruder", (
+        "the finalizer applies whatever the driver hands it; if this ever "
+        "starts filtering by role, the driver check and this test both need "
+        "revisiting together")
 
 
 def test_an_absent_or_oversized_register_still_leaves_the_beat_moving():
@@ -714,3 +727,27 @@ def test_the_anchor_check_matches_whole_words_not_substrings():
         "Slow dolly pull back.")
     assert got.startswith("radio console"), got
     assert "settles" in got
+
+
+@pytest.mark.parametrize("style_id", ["recur_frac", "video_art"])
+def test_a_pack_that_prefixes_a_motto_still_yields_real_motion(style_id):
+    """The two packs this change was sized around were the two it broke.
+
+    Seven packs open their register with "Continuous shot, same console
+    throughout."; `recur_frac` and `video_art` prefix a MOTTO first
+    ("Recursive fractal light field.", "Video-art feedback."). An index-0 check
+    stripped the motto, kept the motto as the kinetic clause, and dropped the
+    dial motion behind the framing line -- so Ghost was sent the front cue
+    restated, with no movement in it. The orphan-dial test could not catch it:
+    it skips when no dial is present, and the motto has none.
+    """
+    style = _style_obj(style_id)
+    registers = dict(style.motion_registers)
+    motto_words = set(_vs.compact_style_cue(style).lower().split())
+    for key in ("announcer", "music_open"):
+        got = _vs.bounded_motion_register(registers[key])
+        assert got, (style_id, key)
+        lead = got.replace("radio console ", "", 1).split(",")[0].lower()
+        assert not motto_words or not set(lead.split()) <= motto_words, (
+            "%s/%s compacted to its own style label rather than a motion: %r"
+            % (style_id, key, got))

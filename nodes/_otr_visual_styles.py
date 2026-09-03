@@ -758,14 +758,29 @@ def bounded_motion_register(register, *, max_words: int = MOTION_REGISTER_MAX_WO
     # So the static camera instruction still goes (telling a model to hold still
     # is the defect this exists to fix), and the SUBJECT it named is re-anchored
     # onto the kinetic clause instead of being thrown away with it.
+    # THE FRAMING SENTENCE IS NOT ALWAYS FIRST. Seven packs open with
+    # "Continuous shot, same console throughout."; `recur_frac` and `video_art`
+    # prefix a MOTTO ("Recursive fractal light field.", "Video-art feedback.").
+    # An index-0 check therefore stripped the motto, kept the motto as the
+    # kinetic clause, and dropped the dial motion sitting behind the framing
+    # line -- so Ghost was sent "recursive fractal light field, slow recursive
+    # push forward": the front cue restated, with no movement in it. On exactly
+    # the two packs the operator names as his interest.
+    #
+    # Search for the framing sentence at ANY index and drop everything up to and
+    # including it. On the seven standard packs the index is 0 and the result is
+    # byte-identical.
     subject = ""
-    if parts and parts[0].lower().startswith("continuous shot"):
-        head = parts[0]
+    framing_idx = next(
+        (i for i, part in enumerate(parts)
+         if part.lower().startswith("continuous shot")), None)
+    if framing_idx is not None:
+        head = parts[framing_idx]
         for noun in ("console", "radio set", "radio"):
             if noun in head.lower():
                 subject = "radio console" if noun == "console" else noun
                 break
-        parts = parts[1:]
+        parts = parts[framing_idx + 1:]
     if not parts:
         return ""
     # WHOLE WORDS. A substring test here got "dial settles" wrong on its first

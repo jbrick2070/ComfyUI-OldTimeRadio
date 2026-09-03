@@ -1796,8 +1796,14 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         # 2026-09-03 across the music_visual shots on disk: 100% are
         # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the old
         # tokens. See the opening half above for the same drift.
-        if any(t in sid for t in ("closing", "close", "outro", "_end", "tag",
-                                  "sign_off")):
+        # TOKEN MEMBERSHIP, NOT SUBSTRING. `"tag"` is inside "montage" and
+        # "stage", and substring matching on ids is exactly how `"close"`
+        # silently stopped matching `"closing"` in the first place. Splitting on
+        # "_" tests the id's own segments, so a longer word containing a token
+        # can never fire it. `"closing"` is listed as its own token because that
+        # is what production mints.
+        _tokens = set(sid.split("_"))
+        if _tokens & {"closing", "close", "outro", "end", "tag", "off"}:
             return "music_close"
         return "music_inter"
     return ""
