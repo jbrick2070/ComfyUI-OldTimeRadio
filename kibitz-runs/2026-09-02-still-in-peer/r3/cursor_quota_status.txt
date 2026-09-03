@@ -1,0 +1,10 @@
+agent=cursor
+quota_check=enabled
+thresholds=50,70,90
+usage_percent=unknown
+
+[status commands]
+$ cursor-agent.cmd status --format text
+rc=0
+STDOUT:
+✓ Logged in as <email>

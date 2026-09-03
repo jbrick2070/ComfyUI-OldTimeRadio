@@ -59,12 +59,9 @@ its receipt id or the 4060 provisioning set moves.
   omitted sockets, `sampler_inputs.latent == 'EmptyLatentImage'`, `init_image is None`, and
   `model_artifacts` == [checkpoint, motion_module, adapter] (`tests/test_ghost_signal_lane.py:226-243,
   416-520`; `tests/test_ghost_signal_haunted.py:165-172`; `tests/test_render_receipts.py:129-143`).
-  => the peer is a NEW subclass that overrides `name`, `recipe_receipt_id`, `render_clip`,
-  `sampler_inputs_for`, `shot_cache_identity`, `canonicalize`, `assert_usable`; it never edits
-  the shipping class. (Corrected after r2/r3: `_node_candidates`, `model_artifacts` and
-  `session_identity` are INHERITED -- the seven-class map is unchanged, the inherited
-  `model_artifacts` already reads the subclass attributes, and BeatSession requires
-  `session_identity` stable within a beat. Sections 10 and 12 govern.)
+  => the peer is a NEW subclass that overrides `name`, `recipe_receipt_id`, `_node_candidates`,
+  `render_clip`, `sampler_inputs_for`, `model_artifacts`, `session_identity`, `shot_cache_identity`;
+  it never edits the shipping class.
 * `_build_render_request` reads only shot/request ids, text_prompt, negative_prompt,
   timing.target_frame_count and seed_bundle.request_seed (`eng_ghost_signal.py:732-778`); the seed
   is `_seed_from_hash(render_request_hash, shot_id)` and does not move when a still, a denoise or an
@@ -229,7 +226,7 @@ E7 (SparseCtrl, pack not installed); per-style checkpoints; any change to the sh
 its graph, tests, receipt, or the 4060 provisioning set; any prompt change on the video prompt
 (that is item 3).
 
-## 4. The build list (the r1 draft -- SUPERSEDED by sections 10 and 12, kept for the record)
+## 4. The build list (what one window codes after r4)
 
 1. `nodes/_otr_video_engines/eng_ghost_signal_stillin_lab.py`: `GhostSignalV3StillInLabEngine(
    GhostSignalV3HauntedEngine)` with `name`, `recipe_receipt_id`, `E1_DENOISE = 0.75`,
@@ -237,9 +234,7 @@ its graph, tests, receipt, or the 4060 provisioning set; any prompt change on th
    plate prompt, STAGE 3 with the plate branch), `_plate_prompt(request, vstyle, ledger_world)`,
    `_plate_seed(request_seed)`, `sampler_inputs_for`, `session_identity`, `shot_cache_identity`,
    `canonicalize` adding `plate_sha256` to the clip (schemas.py: one new optional key, since
-   `CanonicalClip` is `extra='forbid'`). *(r2/r3: seven names, not ten; the plate prompt is
-   composed in `render_driver`, not the engine; the plate seed is `request_seed`; no
-   `session_identity` override; `plate_sha256` rides `CanonicalClip.qc`, no schema key.)*
+   `CanonicalClip` is `extra='forbid'`).
 2. `registry.py` CAPABILITIES row (copy of the haunted row, `status: lab`); `__init__.py` guarded
    import; `scripts/otr_provision.py` `_ANIMATEDIFF_ENGINES` gains the id (so it stays no-still on
    the 4060); `scripts/build_video_evidence_manifest.py` sentence + regenerate;
@@ -361,15 +356,12 @@ object_info capture stands; the peer gets its own instance-count pin (the haunte
 **D6 (seed) -- the plate uses `request_seed` itself.** Nothing new on the request; the plate is
 a pure function of (checkpoint, plate prompt, seed, canvas, plate steps/cfg/sampler).
 
-**D7 (record; reuse SUPERSEDED in r2).** The plate PNG is written to
-`<episode>/stills/ghost_plates/<shot_id>_<sha16 of plate INPUTS>.png` for the record and the
-operator's eye; the replay bundle freezes `stills/` whole, so the file travels with the
-bundle. **The first build never READS it back: every render re-mints the plate
-(deterministic from the plate identity) and the verifier proves stability by EQUAL plate
-hashes across the A/A** (r2 must-fix 2 -- reuse would need an image loader and `VAEEncode`
-that the seven-class map does not carry; it becomes the next knob only if the hashes ever
-disagree). Never a fabricated dispatcher `images[]` row. Node 91 iterates listed rows only,
-so the unlisted PNG is never validated (r3, confirmed).
+**D7 (record and reuse).** The plate PNG is written to
+`<episode>/stills/ghost_plates/<shot_id>_<sha8 of plate INPUTS>.png`; the replay bundle
+already freezes `stills/` whole, so a replay REUSES a present sha-named plate (encoding it
+instead of re-sampling) and the A/A is exact rather than exact-up-to-GPU-noise. Never a
+fabricated dispatcher `images[]` row (those carry `content_hash` / `pool_path` / `provenance`
+and node 91 verifies them). Verify at build that node 91 tolerates the unlisted file.
 
 **D8 (receipt) -- inputs only in the causal hash.** `sampler_inputs_for` returns the parent's
 dict with `latent: 'ghost_plate_init'`, `init_image: None` (kept -- `accepts_still` is False),
@@ -466,12 +458,9 @@ per-engine prompt policy is re-applied without re-authoring.
   [0, 1] or a NAMED `EngineUnusable`; refuses a request whose `plate_prompt` is blank (the
   plate is the lane's whole point) with a named error.
 * `plate_identity(request, denoise)` -> `(dict, sha256)`: canonical sorted JSON of
-  {checkpoint `(name, size, mtime_ns)` -- the `_file_receipt` the lane already uses for
-  `session_identity`, NEVER a per-shot content digest of a 2 GB file (r3 S5); plate positive,
-  plate negative, seed, steps, cfg, sampler, scheduler, canvas, plate adapter strength}; used
-  by the filename (`<sanitised shot_id>_<sha16>.png`), by `shot_cache_identity` (which also
-  folds the resolved denoise) and by `sampler_inputs_for`. The checkpoint's CONTENT digest is
-  already on every receipt once per process through `model_artifacts`.
+  {checkpoint digest, plate positive, plate negative, seed, steps, cfg, sampler, scheduler,
+  canvas, plate adapter strength}; used by the filename (`<sanitised shot_id>_<sha16>.png`),
+  by `shot_cache_identity` (which also folds the resolved denoise) and by `sampler_inputs_for`.
 * `render_clip`: STAGE 2 encodes positive, negative AND the plate prompt before the CLIP is
   released. STAGE 3a (bounded `run_graph`, `audit_node_ids` = plate sampler): EmptyLatentImage
   {512x288, 1} -> KSampler{`Wire('base_model')`, request_seed, plate cells, denoise 1.0} ->
@@ -510,11 +499,10 @@ the receipt.
 **D11 rewritten -- the replay engine override travels in the bundle.**
 `scripts/otr_freeze_replay_bundle.py --derive-engine <id> <bundle>` writes a sibling bundle
 `<bundle>__engine_<id>` (same files, same hashes, a new manifest with `engine_override` and
-`derived_from`), immutable like any bundle. `import_replay_bundle` reads `engine_override`
-and stamps it RAW as `meta.replay_engine_override` (no registry import in the ledger
-module; r4). ShotLock's replay reuse branch validates the id is a registered Ghost sibling of
-the frozen plan's engine (equal family, roles, `prompt_profile`, `frame_contract`) and, when
-the meta carries it, rewrites the WHOLE plan
+`derived_from`), immutable like any bundle. `import_replay_bundle` reads `engine_override`,
+validates the id is a registered Ghost sibling of the frozen plan's engine (equal family,
+roles, `prompt_profile`, `frame_contract`), and stamps `meta.replay_engine_override`.
+ShotLock's replay reuse branch, when the meta carries it, rewrites the WHOLE plan
 atomically: `roles_effective`, every shot's `engine_id` and family, every execution group,
 and re-derives each shot's coverage contract through the same function the render boundary
 uses (`render_driver.py:5355-5362`), refusing (named) on any mismatch. No new widget, no
@@ -523,10 +511,8 @@ canonical edit, no whitelist change; every receipt names the override through
 
 **Registration surface**: CAPABILITIES row (copy of the haunted row; no status key); guarded
 import in `_otr_video_engines/__init__.py`; `_ANIMATEDIFF_ENGINES` gains the id
-(`otr_provision.py:1516-1522`); the `admission_unenforced` sentence appended BY HAND to
-`docs/evidence/video_evidence_manifest.json` (r3: the generator emits version 1 against the
-live version 7 and refuses to overwrite it -- never run it); `docs/ENGINE_MATRIX.md`
-regenerate; `config/profiles/otr_stillin_lab_5080.json`
+(`otr_provision.py:1516-1522`); `scripts/build_video_evidence_manifest.py` sentence +
+regenerate; `docs/ENGINE_MATRIX.md` regenerate; `config/profiles/otr_stillin_lab_5080.json`
 (`status: draft`, three video roles on the peer) + `build_variants --all/--check`;
 `tests/fixtures/still_plan_head_parity.json` regenerated if the roster test demands it.
 
@@ -622,27 +608,18 @@ pattern (`otr_meta_brief_image_prompt.py:1839-1865`) and is imported lazily by
 "plate_source" / "plate_identity_sha256"]` into the non-causal block beside `vram_peak_mb`
 (`render_driver.py:4137-4142`); `_RECEIPT_CAUSAL_KEYS` is unchanged.
 
-**D11 seat (grounded in r4).** `otr_freeze_replay_bundle.py --derive-engine <id> <bundle>`
-is a NEW bundle-to-bundle function, `derive_engine_bundle(bundle_dir, engine_id, out_root)`:
-it never touches `freeze()`, `find_ledger`, `find_master` or a live episode dir (those glob
-`<episode>/audio/*` and name the output `<out_root>/<episode_id>`, which would collide with
-the immutability guard on the very bundle being derived, `otr_freeze_replay_bundle.py:77-101,
-121-123`). It calls `load_replay_manifest(bundle_dir)`, copies every `manifest["files"]` entry
-byte for byte into `<bundle>__engine_<id>/` (self-contained, immutable like any bundle),
-re-verifies each SHA-256, and writes a new manifest = the source manifest + `engine_override`
-+ `derived_from` (the source bundle dir). `load_replay_manifest` checks only `schema_version`,
-the `files` shape and three required keys (`production_ledger.py:573-611`), so the extra key
-passes; `import_replay_bundle` copies strictly from `manifest["files"]` (`:662-672`) and uses
-`source_episode_root` for rebasing only (`:692-693`). **`production_ledger` stamps the override
-RAW** (`meta.replay_engine_override = manifest["engine_override"]`) and imports NO registry --
-the sibling validation (registered Ghost sibling; equal family, roles, `prompt_profile`,
-`frame_contract`) lives in `OTRShotLock.lock`'s replay branch, which already imports the video
-registry, and runs BEFORE the rewrite: `video.roles_effective[role]` for every role the frozen
-plan routed to the source engine, every shot's `engine_id` / `family`, every
-`execution_groups[*].engine_id`; re-derive `coverage_contract` per shot through
-`frame_contract.coverage_contract_receipt`; refuse named on any mismatch; THEN
-`_stamp_durable`. The baseline of every A/B is `--derive-engine
-animatediff15_v3_haunted_video` on a bundle frozen from a PEER render.
+**D11 seat.** `otr_freeze_replay_bundle.py --derive-engine <id> <bundle>` writes
+`<bundle>__engine_<id>/manifest.json` = the source manifest + `engine_override` +
+`derived_from` (files referenced, not copied twice: the manifest's `files` keep their
+relative paths and hashes; the derived bundle carries the SAME files, copied, so it stays
+self-contained and immutable). `production_ledger.import_replay_bundle` reads
+`engine_override`, validates the sibling rule, stamps `meta.replay_engine_override`.
+`OTRShotLock.lock`'s replay branch: if the meta carries the override, rewrite
+`video.roles_effective[role]` for every role the frozen plan routed to the source engine, every
+shot's `engine_id` / `family`, every `execution_groups[*].engine_id`; re-derive
+`coverage_contract` per shot through `frame_contract.coverage_contract_receipt`; refuse named
+on any mismatch; THEN `_stamp_durable`. The baseline of every A/B is
+`--derive-engine animatediff15_v3_haunted_video` on a bundle frozen from a PEER render.
 
 **Registration commit, in one change:** the engine module; the CAPABILITIES row (no status
 key); the guarded import at `__init__.py` between lines 333 and 359; `_ANIMATEDIFF_ENGINES`
@@ -654,25 +631,3 @@ otr_stillin_lab_5080.json` (`status: draft`, no denoise) + `build_variants --all
 **Verifier pairs (the probe runner enforces them):** the A/A = the two same-denoise peer
 replays (equal `actual_request_sha`, equal `plate_sha256`); grid legs and the cross-engine
 baseline compare seeds only; a plate-hash rule applies only where both rows carry one.
-
-## 13. r4 convergence (Sonnet 5, in-process; roster: Fable 5.1 cold + Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- one external seat per round plus the cold read, as the operator ruled 2026-09-02; judgment in `kibitz-runs/2026-09-02-still-in-peer/r4/judgment.md`)
-
-First pass: NOT CONVERGED, four defects, all confirmed at the files and all editorial: r3's
-checkpoint-fingerprint fix had not reached section 10's field spec; section 7 still promised
-plate REUSE and sections 2 / 4 still listed overrides r2 cut; section 10 said "regenerate"
-where section 12 says "by hand"; and `--derive-engine` was prose with no compatible
-implementation path (`freeze()` is hard-wired to a live episode dir and collides with the
-immutability guard). Fixed in place; the reviewer re-read sections 2 / 4 / 7 / 10 / 12 and
-confirmed each: **CONVERGED**, no new must-fix. Verified along the way and kept as the
-receipt: the plate KSampler on the base MODEL handle conflicts with neither patcher hook; no
-live `VideoRequest(...)` validation sits inside `build_request_from_shot`; `roles_effective` is
-stamped only in the fresh-plan branch, so the replay branch is the only seat for D11;
-`load_replay_manifest` tolerates the extra key and `import_replay_bundle` copies from
-`manifest["files"]` only.
-
-**The coding contract is sections 10 + 12** (section 7 for the decisions, 3 / 5 / 8 / 9 / 11
-for the reasoning). One window builds it in the `stillin-peer` worktree, then: Sonnet QA on
-the finished diff (named functions), the targeted tests, `build_variants --check`, the
-preflight matrix, the full suite in the main checkout, a merge at a sweep boundary or after
-the sweep, and the live probe on the 5080 (section 7 D9), every leg published to `otr/obs/`
-with the clean runner and the story's own title.
