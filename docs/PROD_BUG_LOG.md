@@ -10915,3 +10915,49 @@ lifeless output across every unit of a run is far more often a FALLBACK firing
 than a generator writing badly. Read what the fallback emits before rewriting a
 prompt -- a prompt pass aimed at this symptom would have improved text that was
 being discarded, and left the canned strings exactly where they were.
+
+**ADDENDUM 2 -- the corrected diagnosis, and a correction to Addendum 1's scope.**
+
+**First, the correction, because it was wrong in a way worth naming.** The driver
+claimed "88 of the 89 episodes in otr/obs were rendered by still_flat". That was
+counted from FILENAMES: every published file carries `silent_procgen_blended_...`,
+which is the shared COMPOSITING path, not the render engine. Counted properly,
+from ledgers, **19 of 21 episodes used real video engines**, and `still_flat` is
+16 of 202 shots. The lesson is the same one this whole entry is about: measure the
+field, not a string that looks like the field.
+
+What survives that correction: the overnight loop DID publish stills, verified on
+`signal_lost_the_ormond_enigma_20260903_155608` (engine_id=still_flat on all 8
+shots), because it called the bank gate with no `--profile`. That is a real runner
+defect and is fixed. It was simply never the corpus-wide story.
+
+**The actual cause of "not a lot of movement, or foley either."** Operator named
+two episodes. `signal_lost_the_anchor_of_life_20260903_045411` ran REAL engines --
+`ltx25_video` x4, `ltx25_mime` x4 -- and still barely moved. Its ledger says why:
+
+```
+source     : template_after_llm_miss   (8 of 8 shots)
+motion     : ''      camera : ''      expression : ''
+warnings   : empty/unparseable derivation for batch ['b002']..; reseed 1/2, 2/2
+text_prompt: "30s, weary noble captive. Face: angular, high cheekbones,
+              heavy-lidded eyes with deep shadows... Voice: raspy, deliberate...,
+              candlelit chamber, storm-swept island, a vivid, rea[dable reaction]"
+```
+
+The video model was handed a CHARACTER PORTRAIT SHEET -- face, hair, skin, voice
+-- with no action verb anywhere in it, plus the canned
+`_NONVERBAL_FALLBACKS["expression"]` on the tail. A video model given a portrait
+renders a portrait. Worse, `shot_b002` and `shot_b004` carry BYTE-IDENTICAL
+prompts (same character, different beat), so consecutive clips are near-duplicates
+-- which is what "minimal movement" looks like from the couch.
+
+**And it explains the missing foley with the same cause.** `ltx25` is a JOINT
+audio-video model: one prompt drives both streams. A portrait description
+generates no foley because nothing in it makes a sound. The operator read those as
+two defects; they are one.
+
+**So the ranking of today's three fixes, corrected by this evidence:** PBUG-07
+(the truncated reply budget) is the one that matters -- it is why `motion`,
+`camera` and `expression` were empty on real video lanes. The runner profile fix
+matters only for what THIS LOOP publishes. The still_flat theory was a detour, and
+a filename is what sent it there.

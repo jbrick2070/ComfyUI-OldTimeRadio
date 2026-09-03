@@ -42,11 +42,19 @@ BANK_FILTER="${1:-}"
 # This loop used to call the bank gate with no --profile, so it silently took
 # that script's own DEFAULT_PROFILE = "otr_w45_still_flat" -- the cheapest
 # visual lane, chosen there because the GATE's job is to prove the writer and
-# the source banks quickly. The consequence was invisible in every log and
-# obvious in the only place that matters: 88 of the 89 episodes in otr/obs were
-# rendered by `still_flat`, a static-image engine. The operator was judging
-# "bland video with no movement" on a lane that never ran a video model, and
-# no amount of prompt or directive work could have shown up there.
+# the source banks quickly. That is right for the gate and wrong for the loop
+# that produces the operator's dailies: every episode this loop published was a
+# static-image render, verified on the ledger of
+# signal_lost_the_ormond_enigma_20260903_155608 (engine_id=still_flat on all 8
+# shots, VRAM 2.4 of 15.9 GiB on the treatment card).
+#
+# SCOPE, stated because the first version of this comment overstated it: this
+# affected THIS LOOP's output, not the corpus. Counted from ledgers rather than
+# filenames, 19 of 21 episodes used real video engines and still_flat is 16 of
+# 202 shots. The `silent_procgen` in every obs filename is the COMPOSITING path
+# that all episodes share -- it says nothing about the render engine, and
+# reading it as one is how the earlier "88 of 89 are static" claim was produced.
+#
 # A dailies runner names its video lane. Every role_override in the profile
 # below is a real video engine -- announcer, character AND music.
 PROFILE="${OTR_LOOP_PROFILE:-otr_w45_wan_ti2v}"
