@@ -1,3 +1,108 @@
+## 2026-09-03 -- HEAD 31109245 +handoff (v2.0-alpha) -- CODER (alpha.17 published and artifact-verified; the node-count blocker was pycairo; Bible 12.148-12.150)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit.
+
+Did: (1) FOUND AND FIXED THE REGISTRY NODE-COUNT BLOCKER, which turned out to
+  be a different problem from the Flagged one and had been conflated with it
+  all week. The "N Nodes" badge is fed by Algolia's `comfy_nodes` array, filled
+  by Comfy-Org's `node-pack-extract` -- a Linux container that boots headless
+  CPU ComfyUI, runs a bare `pip install -r requirements.txt` under `set -e`,
+  and reads `/object_info`. It is INDEPENDENT of Flagged/Active, so no admin
+  approval would ever have populated it. Measured:
+  `/versions/2.0.0-alpha.16/comfy-nodes` returns
+  `{"comfy_nodes": null, "totalNumberOfPages": 0}` where
+  `comfyui-videohelpersuite/versions/1.7.9` returns real rows. Cause: pycairo
+  publishes 21 Windows wheels, 1 sdist and ZERO Linux wheels, so that install
+  had to build from source against libcairo2-dev and died. Fixed in `aff1f9c4`:
+  `pycairo>=1.24; sys_platform == 'win32'`.
+  **The 0B check earned its keep here.** The marker alone would have silently
+  disabled `viz_mxc_mandala` on the rented pod, which apt-installs
+  libcairo2-dev on purpose (`otr_pod_provision.sh:228`) and lists the engine in
+  `otr_provision.py:1540`. The provisioner now pip-installs pycairo explicitly
+  right after the headers land, so the pod is unchanged. Blast radius measured
+  rather than asserted: the only `import cairo` in `scope_draw.py` is INSIDE
+  `paint_mandala`, so importing the module never imports cairo, and
+  `freq_bars_green` / `cfr_flags` / `find_ffmpeg` / `encode_silent_mp4` are all
+  cairo-free -- scope overlays, caption burn, silent composite and encode sink
+  untouched. Windows is byte-identical on both boxes. The old requirements.txt
+  comment claiming every scope overlay raises ImportError without it was simply
+  wrong and is corrected in place.
+  (2) PUBLISHED 2.0.0-alpha.17 (`524426ee`, 17:56Z, Action green) on the
+  operator's explicit go, after messaging window 02 -- which was holding the
+  bump -- twice: once with the pycairo finding, once to say the operator had
+  approved and I was taking it. VERIFIED AGAINST THE ARTIFACT, not the commit:
+  CDN zip 6,397,276 bytes / 814 files, `OTR_ENABLE_HTTP_RENDER_ROUTES` present
+  in the shipped `__init__.py`, pycairo marker and `kokoro-onnx` present in the
+  shipped requirements.txt, no `tests/` `.claude/` `.github/` `kibitz-runs/`
+  leakage, and the registry recorded **19 dependencies** (alpha.16 recorded 18)
+  -- the static-list check alpha.3 taught us. The bump also reconciled
+  pyproject's static list against requirements.txt by comparing parsed
+  Requirement specifiers and markers rather than by eye; the only two deltas
+  were the pycairo marker and a missing `kokoro-onnx` line, both closed.
+  Pre-flight before pushing: version unique against the live list,
+  `test_registry_prohibited_strings` green, and the four surviving
+  `auth_token_comfy_org` occurrences in `nodes/` confirmed byte-identical to
+  alpha.16 (which scanned 0 critical) and a consumer-side NAME CHECK, not a
+  declaration -- the writer's INPUT_TYPES declares `api_key_comfy_org` only.
+  (3) BUG BIBLE: promoted the three 2026-09-03 replay defects as **12.148**
+  (metadata-provenance -- a clone's clear-list must hold only keys the new run
+  re-stamps; test what SURVIVES), **12.149** (tensors -- a pass-through must
+  pass the real thing through, and beware the test that encodes the placeholder
+  as the contract), **12.150** (deps -- a bare except around an optional import
+  whose call ALWAYS raises, cross-referencing 05.14 with the distinction
+  stated). Bible repo `20204c5`: 326 -> 329 entries, index rows appended in the
+  same change per the delta-scrape discipline, README count moved for the
+  three-file contract, suite 22 passed / 27 skipped / 3 xfailed.
+  `tests/interface_integrity_check.py` errors at setup on this box for an
+  unrelated reason (it reads a `verify_hyradio_master.py` from a different repo
+  that is not present here) -- pre-existing, not caused by this change.
+  PROD_BUG_LOG's three entries now name their Bible ids instead of reading
+  "candidate" (`31109245`).
+Current step: queue item 1 is no longer blocked on publishing. Two SEPARATE
+  goals live under it and the plan now says so explicitly: (a) an INSTALLABLE
+  listing, which needs an admin approval we cannot self-serve, and (b) the node
+  count, which was ours and is fixed. The manual review request's precondition
+  2 (grep the published zip for the route gate) is SATISFIED and struck from
+  the draft.
+Next: two things to re-check, neither actionable at handoff time. (i)
+  `GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true` --
+  alpha.17 still read `Pending` with an empty status_reason at ~25 minutes,
+  which is the documented 30-minute queue. It needs 0 critical, and the 157
+  finding counts quoted in `docs/2026-09-02-registry-manual-review-request.md`
+  must be re-checked against alpha.17's own scan before filing, because the
+  scanner's line numbers shift whenever shipped code moves. Filing is a public
+  post and needs the operator's explicit go. (ii)
+  `/versions/2.0.0-alpha.17/comfy-nodes` -- still null at handoff; extract is a
+  separate Cloud Build job on its own schedule, so the pycairo theory is
+  neither confirmed nor refuted yet. Non-null means it was right and the card
+  should show ~34 Nodes; still null means something else also fails on Linux,
+  and the next suspect is kokoro's spacy/thinc/blis chain against the 600 s
+  extract timeout. KNOWN, NOT ACTED ON: `viewer/index.html` does ship in the
+  zip and calls three unregistered endpoints -- a one-line `.comfyignore` fix,
+  but `.comfyignore` was on this session's do-not-touch list, so it is left for
+  the operator to authorize. After the registry: queue item 3b Half B (full arc
+  before code) and 3d.
+Models: Opus 5 throughout, no subagents spawned. NO KIBITZ ARC, and that is the
+  correct routing under the 2026-08-17 amendment -- this session had no design
+  choice with more than one defensible answer in it. The pycairo call had a
+  single verifiable right answer (a package with zero Linux wheels either
+  installs or does not) and was settled by measurement: PyPI's own file list,
+  the enclosing-scope walk of every `import cairo`, and a grep of the pod
+  provisioner. The Bible promotion and the version bump are likewise
+  deterministic. Two peer messages to window 02 in lieu of operator relay,
+  per the 2026-09-03 directive.
+Commits: `aff1f9c4` (pycairo marker + pod provisioner), `524426ee` (alpha.17
+  release bump), `31109245` (PROD_BUG_LOG Bible references); Bible repo
+  `20204c5`. FULL SUITE READ, NOT ASSUMED: **13,050 passed, 126 skipped,
+  1 xfailed, 0 failed** in 501.47s, RC=0, 13,177 collected and fully accounted
+  for. Box at handoff: server RESIDENT on :8000 (PID 24340) with a leg LIVE --
+  `signal_lost_whispers_in_the_park_20260903_101222`, queue running 1 /
+  pending 0, GPU 99%, 10.6 of 16.3 GB. DO NOT reset the box without checking
+  that leg first; six episodes published to `otr/obs/` today. The handoff
+  commit itself lands ON TOP of these and is not listed here -- see the kickoff
+  line for the real head.
+
 ## 2026-08-28 -- HEAD 83be6c74 +handoff (v2.0-alpha) -- CODER (dead-code campaign + widget migrations + sanctioned-gap C7 closed)
 
 The sha above is the second-to-last on the branch; the last is this handoff

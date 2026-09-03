@@ -27,34 +27,75 @@ tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per
 owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
 AND push + `HEAD == origin/v2.0-alpha`.
 
-**1. THE REGISTRY -- the criticals are gone; alpha.17 carries the route gate; the manual
-review request is the last lever.** The control experiment in the old wording (republish
-alpha.8 byte-identical) was overtaken and is CANCELLED -- the cause was found directly
-instead.
+**1. THE REGISTRY -- alpha.17 IS PUBLISHED AND VERIFIED (2026-09-03). Two SEPARATE goals
+live here and conflating them is what made this feel stuck: (a) an INSTALLABLE listing,
+which needs an admin approval we cannot self-serve, and (b) the "N Nodes" count on the
+card, which is a different pipeline entirely and which we have now fixed.** The old
+control experiment (republish alpha.8 byte-identical) is CANCELLED -- the cause was found
+directly instead.
 
+* **alpha.17 published 2026-09-03 17:56Z, commit `524426ee`, Action green, and VERIFIED
+  AGAINST THE ARTIFACT rather than the commit.** The CDN zip
+  (`.../2.0.0-alpha.17/node.zip`, 6,397,276 bytes, 814 files) was downloaded and grepped:
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` present in `__init__.py`, the pycairo marker and the
+  `kokoro-onnx` line present in the shipped `requirements.txt`, and none of `tests/`,
+  `.claude/`, `.github/`, `kibitz-runs/` leaked. The registry recorded **19 dependencies**
+  (alpha.16 recorded 18) -- the static-list check that alpha.3 taught us to run.
+  Status is `Pending`, which is the 30-minute scan queue, not a verdict.
 * **alpha.16 scanned 0 critical / 157 info (2026-09-03), the first zero-critical scan
   since alpha.8.** The two `critical` `prohibited-string` findings that flagged alpha.9
   through alpha.15 were the writer declaring the session-bearer hidden input beside
-  `api_key_comfy_org` (PBUG-20260902-04); removing it cleared both
-  (`nodes/OTR_LedgerScriptWriter.py:2770-2771` in the alpha.15 scan, absent from
-  alpha.16). `tests/test_registry_prohibited_strings.py` guards every shipped file.
-* **alpha.17 is the one that carries the route gate.** `b198026a` put
-  `POST /otr/video_render_single` and `/otr/video_render_soak` behind
-  `OTR_ENABLE_HTTP_RENDER_ROUTES=1`, default off, so a registry install registers only the
-  read-only ledger GET -- the `UNAUTHENTICATED_SIDE_EFFECT` class the registry banned
-  another pack for. It landed AFTER alpha.16 was cut, and `(node_id, version)` is unique
-  server-side, so publishing alpha.17 is the only way the gate ever reaches the registry.
-  Operator said go 2026-09-03; the peer window owns the bump.
-* **STILL FLAGGED IS THE EXPECTED OUTCOME, not a failure.** Active needs ZERO findings of
-  any severity or an admin batch approval; 157 info-level YARA hits (env reads, ffmpeg
-  subprocess, opt-in cloud lanes) will keep it Flagged forever on the automated path.
-  There is no publisher self-service route to Active -- confirmed by reading
-  `Comfy-Org/registry-backend`.
-* **NEXT: file the manual review request**, draft ready and retargeted at alpha.17 in
-  `docs/2026-09-02-registry-manual-review-request.md`. Its own preconditions first:
-  alpha.17 scans 0 critical, AND the published CDN zip is downloaded and grepped for
-  `OTR_ENABLE_HTTP_RENDER_ROUTES` -- a reviewer greps the artifact, not the commit.
-  Filing is a public post on Comfy-Org's tracker and needs the operator's explicit go.
+  `api_key_comfy_org` (PBUG-20260902-04); removing it cleared both.
+  `tests/test_registry_prohibited_strings.py` guards every shipped file. Confirmed still
+  true of alpha.17: the four remaining `auth_token_comfy_org` occurrences in `nodes/` are
+  byte-identical to alpha.16 and are a consumer-side NAME CHECK, not a declaration.
+* **THE NODE COUNT WAS A DEPENDENCY BUG, NOT AN APPROVAL PROBLEM -- FIXED IN `aff1f9c4`.**
+  The "N Nodes" badge is fed by Algolia's `comfy_nodes` array, which is populated by
+  Comfy-Org's `node-pack-extract`: a Cloud Build container that boots a headless CPU
+  ComfyUI on Linux, runs a bare `pip install -r requirements.txt` under `set -e`, and
+  reads `/object_info`. **It is independent of Flagged/Active, so no approval would ever
+  have populated it.** Measured: `/versions/2.0.0-alpha.16/comfy-nodes` returns
+  `{"comfy_nodes": null, "totalNumberOfPages": 0}` where
+  `comfyui-videohelpersuite/versions/1.7.9` returns real rows. Cause: `pycairo` publishes
+  21 Windows wheels, 1 sdist and **zero Linux wheels**, so that install had to build from
+  source against `libcairo2-dev` and died. `requirements.txt` now marks it
+  `sys_platform == 'win32'`, mirrored into `pyproject.toml`.
+  **Cost, measured not asserted:** one function. The only `import cairo` in
+  `scope_draw.py` is inside `paint_mandala`, so importing the module never imports cairo;
+  `freq_bars_green`, `cfr_flags`, `find_ffmpeg`, `encode_silent_mp4` are cairo-free, so
+  the scope overlays, caption burn, silent composite and encode sink are untouched.
+  `viz_mxc_mandala` guards `load()` and `assert_usable()` and appears zero times in
+  `otr_canonical.json`. The Linux pod keeps the engine because
+  `scripts/otr_pod_provision.sh` apt-installs the headers and now pip-installs pycairo
+  explicitly -- do NOT "simplify" that line away.
+  **WATCH FOR: does alpha.17 extract?** Re-check
+  `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes`. Non-null means
+  the theory was right and the card should show ~34 Nodes. Still null means something
+  else in the install also fails on Linux -- the next suspects are `kokoro`'s
+  spacy/thinc/blis chain against the 600 s extract timeout.
+* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** Active needs ZERO
+  findings of any severity or an admin batch approval; 157 info-level YARA hits (env
+  reads, ffmpeg subprocess, opt-in cloud lanes) keep it Flagged forever on the automated
+  path. The gate is a literal `if issues == ""` on the scanner body -- one info finding
+  and 157 are identical. There is no publisher self-service route to Active, confirmed by
+  reading `Comfy-Org/registry-backend`. Corroborated independently: rgthree's two newest
+  publishes are Flagged too, so the ruleset tightened in late August and comparing against
+  older Active versions of popular packs proves nothing.
+* **NEXT: file the manual review request.** Draft ready and retargeted at alpha.17 in
+  `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
+  published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
+  strike that step. Remaining preconditions: alpha.17's scan lands and shows 0 critical,
+  and the 157 finding counts in the draft are re-checked against alpha.17's own scan
+  (`?include_status_reason=true`), because the scanner's line numbers shift whenever
+  shipped code moves. Filing is a public post on Comfy-Org's tracker and needs the
+  operator's explicit go.
+* **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL
+  verification, NOT for scanner probing.** Publishing a small pack under his own publisher
+  to confirm a dependency set actually installs in their Linux container is ordinary use
+  and would have caught the pycairo bug for free, before it cost four version strings.
+  Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in
+  a real security queue, and it is **unnecessary** -- `?include_status_reason=true` already
+  returns all 157 findings itemized by rule, so there is nothing left to discover.
 * DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes.
   Never version-delete: a soft delete burns the string permanently.
 

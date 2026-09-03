@@ -4,12 +4,15 @@
 1. `GET https://api.comfy.org/nodes/comfyui-old-time-radio/versions?include_status_reason=true`
    and confirm alpha.17 shows ZERO `critical` findings. alpha.16 already measured 0 critical /
    157 info (2026-09-03), so a critical reappearing means the new version reintroduced one.
-2. **Verify the PUBLISHED ARTIFACT, not the commit.** Download
-   `https://cdn.comfy.org/fluxus/comfyui-old-time-radio/2.0.0-alpha.17/node.zip` and confirm its
-   `__init__.py` contains `OTR_ENABLE_HTTP_RENDER_ROUTES`. This step exists because alpha.16
-   published from `8c182b58`, the route gate landed after it in `b198026a`, and the published
-   alpha.16 zip therefore still carries the two unconditional POST routes -- the Boundaries
-   section below is FALSE of alpha.16 and true only from alpha.17 on. A reviewer greps the zip.
+2. **DONE 2026-09-03 -- verified against the PUBLISHED ARTIFACT, not the commit.**
+   `https://cdn.comfy.org/fluxus/comfyui-old-time-radio/2.0.0-alpha.17/node.zip` was downloaded
+   (6,397,276 bytes, 814 files) and its `__init__.py` contains `OTR_ENABLE_HTTP_RENDER_ROUTES`.
+   The shipped `requirements.txt` carries the win32 pycairo marker and the `kokoro-onnx` line,
+   and none of `tests/`, `.claude/`, `.github/`, `kibitz-runs/` leaked into the zip. This step
+   existed because alpha.16 published from `8c182b58`, the route gate landed after it in
+   `b198026a`, and the published alpha.16 zip therefore still carries the two unconditional POST
+   routes -- so the Boundaries section below is FALSE of alpha.16 and TRUE from alpha.17 on.
+   A reviewer greps the zip; now so have we.
 3. Update every finding count below against alpha.17's own scan. The counts are quoted from
    alpha.16 and the scanner's line numbers shift whenever shipped code moves.
 4. Paste the real version ID from that response where marked.
@@ -19,6 +22,14 @@
 Context for whoever files it: every open "Manual review request" on that tracker (#184-#220)
 is unanswered, but admin batch approvals do happen silently (`"Batch approved by admin"` in the
 API's `status_reason`), so the issue is the only lever there is. Keep it factual and short.
+
+**ALPHA.17 IS PUBLISHED (2026-09-03 17:56Z, commit `524426ee`).** So the "publishing
+alpha.17 is the remaining precondition" line at the end of the next paragraph is SATISFIED
+and no longer blocks filing. What still gates the post: alpha.17's scan has to land (it sits
+`Pending` for at least 30 minutes by design), it has to read 0 critical, and the finding
+counts quoted below -- all taken from alpha.16 -- have to be re-checked against alpha.17's
+own `?include_status_reason=true` response, because the scanner's line numbers move whenever
+shipped code moves.
 
 **OPTION (a) LANDED 2026-09-03.** `__init__.py` used to register two unauthenticated POST
 routes, `/otr/video_render_single` and `/otr/video_render_soak`, unconditionally: a JSON body
