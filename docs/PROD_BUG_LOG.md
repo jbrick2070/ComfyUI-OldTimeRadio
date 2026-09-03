@@ -10885,3 +10885,33 @@ here because the loader signals that condition with a plain `ModelLoaderError`
 rather than one of the module's own `CAPACITY_ERRORS`, so consuming it means
 matching message text across seven transports. That is a taxonomy decision worth
 making on purpose, not a mechanical edit to slip into a bug fix.
+
+**ADDENDUM -- why it presented to the operator as "bland boilerplate camera".**
+The operator's read was *"I'm wondering if our camera motion would pass the
+muster of good artistic camera, or it's just bland boilerplate -- that could be
+a part of our stale video runs, video without much movement or action."* The
+symptom was real and the cause was this bug, not the camera writing. With
+derivation failing every time, every character beat received `_NONVERBAL_FALLBACKS`
+verbatim:
+
+```
+expression : a vivid, readable reaction
+motion     : decisive full-body movement matched to the moment
+camera     : mid-shot, slow push-in
+```
+
+The same three strings, on every beat, of every episode -- and `camera` is read
+by eight engines straight into the render prompt, so that IS what the video
+models were animating.
+
+The writer's actual camera work is the opposite of boilerplate. Nineteen
+directives survived truncation across the entire corpus (the count itself
+measures the loss); of those, **63% describe a MOVING camera** and 74% are
+unique: *"Dolly out to show the lab's pressure"*, *"Tilt up from her hands to
+her face"*, *"Track back to frame both characters in the tense moment"*.
+
+**The portable lesson, and it is the useful half of this entry:** uniform,
+lifeless output across every unit of a run is far more often a FALLBACK firing
+than a generator writing badly. Read what the fallback emits before rewriting a
+prompt -- a prompt pass aimed at this symptom would have improved text that was
+being discarded, and left the canned strings exactly where they were.
