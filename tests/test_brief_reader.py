@@ -299,3 +299,64 @@ class TestDottedPathTypoGuard:
             br._read_brief_field({}, None, default=None)  # type: ignore[arg-type]
         with pytest.raises(ValueError):
             br._read_brief_field({}, 42, default=None)  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# spoken_term -- ONE normalisation, shared by every consumer of the brief
+#
+# PBUG-20260903-04. Four modules join `story_brief_terms.setting` into text a
+# model reads: the ghost video composer, the still-image fallback, the ShotLock
+# derivation prompt and the music prompt. Fixing one of them is how the same
+# episode ends up spelled two ways in two prompts, so the normalisation lives
+# here beside `_read_brief_field` and this test pins that they AGREE.
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+@pytest.mark.parametrize("raw, spoken", [
+    ("control_room", "control room"),
+    ("petri_dish", "petri dish"),
+    ("candlelit_period_chamber", "candlelit period chamber"),
+    ("high-security archive", "high-security archive"),   # prose is untouched
+    ("  padded  spacing  ", "padded spacing"),
+    ("", ""),
+    (None, ""),
+])
+def test_spoken_term_normalises_identifier_case(raw, spoken):
+    from nodes._otr_brief_reader import spoken_term
+    assert spoken_term(raw) == spoken
+
+
+def test_every_setting_consumer_spells_an_episode_the_same_way():
+    """The regression this exists for: one consumer normalised, three did not.
+
+    Asserted against the REAL reader in each module rather than a re-derivation,
+    so a consumer that stops routing through `spoken_term` fails here.
+    """
+    meta = {"story_brief_terms": {"setting": ["control_room", "server_room"]},
+            "key_objects": ["archive_reels"]}
+
+    from nodes._otr_video_engines.ghost_signal_author import _setting_terms
+    from nodes.otr_meta_brief_image_prompt import _read_setting as image_setting
+    from nodes.otr_shot_lock import _read_setting as shot_setting
+
+    assert _setting_terms(meta) == ["control room", "server room"]
+    assert image_setting(meta) == "control room, server room"
+    assert shot_setting(meta) == "control room, server room"
+
+    for rendered in (image_setting(meta), shot_setting(meta)):
+        assert "_" not in rendered
+
+
+def test_the_music_prompt_normalises_its_setting_terms():
+    """The MusicGen text prompt composes the same field."""
+    import inspect
+    from nodes import _otr_music_prompt as mp
+
+    assert hasattr(mp, "spoken_term"), (
+        "_otr_music_prompt no longer imports spoken_term; its setting terms "
+        "will reach the MusicGen prompt in identifier case")
+    source = inspect.getsource(mp.compose_music_prompt)
+    assert "spoken_term(t)" in source, (
+        "compose_music_prompt stopped normalising setting_terms")

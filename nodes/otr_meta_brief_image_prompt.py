@@ -38,14 +38,22 @@ def _content_hash(obj) -> str:
 
 
 def _read_setting(meta: dict) -> str:
-    """Brief setting string (mirrors the music-prompt brief read; fail-soft)."""
+    """Brief setting string (mirrors the music-prompt brief read; fail-soft).
+
+    Normalised through `spoken_term`: this string is composed into a still-image
+    DIFFUSION prompt by `compose_image_prompt_fallback`, which is the path that
+    actually runs whenever the writer LLM is unavailable, and the brief emits
+    identifier case (PBUG-20260903-04).
+    """
+    from ._otr_brief_reader import spoken_term
+
     terms = (meta or {}).get("story_brief_terms")
     if not isinstance(terms, dict):
         terms = {}
     setting_raw = terms.get("setting") or []
     if not isinstance(setting_raw, list):
         setting_raw = []
-    setting = [str(t).strip() for t in setting_raw if str(t).strip()]
+    setting = [spoken_term(t) for t in setting_raw if spoken_term(t)]
     return ", ".join(setting[:2])
 
 

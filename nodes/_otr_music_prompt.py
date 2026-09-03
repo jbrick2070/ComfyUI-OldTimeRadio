@@ -22,7 +22,7 @@ brief reader. UTF-8 no BOM, ASCII-only, no em-dashes.
 """
 from __future__ import annotations
 
-from ._otr_brief_reader import _read_brief_field
+from ._otr_brief_reader import _read_brief_field, spoken_term
 
 # Three fixed cues + durations (seconds). Durations are part of cue identity;
 # keep stable (mirrors the legacy MusicGen cue durations).
@@ -86,7 +86,9 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     setting_raw = terms.get("setting") or []
     if not isinstance(setting_raw, list):
         setting_raw = []
-    setting_terms = [str(t).strip() for t in setting_raw if str(t).strip()]
+    # Normalised: this is composed into the MusicGen TEXT prompt below, and the
+    # brief emits identifier case (PBUG-20260903-04).
+    setting_terms = [spoken_term(t) for t in setting_raw if spoken_term(t)]
 
     # Mood: v2 music_mood_terms (via the protocol reader) -> v1 atmosphere ->
     # keyword-mined news.script_brief.

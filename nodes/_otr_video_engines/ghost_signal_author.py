@@ -1430,22 +1430,20 @@ GHOST_V3_KERNEL_MAX_WORDS = 9
 
 
 def _spoken_term(term) -> str:
-    """One brief term as a human would say it, for a prompt a model reads.
+    """One brief term as a human would say it -- see `_otr_brief_reader`.
 
-    The brief's terms are authored by an LLM against a schema that asks for
-    "setting terms" and nothing more, so a share of them arrive in identifier
-    case -- ``control_room``, ``film_reel``, ``petri_dish``, ``concrete_floors``.
-    Nothing downstream ever undid that, and ``resolve_crux_kernel`` joined them
-    into the emitted prompt verbatim: measured across the 1,955 episodes on disk
-    2026-09-03, ``snake_case`` was 690 of the 773 mechanically-bad setting terms
-    and produced kernels reading "archive_reels in the concrete_floors".
-
-    An underscore is never part of what the author meant to say -- it is the
-    schema's punctuation leaking into prose -- so this is a normalisation and
-    not a judgement about the term.  Terms that were already prose are returned
-    unchanged, which is every term on a healthy episode.
+    The implementation lives beside `_read_brief_field` rather than here, because
+    FOUR consumers join `story_brief_terms.setting` into model-facing text (this
+    composer, the still-image fallback, the ShotLock derivation prompt and the
+    music prompt) and normalising one of them is how the same episode ends up
+    spelled two ways in two prompts. This name is kept as the local alias the
+    rest of this module already reads through.
     """
-    return " ".join(str(term or "").replace("_", " ").split())
+    try:
+        from .._otr_brief_reader import spoken_term  # type: ignore
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_brief_reader import spoken_term  # type: ignore
+    return spoken_term(term)
 
 
 def _setting_terms(meta) -> list:

@@ -30,7 +30,33 @@ from __future__ import annotations
 from typing import Any
 
 
-__all__ = ["_read_brief_field"]
+__all__ = ["_read_brief_field", "spoken_term"]
+
+
+def spoken_term(term: Any) -> str:
+    """One brief term as a human would say it, for a prompt a model reads.
+
+    The brief is authored by an LLM against a schema that names its list fields
+    and, for `setting_terms`, defined nothing -- so a share of terms arrive in
+    identifier case: ``control_room``, ``film_reel``, ``petri_dish``,
+    ``concrete_floors``. Nothing downstream undid that, and every consumer that
+    joins those terms into model-facing text emitted them verbatim. Measured
+    2026-09-03 across the 1,955 episodes on disk, ``snake_case`` was 690 of the
+    773 mechanically-bad setting terms (PBUG-20260903-04).
+
+    An underscore is never part of what the author meant to say -- it is the
+    schema's punctuation leaking into prose -- so this is a normalisation, not a
+    judgement about the term. Prose is returned unchanged, which is every term on
+    a healthy episode.
+
+    IT LIVES HERE, beside `_read_brief_field`, for the reason this module was
+    written: *consumers cannot be allowed to drift on how they read a brief
+    field.* Four consumers join `story_brief_terms.setting` into model-facing
+    text -- the ghost video composer, the still-image fallback, the ShotLock
+    derivation prompt and the music prompt -- and fixing one of them is how the
+    same episode ends up spelled two ways in two prompts.
+    """
+    return " ".join(str(term or "").replace("_", " ").split())
 
 
 def _meta(obj: Any) -> dict:

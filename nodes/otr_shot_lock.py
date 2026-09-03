@@ -93,22 +93,30 @@ def _video_role_for_line(line: dict) -> str:
 
 def _read_setting(meta: dict) -> str:
     """Setting string from the Meta brief, via the brief-reader protocol when
-    available; tolerant fallback otherwise."""
+    available; tolerant fallback otherwise.
+
+    Terms are normalised through `spoken_term` because this string is joined
+    into a model-facing prompt and the brief emits identifier case
+    (PBUG-20260903-04). All four consumers of this field normalise the same way,
+    or the same episode gets spelled two ways in two prompts.
+    """
+    from ._otr_brief_reader import spoken_term
+
     terms = (meta or {}).get("story_brief_terms") or {}
     setting = []
     if isinstance(terms, dict):
         raw = terms.get("setting") or []
         if isinstance(raw, list):
-            setting = [str(t).strip() for t in raw if str(t).strip()]
+            setting = [spoken_term(t) for t in raw if spoken_term(t)]
     if not setting:
         try:
             from ._otr_brief_reader import _read_brief_field
 
             raw = _read_brief_field(meta, "setting", default=[])
             if isinstance(raw, list):
-                setting = [str(t).strip() for t in raw if str(t).strip()]
-            elif isinstance(raw, str) and raw.strip():
-                setting = [raw.strip()]
+                setting = [spoken_term(t) for t in raw if spoken_term(t)]
+            elif isinstance(raw, str) and spoken_term(raw):
+                setting = [spoken_term(raw)]
         except Exception:  # noqa: BLE001
             pass
     return ", ".join(setting[:2]) if setting else _FALLBACK_SETTING
