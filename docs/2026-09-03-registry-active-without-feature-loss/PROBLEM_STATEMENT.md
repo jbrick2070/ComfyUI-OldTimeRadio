@@ -18,9 +18,39 @@ Active version that survived.** Because no version is Active, the node record's
 `latest_version` resolves to `null`, and ComfyUI Manager therefore cannot install the pack
 at all — it reports "not a CNR node / cannot resolve install target". Downloads: 0.
 
+## The goal, in the operator's own words and picture
+
+> "My goal is to not be flagged and have nodes registered like this — see screenshot,
+> this is my goal."
+
+He supplied a screenshot of the ComfyUI Registry landing page and drew arrows at one
+specific thing: the **node count** on each card — `ComfyUI-VideoHelperSuite  40 Nodes`,
+`ComfyUI Impact Pack  197 Nodes`, `ComfyUI_essentials  62 Nodes`,
+`ComfyUI-Custom-Scripts  13 Nodes`, `comfyui_controlnet_aux  64 Nodes`,
+`ComfyUI-GGUF  6 Nodes`.
+
+**So success is not just `Active`. Success is: listed, installable, and the card shows
+"34 Nodes".** Treat that as the acceptance criterion.
+
+Note this is not simply a consequence of being Active — on the same page, three Active
+packs show **no** node count at all (`ComfyUI-KJNodes`, `rgthree-comfy`,
+`ComfyUI-Easy-Use`, all with 3–4M downloads), while less-installed packs below them do show
+one. Something other than status drives that panel, and we do not know what.
+
+What we checked and could not explain (verify and correct us):
+- `GET /nodes/<id>` returns **no node-count field at all** for any pack sampled —
+  videohelpersuite, impact-pack, kjnodes, rgthree, and ours. So the count on the card is not
+  coming from that response.
+- `GET /nodes/<id>/comfy-nodes` returns **HTTP 404 for every pack sampled**, including
+  `comfyui-videohelpersuite`, which visibly displays "40 Nodes" on the page. So the count is
+  not coming from that endpoint either, at least not unauthenticated.
+- Our pack already ships `node_list.json` (added in alpha.7), a statically readable list of
+  its node ids — an earlier attempt at exactly this. It has not produced a count.
+
 ## The question
 
-**Is there a path to one Active version that does not require deleting working features?**
+**Is there a path to a listing like those — Active, installable, node count showing — that
+does not require deleting working features?**
 
 The constraint is hard and comes from the operator: **do not remove good features to satisfy
 a scanner.** Reaching zero findings by deleting the operator-knob system, ffmpeg, or the
@@ -175,9 +205,18 @@ Answer these from the **registry-backend source**, not from our summary:
    Python facilities? If it is because the ruleset recently tightened, what changed and when?
 6. **Is there a supported way to get a fresh scan** of an existing version, or is a new version
    string the only way? (Each new string is spent permanently.)
-7. **Given all of the above — is there a route to one Active version that keeps every current
-   feature?** If yes, give the concrete steps. If no, say so, and say what the minimum
-   feature-affecting change would be so the operator can decide with real numbers.
+7. **What populates the "N Nodes" count on a registry card?** This is the operator's actual
+   acceptance criterion and we cannot account for it. Find the service or field that feeds it.
+   Why do `ComfyUI-VideoHelperSuite` (40), `ComfyUI Impact Pack` (197) and `ComfyUI-GGUF` (6)
+   show a count while `ComfyUI-KJNodes`, `rgthree-comfy` and `ComfyUI-Easy-Use` — all Active,
+   all 3M+ downloads — show none? Is it an extraction service that parses
+   `NODE_CLASS_MAPPINGS`, a manifest field, a `node_list.json` convention, or a one-off
+   backfill? Does it require Active status first, or is it independent? **Does anything a
+   publisher controls make it populate?**
+8. **Given all of the above — is there a route to one Active version, installable, with the
+   node count showing, that keeps every current feature?** If yes, give the concrete steps.
+   If no, say so, and say what the minimum feature-affecting change would be so the operator
+   can decide with real numbers.
 
 ## Ground rules for the answer
 
