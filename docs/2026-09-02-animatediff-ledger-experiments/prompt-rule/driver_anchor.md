@@ -395,3 +395,160 @@ kernel in the same shape when v3 lands.
 * The test matrix: nine packs inside 69; the 31 lines of the studied episode through the noun
   selector; `_HUMAN_WORDS` on every vantage; the deterministic fallback over an empty
   `key_objects`; hash/version bumps; the receipts test for the five slots.
+
+## 8. r2 fold (Codex) -- the build splits in two, and the cheap half is the one he wants
+
+Full review: `kibitz-runs/2026-09-02-prompt-v3-crux/r2/codex.md`.
+Driver judgment, with every claim ground against the real files:
+`kibitz-runs/2026-09-02-prompt-v3-crux/r2/judgment.md`.
+
+Codex returned thirteen must-fixes, four should-fixes and two cuts, and its
+verdict was "not build-ready". Accepted, almost in full. Grounding its strongest
+claim reversed the shape of the work in our favour.
+
+**The pivot.** `finalize_ghost_prompt_v2` already takes `ledger_meta`, and the
+render driver already calls it with the live ledger
+(`ghost_signal_author.py:1295-1317`; `render_driver.py:2911-2915`). The prompt
+is composed AT RENDER TIME from a small stored object plus the whole episode
+meta -- so the story is already in the room, and nobody invited it in.
+
+* **Half A -- render-time only.** Resolve the crux kernel from `key_objects`
+  and `story_brief_terms.setting`, stop composing the costume motif, new slot
+  order, drop-to-fit. No ledger field, no author change, no LLM, no bundle flag.
+* **Half B -- plan-time authoring.** New leaf vocabulary, the beat's dialogue
+  reaching the author, subject coverage. Changes the stored object, so it needs
+  the version dispatch and the replay re-author path Codex specified.
+
+Half A is built and proven first.
+
+**The seed, settled.** The planned `request_seed` field is inert; the render
+seed is `_seed_from_hash(render_request_hash, shot_id)`. And
+`request_hash = _content_hash([brief_hash, cast_hash, beat_id, char_id])`
+(`otr_shot_lock.py:1479-1487`) -- **the prompt is not in it.** The v2-vs-v3 A/B
+is same-seed by construction, with no derivation machinery at all. The
+corollary is a trap worth naming: the crux must NOT live inside
+`story_brief_terms`, or `brief_hash` moves and every seed with it.
+
+**The evidence that ends the argument.** "The Faded Ledger", published 21:08
+tonight, is an episode about film canisters, archive shelves and security
+badges in a high-security archive. The lane drew a black shawl, a charcoal coat
+and a charcoal satchel -- three words that appear nowhere in the episode -- on
+four of its beats, two of them a person holding a bag. The table is in the r2
+judgment, section 3.
+
+**Budget, corrected.** `compact_style_cue` is 2-4 words and EMPTY for
+`sci_fi_radio` (`_otr_visual_styles.py:632-653`); the anchor's "4-9 tokens" was
+wrong and the default pack has no cue slot at all. Every slot is re-measured
+with the installed tokenizer before a composition constant is chosen. The good
+news: the motif v3 deletes is longer than the kernel v3 adds, so v3 costs FEWER
+tokens than v2 and the 77-token refusal is not the risk it looked like.
+
+**The governing contract is now V1-V6 in the r2 judgment, section 8.** Where
+R1-R10 (section 6) disagree with V1-V6, V1-V6 win.
+
+## 9. What r3 (wiring, Cursor) must settle
+
+1. **The render seam.** Half A changes `finalize_*` and the driver block at
+   `render_driver.py:2870-2960`. Does anything else read
+   `GHOST_V2_SLOTS`, `prompt_version`, `_ghost_v2_finalized` or the
+   `ghost_*` observability keys -- the trace allowlist, the receipt's causal key
+   set, `otr_stillin_probe_report.py`, the acceptance readers -- such that a v3
+   prompt version breaks a consumer that was written to expect exactly "v2"?
+2. **The receipt.** `actual_request_sha` covers the prompt. Under Half A it
+   MOVES while `render_request_hash` does not. Confirm that is what the
+   instrument's A/A rule expects, and that `scripts/otr_verify_replay.py` reads
+   an A/B (same request hash, different actual sha) as a legitimate difference
+   rather than a corruption.
+3. **The still-in peer.** `ghost_plate_prompt.compose_plate_prompt` has its own
+   protected head and `PLATE_DROP_ORDER`. Where does the kernel sit, is it
+   protected, and does the plate stay inside its own budget when it is?
+4. **The canonical workflow.** Half A should touch no `INPUT_TYPES`, no widget
+   and no link. Confirm that, and name the audits that prove it.
+5. **The other lanes (item 3b).** Every non-Ghost lane composes
+   `appearance, setting, expression, motion[, camera]` through
+   `motion_common.compose_parts`, and `appearance` is the cast row's face
+   paragraph. `ltx25_foley_plus` and `ltx25_mime` already drop it deliberately
+   (`_ltx25_parts(include_appearance=False)`), on the reasoning that the
+   conditioning still already carries identity. Does that reasoning extend to
+   every I2V lane, and which lanes are genuinely exempt (the talking-face lanes
+   `minimax_h3_audio_in`, `humo*`, and any lane with a live T2V path such as
+   `ltx_video`)?
+
+## 10. The budget, MEASURED (r2 contract V5) -- and the operator's question answered
+
+Run: `measure_slots.py` in this folder, against the installed ComfyUI SD1
+tokenizer (`comfy.sd1_clip.SD1Tokenizer`, the same encoder the render uses) and
+the real stored objects of "The Faded Ledger". Full output:
+`slot_budget_measured.txt`.
+
+**Every Ghost v2 prompt in that episode, per slot, in real SD1 tokens:**
+
+| shot | mode | cue | motif | leaf | law | TOTAL |
+|---|---|---|---|---|---|---|
+| music_opening | signal | 5 | 5 | 14 | 17 | 38 |
+| b001 | object | 5 | 7 | 14 | 18 | 41 |
+| b002 | figure | 5 | 13 | 13 | 19 | **47** |
+| b003 | object | 5 | 5 | 13 | 18 | 38 |
+| b004 | figure | 5 | 13 | 12 | 19 | 46 |
+| b005 | signal | 5 | 5 | 13 | 17 | 37 |
+| b006 | signal | 5 | 6 | 12 | 17 | 37 |
+| music_closing | object | 5 | 5 | 13 | 18 | 38 |
+| **mean** | | 5.0 | 7.4 | 13.0 | 17.9 | **40.2** |
+
+**The window is 77 tokens. We are using 40.** Mean headroom 36.8 tokens; even
+the longest prompt in the episode leaves 30 tokens unused.
+
+**This answers the operator's question -- "are we limiting the prompt size too
+much or is that what the specs say" -- with a number: neither.** The spec is 77
+tokens per CLIP window and nothing was pushing against it. The prompts were
+short because they had little to say, not because a limit was squeezing them.
+
+**And it re-reads his other complaint mechanically.** Of the mean 40 tokens:
+
+* **45% is the mode law** -- framing boilerplate: *"mid-shot or wider, whole
+  figure legible, one clear action, unbroken shot"*. Identical on every beat of
+  the same mode.
+* **18% is the motif** -- and on the two `figure` beats it is 13 tokens of
+  invented costume ("a lean figure in a charcoal coat, carrying a satchel").
+* **12% is the pack cue.**
+* **32% is the leaf** -- the only slot that is about this beat at all, and on
+  half these beats it just restates the motif with a verb.
+
+So roughly **three quarters of every prompt is boilerplate or invention**, which
+is precisely *"you are putting way too much ordinary character description,
+that's why we're getting the same thing"*.
+
+**What a v3 kernel actually costs, from this episode's own `key_objects`:**
+
+    film canisters in high-security archive        10 tokens
+    handwritten ledgers in high-security archive   10 tokens
+    archive shelves in high-security archive        9 tokens
+    ink pens in high-security archive               9 tokens
+    security badges in high-security archive        9 tokens
+    [setting alone] high-security archive           6 tokens
+    [light] harsh fluorescent overheads             6 tokens
+
+**v3's arithmetic, worst case:** cue 5 + kernel 10 + leaf 13 + light 6 + law 19
+= **53 tokens, with 24 still spare.** Dropping the 13-token costume motif pays
+for the kernel and the light with change left over. The drop-to-fit order
+(r2 must-fix 9) stays in the design as a safety net, but on real material it
+should never fire.
+
+**Pack cues, measured (r2 must-fix 11 confirmed):**
+
+| pack | cue | tokens |
+|---|---|---|
+| sci_fi_radio | *(empty -- the house look)* | 0 |
+| anime | anime style | 4 |
+| archival_documentary | archival documentary | 4 |
+| cartoon | bright cartoon | 4 |
+| paper_origami | folded paper | 4 |
+| storybook_engraving | storybook engraving | 5 |
+| shakespeare_stage_realism | photorealistic Shakespearean | 6 |
+| recur_frac | recursive fractal light field | 7 |
+| video_art | video-art feedback style | 7 |
+
+The anchor's "4-9 tokens" was wrong at both ends: the range is 0-7, and the
+default pack contributes no cue at all. The two packs the operator is most
+interested in, `video_art` and `recur_frac`, are the most expensive at 7 -- still
+trivial against 24 tokens of spare room.

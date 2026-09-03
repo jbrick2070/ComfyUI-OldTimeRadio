@@ -1,0 +1,44 @@
+tokenizer resolved: True
+
+=== the episode ===
+key_objects: ['film canisters', 'handwritten ledgers', 'archive shelves', 'ink pens', 'security badges']
+setting[0] : ['high-security archive']
+lighting[0]: ['harsh fluorescent overheads']
+
+=== v2 AS RENDERED: per-slot installed SD1 tokens ===
+shot                       mode                 cue motif  leaf   law  TOTAL
+shot_music_opening_001     signal                 5     5    14    17     38
+shot_b001                  object                 5     7    14    18     41
+shot_b002                  figure                 5    13    13    19     47
+shot_b003                  object                 5     5    13    18     38
+shot_b004                  figure                 5    13    12    19     46
+shot_b005                  signal                 5     5    13    17     37
+shot_b006                  signal                 5     6    12    17     37
+shot_music_closing_001     object                 5     5    13    18     38
+MEAN                                            5.0   7.4  13.0  17.9   40.2
+headroom to the 77-token window: 36.8 tokens mean, 30 tokens worst
+
+=== candidate v3 crux kernels (this episode) ===
+  film canisters in high-security archive                    10 tokens
+  handwritten ledgers in high-security archive               10 tokens
+  archive shelves in high-security archive                    9 tokens
+  ink pens in high-security archive                           9 tokens
+  security badges in high-security archive                    9 tokens
+  [setting alone] high-security archive                       6 tokens
+  [light] harsh fluorescent overheads                         6 tokens
+
+=== compact_style_cue per pack (r2 must-fix 11) ===
+  anime                    cue='anime style'                 4 tokens
+  archival_documentary     cue='archival documentary'        4 tokens
+  cartoon                  cue='bright cartoon'              4 tokens
+  paper_origami            cue='folded paper'                4 tokens
+  recur_frac               cue='recursive fractal light field'  7 tokens
+  sci_fi_radio             cue=''                            0 tokens
+  shakespeare_stage_realism cue='photorealistic Shakespearean'  6 tokens
+  storybook_engraving      cue='storybook engraving'         5 tokens
+  video_art                cue='video-art feedback style'    7 tokens
+
+=== GHOST_MODE_LAWS_V2 ===
+  figure   19 tokens  mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  object   18 tokens  the object fills the frame on a table top, one clear action, unbroken shot
+  signal   17 tokens  the object lit against a dark room, moving light across it, unbroken shot
