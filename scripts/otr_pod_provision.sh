@@ -232,6 +232,17 @@ if command -v apt-get >/dev/null 2>&1; then
     || fail "system dependencies libcairo2-dev/pkg-config failed"
 fi
 
+# pycairo is INSTALLED EXPLICITLY HERE, not carried by requirements.txt.
+# 2026-09-03: that file now marks it `sys_platform == 'win32'`, because pycairo
+# ships no Linux wheel and Comfy-Org's node-pack-extract container runs a bare
+# `pip install -r requirements.txt` with no cairo headers -- the build failure
+# killed the extract, which is why the registry card has never shown a node
+# count. This pod is the opposite case: it just installed libcairo2-dev on
+# purpose, so the build succeeds and viz_mxc_mandala stays available exactly as
+# before. Do not "simplify" by deleting this line and un-marking requirements.
+"$COMFY_PY" -m pip install -q "pycairo>=1.24" \
+  || fail "pycairo install failed (libcairo2-dev present but the build did not succeed)"
+
 # Recover template-scoped model/token settings; SSH does not inherit pid 1's
 # environment on common RunPod images. Secrets are never printed.
 otr_pid1_env() {

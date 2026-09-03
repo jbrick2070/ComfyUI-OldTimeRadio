@@ -134,12 +134,39 @@ pyloudnorm>=0.1.1
 # has them only by luck of another pack pulling them in.
 #
 # pycairo: `import cairo` inside nodes/_otr_shared/scope_draw.py and
-# eng_viz_mandala.py, UNGUARDED -- it is a plain import inside the draw
-# function, so on a machine without it every viz_mandala frame and every scope
-# overlay raises ImportError at render time. Confirmed missing on the rented
-# pod today while present here, which is exactly how a gap stays invisible on
-# the box that authors it.
-pycairo>=1.24
+# eng_viz_mandala.py. Confirmed missing on the rented pod on 2026-08-31 while
+# present here, which is exactly how a gap stays invisible on the box that
+# authors it.
+#
+# WINDOWS-ONLY MARKER, 2026-09-03, and the reason is the registry node count.
+# pycairo publishes 21 Windows wheels, 1 sdist and ZERO Linux wheels, so on
+# Linux pip must build from the sdist and that needs the libcairo2-dev headers.
+# Comfy-Org's `node-pack-extract` boots a headless CPU ComfyUI in a Linux
+# container, runs `pip install -r requirements.txt` under `set -e`, and reads
+# /object_info to publish the pack's node list; that list is what Algolia
+# renders as "N Nodes" on the registry card. A pip failure kills the boot, so
+# the pack has never produced rows: /versions/2.0.0-alpha.16/comfy-nodes
+# returns `{"comfy_nodes": null, "totalNumberOfPages": 0}` where
+# comfyui-videohelpersuite/versions/1.7.9 returns real ones. That extractor is
+# independent of Flagged/Active -- an admin approval would not populate it.
+#
+# MEASURED BLAST RADIUS: exactly one function. The only `import cairo` in
+# scope_draw.py is at line 629, indented INSIDE `paint_mandala`, so importing
+# the module never imports cairo; `freq_bars_green`, `cfr_flags`,
+# `find_ffmpeg` and `encode_silent_mp4` are all cairo-free, which leaves the
+# scope overlays, caption burn, silent composite and encode sink untouched.
+# eng_viz_mandala guards both `load()` and `assert_usable()` and raises
+# EngineUnusable naming the pip command, and `viz_mxc_mandala` appears zero
+# times in workflows/otr_canonical.json. So Windows installs exactly as before
+# and Linux loses only the mandala visualizer, which fails loud with the fix in
+# its own message. (The previous comment here claimed every scope overlay
+# raises ImportError without it -- that was never true; only the mandala does.)
+#
+# Mirror this marker into pyproject.toml on the next deliberate version bump,
+# the same way the kokoro lines above are waiting to ride one. The registry
+# reads pyproject's static list for DISPLAY, but the extractor installs from
+# THIS file, so this line is the one that unblocks the node count.
+pycairo>=1.24; sys_platform == 'win32'
 # Pillow: image handling in the cloud-image engine and the media canonicaliser.
 pillow>=10.0
 # aiohttp: imported by __init__.py itself, so it is on the pack's load path.
