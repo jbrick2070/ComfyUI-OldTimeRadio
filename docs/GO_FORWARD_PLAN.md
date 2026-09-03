@@ -1287,3 +1287,32 @@ buys its motion. Item 3b (the other lanes) is amended -- ADD a crux clause besid
 the appearance on silent image-to-video lanes, never drop the face on redundancy
 alone; `wan_ti2v`'s 83-word face inside a 100-word cap is the one place something
 must give.
+
+**THE A/B IS ON SCREEN (2026-09-03 00:20).** Two episodes in `otr/obs/` under the
+same title, told apart by their timestamp:
+
+* **21:08** -- the old prompt (`signal_lost_the_faded_ledger_20260902_210812...`), 145.4 MB
+* **23:59** -- Prompt v3 (`signal_lost_the_faded_ledger_20260902_235930...`), 146.8 MB
+
+Same plan, same seeds, same 107.0s, comparable size at every pipeline stage.
+`scripts/otr_prompt_ab_report.py` returns **seeds identical on 8 of 8, prompts
+differ on 8 of 8**, and every prompt composed live at exactly the token count
+predicted on CPU. Whatever differs on screen differs because of the words.
+
+**It took four legs, and three of them were bug reports** -- PBUG-20260903-01,
+-02 and -03, all in replay code written for the instrument this week, all the
+same shape: a replay skips a stage and something downstream still needs what
+that stage produced. **Two of the three published green**, which is the finding
+worth carrying: `obs_publish OK` is not proof of an episode. The stage table
+(render / blend / caption / credits / mux, each with its duration) is what
+caught them, and a stage that changes the DURATION was the defect every time.
+
+**Queued behind it:** fresh 1-act episodes on `video_art` and `recur_frac`, the
+two packs the operator asked about. Those are new stories rather than the same
+one twice, so they show v3 under a different pack; they are not a comparison.
+
+**Next, in order:** his eye on the pair; then Half B (the beat's own dialogue in
+front of the writer, which is where his motion rule lands); then item 3b on the
+other lanes as amended. The first thing to tune if the pictures read as busy is
+the LIGHT slot -- his own rewrites carry three units where v3 carries four, and
+the light is already first in the drop order.
