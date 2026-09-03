@@ -1224,3 +1224,22 @@ When the sections above are exhausted, continue with `ROADMAP.md`: lean-mean ->
 RunPod/AMD/Mac -> install -> product docs/v2 release. That is a pointer, not work that
 precedes lean-mean. Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md`
 is its sole current scope, blast-radius, coding-order, and verification authority.
+
+**A HUNG CANONICAL LEG WAS FOUND RUNNING AND LEFT ALONE (5080 window, 2026-09-02 22:00).**
+`scripts/otr_canonical_api_run.py --profile otr_ltx25_high_foley_plus --act-count 1
+--source-bank "roll (any eligible bank)" --visual-style "roll (any style)" --timeout 10800`
+started at 20:32 and is still resident, but it is doing nothing: the worker has used
+**1.8 CPU-seconds in ninety minutes**, holds a 48 MB working set (it never imported torch),
+has **no child process**, and nothing is listening on port 8000. It created
+`otr/episodes/pending_20260902_213847/` at 21:38 and has written not one file since. By the
+operator's own five-minute rule that leg is a fail.
+
+**Not killed, deliberately.** It is the other window's process, it holds no VRAM (the GPU sat
+at ~3 GB desktop baseline throughout), and it blocks nothing -- so killing it would destroy
+someone else's context for no gain. It will expire on its own `--timeout 10800` at 23:32.
+It also costs no expected episodes: the operator froze GPU work tonight ("don't waste any GPU
+runs until the prompting is fixed"), so an idle box is what he asked for. Fifteen episodes did
+publish to `otr/obs/` today, the last at 21:08.
+
+Whoever owns that window should read its own launcher output; from outside the process there
+is nothing further to learn.
