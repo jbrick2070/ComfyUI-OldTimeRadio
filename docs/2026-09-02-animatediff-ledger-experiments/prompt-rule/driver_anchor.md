@@ -552,3 +552,53 @@ The anchor's "4-9 tokens" was wrong at both ends: the range is 0-7, and the
 default pack contributes no cue at all. The two packs the operator is most
 interested in, `video_art` and `recur_frac`, are the most expensive at 7 -- still
 trivial against 24 tokens of spare room.
+
+## 11. The driver's own wiring answers (written BEFORE r3 replies, so r3 is checkable)
+
+Section 9 asked r3 five questions. Three of them the driver can answer from the
+files directly, and does, so the reviewer's answer is graded rather than
+trusted.
+
+**Q1 -- does anything break when `prompt_version` says v3?** No production
+consumer branches on the literal string. `GHOST_PROMPT_VERSION_V2` is read in
+exactly one place, `render_driver.py:2923`, where it is STAMPED; the only
+equality test against it lives in `tests/test_ghost_prompt_v2_lane.py:217`.
+`GHOST_V2_SLOTS` has one production consumer, the fallback at
+`render_driver.py:2928`. The `/history` trace allowlist
+(`render_driver.py:4981-5006`) carries `prompt_version` and `prompt_slots` as
+opaque values and never inspects them.
+**So:** the version bump is safe; the work is one test update plus adding
+`prompt_slot_tokens` and `prompt_dropped` to that allowlist (r2 must-fix 12).
+
+**Q2 -- what moves in the receipt, and does the verifier accept it?**
+`_RECEIPT_CAUSAL_KEYS` includes `text_prompt` and `seed`
+(`render_driver.py:4062-4067`), and `actual_request_sha` is the sha256 over
+exactly those keys (`:4179-4182`). Under Half A the prompt changes and the seed
+does not, so **`actual_request_sha` moves and `seed` holds** -- which is the
+signature the A/B wants.
+
+`scripts/otr_verify_replay.py` then splits cleanly:
+
+* its **"seeds equal the source's per shot"** check compares each replay's seed
+  against the SOURCE ledger's seed (`:99-104`). Under v3 that still **passes**,
+  and it is the check that proves the A/B is honest.
+* its **A/A check** (`:105-112`) requires two replays to agree on BOTH `seed`
+  and `actual_request_sha`. A v2-vs-v3 pair differs on the sha **by design**, so
+  run as-is it would report FAIL on a correct experiment.
+
+**So:** the verifier needs one addition -- an A/B mode that asserts equal seeds
+and *unequal* prompt shas, with the plate rule (`:113-122`) still requiring equal
+plate hashes only where both rows carry one. That is a script change, not a node
+change, and it is the honest way to make the tool state what it proved.
+
+**Q4 -- does Half A touch the canonical workflow?** No. It changes
+`ghost_signal_prompt.py`, `ghost_signal_author.py` and the driver block at
+`render_driver.py:2870-2960`. No `INPUT_TYPES`, no widget, no link, no node
+signature. The JSON round-trip, `OTR_WorkflowValidator`,
+`test_widget_value_alignment`, `test_canonical_widget_input_parity` and
+`test_workflow_link_target_indexes` all run anyway, and `build_variants --check`
+with them.
+
+Q3 (the plate's protected head) and Q5 (the other lanes) are left open for r3.
+Q5's measurement is already done and lives in `other_lanes_audit.md`; what r3 is
+asked for there is the wiring judgment, not the count.
