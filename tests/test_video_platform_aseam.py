@@ -405,6 +405,72 @@ def test_shotlock_derives_orphans_from_beat():
     assert "grim resolve" in c["text_prompt"] and "spacer" in c["text_prompt"]
 
 
+# --- PBUG-20260903-07: the reply budget must fit the reply -------------------
+# Live proof on the 5080 (gemma-4-12b-it, a FOUR-beat batch): at the historical
+# flat 300 the reply stopped mid-object and 0 of 4 beats parsed; at 1200 all 4
+# parsed. Production batches 15. Every character beat of every episode was
+# falling through to the deterministic template because of this one constant.
+
+
+def test_the_reply_budget_scales_with_the_batch_not_a_flat_constant():
+    # One directive row costs ~60 tokens, so a full batch cannot fit in 300.
+    # This is the arithmetic that was never done.
+    assert sl._directive_token_budget(15) >= 15 * 60
+    assert sl._directive_token_budget(15) > sl.WRITER_REPLY_TOKENS_DEFAULT
+    # It must also GROW with the batch, not just be a bigger constant.
+    assert sl._directive_token_budget(15) > sl._directive_token_budget(4)
+    # ...and stay bounded, so a runaway batch cannot ask for an unbounded reply.
+    assert sl._directive_token_budget(10_000) == sl.DIRECTIVE_TOKEN_CEILING
+
+
+def test_a_cut_off_reply_is_named_truncated_not_merely_unparseable():
+    # The three causes the old "empty/unparseable" wording conflated. Only the
+    # first is recoverable, so only naming it makes the reseed able to act.
+    cut = '[{"beat_id": "b1", "expression": "grim resolve", "motion": "steps'
+    assert sl._classify_unparsed_reply(cut) == "truncated"
+    assert sl._classify_unparsed_reply("") == "empty"
+    assert sl._classify_unparsed_reply("   ") == "empty"
+    assert sl._classify_unparsed_reply("I cannot help with that.") == "malformed"
+    # A complete reply inside a fence is NOT truncated.
+    assert sl._classify_unparsed_reply('```json\n[{"beat_id": "b1"}]\n```') != "truncated"
+
+
+def test_a_truncated_reply_reseeds_at_a_bigger_budget_not_the_same_one(monkeypatch):
+    """The reseed must CHANGE something. Retrying a truncation under the same
+    ceiling reproduces it exactly -- which is what shipped: three identical
+    attempts, three identical cuts, and a warning that blamed the model."""
+    budgets = []
+    # Long enough that the first budget cannot hold it -- the production shape,
+    # where 15 rows of unbounded expression/motion/camera overran a flat 300.
+    full = json.dumps([{"beat_id": "b1", "expression": "grim resolve",
+                        "motion": ("steps forward, hands trembling near the "
+                                   "console, head tilting sharply, " * 24),
+                        "camera": "tight medium shot, rapid slight zoom-in"}])
+
+    def fake_gen(_messages, temperature=0.1, max_new_tokens=300):
+        budgets.append(int(max_new_tokens))
+        # ~4 chars per token: a small ceiling cuts the JSON mid-string.
+        return full if max_new_tokens * 4 >= len(full) else full[:max_new_tokens * 4]
+
+    assert len(full) > sl._directive_token_budget(1) * 4, "fake must actually truncate"
+
+    monkeypatch.setattr(sl, "_resolve_writer_llm_binding",
+                        lambda *a, **k: (fake_gen, "test/writer"))
+    led = _char_ledger()
+    creative, warns = sl.derive_creative_directives(
+        _char_beat(), led["meta"], led, batch_size=1,
+    )
+    # It escalated rather than repeating itself.
+    assert len(budgets) >= 2, "reseed never happened"
+    assert budgets[1] > budgets[0], f"reseed repeated the same budget: {budgets}"
+    # The warning names the real cause and prints the number that mattered.
+    assert any("truncated" in w for w in warns), warns
+    assert any("budget" in w for w in warns), warns
+    # And the beat lands on the writer, not the template.
+    assert creative["b1"]["source"] == "llm"
+    assert creative["b1"]["motion"].startswith("steps forward")
+
+
 def test_shotlock_all_visualizers_skip_writer_visual_directives(monkeypatch):
     calls = {"n": 0}
 
@@ -412,6 +478,12 @@ def test_shotlock_all_visualizers_skip_writer_visual_directives(monkeypatch):
         calls["n"] += 1
         raise AssertionError("all-visualizer run must not resolve writer LLM")
 
+    # Guard the CHOKEPOINT, not one of the two doors to it. `_resolve_writer_llm`
+    # is a thin wrapper; `_resolve_writer_llm_binding` is what actually resolves
+    # and loads a model, and derivation reaches it directly so it can size its
+    # own reply budget. Patching the wrapper alone left this assertion unable to
+    # fire (2026-09-03).
+    monkeypatch.setattr(sl, "_resolve_writer_llm_binding", must_not_resolve)
     monkeypatch.setattr(sl, "_resolve_writer_llm", must_not_resolve)
     ledger = {
         "cast": [{"char_id": "c1", "name": "BABA",

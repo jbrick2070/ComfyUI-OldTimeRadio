@@ -1644,12 +1644,22 @@ def _apply_llm_slot_fill(
     plan = _CASTPLAN.build_cast_plan(
         ensemble_slots, voice_by_char_id, age_band_by_char_id=age_by_char_id)
     prompt = _build_pass1_prompt(plan, news_seed, style)
+    # The reply is one JSON row PER SLOT, so its length scales with the cast --
+    # a flat budget is the PBUG-20260903-07 defect class (the same shape cost
+    # the video path every character directive in every episode). A row of the
+    # prompt's own shape, with both texture notes at their stated 6-10 word cap,
+    # runs ~44 tokens; 60 leaves headroom for a long name and JSON whitespace.
+    # The old flat 400 was sized against the legacy 6-slot ceiling and never
+    # rechecked when the UI ceiling became _FABLE2_MAX_CAST = 10, where the
+    # arithmetic (10 x 44 = 440) already overruns it. This lane has NO retry, so
+    # a truncation here does not degrade -- it stops the episode.
+    slot_budget = max(400, len(plan) * 60 + 80)
     # LLM slot: creative -- cast naming + texture is a creative-writing pass; it
     # reuses the writer's creative_fn (no new model_id widget, PD6).
     try:
         raw = generate_fn(
             [{"role": "user", "content": prompt}],
-            temperature=0.7, max_new_tokens=400,
+            temperature=0.7, max_new_tokens=slot_budget,
         )
     except Exception as exc:  # noqa: BLE001 -- loader/LLM varies
         # NO-FALLBACK rip (2026-07-03): opt-in naming LLM failure = LOUD stop,

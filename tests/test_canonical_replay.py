@@ -427,8 +427,13 @@ def test_the_assembler_refuses_a_descriptor_for_another_workspace(frozen):
 def test_shot_lock_reuses_the_planned_section_without_an_llm(frozen, monkeypatch):
     from nodes import otr_shot_lock as SL
     sj, led = _replay_ledger_json(frozen)
-    monkeypatch.setattr(SL, "_resolve_writer_llm",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("LLM resolved on replay")))
+    _refuse = lambda *a, **k: (_ for _ in ()).throw(  # noqa: E731
+        AssertionError("LLM resolved on replay"))
+    # Both doors: derivation resolves the BINDING directly (it sizes its own
+    # reply budget), so guarding only the wrapper cannot catch a replay that
+    # wrongly reaches for a model.
+    monkeypatch.setattr(SL, "_resolve_writer_llm_binding", _refuse)
+    monkeypatch.setattr(SL, "_resolve_writer_llm", _refuse)
     policy = json.dumps({"policy_version": 2, "canvas": {"fps": 25}})
     patched, revision, report, done, episode_id = SL.OTRShotLock().lock(sj, audio_done="", video_policy_json=policy)
     assert revision == 2 and done == "shot_lock:done:rev=2" and "replay" in report

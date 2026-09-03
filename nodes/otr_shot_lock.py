@@ -1084,11 +1084,80 @@ def _subject_anchor(appearance: str) -> str:
 
 
 
+# --- Reply budget (PBUG-20260903-07) ----------------------------------------
+# A directive row -- beat_id + expression + motion + camera, JSON-quoted --
+# costs ~60 tokens on the live writer. The wrapper below spent five months
+# handing EVERY caller a flat 300, while `derive_creative_directives` batches
+# up to `batch_size=15` beats and asks for one row each: ~900 tokens of reply
+# against a 300-token ceiling. The reply stopped mid-object, `_parse_directives`
+# reported it as unparseable, and the reseed loop then retried the SAME prompt
+# under the SAME ceiling -- so all three attempts failed identically and every
+# character beat in every episode fell through to the deterministic template.
+#
+# Proven live on the 5080 (2026-09-03, gemma-4-12b-it, a FOUR-beat batch --
+# well under the production 15):
+#     max_new_tokens=300  -> reply ends '"slow push-in on the eyes."\n  ' -> 0/4 parsed
+#     max_new_tokens=1200 -> reply ends '}\n]\n```'                       -> 4/4 parsed
+# The model was never the problem; it was being cut off mid-sentence.
+WRITER_REPLY_TOKENS_DEFAULT = 300      # historical flat budget: short single-shot asks
+# 110, not the ~73/beat the probe measured: neither batch-prompt builder caps
+# the length of expression/motion/camera (the nonverbal one actively asks for
+# "two or three visible physical actions... name the concrete verbs, objects and
+# materials"), so a verbose sample is normal rather than exceptional -- and the
+# 300-budget probe run WAS the verbose one, which is why it got cut. Granting
+# more than the model uses is free; granting less costs the whole batch.
+DIRECTIVE_TOKENS_PER_BEAT = 110
+DIRECTIVE_TOKEN_OVERHEAD = 120         # fences, brackets, the model's habitual preamble
+DIRECTIVE_TOKEN_CEILING = 2400         # escalation stop: past this the prompt is at fault
+#
+# NOT TAKEN, deliberately, and worth knowing about: `_otr_generation_budget`
+# already ships `_otr_fail_on_output_limit`, a payload flag every transport
+# honours that turns "the reply hit its ceiling" into a raise instead of a
+# truncated string -- authoritative where `_classify_unparsed_reply` below is a
+# heuristic. It is not wired here because the loader signals that condition with
+# a plain `ModelLoaderError` rather than one of the module's own CAPACITY_ERRORS,
+# so consuming it means matching on message text across seven transports. That
+# is a taxonomy decision, not a mechanical one. The heuristic needs no such
+# taxonomy and also works for an injected `llm_fn`.
+
+
+def _directive_token_budget(beat_count: int) -> int:
+    """Reply budget for a derivation batch of ``beat_count`` beats.
+
+    Sized to the ACTUAL request. Over-granting is free -- generation stops at
+    the closing bracket -- whereas under-granting truncates the JSON and costs
+    the whole batch, so this errs high on purpose.
+    """
+    beats = max(1, int(beat_count or 1))
+    want = beats * DIRECTIVE_TOKENS_PER_BEAT + DIRECTIVE_TOKEN_OVERHEAD
+    return max(WRITER_REPLY_TOKENS_DEFAULT, min(want, DIRECTIVE_TOKEN_CEILING))
+
+
+def _classify_unparsed_reply(raw: str) -> str:
+    """Name the SHAPE of a reply that did not yield a full batch.
+
+    `_parse_directives` returns {} for three unrelated causes and the old
+    warning called all of them "empty/unparseable", which is why this defect
+    survived weeks of green logs: the one word that would have identified it --
+    truncated -- was never printed. Truncation is the recoverable one (raise the
+    budget); the other two are not, so they must be told apart.
+    """
+    txt = str(raw or "").strip()
+    if not txt:
+        return "empty"
+    # JSON that opened and never closed is a reply the sampler cut off.
+    if ("[" in txt or "{" in txt) and not txt.rstrip("`").rstrip().endswith(("]", "}")):
+        return "truncated"
+    return "malformed"
+
+
 def _parse_directives(raw: str, expected_ids: list) -> dict:
     """Parse a batch LLM reply into ``{beat_id:{expression,motion,camera}}``.
 
     Returns ``{}`` on empty / unparseable / truncated output (the collapse
-    guard's trigger). Accepts a JSON list or object; tolerant of extra keys.
+    guard's trigger); :func:`_classify_unparsed_reply` tells those three apart
+    for the caller's warning. Accepts a JSON list or object; tolerant of extra
+    keys.
     """
     if not raw or not str(raw).strip():
         return {}
@@ -1327,8 +1396,20 @@ def derive_creative_directives(
             preserves_dialogue_for_role[_role] = _lane_preserves_dialogue(
                 _policy_engine_for_role(video_policy, _role), _role)
 
+    # The budget is sized to the REQUEST, not to a constant: this pass asks for
+    # one JSON row per beat, so the reply grows with the batch (PBUG-20260903-07).
+    # Keep the raw generator too -- a truncated reply is recoverable by re-binding
+    # a bigger budget, and that must not cost a model re-resolution.
+    directive_budget = _directive_token_budget(batch_size)
+    writer_gen = None
     if llm_fn is None:
-        llm_fn = _resolve_writer_llm(meta, warnings)
+        writer_gen, writer_model_id = _resolve_writer_llm_binding(meta, warnings)
+        if writer_gen is not None:
+            llm_fn = _writer_call_at(writer_gen, directive_budget)
+            log.info(
+                "[shot_lock] derivation writer %s: %d char beats, batch %d, "
+                "reply budget %d tokens",
+                writer_model_id, len(char_beats), batch_size, directive_budget)
 
     setting = _read_setting(meta)
     brief_hash = _content_hash(meta.get("story_brief_terms") or meta.get("story_brief") or {})
@@ -1349,9 +1430,11 @@ def derive_creative_directives(
                       if batch_preserves_dialogue
                       else _build_nonverbal_batch_prompt(
                           batch, meta, ledger, setting))
+            attempt_fn = llm_fn
+            budget = directive_budget
             for attempt in range(max_reseed + 1):
                 try:
-                    raw = llm_fn(prompt)
+                    raw = attempt_fn(prompt)
                 except Exception as exc:  # noqa: BLE001
                     warnings.append(f"derivation llm_fn raised ({exc}); reseed {attempt}")
                     raw = ""
@@ -1362,10 +1445,32 @@ def derive_creative_directives(
                 if directives and all(bid in directives for bid in expected):
                     break
                 if attempt < max_reseed:
-                    warnings.append(
-                        f"empty/unparseable derivation for batch "
-                        f"{expected[:1]}..; reseed {attempt + 1}/{max_reseed}"
-                    )
+                    # SAY WHICH FAILURE IT IS. The old wording -- "empty/
+                    # unparseable" -- covered three unrelated causes, so a
+                    # truncation read exactly like a refusal and the one number
+                    # that mattered (the budget) never appeared in any log.
+                    shape = _classify_unparsed_reply(raw)
+                    detail = ("%s derivation for batch %s..; reseed %d/%d "
+                              "(%d of %d beats parsed, reply %d chars, "
+                              "budget %d tokens)"
+                              % (shape, expected[:1], attempt + 1, max_reseed,
+                                 len(directives), len(expected),
+                                 len(str(raw or "")), budget))
+                    warnings.append(detail)
+                    log.warning("[shot_lock] %s", detail)
+                    log.debug("[shot_lock] reply tail: %r", str(raw or "")[-240:])
+                    # A retry under the SAME budget reproduces a truncation
+                    # exactly -- same prompt, same ceiling, same cut. Give the
+                    # reseed something to do: re-bind a bigger reply budget.
+                    # Only possible when we resolved the generator ourselves;
+                    # an injected llm_fn owns its own budget.
+                    if (shape == "truncated" and writer_gen is not None
+                            and budget < DIRECTIVE_TOKEN_CEILING):
+                        budget = min(budget * 2, DIRECTIVE_TOKEN_CEILING)
+                        attempt_fn = _writer_call_at(writer_gen, budget)
+                        log.warning(
+                            "[shot_lock] reply was cut off mid-JSON; "
+                            "reseeding at %d tokens", budget)
         for b in batch:
             appearance = _appearance_for_char(ledger, b["char_id"])
             d = directives.get(b["beat_id"]) or {}
@@ -1568,30 +1673,40 @@ def _resolve_writer_llm_binding(meta: dict, warnings: list):
         raise
 
 
-def _resolve_writer_llm(meta: dict, warnings: list):
+def _writer_call_at(gen, max_new_tokens: int):
+    """Bind a raw message generator to ONE reply budget.
+
+    Split out so a caller that knows how much reply it asked for can size the
+    budget to the request instead of inheriting a flat constant, and so the
+    reseed loop can re-bind a bigger budget without re-resolving the model.
+    """
+    def _call(prompt: str) -> str:
+        # 0.1 not 0.0: the local HF lane hardcodes do_sample=True and
+        # transformers rejects a non-positive temperature (live 30w4
+        # catch); 0.1 is near-greedy for short derivation prompts.
+        return gen([{"role": "user", "content": str(prompt)}],
+                   temperature=0.1, max_new_tokens=int(max_new_tokens))
+
+    return _call
+
+
+def _resolve_writer_llm(meta: dict, warnings: list,
+                        max_new_tokens: int = WRITER_REPLY_TOKENS_DEFAULT):
     """Best-effort writer-slot LLM resolver (V-11: no new model_id widget --
     the model name comes from the ledger meta the writer stamped). Returns a
     ``callable(prompt)->str`` or None. Fails soft to None in headless/test mode
     so the deterministic template carries the episode (the live wiring lands
     with the M4 GPU gate before CW-6).
 
-    UNCHANGED CALL SURFACE. Every M4 caller still hands it a prompt STRING and
-    still gets 0.1 / 300 -- the only thing that moved is where the slot is
-    resolved (:func:`_resolve_writer_llm_binding`), so Ghost can reach the raw
-    message generator without this wrapper's fixed budget.
+    UNCHANGED CALL SURFACE. Every M4 caller still hands it a prompt STRING, and
+    an omitted budget still yields the historical 300. ``max_new_tokens`` exists
+    because that constant was silently wrong for the one caller whose reply
+    length scales with a batch -- see :func:`_directive_token_budget`.
     """
     gen, _model_id = _resolve_writer_llm_binding(meta, warnings)
     if gen is None:
         return None
-
-    def _call(prompt: str) -> str:
-        # 0.1 not 0.0: the local HF lane hardcodes do_sample=True and
-        # transformers rejects a non-positive temperature (live 30w4
-        # catch); 0.1 is near-greedy for short derivation prompts.
-        return gen([{"role": "user", "content": str(prompt)}],
-                   temperature=0.1, max_new_tokens=300)
-
-    return _call
+    return _writer_call_at(gen, max_new_tokens)
 
 
 # ---------------------------------------------------------------------------

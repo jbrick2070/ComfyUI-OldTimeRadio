@@ -10790,3 +10790,98 @@ this engine: *a hardcoded allowlist that decides behaviour by identity will go
 stale silently, and the staleness is invisible precisely because the omitted
 member still renders successfully.* The corollary is the test that makes the
 union of decisions cover the registry.
+
+## PBUG-20260903-07 -- every character directive in every episode was thrown away, because one reply budget was a constant and the reply was not
+
+**Status:** ROOT-FIXED and LIVE-PROVEN 2026-09-03. **Verified by:** a live probe
+against the real writer on the 5080, before and after, at production batch size.
+
+**What the operator saw.** *"Character movement was ok but buggy and
+constrained... I feel we need more prompting movement."* And, on the ledgers,
+`video.warnings` carrying the same three lines for every episode sampled:
+
+```
+empty/unparseable derivation for batch ['b002']..; reseed 1/2
+empty/unparseable derivation for batch ['b002']..; reseed 2/2
+writer LLM produced no usable nonverbal directive for ...
+```
+
+**The mechanism.** `derive_creative_directives` batches up to `batch_size=15`
+beats and asks the writer for a JSON list with one object per beat --
+`{beat_id, expression, motion, camera}`. It reached the model through
+`_resolve_writer_llm`, whose closure hardcoded `max_new_tokens=300` for every
+caller. A directive row costs ~73 tokens, so a full batch needs ~1,100 and gets
+300. The reply stopped mid-object, `_parse_directives` returned `{}` -- it
+returns `{}` for empty, malformed AND truncated alike -- and the reseed loop
+then retried **the same prompt under the same ceiling**, so all three attempts
+failed identically. Every character beat fell through to the deterministic
+template, and the story content sitting in `beat_intent` never reached a picture.
+
+**The live proof, and it is unambiguous.** Real writer, real ledger:
+
+```
+gemma-4-12b-it, a FOUR-beat batch (production batches 15):
+  max_new_tokens=300  -> reply ends '"slow push-in on the eyes."'  -> 0 of 4 parsed
+  max_new_tokens=1200 -> reply ends '}\n]\n```'                    -> 4 of 4 parsed
+```
+
+The model was never the problem. It was being cut off mid-sentence, and what it
+was producing is exactly what the operator had been asking for: *"Leaning
+forward, hands trembling near the console, head tilting sharply."*
+
+**After the fix**, same function, real writer (Mistral-Nemo this time, so the
+result is not model-specific), a 14-beat batch:
+
+```
+SOURCE BREAKDOWN: {'llm': 14}      beats with a real motion/camera directive: 14 of 14
+WARNINGS (0)
+```
+
+**Three defects at one site, and the budget was only the first.**
+1. **The budget was a constant while the reply was variable.**
+   `_directive_token_budget(n)` now sizes it to the request (110/beat + 120,
+   floored at the historical 300 and ceilinged at 2,400). 110 rather than the
+   measured ~73 because neither batch-prompt builder caps the field lengths --
+   the nonverbal one actively asks for "two or three visible physical actions" --
+   so a verbose sample is normal, and the 300-budget probe run WAS the verbose
+   one. Over-granting is free; generation stops at the closing bracket.
+2. **The reseed changed nothing.** Retrying a truncation under the same ceiling
+   reproduces it exactly. It now re-binds a doubled budget (no model
+   re-resolution -- `_writer_call_at` binds a generator to one budget), so a
+   reseed has something to do.
+3. **The warning named the wrong thing.** "empty/unparseable" covered three
+   unrelated causes, so a truncation read exactly like a refusal and the one
+   number that mattered never appeared in any log. `_classify_unparsed_reply`
+   tells empty / truncated / malformed apart, and the warning now prints the
+   parsed count, the reply length and the budget.
+
+**The sibling, found by fan-out and fixed in the same change.**
+`_otr_casting.py::_apply_llm_slot_fill` batches one JSON row per cast slot into
+a flat `max_new_tokens=400`. That was sized against the legacy 6-slot ceiling and
+never rechecked when the UI ceiling became `_FABLE2_MAX_CAST = 10`, where the
+arithmetic (10 x ~44 = 440) already overruns it -- and that lane has NO retry, so
+a truncation stops the episode rather than degrading. Now `len(plan) * 60 + 80`.
+
+**Cleared, so nobody re-audits them:** `otr_meta_brief_image_prompt.py`'s two
+call sites inherit the very same 300-token wrapper, and are genuinely FINE --
+they ask for ONE short line per call in a per-character loop, never a batch, so
+300 was never the binding constraint. The story-brief reflection passes use
+fixed-shape schemas that do not scale with cast or beat count, and already stamp
+an explicit `*_status: "failed"` instead of failing silently.
+
+**The portable lesson.** A fixed output-token budget behind a variable-size
+request is a defect even when nothing errors: the failure surfaces as a parse
+miss, gets blamed on the model, and survives indefinitely because the logs never
+print the budget. Two rules fall out of it, and they are cheap:
+- **Size the budget to the request** wherever the reply scales with a count.
+- **A retry must change something.** An identical retry of a deterministic
+  shortfall is a guaranteed-identical failure that costs real model time.
+
+**Also worth knowing, deliberately not taken:** `_otr_generation_budget` already
+ships `_otr_fail_on_output_limit`, a payload flag all seven transports honour that
+turns "the reply hit its ceiling" into a raise instead of a truncated string --
+authoritative where `_classify_unparsed_reply` is a heuristic. It is not wired
+here because the loader signals that condition with a plain `ModelLoaderError`
+rather than one of the module's own `CAPACITY_ERRORS`, so consuming it means
+matching message text across seven transports. That is a taxonomy decision worth
+making on purpose, not a mechanical edit to slip into a bug fix.
