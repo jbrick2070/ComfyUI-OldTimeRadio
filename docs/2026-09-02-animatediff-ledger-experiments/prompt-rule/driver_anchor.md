@@ -713,3 +713,36 @@ episodes if `final_audio_path` were ever absent. Not a production bug -- no live
 failure has occurred, so it earns no PBUG entry -- but the fallback is dead code
 that looks like a safety net, and the honest fix is to rename the master with
 the episode rather than to widen the glob.
+
+## 15. r4 fold (Sonnet) -- CONVERGED, with one regression caught that r2 and r3 both missed
+
+Judgment: `kibitz-runs/2026-09-02-prompt-v3-crux/r4/judgment.md`.
+Verdict: converged. Five open spec gaps named, all five real, all five closed
+before code.
+
+**The one that mattered.** The mode law being deleted is not framing boilerplate
+after all. The comment above it records a measured same-seed pair -- **4 of 4
+recognisable subjects with a concrete noun in the prompt, 0 of 4 without** -- and
+the rule it draws is "legibility tracks concrete nouns". The law's real job was
+forcing a real thing into every prompt. v3's kernel does that better ("film
+canisters" beats "the object") **except when the brief failed**, where
+`key_objects` and `setting` both stamp empty and the prompt would have named
+nothing at all. That is the 0-of-4 condition, rebuilt on purpose.
+
+Closed with a fourth tier: the kernel ladder ends in the beat's **bookend radio
+object** (a bakelite radio set, a glowing radio dial, a broadcast console, a
+spinning turntable). Always present, always drawable, never a costume. A
+brief-failed episode draws the radio world instead of a field of nothing.
+
+**The other four, closed:** the motion pool is new and subject-agnostic rather
+than the person-centric v2 fallback clauses, keyed by vantage and sized against
+the real five-act exhaustion incident; `ghost_motif_cue` and
+`ghost_drawable_beat` keep being stamped but gain a comment saying they describe
+the AUTHORED object, not the rendered text (they would otherwise publish a coat
+on a beat that has none); the vantage table is written down explicitly with
+`signal` keeping the light language and dropping the light slot; and the phantom
+"tail" slot inherited from a superseded draft is cut by name.
+
+**Governing contract: X1-X6 in the r4 judgment, section 6.** The arc is closed --
+r1 Fable cold plus Antigravity, r2 Codex, r3 Cursor, r4 Sonnet. Four rounds, four
+seats, eight grounded reversals of the driver's own plan. Code starts.

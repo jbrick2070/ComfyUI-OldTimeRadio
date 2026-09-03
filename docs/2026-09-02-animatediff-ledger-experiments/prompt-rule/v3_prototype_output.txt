@@ -1,0 +1,166 @@
+====================================================================================================
+EPISODE : signal_lost_the_faded_ledger_20260902_210812
+STYLE   : storybook_engraving   BANK: media_archive   SHOTS: 8
+BRIEF   : A high-security archive filled with film canisters and dusty ledgers where an archivist and a cynical consultant race against a security sweep.
+====================================================================================================
+
+[0] shot_music_opening_001 mode=signal  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a spinning turntable, a turntable spins in the dark as a light beam sweeps it, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (39 tok): storybook engraving. a glowing radio dial, with the film canisters in the high-security archive behind it, trembling faintly, lit against the dark, the light moving
+
+[1] shot_b001              mode=object  kernel_source=key_object
+  v2 (41 tok): storybook engraving. a bakelite radio set, the bakelite radio sits on a table as a dial turns, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (42 tok): storybook engraving. a bakelite radio set, with the handwritten ledgers in the high-security archive behind it, harsh fluorescent overheads, turning slowly in place, the object large in the frame
+
+[2] shot_b002              mode=figure  kernel_source=key_object
+  v2 (47 tok): storybook engraving. a tall figure in a black shawl, carrying a ledger, a figure in a shawl holds a ledger toward a desk, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (35 tok): storybook engraving. archive shelves in the high-security archive, harsh fluorescent overheads, shifting as the light crosses it, wide, the people small in the space
+
+[3] shot_b003              mode=object  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a black ledger, a black ledger lies open as a hand flips the pages, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (29 tok): storybook engraving. ink pens in the high-security archive, harsh fluorescent overheads, drifting slowly, the object large in the frame
+
+[4] shot_b004              mode=figure  kernel_source=key_object
+  v2 (46 tok): storybook engraving. a lean figure in a charcoal coat, carrying a satchel, a figure in a charcoal coat holds a satchel out, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (34 tok): storybook engraving. security badges in the high-security archive, harsh fluorescent overheads, sliding out of the dark, wide, the people small in the space
+
+[5] shot_b005              mode=signal  kernel_source=key_object
+  v2 (37 tok): storybook engraving. a charcoal satchel, a charcoal satchel sits on a desk under a moving light, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (29 tok): storybook engraving. film canisters in the film storage vault, stirring once and going still, lit against the dark, the light moving
+
+[6] shot_b006              mode=signal  kernel_source=key_object
+  v2 (37 tok): storybook engraving. a glowing radio dial, a glowing radio dial flickers in a dark room, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (38 tok): storybook engraving. a glowing radio dial, with the handwritten ledgers in the film storage vault behind it, settling in the still air, lit against the dark, the light moving
+
+[7] shot_music_closing_001 mode=object  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a broadcast console, the broadcast console sits on a metal stand as lights blink, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (41 tok): storybook engraving. a bakelite radio set, with the archive shelves in the film storage vault behind it, harsh fluorescent overheads, moving with the draught, the object large in the frame
+
+MEAN TOKENS  v2=40.2  v3=35.9  (window 77, author target 69)
+MAX  TOKENS  v2=47    v3=42
+v3 beats over the 69 author target: 0 ; over the 77 window: 0
+====================================================================================================
+EPISODE : signal_lost_the_last_reading_20260902_190630
+STYLE   : storybook_engraving   BANK: scifi_news_pro   SHOTS: 29
+BRIEF   : A claustrophobic research station monitors a mysterious floating landmass that defies the laws of physics.
+====================================================================================================
+
+[0] shot_music_opening_001 mode=object  kernel_source=key_object
+  v2 (37 tok): storybook engraving. a broadcast console, it lights from cold to warm on the studio desk, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (44 tok): storybook engraving. a bakelite radio set, with the handheld brass communicator in the subsurface research station behind it, flickering fluorescent, shifting as the light crosses it, the object large in the frame
+
+[1] shot_shot_000_b1       mode=signal  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a glowing radio dial, a warm light finds it in the dark studio, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (39 tok): storybook engraving. a glowing radio dial, with the telemetry screens in the subsurface research station behind it, stirring once and going still, lit against the dark, the light moving
+
+[2] shot_shot_001_b1       mode=figure  kernel_source=key_object
+  v2 (47 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure tilts toward a sound somewhere off the frame, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (32 tok): storybook engraving. data logs in the subsurface research station, flickering fluorescent, turning slowly in place, wide, the people small in the space
+
+[3] shot_shot_001_b2       mode=object  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a cream lantern, it gleams once as the lamp above it steadies, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (32 tok): storybook engraving. hydrographic charts in the subsurface research station, flickering fluorescent, settling in the still air, the object large in the frame
+
+[4] shot_shot_001_b3       mode=figure  kernel_source=key_object
+  v2 (48 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure turns a page and holds the paper to the lamp, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (33 tok): storybook engraving. handheld brass communicator in the remote reservoir, flickering fluorescent, sliding out of the dark, wide, the people small in the space
+
+[5] shot_shot_001_b4       mode=signal  kernel_source=key_object
+  v2 (35 tok): storybook engraving. a cream lantern, the light leaves it and the room goes dim, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (25 tok): storybook engraving. telemetry screens in the remote reservoir, drifting slowly, lit against the dark, the light moving
+
+[6] shot_shot_001_b5       mode=figure  kernel_source=key_object
+  v2 (46 tok): storybook engraving. a broad figure in a charcoal coat, carrying a ledger, a figure stands in the doorway with the light behind, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (31 tok): storybook engraving. data logs in the remote reservoir, flickering fluorescent, moving with the draught, wide, the people small in the space
+
+[7] shot_shot_001_b6       mode=object  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a cream satchel, it slides an inch across the wood and stops, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (30 tok): storybook engraving. hydrographic charts in the remote reservoir, flickering fluorescent, trembling faintly, the object large in the frame
+
+[8] shot_shot_001_b7       mode=figure  kernel_source=key_object
+  v2 (45 tok): storybook engraving. a broad figure in a cream coat, carrying a lantern, a figure steps forward across a bare wooden floor, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (34 tok): storybook engraving. handheld brass communicator in the industrial monitoring hub, flickering fluorescent, settling in the still air, wide, the people small in the space
+
+[9] shot_shot_001_b8       mode=signal  kernel_source=key_object
+  v2 (35 tok): storybook engraving. a cream satchel, light fades from it and the room closes in, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (29 tok): storybook engraving. telemetry screens in the industrial monitoring hub, sliding out of the dark, lit against the dark, the light moving
+
+[10] shot_shot_001_b9       mode=figure  kernel_source=key_object
+  v2 (45 tok): storybook engraving. a broad figure in a cream coat, carrying a lantern, a figure paces once and settles against the wall, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (32 tok): storybook engraving. data logs in the industrial monitoring hub, flickering fluorescent, moving with the draught, wide, the people small in the space
+
+[11] shot_shot_001_b10      mode=object  kernel_source=key_object
+  v2 (39 tok): storybook engraving. a cream satchel, it sits square on the desk and the shadow lengthens, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (31 tok): storybook engraving. hydrographic charts in the industrial monitoring hub, flickering fluorescent, trembling faintly, the object large in the frame
+
+[12] shot_shot_001_b11      mode=figure  kernel_source=key_object
+  v2 (48 tok): storybook engraving. a broad figure in a charcoal coat, carrying a ledger, a figure lowers a hand to the table and leaves it there, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (34 tok): storybook engraving. handheld brass communicator in the isolated wilderness outpost, flickering fluorescent, trembling faintly, wide, the people small in the space
+
+[13] shot_shot_001_b12      mode=signal  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a cream satchel, a pale wash finds it and spreads to the wall, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (28 tok): storybook engraving. telemetry screens in the isolated wilderness outpost, turning slowly in place, lit against the dark, the light moving
+
+[14] shot_shot_001_b13      mode=figure  kernel_source=key_object
+  v2 (48 tok): storybook engraving. a broad figure in a cream coat, carrying a lantern, a figure sits down slowly and rests both hands on the table, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (33 tok): storybook engraving. data logs in the isolated wilderness outpost, flickering fluorescent, shifting as the light crosses it, wide, the people small in the space
+
+[15] shot_shot_001_b14      mode=object  kernel_source=key_object
+  v2 (35 tok): storybook engraving. a cream satchel, it stands upright while dust settles around it, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (31 tok): storybook engraving. hydrographic charts in the isolated wilderness outpost, flickering fluorescent, settling in the still air, the object large in the frame
+
+[16] shot_shot_001_b15      mode=figure  kernel_source=key_object
+  v2 (47 tok): storybook engraving. a broad figure in a cream coat, carrying a lantern, a figure reaches up and pulls a cord above the desk, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (35 tok): storybook engraving. handheld brass communicator in the subsurface research station, monochrome monitor glow, sliding out of the dark, wide, the people small in the space
+
+[17] shot_shot_001_b16      mode=signal  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a charcoal ledger, the beam swings wide and returns to rest on it, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (30 tok): storybook engraving. telemetry screens in the subsurface research station, trembling faintly, lit against the dark, the light moving
+
+[18] shot_shot_001_b17      mode=figure  kernel_source=key_object
+  v2 (46 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure bends toward the floor and rises again, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (30 tok): storybook engraving. data logs in the subsurface research station, monochrome monitor glow, drifting slowly, wide, the people small in the space
+
+[19] shot_shot_001_b18      mode=object  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a cream lantern, it tilts on the table as a shadow crosses it, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (32 tok): storybook engraving. hydrographic charts in the subsurface research station, monochrome monitor glow, moving with the draught, the object large in the frame
+
+[20] shot_shot_001_b19      mode=figure  kernel_source=key_object
+  v2 (46 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure draws a coat closed and stands very still, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (30 tok): storybook engraving. handheld brass communicator in the remote reservoir, monochrome monitor glow, drifting slowly, wide, the people small in the space
+
+[21] shot_shot_001_b20      mode=signal  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a charcoal ledger, a slow beam crosses it and climbs the far wall, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (28 tok): storybook engraving. telemetry screens in the remote reservoir, moving with the draught, lit against the dark, the light moving
+
+[22] shot_shot_001_b21      mode=figure  kernel_source=key_object
+  v2 (46 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure steps back until the dark takes the edges, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (31 tok): storybook engraving. data logs in the remote reservoir, monochrome monitor glow, stirring once and going still, wide, the people small in the space
+
+[23] shot_shot_001_b22      mode=object  kernel_source=key_object
+  v2 (38 tok): storybook engraving. a cream lantern, it stands on a desk while dust drifts across it, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (30 tok): storybook engraving. hydrographic charts in the remote reservoir, monochrome monitor glow, settling in the still air, the object large in the frame
+
+[24] shot_shot_001_b23      mode=figure  kernel_source=key_object
+  v2 (47 tok): storybook engraving. a compact figure in a cream coat, carrying a satchel, a figure moves past the lamp and the shadow swings wide, mid-shot or wider, whole figure legible, one clear action, unbroken shot
+  v3 (34 tok): storybook engraving. handheld brass communicator in the industrial monitoring hub, monochrome monitor glow, settling in the still air, wide, the people small in the space
+
+[25] shot_shot_002_b1       mode=object  kernel_source=key_object
+  v2 (39 tok): storybook engraving. a bakelite radio set, it dims slowly and the highlight leaves its edge, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (41 tok): storybook engraving. a bakelite radio set, with the telemetry screens in the industrial monitoring hub behind it, monochrome monitor glow, moving with the draught, the object large in the frame
+
+[26] shot_shot_002_b2       mode=signal  kernel_source=key_object
+  v2 (37 tok): storybook engraving. a glowing radio dial, the light slides off it and the studio goes dark, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (38 tok): storybook engraving. a glowing radio dial, with the data logs in the industrial monitoring hub behind it, shifting as the light crosses it, lit against the dark, the light moving
+
+[27] shot_shot_002_b3       mode=object  kernel_source=key_object
+  v2 (39 tok): storybook engraving. a bakelite radio set, it holds a thin white line along its upper edge, the object fills the frame on a table top, one clear action, unbroken shot
+  v3 (41 tok): storybook engraving. a bakelite radio set, with the hydrographic charts in the industrial monitoring hub behind it, monochrome monitor glow, sliding out of the dark, the object large in the frame
+
+[28] shot_music_closing_001 mode=signal  kernel_source=key_object
+  v2 (36 tok): storybook engraving. a spinning turntable, the lamp flickers and the shadow jumps behind it, the object lit against a dark room, moving light across it, unbroken shot
+  v3 (39 tok): storybook engraving. a glowing radio dial, with the handheld brass communicator in the isolated wilderness outpost behind it, stirring once and going still, lit against the dark, the light moving
+
+MEAN TOKENS  v2=40.9  v3=33.0  (window 77, author target 69)
+MAX  TOKENS  v2=48    v3=44
+v3 beats over the 69 author target: 0 ; over the 77 window: 0
