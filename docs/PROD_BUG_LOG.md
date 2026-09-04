@@ -11092,8 +11092,9 @@ The roster test said so in prose ("a design call, not a missing method") and
 nobody made the call.
 
 **The fix (kibitz runpod-found-fixes r3, ruling R-B "B-prime").** A DECLARATION,
-read fail-closed: `session_residency = "remote"` on `_CloudVideoBase` (its five
-rows), `google_omni_video` and `google_veo_video`; `beat_session.holds_local_handles()`
+read fail-closed: `session_residency = "remote"` on `_CloudVideoBase` (its six
+rows -- Kling inherits it and never splits a beat, so it is absent from the
+roster's gap), `google_omni_video` and `google_veo_video`; `beat_session.holds_local_handles()`
 skips the identity demand -- pre-load refusal, post-prepare baseline, per-segment
 drift check -- for exactly them; an absent or misspelt attribute reads as local and
 the demand stands. The refusal now names the declaration. The roster tripwire is
@@ -11150,7 +11151,7 @@ default, because that is the copy nothing else exercises. The 4060 drill and the
 pod prove fresh installs; they cannot prove the dev box's own stale files.
 
 
-## PBUG-20260904-05 -- an 8 GB profile on an RSS bank refuses before writing a word, because the 12B writer's context cannot hold the source payload
+## PBUG-20260904-05 -- an 8 GB draft profile refuses before writing a word on two of the three banks, because the 12B writer's 2,048-token context cannot hold their prompts
 
 **Observed (live headless leg, 2026-09-04 08:51 PDT, canonical workflow,
 profile `8gb_lite`, the canonical `science_news` bank, the freshly verified
@@ -11169,9 +11170,14 @@ the 16 GB writer, and no owner picks a writer that fits the ceiling, trims the
 payload to what fits, or refuses at PLAN time (the profile + bank + writer are
 all known before the render starts).
 
-**It is not the bank.** A second attempt on the `original` bank (no RSS
-payload) refused the same way at 3,338 input tokens -- the writer prompt itself
-does not fit a 2,048-token context. `8gb_lite` is a `status: draft` profile
+**It is the bank-plus-context pairing, not the profile alone.** A second
+attempt on the `original` bank (no RSS payload) refused the same way at 3,338
+input tokens. A THIRD attempt (2026-09-04 09:43 PDT, same `8gb_lite`, the
+canonical default bank `media_archive`) wrote, rendered and published --
+`RESULT SUCCESS`, `obs_publish OK`, the mp4 in the watched folder -- so the
+2,048-token context holds the `media_archive` prompt and not the other two.
+An earlier draft of this entry said "on any bank"; the live leg corrected it.
+`8gb_lite` is a `status: draft` profile
 that pins the 12B for BOTH writer slots (`llm.creative_model` /
 `technical_model`) at `gguf_n_ctx: 2048`. The 8 GB row that actually SHIPS is
 `otr_4060_12b_gguf_offload` -- the same 12B Q4_K_M with a full 48-layer GPU
@@ -11188,7 +11194,8 @@ bound the RSS payload. (c) touches what the writer sees (the operator does not
 chase word counts, but a source payload is input, not output); (a) is a
 profile change the 4060 owns for its own rows. Owed: a kibitz arc on which,
 then the fix in the profile/variant layer -- never a silent truncation. Until
-then: an 8 GB profile on an RSS bank does not render; on `original` it does.
+then: a draft 8 GB profile renders on `media_archive` and refuses, loudly and
+before spending anything past the boot, on `science_news` and `original`.
 
 **The evidence stays.** `C:\Users\jeffr\otr_accept\leg_attempt3_context_overflow.log`
 and `server_attempt3.log` on the 5080 (scratch, not committed).

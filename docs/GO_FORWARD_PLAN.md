@@ -30,14 +30,17 @@ Cursor seat by a Sonnet substitute plus the operator's manual paste), a Sonnet 5
 QA pass on the named functions (clean; verified live that with nothing pinned
 every answer on the 5080 resolves to the same binary and the same tree -- the
 only string-level change is a resolved path where a bare literal used to be), a
-Fable gate (ship-with-fixes, applied), then the suite -- **13483 passed, 0
-failed** -- and the live publish matrix (three split roots, a pinned ffmpeg
-copy, the shipping 8 GB profile; its receipt is in the commit that follows
-this one). What landed, in 1.4a's rows:
+Fable gate (ship-with-fixes, applied), two manual passes (Cursor, Antigravity)
+on the pushed tree, then the suite -- **13484 passed, 0 failed** -- and the
+live publish matrix (three pairwise-distinct roots, a pinned ffmpeg copy, the
+shipping 8 GB profile; its receipt is the docs commit that tombstones 1.4a
+row A's "still owed" line). What landed, in 1.4a's rows:
 ffmpeg has one resolver (`_otr_shared/ffmpeg.py`; measured live, 9 of 10 sites
 had ignored `OTR_FFMPEG` on a box with ffmpeg on PATH -- PBUG-20260904-02); the
 output root has one owner and `OTR_OBS_DIR` is a declared publication root
-(R-A); the seven remote video adapters DECLARE `session_residency = "remote"`
+(R-A); the remote video adapters DECLARE `session_residency = "remote"` (the
+cloud base's six rows plus the two Google adapters -- the seven that split a
+long beat are the roster's named gap; Kling inherits it and never splits)
 and BeatSession no longer asks them for handles they do not have (R-B, the
 word_razzle pod failure -- PBUG-20260904-03); the models root has one spelling;
 the widget-drift gate has no silent exemption; the nvenc probe is cached per
@@ -769,9 +772,23 @@ Enforced by `tests/test_output_root_single_owner.py` (AST, named allowlist:
 `vram_context_test`, a diagnostic outside the contract). conftest now strips
 `OTR_OBS_DIR` at import (the launch recipe sets it on this box). The `__init__`
 pin is preserved deliberately; removing it is its own design item.
-**Still owed: the live publish matrix** (`--output-directory A`,
-`OTR_OUTPUT_DIR=B`, `OTR_OBS_DIR=<watched>`; everything under B, the mp4 in
-the watched dir, nothing new under A).
+**PAID 2026-09-04 09:43-10:04 PDT -- the live publish matrix, measured.**
+`workflows/otr_canonical.json`, one act, on the 5080 with `--output-directory
+C:\Users\jeffr\otr_accept\A`, `OTR_OUTPUT_DIR=...\otr_accept\B` and
+`OTR_OBS_DIR=C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` (pairwise
+distinct; the shipped soak `.cmd` locksteps all three, so a launcher derived
+from it ran), `OTR_FFMPEG` pinned to a COPY of the binary while the real one
+stayed on PATH, and a watcher recording every ffmpeg process with its parent.
+Result: `RESULT SUCCESS`; nothing new under A; silent, blended and final all
+under B; the watched folder went 113 -> 114 with the mux's LOUD publish line;
+every ffmpeg the server spawned ran from the pinned copy (the PATH binary
+appeared only under pytest parents from the concurrent suites). The leg ran
+the draft `8gb_lite` profile on the canonical default bank (`media_archive`),
+not the shipping 8 GB row: the launcher's profile substitution did not take,
+and the receipt says what ran. Five attempts, each a measurement: attempts 3
+and 4 surfaced PBUG-20260904-05; attempt 5 also exposed PBUG-20260904-06 (the
+ledger's `meta.paths.obs_final` still pointed at the planned archival-name
+file, not the published one) -- fixed in its own commit with a pairing test.
 
 **B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
 copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
@@ -912,6 +929,21 @@ reason it waits.**
 * The `__init__.py:97-108` output pin: preserved deliberately (it is what makes
   every helper agree inside ComfyUI); removing it changes where Desktop installs
   render and is its own design item.
+* **NEW BUILD ITEM, arc opened 2026-09-04 -- collapse the registry scan from
+  158 findings to about five by the one-owner rule** (plan and driver anchor
+  in `docs/2026-09-04-registry-findings-collapse/`, 5080-local). Measured from
+  alpha.17's real payload: the env rule fires ONCE PER FILE (103 findings, 103
+  files), so one `os.environ` owner takes it to 1; the subprocess rule fires per
+  site (35 in 20 files), so one process runner takes it to ~2; six of the
+  twelve "url command" hits are the words `ffprobe -count_frames` inside error
+  strings; the three singletons (OpenProcess, `Path.read_bytes` for a sha256,
+  `__import__("sys")`) each have a clean replacement. It does NOT reach Active
+  -- that needs zero findings or the manual review -- but it turns the human
+  review from a ledger into five lines and drops every `credential-access` tag.
+  Semantics-neutral by construction (no env name, default or precedence moves;
+  the 4060's numbers do not move). Design questions for the arc: typed getters
+  vs casts at the site, a declared knob catalog, the guard's shipping order
+  across batches, whether the sidecar-venv Popen streams share the runner.
 * **Handed over by the shipping window when it stood down (2026-09-04):**
   (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes`
   periodically -- non-null confirms the pycairo-marker theory and the card
@@ -933,11 +965,14 @@ reason it waits.**
   subprocess/ffmpeg family and 103 are `os.environ` reads, so no single
   subsystem's removal clears the version -- the argument for a review over
   another patch.
-* **The draft 8 GB profiles cannot write at all (PBUG-20260904-05):**
-  `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b` (all `status: draft`) set
-  `gguf_n_ctx: 2048`, and the writer prompt alone is 2,741 tokens on
-  `science_news` and 3,338 on `original` -- the budget refuses loud before
-  writing a word, on any bank. The row that SHIPS, `otr_4060_12b_gguf_offload`,
+* **The draft 8 GB profiles cannot write on two of the three banks
+  (PBUG-20260904-05):** `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b`
+  (all `status: draft`) set `gguf_n_ctx: 2048`, and the writer prompt is 2,741
+  tokens on `science_news` and 3,338 on `original` -- the budget refuses loud
+  before writing a word. `media_archive` FITS: attempt 5 of the publish matrix
+  above rendered and published on `8gb_lite` with that bank, so the fault is
+  the bank-plus-context pairing, not the profile alone. The row that SHIPS,
+  `otr_4060_12b_gguf_offload`,
   runs the same 12B at `gguf_n_ctx: 4096` (measured 7.8 of 8.2 GB) and fits.
   Design call, owed a kibitz arc: retire or re-context the drafts, pair a
   smaller pinned writer (Qwen3-4B / gemma E4B are on disk), or make the plan
