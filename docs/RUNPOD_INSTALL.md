@@ -675,6 +675,10 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | A remote command over SSH returns NO output at all, repeatedly | `pkill -f <pattern>` matched the SSH session's OWN command line and killed the shell before it could print | Exclude the pattern from itself (`pkill -f "[p]attern"`) or kill by PID. Silence with a zero exit is the tell |
 | Two renders fight for one GPU; load average climbs and both crawl | Killing a sweep DRIVER does not kill the leg it already spawned | Orphaned legs keep rendering. `ps -eo pid,etime,cmd | grep canonical_api` and kill by PID; a driver kill is not a run kill |
 | A pod render ignores today's code fix | The resident ComfyUI loaded `nodes/` at boot, before the `git pull` | Restart ComfyUI after any pull and re-verify `/object_info` shows a nonzero OTR class count |
+| A leg reports FAIL at EXACTLY the timeout you set | The runner's `--timeout` bounds the WATCHER, not the render | The log says so in as many words: `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE: the server reports 1 running`. The episode usually still publishes. This is a MEASUREMENT ("this lane needs more than N minutes here"), not a defect -- do not file it as one. Hit three times on 2026-09-03/04: wan_ti2v at 40 min (1 act) and 120 min (3 acts), fastwan_8gb at 40 min |
+| Two legs render at once and both crawl | A previous leg's PROMPT is still executing server-side | Killing the leg CLIENT never cancelled it. See the atlas row above on `/queue`; check `nvidia-smi` and load average before blaming the lane |
+| A lane fails instantly with `DEPENDENCY_MISSING` on a fresh pod | Provisioning fetched the lane's weights but not its extra tool | `mesh_stage` wants a pinned portable Blender (`OTR_BLENDER_*`); `ltx_video` wants weights the default provision does not pull. Both refuse loudly and correctly -- fetch the dependency or drop the lane from the sweep |
+| Every image lane resolves to `z_image_turbo` no matter which profile you pick | Only z_image is on the pod | flux2_klein, flux_gen1, lumina_image and ideogram4_local are the "manual public files" tiers and `otr_fetch_lane_weights.py` does not offer them. A profile naming one fails ADAPTER-level usability before a pixel renders. Image-model coverage is a SEPARATE download errand -- plan it before the sweep, not during |
 
 ## 7A. Driving a pod from a second machine (2026-09-03)
 
@@ -739,6 +743,89 @@ HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`),
 `ltx_audio_in` (`DISABLE_PINNED`, no reserve), and the MiniMax H3 lanes, which
 the engine itself refuses on a stock boot.
 
+## 7B. Running a pod UNATTENDED, and ending it (2026-09-04)
+
+Section 7A is about driving a pod while you watch it. This is the other half: an
+overnight campaign that finishes, publishes, and **shuts the GPU off by itself**.
+
+### The one rule that costs money
+
+**Nothing may depend on a human -- or an assistant session -- still being awake.**
+A pod that bills until someone notices in the morning is the only failure here with
+a dollar figure attached, and it is the easy one to get wrong because everything
+looks fine right up until it doesn't.
+
+RunPod injects a **pod-scoped** API key into every pod, so a pod can stop ITSELF:
+
+```bash
+printenv RUNPOD_POD_ID     # present
+printenv RUNPOD_API_KEY    # present, 50 chars, scoped to THIS pod
+```
+
+**Verify the key read-only before you trust it with the shutdown** -- never by
+test-firing the stop. The scoping is real and worth understanding:
+
+```bash
+# Unauthorized -- the key cannot read the ACCOUNT. Expected, not a problem.
+curl -s -X POST "https://api.runpod.io/graphql?api_key=$RUNPOD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"query { myself { id } }"}'
+
+# Works -- the key CAN act on its own pod. This is the probe that matters.
+curl -s -X POST "https://api.runpod.io/graphql?api_key=$RUNPOD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"query\":\"query { pod(input:{podId:\\\"$RUNPOD_POD_ID\\\"}) { id name desiredStatus } }\"}"
+```
+
+The stop itself is `mutation { podStop(input: {podId: "..."}) { id desiredStatus } }`.
+
+### Two independent stops, not one
+
+The chain script stops the pod in an **EXIT trap**, so it fires even when the work
+phase crashes or is killed. That is still not enough: **a SIGKILL skips traps.** So a
+second, wholly independent watchdog sleeps to a hard deadline and stops the pod
+unconditionally, whatever the chain did. Both retry (five attempts, backing off) --
+a single transient curl failure is the difference between a stopped pod and one
+billing until morning.
+
+```
+chain:     wait for phase 1 -> run phase 2 until CUTOFF -> trap stops the pod
+watchdog:  sleep until CUTOFF+30min -> stop the pod, unconditionally
+```
+
+`scripts/otr_overnight_three_act.py` is the phase-2 runner this was built around.
+
+### The deadline is a START GATE, not a kill
+
+Stop STARTING legs at the cutoff; let a leg already rendering finish. Killing a
+40-minute render at minute 39 wastes the GPU and publishes nothing, which is the
+opposite of the point. Size the hard-stop deadline to sit comfortably after the
+cutoff (30 minutes worked) so the last leg lands.
+
+### Mind the clock difference
+
+**The pod runs UTC; you do not.** Pass the cutoff in the POD's clock. 7:00 AM
+Pacific is `14:00` UTC, and a runner that formats its own deadline will print
+"2:00 PM" -- correct, and alarming if you forget which clock you are reading.
+
+### What an overnight actually costs, measured on a rented RTX 4090
+
+One-act legs unless noted. Times are wall clock including writer, TTS, music and
+publish -- not just the video sampler.
+
+| lane | 1 act | note |
+|---|---|---|
+| `viz_camera`, `viz_green` | 12-15 min | pure numpy/PIL/ffmpeg, no model |
+| `still_flat`, `still_motion`, `still_pan`, `still_word` | 21-23 min | |
+| `animatediff15_v3_haunted_video` | 21 min | **34 min at 3 acts** |
+| `ltx_8gb` | 35 min | |
+| `wan_ti2v` | >40 min | exceeded a 40-min watcher; **>120 min at 3 acts** |
+| `ltx25_*` (video / mime / foley_plus) | n/a | OOM at `decode` on 24 GB Ada -- see the evidence ledger |
+
+Budget roughly **20-25 minutes per 1-act leg** for a mixed sweep, and do not put a
+2-hour ceiling on a 3-act wan leg and call the timeout a failure.
+
+
 ## 8. Evidence ledger
 
 These labels are deliberately narrow:
@@ -752,6 +839,12 @@ These labels are deliberately narrow:
 | RunPod RTX PRO 4000 Blackwell 24 GB | default starter | PROVEN published one-act episode |
 | Local RTX 4060 8 GB | default AnimateDiff episode path | PROVEN published episodes for writer/video/voice/music; configured still-image lane was uninvoked |
 | Local RTX 4060 8 GB | MiniMax H3 raw FL2VA recipe | LAB-PROVEN three isolated 90-frame clips below OTR's 124-model-frame floor; not an OTR adapter episode |
+| RunPod RTX 4090 24 GB (2026-09-04) | 16-lane 1-act matrix | 8 PROVEN published: viz_camera, viz_green, still_flat, still_motion, still_pan, still_word, animatediff15_v3_haunted_video, ltx_8gb |
+| RunPod RTX 4090 24 GB (2026-09-04) | `animatediff15_v3_haunted_video`, 3 ACTS | PROVEN unattended, 33.7 min, published |
+| RunPod RTX 4090 24 GB (2026-09-04) | `wan_ti2v` | INCONCLUSIVE, not negative: exceeded a 40-min watcher at 1 act and a 120-min watcher at 3 acts, render still alive both times. Needs a bigger ceiling, not a smaller graph |
+| RunPod RTX 4090 24 GB (2026-09-04) | `ltx25_video` / `ltx25_mime` / `ltx25_foley_plus` | NEGATIVE, reconfirmed: OOM inside node `decode`. Same tuple as the 2026-09-01 L40S-era finding; 24 GB of Ada does not hold the shipped decode |
+| RunPod RTX 4090 24 GB (2026-09-04) | `word_razzle` | DEFECT, not hardware: renders 2 segments from one set of handles and declares no `session_identity()`, so `beat_session` refuses. Fails identically on any box |
+| RunPod RTX 4090 24 GB (2026-09-04) | `mesh_stage`, `ltx_video` | Dependency absent on that pod (portable Blender; unprovisioned weights). Says so loudly; not a lane verdict |
 
 The 16 GB 5080 success and 24 GB 4090 failure are not explained by capacity
 alone; GPU architecture, driver, allocator state, and residency behavior differ.
