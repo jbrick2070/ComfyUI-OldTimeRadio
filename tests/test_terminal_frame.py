@@ -235,8 +235,17 @@ _ENCODER_PROOF_MARKER = {
     "count": ("proven_frame_count(", "ffprobe_counted_frames("),
     "contract": ("validate_silent_clip_contract(",),
 }
-#: subprocess entry points that start a child.
-_SPAWN_CALLS = ("Popen", "run", "call", "check_call", "check_output")
+#: Entry points that start a child. `popen` is lowercase because the process
+#: OWNER (nodes/_otr_shared/proc.py) spells its Popen wrapper that way; without
+#: it every engine that migrates to the owner would fall out of this sweep and
+#: the encoder inventory would quietly shrink to the un-migrated stragglers.
+_SPAWN_CALLS = ("Popen", "popen", "run", "call", "check_call", "check_output")
+
+#: The module that owns the spawn. A migrated engine imports it ALIASED (see
+#: the owner's docstring), so the alias is resolved from each module's own
+#: imports below, exactly the way `subprocess` already is.
+_PROC_OWNER_MODULE = "proc"
+_PROC_OWNER_PACKAGE = "_otr_shared"
 # KNOWN LIMIT of the sweep below, recorded rather than left to be rediscovered:
 # the codec flag is matched as a STRING CONSTANT, so a flag assembled at
 # runtime (an f-string, a concatenation, "-c:%s" % stream) is invisible to it,
@@ -353,16 +362,38 @@ def _clip_encoder_entry_points(nodes_dir):
         # read too (`from subprocess import Popen` binds a BARE name); no file
         # under nodes/ does that today, and that is precisely why it has to be
         # covered now rather than after the first one does.
+        # The process OWNER is resolved the same way and for the same reason:
+        # it is imported at four different depths (`from . import proc as
+        # otr_proc` inside _otr_shared, `from .._otr_shared import ...` in an
+        # engine subpackage, `from ._otr_shared import ...` in a top-level node,
+        # and the flat `from _otr_shared import ...` every test path takes), and
+        # a hard-coded `otr_proc` would go blind the first time one of those is
+        # spelled differently. `module` never carries the leading dot, so the
+        # relative forms are told apart by `level`.
         mod_aliases, bare_spawn_names = set(), set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for imported in node.names:
                     if imported.name == "subprocess":
                         mod_aliases.add(imported.asname or "subprocess")
+                    elif imported.name == _PROC_OWNER_MODULE:
+                        mod_aliases.add(imported.asname or _PROC_OWNER_MODULE)
             elif isinstance(node, ast.ImportFrom) and node.module == "subprocess":
                 for imported in node.names:
                     if imported.name in _SPAWN_CALLS:
                         bare_spawn_names.add(imported.asname or imported.name)
+            elif isinstance(node, ast.ImportFrom) and (
+                    (node.module or "").endswith(_PROC_OWNER_PACKAGE)
+                    # `from . import proc` means the owner ONLY from inside the
+                    # owner's own package. Anywhere else the same line would
+                    # name some other sibling module that happens to be called
+                    # `proc`, and crediting it here would be the sweep going
+                    # blind in the opposite direction.
+                    or (node.module is None and node.level
+                        and path.parent.name == _PROC_OWNER_PACKAGE)):
+                for imported in node.names:
+                    if imported.name == _PROC_OWNER_MODULE:
+                        mod_aliases.add(imported.asname or _PROC_OWNER_MODULE)
         # NO early `continue` here. A module can BUILD an ffmpeg encode command
         # without spawning anything -- that is what wrapper_bridge's
         # ffmpeg_*_cmd builders do -- and skipping the whole file for want of
