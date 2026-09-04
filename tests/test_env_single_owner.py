@@ -62,19 +62,7 @@ ALLOWED = {
 PENDING = {
     "__init__.py",
     "nodes/OTR_LedgerScriptWriter.py",
-    "nodes/_otr_audio_engines/_otr_sidecar.py",
-    "nodes/_otr_audio_engines/base.py",
-    "nodes/_otr_audio_engines/eng_chatterbox.py",
-    "nodes/_otr_audio_engines/eng_cloud_elevenlabs.py",
-    "nodes/_otr_audio_engines/eng_cloud_sonilo.py",
-    "nodes/_otr_audio_engines/eng_dia.py",
-    "nodes/_otr_audio_engines/eng_google_lyria.py",
-    "nodes/_otr_audio_engines/eng_google_tts.py",
     "nodes/_otr_audio_engines/eng_indextts2.py",
-    "nodes/_otr_audio_engines/eng_kokoro.py",
-    "nodes/_otr_audio_engines/eng_musicgen.py",
-    "nodes/_otr_audio_engines/eng_stable_audio.py",
-    "nodes/_otr_audio_engines/eng_stable_audio_3.py",
     "nodes/_otr_banana_route.py",
     "nodes/_otr_bark_lib.py",
     "nodes/_otr_cast_env.py",
@@ -158,6 +146,22 @@ PENDING = {
     "nodes/video_engine.py",
 }
 
+
+#: Files that still offend and MUST NOT be migrated yet, with the reason and
+#: what unblocks each. They stay in PENDING because they do still offend; this
+#: table exists so a later batch does not sweep one up mechanically and pay a
+#: cost nobody priced.
+BLOCKED = {
+    "nodes/_otr_audio_engines/eng_indextts2.py": (
+        "named in nodes/_otr_voice_route.py RUNTIME_FINGERPRINT_SOURCES, so "
+        "ANY byte changed here moves the adapter's sha256 and DEMOTES the "
+        "shipped Lemmy voice route to the ordinary draw until a GPU "
+        "re-audition re-qualifies it. Migrating it cost 6 voice tests on "
+        "2026-09-04 and would have cost the operator a voice he approved by "
+        "ear. That module's own history records the same thing happening once "
+        "before, for a COMMENT. UNBLOCKS: the next re-audition of that route -- "
+        "the migration rides along with it, never ahead of it."),
+}
 
 def _os_aliases(tree):
     """Every name this module binds the ``os`` MODULE to.
@@ -281,3 +285,14 @@ def test_the_finder_does_not_cry_wolf():
             "    return environ.get('A')\n",
     ):
         assert _find(src) == [], src
+
+
+def test_every_blocked_file_is_still_pending_and_still_offends():
+    """A blocked file that stopped offending, or quietly left PENDING, means
+    this table is describing a world that no longer exists."""
+    for rel, reason in BLOCKED.items():
+        assert reason.strip(), rel
+        assert rel in PENDING, (
+            "%s is BLOCKED but not PENDING -- if it was migrated anyway, the "
+            "reason above says what that costs" % rel)
+        assert (REPO / rel).is_file(), rel

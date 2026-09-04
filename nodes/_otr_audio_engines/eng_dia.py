@@ -29,11 +29,19 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import tempfile
 
 from . import _otr_sidecar as _SC
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 # realpath (NOT abspath): the custom node is reached through a directory junction
 # under the Desktop-v2 install, so abspath(__file__) would point _COMFY_ROOT at the
@@ -71,14 +79,14 @@ class DiaEngine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return os.environ.get("OTR_DIA_VENV") or _default(".venv", "Scripts", "python.exe")
+        return otr_env.get("OTR_DIA_VENV") or _default(".venv", "Scripts", "python.exe")
 
     def _worker_script(self):
-        return os.environ.get("OTR_DIA_WORKER") or os.path.join(
+        return otr_env.get("OTR_DIA_WORKER") or os.path.join(
             _REPO_ROOT, "scripts", "_otr_dia_worker.py")
 
     def _model_id(self):
-        return os.environ.get("OTR_DIA_MODEL") or _DEFAULT_MODEL
+        return otr_env.get("OTR_DIA_MODEL") or _DEFAULT_MODEL
 
     # ---- worker lifecycle ----
     def load(self):
@@ -106,9 +114,9 @@ class DiaEngine:
         err_path = os.path.join(_REPO_ROOT, "_otr_dia_worker.err")
         stderr = open(err_path, "ab", buffering=0)
         try:
-            proc = subprocess.Popen(
-                [py, worker, "--model", self._model_id()], stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=stderr, text=True, encoding="utf-8",
+            proc = otr_proc.popen(
+                [py, worker, "--model", self._model_id()], stdin=otr_proc.PIPE,
+                stdout=otr_proc.PIPE, stderr=stderr, text=True, encoding="utf-8",
                 bufsize=1)
         except Exception:
             stderr.close()

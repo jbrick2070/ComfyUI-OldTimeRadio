@@ -26,10 +26,14 @@ import os
 import queue
 import threading
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 def _env_float(name, default):
     try:
-        v = float(os.environ.get(name, "") or default)
+        v = float(otr_env.get(name, "") or default)
     except (TypeError, ValueError):
         v = float(default)
     # A non-positive timeout would make queue.get raise ValueError (not a

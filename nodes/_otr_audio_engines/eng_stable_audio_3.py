@@ -17,16 +17,20 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
 # Default model files in ComfyUI's models/ tree (Comfy-Org/stable-audio-3).
-_CKPT = os.environ.get("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
-_TENC = os.environ.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
-_CLIP_TYPE = os.environ.get("OTR_SA3_CLIP_TYPE", "stable_audio")
+_CKPT = otr_env.get("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
+_TENC = otr_env.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
+_CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 
 # BUG-408: SA3 is a different model than the old MusicGen default and does NOT
 # respond to MusicGen-shaped abstract-mood prompts the same way -- it wants a
@@ -65,7 +69,7 @@ _SA3_NEG_DEFAULT = (
 def _env_float(name, default):
     """Parse an env override as float; fall back to ``default`` (LOUD) on a bad
     value instead of crashing the render."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None:
         return float(default)
     try:
@@ -78,7 +82,7 @@ def _env_float(name, default):
 
 def _env_int(name, default):
     """Parse an env override as int; fall back to ``default`` (LOUD) on a bad value."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None:
         return int(default)
     try:
@@ -213,11 +217,11 @@ class StableAudio3Engine:
         context_s = _env_float("OTR_SA3_CONTEXT_S", 12.0)
         seconds_start, seconds_total = _sa3_clip_window(prompt, dur, context_s)
         pos_text = _sa3_augment_prompt(prompt)
-        neg_text = os.environ.get("OTR_SA3_NEG_PROMPT", _SA3_NEG_DEFAULT)
+        neg_text = otr_env.get("OTR_SA3_NEG_PROMPT", _SA3_NEG_DEFAULT)
         steps = _env_int("OTR_SA3_STEPS", 100)
         cfg = _env_float("OTR_SA3_CFG", 7.0)
-        sampler = os.environ.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
-        scheduler = os.environ.get("OTR_SA3_SCHEDULER", "exponential")
+        sampler = otr_env.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
+        scheduler = otr_env.get("OTR_SA3_SCHEDULER", "exponential")
         denoise = _env_float("OTR_SA3_DENOISE", 1.0)
 
         pos = comfy_nodes.CLIPTextEncode().encode(clip, pos_text)[0]

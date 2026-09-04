@@ -40,6 +40,11 @@ import random
 
 from .registry import register
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 # Curated British announcer pool (2 male + 2 female: BBC authoritative +
@@ -197,7 +202,7 @@ class KokoroEngine:
         never a 326 MB hash per queue. Uses spec probes, not imports, so a queue
         never pays an import here; a probe that raises reads as "not present".
         """
-        if _spec_present("kokoro") and os.environ.get("OTR_KOKORO_BACKEND", "auto").lower() != "onnx":
+        if _spec_present("kokoro") and otr_env.get("OTR_KOKORO_BACKEND", "auto").lower() != "onnx":
             return {}
         if not _spec_present("kokoro_onnx"):
             return {}
@@ -218,7 +223,7 @@ class KokoroEngine:
         from .registry import EngineUsabilityReason
 
         try:
-            name = _kb.select_backend_name(os.environ.get("OTR_KOKORO_BACKEND"))
+            name = _kb.select_backend_name(otr_env.get("OTR_KOKORO_BACKEND"))
         except _kb.BackendUnavailable as exc:
             # A bad OTR_KOKORO_BACKEND value is a config error; a package that is
             # not installed is the missing-model class (the fix is a pip line).
@@ -240,7 +245,7 @@ class KokoroEngine:
                     "kokoro ONNX model not found at %s. %s" % (model_path, _onnx_model_fetch_hint()))
             try:
                 voices_npz = _kb.ensure_voices_npz(_kokoro_voices_dir())
-                providers = _kb.parse_onnx_providers(os.environ.get("OTR_KOKORO_ONNX_PROVIDERS"))
+                providers = _kb.parse_onnx_providers(otr_env.get("OTR_KOKORO_ONNX_PROVIDERS"))
                 backend = _kb.OnnxKokoroBackend(model_path, voices_npz, providers)
                 backend.load()
             except _kb.BackendUnavailable as exc:

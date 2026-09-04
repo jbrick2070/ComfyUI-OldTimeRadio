@@ -12,8 +12,6 @@ network, or CUDA imports happen at module scope.
 from __future__ import annotations
 
 import base64
-import os
-import subprocess
 
 from .base import AudioEngineAdapter
 from .registry import register
@@ -24,6 +22,15 @@ from .._otr_google_api.client import (
     create_interaction,
     resolve_api_key,
 )
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 DEFAULT_MODEL = "lyria-3-clip-preview"
 SUPPORTED_MODELS = (DEFAULT_MODEL,)
@@ -36,8 +43,8 @@ class GoogleLyriaError(GoogleAPIError):
 
 def _selected_model() -> str:
     model = str(
-        os.environ.get("OTR_GOOGLE_LYRIA_MODEL_ID")
-        or os.environ.get("OTR_GOOGLE_LYRIA_MODEL")
+        otr_env.get("OTR_GOOGLE_LYRIA_MODEL_ID")
+        or otr_env.get("OTR_GOOGLE_LYRIA_MODEL")
         or DEFAULT_MODEL
     ).strip()
     if model not in SUPPORTED_MODELS:
@@ -152,11 +159,11 @@ def _mp3_to_audio(mp3_bytes: bytes, *, sample_rate: int = SAMPLE_RATE) -> dict:
         "pipe:1",
     ]
     try:
-        proc = subprocess.run(
+        proc = otr_proc.run(
             cmd,
             input=mp3_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=otr_proc.PIPE,
+            stderr=otr_proc.PIPE,
             check=False,
         )
     except FileNotFoundError as exc:

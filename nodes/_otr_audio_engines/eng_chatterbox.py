@@ -25,11 +25,19 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import tempfile
 
 from . import _otr_sidecar as _SC
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 # realpath (NOT abspath): the custom node is reached through a directory junction
 # under the Desktop-v2 install, so abspath(__file__) would point _COMFY_ROOT at the
@@ -69,10 +77,10 @@ class ChatterboxEngine:
 
     # ---- config resolution (env override -> box default) ----
     def _venv_python(self):
-        return os.environ.get("OTR_CHATTERBOX_VENV") or _default(".venv", "Scripts", "python.exe")
+        return otr_env.get("OTR_CHATTERBOX_VENV") or _default(".venv", "Scripts", "python.exe")
 
     def _worker_script(self):
-        return os.environ.get("OTR_CHATTERBOX_WORKER") or os.path.join(
+        return otr_env.get("OTR_CHATTERBOX_WORKER") or os.path.join(
             _REPO_ROOT, "scripts", "_otr_chatterbox_worker.py")
 
     # ---- worker lifecycle ----
@@ -105,9 +113,9 @@ class ChatterboxEngine:
             # EXPLICIT (CastLock ledger stamp threaded as requested_device;
             # default cuda = nv50 baseline). No worker-side waterfall.
             _dev = getattr(self, "requested_device", None) or "cuda"
-            proc = subprocess.Popen(
+            proc = otr_proc.popen(
                 [py, worker, "--device", str(_dev)],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stdin=otr_proc.PIPE, stdout=otr_proc.PIPE,
                 stderr=stderr, text=True, encoding="utf-8", bufsize=1)
         except Exception:
             stderr.close()

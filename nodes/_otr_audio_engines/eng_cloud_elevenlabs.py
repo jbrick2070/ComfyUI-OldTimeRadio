@@ -25,10 +25,14 @@ are LAZY inside ``generate_voice``; module scope is the adapter contract only.
 from __future__ import annotations
 
 import logging
-import os
 
 from .base import AudioEngineAdapter
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -76,7 +80,7 @@ def _stability_from_delivery(delivery_vector) -> float:
 
 
 def _partner_model_payload() -> dict:
-    model_id = str(os.environ.get("OTR_ELEVENLABS_MODEL_ID") or _DEFAULT_MODEL_ID).strip()
+    model_id = str(otr_env.get("OTR_ELEVENLABS_MODEL_ID") or _DEFAULT_MODEL_ID).strip()
     if model_id not in _SUPPORTED_MODELS:
         raise ValueError(
             "elevenlabs.generate_voice: unsupported model %r; expected one of %r"
@@ -96,7 +100,7 @@ def _partner_model_payload() -> dict:
 
 
 def _partner_output_format() -> str:
-    fmt = str(os.environ.get("OTR_ELEVENLABS_OUTPUT_FORMAT") or _DEFAULT_OUTPUT_FORMAT).strip()
+    fmt = str(otr_env.get("OTR_ELEVENLABS_OUTPUT_FORMAT") or _DEFAULT_OUTPUT_FORMAT).strip()
     if fmt not in _SUPPORTED_OUTPUT_FORMATS:
         raise ValueError(
             "elevenlabs.generate_voice: unsupported output_format %r; expected one of %r"
@@ -106,7 +110,7 @@ def _partner_output_format() -> str:
 
 
 def _apply_text_normalization() -> str:
-    mode = str(os.environ.get("OTR_ELEVENLABS_TEXT_NORMALIZATION")
+    mode = str(otr_env.get("OTR_ELEVENLABS_TEXT_NORMALIZATION")
                or _DEFAULT_APPLY_TEXT_NORM).strip()
     if mode not in _SUPPORTED_TEXT_NORM:
         raise ValueError(

@@ -13,7 +13,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 import re
 import urllib.error
 from typing import Optional
@@ -21,6 +20,11 @@ from typing import Optional
 from .._otr_google_api.client import GoogleAPIError
 from .base import AudioEngineAdapter
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -86,7 +90,7 @@ def _api_key_env_names() -> tuple[str, ...]:
 def _known_secret_values(extra=()) -> tuple[str, ...]:
     vals = []
     for name in _api_key_env_names():
-        val = os.environ.get(name)
+        val = otr_env.get(name)
         if val:
             vals.append(str(val))
     vals.extend(str(v) for v in (extra or ()) if v)
@@ -102,7 +106,7 @@ def _redact(text, extra=()) -> str:
 
 def _resolve_api_key() -> str:
     for name in _api_key_env_names():
-        val = os.environ.get(name)
+        val = otr_env.get(name)
         if val and str(val).strip():
             return str(val).strip()
     raise GoogleTTSError(
@@ -113,8 +117,8 @@ def _resolve_api_key() -> str:
 
 def _selected_model() -> str:
     model = (
-        os.environ.get("OTR_GOOGLE_TTS_MODEL_ID")
-        or os.environ.get("OTR_GOOGLE_TTS_MODEL")
+        otr_env.get("OTR_GOOGLE_TTS_MODEL_ID")
+        or otr_env.get("OTR_GOOGLE_TTS_MODEL")
         or _DEFAULT_MODEL
     )
     model = str(model).strip()
@@ -132,7 +136,7 @@ def _models_to_try(model: str, *, allow_retry: bool = True) -> tuple[str, ...]:
     # model's key. Matches the profile error_policy: fail_loud.
     if not allow_retry:
         return (model,)
-    configured = str(os.environ.get("OTR_GOOGLE_TTS_RETRY_MODELS") or "").strip()
+    configured = str(otr_env.get("OTR_GOOGLE_TTS_RETRY_MODELS") or "").strip()
     if configured:
         raw = [m.strip() for m in configured.split(",") if m.strip()]
         unknown = [m for m in raw if m not in _SUPPORTED_MODELS]
@@ -143,7 +147,7 @@ def _models_to_try(model: str, *, allow_retry: bool = True) -> tuple[str, ...]:
             )
         return tuple(dict.fromkeys([model] + raw))
 
-    enabled = os.environ.get("OTR_GOOGLE_TTS_ENABLE_MODEL_RETRY", "0") == "1"
+    enabled = otr_env.get("OTR_GOOGLE_TTS_ENABLE_MODEL_RETRY", "0") == "1"
     if not enabled:
         return (model,)
     return tuple(dict.fromkeys([model, _DEFAULT_MODEL, _LOW_COST_RETRY_MODEL]))

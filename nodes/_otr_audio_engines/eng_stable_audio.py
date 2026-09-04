@@ -15,6 +15,10 @@ from __future__ import annotations
 
 from .registry import register
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 @register
 class StableAudioMusicEngine:
@@ -39,12 +43,11 @@ class StableAudioMusicEngine:
                 "stable-audio-tools is not installed -- install Stable Audio "
                 "before rendering with stable_audio_music"
             ) from exc
-        import os
 
         # GPU-VALIDATE (F): the plan's target is the ComfyUI-native SA3 loader;
         # this loads the documented stable_audio_tools pretrained model. The env
         # var points at the SA3 checkpoint / model id.
-        model_id = os.environ.get(
+        model_id = otr_env.get(
             "OTR_STABLE_AUDIO_MODEL", "stabilityai/stable-audio-open-1.0"
         )
         model, _config = get_pretrained_model(model_id)

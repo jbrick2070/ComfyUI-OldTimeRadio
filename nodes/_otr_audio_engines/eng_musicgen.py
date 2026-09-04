@@ -14,6 +14,11 @@ from __future__ import annotations
 
 from .registry import register
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _MUSICGEN_MODEL_ID = "facebook/musicgen-small"
 _MUSICGEN_TOKENS_PER_SEC = 50  # ~50 audio tokens per second at 32 kHz
 
@@ -50,7 +55,7 @@ class MusicGenEngine:
         import torch
 
         cache_dir = os.path.join(
-            os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
+            otr_env.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
             "hub",
         )
         # S4 platform-portability: EXPLICIT device (theme node threads the

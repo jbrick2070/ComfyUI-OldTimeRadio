@@ -24,9 +24,13 @@ inside ``generate_clip``; module scope is the adapter contract only.
 from __future__ import annotations
 
 import logging
-import os
 
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -51,7 +55,7 @@ def _sonilo_min_duration_s() -> int:
     via OTR_SONILO_MIN_DURATION_S so the exact floor can be dialed in without a
     code change; 0 disables the floor (raw cue duration)."""
     try:
-        return max(0, int(os.environ.get("OTR_SONILO_MIN_DURATION_S", "30")))
+        return max(0, int(otr_env.get("OTR_SONILO_MIN_DURATION_S", "30")))
     except (TypeError, ValueError):
         return 30
 

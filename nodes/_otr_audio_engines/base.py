@@ -29,6 +29,11 @@ import torch
 from .._otr_audio_utils import canonical_audio, mono_safe
 from .._otr_resolved_request import assert_audio_batch_contract, empty_audio_batch
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _DEFAULT_SR = 24000
 
 
@@ -136,7 +141,7 @@ def resolve_voice_ref_path(ref):
         return ref
     rp = str(ref).replace("\\", "/")
     stripped = rp[len("models/"):] if rp.startswith("models/") else rp
-    if any(os.environ.get(name, "").strip() for name in (
+    if any(otr_env.get(name, "").strip() for name in (
             "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")):
         # Delegate precedence and expansion to the pack's one models-root
         # authority. This is lazy so ordinary audio imports stay side-effect
