@@ -49,7 +49,7 @@ output:**
 
 | what the scanner keys on | alpha.17 | `<VERSION>` | how |
 |---|---:|---:|---|
-| files that spell `os.environ` (rule fires per FILE) | 103 | **4** | one owner module, `nodes/_otr_shared/env.py`; 99 files now ask it |
+| files that spell `os.environ` (rule fires per FILE) | 103 | **4** under `nodes/` + the root | one owner module, `nodes/_otr_shared/env.py`; 99 files now ask it |
 | `subprocess` spawn SITES (rule fires per SITE) | 35 in 20 files | **3 in 2 files** | one owner, `nodes/_otr_shared/proc.py`, with an executable allowlist |
 | `kernel32.OpenProcess` | 1 | **0** | deleted; `psutil.pid_exists` was already the primary path |
 | `__import__("sys")` | 1 | **0** | it was never dynamic -- the argument was a literal; now a plain import |
@@ -57,7 +57,11 @@ output:**
 
 Two of the four remaining `os.environ` files are the owner itself and
 `prestartup_script.py`, which runs before the pack is a package and has no owner
-to import. The other two are held by contracts we chose not to break for a
+to import. One further file, `tools/engine_matrix.py`, is a developer tool that
+ships only because `.comfyignore` excludes neither `tools/` nor `config/`; it
+sets a test-mode flag before putting the repo on `sys.path`, deliberately, so no
+adapter reaches for a GPU while it is only reading declarations. Nothing shipped
+imports it. The other two are held by contracts we chose not to break for a
 scanner count: one is byte-hashed by a voice-qualification record, so editing it
 by any byte demotes a voice the operator approved by ear; the other is a leaf
 module whose test asserts it imports nothing from the pack, because a pack import

@@ -108,8 +108,10 @@ def test_the_module_loads_standalone_in_a_fresh_interpreter(rel):
         "This is what the in-process suite cannot see -- pytest already has "
         "nodes/ importable, so a missing sys.path bootstrap stays invisible "
         "there.\n"
-        "FIX: insert _NODES_DIR on sys.path BEFORE the owner-import ladder, the "
-        "way otr_post_upscale_procgen_blend.py does.\n\n"
+        "FIX: insert _NODES_DIR on sys.path INSIDE the except arm of the "
+        "owner-import ladder -- NOT before the try, which would mutate sys.path "
+        "on the ordinary packaged import too and invite a second owner "
+        "instance.\n\n"
         "--- stderr ---\n%s" % (rel, STANDALONE_LOADED[rel], done.stderr[-1500:]))
 
 

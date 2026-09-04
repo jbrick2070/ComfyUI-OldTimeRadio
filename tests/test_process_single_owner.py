@@ -32,7 +32,13 @@ from tests.fixtures.ratchet import REPO, assert_ratchet, scan
 NODES = REPO / "nodes"
 OWNER = NODES / "_otr_shared" / "proc.py"
 
-ROOTS = (NODES, REPO / "__init__.py", REPO / "prestartup_script.py")
+#: THE GUARD'S SURFACE MUST EQUAL THE SHIPPED SURFACE (fable, 2026-09-04).
+#: `.comfyignore` excludes `tests/`, `kibitz-runs/` and the probe scripts -- but
+#: NOT `config/` or `tools/`, so eight more `.py` files reach the registry zip
+#: and were outside every guard. A ratchet that cannot see a shipped file cannot
+#: stop that file growing a second `os.environ` read.
+ROOTS = (NODES, REPO / "config", REPO / "tools",
+         REPO / "__init__.py", REPO / "prestartup_script.py")
 
 #: The subprocess entry points that start a child.
 _SPAWN_CALLS = frozenset({"run", "Popen", "call", "check_call", "check_output"})
@@ -85,6 +91,15 @@ def _subprocess_names(tree):
             for imported in node.names:
                 if imported.name in _SPAWN_CALLS:
                     bare[imported.asname or imported.name] = imported.name
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").endswith("proc"):
+            # `from ._otr_shared.proc import Popen as P` -- a BARE name bound to
+            # the raw re-exported class, so `P(argv)` skips the allowlist and
+            # both refusals. This is the spelling a developer who has just seen
+            # `Popen` re-exported would reach for (fable, 2026-09-04). Nothing in
+            # the tree uses it; it is closed before something does.
+            for imported in node.names:
+                if imported.name == "Popen":
+                    bare[imported.asname or imported.name] = "Popen (the owner's raw re-export)"
     return modules, bare
 
 
@@ -100,8 +115,11 @@ def _owner_names(tree):
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for imported in node.names:
-                if imported.name == "proc":
-                    names.add(imported.asname or "proc")
+                # `import proc as X` and the DOTTED `import a.b.proc as X`.
+                # Without the dotted form, `import nodes._otr_shared.proc as pp`
+                # then `pp.Popen(a)` walked straight past (fable, 2026-09-04).
+                if imported.name == "proc" or imported.name.endswith(".proc"):
+                    names.add(imported.asname or imported.name.split(".")[-1])
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.endswith("_otr_shared") or (not module and node.level):

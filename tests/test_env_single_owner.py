@@ -36,9 +36,13 @@ from tests.fixtures.ratchet import REPO, assert_ratchet, scan
 NODES = REPO / "nodes"
 OWNER = NODES / "_otr_shared" / "env.py"
 
-#: Everything under nodes/, plus the two root modules by explicit path. Both
-#: ship in the registry zip and both touch the environment.
-ROOTS = (NODES, REPO / "__init__.py", REPO / "prestartup_script.py")
+#: THE GUARD'S SURFACE MUST EQUAL THE SHIPPED SURFACE (fable, 2026-09-04).
+#: `.comfyignore` excludes `tests/`, `kibitz-runs/` and the probe scripts -- but
+#: NOT `config/` or `tools/`, so eight more `.py` files reach the registry zip
+#: and were outside every guard. A ratchet that cannot see a shipped file cannot
+#: stop that file growing a second `os.environ` read.
+ROOTS = (NODES, REPO / "config", REPO / "tools",
+         REPO / "__init__.py", REPO / "prestartup_script.py")
 
 #: The ``os`` attributes that read or write the process environment. ``environb``
 #: is deliberately absent: it does not exist on Windows and nothing here uses it;
@@ -53,6 +57,14 @@ ALLOWED = {
         "runs before the pack is a package -- there is no package context to "
         "import an owner from -- so it keeps its inline writes by decision, "
         "and stays exactly one finding"),
+    "tools/engine_matrix.py": (
+        "the same shape as prestartup: it sets OTR_TEST_MODE at :35 BEFORE "
+        "putting the repo on sys.path at :36, deliberately, so that no adapter "
+        "reaches for a GPU while the matrix is only asking what it declares. "
+        "Importing the owner first would need the path insert first, which is "
+        "exactly the ordering the flag exists to get in front of. A dev tool, "
+        "imported by nothing shipped -- but it DOES ship, because .comfyignore "
+        "excludes neither tools/ nor config/"),
 }
 
 #: Files not yet migrated to the owner. This set SHRINKS, in the same commit as
