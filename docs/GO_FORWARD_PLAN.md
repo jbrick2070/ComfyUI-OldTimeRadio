@@ -370,6 +370,24 @@ review request is a PUBLIC post and needs the operator's explicit go.
 
 **1. THE REGISTRY.** Two separate goals: (a) an INSTALLABLE listing (needs an admin approval we cannot self-serve), (b) the card's "N Nodes" count (a different pipeline, stalled on Comfy-Org's side -- not ours).
 * **NEXT CODER CHUNK: the scan collapse ratchet commit.** Plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is what remains. Needs nothing from the operator.
+* **PREP STATUS 2026-09-04 -- three of the five handed-over items are DONE:**
+  (b) `viewer/` is already excluded (`.comfyignore:167`, 2026-09-03) -- nothing owed;
+  (d) the `AUTH_TOKEN_COMFY_ORG` literal is ALREADY SCRUBBED -- `grep` finds ZERO in
+  `nodes/` and `__init__.py`; what remains is the lowercase field NAME
+  `auth_token_comfy_org`, which is pinned data about Comfy's own partner nodes, not
+  a credential; (e) the draft polish is folded into the v2 draft below.
+  STILL OPEN: (a) re-check `GET /nodes/comfyui-old-time-radio/versions/<v>/comfy-nodes`
+  after a publish, and (c) the post itself.
+* **THE DRAFT IS NOW `docs/2026-09-04-registry-review-request-READY-v2.md`.** The
+  2026-09-03 draft is the alpha.17 record and MUST NOT be posted -- its numbers are
+  stale in our favour. The v2 draft carries the measured collapse (103 env files -> 4,
+  35 spawn sites -> 3, three singletons -> 0) and changes the ask from "please
+  overlook 158 findings" to "we collapsed what could be collapsed; here is the diff
+  and why the rest is the render path". It has THREE placeholders only the operator
+  can fill: `<VERSION>`, `<SCAN COUNTS>` from the real post-publish scan, and a
+  re-verified `0 critical`. Do NOT predict the scanner's counts -- our measured
+  source-side change is a different claim, and conflating them is what would make a
+  reviewer distrust the rest.
 * **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO, AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision, because admin approval is PER VERSION.
   **File it on the first NON-ALPHA version, the same day it publishes**, so the version under review is the version a stranger would install. Include the question about node-level review; it costs them less than five separate ones.
   Draft is ready and needs no further work: `docs/2026-09-03-registry-review-request-READY.md`. **Re-read it before posting** -- the version id, the counts and the "0 critical" claim all move with each new publish, and a request quoting a superseded version is worse than none. Filing is a public post and needs the operator's explicit go.
