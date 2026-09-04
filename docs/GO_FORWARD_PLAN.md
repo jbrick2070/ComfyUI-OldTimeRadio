@@ -238,14 +238,40 @@ The REJECTED list below is part of the record precisely so a discarded claim is 
 * Long historical comments explaining past bugs: deliberate project practice.
 * Duplicated engine PROMPT COMPOSERS: ruled 2026-08-23, lanes stay independently re-wordable. Only duplicated FACTS and DECISIONS count.
 
-### 2.5 PREFLIGHT THE CLONING ENGINES' REFERENCE WAVs -- the one kokoro-row leftover
+### 2.5 PREFLIGHT THE CLONING ENGINES' REFERENCE WAVs -- THE ROW AS WRITTEN WAS WRONG; it is a DESIGN item now
 
-The kokoro-ONNX row is DONE (`70a1d33b`; archived). Its single unbuilt bullet, carried
-here because it is a small correctness fix: preflight the resolved `ref_path` files in
-`OTR_CastLock` BEFORE the writer call whenever a cloning engine is selected, so a missing
-reference WAV fails at plan time and not after the writer has spent its call.
-DONE WHEN: a deliberately missing reference WAV refuses at CastLock with the path named,
-and the suite has the test.
+**ATTEMPTED AND REVERTED 2026-09-04. Read this before rebuilding it.** The row used
+to say "preflight the resolved `ref_path` files in `OTR_CastLock` BEFORE the writer
+call". It was implemented that way, with 9 passing tests, and a gpt-6-astra kibitz
+lane killed it on three grounded counts. All three were verified against the real
+files:
+
+1. **CASTLOCK RUNS AFTER THE WRITER, so the stated benefit is impossible.**
+   `workflows/otr_canonical.json` link 230 carries node 1 `OTR_LedgerScriptWriter`
+   into node 62 `OTR_LedgerFreezeCascade`, and link 234 carries node 62 into node 80
+   `OTR_CastLock`. A check at CastLock cannot save the writer's call, because the
+   writer has already run.
+2. **IT WOULD HAVE REFUSED CASTS THAT RENDER FINE TODAY -- the worse direction.**
+   `nodes/_otr_voice_node_common.py:413-418` DELIBERATELY clears a stale
+   `voice_ref_path` whose file is absent and resolves another through
+   `_resolve_clone_ref_path`. A missing DECLARED path is a recoverable state by
+   design, not a failure. Refusing on it blocks working episodes.
+3. **It would rarely fire on a real cast anyway.** The ordinary CastLock stamp
+   writes `voice_ref_id` + `voice_engine`, NOT the path fields; the dispatch
+   resolves that ID through the bank. A check keyed on a declared path skips the
+   common case entirely.
+
+**WHAT A CORRECT VERSION WOULD NEED, if this is still wanted:**
+* it must run BEFORE node 1 (the writer), which is a different node or a check
+  inside the writer's own preflight -- not CastLock;
+* it must reuse the dispatch's FULL effective-reference resolution, bank fallback
+  and policy-route precedence included, and refuse only when THAT fails -- anything
+  narrower re-creates defect 2;
+* it must handle ID-only rows, which is the normal shape.
+
+That is no longer a closed spec with one right answer, so it is a DESIGN item and
+takes an arc before code. Not scheduled. DONE WHEN: an owner is named for the
+pre-writer check and it refuses only what the dispatch could not have resolved.
 
 ## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
 
