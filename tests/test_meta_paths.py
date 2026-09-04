@@ -293,3 +293,65 @@ def test_ledger_meta_paths_self_corrects_after_rename(tmp_path):
         "meta.paths.audio_dir still points at the pending dir after rename"
     )
     assert new_id in paths["obs_final"]
+
+
+class TestPublishedNameBindsTheEpisode:
+    """PBUG-20260904-06. The mux publishes `<title>_<ts>__<choices>_final.mp4`
+    with the show prefix stripped; the ledger's validator demanded the prefix
+    and silently kept the PLANNED pointer, so every `meta.paths.obs_final`
+    since the rename named a file that did not exist. The name the publisher
+    writes must be the name the ledger adopts, and a different episode's name
+    must still be refused."""
+
+    EP = "signal_lost_the_test_episode_20260904_094319"
+
+    @pytest.fixture
+    def workspace(self, tmp_path):
+        otr_root = tmp_path / "output" / "otr"
+        audio_dir = otr_root / "episodes" / self.EP / "audio"
+        audio_dir.mkdir(parents=True)
+        (otr_root / "obs").mkdir(parents=True)
+        ledger_path = audio_dir / f"{self.EP}_ledger.json"
+        ledger_path.write_text("{}", encoding="utf-8")
+        return {"otr_root": otr_root, "ledger_path": ledger_path}
+
+    def _obs_final(self, workspace, candidate):
+        paths = OTRL._build_meta_paths(
+            workspace["ledger_path"], self.EP, published_obs_path=candidate)
+        return Path(paths["obs_final"])
+
+    def test_the_watching_name_is_adopted(self, workspace):
+        candidate = (workspace["otr_root"] / "obs" /
+                     "the_test_episode_20260904_094319__anime__still_motion"
+                     "__flux2_klein__bark__media_archive_final.mp4")
+        candidate.write_bytes(b"published")
+        assert self._obs_final(workspace, candidate) == candidate.resolve()
+
+    def test_the_archival_name_is_still_adopted(self, workspace):
+        candidate = workspace["otr_root"] / "obs" / f"{self.EP}_final.mp4"
+        candidate.write_bytes(b"published")
+        assert self._obs_final(workspace, candidate) == candidate.resolve()
+
+    @pytest.mark.parametrize("other", [
+        "the_other_episode_20260904_094319__anime__wan_final.mp4",  # another title
+        "the_test_episode_20260904_101010__anime__wan_final.mp4",   # another render
+        "the_test_episode_2026__anime__wan_final.mp4",              # a prefix of the id
+    ])
+    def test_another_episodes_name_cannot_redirect(self, workspace, other):
+        candidate = workspace["otr_root"] / "obs" / other
+        candidate.write_bytes(b"not this episode")
+        planned = workspace["otr_root"] / "obs" / f"{self.EP}.mp4"
+        assert self._obs_final(workspace, candidate) == planned.resolve()
+
+    def test_the_mux_writes_the_name_the_ledger_accepts(self, workspace, monkeypatch):
+        """The pairing contract end to end: whatever `_obs_basename` produces
+        for this episode's archival final passes `_published_obs_path`. If the
+        naming rule moves again, this is the test that goes red."""
+        from nodes import otr_master_audio_mux as MUX
+        monkeypatch.setattr(OTRL, "in_flight_ledger_path", lambda: None)
+        final = f"{self.EP}_silent_procgen_blended_captioned_with_credits_final.mp4"
+        name = MUX._obs_basename(final)
+        assert name.startswith("the_test_episode_20260904_094319__"), name
+        candidate = workspace["otr_root"] / "obs" / name
+        candidate.write_bytes(b"published")
+        assert self._obs_final(workspace, candidate) == candidate.resolve()

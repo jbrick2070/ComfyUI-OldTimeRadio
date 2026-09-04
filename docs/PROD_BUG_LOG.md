@@ -11199,3 +11199,45 @@ before spending anything past the boot, on `science_news` and `original`.
 
 **The evidence stays.** `C:\Users\jeffr\otr_accept\leg_attempt3_context_overflow.log`
 and `server_attempt3.log` on the 5080 (scratch, not committed).
+
+## PBUG-20260904-06 -- every published episode since the obs rename carries a `meta.paths.obs_final` that names a file which does not exist
+
+**Observed (live headless leg, 2026-09-04 10:04 PDT, canonical workflow,
+profile `8gb_lite`, bank `media_archive`, the publish-matrix acceptance leg of
+the one-owner work):** `obs_publish OK` and the mp4 in the watched folder,
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\the_flaking_oxide_20260904_094319__anime__still_motion__flux2_klein__bark__media_archive_final.mp4`.
+The ledger's `meta.obs_final_path` (the mux's stamp) names that file. The
+ledger's `meta.paths.obs_final` names
+`C:\Users\jeffr\otr_accept\B\otr\obs\signal_lost_the_flaking_oxide_20260904_094319.mp4`
+-- the PLANNED pointer under the inferred sibling root -- and that file does
+not exist.
+
+**What it is.** `_otr_ledger._published_obs_path` validates the publisher's
+stamped path before `meta.paths` adopts it: same authorized root, `.mp4`,
+exists, and BELONGS TO THIS EPISODE -- the last check was
+`stem == episode_id or stem.startswith(episode_id + "_")`. On 2026-09-03 the
+obs copy was renamed to the watching form, `<title>_<ts>__<style>__<video>__
+<image>__<tts>__<bank>_final.mp4`, and `otr_master_audio_mux._obs_basename`
+strips the constant `signal_lost_` show prefix to build it. The episode id
+still carries the prefix. So the validator refused every published name as
+"not this episode" and `_build_meta_paths` fell back to
+`<obs_root>/<episode_id>.mp4`, a path nothing has written since the 05-02
+reorg. No consumer reads `paths.obs_final` today (the obs bridge keys on the
+`_final` marker; the eligibility stamp reads `obs_final_path`), which is why
+it stayed silent -- but a ledger field naming a file that does not exist is a
+hole in the ledger, and the next reader of that field would have shipped a
+broken pointer. `tests/test_meta_paths.py` never saw it because its episode
+ids carry no show prefix, so the old rule and the new name agreed there.
+
+**Fix (root).** The prefix is spelled ONCE, `_otr_ledger.SHOW_PREFIX`; the mux
+strips that constant, and the validator accepts the stem bound to either form
+of the id (with or without the prefix) and still refuses another title,
+another timestamp, or a bare prefix of the id.
+`tests/test_meta_paths.py::TestPublishedNameBindsTheEpisode` pins both
+directions and adds the pairing contract: the name `_obs_basename` writes for
+an episode's archival final is the name `_published_obs_path` adopts. If the
+naming rule moves again, that test goes red in the same commit.
+
+**Evidence.** The leg's ledger under `C:\Users\jeffr\otr_accept\B\otr\episodes\
+signal_lost_the_flaking_oxide_20260904_094319\audio\` (scratch, not committed);
+the published mp4 in the watched folder (obs 113 -> 114).

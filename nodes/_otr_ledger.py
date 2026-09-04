@@ -55,6 +55,14 @@ log = logging.getLogger("OTR")
 # ---------------------------------------------------------------------------
 
 CURRENT_SCHEMA_VERSION = "l4-2026-08-07"
+
+# The show prefix every archival episode id carries (`signal_lost_<title>_<ts>`).
+# Spelled ONCE, here: `otr_master_audio_mux._obs_basename` strips it to build
+# the published (watching) name, and `_published_obs_path` below must accept
+# that name for this episode. PBUG-20260904-06 was the two disagreeing -- the
+# validator demanded the prefix the publisher had just removed, so every
+# `meta.paths.obs_final` since the rename pointed at a file that did not exist.
+SHOW_PREFIX = "signal_lost_"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
 date suffix so the lineage is greppable.
@@ -186,7 +194,13 @@ def _published_obs_path(
             return None
         ep = str(episode_id or "").strip().casefold()
         stem = candidate.stem.casefold()
-        if not ep or not (stem == ep or stem.startswith(ep + "_")):
+        # The archival name carries the show prefix; the published (watching)
+        # name the mux writes drops it. Either form binds the file to THIS
+        # episode; a different title or timestamp binds to neither.
+        forms = [ep]
+        if ep.startswith(SHOW_PREFIX) and len(ep) > len(SHOW_PREFIX):
+            forms.append(ep[len(SHOW_PREFIX):])
+        if not ep or not any(stem == f or stem.startswith(f + "_") for f in forms):
             return None
         if candidate.suffix.casefold() != ".mp4" or not candidate.is_file():
             return None

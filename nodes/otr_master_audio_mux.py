@@ -43,6 +43,15 @@ try:  # ComfyUI loads these node modules flat as well as packaged
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
     from _otr_shared import ffprobe as _ffp  # type: ignore
 
+# The show prefix the published (watching) filename drops. Spelled once, in the
+# ledger, whose `_published_obs_path` must accept the name written here; bound
+# at import so a test that stubs the ledger module cannot silently change the
+# name (PBUG-20260904-06).
+try:
+    from ._otr_ledger import SHOW_PREFIX as _SHOW_PREFIX
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_ledger import SHOW_PREFIX as _SHOW_PREFIX  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -948,8 +957,11 @@ def _obs_basename(final: str) -> str:
             return re.sub(r"_(video|image)$", "", str(name or ""))
 
         # The show prefix is constant across every episode, so it buys nothing
-        # in a folder of them; the title and timestamp are the identity.
-        title = re.sub(r"^signal_lost_", "", stem)
+        # in a folder of them; the title and timestamp are the identity. The
+        # prefix is spelled ONCE, in the ledger, because the ledger's
+        # `_published_obs_path` must accept the name written here
+        # (PBUG-20260904-06: it demanded the prefix this line strips).
+        title = re.sub("^" + re.escape(_SHOW_PREFIX), "", stem)
         fields = [
             _obs_field(meta.get("visual_style"), "nostyle"),
             _obs_field(_trim_engine(vid.most_common(1)[0][0]) if vid else None),
