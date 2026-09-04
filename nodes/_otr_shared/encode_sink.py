@@ -46,10 +46,18 @@ def has_nvenc(ffmpeg: str) -> bool:
     into a render on the leg that found this, long after the script and audio
     were finished, naming nothing useful.
 
-    **This is the ONLY nvenc decision in the pack.** There were two identical
-    string tests, here and in ``video_engine``; fixing one left the other to
-    fail the same render at a later node, which is exactly what happened. The
-    node now delegates here.
+    **This is the SINGLE SOURCE OF TRUTH for nvenc, and every other site
+    delegates to it.** There were two identical string tests, here and in
+    ``video_engine``; fixing one left the other to fail the same render at a
+    later node, which is exactly what happened. The node now delegates here.
+
+    THAT CLAIM WAS WRONG FOR FOUR DAYS, AND IT READ AS COVERAGE (2026-09-03).
+    This docstring said "the ONLY nvenc decision in the pack" while a THIRD
+    string test still lived in ``scope_draw._has_nvenc`` -- and the four viz_*
+    engines encode through that module, not through :class:`RawVideoSink`, so
+    they never reached this probe. A rented 4090 that lists h264_nvenc and
+    cannot open a session found it. ``scope_draw`` now delegates here too, and
+    ``tests/test_nvenc_single_decision.py`` fails if a fourth copy appears.
 
     Probes at 256x256 deliberately: NVENC rejects tiny frames outright with
     "Frame Dimension less than the minimum supported value", so a 64x64 probe

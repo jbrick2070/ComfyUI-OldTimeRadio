@@ -22,11 +22,23 @@ import sys
 import time
 
 # Paths are env-overridable so this is a tool rather than one pod's script.
-# The defaults are this repo's own location and the port RunPod exposes.
+# The default is this file's own repo, which is right when it runs from
+# scripts/ and WRONG when a copy has been dropped somewhere convenient -- on
+# the pod it lived at /workspace/, where the naive parent-of-parent resolves to
+# "/" and every leg dies instantly with
+#   can't open file '/scripts/otr_canonical_api_run.py'
+# So the location is VERIFIED rather than assumed, and an unusable root is a
+# named refusal instead of sixteen mystery failures.
 REPO = os.environ.get(
     "OTR_REPO_ROOT",
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RUNNER = os.path.join(REPO, "scripts", "otr_canonical_api_run.py")
+if not os.path.isfile(RUNNER):
+    raise SystemExit(
+        "cannot find the canonical runner at %s\n"
+        "Set OTR_REPO_ROOT to the ComfyUI-OldTimeRadio checkout, e.g.\n"
+        "  export OTR_REPO_ROOT=/workspace/runpod-slim/ComfyUI/custom_nodes/"
+        "ComfyUI-OldTimeRadio" % RUNNER)
 COMFY = os.environ.get("OTR_COMFYUI_URL", "http://127.0.0.1:8188")
 
 WRITER = "google/gemma-4-12b-it (11.9 GB)"      # both slots, operator 2026-09-03
@@ -50,26 +62,44 @@ BANKS = ("media_archive", "original", "public_domain", "shakespeare")
 #: `ideo` each get at least one leg. Cloud image engines (google_image,
 #: cloud_nano_banana_2) are excluded -- they render provider-side and prove
 #: nothing about this pod.
+#: EVERY LANE RUNS ON z_image_turbo, AND THAT IS A CONSTRAINT, NOT A CHOICE.
+#: Measured on this pod 2026-09-03: `z_image_turbo_bf16.safetensors` is the ONLY
+#: image model on disk. flux2_klein, flux_gen1, lumina_image and ideogram4_local
+#: are all absent and none is offered by `otr_fetch_lane_weights.py` -- they are
+#: the "manual public files" tiers of RUNPOD_INSTALL section 4. Pairing a lane
+#: with a profile that names one of them fails ADAPTER-level usability before a
+#: pixel is rendered:
+#:     still_music_opening_001: image engine 'ideogram4_local' failed ...
+#:     missing_model -- requires all four artifacts; missing: ideogram4_nvfp4_mix
+#: So image-model spread is a SEPARATE errand that needs those downloads first.
+#:
+#: ALSO LEARNED THE HARD WAY: do not pair a big writer with a small-card profile.
+#: `otr_nvidia_8gb_haunted` is an 8 GB row, and pinning the 12B writer against it
+#: raises VRAMFitFailedError in 0.1 min -- the profile's own VRAM policy refuses
+#: the model, regardless of the 24 GB actually available. The `otr_w45_*` rows
+#: carry no such ceiling.
+#:
+#: Ordered cheap-first so a run that is cut short has banked the most lanes.
 LANES = [
-    # (profile, engine)                                    image engine exercised
-    ("otr_w45_ltx25_foley_plus", "ltx25_foley_plus"),        # z_image_turbo
-    ("otr_w45_ltx25_mime", "ltx25_mime"),                    # z_image_turbo
-    ("otr_rot_ltx25_foley_fluxgen1", "ltx25_high_foley_plus"),  # flux_gen1
-    ("otr_rot_wan_ideogram4", "wan_ti2v"),                   # ideogram4_local
-    ("otr_nvidia_8gb_haunted", "animatediff15_v3_haunted_video"),  # flux2_klein
-    ("otr_rot_ltx25_video_lumina", "ltx25_high_video"),      # lumina_image
-    ("otr_w45_ltx_video", "ltx_video"),                      # z_image_turbo
-    ("otr_w45_ltx_8gb", "ltx_8gb"),                          # z_image_turbo
-    ("otr_w45_fastwan", "fastwan_8gb"),                      # z_image_turbo
-    ("otr_ltx25_high_video", "ltx25_video"),                 # z_image_turbo
-    ("otr_rot_ltx25_mime_klein", "ltx25_high_mime"),         # flux2_klein
-    ("otr_w45_mesh_stage", "mesh_stage"),                    # z_image_turbo
-    ("otr_soak_still_pan_ideo", "still_pan"),                # ideo
-    ("otr_ideogram4_local_still_word", "still_word"),        # ideogram4_local
-    ("otr_w45_still_motion", "still_motion"),                # z_image_turbo
-    ("otr_soak_word_razzle_lumina_image", "word_razzle"),    # lumina_image
-    ("otr_w45_viz_camera", "viz_camera"),                    # z_image_turbo
-    ("otr_w45_viz_green", "viz_green"),                      # z_image_turbo
+    ("otr_w45_viz_camera", "viz_camera"),
+    ("otr_w45_viz_green", "viz_green"),
+    ("otr_w45_still_flat", "still_flat"),
+    ("otr_w45_still_motion", "still_motion"),
+    ("otr_w45_still_pan", "still_pan"),
+    ("otr_w45_still_word", "still_word"),
+    ("otr_w45_word_razzle", "word_razzle"),
+    ("otr_w45_mesh_stage", "mesh_stage"),
+    ("otr_w45_animatediff15_v3_haunted_video", "animatediff15_v3_haunted_video"),
+    ("otr_w45_wan_ti2v", "wan_ti2v"),
+    ("otr_w45_fastwan", "fastwan_8gb"),
+    ("otr_w45_ltx_8gb", "ltx_8gb"),
+    ("otr_w45_ltx_video", "ltx_video"),
+    # The LTX 2.5 family is LAST on purpose: re-confirmed 2026-09-03 to OOM at
+    # `decode` on a 24 GB Ada card, matching the evidence ledger's existing
+    # 4090/LTX-2.5 negative. Kept in the list so a bigger card runs them.
+    ("otr_w45_ltx25_foley_plus", "ltx25_foley_plus"),
+    ("otr_w45_ltx25_mime", "ltx25_mime"),
+    ("otr_ltx25_high_video", "ltx25_video"),
 ]
 
 #: Lanes that need their OWN BOOT (different launch env), so they cannot share

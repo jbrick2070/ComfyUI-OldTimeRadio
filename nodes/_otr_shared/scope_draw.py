@@ -828,11 +828,39 @@ def _reap(proc, sink=None):
 
 
 def _has_nvenc(ffmpeg):
+    """Can h264_nvenc actually ENCODE here -- delegated, never re-implemented.
+
+    THE THIRD COPY OF A BUG THAT WAS ALREADY FIXED TWICE (2026-09-03). This
+    used to answer with ``"h264_nvenc" in (ffmpeg -codecs)``, which reports
+    only that ffmpeg was COMPILED with nvenc. `encode_sink.has_nvenc` was
+    rewritten on 2026-08-30 to run a real one-frame probe because that exact
+    string test "cost a whole episode", and its docstring states it is the only
+    nvenc decision in the pack. It was not: this copy survived, and the four
+    viz_* engines reach ffmpeg through THIS module rather than through
+    `RawVideoSink`, so they kept selecting a dead encoder.
+
+    Proven on a rented RTX 4090 (2026-09-03). ffmpeg lists the encoder and
+    cannot open a session -- the normal case in a GPU container that does not
+    pass NVENC through:
+
+        [h264_nvenc] OpenEncodeSessionEx failed: unsupported device (2)
+        [h264_nvenc] No capable devices found     (ffmpeg exits 187)
+
+    The string test said yes, so `viz_camera` streamed raw frames into a
+    doomed encoder and died as `ffmpeg closed the pipe after 3 frame(s)` --
+    naming ffmpeg, not the encoder, eight minutes into the leg. libx264 was
+    available the whole time.
+
+    Delegating rather than copying the probe is the point: a fourth
+    re-implementation is how this recurs a fourth time.
+    """
     try:
-        out = subprocess.run([ffmpeg, "-hide_banner", "-codecs"],
-                             capture_output=True, text=True, timeout=5)
-        return "h264_nvenc" in (out.stdout or "")
-    except Exception:  # noqa: BLE001
+        try:
+            from .encode_sink import has_nvenc as _probe
+        except ImportError:  # pragma: no cover -- flat test imports
+            from encode_sink import has_nvenc as _probe  # type: ignore
+        return bool(_probe(ffmpeg))
+    except Exception:  # noqa: BLE001 -- a probe must never be fatal.
         return False
 
 
