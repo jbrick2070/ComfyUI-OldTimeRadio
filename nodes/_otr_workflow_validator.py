@@ -170,7 +170,21 @@ def widget_vector_drift(workflow: dict, ncm: dict) -> list[str]:
             continue
         try:
             expected = _expected_slot_count(cls.INPUT_TYPES() or {})
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            # A NODE THAT CANNOT DESCRIBE ITS OWN INPUTS IS A DRIFT FINDING,
+            # NOT AN EXEMPTION (2026-09-04, kibitz r1, unanimous). This used to
+            # `continue`, which silently removed the node from the HARD GATE
+            # below -- so a broken INPUT_TYPES() let the gate report
+            # "widget_vector_drift=0" having never checked it. Every class that
+            # reaches this line is one of OURS: third-party types were already
+            # skipped at `cls is None` above, so there is no foreign-node cost
+            # to weigh, and an OTR node whose schema raises is exactly the kind
+            # of silent mis-map the gate exists to halt.
+            findings.append(
+                f"node {node.get('id')} {ntype}: INPUT_TYPES() raised "
+                f"{type(exc).__name__}: {str(exc)!r} -- widget vector could not be "
+                f"checked, treated as drift"
+            )
             continue
         if len(wv) != expected:
             findings.append(
@@ -215,10 +229,11 @@ class WorkflowValidator:
                 }),
                 "validate_anyway": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "True: always run the structural audit and report "
-                               "findings. False: skip the audit body and report "
-                               "'skipped'. Diagnostic switch; it never blocks the "
-                               "episode either way.",
+                    "tooltip": "True: run the structural audit and RAISE on a "
+                               "contract or widget-vector violation, halting the "
+                               "queue before any model loads. False: skip the "
+                               "audit body and report 'skipped' -- the diagnostic "
+                               "bypass for a deliberately drifted graph.",
                 }),
                 "strict_unknown_types": ("BOOLEAN", {
                     "default": True,

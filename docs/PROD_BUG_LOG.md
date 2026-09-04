@@ -10961,3 +10961,50 @@ two defects; they are one.
 `camera` and `expression` were empty on real video lanes. The runner profile fix
 matters only for what THIS LOOP publishes. The still_flat theory was a detour, and
 a filename is what sent it there.
+
+## PBUG-20260904-01 -- the viz lanes chose a dead video encoder, because "was ffmpeg built with nvenc" was asked instead of "can it encode"
+
+**Status:** ROOT-FIXED and LIVE-PROVEN 2026-09-04 (commit b4c05cfc). **Verified by:**
+a rented RTX 4090 pod -- `viz_camera` FAIL (dead encoder, 7.8 min) before the fix,
+PASS and published (14.4 min, `signal_lost_the_weight_of_1924_20260904_025924`) after.
+Then five more viz/still lanes passed in a row on the same box.
+
+**What the operator saw.** The 1-act lane matrix on the pod failed its very first
+lane with `scope_draw: ffmpeg closed the pipe after 3 frame(s) ... [h264_nvenc @ ...]`
+eight minutes into the leg -- an error that names ffmpeg, not the encoder choice.
+
+**The mechanism, and it is the THIRD copy of a bug fixed twice.**
+`_otr_shared/scope_draw.py::_has_nvenc` answered with
+`"h264_nvenc" in (ffmpeg -codecs)`, which reports whether ffmpeg was COMPILED with
+nvenc -- true on a container that cannot open an encode session. `encode_sink.has_nvenc`
+had been rewritten on 2026-08-30 to run a real one-frame encode after that exact
+string test "cost a whole episode", and its docstring then claimed to be "the ONLY
+nvenc decision in the pack". It was not: the four viz_* engines encode through
+`scope_draw`, not `RawVideoSink`, so they never reached the real probe. On the pod:
+
+```
+[h264_nvenc] OpenEncodeSessionEx failed: unsupported device (2)
+[h264_nvenc] No capable devices found          (ffmpeg exits 187)
+has_nvenc(ffmpeg) -> False          # the real probe was right the whole time
+```
+
+**Why the 5080 could never find it.** Your card HAS working NVENC, so on the dev box
+the wrong answer was still the right answer. Only a machine where the string test and
+the encode probe DISAGREE exposes it -- containers, AMD, Mac. This is the canonical
+example of a bug the 4060/pod drill exists for.
+
+**The fix.** `scope_draw._has_nvenc` now DELEGATES to `encode_sink.has_nvenc` rather
+than carrying a copy, because a fourth re-implementation is how this recurs a fourth
+time. The `encode_sink` docstring's "ONLY nvenc decision" claim is corrected to
+"single source of truth every other site delegates to", with the four days it was
+false written down. `tests/test_nvenc_single_decision.py` bans the string test
+outside the owner (AST-based, so the docstring that quotes the banned pattern is not
+a false positive) and was verified to fail on an injected regression.
+
+**The portable lesson, and it generalises past nvenc.** A docstring that makes a
+UNIVERSAL claim -- "the only", "single source of truth", "every", "never" -- READS AS
+COVERAGE and stops the next reader from looking. The claim was false for four days and
+nobody checked precisely because it was stated so confidently. The 2026-09-04 kibitz
+arc found the same shape twice more (`_obs_dir` "ONE owner"; `configured_models_root`
+"folder_paths is probed first"). Grep for universal claims in docstrings and check each
+against the code; it is cheap and it would have caught all three.

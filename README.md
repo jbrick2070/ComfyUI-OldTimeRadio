@@ -839,7 +839,7 @@ appear there as they render.
 
 Development runs under a sibling QA harness — the
 [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a machine-readable Bug Bible (329 entries and growing) distilled from this project's live production
+a machine-readable Bug Bible (331 entries and growing) distilled from this project's live production
 incidents, plus a static regression suite that runs against this pack after every change.
 Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —

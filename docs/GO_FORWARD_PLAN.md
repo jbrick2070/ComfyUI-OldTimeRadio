@@ -677,13 +677,38 @@ bare-`folder_paths`-or-`"."` idiom is copy-pasted again in `otr_caption_burn.py`
 
 **Why it has not bitten:** both launchers hand-pin `OTR_OUTPUT_DIR` =
 `--output-directory` = `OTR_OBS_DIR` in lockstep -- by human discipline in two
-separate shell scripts, not by any code invariant. ComfyUI Desktop, a bare
-`main.py`, or an MCP launch tool does not know to do that. Note also that
-`_obs_dir()`'s own docstring claims "ONE owner for where published means", which is
-exactly the false-universal-claim shape that let the nvenc string test survive.
-**Owed:** make the mux delegate to `_otr_paths`, with care -- `otr_obs_dir()`
-applies a `_validate_contract` the mux copy does not, so this is not a blind
-substitution. A test should assert the two agree under a set `OTR_OUTPUT_DIR`.
+separate shell scripts, not by any code invariant.
+
+**CORRECTED BY KIBITZ r1 (2026-09-04) -- the first draft of this row was wrong
+in three ways, and it matters because the first fix proposed would have broken a
+contract test.** Full record in
+`kibitz-runs/2026-09-04-runpod-found-fixes/r1/{judgment,final}.md` (local, gitignored):
+
+* **Four owners, not two.** `_otr_ledger.py:182` reads `OTR_OBS_DIR` too, and
+  `__init__.py:97-108` WRITES `OTR_OUTPUT_DIR` at import inside ComfyUI -- that
+  pin, not "the launcher was skipped", is the mechanism behind the Desktop /
+  bare-`main.py` split.
+* **Two concepts, deliberately named apart.** The *episode workspace root*
+  (`_episodes_root`) IS a true duplicate that ignores `OTR_OUTPUT_DIR` -- delegate
+  it. The *publication root* (`_obs_dir`) is NOT: `_otr_paths.otr_obs_dir()`
+  (:401-429) never reads `OTR_OBS_DIR`, which is a first-class override read by
+  seven files including five launchers and exists to point OUTSIDE the tree (the
+  documented two-tree split). The mux is right to honour it; `_otr_paths` is the
+  incomplete one. "Delegate the mux to `_otr_paths`" for obs would have broken the
+  split AND tripped `_validate_contract` (:220-236 raises on an out-of-tree path).
+* **A contract test pins it.** `tests/test_output_tree_contract.py:48-50` lists
+  `otr_obs_dir` in `_NOARG_HELPERS` and asserts in-tree. Any change ships WITH
+  that test updated, or does not ship.
+* **Open ruling, deciding in r2:** an explicit pin SKIPS the in-tree assert
+  (driver's first lean) or registers as a *declared second authorized root* the
+  way `_otr_ledger.py:168-191` already does (panel 2-1, and now the driver's lean
+  -- it keeps the validator meaningful instead of holing it).
+* Both docstrings -- mux "ONE owner", `_otr_paths` "THE obs dir" -- are false and
+  must become true or go; this is the nvenc shape.
+* **Acceptance:** Path equality is necessary and NOT sufficient. A live headless
+  publish with `OTR_OUTPUT_DIR != folder_paths.get_output_directory()` landing in
+  the watched tree. Caption-burn / silent-composite fallbacks are a rostered
+  follow-up, not equals of `_publish_to_obs`.
 
 **B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
 copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
