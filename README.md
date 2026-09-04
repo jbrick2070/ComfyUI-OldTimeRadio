@@ -69,18 +69,25 @@ Then restart ComfyUI so it loads the nodes.
 > PATH with the libx264 and aac encoders built in (Windows: the ComfyUI portable and
 > Desktop builds bundle one; Mac: `brew install ffmpeg`; Linux: your package manager's
 > ffmpeg). OTR mixes and muxes every episode through it, and a missing ffmpeg fails at
-> render time with no earlier warning. On Linux (including the AMD profile) the
-> `pycairo` package in `requirements.txt` needs the system Cairo library to build:
-> install `libcairo2-dev` (Debian/Ubuntu) or your distro's equivalent, plus
-> `pkg-config`, before running pip. Skip it and the announcer/music visualizer lanes
-> stop partway through a render with an ImportError naming `cairo`.
+> render time with no earlier warning. **`pycairo` is Windows-only in
+> `requirements.txt`** (`pycairo>=1.24; sys_platform == 'win32'`, because pycairo
+> publishes zero Linux wheels), so pip on Linux or Mac skips it entirely and there
+> are no headers to pre-install. Exactly ONE engine imports cairo --
+> `viz_mxc_mandala` -- and it refuses loudly, naming the pip command, if you select
+> it without cairo; every other visualizer lane is cairo-free. It is not in the
+> canonical workflow, **but the two AMD profiles do select it** (`otr_amd8_rocm` and
+> `otr_amd16_rocm` use `viz_mxc_mandala` for `music_visual`). So on Linux, and only
+> if you run an AMD profile or pick that engine: install `libcairo2-dev`
+> (Debian/Ubuntu) or your distro's equivalent plus `pkg-config`, then
+> `pip install pycairo` yourself.
 
 **The ComfyUI Registry route does not currently work, and Manager cannot install
-this pack by any route.** Both published versions are `Flagged`
+this pack by any route.** No published version is `Active`
 ([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)),
 so `latest_version` resolves to null: `@latest` has no target, and Manager
 refuses the `nightly` git path on any network-exposed instance. Checked live
-2026-08-31 -- 2 versions, 0 active. If Manager reports "not a CNR node" or
+2026-09-04 -- 5 versions, 0 active: alpha.15/16/17 `Flagged`, alpha.13/14
+`Banned`. If Manager reports "not a CNR node" or
 "cannot resolve install target", that is this, not a fault on your machine. Use
 the clone above.
 
@@ -114,7 +121,7 @@ release 1.6.0); on Windows, install the row you need by hand as above.
 > name, same 28 voices, about six times faster than realtime on a laptop CPU, no GPU
 > contention with the video). The 326 MB ONNX model is fetched once at boot into
 > `models/TTS/KokoroTTS/onnx/` when that backend will be used, never during a render.
-> **Registry installs older than 2.0.0-alpha.16 do not carry the kokoro-onnx line
+> **Registry installs older than 2.0.0-alpha.17 do not carry the kokoro-onnx line
 > yet:** on those, run `python -m pip install kokoro-onnx` with ComfyUI's own
 > interpreter once, or open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`,
 > `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` (bark installs
@@ -520,12 +527,14 @@ Update to commit `da2b7a36` or later if your stills are that slow.
 | `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
 | `mesh_stage (16:9)` | not measured | ? | ? | yes |
 
-`animatediff15_v3_haunted_video` is the ONE surviving AnimateDiff lane
-(operator directive 2026-08-23: "delete any animatediff that are not
-haunted"). Its former peers — `animatediff15_video`, the hold-3/hold-5
-cadence variants, `animatediff15_v2_video`, and `animatediff15_v3_video` —
-are retired and tombstoned in the engine registry; they no longer appear in
-any dropdown.
+`animatediff15_v3_haunted_video` was the ONE surviving AnimateDiff lane after
+the 2026-08-23 directive ("delete any animatediff that are not haunted"). Its
+former peers — `animatediff15_video`, the hold-3/hold-5 cadence variants,
+`animatediff15_v2_video`, and `animatediff15_v3_video` — are retired and
+tombstoned in the engine registry; they no longer appear in any dropdown.
+**A second AnimateDiff lane joined it on 2026-09-02:**
+`animatediff15_v3_stillin_lab_video`, the still-in laboratory peer. Both are
+selectable today; the retired peers above are still gone.
 
 **Licensing note on this table:** most engines here are open weights, but two
 are not. `h3_low_video` / `h3_low_audio_in` (MiniMax H3) run under a personal,
@@ -770,6 +779,19 @@ Everything for an episode lands under your ComfyUI `output/otr/` tree:
 - `output/otr/episodes/<episode>/` — working assets (audio, frames, intermediate clips).
 - `output/otr/obs/` — the **finished, playable episodes** (what you watch / publish).
 
+The published file is named after what produced it, so a folder of episodes is
+readable at a glance without opening any of them:
+
+```
+<title>_<timestamp>__<style>__<video>__<image>__<tts>__<bank>_final.mp4
+
+arms_at_the_ready_20260903_092133__cartoon__wan_ti2v__z_image_turbo__indextts2__public_domain_final.mp4
+```
+
+A lane that renders no stills reports `none` in the image field rather than
+borrowing another episode's engine. The archival copy under `episodes/` keeps a
+different, pipeline-stage name — that one is provenance, not something to read.
+
 Point OBS (or any player) at `otr/obs/` for a continuous broadcast — new finished episodes
 appear there as they render.
 
@@ -792,7 +814,7 @@ appear there as they render.
   branch.
 - **`neither kokoro backend is installed` (or `kokoro is not installed`) at the first voice
   line** — on Python 3.13 run `python -m pip install kokoro-onnx` with ComfyUI's own
-  interpreter (a registry install older than 2.0.0-alpha.16 does not carry it); on 3.12
+  interpreter (a registry install older than 2.0.0-alpha.17 does not carry it); on 3.12
   `pip install kokoro`. The message names the exact line. Or open **OTR_CastLock** and set
   `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine`
   -> `bark`, then queue again.
@@ -817,7 +839,7 @@ appear there as they render.
 
 Development runs under a sibling QA harness — the
 [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a machine-readable Bug Bible (325 entries and growing) distilled from this project's live production
+a machine-readable Bug Bible (329 entries and growing) distilled from this project's live production
 incidents, plus a static regression suite that runs against this pack after every change.
 Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
 to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
