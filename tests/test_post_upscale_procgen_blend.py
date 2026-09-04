@@ -18,12 +18,14 @@ os.environ.setdefault("OTR_TEST_MODE", "1")
 
 @pytest.fixture(autouse=True)
 def _isolate_obs_dir(monkeypatch, tmp_path):
-    """Pin OTR_OUTPUT_DIR so otr_obs_dir() resolves under tmp_path.
+    """Pin OTR_OUTPUT_DIR (and clear any inherited OTR_OBS_DIR) so every
+    path the blend resolves lands under tmp_path.
 
-    BUG-LOCAL-108 path cleanup (2026-05-05): the blend node now writes
-    its output into otr_obs_dir() rather than next to the source. Without
-    this fixture every blend test would write into Jeffrey's real
-    ComfyUI output tree.
+    History: BUG-LOCAL-108 (2026-05-05) had the blend write into
+    otr_obs_dir(); since the 2026-06-09 layout change it writes its silent
+    intermediate BESIDE its source inside the episode folder, and only the
+    mux publishes to obs. The pin still matters: without it a test that
+    resolves any output helper would touch the real ComfyUI output tree.
     """
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
     monkeypatch.delenv("OTR_OBS_DIR", raising=False)

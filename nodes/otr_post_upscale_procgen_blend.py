@@ -572,7 +572,7 @@ def _load_master_audio_np(source_mp4: Path, ffmpeg: str):
     import tempfile
     import wave
     import numpy as np
-    fb = str(ffmpeg or "ffmpeg")
+    fb = _ffmpeg_bin(ffmpeg)  # the owner's answer, even when called standalone
     audio_src = _find_master_audio(source_mp4)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp_path = tmp.name

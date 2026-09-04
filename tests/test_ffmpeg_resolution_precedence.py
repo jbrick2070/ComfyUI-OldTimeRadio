@@ -104,6 +104,19 @@ def test_a_pin_spelled_as_the_bare_name_means_use_path(box, monkeypatch):
     assert ffm.resolve_ffmpeg("ffmpeg") == box.path
 
 
+def test_a_pin_with_whitespace_and_a_tilde_still_resolves(box, monkeypatch):
+    """agy (manual r4): expanding before stripping left the tilde in place."""
+    home = box.tmp / "home"
+    (home / "bin").mkdir(parents=True)
+    pinned = home / "bin" / "ffmpeg.exe"
+    pinned.write_bytes(b"")
+    monkeypatch.setattr(os.path, "expanduser",
+                        lambda p: str(home) + p[1:] if p.startswith("~") else p)
+    monkeypatch.setenv("OTR_FFMPEG", "  ~/bin/ffmpeg.exe  ")
+    got = ffm.resolve_ffmpeg("ffmpeg")
+    assert got and os.path.normpath(got) == os.path.normpath(str(pinned))
+
+
 def test_a_pin_that_does_not_resolve_is_skipped_not_returned(box, monkeypatch):
     monkeypatch.setenv("OTR_FFMPEG", str(box.tmp / "nowhere" / "ffmpeg.exe"))
     assert ffm.resolve_ffmpeg("ffmpeg") == box.path

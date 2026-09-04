@@ -13,6 +13,7 @@ is container surgery, and a mocked ffmpeg would prove nothing about it.
 """
 from __future__ import annotations
 
+from nodes._otr_shared.ffmpeg import resolve_ffmpeg as _resolve_ffmpeg  # the pack's one ffmpeg owner
 import os
 import shutil
 import subprocess
@@ -33,7 +34,7 @@ pytestmark = pytest.mark.skipif(
 def _tiny_mp4(path, seconds=1.0):
     """A real, silent, tiny h264 mp4 -- the shape the beat assembler emits."""
     subprocess.run(
-        [shutil.which("ffmpeg") or os.environ.get("OTR_FFMPEG", "ffmpeg"),
+        [_resolve_ffmpeg() or "ffmpeg",
          "-y", "-loglevel", "error", "-f", "lavfi",
          "-i", "color=c=black:s=64x64:r=%d:d=%s" % (FPS, seconds),
          "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)],

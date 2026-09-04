@@ -66,7 +66,9 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
     chosen = _usable(_explicit(preferred, _BARE_FFMPEG_NAMES))
     if chosen:
         return chosen
-    chosen = _usable(os.path.expanduser(os.environ.get(FFMPEG_ENV) or ""))
+    # strip THEN expand: a pin typed with leading whitespace keeps its tilde
+    # otherwise ("  ~/bin/ffmpeg" never expanded -- agy, manual r4).
+    chosen = _usable(os.path.expanduser((os.environ.get(FFMPEG_ENV) or "").strip()))
     if chosen:
         return chosen
     chosen = _usable("ffmpeg")  # PATH, through the one function that reads it

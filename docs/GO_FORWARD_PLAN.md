@@ -912,6 +912,27 @@ reason it waits.**
 * The `__init__.py:97-108` output pin: preserved deliberately (it is what makes
   every helper agree inside ComfyUI); removing it changes where Desktop installs
   render and is its own design item.
+* **Handed over by the shipping window when it stood down (2026-09-04):**
+  (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes`
+  periodically -- non-null confirms the pycairo-marker theory and the card
+  should show ~34 nodes; still-null means something else fails in the Linux
+  extract container (residual suspect: kokoro pulls torch, and a multi-GB
+  download would blow the 600 s extract timeout). (b) `viewer/index.html`
+  SHIPS in the alpha.17 zip and calls three unregistered endpoints; one
+  `.comfyignore` line fixes it, and `.comfyignore` decides what ships -- the
+  operator authorizes that line, neither window just does it. (c) The registry
+  manual-review request is ready to file and is a PUBLIC post: it needs his
+  own explicit go, not a peer relay. (d) From the `-02` window:
+  `nodes/_otr_shared/partner_nodes.yaml` carries the literal
+  `AUTH_TOKEN_COMFY_ORG` fourteen times as pinned data about Comfy's own
+  partner nodes -- the YARA scanner never read it (YAML), but a human reviewer
+  who greps the zip after reading our request finds the string we said we
+  removed. Scrub to a placeholder BEFORE a reviewer engages, after checking the
+  partner-row parser does not key on the literal. (e) Optional draft polish for
+  the review request: one line that 47 of the 158 findings are the
+  subprocess/ffmpeg family and 103 are `os.environ` reads, so no single
+  subsystem's removal clears the version -- the argument for a review over
+  another patch.
 * **The draft 8 GB profiles cannot write at all (PBUG-20260904-05):**
   `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b` (all `status: draft`) set
   `gguf_n_ctx: 2048`, and the writer prompt alone is 2,741 tokens on
