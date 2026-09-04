@@ -71,6 +71,12 @@ def _move_to_device(obj, device):
 #   The only clean fix without forking Bark is filterwarnings() at module load.
 # -----------------------------------------------------------------------------
 import warnings
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 warnings.filterwarnings(
     "ignore",
     message=r".*Both.*`max_new_tokens`.*`max_length`.*",
@@ -152,7 +158,7 @@ def _load_bark(model_id="suno/bark", device=None):
         log.info(f"Loading Bark model: {model_id} on {device}")
         
         # v1.4.10 Hardening: Force cache_dir to our local Hub directory
-        cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+        cache_dir_path = os.path.join(otr_env.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
         
         try:
             from transformers import AutoProcessor, BarkModel
@@ -524,7 +530,7 @@ _BARK_DEFAULT_MIN_EOS_P = 0.1
 def _resolve_min_eos_p():
     """The semantic-stage min EOS probability (env OTR_BARK_MIN_EOS_P, default
     0.1; <=0 disables). Pure."""
-    raw = (os.environ.get("OTR_BARK_MIN_EOS_P") or "").strip()
+    raw = (otr_env.get("OTR_BARK_MIN_EOS_P") or "").strip()
     if raw == "":
         return _BARK_DEFAULT_MIN_EOS_P
     try:
@@ -536,7 +542,7 @@ def _resolve_min_eos_p():
 def _env_flag(name, default):
     """Parse a boolean env flag. Empty/unset -> ``default``; otherwise
     1/true/yes/on -> True, everything else -> False. Pure."""
-    raw = (os.environ.get(name) or "").strip().lower()
+    raw = (otr_env.get(name) or "").strip().lower()
     if raw == "":
         return bool(default)
     return raw in ("1", "true", "yes", "on")

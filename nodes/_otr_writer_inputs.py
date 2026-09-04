@@ -27,7 +27,6 @@ UTF-8, no BOM, ASCII source.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
@@ -38,6 +37,11 @@ from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
 from . import _otr_story_routing as _otr_story_routing
 from ._otr_shared import llm_policy as _llm_policy
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 try:                                            # package import
     from . import _otr_episode_budget as _OTRB
@@ -310,8 +314,8 @@ def _resolve_inputs(
         # The source is frozen, but cast/style still roll unless C7 pins them.
         # A replay leg meant as a controlled A/B (F2) needs OTR_C7=1; warn LOUD
         # if the seeds are unset so a mis-run does not masquerade as a control.
-        if not (os.environ.get("OTR_CAST_SEED", "").strip()
-                and os.environ.get("OTR_STYLE_SEED", "").strip()):
+        if not (otr_env.get("OTR_CAST_SEED", "").strip()
+                and otr_env.get("OTR_STYLE_SEED", "").strip()):
             log.warning(
                 "[OTR_LedgerScriptWriter] source-snapshot REPLAY without C7 seed "
                 "pinning (OTR_CAST_SEED/OTR_STYLE_SEED unset): the SOURCE is "

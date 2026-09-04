@@ -48,8 +48,6 @@ ALLOWED = {
 #: Not yet migrated. Shrinks in the same commit as each batch; never grows.
 PENDING = {
     "nodes/_otr_audio_engines/eng_indextts2.py",
-    "nodes/_otr_ledger.py",
-    "nodes/_otr_sys_specs.py",
     "nodes/otr_caption_burn.py",
     "nodes/otr_credits_roll.py",
     "nodes/otr_master_audio_mux.py",

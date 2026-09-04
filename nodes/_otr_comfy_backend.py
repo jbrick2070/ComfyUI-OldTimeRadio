@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from typing import Any
 
@@ -45,6 +44,11 @@ from ._otr_generation_budget import (
     estimate_prompt_tokens,
     fit_output_tokens,
 )
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger(__name__)
 
@@ -171,12 +175,12 @@ class ComfyCreditsCallFailedError(ComfyCreditsError):
 
 
 def _env(name: str) -> str | None:
-    v = os.environ.get(name)
+    v = otr_env.get(name)
     return v if v else None
 
 
 def _int_env(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if not raw:
         return default
     try:
@@ -186,7 +190,7 @@ def _int_env(name: str, default: int) -> int:
 
 
 def _float_env(name: str) -> float | None:
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if not raw:
         return None
     try:
@@ -201,7 +205,7 @@ def comfy_credits_enabled() -> bool:
     time, so the env flag is the load-visible opt-in; the actual auth token
     is checked at generate() time. Default-off keeps the offline baseline
     and the dropdowns untouched (mirrors openrouter_enabled)."""
-    return os.environ.get("OTR_ENABLE_COMFY_CREDITS", "0") == "1"
+    return otr_env.get("OTR_ENABLE_COMFY_CREDITS", "0") == "1"
 
 
 def is_comfy_row_id(repo_id: str) -> bool:
@@ -660,7 +664,7 @@ class ComfyCreditsBackend:
         result: dict, *, slug: str, fail_on_output_limit: bool = False,
     ) -> str:
         body = result.get("json") or {}
-        if os.environ.get("OTR_COMFY_DEBUG_RAW") == "1":
+        if otr_env.get("OTR_COMFY_DEBUG_RAW") == "1":
             log.info("[ComfyCredits] raw %s response: %s", slug, json.dumps(body)[:1500])
         choices = body.get("choices") or []
         if not choices:

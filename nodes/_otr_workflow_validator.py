@@ -34,9 +34,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.workflow_validator")
 
@@ -438,7 +442,7 @@ class WorkflowValidator:
         # are OUTPUTS kept for external tooling and the same-process node packs
         # -- the env value is the only full-fidelity record of which workflow
         # snapshot actually ran (the log prints a 12-char prefix).
-        os.environ["OTR_ACTIVE_PROFILE"] = profile_id
+        otr_env.pin("OTR_ACTIVE_PROFILE", profile_id)
         snapshot_hash = ""
         try:
             p = _resolve_workflow_path(workflow_json_path)
@@ -447,7 +451,7 @@ class WorkflowValidator:
                 snapshot_hash = hashlib.sha256(p.read_bytes()).hexdigest()
         except OSError:
             pass
-        os.environ["OTR_SNAPSHOT_HASH"] = snapshot_hash
+        otr_env.pin("OTR_SNAPSHOT_HASH", snapshot_hash)
         msg = (f"stamp OK: profile={profile_id} "
                f"snapshot_sha={snapshot_hash[:12] or 'n/a'}"
                + (f" generated_by={generated_by}" if generated_by else ""))

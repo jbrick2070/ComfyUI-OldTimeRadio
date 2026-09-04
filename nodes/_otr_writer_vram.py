@@ -21,7 +21,11 @@ confirmed by an operator GPU smoke -- this path does nothing observable headless
 from __future__ import annotations
 
 import logging
-import os
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +43,7 @@ def unload_writer_llm_after_script(unload_fn=None) -> str:
     OpenRouter / Comfy Credits entries in the local singleton cache, so it must
     not import torch just to empty an already-empty CUDA allocator.
     """
-    if os.environ.get("OTR_WRITER_UNLOAD_AFTER_SCRIPT", "1").strip() == "0":
+    if otr_env.get("OTR_WRITER_UNLOAD_AFTER_SCRIPT", "1").strip() == "0":
         return "skipped_env"
     try:
         if unload_fn is None:

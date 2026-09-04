@@ -23,7 +23,6 @@ import hashlib
 import json
 import logging
 import math
-import os
 import random
 import re
 import warnings
@@ -39,6 +38,11 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 try:
     from . import _otr_episode_budget as _OTRB
@@ -602,7 +606,7 @@ def _resolve_seed() -> int:
     """OTR_SCIFI_NEWS_PRO_SEED reproduces the frame-card/stance deal AND the
     announcer voice draw (r3/S2); OS entropy otherwise. The resolved
     value is stamped in meta.scifi_news_pro.seed either way."""
-    raw = os.environ.get("OTR_SCIFI_NEWS_PRO_SEED", "").strip()
+    raw = otr_env.get("OTR_SCIFI_NEWS_PRO_SEED", "").strip()
     if raw:
         try:
             return int(raw)

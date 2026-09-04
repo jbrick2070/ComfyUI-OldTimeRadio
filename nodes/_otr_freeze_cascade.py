@@ -16,6 +16,11 @@ from typing import Any, Optional
 from . import _otr_ledger_freeze as _LFC
 from . import _otr_word_delivery as _OTRWD
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR.freeze_cascade")
 
 
@@ -908,8 +913,7 @@ def run_freeze_cascade(
     # D3 CI-only invariant (gated on OTR_TEST_MODE so production never crashes --
     # COERCE-NEVER-CRASH). NOT inside the sweep try/except above (that would
     # swallow the AssertionError). Music rows are separate (not asserted).
-    import os as _os_d3
-    if _os_d3.environ.get("OTR_TEST_MODE"):
+    if otr_env.get("OTR_TEST_MODE"):
         try:
             _ci_cast_ids = _PL.cast_ids_from_ledger(led.data)
         except Exception:  # noqa: BLE001

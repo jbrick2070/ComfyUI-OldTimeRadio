@@ -55,6 +55,11 @@ from ._otr_story_brief import (
     run_story_brief_reflection,
 )
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -369,9 +374,8 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
     baseline-capture or regression run. This mirrors BUG-LOCAL-260's
     LEMMY decoupling: random in production, explicit force path for C7.
     """
-    import os
     import random
-    env = os.environ.get("OTR_CAST_SEED", "").strip()
+    env = otr_env.get("OTR_CAST_SEED", "").strip()
     if env:
         # OTR_CAST_SEED WITHOUT OTR_C7 IS ALMOST ALWAYS A LEAK, not a choice.
         # The soak launcher only ever sets this variable inside its C7 branch,
@@ -381,7 +385,7 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
         # bake-off cast GULLIVER REEVES and the operator caught it by watching
         # the episodes rather than by reading a log. Say so at WARNING, name
         # the cast it will produce, and name the variable to clear.
-        if not os.environ.get("OTR_C7", "").strip():
+        if not otr_env.get("OTR_C7", "").strip():
             log.warning(
                 "CAST SEED IS PINNED TO %s BUT OTR_C7 IS NOT SET. Every "
                 "episode from this server will open with the SAME cast (seed "

@@ -46,6 +46,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 # Live token heartbeat. A LEAF module on purpose: _otr_constrained_generate
 # imports FROM this file, so the streamer cannot live there without a cycle --
 # which is exactly why this transport had no live view for so long.
@@ -855,7 +860,7 @@ def load_llm(
         except Exception as _hf_err:
             _runtime_log(f"[StoryOrchestrator] HF_HOME helper unavailable ({_hf_err}); using os.environ fallback")
             _OTR_HF = None
-            _hf_home_resolved = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+            _hf_home_resolved = otr_env.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
 
         cache_dir_path = os.path.join(_hf_home_resolved, "hub")
 

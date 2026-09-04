@@ -34,10 +34,18 @@ import hashlib
 import json
 import logging
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Optional
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 try:  # pragma: no cover - package and standalone import styles
     from ._otr_text_metrics import WORD_RE, canonical_char_count, canonical_word_count
@@ -188,7 +196,7 @@ def _published_obs_path(
     try:
         candidate = Path(raw).expanduser().resolve()
         roots = [inferred_obs_root.resolve()]
-        explicit_root = os.environ.get("OTR_OBS_DIR", "").strip()
+        explicit_root = otr_env.get("OTR_OBS_DIR", "").strip()
         if explicit_root:
             roots.append(Path(explicit_root).expanduser().resolve())
         if not any(candidate.parent == root for root in roots):
@@ -578,7 +586,7 @@ def in_flight_ledger_path() -> Optional[Path]:
             "[OTR_Ledger] in_flight singleton lookup failed (%s); "
             "checking fallback path", exc,
         )
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         log.info(
             "[OTR_Ledger] test mode: no saved singleton ledger; "
             "skipping mtime walker fallback"
@@ -882,7 +890,7 @@ def lookup_git_commit(repo_root: Path) -> Optional[str]:
     if _GIT_COMMIT_CACHE is not None:
         return _GIT_COMMIT_CACHE
     try:
-        out = subprocess.run(
+        out = otr_proc.run(
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=str(Path(repo_root)),
             capture_output=True,

@@ -4,7 +4,7 @@ S30 B1a2. Used by GatedModelError pre-flight checks and
 auto_download_if_missing's token forwarding.
 
 Resolution order:
-    1. os.environ.get("HF_TOKEN")
+    1. otr_env.get("HF_TOKEN")
     2. (Windows only) HKCU\\Environment via winreg
     3. None
 
@@ -21,6 +21,10 @@ from __future__ import annotations
 
 import os
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 def resolve_hf_token() -> str | None:
     """Return the user's HF_TOKEN if available, else None.
@@ -29,7 +33,7 @@ def resolve_hf_token() -> str | None:
     Windows (catches the ComfyUI Desktop env-inheritance gap), then
     gives up cleanly.
     """
-    env_token = os.environ.get("HF_TOKEN")
+    env_token = otr_env.get("HF_TOKEN")
     if env_token:
         return env_token
     if os.name == "nt":

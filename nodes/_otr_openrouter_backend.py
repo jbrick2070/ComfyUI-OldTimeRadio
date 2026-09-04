@@ -44,6 +44,11 @@ from ._otr_generation_budget import (
     fit_output_tokens,
 )
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger(__name__)
 
 #: One-shot guard so the "reasoning_effort ACTIVE" evidence line logs once/process.
@@ -296,12 +301,12 @@ class OpenRouterModelGoneError(OpenRouterCallFailedError):
 
 
 def _env(name: str) -> str | None:
-    v = os.environ.get(name)
+    v = otr_env.get(name)
     return v if v else None
 
 
 def _int_env(name: str, default: int) -> int:
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if not raw:
         return default
     try:
@@ -311,7 +316,7 @@ def _int_env(name: str, default: int) -> int:
 
 
 def _float_env(name: str) -> float | None:
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if not raw:
         return None
     try:
@@ -1560,7 +1565,7 @@ class OpenRouterBackend:
         result: dict, *, slug: str, fail_on_output_limit: bool = False,
     ) -> str:
         body = result.get("json") or {}
-        if os.environ.get("OPENROUTER_DEBUG_RAW") == "1":
+        if otr_env.get("OPENROUTER_DEBUG_RAW") == "1":
             log.info("[OpenRouter] raw %s response: %s", slug, json.dumps(body)[:1500])
         # Record the concrete model the upstream actually served (a `~latest`
         # alias resolves server-side) + its cost, for the episode credits sheet.

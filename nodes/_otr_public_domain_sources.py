@@ -19,6 +19,11 @@ from typing import Any, Callable
 from pydantic import BaseModel, Field, field_validator
 
 try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
+try:
     from . import _otr_source_payload as _osp
 except ImportError:  # pragma: no cover -- flat import harnesses
     import _otr_source_payload as _osp  # type: ignore
@@ -757,7 +762,7 @@ def build_public_domain_briefs(
 
 def source_bank_cache_root() -> Path:
     """Resolve the public source-bank cache root without creating it."""
-    env = os.environ.get("OTR_SOURCE_BANK_CACHE_DIR", "").strip()
+    env = otr_env.get("OTR_SOURCE_BANK_CACHE_DIR", "").strip()
     if env:
         return Path(env).expanduser()
     try:

@@ -25,11 +25,15 @@ UTF-8, no BOM, ASCII-only source. Dependency-free (stdlib only).
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.janitor")
 
@@ -115,7 +119,7 @@ def sweep_shared_tmp(max_age_seconds: float | None = None,
             from _otr_paths import otr_shared_tmp_dir  # type: ignore
         tmp_root = otr_shared_tmp_dir()
         if max_age_seconds is None:
-            raw = os.environ.get("OTR_TMP_SWEEP_MAX_AGE_S", "")
+            raw = otr_env.get("OTR_TMP_SWEEP_MAX_AGE_S", "")
             try:
                 max_age_seconds = float(raw) if raw.strip() else \
                     DEFAULT_TMP_MAX_AGE_S

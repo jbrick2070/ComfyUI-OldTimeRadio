@@ -26,6 +26,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ._otr_audio_engines import EngineUnusable, EngineUsabilityReason, assert_usable
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 _PROFILES_FILENAME = "audio_engine_profiles.yaml"
@@ -419,7 +424,7 @@ def assert_token_for_profile(profile: EngineProfile) -> None:
     Reads the environment, so call this on the generate() path, NEVER in
     INPUT_TYPES (C-5).
     """
-    if profile.requires_hf_token and not os.getenv("HF_TOKEN"):
+    if profile.requires_hf_token and not otr_env.get("HF_TOKEN"):
         raise EngineUnusable(
             profile.engine, profile.role, EngineUsabilityReason.MISSING_HF_TOKEN,
             f"profile '{profile.profile_id}' needs HF_TOKEN (accept the model "

@@ -18,10 +18,14 @@ explicit call, not an import side effect.
 from __future__ import annotations
 
 import contextlib
-import os
 import random
 
 import torch
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 # The env the launcher must export BEFORE python/torch starts (C-1).
 REQUIRED_DETERMINISM_ENV = {
@@ -38,7 +42,7 @@ def determinism_env_status() -> dict:
     Pure ``os.environ`` inspection; touches no torch/CUDA state (C-1).
     """
     return {
-        key: (os.environ.get(key) == expected, os.environ.get(key))
+        key: (otr_env.get(key) == expected, otr_env.get(key))
         for key, expected in REQUIRED_DETERMINISM_ENV.items()
     }
 

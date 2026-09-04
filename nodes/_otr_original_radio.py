@@ -12,13 +12,17 @@ from __future__ import annotations
 import json
 import hashlib
 import logging
-import os
 import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 from pydantic import BaseModel, Field
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 try:
     from ._otr_structured_call import (
@@ -114,7 +118,7 @@ def draw_spark_atoms(deck: "dict | None" = None) -> SparkDraw:
     the OTR_ORIGINAL_SEED env reproduces the DRAW ONLY (stated limit:
     model outputs downstream are not deterministic)."""
     d = deck if deck is not None else load_spark_deck()
-    seed = os.environ.get("OTR_ORIGINAL_SEED", "").strip()
+    seed = otr_env.get("OTR_ORIGINAL_SEED", "").strip()
     rng: "random.Random" = (
         random.Random(seed) if seed else random.SystemRandom()
     )

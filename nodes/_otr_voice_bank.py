@@ -33,6 +33,11 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 # v2 (2026-06-11, whiny-fix, operator-directed): scores now WEIGHT the in-tier
@@ -57,7 +62,7 @@ _MIN_TIER_POOL_DEFAULT = 2
 def _min_tier_pool() -> int:
     """Smallest candidate tier the ladder will accept (env-overridable A/B)."""
     try:
-        return max(1, int(os.getenv("OTR_CAST_MIN_TIER_POOL",
+        return max(1, int(otr_env.get("OTR_CAST_MIN_TIER_POOL",
                                     _MIN_TIER_POOL_DEFAULT)))
     except (TypeError, ValueError):
         return _MIN_TIER_POOL_DEFAULT
@@ -314,7 +319,7 @@ def load_voice_bank(path: Optional[str] = None) -> Tuple[Tuple[VoiceBankEntry, .
     # Provisioning and runtime share this one authority; without it a setup
     # could verify a two-voice portable bank and then cast from the unrelated
     # historical bank at render time.
-    bank_path = path or os.getenv("OTR_VOICE_REFERENCE_BANK") or _config_path(
+    bank_path = path or otr_env.get("OTR_VOICE_REFERENCE_BANK") or _config_path(
         _BANK_FILENAME)
     try:
         with open(bank_path, "r", encoding="utf-8") as fh:
@@ -628,7 +633,7 @@ def assign_voice_for_slot(
         # (score+1 so a zero-score candidate keeps a small chance instead of
         # vanishing); deterministic in the same stable_cast_seed. The G4 v1
         # uniform draw stays reachable via OTR_CAST_WEIGHTED=0 for A/B.
-        if os.getenv("OTR_CAST_WEIGHTED", "1") == "0":
+        if otr_env.get("OTR_CAST_WEIGHTED", "1") == "0":
             return random.Random(seed).choice(pool)
         weights = [
             _score(e, gender=gender, timbre=timbre, role=role, age_band=age_band) + 1

@@ -29,6 +29,11 @@ from ._otr_generation_budget import (
     fit_output_tokens,
 )
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 GGUF_BACKEND_KEY = "gguf_native"
@@ -458,7 +463,7 @@ def row_artifact_path(row: GGUFRow, quant: str) -> Path:
     id to a gemma file."""
     filename, _size, _sha = row.artifact_for_quant(quant)
     if row.repo_id == ROW_ID:
-        raw = os.environ.get("GEMMA4_12B_GGUF_PATH")
+        raw = otr_env.get("GEMMA4_12B_GGUF_PATH")
         if raw:
             return Path(raw).expanduser()
     return _models_root() / "LLM" / "converted" / row.subdir / filename
@@ -490,7 +495,7 @@ def gguf_native_row_on_disk(repo_id: str) -> bool:
 def _strict_int_env(name: str) -> int | None:
     """Parse an int env override. Absent/blank -> None (use the next source in
     precedence). A PRESENT-but-malformed value RAISES -- no silent fallback."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None or not raw.strip():
         return None
     try:
@@ -549,7 +554,7 @@ def _resolve_gguf_seed() -> int:
     (2026-07-20, operator: the old hard "OTR_GGUF_SEED is REQUIRED" guard was
     removed as unneeded -- an unset seed defaults to fresh entropy rather than
     failing the writer. An explicitly-set-but-malformed value still fails LOUD.)"""
-    raw = os.environ.get("OTR_GGUF_SEED")
+    raw = otr_env.get("OTR_GGUF_SEED")
     if raw is None or not raw.strip():
         return int.from_bytes(os.urandom(4), "big")   # fresh OS-entropy uint32
     try:
@@ -869,20 +874,20 @@ def _merge_stop_tokens(row_stops: Any, caller_stop: Any) -> list[str]:
 
 def _int_env(name: str, default: int) -> int:
     try:
-        return int(os.environ.get(name, "") or default)
+        return int(otr_env.get(name, "") or default)
     except (TypeError, ValueError):
         return default
 
 
 def _float_env(name: str, default: float) -> float:
     try:
-        return float(os.environ.get(name, "") or default)
+        return float(otr_env.get(name, "") or default)
     except (TypeError, ValueError):
         return default
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
@@ -912,8 +917,8 @@ def _models_root() -> Path:
     looking verified.
     """
     raw = (
-        os.environ.get("OTR_COMFYUI_MODELS_ROOT")
-        or os.environ.get("COMFYUI_MODELS_ROOT")
+        otr_env.get("OTR_COMFYUI_MODELS_ROOT")
+        or otr_env.get("COMFYUI_MODELS_ROOT")
     )
     if raw:
         return Path(raw).expanduser()
@@ -957,7 +962,7 @@ def gguf_artifact_for_quant(quant: str) -> tuple[str, int | None, str | None]:
 
 
 def resolve_gguf_path(quant: str = "Q8_0") -> Path:
-    raw = os.environ.get("GEMMA4_12B_GGUF_PATH")
+    raw = otr_env.get("GEMMA4_12B_GGUF_PATH")
     return Path(raw).expanduser() if raw else default_gguf_path(quant)
 
 

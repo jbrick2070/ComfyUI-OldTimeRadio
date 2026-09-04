@@ -26,6 +26,11 @@ from pathlib import Path
 
 from . import _otr_voice_route as _ROUTE
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -384,7 +389,7 @@ def _audio_cache_dir_for(meta: dict) -> str:
     <meta.paths.audio_dir>/audio_cache/ -> "". A "" return with cache
     enabled is treated as a config error by the caller (fail loud).
     """
-    override = os.environ.get("OTR_AUDIO_CACHE_DIR", "").strip()
+    override = otr_env.get("OTR_AUDIO_CACHE_DIR", "").strip()
     if override:
         resolved = os.path.abspath(os.path.expanduser(override))
         log.info("[OTR voice cache] using OTR_AUDIO_CACHE_DIR: %s", resolved)
@@ -520,7 +525,7 @@ def _begin_line_runtime(adapter, profile, delivery_vector) -> _LineRuntime:
     # param at all, so every other engine keys byte-identically to before.
     if bool(getattr(profile, "character_stable_seed", False)):
         runtime.character_seed_enabled = (
-            os.getenv("OTR_VOICE_CHARACTER_SEED", "1") != "0")
+            otr_env.get("OTR_VOICE_CHARACTER_SEED", "1") != "0")
         runtime.params["voice_seed_policy"] = (
             SEED_POLICY_CHARACTER if runtime.character_seed_enabled
             else SEED_POLICY_LINE)
@@ -1012,7 +1017,7 @@ class OTRVoiceNodeBase:
         # Engines that ignore delivery (bark / kokoro / dia) stay byte-identical;
         # OTR_DELIVERY_VECTOR=0 reproduces pre-delivery (flat) renders -- and is a
         # TRUE old path: the delivery module is imported lazily only when on.
-        _delivery_on = os.getenv("OTR_DELIVERY_VECTOR", "1") != "0"
+        _delivery_on = otr_env.get("OTR_DELIVERY_VECTOR", "1") != "0"
         # voice_ref routing (clean-break 1a): most engines clone from a reference
         # clip path; bark routes its discrete v2/* voice_preset through the SAME
         # positional ref slot. The adapter declares which cast field feeds the

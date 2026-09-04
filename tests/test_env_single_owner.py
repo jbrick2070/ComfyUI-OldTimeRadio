@@ -63,38 +63,7 @@ PENDING = {
     "__init__.py",
     "nodes/OTR_LedgerScriptWriter.py",
     "nodes/_otr_audio_engines/eng_indextts2.py",
-    "nodes/_otr_banana_route.py",
-    "nodes/_otr_bark_lib.py",
-    "nodes/_otr_cast_env.py",
-    "nodes/_otr_comfy_backend.py",
-    "nodes/_otr_config.py",
-    "nodes/_otr_determinism.py",
-    "nodes/_otr_engine_profiles.py",
-    "nodes/_otr_freeze_cascade.py",
-    "nodes/_otr_gguf_backend.py",
-    "nodes/_otr_hf_auth.py",
-    "nodes/_otr_hf_env.py",
-    "nodes/_otr_janitor.py",
-    "nodes/_otr_kokoro_voice_prefetch.py",
-    "nodes/_otr_ledger.py",
-    "nodes/_otr_media_archive_sources.py",
-    "nodes/_otr_model_catalog.py",
-    "nodes/_otr_model_loader.py",
-    "nodes/_otr_openrouter_backend.py",
-    "nodes/_otr_original_radio.py",
-    "nodes/_otr_paths.py",
-    "nodes/_otr_public_domain_sources.py",
-    "nodes/_otr_rolls.py",
-    "nodes/_otr_scifi_news_pro.py",
-    "nodes/_otr_source_snapshot.py",
-    "nodes/_otr_sys_specs.py",
-    "nodes/_otr_voice_bank.py",
-    "nodes/_otr_voice_node_common.py",
-    "nodes/_otr_workflow_validator.py",
     "nodes/_otr_writer_heartbeat.py",
-    "nodes/_otr_writer_inputs.py",
-    "nodes/_otr_writer_tail.py",
-    "nodes/_otr_writer_vram.py",
     "nodes/cast_lock.py",
     "nodes/otr_caption_burn.py",
     "nodes/otr_credits_roll.py",
@@ -124,7 +93,20 @@ BLOCKED = {
         "ear. That module's own history records the same thing happening once "
         "before, for a COMMENT. UNBLOCKS: the next re-audition of that route -- "
         "the migration rides along with it, never ahead of it."),
+    "nodes/_otr_writer_heartbeat.py": (
+        "a LEAF by contract: tests/test_writer_heartbeat_is_visible.py asserts "
+        "it contains no `from ._otr` import at all, because a pack import "
+        "reintroduces the cycle that once left two of three local generate "
+        "transports running BLIND (no streamer, no visible progress). Migrating "
+        "it added `from ._otr_shared import env as otr_env` and turned that "
+        "guard red on 2026-09-04. The owner IS a stdlib-only leaf and could not "
+        "actually cycle, but the guard is deliberately stricter than the hazard "
+        "and weakening a safeguard to remove one finding is the trade the "
+        "operator has already refused elsewhere. UNBLOCKS: never, unless that "
+        "guard is deliberately narrowed on its own merits -- which is its own "
+        "design item, not a migration detail."),
 }
+
 
 def _os_aliases(tree):
     """Every name this module binds the ``os`` MODULE to.

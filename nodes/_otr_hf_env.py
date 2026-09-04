@@ -39,8 +39,12 @@ Why this exists (BUG-LOCAL-085):
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR._otr_hf_env")
 
@@ -100,7 +104,7 @@ def ensure_hf_home() -> str:
         return _CACHE["hf_home"]
 
     # 1. Already in process env?
-    env_val = (os.environ.get("HF_HOME") or "").strip()
+    env_val = (otr_env.get("HF_HOME") or "").strip()
     if env_val:
         resolved = env_val
         source = "os.environ"
@@ -116,14 +120,14 @@ def ensure_hf_home() -> str:
             source = "default"
 
     # Export so downstream HF tooling picks it up automatically.
-    os.environ["HF_HOME"] = resolved
+    otr_env.pin("HF_HOME", resolved)
     # HF_HOME is the cache *root*; HF_HUB_CACHE is the hub subdirectory.
     # Pointing both variables at the same path makes huggingface_hub scan
     # ``...\huggingface\models--*`` while OTR stores the weights under
     # ``...\huggingface\hub\models--*``. That mismatch can turn a complete
     # offline cache into a false miss and trigger an unwanted download.
     hub_cache = str(Path(resolved) / "hub")
-    os.environ["HF_HUB_CACHE"] = hub_cache
+    otr_env.pin("HF_HUB_CACHE", hub_cache)
     _CACHE["hf_home"] = resolved
     _CACHE["resolved"] = True
     log.info(

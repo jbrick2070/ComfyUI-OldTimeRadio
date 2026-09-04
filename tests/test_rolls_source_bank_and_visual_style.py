@@ -333,6 +333,15 @@ def test_the_roll_module_imports_nothing_that_could_call_a_model():
         # the three registries a roll is allowed to read
         "_otr_lane_specs", "_otr_story_routing", "_otr_visual_styles",
         "_LANES", "_ROUTING", "_STYLES", "",
+        # THE ENV OWNER, admitted 2026-09-04 with its whole closure checked.
+        # This rule is "imports nothing that could call a model", and
+        # nodes/_otr_shared/env.py imports EXACTLY __future__, os and typing --
+        # all three already on this list. So the roll gains no capability it did
+        # not have when it spelled `os.environ.get` itself; it is the same read
+        # through one owner. Admitting a stdlib-only leaf keeps the rule intact.
+        # If env.py ever grows a non-stdlib import, THAT is the thing to refuse,
+        # and this entry is where to come back to.
+        "_otr_shared", "env", "otr_env",
     }
     assert imported <= allowed, f"unexpected imports: {imported - allowed}"
 

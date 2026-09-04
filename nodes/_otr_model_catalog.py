@@ -18,11 +18,15 @@ Catalog discipline:
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Canonical constants -- single source of truth for tests + wiring code.
@@ -519,12 +523,12 @@ def _hf_hub_root() -> Path | None:
     stale ~/.cache default and mislabeled on-disk models NOT DOWNLOADED.
     """
     for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
-        val = os.environ.get(var)
+        val = otr_env.get(var)
         if val:
             root = Path(val)
             if root.is_dir():
                 return root
-    hf_home = os.environ.get("HF_HOME")
+    hf_home = otr_env.get("HF_HOME")
     if hf_home:
         root = Path(hf_home) / "hub"
         if root.is_dir():
@@ -814,7 +818,7 @@ def _lead_with_sentinel(sentinel: str, choices: list[str]) -> list[str]:
 def _csv_env(name: str) -> list[str]:
     """Parse a comma-separated env var into a stripped, non-empty list.
     Unset / empty -> []."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if not raw:
         return []
     return [tok.strip() for tok in raw.split(",") if tok.strip()]
@@ -825,7 +829,7 @@ def _slot_requires_json(slot: str) -> bool:
     creative model is never hidden from slot A just because slot B needs
     JSON. Reads OTR_OPENROUTER_SLOT_<A|B>_REQUIRE_JSON."""
     var = f"OTR_OPENROUTER_SLOT_{slot.strip().upper()}_REQUIRE_JSON"
-    return os.environ.get(var, "0") == "1"
+    return otr_env.get(var, "0") == "1"
 
 
 def _is_text_writer_model(m: dict) -> bool:
@@ -860,7 +864,7 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
     allow = set(_csv_env("OTR_OPENROUTER_MODEL_ALLOWLIST"))
     deny = set(_csv_env("OTR_OPENROUTER_MODEL_DENYLIST"))
     require_json = _slot_requires_json(slot)
-    text_only = os.environ.get("OTR_OPENROUTER_ALLOW_NONTEXT", "0") != "1"
+    text_only = otr_env.get("OTR_OPENROUTER_ALLOW_NONTEXT", "0") != "1"
     out: list[dict] = []
     for m in models:
         mid = m.get("id")
@@ -1055,7 +1059,7 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     # Tier 1 lead: the per-slot env override iff present in the filtered cache,
     # else the recommended constant ("if set + present, else recommended").
-    configured = (os.environ.get(f"OTR_OPENROUTER_SLOT_{s.upper()}_DEFAULT") or "").strip()
+    configured = (otr_env.get(f"OTR_OPENROUTER_SLOT_{s.upper()}_DEFAULT") or "").strip()
     constant = (
         _orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT if s == "a"
         else _orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT
@@ -1079,8 +1083,8 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     # The CURATED alias block (default view only). SKIPPED when the operator set
     # an EXPLICIT allowlist / provider-filter -- there they asked for an exact
     # narrowed set, so we honour it verbatim.
-    allowlist = (os.environ.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
-    provider_filter = (os.environ.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
+    allowlist = (otr_env.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
+    provider_filter = (otr_env.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
     explicit_narrowing = bool(allowlist or provider_filter)
 
     if not explicit_narrowing:
@@ -1098,7 +1102,7 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     # fast; in the default view it is OPT-IN (OTR_OPENROUTER_FULL_CATALOG=1) so
     # the dropdown stays short. When the operator is explicitly narrowing
     # (allowlist / provider-filter), show the full filtered set as before.
-    if explicit_narrowing or os.environ.get(
+    if explicit_narrowing or otr_env.get(
             "OTR_OPENROUTER_FULL_CATALOG", "0").strip() == "1":
         for m in sorted(models, key=lambda m: m["id"]):
             _add(m["id"])
@@ -1347,11 +1351,11 @@ def validate_model_id(
     from ._otr_model_inputs import UnknownModelError
 
     if auto_download_enabled is None:
-        auto_download_enabled = os.environ.get(
+        auto_download_enabled = otr_env.get(
             "OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1"
         ) != "0"
     if allow_remote is None:
-        allow_remote = os.environ.get("OTR_MODEL_CATALOG_ALLOW_REMOTE", "0") == "1"
+        allow_remote = otr_env.get("OTR_MODEL_CATALOG_ALLOW_REMOTE", "0") == "1"
 
     if not isinstance(model_id, str):
         raise UnknownModelError(
@@ -1433,7 +1437,7 @@ def validate_model_id(
 # Default: 8192 on the 5080 16 GB target. Configurable via
 # OTR_HARD_VRAM_CONTEXT_LIMIT so users on bigger hardware can raise it.
 def _hard_vram_context_limit() -> int:
-    raw = os.environ.get("OTR_HARD_VRAM_CONTEXT_LIMIT")
+    raw = otr_env.get("OTR_HARD_VRAM_CONTEXT_LIMIT")
     if raw:
         try:
             return max(512, int(raw))
@@ -1531,7 +1535,7 @@ def resolve_context_cap(
         )
         # An operator who pins OTR_HARD_VRAM_CONTEXT_LIMIT is on a card whose
         # budget we must respect even over a soak-tested override.
-        env_pinned = bool(os.environ.get("OTR_HARD_VRAM_CONTEXT_LIMIT"))
+        env_pinned = bool(otr_env.get("OTR_HARD_VRAM_CONTEXT_LIMIT"))
         if row_is_pass and not env_pinned:
             return ContextCapVerdict(
                 tier="PASS",
@@ -1889,7 +1893,7 @@ def auto_download_if_missing(
     if cached is not None and cached.on_disk and cached.snapshot_path:
         return cached.snapshot_path
 
-    if os.environ.get("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1") == "0":
+    if otr_env.get("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1") == "0":
         raise UnknownModelError(
             _unknown_recovery_hint(
                 repo_id,

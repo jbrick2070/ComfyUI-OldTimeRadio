@@ -31,6 +31,11 @@ from __future__ import annotations
 import logging
 import os
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 #: The upstream repo. Pinned by name, never by revision: a voice file is a
@@ -135,7 +140,7 @@ def onnx_backend_wanted() -> bool:
     """Will `eng_kokoro` select the ONNX backend on this interpreter? True when
     forced by OTR_KOKORO_BACKEND=onnx, or when the torch `kokoro` package is
     absent and `kokoro_onnx` is present. Nothing is imported to decide."""
-    mode = os.environ.get("OTR_KOKORO_BACKEND", "auto").strip().lower()
+    mode = otr_env.get("OTR_KOKORO_BACKEND", "auto").strip().lower()
     if mode == "onnx":
         return True
     if mode == "torch":
@@ -167,11 +172,11 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
     if not force and not onnx_backend_wanted():
         receipt["reason"] = "ONNX backend not selected on this interpreter"
         return receipt
-    if not force and os.environ.get("HF_HUB_OFFLINE") == "1":
+    if not force and otr_env.get("HF_HUB_OFFLINE") == "1":
         receipt["skipped_offline"] = True
         receipt["reason"] = "HF_HUB_OFFLINE=1"
         return receipt
-    if os.environ.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
+    if otr_env.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
         receipt["skipped_offline"] = True
         receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
         return receipt
@@ -229,11 +234,11 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
 
     # An operator who has deliberately gone offline stays offline. The engine
     # still works for whatever is already on disk.
-    if not force and os.environ.get("HF_HUB_OFFLINE") == "1":
+    if not force and otr_env.get("HF_HUB_OFFLINE") == "1":
         receipt["skipped_offline"] = True
         receipt["reason"] = "HF_HUB_OFFLINE=1"
         return receipt
-    if os.environ.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
+    if otr_env.get("OTR_SKIP_KOKORO_PREFETCH") == "1":
         receipt["skipped_offline"] = True
         receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
         return receipt

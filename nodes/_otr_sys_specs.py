@@ -15,8 +15,16 @@ from __future__ import annotations
 
 import os
 import platform
-import subprocess
 import sys
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 _UNKNOWN = "(unknown)"
 
@@ -43,7 +51,7 @@ def _cpu_model() -> str:
     except OSError:
         pass
     # Windows: PROCESSOR_IDENTIFIER env carries a usable description
-    env_id = (os.environ.get("PROCESSOR_IDENTIFIER") or "").strip()
+    env_id = (otr_env.get("PROCESSOR_IDENTIFIER") or "").strip()
     if env_id:
         return env_id
     return name or _UNKNOWN
@@ -107,7 +115,7 @@ def _gpu_via_nvidia_smi() -> tuple[str, str]:
     Used only when torch could not report a GPU (e.g. the treatment runs in a
     torch-less context). Bounded 5s timeout; any failure -> unknowns."""
     try:
-        out = subprocess.run(
+        out = otr_proc.run(
             ["nvidia-smi",
              "--query-gpu=name,memory.total",
              "--format=csv,noheader"],

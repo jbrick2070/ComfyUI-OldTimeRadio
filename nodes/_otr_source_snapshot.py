@@ -34,6 +34,11 @@ from dataclasses import dataclass
 
 from . import _otr_bank_variants as _otr_bank_variants
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 # Env var naming the process-wide snapshot manifest JSON. Unset => no replay.
 SNAPSHOT_MANIFEST_ENV = "OTR_SOURCE_SNAPSHOT_MANIFEST"
 
@@ -86,7 +91,7 @@ def _clear_cache() -> None:
 
 def _manifest_path() -> str:
     """The configured manifest path (stripped), or '' when unset."""
-    return os.environ.get(SNAPSHOT_MANIFEST_ENV, "").strip()
+    return otr_env.get(SNAPSHOT_MANIFEST_ENV, "").strip()
 
 
 def _load_manifest():

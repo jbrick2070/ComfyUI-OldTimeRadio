@@ -43,10 +43,14 @@ Import direction stays one-way:
 
 from __future__ import annotations
 
-import os
 import random
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 try:
     from . import _otr_lane_specs as _LANES
@@ -143,7 +147,10 @@ def resolve_seed(
     Reads the mapping it is handed rather than reaching for `os.environ`
     itself, so a test never has to mutate process state to pin a roll.
     """
-    mapping = os.environ if env is None else env
+    # snapshot() is a COPY and the single read below is immediate, so it
+    # cannot disagree with the live mapping. A caller-supplied mapping is
+    # still used as given -- that is this function's whole point.
+    mapping = otr_env.snapshot() if env is None else env
     raw = str(mapping.get(env_var, "") or "").strip()
     if raw:
         return _parse_seed(raw, env_var), f"{env_var} override"

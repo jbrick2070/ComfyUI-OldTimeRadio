@@ -10,9 +10,13 @@ from __future__ import annotations
 import hashlib
 import html
 import logging
-import os
 import re
 from typing import Any
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -181,7 +185,7 @@ def parse_media_archive_feed(
 
 
 def _configured_feeds() -> tuple[str, ...]:
-    raw = os.environ.get("OTR_MEDIA_ARCHIVE_FEEDS", "").strip()
+    raw = otr_env.get("OTR_MEDIA_ARCHIVE_FEEDS", "").strip()
     if not raw:
         return DEFAULT_MEDIA_ARCHIVE_FEEDS
     vals = [
@@ -192,7 +196,7 @@ def _configured_feeds() -> tuple[str, ...]:
 
 
 def _configured_index() -> int:
-    raw = os.environ.get("OTR_MEDIA_ARCHIVE_ITEM_INDEX", "0").strip()
+    raw = otr_env.get("OTR_MEDIA_ARCHIVE_ITEM_INDEX", "0").strip()
     try:
         return max(0, int(raw))
     except ValueError:
@@ -209,7 +213,7 @@ def _explicit_index():
     override branch fires, the index collapses to 0, and the lane is back to
     adapting the newest post forever with no sign anything went wrong.
     """
-    raw = os.environ.get("OTR_MEDIA_ARCHIVE_ITEM_INDEX", "").strip()
+    raw = otr_env.get("OTR_MEDIA_ARCHIVE_ITEM_INDEX", "").strip()
     if not raw:
         return None
     try:

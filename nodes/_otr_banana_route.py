@@ -80,8 +80,12 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-import os
 import re
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 try:  # package import (production)
     from ._otr_bank_variants import base_source_bank_id
@@ -566,7 +570,7 @@ _WARNED_MALFORMED_ENV: set = set()
 def _bool_env(name: str, default: bool) -> bool:
     """Guarded boolean env read (BUILD-SPEC section 1): a malformed knob is
     IGNORED with one warning, never fatal."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None:
         return default
     token = raw.strip().lower()

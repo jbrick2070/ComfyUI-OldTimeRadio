@@ -55,6 +55,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 class OtrPathContractError(ValueError):
     """An OTR output-path request violates the output-tree contract
@@ -79,7 +83,7 @@ def comfy_output_dir() -> Path:
     this function is read-only and never creates directories.
     """
     # Tier 1: explicit env override
-    env_override = (os.environ.get("OTR_OUTPUT_DIR") or "").strip()
+    env_override = (otr_env.get("OTR_OUTPUT_DIR") or "").strip()
     if env_override:
         return Path(env_override).expanduser()
 
@@ -120,7 +124,7 @@ def comfy_models_dir() -> Path:
       3. Walk up: ``<repo>/../../../models``.
       4. ``Path.cwd() / "models"``.
     """
-    env_override = os.environ.get("OTR_MODELS_DIR")
+    env_override = otr_env.get("OTR_MODELS_DIR")
     if env_override:
         return Path(env_override).expanduser()
 
@@ -155,7 +159,7 @@ def comfy_input_dir() -> Path:
       3. Walk up: ``<repo>/../../../input``
       4. ``Path.cwd() / "input"``
     """
-    env_override = os.environ.get("OTR_INPUT_DIR")
+    env_override = otr_env.get("OTR_INPUT_DIR")
     if env_override:
         return Path(env_override).expanduser()
 
@@ -429,7 +433,7 @@ def otr_obs_dir() -> Path:
     item 8 (2026-08-08) then ripped the node entirely. Intermediates
     live under their episode; only the broadcast cut lives here.
     """
-    pinned = (os.environ.get("OTR_OBS_DIR") or "").strip()
+    pinned = (otr_env.get("OTR_OBS_DIR") or "").strip()
     if pinned:
         # AN EXPLICIT PIN IS A DECLARED PUBLICATION ROOT, NOT AN ESCAPE
         # (kibitz runpod-found-fixes R-A, 2026-09-04). The headless launcher
@@ -489,7 +493,7 @@ def comfyui_log_path() -> Optional[str]:
     home = os.path.expanduser("~")
 
     # ComfyUI Desktop Electron build, Windows
-    appdata = os.environ.get("APPDATA")
+    appdata = otr_env.get("APPDATA")
     if appdata:
         candidates.append(os.path.join(appdata, "ComfyUI", "logs", "comfyui.log"))
 
@@ -497,7 +501,7 @@ def comfyui_log_path() -> Optional[str]:
     candidates.append(os.path.join(home, "Library", "Logs", "ComfyUI", "comfyui.log"))
 
     # ComfyUI Desktop Electron build, Linux
-    xdg_config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+    xdg_config = otr_env.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
     candidates.append(os.path.join(xdg_config, "ComfyUI", "logs", "comfyui.log"))
 
     # ComfyUI portable / pip / standalone (legacy layout). folder_paths
@@ -564,11 +568,11 @@ def resolve_hf_model_path(repo_id: str) -> str:
     cache_dirname = "models--" + repo_id.replace("/", "--")
     candidates = []
 
-    otr_dir = os.environ.get("OTR_MODELS_DIR", "").strip()
+    otr_dir = otr_env.get("OTR_MODELS_DIR", "").strip()
     if otr_dir:
         candidates.append(Path(otr_dir) / "huggingface" / "hub" / cache_dirname)
 
-    hf_home = os.environ.get("HF_HOME", "").strip()
+    hf_home = otr_env.get("HF_HOME", "").strip()
     if hf_home:
         candidates.append(Path(hf_home) / "hub" / cache_dirname)
 
