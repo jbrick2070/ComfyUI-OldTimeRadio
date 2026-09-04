@@ -34,11 +34,40 @@ from __future__ import annotations
 import ast
 import collections
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CODE_DIRS = ["nodes", "scripts"]
 ROOT_FILES = ["__init__.py", "prestartup_script.py"]
+
+#: Docs that can PROTECT a symbol the code no longer references. A name that
+#: appears in one of these is reported separately and never as a clean
+#: candidate, because the repo has already ruled on it: a guard nobody calls
+#: that must stay ("deleting it would silently accept a loss nobody chose"), a
+#: declared contract shape, or -- the expensive one -- an unwired FIX for an
+#: OPEN production bug. On 2026-09-04 a 73-agent verification pass cleared
+#: fifteen such symbols as dead, because every agent searched the CODE for
+#: reachability and none of them read the rulings; a QA pass caught it before
+#: the commit. Reachability is not the only question. Permission is the other.
+PROTECTIVE_DOCS = [
+    "docs/OTR_STANDING_RULINGS.md",
+    "docs/2026-08-22-dead-symbol-inventory.md",
+    "docs/PROD_BUG_LOG.md",
+    "CLAUDE.md",
+]
+
+#: Whole modules a ruling protects wholesale, which no per-name scan can see.
+#: The ruling for the first one is literal: "every symbol in
+#: _otr_scifi_p0_contract stays untouched because that module is the subject of
+#: the finding above -- deleting p0_contract_instruction would destroy the
+#: evidence for it", and PROD_BUG_LOG ties p0_source_char_budget to OPEN bug
+#: PBUG-20260729-03 as the diagnosed-but-unwired fix.
+PROTECTED_MODULES = {
+    "nodes/_otr_scifi_p0_contract.py":
+        "OTR_STANDING_RULINGS: every symbol stays -- it is the evidence for "
+        "OPEN PBUG-20260729-03, whose fix is unwired in this module",
+}
 
 #: Names ComfyUI or a launcher reaches without a Python reference to them.
 DYNAMIC_HINTS = {
@@ -92,11 +121,19 @@ def _names_in(node: ast.AST) -> set:
         elif isinstance(child, ast.Attribute):
             found.add(child.attr)
         elif isinstance(child, ast.Constant) and isinstance(child.value, str):
-            found.add(child.value.strip())
+            text = child.value.strip()
+            found.add(text)
+            # A string can BE a reference: a forward-referenced annotation
+            # (`characters: "list[CharacterAliases]"` in a pydantic model) or a
+            # registry key built from a name. Add every identifier inside it,
+            # not just the whole literal -- the fan-out rescued
+            # `CharacterAliases` from this exact blind spot on 2026-09-04.
+            if len(text) <= 200:
+                found.update(re.findall(r"[A-Za-z_][A-Za-z_0-9]*", text))
         elif isinstance(child, (ast.Import, ast.ImportFrom)):
-            for alias in child.names:
-                found.add(alias.asname or alias.name.split(".")[0])
-                found.add(alias.name.split(".")[-1])
+            for imported in child.names:
+                found.add(imported.asname or imported.name.split(".")[0])
+                found.add(imported.name.split(".")[-1])
     return found
 
 
@@ -176,6 +213,19 @@ def sweep(include_tests: bool):
     return definitions, rounds
 
 
+def protected_names() -> dict:
+    """Symbol -> the doc that speaks for it. See :data:`PROTECTIVE_DOCS`."""
+    out: dict = {}
+    for rel in PROTECTIVE_DOCS:
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for word in re.findall(r"[A-Za-z_][A-Za-z_0-9]{3,}", text):
+            out.setdefault(word, rel)
+    return out
+
+
 def main() -> int:
     include_tests = "--include-tests" in sys.argv[1:]
     definitions, rounds = sweep(include_tests)
@@ -184,6 +234,15 @@ def main() -> int:
     scope += "; tests/ scanned as code" if include_tests else "; tests/ are ROOTS"
     print("transitive dead-code candidates: %d over %d round(s) [%s]\n"
           % (total, len(rounds), scope))
+    guarded = protected_names()
+    flagged = []
+    for batch in rounds:
+        for key in list(batch):
+            rel, name = definitions[key][0], definitions[key][1]
+            doc = PROTECTED_MODULES.get(rel) or guarded.get(name)
+            if doc:
+                flagged.append((key, doc))
+                batch.remove(key)
     for index, batch in enumerate(rounds, 1):
         if index == 1:
             label = "directly unreferenced"
@@ -194,6 +253,14 @@ def main() -> int:
             rel, name, lineno, kind = definitions[key]
             print("  %s:%d  %s %s" % (rel, lineno, kind, name))
             print("      verify: git grep -n -w -F %s -- '*.py'" % name)
+        print()
+    if flagged:
+        print("NAMED IN A PROTECTIVE DOC -- unreferenced, but the repo has")
+        print("already ruled on these. READ THE DOC before proposing a cut:")
+        for key, doc in sorted(flagged):
+            rel, name, lineno, kind = definitions[key]
+            print("  %s:%d  %s %s" % (rel, lineno, kind, name))
+            print("      ruled on in: %s" % doc)
         print()
     print("BLIND SPOTS -- verify before cutting: getattr(module, 'name'),")
     print("registry strings, workflow JSON keys, importlib, and anything")

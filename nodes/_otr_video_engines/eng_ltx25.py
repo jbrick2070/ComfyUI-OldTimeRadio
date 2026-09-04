@@ -2659,35 +2659,6 @@ def _ltx25_legacy(inputs):
     return str(inputs.get("text_prompt") or "")
 
 
-#: THE JOINT-AV PICTURE CLAUSE -- ONE STRING, BOTH LANES (operator ruling,
-#: restated 2026-08-28: "foley and mime should have the same prompting, the
-#: only difference is the mux layer setting").
-#:
-#: The two formatters below remain SEPARATE FUNCTIONS bound per class, because
-#: a different standing ruling requires it -- "I want each lane independent, so
-#: later one could have slow motion, some could have tulip motion" -- and the
-#: dispatcher resolves `compose_prompt` from each class's own `__dict__`.
-#: Separate functions, shared text: when the lanes SHOULD diverge again, one
-#: lane stops referencing this constant and nothing else moves.
-#:
-#: Foley's wording is the survivor, by name: "they use the new foley
-#: prompting". It is also the better instruction, since "every movement has a
-#: visible source" is what earns a bed, and a mime beat that earns one loses
-#: nothing.
-#: RETIRED 2026-08-28, and kept here as a tombstone so it is not re-added.
-#: This clause was SPOKEN ALOUD by the model -- a transcribed stem reads "So
-#: every movement has a visible source". So was `_LTX25_FRAMING` ("full face,
-#: clearly visible, generous"). Both were OUR instructions, not the writer's
-#: content, and the joint-AV lanes now compose from the authored leaves alone:
-#: setting, expression, motion, camera. The motion work of 2026-08-27 is in
-#: those leaves and is untouched.
-#:
-#: The silent `ltx25_video` lane still uses `_LTX25_FRAMING`, correctly -- it
-#: discards its audio latent and cannot say anything.
-_JOINT_AV_ACTION_RETIRED = ("working the objects within reach so every "
-                            "movement has a visible source")
-
-
 def compose_ltx25_video(self, inputs):
     """``ltx25_video`` -- PUSH THE LIMIT. One decisive within-frame action.
 

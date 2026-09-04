@@ -22,15 +22,6 @@ from __future__ import annotations
 from typing import Any
 
 
-# RETIRED 2026-08-05 (operator directive: no content guardrails on generated
-# episodes). These carried the SAME weapon/nudity policy the audio path was
-# ripped of, and they were still being appended to every image and video
-# request -- so an episode faithful enough to say "dagger" was still asking the
-# image model not to draw one. Emptied rather than deleted: they are imported
-# by name across the render path, and an empty clause appends nothing.
-# (The SFX audio clause + its appender died with the SFX bed producers,
-# rip-sfx 2026-08-06 -- no surviving engine requests provider audio.)
-VISUAL_SAFETY_POSITIVE_CLAUSE = ""
 VISUAL_SAFETY_NEGATIVE_PROMPT = ""
 
 

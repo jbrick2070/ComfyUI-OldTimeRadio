@@ -18,9 +18,6 @@ from __future__ import annotations
 import os
 
 _VALID_MODES = ("pool", "llm_slot_fill")
-_VALID_OTHER_POLICY = ("unisex", "all")
-
-
 def name_mode() -> str:
     """OTR_NAME_MODE: 'pool' (deterministic pool fill, default) or
     'llm_slot_fill' (schema-locked LLM naming with pool fallback)."""

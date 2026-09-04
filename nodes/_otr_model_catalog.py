@@ -498,9 +498,6 @@ class ScanResult:
     advertised_context: int | None  # max_position_embeddings (or fallback)
 
 
-_HF_REPO_DIR_RE = re.compile(r"^models--(?P<org>[^-]+)--(?P<name>.+)$")
-
-
 def _hf_hub_root() -> Path | None:
     """Resolve the HuggingFace hub cache root the SAME way huggingface_hub
     (and therefore the transformers model loader) does, so the dropdown's

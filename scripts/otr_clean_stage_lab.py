@@ -489,43 +489,6 @@ def f2_fixtures() -> "dict[str, dict]":
 # a story that never existed.
 
 
-def _derive_beats(data: dict) -> "list[dict]":
-    """Beats for a ledger that may have none, or none with intent.
-
-    Only the arc position is invented, and only because it IS derivable: a
-    row two thirds of the way through an episode is in its falling action
-    whether or not anybody stamped that. `beat_intent` is left alone -- if
-    the episode never recorded what a moment was for, this lab will not
-    pretend to know.
-    """
-    existing = {
-        str(b.get("beat_id")): dict(b)
-        for b in (data.get("beats") or []) if isinstance(b, dict)
-    }
-    rows = [r for r in (data.get("lines") or []) if isinstance(r, dict)]
-    voiced = [r for r in rows if r.get("speaker_role") in POLICY.VOICED_ROLES]
-    total = max(1, len(voiced))
-    arcs = ("setup", "rising", "turn", "fall", "close")
-
-    out: "list[dict]" = []
-    seen = 0
-    for row in rows:
-        beat_id = str(row.get("beat_id") or "")
-        if not beat_id:
-            continue
-        beat = existing.get(beat_id) or {
-            "beat_id": beat_id,
-            "speaker": row.get("speaker"),
-            "char_id": row.get("char_id"),
-        }
-        if row.get("speaker_role") in POLICY.VOICED_ROLES:
-            seen += 1
-        if not str(beat.get("arc_phase") or "").strip():
-            beat["arc_phase"] = arcs[min(seen * len(arcs) // total, 4)]
-        out.append(beat)
-    return out
-
-
 def score(ledger: dict, receipt: dict) -> dict:
     """Grade the run against the ground truth planted in the fixture."""
     lab = {

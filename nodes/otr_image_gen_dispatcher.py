@@ -631,12 +631,6 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     return dst
 
 
-#: object role -> the OTR_VideoDirector video slot that owns it. Route-A: the
-#: ONE shared per-role map (nodes/_otr_shared/role_slots.py); aliased here so any
-#: importer of this name keeps working but the rule lives in one place.
-_ROLE_TO_VIDEO_SLOT = _role_slots.ROLE_TO_VIDEO_SLOT
-
-
 def engine_consumes_still(eng) -> bool:
     """Coverage architecture (2026-06-18) -- the ONE capability the still dispatcher
     keys on, so coverage (which image feeds which video) is decided in a single

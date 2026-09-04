@@ -51,11 +51,6 @@ _HALLUCINATIONS = {
 #: that is punctuation and whitespace only carries no words by definition.
 _PUNCT_ONLY = re.compile(r"^[\s.,!?\-–—']*$")
 
-#: Below this average log-prob Whisper is guessing. Tuned to keep real words
-#: and drop the stock filler above.
-_MIN_LOGPROB = -1.0
-
-
 def is_hallucination(text):
     t = (text or "").strip().lower()
     t = re.sub(r"\s+", " ", t)

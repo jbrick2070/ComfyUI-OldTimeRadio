@@ -79,22 +79,6 @@ HARD_CPS_CAP = 20.0
 MIN_CUE_DUR_S = 1.0
 CAPTION_MARGIN_X = 40
 
-# -- Speaker label color (ASS \3c outline-override format: &Hbbggrr&) -------
-# ACCESSIBILITY (Jeffrey 2026-05-30): color is NEVER the speaker cue --
-# color-sensitive / color-blind viewers must not depend on it. The speaker
-# is identified by the BOLD WHITE "NAME:" label (text + weight). Per-speaker
-# color is applied ONLY as a subtle OUTLINE on the name; the fill stays white
-# and the dialogue stays white on the opaque box, so every caption is
-# constantly, equally legible regardless of color perception.
-_WHITE = "&HFFFFFF&"
-# Desaturated PASTEL hues so the name outline is a subtle tint, never a neon
-# block. Speaker ID never depends on these -- they are a secondary cue only.
-_NAME_COLORS_BBGGRR = [
-    "&HE0E0A0&",  # soft teal  (#A0E0E0)
-    "&HA0E0A0&",  # soft green (#A0E0A0)
-    "&HA0E0E0&",  # soft straw (#E0E0A0)
-    "&HE0B0E0&",  # soft mauve (#E0B0E0)
-]
 _ANNOUNCER_COLOR_BBGGRR = "&H80C8FF&"  # soft amber (#FFC880) -- announcer distinct
 
 # -- Style presets ----------------------------------------------------------

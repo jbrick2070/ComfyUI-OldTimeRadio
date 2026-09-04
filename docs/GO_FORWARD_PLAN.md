@@ -900,6 +900,30 @@ and `humo_diet` -- so it is kept; the audit's "only `eng_humo.py` exists"
 was true of files and false of engine ids. `REPAIR_TEMPERATURE` was folded
 into `_REPAIR_TEMPERATURE`, the spelling every call site and test used.
 
+**PHASE 0b, SAME DAY -- the chain, and the thing that nearly went wrong.**
+Operator: "even though there may be dependency B, what does dependency B lead
+to, dependency C -- follow the dependency chain to find truly rippable code."
+`scripts/dead_code_closure.py` now walks the reference graph to a FIXPOINT and
+prints each round; Phase 0 had already proved the need by orphaning
+`_derive_beats` when it removed `corpus_ledgers`. Calibration took two fixes
+before the tool could be trusted: a class registered by a DECORATOR is reached
+by the side effect and never named again (47 engine adapters), and with tests
+as roots the first cut never opened `tests/` at all. That took 289 candidates,
+five of five hand-checked LIVE, down to 55 with every known-live symbol clear.
+A 73-agent fan-out then verified each one against the dynamic paths a static
+sweep cannot see; 36 of 37 were confirmed dead and one was RESCUED --
+`CharacterAliases` is reached by a pydantic forward-reference string.
+
+**AND THEN THE QA PASS CAUGHT WHAT ALL 73 AGENTS MISSED.** Fifteen of those
+"dead" symbols are protected by `docs/OTR_STANDING_RULINGS.md`, written the day
+before, and `p0_source_char_budget` is the diagnosed-but-unwired fix for OPEN
+`PBUG-20260729-03`. Every agent had asked whether code reaches the symbol; none
+had asked whether the repo already ruled on it. All fifteen were restored before
+the commit, and the sweep now READS those rulings and reports such candidates
+under a separate heading naming the doc that speaks for them. Thirteen cleanly
+cleared symbols shipped; the rest stay, each with its ruling.
+
+
 **G. FOLLOW-UPS THE 2026-09-04 ARC SURFACED AND DID NOT BUILD -- each with the
 reason it waits.**
 * `otr_post_upscale_procgen_blend.py` keeps a `sys.path` insert of `nodes/` for

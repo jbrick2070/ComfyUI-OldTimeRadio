@@ -145,8 +145,6 @@ _LTX8_CKPT_MIN_BYTES = 4 * 1024 * 1024 * 1024
 #: drift into a config check that accepts a cap below the real floor.
 _LTX8_MIN_FRAMES = 9
 _LTX8_MAX_FRAMES_DEFAULT = 161            # 8*20+1; env-overridable per hardware
-_LTX8_DEFAULT_W = 832
-_LTX8_DEFAULT_H = 480
 _LTX8_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 

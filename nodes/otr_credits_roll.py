@@ -67,7 +67,6 @@ _A_RULE = 51
 # Geometry (1920x1080 reference; scaled by h/1080 for other sizes).
 # --------------------------------------------------------------------------- #
 _REF_H = 1080
-_MARGIN_L = 56
 _MARGIN_TOP = 48
 _COL1_X, _COL1_W = 56, 598
 _COL2_X, _COL2_W = 742, 424
@@ -108,7 +107,6 @@ _PT_NAME = 22
 _PT_SPEAKER = 19
 _PT_BODY = 20
 _PT_GRID = 16
-_PT_GRIDL = 18
 _PT_TAG = 15
 _PT_MICRO = 14
 _PT_FOOTER = 15
