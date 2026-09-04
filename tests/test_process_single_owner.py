@@ -143,13 +143,20 @@ def _offenders(tree, rel):
     # `x = subprocess.run` then `x(...)` -- the rebinding Astra demonstrated.
     # Flagged at the ASSIGNMENT, which is where it is readable.
     for node in ast.walk(tree):
-        if (isinstance(node, ast.Assign)
-                and isinstance(node.value, ast.Attribute)
-                and node.value.attr in _SPAWN_CALLS
-                and isinstance(node.value.value, ast.Name)
-                and node.value.value.id in modules):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = node.value
+        if not isinstance(value, ast.Attribute) or not isinstance(value.value, ast.Name):
+            continue
+        if value.attr in _SPAWN_CALLS and value.value.id in modules:
             out.append(f"{rel}:{node.lineno} rebinds "
-                       f"{node.value.value.id}.{node.value.attr} to a local name")
+                       f"{value.value.id}.{value.attr} to a local name")
+        elif value.attr == "Popen" and value.value.id in owners:
+            # `P = otr_proc.Popen` then `P(argv)`. Same class as the rebind
+            # above, on the identity re-export we deliberately kept. NOT
+            # flagged for `otr_proc.run`, which still lands on the wrapper.
+            out.append(f"{rel}:{node.lineno} rebinds {value.value.id}.Popen "
+                       "-- the raw re-export, which skips the boundary")
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -300,3 +307,12 @@ def test_the_finder_catches_a_REBOUND_spawn_function():
 def test_the_known_limits_are_recorded_next_to_the_guard():
     import pathlib
     assert "KNOWN LIMITS" in pathlib.Path(__file__).read_text(encoding="utf-8")
+
+
+def test_the_finder_catches_a_REBOUND_RE_EXPORT():
+    """`P = otr_proc.Popen` is the same bypass as `run = subprocess.run`, on the
+    export we kept on purpose. Rebinding `otr_proc.run` is NOT flagged -- that
+    still lands on the guarded wrapper."""
+    assert _find("from . import proc as otr_proc\nP = otr_proc.Popen\nP(a)\n")
+    assert _find("from . import proc as otr_proc\nP: type = otr_proc.Popen\n")
+    assert _find("from . import proc as otr_proc\nr = otr_proc.run\n") == []

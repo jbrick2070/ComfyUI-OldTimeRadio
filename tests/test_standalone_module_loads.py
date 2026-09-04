@@ -21,8 +21,12 @@ FRESH interpreter can see it. That is why every case below runs in a subprocess
 with a clean `sys.modules` and no inherited path -- an in-process version of this
 file would pass while the provisioner was broken.
 
-THE FIX each module carries is a `_NODES_DIR` insert before the ladder, the same
-pattern `otr_post_upscale_procgen_blend.py` already had for the same reason.
+THE FIX each module carries is a `_NODES_DIR` insert INSIDE the `except` arm --
+not before the try. Putting it before would mutate `sys.path[0]` on the ordinary
+packaged import too, making the flat spelling resolvable everywhere and inviting a
+SECOND module instance of the owner; inside the arm it runs only when the relative
+rung has already failed, i.e. only when there is no package instance to duplicate.
+(Placement corrected by a cursor cross-check, 2026-09-04.)
 """
 from __future__ import annotations
 
@@ -43,7 +47,15 @@ STANDALONE_LOADED = {
     "nodes/_otr_voice_bank.py":
         "scripts/otr_provision.py + scripts/otr_make_portable_voice_bank.py",
     "nodes/_otr_kokoro_voice_prefetch.py":
-        "scripts/otr_fetch_lane_weights.py",
+        # CORRECTED by a cursor cross-check, 2026-09-04. My first attribution
+        # said scripts/otr_fetch_lane_weights.py, which only NAMES this module
+        # in a comment explaining that kokoro voices are deliberately absent --
+        # it never loads it. The real standalone loader is prestartup_script.py,
+        # which ALREADY inserts nodes/ before its flat import, so BOOT was never
+        # broken; only this stricter probe saw it. The probe stays, because a
+        # module that needs an ambient sys.path insert to import is one edit
+        # away from breaking.
+        "prestartup_script.py (which inserts nodes/ itself, so boot was safe)",
     "nodes/otr_post_upscale_procgen_blend.py":
         "its own documented FLAT load by ComfyUI's custom-node loader",
 }
@@ -62,6 +74,19 @@ _PROBE = textwrap.dedent(
 )
 
 
+def _scrubbed_env():
+    """The probe must not inherit a PYTHONPATH that already contains `nodes/`.
+
+    If it did, the flat rung would resolve for the wrong reason: a genuinely
+    broken module would print LOADED and this guard would fail OPEN, which is
+    worse than not having it. Keeps only what a Windows interpreter needs to
+    start (cursor cross-check, 2026-09-04)."""
+    import os
+    keep = ("SYSTEMROOT", "PATH", "COMSPEC", "TEMP", "TMP", "PATHEXT",
+            "WINDIR", "PYTHONUTF8", "HOME", "USERPROFILE", "LANG")
+    return {k: v for k, v in os.environ.items() if k.upper() in keep}
+
+
 def _load_in_fresh_interpreter(rel: str):
     """Exactly what a `scripts/` helper does: spec_from_file_location on a path,
     under a NON-package name, in a process that has not imported the pack."""
@@ -69,6 +94,7 @@ def _load_in_fresh_interpreter(rel: str):
         [sys.executable, "-c", _PROBE, str(REPO / rel)],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
         cwd=str(REPO.parent),        # NOT the repo root -- no accidental sys.path[0]
+        env=_scrubbed_env(),         # and no inherited PYTHONPATH
         timeout=120,
     )
 
@@ -101,7 +127,7 @@ def test_the_probe_would_actually_fail_on_a_broken_module(tmp_path):
     done = subprocess.run(
         [sys.executable, "-c", _PROBE, str(broken)],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
-        cwd=str(REPO.parent), timeout=120)
+        cwd=str(REPO.parent), env=_scrubbed_env(), timeout=120)
     assert done.returncode != 0
     assert "ModuleNotFoundError" in done.stderr
 

@@ -31,22 +31,28 @@ from __future__ import annotations
 import logging
 import os
 
-import os as _os_boot
-import sys as _sys_boot
-
-# STANDALONE LOAD. `scripts/otr_provision.py`, `otr_make_portable_voice_bank.py`
-# and friends load this file by PATH under a non-package name, deliberately --
-# "without importing the ComfyUI node package". Neither ladder rung below can
-# resolve then: the relative one has no parent package and the flat one needs
-# `nodes/` on sys.path, which those loaders do not add. Same insert, and the
-# same reason, as `otr_post_upscale_procgen_blend.py`.
-_NODES_DIR = _os_boot.path.dirname(_os_boot.path.abspath(__file__))
-if _NODES_DIR not in _sys_boot.path:
-    _sys_boot.path.insert(0, _NODES_DIR)
-
 try:
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat / standalone load
+    # STANDALONE LOAD, and the insert belongs HERE, not above the try.
+    # `scripts/otr_provision.py` and `otr_make_portable_voice_bank.py` load this
+    # file by PATH under a non-package name, deliberately -- "without importing
+    # the ComfyUI node package". In that mode the relative rung has no parent
+    # package and the flat one needs `nodes/` on sys.path, which those loaders
+    # do not add.
+    #
+    # MUTATING sys.path ONLY IN THIS ARM IS THE POINT (cursor cross-check,
+    # 2026-09-04). Doing it before the try would put `nodes/` at sys.path[0] on
+    # the ORDINARY packaged import too, which is precisely the enablement
+    # `otr_post_upscale_procgen_blend.py` warns about: it makes the flat
+    # spelling resolvable everywhere and invites a SECOND module instance of
+    # the owner. Here it runs only when the relative rung has already failed,
+    # i.e. only when there is no package instance to duplicate.
+    import os as _os_boot
+    import sys as _sys_boot
+    _NODES_DIR = _os_boot.path.dirname(_os_boot.path.abspath(__file__))
+    if _NODES_DIR not in _sys_boot.path:
+        _sys_boot.path.insert(0, _NODES_DIR)
     from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
