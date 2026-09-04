@@ -1,3 +1,69 @@
+## 2026-09-04 -- HEAD 3d4a7077 +handoff (v2.0-alpha) -- CODER (one-owner receipt landed; the ledger's obs pointer fixed; the registry-collapse plan closed at r4; orphan rips shipped and one near-miss reverted before commit)
+
+The sha above is the second-to-last on the branch; the last is this handoff
+commit.
+
+Did: (1) THE ONE-OWNER RECEIPT (`42fa3c88`): the live publish matrix on the
+  5080 -- three pairwise-distinct roots, OTR_FFMPEG pinned to a COPY with the
+  real binary on PATH, a watcher on every ffmpeg process. RESULT SUCCESS,
+  nothing under A, every intermediate under B, `otr/obs` 113 -> 114, every
+  server-spawned ffmpeg from the pinned copy. Stated exactly: it ran the DRAFT
+  `8gb_lite` profile on `media_archive` because a derived launcher's `sed` did
+  not take -- which corrected PBUG-20260904-05 from "any bank" to "two of
+  three" (the 2048 context holds `media_archive`).
+  (2) PBUG-20260904-06, found by that leg and FIXED (`22baa861`, placement nit
+  `c5648864`): every published episode since the 09-03 obs rename carried a
+  `meta.paths.obs_final` naming a file that does not exist -- the mux strips
+  the `signal_lost_` prefix to build the watching name, the ledger's validator
+  demanded it, and the planned pointer won silently. One spelled constant
+  (`_otr_ledger.SHOW_PREFIX`, imported at the mux's module level because a
+  test stubs the ledger module) and a pairing test: the name the mux writes is
+  the name the ledger adopts. Bible **12.156** (repo `81a8a9e`, 335 entries).
+  (3) THE REGISTRY-COLLAPSE PLAN, closed after a full r1-r4 arc and ready to
+  build: `kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md`
+  (force-added in this handoff). Floor ~9 info findings from 158 by the
+  one-owner rule: an env owner (103 -> 1 + prestartup), a process owner with a
+  measured executable allowlist (35 -> 2; `argv0_receipt.txt` resolves all 35
+  sites), network kept as five named files (the rule counts per FILE --
+  answered by two `urlopen` sites drawing one finding), three singletons and
+  six strings. Owners + shared ratchet committed INERT (`3d4a7077`).
+  (4) PHASE 0 / 0b, the orphan rips (`2f12a696`, `1e373adc`; tools `9ac2f512`):
+  operator directive "rip 100% or wire back in" and "follow the dependency
+  chain". `scripts/dead_code_closure.py` walks the reference graph to a
+  fixpoint; calibration needed two fixes (decorator-registered classes; tests
+  never opened) to go from 289 candidates with 5/5 hand-checks LIVE to 55 with
+  every known-live symbol clear. A 73-agent fan-out then cleared 36 of 37 and
+  RESCUED `CharacterAliases` (a pydantic forward-reference string). THEN THE QA
+  PASS CAUGHT WHAT ALL 73 MISSED: `docs/OTR_STANDING_RULINGS.md` (written the
+  day before) protects fifteen of them, and `p0_source_char_budget` is the
+  unwired fix for OPEN PBUG-20260729-03. All fifteen restored before commit;
+  thirteen cleanly cleared symbols shipped; the sweep now READS the rulings
+  and reports such candidates under their doc. Reachability is not permission.
+  (5) Kibitz: the Codex selector silently swapped an explicit Spark request for
+  the strong tier (fixed in all four copies, clone `648fd06`); Spark then
+  overflowed its context and hit its own limit -- no Codex seat until 09-07.
+  Both r4 Gemini lanes demanded "delete Phase 0 entirely" because they read
+  the tree AFTER Phase 0 shipped; rejected on the grounding. A derived r3
+  launcher fed Antigravity the r1 document; re-run on Gemini 3.1 Pro.
+Current step: queue item 1 -- the collapse build. Next commit = the ratchet
+  commit (guards + sweep teach + network allowlist), then batches (a)-(d),
+  then the obs leg, then the operator's version bump.
+Next: read `r4/final.md` whole; write the two guard tests against
+  `tests/fixtures/ratchet.py`; teach `test_terminal_frame.py` `otr_proc` at
+  every import depth; run the full suite; commit; push. Blocked on the
+  operator: the four decisions in WHERE TO PICK UP (content_oracle, the review
+  filing, .comfyignore / partner_nodes, PBUG-05's profile design).
+Models: Opus 5 drove the second half (Fable 5.1 the first). Full arc r1-r4,
+  roster stated per round in each `judgment.md`: r1 agy 3.8 Flash + Sonnet +
+  Cursor (operator paste); r2 agy 3.8 Flash + Sonnet + Codex (operator paste);
+  r3 Sonnet + agy 3.1 Pro + operator paste, with agy 3.8 Flash on the WRONG
+  document kept as a receipt; r4 Sonnet + agy 3.8 Flash + agy 3.1 Pro. Codex
+  CLI held all day. Three grounding workflows (33 agents) on r3, one 73-agent
+  verification fan-out on the rips, Sonnet QA on every finished diff.
+Commits: 42fa3c88, 22baa861, c5648864, 2f12a696, 9ac2f512, 1e373adc, 3d4a7077
+  (Bible 95be6ec -> 81a8a9e; kibitz clone 648fd06). The handoff commit lands
+  on top and is not listed -- see the kickoff line for the real head.
+
 ## 2026-09-03 -- HEAD 31109245 +handoff (v2.0-alpha) -- CODER (alpha.17 published and artifact-verified; the node-count blocker was pycairo; Bible 12.148-12.150)
 
 The sha above is the second-to-last on the branch; the last is this handoff

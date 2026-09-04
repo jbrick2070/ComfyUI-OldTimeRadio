@@ -1,0 +1,67 @@
+EXEC CALL SITES (deduplicated): 35
+
+argv[0] as resolved, by count:
+  7  expr:fb
+  5  expr:_ffmpeg_bin()
+  5  expr:ffmpeg
+  3  expr:py
+  2  literal:git
+  2  expr:_ffmpeg(ffmpeg)
+  2  expr:_with_resolved_ffmpeg(cmd)
+  1  expr:ffmpeg_bin
+  1  literal:-v
+  1  literal:nvidia-smi
+  1  expr:str(blender_exe)
+  1  expr:_slicer_ffmpeg_bin()
+  1  expr:fp
+  1  expr:_build_blend_cmd(source_mp4=src, procgen_mp4=pgn, out_mp4=ou
+  1  expr:_build_bars_caption_cmd(_main_out, bars_path, output_path, _
+  1  expr:[fb, '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt
+
+every site (file:line  primitive  argv[0]):
+  nodes/_otr_audio_engines/eng_chatterbox.py:108  Popen  expr:py
+  nodes/_otr_audio_engines/eng_dia.py:109  Popen  expr:py
+  nodes/_otr_audio_engines/eng_google_lyria.py:155  run  expr:_ffmpeg_bin()
+  nodes/_otr_audio_engines/eng_indextts2.py:214  Popen  expr:py
+  nodes/_otr_ledger.py:884  run  literal:git
+  nodes/_otr_shared/cloud_media_canonical.py:161  run  expr:ffmpeg
+  nodes/_otr_shared/cloud_media_canonical.py:202  run  expr:ffmpeg
+  nodes/_otr_shared/cloud_media_canonical.py:386  run  expr:ffmpeg_bin
+  nodes/_otr_shared/content_oracle.py:149  run  expr:_ffmpeg(ffmpeg)
+  nodes/_otr_shared/content_oracle.py:176  run  expr:_ffmpeg(ffmpeg)
+  nodes/_otr_shared/encode_sink.py:183  Popen  expr:fb
+  nodes/_otr_shared/encode_sink.py:92  run  expr:ffmpeg
+  nodes/_otr_shared/ffprobe.py:212  run  literal:-v
+  nodes/_otr_shared/scope_draw.py:1010  Popen  expr:fb
+  nodes/_otr_shared/scope_draw.py:896  run  expr:ffmpeg
+  nodes/_otr_sys_specs.py:110  run  literal:nvidia-smi
+  nodes/_otr_video_engines/eng_mesh_stage.py:810  run  expr:str(blender_exe)
+  nodes/_otr_video_engines/render_driver.py:715  run  expr:_slicer_ffmpeg_bin()
+  nodes/_otr_video_engines/wrapper_bridge.py:1102  run  expr:_with_resolved_ffmpeg(cmd)
+  nodes/_otr_video_engines/wrapper_bridge.py:1222  Popen  expr:_with_resolved_ffmpeg(cmd)
+  nodes/otr_caption_burn.py:254  run  expr:fb
+  nodes/otr_credits_roll.py:1318  run  expr:_ffmpeg_bin()
+  nodes/otr_credits_roll.py:1322  run  expr:_ffmpeg_bin()
+  nodes/otr_credits_roll.py:1449  run  expr:_ffmpeg_bin()
+  nodes/otr_credits_roll.py:1476  run  expr:_ffmpeg_bin()
+  nodes/otr_master_audio_mux.py:102  run  expr:fb
+  nodes/otr_master_audio_mux.py:144  run  expr:fp
+  nodes/otr_post_upscale_procgen_blend.py:581  run  expr:fb
+  nodes/otr_post_upscale_procgen_blend.py:995  run  expr:_build_blend_cmd(source_mp4=src, procgen_mp4=pgn, out_mp4=ou
+  nodes/otr_post_upscale_procgen_blend.py:1026  run  expr:_build_bars_caption_cmd(_main_out, bars_path, output_path, _
+  nodes/otr_silent_composite.py:168  run  expr:fb
+  nodes/otr_silent_composite.py:1044  Popen  expr:fb
+  nodes/otr_silent_composite.py:1047  Popen  expr:[fb, '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt
+  nodes/production_ledger.py:222  check_output  literal:git
+  nodes/video_engine.py:1082  Popen  expr:ffmpeg
+
+DRIVER NOTE (grounded after the run): the one "literal:-v" row is a resolver
+artifact. nodes/_otr_shared/ffprobe.py:212 runs `argv = [binary] + [str(a)
+for a in args]` -- the ffprobe owner's own run(); the walker matched an
+`argv = ["-v", ...]` assignment from another function in the same file
+because assignments were collected per enclosing scope, and the module scope
+encloses every function. Real executable set today, by basename: ffmpeg
+(24 sites through nine resolver spellings), ffprobe (2), the sidecar venv
+interpreters (3: chatterbox, dia, indextts2), git (2: _otr_ledger.py:884,
+production_ledger.py:222), nvidia-smi (1: _otr_sys_specs.py:110), blender
+(1: eng_mesh_stage.py:810). 35 sites, matching the scanner's 35 findings.

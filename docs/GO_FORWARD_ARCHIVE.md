@@ -3539,3 +3539,95 @@ a few settings ("a spinning turntable **in the** riverbank"). The operator's own
 rewrites vary the preposition ("at a reservoir", "in a large water reservoir").
 A small per-setting preposition choice would fix it; it is cosmetic and it waits
 for his eye on the pictures first.
+
+
+## STATUS -- WHAT THE 2026-09-03/04 SESSION SETTLED (archived 2026-09-04 evening; done-work narrative, moved whole -- the one forward pointer it carried, item 3d, lives in the queue)
+
+## STATUS -- WHAT THE 2026-09-03/04 SESSION SETTLED (read before re-deriving any of it)
+
+**2026-09-04, second half -- the runpod-found fixes landed in the commit that
+carries this paragraph, as ONE invariant: a machine fact has ONE owner, and a
+test proves the copies agree.** Full four-round `kibitz-plugin:kibitz` arc
+(Codex gpt-5.6-sol, Antigravity Gemini 3.8 Flash, Cursor grok-4.6 -- r4's
+Cursor seat by a Sonnet substitute plus the operator's manual paste), a Sonnet 5
+QA pass on the named functions (clean; verified live that with nothing pinned
+every answer on the 5080 resolves to the same binary and the same tree -- the
+only string-level change is a resolved path where a bare literal used to be), a
+Fable gate (ship-with-fixes, applied), two manual passes (Cursor, Antigravity)
+on the pushed tree, then the suite -- **13484 passed, 0 failed** -- and the
+live publish matrix (three pairwise-distinct roots, a pinned ffmpeg copy, the
+shipping 8 GB profile; its receipt is the docs commit that tombstones 1.4a
+row A's "still owed" line). What landed, in 1.4a's rows:
+ffmpeg has one resolver (`_otr_shared/ffmpeg.py`; measured live, 9 of 10 sites
+had ignored `OTR_FFMPEG` on a box with ffmpeg on PATH -- PBUG-20260904-02); the
+output root has one owner and `OTR_OBS_DIR` is a declared publication root
+(R-A); the remote video adapters DECLARE `session_residency = "remote"` (the
+cloud base's six rows plus the two Google adapters -- the seven that split a
+long beat are the roster's named gap; Kling inherits it and never splits)
+and BeatSession no longer asks them for handles they do not have (R-B, the
+word_razzle pod failure -- PBUG-20260904-03); the models root has one spelling;
+the widget-drift gate has no silent exemption; the nvenc probe is cached per
+binary. Three AST guards (`test_ffmpeg_single_resolution`,
+`test_output_root_single_owner`, `test_models_root_single_spelling`) make the
+claim a test, not a docstring. Bible 12.151-12.154 promoted. The pod
+(`k0ph3m9491yp6s`) was stopped at 7:15 AM after its chain went idle; its seven
+overnight episodes are in `otr/obs`. Side find: the 5080's own Q4_K_M writer
+copy predates the 2026-08-29 pin (PBUG-20260904-04) -- re-downloaded. Open
+threads live in 1.4a row G.
+
+**The big one: character directives were being thrown away, 100% of the time.**
+`derive_creative_directives` batches up to 15 beats and asks for one JSON row
+each, but reached the model through a wrapper hardcoding `max_new_tokens=300`.
+A row costs ~73 tokens, so a full batch needed ~1,100 and got 300: the reply
+stopped mid-object, the parser returned `{}`, and the reseed loop retried the
+SAME prompt under the SAME ceiling. Every character beat fell through to the
+deterministic template -- a character PORTRAIT with no action verb in it -- which
+is why the picture never matched the story. Fixed (PBUG-20260903-07) and proven
+live: 14 of 14 beats from the writer, zero warnings, where it had been 0 of 14.
+
+**Also fixed and pushed:** `"camera locked"` as the default when no camera was
+given (3 lanes); the compactor silently dropping the CAMERA clause over a
+12-word cap (2 of 32 registers, both in packs the operator watches); `Voice:`
+reaching picture models in 90% of joint-AV prompts; the one-sentence camera ask,
+now requiring a STRATEGIC move and banning framing-only answers; the wan/fastwan
+bookends, which previously shipped a static seed with ZERO verbs.
+
+**A portability bug only a second machine could find.** `scope_draw._has_nvenc`
+asked whether ffmpeg was COMPILED with nvenc, not whether it can ENCODE -- the
+third copy of a mistake already fixed twice, and `encode_sink`'s docstring
+claimed to be the only such decision, which is why it survived. On a rented 4090
+that lists the encoder and cannot open a session, `viz_camera` went FAIL -> PASS
+on the fix. Any AMD / Mac / container host hit the same wall.
+
+**`ideogram4_local` was never Blackwell-only** -- only its default was. It now
+walks a precision ladder (nvfp4 -> fp8_scaled -> int8_convrot), all three in the
+same UNGATED Comfy-Org/Ideogram-4 repo. NOT an 8 GB lane: fp8 is ~29 GB all-in.
+
+**Published filenames now say what made the episode** --
+`<title>_<ts>__<style>__<video>__<image>__<tts>__<bank>_final.mp4`. The old tail
+was compositing noise and actively misleading: this session read `procgen` as a
+render engine and built a wrong diagnosis on it. Obs copy only; archival
+untouched.
+
+**Rented-4090 lane matrix (1 act each), and read the failures correctly:**
+
+| outcome | lanes |
+|---|---|
+| PASS | viz_camera, viz_green, still_flat, still_motion, still_pan, still_word, animatediff15_v3_haunted, ltx_8gb |
+| TIMEOUT (driver's 40 min, render survived -- NOT a defect) | wan_ti2v, fastwan_8gb |
+| OOM at decode (known 24 GB Ada negative) | ltx25_foley_plus, ltx25_mime, ltx25_video |
+| dependency absent on that pod | ltx_video, mesh_stage (portable Blender) |
+| REAL defect -- FIXED 2026-09-04 | word_razzle -- refused every beat long enough to split, because `BeatSession` demanded a handle identity from an adapter that holds no handles. The seven remote adapters now DECLARE `session_residency = "remote"` and the demand is skipped for exactly them, fail-closed (kibitz runpod-found-fixes R-B; PBUG-20260904-03) |
+
+A 3-act AnimateDiff episode also passed unattended in 33.7 min.
+
+**STILL OPEN, and today's audit CONFIRMED it rather than fixing it:** item 3d
+below -- ten of eleven lanes lead the prompt with the cast's face paragraph via
+`motion_common.compose_parts`, 83 words of a hard 100-word cap on `wan_ti2v`, so
+the camera clause falls off the end. That is a SHARED-composer change touching
+eleven lanes on both machines and is deliberately not a drive-by.
+
+Eight pod-driving lessons landed in `docs/RUNPOD_INSTALL.md` section 7A and its
+failure atlas.
+
+---

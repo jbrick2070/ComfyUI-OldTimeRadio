@@ -20,92 +20,63 @@ gitignored: pointers to them are 5080-local.
   **Pod manual:** `docs/RUNPOD_INSTALL.md` (Codex owns it). **Ship-readiness receipts:**
   `docs/ship-audit-2026-09-01/`. **The highest authority is still `CLAUDE.md`.**
 
-## STATUS -- WHAT THE 2026-09-03/04 SESSION SETTLED (read before re-deriving any of it)
+## WHERE TO PICK UP (written 2026-09-04 evening; the last CODE head is `3d4a7077`)
 
-**2026-09-04, second half -- the runpod-found fixes landed in the commit that
-carries this paragraph, as ONE invariant: a machine fact has ONE owner, and a
-test proves the copies agree.** Full four-round `kibitz-plugin:kibitz` arc
-(Codex gpt-5.6-sol, Antigravity Gemini 3.8 Flash, Cursor grok-4.6 -- r4's
-Cursor seat by a Sonnet substitute plus the operator's manual paste), a Sonnet 5
-QA pass on the named functions (clean; verified live that with nothing pinned
-every answer on the 5080 resolves to the same binary and the same tree -- the
-only string-level change is a resolved path where a bare literal used to be), a
-Fable gate (ship-with-fixes, applied), two manual passes (Cursor, Antigravity)
-on the pushed tree, then the suite -- **13484 passed, 0 failed** -- and the
-live publish matrix (three pairwise-distinct roots, a pinned ffmpeg copy, the
-shipping 8 GB profile; its receipt is the docs commit that tombstones 1.4a
-row A's "still owed" line). What landed, in 1.4a's rows:
-ffmpeg has one resolver (`_otr_shared/ffmpeg.py`; measured live, 9 of 10 sites
-had ignored `OTR_FFMPEG` on a box with ffmpeg on PATH -- PBUG-20260904-02); the
-output root has one owner and `OTR_OBS_DIR` is a declared publication root
-(R-A); the remote video adapters DECLARE `session_residency = "remote"` (the
-cloud base's six rows plus the two Google adapters -- the seven that split a
-long beat are the roster's named gap; Kling inherits it and never splits)
-and BeatSession no longer asks them for handles they do not have (R-B, the
-word_razzle pod failure -- PBUG-20260904-03); the models root has one spelling;
-the widget-drift gate has no silent exemption; the nvenc probe is cached per
-binary. Three AST guards (`test_ffmpeg_single_resolution`,
-`test_output_root_single_owner`, `test_models_root_single_spelling`) make the
-claim a test, not a docstring. Bible 12.151-12.154 promoted. The pod
-(`k0ph3m9491yp6s`) was stopped at 7:15 AM after its chain went idle; its seven
-overnight episodes are in `otr/obs`. Side find: the 5080's own Q4_K_M writer
-copy predates the 2026-08-29 pin (PBUG-20260904-04) -- re-downloaded. Open
-threads live in 1.4a row G.
+**Tree state:** `v2.0-alpha`, HEAD == origin, clean. Suite baseline **13492 passed /
+126 skipped / 1 xfailed** (2026-09-04 evening). Bible **335 entries** (repo HEAD
+`81a8a9e`; 22 passed / 27 skipped / 3 xfailed). No resident server; VRAM at the
+desktop baseline. Codex CLI: the standard tier is out of credits until
+**2026-09-07 08:34 PDT** and Spark (`gpt-5.3-codex-spark`) overflowed its context on
+a 12 KB plan -- fill the seat with Sonnet/Opus or a second agy model (Gemini 3.1 Pro
+(High) is a distinct reviewer from 3.8 Flash) and say so in the roster. Reviews are
+**one or two lanes per decision** (operator, 2026-09-04), not three.
 
-**The big one: character directives were being thrown away, 100% of the time.**
-`derive_creative_directives` batches up to 15 beats and asks for one JSON row
-each, but reached the model through a wrapper hardcoding `max_new_tokens=300`.
-A row costs ~73 tokens, so a full batch needed ~1,100 and got 300: the reply
-stopped mid-object, the parser returned `{}`, and the reseed loop retried the
-SAME prompt under the SAME ceiling. Every character beat fell through to the
-deterministic template -- a character PORTRAIT with no action verb in it -- which
-is why the picture never matched the story. Fixed (PBUG-20260903-07) and proven
-live: 14 of 14 beats from the writer, zero warnings, where it had been 0 of 14.
+**NEXT CODER STEP -- the registry-collapse BUILD. The plan is CLOSED (r1-r4):**
+`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` (force-added; read it
+whole before typing; its r4 judgment sits beside it). Shipped already: Phase 0 and 0b,
+the orphan rips (`2f12a696`, `1e373adc`); the two owners `nodes/_otr_shared/env.py`
+and `nodes/_otr_shared/proc.py` plus the shared two-direction ratchet
+`tests/fixtures/ratchet.py`, on disk and INERT -- nothing imports them yet (`3d4a7077`).
+**The next commit is THE RATCHET COMMIT**, sequencing step 2 of the plan: both AST
+guards as named-set ratchets calling the shared helper in both directions (env: every
+`os.environ` spelling, `import os as X` aliases resolved generically, subscript reads,
+`getenv/putenv/unsetenv`, `nodes/**` plus the two roots by explicit path, allowlist =
+the owner and `prestartup_script.py`; proc: execution CALLS only -- `PIPE` and the
+exception classes are not findings); the network guard with its five named files;
+`tests/test_terminal_frame.py` taught `otr_proc` at every import depth with lowercase
+`popen` added to `_SPAWN_CALLS` (`:495` AND `:498` are the receipt); the mux knob
+test's predicate resolved from the mux's own import. Then the batches, one commit
+each, full suite per commit: (a) `_otr_shared` (with `gpu_residency`'s D fix) -> (b)
+audio, image, upscale (spandrel sha256 rides here), video (`eng_ltx25` `import sys`
+and the six `wan_shared` strings ride here), google_api -> (c) `nodes/_otr_*.py` ->
+(d) EVERY remaining `nodes/*.py` (eleven are unprefixed) and the root `__init__.py`
+(env import ABOVE line 51, OUTSIDE the swallowing try/excepts). Every migrated module
+imports the owners ALIASED, `otr_env` / `otr_proc`, at its own depth (`env` and `proc`
+collide with live locals); test seams patch `M.otr_proc.run` in the module's own
+batch. Acceptance: both guards green with empty pending sets, then a canonical leg
+that PUBLISHES to `otr/obs/` (the launcher's profile and roots READ BACK from the leg
+log before any receipt), then the operator bumps `pyproject.toml` and the next scan
+is the receipt (about 9 `info` findings expected, from 158).
 
-**Also fixed and pushed:** `"camera locked"` as the default when no camera was
-given (3 lanes); the compactor silently dropping the CAMERA clause over a
-12-word cap (2 of 32 registers, both in packs the operator watches); `Voice:`
-reaching picture models in 90% of joint-AV prompts; the one-sentence camera ask,
-now requiring a STRATEGIC move and banning framing-only answers; the wan/fastwan
-bookends, which previously shipped a static seed with ZERO verbs.
+**DECISIONS OWED BY THE OPERATOR -- skip these, do not guess:**
+* `nodes/_otr_shared/content_oracle.py` has ZERO production importers (eight test
+  sites; the two "importers" were comment mentions). Rip it, wire its luma-floor and
+  freeze checks into the render path (an ffmpeg pass per clip), or move it under
+  `tests/` / `scripts/` so it stops shipping. `OTR_STANDING_RULINGS` currently keeps
+  its manifest wrappers, so the default is KEEP until ruled.
+* File the Comfy-Org manual review request -- a PUBLIC post; every precondition is met.
+* The `.comfyignore` line for `viewer/index.html`; the `partner_nodes.yaml`
+  `AUTH_TOKEN_COMFY_ORG` scrub (check the parser first).
+* PBUG-20260904-05: the draft 8 GB profiles (`8gb_lite`, `otr_4060_floor`,
+  `otr_4060_viz_12b`) render `media_archive` at 2048 ctx and refuse `science_news`
+  (2,741 tokens) and `original` (3,338) -- a profile-design call; the 4060 proves,
+  the 5080 promotes.
 
-**A portability bug only a second machine could find.** `scope_draw._has_nvenc`
-asked whether ffmpeg was COMPILED with nvenc, not whether it can ENCODE -- the
-third copy of a mistake already fixed twice, and `encode_sink`'s docstring
-claimed to be the only such decision, which is why it survived. On a rented 4090
-that lists the encoder and cannot open a session, `viz_camera` went FAIL -> PASS
-on the fix. Any AMD / Mac / container host hit the same wall.
-
-**`ideogram4_local` was never Blackwell-only** -- only its default was. It now
-walks a precision ladder (nvfp4 -> fp8_scaled -> int8_convrot), all three in the
-same UNGATED Comfy-Org/Ideogram-4 repo. NOT an 8 GB lane: fp8 is ~29 GB all-in.
-
-**Published filenames now say what made the episode** --
-`<title>_<ts>__<style>__<video>__<image>__<tts>__<bank>_final.mp4`. The old tail
-was compositing noise and actively misleading: this session read `procgen` as a
-render engine and built a wrong diagnosis on it. Obs copy only; archival
-untouched.
-
-**Rented-4090 lane matrix (1 act each), and read the failures correctly:**
-
-| outcome | lanes |
-|---|---|
-| PASS | viz_camera, viz_green, still_flat, still_motion, still_pan, still_word, animatediff15_v3_haunted, ltx_8gb |
-| TIMEOUT (driver's 40 min, render survived -- NOT a defect) | wan_ti2v, fastwan_8gb |
-| OOM at decode (known 24 GB Ada negative) | ltx25_foley_plus, ltx25_mime, ltx25_video |
-| dependency absent on that pod | ltx_video, mesh_stage (portable Blender) |
-| REAL defect -- FIXED 2026-09-04 | word_razzle -- refused every beat long enough to split, because `BeatSession` demanded a handle identity from an adapter that holds no handles. The seven remote adapters now DECLARE `session_residency = "remote"` and the demand is skipped for exactly them, fail-closed (kibitz runpod-found-fixes R-B; PBUG-20260904-03) |
-
-A 3-act AnimateDiff episode also passed unattended in 33.7 min.
-
-**STILL OPEN, and today's audit CONFIRMED it rather than fixing it:** item 3d
-below -- ten of eleven lanes lead the prompt with the cast's face paragraph via
-`motion_common.compose_parts`, 83 words of a hard 100-word cap on `wan_ti2v`, so
-the camera clause falls off the end. That is a SHARED-composer change touching
-eleven lanes on both machines and is deliberately not a drive-by.
-
-Eight pod-driving lessons landed in `docs/RUNPOD_INSTALL.md` section 7A and its
-failure atlas.
+**Still open, forward:** 1.4a row G follow-ups; the symbols `python
+scripts/dead_code_closure.py` lists under "NAMED IN A PROTECTIVE DOC" (each has a
+ruling; `force_vram_offload` is kept on purpose; the P0 contract module is the
+evidence for OPEN PBUG-20260729-03 and stays whole); item 3d, the shared-composer
+face-paragraph change across eleven lanes, is still deliberately not a drive-by.
 
 ---
 
@@ -140,6 +111,9 @@ directly instead.
   the credential fix held across the bump, Flagged-on-info-only is the expected outcome,
   and **every precondition on the manual review request is now satisfied** -- it is ready
   to file on the operator's go and nothing else gates it.
+* **THE SCAN COLLAPSE IS THE CODER'S NEXT CHUNK** -- see WHERE TO PICK UP at the
+  top: plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is
+  next. Nothing in it needs the operator except the review filing above.
 * **pycairo was the ONLY source-build-only dependency -- audited, not assumed
   (2026-09-04).** Every line in `requirements.txt` was evaluated against a
   linux / cp310 / x86_64 marker environment (what the extract container is) and then
@@ -1890,9 +1864,11 @@ has asked for long cloud beats; log it, do not build it.
 | historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
 | `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
 | **Seedance softener mangles authored prompts (2026-08-17)** | CANDIDATE only: fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever produces the artifact; nearest coverage `12.108` does not cover blind-regex rewriting of authored text. Detail: `docs/GO_FORWARD_ARCHIVE.md` |
+| `PBUG-20260904-05` (draft 8 GB profiles: 2048 ctx holds `media_archive`, refuses the other two banks) | CANDIDATE: a live refusal, but the fix is a profile-design call not yet made; promote when the verify condition is automatable |
 | `PBUG-20260901-04` (kokoro on Python 3.13) | Bible CANDIDATE (a Requires-Python marker rule); promote at the fan-out (Section 3, question F) |
 
-(The 12.139 / 12.140 promotions completed 2026-08-28 and the 2026-08-25 /
+(12.151-12.156 promoted 2026-09-04 -- PBUG-20260904-01..04 and -06; receipts in
+HANDOFF_LOG. The 12.139 / 12.140 promotions completed 2026-08-28 and the 2026-08-25 /
 2026-08-18 / 2026-08-17 promotion receipts are in the archive.)
 
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`; promotion to the Bible is

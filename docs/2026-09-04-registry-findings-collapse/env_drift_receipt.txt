@@ -1,0 +1,85 @@
+231 distinct knobs read at 305 sites in 273 files
+14 knobs read with more than one default or cast:
+
+HF_HOME
+    nodes/_otr_audio_engines/eng_musicgen.py:53  default=os.path.expanduser('~/.cache/huggingface')  cast=-
+    nodes/_otr_bark_lib.py:155  default=os.path.expanduser('~/.cache/huggingface')  cast=-
+    nodes/_otr_hf_env.py:103  default=<none>  cast=-
+    nodes/_otr_hf_env.py:119  default=<KeyError>  cast=-
+    nodes/_otr_model_catalog.py:530  default=<none>  cast=-
+    nodes/_otr_model_loader.py:858  default=os.path.expanduser('~/.cache/huggingface')  cast=-
+    nodes/_otr_paths.py:571  default=''  cast=-
+    nodes/_otr_video_engines/eng_ltx_video.py:1147  default=''  cast=-
+    nodes/_otr_video_engines/eng_ltx_video.py:1219  default=''  cast=-
+    nodes/_otr_video_engines/eng_mesh_stage.py:482  default=''  cast=-
+    prestartup_script.py:60  default=<KeyError>  cast=-
+    prestartup_script.py:64  default=<none>  cast=-
+HF_TOKEN
+    nodes/_otr_engine_profiles.py:422  default=<none>  cast=-
+    nodes/_otr_hf_auth.py:32  default=<none>  cast=-
+    nodes/_otr_shared/hf_token.py:89  default=<none>  cast=-
+    nodes/_otr_shared/hf_token.py:97  default=<KeyError>  cast=-
+OTR_COMPOSITE_UNSHARP_AMOUNT
+    nodes/otr_silent_composite.py:214  default=_UNSHARP_AMOUNT_DEFAULT  cast=float
+    nodes/otr_silent_composite.py:1663  default=''  cast=-
+OTR_ENABLE_STYLE_GRAMMAR
+    nodes/OTR_LedgerScriptWriter.py:293  default=<none>  cast=-
+    nodes/OTR_LedgerScriptWriter.py:1750  default=<KeyError>  cast=-
+    nodes/OTR_LedgerScriptWriter.py:1752  default=<KeyError>  cast=-
+    nodes/OTR_LedgerScriptWriter.py:1757  default=<KeyError>  cast=-
+    nodes/OTR_LedgerScriptWriter.py:3021  default=<none>  cast=-
+    nodes/_otr_config.py:17  default=<none>  cast=-
+OTR_HARD_VRAM_CONTEXT_LIMIT
+    nodes/_otr_model_catalog.py:1439  default=<none>  cast=-
+    nodes/_otr_model_catalog.py:1537  default=<none>  cast=bool
+OTR_KOKORO_BACKEND
+    nodes/_otr_audio_engines/eng_kokoro.py:200  default='auto'  cast=-
+    nodes/_otr_audio_engines/eng_kokoro.py:221  default=<none>  cast=-
+    nodes/_otr_kokoro_voice_prefetch.py:138  default='auto'  cast=-
+OTR_LTX_RENDER_CANVAS
+    nodes/_otr_video_engines/eng_ltx_video.py:391  default=<none>  cast=-
+    nodes/_otr_video_engines/render_driver.py:2965  default='832x480'  cast=-
+OTR_MEDIA_ARCHIVE_ITEM_INDEX
+    nodes/_otr_media_archive_sources.py:195  default='0'  cast=-
+    nodes/_otr_media_archive_sources.py:212  default=''  cast=-
+OTR_MESH_CACHE_DIR
+    nodes/_otr_video_engines/eng_mesh_stage.py:507  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_mesh_stage.py:508  default=<KeyError>  cast=-
+OTR_MESH_COMPOSITE_STYLE
+    nodes/otr_silent_composite.py:1280  default='source_over'  cast=-
+    nodes/otr_silent_composite.py:1665  default=''  cast=-
+OTR_MODELS_DIR
+    nodes/_otr_paths.py:123  default=<none>  cast=-
+    nodes/_otr_paths.py:567  default=''  cast=-
+OTR_OBS_DIR
+    nodes/_otr_ledger.py:191  default=''  cast=-
+    nodes/_otr_paths.py:432  default=<none>  cast=-
+OTR_OUTPUT_DIR
+    __init__.py:97  default=<none>  cast=-
+    __init__.py:107  default=<KeyError>  cast=-
+    nodes/_otr_paths.py:82  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_mesh_stage.py:524  default=<none>  cast=-
+OTR_TEST_MODE
+    nodes/_otr_freeze_cascade.py:912  default=<none>  cast=-
+    nodes/_otr_ledger.py:581  default=<none>  cast=-
+    nodes/_otr_video_engines/_tmp.py:45  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_ltx_8gb.py:1544  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_minimax_h3.py:932  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_visualizer.py:258  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_visualizer.py:288  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_camera.py:200  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_camera.py:229  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_mandala.py:251  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_mandala.py:288  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_rainbow.py:223  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_viz_rainbow.py:253  default=<none>  cast=-
+    nodes/_otr_video_engines/eng_wan_ti2v.py:1281  default=<none>  cast=-
+    nodes/_otr_video_engines/ghost_signal_author.py:1196  default=<none>  cast=-
+    nodes/_otr_video_engines/render_driver.py:5993  default=<none>  cast=-
+    nodes/otr_image_gen_dispatcher.py:562  default=<none>  cast=-
+    nodes/otr_master_audio_mux.py:671  default=<none>  cast=-
+    nodes/otr_shot_lock.py:305  default=<none>  cast=-
+    nodes/otr_shot_lock.py:1695  default=<none>  cast=-
+    nodes/otr_shot_lock.py:2827  default=<none>  cast=-
+    nodes/otr_video_render_batch.py:46  default='0'  cast=-
+    nodes/production_ledger.py:780  default=<none>  cast=-
