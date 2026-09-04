@@ -667,6 +667,76 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | Low GPU utilization while hundreds of weight shards scroll | Persistent network volume is loading a large model | Let it finish; use logs/heartbeat, not utilization alone, to decide it is stuck |
 | Disk fills despite a large volume | Models or HF cache landed on container disk or in two cache roots | Use the generated receipt; keep `HF_HOME=$OTR_COMFYUI_MODELS_ROOT/huggingface` |
 | Provisioner says ComfyUI is not a git checkout or has tracked changes | The template core cannot be safely pinned in place | Follow its printed side-by-side checkout recipe, or restore the exact tracked core deliberately; never overwrite unknown work |
+| Resuming a stopped pod fails with `not enough free GPUs on the host machine` | A stopped pod resumes on its ORIGINAL host; that host is now full | Not a fault in the pod or the account. Migrate the pod in the console -- migration places it on a new host and mints a NEW pod id, so re-read the id before any `runpod` call |
+| `ssh ...@ssh.runpod.io` fails with `Your SSH client doesn't support PTY` | The RunPod SSH proxy needs a PTY that git-bash's client will not give it | Use the DIRECT TCP form the console shows (`ssh -p <port> root@<ip>`); it also supports `scp`, which the proxy form does not |
+| Every SSH key is refused as `Permission denied (publickey)` | The pod carries the key it was built with, not the machine default | This repo's pod key is `~/.ssh/runpod_otr`; `id_ed25519` is a different key and will always be denied |
+| A weight is reported MISSING that is on disk | Looked in the wrong model directory | AnimateDiff motion weights live in `animatediff_models/`, NOT `motion_models/` -- an empty `motion_models/` proves nothing. `scripts/otr_fetch_lane_weights.py <lane>` is the authority: it prints PRESENT/FETCHING per file with byte counts |
+| A remote command over SSH returns NO output at all, repeatedly | `pkill -f <pattern>` matched the SSH session's OWN command line and killed the shell before it could print | Exclude the pattern from itself (`pkill -f "[p]attern"`) or kill by PID. Silence with a zero exit is the tell |
+| Two renders fight for one GPU; load average climbs and both crawl | Killing a sweep DRIVER does not kill the leg it already spawned | Orphaned legs keep rendering. `ps -eo pid,etime,cmd | grep canonical_api` and kill by PID; a driver kill is not a run kill |
+| A pod render ignores today's code fix | The resident ComfyUI loaded `nodes/` at boot, before the `git pull` | Restart ComfyUI after any pull and re-verify `/object_info` shows a nonzero OTR class count |
+
+## 7A. Driving a pod from a second machine (2026-09-03)
+
+Lessons from running the whole video-lane matrix on a rented RTX 4090 while the
+local 5080 kept rendering. These are about the DRIVER, not about any one lane.
+
+**Staging code is a `git pull` in the pod's own clone.** The pod carries a real
+checkout on `v2.0-alpha` with the GitHub remote, so there is no file copying and
+no risk of a half-synced tree. Prove the baseline afterwards rather than assuming
+it -- CLAUDE.md section 0 requires every headless run to load the real canonical
+workflow:
+
+```bash
+sha256sum workflows/otr_canonical.json      # run on BOTH machines; must match
+git rev-parse --short HEAD                  # and match the commit you pushed
+```
+
+`scripts/_otr_canonical_api_prompt.json` looks like a cached graph and is not
+one -- it is the runner's OUTPUT dump, rewritten every run. The runner resolves
+`workflows/otr_canonical.json` and raises if the path is anything else.
+
+**The port does not line up, and the fix is to move the port, not the runner.**
+The pod's ComfyUI listens on **8188** because that is what RunPod exposes as an
+HTTP proxy; every OTR headless script targets **8000**
+(`otr_bank_engine_sweep.COMFY_URL`, and the canonical runner's default).
+`otr_canonical_api_run.py` accepts `--comfyui-url`, but the sweep driver does
+not. Editing a runner to chase a port is how a stale runner is born, so bridge
+instead -- `socat` is not installed on the stock image, and a ~60-line stdlib
+Python TCP forwarder (8000 -> 8188) is enough for a headless driver's handful of
+long-lived HTTP calls.
+
+**Set both roots before anything else**, or models land in a second cache and the
+volume fills:
+
+```bash
+export OTR_COMFYUI_MODELS_ROOT=/workspace/runpod-slim/ComfyUI/models
+export HF_HOME=$OTR_COMFYUI_MODELS_ROOT/huggingface
+```
+
+**Know which sweep driver you are running.** `otr_bank_engine_sweep.py --lanes
+video` exists to prove the SMALLEST writer survives every bank: it hard-pins
+`gemma-4-E2B-it` in both writer slots and one fixed visual style per bank. That
+is a robustness driver, not a quality driver -- do not judge picture or camera
+work from its output. To exercise quality, drive `otr_canonical_api_run.py` per
+lane with `--creative-model` / `--technical-model` set to the row you want and
+`--visual-style "roll (any style)"` to leave the randomizer on. Never pass
+`--title` to a canonical leg: the harness label becomes the published title card.
+
+**The IMAGE engine is chosen by the PROFILE, not by a runner flag.** There is no
+`--image-model`; `role_overrides.character_image` is the sanctioned lever, which
+is exactly what a human clicking the dropdown would save. So covering the image
+models is a PROFILE-SELECTION problem: pick the profile that pairs the video lane
+you want with the image engine you still owe a test. The `otr_rot_*` profiles
+exist for precisely this rotation -- e.g. `otr_rot_wan_ideogram4` (wan_ti2v +
+ideogram4_local), `otr_rot_ltx25_video_lumina` (ltx25_high_video + lumina_image),
+`otr_rot_ltx25_foley_fluxgen1` (ltx25_high_foley_plus + flux_gen1). A profile's
+`status` is not gated by the applier, so `draft` rows are runnable.
+
+**Lanes that need their own boot cannot share a sweep.** A profile's `launch.env`
+is a BOOT contract, so these get a separate ComfyUI start and their own group:
+HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`),
+`ltx_audio_in` (`DISABLE_PINNED`, no reserve), and the MiniMax H3 lanes, which
+the engine itself refuses on a stock boot.
 
 ## 8. Evidence ledger
 
