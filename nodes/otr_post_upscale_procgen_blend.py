@@ -46,11 +46,6 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-try:
-    from ._otr_shared import proc as otr_proc
-except ImportError:  # pragma: no cover -- flat test imports
-    from _otr_shared import proc as otr_proc  # type: ignore
-
 # Ensure sibling node modules (e.g. _otr_shared) resolve when this file is
 # loaded FLAT by ComfyUI's custom-node loader -- the flat fallbacks of the
 # two try/except imports below need it. Package-relative comes FIRST in
@@ -60,6 +55,11 @@ except ImportError:  # pragma: no cover -- flat test imports
 _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
+
+try:
+    from ._otr_shared import proc as otr_proc  # noqa: E402
+except ImportError:  # pragma: no cover -- flat / standalone load
+    from _otr_shared import proc as otr_proc  # type: ignore  # noqa: E402
 
 try:
     from ._otr_shared.ffmpeg import resolve_ffmpeg  # noqa: E402

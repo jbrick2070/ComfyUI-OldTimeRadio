@@ -211,6 +211,26 @@ def test_an_empty_argv_is_refused_by_NAME_not_by_IndexError():
 
 
 @pytest.mark.parametrize("spawn", ["run", "popen"])
+def test_executable_override_is_refused_on_both_entry_points(spawn):
+    """`executable=` swaps the binary that actually runs while argv[0] keeps the
+    name the allowlist checked, so `(["ffmpeg"], executable="cmd.exe")` would
+    pass the check and launch something else. Found by a gpt-6-astra review of
+    the shipped migration; nothing in the pack passes it, which is exactly why
+    it has to be refused before something does."""
+    with pytest.raises(otr_proc.ExecutableNotAllowed) as exc:
+        getattr(otr_proc, spawn)(["ffmpeg", "-version"], executable="cmd.exe")
+    assert "executable=" in str(exc.value)
+
+
+def test_an_explicit_executable_None_is_still_fine():
+    """subprocess's own default. Refusing it would break a caller that passes
+    the parameter through from its own signature."""
+    done = otr_proc.run([sys.executable, "-c", "pass"], executable=None,
+                        stdout=otr_proc.DEVNULL, stderr=otr_proc.DEVNULL)
+    assert done.returncode == 0
+
+
+@pytest.mark.parametrize("spawn", ["run", "popen"])
 def test_shell_true_is_refused_on_both_entry_points(spawn):
     with pytest.raises(otr_proc.ExecutableNotAllowed) as exc:
         getattr(otr_proc, spawn)([sys.executable, "-c", "pass"], shell=True)

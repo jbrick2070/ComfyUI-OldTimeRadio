@@ -142,6 +142,16 @@ def _no_shell(kwargs: dict) -> None:
     if kwargs.get("shell"):
         raise ExecutableNotAllowed(
             "shell=True is refused: it re-parses an argv list through a shell")
+    # `executable=` REPLACES the binary that actually runs while argv[0] keeps
+    # its old value -- so `run(["ffmpeg"], executable="cmd.exe")` would pass the
+    # allowlist on "ffmpeg" and launch cmd.exe. The check above it would be
+    # decoration. Nothing in this pack passes it; refusing it keeps the
+    # allowlist a boundary rather than a suggestion.
+    if kwargs.get("executable") is not None:
+        raise ExecutableNotAllowed(
+            "executable= is refused: it replaces the binary that runs while "
+            "argv[0] -- the thing the allowlist checked -- stays unchanged. "
+            "Put the real program in argv[0].")
 
 
 def run(argv: Sequence[Any], **kwargs) -> subprocess.CompletedProcess:

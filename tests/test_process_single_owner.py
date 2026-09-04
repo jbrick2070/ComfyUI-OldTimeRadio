@@ -67,6 +67,7 @@ BLOCKED = {
         "the migration rides along with it, never ahead of it."),
 }
 
+
 def _subprocess_names(tree):
     """(module aliases, {bound name: spawn call}) resolved from this module.
 
@@ -85,6 +86,29 @@ def _subprocess_names(tree):
                 if imported.name in _SPAWN_CALLS:
                     bare[imported.asname or imported.name] = imported.name
     return modules, bare
+
+
+def _owner_names(tree):
+    """Whatever name this module binds ``nodes/_otr_shared/proc.py`` to.
+
+    Needed because the owner RE-EXPORTS ``Popen`` as an identity alias, so
+    ``otr_proc.Popen(argv)`` is the raw stdlib class and skips the allowlist and
+    the shell/executable refusals entirely. The re-export has to stay -- an
+    ``except`` clause and a type annotation both need it -- so the guard has to
+    tell an annotation from a CALL. Found by a gpt-6-astra review, 2026-09-04."""
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                if imported.name == "proc":
+                    names.add(imported.asname or "proc")
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module.endswith("_otr_shared") or (not module and node.level):
+                for imported in node.names:
+                    if imported.name == "proc":
+                        names.add(imported.asname or "proc")
+    return names
 
 
 def _os_spawn_names(tree):
@@ -114,13 +138,30 @@ def _offenders(tree, rel):
     spawns, and the owner re-exports those names so they stay legal."""
     modules, bare = _subprocess_names(tree)
     os_modules, os_bare = _os_spawn_names(tree)
+    owners = _owner_names(tree)
     out = []
+    # `x = subprocess.run` then `x(...)` -- the rebinding Astra demonstrated.
+    # Flagged at the ASSIGNMENT, which is where it is readable.
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Attribute)
+                and node.value.attr in _SPAWN_CALLS
+                and isinstance(node.value.value, ast.Name)
+                and node.value.value.id in modules):
+            out.append(f"{rel}:{node.lineno} rebinds "
+                       f"{node.value.value.id}.{node.value.attr} to a local name")
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
         if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-            if func.attr in _SPAWN_CALLS and func.value.id in modules:
+            if func.attr == "Popen" and func.value.id in owners:
+                # CALLING the re-export, not annotating with it. This is the
+                # raw stdlib class: no allowlist, no shell/executable refusal.
+                out.append(f"{rel}:{node.lineno} calls {func.value.id}.Popen() "
+                           "-- the raw re-export; use "
+                           f"{func.value.id}.popen() so the boundary applies")
+            elif func.attr in _SPAWN_CALLS and func.value.id in modules:
                 out.append(f"{rel}:{node.lineno} calls "
                            f"{func.value.id}.{func.attr}()")
             elif func.attr in _OS_SPAWN_CALLS and func.value.id in os_modules:
@@ -214,3 +255,48 @@ def test_every_blocked_file_is_still_pending_and_still_offends():
             "%s is BLOCKED but not PENDING -- if it was migrated anyway, the "
             "reason above says what that costs" % rel)
         assert (REPO / rel).is_file(), rel
+
+
+def test_the_finder_catches_a_call_through_the_RE_EXPORT():
+    """`otr_proc.Popen(...)` is the raw stdlib class -- no allowlist, no shell or
+    executable refusal. The re-export itself must STAY (an `except` clause and a
+    type annotation both need it), so the rule keys on the CALL, not the name."""
+    for src in (
+            "from . import proc as otr_proc\notr_proc.Popen(['ffmpeg'])\n",
+            "from ._otr_shared import proc as otr_proc\notr_proc.Popen(a)\n",
+            "from _otr_shared import proc as p\np.Popen(a)\n",
+    ):
+        assert _find(src), src
+
+
+def test_the_re_export_is_still_legal_as_an_ANNOTATION_and_an_EXCEPT():
+    """The whole reason it is re-exported. Flagging these would push modules back
+    to importing subprocess just to name a type or catch an error."""
+    for src in (
+            "from . import proc as otr_proc\ndef f() -> otr_proc.Popen: ...\n",
+            "from . import proc as otr_proc\nx: otr_proc.Popen = None\n",
+            "from . import proc as otr_proc\ntry:\n    pass\n"
+            "except otr_proc.CalledProcessError:\n    pass\n",
+            "from . import proc as otr_proc\nx = otr_proc.PIPE\n",
+            "from . import proc as otr_proc\notr_proc.popen(['ffmpeg'])\n",
+    ):
+        assert _find(src) == [], src
+
+
+def test_the_finder_catches_a_REBOUND_spawn_function():
+    """`run = subprocess.run` then `run(argv)` -- flagged at the ASSIGNMENT,
+    which is where a reader can actually see it."""
+    assert _find("import subprocess\nrun = subprocess.run\nrun(['ffmpeg'])\n")
+    assert _find("import subprocess as sp\np = sp.Popen\n")
+
+
+# KNOWN LIMITS, stated rather than implied. This guard reads SPELLINGS, not
+# dataflow: `getattr(subprocess, "run")`, `importlib.import_module("subprocess")`
+# and a star-import would each get past it. That is deliberate -- a general
+# reflection analyser is not worth building for this migration, which was
+# gpt-6-astra's own recommendation on 2026-09-04 -- and none of those spellings
+# appears anywhere in the tree today. If one ever does, it belongs here as a
+# named case, not as a rewrite of the finder.
+def test_the_known_limits_are_recorded_next_to_the_guard():
+    import pathlib
+    assert "KNOWN LIMITS" in pathlib.Path(__file__).read_text(encoding="utf-8")
