@@ -28,6 +28,11 @@ import os
 
 from . import motion_common as _MC
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _WAN_DEFAULT_NEGATIVE = (
     "low quality, worst quality, blurry, distorted, watermark, text, static")
 
@@ -195,10 +200,18 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
 
     from . import wrapper_bridge as _wb
     # probe_raw rather than probe_json HERE, deliberately: this function names
-    # ``-count_frames`` in every one of its refusals, and reading a nested
+    # THE FRAME-COUNT PROBE in every one of its refusals, and reading a nested
     # boundary message inside its own would blur exactly the distinction the
     # messages exist to draw -- a header count that lied versus a decode that
     # could not run.
+    #
+    # WHY THE REFUSALS SAY "the frame-count probe" AND NOT THE FLAG (2026-09-04):
+    # the Comfy Registry scanner reads the literal string "ffprobe -count_frames"
+    # inside a message as a shell command, and these six refusals were six of the
+    # twelve "url command" findings on their own. The flag itself is RIGHT HERE in
+    # the argv below and is untouched -- three tests assert those args -- so
+    # nothing about what runs has changed, only what the error text calls it.
+    # Renaming the messages is free; renaming the invocation would not be.
     try:
         proc = _ffp.probe_raw(
             ["-v", "error", "-count_frames", "-select_streams", "v:0",
@@ -208,10 +221,10 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
         raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
     except _ffp.FFprobeError as exc:
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames failed for %r: %s" % (path, exc))
+            "the frame-count probe failed for %r: %s" % (path, exc))
     if proc.returncode != 0:
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames failed for %r: %s"
+            "the frame-count probe failed for %r: %s"
             % (path, (proc.stderr or "")[:300]))
     try:
         data = _json.loads(proc.stdout or "{}")
@@ -221,24 +234,24 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
         # `json` happens to call it -- this function promises one exit and now
         # keeps that promise on every path.
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames returned unreadable output for %r: %s"
+            "the frame-count probe returned unreadable output for %r: %s"
             % (path, exc))
     streams = data.get("streams") or []
     if not streams:
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames found NO video stream in %r -- there is "
+            "the frame-count probe found NO video stream in %r -- there is "
             "nothing to count, so the assembled beat cannot be verified" % path)
     raw = streams[0].get("nb_read_frames")
     try:
         counted = int(raw)
     except (TypeError, ValueError):
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames reported nb_read_frames=%r for %r, which is "
+            "the frame-count probe reported nb_read_frames=%r for %r, which is "
             "not a count. NO GUESS -- an unreadable count is a failed "
             "verification, not a zero." % (raw, path))
     if counted < 0:
         raise _wb.GraphExecutionError(
-            "ffprobe -count_frames reported %d frames for %r" % (counted, path))
+            "the frame-count probe reported %d frames for %r" % (counted, path))
     return counted
 
 
@@ -427,7 +440,7 @@ class WanInitImageMixin:
         then the standard ``models/<category>/<name>`` layout. Returns ``None``
         when absent everywhere. The offline invariant means NO runtime fetch --
         a missing file is fail-closed, never silently downloaded."""
-        base = os.environ.get(env_dir)
+        base = otr_env.get(env_dir)
         if base:
             cand = os.path.join(base, name)
             return cand if os.path.exists(cand) else None

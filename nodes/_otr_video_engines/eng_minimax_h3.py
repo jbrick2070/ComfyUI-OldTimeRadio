@@ -98,6 +98,11 @@ from .frame_contract import (
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.minimax_h3")
 
 #: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
@@ -513,7 +518,7 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         return tuple(rows)
 
     def _token_for(self, label, default):
-        return os.environ.get("OTR_MINIMAX_H3_%s_NAME" % label) or default
+        return otr_env.get("OTR_MINIMAX_H3_%s_NAME" % label) or default
 
     def _weight_paths(self):
         """``{label: (token, resolved path or None)}`` for all three weights.
@@ -929,7 +934,7 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                                                   self.target_fps)
         # M7: PROVE the silent bt709/yuv420p contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
-        if not os.environ.get("OTR_TEST_MODE"):
+        if not otr_env.get("OTR_TEST_MODE"):
             _LOG.info(
                 "[OTR video] %s VRAM render-phase peak %s MB @ %dx%d "
                 "model_len=%d canvas_len=%d",

@@ -45,6 +45,11 @@ from .frame_contract import CONTINUITY_NONE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.ghost_signal")
 
 # --------------------------------------------------------------------------- #
@@ -141,7 +146,7 @@ def _resolve_hold_factor(class_default):
     -- but honest is not self-describing.
     """
     default = int(class_default)
-    raw = os.environ.get(GHOST_HOLD_FACTOR_ENV)
+    raw = otr_env.get(GHOST_HOLD_FACTOR_ENV)
     if raw is None or not str(raw).strip():
         return default
     try:

@@ -56,7 +56,6 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import time
 
@@ -65,6 +64,15 @@ from .directory_clip import validate_directory_clip
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import configured_models_root
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 _LOG = logging.getLogger("OTR.video.eng_mesh_stage")
 
@@ -423,7 +431,7 @@ class MeshStageEngine(_CheapFamilyBase):
     # ---- config resolution (env override -> box default) ----
     @staticmethod
     def _blender_exe():
-        return os.environ.get("OTR_BLENDER_EXE", "")
+        return otr_env.get("OTR_BLENDER_EXE", "")
 
     #: The hy3d all-in-one checkpoint basenames, most specific first. The
     #: LOADER is handed the BARE BASENAME (``ckpt_name``), which ComfyUI
@@ -467,7 +475,7 @@ class MeshStageEngine(_CheapFamilyBase):
         Returns a path that may not exist when nothing resolves (the caller,
         ``_installed``, probes existence), so the refusal can NAME a file.
         """
-        explicit = os.environ.get("OTR_HY3D_CKPT")
+        explicit = otr_env.get("OTR_HY3D_CKPT")
         if explicit:
             return explicit
         for name in self.CKPT_NAMES:
@@ -479,7 +487,7 @@ class MeshStageEngine(_CheapFamilyBase):
             if hit:
                 return hit
         candidate_dirs = [os.path.join(_COMFY_ROOT, "models", "checkpoints")]
-        hf_home = os.environ.get("HF_HOME", "")
+        hf_home = otr_env.get("HF_HOME", "")
         if hf_home:
             candidate_dirs.append(
                 os.path.join(os.path.dirname(hf_home), "checkpoints"))
@@ -495,7 +503,7 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.join(fallback_dir, self.CKPT_NAMES[0])
 
     def _ckpt_name(self):
-        return os.environ.get("OTR_HY3D_CKPT_NAME") or os.path.basename(
+        return otr_env.get("OTR_HY3D_CKPT_NAME") or os.path.basename(
             self._ckpt_path())
 
     def _installed(self):
@@ -504,8 +512,11 @@ class MeshStageEngine(_CheapFamilyBase):
         return os.path.exists(self._ckpt_path())
 
     def _cache_root(self):
-        if os.environ.get("OTR_MESH_CACHE_DIR"):
-            return os.environ["OTR_MESH_CACHE_DIR"]
+        # ONE read: the old shape asked `.get` and then subscripted the same
+        # name, which raises KeyError if the knob is unset between the two.
+        pinned = otr_env.get("OTR_MESH_CACHE_DIR")
+        if pinned:
+            return pinned
         # The mesh cache MUST live under ComfyUI's CONFIGURED output dir -- core
         # SaveGLB resolves filename_prefix through folder_paths.get_save_image_path
         # and REFUSES any path outside the active output folder. The headless
@@ -521,7 +532,7 @@ class MeshStageEngine(_CheapFamilyBase):
         except Exception:  # noqa: BLE001 -- off-box / pre-Comfy import
             out = ""
         if not out:
-            out = os.environ.get("OTR_OUTPUT_DIR") or os.path.join(
+            out = otr_env.get("OTR_OUTPUT_DIR") or os.path.join(
                 _COMFY_ROOT, "output")
         # MUST be under the configured output (SaveGLB) AND under the otr tree's
         # RESERVED system tier (the OUTPUT-TREE CONTRACT: otr/ top level is
@@ -640,8 +651,8 @@ class MeshStageEngine(_CheapFamilyBase):
         (OTR_MESH_CACHE_DIR) must stay under it (the default does)."""
         from . import wrapper_bridge as _wb
         W = _wb.Wire
-        steps = int(os.environ.get("OTR_HY3D_STEPS", "30"))
-        cfg = float(os.environ.get("OTR_HY3D_CFG", "5.0"))
+        steps = int(otr_env.get("OTR_HY3D_STEPS", "30"))
+        cfg = float(otr_env.get("OTR_HY3D_CFG", "5.0"))
         return {
             "checkpoint": {"class": "checkpoint",
                            "inputs": {"ckpt_name": self._ckpt_name()}},
@@ -787,7 +798,7 @@ class MeshStageEngine(_CheapFamilyBase):
         via OTR_MESH_STAGE_SKIP_SELFTEST=1 (the operator's call)."""
         if MeshStageEngine._selftest_passed:
             return
-        if os.environ.get("OTR_MESH_STAGE_SKIP_SELFTEST") == "1":
+        if otr_env.get("OTR_MESH_STAGE_SKIP_SELFTEST") == "1":
             _LOG.warning("[eng_mesh_stage] selftest SKIPPED by env (operator)")
             MeshStageEngine._selftest_passed = True
             return
@@ -805,9 +816,12 @@ class MeshStageEngine(_CheapFamilyBase):
         """Run headless Blender with the sanitized env + timeout; fail-closed
         NAMED on a nonzero exit (the stage script exits nonzero on any
         exception -- a partial render never publishes)."""
-        timeout = int(os.environ.get("OTR_MESH_STAGE_TIMEOUT_S", "1800"))
-        env = build_blender_env(os.environ)
-        proc = subprocess.run(cmd, env=env, capture_output=True, text=True,
+        timeout = int(otr_env.get("OTR_MESH_STAGE_TIMEOUT_S", "1800"))
+        # snapshot() is a copy, and build_blender_env copies again at :215, so
+        # this is the same value the live mapping would have given -- and the
+        # sanitizer still cannot reach back into this process.
+        env = build_blender_env(otr_env.snapshot())
+        proc = otr_proc.run(cmd, env=env, capture_output=True, text=True,
                               timeout=timeout)
         if proc.returncode != 0:
             raise RuntimeError(
@@ -876,15 +890,15 @@ class MeshStageEngine(_CheapFamilyBase):
         # mesh texture; the GLB stays geometry-only). OTR_MESH_PROJECT_PORTRAIT=1
         # restores the legacy front-projected still decal (opt-in). The bounded
         # hero arc keeps the unpainted back off-camera; knobs are env-tunable.
-        sa = os.environ.get("OTR_MESH_STAGE_START_ANGLE")
-        ad = os.environ.get("OTR_MESH_STAGE_ARC_DEGREES")
-        project = os.environ.get("OTR_MESH_PROJECT_PORTRAIT", "0") == "1"
+        sa = otr_env.get("OTR_MESH_STAGE_START_ANGLE")
+        ad = otr_env.get("OTR_MESH_STAGE_ARC_DEGREES")
+        project = otr_env.get("OTR_MESH_PROJECT_PORTRAIT", "0") == "1"
         # Mesh-improve item 2 (2026-06-30): operator escape hatch for the
         # adaptive camera framing. Unset (the default) -> the stage script
         # computes radius/elevation from the mesh's own post-normalize size.
-        rad = os.environ.get("OTR_MESH_STAGE_RADIUS")
-        elev = os.environ.get("OTR_MESH_STAGE_ELEVATION")
-        thf = os.environ.get("OTR_MESH_STAGE_TARGET_HEIGHT_FRAC")
+        rad = otr_env.get("OTR_MESH_STAGE_RADIUS")
+        elev = otr_env.get("OTR_MESH_STAGE_ELEVATION")
+        thf = otr_env.get("OTR_MESH_STAGE_TARGET_HEIGHT_FRAC")
         cmd = build_blender_cmd(
             blender, glb_path, tmp_dir, n, w, h, seed,
             surface=("portrait" if project else "gradient"),

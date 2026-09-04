@@ -26,13 +26,17 @@ receipt on the result. That was fixed first (``recipe_id`` / ``recipe_data`` /
 the first consumer of it.
 """
 
-import os
 
 from . import eng_wan_ti2v as _WT
 from . import motion_common as _MC
 from . import wan_recipe as _WR
 from . import wrapper_bridge as _wb
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 #: The recipe-receipt string threaded into the manifest. The version lives IN the
 #: string (see the incumbent's note): bumping a recipe means repointing
@@ -257,7 +261,7 @@ class FastWan8gbEngine(_WT.WanTi2vEngine):
     # ---- assets ---------------------------------------------------------- #
     def _lora_name(self):
         """The LoRA FILENAME the loader node consumes (env-overridable)."""
-        return os.environ.get("OTR_FASTWAN_8GB_LORA_NAME", FASTWAN_LORA_NAME)
+        return otr_env.get("OTR_FASTWAN_8GB_LORA_NAME", FASTWAN_LORA_NAME)
 
     def _loader_names(self):
         """The incumbent's three files plus the LoRA that IS the distillation."""

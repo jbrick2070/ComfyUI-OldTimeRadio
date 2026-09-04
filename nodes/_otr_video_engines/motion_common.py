@@ -27,11 +27,15 @@ shared GPU lease + the dep-free registry error types. torch / diffusers / the LT
 from __future__ import annotations
 
 import math
-import os
 import sys
 
 from .._otr_shared import gpu_residency as _GR
 from .registry import EngineUnusable, EngineUsabilityReason
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 #: Aspect policies an init image may be fit into the canvas with (mirrors
 #: schemas.Canvas.aspect_policy). Each uses ONE uniform scale, so the aspect ratio
@@ -66,7 +70,11 @@ def sageattention_patched(modules=None, env=None):
     contexts, e.g. CPU tests, which inject ``modules``/``env``). Pure +
     side-effect free; never imports sageattention itself.
     """
-    environ = os.environ if env is None else env
+    # snapshot() is a COPY; the single `.get` below happens immediately, so it
+    # cannot disagree with the live mapping. `environ` stays a plain local bound
+    # to a caller-supplied mapping when one is passed -- that is the contract of
+    # this function and it does not change.
+    environ = otr_env.snapshot() if env is None else env
     if environ.get("OTR_SAGEATTENTION_PATCHED", "0") == "1":
         return True
     if modules is None and env is None:
@@ -354,8 +362,8 @@ def free_vram_mb():
 def _cost_model_for(engine_name):
     """(overhead_mb, per_frame_mb) for ``engine_name`` with global env overrides."""
     overhead, per_frame = FRAME_COST_MODEL.get(engine_name, _DEFAULT_FRAME_COST)
-    raw_o = (os.environ.get("OTR_VIDEO_COST_OVERHEAD_MB") or "").strip()
-    raw_f = (os.environ.get("OTR_VIDEO_COST_PER_FRAME_MB") or "").strip()
+    raw_o = (otr_env.get("OTR_VIDEO_COST_OVERHEAD_MB") or "").strip()
+    raw_f = (otr_env.get("OTR_VIDEO_COST_PER_FRAME_MB") or "").strip()
     try:
         if raw_o:
             overhead = float(raw_o)
@@ -509,7 +517,7 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
     pixels = max(1, int(canvas_w) * int(canvas_h))
     per_frame_at_res = per_frame * (pixels / float(_FRAME_COST_REF_PIXELS))
     try:
-        margin = float(os.environ.get("OTR_VIDEO_BUDGET_MARGIN", _BUDGET_MARGIN))
+        margin = float(otr_env.get("OTR_VIDEO_BUDGET_MARGIN", _BUDGET_MARGIN))
     except (TypeError, ValueError):
         margin = _BUDGET_MARGIN
     budget_mb = float(free_vram_mb_value) * margin
@@ -758,7 +766,7 @@ class MotionEngineBase:
         empty must stay indistinguishable to callers."""
         self._active_profile = dict(profile or {})
         lease = _GR.acquire(
-            timeout_s=float(os.getenv("OTR_GPU_LEASE_TIMEOUT_S", "120")))
+            timeout_s=float(otr_env.get("OTR_GPU_LEASE_TIMEOUT_S", "120")))
         try:
             self.load()
         except BaseException:

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 from .client import GoogleAPIKeyMissingError, resolve_api_key
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 GOOGLE_API_BACKEND_KEY = "google_api_http"
 GOOGLE_API_PROVIDER = "google_api"
@@ -136,7 +140,7 @@ def clear_slot_bindings() -> None:
 
 
 def _cache_path() -> Path:
-    env = os.environ.get("OTR_GOOGLE_API_MODEL_CACHE")
+    env = otr_env.get("OTR_GOOGLE_API_MODEL_CACHE")
     if env:
         return Path(env).expanduser()
     try:

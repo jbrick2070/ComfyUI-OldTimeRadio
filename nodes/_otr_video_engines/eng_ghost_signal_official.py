@@ -38,10 +38,14 @@ conditioning (coding plan, section 4.1 item 5).
 """
 from __future__ import annotations
 
-import os
 
 from .eng_ghost_signal import GhostSignalEngine
 from .registry import register
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 #: The official v3 module. Documented as the smoother one -- less "boiling" and
 #: flicker than v2 -- which matters here because flicker on this project is a
@@ -172,7 +176,7 @@ class GhostSignalV3HauntedEngine(GhostSignalV3Engine):
         on zero: zero would render the CLEAN lane while stamping a haunted
         receipt, which is the one outcome this lane may never produce.
         """
-        raw = os.environ.get(ADAPTER_V3_STRENGTH_ENV)
+        raw = otr_env.get(ADAPTER_V3_STRENGTH_ENV)
         if raw is None or not str(raw).strip():
             return ADAPTER_V3_STRENGTH
         try:

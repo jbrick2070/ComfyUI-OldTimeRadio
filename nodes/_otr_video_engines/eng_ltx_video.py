@@ -59,6 +59,11 @@ from .frame_contract import (CONTINUITY_STRICT_FIRST_FRAME, ContractEnvConflict,
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.eng_ltx_video")
 
 _THIS = os.path.abspath(__file__)
@@ -232,7 +237,7 @@ _LTX_MAX_FRAMES_DEFAULT = 169
 def _env_int(name, default, floor):
     """``int(os.environ[name])`` with a LOUD warning + ``default`` on a missing/
     invalid value and a LOUD clamp up to ``floor``. Pure given the env."""
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None or not str(raw).strip():
         return int(default)
     try:
@@ -299,7 +304,7 @@ _TRUTHY = ("1", "true", "yes", "on")
 
 def prequalification_active():
     """True when the operator has explicitly opened this lane for measurement."""
-    return (os.environ.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
+    return (otr_env.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
         in _TRUTHY
 
 
@@ -388,7 +393,7 @@ def assert_env_matches_contract(contract):
     # small lie -- and this repo's rule is that the environment disagreeing with
     # a declaration is a REFUSAL, not a quiet re-plan. Same doctrine as the two
     # checks above; the operator gets told which variable to unset.
-    raw_canvas = (os.environ.get("OTR_LTX_RENDER_CANVAS") or "").strip()
+    raw_canvas = (otr_env.get("OTR_LTX_RENDER_CANVAS") or "").strip()
     declared_canvas = getattr(LtxVideoEngine, "render_canvas", None)
     if raw_canvas and declared_canvas:
         try:
@@ -558,7 +563,7 @@ _FLOOR_UPSCALER = int(0.05 * _GiB)
 
 
 def _ltx_hq_upscale_model_name():
-    return os.environ.get("OTR_LTX_VIDEO_UPSCALE_MODEL",
+    return otr_env.get("OTR_LTX_VIDEO_UPSCALE_MODEL",
                           "ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
 
 
@@ -815,11 +820,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     # via ComfyUI folder_paths so a box never needs a code edit. The distilled
     # LoRA keeps its own (name, path) tuple helper (_distilled_lora_file, below).
     def _unet_name(self):
-        return os.environ.get("OTR_LTX_VIDEO_UNET",
+        return otr_env.get("OTR_LTX_VIDEO_UNET",
                               "ltx-2.3-22b-dev-Q3_K_M.gguf")
 
     def _encoder_name(self):
-        return os.environ.get("OTR_LTX_VIDEO_TEXT_ENCODER",
+        return otr_env.get("OTR_LTX_VIDEO_TEXT_ENCODER",
                               "gemma_3_12B_it_fp4_mixed.safetensors")
 
     def _encoder_device(self):
@@ -835,14 +840,14 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         slowly ON the CPU for no VRAM gain, so 'default' stays the default; the
         env knob remains for boxes that want the encoder off-GPU. (M0 @512x288x97:
         Q4_K_S 15594 MB, Q3_K_M 13688 MB.)"""
-        return os.environ.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "default")
+        return otr_env.get("OTR_LTX_VIDEO_ENCODER_DEVICE", "default")
 
     def _projection_ckpt(self):
-        return os.environ.get("OTR_LTX_VIDEO_PROJECTION_CKPT",
+        return otr_env.get("OTR_LTX_VIDEO_PROJECTION_CKPT",
                               "ltx-2.3-22b-dev.safetensors")
 
     def _video_vae_name(self):
-        return os.environ.get("OTR_LTX_VIDEO_VAE",
+        return otr_env.get("OTR_LTX_VIDEO_VAE",
                               "ltx-2.3-22b-dev_video_vae.safetensors")
 
     def _weight_paths(self):
@@ -1062,7 +1067,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         # harder = less subject/head drift, the panel's PRIMARY lever for keeping
         # the subject in frame. Opt-in only; the default is unchanged.
         try:
-            cond_strength = float(os.environ.get("OTR_LTX_I2V_STRENGTH", "0.75"))
+            cond_strength = float(otr_env.get("OTR_LTX_I2V_STRENGTH", "0.75"))
         except (TypeError, ValueError):
             cond_strength = 0.75
         cond_strength = max(0.0, min(1.0, cond_strength))
@@ -1117,7 +1122,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         knobs (OTR_LTX_CFG / _SAMPLER_NAME / _DISTILLED_LORA_STRENGTH /
         _I2V_STRENGTH) apply to ksampler/manual only. Invalid falls back LOUD to
         distilled."""
-        mode = os.environ.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
+        mode = otr_env.get("OTR_LTX_SAMPLER", "distilled").strip().lower()
         if mode not in ("distilled", "ksampler"):
             _LOG.warning("[eng_ltx_video] unknown OTR_LTX_SAMPLER=%r -- "
                          "using distilled default", mode)
@@ -1131,7 +1136,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         good LTX bookends recorded (BUG-LOCAL-412 forensic); override via
         OTR_LTX_SAMPLER_NAME. The post-cleanbreak refactor had left it on plain
         ``euler``; restored 2026-06-14 per operator ("make LTX just as it was")."""
-        return os.environ.get("OTR_LTX_SAMPLER_NAME", "euler_cfg_pp").strip()
+        return otr_env.get("OTR_LTX_SAMPLER_NAME", "euler_cfg_pp").strip()
 
     def _distilled_lora_file(self):
         """``(lora_name, abs_path)`` for the distilled LoRA; ``abs_path`` is
@@ -1139,12 +1144,12 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         loras dir + the HF_HOME-derived shared-models loras dir (C:\\ComfyUI-Models
         on this box). Kept as a (name, path) tuple per the splice plan (the new
         4-artifact resolvers handle the rest)."""
-        name = os.environ.get("OTR_LTX_DISTILLED_LORA",
+        name = otr_env.get("OTR_LTX_DISTILLED_LORA",
                               _LTX_DISTILLED_LORA_DEFAULT)
         if not name:
             return "", ""
         cand_dirs = [os.path.join(_COMFY_ROOT, "models", "loras")]
-        hf_home = os.environ.get("HF_HOME", "")
+        hf_home = otr_env.get("HF_HOME", "")
         if hf_home:
             cand_dirs.append(os.path.join(os.path.dirname(hf_home), "loras"))
         for d in cand_dirs:
@@ -1177,7 +1182,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
         auto -> unet-family detection; explicit invalid value RAISES (NO
         FALLBACKS); hq_two_stage on a distilled unet RAISES (the HQ ladder
         assumes the DEV unet -- full distillation blunts the refine)."""
-        sel = os.environ.get("OTR_LTX_VIDEO_RECIPE", RECIPE_AUTO).strip().lower()
+        sel = otr_env.get("OTR_LTX_VIDEO_RECIPE", RECIPE_AUTO).strip().lower()
         base = os.path.basename(self._unet_name()).lower()
         if sel != RECIPE_AUTO:
             if sel not in _VALID_RECIPES:
@@ -1212,11 +1217,11 @@ class LtxVideoEngine(_MC.MotionEngineBase):
     def _hq_lora_file(self):
         """(lora_name, abs_path) for the HQ recipe's half-strength LoRA (the
         ORIGINAL non-1.1 384). Same search dirs as _distilled_lora_file."""
-        name = os.environ.get("OTR_LTX_HQ_LORA", _LTX_HQ_LORA_DEFAULT)
+        name = otr_env.get("OTR_LTX_HQ_LORA", _LTX_HQ_LORA_DEFAULT)
         if not name:
             return "", ""
         cand_dirs = [os.path.join(_COMFY_ROOT, "models", "loras")]
-        hf_home = os.environ.get("HF_HOME", "")
+        hf_home = otr_env.get("HF_HOME", "")
         if hf_home:
             cand_dirs.append(os.path.join(os.path.dirname(hf_home), "loras"))
         for d in cand_dirs:
@@ -1288,7 +1293,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                 "no image means no graph, never a silent t2v downgrade"
                 % self.name)
         positive = plan.get("text_prompt") or "a cinematic scene"
-        negative = plan.get("negative_prompt") or os.environ.get(
+        negative = plan.get("negative_prompt") or otr_env.get(
             "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         lora_name, _lora_path = self._hq_lora_file()
@@ -1448,18 +1453,18 @@ class LtxVideoEngine(_MC.MotionEngineBase):
             lora_strength = _LTX_DISTILLED_LORA_STRENGTH   # 0.70 (mini LoRA)
         else:
             try:
-                cfg = float(os.environ.get("OTR_LTX_CFG", str(_LTX_KSAMPLER_CFG)))
+                cfg = float(otr_env.get("OTR_LTX_CFG", str(_LTX_KSAMPLER_CFG)))
             except (TypeError, ValueError):
                 cfg = _LTX_KSAMPLER_CFG
             sampler_name = self._sampler_name()
             try:
-                lora_strength = float(os.environ.get(
+                lora_strength = float(otr_env.get(
                     "OTR_LTX_DISTILLED_LORA_STRENGTH",
                     str(_LTX_DISTILLED_LORA_STRENGTH)))
             except (TypeError, ValueError):
                 lora_strength = _LTX_DISTILLED_LORA_STRENGTH
         positive = plan.get("text_prompt") or "a cinematic scene"
-        negative = plan.get("negative_prompt") or os.environ.get(
+        negative = plan.get("negative_prompt") or otr_env.get(
             "OTR_LTX_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0))
         lora_name, _lora_path = self._distilled_lora_file()
@@ -1521,7 +1526,7 @@ class LtxVideoEngine(_MC.MotionEngineBase):
                            "latent_image": W("latent", 0)}}
             samples = W("sampleradv", 0)
         else:
-            steps = int(os.environ.get("OTR_LTX_STEPS", "30"))
+            steps = int(otr_env.get("OTR_LTX_STEPS", "30"))
             graph["ksampler"] = {
                 "class": "ksampler",
                 "inputs": {"seed": seed, "steps": steps,

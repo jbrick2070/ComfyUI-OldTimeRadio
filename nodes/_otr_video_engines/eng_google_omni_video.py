@@ -14,7 +14,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import mimetypes
-import os
 import time
 from pathlib import Path
 
@@ -30,6 +29,11 @@ from .._otr_google_api.client import (
     resolve_api_key,
 )
 from .._otr_story_brief_helpers import append_visual_safety_clause
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 DEFAULT_MODEL = "gemini-omni-flash-preview"
 SUPPORTED_MODELS = (DEFAULT_MODEL,)
@@ -56,9 +60,9 @@ def _req_get(request, key, default=None):
 
 def _selected_model() -> str:
     model = str(
-        os.environ.get("OTR_GOOGLE_OMNI_MODEL_ID")
-        or os.environ.get("OTR_GOOGLE_VIDEO_MODEL_ID")
-        or os.environ.get("OTR_GOOGLE_VIDEO_MODEL")
+        otr_env.get("OTR_GOOGLE_OMNI_MODEL_ID")
+        or otr_env.get("OTR_GOOGLE_VIDEO_MODEL_ID")
+        or otr_env.get("OTR_GOOGLE_VIDEO_MODEL")
         or DEFAULT_MODEL
     ).strip()
     if model not in SUPPORTED_MODELS:

@@ -19,10 +19,14 @@ commercial-clean flag is metadata the UI/license gate reads, not a usability gat
 from __future__ import annotations
 
 import logging
-import os
 
 from .registry import register
 from .._otr_shared.role_compat import ROLES
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.image.flux_gen1")
 
@@ -124,18 +128,18 @@ class FluxGen1ImageEngine:
 
         def _eint(name, default):
             try:
-                return int(os.environ.get(name, default))
+                return int(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return int(default)
 
         def _efloat(name, default):
             try:
-                return float(os.environ.get(name, default))
+                return float(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return float(default)
 
         return {
-            "ckpt_name": os.environ.get(
+            "ckpt_name": otr_env.get(
                 "OTR_FLUX_CKPT", "flux1-dev-fp8.safetensors"),
             "prompt": str(get("prompt") or ""),
             # Same request-negative channel as the other two negative-capable
@@ -145,7 +149,7 @@ class FluxGen1ImageEngine:
             # reading env-only would be a latent inconsistency, not a saved line.
             # `is not None`, not `or` -- see lumina_image: an explicitly-empty
             # override means "no negative", not "fall through to the request".
-            "negative": (_env_neg if (_env_neg := os.environ.get(
+            "negative": (_env_neg if (_env_neg := otr_env.get(
                 "OTR_FLUX_NEGATIVE")) is not None
                 else str(get("negative_prompt") or "")),
             "seed": int(get("seed") or 0),
@@ -156,8 +160,8 @@ class FluxGen1ImageEngine:
             # the conditioning by a FluxGuidance node -- the 6/5 pipeline applied
             # 3.5 and the rewrite dropped it, flattening the look. Env-overridable.
             "guidance": _efloat("OTR_FLUX_GUIDANCE", 3.5),
-            "sampler_name": os.environ.get("OTR_FLUX_SAMPLER", "euler"),
-            "scheduler": os.environ.get("OTR_FLUX_SCHEDULER", "simple"),
+            "sampler_name": otr_env.get("OTR_FLUX_SAMPLER", "euler"),
+            "scheduler": otr_env.get("OTR_FLUX_SCHEDULER", "simple"),
             # Request dims take precedence (still-spine ST-3 / pass-02 Gem-1:
             # w/h plumbed end-to-end so landscape SCENE stills are real);
             # the env knobs remain the no-request default.

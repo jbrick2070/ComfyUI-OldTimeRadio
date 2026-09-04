@@ -11,6 +11,10 @@ from __future__ import annotations
 import os
 import tempfile
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 def _in_tree_tmp_dir():
     """otr/episodes/_shared/tmp (created), or None if the output tree cannot be
@@ -42,7 +46,7 @@ def otr_engine_tmp_path(prefix: str, suffix: str = ".mp4") -> str:
     (roundtable MUST-FIX #2)."""
     d = _in_tree_tmp_dir()
     if d is None:
-        if os.environ.get("OTR_TEST_MODE"):
+        if otr_env.get("OTR_TEST_MODE"):
             d = None  # tempfile default dir, tests only
         else:
             raise RuntimeError(

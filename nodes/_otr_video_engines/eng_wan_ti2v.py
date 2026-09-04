@@ -70,6 +70,11 @@ from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import (
     _WAN_DEFAULT_NEGATIVE, ffprobe_clip_fields, validate_silent_clip_contract)
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.wan_ti2v")
 
 _THIS = os.path.abspath(__file__)
@@ -438,7 +443,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_path(self):
-        return os.environ.get("OTR_WAN_TI2V_CKPT") or os.path.join(
+        return otr_env.get("OTR_WAN_TI2V_CKPT") or os.path.join(
             _COMFY_ROOT, "models", "diffusion_models", _TI2V_DEFAULT_UNET)
 
     def _installed(self):
@@ -675,7 +680,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """``gguf`` (``UnetLoaderGGUF``) or ``safetensors`` (``UNETLoader``).
         Explicit via ``OTR_WAN_TI2V_LOADER``; else inferred from the unet
         extension (the 8GB-tier default is the GGUF)."""
-        mode = (os.environ.get("OTR_WAN_TI2V_LOADER") or "").strip().lower()
+        mode = (otr_env.get("OTR_WAN_TI2V_LOADER") or "").strip().lower()
         if mode in ("gguf", "safetensors"):
             return mode
         return ("gguf" if self._loader_names()["unet"].lower().endswith(".gguf")
@@ -686,7 +691,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         umt5 encoder. Explicit via ``OTR_WAN_TI2V_CLIP_LOADER``; else inferred from
         the clip extension (the floor default is the GGUF umt5 -- fp8 safetensors
         throws Float8_e4m3fn on Mac MPS, ComfyUI #9255, 2026-06-18 roundtable)."""
-        mode = (os.environ.get("OTR_WAN_TI2V_CLIP_LOADER") or "").strip().lower()
+        mode = (otr_env.get("OTR_WAN_TI2V_CLIP_LOADER") or "").strip().lower()
         if mode in ("gguf", "safetensors"):
             return mode
         return ("gguf" if self._loader_names()["clip"].lower().endswith(".gguf")
@@ -752,11 +757,11 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         """Model FILENAMES the loader nodes consume (env-overridable). The VAE
         defaults to the Wan2.2 VAE (the 5B requirement, M8)."""
         return {
-            "unet": os.environ.get("OTR_WAN_TI2V_UNET_NAME")
+            "unet": otr_env.get("OTR_WAN_TI2V_UNET_NAME")
             or os.path.basename(self._ckpt_path()),
-            "clip": os.environ.get(
+            "clip": otr_env.get(
                 "OTR_WAN_TI2V_CLIP_NAME", _TI2V_DEFAULT_CLIP),
-            "vae": os.environ.get("OTR_WAN_TI2V_VAE_NAME", "wan2.2_vae.safetensors"),
+            "vae": otr_env.get("OTR_WAN_TI2V_VAE_NAME", "wan2.2_vae.safetensors"),
         }
 
     #: Why the portable-sampler whitelist exists, appended to its refusal so the
@@ -897,7 +902,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # in the cost model (2026-07-23 wan_8gb__lumina_image__media_archive).
         # Order: explicit env pin (operator override) -> the tier's
         # profile-carried ceiling (ledger-stamped, the normal path) -> engine max.
-        _raw_env = (os.environ.get(self.max_frames_env) or "").strip()
+        _raw_env = (otr_env.get(self.max_frames_env) or "").strip()
         try:
             hard_cap = int(_raw_env) if _raw_env else 0
         except (TypeError, ValueError):
@@ -967,7 +972,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 % (self.name, target, int(contract.min_frames), int(contract.max_frames),
                    int(contract.quantum)))
         ceiling = self.profile_max_render_frames()
-        _raw_env = (os.environ.get(self.max_frames_env) or "").strip()
+        _raw_env = (otr_env.get(self.max_frames_env) or "").strip()
         try:
             env_cap = int(_raw_env) if _raw_env else 0
         except (TypeError, ValueError):
@@ -1278,7 +1283,7 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
-        if not os.environ.get("OTR_TEST_MODE"):
+        if not otr_env.get("OTR_TEST_MODE"):
             post_mb = _MC.vram_used_mb() or 0
             _LOG.info("[OTR video] wan_ti2v VRAM render-phase peak %s MB / post %s "
                       "MB", render_peak, post_mb)

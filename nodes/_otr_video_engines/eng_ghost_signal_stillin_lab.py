@@ -48,6 +48,11 @@ from .eng_ghost_signal_official import GhostSignalV3HauntedEngine
 from .registry import register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.ghost_signal_stillin_lab")
 
 #: The denoise dial for the probe grid. Read INSIDE a method through a strict
@@ -136,7 +141,7 @@ class GhostSignalV3StillInLabEngine(GhostSignalV3HauntedEngine):
     # ---- the dial ------------------------------------------------------ #
     def resolve_denoise(self) -> float:
         """The video sampler's denoise for THIS process, or a NAMED refusal."""
-        raw = os.environ.get(STILLIN_LAB_DENOISE_ENV)
+        raw = otr_env.get(STILLIN_LAB_DENOISE_ENV)
         if raw is None or not str(raw).strip():
             return float(STILLIN_LAB_DENOISE_DEFAULT)
         try:

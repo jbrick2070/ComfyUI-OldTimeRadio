@@ -51,6 +51,11 @@ import os
 from .registry import register, EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR.image.flux2_klein")
 
 #: Historical compatibility name. ``requires_flag`` is None; the registry is
@@ -184,7 +189,7 @@ def _register_loader_parent(category: str, path: str) -> str:
 
 
 def _loader_name(env_name: str, category: str, default: str) -> str:
-    selected = os.environ.get(env_name, "").strip() or default
+    selected = otr_env.get(env_name, "").strip() or default
     expanded = os.path.abspath(os.path.expanduser(selected))
     if os.path.isabs(os.path.expanduser(selected)) and os.path.isfile(expanded):
         _register_loader_parent(category, expanded)
@@ -193,7 +198,7 @@ def _loader_name(env_name: str, category: str, default: str) -> str:
 
 def _resolve_unet_path() -> str:
     """Resolve the selected GGUF through the same lazy path used by its loader."""
-    explicit = os.environ.get(MODEL_ENV, "").strip()
+    explicit = otr_env.get(MODEL_ENV, "").strip()
     if explicit:
         return _register_loader_parent(
             "unet", os.path.abspath(os.path.expanduser(explicit)))
@@ -207,7 +212,7 @@ def _resolve_unet_path() -> str:
         pass
 
     for env_name in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
-        root = os.environ.get(env_name, "").strip()
+        root = otr_env.get(env_name, "").strip()
         if root:
             candidate = os.path.abspath(os.path.join(
                 os.path.expanduser(root), "diffusion_models", _DEFAULT_CKPT))
@@ -255,13 +260,13 @@ class Flux2KleinEngine:
 
         def _eint(name, default):
             try:
-                return int(os.environ.get(name, default))
+                return int(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return int(default)
 
         def _efloat(name, default):
             try:
-                return float(os.environ.get(name, default))
+                return float(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return float(default)
 
@@ -278,7 +283,7 @@ class Flux2KleinEngine:
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_FLUX2_KLEIN_STEPS", 20),
             "guidance": _efloat("OTR_FLUX2_KLEIN_GUIDANCE", 4.0),
-            "sampler_name": os.environ.get("OTR_FLUX2_KLEIN_SAMPLER", "euler"),
+            "sampler_name": otr_env.get("OTR_FLUX2_KLEIN_SAMPLER", "euler"),
             # Request dims take precedence (still-spine: w/h plumbed end-to-end so
             # landscape SCENE stills are real); env knobs are the no-request default.
             "width": _snap16(get("width") or get("w") or _eint("OTR_FLUX2_KLEIN_WIDTH", 1024)),

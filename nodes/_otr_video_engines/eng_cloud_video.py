@@ -46,6 +46,11 @@ from .._otr_story_brief_helpers import (
     visual_safety_negative,
 )
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.eng_cloud_video")
 
 #: The canvas rate word_razzle's discrete menu is expressed at -- the same 25
@@ -360,20 +365,20 @@ def _condition_vidu_q2_prompt(prompt: str) -> "tuple[str, dict]":
 
 def _est_usd() -> float:
     try:
-        return float(os.environ.get("OTR_CLOUD_VIDEO_EST_USD", "0.50"))
+        return float(otr_env.get("OTR_CLOUD_VIDEO_EST_USD", "0.50"))
     except ValueError:
         return 0.50
 
 
 def _timeout_s() -> float:
     try:
-        return float(os.environ.get("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"))
+        return float(otr_env.get("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"))
     except ValueError:
         return 900.0
 
 
 def _bool_env(name: str, default: bool) -> bool:
-    raw = os.environ.get(name, "").strip().lower()
+    raw = otr_env.get(name, "").strip().lower()
     if not raw:
         return default
     if raw in {"1", "true", "yes", "on"}:
@@ -616,7 +621,7 @@ class _CloudVideoBase:
 
     def _duration_seconds(self, request, *, env: str, default: int,
                           min_s: int, max_s: int) -> int:
-        raw = os.environ.get(env, "").strip()
+        raw = otr_env.get(env, "").strip()
         if raw:
             try:
                 secs = int(raw)
@@ -641,7 +646,7 @@ class _CloudVideoBase:
 
     def _choice(self, env: str, default: str, allowed: tuple[str, ...],
                 *, transform=None) -> str:
-        value = os.environ.get(env, "").strip() or default
+        value = otr_env.get(env, "").strip() or default
         if transform is not None:
             value = transform(value)
         if value not in allowed:
@@ -734,7 +739,7 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
     still_plan = _CLOUD_KLING_AVATAR_PLAN
 
     def _mode(self) -> str:
-        raw = os.environ.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
+        raw = otr_env.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
         folded = raw.lower()
         mode = _KLING_MODE_ALIASES.get(folded, folded)
         if mode not in _KLING_MODES:
@@ -888,7 +893,7 @@ class CloudWanI2VEngine(_CloudVideoBase):
             "model": {
                 "model": model,
                 "prompt": prompt,
-                "negative_prompt": visual_safety_negative(os.environ.get(
+                "negative_prompt": visual_safety_negative(otr_env.get(
                     "OTR_CLOUD_WAN_NEGATIVE_PROMPT", "").strip()
                     or _WAN_NEGATIVE_DEFAULT),
                 "resolution": self._choice(
@@ -1032,7 +1037,7 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         (env-overridable) LEADS; the beat's own text_prompt (scene/subject) is
         appended so the animation matches the beat, never overriding the
         readability directive."""
-        motion = os.environ.get(_RAZZLE_MOTION_ENV, "").strip() or _RAZZLE_MOTION_DEFAULT
+        motion = otr_env.get(_RAZZLE_MOTION_ENV, "").strip() or _RAZZLE_MOTION_DEFAULT
         beat = str(_req_get(request, "text_prompt") or "").strip()
         prompt = f"{motion}. {beat}".strip().rstrip(".") if beat else motion
         return append_visual_safety_clause(prompt)
@@ -1041,7 +1046,7 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         """The provider duration (seconds). Derived from the beat's frame
         target (timing.target_frame_count / fps) and clamped to Pixverse's
         supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides."""
-        env = os.environ.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
+        env = otr_env.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
         if env:
             # THE ENV MAY NOT LEAVE THE MENU (chunk 7b, 2026-07-26). This
             # branch used to `return int(env)` outright, skipping the 5/8 bucket
@@ -1085,10 +1090,10 @@ class CloudWordRazzleEngine(_CloudVideoBase):
             "image": self._init_image_input(request),
             "prompt": self._razzle_prompt(request),
             "negative_prompt": visual_safety_negative(
-                os.environ.get(_RAZZLE_NEG_ENV, "").strip()
+                otr_env.get(_RAZZLE_NEG_ENV, "").strip()
                 or _RAZZLE_NEG_DEFAULT),
-            "motion_mode": os.environ.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
-            "quality": os.environ.get("OTR_CLOUD_PIXVERSE_QUALITY", "1080p"),
+            "motion_mode": otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
+            "quality": otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "1080p"),
             "duration_seconds": self._duration_seconds(request),
             "seed": self._seed(request),
         }

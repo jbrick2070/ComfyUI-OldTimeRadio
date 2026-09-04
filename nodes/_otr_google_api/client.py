@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 import urllib.error
 import urllib.request
 from typing import Any
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
 DEFAULT_TIMEOUT_S = 120
@@ -36,7 +40,7 @@ class GoogleAPIBillingOrQuotaError(GoogleAPIError):
 
 
 def _env(name: str) -> str | None:
-    value = os.environ.get(name)
+    value = otr_env.get(name)
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
@@ -257,7 +261,7 @@ def get_json(
 ) -> dict[str, Any]:
     """GET a Google API JSON resource using the shared BYO-key auth."""
     key = _api_key or resolve_api_key()
-    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     getter = _get or _get_bytes
     body = getter(
         path_or_url,
@@ -285,7 +289,7 @@ def post_json(
     if not isinstance(payload, dict):
         raise GoogleAPIRequestShapeError("Google payload must be a dict.")
     key = _api_key or resolve_api_key()
-    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     post = _post or _post_json
     parsed = post(path, payload, api_key=key, timeout_s=timeout)
     if not isinstance(parsed, dict):
@@ -304,7 +308,7 @@ def download_media(
 ) -> bytes:
     """Download a Google API media resource using the shared BYO-key auth."""
     key = _api_key or resolve_api_key()
-    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     getter = _get or _get_bytes
     data = getter(
         path_or_url,
@@ -334,9 +338,9 @@ def create_interaction(
         raise GoogleAPIRequestShapeError("Google payload missing required 'input'.")
 
     key = _api_key or resolve_api_key()
-    timeout = int(timeout_s or os.environ.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
+    timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     retries = int(max_retries if max_retries is not None else (
-        os.environ.get("OTR_GOOGLE_MAX_RETRIES") or DEFAULT_MAX_RETRIES
+        otr_env.get("OTR_GOOGLE_MAX_RETRIES") or DEFAULT_MAX_RETRIES
     ))
     post = _post or _post_json
     last_exc: Exception | None = None

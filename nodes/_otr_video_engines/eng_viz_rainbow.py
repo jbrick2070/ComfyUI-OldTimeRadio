@@ -28,6 +28,11 @@ from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .frame_contract import CONTINUITY_NONE, FrameContract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.viz_mxc")
 
 
@@ -220,7 +225,7 @@ class VizMxcCpuEngine:
         else:
             sr = 24000
             audio_np = np.zeros(int(sr * total / max(1, fps)) + sr, dtype=np.float32)
-            if not os.environ.get("OTR_TEST_MODE"):
+            if not otr_env.get("OTR_TEST_MODE"):
                 _LOG.info("[OTR video] viz_mxc_cpu: beat has no audio_ref -> idle "
                           "rainbow from silence (%d frames)", total)
 
@@ -250,7 +255,7 @@ class VizMxcCpuEngine:
         # authority, and it was the pre-computed loop bound, self-declared.
         validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
         proven = proven_frame_count(out_path, total)
-        if not os.environ.get("OTR_TEST_MODE"):
+        if not otr_env.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] viz_mxc_cpu %dx%d x%d frames (audio=%s) -> %s",
                       w, h, proven, audio_used, out_path)
         return {"out_path": out_path, "frame_count": proven,

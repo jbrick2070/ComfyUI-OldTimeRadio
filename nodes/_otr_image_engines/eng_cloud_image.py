@@ -33,11 +33,15 @@ lifecycle.
 from __future__ import annotations
 
 import logging
-import os
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .._otr_story_brief_helpers import append_visual_safety_clause
 from .._otr_shared.role_compat import ROLES
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 _LOG = logging.getLogger("OTR.image.eng_cloud_image")
 
@@ -123,14 +127,14 @@ _IDEOGRAM_RESOLUTION_BY_PIXELS = {
 
 def _efloat(name: str, default: float) -> float:
     try:
-        return float(os.environ.get(name, default))
+        return float(otr_env.get(name, default))
     except (TypeError, ValueError):
         return float(default)
 
 
 def _eint(name: str, default: int) -> int:
     try:
-        return int(os.environ.get(name, default))
+        return int(otr_env.get(name, default))
     except (TypeError, ValueError):
         return int(default)
 
@@ -154,7 +158,7 @@ def _ideogram_speed() -> str:
 
 
 def _ideogram_est_usd() -> float:
-    env = os.environ.get("OTR_CLOUD_IDEOGRAM_EST_USD")
+    env = otr_env.get("OTR_CLOUD_IDEOGRAM_EST_USD")
     if env:
         try:
             return float(env)
@@ -199,7 +203,7 @@ def _choice(value: str, allowed: tuple, *, name: str, normalize=None,
 
 def _choice_env(env_name: str, default: str, allowed: tuple, *,
                 normalize=None, aliases: dict | None = None) -> str:
-    return _choice(os.environ.get(env_name, "") or default, allowed,
+    return _choice(otr_env.get(env_name, "") or default, allowed,
                    name=env_name, normalize=normalize, aliases=aliases)
 
 
@@ -454,7 +458,7 @@ class CloudSeedream2ImageEngine(_CloudImageBase):
     def _size_preset(self, model_name: str, request) -> str:
         presets = _SEEDREAM_PRESETS[model_name]
         allowed = tuple(presets.values())
-        env = os.environ.get("OTR_CLOUD_SEEDREAM_SIZE_PRESET", "").strip()
+        env = otr_env.get("OTR_CLOUD_SEEDREAM_SIZE_PRESET", "").strip()
         if env:
             return _choice(env, allowed, name="OTR_CLOUD_SEEDREAM_SIZE_PRESET")
         w, h = self._canvas_wh(request)
@@ -500,7 +504,7 @@ class CloudKrea2TurboImageEngine(_CloudImageBase):
         }
 
     def _aspect_ratio(self, request) -> str:
-        env = os.environ.get("OTR_CLOUD_KREA_ASPECT", "").strip()
+        env = otr_env.get("OTR_CLOUD_KREA_ASPECT", "").strip()
         if env:
             return _choice(env, _KREA_ASPECTS, name="OTR_CLOUD_KREA_ASPECT")
         w, h = self._canvas_wh(request)
@@ -534,7 +538,7 @@ class CloudLumaPhotonFlashImageEngine(_CloudImageBase):
         }
 
     def _aspect_ratio(self, request) -> str:
-        env = os.environ.get("OTR_CLOUD_LUMA_PHOTON_ASPECT", "").strip()
+        env = otr_env.get("OTR_CLOUD_LUMA_PHOTON_ASPECT", "").strip()
         if env:
             return _choice(env, _LUMA_PHOTON_ASPECTS,
                            name="OTR_CLOUD_LUMA_PHOTON_ASPECT")
@@ -547,7 +551,7 @@ class CloudLumaPhotonFlashImageEngine(_CloudImageBase):
 
     def _style_image_weight(self) -> float:
         env_name = "OTR_CLOUD_LUMA_STYLE_IMAGE_WEIGHT"
-        raw = os.environ.get(env_name, "").strip()
+        raw = otr_env.get(env_name, "").strip()
         if not raw:
             return 1.0
         try:
@@ -589,7 +593,7 @@ class CloudIdeoImageEngine(_CloudImageBase):
         }
 
     def _resolution(self, request) -> str:
-        env = os.environ.get("OTR_CLOUD_IDEOGRAM_RESOLUTION", "").strip()
+        env = otr_env.get("OTR_CLOUD_IDEOGRAM_RESOLUTION", "").strip()
         aliases = dict(_IDEOGRAM_RESOLUTION_BY_PIXELS)
         if env:
             return _choice(env, _IDEOGRAM_RESOLUTIONS,

@@ -29,7 +29,6 @@ import math
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import time
 
@@ -52,6 +51,15 @@ from . import ghost_signal_prompt as _gsp
 from . import ghost_signal_author as _gsa
 from . import motion_common as _mc
 from . import registry as _vreg
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 _LOG = logging.getLogger("OTR.video.render_driver")
 
@@ -712,7 +720,7 @@ def _slice_master_audio(master_path, start_s, dur_s, master_hash="",
         cmd += ["-af", "apad", "-t", "%.6f" % (float(dur_s) + pad)]
     cmd.append(out)
     try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=30)
+        otr_proc.run(cmd, check=True, capture_output=True, timeout=30)
     except Exception as exc:             # noqa: BLE001 - LOUD, never crash
         _LOG.warning("[OTR.render_driver] _slice_master_audio FAILED "
                      "(%s@%.3f+%.3fs): %s",
@@ -1792,7 +1800,7 @@ def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
         # AND moves ~9x more (paired with the ksampler default). So the dynamic
         # open is RESTORED as the default (operator "moving grooving"). music_inter
         # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
-        _open_key = os.environ.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
+        _open_key = otr_env.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
         # A2: membership check against the STATIC key set (the values moved
         # to the style pack; the retired fixture dict is not consulted).
         return (_open_key if _open_key in _MOTION_REGISTER_KEYS
@@ -2011,7 +2019,7 @@ def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
         return False
     if (str(family) == "audio_driven_face"
             and _is_never_humo_video_role(str(role or ""))):
-        return (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+        return (otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
                 or _is_cloud_video_engine(engine_id))
     return (str(family) == "audio_conditioned_video"
             or str(engine_id) in ("viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
@@ -2248,7 +2256,7 @@ def _enforce_radio_is_host(shot):
     radio-host FACE (fed the brief-driven radio_host_portrait still downstream),
     so this redirect is a NO-OP. Default OFF = today's behavior byte-for-byte
     (HuMo on bookends still redirects to the ltx_audio_in animated console)."""
-    if os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
+    if otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
         return
     role = _role_of_shot(shot)
     if not _is_never_humo_video_role(role):
@@ -2658,7 +2666,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # if the toggle is ON but the face still is absent -- NEVER a black-screen
     # fallback. (Toggle OFF: _enforce_radio_is_host already redirected these off
     # HuMo, so this block never triggers -> byte-identical.)
-    if (os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+    if (otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
             and not init_image
             and _family == "audio_driven_face"
             and _is_never_humo_video_role(_role_of_shot(shot))):
@@ -2946,7 +2954,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         if _face_wide:
             _face_excl.discard("audio_driven_face")
     if _canvas_fam not in _face_excl:
-        _lc = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
+        _lc = otr_env.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
         try:
             _lw, _lh = (int(x) for x in _lc.lower().split("x", 1))
         except (ValueError, AttributeError):
@@ -2962,7 +2970,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # still/floor families (still_pan etc.) KEEP the full landscape canvas above.
     # Env OTR_LTX_RENDER_CANVAS (default 832x480, the 6/5 value; /32-friendly).
     if str(shot.get("engine_id") or "") == "ltx_video":
-        _lxc = os.environ.get("OTR_LTX_RENDER_CANVAS", "832x480")
+        _lxc = otr_env.get("OTR_LTX_RENDER_CANVAS", "832x480")
         try:
             _lxw, _lxh = (int(x) for x in _lxc.lower().split("x", 1))
         except (ValueError, AttributeError):
@@ -3672,7 +3680,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                                   ("announcer_visual", "music_visual")))
         _is_open = (_is_synthetic_open
                     or _shot_role in ("announcer_visual", "music_visual"))
-        _override = (os.environ.get("OTR_LTX_RADIO_PROMPT", "").strip()
+        _override = (otr_env.get("OTR_LTX_RADIO_PROMPT", "").strip()
                      if _is_open else "")
         if _override:
             _LOG.warning("[OTR.render_driver] LTX SCENE: %s beat %s prompt "
@@ -5839,7 +5847,7 @@ def apply_engine_override(ledger):
     swallowed parse error means stills were minted for engines that are not
     the ones that render. A malformed ``OTR_FORCE_ENGINE_MAP`` is operator
     misconfiguration and it is now terminal, before any GPU time is spent."""
-    spec = os.environ.get("OTR_FORCE_ENGINE_MAP", "").strip()
+    spec = otr_env.get("OTR_FORCE_ENGINE_MAP", "").strip()
     if not spec:
         return ledger
     try:
@@ -5927,7 +5935,7 @@ def check_ltx_open_health(manifest, *, strict=None):
     surfaces the degrade, it does not remove the fallback. Returns the list of
     offending open rows (empty == healthy)."""
     if strict is None:
-        strict = os.environ.get("OTR_LTX_OPEN_STRICT", "0") == "1"
+        strict = otr_env.get("OTR_LTX_OPEN_STRICT", "0") == "1"
     bad = []
     for row in (manifest or {}).get("clips") or []:
         role = str(row.get("role") or "")
@@ -5990,7 +5998,7 @@ def resolve_episode_id_for_clip_persistence(episode_id, freeze_timestamp=""):
     eid = str(episode_id or "").strip()
     if not eid or not eid.startswith("pending_"):
         return eid
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         return eid
     try:
         from pathlib import Path
@@ -6857,7 +6865,7 @@ def render_single(engine_name="humo", *, assets=None, frame_count=33,
             if _declared is not None:
                 canvas = tuple(_declared)
             elif getattr(_eng, "render_aspect", "portrait") == "wide":
-                _rc = os.environ.get("OTR_VIDEO_RENDER_CANVAS", "832x480")
+                _rc = otr_env.get("OTR_VIDEO_RENDER_CANVAS", "832x480")
                 try:
                     _rw, _rh = (int(x) for x in _rc.lower().split("x", 1))
                 except (ValueError, AttributeError):

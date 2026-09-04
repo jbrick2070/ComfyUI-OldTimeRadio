@@ -54,6 +54,11 @@ from . import motion_common as _MC
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.eng_ltx_av")
 
 #: PROMPT-STYLE OVERLAY -- STORED, NOT WIRED (item C, 2026-08-17). Schema, caps
@@ -173,7 +178,7 @@ def _env_num(name, default, cast):
     ``tests/test_engine_contract_roster.py:184`` reads
     ``_LTX_AV_MAX_FRAMES`` as one.
     """
-    raw = os.environ.get(name)
+    raw = otr_env.get(name)
     if raw is None or not str(raw).strip():
         return cast(default)
     try:
@@ -220,7 +225,7 @@ def _decode_temporal_knobs():
     raise; ``overlap >= size`` -> raise. A NAMED ValueError fires BEFORE the graph
     is built so a bad box config fails loud instead of silently degrading."""
     def _read_int(name, default):
-        raw = os.environ.get(name)
+        raw = otr_env.get(name)
         if raw is None or str(raw).strip() == "":
             return int(default)
         try:
@@ -290,7 +295,7 @@ def assert_env_matches_contract(contract, declared_canvas=None):
     # CONTRACT-BEARING variable that disagrees -- or cannot be parsed at all --
     # is a refusal, because the planner already partitioned the beat against
     # the declaration and the operator deserves to be told their knob is inert.
-    raw_max = (os.environ.get("OTR_LTX_AV_MAX_FRAMES") or "").strip()
+    raw_max = (otr_env.get("OTR_LTX_AV_MAX_FRAMES") or "").strip()
     if raw_max:
         try:
             want_max = int(raw_max)
@@ -310,7 +315,7 @@ def assert_env_matches_contract(contract, declared_canvas=None):
                 "render segments the plan did not ask for. NO FALLBACK -- "
                 "unset the variable or move the declaration."
                 % (want_max, declared_max))
-    raw_canvas = (os.environ.get("OTR_LTX_AV_RENDER_CANVAS") or "").strip()
+    raw_canvas = (otr_env.get("OTR_LTX_AV_RENDER_CANVAS") or "").strip()
     if raw_canvas and declared_canvas:
         try:
             want = tuple(int(x) for x in raw_canvas.lower().split("x", 1))
@@ -494,7 +499,7 @@ _FLOOR_UPSCALER = int(0.05 * _GiB)
 
 
 def _ia2v_upscale_model_name():
-    return os.environ.get("OTR_LTX_AV_UPSCALE_MODEL",
+    return otr_env.get("OTR_LTX_AV_UPSCALE_MODEL",
                           "ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
 
 
@@ -594,7 +599,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
 
     # ---- config resolution (env override -> folder_paths -> join) ----
     def _unet_name(self):
-        return os.environ.get("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+        return otr_env.get("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
 
     def _quant_label(self):
         """The GGUF quant / precision token from the unet basename (e.g.
@@ -606,19 +611,19 @@ class _LtxAvBase(_MC.MotionEngineBase):
         return m.group(1) if m else ""
 
     def _encoder_name(self):
-        return os.environ.get("OTR_LTX_AV_TEXT_ENCODER",
+        return otr_env.get("OTR_LTX_AV_TEXT_ENCODER",
                               "gemma_3_12B_it_fp4_mixed.safetensors")
 
     def _projection_ckpt(self):
-        return os.environ.get("OTR_LTX_AV_PROJECTION_CKPT",
+        return otr_env.get("OTR_LTX_AV_PROJECTION_CKPT",
                               "ltx-2.3-22b-dev.safetensors")
 
     def _video_vae_name(self):
-        return os.environ.get("OTR_LTX_AV_VIDEO_VAE",
+        return otr_env.get("OTR_LTX_AV_VIDEO_VAE",
                               "ltx-2.3-22b-dev_video_vae.safetensors")
 
     def _audio_vae_name(self):
-        return os.environ.get("OTR_LTX_AV_AUDIO_VAE",
+        return otr_env.get("OTR_LTX_AV_AUDIO_VAE",
                               "ltx-2.3-22b-dev_audio_vae.safetensors")
 
     def _distilled_lora_name(self, rcfg=None):
@@ -628,7 +633,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
         handled by _resolve('loras', ...) like the other artifacts."""
         if rcfg is None:
             rcfg = _recipe_config(self._recipe())
-        return os.environ.get(
+        return otr_env.get(
             "OTR_LTX_AV_DISTILLED_LORA",
             rcfg.get("lora_name", _LTX_AV_DISTILLED_LORA_DEFAULT))
 
@@ -649,12 +654,12 @@ class _LtxAvBase(_MC.MotionEngineBase):
         daily<->hero per beat by swapping OTR_LTX_AV_UNET / OTR_LTX_AV_RECIPE).
         NO FALLBACKS: a retired flag, a bad override, or an unrecognized unet
         RAISE -- never guess, never warn-and-continue, never double-distill."""
-        if os.environ.get("OTR_LTX_AV_SHARP") is not None:
+        if otr_env.get("OTR_LTX_AV_SHARP") is not None:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
                 "OTR_LTX_AV_SHARP is retired -- use OTR_LTX_AV_RECIPE="
                 + _RECIPE_MENU, kind="video")
-        sel = os.environ.get("OTR_LTX_AV_RECIPE", RECIPE_AUTO).strip().lower()
+        sel = otr_env.get("OTR_LTX_AV_RECIPE", RECIPE_AUTO).strip().lower()
         base = os.path.basename(
             str(self._unet_name() or "").replace("\\", "/")).lower()
         if sel != RECIPE_AUTO:
@@ -891,7 +896,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "one continuous medium-close shot of a vintage radio broadcast, "
             "the speaker centred and frontal with mouth clearly visible, the "
             "camera pushing in very slowly")
-        negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        negative = otr_env.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]
         sampler_name = rcfg["sampler"]
@@ -902,7 +907,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "te": {"class": "te", "inputs": {
                 "text_encoder": self._encoder_name(),
                 "ckpt_name": self._projection_ckpt(),
-                "device": os.environ.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
+                "device": otr_env.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
             "pos": {"class": "pos", "inputs": {"text": positive, "clip": W("te", 0)}},
             "neg": {"class": "neg", "inputs": {"text": negative, "clip": W("te", 0)}},
             "cond": {"class": "cond", "inputs": {
@@ -1048,7 +1053,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "one continuous medium-close shot of a vintage radio broadcast, "
             "the speaker centred and frontal with mouth clearly visible, the "
             "camera pushing in very slowly")
-        negative = os.environ.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
+        negative = otr_env.get("OTR_LTX_AV_NEGATIVE", _LTX_DEFAULT_NEGATIVE)
         seed = int(plan.get("seed", 0) or 0)
         cfg = rcfg["cfg"]
         # Exact canonical halving. STAGE A IS A REAL LATENT AND LTX'S /32 GRID
@@ -1071,7 +1076,7 @@ class _LtxAvBase(_MC.MotionEngineBase):
             "te": {"class": "te", "inputs": {
                 "text_encoder": self._encoder_name(),
                 "ckpt_name": self._projection_ckpt(),
-                "device": os.environ.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
+                "device": otr_env.get("OTR_LTX_AV_ENCODER_DEVICE", "cpu")}},
             "pos": {"class": "pos", "inputs": {"text": positive, "clip": W("te", 0)}},
             "neg": {"class": "neg", "inputs": {"text": negative, "clip": W("te", 0)}},
             "cond": {"class": "cond", "inputs": {
@@ -1649,7 +1654,7 @@ class LtxAudioInEngine(_LtxAvBase):
     render_canvas = _LTX_AV_RENDER_CANVAS
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). 8n+1: 9 .. 497 (8*61+1).
     #: The LITERAL 497, not ``_LTX_AV_MAX_FRAMES`` -- that constant is
-    #: ``int(os.environ.get("OTR_LTX_AV_MAX_FRAMES", "497"))``, resolved at
+    #: ``int(otr_env.get("OTR_LTX_AV_MAX_FRAMES", "497"))``, resolved at
     #: IMPORT, so binding the contract to it would let the environment rewrite
     #: a declaration the image phase already planned against. Env disagreement
     #: is a REFUSAL in 7b, never a silent re-plan.

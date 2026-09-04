@@ -58,6 +58,11 @@ import os
 from .registry import register, EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR.image.z_image_turbo")
 
 #: VESTIGIAL (no runtime reader; the registry is the menu). Kept only for
@@ -197,7 +202,7 @@ def _resolve_negative(request_negative):
     and de-duplicated by the dispatcher. Empty falls back to hygiene, never to
     nothing.
     """
-    override = os.environ.get("OTR_ZIMAGE_NEGATIVE")
+    override = otr_env.get("OTR_ZIMAGE_NEGATIVE")
     if override is not None:
         return override
     return str(request_negative or "").strip() or _HYGIENE_NEGATIVE
@@ -241,7 +246,7 @@ def _resolve_unet_name():
       3. else ``_DEFAULT_UNET`` (UNVERIFIED -> assert_usable greys the engine, and
          the loader still raises a CLEAR error if it is ever reached).
     Returns ``(basename, verified: bool)``."""
-    env = os.environ.get(MODEL_ENV, "").strip()
+    env = otr_env.get(MODEL_ENV, "").strip()
     installed = _installed_unets()
     if env:
         base = os.path.basename(env)
@@ -320,13 +325,13 @@ class ZImageTurboEngine:
 
         def _eint(name, default):
             try:
-                return int(os.environ.get(name, default))
+                return int(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return int(default)
 
         def _efloat(name, default):
             try:
-                return float(os.environ.get(name, default))
+                return float(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return float(default)
 
@@ -335,19 +340,19 @@ class ZImageTurboEngine:
                  "installed=%s)", _unet_name, _unet_ok, _installed_unets())
         return {
             "unet_name": _unet_name,
-            "clip_name": os.path.basename(os.environ.get(CLIP_ENV, "") or _DEFAULT_CLIP),
-            "vae_name": os.path.basename(os.environ.get(VAE_ENV, "") or _DEFAULT_VAE),
-            "clip_type": os.environ.get("OTR_ZIMAGE_CLIP_TYPE", _DEFAULT_CLIP_TYPE),
-            "latent_node": os.environ.get("OTR_ZIMAGE_LATENT_NODE", _DEFAULT_LATENT_NODE),
-            "unet_dtype": os.environ.get("OTR_ZIMAGE_UNET_DTYPE", "default"),
+            "clip_name": os.path.basename(otr_env.get(CLIP_ENV, "") or _DEFAULT_CLIP),
+            "vae_name": os.path.basename(otr_env.get(VAE_ENV, "") or _DEFAULT_VAE),
+            "clip_type": otr_env.get("OTR_ZIMAGE_CLIP_TYPE", _DEFAULT_CLIP_TYPE),
+            "latent_node": otr_env.get("OTR_ZIMAGE_LATENT_NODE", _DEFAULT_LATENT_NODE),
+            "unet_dtype": otr_env.get("OTR_ZIMAGE_UNET_DTYPE", "default"),
             "prompt": str(get("prompt") or ""),
             "negative": _resolve_negative(get("negative_prompt")),
             "seed": int(get("seed") or 0),
             "steps": _eint("OTR_ZIMAGE_STEPS", 8),       # distilled design point
             "cfg": _efloat("OTR_ZIMAGE_CFG", 1.0),       # operator A/B 2026-09-01; negative inert
             "shift": _efloat("OTR_ZIMAGE_SHIFT", 3.0),   # ModelSamplingAuraFlow
-            "sampler_name": os.environ.get("OTR_ZIMAGE_SAMPLER", "euler"),
-            "scheduler": os.environ.get("OTR_ZIMAGE_SCHEDULER", "normal"),
+            "sampler_name": otr_env.get("OTR_ZIMAGE_SAMPLER", "euler"),
+            "scheduler": otr_env.get("OTR_ZIMAGE_SCHEDULER", "normal"),
             # Request dims win (aspect-aware still spine); env knobs are the
             # no-request default. Honor dims EXACTLY -- no snapping/upscale here.
             "width": int(get("width") or get("w") or _eint("OTR_ZIMAGE_WIDTH", 1024)),

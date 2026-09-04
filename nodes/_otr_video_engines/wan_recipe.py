@@ -32,10 +32,14 @@ exceptions only.
 """
 from __future__ import annotations
 
-import os
 
 from . import recipe_departures as _RD
 from .registry import EngineUnusable, EngineUsabilityReason
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 #: The explicit YES spellings for a consent act or a yes/no knob.
 _TRUTHY = ("1", "true", "yes", "on")
@@ -86,7 +90,7 @@ def prequalification_active(env_name):
     ``+prequalification`` receipt on a clip that had rendered with the frozen
     recipe -- a receipt that lies in the safer direction is still a receipt
     that lies."""
-    return (os.environ.get(env_name, "") or "").strip().lower() in _TRUTHY
+    return (otr_env.get(env_name, "") or "").strip().lower() in _TRUTHY
 
 
 def ignored_override_keys(recipe_env_keys):
@@ -100,7 +104,7 @@ def ignored_override_keys(recipe_env_keys):
     these values cannot bind, so they cannot be wrong; they can only be
     ignored, and the operator is told."""
     return sorted(env for env in recipe_env_keys.values()
-                  if os.environ.get(env) not in (None, ""))
+                  if otr_env.get(env) not in (None, ""))
 
 
 def recipe_receipt(frozen_receipt, prequalification_env, departed=None):
@@ -131,7 +135,7 @@ def config_number(engine, env, dflt, lo, hi, cast):
     only under the consent act; outside it the frozen value is returned without
     this function being reached, which is what keeps a stale malformed value
     from killing a leg it cannot influence."""
-    raw = os.environ.get(env)
+    raw = otr_env.get(env)
     if raw is None or raw == "":
         return cast(dflt)
     try:
@@ -159,7 +163,7 @@ def config_flag(engine, env, frozen):
     it is varying would otherwise decode the other way and stamp a receipt
     saying it had measured the one it named."""
     dflt = "1" if frozen else "0"
-    raw = (os.environ.get(env) or dflt).strip().lower()
+    raw = (otr_env.get(env) or dflt).strip().lower()
     if raw in _TRUTHY:
         return True
     if raw in _FALSY:
@@ -167,7 +171,7 @@ def config_flag(engine, env, frozen):
     raise EngineUnusable(
         engine.name, engine.family, EngineUsabilityReason.MALFORMED_CONFIG,
         "%s=%r is not a yes/no value (yes: %s; no: %s)"
-        % (env, os.environ.get(env), ", ".join(_TRUTHY), ", ".join(_FALSY)),
+        % (env, otr_env.get(env), ", ".join(_TRUTHY), ", ".join(_FALSY)),
         kind="video")
 
 
@@ -182,7 +186,7 @@ def config_text(engine, env, frozen, allowed=None, strip=True, hint=""):
     ``strip=False`` is for free prose such as the negative prompt, where the
     exact text is the render input and trimming it would silently change what
     was measured."""
-    val = os.environ.get(env) or frozen
+    val = otr_env.get(env) or frozen
     if strip:
         val = val.strip()
     if allowed is not None and val not in allowed:

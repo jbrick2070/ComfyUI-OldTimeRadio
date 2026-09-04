@@ -43,9 +43,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import re
 from typing import Callable, Optional
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 _LOG = logging.getLogger("OTR.video.ghost_signal_author")
 
@@ -1193,7 +1197,7 @@ _TOKENIZER_CACHE = {}
 
 
 def _test_mode() -> bool:
-    return os.environ.get("OTR_TEST_MODE") == "1"
+    return otr_env.get("OTR_TEST_MODE") == "1"
 
 
 def _installed_sd1_tokenizer():
@@ -1788,8 +1792,7 @@ GHOST_STYLE_PLACEMENTS = ("both", "front", "end")
 
 def _style_placement() -> str:
     """`both` unless the operator is running the placement A/B/C."""
-    import os
-    raw = str(os.environ.get(GHOST_STYLE_PLACEMENT_ENV, "") or "").strip().lower()
+    raw = str(otr_env.get(GHOST_STYLE_PLACEMENT_ENV, "") or "").strip().lower()
     return raw if raw in GHOST_STYLE_PLACEMENTS else "both"
 
 

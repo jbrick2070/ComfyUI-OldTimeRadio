@@ -92,6 +92,11 @@ from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 _LOG = logging.getLogger("OTR.video.ltx_8gb")
 
 # PROMPT-STYLE OVERLAY: this engine has NO pair of its own, ON PURPOSE. The
@@ -343,7 +348,7 @@ def _prequalification_active():
     Deliberately NOT inferred from the absence of a ledger or from any other
     ambient condition: a signal you can arrive at by accident is one a
     production leg can arrive at by accident."""
-    return (os.environ.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
+    return (otr_env.get(PREQUALIFICATION_ENV, "") or "").strip().lower() \
         in _TRUTHY
 
 
@@ -358,7 +363,7 @@ def _ignored_override_keys():
     these values cannot bind, so they cannot be wrong; they can only be
     ignored, and the operator is told."""
     return sorted(env for env in _RECIPE_ENV_KEYS.values()
-                  if os.environ.get(env) not in (None, ""))
+                  if otr_env.get(env) not in (None, ""))
 
 
 def recipe_receipt(departed=None):
@@ -591,10 +596,10 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
 
     # ---- config resolution (env override -> box default) ----
     def _ckpt_name(self):
-        return os.environ.get("OTR_LTX_8GB_CKPT_NAME") or _LTX8_DEFAULT_CKPT
+        return otr_env.get("OTR_LTX_8GB_CKPT_NAME") or _LTX8_DEFAULT_CKPT
 
     def _t5_name(self):
-        return os.environ.get("OTR_LTX_8GB_T5_NAME") or _LTX8_DEFAULT_T5
+        return otr_env.get("OTR_LTX_8GB_T5_NAME") or _LTX8_DEFAULT_T5
 
     def _ckpt_path(self):
         """Resolved checkpoint path, by the LOADER'S token. ``None`` when absent
@@ -680,7 +685,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # that actually loads the weights: the same identity lie as the explicit
         # path, one level up. Ask what the LOADER would find and require the two
         # to agree. Only fires when the operator actually set a *_DIR.
-        if os.environ.get(env_dir):
+        if otr_env.get(env_dir):
             loader_would_load = self._resolve_model_file_by_token(categories, token)
             if loader_would_load is None or not _same_file(by_token or "",
                                                            loader_would_load):
@@ -694,11 +699,11 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                     "channel that does reach the loader) or move the file under "
                     "models/, then unset %s. Stopping now rather than spending a "
                     "render on weights you did not choose."
-                    % (env_dir, os.environ.get(env_dir), token,
+                    % (env_dir, otr_env.get(env_dir), token,
                        repr(loader_would_load) if loader_would_load
                        else "nothing at all on this box",
                        env_dir), kind="video")
-        explicit = os.environ.get(env_explicit) if env_explicit else None
+        explicit = otr_env.get(env_explicit) if env_explicit else None
         if explicit:
             if by_token is None or not _same_file(explicit, by_token):
                 raise EngineUnusable(
@@ -810,7 +815,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # `or dflt`, not `get(name, dflt)`: an exported-but-EMPTY var would
         # otherwise read as "" -- not truthy -- and force the knob OFF against
         # a frozen default of ON. Every other accessor treats empty as unset.
-        raw = (os.environ.get("OTR_LTX_8GB_TILED_VAE") or dflt).strip().lower()
+        raw = (otr_env.get("OTR_LTX_8GB_TILED_VAE") or dflt).strip().lower()
         if raw in _TRUTHY:
             return True
         if raw in _FALSY:
@@ -824,7 +829,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         raise EngineUnusable(
             self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
             "OTR_LTX_8GB_TILED_VAE=%r is not a yes/no value (yes: %s; no: %s)"
-            % (os.environ.get("OTR_LTX_8GB_TILED_VAE"),
+            % (otr_env.get("OTR_LTX_8GB_TILED_VAE"),
                ", ".join(_TRUTHY), ", ".join(_FALSY)), kind="video")
 
     def _t5_device(self):
@@ -834,7 +839,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         frozen = str(LTX8_RECIPE["t5_device"])
         if not _prequalification_active():
             return frozen
-        dev = (os.environ.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
+        dev = (otr_env.get("OTR_LTX_8GB_T5_DEVICE") or frozen).strip().lower()
         if dev in _T5_DEVICES:
             return dev
         # FAIL CLOSED, not clamp-to-recipe. Clamping kept a bad device string
@@ -845,7 +850,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         raise EngineUnusable(
             self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
             "OTR_LTX_8GB_T5_DEVICE=%r is not one of %s"
-            % (os.environ.get("OTR_LTX_8GB_T5_DEVICE"),
+            % (otr_env.get("OTR_LTX_8GB_T5_DEVICE"),
                ", ".join(_T5_DEVICES)), kind="video")
 
     def _negative_prompt(self):
@@ -859,7 +864,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         frozen = str(LTX8_RECIPE["negative"])
         if not _prequalification_active():
             return frozen
-        return os.environ.get("OTR_LTX_8GB_NEGATIVE") or frozen
+        return otr_env.get("OTR_LTX_8GB_NEGATIVE") or frozen
 
     def _negative_for(self, shot_negative):
         """The negative conditioning for THIS shot, and the one place that
@@ -907,7 +912,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         measuring, render at something else, and stamp a receipt saying it had
         measured it. Two implementations of one rule is how that happens; one
         is the fix."""
-        raw = os.environ.get(env)
+        raw = otr_env.get(env)
         if raw is None or raw == "":
             return cast(dflt)
         try:
@@ -972,7 +977,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # PREQUALIFICATION: the knobs are open, every value is range-checked as
         # before, and each honoured override is announced so a sweep's log says
         # what it actually measured.
-        sampler = (os.environ.get("OTR_LTX_8GB_SAMPLER")
+        sampler = (otr_env.get("OTR_LTX_8GB_SAMPLER")
                    or self._DEFAULT_SAMPLER).strip()
         if sampler not in self._PORTABLE_SAMPLERS:
             raise EngineUnusable(
@@ -1539,7 +1544,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path, self.target_fps)
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
-        if not os.environ.get("OTR_TEST_MODE"):
+        if not otr_env.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] ltx_8gb VRAM render-phase peak %s MB @ %dx%d len=%d",
                       render_peak, width, height, n)
         # `native_frame_count` / `extension_mode` (2026-08-06). This adapter is

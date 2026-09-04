@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import os
 from pathlib import Path
 
 from .registry import register
@@ -25,6 +24,11 @@ from .._otr_google_api.client import (
 )
 from .._otr_shared.role_compat import ROLES
 from .._otr_story_brief_helpers import append_visual_safety_clause
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 DEFAULT_MODEL = "gemini-3.1-flash-image"
 SUPPORTED_MODELS = (
@@ -65,8 +69,8 @@ def _first_present(request, *keys, default=None):
 
 def _selected_model() -> str:
     model = str(
-        os.environ.get("OTR_GOOGLE_IMAGE_MODEL_ID")
-        or os.environ.get("OTR_GOOGLE_IMAGE_MODEL")
+        otr_env.get("OTR_GOOGLE_IMAGE_MODEL_ID")
+        or otr_env.get("OTR_GOOGLE_IMAGE_MODEL")
         or DEFAULT_MODEL
     ).strip()
     if model not in SUPPORTED_MODELS:
@@ -78,7 +82,7 @@ def _selected_model() -> str:
 
 
 def _selected_mime() -> str:
-    mime = str(os.environ.get("OTR_GOOGLE_IMAGE_MIME") or "image/jpeg").strip().lower()
+    mime = str(otr_env.get("OTR_GOOGLE_IMAGE_MIME") or "image/jpeg").strip().lower()
     if mime not in REQUEST_MIME_TYPES:
         raise GoogleAPIRequestShapeError(
             "google_image.generate: unsupported MIME %r; expected one of %r"
@@ -89,7 +93,7 @@ def _selected_mime() -> str:
 
 def _selected_image_size(model: str) -> str:
     allowed = SUPPORTED_IMAGE_SIZES[model]
-    size = str(os.environ.get("OTR_GOOGLE_IMAGE_SIZE") or "1K").strip().upper()
+    size = str(otr_env.get("OTR_GOOGLE_IMAGE_SIZE") or "1K").strip().upper()
     if size not in allowed:
         raise GoogleAPIRequestShapeError(
             "google_image.generate: image_size %r is unsupported for %s; "
@@ -110,7 +114,7 @@ def _canvas_wh(request) -> tuple[int, int]:
 
 
 def _aspect_for_request(request) -> str:
-    env = str(os.environ.get("OTR_GOOGLE_IMAGE_ASPECT") or "").strip()
+    env = str(otr_env.get("OTR_GOOGLE_IMAGE_ASPECT") or "").strip()
     if env:
         if env not in SUPPORTED_ASPECTS:
             raise GoogleAPIRequestShapeError(

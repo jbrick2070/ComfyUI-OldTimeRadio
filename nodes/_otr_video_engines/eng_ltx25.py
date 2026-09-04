@@ -79,6 +79,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 import threading
 import time
 
@@ -98,6 +99,11 @@ from .foley_stems import (
 from .frame_contract import CONTINUITY_STRICT_FIRST_FRAME, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 _LOG = logging.getLogger("OTR.eng_ltx25")
 
@@ -159,7 +165,6 @@ def _inspect_ltx25_gguf_patch(loader_cls):
     check. GGUF and torch remain unimported at module scope.
     """
     import ast
-    import sys
 
     module_name = getattr(loader_cls, "__module__", "")
     module = sys.modules.get(module_name)
@@ -284,7 +289,7 @@ def _cpu_pinned_clip_loader(base_cls):
     and subclassing whatever ``NODE_CLASS_MAPPINGS`` actually resolved means we
     inherit the installed version's file handling instead of copying it.
     """
-    ggml_module = __import__("sys").modules.get(base_cls.__module__)
+    ggml_module = sys.modules.get(base_cls.__module__)
 
     class _CpuPinnedGgufClipLoader(base_cls):  # type: ignore[misc, valid-type]
         """The stock loader with one method replaced."""
@@ -343,7 +348,7 @@ _CACHE_DISABLE_TOKENS = frozenset({"0", "false", "no", "off"})
 
 def _encoder_cache_enabled():
     """ON unless explicitly disabled. Unset and empty both keep the default."""
-    return (os.environ.get(_ENCODER_CACHE_ENV, "") or "").strip().lower() \
+    return (otr_env.get(_ENCODER_CACHE_ENV, "") or "").strip().lower() \
         not in _CACHE_DISABLE_TOKENS
 
 
@@ -607,19 +612,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
     def _dit_name(self):
-        return os.environ.get("OTR_LTX25_DIT", R.LTX25_DIT_GGUF)
+        return otr_env.get("OTR_LTX25_DIT", R.LTX25_DIT_GGUF)
 
     def _text_encoder_name(self):
-        return os.environ.get("OTR_LTX25_TEXT_ENCODER", R.LTX25_TEXT_ENCODER_GGUF)
+        return otr_env.get("OTR_LTX25_TEXT_ENCODER", R.LTX25_TEXT_ENCODER_GGUF)
 
     def _video_vae_name(self):
-        return os.environ.get("OTR_LTX25_VIDEO_VAE", R.LTX25_VIDEO_VAE)
+        return otr_env.get("OTR_LTX25_VIDEO_VAE", R.LTX25_VIDEO_VAE)
 
     def _audio_vae_name(self):
-        return os.environ.get("OTR_LTX25_AUDIO_VAE", R.LTX25_AUDIO_VAE)
+        return otr_env.get("OTR_LTX25_AUDIO_VAE", R.LTX25_AUDIO_VAE)
 
     def _upscaler_name(self):
-        return os.environ.get("OTR_LTX25_UPSCALER", R.LTX25_UPSCALER_MODEL)
+        return otr_env.get("OTR_LTX25_UPSCALER", R.LTX25_UPSCALER_MODEL)
 
     def _weight_paths(self):
         """``(label, full_path, floor_bytes)`` for every required artifact.

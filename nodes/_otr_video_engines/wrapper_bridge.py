@@ -31,7 +31,15 @@ import json
 import logging
 import os
 import shutil
-import subprocess
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 _LOG = logging.getLogger("OTR.video.wrapper_bridge")
 
@@ -979,7 +987,7 @@ def fear_cape_enabled():
     ``OTR_FEAR_CAPE=0`` (or ``false`` / ``off`` / ``no``) disables it.
     An unset or unrecognised value leaves the effect ON, because the default is
     the shipped creative choice and a typo must not silently remove it."""
-    raw = (os.environ.get("OTR_FEAR_CAPE") or "").strip().lower()
+    raw = (otr_env.get("OTR_FEAR_CAPE") or "").strip().lower()
     return raw not in ("0", "false", "off", "no")
 
 
@@ -989,7 +997,7 @@ def fear_cape_min_segments():
     Env ``OTR_FEAR_CAPE_MIN_SEGMENTS`` (default 4). A beat split into fewer
     segments than this is left alone -- the flip is meant for a LONG beat, where
     there is enough runway for the surreal turn to read as deliberate."""
-    raw = (os.environ.get("OTR_FEAR_CAPE_MIN_SEGMENTS") or "").strip()
+    raw = (otr_env.get("OTR_FEAR_CAPE_MIN_SEGMENTS") or "").strip()
     try:
         value = int(raw) if raw else FEAR_CAPE_MIN_SEGMENTS
     except (TypeError, ValueError):
@@ -1099,8 +1107,8 @@ def run_ffmpeg(cmd):
     non-zero exit or a missing ffmpeg. Returns ``cmd`` on success."""
     cmd = _with_resolved_ffmpeg(cmd)
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL,
-                              stderr=subprocess.PIPE)
+        proc = otr_proc.run(cmd, stdout=otr_proc.DEVNULL,
+                              stderr=otr_proc.PIPE)
     except FileNotFoundError as exc:
         raise GraphExecutionError("ffmpeg not found: %s" % exc)
     if proc.returncode != 0:
@@ -1219,8 +1227,8 @@ def encode_frames_to_silent_mp4(frames, out_path, fps, *, ffmpeg="ffmpeg",
     cmd = _with_resolved_ffmpeg(
         ffmpeg_silent_mp4_cmd(out_path, w, h, fps, ffmpeg=ffmpeg, crf=crf))
     try:
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        proc = otr_proc.popen(cmd, stdin=otr_proc.PIPE,
+                                stdout=otr_proc.DEVNULL, stderr=otr_proc.PIPE)
         _, err = proc.communicate(frames.tobytes())
     except FileNotFoundError as exc:
         raise GraphExecutionError("ffmpeg not found: %s" % exc)

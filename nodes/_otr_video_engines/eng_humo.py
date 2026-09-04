@@ -43,6 +43,11 @@ from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from .wan_shared import ffprobe_clip_fields, validate_silent_clip_contract
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 #: Module logger, matching the other video engines' naming.
 #:
 #: ADDED 2026-08-02, and it was overdue: ``_LOG`` was already referenced in the
@@ -419,9 +424,13 @@ class HuMoEngine(_MC.MotionEngineBase):
         shipped wan_i2v dead. Two copies of the same chain was also two places
         to fix it, so there is now one.
         """
-        if env_explicit and os.environ.get(env_explicit):
-            return os.environ[env_explicit]
-        name = os.environ.get(env_name) or default_name
+        # ONE read, not two. The old shape asked `.get` and then subscripted the
+        # same name, so a knob unset between the two lines raised KeyError on a
+        # path whose whole job is to answer "is this pinned".
+        explicit = otr_env.get(env_explicit) if env_explicit else None
+        if explicit:
+            return explicit
+        name = otr_env.get(env_name) or default_name
         try:
             import folder_paths  # type: ignore
             hit = folder_paths.get_full_path("diffusion_models", name)
@@ -451,11 +460,11 @@ class HuMoEngine(_MC.MotionEngineBase):
     # ---- its own steps/cfg so the 14B OTR_HUMO_STEPS/CFG never bleed into it) --
     def _steps(self):
         """KSampler steps for this tier. 14B + lightx2v distill = 6 (fast)."""
-        return int(os.environ.get("OTR_HUMO_STEPS", "6"))
+        return int(otr_env.get("OTR_HUMO_STEPS", "6"))
 
     def _cfg(self):
         """KSampler cfg for this tier. 14B + lightx2v distill = 1.0."""
-        return float(os.environ.get("OTR_HUMO_CFG", "1.0"))
+        return float(otr_env.get("OTR_HUMO_CFG", "1.0"))
 
     # ---- usability (fail-closed BEFORE any forward; no heavy import) ----
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -759,15 +768,15 @@ class HuMoEngine(_MC.MotionEngineBase):
         legacy-proven names; each is env-overridable so the operator points at the
         installed files without editing code (VERIFY-ON-GPU)."""
         return {
-            "unet": os.environ.get("OTR_HUMO_UNET_NAME")
+            "unet": otr_env.get("OTR_HUMO_UNET_NAME")
             or os.path.basename(self._ckpt_path()),
-            "lora": os.environ.get(
+            "lora": otr_env.get(
                 "OTR_HUMO_LORA_NAME",
                 "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"),
-            "clip": os.environ.get(
+            "clip": otr_env.get(
                 "OTR_HUMO_CLIP_NAME", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"),
-            "vae": os.environ.get("OTR_HUMO_VAE_NAME", "wan_2.1_vae.safetensors"),
-            "whisper": os.environ.get(
+            "vae": otr_env.get("OTR_HUMO_VAE_NAME", "wan_2.1_vae.safetensors"),
+            "whisper": otr_env.get(
                 "OTR_HUMO_AUDIO_ENCODER_NAME", "whisper_large_v3_fp16.safetensors"),
         }
 
@@ -790,8 +799,8 @@ class HuMoEngine(_MC.MotionEngineBase):
         """
         from .._otr_shared.aspect import humo_dims_for_aspect
         _dw, _dh = humo_dims_for_aspect(self.render_aspect)
-        w = int(os.environ.get("OTR_HUMO_WIDTH", _dw))
-        h = int(os.environ.get("OTR_HUMO_HEIGHT", _dh))
+        w = int(otr_env.get("OTR_HUMO_WIDTH", _dw))
+        h = int(otr_env.get("OTR_HUMO_HEIGHT", _dh))
         declared = getattr(self, "render_canvas", None)
         if declared and (w, h) != (int(declared[0]), int(declared[1])):
             raise EngineUnusable(
@@ -847,7 +856,7 @@ class HuMoEngine(_MC.MotionEngineBase):
             "a person speaking, medium-close and mostly frontal, mouth and jaw "
             "fully visible, leaning slightly forward with one controlled head "
             "nod, camera locked")
-        negative = os.environ.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
+        negative = otr_env.get("OTR_HUMO_NEGATIVE", _HUMO_DEFAULT_NEGATIVE)
         W = _wb.Wire
         # The lightx2v distill LoRA is a 14B-shaped adapter: it is INCOMPATIBLE
         # with the 1.7B tier (shape-mismatch -> not merged + wasted VRAM). Make
@@ -967,7 +976,7 @@ class HuMoEngine(_MC.MotionEngineBase):
         # tiers (humo / humo_1.7B*) keep the legacy 177-frame ceiling unchanged.
         cap = self.safe_render_frames
         if cap is not None:
-            cap = int(os.environ.get("OTR_HUMO_14B_SAFE_FRAMES", cap))
+            cap = int(otr_env.get("OTR_HUMO_14B_SAFE_FRAMES", cap))
         render_max = cap if cap is not None else _HUMO_MAX_FRAMES
         length = _wb.quantize_frames_4n1(
             target_fc or self.target_fps,
@@ -1372,11 +1381,11 @@ class HuMo17BEngine(HuMoEngine):
         names["unet"] = os.path.basename(self._ckpt_path())
         # The 14B-shaped lightx2v distill LoRA is incompatible with 1.7B: run
         # LoRA-free (more steps below make up for the lost distill shortcut).
-        names["lora"] = os.environ.get("OTR_HUMO_17B_LORA_NAME", "none")
+        names["lora"] = otr_env.get("OTR_HUMO_17B_LORA_NAME", "none")
         return names
 
     def _steps(self):
-        return int(os.environ.get("OTR_HUMO_17B_STEPS", "20"))
+        return int(otr_env.get("OTR_HUMO_17B_STEPS", "20"))
 
     def _cfg(self):
         # cfg 1.0 (was 5.0): the LoRA-free 1.7B tier at cfg 5.0 produced a strong
@@ -1385,7 +1394,7 @@ class HuMo17BEngine(HuMoEngine):
         # (B-R +2.8, red recovered) on the identical beat. HuMo's talking-face
         # motion is driven by the AUDIO conditioning, not cfg, so the lip motion
         # survives the drop. Tune via OTR_HUMO_17B_CFG.
-        return float(os.environ.get("OTR_HUMO_17B_CFG", "1.0"))
+        return float(otr_env.get("OTR_HUMO_17B_CFG", "1.0"))
 
 
 @register
@@ -1423,7 +1432,7 @@ class HuMo17BLandscapeEngine(HuMo17BEngine):
 
     def _cfg(self):
         # 16:9 sweet spot (cfg sweep 2026-06-16); override via OTR_HUMO_17B_169_CFG.
-        return float(os.environ.get("OTR_HUMO_17B_169_CFG", "2.5"))
+        return float(otr_env.get("OTR_HUMO_17B_169_CFG", "2.5"))
 
 
 @register
@@ -1515,7 +1524,7 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     def _cfg(self):
         # Inherit the 14B distill cfg (1.0); a 16:9 tuning hook is available via
         # OTR_HUMO_14B_169_CFG without disturbing the portrait 14B's OTR_HUMO_CFG.
-        return float(os.environ.get("OTR_HUMO_14B_169_CFG", str(super()._cfg())))
+        return float(otr_env.get("OTR_HUMO_14B_169_CFG", str(super()._cfg())))
 
 
 __all__ = [

@@ -29,6 +29,11 @@ import os
 from .registry import EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR.image.sd35_large")
 
 #: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
@@ -141,7 +146,7 @@ class SD35LargeEngine:
         ``requires_flag``; this is the deeper disk check (the WEIGHTS file). The
         commercial-clean gate is metadata the license gate reads, not a usability
         check -- it is False here (conditional Community license)."""
-        ckpt = os.getenv(MODEL_ENV, "").strip()
+        ckpt = otr_env.get(MODEL_ENV, "").strip()
         if not ckpt or not os.path.isfile(ckpt):
             raise EngineUnusable(
                 self.name, _role_of(profile),

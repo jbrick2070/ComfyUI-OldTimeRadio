@@ -48,6 +48,11 @@ import os
 from .registry import register, EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR.image.lumina_image")
 
 #: Opt-in flag (default-OFF). The registry greys the engine until set to "1".
@@ -187,7 +192,7 @@ def _resolve_system_key() -> str:
     typo in an env var must not kill a render (BUG-046 degrades, never dies),
     but it must not be silent either or the operator never learns the knob
     missed."""
-    key = (os.environ.get(SYSTEM_ENV, "") or "").strip() or _DEFAULT_SYSTEM
+    key = (otr_env.get(SYSTEM_ENV, "") or "").strip() or _DEFAULT_SYSTEM
     if key not in SYSTEM_PROMPTS:
         log.warning(
             "[OTR.image.lumina_image] %s=%r is not one of %s -- falling back "
@@ -263,20 +268,20 @@ class LuminaImage2Engine:
 
         def _eint(name, default):
             try:
-                return int(os.environ.get(name, default))
+                return int(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return int(default)
 
         def _efloat(name, default):
             try:
-                return float(os.environ.get(name, default))
+                return float(otr_env.get(name, default))
             except (TypeError, ValueError):
                 return float(default)
 
         return {
-            "unet_name": os.path.basename(os.environ.get(MODEL_ENV, "") or _DEFAULT_CKPT),
-            "clip_name": os.path.basename(os.environ.get(CLIP_ENV, "") or _DEFAULT_CLIP),
-            "vae_name": os.path.basename(os.environ.get(VAE_ENV, "") or _DEFAULT_VAE),
+            "unet_name": os.path.basename(otr_env.get(MODEL_ENV, "") or _DEFAULT_CKPT),
+            "clip_name": os.path.basename(otr_env.get(CLIP_ENV, "") or _DEFAULT_CLIP),
+            "vae_name": os.path.basename(otr_env.get(VAE_ENV, "") or _DEFAULT_VAE),
             "prompt": str(get("prompt") or ""),
             # The request's composed negative (pack style + per-object) wins;
             # the env override stays for dev only. Before 2026-08-17 this read
@@ -302,7 +307,7 @@ class LuminaImage2Engine:
             # Whether this engine should grow its own floor is a RENDER
             # decision on a different model, not a comment fix; it is logged,
             # not folded in here.
-            "negative": (_env_neg if (_env_neg := os.environ.get(
+            "negative": (_env_neg if (_env_neg := otr_env.get(
                 "OTR_LUMINA_NEGATIVE")) is not None
                 else str(get("negative_prompt") or "")),
             # The system line is resolved here but applied in the GRAPH, so
@@ -315,8 +320,8 @@ class LuminaImage2Engine:
             "steps": _eint("OTR_LUMINA_STEPS", 30),
             "cfg": _efloat("OTR_LUMINA_CFG", 4.0),
             "shift": _efloat("OTR_LUMINA_SHIFT", 6.0),
-            "sampler_name": os.environ.get("OTR_LUMINA_SAMPLER", "euler"),
-            "scheduler": os.environ.get("OTR_LUMINA_SCHEDULER", "normal"),
+            "sampler_name": otr_env.get("OTR_LUMINA_SAMPLER", "euler"),
+            "scheduler": otr_env.get("OTR_LUMINA_SCHEDULER", "normal"),
             # Request dims take precedence (still-spine: w/h plumbed end-to-end so
             # landscape SCENE stills are real); env knobs are the no-request default.
             "width": int(get("width") or get("w") or _eint("OTR_LUMINA_WIDTH", 1024)),
@@ -402,7 +407,7 @@ class LuminaImage2Engine:
         ABSENT/greyed, never a stub. The registry already gates on
         ``requires_flag``; this is the deeper disk check (the WEIGHTS file). The
         TE + VAE loaders fail LOUD at render if their files are absent."""
-        ckpt = os.getenv(MODEL_ENV, "").strip()
+        ckpt = otr_env.get(MODEL_ENV, "").strip()
         if not ckpt or not os.path.isfile(ckpt):
             raise EngineUnusable(
                 self.name, _role_of(profile),

@@ -336,7 +336,7 @@ def _slicer_argv(tmp_path, monkeypatch, **kwargs):
             fh.write(b"RIFF fake out")
         return mock.Mock(returncode=0)
 
-    monkeypatch.setattr(rd.subprocess, "run", _fake_run)
+    monkeypatch.setattr(rd.otr_proc, "run", _fake_run)
     out = rd._slice_master_audio(str(master), master_hash="deadbeef", **kwargs)
     assert out, "the slicer reported failure, so there is no argv to judge"
     return seen["cmd"]

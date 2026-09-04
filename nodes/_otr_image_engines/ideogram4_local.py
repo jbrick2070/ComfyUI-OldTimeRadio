@@ -84,6 +84,11 @@ import re
 from .registry import register, EngineUnusable, EngineUsabilityReason
 from .._otr_shared.role_compat import ROLES
 
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
@@ -325,7 +330,7 @@ def _resolve_artifact(env_var: str, candidates, category: str):
     consults ``candidates``, taking the first one actually INSTALLED so a box
     that has fp8 but not nvfp4 resolves instead of being refused.
     """
-    override = os.path.basename((os.environ.get(env_var, "") or "").strip())
+    override = os.path.basename((otr_env.get(env_var, "") or "").strip())
     names = [override] if override else [os.path.basename(c) for c in candidates]
     try:
         import folder_paths  # ComfyUI runtime; absent in the CPU suite

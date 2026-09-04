@@ -460,7 +460,7 @@ def test_the_encoder_returns_what_the_boundary_proved(monkeypatch, tmp_path):
 
     out = tmp_path / "clip.mp4"
     out.write_bytes(b"x")
-    monkeypatch.setattr(wb.subprocess, "Popen", lambda *_a, **_k: _P())
+    monkeypatch.setattr(wb.otr_proc, "popen", lambda *_a, **_k: _P())
     _p, n = wb.encode_frames_to_silent_mp4(
         np.zeros((6, 8, 8, 3), dtype="uint8"), str(out), 25)
     assert seen["declared"] == 6            # it was told the array's length

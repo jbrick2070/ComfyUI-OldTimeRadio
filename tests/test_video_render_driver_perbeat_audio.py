@@ -111,7 +111,7 @@ class TestSliceMasterAudio:
         # Create a fake master file so the is-file check passes; patch subprocess
         master = tmp_path / "master.mp4"
         master.write_bytes(b"fake")
-        with mock.patch("nodes._otr_video_engines.render_driver.subprocess.run",
+        with mock.patch("nodes._otr_video_engines.render_driver.otr_proc.run",
                         side_effect=Exception("ffmpeg not found")):
             out = rd._slice_master_audio(str(master), 1.0, 2.0)
         assert out == ""
@@ -133,7 +133,7 @@ class TestSliceMasterAudio:
         with open(cached, "wb") as f:
             f.write(b"RIFF fake wav")
         run_calls = []
-        with mock.patch("nodes._otr_video_engines.render_driver.subprocess.run",
+        with mock.patch("nodes._otr_video_engines.render_driver.otr_proc.run",
                         side_effect=lambda *a, **kw: run_calls.append(a)):
             out = rd._slice_master_audio(str(master), 1.5, 3.0)
         assert out == cached
@@ -151,7 +151,7 @@ class TestSliceMasterAudio:
                 f.write(b"RIFF\x24\x00\x00\x00WAVEfmt ")
             return mock.Mock(returncode=0)
 
-        with mock.patch("nodes._otr_video_engines.render_driver.subprocess.run",
+        with mock.patch("nodes._otr_video_engines.render_driver.otr_proc.run",
                         side_effect=_fake_run):
             out = rd._slice_master_audio(str(master), 0.5, 2.5)
         assert out != ""
@@ -167,7 +167,7 @@ class TestSliceMasterAudio:
             open(out_path, "wb").close()
             return mock.Mock(returncode=0)
 
-        with mock.patch("nodes._otr_video_engines.render_driver.subprocess.run",
+        with mock.patch("nodes._otr_video_engines.render_driver.otr_proc.run",
                         side_effect=_fake_run):
             out = rd._slice_master_audio(str(master), 0.5, 2.5)
         assert out == ""

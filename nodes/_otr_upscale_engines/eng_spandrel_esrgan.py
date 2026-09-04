@@ -43,6 +43,27 @@ _LOG = logging.getLogger("OTR.upscale.spandrel_esrgan")
 _RESOLVE_WARNED: set = set()
 _RESOLVE_WARNED_MAX = 32
 
+#: 1 MiB. Big enough that the loop costs nothing next to the read itself, small
+#: enough that the peak is a rounding error against a checkpoint.
+_SHA_CHUNK_BYTES = 1024 * 1024
+
+
+def _sha256_file(path) -> str:
+    """sha256 of a file, read in chunks.
+
+    ``Path(...).read_bytes()`` slurps the WHOLE checkpoint into memory to hash
+    it, on a code path that runs while a render is holding VRAM and the process
+    is already near its ceiling -- for a value that only ever gets compared to a
+    pinned digest. Chunking costs nothing and bounds the peak at one chunk.
+    (It is also the pack's only ``read_bytes`` finding in the registry scan,
+    which is how it got looked at.)
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(_SHA_CHUNK_BYTES), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
 
 @register
 class SpandrelEsrgan:
@@ -256,7 +277,7 @@ class SpandrelEsrgan:
         # SHA-256 verify if pinned. Empty string = skip (dev mode / first run).
         if self._model_sha256:
             try:
-                actual = hashlib.sha256(Path(model_path).read_bytes()).hexdigest()
+                actual = _sha256_file(model_path)
             except OSError as e:
                 raise EngineUnusable(
                     self.name, "upscale_stage",

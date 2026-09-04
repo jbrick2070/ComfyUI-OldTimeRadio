@@ -15,7 +15,6 @@ from __future__ import annotations
 import hashlib
 import base64
 import mimetypes
-import os
 import time
 from pathlib import Path
 
@@ -31,6 +30,11 @@ from .._otr_google_api.client import (
     resolve_api_key,
 )
 from .._otr_story_brief_helpers import append_visual_safety_clause
+
+try:
+    from .._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 DEFAULT_MODEL = "veo-3.1-lite-generate-preview"
 SUPPORTED_MODELS = (
@@ -82,7 +86,7 @@ def _req_get(request, key, default=None):
 
 def _env_first(*names: str) -> str | None:
     for name in names:
-        value = os.environ.get(name)
+        value = otr_env.get(name)
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
