@@ -56,13 +56,6 @@ log = logging.getLogger("OTR")
 
 CURRENT_SCHEMA_VERSION = "l4-2026-08-07"
 
-# The show prefix every archival episode id carries (`signal_lost_<title>_<ts>`).
-# Spelled ONCE, here: `otr_master_audio_mux._obs_basename` strips it to build
-# the published (watching) name, and `_published_obs_path` below must accept
-# that name for this episode. PBUG-20260904-06 was the two disagreeing -- the
-# validator demanded the prefix the publisher had just removed, so every
-# `meta.paths.obs_final` since the rename pointed at a file that did not exist.
-SHOW_PREFIX = "signal_lost_"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
 date suffix so the lineage is greppable.
@@ -135,6 +128,14 @@ Reader pattern for all l3-2026-05-08 fields: ALWAYS use
 ledgers will return the default, newer ledgers return the stamped
 value. No KeyError on either side.
 """
+
+# The show prefix every archival episode id carries (`signal_lost_<title>_<ts>`).
+# Spelled ONCE, here: `otr_master_audio_mux._obs_basename` strips it to build
+# the published (watching) name, and `_published_obs_path` below must accept
+# that name for this episode. PBUG-20260904-06 was the two disagreeing -- the
+# validator demanded the prefix the publisher had just removed, so every
+# `meta.paths.obs_final` since the rename pointed at a file that did not exist.
+SHOW_PREFIX = "signal_lost_"
 
 GATE_HASH_BYTES = 1024
 """How many leading bytes of a master audio waveform to feed into
