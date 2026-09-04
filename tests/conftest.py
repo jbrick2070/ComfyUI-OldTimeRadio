@@ -41,6 +41,10 @@ os.environ.setdefault("OTR_TEST_MODE", "1")
 # tests opt back in with monkeypatch so production inheritance cannot silently
 # change unrelated casting assertions.
 os.environ.pop("OTR_VOICE_REFERENCE_BANK", None)
+# A pinned publication root belongs to a launcher, never to a test run: with
+# it inherited, any test that resolves otr_obs_dir() would write into the
+# operator's live watched folder (kibitz runpod-found-fixes r3, 2026-09-04).
+os.environ.pop("OTR_OBS_DIR", None)
 for _google_key_env in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
     os.environ.pop(_google_key_env, None)
 

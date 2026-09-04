@@ -26,6 +26,7 @@ def _isolate_obs_dir(monkeypatch, tmp_path):
     ComfyUI output tree.
     """
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    monkeypatch.delenv("OTR_OBS_DIR", raising=False)
 
 
 @pytest.fixture

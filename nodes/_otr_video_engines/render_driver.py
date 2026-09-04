@@ -35,6 +35,7 @@ import time
 
 from .._otr_shared import retry_taxonomy as _rt
 from .._otr_shared import still_receipt as _receipt
+from .._otr_shared.ffmpeg import resolve_ffmpeg as _resolve_ffmpeg
 from .._otr_shared.aspect import is_wide as _aspect_is_wide
 from .._otr_speaker_role import (
     SPEAKER_ROLE_ANNOUNCER as _SPEAKER_ROLE_ANNOUNCER,
@@ -645,10 +646,7 @@ def _slicer_ffmpeg_bin():
     no voice line" rather than as "this box cannot slice". Returns the bare
     name when nothing resolves, so the failure is still ffmpeg's own and still
     LOUD at the call site rather than an import-time raise."""
-    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if cand and (os.path.isfile(cand) or shutil.which(cand)):
-        return cand
-    return shutil.which("ffmpeg") or "ffmpeg"
+    return _resolve_ffmpeg() or "ffmpeg"
 
 
 def _slice_master_audio(master_path, start_s, dur_s, master_hash="",

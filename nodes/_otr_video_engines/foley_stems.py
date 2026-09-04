@@ -123,6 +123,16 @@ GLOBAL_MASTER_GAIN_LANES = frozenset({"ltx25_foley_plus"})
 #: table is exactly what sends the next reader to the wrong place.
 
 
+def _ffmpeg_bin() -> str:
+    """The pack's ONE ffmpeg answer, kept as a string so a missing binary
+    still fails by name at the mux below (2026-09-04; this ran a literal)."""
+    try:
+        from .._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg() or "ffmpeg"
+
+
 def is_foley_route(video_policy_json):
     """True when ANY role on this episode renders with the foley engine.
 
@@ -496,7 +506,7 @@ def mux_native_audio_into_beat_clip(video_path, wav_path, *, fps):
 
     root, ext = os.path.splitext(video_path)
     sibling = root + "_av" + (ext or ".mp4")
-    cmd = ["ffmpeg", "-y", "-loglevel", "error",
+    cmd = [_ffmpeg_bin(), "-y", "-loglevel", "error",
            "-i", video_path, "-i", wav_path,
            "-map", "0:v:0", "-map", "1:a:0",
            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",

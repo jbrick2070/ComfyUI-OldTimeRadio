@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -70,13 +69,16 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     The explicit widget argument still wins when it resolves: an operator who
     typed a path meant it. The env var is consulted only when the passed value
     does not resolve, and PATH remains the last resort.
+
+    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
+    and the widget's own default literal ``"ffmpeg"`` is not a choice: with
+    ffmpeg on PATH that literal used to win here and the pin was never read.
     """
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if cand and (os.path.isfile(cand) or shutil.which(cand)):
-        return cand
-    return shutil.which("ffmpeg") or ""
+    try:
+        from ._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg(ffmpeg) or ""
 
 
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
@@ -346,12 +348,13 @@ class OTRCaptionBurn:
         in_dir = os.path.dirname(os.path.abspath(video_path)) if video_path else ""
         if in_dir and os.path.isdir(in_dir):
             return os.path.join(in_dir, f"{stem}_captioned.mp4")
+        # The pack's ONE output-root owner answers (2026-09-04); this read
+        # `folder_paths` itself.
         try:
-            import folder_paths  # type: ignore
-            root = folder_paths.get_output_directory()
-        except Exception:  # noqa: BLE001
-            root = "."
-        out_dir = os.path.join(root, "otr", "episodes")
+            from ._otr_paths import otr_episodes_root
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_paths import otr_episodes_root  # type: ignore
+        out_dir = str(otr_episodes_root())
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_captioned.mp4")
 

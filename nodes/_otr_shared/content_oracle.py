@@ -86,7 +86,18 @@ class ContentOracleError(AssertionError):
 
 
 def _ffmpeg(ffmpeg: Optional[str] = None) -> str:
-    return ffmpeg or os.environ.get("OTR_FFMPEG", "ffmpeg")
+    """The pack's ONE ffmpeg answer, kept as a string: the oracle's own
+    ffmpeg call is where a missing binary should fail, by name."""
+    try:
+        from .ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        try:
+            from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore  # nodes/ on sys.path
+        except ImportError:
+            # _otr_shared/ itself on sys.path -- INSERTED, so the local file
+            # shadows the third-party `ffmpeg` package (Fable gate, 2026-09-04).
+            from ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg(ffmpeg) or "ffmpeg"
 
 
 def family_for_engine(engine_id: str) -> str:

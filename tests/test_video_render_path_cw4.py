@@ -240,6 +240,9 @@ def test_master_audio_mux_default_out_peels_credits_suffix(monkeypatch, tmp_path
     import types
     monkeypatch.setitem(sys.modules, "folder_paths", types.SimpleNamespace(
         get_output_directory=lambda: str(tmp_path)))
+    # The mux asks the pack's ONE output-root owner (2026-09-04), and the
+    # owner reads OTR_OUTPUT_DIR AHEAD of folder_paths -- inject through both.
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
     node = OTRMasterAudioMux()
     got = node._default_out(str(
         tmp_path / "ep042_silent_procgen_blended_captioned_with_credits.mp4"))
@@ -264,6 +267,7 @@ def test_master_audio_mux_default_out_uses_live_ledger_episode_authority(
 
     monkeypatch.setitem(sys.modules, "folder_paths", types.SimpleNamespace(
         get_output_directory=lambda: str(tmp_path)))
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))  # the owner's first tier
     episode_dir = tmp_path / "otr" / "episodes" / "ep042"
     ledger_path = episode_dir / "audio" / "ep042_ledger.json"
     ledger_path.parent.mkdir(parents=True)
@@ -364,6 +368,7 @@ def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     fake_fp = types.SimpleNamespace(
         get_output_directory=lambda: str(tmp_path / "out"))
     monkeypatch.setitem(sys.modules, "folder_paths", fake_fp)
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path / "out"))  # owner's first tier
     monkeypatch.delenv("OTR_OBS_DIR", raising=False)
     _publishable_episode(tmp_path, monkeypatch, "silent")
     node = OTRMasterAudioMux()

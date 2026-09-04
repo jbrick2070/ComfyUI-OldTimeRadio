@@ -35,7 +35,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shutil
 import subprocess
 
 try:  # ComfyUI loads these node modules flat as well as packaged
@@ -1336,11 +1335,13 @@ def extract_final_frame(video_path: str, out_png: str) -> str:
 # ffmpeg render + append (every failure RAISES; no source-copy)
 # =========================================================================== #
 def _ffmpeg_bin() -> str:
-    # Honor OTR_FFMPEG (the sibling video nodes' config path) before PATH, so
-    # credits never fail on a box where ffmpeg is configured but not on PATH.
-    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
-    p = (cand if (cand and (os.path.isfile(cand) or shutil.which(cand)))
-         else shutil.which("ffmpeg"))
+    # OTR_FFMPEG before PATH, through the pack's one owner, so credits never
+    # fail on a box where ffmpeg is configured but not on PATH.
+    try:
+        from ._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    p = resolve_ffmpeg()
     if not p:
         raise CreditsDataError(
             "ffmpeg not found (OTR_FFMPEG / PATH) -- cannot render credits")

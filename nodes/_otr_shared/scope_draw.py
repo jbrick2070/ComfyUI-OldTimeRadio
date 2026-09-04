@@ -30,7 +30,6 @@ from __future__ import annotations
 import hashlib
 import math
 import os
-import shutil
 import subprocess
 import tempfile
 
@@ -768,20 +767,27 @@ def apply_crt_post_rgb(rgb, scanlines, vignette, fi, rng_key, vol=0.0):
 # Silent ffmpeg encode (copied; SILENT -- only OTR_MasterAudioMux adds audio).
 # --------------------------------------------------------------------------- #
 def find_ffmpeg(ffmpeg):
-    """Resolve the ffmpeg binary: explicit argument if it resolves, then the
-    ``OTR_FFMPEG`` env var, then PATH.
+    """Resolve the ffmpeg binary: an explicit CHOICE if it resolves, then the
+    ``OTR_FFMPEG`` env var, then PATH -- the pack's one owner
+    (``_otr_shared.ffmpeg``) answers. A bare ``ffmpeg`` is the caller's
+    default, not a choice: with ffmpeg on PATH it used to win here and the
+    pin was never read.
 
     The env step is not optional politeness -- OTR_SceneAwareScopes ships a
     tooltip promising exactly this order, and without it an install where
     ffmpeg is reachable ONLY through ``OTR_FFMPEG`` encodes nothing while the
     operator-facing contract says it should.
     """
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    env = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if env and (shutil.which(env) or os.path.isfile(env)):
-        return env
-    return shutil.which("ffmpeg")
+    try:
+        from .ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        try:
+            from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore  # nodes/ on sys.path
+        except ImportError:
+            # _otr_shared/ itself on sys.path -- INSERTED, so the local file
+            # shadows the third-party `ffmpeg` package (Fable gate, 2026-09-04).
+            from ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg(ffmpeg)
 
 
 #: The smallest canvas h264_nvenc will open, per NVIDIA's H.264 NVENC spec and

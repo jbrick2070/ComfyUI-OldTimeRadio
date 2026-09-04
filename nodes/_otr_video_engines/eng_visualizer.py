@@ -124,7 +124,7 @@ class VisualizerEngine:
     # ---- residency (none: CPU + ffmpeg only) ----
     def load(self):
         from .._otr_shared import scope_draw as _sd
-        if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
+        if not _sd.find_ffmpeg(None):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
@@ -142,7 +142,7 @@ class VisualizerEngine:
     # ---- usability (fail LOUD; no NVML / weights / node gate) ----
     def assert_usable(self, host_caps, profile, request_template=None):
         from .._otr_shared import scope_draw as _sd
-        if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
+        if not _sd.find_ffmpeg(None):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "viz_green needs ffmpeg on PATH (or set OTR_FFMPEG)", kind="video")
@@ -276,7 +276,7 @@ class VisualizerEngine:
 
         out_path = otr_engine_tmp_mp4("otr_viz_green_")
         _sd.encode_silent_mp4(_frames(), total, out_path, w, h, fps,
-                              os.environ.get("OTR_FFMPEG", "ffmpeg"))
+                              None)
         # M7 (2026-07-28): THE SECOND ENCODER. These four viz_* engines write
         # through scope_draw.encode_silent_mp4, not encode_frames_to_silent_mp4,
         # so neither half of the clip proof ever reached them and the roster

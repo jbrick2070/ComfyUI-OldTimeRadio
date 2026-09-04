@@ -104,6 +104,19 @@ class VideoEngine(Protocol):
     # it is never inherited by default.
     def frame_contract(self): ...
 
+    # --- session residency (2026-09-04, kibitz runpod-found-fixes r3; OPTIONAL,
+    # deliberately NOT a protocol member -- this Protocol is runtime_checkable
+    # and ``declared_isolation`` set the precedent) ---
+    # ``session_residency = "local" | "remote"`` says whether a multi-segment
+    # beat can be asked to prove its handles. ``"local"`` -- the reading when
+    # the attribute is absent -- means the adapter loads weights in this
+    # process or a sidecar, so ``beat_session.BeatSession`` demands a
+    # ``session_identity()`` before it renders two segments from one set of
+    # handles. ``"remote"`` means it holds NO local handles: ``prepare()``
+    # returns nothing reusable and every ``render_clip`` is an independent
+    # provider call, so there is no handle to drift and no identity is asked
+    # for. FAIL-CLOSED: anything that does not spell ``"remote"`` is local.
+
     # --- render lifecycle (CW-4+ adapters implement; not called by registry) ---
     def assert_usable(self, host_caps, profile, request_template=None): ...
     def prepare(self, host_caps, profile, session_ctx): ...

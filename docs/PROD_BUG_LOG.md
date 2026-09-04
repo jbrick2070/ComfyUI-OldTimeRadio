@@ -11008,3 +11008,187 @@ nobody checked precisely because it was stated so confidently. The 2026-09-04 ki
 arc found the same shape twice more (`_obs_dir` "ONE owner"; `configured_models_root`
 "folder_paths is probed first"). Grep for universal claims in docstrings and check each
 against the code; it is cheap and it would have caught all three.
+
+
+## PBUG-20260904-02 -- nine of ten ffmpeg resolvers ignored the operator's pin, because a signature default was read as a choice
+
+**Measured live on the 5080, 2026-09-04 06:5x PDT** (ffmpeg on PATH through the
+WinGet shim; `OTR_FFMPEG` pointed at a DIFFERENT existing copy of the binary):
+
+```
+mux._ffmpeg_bin('ffmpeg')              -> ffmpeg                      pin IGNORED
+caption._ffmpeg_bin('ffmpeg')          -> ffmpeg                      pin IGNORED
+silent._ffmpeg_bin('ffmpeg')           -> ffmpeg                      pin IGNORED
+scope_draw.find_ffmpeg('ffmpeg')       -> ffmpeg                      pin IGNORED
+encode_sink.find_ffmpeg('ffmpeg')      -> ffmpeg                      pin IGNORED
+wrapper_bridge.resolve_ffmpeg('ffmpeg')-> ffmpeg                      pin IGNORED
+video_engine._find_ffmpeg()            -> ...\WinGet\Links\ffmpeg.EXE pin IGNORED
+content_oracle._ffmpeg('ffmpeg')       -> ffmpeg                      pin IGNORED
+credits._ffmpeg_bin()                  -> <the pin>                   honoured
+```
+
+Twelve resolver copies in `nodes/`, in four different orders. Six shared one
+defect: `if ffmpeg and (which(ffmpeg) or isfile(ffmpeg)): return ffmpeg` FIRST,
+so the caller's own signature default -- the bare string `"ffmpeg"` -- was
+treated as an operator choice and won on any box with ffmpeg on PATH; the pin
+was never consulted. Two never read the pin at all (the registered SignalLost
+renderer and the raw-video encode sink). The three cloud preflights gated on
+`which("ffmpeg")` alone and REFUSED an install whose ffmpeg is reachable only
+through the variable. Three more sites ran the literal with no resolver at all
+(`otr_post_upscale_procgen_blend`, canonical node 93 -- the widget literal went
+straight into its decode, blend and bars subprocesses; `eng_google_lyria`;
+`foley_stems`), so no guard on resolver copies could have seen them.
+
+**Why the 5080 could never find it.** PATH and the pin resolve to the same build
+here, so the wrong answer was the right answer. **Why the tests could never find
+it:** every copy's test stubbed `shutil.which` to `None` -- the ONE condition under
+which the defect cannot manifest. A test that removes the condition a bug needs
+is a test of the fix's absence.
+
+**The probe module had already solved this exact bug.** `_otr_shared/ffprobe.py`
+carries `_BARE_PROBE_NAMES` and `_explicit()` -- "a bare name with no directory is
+not a preference" -- because `OTR_FFPROBE` had been ignored the same way. The
+encoder copies never learned from it; the 2026-08-28 fix that made three of them
+"honour OTR_FFMPEG before PATH" honoured it only when the passed value did not
+resolve, which a bare name on PATH always does.
+
+**The fix.** ONE owner, `nodes/_otr_shared/ffmpeg.py::resolve_ffmpeg(preferred)`:
+explicit CHOICE -> `OTR_FFMPEG` -> PATH -> the two Windows install dirs SignalLost
+used to probe alone -> `None`, never raising; a bare `ffmpeg`/`ffmpeg.exe` is not a
+choice, by reusing the probe's `_explicit`. Every runtime site is a thin adapter
+that keeps its own contract on none (`""`, its own literal, or its named refusal);
+the thirteen viz/cheap-lane pass-through readers hand `None` in. Enforced by
+`tests/test_ffmpeg_single_resolution.py` -- an AST walk with NO allowlist: outside
+the owner no `OTR_FFMPEG` constant; outside the two tool owners no `which(...)`
+call at all; anywhere else no list literal whose first element is the bare name.
+`tests/test_ffmpeg_resolution_precedence.py` runs the matrix with PATH LEFT
+AVAILABLE. After: 9 of 9 honour the pin (`resolve_ffprobe` returning the PATH
+probe ahead of the pinned ffmpeg's sibling is its documented order).
+
+**Kibitz runpod-found-fixes r1-r3** (Codex gpt-5.6-sol, Antigravity Gemini 3.8
+Flash, Cursor grok-4.6): r1 found the precedence bug the driver had missed; r2
+found `scope_draw` was not "already correct" and that a None-returning drop-in
+would put `None` in wrapper_bridge's argv[0]; r3 found the three literal sites and
+the second nvenc cache in front of the owner (`video_engine._check_nvenc`).
+
+## PBUG-20260904-03 -- every remote video lane refused any beat long enough to split, because the session asked it to name handles it does not have
+
+**Observed on the 2026-09-03 pod matrix (RTX 4090):** `word_razzle` failed with
+`SessionIdentityUnavailable` -- "would render 2 segments from ONE set of handles
+but declares no session_identity()". Not hardware, not credentials: the same
+refusal fires on the 5080 for any beat over the lane's `max_frames`, on every
+one of the seven remote adapters the partitioner will split
+(`tests/test_multiclip_session_identity_roster.py::EXPECTED_CLOUD_GAP`). Recorded
+in `docs/RUNPOD_INSTALL.md` evidence ledger and in GO_FORWARD_PLAN, where a
+paragraph then called it "already fixed" for a day while the refusal was
+untouched.
+
+**Root cause.** `BeatSession`'s identity demand exists to catch LOCAL handle drift:
+segment 2 must render with the weights segment 1 loaded. A remote adapter has no
+handles -- `prepare()` returns `{}`, `teardown()` is a no-op, every `render_clip`
+is an independent provider call -- so "the model segment 2 renders with" is not a
+question it can honestly answer, and the session had no way to be told that.
+The roster test said so in prose ("a design call, not a missing method") and
+nobody made the call.
+
+**The fix (kibitz runpod-found-fixes r3, ruling R-B "B-prime").** A DECLARATION,
+read fail-closed: `session_residency = "remote"` on `_CloudVideoBase` (its five
+rows), `google_omni_video` and `google_veo_video`; `beat_session.holds_local_handles()`
+skips the identity demand -- pre-load refusal, post-prepare baseline, per-segment
+drift check -- for exactly them; an absent or misspelt attribute reads as local and
+the demand stands. The refusal now names the declaration. The roster tripwire is
+keyed on the declaration and a control pins that no engine declares remote AND a
+local isolation. No `session_identity()` was added to any cloud adapter.
+
+**What was rejected, and why.** Inferring residency from an absent
+`declared_isolation` (Antigravity r2) -- enablement by accident, keyed on an
+attribute that is not protocol. Inventing an identity on the cloud adapters
+(the driver's r1 proposal) -- theater. Leaving the refusal (the r2 ruling) --
+defensible until the pod evidence showed it was a LIVE failure on a lane the
+dropdown already offers.
+
+**Not done, logged:** a RECIPE identity for remote lanes (model id + params) so a
+mid-beat env flip is caught the way weight drift is for local lanes.
+
+**The portable lesson.** When a gate asks a question a component cannot honestly
+answer, give the component an explicit way to say so -- and read the absence of
+that declaration as "the question stands", never as "the component is exempt".
+
+
+## PBUG-20260904-04 -- every 8 GB-profile leg on the 5080 refused its writer, because the box that tightened the pin never re-checked its own copy
+
+**Observed (live headless leg, 2026-09-04 07:30 PDT, canonical workflow, profile
+`8gb_lite`, port 8011):** node 1 raised in 9 seconds --
+`Incomplete Gemma 4 12B Q4_K_M GGUF file: C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf has 7121860000 bytes, expected 7121861440`.
+The file is dated 2026-07-12 and has rendered episodes since.
+
+**Why it is not a partial download.** `GGUF_ARTIFACTS["Q4_K_M"]` was re-pinned on
+2026-08-29 (`8b87b22b`, PBUG-20260829-19: "re-pin both gemma GGUF artifacts to
+the builds a user can actually obtain") to the CURRENT Hugging Face upload --
+7,121,861,440 bytes, confirmed against the Hub on 2026-09-04. The 5080's copy is
+the earlier build of the same file, 1,440 bytes shorter, from before the upstream
+re-upload. The pin is correct; the developer box's own artifact predates it.
+
+**Why nobody noticed for six days.** The 16 GB canonical path resolves the writer
+to `Q8_0` (a different artifact with its own pin, which this box matches), so
+every nightly leg here was green. Only an 8 GB profile (`llm_vram_ceiling_gb`
+6.8 -> `Q4_K_M`) reaches the stale file -- and the 8 GB profiles are proven on
+the 4060 and the pod, both of which downloaded the NEW build. The one box that
+would fail is the one that wrote the pin, on the one quant it does not use by
+default.
+
+**The fix.** Re-download the pinned build (size and sha256 verified against the
+table before it replaces the old file; the old copy kept aside for one session).
+No code change: the integrity gate did exactly what A6 (2026-07-27) built it to
+do -- refuse an artifact that does not match its pin, by name, before a render
+spends anything.
+
+**The portable lesson.** A pin tightened to "what a user can obtain" must be
+re-verified on EVERY box that carries the artifact, starting with the box that
+wrote it -- and the check has to run against the quant the box does NOT use by
+default, because that is the copy nothing else exercises. The 4060 drill and the
+pod prove fresh installs; they cannot prove the dev box's own stale files.
+
+
+## PBUG-20260904-05 -- an 8 GB profile on an RSS bank refuses before writing a word, because the 12B writer's context cannot hold the source payload
+
+**Observed (live headless leg, 2026-09-04 08:51 PDT, canonical workflow,
+profile `8gb_lite`, the canonical `science_news` bank, the freshly verified
+Q4_K_M writer):** node 1 raised in twenty seconds --
+`GGUF unsloth/gemma-4-12b-it-GGUF cannot fit: prompt requires 2741 input tokens, context_cap=2048 leaves 0 output tokens but at least 64 are required`
+(`_otr_generation_budget.GenerationContextOverflowError`, surfaced as
+`GGUFNativeConfigError`).
+
+**What it is.** `8gb_lite` sets `llm_vram_ceiling_gb: 6.8`, which fits the 12B
+Q4_K_M weights with a 2,048-token context. The canonical workflow's default
+writer is that 12B, and the `science_news` bank's RSS payload plus the writer
+prompt is 2,741 tokens before a single output token. The budget arithmetic is
+right and the refusal is loud and named -- that part is the pack working. The
+defect is the COMBINATION the shipped defaults produce: the 8 GB profile keeps
+the 16 GB writer, and no owner picks a writer that fits the ceiling, trims the
+payload to what fits, or refuses at PLAN time (the profile + bank + writer are
+all known before the render starts).
+
+**It is not the bank.** A second attempt on the `original` bank (no RSS
+payload) refused the same way at 3,338 input tokens -- the writer prompt itself
+does not fit a 2,048-token context. `8gb_lite` is a `status: draft` profile
+that pins the 12B for BOTH writer slots (`llm.creative_model` /
+`technical_model`) at `gguf_n_ctx: 2048`. The 8 GB row that actually SHIPS is
+`otr_4060_12b_gguf_offload` -- the same 12B Q4_K_M with a full 48-layer GPU
+offload at `gguf_n_ctx: 4096`, measured 7.8 of 8.2 GB on the 4060 -- and 4,096
+holds either bank's prompt with room to answer. The defect is that a shipped
+profile file (`8gb_lite`, `otr_4060_floor`, `otr_4060_viz_12b`, all `draft`)
+can pair a context with a writer prompt that can never fit it, and nothing says
+so before the render spends its boot.
+
+**Not fixed here -- it is a design call, not a drive-by:** (a) pair each VRAM
+ceiling with a writer that fits it at a working context (Qwen3-4B / gemma E4B
+are on disk and pinned), (b) grow the context by trading KV for weights, or (c)
+bound the RSS payload. (c) touches what the writer sees (the operator does not
+chase word counts, but a source payload is input, not output); (a) is a
+profile change the 4060 owns for its own rows. Owed: a kibitz arc on which,
+then the fix in the profile/variant layer -- never a silent truncation. Until
+then: an 8 GB profile on an RSS bank does not render; on `original` it does.
+
+**The evidence stays.** `C:\Users\jeffr\otr_accept\leg_attempt3_context_overflow.log`
+and `server_attempt3.log` on the 5080 (scratch, not committed).

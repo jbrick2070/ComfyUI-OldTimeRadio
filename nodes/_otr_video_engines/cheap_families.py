@@ -198,7 +198,7 @@ class _CheapFamilyBase:
         `OTR_FFMPEG` is honoured identically.
         """
         from .._otr_shared import scope_draw as _sd
-        if not _sd.find_ffmpeg(os.environ.get("OTR_FFMPEG", "ffmpeg")):
+        if not _sd.find_ffmpeg(None):
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "%s needs ffmpeg on PATH (or set OTR_FFMPEG) -- refused at "

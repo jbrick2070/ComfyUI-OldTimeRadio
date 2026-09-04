@@ -8,24 +8,32 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Optional
 
+from .ffmpeg import resolve_ffmpeg
 from .scope_draw import cfr_flags
 
 
 def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    return shutil.which("ffmpeg")
+    """The pack's ONE ffmpeg answer (``.ffmpeg.resolve_ffmpeg``). This copy
+    never read ``OTR_FFMPEG`` at all and treated its signature default as a
+    choice; the owner does neither."""
+    return resolve_ffmpeg(ffmpeg)
 
 
-#: Cached for the process. The probe costs about a second and the answer cannot
-#: change while we run.
-_NVENC_PROBE: Optional[bool] = None
+#: Cached for the process, PER BINARY. The probe costs about a second and the
+#: answer cannot change while we run -- but it is an answer about ONE build,
+#: so the key is the normalized binary path (kibitz r2, 2026-09-04): a caller
+#: naming a different ffmpeg gets its own probe, not the first caller's.
+_NVENC_PROBE: dict = {}
+#: The probe takes up to twenty seconds; two first callers racing on the same
+#: binary must run it once, not twice (the lock this replaced lived in
+#: `video_engine`, in front of a cache that is gone -- it belongs HERE).
+_NVENC_PROBE_LOCK = threading.Lock()
 
 
 def has_nvenc(ffmpeg: str) -> bool:
@@ -63,23 +71,38 @@ def has_nvenc(ffmpeg: str) -> bool:
     "Frame Dimension less than the minimum supported value", so a 64x64 probe
     reports a HEALTHY card as unavailable and silently drops it to CPU.
     """
-    global _NVENC_PROBE
-    if _NVENC_PROBE is not None:
-        return _NVENC_PROBE
-    try:
-        out = subprocess.run(
-            [ffmpeg, "-hide_banner", "-loglevel", "error",
-             "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
-             "-c:v", "h264_nvenc", "-frames:v", "1",
-             "-f", "null", "-"],
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-        _NVENC_PROBE = out.returncode == 0
-    except Exception:  # noqa: BLE001 -- a probe must never be fatal.
-        _NVENC_PROBE = False
-    return _NVENC_PROBE
+    if not ffmpeg:
+        return False
+    # A BARE name would key the cache on <cwd>/ffmpeg and probe whatever
+    # PATH says; resolve it through the owner first (the pin, then PATH). An
+    # explicit path is the caller's choice and is probed as given.
+    ffmpeg = str(ffmpeg)
+    if not os.path.dirname(ffmpeg):
+        ffmpeg = resolve_ffmpeg(ffmpeg)
+        if not ffmpeg:
+            # Nothing to probe and nothing to remember: a name that does
+            # not resolve must not key the cache on <cwd>/name (cursor r4).
+            return False
+    key = os.path.normcase(os.path.abspath(ffmpeg))
+    with _NVENC_PROBE_LOCK:
+        cached = _NVENC_PROBE.get(key)
+        if cached is not None:
+            return cached
+        try:
+            out = subprocess.run(
+                [ffmpeg, "-hide_banner", "-loglevel", "error",
+                 "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
+                 "-c:v", "h264_nvenc", "-frames:v", "1",
+                 "-f", "null", "-"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            verdict = out.returncode == 0
+        except Exception:  # noqa: BLE001 -- a probe must never be fatal.
+            verdict = False
+        _NVENC_PROBE[key] = verdict
+        return verdict
 
 
 @dataclass

@@ -17,6 +17,7 @@ import subprocess
 
 from .base import AudioEngineAdapter
 from .registry import register
+from .._otr_shared.ffmpeg import resolve_ffmpeg
 from .._otr_google_api.client import (
     GoogleAPIError,
     GoogleAPIRequestShapeError,
@@ -122,11 +123,17 @@ def _extract_audio_data(response: dict) -> dict:
     )
 
 
+def _ffmpeg_bin() -> str:
+    """The pack's ONE ffmpeg answer, kept as a string so a missing binary
+    still fails by name in the decode below (2026-09-04; this ran a literal)."""
+    return resolve_ffmpeg() or "ffmpeg"
+
+
 def _mp3_to_audio(mp3_bytes: bytes, *, sample_rate: int = SAMPLE_RATE) -> dict:
     if not mp3_bytes:
         raise GoogleLyriaError("Google Lyria response audio was empty")
     cmd = [
-        "ffmpeg",
+        _ffmpeg_bin(),
         "-hide_banner",
         "-loglevel",
         "error",

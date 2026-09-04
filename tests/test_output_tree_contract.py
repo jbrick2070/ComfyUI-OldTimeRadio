@@ -35,6 +35,9 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 @pytest.fixture()
 def out_root(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    # An inherited publication pin would move otr_obs_dir() outside this
+    # tree and fail the in-tree assertions for a reason unrelated to them.
+    monkeypatch.delenv("OTR_OBS_DIR", raising=False)
     return tmp_path
 
 
@@ -185,3 +188,17 @@ def test_ci_ban_otr_path_composition_outside_authority():
     assert not offenders, (
         "otr/ path composition outside the _otr_paths authority (or with a "
         "non-contract top level):\n" + "\n".join(offenders))
+
+def test_otr_obs_dir_honours_an_explicit_pin_outside_the_tree(out_root, monkeypatch):
+    """R-A (kibitz runpod-found-fixes, 2026-09-04): an explicit ``OTR_OBS_DIR``
+    is a DECLARED publication root -- the headless launcher renders into one
+    tree while the operator watches another -- so the owner returns it as
+    typed and does not run the in-tree assert against it. Everything else
+    (the unpinned case above) stays inside the contract."""
+    pin = out_root.parent / "watched_elsewhere" / "obs"
+    monkeypatch.setenv("OTR_OBS_DIR", str(pin))
+    assert P.otr_obs_dir() == pin
+    with pytest.raises(ValueError):
+        P.otr_obs_dir().resolve().relative_to((out_root / "otr").resolve())
+    monkeypatch.setenv("OTR_OBS_DIR", "   ")
+    assert P.otr_obs_dir() == out_root / "otr" / "obs"

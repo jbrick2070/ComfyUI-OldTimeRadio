@@ -26,7 +26,6 @@ import logging
 import math
 import os
 import re as _re
-import shutil
 import subprocess
 import sys
 import time as _time
@@ -989,54 +988,45 @@ class _CRTRenderer:
 # FFMPEG ENCODER
 # -----------------------------------------------------------------------------
 def _find_ffmpeg():
-    path = shutil.which("ffmpeg")
-    if path:
-        return path
-    for candidate in [
-        os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe"),
-        r"C:\ffmpeg\bin\ffmpeg.exe",
-    ]:
-        if os.path.isfile(candidate):
-            return candidate
-    return None
+    """The pack's ONE ffmpeg answer (``_otr_shared.ffmpeg``): OTR_FFMPEG,
+    then PATH, then the Windows install dirs this renderer used to probe on
+    its own. ``None`` when the box has none."""
+    try:
+        from ._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg()
 
 
-_NVENC_AVAILABLE = None  # cached after first check
-_NVENC_LOCK = None       # lazy-init threading.Lock()
+_NVENC_ANNOUNCED: set = set()  # binaries whose verdict was already logged
 
 def _check_nvenc(ffmpeg_path):
-    """Return True if ffmpeg supports h264_nvenc on this system.
+    """Can h264_nvenc ENCODE with this ffmpeg -- the pack's ONE owner's answer.
 
-    Thread-safe: uses a lock so parallel ComfyUI workers can't race on the
-    first check. Safe when ffmpeg_path is None (returns False immediately).
+    ONE OWNER FOR THIS QUESTION (2026-08-30). The probe lives in
+    `_otr_shared.encode_sink.has_nvenc` and is cached THERE, per binary
+    (kibitz r3, 2026-09-04). This function used to keep a second,
+    process-global cache in front of it, so the first binary's verdict was
+    handed back for every later one and the owner's per-binary key was never
+    consulted. It now delegates every call; only the log line is
+    de-duplicated. Safe when ffmpeg_path is None (returns False).
     """
-    global _NVENC_AVAILABLE, _NVENC_LOCK
-    # Lazy-init the lock to avoid import-time threading overhead
-    if _NVENC_LOCK is None:
-        import threading
-        _NVENC_LOCK = threading.Lock()
-
-    with _NVENC_LOCK:
-        if _NVENC_AVAILABLE is not None:
-            return _NVENC_AVAILABLE
-        if not ffmpeg_path:
-            _NVENC_AVAILABLE = False
+    if not ffmpeg_path:
+        if "" not in _NVENC_ANNOUNCED:
+            _NVENC_ANNOUNCED.add("")
             log.info("[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
-            return False
-        # ONE OWNER FOR THIS QUESTION (2026-08-30). The probe lives in
-        # `_otr_shared.encode_sink.has_nvenc`; this used to be a second,
-        # independent copy of the same test, and when the first was fixed the
-        # duplicate failed the very next render at OTR_SceneAwareScopes
-        # eighteen minutes in. Two implementations of one capability check is
-        # how a fix looks applied and is not.
-        try:
-            from ._otr_shared.encode_sink import has_nvenc as _has_nvenc
-        except ImportError:  # pragma: no cover -- flat-import test harnesses
-            from _otr_shared.encode_sink import has_nvenc as _has_nvenc  # type: ignore
-        _NVENC_AVAILABLE = bool(_has_nvenc(ffmpeg_path))
-        tag = "NVIDIA h264_nvenc" if _NVENC_AVAILABLE else "CPU libx264"
-        log.info("[Video] Encoder: %s", tag)
-        return _NVENC_AVAILABLE
+        return False
+    try:
+        from ._otr_shared.encode_sink import has_nvenc as _has_nvenc
+    except ImportError:  # pragma: no cover -- flat-import test harnesses
+        from _otr_shared.encode_sink import has_nvenc as _has_nvenc  # type: ignore
+    verdict = bool(_has_nvenc(ffmpeg_path))
+    key = os.path.normcase(os.path.abspath(str(ffmpeg_path)))
+    if key not in _NVENC_ANNOUNCED:
+        _NVENC_ANNOUNCED.add(key)
+        log.info("[Video] Encoder: %s",
+                 "NVIDIA h264_nvenc" if verdict else "CPU libx264")
+    return verdict
 
 
 def _encode_mp4(frames_iter, total_frames, audio_path, output_path,

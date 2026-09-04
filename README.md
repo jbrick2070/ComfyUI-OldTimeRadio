@@ -69,7 +69,12 @@ Then restart ComfyUI so it loads the nodes.
 > PATH with the libx264 and aac encoders built in (Windows: the ComfyUI portable and
 > Desktop builds bundle one; Mac: `brew install ffmpeg`; Linux: your package manager's
 > ffmpeg). OTR mixes and muxes every episode through it, and a missing ffmpeg fails at
-> render time with no earlier warning. **`pycairo` is Windows-only in
+> render time with no earlier warning. Not on PATH? Set `OTR_FFMPEG` to the
+> binary's full path -- and set `OTR_FFPROBE` too whenever any other ffprobe is
+> on PATH, because the probe resolver takes a PATH ffprobe ahead of the pinned
+> ffmpeg's sibling. Every stage resolves ffmpeg through one owner that honours
+> that pin ahead of PATH, and a node's bare `ffmpeg` widget default never
+> overrides it. **`pycairo` is Windows-only in
 > `requirements.txt`** (`pycairo>=1.24; sys_platform == 'win32'`, because pycairo
 > publishes zero Linux wheels), so pip on Linux or Mac skips it entirely and there
 > are no headers to pre-install. Exactly ONE engine imports cairo --

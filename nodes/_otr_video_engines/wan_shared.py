@@ -35,21 +35,30 @@ _WAN_DEFAULT_NEGATIVE = (
 def configured_models_root():
     """Where THIS box keeps its models, off the ComfyUI runtime.
 
-    ONE spelling for the whole project: the same override chain
-    ``_otr_gguf_backend._models_root`` already uses, so a reader who finds the
-    answer in one place finds the same answer in the other. Inside a live
-    server this is irrelevant -- ``folder_paths`` is the authority and is
-    probed first. Outside one it is the difference between "this lane is not
-    installed" and the truth (lesson L1: a hardcoded root knows one location;
-    the operator's box is allowed to be somewhere else).
+    ONE spelling for the whole project, FOR REAL (2026-09-04): this IS
+    ``_otr_gguf_backend._models_root`` -- the env pins, then the reference
+    box's tree if it exists, then ``folder_paths.models_dir`` -- so a reader
+    who finds the answer in one place finds the same answer in the other.
+    Until then this re-implemented the chain and drifted from it (it returned
+    the legacy literal unconditionally), while claiming to be the same.
 
-    Pure, stdlib-only, never raises. Returns a path string that may not exist;
-    every caller probes existence for itself.
+    This is the OFF-RUNTIME fallback: every caller probes ``folder_paths``
+    first and existence-gates the join, so inside a live server this only
+    answers when the runtime did not. Outside one it is the difference
+    between "this lane is not installed" and the truth (lesson L1: a
+    hardcoded root knows one location; the operator's box is allowed to be
+    somewhere else). ``_otr_paths.comfy_models_dir()`` (``OTR_MODELS_DIR``)
+    is a third, parked convention -- GO_FORWARD_PLAN 1.4a.
+
+    Never raises. Returns a path string that may not exist; every caller
+    probes existence for itself. The owner is imported LAZILY so this
+    module's cold-import statement above stays true.
     """
-    return os.path.expanduser(
-        os.environ.get("OTR_COMFYUI_MODELS_ROOT")
-        or os.environ.get("COMFYUI_MODELS_ROOT")
-        or r"C:\ComfyUI-Models")
+    try:
+        from .._otr_gguf_backend import _models_root
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_gguf_backend import _models_root  # type: ignore
+    return str(_models_root())
 
 
 # --------------------------------------------------------------------------- #

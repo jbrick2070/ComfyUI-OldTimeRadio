@@ -15,6 +15,7 @@ canonicalization -- so work completed and then failed at the boundary.
 """
 from __future__ import annotations
 
+import shutil
 import pytest
 
 from nodes._otr_shared import boot_contracts as bc
@@ -107,7 +108,7 @@ def test_the_wrapper_bridge_honours_OTR_FFMPEG(monkeypatch, tmp_path):
     fake = tmp_path / "ffmpeg.exe"
     fake.write_bytes(b"")
     monkeypatch.setenv("OTR_FFMPEG", str(fake))
-    monkeypatch.setattr(wb.shutil, "which", lambda name: None)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
     assert wb.resolve_ffmpeg("ffmpeg") == str(fake)
     # argv[0] of an already-built command is rewritten, so every pure builder
     # is covered without changing one tested arg list.
@@ -122,7 +123,7 @@ def test_an_explicit_ffmpeg_still_wins_over_the_env(monkeypatch, tmp_path):
     other = tmp_path / "env.exe"
     other.write_bytes(b"")
     monkeypatch.setenv("OTR_FFMPEG", str(other))
-    monkeypatch.setattr(wb.shutil, "which", lambda name: None)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
     assert wb.resolve_ffmpeg(str(explicit)) == str(explicit)
 
 
@@ -133,7 +134,7 @@ def test_scope_draw_honours_OTR_FFMPEG(monkeypatch, tmp_path):
     fake = tmp_path / "ffmpeg.exe"
     fake.write_bytes(b"")
     monkeypatch.setenv("OTR_FFMPEG", str(fake))
-    monkeypatch.setattr(sd.shutil, "which", lambda name: None)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
     assert sd.find_ffmpeg("ffmpeg") == str(fake)
 
 
@@ -146,7 +147,7 @@ def test_the_mux_identity_proof_resolves_like_the_encode(monkeypatch, tmp_path):
     fake = tmp_path / "ffmpeg.exe"
     fake.write_bytes(b"")
     monkeypatch.setenv("OTR_FFMPEG", str(fake))
-    monkeypatch.setattr(mux.shutil, "which", lambda name: None)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
 
     seen = {}
 

@@ -79,7 +79,7 @@ def comfy_output_dir() -> Path:
     this function is read-only and never creates directories.
     """
     # Tier 1: explicit env override
-    env_override = os.environ.get("OTR_OUTPUT_DIR")
+    env_override = (os.environ.get("OTR_OUTPUT_DIR") or "").strip()
     if env_override:
         return Path(env_override).expanduser()
 
@@ -399,7 +399,10 @@ def otr_state_dir() -> Path:
 
 
 def otr_obs_dir() -> Path:
-    """OBS-watched final-deliverable dir: ``<output>/otr/obs/``.
+    """OBS-watched final-deliverable dir: ``$OTR_OBS_DIR`` when pinned
+    (returned AS TYPED -- unresolved, and not held to the in-tree contract:
+    it is the operator's declared publication root), else
+    ``<output>/otr/obs/`` under the contract.
 
     Holds EXACTLY ONE mp4 per episode -- the final user-facing
     deliverable. As of 2026-05-05 the canonical filename is
@@ -426,6 +429,16 @@ def otr_obs_dir() -> Path:
     item 8 (2026-08-08) then ripped the node entirely. Intermediates
     live under their episode; only the broadcast cut lives here.
     """
+    pinned = (os.environ.get("OTR_OBS_DIR") or "").strip()
+    if pinned:
+        # AN EXPLICIT PIN IS A DECLARED PUBLICATION ROOT, NOT AN ESCAPE
+        # (kibitz runpod-found-fixes R-A, 2026-09-04). The headless launcher
+        # renders into one tree while the operator watches another, and
+        # `_otr_ledger._published_obs_path` already authorizes exactly this
+        # root. The in-tree assert below guards ACCIDENTAL escapes; a path the
+        # operator typed is not one. Returned unresolved, as typed, so the
+        # ledger and the mux compare what was configured.
+        return Path(pinned).expanduser()
     return _validate_contract(comfy_output_dir() / "otr" / "obs")
 
 

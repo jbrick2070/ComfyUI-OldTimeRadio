@@ -477,6 +477,9 @@ class _CloudVideoBase:
     requires_flag = None
     invocable = True
     invocability_reason = ""
+    # No local handles: every render_clip is an independent provider call, so
+    # BeatSession does not ask this family to name one (registry.VideoEngine).
+    session_residency = "remote"
 
     # --- row identity (subclasses) ---
     name = ""
@@ -500,17 +503,15 @@ class _CloudVideoBase:
         # (resolve_auth names OTR_COMFY_API_KEY / logged-in Comfy hidden
         # inputs) -- hidden auth only exists in the prompt context, so a
         # resolve-time env check would wrongly block logged-in desktop users.
-        import shutil
-
+        from .._otr_shared.ffmpeg import resolve_ffmpeg
         from .._otr_shared.ffprobe import resolve_ffprobe
-        # The gate asks the SAME question the canonicalizer will: ffmpeg is
-        # still PATH-only (it runs a literal "ffmpeg"), but ffprobe is now
-        # found the way the probe itself finds it, so an OTR_FFPROBE box is no
-        # longer refused over a tool it has.
-        if not shutil.which("ffmpeg") or not resolve_ffprobe():
+        # The gate asks the SAME question the canonicalizer will, through the
+        # same two owners, so a box configured only through OTR_FFMPEG /
+        # OTR_FFPROBE is not refused over tools it has.
+        if not resolve_ffmpeg() or not resolve_ffprobe():
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MALFORMED_CONFIG,
-                "ffmpeg not on PATH, or no ffprobe (OTR_FFPROBE / PATH / "
+                "ffmpeg not found (OTR_FFMPEG / PATH), or no ffprobe (OTR_FFPROBE / PATH / "
                 "ffmpeg sibling) -- the cloud video canonicalizer strips "
                 "provider audio via ffmpeg (must_strip_audio)",
                 kind="video")

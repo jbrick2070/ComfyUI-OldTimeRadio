@@ -50,13 +50,15 @@ class PortraitUnresolved(LookupError):
 
 def _output_base(output_dir: Optional[str] = None) -> str:
     """The ComfyUI output root (``output_dir`` overrides; tests). Falls back
-    to ComfyUI ``folder_paths``, then the CWD -- resolved LAZILY (V-12)."""
+    to the pack's ONE owner, ``_otr_paths.comfy_output_dir`` (OTR_OUTPUT_DIR,
+    then ``folder_paths``, then the tree walk-up) -- resolved LAZILY (V-12).
+    Until 2026-09-04 this read ``folder_paths`` itself."""
     if output_dir is None:
         try:
-            import folder_paths  # type: ignore
-            output_dir = folder_paths.get_output_directory()
-        except Exception:  # noqa: BLE001
-            output_dir = "."
+            from .._otr_paths import comfy_output_dir
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_paths import comfy_output_dir  # type: ignore
+        output_dir = comfy_output_dir()
     return str(output_dir)
 
 

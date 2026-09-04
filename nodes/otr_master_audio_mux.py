@@ -66,13 +66,16 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     The explicit widget argument still wins when it resolves: an operator who
     typed a path meant it. The env var is consulted only when the passed value
     does not resolve, and PATH remains the last resort.
+
+    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
+    and the widget's own default literal ``"ffmpeg"`` is not a choice: with
+    ffmpeg on PATH that literal used to win here and the pin was never read.
     """
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if cand and (os.path.isfile(cand) or shutil.which(cand)):
-        return cand
-    return shutil.which("ffmpeg") or ""
+    try:
+        from ._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg(ffmpeg) or ""
 
 
 def _ffprobe_bin() -> str:
@@ -693,13 +696,17 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
 
 
 def _episodes_root() -> Path:
-    """``<output>/otr/episodes``, or ``./otr/episodes`` outside ComfyUI."""
+    """The episode workspace root -- the pack's ONE owner's answer
+    (``_otr_paths.otr_episodes_root``). This read ``folder_paths`` itself, so
+    on a server launched with ``--output-directory`` the mux looked under a
+    tree the stills, audio and ledger had already left (kibitz
+    runpod-found-fixes, 2026-09-04). Kept under this name because the
+    publication tests monkeypatch it."""
     try:
-        import folder_paths  # type: ignore
-        root = folder_paths.get_output_directory()
-    except Exception:  # noqa: BLE001
-        root = "."
-    return Path(root) / "otr" / "episodes"
+        from ._otr_paths import otr_episodes_root
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_paths import otr_episodes_root  # type: ignore
+    return otr_episodes_root()
 
 
 def _episode_stem(silent_video_path: str) -> str:
@@ -707,23 +714,18 @@ def _episode_stem(silent_video_path: str) -> str:
 
 
 def _obs_dir() -> Path:
-    """The operator-facing OBS folder. ONE owner for where "published" means.
-
-    ``OTR_OBS_DIR`` pins it explicitly -- on this box the headless server
-    renders into the ComfyUI-Installs tree while the operator watches
-    ``Documents\\ComfyUI\\output\\otr\\obs`` (two-tree split, 2026-06-09), so
-    the launch recipe sets it. Pure: resolves a path and creates nothing, so a
-    caller may ASK where obs is without bringing it into existence.
-    """
-    pinned = os.environ.get("OTR_OBS_DIR", "").strip()
-    if pinned:
-        return Path(pinned)
+    """The operator-facing OBS folder -- the pack's ONE owner's answer
+    (``_otr_paths.otr_obs_dir``): ``OTR_OBS_DIR`` when pinned (the headless
+    launcher renders into one tree while the operator watches another --
+    the two-tree split, 2026-06-09), else ``<output>/otr/obs``. Pure:
+    resolves a path and creates nothing. Kept under this name because the
+    publication tests monkeypatch it; until 2026-09-04 it was the second
+    owner of this answer."""
     try:
-        import folder_paths  # type: ignore
-        root = folder_paths.get_output_directory()
-    except Exception:  # noqa: BLE001
-        root = "."
-    return Path(root) / "otr" / "obs"
+        from ._otr_paths import otr_obs_dir
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_paths import otr_obs_dir  # type: ignore
+    return otr_obs_dir()
 
 
 def _is_inside_obs_dir(path: str) -> bool:
@@ -1117,7 +1119,12 @@ class OTRMasterAudioMux:
         # copied untouched, audio encoded AAC-320k. The ARCHIVAL byte-identical
         # PCM final stays in otr/episodes/<ep>/ (mux gate already asserted it
         # against the frozen master; the master itself is never touched).
-        fb = _ffmpeg_bin("ffmpeg") or "ffmpeg"
+        fb = _ffmpeg_bin("ffmpeg")
+        if not fb:
+            # The mux itself refused earlier on the same answer; keep the
+            # empty-string contract here too instead of running a literal
+            # that fails inside subprocess with a less useful name.
+            raise OSError("obs publish: ffmpeg not found (OTR_FFMPEG / PATH)")
         p = _run([fb, "-y", "-loglevel", "error", "-i", final,
                   "-map", "0:v", "-map", "0:a",
                   "-c:v", "copy", "-c:a", "aac", "-b:a", "320k",

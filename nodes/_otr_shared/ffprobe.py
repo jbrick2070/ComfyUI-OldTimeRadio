@@ -154,7 +154,8 @@ def resolve_ffprobe(preferred=None, *, ffmpeg=None):
     4. ``ffprobe`` on ``PATH`` -- what almost every box actually uses, and
        deliberately ahead of the ffmpeg-sibling guesses below so a normal
        install keeps resolving exactly as it always did.
-    5. the sibling of ``$OTR_FFMPEG``.
+    5. the sibling of the ffmpeg this box runs (``.ffmpeg.resolve_ffmpeg``:
+       the pin, else PATH, else the Windows install dirs).
     6. the sibling of ``ffmpeg`` on ``PATH``.
 
     NEVER RAISES. "This box has no ffprobe" is a fact, and each caller has
@@ -174,7 +175,16 @@ def resolve_ffprobe(preferred=None, *, ffmpeg=None):
     chosen = shutil.which("ffprobe")
     if chosen:
         return chosen
-    for candidate in (os.environ.get("OTR_FFMPEG"), "ffmpeg"):
+    try:
+        from .ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        try:
+            from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore  # nodes/ on sys.path
+        except ImportError:
+            # _otr_shared/ itself on sys.path -- INSERTED, so the local file
+            # shadows the third-party `ffmpeg` package (Fable gate, 2026-09-04).
+            from ffmpeg import resolve_ffmpeg  # type: ignore
+    for candidate in (resolve_ffmpeg(), shutil.which("ffmpeg")):
         sibling = _sibling_of_ffmpeg(candidate)
         if sibling:
             return sibling

@@ -524,6 +524,9 @@ class GoogleVeoVideoEngine:
     commercial_clean = True
     requires_flag = None
     family = "text_to_video"
+    # No local handles: every render_clip is an independent provider call, so
+    # BeatSession does not ask this adapter to name one (registry.VideoEngine).
+    session_residency = "remote"
     required_inputs = ("text_prompt",)
     invocable = True
     invocability_reason = ""
@@ -547,21 +550,20 @@ class GoogleVeoVideoEngine:
         return None
 
     def assert_usable(self, host_caps, profile, request_template=None):  # noqa: ARG002
-        import shutil
-
+        from .._otr_shared.ffmpeg import resolve_ffmpeg
         from .._otr_shared.ffprobe import resolve_ffprobe
 
         resolve_api_key()
-        # ffmpeg is still PATH-only (the canonicalizer runs a literal
-        # "ffmpeg"); ffprobe is found the way the probe itself finds it.
-        if not shutil.which("ffmpeg") or not resolve_ffprobe():
+        # Both tools are found the way their owners find them (OTR_FFMPEG /
+        # OTR_FFPROBE honoured), the same way the canonicalizer will.
+        if not resolve_ffmpeg() or not resolve_ffprobe():
             from .registry import EngineUnusable, EngineUsabilityReason
 
             raise EngineUnusable(
                 self.name,
                 self.family,
                 EngineUsabilityReason.MALFORMED_CONFIG,
-                "ffmpeg not on PATH, or no ffprobe (OTR_FFPROBE / PATH / "
+                "ffmpeg not found (OTR_FFMPEG / PATH), or no ffprobe (OTR_FFPROBE / PATH / "
                 "ffmpeg sibling) -- Google Veo video canonicalizer strips "
                 "provider audio via ffmpeg",
                 kind="video",

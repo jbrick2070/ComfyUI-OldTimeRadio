@@ -89,6 +89,22 @@ def session_identity(engine):
     return (str(value),)
 
 
+def holds_local_handles(engine):
+    """Can this adapter be asked what its handles ARE -- does it have any?
+
+    Keyed on the adapter's DECLARED ``session_residency`` (2026-09-04, kibitz
+    runpod-found-fixes r3). ``"remote"`` means it holds no local handles --
+    ``prepare()`` returns nothing reusable and every ``render_clip`` is an
+    independent provider call -- so nothing can move under a running beat
+    and there is nothing it can honestly name. Everything else is local,
+    FAIL-CLOSED: an absent attribute, or any other spelling, reads as local
+    and the identity demand stands. Before this, every remote lane refused
+    every multi-segment beat; ``word_razzle`` did on the 2026-09-03 pod
+    matrix, for a question it could not answer.
+    """
+    return str(getattr(engine, "session_residency", "") or "").strip().lower() != "remote"
+
+
 class BeatSession:
     """ONE engine, ONE set of handles, ONE beat -- opened and closed once.
 
@@ -174,7 +190,7 @@ class BeatSession:
             raise SessionError(
                 "beat session for %r is already open -- a second open would "
                 "strand the first set of handles" % (self.beat_id or "?",))
-        if self.is_multi_segment:
+        if self.is_multi_segment and holds_local_handles(self.engine):
             # ASK BEFORE LOADING, BASELINE AFTER (2026-07-26, chunk-5 QA panel).
             # The refusal has to come before the weights land -- refusing after
             # a 10 GB load is not refusing. But the BASELINE is captured after
@@ -188,13 +204,16 @@ class BeatSession:
                     "handles but declares no session_identity(), so nothing "
                     "can prove the model segment %d renders with is the one "
                     "segment 1 loaded. Declare the identity (engine, recipe, "
-                    "weights) or render this beat single-clip. NO FALLBACK."
+                    "weights) or render this beat single-clip. An engine that "
+                    "holds NO local handles -- every render_clip an independent "
+                    "provider call -- declares session_residency = 'remote' "
+                    "instead. NO FALLBACK."
                     % (getattr(self.engine, "name", "?"), self.segment_count,
                        self.segment_count))
         self.prepared = self.engine.prepare(
             host_caps=self.host_caps, profile=self.profile,
             session_ctx=self.session_ctx())
-        if self.is_multi_segment:
+        if self.is_multi_segment and holds_local_handles(self.engine):
             try:
                 self.identity = session_identity(self.engine)
             except BaseException:
@@ -276,7 +295,7 @@ class BeatSession:
                     "many beats, so the engine check alone cannot catch a "
                     "session held one loop too long."
                     % (self.beat_id, index, owner))
-        if self.is_multi_segment:
+        if self.is_multi_segment and holds_local_handles(self.engine):
             current = session_identity(self.engine)
             if current != self.identity:
                 raise SessionIdentityDrift(

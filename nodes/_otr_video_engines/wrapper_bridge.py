@@ -1062,9 +1062,12 @@ def extract_terminal_frame(clip_path, out_path, *, ffmpeg="ffmpeg"):
 
 
 def resolve_ffmpeg(ffmpeg="ffmpeg"):
-    """The binary an ffmpeg command should actually run, in ONE order:
-    the explicit value if it resolves, then ``OTR_FFMPEG`` if it resolves,
-    then bare ``ffmpeg`` on PATH.
+    """The binary an ffmpeg command should actually run -- the pack's ONE
+    owner's answer (``_otr_shared.ffmpeg.resolve_ffmpeg``: an explicit
+    choice, then ``OTR_FFMPEG``, then PATH; a bare ``ffmpeg`` is a default,
+    not a choice) kept as a STRING, so argv[0] is never None and a missing
+    binary still surfaces as subprocess's FileNotFoundError -> the named
+    GraphExecutionError in :func:`run_ffmpeg`.
 
     Applied at the two EXECUTION points below rather than in the ten pure arg
     builders, so their tested arg lists are unchanged. Without it this bridge
@@ -1074,13 +1077,12 @@ def resolve_ffmpeg(ffmpeg="ffmpeg"):
     after the expensive work. Every heavy lane (still families, HuMo, LTX,
     MiniMax, Wan, Ghost Signal) encodes through here.
     """
+    try:
+        from .._otr_shared.ffmpeg import resolve_ffmpeg as _resolve
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg as _resolve  # type: ignore
     cand = (ffmpeg or "").strip()
-    if cand and (shutil.which(cand) or os.path.isfile(cand)):
-        return cand
-    env = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if env and (shutil.which(env) or os.path.isfile(env)):
-        return env
-    return shutil.which("ffmpeg") or (cand or "ffmpeg")
+    return _resolve(cand) or (cand or "ffmpeg")
 
 
 def _with_resolved_ffmpeg(cmd):

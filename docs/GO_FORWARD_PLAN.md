@@ -22,6 +22,33 @@ gitignored: pointers to them are 5080-local.
 
 ## STATUS -- WHAT THE 2026-09-03/04 SESSION SETTLED (read before re-deriving any of it)
 
+**2026-09-04, second half -- the runpod-found fixes landed in the commit that
+carries this paragraph, as ONE invariant: a machine fact has ONE owner, and a
+test proves the copies agree.** Full four-round `kibitz-plugin:kibitz` arc
+(Codex gpt-5.6-sol, Antigravity Gemini 3.8 Flash, Cursor grok-4.6 -- r4's
+Cursor seat by a Sonnet substitute plus the operator's manual paste), a Sonnet 5
+QA pass on the named functions (clean; verified live that with nothing pinned
+every answer on the 5080 resolves to the same binary and the same tree -- the
+only string-level change is a resolved path where a bare literal used to be), a
+Fable gate (ship-with-fixes, applied), then the suite -- **13483 passed, 0
+failed** -- and the live publish matrix (three split roots, a pinned ffmpeg
+copy, the shipping 8 GB profile; its receipt is in the commit that follows
+this one). What landed, in 1.4a's rows:
+ffmpeg has one resolver (`_otr_shared/ffmpeg.py`; measured live, 9 of 10 sites
+had ignored `OTR_FFMPEG` on a box with ffmpeg on PATH -- PBUG-20260904-02); the
+output root has one owner and `OTR_OBS_DIR` is a declared publication root
+(R-A); the seven remote video adapters DECLARE `session_residency = "remote"`
+and BeatSession no longer asks them for handles they do not have (R-B, the
+word_razzle pod failure -- PBUG-20260904-03); the models root has one spelling;
+the widget-drift gate has no silent exemption; the nvenc probe is cached per
+binary. Three AST guards (`test_ffmpeg_single_resolution`,
+`test_output_root_single_owner`, `test_models_root_single_spelling`) make the
+claim a test, not a docstring. Bible 12.151-12.154 promoted. The pod
+(`k0ph3m9491yp6s`) was stopped at 7:15 AM after its chain went idle; its seven
+overnight episodes are in `otr/obs`. Side find: the 5080's own Q4_K_M writer
+copy predates the 2026-08-29 pin (PBUG-20260904-04) -- re-downloaded. Open
+threads live in 1.4a row G.
+
 **The big one: character directives were being thrown away, 100% of the time.**
 `derive_creative_directives` batches up to 15 beats and asks for one JSON row
 each, but reached the model through a wrapper hardcoding `max_new_tokens=300`.
@@ -64,7 +91,7 @@ untouched.
 | TIMEOUT (driver's 40 min, render survived -- NOT a defect) | wan_ti2v, fastwan_8gb |
 | OOM at decode (known 24 GB Ada negative) | ltx25_foley_plus, ltx25_mime, ltx25_video |
 | dependency absent on that pod | ltx_video, mesh_stage (portable Blender) |
-| REAL defect | word_razzle -- renders 2 segments from one set of handles and declares no `session_identity()`; fails the same way on the 5080 |
+| REAL defect -- FIXED 2026-09-04 | word_razzle -- refused every beat long enough to split, because `BeatSession` demanded a handle identity from an adapter that holds no handles. The seven remote adapters now DECLARE `session_residency = "remote"` and the demand is skipped for exactly them, fail-closed (kibitz runpod-found-fixes R-B; PBUG-20260904-03) |
 
 A 3-act AnimateDiff episode also passed unattended in 33.7 min.
 
@@ -710,6 +737,25 @@ contract test.** Full record in
   the watched tree. Caption-burn / silent-composite fallbacks are a rostered
   follow-up, not equals of `_publish_to_obs`.
 
+**RESOLVED 2026-09-04 (kibitz r2-r3, built the same day).** Ruling R-A: the
+pin is honoured INSIDE `_otr_paths.otr_obs_dir()` and skips the in-tree assert
+for that path only (returned as typed, no `resolve()`); `_validate_contract`
+untouched; the ledger already authorized both roots. The mux's two functions
+are thin delegates (names kept -- the publication tests monkeypatch them).
+r3 grew the scope: the canonical graph's node 84 (`OTR_SilentComposite`, empty
+`output_path`) writes via `_default_out`, and node 93 writes beside it, so the
+"rostered follow-up" above would have left the canonical chain split -- silent
+composite, caption burn AND `portrait_ledger._output_base` now delegate too.
+Enforced by `tests/test_output_root_single_owner.py` (AST, named allowlist:
+`eng_mesh_stage` because ComfyUI's SaveGLB refuses any path outside
+`folder_paths`' own dir -- NOT a leftover twin, do not "retire" it -- and
+`vram_context_test`, a diagnostic outside the contract). conftest now strips
+`OTR_OBS_DIR` at import (the launch recipe sets it on this box). The `__init__`
+pin is preserved deliberately; removing it is its own design item.
+**Still owed: the live publish matrix** (`--output-directory A`,
+`OTR_OUTPUT_DIR=B`, `OTR_OBS_DIR=<watched>`; everything under B, the mp4 in
+the watched dir, nothing new under A).
+
 **B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
 copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
 `otr_silent_composite.py:123`) and each self-documents that this defect class has
@@ -720,6 +766,24 @@ Two have live gaps, dormant only because nothing calls them:
 `_otr_shared/content_oracle.py::_ffmpeg` (:88) has no PATH fallback at all (that
 module has zero importers). The rest disagree on what to return when nothing
 resolves (`None` / `""` / bare `"ffmpeg"`).
+
+**RESOLVED 2026-09-04 -- and it was not latent (PBUG-20260904-02).** The count
+was twelve, not nine, plus three sites that ran a literal `"ffmpeg"` with no
+resolver at all (`otr_post_upscale_procgen_blend` -- canonical node 93 -- ,
+`eng_google_lyria`, `foley_stems`). Six copies read the caller's own bare
+default as an operator choice, so on any box with ffmpeg on PATH the pin was
+never consulted: measured live on the 5080, 9 of 10 resolvers ignored
+`OTR_FFMPEG`. The cloud preflights refused env-only installs. ONE owner now:
+`nodes/_otr_shared/ffmpeg.py::resolve_ffmpeg` (explicit choice -> pin -> PATH
+-> the Windows install dirs -> `None`; reuses the probe's bare-name rule);
+every runtime site a thin adapter with its own refusal; `resolve_ffprobe`'s
+sibling steps go through it. Guard: `tests/test_ffmpeg_single_resolution.py`,
+three AST rules, NO allowlist. Matrix: `tests/test_ffmpeg_resolution_precedence.py`,
+PATH left available in every case. The nvenc cache is keyed per binary and the
+second cache in front of it (`video_engine._check_nvenc`) is gone.
+Out of scope, named: `scripts/otr_ingest_pd_voices.py:101`,
+`scripts/otr_macbeth_probe.py:603/620/1196` (scripts cannot import the owner
+without the package; convert when a script is next touched).
 
 **C. VERIFIED, LATENT -- the models root is decided twice.**
 `_otr_gguf_backend.py::_models_root()` (:891) existence-gates the legacy
@@ -732,6 +796,18 @@ every caller probes `folder_paths` itself first, but the docstring invites
 standalone use, and a direct caller would break on exactly the fresh-install box
 this repo's notes keep warning about.
 
+**RESOLVED 2026-09-04 -- delegated, not reworded.** `configured_models_root()`
+now returns `str(_models_root())` through a LAZY import (the module's V-12
+cold-import statement holds, and `tests/test_models_root_single_spelling.py`
+pins both the equality under every env state and the absence of a top-level
+import). The "ONE spelling" sentence is true instead of admitting it was false.
+The third convention, `_otr_paths.comfy_models_dir()` / `OTR_MODELS_DIR`, stays
+parked (cursor r3: do not open a third env in this diff). A FOURTH spelling
+belongs to the same parked item (agy r4): `_otr_image_engines/flux2_klein.py:209-215`
+probes `folder_paths` first, then the two env vars, and never the legacy tree --
+the inverse of `_models_root`'s order. When the merge happens it has four
+owners to retire, not three.
+
 **D. VERIFIED, RISKY -- the widget-drift HARD GATE has a silent escape hatch.**
 `_otr_workflow_validator.py:172` -- `try: expected = _expected_slot_count(...)
 except Exception: continue`. This backs the gate at :497 that exists to catch the
@@ -739,6 +815,19 @@ BUG-210/253/281 silent-widget-shift class. Any node whose `INPUT_TYPES()` raises
 silently exempted with no log, and the gate can report `widget_vector_drift=0`
 having never checked it. Owed: log the skip at minimum, and decide whether an
 un-introspectable node should fail the gate rather than pass it.
+
+**RESOLVED 2026-09-04 (`ad89a45b`).** A raising `INPUT_TYPES()` is a named drift
+FINDING (node id, type, exception class, repr'd message), so the hard gate
+fails; every class reaching that line is ours (third-party types are skipped
+above it), so there was no foreign-node cost to weigh. Precise blast radius,
+found while writing the public-path test: `validate_workflow_contract` already
+raised on a raising `INPUT_TYPES()` for `OTR_`-prefixed types BEFORE the drift
+gate, so the node's own `validate()` was fail-closed all along -- the hatch
+mattered for the STANDALONE callers of `widget_vector_drift` (the canonical-graph
+integrity test could report zero drift on a class it never checked) and for any
+mapped class without the prefix. The `validate_anyway` tooltip no longer claims
+the switch "never blocks the episode". 7 tests in
+`tests/test_widget_drift_gate_no_silent_exemption.py`.
 
 **E. VERIFIED, DEAD -- 12 symbols with exactly one repo-wide reference (their own
 definition), confirmed by `git grep -n -w -F`:** `MAX_HEADLINE_CLEAN_CHARS`
@@ -765,6 +854,57 @@ so the preceding `== "humo"` always wins). `scripts/otr_machine_matrix.py:124`
 `load_classes(_profiles=None)` never reads the parameter and both call sites pass
 nothing. `_otr_paths.py:449` `episodes_for_obs_dir()` claims to be kept "for
 back-compat with existing imports" and has zero callers.
+
+**G. FOLLOW-UPS THE 2026-09-04 ARC SURFACED AND DID NOT BUILD -- each with the
+reason it waits.**
+* `otr_post_upscale_procgen_blend.py` keeps a `sys.path` insert of `nodes/` for
+  ComfyUI's flat loading. Both tool owners it uses (`_otr_shared.ffmpeg`,
+  `_otr_shared.ffprobe`) now import package-relative first with the flat
+  fallback, and its unused flat `_otr_paths` import is gone -- the flat-first
+  spelling had made a SECOND module instance of the owner that no fixture could
+  reach (it kept its own Windows-dir tuple and answered a test the fixture
+  thought it had muted). Only the insert itself remains; it is what the flat
+  fallbacks need.
+* `tests/test_openrouter_slug_curation.py::test_routers_appear_in_both_slot_dropdowns_and_auto_leads`
+  passes on this box only because of an UNTRACKED catalog cache ("no OpenRouter
+  models cached -- run refresh_catalog_cache" in a clean worktree). A machine-local
+  lie; the test should build the cache it needs or skip by name.
+* The google omni / veo / image adapter tests resolve `comfy_output_dir()` without
+  pinning `OTR_OUTPUT_DIR`, so on the real tree they write provider bytes under the
+  live `output/otr/episodes/_shared/tmp/`; in a worktree the Tier-3 walk-up lands
+  on `C:\Users\output` and they fail. Pin in their fixtures.
+* **UNFOUND EXPORTER (2026-09-04):** inside a pytest session `OTR_OUTPUT_DIR` is
+  set to `C:\Users\jeffr\Documents\ComfyUI\output` -- exactly the value the package
+  `__init__.py:97-108` pin would compute -- yet it is NOT set by `tests/conftest.py`
+  (import, `pytest_configure`, `pytest_sessionstart`), `tests/__init__.py`,
+  `pyproject.toml`, any registered plugin (anyio, hydra, langsmith, pytest_asyncio)
+  or by importing the mux in plain Python. Consequence: a test that injects an
+  output root ONLY through a `folder_paths` stub is overridden once the reader it
+  drives delegates to the owner (three `test_video_render_path_cw4` tests broke this
+  way and now pin the env too). Find the exporter; then decide whether conftest
+  should strip `OTR_OUTPUT_DIR` at import the way it now strips `OTR_OBS_DIR`.
+* `otr_credits_roll.py:149` reads `.git/HEAD` for the production ledger's commit
+  rev; a git WORKTREE has a `.git` pointer FILE, so 44 credits tests fail there.
+  Harmless in production; the reader should follow a gitdir pointer.
+* A RECIPE identity for remote video lanes (see R-B above): logged, not built.
+* Scripts' own ffmpeg readers (`otr_ingest_pd_voices.py:101`,
+  `otr_macbeth_probe.py:603/620/1196`): convert when a script is next touched.
+* `.kibitz/comfyui.local.md:26` records 23 nodes / 60 links / 132 widget slots;
+  the canonical graph is 23 / 61 / 133. Regenerate with `--force` before the next
+  arc.
+* The `__init__.py:97-108` output pin: preserved deliberately (it is what makes
+  every helper agree inside ComfyUI); removing it changes where Desktop installs
+  render and is its own design item.
+* **The draft 8 GB profiles cannot write at all (PBUG-20260904-05):**
+  `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b` (all `status: draft`) set
+  `gguf_n_ctx: 2048`, and the writer prompt alone is 2,741 tokens on
+  `science_news` and 3,338 on `original` -- the budget refuses loud before
+  writing a word, on any bank. The row that SHIPS, `otr_4060_12b_gguf_offload`,
+  runs the same 12B at `gguf_n_ctx: 4096` (measured 7.8 of 8.2 GB) and fits.
+  Design call, owed a kibitz arc: retire or re-context the drafts, pair a
+  smaller pinned writer (Qwen3-4B / gemma E4B are on disk), or make the plan
+  stage refuse a profile whose context cannot hold its own prompt -- in the
+  profile/variant layer, never a silent truncation. The 4060 owns the 8 GB rows.
 
 **FIXED IN THIS SESSION -- the audit's best catch was the driver's own slop from
 the night before.** Four rows, all introduced 2026-09-03 and corrected 09-04:
@@ -1607,13 +1747,29 @@ the cloud `word_razzle` row -- retire it, or rename it `cloud_word_razzle` so th
 roster is honest either way. Renaming alone would fix the transparency defect
 even if the local lane never lands.
 
-**Separately noted, already fixed:** `word_razzle` failed the 2026-09-03 pod
-matrix with `SessionIdentityUnavailable` -- it would render 2 segments from one
-set of handles but declares no `session_identity()`. That is NOT a credentials
-problem and NOT pod-specific; it fails the same way on the 5080 for any beat
-long enough to need two segments. Eight engines declare the identity
-(ghost_signal, humo, ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v);
-the cloud adapters do not.
+**Separately noted -- FIXED 2026-09-04 (kibitz runpod-found-fixes, ruling R-B;
+PBUG-20260904-03).** `word_razzle` failed the 2026-09-03 pod matrix with
+`SessionIdentityUnavailable` -- it would render 2 segments from one set of
+handles but declares no `session_identity()`. NOT a credentials problem and NOT
+pod-specific: the same refusal fires on the 5080 for any beat long enough to
+need two segments, on every one of the seven remote adapters. (This paragraph
+said "already fixed" for a day while the refusal was untouched; the roster
+test's tripwire was the only honest record.)
+
+The fix is a DECLARATION, not an inference: `_CloudVideoBase` (five rows),
+`google_omni_video` and `google_veo_video` set `session_residency = "remote"`,
+and `beat_session.holds_local_handles()` skips the identity demand for exactly
+them -- fail-closed, so an absent or misspelt attribute still reads as local and
+the demand stands. No `session_identity()` was added to any cloud adapter: an
+identity of handles that do not exist would be theater. The roster test is keyed
+on the declaration and a control pins that no engine declares remote AND a local
+isolation. Eight local engines still declare the identity (ghost_signal, humo,
+ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v).
+
+**Not done, and the predicate question if anyone wants it:** a RECIPE identity
+for remote lanes (model id + resolution + params), so a mid-beat env flip is
+caught for a cloud lane the way weight drift is caught for a local one. Nobody
+has asked for long cloud beats; log it, do not build it.
 
 ## SECTION 5 -- Bug Bible promotion field -- pending actions only
 

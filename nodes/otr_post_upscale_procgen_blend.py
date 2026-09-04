@@ -47,21 +47,34 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Ensure sibling node modules (e.g. _otr_paths) resolve when this file is
-# loaded by ComfyUI's custom-node loader, so otr_obs_dir() is reachable as
-# the canonical write target for the broadcast-ready blended mp4. (The
-# pattern was originally copied from rtx_upscale.py, which queue item 8
-# deleted; it is standard across the pack.)
+# Ensure sibling node modules (e.g. _otr_shared) resolve when this file is
+# loaded FLAT by ComfyUI's custom-node loader -- the flat fallbacks of the
+# two try/except imports below need it. Package-relative comes FIRST in
+# each: the flat spelling resolves through this insert even inside the
+# package and yields a SECOND module instance of the owner it names
+# (kibitz runpod-found-fixes r3/r4, 2026-09-04).
 _NODES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _NODES_DIR not in sys.path:
     sys.path.insert(0, _NODES_DIR)
 
-from _otr_paths import otr_audio_dir, otr_obs_dir  # noqa: E402
+try:
+    from ._otr_shared.ffmpeg import resolve_ffmpeg  # noqa: E402
+except ImportError:  # pragma: no cover -- flat (sys.path) load
+    from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore  # noqa: E402
 
-try:  # ComfyUI loads these node modules flat as well as packaged
+
+def _ffmpeg_bin(ffmpeg: str = "ffmpeg") -> str:
+    """The pack's ONE ffmpeg answer, kept as a string. This node's widget
+    default is the bare literal, and until 2026-09-04 that literal went
+    straight into every subprocess here (decode, blend, bars), so a box whose
+    ffmpeg is reachable only through OTR_FFMPEG blended nothing -- and no
+    resolver copy existed for the guard to catch."""
+    return resolve_ffmpeg(ffmpeg) or (str(ffmpeg or "").strip() or "ffmpeg")
+
+try:
+    from ._otr_shared import ffprobe as _ffp  # noqa: E402
+except ImportError:  # pragma: no cover -- flat (sys.path) load
     from _otr_shared import ffprobe as _ffp  # type: ignore  # noqa: E402
-except ImportError:  # pragma: no cover -- packaged import
-    from nodes._otr_shared import ffprobe as _ffp  # type: ignore  # noqa: E402
 
 # NOTE: the SDH caption builder import (build_ass_from_ledger) was removed here in
 # the 2026-07-04 widget-audit Batch 3 -- captions migrated to node 86
@@ -858,6 +871,7 @@ class PostUpscaleProcgenBlend:
         audio_bars: str = "bottom",
     ):
         report_lines: list[str] = []
+        ffmpeg = _ffmpeg_bin(ffmpeg)
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
         pgn = Path(procgen_mp4_path).resolve() if procgen_mp4_path else None
         scp = Path(scopes_mp4_path).resolve() if scopes_mp4_path else None

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional, TypedDict
 
 from .cloud_media_backend import CloudErrorCode, CloudMediaError
+from .ffmpeg import resolve_ffmpeg
 
 __all__ = [
     "PartnerResult",
@@ -144,7 +145,6 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
     ("stereo"|"mono", default stereo), optional ``target_duration_s`` +
     ``out_path``. ``session`` is accepted for signature parity (unused here)."""
     import hashlib
-    import shutil
     import subprocess
     import numpy as np
 
@@ -153,8 +153,7 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
     sr = int(request.get("sample_rate") or 44100)
     ch = 1 if str(request.get("stereo_policy") or "stereo").lower() == "mono" else 2
 
-    ffmpeg = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
-        or shutil.which("ffmpeg")
+    ffmpeg = resolve_ffmpeg()
     if not ffmpeg:
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
                               "ffmpeg not found -- cannot canonicalize audio")
@@ -373,15 +372,9 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
                     src.with_suffix("")).with_suffix(".canon.mp4")
     vf = (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
           f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps={fps},format=yuv420p")
-    # Same resolution order the AUDIO canonicalizer above already uses:
-    # OTR_FFMPEG then PATH. This built a literal "ffmpeg", so on an env-only
-    # install audio canonicalized and video did not. `shutil` is imported
-    # locally here, matching that function's own convention (this module keeps
-    # its top-level import surface stdlib-minimal).
-    import shutil
-
-    ffmpeg_bin = shutil.which(os.environ.get("OTR_FFMPEG") or "ffmpeg") \
-        or shutil.which("ffmpeg")
+    # The pack's ONE ffmpeg answer (the pin, then PATH) -- the same one the
+    # AUDIO canonicalizer above and every episode-stage encoder use.
+    ffmpeg_bin = resolve_ffmpeg()
     if not ffmpeg_bin:
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
                               "ffmpeg not found -- cannot canonicalize video")

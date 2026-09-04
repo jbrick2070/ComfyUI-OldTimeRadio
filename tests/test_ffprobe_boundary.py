@@ -42,10 +42,15 @@ def _touch(path: Path) -> str:
 
 @pytest.fixture()
 def clean_env(monkeypatch):
-    """No OTR pins and nothing on PATH -- every test opts its own pieces back in."""
+    """No OTR pins, nothing on PATH, and none of the ffmpeg owner's Windows
+    install dirs -- every test opts its own pieces back in. (The probe's
+    sibling steps go through ``_otr_shared.ffmpeg`` since 2026-09-04, and on
+    the reference box the WinGet dir really holds an ffmpeg.)"""
+    from nodes._otr_shared import ffmpeg as ffm
     monkeypatch.delenv("OTR_FFPROBE", raising=False)
     monkeypatch.delenv("OTR_FFMPEG", raising=False)
     monkeypatch.setattr(ffp.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ffm, "_WINDOWS_INSTALL_CANDIDATES", ())
     return monkeypatch
 
 

@@ -23,10 +23,10 @@ could not render. That is the most expensive possible place to learn it.
 This gate asks the partitioner itself which engines it will split, and requires
 an identity from exactly those. It costs a second and it fails in the suite.
 
-SCOPE, HONESTLY. The gate covers engines that declare an isolation
-(`in_process` / `sidecar_optional`) -- the ones whose handles are real local
-objects that CAN move under them. Cloud and remote-dispatch engines declare no
-isolation, hold no local handles, and are covered by
+SCOPE, HONESTLY. The gate covers engines that hold LOCAL handles -- the ones
+whose weights CAN move under a running beat. Remote-dispatch engines DECLARE
+`session_residency = "remote"` (no local handles; every render is an
+independent provider call, 2026-09-04) and are covered by
 `test_the_cloud_gap_is_known_and_named` below instead of being silently
 excluded.
 """
@@ -68,13 +68,16 @@ def _splits(name):
 
 
 def _holds_local_handles(name):
-    """Does this engine load handles in THIS process?
+    """Does this engine load handles in THIS process (or a sidecar)?
 
-    `MotionEngineBase` sets `declared_isolation`; a cloud or remote-dispatch
-    adapter does not. Only a local handle can move under a running beat, so
-    only a local engine can be asked to name one.
+    Keyed on the engine's DECLARED ``session_residency`` (2026-09-04): an
+    adapter that says ``"remote"`` holds no local handles -- ``prepare()``
+    returns nothing reusable and each ``render_clip`` is an independent
+    provider call -- so nothing can move under a running beat and nothing it
+    can honestly be asked to name. Anything that does not say so is local,
+    fail-closed, exactly as ``beat_session`` reads it.
     """
-    return bool(getattr(vreg.get_engine(name), "declared_isolation", None))
+    return bs.holds_local_handles(vreg.get_engine(name))
 
 
 IN_SCOPE = [n for n in _engines() if _splits(n) and _holds_local_handles(n)]
@@ -98,8 +101,9 @@ def identity_is_stable(engine):
     return bs.session_identity(engine) == bs.session_identity(engine)
 
 
-#: The KNOWN gap: engines the partitioner will split that hold no local handles
-#: and declare no identity. Named once, asserted from two directions below --
+#: The DECLARED remote set: engines the partitioner will split that say
+#: `session_residency = "remote"` (no local handles, so BeatSession asks them
+#: for no identity). Named once, asserted from two directions below --
 #: the tripwire compares the live roster against it, and the control re-asserts
 #: it independently, so weakening either one alone does not stop the other
 #: noticing a substitution inside the set.
@@ -235,27 +239,25 @@ def test_the_engines_that_forced_this_gate_are_still_covered_by_it():
 
 
 def test_the_cloud_gap_is_known_and_named():
-    """The gate above deliberately does NOT cover cloud engines, and that
-    exclusion is written down here rather than left as a silent narrowing.
+    """The gate above deliberately does NOT cover remote engines, and that
+    exclusion is DECLARED, not inferred: each of these adapters says
+    ``session_residency = "remote"`` -- it holds no local handles, so
+    ``BeatSession`` does not ask it to name one (2026-09-04). Before that
+    the session refused every multi-segment beat on these lanes for a
+    question they could not answer; ``word_razzle`` did exactly that on the
+    2026-09-03 pod matrix.
 
-    Twelve remote-dispatch engines DO split a 30-second beat and declare no
-    identity. `render_beat_coverage` opens a `BeatSession` unconditionally, so
-    routing one of them through a multi-segment beat would refuse exactly the
-    way `ltx_video` did. Nobody has: this box is local-only and no cloud lane
-    has run a multi-clip beat. The reason it is not fixed here is that a cloud
-    adapter holds NO local handles, so "the model segment 2 renders with" is
-    not a question it can honestly answer -- the right fix is a decision about
-    whether BeatSession should demand an identity from an engine with no
-    residency at all, and that is a design call, not a missing method.
-
-    This test fails the day that set CHANGES, which is the point: it is a
-    tripwire on a known gap, not a blessing of it.
+    This test fails the day that set CHANGES, which is the point: a new
+    remote engine must declare itself here, on purpose, and a local engine
+    that starts claiming "remote" to dodge the gate trips the residency
+    control below.
     """
     assert set(CLOUD_SPLITTERS) == EXPECTED_CLOUD_GAP, (
-        "the set of splittable engines with NO local handles changed: %s. "
-        "If an engine ARRIVED here, decide whether BeatSession should demand "
-        "an identity from an engine with no residency. If one LEFT because it "
-        "grew local handles, it now belongs in the gate above."
+        "the set of splittable engines declaring session_residency='remote' "
+        "changed: %s. If an engine ARRIVED here, confirm it holds no local "
+        "handles (prepare() returns nothing reusable, teardown is a no-op). "
+        "If one LEFT because it grew local handles, it now belongs in the "
+        "gate above."
         % sorted(CLOUD_SPLITTERS))
 
 
@@ -275,12 +277,14 @@ def test_the_cloud_gap_is_known_and_named():
 class _FakeEngine:
     """The smallest thing the gate's predicates read."""
 
-    def __init__(self, name, *, isolation=None, identity=None):
+    def __init__(self, name, *, isolation=None, identity=None, residency=None):
         self.name = name
         if isolation is not None:
             self.declared_isolation = isolation
         if identity is not None:
             self.session_identity = identity
+        if residency is not None:
+            self.session_residency = residency
 
 
 def test_CONTROL_the_gate_rejects_a_local_splittable_engine_with_no_identity():
@@ -299,16 +303,35 @@ def test_CONTROL_the_gate_rejects_a_local_splittable_engine_with_no_identity():
 
 
 def test_CONTROL_local_handles_are_told_apart_from_remote_dispatch():
-    """`_holds_local_handles` keys on a DECLARED isolation. A version that
-    answers True for everything would drag twelve cloud engines into a gate
-    they cannot satisfy; one that answers False for everything would empty the
-    gate silently."""
+    """`_holds_local_handles` keys on a DECLARED residency. A version that
+    answers True for everything would drag the remote engines into a gate
+    they cannot satisfy; one that answers False for everything would empty
+    the gate silently; and an unknown spelling, or no declaration at all,
+    must read as LOCAL -- the demand stands unless the adapter said
+    otherwise."""
     local = _FakeEngine("fake_local", isolation="in_process")
     sidecar = _FakeEngine("fake_sidecar", isolation="sidecar_optional")
-    cloud = _FakeEngine("fake_cloud")
-    assert bool(getattr(local, "declared_isolation", None))
-    assert bool(getattr(sidecar, "declared_isolation", None))
-    assert not bool(getattr(cloud, "declared_isolation", None))
+    remote = _FakeEngine("fake_remote", residency="remote")
+    misspelt = _FakeEngine("fake_cloudish", residency="cloud")
+    undeclared = _FakeEngine("fake_silent")
+    assert bs.holds_local_handles(local)
+    assert bs.holds_local_handles(sidecar)
+    assert not bs.holds_local_handles(remote)
+    assert bs.holds_local_handles(misspelt)
+    assert bs.holds_local_handles(undeclared)
+
+
+def test_a_remote_declaration_never_sits_on_an_engine_that_loads_weights():
+    """The declaration is only honest on an adapter with nothing to name.
+    A local engine (one that sets `declared_isolation`, i.e. loads weights
+    in-process or in a sidecar) claiming "remote" would dodge the gate;
+    this pins that no registered engine does both."""
+    for name in _engines():
+        engine = vreg.get_engine(name)
+        if not bs.holds_local_handles(engine):
+            assert not getattr(engine, "declared_isolation", None), (
+                "%s declares session_residency='remote' AND a local isolation"
+                % name)
 
 
 def test_CONTROL_the_stability_check_catches_an_identity_that_drifts():

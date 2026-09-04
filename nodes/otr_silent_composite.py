@@ -140,13 +140,16 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     The explicit widget argument still wins when it resolves: an operator who
     typed a path meant it. The env var is consulted only when the passed value
     does not resolve, and PATH remains the last resort.
+
+    ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
+    and the widget's own default literal ``"ffmpeg"`` is not a choice: with
+    ffmpeg on PATH that literal used to win here and the pin was never read.
     """
-    if ffmpeg and (shutil.which(ffmpeg) or os.path.isfile(ffmpeg)):
-        return ffmpeg
-    cand = (os.environ.get("OTR_FFMPEG") or "").strip()
-    if cand and (os.path.isfile(cand) or shutil.which(cand)):
-        return cand
-    return shutil.which("ffmpeg") or ""
+    try:
+        from ._otr_shared.ffmpeg import resolve_ffmpeg
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+    return resolve_ffmpeg(ffmpeg) or ""
 
 
 def _ffprobe_bin() -> str:
@@ -1690,17 +1693,20 @@ class OTRSilentComposite:
             return float("nan")
 
     def _default_out(self, base_video_path: str) -> str:
-        try:
-            import folder_paths  # type: ignore
-            root = folder_paths.get_output_directory()
-        except Exception:  # noqa: BLE001
-            root = "."
         # OUTPUT HYGIENE (operator directive 2026-06-09): every per-episode
         # asset lives INSIDE that episode's own folder under otr/episodes/<ep>/
         # -- never loose at the episodes root. The base video stem IS the
-        # episode slug.
+        # episode slug. The root is the pack's ONE owner's answer
+        # (`_otr_paths.otr_episodes_root`, 2026-09-04): this read
+        # `folder_paths` itself, so on a server launched with
+        # --output-directory the canonical graph's node 84 wrote beside a
+        # tree every earlier stage had already left.
+        try:
+            from ._otr_paths import otr_episodes_root
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_paths import otr_episodes_root  # type: ignore
         stem = os.path.splitext(os.path.basename(base_video_path or "episode"))[0]
-        out_dir = os.path.join(root, "otr", "episodes", stem)
+        out_dir = os.path.join(str(otr_episodes_root()), stem)
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
