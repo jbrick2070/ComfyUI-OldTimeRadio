@@ -4255,3 +4255,859 @@ Open risks that have no live receipt yet.
 
 ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
 ```
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.2 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review r
+
+### 1.2 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review round, then code
+
+Left open, recorded in PBUG-20260815-04's follow-up: a given-name alias can
+match a different character with that surname (COLONEL FITZWILLIAM via "fitzwilliam"; right
+here by coincidence) -- a surname-only alias for the short_form tier is the next fork.
+
+Operator rulings folded: ARIEL / PUCK / ROBIN stay on the roll (locked index entries); Dr. Lira Kell is
+female (locked).
+
+**TWO OPERATOR RULINGS, 2026-08-28, and they reshape the spec:**
+
+* **Shakespeare: fill ONLY the 32 `unknown` roster rows.** KNOWN rows from the
+  parsed dramatis personae stay untouchable; the ladder's lower tiers may fill
+  the blanks.
+* **THE WEB-SEARCH TIER IS REPLACED, not plumbed.** Operator's design, his
+  words: *"just have the LLM decide -- ask what the likely gender of this
+  person name is, have the LLM decide, and keep that in an index of names."*
+  So tier 3 becomes an LLM VERDICT ON THE NAME (the model already knows
+  Scrooge and Marley from training -- no live search needed), cached in a
+  PERSISTENT name index so each name is asked once, ever. Tier 4
+  name-frequency stays as the deterministic floor beneath it, keeping the
+  ladder TOTAL when the LLM call fails. This dissolves both review rounds'
+  biggest must-fix (the silent no-op web call): there is no web call. On his
+  "is it not easy to query a search engine?" -- keyless search-engine querying
+  is the fragile part (scraping is blocked/ToS; keyless APIs are thin); the
+  RSS precedent covers feeds because feeds are MEANT to be fetched. The
+  LLM-ask design avoids the whole problem, offline-first.
+  The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING
+  by the standing ruling -- their characters do not exist, so no lookup of
+  any kind applies.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.3 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
+
+r1 verdict (2026-08-31, Codex `no` / Antigravity `yes-with-fixes` / Cursor `no`; artifacts
+`kibitz-runs/2026-08-31-ghost-clause-pool/r1/`, 5080-local; narrative in
+`docs/GO_FORWARD_ARCHIVE.md`): **the pool is not too small, the duplicate check is.** The
+picture is four slots (`GHOST_V2_SLOTS`) and the check reads one (`key = leaf.casefold()`
+in `otr_shot_lock.py`), so two beats with the same leaf and different characters are
+rejected although they render different pictures. That is why 6 -> 18 failed and why 50
+would fail too.
+
+(The r1 anchor's "roughly 70 minutes" failure was the zero-frame beat, PBUG-20260831-01; not this row.)
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.4 OPEN DEFECTS THAT ARE CODING WORK (queue item 3c; a leg may prove some later, none needs a l
+
+#### The P0 / source-span cluster (2026-07-30)
+
+- **`full_text` HTML block joins fuse tokens** (`...PolygonsNASA/JPL-`, `...School
+  ofEngine`, `...doing.Let's s`, `...(AMR).The resea`): the dominant P0 span-rejection
+  cause on live evidence. The RSS adapter strips tags without inserting whitespace, and
+  `_normalize_span_source_text` can collapse runs but cannot insert a space that was never
+  there. Owed, after Section 3 question B is ruled: name the adapter that builds
+  `full_text`, insert the separator at admission without breaking any accepted ledger's
+  `source_digest`, and pin a fixture from those four strings. Belongs in the source
+  adapter, not the codex normalizer. History: `docs/GO_FORWARD_ARCHIVE.md`.
+
+- **The deterministic P0 rung PRUNES SILENTLY, which violates the plan's own
+  Invariant 3.** `repair_literal_source_metadata` drops an unsupported span, then its
+  evidence row, then the fact -- and emits no receipt. An accepted P0 index simply
+  has fewer facts than the model wrote, and nothing says which were dropped or why.
+
+- **The deterministic P0 rung is ALL-OR-NOTHING across an artifact, and can poison
+  its own good work.** It is handed `a0_payload` (all seven keys) while
+  `_validate_fact_index` restricts spans to `allowed_source_fields` (the projection).
+  A quote rehomed into a field the projection omitted makes `post_validator` reject
+  the WHOLE repaired artifact -- "cites source field ... outside the supplied P0
+  evidence" -- so one unlucky rehome discards every correct prune in the same pass.
+  Either give the repairer the allowlist or prune per row.
+
+- **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs provider cap
+  `512`; the whole-artifact retry contracts LANDED @ `314dd481` are the base; the
+  residual fix is now unblocked.
+
+#### The orphan-occupancy registry (design item -- full arc BEFORE code)
+
+Deferred three times as correctly out of scope for the
+cache-bookkeeping fixes (PBUG-20260825-04, `fb67d059`; arc history in the archive), and
+each cut of that fix found a new race, so this is a genuine design choice: full arc first.
+`da2b7a36` (the dispatcher frees the writer before the first local still) narrows the
+image-stage exposure but does not build the registry.
+
+#### Coverage, canvas and clip-contract
+
+- **The route lock is ONE NODE TOO LATE for the image phase** (found 2026-07-25, node
+  order confirmed against the canonical JSON: ...). The landed fix closed the spine-validation gap; the image phase still
+  relies on its own MIRROR (`otr_meta_brief_image_prompt._effective_prompt_engine_for_role`,
+  whose docstring says it "mirrors the image dispatcher's effective-engine seam").
+
+- **The ShotLock WRITE-side canvas validation is still owed** (O1 judgment item 1).
+  B5 made this non-load-bearing for the render (the engine declares its own
+  canvas now), so it is no longer urgent -- the drift guard in
+  `tests/test_ltx_8gb_canonical_canvas.py` covers the disagreement that matters.
+
+- **`ltx_av` underruns long beats** (found 2026-07-25, codex; confirmed).
+
+#### Voice engines
+
+- (PBUG-20260902-03; ROOT-PINNED 2026-09-02 14:20). The 4060 Leg C5 episode
+  lost both announcer lines to a 1.4 kHz tone; a direct engine probe on the same box
+  then rendered the exact announcer line as speech and a 9-word character line as
+  seven seconds of noise plus a 2.5 kHz tone. So it is the engine's roll, not the
+  announcer graph, not the knobs, not line length (the 180-character chunker already
+  exists). ... test = a stub engine that returns a tone first
+  and speech second yields speech in one retry.
+
+#### Routing, env-capture and the credits card
+
+- **Env-read sites missing from the S0b inventory** (was four; the `OTR_ENABLE_LTX_I2V`
+  site was DELETED by the 2026-08-28 retirement, so two remain)
+
+- **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At
+  512x288 (the ltx_8gb tier) col1 is 65px past its footer even with every ledger row
+  this policy may drop already dropped; at 640x360 it is 12px over. Both are drawn
+  anyway (a terminal node never destroys a finished episode) and LOGGED at ERROR
+  naming the canvas -- the old behaviour was drawn, clipped by PIL, silent. At 288
+  lines the three-column console is already a polite fiction: col3's scrolling
+  transcript is as unreadable as anything col1 clips.
+
+#### 1.4a DEAD CODE / DUPLICATED-DECISION AUDIT (2026-09-04) -- three Sonnet lanes, driver-verified
+
+Every row below was re-checked against the real files by the driver before it was
+written down; the REJECTED list is part of the record precisely so a discarded
+claim is not re-raised as a fresh finding.
+
+**STANDING RULINGS FROM THE AUDIT (rows A-F are built; the receipts are in the archive,
+these sentences are not).**
+
+**G. FOLLOW-UPS THE 2026-09-04 ARC SURFACED AND DID NOT BUILD -- each with the
+reason it waits.**
+* `tests/test_openrouter_slug_curation.py::test_routers_appear_in_both_slot_dropdowns_and_auto_leads`
+  passes on this box only because of an UNTRACKED catalog cache ("no OpenRouter
+  models cached -- run refresh_catalog_cache" in a clean worktree).
+* The google omni / veo / image adapter tests resolve `comfy_output_dir()` without
+  pinning `OTR_OUTPUT_DIR`, so on the real tree they write provider bytes under the
+  live `output/otr/episodes/_shared/tmp/`; in a worktree the Tier-3 walk-up lands
+  on `C:\Users\output` and they fail.
+* **UNFOUND EXPORTER (2026-09-04):** ... (import, `pytest_configure`, `pytest_sessionstart`), `tests/__init__.py`,
+  `pyproject.toml`, any registered plugin (anyio, hydra, langsmith, pytest_asyncio)
+  or by importing the mux in plain Python. Consequence: a test that injects an
+  output root ONLY through a `folder_paths` stub is overridden once the reader it
+  drives delegates to the owner (three `test_video_render_path_cw4` tests broke this
+  way and now pin the env too).
+* **NEW BUILD ITEM, arc opened 2026-09-04 -- collapse the registry scan from
+  158 findings to about five by the one-owner rule** ... Measured from
+  alpha.17's real payload: the env rule fires ONCE PER FILE (103 findings, 103
+  files), so one `os.environ` owner takes it to 1; the subprocess rule fires per
+  site (35 in 20 files), so one process runner takes it to ~2.
+* (d) From the `-02` window:
+* **The draft 8 GB profiles cannot write on two of the three banks
+  (PBUG-20260904-05):** ... `media_archive` FITS: attempt 5 of the publish matrix
+  above rendered and published on `8gb_lite` with that bank, so the fault is
+  the bank-plus-context pairing, not the profile alone. The row that SHIPS,
+  `otr_4060_12b_gguf_offload`,
+  runs the same 12B at `gguf_n_ctx: 4096` (measured 7.8 of 8.2 GB) and fits.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design ite
+
+Shape (settle the details in the arc, do not re-derive these):
+* A second backend inside `nodes/_otr_audio_engines/eng_kokoro.py` (247 lines; today it loads
+  `KPipeline`). ONNX path: load model + voices, phonemize with espeak-ng, run onnxruntime,
+  return 24 kHz audio.
+* Weights: kokoro-onnx expects `kokoro-v1.0.onnx` + one `voices-v1.0.bin` (an npz keyed by
+  voice, GitHub release `model-files-v1.1`); the HF mirror `onnx-community/Kokoro-82M-v1.0-ONNX`
+  (ungated; model 86 MB q8f16 to 326 MB full, 55 per-voice `.bin` files at 0.5 MB) uses a
+  different per-voice format.
+* it is an 82M model and faster than realtime on CPU.
+* That dissolves the indextts2-default half of the ship-audit finding (the
+  reference-WAV preflight is the bullet below)
+* (the surviving half of the ship-audit indextts2 finding)
+* so README can say "want a better TTS, install it yourself, here is what runs where" and point at one table.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.9 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto do
+
+Today only the writer LLMs, bark, musicgen and the kokoro voices fetch themselves; every
+image engine, every video engine, Stable Audio 3, the cloning TTS engines and the reference
+WAVs are manual placement behind two fetchers under `scripts/` that the registry bundle does
+not ship, and README's "auto-fetch" wording for the 8 GB lane is what the drill measured as
+manual.
+
+(The first-run download bill is README's number, not this file's.)
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.10 SHIP-AUDIT SURVIVORS (2026-09-01) -- each needs a design decision, not a grep (queue item 8
+
+### 1.10 SHIP-AUDIT SURVIVORS (2026-09-01) -- each needs a design decision, not a grep (queue item 8)
+
+Receipts and every file:line: `docs/ship-audit-2026-09-01/SHIP_LIST.md` (71 confirmed,
+51 disputed for the operator to rule, section 8). The mechanical items are landed; the voice item rides Section 1.1, the 8 GB writer item
+Section 1.5, Mac / AMD Section 1.13. These are not mechanical and each wants a kibitz arc
+before code:
+1. **Runtime writes inside the pack directory** (cloud-media billing ledger,
+   OpenRouter catalog cache): a registry update wipes them. Route through
+   `nodes/_otr_paths.otr_shared_cache_dir()`; needs a migration note for existing
+   ledgers.
+   Bites exactly the registry-install users the queue's first items create.
+2. **`_fit_reason` never consults `needs_fp8_te` / `needs_fp4_te`**
+   (`nodes/_otr_shared/capability_profiles.py`), so fp8 and NVFP4 engines qualify on the
+   ROCm tiers whose `dtype_policy` forbids them. Two clauses keyed on `dtype_policy`.
+3. **The janitor cannot sweep `tmp/audio_slices`** (`nodes/_otr_janitor.py`: directory
+   granularity, newest-child mtime): 9.3 GB measured, and the boot sweep stats 21,440
+   files (6.7 s) every ComfyUI start. Three lines, but it widens what gets auto-deleted,
+   so it lands with a test.
+4. **Cloud spend with no ceiling**: `cpu_floor` and `otr_mac_mps` route every image role
+   to the paid Google API on the mere presence of a key, and the BYO-key lane has no
+   reserve/bill/ledger path (`eng_google_image.py`). Ledger it or make it an explicit
+   opt-in.
+5. **`eng_ltx_video` / `eng_ltx_av` reload ~14 GiB of weights per beat**; the
+   `prepare()` + `external_results` pattern the sibling lanes use is the fix.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.11 THE ADAPTATION DESIGN (queue item 8; hardened, NOT yet built; multi-session -- start only w
+
+Keystone rationale (removed as explanation, not work): "(which also removes the VRAM hazard: no model sits in the source-speech path)."
+
+From step 2: "-- the failure that killed `scifi_news` in the six-bank run."
+
+From step 5: "(`visual_style_policy`, the other half of this item, was ripped 2026-08-04.)"
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.12 STYLE / IDENTITY DECISION WORK (queue item 8; backlog; not the next coder window)
+
+Grounded by the 2026-08-03 four-agent forensics; every line has a file:line in the
+session traces.
+
+1. **"Invent one and tag it"**: ... (`_otr_story_brief.py:513` -- proven content-loyal on
+   both specimens) ... Highest-leverage item here: it fixes the credits line for all six
+   banks uniformly.
+2. **Rename `meta.style` -> `meta.story_scaffold`**: "Consumers move in ONE atomic change" narrative prose form; ledger validator note "(r3)".
+3. **Ghost-name reconciliation fork**: original prose form.
+4. **Dead fields found**: original prose form.
+5. **`meta` is a 120-key drawer** -- the cleanup the operator keeps asking for. Scope
+   as its own rip with the ledger law (every field one owner).
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.5 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
+
+Klein is already the image default in all
+19 low-VRAM profiles and the 8gb / 12gb / amd classes (ruling 2026-09-01, `c0ebe31f`;
+`docs/OTR_STANDING_RULINGS.md` "IMAGE ENGINE DEFAULTS BY MACHINE CLASS").
+
+1. **The PROVEN flip.** The Leg C5 episode is in the clean room's obs
+   (`signal_lost_rationed_breath_20260902_060027`, published 2026-09-02 12:10, 24 LTX 2.5
+   clips, 12 Klein stills, 6 h 35 min). When the operator has watched it: add the receipt to `config/machine_classes.json` (`proven[]`
+   on the 8gb class, image column included; `known_limits` keeps the pace), regenerate
+   `docs/MACHINE_MATRIX.md` and the README block (`scripts/otr_machine_matrix.py`), and
+   the 8gb `proof_summary` stops saying "image lane unexercised". Record only what
+   published.
+
+(from item 3) (14.5 GB ceiling next to the only genuinely 8 GB video engine). ... (agy proposed it and was wrong). "Finish retiring the profiles" is no longer an option: `95feac86` keeps `config/profiles` as lab presets and makes the matrix the record.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 1.6 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
+
+* **One JSON for now (operator 2026-09-02).** `workflows/otr_4060_floor.json` is
+  removed from the gallery (it shipped 2026-08-29 to 2026-09-02 as a bark-voiced
+  zero-download floor, before kokoro ran on 3.13); `config/profiles/otr_4060_floor.json`
+  and its generated variant stay as lab presets.
+* (from the README bullet) -- or the operator rules that README's injected class table and
+  per-lane facts (66da15da) already cover it and the bullet goes.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R1 -- THE H3 PROMPT-POLICY VERDICT: read the receipts first, render only if they do not an
+
+### Batch R1 -- THE H3 PROMPT-POLICY VERDICT: read the receipts first, render only if they do not answer
+
+The fix (`e923a9f3`, 2026-08-27) already has two post-fix `minimax_h3_video` episodes in
+the matrix's PROVEN row: `signal_lost_the_poise_of_stone_20260827_143538` and
+`signal_lost_reel_of_resistance_20260828_121427` (the operator watched the latter). Owed
+is the VERDICT, still marked "STILL OWED" under PBUG-20260827-01 in `docs/PROD_BUG_LOG.md`:
+the positive video prompt shows nonverbal action and camera PRESENT, and the beat's exact
+dialogue and any speaking / lip-sync / mouth anchor ABSENT. The ledger on disk stores only
+`prompt_sha8` for the positives, so read the render receipt or the server log. Clean
+receipts close the row. Render a fresh leg ONLY if neither episode's receipt answers it:
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile otr_w45_minimax_h3_video -Acts 1
+```
+
+Engine routing is a PROFILE, never `-Set` (`patch_creative` whitelists creative widgets
+only; writers may ride as `-Set`); the profile carries the h3 boot contract
+(`--reserve-vram 12`, `--disable-pinned-memory`); a FRESH episode id is mandatory because
+`request_hash` excludes prompt bytes, so a cached SPEAKING clip would be a false pass. The
+BEFORE sample `signal_lost_the_caretakers_clause_20260826_155835` (every beat on H3,
+pre-fix, under `output/otr/episodes/`) stays untouched: it is half of the A/B.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R2 -- ONE image-mode sweep on `otr_soak_llmsweep_02` settles SCENE + PORTRAIT `elements: [
+
+Re-run the image sweep's profile `otr_soak_llmsweep_02` against post-`ae7e7b6a`
+HEAD
+
+Full argument:
+`docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` (5080-local) and
+PBUG-20260826-01.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R3 -- FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator directive 2
+
+After Leg 0 (Section 1.7), four canonical legs prove all 7 surviving local LLM rows in
+BOTH slots plus the gemma Q8_0 negative probe -- and each leg doubles as a ledger-cleanup
+live-watch and an eyeball re-observation chance.
+
+**THE SWEEP ITSELF is what is open. Design is done (11-agent fan-out, 2026-08-25), build
+is not.** The honest shape, which is NOT one render:
+
+* **The operator's creative/technical parity rule is the sweep's acceptance
+  criterion.** Structurally both slots already build from the IDENTICAL
+  `dropdown_choices()` list, so no row is slot-restricted; what is unproven is
+  whether each row can actually do the TECHNICAL job (constrained JSON / GBNF).
+
+**Full design (coverage matrix, per-row assertions, skip-reporting rules, risks)
+is in the 2026-08-25 workflow result; re-derive from this row if it is lost.**
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R5 -- OPPORTUNISTIC: the cfg 1.0 promotion cells, D2 fail-hunting still legs, and the eyeb
+
+* **The cfg 1.0 promotion A/B** (Section 1.5 item 4): four cells x three real episode
+  prompts to a NEW dir under `docs/ship-audit-2026-09-01/image-jury/`, then the operator's
+  eyeball. Confirms cfg 1.0 on real content or sends it back.
+* **D2:** reset per CLAUDE.md section 4, boot headless, run 320-word `public_domain` or
+  `shakespeare` still legs until one fails (~1 in 6). A publish is a clean leg; a
+  fail-closed with the compact JSON `MISSING_TARGET` record in the SERVER log (arm, token,
+  index, canonical `prompt_hash`, repr-escaped excerpt; the canonical runner truncates the
+  exception at 500 chars) is the PROOF D1 WORKS -- D3 then fixes THAT branch at its root and
+  `docs/PROD_BUG_LOG.md` gets a mechanism, not a guess. Do NOT weaken the completion gate,
+  revive the portrait-init fallback, or rebuild the withdrawn "give the collapse guard a
+  still owner" fix (the 08-04 postmortem disproved that chain). Receipts:
+  `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md`,
+  `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`.
+* **Two eyeball items ride ANY real render leg, at zero extra legs:** the announcer
+  framing defect (`docs/2026-07-11-announcer-framing-defect.md`: episodes START a story
+  instead of admitting you into one) and name-splice defect #2. Both predate THE LAW and
+  have no reproduction at HEAD, so no coder time: still there -> re-admit as a FRESH dated
+  row with that leg as evidence (the framing fix stays seam + score contract + fail-closed
+  validator, never Python authorship); gone -> tombstone.
+
+Removed detail: "the canonical runner truncates the exception at 500 chars"; "is the PROOF D1 WORKS" (D1 is shipped).
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R7 -- THE 4060 CLEAN ROOM: the legs still owed
+
+### Batch R7 -- THE 4060 CLEAN ROOM: the legs still owed
+
+The clean room stays on disk: `C:\OTR-CleanRoom` on the 4060 (portable v0.34.0, Python
+3.13, OTR clone at `da2b7a36`, ComfyUI-GGUF pinned + patched, pinned weights, bark
+voices). Server and legs start through Task Scheduler, never from an SSH session. The
+clean-room profiles are untracked stand-ins on the 4060; the shipped equivalent is
+Section 1.5 item 2. Friction log and every leg receipt (R1, R2, C through C6):
+`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
+
+* **Leg C5** (Klein + LTX 2.5, stock flags): the operator eyeball is Section 1.5 item 1. Leg A's question is
+  answered by this leg (LTX 2.5 works on 8 GB, not a daily driver); Leg C6 (fp8 encoder)
+  is not needed.
+* **Leg B -- OPEN:** `otr_cleanroom_8gb_humo17` (HuMo 1.7B, 13.6 GB of Comfy-Org weights,
+  no extra node pack) -- the faster 8 GB video candidate if LTX 2.5's ~14 min a clip is
+  too slow to ship as the 8 GB video default. Pull the clone to HEAD first (later commits
+  are docs and the provisioner).
+* **Z-Image from the dropdown on 8 GB:** one stock-flag `z_image_turbo` still
+  post-`da2b7a36`. The R1 abort (`Fatal Python error: Aborted` at sampler step 5/8 under
+  DynamicVRAM) was never re-tested after the residency fixes, which the clean-room doc
+  calls only its "likely root". If it still aborts: document the
+  `--disable-dynamic-vram --lowvram` pair in README's 8 GB row for that dropdown choice
+  (README carries no such text today) and file the faulthandler report with ComfyUI. The
+  shipped 8 GB set runs Klein by ruling and is unaffected either way.
+* **The registry-install template test** (Section 1.6) runs here once a version is
+  Active.
+* Record ONLY what publishes (`RESULT SUCCESS` + `obs_publish OK` + the file) into
+  `config/machine_classes.json`, regenerate `docs/MACHINE_MATRIX.md`. Do not advertise a
+  lane the clean room did not finish.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Batch R8 -- THE NEXT POD SESSION: the acid test and a looped lane sweep on one rental (queue ite
+
+### Batch R8 -- THE NEXT POD SESSION: the acid test and a looped lane sweep on one rental (queue item 9)
+
+The volume stays (it holds the warm cache, the expensive thing to recreate); the pod stays
+STOPPED until this batch runs. Codex owns it and `docs/RUNPOD_INSTALL.md`. Sequence on the
+one rental: saved template -> `scripts/otr_provision.py` -> one published episode with
+ZERO hand steps (the acid test the DOER was built for: Stable Audio 3, index-tts in its own
+`uv` venv at `INDEXTTS2_PYTHON = "3.10"`, the reference WAVs -- all installed by the
+provisioner, none by hand), THEN the looped lane sweep (`scripts/otr_pod_lane_soak.sh`,
+`scripts/otr_pod_overnight_sweep.sh`) for the HuMo 14B / LTX 2.5 / indextts2
+second-machine receipts. Receipts file under the 16gb class in `config/machine_classes.json`
+`engine_evidence`: there is no 24 GB class or profile by ruling (`95feac86`; Section 3 L
+asks whether a row is wanted).
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### The registry rows, carried forward (the 2026-09-02 queue's item 1)
+
+**1. THE REGISTRY -- alpha.17 IS PUBLISHED AND VERIFIED (2026-09-03). Two SEPARATE goals
+live here and conflating them is what made this feel stuck: (a) an INSTALLABLE listing,
+which needs an admin approval we cannot self-serve, and (b) the "N Nodes" count on the
+card, which is a different pipeline entirely -- and which, MEASURED 2026-09-03, is
+STALLED ON COMFY-ORG'S SIDE and is not ours to fix at all (see the ANSWERED block
+below; the newest successful extract in a 360-pack sample is 2026-04-28).** The old
+control experiment (republish alpha.8 byte-identical) is CANCELLED -- the cause was found
+directly instead.
+
+* So the credential fix held across the bump, Flagged-on-info-only is the expected outcome,
+  and **every precondition on the manual review request is now satisfied** -- it is ready
+  to file on the operator's go and nothing else gates it.
+* **THE SCAN COLLAPSE IS THE CODER'S NEXT CHUNK** -- see WHERE TO PICK UP at the
+  top: plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is
+  next. Nothing in it needs the operator except the review filing above.
+* **ANSWERED 2026-09-03 18:30Z, AND THE ANSWER CLOSES (b) AS NOT-OURS.**
+  It simply was not the node-count blocker.
+* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** Active needs ZERO
+  findings of any severity or an admin batch approval; 157 info-level YARA hits (env
+  reads, ffmpeg subprocess, opt-in cloud lanes) keep it Flagged forever on the automated
+  path. The gate is a literal `if issues == ""` on the scanner body -- one info finding
+  and 157 are identical. There is no publisher self-service route to Active, confirmed by
+  reading `Comfy-Org/registry-backend`. Corroborated independently: rgthree's two newest
+  publishes are Flagged too, so the ruleset tightened in late August and comparing against
+  older Active versions of popular packs proves nothing.
+* **THE NODE-COUNT HALF IS ALREADY FILED, AND HAS BEEN SINCE 2026-08-24: the operator
+  opened `Comfy-Org/registry-backend#203`.** It is still OPEN with no comments, labels or
+  assignee. It names a cause this window's 480-pack survey could not have found on its own
+  -- **a backfill cron scheduled for February 29th**, a date that does not occur in 2026 and
+  next occurs in 2028. The operator added the survey as a comment on 2026-09-03 and
+  corrected the issue's date window: extraction did not stop in February, it stopped
+  **2026-04-28**, and 19 packs' newest success falls in April with nothing after.
+* Verified on `comfyui-video-xy-plot`: all five of its versions carry their own
+  `{"message": "subprocess: ffprobe", "by": "dr.lt.data@gmail.com"}` note, four of
+  them published on the same day. So approving alpha.17 buys nothing for
+  alpha.18, and this branch shipped five versions in five days. Asking now would
+  spend a reviewer's time on a version superseded within the week -- which is the
+  behaviour that actually annoys a maintainer, as distinct from asking at all.
+  `docs/2026-09-03-registry-review-request-READY.md` carries the title, the body,
+  alpha.17's version id, counts read from its own scan, the zero-is-unreachable
+  measurement, and the video-xy-plot precedent.
+* **The old NEXT line, kept so the parking is legible:** file the manual review
+  request. Draft ready and retargeted at alpha.17 in
+  `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
+  published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
+  strike that step. **BOTH REMAINING PRECONDITIONS ARE NOW SATISFIED
+  (2026-09-03):** alpha.17's scan landed at 0 critical, and every finding count in the
+  draft has been re-read from alpha.17's own scan (158, not alpha.16's 157). The draft is
+  ready to post as-is. Filing is a public post on Comfy-Org's tracker and needs the
+  operator's explicit go -- it is the only thing still holding it.
+* Publishing a small pack under his own publisher
+  to confirm a dependency set actually installs in their Linux container is ordinary use
+  and would have caught the pycairo bug for free, before it cost four version strings.
+
+**3b. PROMPT v3 "DRAW THE CRUX" -- HALF A SHIPPED AND PROVEN 2026-09-03.**
+  **HALF B -- THE OPERATOR RULED ITS SHAPE 2026-09-03 AND r1 INVERTED ITS
+  MOTIVATING CASE.** the r1 panel caught that the item's own worked example had been read backwards.
+  r1 also corrected three inherited claims. r2 is running.
+  **The old framing, kept only so a reader of the history understands what
+  changed:** subject-appropriate motion needs the beat's own dialogue in front
+  of the writer -- Half A buys the story's object, place and light on every beat and cannot
+  buy its motion. He named the gap himself on the ledger episode: "I don't see any trucks
+  though, it does mention a truck once" -- `truck` is in one spoken line and not in
+  `key_objects`, so Half A had no path to it.
+
+**3d. Item 3b-of-the-old-numbering** -- (83 words on one real episode) measurement detail.
+
+**4.** what the clean room proved becomes a saved dropdown set.
+
+**9.** there is no 24 GB class or profile by ruling (95feac86).
+
+**WATCH:**
+* **`obs_publish OK` is not proof of an episode (2026-09-03, cost two GPU legs).** Three
+  replay bugs shipped that morning; TWO of them published green with a broken file --
+  one second of picture in an 85-second episode, because a placeholder wire set the
+  procgen overlay's length and `PostUpscaleProcgenBlend` takes the shorter input. What
+  caught it was measuring the published file's DURATION at every pipeline stage.
+  PBUG-20260903-01/02/03.
+* `video_rotation.sh` has run since 2026-08-31 out of session `8a385813` (that runs in GitHub
+  Actions against the repo, not this box).
+* Zero-frame beat: the root fix landed (`415b1ba0`, PBUG-20260831-01: an untimed
+  `music_open`/`music_close` with no timed mirror got no duration; it was also the ghost
+  pool r1's "roughly 70 minutes" death).
+* Whether a PRUNED P0 index is ever accepted has not been measured live (the deterministic
+  rung became reachable at `47c554fa` after the campaign stopped).
+* Token rotation: (Codex's security note, relayed in-session 2026-09-02 and recorded nowhere else).
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### J. THE REGISTRY -- the control experiment, only if alpha.15 flags
+
+Two versions exist, both Flagged (a private secret scanner, not an exec linter; CLAUDE.md
+7A), no Active, no rollback target (the node hard-delete freed alpha.8's string). The
+alpha.15 push is queue item 1; the README's token-shaped literal, the only shipped string
+matching a published secret rule, is already gone (`64d81ca7`).
+
+* **If alpha.15 flags, run the control:** republish the alpha.8 tree (`e44235f5`)
+  byte-identical as alpha.16. Active means the trigger is in the alpha.9+ delta and can be
+  bisected; Flagged means the ruleset moved and that result is the evidence to hand
+  Comfy-Org. Never version-delete (a soft delete burns the string).
+* **Version sequencing:** alpha.15 = the marker patch; alpha.16 = the control, only if
+  needed; the kokoro-onnx dependencies (Section 1.1) ride the NEXT bump after both, never
+  while a version is Pending.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### The question list
+
+Removed from "### The question list" (finished-work reports, commit shas, past evidence, and superseded prose), verbatim:
+
+(A) "The G15 vacuity fix (`e2807dcc`) is live code with zero callers."
+
+(B) "Inserting separators is a WIDER change to the coordinate system `source_digest` pins -- it belongs in the source adapter, and it is the DOMINANT P0 failure cause on live evidence."
+
+(D) "After profile retirement, who owns a tier's native render ceiling? Since `95feac86` the machine matrix, not a profile, is the stranger-facing channel; profiles are lab presets."
+
+(H) "Since 08-15 a research_only source WITHHOLDS the OBS copy instead of killing the finished render."
+
+(I) "Found by the five-bank beat test: a `pirate_radio_resistance_drama` premise was drawn over a film-reel standoff seeded by a real Library of Congress item on 'Midnight' (1939) -- the operator caught it on screen. Second specimen of the content-blind-draw class; the scaffold-off rule so far was stated only for `original`."
+
+(J) "skipping `finish_visual_prompt` and the `image_grade_tail` append by the 2026-07-02 look direction"
+
+(K) "codex and Fable both said RIP, Claude grounded both." "Argument in the archive."
+
+(L) "The matrix says 16 GB+ is the top tier by design (`95feac86`) and LTX 2.5 at 1664x960 OOMed on a rented 24 GB 4090 (`docs/RUNPOD_INSTALL.md`)."
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Detail for question (D): the 8 GB / profile cluster -- one decision underneath
+
+- **WAN 8 GB ceiling: CODE-COMPLETE, PROOF-INCOMPLETE, and ONE decision blocks it.** The
+  17-frame ceiling reaches a leg only through a variant workflow or a hand-set widget:
+  `otr_canonical.json` node 87 ships `max_render_frames=0`, so a plain canonical WAN run
+  is UNPINNED and inherits `_TI2V_MAX_FRAMES = 177` -- exactly the 2026-07-23 failure
+  shape. Pinning 17 in the canonical is WRONG (it would cap the 16 GB LTX / HuMo legs).
+  Proposed shape: `eng_wan_ti2v` DECLARES its own tier ceiling as a capability-row field,
+  the widget becomes an operator OVERRIDE with 0 meaning "use the adapter's contract", and
+  the profile channel stops mattering -- a real design change with a live blast radius on
+  any card with headroom, so ratify before code. The wired chain is pinned by
+  `tests/test_remaining_video_contracts.py` (nine hop-by-hop tests) and
+  `tests/test_multiclip_effective_contract.py`; commit history in the archive. Also owed
+  after the ruling: a render on a PHYSICAL 8 GB card (the four-arm bench prequalified on a
+  16 GB card told to reserve 8 GiB, which is not the same claim; the 18-engine campaign is
+  coverage, not an 8 GB qualification). One untested edge, cheap to close when this
+  reopens: WAN is out of `PLANNING_CAP_ENGINES`, so a tier ceiling and a multi-clip plan
+  CAN contradict by design and `_planned_length` hard-refuses mid-episode -- no test asserts
+  a 17-frame tier survives a multi-segment beat.
+- **A2 -- the applied-overrides echo hides the profile's `llm.*` override.**
+  `nodes/_otr_workflow_apply.py` already flattens `llm`; `scripts/otr_api.py` echoes only
+  role / slot / features plus two seed keys, so a run reports "16 overrides" while also
+  having replaced the entire LLM configuration. Fix: generate the echo FROM the applier's
+  flattened map (never add keys by hand). HELD on question (D), because its whole subject
+  is the profile channel.
+- **The `ltx_8gb` render-length ceiling has TWO owners that only agree by
+  coincidence** (found 2026-07-27, B6 panel, two lenses independently). The coverage
+  PLANNER reads `config/profiles/otr_8gb_ltx.json` `video.max_render_frames`, and
+  `ltx_8gb` is the sole member of `PLANNING_CAP_ENGINES`. The ADAPTER's own
+  pre-render refusal reads `OTR_LTX_8GB_MAX_FRAMES`. Today both land on 161 (profile
+  unpinned, env unset), so nothing breaks. But `workflows/variants/otr_8gb_ltx.env.json`
+  ships `OTR_LTX_8GB_MAX_FRAMES=97` and NOTHING currently reads that file. The day a
+  launcher honours it without also pinning the profile, the planner emits a 98-161
+  frame segment and the adapter refuses it MID-EPISODE -- after the stills are minted
+  and, on a multi-segment beat, after the 6.34 GiB checkpoint is hoisted.
+  **Deliberately NOT fixed in B6:** pinning the profile to 97 changes how a 237-frame
+  beat partitions, which is a production planning decision, not a cleanup. The preset
+  carries a `_ceiling_note` saying do not export it alone. Compare WAN, which B3
+  wired correctly: `otr_8gb_wan.json` sets BOTH `launch.env.OTR_WAN_TI2V_MAX_FRAMES`
+  and `video.max_render_frames`.
+
+Archived-only detail (finished work / provenance removed from the go-forward rows):
+- "CODE-COMPLETE, PROOF-INCOMPLETE" status framing.
+- The wired chain is pinned by `tests/test_remaining_video_contracts.py` (nine hop-by-hop tests) and `tests/test_multiclip_effective_contract.py`; commit history in the archive.
+- The four-arm bench prequalified on a 16 GB card told to reserve 8 GiB; the 18-engine campaign ran as coverage.
+- Found 2026-07-27, B6 panel, two lenses independently.
+- Compare WAN, which B3 wired correctly: `otr_8gb_wan.json` sets BOTH `launch.env.OTR_WAN_TI2V_MAX_FRAMES` and `video.max_render_frames`.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+
+Measured table and the full argument: `docs/GO_FORWARD_ARCHIVE.md`. (204-entry reference bank: 153 resolvable on disk, 97M/106F/1N; `MAX_SPEAKING_CAST = 10` is a Bark artifact; writer pool is 6M/4F.)
+
+Related and already shipped: `num_characters` is now a REQUEST rather than a cap
+(operator directive, all banks) -- see `tests/test_cast_size_is_a_request.py`.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
+
+### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
+
+**Not work yet, and explicitly not before v2 ships.** The operator, thinking it
+over away from the desk: *"once we ship v2 we ship an OTR-Lite, similar
+architecture but only the most frictionless auto-download non-gated models, and
+maybe just maybe we can figure an ffmpeg-less solution for a truly streamlined
+workflow."*
+
+**Two halves, and the second one pays a debt nobody connected to it.**
+
+* **Non-gated auto-download only.** Already half-mapped:
+  `scripts/otr_fetch_lane_weights.py` offers UNGATED sources by design and
+  deliberately refuses to paper over the one gated repo (Lightricks/LTX-2.5), so
+  its lane list is effectively the candidate set. Measured on the 4090 pod
+  2026-09-03, the fully-frictionless bundle is `haunted + one z_image precision
+  + stable_audio_3` -- about 20 GB for one complete episode.
+* **ffmpeg-less.** This is not only an install-friction win. `subprocess` calls
+  to ffmpeg/ffprobe are **35 of the pack's 158 Comfy Registry scan findings**
+  (`python_command_injection_risk`), plus most of the 12
+  `python_url_command_execution` ones. An in-process encode path shrinks the
+  largest non-`os.environ` finding class at the same time as removing the binary
+  dependency -- the two goals are the same work. PyAV (`av>=16.0.0`) is already a
+  ComfyUI CORE dependency, so it ships on every install.
+
+**THE ONE KNOWN BLOCKER, and it is where this starts.** This PyAV build has no
+`libass` and no `drawtext`, so CAPTION BURN and CREDITS cannot move in-process
+as-is. The mux, the silent composite and the probe already have PyAV routes. So
+the first question of an OTR-Lite effort is captions and credits without
+libass/drawtext -- not the mux, which is the part that looks hard and is not.
+
+**Related evidence already on disk:** `docs/RUNPOD_INSTALL.md` section 7A (what a
+second machine actually trips over), and the registry finding counts in
+`docs/2026-09-03-registry-review-request-READY.md`.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### 4.Y BRING `word_razzle` HOME -- it is the one cloud lane whose NAME hides it (operator, 2026-09-
+
+**The transparency problem, stated exactly.** 8 of the 30 registered video
+engines render provider-side:
+
+```
+cloud_kling_avatar  cloud_seedance_2  cloud_wan_i2v  cloud_wan_i2v_audio
+cloud_vidu_q2_pro_fast_720p          google_omni_video  google_veo_video
+word_razzle   <- the outlier: nothing in the name says it phones out
+```
+
+Seven of the eight self-label via a `cloud_`/`google_` prefix. `word_razzle`
+reads like a local text-effect lane and is not one. That is the misleading row,
+and it is also the one with a plausible local replacement.
+
+**WHY IT IS NOW FEASIBLE, AND IT MAY NOT EVEN BE A NEW ENGINE.** word_razzle is
+"animate a word-card still into a living period poster" -- a cloud i2v taking
+(init image + prompt + seed + duration + motion_mode). Both halves already exist
+locally:
+
+* **The card.** `ideogram4_local` is the pack's spelling champion -- its own
+  recipe note records that every card in the campaign with perfect spelling
+  rendered at mu 0.5. It did NOT exist when word_razzle was built as a cloud
+  lane in 2026-07-03, which is the whole reason that lane is cloud.
+* **The motion.** `still_motion`, `still_pan` and `ltx_video` already animate a
+  still. A word card is a still.
+
+**So the first question of the arc is whether this is an ENGINE at all, or just
+a PROFILE** -- `character_image: ideogram4_local` + an existing local i2v in
+`character_visual`. A profile costs nothing; a new engine id trips five
+generated fixtures, two literal rosters, the terminal-frame proof rule and
+`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8. Those are very different prices for
+the same outcome, which is exactly why this is a design item and not a
+drive-by.
+
+**Owed before code:** a kibitz arc on that question. Also decide what happens to
+the cloud `word_razzle` row -- retire it, or rename it `cloud_word_razzle` so the
+roster is honest either way. Renaming alone would fix the transparency defect
+even if the local lane never lands.
+
+**Not done, and the predicate question if anyone wants it:** a RECIPE identity
+for remote lanes (model id + resolution + params), so a mid-beat env flip is
+caught for a cloud lane the way weight drift is caught for a local one. Nobody
+has asked for long cloud beats; log it, do not build it.
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Bug Bible promotion field -- pending actions only
+
+| `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
+
+(12.151-12.156 promoted 2026-09-04 -- PBUG-20260904-01..04 and -06; receipts in
+HANDOFF_LOG. The 12.139 / 12.140 promotions completed 2026-08-28 and the 2026-08-25 /
+2026-08-18 / 2026-08-17 promotion receipts are in the archive.)
+
+
+## ARCHIVED 2026-09-04 evening (compaction pass) from ### Open risks
+
+- **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite
+  and by contract tests, and the first real client bundle is still an unproven path end
+  to end (fetch -> interpret -> writer -> cleanup -> tail -> publish).
+- **CLIENT-AUTHORED PYTHON executes in-process** (wave 3).
+- **The client-facing surface is LIVE TEXT, not just docs:** the `custom_source_bank`
+  row's `guide_ref` is raised to the operator by `require_runnable_bank`, and the
+  `source_bank` tooltip repeats it.
+- **The ledger-cleanup pass runs on EVERY bank, not just client banks** (`3d97a130`). It
+  is a no-op on a complete ledger and costs no LLM call there, but two shipped-lane
+  behaviours did change and are worth watching on the next live legs: (a) unsafe spoken
+  language on a `content_owned_readonly` bank is now REPAIRED at the writer tail instead
+  of reaching G9 untouched, so a leg that used to die at freeze may now ship a sanitized
+  line; (b) a blank `meta.episode_title` is now filled at the tail instead of exploding
+  later in `otr_credits_roll`. Both are the intended direction under THE LAW; neither has
+  a live receipt yet.
+- Lean-mean has one current ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.
+
+## ARCHIVED 2026-09-04 evening -- ruling fragments the compaction pass did not carry verbatim
+
+The compaction rewrote each section into short to-do rows. Most rulings were carried in
+the rewrite, but these lines are not present VERBATIM in the compacted plan, so they are
+kept here with their neighbours -- a reworded ruling is not proof the original survived.
+
+**From ### 1.3 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build (line 108 of the pre-compaction plan):**
+
+```
+bounded progression, total by construction: unused finalized prompt -> reuse a leaf where a
+different motif keeps the prompt new -> reuse the least-recent signature, deterministic on
+`episode_seed + beat_id`, never adjacent. The allocator appends a PER-BEAT reuse
+disposition to that beat's existing `fallback_reason` (ShotLock stamps one batch-wide
+reason today, which would erase the original model-failure reason). Only pool exhaustion
+```
+
+**From #### The P0 / source-span cluster (2026-07-30) (line 174 of the pre-compaction plan):**
+
+```
+  `512`; the whole-artifact retry contracts LANDED @ `314dd481` are the base; the
+  residual fix is now unblocked. Related independent items: the P9 8K
+  structured-capacity follow-up + the GGUF structured-enforcement NEWBUG. Do not
+  raise the minimum word target as a capacity workaround.
+
+```
+
+**From ### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (line 424 of the pre-compaction plan):**
+
+```
+  PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video
+  engine holds the GPU; it is an 82M model and faster than realtime on CPU.
+* SHIP SCOPE (operator ruling 2026-09-01: "we can ship all audio lanes with kokoro"): in
+  the same change, `workflows/otr_canonical.json` and every generated variant default BOTH
+  voice slots to kokoro (`char_voice_engine`, `announcer_voice_engine`, `voice_bank`
+```
+
+**From ### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (line 429 of the pre-compaction plan):**
+
+```
+  `kokoro_builtin`); indextts2, chatterbox, dia and bark stay in the dropdowns as
+  install-it-yourself upgrades. That dissolves the indextts2-default half of the ship-audit finding (the
+  reference-WAV preflight is the bullet below) and the Section 4 voice-bank item stays parked.
+* THE COMPATIBILITY TABLE IS GENERATED, NOT HAND-KEPT: extend
+  `scripts/otr_machine_matrix.py` to emit a "Voice engines" table into
+```
+
+**From ### 1.9 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked  (line 461 of the pre-compaction plan):**
+
+```
+2. Preflight resolves the selected dropdowns to artifacts, prints the total, refuses early
+   if disk is short, downloads into the running ComfyUI's models tree through `folder_paths`
+   (never `C:\ComfyUI-Models`) with `.part` files, hash verification and resume; the fetcher
+   already has that code and moves under `nodes/` so it ships.
+3. Gated rows (LTX 2.5) refuse BEFORE downloading, naming the terms URL and the token step.
+```
+
+**From ### 1.9 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked  (line 464 of the pre-compaction plan):**
+
+```
+   already has that code and moves under `nodes/` so it ships.
+3. Gated rows (LTX 2.5) refuse BEFORE downloading, naming the terms URL and the token step.
+4. A `download_policy` widget: auto (default), ask (list sizes only), never (air-gapped).
+The manifest carries the kokoro-onnx weights, so this lands after Section 1.1. Design item:
+kibitz arc before code. (The first-run download bill is README's number, not this file's.)
+```
+
+**From ### 1.11 THE ADAPTATION DESIGN (queue item 8; hardened, NOT yet built; multi-session --  (line 496 of the pre-compaction plan):**
+
+```
+
+Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md` (5080-local).
+Keystone: compile source speech from an authenticated segmented artifact, never generate
+it; "summarize into X words" means SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not
+paraphrasing (which also removes the VRAM hazard: no model sits in the source-speech path).
+```
+
+**From ### 1.12 STYLE / IDENTITY DECISION WORK (queue item 8; backlog; not the next coder windo (line 549 of the pre-compaction plan):**
+
+```
+   (`MatrixRow("style", ...)` at `:68`, `:177`) and `_otr_ledger_cleanup.py`
+   reads it too; missing them fails ledger validation on the first episode.
+3. **Ghost-name reconciliation fork**: pitch cast never reaches `lock_cast` (names
+   are a pure pool draw; `source_character_names` deliberately None for invention
+   lanes). Decide: scrub briefs after cast lock, or propagate pitch names. Evidence:
+```
+
+**From ### Batch R2 -- ONE image-mode sweep on `otr_soak_llmsweep_02` settles SCENE + PORTRAIT  (line 719 of the pre-compaction plan):**
+
+```
+* **If they refuse:** the fork below is real and gets the full arc, now with
+  numbers instead of an inference.
+* **If they do not:** this row collapses to a documentation correction and costs
+  nothing further. That is the likelier outcome and it is why no arc runs first.
+
+```
+
+**From ### Batch R3 -- FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator (line 731 of the pre-compaction plan):**
+
+```
+PBUG-20260826-01.
+
+### Batch R3 -- FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator directive 2026-08-25)
+
+After Leg 0 (Section 1.7), four canonical legs prove all 7 surviving local LLM rows in
+```
+
+**From ### Batch R3 -- FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator (line 737 of the pre-compaction plan):**
+
+```
+live-watch and an eyeball re-observation chance. Charter: `docs/OTR_STANDING_RULINGS.md`
+"ONLY EASY-TO-LOAD LLMs SHIP" -- every surviving row does creative AND technical, or it
+is ripped on a MEASURED failure, never on assumption. All 7 rows are on disk;
+`docs/LLM_PREFLIGHT_GUIDE.md` is the preflight guide.
+
+```
+
+**From ### The registry rows, carried forward (the 2026-09-02 queue's item 1) (line 897 of the pre-compaction plan):**
+
+```
+  and if the container's preinstalled CPU torch does not satisfy the constraint, pip would
+  download multiple GB inside the 600 s extract timeout. Unknowable without the image.
+* **ANSWERED 2026-09-03 18:30Z, AND THE ANSWER CLOSES (b) AS NOT-OURS. DO NOT CHASE
+  KOKORO.**
+  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits -- a package
+```
+
+**From ### The registry rows, carried forward (the 2026-09-02 queue's item 1) (line 924 of the pre-compaction plan):**
+
+```
+  next occurs in 2028. The operator added the survey as a comment on 2026-09-03 and
+  corrected the issue's date window: extraction did not stop in February, it stopped
+  **2026-04-28**, and 19 packs' newest success falls in April with nothing after. Do NOT
+  open a second issue on this; comment on #203.
+* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO,
+```
+
+**From ### The registry rows, carried forward (the 2026-09-02 queue's item 1) (line 1013 of the pre-compaction plan):**
+
+```
+**4. THE 8 GB SHIP SET -- what the clean room proved becomes a saved dropdown set.**
+(b) a shipped `otr_8gb_klein_ltx25` profile and variant (the clean-room profile is
+untracked on the 4060 -- promote it, do not rewrite it); (c) the eight profiles that still
+pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships. Section
+1.5.
+```
+
+**From ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE B (line 1216 of the pre-compaction plan):**
+
+```
+### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+
+**Status: PARKED, not rejected** (operator: *"park it on go forward"*). The writer casts
+from 10 Bark presets (6M/4F, `config/cast_pools.py`) while the cloning engines draw from a
+204-entry reference bank (153 resolvable on disk, 97M/106F/1N,
+```
+
+**From ### Bug Bible promotion field -- pending actions only (line 1358 of the pre-compaction plan):**
+
+```
+| `PBUG-20260713-19` | Live requalification pending (promoted BUG-05.11) |
+| duplicate-id cleanup | Same fan-out: BUG-11.54 legacy_id -> `PBUG-20260713-21`; verify the acronym-union rule's legacy_id (both Bible rows cite `-10`; see the log's renumber note) |
+| historical `PBUG-20260711-18` | Keep as a standing context/cap engineering risk; never eligible from static evidence |
+| `PBUG-20260710-07` | Ratify retirement at the next fan-out (green codex leg `c1f3891f`) |
+| **Seedance softener mangles authored prompts (2026-08-17)** | CANDIDATE only: fixed pack-side, but it conditions a CLOUD render this repo cannot observe, so it fails the admission rule. Promote only if a cloud leg ever produces the artifact; nearest coverage `12.108` does not cover blind-regex rewriting of authored text. Detail: `docs/GO_FORWARD_ARCHIVE.md` |
+```
