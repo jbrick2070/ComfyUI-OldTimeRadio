@@ -11,13 +11,16 @@ than the length does.
 
 **THE ORDER BELOW IS BY DEPENDENCY, and it is the operator's (2026-09-04, late):** *"I really
 want to get the registry thing fixed, but no sense in fixing it if bug fixes will break it --
-get all the easy code items done first, then the registry, then testing."* So: the SCAN
-COLLAPSE goes first, because its guard tests make every later change that adds an env read or
-a process spawn FAIL THE SUITE -- once they ship, nothing after can quietly push the findings
-back up. Then the EASY code (closed specs, no arc). Then the REGISTRY: publish the first
-non-alpha and file the review the same day, so the version under review is the version a
-stranger installs. Then TESTING, which needs the published pack or a GPU leg. The DESIGN rows
-come after, each behind an arc, each shipping as a later version behind the guards.
+get all the easy code items done first, then the registry, then testing"* -- and, on second
+look, *"shouldn't we move [the design rows] before the registry?"* Yes: a design row is a code
+change too, and a code change after the publish is a NEW VERSION with its own per-version
+review. So: the SCAN COLLAPSE first, because its guard tests make every later change that adds
+an env read or a process spawn FAIL THE SUITE -- once they ship, nothing after can push the
+findings back up. Then the EASY code (closed specs). Then the DESIGN rows, each behind its arc,
+because they edit shipped code and must be in the version that gets reviewed. THEN the
+REGISTRY: publish the first non-alpha and file the review the same day, so the version under
+review is the version a stranger installs. Then TESTING, which needs the published pack. The
+cost of this order is real and chosen: the registry waits for the design arcs.
 
 **Standing constraints, every chunk, every window:** the 5080 loop is untouched -- nothing
 ships that reduces tomorrow's `obs` count. The pod stays STOPPED until its own item. One
@@ -44,26 +47,26 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 | `2.2` | `1.2` |
 | `2.3` | `(new row)` |
 | `2.4` | `1.3` |
-| `4.1` | `1.5` |
-| `4.2` | `1.6` |
-| `4.3` | `1.7` |
-| `4.4` | `(new row)` |
-| `4.5` | `(new row)` |
-| `4.6` | `(new row)` |
-| `4.7` | `1.1` |
-| `4.8` | `1.9` |
-| `4.9` | `1.10` |
-| `4.10` | `1.11` |
-| `4.11` | `1.12` |
-| `4.12` | `(new row)` |
-| `5.1` | `(new row)` |
-| `5.2` | `(new row)` |
-| `5.3` | `(new row)` |
-| `5.4` | `1.2` |
-| `5.5` | `1.3` |
+| `2.5` | `(new row)` |
+| `3.1` | `(new row)` |
+| `3.2` | `(new row)` |
+| `3.3` | `(new row)` |
+| `3.4` | `1.3` |
+| `3.5` | `(new row)` |
+| `3.6` | `1.4` |
+| `3.7` | `2.5` |
+| `5.1` | `1.5` |
+| `5.2` | `1.6` |
+| `5.3` | `1.7` |
+| `5.4` | `(new row)` |
+| `5.5` | `(new row)` |
 | `5.6` | `(new row)` |
-| `5.7` | `1.4` |
-| `5.8` | `2.5` |
+| `5.7` | `1.1` |
+| `5.8` | `1.9` |
+| `5.9` | `1.10` |
+| `5.10` | `1.11` |
+| `5.11` | `1.12` |
+| `5.12` | `(new row)` |
 
 ---
 
@@ -82,7 +85,7 @@ whole before typing. The owners `nodes/_otr_shared/env.py` and `nodes/_otr_share
 and the shared ratchet `tests/fixtures/ratchet.py` are already on disk and INERT: nothing
 imports them, so the tree's behaviour is unchanged until the migration starts.
 
-**Decisions owed by the operator (skip, do not guess):** the review filing in item 3, the content_oracle-style calls under item 7,
+**Decisions owed by the operator (skip, do not guess):** the review filing in item 4, the content_oracle-style calls under item 7,
 the Section 3 question list, and PBUG-20260904-05's profile design (the 4060 proves, the
 5080 promotes).
 
@@ -238,7 +241,91 @@ The REJECTED list below is part of the record precisely so a discarded claim is 
 * Long historical comments explaining past bugs: deliberate project practice.
 * Duplicated engine PROMPT COMPOSERS: ruled 2026-08-23, lanes stay independently re-wordable. Only duplicated FACTS and DECISIONS count.
 
-## 3. THE REGISTRY -- publish the first NON-ALPHA, file the review the same day
+### 2.5 PREFLIGHT THE CLONING ENGINES' REFERENCE WAVs -- the one kokoro-row leftover
+
+The kokoro-ONNX row is DONE (`70a1d33b`; archived). Its single unbuilt bullet, carried
+here because it is a small correctness fix: preflight the resolved `ref_path` files in
+`OTR_CastLock` BEFORE the writer call whenever a cloning engine is selected, so a missing
+reference WAV fails at plan time and not after the writer has spent its call.
+DONE WHEN: a deliberately missing reference WAV refuses at CastLock with the path named,
+and the suite has the test.
+
+## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
+
+None of these is the next coder window (that is item 1), but every one of them lands
+BEFORE the registry publish: a design row edits shipped code, and shipped code changed after
+the publish is a new version and a new review. Each row has more than one defensible
+answer, so each takes its arc first (one or two lanes per decision -- operator 2026-09-04).
+The guards from item 1 keep every one of these from moving the findings.
+
+### 3.1 PROMPT v3 HALF B -- the arc (r2 in flight), then the code
+* **3b. PROMPT v3 HALF B -- the next coder window on this lane.** Read `docs/OTR_STANDING_RULINGS.md` "THE BEAT'S SUBJECT IS A PHYSICAL ARTIFACT" before touching this.
+  Shape (operator-ruled 2026-09-03): extend the EXISTING batched Ghost author with the beat's dialogue (never a second pass), and have it name a PHYSICAL ARTIFACT of the story, preferring one the beat refers to -- never an abstraction and never a noun the dialogue mentions only to say it is absent. **The truck must NOT be drawn** ("this isn't just some dusty list of truck routes" is a rhetorical negative; Ellie is holding a ledger in an archive).
+  Root defect: `resolve_crux_kernel` picks `objects[ordinal % len(objects)]`, so the ledger beat drew `pen`.
+  Constraints carried from r1: the render batch DOES have `IS_CHANGED`; replay returns before the author runs, so a migration needs an explicit seam at the replay boundary, not a version check in the author; the beat's own `text` projection is the accessor -- not a `_ghost_line_index` join, which silently misses synthesized beats. Half B changes the STORED object, so it needs version-dispatch discipline and a re-author path for replay.
+  Full arc before code. r2 in flight; records in `kibitz-runs/2026-09-03-prompt-v3-half-b/`, anchor in `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` and `kibitz-runs/2026-09-02-prompt-v3-crux/`.
+
+### 3.2 THE OTHER VIDEO LANES -- the shared composer's face paragraph (measured, not started)
+* **3d. The OTHER video lanes -- measured, not started.** Ten of eleven lanes lead their prompt with the cast's face paragraph via `motion_common.compose_parts`; on `wan_ti2v` that is 83 of a hard 100-word cap, so the camera clause silently falls off. **AMENDED by the r3 reviewer:** ADD a crux clause beside `appearance` on the silent image-to-video lanes; do NOT drop the face on redundancy alone -- the foley/mime lanes drop it because their joint latent SPEAKS the prompt, which is not a general I2V rule. Audio-in lanes (HuMo, the h3 audio lane, `ltx_audio_in`) and the two Google text-to-video lanes keep the face unconditionally. Runs after his eye on Half A. Measurements: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/other_lanes_audit.md`.
+
+### 3.3 ORPHAN-OCCUPANCY REGISTRY -- design item, full arc BEFORE code
+
+`has_local_resident_llm()` (`nodes/_otr_model_loader.py`) reports "nothing resident" the moment a timeout clears the cache dict, even while the orphan worker still runs CUDA kernels; `nodes/otr_shot_lock.py` and `nodes/otr_video_render_batch.py` both trust that signal before visual or video work. Shape: process-global lock-protected registry of in-flight generations, registered before invalidation, cleared via `Future.add_done_callback`, fail-fast admission on `request_slot`, the two visual-entry guards reading real occupancy. Deferred three times as correctly out of scope for the cache-bookkeeping fixes (PBUG-20260825-04), and each cut of that fix found a new race, so this is a genuine design choice: full arc first.
+
+### 3.4 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
+
+RULING: Keep the rule that nothing downloads DURING a render.
+RULING: Design item: kibitz arc before code.
+
+Problem: only the writer LLMs, bark, musicgen and the kokoro voices fetch themselves. Every image engine, every video engine, Stable Audio 3, the cloning TTS engines and the reference WAVs are manual placement behind two fetchers under `scripts/` that the registry bundle does not ship. Move the fetch to the queue-time preflight that already refuses with "PREFLIGHT FAIL: the running server cannot see: <files>".
+
+- **Manifest** -- write one `config/model_manifest.json` (repo, revision, path, destination, bytes, sha256, gated) merging the provisioner's pinned tiers and the fetcher's lanes (12 rows each today). DONE WHEN it is the single source read by the preflight, the pod provisioner and the matrix generator.
+- **Preflight fetch** -- resolve the selected dropdowns to artifacts, print the total, refuse early if disk is short, download into the running ComfyUI's models tree through `folder_paths` (never `C:\ComfyUI-Models`) with `.part` files, hash verification and resume. Move the fetcher's existing download code under `nodes/` so it ships in the registry bundle. DONE WHEN a clean box renders with zero manual model placement.
+- **Gated rows** -- LTX 2.5 and any other gated row refuses BEFORE downloading, naming the terms URL and the token step.
+- **`download_policy` widget** -- auto (default), ask (list sizes only), never (air-gapped).
+- BLOCKED ON: Section 1.1 -- the manifest carries the kokoro-onnx weights, so this lands after it.
+
+### 3.5 SHIP-AUDIT SURVIVORS (2026-09-01) -- each needs a design decision, not a grep (queue item 8)
+
+Receipts and every file:line: `docs/ship-audit-2026-09-01/SHIP_LIST.md` (section 8 holds 51 disputed items still awaiting an operator ruling).
+Related survivors live elsewhere: the voice item rides Section 1.1, the 8 GB writer item Section 1.5, Mac / AMD Section 1.13.
+These are not mechanical and each wants a kibitz arc before code.
+
+- **Runtime writes inside the pack directory** (cloud-media billing ledger, OpenRouter catalog cache) -- a registry update wipes them, and it bites exactly the registry-install users. Route through `nodes/_otr_paths.otr_shared_cache_dir()`. DONE WHEN: no runtime file is written under the pack dir, plus a migration note for existing ledgers.
+- **`_fit_reason` never consults `needs_fp8_te` / `needs_fp4_te`** (`nodes/_otr_shared/capability_profiles.py`) -- fp8 and NVFP4 engines qualify on ROCm tiers whose `dtype_policy` forbids them. DONE WHEN: two clauses keyed on `dtype_policy` reject them, with coverage.
+- **The janitor cannot sweep `tmp/audio_slices`** (`nodes/_otr_janitor.py`: directory granularity, newest-child mtime) -- the unswept tree costs disk and slows every ComfyUI boot sweep. DONE WHEN: slices are swept and a test pins the widened auto-delete scope (three lines of code, but it widens what gets auto-deleted).
+- **Cloud spend with no ceiling** -- `cpu_floor` and `otr_mac_mps` route every image role to the paid Google API on the mere presence of a key, and the BYO-key lane has no reserve/bill/ledger path (`eng_google_image.py`). DONE WHEN: spend is ledgered or the lane is an explicit opt-in.
+- **`eng_ltx_video` / `eng_ltx_av` reload ~14 GiB of weights per beat** -- adopt the `prepare()` + `external_results` pattern the sibling lanes use. DONE WHEN: weights load once per run, not per beat.
+
+### 3.6 THE ADAPTATION DESIGN (queue item 8; hardened, NOT yet built; multi-session -- start only with room to finish step 1)
+
+Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md` (5080-local).
+
+RULING (2026-08-23): the verbatim lane is Shakespeare only; public_domain may paraphrase.
+RULING (keystone): compile source speech from an authenticated segmented artifact, never generate it; "summarize into X words" means SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not paraphrasing.
+CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7, `BEAT_WORD_HARD_MAX` 80); full-scene performance would need a beat-topology redesign. Build target is the 300-word unit.
+
+**NEXT, IN ORDER:**
+
+1. **Segmented source artifact** -- schema, spans, hashes, `body[start:end] == segment.text`, omission receipts, plus the pass-to-field ownership table. **BLOCKS EVERYTHING: nothing else codes until that table exists.** DONE WHEN: artifact schema + ownership table exist and the span/hash identity holds.
+2. **Cast from the selected cut** -- real scenes carry 3-12 speakers against a 6-character ceiling (`_otr_casting.py` 1-6, `OutlineRequest` rejects >6), so which speakers appear must follow from the cut that fits the word budget. Coupled to the capacity guard: at act_count 1 there are exactly THREE voiced beats, so a 4-person cast is a guaranteed `CastVoiceCoverageError`. DONE WHEN: cast derives from the cut and `compute_episode_budget` receives the TRUE locked cast. Blocked on step 1.
+3. **Loosen the count-match invariant** at `OTR_LedgerScriptWriter.py:4061-4067` (hard-raises on any locked != requested), and change the pack text that tells the model to drop figures. DONE WHEN: a locked count differing from requested no longer raises.
+4. **Extend `_otr_provenance.py`** -- do not add a second attribution owner -- and bind its output to the verified body hash. DONE WHEN: attribution has exactly one owner and is hash-bound.
+5. **Schema migration to retire `cast_hints`** -- still required by the validators and by `public_domain_manifest_schema.json`, so manifests and tests migrate in the same change. DONE WHEN: no validator or manifest references `cast_hints`.
+
+**KNOWN AND NOT FIXED:** `canonicalize_shakespeare_text` truncates at 12,000 chars and the interpreter sees only the first 5,000, so a 3,445-word scene reaches the brief as ~880 words, silently. Fix belongs with the step-1 artifact work, where each beat is fed its own segment rather than a blind prefix.
+
+### 3.7 STYLE / IDENTITY DECISION WORK (queue item 8; backlog; not the next coder window)
+
+- **Derived style/genre field** -- add to `run_story_brief_reflection` (`_otr_story_brief.py:513`), stamp beside `story_brief`, repoint the treatment `Style:` line (`video_engine.py:1762`) and the HUD (`video_engine.py:1336` -> `_build_left` `:1592`) at it. Why: fixes the credits line uniformly for all six banks. DONE WHEN: all six banks show a content-derived style in credits + HUD.
+- **Rename `meta.style` -> `meta.story_scaffold`** in ONE atomic change across: writer stamps, credits `_story_style_receipt`, `visual_plan.style`, `video_engine.py:1336`, tests, AND the ledger validators -- `_otr_ledger_consistency.py` (`MatrixRow("style", ...)` at `:68`, `:177`) and `_otr_ledger_cleanup.py`. DONE WHEN: no `meta.style` references remain and ledger validation passes on a live episode. Miss the validators and the first episode fails ledger validation.
+  - Operator ruling: too many metas; the field is neither scifi nor a description.
+- **Ghost-name reconciliation fork (DECISION NEEDED)** -- pitch cast never reaches `lock_cast` (names are a pure pool draw; `source_character_names` deliberately None for invention lanes). Decide: scrub briefs after cast lock, or propagate pitch names. Evidence: Evelyn/Leonard as offscreen lore; Fogbound Rails bio still opens "Lizzie Gray". Cross-listed as Section 3, question C. BLOCKED ON: operator/decision.
+- **Dead fields to resolve** -- `ending_template` computed but no LineRequest call site passes it; `seed_policy.style_seed_env` validated but unconsumed; `dramatic_state` derived PRE-dialogue and goes stale in the treatment. DONE WHEN: each is either wired to a consumer or removed.
+- **`meta` is a 120-key drawer** -- scope as its own rip under the ledger law (every field exactly one owner).
+  - Operator ruling: this is the cleanup the operator keeps asking for.
+
+## 4. THE REGISTRY -- publish the first NON-ALPHA, file the review the same day
 
 Everything above changes shipped code; everything below needs the published pack. The
 review request is a PUBLIC post and needs the operator's explicit go.
@@ -259,13 +346,13 @@ review request is a PUBLIC post and needs the operator's explicit go.
 * **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL verification, NOT for scanner probing.** Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in a real security queue, and it is unnecessary -- `?include_status_reason=true` already returns all findings itemized by rule.
 * DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes. Never version-delete: a soft delete burns the string permanently.
 
-## 4. TESTING -- needs the published pack or a GPU leg
+## 5. TESTING -- needs the published pack or a GPU leg
 
-The 4060 template test installs FROM THE REGISTRY, which is why it cannot precede item 3.
+The 4060 template test installs FROM THE REGISTRY, which is why it cannot precede item 4.
 The render proofs are batched by the leg that proves them -- test the least. The pod is
 ONE rental with two jobs on the same dollar, and its runners shut the GPU off themselves.
 
-### 4.1 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
+### 5.1 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
 
 RULING (2026-09-01): Klein is the image default in all 19 low-VRAM profiles and the 8gb / 12gb / amd classes -- see `docs/OTR_STANDING_RULINGS.md` "IMAGE ENGINE DEFAULTS BY MACHINE CLASS".
 RULING: "Finish retiring the profiles" is no longer an option -- `config/profiles` stays as lab presets and the matrix is the record.
@@ -281,7 +368,7 @@ Owed, in order:
 
 4. **cfg 1.0 promotion A/B** on three real episode prompts (announcer portrait, character portrait, scene beat), the same four cells (nvfp4 / bf16 x cfg 1.0 / 2.0), rendered to a NEW dir under `docs/ship-audit-2026-09-01/image-jury/`, then the operator's eyeball. One seed was a strong lead, not a proof. DONE WHEN the operator rules. Scheduled: Section 2, Batch R5.
 
-### 4.2 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
+### 5.2 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
 
 RULINGS (verbatim, do not re-open):
 * **One JSON for now (operator 2026-09-02).**
@@ -294,14 +381,14 @@ OPEN WORK:
 * **README model table** from the compatibility workbook's Baseline Combos tab (`outputs/20260828-ungated-models/`, the LIVING fact sheet: edit cells in place, never add a changelog tab). DONE WHEN: the table is in README, or the operator rules that README's injected class table and per-lane facts already cover it and this bullet goes. Blocked on: that operator call.
 * The knob census (Section 1 header) informs what the template pins.
 
-### 4.3 LOCAL-LLM SWEEP LEG 0 -- the in-process preflight (queue item 6)
+### 5.3 LOCAL-LLM SWEEP LEG 0 -- the in-process preflight (queue item 6)
 
 Leg 0 = one in-process command (`request_slot` -> ~40-token generate -> `_self_unload`
 per row, with `reset_peak_memory_stats()` around each), ~15-20 min, IDLE GPU, no ComfyUI.
 It fails loudly on a dead row. The four canonical legs that are the real proof, and the
 whole sweep design, are Section 2 Batch R3.
 
-### 4.4 THE H3 PROMPT-POLICY VERDICT: read the receipts first, render only if they do not answer
+### 5.4 THE H3 PROMPT-POLICY VERDICT: read the receipts first, render only if they do not answer
 
 - **Close the h3 prompt-policy verdict** (PBUG-20260827-01 in `docs/PROD_BUG_LOG.md` is still marked "STILL OWED") -- without it the prompt-policy fix has no receipt.
   - **What to check:** in the positive video prompt, nonverbal action and camera PRESENT; the beat's exact dialogue and any speaking / lip-sync / mouth anchor ABSENT.
@@ -316,7 +403,7 @@ whole sweep design, are Section 2 Batch R3.
   - A FRESH episode id is mandatory because `request_hash` excludes prompt bytes, so a cached SPEAKING clip would be a false pass.
   - The BEFORE sample `signal_lost_the_caretakers_clause_20260826_155835` (every beat on H3, pre-fix, under `output/otr/episodes/`) stays untouched: it is half of the A/B.
 
-### 4.5 ONE image-mode sweep on `otr_soak_llmsweep_02` settles SCENE + PORTRAIT `elements: []`
+### 5.5 ONE image-mode sweep on `otr_soak_llmsweep_02` settles SCENE + PORTRAIT `elements: []`
 
 **This is a RENDER/MEASUREMENT item, not a panel item. No arc runs before the numbers exist.**
 
@@ -330,7 +417,7 @@ whole sweep design, are Section 2 Batch R3.
 * **CONTEXT:** `docs/2026-08-26-ideogram-music-card-PROBLEM-STATEMENT.md` (5080-local) and PBUG-20260826-01.
 * **BLOCKED ON:** nothing -- needs GPU time for the sweep.
 
-### 4.6 FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator directive 2026-08-25)
+### 5.6 FOUR canonical legs prove the WHOLE local-LLM acceptance sweep (operator directive 2026-08-25)
 
 Prove all 7 surviving local-LLM rows in BOTH model slots (creative + technical) plus the gemma `Q8_0` negative probe. Runs after Leg 0 (Section 1.7). All 7 rows are on disk; preflight guide: `docs/LLM_PREFLIGHT_GUIDE.md`; charter: `docs/OTR_STANDING_RULINGS.md`.
 
@@ -350,14 +437,14 @@ Prove all 7 surviving local-LLM rows in BOTH model slots (creative + technical) 
 
 **Reference:** coverage matrix, per-row assertions, skip-reporting rules and risks live in the 2026-08-25 workflow result; re-derive from this row if it is lost.
 
-### 4.7 ONE canonical `fastwan_8gb` leg with 60-second opening AND closing cues proves PBUG-20260811-02
+### 5.7 ONE canonical `fastwan_8gb` leg with 60-second opening AND closing cues proves PBUG-20260811-02
 
 The only row of the 2026-08-25 re-triage still open. Root cause established, the repair is
 WRITTEN, and it is not a coding item: it needs a canonical `fastwan_8gb` leg whose cues are
 long enough to chunk at `_MUSIC_MAX_CHUNK_DUR_S = 22.0`. A render window, not a coder
 slot. Detail: `docs/PROD_BUG_LOG.md`; the closed trio is in the archive.
 
-### 4.8 OPPORTUNISTIC: the cfg 1.0 promotion cells, D2 fail-hunting still legs, and the eyeball re-observations
+### 5.8 OPPORTUNISTIC: the cfg 1.0 promotion cells, D2 fail-hunting still legs, and the eyeball re-observations
 
 Run when a render window is free and nothing above needs the box.
 
@@ -368,7 +455,7 @@ Run when a render window is free and nothing above needs the box.
 * **Two eyeball items ride ANY real render leg, at zero extra legs** -- no coder time, just look: the announcer framing defect (`docs/2026-07-11-announcer-framing-defect.md`: episodes START a story instead of admitting you into one) and name-splice defect #2. Both predate THE LAW and have no reproduction at HEAD. DONE WHEN: each is either re-admitted as a FRESH dated row with that leg as evidence, or tombstoned.
   * RULING: the framing fix stays seam + score contract + fail-closed validator, never Python authorship.
 
-### 4.9 RETIRE OR RE-DERIVE the seven 45-word engine proofs
+### 5.9 RETIRE OR RE-DERIVE the seven 45-word engine proofs
 
 Cross-check the seven public engine IDs of the archived 2026-08-13 runway table (row 3;
 its pointer was recorded BROKEN on 2026-08-16) against `config/machine_classes.json`
@@ -377,7 +464,7 @@ its pointer was recorded BROKEN on 2026-08-16) against `config/machine_classes.j
 post-08-13 receipt; otherwise retire the row. Do not spend seven legs on an unverified
 list.
 
-### 4.10 THE 4060 CLEAN ROOM: the legs still owed
+### 5.10 THE 4060 CLEAN ROOM: the legs still owed
 
 Context to act: clean room is `C:\OTR-CleanRoom` on the 4060 (portable v0.34.0, Python 3.13, OTR clone at `da2b7a36`, ComfyUI-GGUF pinned + patched, pinned weights, bark voices). Server and legs start through Task Scheduler, never from an SSH session. The clean-room profiles are untracked stand-ins on the 4060; the shipped equivalent is Section 1.5 item 2. Friction log and leg receipts: `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
 
@@ -391,7 +478,7 @@ Rulings -- do not re-open:
 * The shipped 8 GB set runs Klein by ruling and is unaffected by the Z-Image outcome either way.
 * Operator eyeball on Leg C5 (Klein + LTX 2.5, stock flags) is tracked as Section 1.5 item 1.
 
-### 4.11 THE NEXT POD SESSION: the acid test and a looped lane sweep on one rental (queue item 9)
+### 5.11 THE NEXT POD SESSION: the acid test and a looped lane sweep on one rental (queue item 9)
 
 - **Owner:** Codex, who also owns `docs/RUNPOD_INSTALL.md`. Pod stays STOPPED until this batch runs; the volume stays (it holds the warm cache, the expensive thing to recreate).
 - **Run both legs on ONE rental, in this order:** saved template -> `scripts/otr_provision.py` -> acid test -> looped lane sweep.
@@ -399,7 +486,7 @@ Rulings -- do not re-open:
 - **Leg 2 -- the looped lane sweep:** `scripts/otr_pod_lane_soak.sh` + `scripts/otr_pod_overnight_sweep.sh` for the HuMo 14B / LTX 2.5 / indextts2 second-machine receipts. DONE WHEN: receipts are filed under the 16gb class in `config/machine_classes.json` `engine_evidence`.
 - RULING: there is no 24 GB class or profile by ruling (Section 3 L asks whether a row is wanted).
 
-### 4.12 Deferred render items (each blocked, or waiting on something else first)
+### 5.12 Deferred render items (each blocked, or waiting on something else first)
 
 - **Capped-14B HuMo leg** -- live proof of the ping-pong lip-sync reversal fix
   (`a1d810f1`); see the coverage cluster row in Section 1.4.
@@ -409,94 +496,6 @@ Rulings -- do not re-open:
   behind Section 3 question D, detail there.
 
 ---
-
-## 5. THE DESIGN ROWS -- each gets its arc BEFORE code, then ships as a later version
-
-Nothing here is the next coder window. Each row has more than one defensible answer, so
-each takes its arc first (one or two lanes per decision -- operator 2026-09-04). The guards
-from item 1 keep every one of these from moving the findings.
-
-### 5.1 PROMPT v3 HALF B -- the arc (r2 in flight), then the code
-* **3b. PROMPT v3 HALF B -- the next coder window on this lane.** Read `docs/OTR_STANDING_RULINGS.md` "THE BEAT'S SUBJECT IS A PHYSICAL ARTIFACT" before touching this.
-  Shape (operator-ruled 2026-09-03): extend the EXISTING batched Ghost author with the beat's dialogue (never a second pass), and have it name a PHYSICAL ARTIFACT of the story, preferring one the beat refers to -- never an abstraction and never a noun the dialogue mentions only to say it is absent. **The truck must NOT be drawn** ("this isn't just some dusty list of truck routes" is a rhetorical negative; Ellie is holding a ledger in an archive).
-  Root defect: `resolve_crux_kernel` picks `objects[ordinal % len(objects)]`, so the ledger beat drew `pen`.
-  Constraints carried from r1: the render batch DOES have `IS_CHANGED`; replay returns before the author runs, so a migration needs an explicit seam at the replay boundary, not a version check in the author; the beat's own `text` projection is the accessor -- not a `_ghost_line_index` join, which silently misses synthesized beats. Half B changes the STORED object, so it needs version-dispatch discipline and a re-author path for replay.
-  Full arc before code. r2 in flight; records in `kibitz-runs/2026-09-03-prompt-v3-half-b/`, anchor in `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` and `kibitz-runs/2026-09-02-prompt-v3-crux/`.
-
-### 5.2 THE OTHER VIDEO LANES -- the shared composer's face paragraph (measured, not started)
-* **3d. The OTHER video lanes -- measured, not started.** Ten of eleven lanes lead their prompt with the cast's face paragraph via `motion_common.compose_parts`; on `wan_ti2v` that is 83 of a hard 100-word cap, so the camera clause silently falls off. **AMENDED by the r3 reviewer:** ADD a crux clause beside `appearance` on the silent image-to-video lanes; do NOT drop the face on redundancy alone -- the foley/mime lanes drop it because their joint latent SPEAKS the prompt, which is not a general I2V rule. Audio-in lanes (HuMo, the h3 audio lane, `ltx_audio_in`) and the two Google text-to-video lanes keep the face unconditionally. Runs after his eye on Half A. Measurements: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/other_lanes_audit.md`.
-
-### 5.3 ORPHAN-OCCUPANCY REGISTRY -- design item, full arc BEFORE code
-
-`has_local_resident_llm()` (`nodes/_otr_model_loader.py`) reports "nothing resident" the moment a timeout clears the cache dict, even while the orphan worker still runs CUDA kernels; `nodes/otr_shot_lock.py` and `nodes/otr_video_render_batch.py` both trust that signal before visual or video work. Shape: process-global lock-protected registry of in-flight generations, registered before invalidation, cleared via `Future.add_done_callback`, fail-fast admission on `request_slot`, the two visual-entry guards reading real occupancy. Deferred three times as correctly out of scope for the cache-bookkeeping fixes (PBUG-20260825-04), and each cut of that fix found a new race, so this is a genuine design choice: full arc first.
-
-### 5.4 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
-
-Settle the details in the arc, do not re-derive these.
-
-* **Add an ONNX backend to `nodes/_otr_audio_engines/eng_kokoro.py`** so a default voice installs on every box: load model + voices, phonemize with espeak-ng, run onnxruntime, return 24 kHz audio. Prefer the torch backend only when `kokoro` is importable (3.12 boxes); ONNX everywhere else; bark stays the zero-dependency fallback.
-* **Pick ONE weights source and wire the fetch.** kokoro-onnx wants `kokoro-v1.0.onnx` + one `voices-v1.0.bin` (npz keyed by voice, GitHub release `model-files-v1.1`); the ungated HF mirror `onnx-community/Kokoro-82M-v1.0-ONNX` (86 MB q8f16 to 326 MB full, 55 per-voice `.bin` at 0.5 MB) uses a different per-voice format. Fetch via the existing `_otr_kokoro_voice_prefetch` machinery, and map announcer/character voice ids onto the same names the torch path uses so the cast ledger does not change.
-* **Registry deps:** `kokoro-onnx>=0.6.1` and `onnxruntime>=1.20.1` in both manifests (plain PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video engine holds the GPU (82M model, faster than realtime on CPU).
-* **Default both voice slots to kokoro in the same change** -- `workflows/otr_canonical.json` and every generated variant: `char_voice_engine`, `announcer_voice_engine`, `voice_bank` `kokoro_builtin`; indextts2, chatterbox, dia and bark stay in the dropdowns as install-it-yourself upgrades.
-  * SHIP SCOPE (operator ruling 2026-09-01: "we can ship all audio lanes with kokoro").
-  * The Section 4 voice-bank item stays parked.
-* **THE COMPATIBILITY TABLE IS GENERATED, NOT HAND-KEPT:** extend `scripts/otr_machine_matrix.py` to emit a "Voice engines" table into `docs/MACHINE_MATRIX.md` from `nodes/_otr_audio_engines/registry.py` (device_backends, requires_sidecar, requires_vendor, practical_without_gpu, model_requirements) plus a per-engine "ships with the pack / install on your own" column, so README can point at one table.
-* **Cloning engines preflight their reference WAVs:** preflight the resolved `ref_path` files in `OTR_CastLock` BEFORE the writer call whenever a cloning engine IS selected, so an opt-in indextts2 / chatterbox / dia user fails in seconds, not after a whole script.
-* **DONE WHEN:** a clean 3.13 portable install renders a 1-act episode with kokoro voices for announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`, and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
-* **BLOCKED ON / release gate:** the `pyproject.toml` dependency edit auto-fires a registry publish. It rides the bump AFTER alpha.15 (and alpha.16 if the control runs) resolves -- never while a version is Pending, and never reusing a string (CLAUDE.md 7A).
-
-### 5.5 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
-
-RULING: Keep the rule that nothing downloads DURING a render.
-RULING: Design item: kibitz arc before code.
-
-Problem: only the writer LLMs, bark, musicgen and the kokoro voices fetch themselves. Every image engine, every video engine, Stable Audio 3, the cloning TTS engines and the reference WAVs are manual placement behind two fetchers under `scripts/` that the registry bundle does not ship. Move the fetch to the queue-time preflight that already refuses with "PREFLIGHT FAIL: the running server cannot see: <files>".
-
-- **Manifest** -- write one `config/model_manifest.json` (repo, revision, path, destination, bytes, sha256, gated) merging the provisioner's pinned tiers and the fetcher's lanes (12 rows each today). DONE WHEN it is the single source read by the preflight, the pod provisioner and the matrix generator.
-- **Preflight fetch** -- resolve the selected dropdowns to artifacts, print the total, refuse early if disk is short, download into the running ComfyUI's models tree through `folder_paths` (never `C:\ComfyUI-Models`) with `.part` files, hash verification and resume. Move the fetcher's existing download code under `nodes/` so it ships in the registry bundle. DONE WHEN a clean box renders with zero manual model placement.
-- **Gated rows** -- LTX 2.5 and any other gated row refuses BEFORE downloading, naming the terms URL and the token step.
-- **`download_policy` widget** -- auto (default), ask (list sizes only), never (air-gapped).
-- BLOCKED ON: Section 1.1 -- the manifest carries the kokoro-onnx weights, so this lands after it.
-
-### 5.6 SHIP-AUDIT SURVIVORS (2026-09-01) -- each needs a design decision, not a grep (queue item 8)
-
-Receipts and every file:line: `docs/ship-audit-2026-09-01/SHIP_LIST.md` (section 8 holds 51 disputed items still awaiting an operator ruling).
-Related survivors live elsewhere: the voice item rides Section 1.1, the 8 GB writer item Section 1.5, Mac / AMD Section 1.13.
-These are not mechanical and each wants a kibitz arc before code.
-
-- **Runtime writes inside the pack directory** (cloud-media billing ledger, OpenRouter catalog cache) -- a registry update wipes them, and it bites exactly the registry-install users. Route through `nodes/_otr_paths.otr_shared_cache_dir()`. DONE WHEN: no runtime file is written under the pack dir, plus a migration note for existing ledgers.
-- **`_fit_reason` never consults `needs_fp8_te` / `needs_fp4_te`** (`nodes/_otr_shared/capability_profiles.py`) -- fp8 and NVFP4 engines qualify on ROCm tiers whose `dtype_policy` forbids them. DONE WHEN: two clauses keyed on `dtype_policy` reject them, with coverage.
-- **The janitor cannot sweep `tmp/audio_slices`** (`nodes/_otr_janitor.py`: directory granularity, newest-child mtime) -- the unswept tree costs disk and slows every ComfyUI boot sweep. DONE WHEN: slices are swept and a test pins the widened auto-delete scope (three lines of code, but it widens what gets auto-deleted).
-- **Cloud spend with no ceiling** -- `cpu_floor` and `otr_mac_mps` route every image role to the paid Google API on the mere presence of a key, and the BYO-key lane has no reserve/bill/ledger path (`eng_google_image.py`). DONE WHEN: spend is ledgered or the lane is an explicit opt-in.
-- **`eng_ltx_video` / `eng_ltx_av` reload ~14 GiB of weights per beat** -- adopt the `prepare()` + `external_results` pattern the sibling lanes use. DONE WHEN: weights load once per run, not per beat.
-
-### 5.7 THE ADAPTATION DESIGN (queue item 8; hardened, NOT yet built; multi-session -- start only with room to finish step 1)
-
-Plan of record: `kibitz-runs/2026-08-03-adaptation-fidelity/r2/final.md` (5080-local).
-
-RULING (2026-08-23): the verbatim lane is Shakespeare only; public_domain may paraphrase.
-RULING (keystone): compile source speech from an authenticated segmented artifact, never generate it; "summarize into X words" means SELECTING WHICH REAL SEGMENTS FIT THE BUDGET, not paraphrasing.
-CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7, `BEAT_WORD_HARD_MAX` 80); full-scene performance would need a beat-topology redesign. Build target is the 300-word unit.
-
-**NEXT, IN ORDER:**
-
-1. **Segmented source artifact** -- schema, spans, hashes, `body[start:end] == segment.text`, omission receipts, plus the pass-to-field ownership table. **BLOCKS EVERYTHING: nothing else codes until that table exists.** DONE WHEN: artifact schema + ownership table exist and the span/hash identity holds.
-2. **Cast from the selected cut** -- real scenes carry 3-12 speakers against a 6-character ceiling (`_otr_casting.py` 1-6, `OutlineRequest` rejects >6), so which speakers appear must follow from the cut that fits the word budget. Coupled to the capacity guard: at act_count 1 there are exactly THREE voiced beats, so a 4-person cast is a guaranteed `CastVoiceCoverageError`. DONE WHEN: cast derives from the cut and `compute_episode_budget` receives the TRUE locked cast. Blocked on step 1.
-3. **Loosen the count-match invariant** at `OTR_LedgerScriptWriter.py:4061-4067` (hard-raises on any locked != requested), and change the pack text that tells the model to drop figures. DONE WHEN: a locked count differing from requested no longer raises.
-4. **Extend `_otr_provenance.py`** -- do not add a second attribution owner -- and bind its output to the verified body hash. DONE WHEN: attribution has exactly one owner and is hash-bound.
-5. **Schema migration to retire `cast_hints`** -- still required by the validators and by `public_domain_manifest_schema.json`, so manifests and tests migrate in the same change. DONE WHEN: no validator or manifest references `cast_hints`.
-
-**KNOWN AND NOT FIXED:** `canonicalize_shakespeare_text` truncates at 12,000 chars and the interpreter sees only the first 5,000, so a 3,445-word scene reaches the brief as ~880 words, silently. Fix belongs with the step-1 artifact work, where each beat is fed its own segment rather than a blind prefix.
-
-### 5.8 STYLE / IDENTITY DECISION WORK (queue item 8; backlog; not the next coder window)
-
-- **Derived style/genre field** -- add to `run_story_brief_reflection` (`_otr_story_brief.py:513`), stamp beside `story_brief`, repoint the treatment `Style:` line (`video_engine.py:1762`) and the HUD (`video_engine.py:1336` -> `_build_left` `:1592`) at it. Why: fixes the credits line uniformly for all six banks. DONE WHEN: all six banks show a content-derived style in credits + HUD.
-- **Rename `meta.style` -> `meta.story_scaffold`** in ONE atomic change across: writer stamps, credits `_story_style_receipt`, `visual_plan.style`, `video_engine.py:1336`, tests, AND the ledger validators -- `_otr_ledger_consistency.py` (`MatrixRow("style", ...)` at `:68`, `:177`) and `_otr_ledger_cleanup.py`. DONE WHEN: no `meta.style` references remain and ledger validation passes on a live episode. Miss the validators and the first episode fails ledger validation.
-  - Operator ruling: too many metas; the field is neither scifi nor a description.
-- **Ghost-name reconciliation fork (DECISION NEEDED)** -- pitch cast never reaches `lock_cast` (names are a pure pool draw; `source_character_names` deliberately None for invention lanes). Decide: scrub briefs after cast lock, or propagate pitch names. Evidence: Evelyn/Leonard as offscreen lore; Fogbound Rails bio still opens "Lizzie Gray". Cross-listed as Section 3, question C. BLOCKED ON: operator/decision.
-- **Dead fields to resolve** -- `ending_template` computed but no LineRequest call site passes it; `seed_policy.style_seed_env` validated but unconsumed; `dramatic_state` derived PRE-dialogue and goes stale in the treatment. DONE WHEN: each is either wired to a consumer or removed.
-- **`meta` is a 120-key drawer** -- scope as its own rip under the ledger law (every field exactly one owner).
-  - Operator ruling: this is the cleanup the operator keeps asking for.
 
 ## 6. RULINGS OWED BY THE OPERATOR -- each with its default if unruled
 
@@ -597,7 +596,6 @@ gains `mps` on the `flux2_klein` row (cuda-only today) -> `otr_mac_mps` flips of
 (`_otr_upscale_engines/__init__.py`, deliberately deferred); (3) a measured ROCm boot for
 `otr_amd8_rocm` / `otr_amd16_rocm`. ROCm already qualifies for Klein (presents as cuda).
 Needs hardware neither NVIDIA box has.
-
 
 ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
 
