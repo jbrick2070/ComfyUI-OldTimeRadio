@@ -131,6 +131,11 @@ _ALLOWED_ARGV0 = [
     "ffmpeg", "ffmpeg.exe", "FFmpeg.EXE",           # case and .exe normalize
     "/usr/bin/ffmpeg",
     "ffprobe", "/usr/bin/ffprobe",
+    # What imageio_ffmpeg actually ships, and what the encoder tests resolve.
+    # This is the case the argv receipt could not see -- it sweeps argv[0]
+    # LITERALS, and this path is computed at run time by a library.
+    "ffmpeg-win-x86_64-v7.1.exe", "ffmpeg-linux-x86_64-v7.1",
+    "ffmpeg-7.1", "ffprobe-7.1",
     "git", "git.exe",
     "nvidia-smi", "nvidia-smi.exe",
     "blender", "/opt/blender/blender",
@@ -154,7 +159,8 @@ _ALLOWED_ARGV0_WINDOWS = [
 
 _REFUSED_ARGV0 = [
     "curl", "powershell.exe", "cmd.exe", "bash", "sh", "wget", "/bin/sh",
-    "ffmpeg-7.1",           # a versioned basename is NOT admitted; see below
+    # blender stays EXACT: no versioned blender basename has ever reached a
+    # spawn here, and the named refusal is how the ffmpeg case was found.
     "blender-4.2",
 ]
 
@@ -248,6 +254,29 @@ def test_the_re_exports_are_IDENTITY_aliases():
 
 
 def test_every_allowlist_entry_carries_its_reason():
-    for name, reason in otr_proc.ALLOWED_EXECUTABLES.items():
-        assert name == name.lower(), name
-        assert reason.strip(), name
+    for table in (otr_proc.ALLOWED_EXECUTABLES,
+                  otr_proc.ALLOWED_EXECUTABLE_PREFIXES):
+        for name, reason in table.items():
+            assert name == name.lower(), name
+            assert reason.strip(), name
+
+
+def test_the_two_allowlist_tables_do_not_overlap():
+    """A name in both is a name whose rule nobody can state. The prefix table
+    is the whole answer for a family; the exact table is the whole answer for a
+    fixed name."""
+    for exact in otr_proc.ALLOWED_EXECUTABLES:
+        assert not any(exact.startswith(p)
+                       for p in otr_proc.ALLOWED_EXECUTABLE_PREFIXES), exact
+
+
+def test_the_refusal_message_names_BOTH_tables():
+    """An operator reading the error has to be able to see the whole rule, or
+    the next person hits the same wall the imageio-ffmpeg binary did."""
+    with pytest.raises(otr_proc.ExecutableNotAllowed) as exc:
+        otr_proc._check(["curl", "-V"])
+    text = str(exc.value)
+    for exact in otr_proc.ALLOWED_EXECUTABLES:
+        assert exact in text, exact
+    for prefix in otr_proc.ALLOWED_EXECUTABLE_PREFIXES:
+        assert prefix + "*" in text, prefix

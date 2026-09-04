@@ -42,7 +42,13 @@ called, which is always inside a node's execution, never at import.
 
 from __future__ import annotations
 
-import os
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
 
 #: The two environment variables that decide effective routing. Any new
 #: routing env var MUST be added here AND to the snapshot, or it escapes the
@@ -69,7 +75,11 @@ def routing_env_snapshot(env=None) -> dict:
     (stripped) -- kept raw, not pre-parsed, so the snapshot stays serializable
     and a consumer can re-verify the exact operator input it was frozen from.
     """
-    src = os.environ if env is None else env
+    # snapshot() is a COPY, and that is the right shape here: both reads
+    # happen on the next two lines, so a copy and the live mapping cannot
+    # disagree -- and a copy cannot be mutated back into this process by a
+    # consumer of the returned dict.
+    src = otr_env.snapshot() if env is None else env
     return {
         "force_engine_map": str(src.get(FORCE_ENGINE_MAP_ENV, "") or "").strip(),
         "enable_humo_hosts": str(src.get(ENABLE_HUMO_HOSTS_ENV, "0") or "0") == "1",

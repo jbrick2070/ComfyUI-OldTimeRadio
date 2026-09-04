@@ -21,7 +21,7 @@ def test_two_binaries_get_two_verdicts_and_each_is_cached(monkeypatch):
         probed.append(cmd[0])
         return SimpleNamespace(returncode=0 if "good" in cmd[0] else 1)
 
-    monkeypatch.setattr(es.subprocess, "run", run_by_binary)
+    monkeypatch.setattr(es.otr_proc, "run", run_by_binary)
 
     assert es.has_nvenc("/opt/good/ffmpeg") is True
     assert es.has_nvenc("/opt/bad/ffmpeg") is False
@@ -38,7 +38,7 @@ def test_the_same_binary_spelled_two_ways_is_one_probe(monkeypatch):
         probed.append(cmd[0])
         return SimpleNamespace(returncode=0)
 
-    monkeypatch.setattr(es.subprocess, "run", run_ok)
+    monkeypatch.setattr(es.otr_proc, "run", run_ok)
     import os
     here = os.path.abspath("ffmpeg.exe")
     assert es.has_nvenc(here) is True
@@ -59,7 +59,7 @@ def test_signal_lost_asks_the_owner_for_every_binary(monkeypatch):
         probed.append(cmd[0])
         return SimpleNamespace(returncode=0 if "good" in cmd[0] else 1)
 
-    monkeypatch.setattr(es.subprocess, "run", run_by_binary)
+    monkeypatch.setattr(es.otr_proc, "run", run_by_binary)
     assert ve._check_nvenc("/opt/good/ffmpeg") is True
     assert ve._check_nvenc("/opt/bad/ffmpeg") is False
     assert ve._check_nvenc("/opt/good/ffmpeg") is True
@@ -71,7 +71,7 @@ def test_signal_lost_asks_the_owner_for_every_binary(monkeypatch):
 def test_an_empty_binary_is_false_and_never_keys_the_cache_on_cwd(monkeypatch):
     monkeypatch.setattr(es, "_NVENC_PROBE", {})
     calls = []
-    monkeypatch.setattr(es.subprocess, "run",
+    monkeypatch.setattr(es.otr_proc, "run",
                         lambda cmd, **_kw: calls.append(cmd) or SimpleNamespace(returncode=0))
     assert es.has_nvenc("") is False
     assert es.has_nvenc(None) is False
@@ -86,7 +86,7 @@ def test_a_bare_name_is_resolved_through_the_owner_before_it_keys(monkeypatch):
     monkeypatch.setattr(es, "_NVENC_PROBE", {})
     monkeypatch.setattr(es, "resolve_ffmpeg", lambda p=None: "/x/pinned/ffmpeg")
     probed = []
-    monkeypatch.setattr(es.subprocess, "run",
+    monkeypatch.setattr(es.otr_proc, "run",
                         lambda cmd, **_kw: probed.append(cmd[0]) or SimpleNamespace(returncode=0))
     assert es.has_nvenc("ffmpeg") is True
     assert probed == ["/x/pinned/ffmpeg"]
@@ -104,7 +104,7 @@ def test_an_unresolvable_bare_name_is_false_and_never_keys_the_cache(monkeypatch
     monkeypatch.setattr(es, "_NVENC_PROBE", {})
     monkeypatch.setattr(es, "resolve_ffmpeg", lambda p=None: None)
     calls = []
-    monkeypatch.setattr(es.subprocess, "run",
+    monkeypatch.setattr(es.otr_proc, "run",
                         lambda cmd, **_kw: calls.append(cmd) or SimpleNamespace(returncode=0))
     assert es.has_nvenc("ffmpeg") is False
     assert calls == []
@@ -119,7 +119,7 @@ def test_a_probe_that_explodes_is_false_and_cached_for_that_binary(monkeypatch):
         calls.append(cmd[0])
         raise OSError("no such binary")
 
-    monkeypatch.setattr(es.subprocess, "run", boom)
+    monkeypatch.setattr(es.otr_proc, "run", boom)
     assert es.has_nvenc("/nowhere/ffmpeg") is False
     assert es.has_nvenc("/nowhere/ffmpeg") is False
     assert len(calls) == 1

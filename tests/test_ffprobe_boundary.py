@@ -162,7 +162,7 @@ def test_probe_raw_hands_back_a_non_zero_return_code_without_raising(
         seen["kwargs"] = kwargs
         return subprocess.CompletedProcess(argv, 1, "", "boom")
 
-    clean_env.setattr(ffp.subprocess, "run", fake_run)
+    clean_env.setattr(ffp.otr_proc, "run", fake_run)
     proc = ffp.probe_raw(["-i", 42], ffprobe=binary, timeout=9)
     assert proc.returncode == 1 and proc.stderr == "boom"
     assert seen["argv"] == [binary, "-i", "42"]
@@ -176,7 +176,7 @@ def test_probe_raw_names_a_timeout_and_a_launch_failure(clean_env, tmp_path):
     def timing_out(argv, **kwargs):
         raise subprocess.TimeoutExpired(argv, 3)
 
-    clean_env.setattr(ffp.subprocess, "run", timing_out)
+    clean_env.setattr(ffp.otr_proc, "run", timing_out)
     with pytest.raises(ffp.FFprobeError) as excinfo:
         ffp.probe_raw(["-version"], ffprobe=binary, timeout=3)
     assert "timed out" in str(excinfo.value)
@@ -184,7 +184,7 @@ def test_probe_raw_names_a_timeout_and_a_launch_failure(clean_env, tmp_path):
     def not_executable(argv, **kwargs):
         raise OSError(8, "Exec format error")
 
-    clean_env.setattr(ffp.subprocess, "run", not_executable)
+    clean_env.setattr(ffp.otr_proc, "run", not_executable)
     with pytest.raises(ffp.FFprobeError):
         ffp.probe_raw(["-version"], ffprobe=binary)
 
@@ -196,7 +196,7 @@ def test_a_vanished_binary_is_reported_as_missing_not_as_a_probe_failure(
     def gone(argv, **kwargs):
         raise FileNotFoundError(2, "No such file")
 
-    clean_env.setattr(ffp.subprocess, "run", gone)
+    clean_env.setattr(ffp.otr_proc, "run", gone)
     with pytest.raises(ffp.FFprobeMissing):
         ffp.probe_raw(["-version"], ffprobe=binary)
 
@@ -212,7 +212,7 @@ def _stub_json(monkeypatch, tmp_path, stdout, returncode=0):
         seen["argv"] = argv
         return subprocess.CompletedProcess(argv, returncode, stdout, "why not")
 
-    monkeypatch.setattr(ffp.subprocess, "run", fake_run)
+    monkeypatch.setattr(ffp.otr_proc, "run", fake_run)
     return binary, seen
 
 

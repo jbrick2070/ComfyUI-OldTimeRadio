@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-import subprocess
 import threading
 import time
 from pathlib import Path
@@ -16,6 +15,14 @@ from typing import Optional
 
 from .ffmpeg import resolve_ffmpeg
 from .scope_draw import cfr_flags
+
+try:
+    from . import proc as otr_proc
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
 
 
 def find_ffmpeg(ffmpeg: str = "ffmpeg") -> Optional[str]:
@@ -89,7 +96,7 @@ def has_nvenc(ffmpeg: str) -> bool:
         if cached is not None:
             return cached
         try:
-            out = subprocess.run(
+            out = otr_proc.run(
                 [ffmpeg, "-hide_banner", "-loglevel", "error",
                  "-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
                  "-c:v", "h264_nvenc", "-frames:v", "1",
@@ -145,7 +152,7 @@ class RawVideoSink:
         self.ffmpeg = ffmpeg
         self.output_path = Path(output_path) if output_path else None
         self.prefer_nvenc = bool(prefer_nvenc)
-        self.proc: Optional[subprocess.Popen] = None
+        self.proc: Optional[otr_proc.Popen] = None
         self.stats = RawVideoSinkStats(mode=self.mode)
 
     def __enter__(self) -> "RawVideoSink":
@@ -180,11 +187,11 @@ class RawVideoSink:
                 "-colorspace", "bt709", "-movflags", "+faststart",
                 str(self.output_path),
             ]
-        self.proc = subprocess.Popen(
+        self.proc = otr_proc.popen(
             cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stdin=otr_proc.PIPE,
+            stdout=otr_proc.DEVNULL,
+            stderr=otr_proc.PIPE,
         )
         self.stats.codec = codec
         self.stats.used_nvenc = use_nvenc

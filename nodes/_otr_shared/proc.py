@@ -61,6 +61,7 @@ TimeoutExpired = subprocess.TimeoutExpired
 
 __all__ = [
     "run", "popen", "ExecutableNotAllowed", "ALLOWED_EXECUTABLES",
+    "ALLOWED_EXECUTABLE_PREFIXES",
     "PIPE", "DEVNULL", "STDOUT", "CompletedProcess", "Popen",
     "CalledProcessError", "TimeoutExpired",
 ]
@@ -72,20 +73,40 @@ class ExecutableNotAllowed(RuntimeError):
 
 #: basename (lower, ``.exe`` stripped) -> why this pack runs it. Measured from
 #: every spawn site in the tree; see the argv receipt named in the module
-#: docstring. Interpreters are handled by the ``python*`` rule below, because
-#: a venv's interpreter is ``python``, ``pythonw``, ``python3`` or
-#: ``python3.12`` depending on the box.
+#: docstring. EXACT names only -- the families whose file name carries a version
+#: or a platform live in the prefix table below.
 ALLOWED_EXECUTABLES = {
-    "ffmpeg": "the render path: every encode, mux, concat and burn-in",
-    "ffprobe": "duration, frame-count and stream probes",
     "git": "the ledger's commit stamp (rev-parse --short HEAD)",
     "nvidia-smi": "GPU specs when torch cannot answer",
     "blender": "the mesh stage's headless render",
 }
 
-#: A sidecar TTS engine runs in its OWN venv, so the interpreter's basename
-#: varies by platform and by venv layout.
-_INTERPRETER_PREFIX = "python"
+#: basename PREFIX -> why. For tools whose PACKAGING puts a version or a
+#: platform in the file name, so the exact basename is not knowable from here.
+#:
+#: The interpreter rule was here from the start (a sidecar TTS engine runs in
+#: its own venv, so its interpreter is ``python``, ``pythonw``, ``python3`` or
+#: ``python3.10`` depending on the box). The ffmpeg family JOINED IT on
+#: 2026-09-04, and it is worth saying why rather than leaving it to look like
+#: laziness: the argv receipt this allowlist was built from is an AST sweep of
+#: argv[0] LITERALS, and it therefore cannot see a path a third-party library
+#: computes at run time. ``imageio_ffmpeg`` -- installed here, and what the
+#: encoder tests resolve -- ships its binary as
+#: ``ffmpeg-win-x86_64-v7.1.exe``. Pinning that exact string instead would have
+#: worked until the next imageio-ffmpeg release and then broken on somebody
+#: else's machine, which is the worst shape a guard can take.
+#:
+#: WHAT THIS IS NOT: a sandbox. A prefix admits ``ffmpeg-anything``, and this
+#: module could never stop a caller determined to run something else -- it is a
+#: boundary that keeps the set of things this pack launches small, reviewable
+#: and stated. ``blender`` stays EXACT because no versioned blender basename has
+#: ever reached a spawn here; if one does, the named error below says so at the
+#: spawn, which is exactly how the ffmpeg case was found.
+ALLOWED_EXECUTABLE_PREFIXES = {
+    "ffmpeg": "the render path: every encode, mux, concat and burn-in",
+    "ffprobe": "duration, frame-count and stream probes",
+    "python": "a sidecar engine's own venv interpreter",
+}
 
 
 def _normalized(argv0: Any) -> str:
@@ -93,6 +114,11 @@ def _normalized(argv0: Any) -> str:
     if name.endswith(".exe"):
         name = name[: -len(".exe")]
     return name
+
+
+def _allowed(name: str) -> bool:
+    return (name in ALLOWED_EXECUTABLES
+            or any(name.startswith(p) for p in ALLOWED_EXECUTABLE_PREFIXES))
 
 
 def _check(argv: Sequence[Any]) -> None:
@@ -103,11 +129,12 @@ def _check(argv: Sequence[Any]) -> None:
     if not argv:
         raise ExecutableNotAllowed("argv is empty; nothing to run")
     name = _normalized(argv[0])
-    if name in ALLOWED_EXECUTABLES or name.startswith(_INTERPRETER_PREFIX):
+    if _allowed(name):
         return
     raise ExecutableNotAllowed(
         f"{name!r} is not an executable this pack runs (from {argv[0]!r}). "
-        f"Allowed: {', '.join(sorted(ALLOWED_EXECUTABLES))}, python*. "
+        f"Allowed: {', '.join(sorted(ALLOWED_EXECUTABLES))}, "
+        f"{', '.join(sorted(p + '*' for p in ALLOWED_EXECUTABLE_PREFIXES))}. "
         "Add it to ALLOWED_EXECUTABLES with its reason if that is wrong.")
 
 

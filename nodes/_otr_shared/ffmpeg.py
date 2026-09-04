@@ -33,6 +33,14 @@ except ImportError:  # loaded flat
     except ImportError:
         from ffprobe import _BARE_FFMPEG_NAMES, _explicit, _usable  # type: ignore  # _otr_shared/ on sys.path
 
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
+
 #: The operator's pin. One spelling, read in one place.
 FFMPEG_ENV = "OTR_FFMPEG"
 
@@ -68,7 +76,7 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
         return chosen
     # strip THEN expand: a pin typed with leading whitespace keeps its tilde
     # otherwise ("  ~/bin/ffmpeg" never expanded -- agy, manual r4).
-    chosen = _usable(os.path.expanduser((os.environ.get(FFMPEG_ENV) or "").strip()))
+    chosen = _usable(os.path.expanduser((otr_env.get(FFMPEG_ENV) or "").strip()))
     if chosen:
         return chosen
     chosen = _usable("ffmpeg")  # PATH, through the one function that reads it

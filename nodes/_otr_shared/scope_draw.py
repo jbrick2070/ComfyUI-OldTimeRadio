@@ -29,12 +29,18 @@ from __future__ import annotations
 
 import hashlib
 import math
-import os
-import subprocess
 import tempfile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+try:
+    from . import proc as otr_proc
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
 
 # -- full-colour CRT palette (from video_engine.py) --------------------------
 CRT_BG = (8, 8, 16)
@@ -893,7 +899,7 @@ def cfr_flags(ffmpeg):
         return list(hit)
     flags = ["-vsync", "cfr"]
     try:
-        probe = subprocess.run(
+        probe = otr_proc.run(
             [ffmpeg, "-hide_banner", "-loglevel", "error",
              "-f", "lavfi", "-i", "nullsrc=s=16x16:r=5:d=0.2",
              "-fps_mode", "cfr",  # OUTPUT option: must follow -i
@@ -1007,8 +1013,9 @@ def encode_silent_mp4(frames_iter, total, out_path, w, h, fps, ffmpeg):
     # not have this hazard: it uses proc.communicate(), which drains
     # concurrently. This one must stream, so it cannot.)
     err_sink = tempfile.TemporaryFile()
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                            stdout=subprocess.DEVNULL, stderr=err_sink)
+    # otr_proc, never a bare `proc`: the local below IS named proc.
+    proc = otr_proc.popen(cmd, stdin=otr_proc.PIPE,
+                          stdout=otr_proc.DEVNULL, stderr=err_sink)
     written = 0
     try:
         frame = first

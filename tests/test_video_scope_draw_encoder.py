@@ -178,7 +178,11 @@ def test_ZERO_frames_is_refused_before_ffmpeg_is_started():
 def _captured_codec(monkeypatch, w, h, has_nvenc=True):
     """Which encoder the command names, without running it."""
     seen = {}
-    real_popen = sd.subprocess.Popen
+    # The WRAPPER, not the re-exported class. `otr_proc.Popen` is the raw
+    # subprocess.Popen (an identity alias), so restoring THAT onto `popen`
+    # would leave the module holding a spawn with no allowlist and no
+    # shell=True refusal until the next patch undid it.
+    real_popen = sd.otr_proc.popen
 
     class _Stop(RuntimeError):
         pass
@@ -188,14 +192,14 @@ def _captured_codec(monkeypatch, w, h, has_nvenc=True):
         raise _Stop("captured")
 
     monkeypatch.setattr(sd, "_has_nvenc", lambda _fb: has_nvenc)
-    monkeypatch.setattr(sd.subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(sd.otr_proc, "popen", _fake_popen)
     try:
         sd.encode_silent_mp4(_frames(1, w=w, h=h), 1, "unused.mp4",
                              w, h, 25, "ffmpeg")
     except _Stop:
         pass
     finally:
-        monkeypatch.setattr(sd.subprocess, "Popen", real_popen)
+        monkeypatch.setattr(sd.otr_proc, "popen", real_popen)
     cmd = seen["cmd"]
     return cmd[cmd.index("-c:v") + 1]
 

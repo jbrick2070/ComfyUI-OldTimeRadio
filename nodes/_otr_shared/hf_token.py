@@ -33,7 +33,14 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
+
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
 
 log = logging.getLogger("OTR.hf_token")
 
@@ -86,7 +93,7 @@ def ensure_hf_token() -> str | None:
     if _HF_TOKEN_CACHE["resolved"]:
         return _HF_TOKEN_CACHE["value"]
 
-    token = os.environ.get("HF_TOKEN") or None
+    token = otr_env.get("HF_TOKEN") or None
     source = "os.environ" if token else None
 
     if not token:
@@ -94,9 +101,9 @@ def ensure_hf_token() -> str | None:
         if token:
             source = "HKCU\\Environment"
             # Export so transformers + huggingface_hub pick it up.
-            os.environ["HF_TOKEN"] = token
+            otr_env.pin("HF_TOKEN", token)
             # Some HF libs still look at HUGGING_FACE_HUB_TOKEN.
-            os.environ.setdefault("HUGGING_FACE_HUB_TOKEN", token)
+            otr_env.setdefault("HUGGING_FACE_HUB_TOKEN", token)
 
     _HF_TOKEN_CACHE["value"] = token
     _HF_TOKEN_CACHE["resolved"] = True

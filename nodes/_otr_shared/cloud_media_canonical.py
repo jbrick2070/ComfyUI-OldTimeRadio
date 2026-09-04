@@ -15,13 +15,28 @@ LOUDNESS_REFERENCE_SOURCE documents where it must come from.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, TypedDict
 
 from .cloud_media_backend import CloudErrorCode, CloudMediaError
 from .ffmpeg import resolve_ffmpeg
+
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
+
+try:
+    from . import proc as otr_proc
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
 
 __all__ = [
     "PartnerResult",
@@ -53,8 +68,8 @@ def cloud_delivery_wh(request_w, request_h, *, land_env, port_env,
     except (TypeError, ValueError):
         rw = rh = 0
     portrait = rh > rw > 0
-    spec = (os.environ.get(port_env, port_default) if portrait
-            else os.environ.get(land_env, land_default))
+    spec = (otr_env.get(port_env, port_default) if portrait
+            else otr_env.get(land_env, land_default))
     try:
         parts = str(spec).lower().split("x", 1)
         return (max(1, int(parts[0])), max(1, int(parts[1])))
@@ -145,7 +160,6 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
     ("stereo"|"mono", default stereo), optional ``target_duration_s`` +
     ``out_path``. ``session`` is accepted for signature parity (unused here)."""
     import hashlib
-    import subprocess
     import numpy as np
 
     validated = validate_partner_result(dict(raw))
@@ -158,7 +172,7 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
                               "ffmpeg not found -- cannot canonicalize audio")
 
-    dec = subprocess.run(
+    dec = otr_proc.run(
         [ffmpeg, "-v", "error", "-i", str(src), "-ar", str(sr), "-ac", str(ch),
          "-f", "f32le", "-"], capture_output=True)
     if dec.returncode != 0 or not dec.stdout:
@@ -199,7 +213,7 @@ def canonicalize_audio(raw: PartnerResult, request: dict, session=None) -> Canon
                 % (cur, float(target)))
 
     out_path = Path(request.get("out_path") or (str(src) + ".canon.wav"))
-    enc = subprocess.run(
+    enc = otr_proc.run(
         [ffmpeg, "-y", "-v", "error", "-f", "f32le", "-ar", str(sr),
          "-ac", str(ch), "-i", "-", "-c:a", "pcm_s16le", str(out_path)],
         input=audio.astype(np.float32).tobytes(), capture_output=True)
@@ -352,7 +366,6 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     optionally ``out_path`` (default: a fresh mp4 beside the input with a
     ``.canon.mp4`` suffix)."""
     import hashlib
-    import subprocess
     validated = validate_partner_result(dict(raw))
     src = Path(validated["path"])
     try:
@@ -383,7 +396,7 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
            "-colorspace", "bt709", "-color_primaries", "bt709",
            "-color_trc", "bt709", "-movflags", "+faststart", str(out_path)]
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        res = otr_proc.run(cmd, capture_output=True, text=True, timeout=600)
         if res.returncode != 0:
             raise RuntimeError(res.stderr.strip()[-300:])
     except CloudMediaError:

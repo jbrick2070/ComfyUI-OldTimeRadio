@@ -35,7 +35,20 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
+
 log = logging.getLogger("OTR.gpu_residency")
+
+#: Emitted at most ONCE per process. `_pid_alive` is polled every 0.25 s by
+#: `acquire()`'s wait loop for up to 120 s, so an unlatched warning here would
+#: log four times a second for two minutes and bury whatever else the run said.
+_WARNED_NO_PSUTIL = False
 
 #: Lock-directory name. The PARENT dir defaults to the OS temp root (a stable,
 #: machine-wide, NON-OneDrive location); override the parent with
@@ -48,7 +61,7 @@ _MB = 1024 * 1024
 
 
 def _default_lockdir() -> Path:
-    parent = os.getenv("OTR_GPU_LEASE_DIR") or tempfile.gettempdir()
+    parent = otr_env.get("OTR_GPU_LEASE_DIR") or tempfile.gettempdir()
     return Path(parent) / _LOCKDIR_NAME
 
 
@@ -64,8 +77,13 @@ class LeaseError(RuntimeError):
 
 def _pid_alive(pid: int) -> bool:
     """True if process ``pid`` is still running. Fail-SAFE: when liveness is
-    uncertain (access-denied, unknown error) treat the owner as ALIVE so a live
-    lock is never stolen. Only a definitively-absent PID returns False."""
+    uncertain (access-denied, unknown error, or no psutil on Windows) treat the
+    owner as ALIVE so a live lock is never stolen. Only a definitively-absent
+    PID returns False.
+
+    ``psutil`` is the answer on every platform. It is line 20 of ComfyUI core's
+    own ``requirements.txt``, so a box running ComfyUI has it.
+    """
     if not pid or int(pid) <= 0:
         return False
     pid = int(pid)
@@ -75,19 +93,28 @@ def _pid_alive(pid: int) -> bool:
     except Exception:  # noqa: BLE001  (psutil absent/erroring -> manual check)
         pass
     if os.name == "nt":
-        try:
-            import ctypes
-            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-            SYNCHRONIZE = 0x00100000
-            handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
-            if handle:
-                kernel32.CloseHandle(handle)
-                return True
-            err = ctypes.get_last_error()
-            ERROR_INVALID_PARAMETER = 87  # only this reliably means "no such pid"
-            return err != ERROR_INVALID_PARAMETER
-        except Exception:  # noqa: BLE001
-            return True  # uncertain -> do not steal a possibly-live lock
+        # There used to be a ctypes OpenProcess probe here. It was this pack's
+        # ONE process-inspection site, and it is not worth carrying for a case
+        # that cannot arise on a working box: psutil is a ComfyUI CORE
+        # requirement, so a Windows install without it is already broken in
+        # ways this lease cannot fix.
+        #
+        # THE TRADE, stated so nobody rediscovers it as a bug: the probe used to
+        # return False for a genuinely dead pid, so a stale lease was reclaimed.
+        # Without psutil, a psutil-less Windows box now never reclaims and times
+        # out LOUDLY instead. Loud and wrong-but-safe beats silent and
+        # lock-stealing, and the warning below says exactly that.
+        global _WARNED_NO_PSUTIL
+        if not _WARNED_NO_PSUTIL:
+            _WARNED_NO_PSUTIL = True
+            log.warning(
+                "[gpu_residency] psutil is unavailable, so process liveness "
+                "cannot be determined on Windows. CONSEQUENCE: stale-lease "
+                "reclamation is disabled for this process -- a lease left by a "
+                "crashed run will time out instead of being reclaimed. Install "
+                "psutil (a ComfyUI core requirement) to restore it.")
+        return True
+    # POSIX only, now that Windows returns above.
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

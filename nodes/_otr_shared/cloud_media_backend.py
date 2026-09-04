@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import enum
 import json
-import os
 import re
 import threading
 import time
@@ -46,6 +45,14 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
+
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
 
 __all__ = [
     "CloudErrorCode",
@@ -114,7 +121,7 @@ def mute_ok_roles() -> frozenset:
     """Roles the operator EXPLICITLY opted down to mute video.
     Operator amendment 2026-07-02: default EMPTY -- audio reactivity is
     default-on for every video role; ledger stamps MUTE_OPT_DOWN."""
-    raw = os.environ.get("OTR_VIDEO_MUTE_OK_ROLES", "")
+    raw = otr_env.get("OTR_VIDEO_MUTE_OK_ROLES", "")
     return frozenset(r.strip() for r in raw.split(",") if r.strip())
 
 
@@ -139,7 +146,7 @@ def resolve_auth(
     """OTR_COMFY_API_KEY env > hidden api_key_comfy_org > hidden
     auth_token_comfy_org. Missing everything = fail closed, naming all
     three sources."""
-    env_key = os.environ.get("OTR_COMFY_API_KEY", "").strip()
+    env_key = otr_env.get("OTR_COMFY_API_KEY", "").strip()
     if env_key:
         return CloudAuth("api_key_env", env_key)
     if hidden_api_key and hidden_api_key.strip():
@@ -176,7 +183,7 @@ def normalize_provider_id(provider_id: str) -> str:
 def provider_semaphore_size(provider_id: str) -> int:
     pid = normalize_provider_id(provider_id)
     env_name = f"OTR_CLOUD_MAX_CONCURRENCY_{pid}"
-    raw = os.environ.get(env_name, "").strip()
+    raw = otr_env.get(env_name, "").strip()
     if raw:
         try:
             size = int(raw)
@@ -200,7 +207,7 @@ def provider_semaphore_size(provider_id: str) -> int:
 
 
 def resolve_cache_root() -> Path:
-    override = os.environ.get("OTR_CLOUD_MEDIA_CACHE_DIR", "").strip()
+    override = otr_env.get("OTR_CLOUD_MEDIA_CACHE_DIR", "").strip()
     if override:
         return Path(override)
     return Path(__file__).resolve().parents[2] / "otr" / "cache" / "cloud_media"
@@ -253,7 +260,7 @@ class CloudMediaSession:
         self.auth = auth
         self.episode_id: Optional[str] = None  # metadata, never the key
         self.created_at = time.time()
-        raw = os.environ.get("OTR_CLOUD_MEDIA_BUDGET_USD", "").strip()
+        raw = otr_env.get("OTR_CLOUD_MEDIA_BUDGET_USD", "").strip()
         if budget_ceiling_usd is not None:
             self.budget_ceiling_usd = float(budget_ceiling_usd)
         else:

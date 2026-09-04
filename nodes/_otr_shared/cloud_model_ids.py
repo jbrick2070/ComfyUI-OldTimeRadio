@@ -19,7 +19,13 @@ Cold-import-clean: stdlib only.
 """
 from __future__ import annotations
 
-import os
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
 
 from .cloud_media_backend import CloudErrorCode, CloudMediaError
 
@@ -63,7 +69,7 @@ def resolve_model_id(node_key: str) -> str:
             CloudErrorCode.MALFORMED_CONFIG,
             f"no V3 model-id mapping for {node_key!r} (add it to "
             f"cloud_model_ids.V3_MODEL_IDS)")
-    value = (os.environ.get(spec["env"], "") or spec["default"] or "").strip()
+    value = (otr_env.get(spec["env"], "") or spec["default"] or "").strip()
     if not value:
         raise CloudMediaError(
             CloudErrorCode.MALFORMED_CONFIG,

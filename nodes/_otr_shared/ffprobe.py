@@ -44,7 +44,22 @@ from __future__ import annotations
 import json as _json
 import os
 import shutil
-import subprocess
+
+try:
+    from . import env as otr_env
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import env as otr_env  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import env as otr_env  # type: ignore  # _otr_shared/ on sys.path
+
+try:
+    from . import proc as otr_proc
+except ImportError:  # pragma: no cover -- loaded flat
+    try:
+        from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
+    except ImportError:
+        import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
 
 __all__ = [
     "FFprobeError",
@@ -169,7 +184,7 @@ def resolve_ffprobe(preferred=None, *, ffmpeg=None):
         sibling = _sibling_of_ffmpeg(from_argument)
         if sibling:
             return sibling
-    chosen = _usable(os.environ.get("OTR_FFPROBE"))
+    chosen = _usable(otr_env.get("OTR_FFPROBE"))
     if chosen:
         return chosen
     chosen = shutil.which("ffprobe")
@@ -209,12 +224,12 @@ def probe_raw(args, *, ffprobe=None, ffmpeg=None, timeout=None):
             "ffprobe not found (OTR_FFPROBE / PATH / ffmpeg sibling)")
     argv = [binary] + [str(a) for a in args]
     try:
-        return subprocess.run(argv, capture_output=True, text=True,
-                              encoding="utf-8", errors="replace",
-                              timeout=timeout)
+        return otr_proc.run(argv, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace",
+                            timeout=timeout)
     except FileNotFoundError as exc:
         raise FFprobeMissing("ffprobe not found: %s" % exc)
-    except subprocess.TimeoutExpired as exc:
+    except otr_proc.TimeoutExpired as exc:
         raise FFprobeError("ffprobe timed out after %rs: %s" % (timeout, exc))
     except OSError as exc:
         raise FFprobeError("ffprobe could not be launched (%s): %s"
