@@ -1759,6 +1759,74 @@ def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,
 GHOST_V3_DROP_ORDER = ("trailing_style", "light", "vantage", "motion",
                        "kernel_setting")
 
+#: LAB LEVER: WHERE THE STYLE CUE SITS IN THE PROMPT (operator A/B/C, 2026-09-03).
+#:
+#: A Ghost v3 prompt currently names the pack TWICE -- `pack_cue` opens it and
+#: `trailing_style` closes it:
+#:
+#:   recursive fractal light field. a bakelite radio set, distance opening
+#:   toward the back, wide, the people small in the space, pristine raster
+#:   geometry, nested self-similar depth, emissive shader surfaces
+#:   |________ pack_cue ________|                    |____ trailing_style ____|
+#:
+#: The operator wants to know whether that repetition earns its tokens:
+#: *"the main diff is including reference to the style at the start AND at the
+#: end, or just the start, or just the end."* This is the only knob that
+#: question needs, and it is READ-ONLY OBSERVATION -- it changes nothing unless
+#: set:
+#:
+#:   OTR_GHOST_STYLE_PLACEMENT=both   (default; byte-identical to shipping)
+#:   OTR_GHOST_STYLE_PLACEMENT=front  arm A -- pack_cue only, trailing dropped
+#:   OTR_GHOST_STYLE_PLACEMENT=end    arm B -- trailing only, pack_cue stripped
+#:
+#: Applied INSIDE the composer rather than to the finished string, so the token
+#: measurement and the drop ladder see the arm that will actually render. An arm
+#: judged on a prompt the budget never saw is not the arm that shipped.
+GHOST_STYLE_PLACEMENT_ENV = "OTR_GHOST_STYLE_PLACEMENT"
+GHOST_STYLE_PLACEMENTS = ("both", "front", "end")
+
+
+def _style_placement() -> str:
+    """`both` unless the operator is running the placement A/B/C."""
+    import os
+    raw = str(os.environ.get(GHOST_STYLE_PLACEMENT_ENV, "") or "").strip().lower()
+    return raw if raw in GHOST_STYLE_PLACEMENTS else "both"
+
+
+def _apply_style_placement(composed: dict) -> dict:
+    """Drop one end of the style sandwich, per :func:`_style_placement`.
+
+    `front` drops the trailing clause; `end` strips the opening pack cue, which
+    the composer joins as ``"<pack_cue>. <rest>"``. The strip is by exact prefix
+    match on that spelling -- if the join ever changes, this refuses to guess
+    and leaves the prompt alone rather than mangling it.
+    """
+    placement = _style_placement()
+    if placement == "both":
+        return composed
+    out = dict(composed)
+    comp = dict(out.get("components") or {})
+    slots = list(out.get("slots") or [])
+    positive = str(out.get("positive") or "")
+
+    if placement == "front":
+        trailing = str(comp.get("trailing_style") or "")
+        if trailing and positive.endswith(", " + trailing):
+            positive = positive[: -len(", " + trailing)]
+            comp["trailing_style"] = ""
+            slots = [s for s in slots if s != "trailing_style"]
+    elif placement == "end":
+        cue = str(comp.get("pack_cue") or "")
+        if cue and positive.startswith(cue + ". "):
+            positive = positive[len(cue) + 2:]
+            comp["pack_cue"] = ""
+            slots = [s for s in slots if s != "pack_cue"]
+
+    out["positive"] = positive
+    out["components"] = comp
+    out["slots"] = slots
+    return out
+
 
 def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
                              ordinal=0, token_measure_fn=None,
@@ -1870,6 +1938,7 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
             composed["components"] = dict(composed["components"])
             composed["components"]["trailing_style"] = trailing
             composed["slots"] = list(composed["slots"]) + ["trailing_style"]
+        composed = _apply_style_placement(composed)
         return composed
 
     flags = {"light": True, "motion": True, "vantage": True,

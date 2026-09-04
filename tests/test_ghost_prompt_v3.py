@@ -751,3 +751,64 @@ def test_a_pack_that_prefixes_a_motto_still_yields_real_motion(style_id):
         assert not motto_words or not set(lead.split()) <= motto_words, (
             "%s/%s compacted to its own style label rather than a motion: %r"
             % (style_id, key, got))
+
+
+# --- style-cue placement A/B/C (operator, 2026-09-03) -----------------------
+# A Ghost v3 prompt names the pack TWICE: `pack_cue` opens it and
+# `trailing_style` closes it. The operator asked whether that repetition earns
+# its tokens -- "the style at the start AND the end, or just the start, or just
+# the end" -- so OTR_GHOST_STYLE_PLACEMENT selects the arm. The default must be
+# byte-identical to shipping, or the A/B/C measures the lever instead of the
+# question.
+
+def _placement_prompt(monkeypatch, placement, style_id="anime",
+                      role="character_video", mode="figure"):
+    from nodes._otr_video_engines import ghost_signal_author as gsa
+    from nodes import _otr_visual_styles as vs
+    if placement is None:
+        monkeypatch.delenv(gsa.GHOST_STYLE_PLACEMENT_ENV, raising=False)
+    else:
+        monkeypatch.setenv(gsa.GHOST_STYLE_PLACEMENT_ENV, placement)
+    style = vs.get_visual_style({"visual_style": style_id})
+    return gsa.finalize_ghost_prompt_v3(
+        role=role, style=style, mode=mode,
+        ledger_meta={"visual_style": style_id}, ordinal=0)
+
+
+def test_style_placement_defaults_to_both_and_is_byte_identical(monkeypatch):
+    """Unset and `both` must produce the SAME bytes, and both ends must be
+    present -- an opt-in lever that changes the default is not opt-in."""
+    unset = _placement_prompt(monkeypatch, None)
+    both = _placement_prompt(monkeypatch, "both")
+    assert unset["positive"] == both["positive"]
+    assert unset["components"]["pack_cue"], "the opening cue must survive"
+    assert unset["components"]["trailing_style"], "the closing cue must survive"
+
+
+def test_style_placement_front_drops_only_the_trailing_cue(monkeypatch):
+    both = _placement_prompt(monkeypatch, "both")
+    front = _placement_prompt(monkeypatch, "front")
+    assert front["components"]["pack_cue"] == both["components"]["pack_cue"]
+    assert not front["components"]["trailing_style"]
+    assert "trailing_style" not in front["slots"]
+    # The rest of the prompt is untouched: front is `both` minus the tail.
+    assert both["positive"].startswith(front["positive"])
+    assert front["positive"].startswith(both["components"]["pack_cue"])
+
+
+def test_style_placement_end_drops_only_the_opening_cue(monkeypatch):
+    both = _placement_prompt(monkeypatch, "both")
+    end = _placement_prompt(monkeypatch, "end")
+    assert not end["components"]["pack_cue"]
+    assert "pack_cue" not in end["slots"]
+    assert end["components"]["trailing_style"] == both["components"]["trailing_style"]
+    # end is `both` minus the head, so the tail still closes it.
+    assert both["positive"].endswith(end["positive"])
+    assert end["positive"].endswith(both["components"]["trailing_style"])
+
+
+def test_an_unknown_placement_value_falls_back_to_both(monkeypatch):
+    """A typo must not silently render a third arm nobody asked for."""
+    both = _placement_prompt(monkeypatch, "both")
+    typo = _placement_prompt(monkeypatch, "middle")
+    assert typo["positive"] == both["positive"]
