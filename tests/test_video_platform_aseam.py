@@ -435,6 +435,44 @@ def test_a_cut_off_reply_is_named_truncated_not_merely_unparseable():
     assert sl._classify_unparsed_reply('```json\n[{"beat_id": "b1"}]\n```') != "truncated"
 
 
+def test_a_voice_clause_never_reaches_a_picture_model():
+    """No picture model can render a voice, and on the JOINT audio-video lanes
+    a voice clause is actively banned because those models vocalize what they
+    read. Measured on shipped ledgers before the fix: 18 of 20 joint-AV prompts
+    (90%) carried one, e.g. ltx25_mime receiving "Voice: raspy, deliberate,
+    punctuated by heavy breaths."
+
+    Face and Presence must SURVIVE -- presence is behaviour, which is precisely
+    what a video model can act on.
+    """
+    real = ("30s, weary noble captive. Face: angular, high cheekbones, "
+            "heavy-lidded eyes with deep shadows. Presence: alert, scanning "
+            "the room with restless, guarded intensity. Voice: raspy, "
+            "deliberate, punctuated by heavy breaths.")
+    out = sl._strip_unrenderable_appearance(real)
+    assert "Voice:" not in out and "raspy" not in out
+    assert "Face:" in out and "high cheekbones" in out
+    assert "Presence:" in out and "scanning the room" in out
+    # A voice clause in the MIDDLE must not swallow what follows it.
+    mid = sl._strip_unrenderable_appearance(
+        "Face: sharp. Voice: low and gravelly. Presence: still and watchful.")
+    assert mid == "Face: sharp. Presence: still and watchful."
+    # Absent / empty are no-ops, not crashes.
+    assert sl._strip_unrenderable_appearance("Face: sharp.") == "Face: sharp."
+    assert sl._strip_unrenderable_appearance("") == ""
+
+
+def test_the_appearance_lookup_applies_the_strip():
+    """The seam that matters: every caller of _appearance_for_char draws a
+    picture, so the strip belongs in the lookup, not at each of the 8 sites."""
+    ledger = {"cast": [{"char_id": "c1", "name": "BABA",
+                        "portrait_prompt": "a tall weathered spacer. "
+                                           "Voice: gravel and smoke."}]}
+    got = sl._appearance_for_char(ledger, "c1")
+    assert "Voice:" not in got, got
+    assert "weathered spacer" in got, got
+
+
 def test_a_truncated_reply_reseeds_at_a_bigger_budget_not_the_same_one(monkeypatch):
     """The reseed must CHANGE something. Retrying a truncation under the same
     ceiling reproduces it exactly -- which is what shipped: three identical

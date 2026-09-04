@@ -1634,7 +1634,11 @@ def compose_ltx_8gb(self, inputs):
     if not core:
         return _legacy(inputs)
     camera = str((inputs or {}).get("camera") or "").strip().strip(",")
-    tail = (", %s" % camera) if camera else ", camera locked"
+    # NO DAMPING WORDS, EVER (eng_ltx25.py:2519). An absent camera directive is
+    # the absence of a request, not a request to hold still. "completed on
+    # screen" STAYS -- that is this lane's documented atomic-action endpoint,
+    # not an instruction to stop moving; only the lock default goes.
+    tail = (", %s" % camera) if camera else ""
     return ("%s, a single clear action completed on screen%s"
             % (core.rstrip(" ,."), tail))
 

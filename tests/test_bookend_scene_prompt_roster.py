@@ -37,9 +37,10 @@ def _registered():
 #: checked only `BOOKEND_SCENE_PROMPT_ENGINES`, and review promptly found two
 #: tombstoned ids sitting in `SELF_COMPOSED` -- the same dead-id defect this
 #: file was written to stop, reproduced inside its own fix and invisible to its
-#: own test. A gate that guards one of four doors guards nothing.
+#: own test. A gate that guards one of five doors guards nothing.
 _ALL_SETS = (
     ("BOOKEND_SCENE_PROMPT_ENGINES", "BOOKEND_SCENE_PROMPT_ENGINES"),
+    ("BOOKEND_SCENE_PROMPT_BOUNDED", "BOOKEND_SCENE_PROMPT_BOUNDED"),
     ("BOOKEND_SCENE_PROMPT_SELF_COMPOSED", "BOOKEND_SCENE_PROMPT_SELF_COMPOSED"),
     ("BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN", "BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN"),
     ("BOOKEND_SCENE_PROMPT_KNOWN_RED", "BOOKEND_SCENE_PROMPT_KNOWN_RED"),
@@ -90,6 +91,7 @@ def test_no_live_engine_falls_through_silently():
     nobody decided about, which is how `wan_ti2v` shipped bland for a week.
     """
     accounted = (set(rd.BOOKEND_SCENE_PROMPT_ENGINES)
+                 | set(rd.BOOKEND_SCENE_PROMPT_BOUNDED)
                  | set(rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED)
                  | set(rd.BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN)
                  | set(rd.BOOKEND_SCENE_PROMPT_KNOWN_RED)
@@ -110,22 +112,31 @@ def test_no_live_engine_falls_through_silently():
 
 
 def test_the_engine_that_shipped_the_bland_episode_is_accounted_for():
-    """The regression, named. `wan_ti2v` rendered `whispers_in_the_park` and
-    put all four bookends on the static seed.
+    """The regression, named, and now PAID. `wan_ti2v` rendered
+    `whispers_in_the_park` and put all four bookends on the static seed.
 
-    It is ACCOUNTED FOR, not silenced -- and deliberately not in the prompt set.
-    That branch emits an LTX-shaped five-clause register (framing constraint,
-    three subject motions, a camera move) and wan's own directive asks for "one
-    subject, one action, one speed. Do not restate the set" at cfg 5.0, the
-    highest guidance in the stack. Handing it the LTX register would trade no
-    motion for five competing instructions at maximum adherence. The debt it
-    owes -- an engine-appropriate formatter -- is written in KNOWN_RED.
+    It is still deliberately NOT in BOOKEND_SCENE_PROMPT_ENGINES: that branch
+    emits an LTX-shaped five-clause register (framing constraint, three subject
+    motions, a camera move) and wan's own directive asks for "one subject, one
+    action, one speed. Do not restate the set" at cfg 5.0, the highest guidance
+    in the stack. What KNOWN_RED said it was OWED instead -- an engine-shaped
+    formatter emitting one subject/action/speed -- is `bounded_motion_register`,
+    and BOOKEND_SCENE_PROMPT_BOUNDED is where it is now paid (2026-09-03).
+
+    The debt therefore must NOT still be sitting in KNOWN_RED: a standing
+    "PROVEN DEFECT / OWED" note over a fixed defect reads as coverage exactly
+    the way a dead engine id does, which is the failure this whole file exists
+    to stop.
     """
     assert "wan_i2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
     assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED
-    reason = rd.BOOKEND_SCENE_PROMPT_KNOWN_RED["wan_ti2v"]
-    assert "PBUG-20260903-06" in reason, "the debt must cite its bug"
+    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_BOUNDED, (
+        "wan_ti2v must receive the COMPACTED register -- that is the debt "
+        "PBUG-20260903-06 left owed and 2026-09-03 paid")
+    assert "fastwan_8gb" in rd.BOOKEND_SCENE_PROMPT_BOUNDED, (
+        "fastwan_8gb inherits wan_ti2v's directive and its fix")
+    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED, (
+        "the debt is paid; leaving the OWED note standing reads as coverage")
 
 
 @pytest.mark.parametrize("engine_id", sorted(rd.BOOKEND_SCENE_PROMPT_ENGINES))
@@ -134,10 +145,17 @@ def test_each_prompt_owning_engine_is_selectable_and_registered(engine_id):
     assert vreg.get_engine(engine_id) is not None, engine_id
 
 
-def test_the_four_sets_are_disjoint():
-    """An engine in two sets is an engine nobody decided about, twice."""
+def test_the_five_sets_are_disjoint():
+    """An engine in two sets is an engine nobody decided about, twice.
+
+    BOUNDED joined on 2026-09-03. It is a genuinely separate decision from
+    ENGINES -- both receive a scene prompt, but of different SHAPES -- so an
+    engine in both would be handed the five-clause LTX register and the
+    one-action compaction of it, and only the last write would survive.
+    """
     sets = {
         "ENGINES": set(rd.BOOKEND_SCENE_PROMPT_ENGINES),
+        "BOUNDED": set(rd.BOOKEND_SCENE_PROMPT_BOUNDED),
         "SELF_COMPOSED": set(rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED),
         "NOT_TEXT_DRIVEN": set(rd.BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN),
         "KNOWN_RED": set(rd.BOOKEND_SCENE_PROMPT_KNOWN_RED),

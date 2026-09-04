@@ -181,6 +181,27 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     "ltx25_mime",
 })
 
+#: Engines that DO get a bookend scene prompt, but the COMPACTED one-action form
+#: rather than the five-clause LTX-shaped register above.
+#:
+#: This pays the debt BOOKEND_SCENE_PROMPT_KNOWN_RED called "the top row"
+#: (PBUG-20260903-06). The wan family's own directive is "state ONE subject, ONE
+#: action, ONE speed. Do not restate the set" at cfg 5.0 -- the highest guidance
+#: in the stack -- so handing it the five-clause register (multiple actions, a
+#: camera move AND a set restatement) is worse than silence. But the state it was
+#: left in was not silence either: it fell through to build_request's static seed,
+#: `"a 1940s radio studio, on air sign illuminated, period broadcast set"`, which
+#: contains no verb at all. `bounded_motion_register` drops the framing
+#: constraint and the middle clauses and emits exactly one subject-action plus
+#: the camera move -- precisely the shape KNOWN_RED said was owed.
+#:
+#: This is the operator's own complaint, on the beats he named: "announcer and
+#: music had basically no movement".
+BOOKEND_SCENE_PROMPT_BOUNDED = frozenset({
+    "wan_ti2v",
+    "fastwan_8gb",
+})
+
 #: Engines that compose their OWN bookend prompt and must not be handed one.
 #: The Ghost/AnimateDiff family composes BOTH its positive and its negative from
 #: the same authorities; letting the scene branch run would overwrite the
@@ -238,23 +259,15 @@ BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN = frozenset({
 #:
 #: SO "give this lane a formatter shaped to its own model" IS NOT A FREE FIX.
 #: It is correct, and it lands behind that probe A/B, not before it.
+#: (`wan_ti2v` and `fastwan_8gb` WERE the top two rows here. The debt this
+#: entry described -- "an engine-appropriate bookend formatter emitting one
+#: subject/action/speed, roughly what `bounded_motion_register` already
+#: produces" -- was PAID on 2026-09-03: both now sit in
+#: BOOKEND_SCENE_PROMPT_BOUNDED and receive the compacted register. They are
+#: removed rather than annotated, because a "PROVEN DEFECT / OWED" note left
+#: standing over a fixed defect is the same reads-as-coverage failure this
+#: file exists to stop.)
 BOOKEND_SCENE_PROMPT_KNOWN_RED = {
-    "wan_ti2v": "PROVEN DEFECT, and the fix is NOT to add it above. It shipped "
-                "signal_lost_whispers_in_the_park_20260903_101222 with all four "
-                "bookends on build_request's static seed and the operator "
-                "reported 'basically no movement' (PBUG-20260903-06). But its "
-                "own directive is 'state ONE subject, ONE action, ONE speed. Do "
-                "not restate the set' at cfg 5.0 -- the highest guidance in the "
-                "stack, where 'each modifier is honoured'. The LTX branch would "
-                "hand it a five-clause register containing multiple actions, a "
-                "camera move AND a set restatement, which is worse than "
-                "silence at that guidance. OWED: an engine-appropriate bookend "
-                "formatter emitting one subject/action/speed -- roughly what "
-                "`_otr_visual_styles.bounded_motion_register` already produces "
-                "for the Ghost lane. This is the top row.",
-    "fastwan_8gb": "same family and same directive as wan_ti2v (one subject, "
-                   "one action, one speed; no set restatement). OWED: the same "
-                   "engine-appropriate formatter, and it inherits wan_ti2v's.",
     "ltx_8gb": "LTX-family but NOT on the LTX scene branch. OWED: confirm "
                "whether its prompt contract matches ltx_video's closely enough "
                "to join BOOKEND_SCENE_PROMPT_ENGINES directly, or whether the "
@@ -3640,6 +3653,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # entry could not match a shot. `tests/test_bookend_scene_prompt_roster.py`
     # is what stops the fourth occurrence.
     if ((_engine_id in BOOKEND_SCENE_PROMPT_ENGINES
+            or _engine_id in BOOKEND_SCENE_PROMPT_BOUNDED
             or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat
@@ -3690,6 +3704,25 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # is a VERBATIM Python constant (P8) and always outranks the pack.
             scene_prompt = _vstyle.motion_registers[_motion_key]
             _field_source = "motion_registers:%s" % _motion_key
+            # THE WAN FAMILY GETS THE MOVEMENT, NOT THE FIVE CLAUSES. Its
+            # directive forbids restating the set and asks for one subject, one
+            # action, one speed; the compactor emits exactly that. Applied
+            # BEFORE the talking swap below so the probe-locked IA2V constant,
+            # which outranks the pack verbatim, is never compacted.
+            if _engine_id in BOOKEND_SCENE_PROMPT_BOUNDED:
+                # Imported HERE, not reused from the Ghost block above: that
+                # import lives inside a conditional this path does not enter,
+                # so the name would be unbound on every wan bookend.
+                try:
+                    from .._otr_visual_styles import (  # type: ignore
+                        bounded_motion_register as _bounded_now)
+                except ImportError:  # pragma: no cover -- flat test imports
+                    from _otr_visual_styles import (  # type: ignore
+                        bounded_motion_register as _bounded_now)
+                _bounded = _bounded_now(scene_prompt)
+                if _bounded:
+                    scene_prompt = _bounded
+                    _field_source = "bounded_motion_registers:%s" % _motion_key
             # ia2v TALKING register: both explicitly audio-driven radio bookends
             # use the lip-sync prompt and the matching radio-with-lips still.
             # Single-pass or non-audio-driven music stays on its faceless

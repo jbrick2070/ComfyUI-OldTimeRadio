@@ -606,13 +606,16 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     for joint_av in ("ltx25_foley_plus", "ltx25_mime"):
         assert joint_av in rd.BOOKEND_SCENE_PROMPT_ENGINES, joint_av
 
-    # The retired id is GONE. `wan_ti2v` is deliberately NOT here: this branch
-    # emits an LTX-shaped five-clause register, and wan's own directive asks for
-    # one subject/action/speed at cfg 5.0. It is tracked in KNOWN_RED with the
-    # engine-appropriate formatter it is owed (PBUG-20260903-06).
+    # The retired id is GONE. `wan_ti2v` is still deliberately NOT here: this
+    # branch emits an LTX-shaped five-clause register, and wan's own directive
+    # asks for one subject/action/speed at cfg 5.0. What it was OWED in
+    # KNOWN_RED -- an engine-shaped formatter emitting exactly that -- was paid
+    # on 2026-09-03 as BOOKEND_SCENE_PROMPT_BOUNDED, so the debt entry is gone
+    # and membership moved rather than disappearing (PBUG-20260903-06).
     assert "wan_i2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
     assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED
+    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_BOUNDED
+    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED
 
 
 def test_an_all_ghost_policy_spends_no_writer_llm_call():

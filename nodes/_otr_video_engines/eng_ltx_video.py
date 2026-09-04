@@ -1914,8 +1914,13 @@ def compose_ltx_video(self, inputs):
     if not core:
         return _legacy(inputs)
     camera = str((inputs or {}).get("camera") or "").strip().strip(",")
-    tail = (", %s" % camera) if camera else ", camera locked"
-    return ("%s, the movement staged clearly from start to a held finish%s"
+    # NO DAMPING WORDS, EVER (eng_ltx25.py:2519, and it applies here too).
+    # An ABSENT camera directive is not a request to lock the camera -- it is
+    # the absence of a request, and answering it with "camera locked" tells the
+    # model to hold still. Same for "a held finish": the shot is asked to stop.
+    # Both were live on every beat of this lane that carried no camera value.
+    tail = (", %s" % camera) if camera else ""
+    return ("%s, the movement staged clearly from start to finish%s"
             % (core.rstrip(" ,."), tail))
 
 

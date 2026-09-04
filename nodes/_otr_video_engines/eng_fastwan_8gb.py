@@ -415,8 +415,14 @@ def compose_fastwan_8gb(self, inputs):
     if not core:
         return _legacy(inputs)
     camera = str((inputs or {}).get("camera") or "").strip().strip(",")
-    tail = (", %s" % camera) if camera else ", camera locked"
-    return "%s, ending on a clear final position%s" % (core.rstrip(" ,."), tail)
+    # NO DAMPING WORDS, EVER (eng_ltx25.py:2519). The wan family's directive is
+    # "one subject, one action, one speed" -- "camera locked" spends the speed
+    # slot on standing still, and "ending on a clear final position" spends the
+    # action on arriving at rest. With a real camera value the clause is simply
+    # the camera; without one the core carries the beat unqualified.
+    if camera:
+        return "%s, %s" % (core.rstrip(" ,."), camera)
+    return core.rstrip(" ,.")
 
 
 FastWan8gbEngine.compose_prompt = compose_fastwan_8gb

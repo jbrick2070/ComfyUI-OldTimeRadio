@@ -715,8 +715,21 @@ def trailing_style_cue(vstyle, *, max_words: int = TRAILING_STYLE_MAX_WORDS) -> 
 #: The registers were authored for the LTX lane and run 20-29 words across the
 #: nine packs, which is 26-37 CLIP tokens -- enough on its own to push an
 #: AnimateDiff prompt past the ~75-token point where that model stops moving
-#: altogether. Twelve buys the two sentences that carry the movement.
-MOTION_REGISTER_MAX_WORDS = 12
+#: altogether. Fourteen buys the two sentences that carry the movement.
+#:
+#: FOURTEEN, NOT TWELVE (2026-09-03). At twelve, the over-budget branch below
+#: falls back to `text = kinetic`, which discards the CAMERA CLAUSE -- the one
+#: part of the register that makes the shot travel rather than shimmer in
+#: place. Measured across all 32 registers: exactly 2 exceeded twelve, both by
+#: a single word, and both are packs the operator names as his interest --
+#: `video_art/music_open` ("...red blue green halos, measured push forward")
+#: and `paper_origami/announcer` ("...in gentle arcs, slow steady dolly
+#: forward"). Losing the camera move to save one word defeats the entire
+#: purpose of a function that exists to restore movement, and 14 words is
+#: still comfortably the "one subject, one action, one speed" shape the wan
+#: family's directive asks for. The other 30 registers are byte-identical at
+#: either value.
+MOTION_REGISTER_MAX_WORDS = 14
 
 
 def bounded_motion_register(register, *, max_words: int = MOTION_REGISTER_MAX_WORDS) -> str:

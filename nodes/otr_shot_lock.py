@@ -122,8 +122,42 @@ def _read_setting(meta: dict) -> str:
     return ", ".join(setting[:2]) if setting else _FALLBACK_SETTING
 
 
+#: Clauses in a cast description that NO picture model can render.
+#:
+#: The writer authors one character description that serves several consumers,
+#: and casting deliberately asks it for a `Voice:` clause -- TTS needs a timbre.
+#: Every caller of `_appearance_for_char`, though, is a VIDEO or STILL prompt
+#: composer (8 sites across otr_shot_lock.py and otr_meta_brief_image_prompt.py,
+#: checked), and none of them can draw a voice.
+#:
+#: On the JOINT AUDIO-VIDEO lanes it is worse than dead weight. Those models
+#: read one prompt for picture AND sound, and the standing ruling is that voice
+#: and identity words never reach them because they get VOCALIZED. Measured on
+#: shipped ledgers before this fix: `Voice:` appeared in 18 of 20 joint-AV
+#: prompts (90%) -- e.g. ltx25_mime receiving "Voice: raspy, deliberate,
+#: punctuated by heavy breaths." Every one of those was the banned case.
+#:
+#: `Face:` and `Presence:` are deliberately KEPT. Presence is behaviour --
+#: "alert, scanning the room with restless, guarded intensity" -- which is
+#: exactly the kind of thing a video model can act on.
+_UNRENDERABLE_APPEARANCE_CLAUSE = re.compile(
+    r"\bVoice:\s*[^.]*(?:\.|$)", re.IGNORECASE)
+
+
+def _strip_unrenderable_appearance(text: str) -> str:
+    """Drop the clauses of a cast description a picture model cannot draw."""
+    if not text:
+        return text
+    cleaned = _UNRENDERABLE_APPEARANCE_CLAUSE.sub(" ", str(text))
+    return " ".join(cleaned.split()).strip(" ,")
+
+
 def _appearance_for_char(ledger: dict, char_id: str) -> str:
-    """Appearance LOOKUP by char_id (alias-safe), never by display name."""
+    """Appearance LOOKUP by char_id (alias-safe), never by display name.
+
+    Non-renderable clauses (see :data:`_UNRENDERABLE_APPEARANCE_CLAUSE`) are
+    removed: every consumer of this function draws a picture.
+    """
     if not char_id:
         return ""
     try:
@@ -149,6 +183,7 @@ def _appearance_for_char(ledger: dict, char_id: str) -> str:
     if not base:
         name = entry.get("name")
         base = str(name) if name else ""
+    base = _strip_unrenderable_appearance(base)
     # The opt-in outfit LOCK was ripped 2026-08-27 (operator: "outfits yeah i
     # didnt even know we had outfits"). It was `OTR_OUTFIT_LOCK`, default OFF
     # and set by no profile or launcher, so it never once ran -- and its call
@@ -1195,10 +1230,28 @@ def _build_batch_prompt(batch: list, meta: dict, ledger: dict, setting: str) -> 
     """Compose ONE batched derivation prompt (mirrors the Meta-brief protocol:
     derive from brief + beat + cast; instrumental wording kept model-agnostic)."""
     lines = [
-        "You are a film director. For EACH beat below, give a concise "
-        "expression, motion, and camera direction that fits the character and "
-        "the setting. Reply ONLY with a JSON list of objects "
-        '{"beat_id","expression","motion","camera"}.',
+        # PARITY WITH THE SILENT SIBLING (2026-09-03). This asked only for "a
+        # concise expression, motion, and camera direction that fits the
+        # character and the setting", which permits a pose and a framing --
+        # both of which render as a photograph. The silent builder had already
+        # been taught to ask for a kinetic chain and to scale it to the line;
+        # this path stayed on the weaker wording and produced the flatter half
+        # of the corpus. The character IS speaking here, so the body action is
+        # what reads WHILE they speak rather than a full cross-room move.
+        "You are a film director. For EACH beat below give the visible "
+        "performance: a vivid facial expression, and body action that reads "
+        "WHILE the character speaks -- a gesture that lands, a weight shift, a "
+        "turn, a hand that makes real contact with something the setting "
+        "supports. Name the concrete verbs and objects; scale it to the line, "
+        "so an urgent or angry line earns real movement and a calm one earns "
+        "less. Then ONE camera movement, and it must be STRATEGIC: it has to "
+        "earn its place in THIS beat -- push in as a realisation lands, pull "
+        "back as someone is left alone, tilt or crane to reveal what the beat "
+        "turns on, track with a body that moves. Say what it moves toward or "
+        "away from. A shot size or an angle on its own is a photograph, not a "
+        "movement, so never answer with framing alone, and never repeat the "
+        "same move twice in this batch. Reply ONLY with a JSON list of "
+        'objects {"beat_id","expression","motion","camera"}.',
         # Gap-audit F3 (2026-06-10): the era/style tails are APPENDED later
         # by the prompt finisher -- the model must not duplicate them.
         "Do not include film-stock, film-grain, or lighting-style terms; "
@@ -1271,8 +1324,14 @@ def _build_nonverbal_batch_prompt(batch: list, meta: dict, ledger: dict,
         "objects and materials (a brass dial rolled down, a ledger snapped "
         "shut, a chart slapped onto the wooden desk), because the shot's "
         "sound is derived from exactly those words. Do not cap yourself at "
-        "fidgets. Then ONE camera movement only. Reply ONLY with a JSON list "
-        'of objects {"beat_id","expression","motion","camera"}.',
+        "fidgets. Then ONE camera movement, and it must be STRATEGIC: the move "
+        "has to earn its place in THIS beat -- push in as a realisation lands, "
+        "pull back as someone is left alone, tilt or crane to reveal the thing "
+        "the beat turns on, track with a body that crosses the room. Say what "
+        "it moves toward or away from. A shot size or an angle on its own is a "
+        "photograph, not a movement, so never answer with framing alone, and "
+        "never repeat the same move twice in this batch. Reply ONLY with a "
+        'JSON list of objects {"beat_id","expression","motion","camera"}.',
         # Same finisher contract as the spoken path: the era/style tails are
         # APPENDED later and must not be duplicated here.
         "Do not include film-stock, film-grain, or lighting-style terms; "
