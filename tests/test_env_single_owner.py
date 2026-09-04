@@ -60,22 +60,8 @@ ALLOWED = {
 #: `os.environ` site under nodes/ lands outside it and fails on the next run,
 #: including on the other box's next pull, which is the intended behaviour.
 PENDING = {
-    "__init__.py",
-    "nodes/OTR_LedgerScriptWriter.py",
     "nodes/_otr_audio_engines/eng_indextts2.py",
     "nodes/_otr_writer_heartbeat.py",
-    "nodes/cast_lock.py",
-    "nodes/otr_caption_burn.py",
-    "nodes/otr_credits_roll.py",
-    "nodes/otr_image_gen_dispatcher.py",
-    "nodes/otr_master_audio_mux.py",
-    "nodes/otr_meta_brief_image_prompt.py",
-    "nodes/otr_shot_lock.py",
-    "nodes/otr_silent_composite.py",
-    "nodes/otr_video_render_batch.py",
-    "nodes/production_ledger.py",
-    "nodes/scene_sequencer.py",
-    "nodes/video_engine.py",
 }
 
 

@@ -33,6 +33,11 @@ from datetime import datetime, timezone
 
 from . import _otr_voice_route as _ROUTE
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -496,7 +501,7 @@ class CastLock:
         """
         verdict = (meta or {}).get("freeze_verdict")
         if verdict == "needs_full_rerun":
-            bypass = os.environ.get("OTR_BYPASS_FREEZE_HALT", "0") == "1"
+            bypass = otr_env.get("OTR_BYPASS_FREEZE_HALT", "0") == "1"
             if bypass:
                 log.warning(
                     "[CastLock] FREEZE HALT BYPASSED (OTR_BYPASS_FREEZE_HALT=1); "

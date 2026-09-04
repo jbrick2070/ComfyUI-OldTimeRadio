@@ -18,7 +18,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -43,7 +47,7 @@ def _legacy_receipt_bypass_allowed(ledger):
     Extracted from an inline condition so the decision has a name, and so a
     test can pin it directly rather than by inference.
     """
-    if os.environ.get("OTR_TEST_MODE", "0") != "1":
+    if otr_env.get("OTR_TEST_MODE", "0") != "1":
         return False
     images = ledger.get("images") if isinstance(ledger, dict) else None
     if isinstance(images, dict) and isinstance(

@@ -564,7 +564,7 @@ def test_scroll_still_inputs_are_looped_timed(monkeypatch, tmp_path):
     precedes each still input -- a guard the fade-masked motion test above missed."""
     backdrop = _backdrop_png(tmp_path / "bd.png")
     seen = {}
-    real_run = cr.subprocess.run
+    real_run = cr.otr_proc.run
 
     def _spy(cmd, *a, **k):
         if isinstance(cmd, (list, tuple)) and any(
@@ -579,7 +579,7 @@ def test_scroll_still_inputs_are_looped_timed(monkeypatch, tmp_path):
             return _R()
         return real_run(cmd, *a, **k)
 
-    monkeypatch.setattr(cr.subprocess, "run", _spy)
+    monkeypatch.setattr(cr.otr_proc, "run", _spy)
     cr.render_credits_clip(_layout(), str(backdrop), str(tmp_path / "credits.mp4"),
                            w=1280, h=720, fps=25.0)
     cmd = seen["cmd"]

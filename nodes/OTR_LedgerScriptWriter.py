@@ -111,7 +111,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import random
 import re
 from dataclasses import dataclass
@@ -251,6 +250,11 @@ from ._otr_writer_tail import (  # noqa: F401 -- re-exported for callers/tests
     _title_source_for_custom_override,
 )
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -290,7 +294,7 @@ LAST_LINES_WINDOW = 5
 # the env so every downstream config + module read is consistent); the "auto"
 # setting restores THIS baseline so an on/off run never leaks to the next prompt
 # in a long-lived server.
-_OTR_SCAFFOLD_ENV_BASELINE = os.environ.get("OTR_ENABLE_STYLE_GRAMMAR")
+_OTR_SCAFFOLD_ENV_BASELINE = otr_env.get("OTR_ENABLE_STYLE_GRAMMAR")
 """Rolling context window size for compose_line. Each character /
 announcer beat appends to the window; non-voiced beats do not.
 
@@ -1318,7 +1322,7 @@ def _seed_writer_sampling(inputs) -> "int | None":
     Returns the seed applied, or None when the variable is unset or unusable.
     Never raises: a bake-off convenience may not be able to break a render.
     """
-    raw = os.environ.get(WRITER_SEED_ENV, "").strip()
+    raw = otr_env.get(WRITER_SEED_ENV, "").strip()
     if not raw:
         return None
     try:
@@ -1747,14 +1751,14 @@ def _apply_story_scaffold_env(scaffold) -> str:
     returns the normalized scaffold string. Never raises."""
     s = str(scaffold or "auto").strip().lower()
     if s == "on":
-        os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = "1"
+        otr_env.pin("OTR_ENABLE_STYLE_GRAMMAR", "1")
     elif s == "off":
-        os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = "0"
+        otr_env.pin("OTR_ENABLE_STYLE_GRAMMAR", "0")
     else:  # "auto" (or any unknown value) -- respect the process baseline
         if _OTR_SCAFFOLD_ENV_BASELINE is None:
-            os.environ.pop("OTR_ENABLE_STYLE_GRAMMAR", None)
+            otr_env.unpin("OTR_ENABLE_STYLE_GRAMMAR")
         else:
-            os.environ["OTR_ENABLE_STYLE_GRAMMAR"] = _OTR_SCAFFOLD_ENV_BASELINE
+            otr_env.pin("OTR_ENABLE_STYLE_GRAMMAR", _OTR_SCAFFOLD_ENV_BASELINE)
     return s
 
 
@@ -3012,13 +3016,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             gguf_n_ctx=gguf_n_ctx,
             gguf_quant=gguf_quant,
         )
-        import os
         _scaffold = _apply_story_scaffold_env(story_scaffold)
         if _scaffold in ("on", "off"):
             log.info(
                 "[OTR_LedgerScriptWriter] story_scaffold=%s -> "
                 "OTR_ENABLE_STYLE_GRAMMAR=%s (widget override)",
-                _scaffold, os.environ.get("OTR_ENABLE_STYLE_GRAMMAR"),
+                _scaffold, otr_env.get("OTR_ENABLE_STYLE_GRAMMAR"),
             )
 
         # BUG-LOCAL-296 (2026-05-31): reset the OpenRouter per-RUN cost
@@ -3652,8 +3655,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # batch run degrade (raw news_seed) instead of halting on a
             # single fabricated key_term, without editing the graph widget.
             # Production leaves this unset so the widget default governs.
-            import os  # stdlib; local import matches this file's convention
-            if os.environ.get("OTR_NEWS_BRIEFS_REQUIRED") == "0":
+            if otr_env.get("OTR_NEWS_BRIEFS_REQUIRED") == "0":
                 _news_required = False
                 log.warning(
                     "[OTR_LedgerScriptWriter] OTR_NEWS_BRIEFS_REQUIRED=0 "
@@ -4311,7 +4313,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             _arc_shape = ""
             if _arc_lane_rolls:
                 try:
-                    _arc_style_seed = os.environ.get("OTR_STYLE_SEED", "").strip()
+                    _arc_style_seed = otr_env.get("OTR_STYLE_SEED", "").strip()
                     _arc_news_hash = str(
                         (meta.get("news") or {}).get("source_hash") or ""
                     )

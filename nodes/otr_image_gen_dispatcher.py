@@ -56,6 +56,11 @@ from ._otr_image_engines import registry as _ireg
 # module scope; torch / comfy are imported lazily inside the call.
 from . import _otr_vram_levers as _levers
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 #: Smallest plausible real PNG (8-byte signature + IHDR + IDAT + IEND). Anything
 #: smaller off the cross-process disk handoff is a 0-byte / truncated write,
 #: never a finished render.
@@ -203,7 +208,7 @@ def resolve_seed_and_mode(
     if (str(kind or "") == "scene_open" or _oid == "radio_host_portrait"
             or _oid.endswith("_radio_face_169")):   # ltx talking radio-face
         try:
-            return (int(os.environ.get("OTR_RADIO_BOOKEND_SEED", 4242)), "")
+            return (int(otr_env.get("OTR_RADIO_BOOKEND_SEED", 4242)), "")
         except (TypeError, ValueError):
             return (4242, "")
     cfg = seed_cfg if isinstance(seed_cfg, dict) else {}
@@ -216,7 +221,7 @@ def resolve_seed_and_mode(
     # dies. Placed between `base` and the gate, it silently breaks the
     # documented mode='fixed' contract instead, which is worse.
     if (str(kind or "") == "scene_character" and char_id and portrait_prompt_hash
-            and os.environ.get("OTR_PORTRAIT_IDENTITY_SEED", "1") != "0"):
+            and otr_env.get("OTR_PORTRAIT_IDENTITY_SEED", "1") != "0"):
         # EXACTLY the portrait object's own draw: the portrait's object_id IS
         # the char_id (otr_meta_brief_image_prompt.py:1765), so this reproduces
         # the seed that character's portrait already rendered with, leaving the
@@ -559,7 +564,7 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
     the mux; the helper itself stays directly testable with the env cleared).
     """
     try:
-        if os.environ.get("OTR_TEST_MODE") == "1":
+        if otr_env.get("OTR_TEST_MODE") == "1":
             return ep_dir, ep
         if not str(ep).startswith("pending_"):
             return ep_dir, ep
@@ -1494,7 +1499,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         if (portrait_row is not None and anchor_hash
                 and getattr(_safe_engine(engine_id),
                             "accepts_reference_image", False)
-                and os.environ.get("OTR_PORTRAIT_REFERENCE", "1") != "0"):
+                and otr_env.get("OTR_PORTRAIT_REFERENCE", "1") != "0"):
             _cand = str(portrait_row.get("pool_path")
                         or portrait_row.get("path") or "")
             if not _cand or not os.path.isfile(_cand):

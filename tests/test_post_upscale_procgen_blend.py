@@ -213,7 +213,7 @@ def test_blend_cmd_uses_audio_passthrough(node, tmp_path):
     # rev-parse via the canonical Ledger.save commit lookup) don't
     # contaminate the captured ffmpeg cmd. Stamp behavior is covered by
     # its own dedicated tests further down.
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+    with mock.patch.object(M.otr_proc, "run", side_effect=fake_run), \
          mock.patch.object(M, "_stamp_ledger_final_video_path",
                            return_value=(False, "stubbed for cmd-shape test")):
         node.blend(
@@ -260,7 +260,7 @@ def test_blend_cmd_does_NOT_use_shortest_for_c7_safety(node, tmp_path):
 
     # Stub ledger stamp -- this test is about the ffmpeg cmd shape, not
     # the ledger stamp side-effect (covered by other tests below).
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+    with mock.patch.object(M.otr_proc, "run", side_effect=fake_run), \
          mock.patch.object(M, "_stamp_ledger_final_video_path",
                            return_value=(False, "stubbed for cmd-shape test")):
         node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
@@ -291,7 +291,7 @@ def test_blend_cmd_includes_longform_hardening_flags(node, tmp_path):
     captured, fake_run = _capture_run()
     from nodes import otr_post_upscale_procgen_blend as M
 
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+    with mock.patch.object(M.otr_proc, "run", side_effect=fake_run), \
          mock.patch.object(M, "_stamp_ledger_final_video_path",
                            return_value=(False, "stubbed for cmd-shape test")):
         node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
@@ -316,7 +316,7 @@ def test_bypass_mode_copies_source_to_output(node, tmp_path):
     pgn.write_bytes(b"pgn")
     from nodes import otr_post_upscale_procgen_blend as M
 
-    with mock.patch.object(M.subprocess, "run") as mock_run:
+    with mock.patch.object(M.otr_proc, "run") as mock_run:
         out, report = node.blend(
             source_mp4_path=str(src), procgen_mp4_path=str(pgn),
             bypass=True,
@@ -365,7 +365,7 @@ def test_ffmpeg_failure_falls_back_to_source_copy(node, tmp_path):
     def _fail_run(cmd, **kwargs):
         raise _sub.CalledProcessError(returncode=1, cmd=cmd, stderr=b"ffmpeg boom")
 
-    with mock.patch.object(M.subprocess, "run", side_effect=_fail_run):
+    with mock.patch.object(M.otr_proc, "run", side_effect=_fail_run):
         out, report = node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
     out_p = Path(out)
     assert out_p.exists()
@@ -413,7 +413,7 @@ def test_ledger_stamped_after_successful_blend(node, tmp_path):
     captured, fake_run = _capture_run()
     from nodes import otr_post_upscale_procgen_blend as M
 
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+    with mock.patch.object(M.otr_proc, "run", side_effect=fake_run), \
          mock.patch("nodes._otr_ledger.in_flight_ledger_path", return_value=ledger_path):
         out, report = node.blend(
             source_mp4_path=str(src),

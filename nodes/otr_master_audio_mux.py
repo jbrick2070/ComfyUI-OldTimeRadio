@@ -33,10 +33,18 @@ import math
 import os
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import logging
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 try:  # ComfyUI loads these node modules flat as well as packaged
     from ._otr_shared import ffprobe as _ffp
@@ -99,7 +107,7 @@ def _ffprobe_bin() -> str:
 
 
 def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True,
+    return otr_proc.run(cmd, capture_output=True, text=True,
                           encoding="utf-8", errors="replace")
 
 
@@ -141,7 +149,7 @@ def audio_pcm_sha(path: str, ffmpeg: str = "ffmpeg") -> str:
     fp = _ffmpeg_bin(ffmpeg)
     if not fp:
         return ""
-    raw = subprocess.run(
+    raw = otr_proc.run(
         [fp, "-v", "error", "-i", path, "-map", "0:a", "-f", "s16le",
          "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1", "-"],
         capture_output=True)
@@ -214,7 +222,7 @@ def _credits_tail_ceiling() -> float:
     malformed, never fatal.
 
     This knob is read at the LAST node of the graph, after the whole episode has
-    rendered. It used to be a bare ``float(os.environ.get(...))``, so a single
+    rendered. It used to be a bare ``float(otr_env.get(...))``, so a single
     typo in a server's launch environment (``45s``, ``forty-five``) killed a
     finished episode at the finish line with an uncaught ValueError -- hours of
     render lost to a value that only widens a sanity ceiling.
@@ -226,7 +234,7 @@ def _credits_tail_ceiling() -> float:
     WARNING that one omits, because a ceiling silently reverting to the default
     is a ceiling the operator thinks they moved. (It is not the mux's only env
     read -- `_ffmpeg_bin` consults `OTR_FFMPEG` in the same call.)"""
-    raw = os.environ.get("OTR_MAX_CREDITS_TAIL_S")
+    raw = otr_env.get("OTR_MAX_CREDITS_TAIL_S")
     if raw in (None, ""):
         return _MAX_CREDITS_TAIL_S_DEFAULT
     try:
@@ -668,7 +676,7 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     """
     if not master_audio_path or os.path.isfile(master_audio_path):
         return master_audio_path
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         return master_audio_path
     want = os.path.basename(master_audio_path)
     try:

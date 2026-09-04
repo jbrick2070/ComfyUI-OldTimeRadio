@@ -42,6 +42,11 @@ from ._otr_shared import resolver as _resolver
 from ._otr_shared.role_compat import Role
 from ._otr_shared import role_slots as _role_slots
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 # ---------------------------------------------------------------------------
 # Role mapping + which roles are "character-bearing" (get the rich derivation)
 # ---------------------------------------------------------------------------
@@ -301,8 +306,7 @@ def overlay_audio_timing(ledger: dict, strict: bool = False) -> dict:
     ledger untouched rather than half-overlaid. Without ``strict`` the behaviour
     is exactly what it has always been -- warn and return the wire unchanged.
     """
-    import os
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         return ledger                       # CPU tests never read disk state
     lines = ledger.get("lines") or []
     try:
@@ -1690,9 +1694,8 @@ def _resolve_writer_llm_binding(meta: dict, warnings: list):
     through :func:`_resolve_writer_llm`'s prompt-only wrapper, and without a
     second copy of the slot/policy/GGUF load contract that would drift.
     """
-    import os
 
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         return None, ""
     model_id = writer_model_id_from_meta(meta)
     if not model_id:
@@ -1786,7 +1789,6 @@ def _resolve_writer_llm(meta: dict, warnings: list,
 def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                                                policy, subject_sigils=None,
                                                ghost_prompts=None):
-    import os
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
     except ImportError:
@@ -2730,7 +2732,6 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
     preflight and must stay valid. A REAL ledger with Ghost beats authors every
     one of them.
     """
-    import os
 
     warnings = warnings if isinstance(warnings, list) else []
     if ledger is None:
@@ -2824,7 +2825,7 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
     # for an episode whose every row replays.
     requested_model = writer_model_id_from_meta(meta)
     model_id = _gsa.GHOST_DETERMINISTIC_MODEL_ID
-    if requested_model and os.environ.get("OTR_TEST_MODE") != "1":
+    if requested_model and otr_env.get("OTR_TEST_MODE") != "1":
         try:
             from . import _otr_model_catalog as _catalog  # type: ignore
         except ImportError:  # pragma: no cover -- flat test imports

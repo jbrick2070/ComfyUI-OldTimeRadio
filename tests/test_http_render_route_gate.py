@@ -105,11 +105,15 @@ def test_1_registers_exactly_the_two_POST_routes_and_nothing_else(monkeypatch):
 
 
 def test_the_flag_check_matches_the_house_convention():
-    """Same shape as OTR_ENABLE_COMFY_CREDITS: `os.environ.get(name, "0") == "1"`.
+    """Same shape as OTR_ENABLE_COMFY_CREDITS: `_otr_route_env.get(name, "0") == "1"`.
+
+    The spelling moved to the env OWNER on 2026-09-04 (scan collapse); the
+    SEMANTICS did not -- otr_env.get is os.environ.get, read live, returned
+    unchanged. This pin is still a text pin for the reason below.
 
     Pinned as text so a future edit that swaps in "on"/"off" or a truthy-string
     parser (a real behaviour change, not a typo) is a deliberate, reviewed
     decision rather than something that slips through unnoticed.
     """
     block = _route_gate_block()
-    assert 'environ.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1"' in block
+    assert '_otr_route_env.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1"' in block

@@ -22,6 +22,11 @@ import json
 import logging
 import re
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 # A malformed routing environment is terminal at every reader (2026-07-25).
 # route_freeze is stdlib-only at module scope, so this stays cold-import clean.
 try:
@@ -347,8 +352,7 @@ RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 #: bookends keep today's ltx_audio_in animated-console behavior).
 def _humo_hosts_enabled() -> bool:
     """True iff OTR_ENABLE_HUMO_HOSTS is opted ON (default OFF)."""
-    import os
-    return os.environ.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
+    return otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1"
 
 
 #: LTX audio-in bookends use a WIDE radio-face still for their I2V init. Music
@@ -482,8 +486,7 @@ def _landscape_still_dims():
     """(w, h) for SCENE stills: the landscape composite canvas, each dim
     snapped DOWN to /32 (the latent-grid contract). Env-overridable via
     OTR_VIDEO_LANDSCAPE_CANVAS (the same knob the render driver reads)."""
-    import os
-    raw = os.environ.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
+    raw = otr_env.get("OTR_VIDEO_LANDSCAPE_CANVAS", "1472x832")
     try:
         w, h = (int(x) for x in raw.lower().split("x", 1))
     except (ValueError, AttributeError):

@@ -106,7 +106,7 @@ def _run(monkeypatch, frames_bgr, *, n_frames, src_w, src_h, out_w, out_h):
         popen_calls["n"] += 1
         return dec if popen_calls["n"] == 1 else enc
 
-    monkeypatch.setattr(sc.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(sc.otr_proc, "popen", fake_popen)
     # The pipeline asserts the encoded segment's frame count; there is no real
     # file here, so return exactly what the loop was asked to write.
     monkeypatch.setattr(sc, "count_video_frames", lambda p: int(n_frames))

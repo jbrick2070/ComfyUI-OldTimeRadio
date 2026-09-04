@@ -42,10 +42,14 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
+
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 # Ensure sibling node modules (e.g. _otr_shared) resolve when this file is
 # loaded FLAT by ComfyUI's custom-node loader -- the flat fallbacks of the
@@ -578,10 +582,10 @@ def _load_master_audio_np(source_mp4: Path, ffmpeg: str):
     tmp_path = tmp.name
     tmp.close()
     try:
-        subprocess.run(
+        otr_proc.run(
             [fb, "-y", "-loglevel", "error", "-i", str(audio_src),
              "-vn", "-ac", "1", "-ar", "22050", "-acodec", "pcm_s16le", tmp_path],
-            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            check=True, stdout=otr_proc.PIPE, stderr=otr_proc.PIPE)
         with wave.open(tmp_path, "rb") as wf:
             sr = wf.getframerate()
             raw = wf.readframes(wf.getnframes())
@@ -992,14 +996,14 @@ class PostUpscaleProcgenBlend:
                 shadow_crush_threshold=int(shadow_crush_threshold),
                 green_only_overlay=bool(green_only_overlay),
                 captions_ass_path=caps, source_dims=src_dims, scopes_mp4=scp)
-            subprocess.run(_cmd, check=True, stdout=subprocess.PIPE,
-                           stderr=subprocess.PIPE,
+            otr_proc.run(_cmd, check=True, stdout=otr_proc.PIPE,
+                           stderr=otr_proc.PIPE,
                            cwd=(str(Path(caps).parent) if caps else None))
 
         # -- main blend (procgen [+ scopes]); captions deferred when bars are on --
         try:
             _run_blend(_main_out, _main_captions)
-        except subprocess.CalledProcessError as exc:
+        except otr_proc.CalledProcessError as exc:
             stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
             msg = (
                 f"PostUpscaleProcgenBlend: ffmpeg blend failed -- "
@@ -1023,17 +1027,17 @@ class PostUpscaleProcgenBlend:
             _bars_ok = False
             if bars_path is not None:
                 try:
-                    subprocess.run(
+                    otr_proc.run(
                         _build_bars_caption_cmd(
                             _main_out, bars_path, output_path, _BARS_OPACITY,
                             ffmpeg, captions_ass_path, src_dims),
-                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        check=True, stdout=otr_proc.PIPE, stderr=otr_proc.PIPE,
                         cwd=run_cwd)
                     _bars_ok = True
                     report_lines.append(
                         "audio_bars: bottom overlay (lighten @%.2f)"
                         % _BARS_OPACITY)
-                except subprocess.CalledProcessError as exc:
+                except otr_proc.CalledProcessError as exc:
                     _se = exc.stderr.decode("utf-8", "replace") if exc.stderr else ""
                     log.warning("[PostUpscaleProcgenBlend] audio_bars: overlay pass "
                                 "failed (%s); re-running the normal blend",
@@ -1045,7 +1049,7 @@ class PostUpscaleProcgenBlend:
                     _run_blend(output_path, captions_ass_path)
                     report_lines.append("audio_bars: SKIPPED (bars layer "
                                         "unavailable); shipped normal blend")
-                except subprocess.CalledProcessError:
+                except otr_proc.CalledProcessError:
                     try:
                         shutil.copy2(src, output_path)
                     except Exception:  # noqa: BLE001

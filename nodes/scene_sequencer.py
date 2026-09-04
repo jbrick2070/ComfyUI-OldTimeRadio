@@ -35,6 +35,11 @@ import torch
 
 from .story_orchestrator import _runtime_log
 
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -356,7 +361,6 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     ``makeup_db`` is retained ONLY for the fallback path below. It is no longer
     the loudness engine.
     """
-    import os
     ceiling = 10.0 ** (ceiling_dbfs / 20.0)
     peak = waveform.abs().max()
     if float(peak) < 1e-8:
@@ -365,7 +369,7 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     if target_lufs is None:
         try:
             target_lufs = float(
-                os.environ.get("OTR_MASTER_TARGET_LUFS", _MASTER_TARGET_LUFS))
+                otr_env.get("OTR_MASTER_TARGET_LUFS", _MASTER_TARGET_LUFS))
         except (TypeError, ValueError):
             target_lufs = _MASTER_TARGET_LUFS
 
@@ -420,7 +424,7 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     waveform = waveform * (ceiling / peak)
     if makeup_db is None:
         try:
-            makeup_db = float(os.environ.get("OTR_MASTER_MAKEUP_DB", "4.0"))
+            makeup_db = float(otr_env.get("OTR_MASTER_MAKEUP_DB", "4.0"))
         except (TypeError, ValueError):
             makeup_db = 4.0
     makeup_db = max(0.0, min(12.0, float(makeup_db)))
@@ -456,7 +460,7 @@ _LOUDNORM_PREFLIGHT_LOGGED = False
 
 def _segment_loudnorm_mode():
     """Per-segment loudness mode. Default 'rms' (baked in); 'peak' = legacy escape hatch."""
-    return os.environ.get("OTR_SEGMENT_LOUDNORM", "rms").strip().lower()
+    return otr_env.get("OTR_SEGMENT_LOUDNORM", "rms").strip().lower()
 
 
 def _env_float(name, default, lo=None, hi=None):
@@ -465,7 +469,7 @@ def _env_float(name, default, lo=None, hi=None):
     Read per call (no cache) so tests can monkeypatch and operators can set
     the value at server boot without a stale module-level snapshot.
     """
-    raw = os.environ.get(name, "").strip()
+    raw = otr_env.get(name, "").strip()
     try:
         v = float(raw) if raw else float(default)
     except (TypeError, ValueError):

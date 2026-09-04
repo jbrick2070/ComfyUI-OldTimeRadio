@@ -61,10 +61,19 @@ import ntpath
 import os
 import posixpath
 import re
-import subprocess
 import threading
 import time
 from typing import Any, Dict, Iterable, List, Optional
+
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
 
 log = logging.getLogger("OTR.production_ledger")
 
@@ -219,11 +228,13 @@ def _git_head_short() -> str:
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         repo_root = os.path.dirname(here)
-        out = subprocess.check_output(
+        out = otr_proc.run(
             ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL,
+            stdout=otr_proc.PIPE,
+            stderr=otr_proc.DEVNULL,
             timeout=5,
-        ).decode("utf-8", errors="ignore").strip()
+            check=True,
+        ).stdout.decode("utf-8", errors="ignore").strip()
         _GIT_HEAD_CACHE = out or "unknown"
     except Exception:  # noqa: BLE001 -- any failure means we just skip
         _GIT_HEAD_CACHE = "unknown"
@@ -777,7 +788,7 @@ def stamp_durable(*, sections: Optional[Dict[str, Any]] = None,
             meta = {}
             led.data["meta"] = meta
         meta.update(meta_updates)
-    if os.environ.get("OTR_TEST_MODE") == "1":
+    if otr_env.get("OTR_TEST_MODE") == "1":
         log.info("[Ledger] stamp_durable(%s): test-mode injection "
                  "(in-memory only, disk save skipped)", source or "?")
         return None

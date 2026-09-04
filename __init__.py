@@ -47,8 +47,17 @@ log = logging.getLogger("OTR")
 # ─────────────────────────────────────────────────────────────────────────────
 # (the nuclear mock runs before this file is even executed)
 
+# THE ENV OWNER. Imported HERE -- above the first write below, and OUTSIDE the
+# two swallowing try/excepts further down -- because it is stdlib-only and
+# CANNOT fail. If it ever did, the boot must say so loudly rather than skip the
+# OTR_OUTPUT_DIR pin behind a debug line.
+try:
+    from .nodes._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat load
+    from nodes._otr_shared import env as otr_env  # type: ignore
+
 # 1. Hub telemetry — disable before any transformers/huggingface_hub import
-os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+otr_env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 # 2. transformers + huggingface_hub logging — errors only, no INFO/WARNING chatter
 #    These are two separate logging systems — both need to be silenced.
@@ -94,7 +103,7 @@ except Exception as _hf_err:
 #    episodes already live: output/otr/{episodes,obs}. Gated on folder_paths
 #    being importable so it ONLY fires inside the ComfyUI process; CLI/pytest
 #    get no pin (preserves test isolation + monkeypatch). Skipped when set.
-if not os.environ.get("OTR_OUTPUT_DIR"):
+if not otr_env.get("OTR_OUTPUT_DIR"):
     try:
         import folder_paths  # presence == running inside the ComfyUI process
         _ = folder_paths.get_output_directory  # touch attr; absence -> skip
@@ -104,7 +113,7 @@ if not os.environ.get("OTR_OUTPUT_DIR"):
             ),
             "output",
         )
-        os.environ["OTR_OUTPUT_DIR"] = _otr_out
+        otr_env.pin("OTR_OUTPUT_DIR", _otr_out)
         log.info("[OldTimeRadio] OTR_OUTPUT_DIR pinned (node-relative): %s", _otr_out)
     except Exception as _out_err:
         log.debug("[OldTimeRadio] OTR_OUTPUT_DIR pin skipped: %s", _out_err)
@@ -509,6 +518,23 @@ try:
     import json as _otr_rj
     import os as _otr_ro
     import threading as _otr_threading
+    # The owner is imported INSIDE this block on purpose. The block is executed
+    # standalone in an empty namespace by
+    # tests/test_http_render_route_gate.py::_exec_route_block, so anything it
+    # reaches for has to be reached for HERE -- a module-scope name from further
+    # up __init__.py is not in scope there, the NameError is swallowed by this
+    # very try/except, and the routes silently do not register.
+    try:
+        from .nodes._otr_shared import env as _otr_route_env
+    except (ImportError, KeyError):  # pragma: no cover -- standalone exec
+        # KeyError, not ImportError, and that is the whole point of naming it:
+        # a RELATIVE import evaluated with empty globals raises
+        # KeyError("'__name__' not in globals") before it ever reaches the
+        # import machinery. `except ImportError` does NOT catch that, so the
+        # error escapes to the outer handler, the whole block is swallowed, and
+        # the routes silently do not register -- which is exactly what happened
+        # on 2026-09-04 until the gate test said so.
+        from nodes._otr_shared import env as _otr_route_env  # type: ignore
     from server import PromptServer as _otr_PS2  # type: ignore
     from aiohttp import web as _otr_web2  # type: ignore
 
@@ -557,7 +583,7 @@ try:
     # Nothing that ships calls them; they are a hand-built GPU-gate harness for
     # the operator to poll during dev. Default OFF so a registry install
     # registers only the read-only ledger GET above; the operator opts in.
-    if _otr_ro.environ.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1":
+    if _otr_route_env.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1":
         @_otr_PS2.instance.routes.post("/otr/video_render_single")
         async def _otr_video_render_single(request):
             body = await _otr_body(request)

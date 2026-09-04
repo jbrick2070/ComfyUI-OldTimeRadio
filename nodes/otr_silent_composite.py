@@ -22,9 +22,17 @@ import json
 import math
 import os
 import shutil
-import subprocess
 import tempfile
 import logging
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 try:
     from ._otr_shared.scope_draw import cfr_flags
@@ -165,7 +173,7 @@ def _ffprobe_bin() -> str:
 
 
 def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True,
+    return otr_proc.run(cmd, capture_output=True, text=True,
                           encoding="utf-8", errors="replace")
 
 
@@ -211,7 +219,7 @@ _UNSHARP_AMOUNT_DEFAULT = 0.4
 
 def _unsharp_amount() -> float:
     try:
-        return float(os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT",
+        return float(otr_env.get("OTR_COMPOSITE_UNSHARP_AMOUNT",
                                     _UNSHARP_AMOUNT_DEFAULT))
     except (TypeError, ValueError):
         return _UNSHARP_AMOUNT_DEFAULT
@@ -1041,10 +1049,10 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
 
     dec_stderr_fobj, dec_stderr_path = _tempfile_stderr("dec")
     enc_stderr_fobj, enc_stderr_path = _tempfile_stderr("enc")
-    dec = subprocess.Popen(dec_args, stdout=subprocess.PIPE,
+    dec = otr_proc.popen(dec_args, stdout=otr_proc.PIPE,
                            stderr=dec_stderr_fobj, bufsize=0)
     try:
-        enc = subprocess.Popen(enc_args, stdin=subprocess.PIPE,
+        enc = otr_proc.popen(enc_args, stdin=otr_proc.PIPE,
                                stderr=enc_stderr_fobj, bufsize=0)
     except Exception:  # noqa: BLE001
         _kill_and_wait_all([dec], timeout=30)
@@ -1141,7 +1149,7 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
         try:
             dec.wait(timeout=30)
             enc.wait(timeout=30)
-        except subprocess.TimeoutExpired:
+        except otr_proc.TimeoutExpired:
             error_raised = True
             _kill_and_wait_all([dec, enc], timeout=30)
             raise RuntimeError(
@@ -1277,7 +1285,7 @@ def _encode_segment_from_dir(fb, frame_dir, n_frames, seg_path, *, w, h, fps,
     # renders straight-alpha, so its own alpha is the matte. The prior auto-format
     # look is preserved as the NAMED opt-in style OTR_MESH_COMPOSITE_STYLE=blend
     # (never the default).
-    _style = os.environ.get("OTR_MESH_COMPOSITE_STYLE", "source_over").strip().lower()
+    _style = otr_env.get("OTR_MESH_COMPOSITE_STYLE", "source_over").strip().lower()
     _ov_format = "auto" if _style == "blend" else "rgb"
     graph = (bg_filter + ";" + fg_filter +
              ";[bg][fg]overlay=(W-w)/2:(H-h)/2:eof_action=repeat:format=%s,"
@@ -1660,9 +1668,9 @@ class OTRSilentComposite:
             # var in there would invalidate a cached composite for a knob that
             # cannot reach a single pixel of it.
             parts.append(("env",
-                          (os.environ.get("OTR_COMPOSITE_UNSHARP_AMOUNT", "")
+                          (otr_env.get("OTR_COMPOSITE_UNSHARP_AMOUNT", "")
                            if _model_eligible else ""),
-                          os.environ.get("OTR_MESH_COMPOSITE_STYLE", "")))
+                          otr_env.get("OTR_MESH_COMPOSITE_STYLE", "")))
             # 5. Engine identity + whatever model state that engine declares.
             #
             # The engine is ASKED rather than special-cased. This block used to

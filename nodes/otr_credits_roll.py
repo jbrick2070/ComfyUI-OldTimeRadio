@@ -35,7 +35,15 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 try:  # ComfyUI loads these node modules flat as well as packaged
     from ._otr_shared import ffprobe as _ffp
@@ -610,14 +618,14 @@ def _load_font(pt: int):
     key = int(pt)
     if key in _FONT_CACHE:
         return _FONT_CACHE[key]
-    fd = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+    fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
     # OTR_CREDITS_FONT (2026-09-01 ship audit, hardcoded-paths-01): an explicit
     # path wins outright. It is tried FIRST and only when set, so a box that
     # never sets it resolves exactly as before. The macOS candidates sit AFTER
     # the Windows and Linux ones for the same reason: unreachable on the boxes
     # that already resolve, and the difference between a credits tail and a
     # CreditsDataError on Apple Silicon, which ships no DejaVu and no consola.
-    explicit = os.environ.get("OTR_CREDITS_FONT", "").strip()
+    explicit = otr_env.get("OTR_CREDITS_FONT", "").strip()
     candidates = ([explicit] if explicit else []) + [
         os.path.join(fd, "JetBrainsMono-Bold.ttf"),
         os.path.join(fd, "consola.ttf"),
@@ -1313,11 +1321,11 @@ def extract_final_frame(video_path: str, out_png: str) -> str:
     """
     cmd = [_ffmpeg_bin(), "-y", "-sseof", "-3", "-i", video_path,
            "-update", "1", "-frames:v", "1", "-q:v", "2", out_png]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = otr_proc.run(cmd, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(out_png) \
             or os.path.getsize(out_png) == 0:
         # A very short body may have nothing 3s from the end; take frame 0.
-        r = subprocess.run(
+        r = otr_proc.run(
             [_ffmpeg_bin(), "-y", "-i", video_path,
              "-update", "1", "-frames:v", "1", "-q:v", "2", out_png],
             capture_output=True, text=True)
@@ -1444,7 +1452,7 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
             "-crf", "18", out_path,
         ]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = otr_proc.run(cmd, capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out_path) \
                 or os.path.getsize(out_path) == 0:
             raise CreditsDataError(
@@ -1471,7 +1479,7 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
         for p in (body_path, credits_path):
             f.write("file '%s'\n" % p.replace("\\", "/").replace("'", r"'\''"))
     try:
-        r = subprocess.run(
+        r = otr_proc.run(
             [_ffmpeg_bin(), "-y", "-f", "concat", "-safe", "0", "-i", lst,
              "-c", "copy", out_path],
             capture_output=True, text=True)

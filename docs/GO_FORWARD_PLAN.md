@@ -91,44 +91,41 @@ in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
 
 ---
 
-## 1. THE SCAN COLLAPSE -- FIRST, because its guards make every later change safe to ship
+## 1. THE SCAN COLLAPSE -- the MIGRATION is done; one acceptance step remains
 
-**The plan is CLOSED after a full r1-r4 arc and is the next coder chunk:**
-`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md`, with its round judgments
-beside it and the two measured receipts in
-`docs/2026-09-04-registry-findings-collapse/` (`argv0_receipt.txt` resolves all 35 spawn
-sites; `env_drift_receipt.txt` lists the 14 knobs read with more than one default).
+**Batches (a)-(d) and the ratchet commit are SHIPPED** (receipts in
+`docs/HANDOFF_LOG.md`). env offender FILES 103 -> 2, spawn files 20 -> 1, all three
+singletons cleared, six of twelve "url command" hits gone. Both PENDING sets now
+contain ONLY the two BLOCKED files below, so the guards are green with nothing left
+to migrate.
 
-**The invariant:** a machine fact has ONE owner, and a test proves the copies agree. From
-158 `info` findings to about 9, and the `credential-access` tag on one file instead of
-eleven.
+**TWO FILES ARE PERMANENTLY BLOCKED, each with its reason recorded in the guards'
+own `BLOCKED` tables. Do not sweep either up mechanically:**
+* `nodes/_otr_audio_engines/eng_indextts2.py` -- byte-hashed by Lemmy's voice
+  qualification. Rides along with the next re-audition wanted for other reasons;
+  ruled and closed, see
+  `docs/2026-09-04-PROBLEM-STATEMENT-indextts2-fingerprint-lock.md`.
+* `nodes/_otr_writer_heartbeat.py` -- a LEAF by contract; a pack import
+  reintroduces the cycle that once left two generate transports blind.
 
-**Sequence, each commit full-suite green:**
+**STILL OWED, and it is the only thing left in this item:**
 
-1. **The ratchet commit** -- both AST guards as named-set ratchets calling
-   `tests/fixtures/ratchet.py` in BOTH directions, the network guard with its five named
-   files, `tests/test_terminal_frame.py` taught `otr_proc` at every import depth with
-   lowercase `popen` added to `_SPAWN_CALLS` (`:495` AND `:498` are the receipt), and the
-   mux knob test's predicate resolved from the mux's own import.
-2. **Batch (a)** `nodes/_otr_shared/**` including `gpu_residency`'s Windows-liveness fix.
-3. **Batch (b)** the engine subpackages, one commit each: audio, image, upscale (the
-   spandrel chunked sha256 rides here), video (`eng_ltx25`'s `import sys` and the six
-   `wan_shared` strings ride here), google_api.
-4. **Batch (c)** `nodes/_otr_*.py`.
-5. **Batch (d)** EVERY remaining `nodes/*.py` -- eleven carry no prefix, so a glob would
-   miss them -- plus the root `__init__.py`, whose env import goes ABOVE line 51 and
-   OUTSIDE the swallowing try/excepts.
-6. **Acceptance** both guards green with empty pending sets, then a canonical leg that
-   PUBLISHES to `otr/obs/`, its launcher's profile and roots READ BACK from the leg log
-   before any receipt is written.
+1. **The acceptance leg.** A canonical leg (`workflows/otr_canonical.json`, one act)
+   that PUBLISHES to `otr/obs/`, with the launcher's profile and roots READ BACK from
+   the leg log before any receipt is written, and the boot log showing no "Kokoro
+   voice prefetch unavailable" line. DEFERRED by the operator (2026-09-04) until
+   after the registry: no long render legs before then.
+2. **Re-run `python scripts/dead_code_closure.py`** -- migrating a hundred files
+   strands helpers, and the sweep reports anything a standing ruling protects under
+   its own heading rather than as a clean candidate. Not yet run against the
+   post-migration tree.
 
-**Every migrated module imports the owners ALIASED** -- `otr_env` / `otr_proc` -- at its own
-depth, because `env` and `proc` collide with live parameter and local names. Test seams
-patch `M.otr_proc.run` in the module's own batch.
-
-**After the batches, re-run `python scripts/dead_code_closure.py`:** migrating a hundred
-files strands helpers, and the sweep now reports anything a standing ruling protects under
-its own heading rather than as a clean candidate.
+**A NOTE THE NEXT WINDOW NEEDS.** The registry floor is NOT zero and never was: the
+closed plan says "the gate is ZERO findings or a manual admin approval; nothing here
+reaches zero (ffmpeg is a subprocess and that is the render path)". The collapse buys
+a report a human can read in one screen -- about eleven lines instead of 158, and the
+`credential-access` tag on two files instead of eleven. The route to Active is the
+manual review in item 4.
 
 ## 2. THE EASY CODE -- closed specs, no arc; lands BEFORE the version that gets reviewed
 

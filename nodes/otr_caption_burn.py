@@ -34,9 +34,17 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 from pathlib import Path
 from typing import Optional
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 try:
     from ._otr_shared.scope_draw import cfr_flags
@@ -251,7 +259,7 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
         os.path.abspath(out_path),
     ]
     assert "-shortest" not in cmd, "V-2: -shortest must not appear in the caption burn"
-    p = subprocess.run(cmd, cwd=ass_cwd, capture_output=True, text=True,
+    p = otr_proc.run(cmd, cwd=ass_cwd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise ValueError(f"OTR_CaptionBurn: ffmpeg ass-burn failed :: {p.stderr.strip()[:300]}")
@@ -381,7 +389,7 @@ class OTRCaptionBurn:
         # widget + profile on/off feature; node 86 is the single owner).
         if not bool(burn_captions) and not title_required:
             return (video_path, "OTR_CaptionBurn: captions OFF (clean master) -- passthrough")
-        style = str(os.environ.get("OTR_CAPTION_STYLE", "") or caption_style).strip() or _DEFAULT_CAPTION_STYLE
+        style = str(otr_env.get("OTR_CAPTION_STYLE", "") or caption_style).strip() or _DEFAULT_CAPTION_STYLE
         led = ledger_path.strip() or _resolve_ledger_path(video_path) or ""
         if not led and not title_required:
             log.warning("[OTR_CaptionBurn] no timed ledger found; passthrough (no captions)")

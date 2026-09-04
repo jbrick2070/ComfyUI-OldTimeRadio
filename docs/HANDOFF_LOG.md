@@ -1,3 +1,129 @@
+## 2026-09-04 (evening) -- v2.0-alpha -- CODER (the scan collapse SHIPPED end to end: batches a-d, 103 env files -> 2)
+
+Did: THE REGISTRY SCAN COLLAPSE, the whole migration, in six pushed commits off
+the closed r4 plan (`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md`).
+
+* `4a8e063d` THE RATCHET COMMIT -- three AST guards (env, process, network) as
+  named-set shrinking ratchets over `tests/fixtures/ratchet.py`, contract tests
+  for both owners, and two existing gates taught the new spelling
+  (`test_terminal_frame.py` learns `otr_proc` at all four import depths plus
+  lowercase `popen`; `test_master_mux_terminal_knob.py`'s predicate resolves the
+  env owner from the mux's OWN imports). PROVEN, not just passing: a probe file
+  dropped into `nodes/` that read `os.environ`, spawned `subprocess.run` and
+  called `requests.get` failed all three guards BY NAME and all three went green
+  when it was removed.
+* `8b59d2d2` batch (a) `_otr_shared` -- 11 files, plus `gpu_residency`'s
+  Windows-liveness fix (the ctypes `OpenProcess` probe deleted: the pack's one
+  `process_inspection` finding).
+* `1a9fa19b` batch (b) audio -- 12 of 13 adapters.
+* `2301d2e3` batch (b) rest -- image, google_api, upscale, all 26 video engines.
+* `fabda720` batch (c) -- 32 internal `nodes/_otr_*.py` libraries.
+* batch (d) -- the 14 remaining `nodes/*.py` plus the root `__init__.py`.
+
+RESULT, measured by re-walking the tree with the guards' own finders:
+env offender FILES **103 -> 2**, spawn files **20 -> 1**, `credential-access`
+tagged files **11 -> 2**, all THREE singletons cleared (`OpenProcess`, the
+spandrel `Path.read_bytes` slurp -> chunked `_sha256_file`, `__import__("sys")`
+-> a plain import), and six of twelve "url command" hits gone (they were
+`wan_shared` ERROR STRINGS saying `ffprobe -count_frames`; the argv is untouched
+and three tests still assert it).
+
+TWO FILES ARE PERMANENTLY BLOCKED, each with its reason and its unblock condition
+written into the guards' own `BLOCKED` tables, plus a test asserting a blocked
+file is still pending and still offends:
+* `eng_indextts2.py` -- named in `_otr_voice_route.RUNTIME_FINGERPRINT_SOURCES`,
+  so ANY byte changed there moves the adapter sha256 and DEMOTES the shipped
+  Lemmy route to the ordinary draw until a GPU re-audition. Migrating it (6 env
+  reads, 1 spawn, nothing audible) turned 6 voice tests red; reverting that one
+  file restored all 122. The fingerprint was NOT re-recorded -- that would assert
+  code was approved by ear when it was not. RULED AND CLOSED by the operator
+  (`6a5fec90`, and `docs/2026-09-04-PROBLEM-STATEMENT-indextts2-fingerprint-lock.md`):
+  option A stands, option D is not worth an arc and must not be re-opened,
+  because the class-level fix already shipped in `6f509b16` on 2026-08-19 and AST
+  hashing was MEASURED then at 43 of 44 commits still moving the hash. The
+  migration rides along with the next re-audition wanted for other reasons.
+* `_otr_writer_heartbeat.py` -- a LEAF by contract; its guard asserts no
+  `from ._otr` import AT ALL, because a pack import reintroduces the cycle that
+  once left two of three local generate transports running BLIND. The owner is a
+  stdlib-only leaf and could not actually cycle, but the rule's value IS its
+  bluntness and weakening a safeguard to remove one finding is the trade the
+  operator refused on the fingerprint.
+
+A THIRD import-isolation guard was resolved the OTHER way, and the distinguishing
+test is worth keeping: does the guard's STATED RULE still hold after the change?
+`_otr_rolls.py`'s rule is "imports nothing that could call a model; a model call
+needs a backend, and the roll imports none". `env.py`'s ENTIRE closure is
+`__future__`, `os`, `typing` -- all three ALREADY on that allowlist, all confirmed
+against `sys.stdlib_module_names`. So the allowlist was EXTENDED with the reason
+and the tripwire recorded (if env.py ever grows a non-stdlib import, that is the
+thing to refuse). Blunt-rule violations block; mechanism-only gaps extend.
+
+DEFECTS THE SUITE FOUND THAT REVIEW DID NOT:
+* **The proc allowlist refused a legitimate ffmpeg.** `imageio_ffmpeg` -- installed
+  here, and what the encoder tests resolve -- ships `ffmpeg-win-x86_64-v7.1.exe`.
+  The allowlist was built from an AST sweep of argv[0] LITERALS, which structurally
+  cannot see a path a third-party library computes at run time: the receipt was
+  complete and still wrong. Worse than a crash --
+  `_render_bars_only_mp4` catches broadly and returns None, so a real render would
+  have degraded SILENTLY to the no-bars blend. Fixed at the root:
+  `ALLOWED_EXECUTABLE_PREFIXES` for tools whose packaging carries a version
+  (`ffmpeg`, `ffprobe`, joining the `python` rule that already existed for the
+  same reason). `blender` stays EXACT -- no versioned blender basename has reached
+  a spawn, and the named refusal is exactly how this was caught.
+* **A capture-site rename bug**, twice the same class: a mechanical rename right at
+  the call site and wrong at the capture site. `test_video_scope_draw_encoder.py`
+  captured `otr_proc.Popen` (the re-exported RAW class) and restored it onto
+  `otr_proc.popen` (the guarded wrapper), which would have left the module holding
+  a spawn with no allowlist until teardown. Caught by the Sonnet QA pass.
+* **The migrator's "nothing to do" reads exactly like success** and twice meant the
+  owner IMPORT was never added, leaving `otr_env` undefined -- once in
+  `_otr_hf_env.py`, which every HF model load goes through. Only pyflakes caught
+  it. EVERY batch here is checked by diffing pyflakes against a STASHED baseline,
+  never against the migration report.
+* **Nine orphaned `import os` statements** the rewrite stranded, all
+  function-level (the migrator only strips top-level ones). `nodes/*.py` finished
+  one BETTER than its pre-batch baseline.
+
+ALSO: `tests/test_cloud_video_engine_is_a_three_part_rule.py` -- the regression
+GO_FORWARD asked for on `_is_cloud_video_engine`. Its first draft SKIPPED 5 of 8
+tests and still reported green, because `audit_engine_roster()` returns
+`{"missing": ..., "unexpected": ...}` and `sorted()` over it yields the two KEYS,
+reading as a two-engine roster. The real roster is `CAPABILITIES` (33 rows). Now
+8 passed, 0 skipped, and the reason is written into the helper.
+
+Suites: 13552 -> 13565 passed, 126 skipped, 1 xfailed, zero regressions on every
+pushed commit. Bug Bible 22 passed each time. Every commit `HEAD == origin`.
+
+Reviews: Sonnet QA on each finished diff (CLEAN on batch (b) rest with no defects;
+one real finding on the ratchet commit -- a `setdefault` that leaked
+`OTR_PROBE_KNOB` for the rest of the session -- and one on batch (a), the capture-site
+bug above). Codex had no seat for those: standard credits were out until 2026-09-07,
+restored by the operator later in the session.
+
+STILL OWED on this item, and only these: (1) the acceptance leg to `otr/obs/`,
+DEFERRED by the operator until after the registry -- no long render legs before
+then; (2) `python scripts/dead_code_closure.py` against the post-migration tree.
+
+THE FLOOR IS NOT ZERO AND NEVER WAS, and the next window should not chase it: the
+closed plan says "the gate is ZERO findings or a manual admin approval; nothing
+here reaches zero (ffmpeg is a subprocess and that is the render path)". A pack
+that renders video runs ffmpeg. The collapse buys a report a human reads in one
+screen -- about eleven lines instead of 158. Active comes from the manual review.
+
+SIDE WORK, operator-directed: kibitz's model pins were refreshed and PUSHED
+(`jbrick2070/kibitz` `c8cf34a`). The codex tuple led with `gpt-5.6-sol` while
+`gpt-6-astra` had shipped, so every arc silently ran a generation behind -- the
+exact silent downgrade that file's own 2026-07-27 comment records. The worse half:
+the auto-pick FALLBACK was `startswith("gpt-5")`, which cannot match `gpt-6-astra`
+at all, and a reverse STRING sort ranks `gpt-5.6-terra` above it anyway. Now
+matches any `gpt-<n>` and sorts by NUMERIC generation. agy 3.7 -> 3.8 Flash (High);
+cursor unchanged (4.6 IS current). Reasoning ladder generalized to
+ultra -> max -> xhigh -> high so `ultra` is safely usable. All four copies on the
+box are byte-identical; the executing plugin cache is one of them.
+
+Next: item 2's bug rows (code + unit tests, no long legs), then the registry
+prep up to the operator's line.
+
 ## 2026-09-04 (late) -- HEAD 2ef69abf +handoff (v2.0-alpha) -- CODER (three rulings executed; GO_FORWARD rebuilt forward-only and ordered by dependency)
 
 The sha above is the last CODE head. Four docs commits follow it on the branch

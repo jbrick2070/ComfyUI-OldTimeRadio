@@ -26,12 +26,20 @@ import logging
 import math
 import os
 import re as _re
-import subprocess
 import sys
 import time as _time
 
 import numpy as np
 import torch
+
+try:
+    from ._otr_shared import env as otr_env
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import env as otr_env  # type: ignore
+try:
+    from ._otr_shared import proc as otr_proc
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared import proc as otr_proc  # type: ignore
 
 # Shared hero-title-card arithmetic. RELATIVE with a bare-name fallback, never
 # `from nodes...`: an absolute package import resolves in the test suite (where
@@ -78,7 +86,7 @@ def _load_font(size):
 
     candidates = []
     if sys.platform == "win32":
-        fd = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+        fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
         candidates = [
             os.path.join(fd, "consola.ttf"),
             os.path.join(fd, "cour.ttf"),
@@ -362,7 +370,7 @@ def _hero_title_in_procgen():
     already title-free, so the brightest-underlying-source ROI is read from
     there rather than from a third render.
     """
-    return str(os.environ.get("OTR_HERO_TITLE_IN_PROCGEN", "")).strip().lower() \
+    return str(otr_env.get("OTR_HERO_TITLE_IN_PROCGEN", "")).strip().lower() \
         in {"1", "true", "yes", "on"}
 
 
@@ -799,7 +807,7 @@ class _CRTRenderer:
         draw = ImageDraw.Draw(img)
         measure_text, fit_hero = self._hero_measure(draw)
         try:
-            reveal_frac = float(os.environ.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
+            reveal_frac = float(otr_env.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
         except (TypeError, ValueError):
             reveal_frac = 0.4
         return _OTRTC.build_title_plan(
@@ -849,7 +857,7 @@ class _CRTRenderer:
         # BUG-LOCAL-409: resolve the reveal in the first fraction of the window,
         # then hold the solid title until the POP/dock (env OTR_TITLE_REVEAL_FRACTION).
         try:
-            _rfrac = float(os.environ.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
+            _rfrac = float(otr_env.get("OTR_TITLE_REVEAL_FRACTION", "0.4"))
         except (TypeError, ValueError):
             _rfrac = 0.4
         p = _title_reveal_progress(fi, w0, me, in_dock, _rfrac)
@@ -1076,10 +1084,10 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
         mode="w+b", prefix="otr_ffmpeg_", suffix=".log", delete=False
     )
 
-    proc = subprocess.Popen(
+    proc = otr_proc.popen(
         cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
+        stdin=otr_proc.PIPE,
+        stdout=otr_proc.DEVNULL,
         stderr=stderr_file,
     )
 

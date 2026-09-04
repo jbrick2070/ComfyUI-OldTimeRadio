@@ -155,7 +155,7 @@ def test_the_mux_identity_proof_resolves_like_the_encode(monkeypatch, tmp_path):
         seen["argv0"] = cmd[0]
         raise RuntimeError("stop after argv is proven")
 
-    monkeypatch.setattr(mux.subprocess, "run", _fake_run)
+    monkeypatch.setattr(mux.otr_proc, "run", _fake_run)
     with pytest.raises(RuntimeError):
         mux.audio_pcm_sha(str(tmp_path / "x.wav"))
     assert seen["argv0"] == str(fake)
