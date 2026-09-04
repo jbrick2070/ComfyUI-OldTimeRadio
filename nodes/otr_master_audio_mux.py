@@ -962,7 +962,16 @@ def _obs_basename(final: str) -> str:
             name = "%s__%s_final%s" % (_obs_field(title[:max(16, keep)]),
                                        "__".join(fields), ext or ".mp4")
         return name
-    except Exception:  # noqa: BLE001 -- a publish never dies over a filename.
+    except Exception as exc:  # noqa: BLE001 -- a publish never dies over a name.
+        # BUT IT SAYS SO. The first cut of this helper referenced `re` without
+        # importing it, and this except swallowed the NameError -- every publish
+        # "worked" while silently reverting to the old confusing name, with no
+        # trace anywhere. A test now covers that specific bug; this log covers
+        # the NEXT one, because every other fallback in this file already logs
+        # when it degrades and this one was the exception.
+        log.warning("[OTR_MasterAudioMux] descriptive obs name failed (%s: %s); "
+                    "published under the archival name %s",
+                    type(exc).__name__, exc, base)
         return base
 
 

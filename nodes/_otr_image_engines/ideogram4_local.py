@@ -104,8 +104,19 @@ VAE_ENV = "OTR_IDEOGRAM4_VAE"
 #: know the four env overrides existed. The engine was never Blackwell-only;
 #: only its default was, and the refusal read as though the lane were.
 #:
-#: `Comfy-Org/Ideogram-4` is UNGATED and publishes all four slots in three
-#: precisions, in exactly this folder layout and naming:
+#: `Comfy-Org/Ideogram-4` is UNGATED. It publishes the two DIFFUSION slots in
+#: three precisions and the text encoder in two; the VAE is single. So the
+#: ladders below are 3 / 3 / 2 / 1, NOT "three precisions across four slots" --
+#: an earlier draft of this comment said that and it was never true.
+#:
+#: THE CONSEQUENCE IS A REAL MIXED-PRECISION REQUIREMENT: there is no int8 text
+#: encoder, so a box holding only the int8 diffusion pair must still fetch an
+#: nvfp4 or fp8 `qwen3vl_8b`. That is legal -- the encoder and the UNET are
+#: loaded separately -- but it is not obvious, and the refusal message does not
+#: spell it out. Worth stating in the fetch docs if int8 ever becomes a
+#: recommended row rather than a fallback.
+#:
+#: The published layout and naming:
 #:
 #:   ideogram4_nvfp4_mixed        5.49 GB   Blackwell (sm_120), smallest
 #:   ideogram4_fp8_scaled         9.28 GB   universal
@@ -137,14 +148,13 @@ _CLIP_CANDIDATES = (
 )
 _VAE_CANDIDATES = ("flux2-vae.safetensors",)
 
-#: Kept as the name the error message leads with, and what a caller sees when
-#: NOTHING is installed -- the ladder cannot pick a winner from an empty shelf.
-_DEFAULT_COND_UNET = _COND_UNET_CANDIDATES[0]
-_DEFAULT_UNCOND_UNET = _UNCOND_UNET_CANDIDATES[0]
-_DEFAULT_CLIP = _CLIP_CANDIDATES[0]
-_DEFAULT_VAE = _VAE_CANDIDATES[0]
-
 #: (env var, candidate basenames, folder_paths category) per required artifact.
+#:
+#: (Four `_DEFAULT_*` aliases used to sit here, justified as "the name the error
+#: message leads with". That was false -- the refusal text is literal and the
+#: params path resolves through `resolve_all_artifacts()`, so nothing read them.
+#: Removed 2026-09-04, the same session that added them. `candidates[0]` is the
+#: lead name, and it needs no second spelling.)
 _ARTIFACTS = (
     (COND_UNET_ENV, _COND_UNET_CANDIDATES, "diffusion_models"),
     (UNCOND_UNET_ENV, _UNCOND_UNET_CANDIDATES, "diffusion_models"),

@@ -1758,9 +1758,19 @@ def _resolve_writer_llm(meta: dict, warnings: list,
     with the M4 GPU gate before CW-6).
 
     UNCHANGED CALL SURFACE. Every M4 caller still hands it a prompt STRING, and
-    an omitted budget still yields the historical 300. ``max_new_tokens`` exists
-    because that constant was silently wrong for the one caller whose reply
-    length scales with a batch -- see :func:`_directive_token_budget`.
+    an omitted budget still yields the historical 300.
+
+    ``max_new_tokens`` IS CURRENTLY UNUSED BY EVERY CALLER, and that is worth
+    saying rather than implying otherwise. It was added for
+    `derive_creative_directives`, whose reply length scales with the batch --
+    but the same change taught that function to call
+    :func:`_resolve_writer_llm_binding` + :func:`_writer_call_at` directly so it
+    could re-bind a larger budget mid-reseed, which bypasses this wrapper
+    entirely. The two remaining callers
+    (`otr_meta_brief_image_prompt.py`, both sites) ask for ONE short line each
+    and take the 300 default. The parameter stays because the next
+    batch-shaped caller should not have to rediscover why 300 was wrong -- see
+    :func:`_directive_token_budget`.
     """
     gen, _model_id = _resolve_writer_llm_binding(meta, warnings)
     if gen is None:

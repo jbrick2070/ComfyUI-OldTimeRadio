@@ -648,6 +648,128 @@ image-stage exposure but does not build the registry.
   transcript is as unreadable as anything col1 clips. This is a DESIGN job -- a card
   laid out for a small canvas -- not more ladder heroics.
 
+#### 1.4a DEAD CODE / DUPLICATED-DECISION AUDIT (2026-09-04) -- three Sonnet lanes, driver-verified
+
+Every row below was re-checked against the real files by the driver before it was
+written down; the REJECTED list is part of the record precisely so a discarded
+claim is not re-raised as a fresh finding. Line cites drift -- re-pin when touched.
+
+**A. VERIFIED, HIGH -- the output tree is decided TWICE, and the copies disagree.**
+`nodes/_otr_paths.py` is the documented owner (`OTR_OUTPUT_DIR` is "highest
+precedence", :74-106). `nodes/otr_master_audio_mux.py` imports NOTHING from it and
+carries its own `_episodes_root()` (:695) and `_obs_dir()` (:709), neither of which
+reads `OTR_OUTPUT_DIR`. Proven by EXECUTION, not by reading:
+
+```
+OTR_OUTPUT_DIR=D:\RenderOutput , folder_paths=C:\ComfyRoot\output
+_otr_paths.otr_episodes_root()  -> D:\RenderOutput\otr\episodes
+mux._episodes_root()            -> C:\ComfyRoot\output\otr\episodes   AGREE? False
+_otr_paths.otr_obs_dir()        -> D:\RenderOutput\otr\obs
+mux._obs_dir()                  -> C:\ComfyRoot\output\otr\obs        AGREE? False
+```
+
+**Blast radius is the terminal publisher.** `_episodes_root()` gates
+`_inflight_episode_for_stem()` (:797) -- a mismatch silently rejects a valid
+in-flight ledger and falls back to filename-suffix peeling the module itself calls
+fragile. `_obs_dir()` is where `_publish_to_obs()` writes the deliverable. The same
+bare-`folder_paths`-or-`"."` idiom is copy-pasted again in `otr_caption_burn.py`
+(:349) and `otr_silent_composite.py` (:1692).
+
+**Why it has not bitten:** both launchers hand-pin `OTR_OUTPUT_DIR` =
+`--output-directory` = `OTR_OBS_DIR` in lockstep -- by human discipline in two
+separate shell scripts, not by any code invariant. ComfyUI Desktop, a bare
+`main.py`, or an MCP launch tool does not know to do that. Note also that
+`_obs_dir()`'s own docstring claims "ONE owner for where published means", which is
+exactly the false-universal-claim shape that let the nvenc string test survive.
+**Owed:** make the mux delegate to `_otr_paths`, with care -- `otr_obs_dir()`
+applies a `_validate_contract` the mux copy does not, so this is not a blind
+substitution. A test should assert the two agree under a set `OTR_OUTPUT_DIR`.
+
+**B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
+copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
+`otr_silent_composite.py:123`) and each self-documents that this defect class has
+already hit the pack twice. The same three correctly delegate `_ffprobe_bin()` to
+`_otr_shared/ffprobe.py`, so the pack knows the right shape and did not use it here.
+Two have live gaps, dormant only because nothing calls them:
+`_otr_shared/encode_sink.py::find_ffmpeg` (:20) never checks `OTR_FFMPEG`, and
+`_otr_shared/content_oracle.py::_ffmpeg` (:88) has no PATH fallback at all (that
+module has zero importers). The rest disagree on what to return when nothing
+resolves (`None` / `""` / bare `"ffmpeg"`).
+
+**C. VERIFIED, LATENT -- the models root is decided twice.**
+`_otr_gguf_backend.py::_models_root()` (:891) existence-gates the legacy
+`C:\ComfyUI-Models` before falling back to `folder_paths.models_dir`.
+`_otr_video_engines/wan_shared.py::configured_models_root()` (:35) returns that
+literal UNCONDITIONALLY with no existence check and no `folder_paths` fallback --
+while its docstring claims "folder_paths is the authority and is probed first",
+which is true of its callers and false of the function. Harmless today because
+every caller probes `folder_paths` itself first, but the docstring invites
+standalone use, and a direct caller would break on exactly the fresh-install box
+this repo's notes keep warning about.
+
+**D. VERIFIED, RISKY -- the widget-drift HARD GATE has a silent escape hatch.**
+`_otr_workflow_validator.py:172` -- `try: expected = _expected_slot_count(...)
+except Exception: continue`. This backs the gate at :497 that exists to catch the
+BUG-210/253/281 silent-widget-shift class. Any node whose `INPUT_TYPES()` raises is
+silently exempted with no log, and the gate can report `widget_vector_drift=0`
+having never checked it. Owed: log the skip at minimum, and decide whether an
+un-introspectable node should fail the gate rather than pass it.
+
+**E. VERIFIED, DEAD -- 12 symbols with exactly one repo-wide reference (their own
+definition), confirmed by `git grep -n -w -F`:** `MAX_HEADLINE_CLEAN_CHARS`
+(`_otr_scifi_p0_contract.py:23`), `PLATE_DIRNAME`
+(`eng_ghost_signal_stillin_lab.py:72`), `RADIO_HOST_FACE_NEG`
+(`otr_meta_brief_image_prompt.py:322`), `CRT_RED`/`CRT_WHITE`/`CRT_MAGENTA`
+(`video_engine.py:68-71`), `HARNESS_VERSION`/`MACHINE_CEILING_MB`/`NVML_FLOOR_MB`
+(`scripts/_otr_b_spikes/_b_harness.py`), `ffprobe_timebase`
+(`scripts/audit_otr_full_run.py:101`), `corpus_ledgers`
+(`scripts/otr_clean_stage_lab.py:529`), `_negative_phrases`
+(`scripts/otr_style_traceroute.py:213` -- and its logic is duplicated inline in the
+function directly below it, which is the slop shape exactly).
+`MAX_HEADLINE_CLEAN_CHARS` was queried as a possible UNWIRED cap rather than dead
+code; the file answers it at :50 -- "headline/summary are short and bounded by the
+fetcher" -- so the bound exists upstream and the constant is vestigial. Clean delete.
+
+**F. VERIFIED, SMALL -- vestigial rows.** `_otr_structured_call.py:110` calls
+`REPAIR_TEMPERATURE` the shared public export and `_REPAIR_TEMPERATURE` a compat
+alias; it is backwards (the underscore name is the one every call site and test
+uses, the public one has zero consumers). `otr_shot_lock.py:3396` re-imports
+`_stamp_durable` into a scope that already bound it at :3207. `scripts/otr_asset_index.py:264`
+has an `elif engine.startswith("humo")` that cannot fire (only `eng_humo.py` exists,
+so the preceding `== "humo"` always wins). `scripts/otr_machine_matrix.py:124`
+`load_classes(_profiles=None)` never reads the parameter and both call sites pass
+nothing. `_otr_paths.py:449` `episodes_for_obs_dir()` claims to be kept "for
+back-compat with existing imports" and has zero callers.
+
+**FIXED IN THIS SESSION -- the audit's best catch was the driver's own slop from
+the night before.** Four rows, all introduced 2026-09-03 and corrected 09-04:
+`_obs_basename`'s broad except returned silently while all eight other fallbacks in
+that file log -- the exact shape that had already hidden a missing `re` import for
+one dev cycle; `_resolve_writer_llm`'s docstring justified `max_new_tokens` by "the
+one caller whose reply length scales with a batch" after the same commit taught that
+caller to bypass the wrapper; the ideogram ladder comment claimed "all four slots in
+three precisions" when the real shape is 3/3/2/1, which also hides a genuine
+mixed-precision requirement (no int8 text encoder exists); and four `_DEFAULT_*`
+aliases were added with a comment justifying them as the error message's lead name,
+which the literal refusal text never reads.
+
+**REJECTED, with reasons -- do not re-raise these.**
+* `_DEFAULT_CLIP` / `_DEFAULT_VAE` "have 7 references": a DRIVER false positive.
+  `git grep -w` matched `flux2_klein.py` and `lumina_image.py`, which define their
+  own same-named constants. Within ideogram4_local all four were definition-only.
+* `MAX_PROVENANCE_NOTE_CHARS`: looked dead in-file, has 2 repo-wide refs. ALIVE.
+* The ~90 `OTR_*` env knobs: a deliberate, pervasive escape-hatch pattern, every
+  sampled one inside live code. Not slop.
+* The standalone HuMo render chain (`render_episode_concat.py` and peers, ~5,000
+  lines with tests): zero live callers, but `docs/LEAN_MEAN_CLEANUP.md` sec 2.4
+  explicitly protects active render tools pending a per-file re-ground, and the old
+  bulk kill list is marked SUPERSEDED -- DO NOT EXECUTE. A deferred decision, not
+  an oversight. Belongs to whoever runs that pass.
+* Long historical comments explaining past bugs: deliberate project practice.
+* Duplicated engine PROMPT COMPOSERS: ruled 2026-08-23, lanes stay independently
+  re-wordable. Only duplicated FACTS and DECISIONS count.
+
+
 ### 1.5 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
 
 Measured 2026-09-02 on the physical RTX 4060 under plain stock launch flags (receipts:
