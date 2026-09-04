@@ -1,3 +1,44 @@
+## 2026-09-04 (late) -- HEAD 2ef69abf +handoff (v2.0-alpha) -- CODER (three rulings executed; GO_FORWARD rebuilt forward-only and ordered by dependency)
+
+The sha above is the last CODE head. Four docs commits follow it on the branch
+(three plan rebuilds and this handoff), so it is the fifth-from-last sha once
+this entry lands; the kickoff line carries the real head.
+
+Did: (1) THREE OPERATOR RULINGS, in one commit (`2ef69abf`, suite 13480 green):
+  content_oracle RIPPED whole (zero production importers; its verdict reached
+  no gate) with its seven test consumers, the two comment mentions reworded,
+  the standing ruling updated; the .comfyignore viewer line was ALREADY done
+  on 09-03 (no change); the session-bearer literal SCRUBBED from the shipped
+  Partner pin WITHOUT breaking bearer auth -- the loader requires the key, but
+  every hidden TYPE is the key uppercased, so the key stays and the loader
+  derives the value; 14 copies of AUTH_TOKEN_COMFY_ORG leave a shipped YAML,
+  the generator emits the same form (pin drift test green), and
+  tests/test_registry_prohibited_strings.py now scans yaml/yml/json too.
+  (2) GO_FORWARD REBUILT FORWARD-ONLY (`8a92b60b`, `3fb58537`, `95550936`):
+  1,925 lines to 710. Twenty-two sections triaged by a reader each (seven
+  audited), then 25 oversized sections compacted to to-do rows, then the whole
+  file reordered BY DEPENDENCY: 1 the scan collapse (its guards make every
+  later change safe), 2 easy code, 3 design rows (before the registry, because
+  a code change after the publish is a new version and a new review), 4 the
+  registry, 5 testing. kokoro-ONNX was found DONE and archived; its one
+  leftover (the reference-WAV preflight) is an easy-code row. Every rebuild was
+  gated by a mechanical audit of all 112 ruling-bearing lines of the pre-session
+  plan against plan-plus-archive: 0 missing each time; 28 fragments that fell
+  between split halves are preserved verbatim under their own archive heading.
+Current step: item 1, the scan collapse -- the ratchet commit is the next
+  commit. Owners and the shared ratchet are on disk and inert (`3d4a7077`).
+Next: the next window executes items 1 -> 3 autonomously and stops at the
+  two things only the operator does: the pyproject version bump (a publish is
+  his eyeball, CLAUDE.md 7A) and the review request (a public post). Each
+  finished row is tombstoned OUT of GO_FORWARD into this log, so the plan stays
+  clean. Blocked on the operator: section 6's rulings.
+Models: Opus 5 and Fable 5.1 drove. No kibitz arcs this stretch (the rulings
+  were mechanical: one verifiable answer each); Sonnet QA on the finished diff
+  of the rip; the plan rebuild used three read-only workflows (78 agents) plus
+  the mechanical ruling audit. Codex CLI: standard tier out until 09-07 08:34.
+Commits: 2ef69abf (code + docs), 8a92b60b, 3fb58537, 95550936 (docs). The
+  handoff commit lands on top and is not listed -- see the kickoff line.
+
 ## 2026-09-04 -- HEAD 3d4a7077 +handoff (v2.0-alpha) -- CODER (one-owner receipt landed; the ledger's obs pointer fixed; the registry-collapse plan closed at r4; orphan rips shipped and one near-miss reverted before commit)
 
 The sha above is the second-to-last on the branch; the last is this handoff

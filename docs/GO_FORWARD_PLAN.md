@@ -72,8 +72,9 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Tree:** `v2.0-alpha`, HEAD == origin, clean. Suite baseline **13492 passed / 126 skipped
-/ 1 xfailed**. Bible **335 entries** (repo `81a8a9e`). No resident server; VRAM at the
+**Tree:** `v2.0-alpha`, HEAD == origin, clean; the last CODE head is `2ef69abf` (the
+content_oracle rip and the token scrub), everything after it is docs. Suite baseline
+**13480 passed / 126 skipped / 1 xfailed** (twelve oracle tests removed on purpose). Bible **335 entries** (repo `81a8a9e`). No resident server; VRAM at the
 desktop baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and
 Spark overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second
 agy model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster
