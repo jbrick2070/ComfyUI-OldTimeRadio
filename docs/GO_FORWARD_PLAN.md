@@ -178,9 +178,7 @@ MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 #### P0 / source-span cluster
 
 - **`full_text` HTML block joins fuse tokens** (`...PolygonsNASA/JPL-`, `...School ofEngine`, `...doing.Let's s`, `...(AMR).The resea`) -- dominant P0 span-rejection cause. Do: name the adapter that builds `full_text`, insert the separator at admission without breaking any accepted ledger's `source_digest`, pin a fixture from those four strings. Belongs in the source adapter, not the codex normalizer. DONE WHEN: fixture passes and no accepted digest changes. BLOCKED ON: Section 3 question B being ruled.
-- **Re-pin before spending time on the next two rows:** `repair_literal_source_metadata`, `_validate_fact_index` and `a0_payload` no longer exist under `nodes/` (only `allowed_source_fields` survives, in `_otr_scifi_p0_contract.py`). Locate the deterministic P0 repair rung by behaviour, or tombstone both rows.
-- **Deterministic P0 rung PRUNES SILENTLY (violates Invariant 3).** It drops an unsupported span, then its evidence row, then the fact, with no receipt -- an accepted P0 index silently has fewer facts. DONE WHEN: every prune emits a receipt naming what was dropped and why. Under "fail loud, not fatal" the degrade is the right direction and the silence is not.
-- **Deterministic P0 rung is ALL-OR-NOTHING across an artifact and poisons its own good work.** Repairer gets `a0_payload` (seven keys) while validation restricts spans to `allowed_source_fields`; one quote rehomed into an omitted field makes `post_validator` reject the WHOLE repaired artifact, discarding every correct prune. DONE WHEN: repairer gets the allowlist, or pruning is per-row.
+- **TOMBSTONED 2026-09-04 -- the two deterministic-P0-rung rows below are GONE, and the re-pin they were waiting on is DONE.** The row asked to "locate the deterministic P0 repair rung by behaviour, or tombstone both rows". Located by behaviour: it does not exist. `repair_literal_source_metadata`, `_validate_fact_index` and `a0_payload` are absent from `nodes/` entirely (0 files each); only `allowed_source_fields` survives, in `_otr_scifi_p0_contract.py`. No function anywhere under `nodes/` prunes a span, an evidence row or a fact -- the only `*_repair*` callables left are LLM retry-NOTE builders in `_otr_scifi_news_pro.py`, which is a different mechanism. AND THE SURVIVING CODE ALREADY DOES THE OPPOSITE OF BOTH COMPLAINTS: `compact_p0_repair_context` (`_otr_scifi_p0_contract.py:334`) trims a repair CONTEXT to a byte budget longest-field-first, never trims `rejection` / `source_digest` / `allowed_source_fields`, populates a `trim_receipt`, and its own docstring says "NO SILENT ANYTHING". The silent-prune defect and the all-or-nothing defect were carried out by the rewrite that removed those symbols. Nothing to build; if a prune rung is ever reintroduced, these two rows are the record of what it must not do.
 - **`scifi_news` P0 convergence defect** -- both 120w and 320w legs fail in P0 after two attempts on non-literal fact source spans; provider/model convergence, extends BUG-11.35. NOT a word/length gate. Blocks the last 120w receipt and the `scifi_news` live reverify (PBUGs 20260712-22/23/24/25, fixed in tree, reverify still owed).
 - **`scifi_news_pro` provider capacity** -- `requested_output=2800` vs provider cap `512`; residual fix now unblocked. Related independent items: P9 8K structured-capacity follow-up, GGUF structured-enforcement NEWBUG. Do not raise the minimum word target as a capacity workaround.
 
@@ -198,7 +196,22 @@ MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
 
 #### Routing, env-capture and the credits card
 
-- **`wants_talking_prompt()` escapes any routing freeze.** It calls `_recipe_config(self._recipe())`, and `_recipe()` (`eng_ltx_av.py`) re-reads `OTR_LTX_AV_RECIPE` / `OTR_LTX_AV_SHARP` / the UNET name on EVERY call by documented design ("Read fresh every call"), so a `required="when_engine_talking"` row re-reads the environment after capture. DONE WHEN: S0b-core has ONE shared `row_is_active(...)` evaluator over captured state, with the talking result inside `ltx_resolved`.
+- **`wants_talking_prompt()` escapes any routing freeze -- REAL, but it is a DESIGN
+  row, not a closed spec (re-pinned 2026-09-04).** Grounded: `wants_talking_prompt`
+  (`eng_ltx_av.py:640`) returns `_recipe_config(self._recipe())["two_stage"]`, and
+  `_recipe()` (`:652`) documents its fresh read as DELIBERATE -- "an operator flips
+  daily<->hero per beat by swapping OTR_LTX_AV_UNET / OTR_LTX_AV_RECIPE". THREE live
+  consumers call the hook at three different graph times: `otr_video_director.py:603`
+  (node 87), `otr_meta_brief_image_prompt.py:604` (node 89), and
+  `render_driver.py:1760` (node 92). Nothing captures the answer between them, and
+  `route_freeze.py` captures only `OTR_FORCE_ENGINE_MAP` / `OTR_ENABLE_HUMO_HOSTS`
+  -- not the recipe knobs. So the director can plan a talking still, the prompt
+  generator write a talking prompt, and the renderer render the other register.
+  **The DONE WHEN names code that does not exist** (`row_is_active`, `ltx_resolved`
+  -- 0 hits each), i.e. it describes a new shared evaluator over captured state.
+  That is a design choice with more than one defensible answer -- what to capture,
+  where the capture lives, and whether the deliberate per-beat flip survives it --
+  so it takes an arc BEFORE code. Not scheduled.
 - **`provider_side` is a THREE-part rule, not an attribute.** `_is_cloud_video_engine` (`render_driver.py`) accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`. `cloud_kling_avatar` has no `provider_side` attribute, so an `engine_facts` builder using a bare `getattr` would classify it local and send a cloud avatar to local LTX. DONE WHEN: a regression covers picked AND forced `cloud_kling_avatar`.
 - **Env-read sites missing from the S0b inventory** (two remain): the `OTR_ENABLE_HUMO_HOSTS` reads in `render_driver.py` and `otr_meta_brief_image_prompt.py`, and the recipe / UNET re-read in `eng_ltx_av.py` (`wants_talking_prompt` / `_recipe`) outside `assert_usable`.
 - **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At 512x288 (ltx_8gb) col1 is 65px past its footer even with every droppable ledger row dropped; at 640x360 it is 12px over. Both are drawn anyway and LOGGED at ERROR naming the canvas. At 288 lines the three-column console is already a polite fiction. This is a DESIGN job -- a card laid out for a small canvas -- not more ladder heroics.
