@@ -95,17 +95,61 @@ UNCOND_UNET_ENV = "OTR_IDEOGRAM4_UNCOND_UNET"
 CLIP_ENV = "OTR_IDEOGRAM4_CLIP"
 VAE_ENV = "OTR_IDEOGRAM4_VAE"
 
-_DEFAULT_COND_UNET = "ideogram4_nvfp4_mixed.safetensors"
-_DEFAULT_UNCOND_UNET = "ideogram4_unconditional_nvfp4_mixed.safetensors"
-_DEFAULT_CLIP = "qwen3vl_8b_nvfp4.safetensors"
-_DEFAULT_VAE = "flux2-vae.safetensors"
+#: PRECISION LADDERS, NOT ONE HARDCODED BASENAME (2026-09-03).
+#:
+#: This engine used to demand exactly `ideogram4_nvfp4_mixed.safetensors`, and
+#: nvfp4 is a Blackwell format -- so an AMD, Mac or 3060 box that had installed
+#: the perfectly good fp8 or int8 build was still refused with
+#: "missing: ideogram4_nvfp4_mix...", a dead end unless the operator happened to
+#: know the four env overrides existed. The engine was never Blackwell-only;
+#: only its default was, and the refusal read as though the lane were.
+#:
+#: `Comfy-Org/Ideogram-4` is UNGATED and publishes all four slots in three
+#: precisions, in exactly this folder layout and naming:
+#:
+#:   ideogram4_nvfp4_mixed        5.49 GB   Blackwell (sm_120), smallest
+#:   ideogram4_fp8_scaled         9.28 GB   universal
+#:   ideogram4_int8_convrot       9.58 GB   universal (same family as the
+#:                                          proven minimax_h3 int8_convrot)
+#:
+#: So the ladder is ordered SMALLEST-FIRST rather than best-first: on a
+#: Blackwell card nvfp4 is both the fastest and the lightest, and on anything
+#: else it simply will not be installed and the walk falls through. Whatever
+#: resolves is what the effective engine version hashes (line ~590), so a
+#: precision swap busts the still cache on its own -- a machine that changes
+#: precision cannot serve a still rendered by the other one.
+#:
+#: An env override still wins absolutely and is used verbatim; the ladder is
+#: only the default walk.
+_COND_UNET_CANDIDATES = (
+    "ideogram4_nvfp4_mixed.safetensors",
+    "ideogram4_fp8_scaled.safetensors",
+    "ideogram4_int8_convrot.safetensors",
+)
+_UNCOND_UNET_CANDIDATES = (
+    "ideogram4_unconditional_nvfp4_mixed.safetensors",
+    "ideogram4_unconditional_fp8_scaled.safetensors",
+    "ideogram4_unconditional_int8_convrot.safetensors",
+)
+_CLIP_CANDIDATES = (
+    "qwen3vl_8b_nvfp4.safetensors",
+    "qwen3vl_8b_fp8_scaled.safetensors",
+)
+_VAE_CANDIDATES = ("flux2-vae.safetensors",)
 
-#: (env var, default basename, folder_paths category) for each required artifact.
+#: Kept as the name the error message leads with, and what a caller sees when
+#: NOTHING is installed -- the ladder cannot pick a winner from an empty shelf.
+_DEFAULT_COND_UNET = _COND_UNET_CANDIDATES[0]
+_DEFAULT_UNCOND_UNET = _UNCOND_UNET_CANDIDATES[0]
+_DEFAULT_CLIP = _CLIP_CANDIDATES[0]
+_DEFAULT_VAE = _VAE_CANDIDATES[0]
+
+#: (env var, candidate basenames, folder_paths category) per required artifact.
 _ARTIFACTS = (
-    (COND_UNET_ENV, _DEFAULT_COND_UNET, "diffusion_models"),
-    (UNCOND_UNET_ENV, _DEFAULT_UNCOND_UNET, "diffusion_models"),
-    (CLIP_ENV, _DEFAULT_CLIP, "text_encoders"),
-    (VAE_ENV, _DEFAULT_VAE, "vae"),
+    (COND_UNET_ENV, _COND_UNET_CANDIDATES, "diffusion_models"),
+    (UNCOND_UNET_ENV, _UNCOND_UNET_CANDIDATES, "diffusion_models"),
+    (CLIP_ENV, _CLIP_CANDIDATES, "text_encoders"),
+    (VAE_ENV, _VAE_CANDIDATES, "vae"),
 )
 
 # --------------------------------------------------------------------------- #
@@ -257,31 +301,40 @@ def canonical_aspect(width: int, height: int) -> str:
     return f"{w}:{h}"
 
 
-def _resolve_artifact(env_var: str, default_name: str, category: str):
-    """``(basename, verified)`` for one artifact.
+def _resolve_artifact(env_var: str, candidates, category: str):
+    """``(basename, verified)`` for one artifact, walking a precision ladder.
 
     ONE resolver shared by ``assert_usable`` and the params path, so the
     usability gate and the render can never disagree -- the 2026-07-05 landmine
     where a gate required an env var while render fell back to an absent default
     and died deep in a FileNotFoundError instead of greying out early.
+
+    An ENV OVERRIDE WINS ABSOLUTELY and is used verbatim: it is the operator
+    naming a mirror or a quant we have never heard of, and second-guessing it
+    against a ladder would defeat the reason it exists. Only the default walk
+    consults ``candidates``, taking the first one actually INSTALLED so a box
+    that has fp8 but not nvfp4 resolves instead of being refused.
     """
-    name = os.path.basename((os.environ.get(env_var, "") or "").strip()
-                            or default_name)
+    override = os.path.basename((os.environ.get(env_var, "") or "").strip())
+    names = [override] if override else [os.path.basename(c) for c in candidates]
     try:
         import folder_paths  # ComfyUI runtime; absent in the CPU suite
         installed = {os.path.basename(n)
                      for n in (folder_paths.get_filename_list(category) or [])}
-        if name in installed:
-            return name, True
-        return name, bool(folder_paths.get_full_path(category, name))
+        for name in names:
+            if name in installed or folder_paths.get_full_path(category, name):
+                return name, True
+        # Nothing on the shelf: report the FIRST candidate, which is what the
+        # refusal should name and what an operator most likely wants to fetch.
+        return names[0], False
     except Exception:  # noqa: BLE001 -- no folder_paths -> nothing discoverable
-        return name, False
+        return names[0], False
 
 
 def resolve_all_artifacts():
     """``[(basename, verified, category), ...]`` in the fixed artifact order."""
-    return [(*_resolve_artifact(env, default, cat), cat)
-            for env, default, cat in _ARTIFACTS]
+    return [(*_resolve_artifact(env, candidates, cat), cat)
+            for env, candidates, cat in _ARTIFACTS]
 
 
 def _tidy(text: str) -> str:
@@ -605,11 +658,19 @@ class Ideogram4LocalEngine:
                    for name, verified, cat in resolve_all_artifacts()
                    if not verified]
         if missing:
+            # NAME THE ALTERNATIVES. The refusal used to quote only the nvfp4
+            # basename, which reads as "this lane needs a Blackwell card" -- and
+            # that is false. Every precision below lives in the same UNGATED
+            # Comfy-Org/Ideogram-4 repo and any of them satisfies this engine.
             raise EngineUnusable(
                 self.name, _role_of(profile),
                 EngineUsabilityReason.MISSING_MODEL,
                 f"ideogram4_local requires all four artifacts; missing: "
-                f"{', '.join(missing)}. Install them or point "
+                f"{', '.join(missing)}. NOT Blackwell-only -- fetch ANY one "
+                f"precision from the ungated Comfy-Org/Ideogram-4: "
+                f"nvfp4_mixed (5.5 GB, Blackwell), fp8_scaled (9.3 GB, any "
+                f"GPU) or int8_convrot (9.6 GB, any GPU), plus the matching "
+                f"qwen3vl_8b text encoder and flux2-vae. Or point "
                 f"{COND_UNET_ENV} / {UNCOND_UNET_ENV} / {CLIP_ENV} / {VAE_ENV} "
                 f"at installed files.",
                 kind="image",

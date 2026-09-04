@@ -27,9 +27,11 @@ render to prevent a copy; here it withholds the copy and keeps the render.
 """
 from __future__ import annotations
 
+import collections
 import hashlib
 import math
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -858,6 +860,112 @@ def _publication_decision(silent_video_path: str):
         )
 
 
+#: Pipeline-stage suffixes the archival stem accumulates on its way through the
+#: graph. They are meaningful in `otr/episodes/` and pure noise in `otr/obs/`.
+_PIPELINE_SUFFIXES = ("_silent_procgen_blended_captioned_with_credits",
+                      "_procgen_blended_captioned_with_credits",
+                      "_captioned_with_credits", "_procgen_blended",
+                      "_captioned", "_blend", "_silent")
+
+#: Cap so a long title plus six fields cannot approach the Windows path limit.
+_OBS_NAME_MAX = 150
+
+
+def _obs_field(text, fallback="none"):
+    """One filename-safe field: lowercase, no separators of our own."""
+    s = re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or "").strip()).strip("-.")
+    return (s or fallback).lower()
+
+
+def _obs_basename(final: str) -> str:
+    """The OPERATOR-FACING filename for the published episode.
+
+    THE ARCHIVAL NAME IS NOT THE WATCHING NAME (operator, 2026-09-03). The obs
+    copy used to inherit the archival stem verbatim, so every published episode
+    read:
+
+        signal_lost_<title>_<ts>_silent_procgen_blended_captioned_with_credits_final.mp4
+
+    -- and in a file browser every row truncated at the identical point,
+    `..._silent_procgen_blended_captioned_wit...`, telling the operator nothing
+    about what actually made the episode. Worse, that tail is actively
+    misleading: `procgen` is a COMPOSITING stage, and this session read it as
+    the render engine and built a whole wrong diagnosis on it before the
+    ledgers corrected it.
+
+    So the obs copy is renamed to carry what a viewer is comparing -- the
+    episode, then the five choices that produced it:
+
+        <title>_<ts>__<style>__<video>__<image>__<tts>__<bank>_final.mp4
+        arms_at_the_ready_20260903_092133__cartoon__wan_ti2v__z_image_turbo__
+            indextts2__public_domain_final.mp4
+
+    Episode first (operator's pick) so the folder still sorts by episode and
+    keeps its identity; style and video next because those are the axes he
+    actually compares, and they survive the truncation on ordinary titles.
+
+    `_final` IS PRESERVED: `scripts/otr_pod_obs_bridge.py` keys on that marker
+    to recognise a published episode, and the archival copy in `otr/episodes/`
+    is deliberately UNTOUCHED -- its suffixes carry pipeline provenance and
+    `otr_caption_burn` strips those exact spellings.
+
+    Fails soft to the archival basename: a publish must never die over a name.
+    """
+    base = os.path.basename(final)
+    try:
+        stem, ext = os.path.splitext(base)
+        for suf in ("_final",):
+            if stem.endswith(suf):
+                stem = stem[: -len(suf)]
+        for suf in _PIPELINE_SUFFIXES:
+            if stem.endswith(suf):
+                stem = stem[: -len(suf)]
+                break
+
+        try:
+            from . import _otr_ledger as _OL
+        except ImportError:  # pragma: no cover -- flat test imports
+            import _otr_ledger as _OL  # type: ignore
+        path = _OL.in_flight_ledger_path()
+        led = (_OL.load_ledger_safe(path) or {}) if path else {}
+        meta = led.get("meta") or {}
+        video = led.get("video") or {}
+
+        vid = collections.Counter(
+            s.get("engine_id") for s in (video.get("shots") or [])
+            if s.get("engine_id"))
+        img = collections.Counter()
+        for _role, per in ((meta.get("image_engines") or {}).get("by_role")
+                           or {}).items():
+            for eng, n in (per or {}).items():
+                img[eng] += int(n or 0)
+
+        def _trim_engine(name):
+            # `animatediff15_v3_haunted_video` -> `animatediff15_v3_haunted`;
+            # the role is already implied by the field position.
+            return re.sub(r"_(video|image)$", "", str(name or ""))
+
+        # The show prefix is constant across every episode, so it buys nothing
+        # in a folder of them; the title and timestamp are the identity.
+        title = re.sub(r"^signal_lost_", "", stem)
+        fields = [
+            _obs_field(meta.get("visual_style"), "nostyle"),
+            _obs_field(_trim_engine(vid.most_common(1)[0][0]) if vid else None),
+            _obs_field(_trim_engine(img.most_common(1)[0][0]) if img else None),
+            _obs_field(meta.get("char_voice_engine"), "novoice"),
+            _obs_field(meta.get("source_bank"), "nobank"),
+        ]
+        name = "%s__%s_final%s" % (_obs_field(title, "episode"),
+                                   "__".join(fields), ext or ".mp4")
+        if len(name) > _OBS_NAME_MAX:
+            keep = _OBS_NAME_MAX - (len(name) - len(title))
+            name = "%s__%s_final%s" % (_obs_field(title[:max(16, keep)]),
+                                       "__".join(fields), ext or ".mp4")
+        return name
+    except Exception:  # noqa: BLE001 -- a publish never dies over a filename.
+        return base
+
+
 class OTRMasterAudioMux:
     """Registered as ``OTR_MasterAudioMux``. Terminal audio mux (V-1: the ONLY
     node that adds audio). ``-c:a copy``, NO ``-shortest``, byte-identical assert."""
@@ -992,7 +1100,7 @@ class OTRMasterAudioMux:
         launch recipe sets it (two-tree split, 2026-06-09 operator report)."""
         obs_dir = str(_obs_dir())
         os.makedirs(obs_dir, exist_ok=True)
-        dst = os.path.join(obs_dir, os.path.basename(final))
+        dst = os.path.join(obs_dir, _obs_basename(final))
         # PLAYABILITY (operator screenshot 2026-06-09): -c:a copy from the WAV
         # master leaves raw PCM ("ipcm") in the MP4 -- byte-identical but
         # unplayable in standard players (Windows Media Player refuses the

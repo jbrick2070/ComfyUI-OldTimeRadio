@@ -674,3 +674,92 @@ def test_the_music_card_anchor_is_an_object_and_never_lettering():
     blob = _json.dumps(cap, ensure_ascii=False).lower()
     for banned in ("the words", "lettering reading", "spelled exactly"):
         assert banned not in blob, banned
+
+
+# --- precision ladder (2026-09-03) -----------------------------------------
+# The engine used to demand exactly `ideogram4_nvfp4_mixed.safetensors`. nvfp4
+# is a Blackwell format, so an AMD / Mac / 3060 box holding the perfectly good
+# fp8 or int8 build from the SAME ungated Comfy-Org/Ideogram-4 repo was refused
+# with "missing: ideogram4_nvfp4_mix..." -- which reads as "this lane needs a
+# Blackwell card" and is false. Only the DEFAULT was Blackwell.
+
+class _FakeFolderPaths:
+    """Minimal stand-in for ComfyUI's folder_paths with a chosen shelf."""
+
+    def __init__(self, shelf):
+        self._shelf = shelf
+
+    def get_filename_list(self, category):
+        return list(self._shelf.get(category, ()))
+
+    def get_full_path(self, category, name):
+        return ("/models/%s/%s" % (category, name)
+                if name in self._shelf.get(category, ()) else None)
+
+
+def _with_shelf(monkeypatch, shelf):
+    import sys
+    monkeypatch.setitem(sys.modules, "folder_paths", _FakeFolderPaths(shelf))
+    for env in ("OTR_IDEOGRAM4_COND_UNET", "OTR_IDEOGRAM4_UNCOND_UNET",
+                "OTR_IDEOGRAM4_CLIP", "OTR_IDEOGRAM4_VAE"):
+        monkeypatch.delenv(env, raising=False)
+    from nodes._otr_image_engines import ideogram4_local as ig
+    return ig.resolve_all_artifacts()
+
+
+_FP8_ONLY = {
+    "diffusion_models": ("ideogram4_fp8_scaled.safetensors",
+                         "ideogram4_unconditional_fp8_scaled.safetensors"),
+    "text_encoders": ("qwen3vl_8b_fp8_scaled.safetensors",),
+    "vae": ("flux2-vae.safetensors",),
+}
+_NVFP4_ONLY = {
+    "diffusion_models": ("ideogram4_nvfp4_mixed.safetensors",
+                         "ideogram4_unconditional_nvfp4_mixed.safetensors"),
+    "text_encoders": ("qwen3vl_8b_nvfp4.safetensors",),
+    "vae": ("flux2-vae.safetensors",),
+}
+
+
+def test_an_fp8_only_box_resolves_instead_of_being_refused(monkeypatch):
+    """THE REGRESSION. A non-Blackwell machine with the fp8 build installed."""
+    got = _with_shelf(monkeypatch, _FP8_ONLY)
+    assert all(verified for _n, verified, _c in got), got
+    names = [n for n, _v, _c in got]
+    assert names[0] == "ideogram4_fp8_scaled.safetensors"
+    assert names[1] == "ideogram4_unconditional_fp8_scaled.safetensors"
+    assert names[2] == "qwen3vl_8b_fp8_scaled.safetensors"
+
+
+def test_a_blackwell_box_still_prefers_nvfp4(monkeypatch):
+    """The ladder is smallest-first, so nvfp4 wins where it exists -- the
+    5.5 GB build is both lighter and faster on the card that supports it."""
+    got = _with_shelf(monkeypatch, _NVFP4_ONLY)
+    assert all(verified for _n, verified, _c in got), got
+    assert [n for n, _v, _c in got][0] == "ideogram4_nvfp4_mixed.safetensors"
+
+
+def test_nvfp4_wins_when_both_precisions_are_installed(monkeypatch):
+    both = {k: tuple(_NVFP4_ONLY.get(k, ())) + tuple(_FP8_ONLY.get(k, ()))
+            for k in ("diffusion_models", "text_encoders", "vae")}
+    got = _with_shelf(monkeypatch, both)
+    assert [n for n, _v, _c in got][0] == "ideogram4_nvfp4_mixed.safetensors"
+
+
+def test_an_env_override_beats_the_whole_ladder(monkeypatch):
+    """The override names a mirror or a quant we have never heard of; second-
+    guessing it against a ladder would defeat why it exists."""
+    import sys
+    monkeypatch.setitem(sys.modules, "folder_paths", _FakeFolderPaths(_NVFP4_ONLY))
+    monkeypatch.setenv("OTR_IDEOGRAM4_COND_UNET", "some_mirror_q4.safetensors")
+    from nodes._otr_image_engines import ideogram4_local as ig
+    assert ig.resolve_all_artifacts()[0][0] == "some_mirror_q4.safetensors"
+
+
+def test_precision_is_part_of_the_engine_version(monkeypatch):
+    """A precision swap must bust the still cache: the resolved basenames feed
+    the effective version, so two machines on different builds cannot serve
+    each other's cached stills."""
+    a = [n for n, _v, _c in _with_shelf(monkeypatch, _NVFP4_ONLY)]
+    b = [n for n, _v, _c in _with_shelf(monkeypatch, _FP8_ONLY)]
+    assert a != b, "different precisions must yield different version inputs"

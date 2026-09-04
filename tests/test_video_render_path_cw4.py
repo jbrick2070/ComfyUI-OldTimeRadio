@@ -369,9 +369,20 @@ def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     node = OTRMasterAudioMux()
     final, status = node.mux(str(silent), str(master))
     assert final and os.path.isfile(final)
-    obs = tmp_path / "out" / "otr" / "obs" / os.path.basename(final)
+    # THE OBS COPY IS NO LONGER NAMED LIKE THE ARCHIVAL ONE (2026-09-03). It
+    # carries the five choices that made the episode instead of the pipeline
+    # suffix tail, so this locates the publication rather than assuming its
+    # basename -- see tests/test_obs_published_filename.py for the naming rules.
+    obs_dir = tmp_path / "out" / "otr" / "obs"
+    published = sorted(obs_dir.glob("*.mp4"))
+    assert len(published) == 1, "expected exactly one published mp4: %s" % published
+    obs = published[0]
     assert obs.is_file(), "final mp4 was not published to otr/obs"
     assert "obs_publish OK" in status
+    # The published name keeps the marker the pod bridge keys on, and sheds the
+    # compositing tail that made every row in the folder look identical.
+    assert obs.name.endswith("_final.mp4")
+    assert "procgen" not in obs.name and "captioned" not in obs.name
     # the obs copy carries PLAYABLE aac audio; the archival final stays pcm.
     def _codecs(path, kind):
         out = subprocess.run(

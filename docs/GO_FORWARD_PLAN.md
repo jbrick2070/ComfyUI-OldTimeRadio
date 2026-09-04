@@ -1194,6 +1194,57 @@ An i2v anchor for the 8 GB floor lane. Not started; ship-readiness first.
 
 ---
 
+### 4.Y BRING `word_razzle` HOME -- it is the one cloud lane whose NAME hides it (operator, 2026-09-03)
+
+**Operator:** *"word_razzle shouldn't be cloud anymore"*, and the reason behind it:
+*"I don't want to mislead my audience -- make cloudy lanes transparent."*
+
+**The transparency problem, stated exactly.** 8 of the 30 registered video
+engines render provider-side:
+
+```
+cloud_kling_avatar  cloud_seedance_2  cloud_wan_i2v  cloud_wan_i2v_audio
+cloud_vidu_q2_pro_fast_720p          google_omni_video  google_veo_video
+word_razzle   <- the outlier: nothing in the name says it phones out
+```
+
+Seven of the eight self-label via a `cloud_`/`google_` prefix. `word_razzle`
+reads like a local text-effect lane and is not one. That is the misleading row,
+and it is also the one with a plausible local replacement.
+
+**WHY IT IS NOW FEASIBLE, AND IT MAY NOT EVEN BE A NEW ENGINE.** word_razzle is
+"animate a word-card still into a living period poster" -- a cloud i2v taking
+(init image + prompt + seed + duration + motion_mode). Both halves already exist
+locally:
+
+* **The card.** `ideogram4_local` is the pack's spelling champion -- its own
+  recipe note records that every card in the campaign with perfect spelling
+  rendered at mu 0.5. It did NOT exist when word_razzle was built as a cloud
+  lane in 2026-07-03, which is the whole reason that lane is cloud.
+* **The motion.** `still_motion`, `still_pan` and `ltx_video` already animate a
+  still. A word card is a still.
+
+**So the first question of the arc is whether this is an ENGINE at all, or just
+a PROFILE** -- `character_image: ideogram4_local` + an existing local i2v in
+`character_visual`. A profile costs nothing; a new engine id trips five
+generated fixtures, two literal rosters, the terminal-frame proof rule and
+`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8. Those are very different prices for
+the same outcome, which is exactly why this is a design item and not a
+drive-by.
+
+**Owed before code:** a kibitz arc on that question. Also decide what happens to
+the cloud `word_razzle` row -- retire it, or rename it `cloud_word_razzle` so the
+roster is honest either way. Renaming alone would fix the transparency defect
+even if the local lane never lands.
+
+**Separately noted, already fixed:** `word_razzle` failed the 2026-09-03 pod
+matrix with `SessionIdentityUnavailable` -- it would render 2 segments from one
+set of handles but declares no `session_identity()`. That is NOT a credentials
+problem and NOT pod-specific; it fails the same way on the 5080 for any beat
+long enough to need two segments. Eight engines declare the identity
+(ghost_signal, humo, ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v);
+the cloud adapters do not.
+
 ### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
 
 **Not work yet, and explicitly not before v2 ships.** The operator, thinking it
