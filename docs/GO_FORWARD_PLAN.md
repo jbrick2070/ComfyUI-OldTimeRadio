@@ -72,23 +72,22 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Tree:** `v2.0-alpha`, HEAD == origin, clean; the last CODE head is `2ef69abf` (the
-content_oracle rip and the token scrub), everything after it is docs. Suite baseline
-**13480 passed / 126 skipped / 1 xfailed** (twelve oracle tests removed on purpose). Bible **335 entries** (repo `81a8a9e`). No resident server; VRAM at the
-desktop baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and
-Spark overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second
-agy model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster
-honestly.
+**State:** `v2.0-alpha`, HEAD == origin, clean tree. Suite baseline **13480 passed / 126
+skipped / 1 xfailed**. Bible **335 entries**. No resident server; VRAM at the desktop
+baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and Spark
+overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second agy
+model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster.
 
-**THE NEXT COMMIT is the ratchet commit of the scan collapse** (item 1 below). Its plan is
-CLOSED and is `kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` -- read it
-whole before typing. The owners `nodes/_otr_shared/env.py` and `nodes/_otr_shared/proc.py`
-and the shared ratchet `tests/fixtures/ratchet.py` are already on disk and INERT: nothing
-imports them, so the tree's behaviour is unchanged until the migration starts.
+**NEXT COMMIT: the ratchet commit of the scan collapse** (item 1). Read
+`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` whole before typing. The
+owners `nodes/_otr_shared/env.py`, `nodes/_otr_shared/proc.py` and the shared ratchet
+`tests/fixtures/ratchet.py` are on disk and inert until the migration starts.
 
-**Decisions owed by the operator (skip, do not guess):** the review filing in item 4, the content_oracle-style calls under item 7,
-the Section 3 question list, and PBUG-20260904-05's profile design (the 4060 proves, the
-5080 promotes).
+**Only the operator does these -- stop and ask:** the `pyproject.toml` version bump (a
+publish is his eyeball), the review request (a public post), and the rulings in item 6.
+
+**Keep this file clean:** when a row is finished, delete it from here and write the receipt
+in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
 
 ---
 
