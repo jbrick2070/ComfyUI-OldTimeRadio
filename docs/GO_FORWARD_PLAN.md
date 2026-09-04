@@ -889,6 +889,17 @@ so the preceding `== "humo"` always wins). `scripts/otr_machine_matrix.py:124`
 nothing. `_otr_paths.py:449` `episodes_for_obs_dir()` claims to be kept "for
 back-compat with existing imports" and has zero callers.
 
+**RIPPED 2026-09-04 (Phase 0 of the registry collapse; operator directive:
+an orphan is ripped 100% or wired back in).** Every row-E symbol and every
+row-F item above was re-verified on the current tree with `git grep -n -w
+-F` before the cut and returns zero references after it. Two corrections
+from the re-verification: `episodes_for_obs_dir()` also had an `__all__`
+entry (gone with the function), and `scripts/otr_asset_index.py`'s
+`elif engine.startswith("humo")` is LIVE -- the registry carries `humo_clip`
+and `humo_diet` -- so it is kept; the audit's "only `eng_humo.py` exists"
+was true of files and false of engine ids. `REPAIR_TEMPERATURE` was folded
+into `_REPAIR_TEMPERATURE`, the spelling every call site and test used.
+
 **G. FOLLOW-UPS THE 2026-09-04 ARC SURFACED AND DID NOT BUILD -- each with the
 reason it waits.**
 * `otr_post_upscale_procgen_blend.py` keeps a `sys.path` insert of `nodes/` for

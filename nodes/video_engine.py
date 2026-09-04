@@ -64,10 +64,7 @@ CRT_GREEN     = (0, 255, 65)       # phosphor green
 CRT_AMBER     = (255, 176, 0)      # amber accent
 CRT_DIM       = (0, 100, 28)       # dim green
 CRT_DARK      = (0, 50, 14)        # very dim green
-CRT_RED       = (255, 50, 50)      # alert red
-CRT_WHITE     = (180, 200, 180)    # faded CRT white
 CRT_CYAN      = (0, 200, 200)      # cyan accent
-CRT_MAGENTA   = (200, 0, 200)      # magenta accent
 
 # -----------------------------------------------------------------------------
 # FONT LOADING

@@ -210,22 +210,6 @@ def _terms(text):
             if w not in _STOPWORDS}
 
 
-def _negative_phrases(style):
-    """The negative as the COMMA-SEPARATED PHRASES it is actually written in.
-
-    Phrases, not bare words, because these negatives are qualified: "plastic
-    skin" and "waxy skin" do not contradict a portrait that wants realistic
-    skin, they are the specific failure modes being excluded. Splitting them
-    into words reported `skin` as a fight on two packs that have none.
-    """
-    out = []
-    for raw in str(getattr(style, "negative_tail", "") or "").split(","):
-        phrase = raw.strip().lower()
-        if phrase and phrase not in _ARTIFACT_TERMS:
-            out.append(phrase)
-    return out
-
-
 def _fights_in(negative_text, style):
     """Phrases in ``negative_text`` that ``style``'s own positive asks for.
 

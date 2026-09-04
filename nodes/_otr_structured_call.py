@@ -108,12 +108,11 @@ _STRUCTURED_MAX_NEW_TOKENS: int = 512
 # is a "follow the schema exactly" instruction, and low entropy is what
 # makes a local model comply. Deliberately below any sane base
 # temperature so the repair attempt is the calmest attempt in the
-# ladder.  P3's bounded authored-text patch uses this same public value rather
-# than inventing a second repair temperature.
-REPAIR_TEMPERATURE: float = 0.10
-# Compatibility name retained for existing callers/tests that predate the
-# shared public export.
-_REPAIR_TEMPERATURE: float = REPAIR_TEMPERATURE
+# ladder.  P3's bounded authored-text patch uses this same value rather than
+# inventing a second repair temperature. The underscore name is the only
+# spelling: the unused public alias was ripped on 2026-09-04 (dead-code audit
+# row F), and every call site and test already used this one.
+_REPAIR_TEMPERATURE: float = 0.10
 
 # A typed repair that starts but does not finish decodable JSON gets one
 # syntax-only retry when call budget remains. The retry temperature is

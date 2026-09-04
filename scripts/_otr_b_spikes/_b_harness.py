@@ -25,8 +25,6 @@ from typing import Callable, Optional
 
 import numpy as np
 
-HARNESS_VERSION = "b-spike-1"
-
 # Apple ARKit ARFaceAnchor.BlendShapeLocation -- the canonical 52 coefficients a
 # viseme / audio driver (A2F-3D) animates. The WRAP keystone must expose ALL 52.
 ARKIT_52 = (
@@ -456,8 +454,6 @@ SIDECAR_LEAK_KEYS = (
 # VRAM ceilings (MB). The 3D sidecar asserts the STRICTER sub-ceiling, never the
 # global machine ceiling.
 SIDECAR_3D_BUDGET_MB = 14000
-MACHINE_CEILING_MB = 14500
-NVML_FLOOR_MB = 768
 
 
 def build_sidecar_env(base_env: dict, cu_home: str, torch_ext_dir: str) -> dict:

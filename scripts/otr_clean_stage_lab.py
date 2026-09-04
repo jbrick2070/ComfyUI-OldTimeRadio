@@ -526,59 +526,6 @@ def _derive_beats(data: dict) -> "list[dict]":
     return out
 
 
-def corpus_ledgers(limit: int, bank: "str | None") -> "list[dict]":
-    """Real episodes off disk that the grader says are dirty, newest first.
-
-    Dirty is decided by the SAME detector the pass gates on, so this selects
-    for material the clean stage will actually have to work on rather than
-    for a random sample that is mostly clean.
-    """
-    view_path = REPO_ROOT / "scripts" / "otr_ledger_view.py"
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("_otr_view_lab", view_path)
-    view = importlib.util.module_from_spec(spec)
-    sys.modules["_otr_view_lab"] = view
-    try:
-        spec.loader.exec_module(view)
-    finally:
-        sys.modules.pop("_otr_view_lab", None)
-
-    picked: "list[dict]" = []
-    for path in view.episode_ledgers():
-        if len(picked) >= limit:
-            break
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001 -- a corpus of 1,400 has bad files
-            continue
-        if not isinstance(data, dict):
-            continue
-        meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
-        found_bank = str(meta.get("source_bank") or "") or "(unstamped)"
-        if bank and found_bank != bank:
-            continue
-        rows = [r for r in (data.get("lines") or []) if isinstance(r, dict)]
-        dirty = [
-            r for r in rows
-            if r.get("speaker_role") in POLICY.VOICED_ROLES
-            and POLICY.f1_findings(str(r.get("text") or ""))
-        ]
-        if not dirty:
-            continue
-        data["beats"] = _derive_beats(data)
-        data["meta"] = dict(meta)
-        data["meta"]["source_bank"] = found_bank
-        data["_lab_source"] = str(path)
-        data["_lab_dirty_rows"] = len(dirty)
-        picked.append(data)
-    return picked
-
-
-# ---------------------------------------------------------------------------
-# scoring
-# ---------------------------------------------------------------------------
-
-
 def score(ledger: dict, receipt: dict) -> dict:
     """Grade the run against the ground truth planted in the fixture."""
     lab = {

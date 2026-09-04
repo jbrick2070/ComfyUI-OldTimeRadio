@@ -442,52 +442,6 @@ def otr_obs_dir() -> Path:
     return _validate_contract(comfy_output_dir() / "otr" / "obs")
 
 
-def episodes_for_obs_dir(episode_id: str = "") -> Path:
-    """VideoComposite intermediate-mp4 dir -- per-episode workspace.
-
-    Path: ``<output>/otr/episodes/<episode_id>/composited/`` when
-    ``episode_id`` is given. Returns ``otr_episodes_root()`` (the
-    parent of all per-episode subdirs) when called without an
-    episode_id, for legacy callers that scan the tree.
-
-    Holds the native composite mp4 written by VideoComposite as
-    ``<episode_id>.mp4`` (one per episode). This is the INTERMEDIATE --
-    the downstream OTR_PostUpscaleProcgenBlend stage reads from here
-    and writes the final mp4 to the OBS-watched dir (see
-    ``otr_obs_dir``). It read through a standalone OTR_RTXUpscale stage
-    until queue item 8 (2026-08-08) ripped that node.
-
-    Despite the historical name ``episodes_for_obs_dir``, this dir
-    is NOT what OBS watches anymore -- that role moved to ``otr/obs/``
-    on 2026-05-02 EVENING. Function name kept for back-compat with
-    existing imports; canonical OBS-watched dir is now ``otr_obs_dir``;
-    canonical intermediate dir helper is ``otr_composited_dir``.
-
-    History (canonical change-log for this path):
-      - Originally ``<output>/episodes_for_obs/<episode_id>/``,
-        sibling of ``otr/`` (BUG-LOCAL-084 era).
-      - 2026-05-02 EVENING (Jeffrey directive 1): consolidate under
-        ``otr/`` -> ``<output>/otr/episodes/<episode_id>/``.
-      - 2026-05-02 EVENING (Jeffrey directive 2): flatten ->
-        ``<output>/otr/episodes/`` (no per-episode subfolder).
-      - 2026-05-02 EVENING (Jeffrey directive 3): split intermediate
-        vs final -- new ``otr_obs_dir()`` for the single final mp4
-        per episode; this dir keeps the intermediate.
-      - 2026-05-02 EVENING (Jeffrey directive 4): per-episode workspace.
-        Intermediate moves to per-episode subdir
-        ``<output>/otr/episodes/<episode_id>/composited/<episode_id>.mp4``.
-    """
-    if episode_id:
-        return otr_composited_dir(episode_id)
-    return otr_episodes_root()
-
-
-# director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
-# (2026-05-13) along with the LLMDirector class itself (S2,
-# commit 249bc06). No replacement is needed -- the L3 ledger and
-# atomic save_ledger_safe path replace the raw-dump scheme.
-
-
 def comfyui_log_path() -> Optional[str]:
     """Locate the active ComfyUI core log file.
 
@@ -658,7 +612,6 @@ __all__ = [
     "otr_composited_dir",
     "otr_obs_dir",
     "otr_state_dir",
-    "episodes_for_obs_dir",
     # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1
     "resolve_hf_model_path",
     "comfyui_log_path",

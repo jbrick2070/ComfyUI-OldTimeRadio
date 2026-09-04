@@ -3403,10 +3403,6 @@ class OTRShotLock:
         # 60 newest ledgers carried what the director asked for. Stamped through
         # the SINGLETON (a disk-only save would desync the state later saves
         # merge from), LOUD on failure, and never in test mode.
-        try:
-            from .production_ledger import stamp_durable as _stamp_durable
-        except ImportError:  # pragma: no cover -- flat imports
-            from production_ledger import stamp_durable as _stamp_durable  # type: ignore
         _stamp_durable(sections={"video": video_section},
                        meta_updates={"video_revision": revision},
                        source="OTR_ShotLock")

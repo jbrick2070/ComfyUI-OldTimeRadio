@@ -121,7 +121,7 @@ def _md_cell(value) -> str:
     return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
-def load_classes(_profiles=None):
+def load_classes():
     """Load complete, self-contained machine rows; no profile indirection."""
     try:
         doc = json.load(io.open(_CLASS_FILE, encoding="utf-8"))

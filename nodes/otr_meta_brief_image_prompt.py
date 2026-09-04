@@ -318,8 +318,6 @@ _RADIO_FACE_OVERT_KEYS = ("space", "orbital", "docking", "spacecraft", "starship
 #: RADIO_CONSOLE_NEG (humans OUT). Facelessness rides the POSITIVE,
 #: so this is COSMETIC for the still engines -- facelessness rides the POSITIVE.
 RADIO_CONSOLE_NEG = "human, person, man, woman, human face, hands, arms, crowd"
-#: Back-compat alias (default = the console look).
-RADIO_HOST_FACE_NEG = RADIO_CONSOLE_NEG
 
 #: The live radio-host styles. build_radio_host_prompt + radio_host_negative
 #: dispatch EXPLICITLY over this set and raise on anything else, so a typo or a

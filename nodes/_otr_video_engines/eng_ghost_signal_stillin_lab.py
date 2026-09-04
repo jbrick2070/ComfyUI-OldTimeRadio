@@ -69,7 +69,6 @@ NODE_PLATE_DECODE = "plate_decode"
 EXTERNAL_PLATE_INIT = "plate_init"
 
 PLATE_SOURCE_MINTED = "minted"
-PLATE_DIRNAME = "ghost_plates"
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
 

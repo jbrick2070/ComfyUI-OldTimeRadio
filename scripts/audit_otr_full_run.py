@@ -98,21 +98,6 @@ def ffprobe_dimensions(mp4: Path) -> tuple[int, int] | None:
         return None
 
 
-def ffprobe_timebase(mp4: Path) -> str | None:
-    try:
-        r = subprocess.run(
-            ["ffprobe", "-v", "error",
-             "-select_streams", "v:0",
-             "-show_entries", "stream=time_base",
-             "-of", "default=noprint_wrappers=1:nokey=1",
-             str(mp4)],
-            capture_output=True, text=True, check=True,
-        )
-        return r.stdout.strip()
-    except Exception:
-        return None
-
-
 def load_ledger(episode_dir: Path) -> dict | None:
     candidates = [
         episode_dir / "ledger.json",
