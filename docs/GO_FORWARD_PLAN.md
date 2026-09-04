@@ -20,6 +20,65 @@ gitignored: pointers to them are 5080-local.
   **Pod manual:** `docs/RUNPOD_INSTALL.md` (Codex owns it). **Ship-readiness receipts:**
   `docs/ship-audit-2026-09-01/`. **The highest authority is still `CLAUDE.md`.**
 
+## STATUS -- WHAT THE 2026-09-03/04 SESSION SETTLED (read before re-deriving any of it)
+
+**The big one: character directives were being thrown away, 100% of the time.**
+`derive_creative_directives` batches up to 15 beats and asks for one JSON row
+each, but reached the model through a wrapper hardcoding `max_new_tokens=300`.
+A row costs ~73 tokens, so a full batch needed ~1,100 and got 300: the reply
+stopped mid-object, the parser returned `{}`, and the reseed loop retried the
+SAME prompt under the SAME ceiling. Every character beat fell through to the
+deterministic template -- a character PORTRAIT with no action verb in it -- which
+is why the picture never matched the story. Fixed (PBUG-20260903-07) and proven
+live: 14 of 14 beats from the writer, zero warnings, where it had been 0 of 14.
+
+**Also fixed and pushed:** `"camera locked"` as the default when no camera was
+given (3 lanes); the compactor silently dropping the CAMERA clause over a
+12-word cap (2 of 32 registers, both in packs the operator watches); `Voice:`
+reaching picture models in 90% of joint-AV prompts; the one-sentence camera ask,
+now requiring a STRATEGIC move and banning framing-only answers; the wan/fastwan
+bookends, which previously shipped a static seed with ZERO verbs.
+
+**A portability bug only a second machine could find.** `scope_draw._has_nvenc`
+asked whether ffmpeg was COMPILED with nvenc, not whether it can ENCODE -- the
+third copy of a mistake already fixed twice, and `encode_sink`'s docstring
+claimed to be the only such decision, which is why it survived. On a rented 4090
+that lists the encoder and cannot open a session, `viz_camera` went FAIL -> PASS
+on the fix. Any AMD / Mac / container host hit the same wall.
+
+**`ideogram4_local` was never Blackwell-only** -- only its default was. It now
+walks a precision ladder (nvfp4 -> fp8_scaled -> int8_convrot), all three in the
+same UNGATED Comfy-Org/Ideogram-4 repo. NOT an 8 GB lane: fp8 is ~29 GB all-in.
+
+**Published filenames now say what made the episode** --
+`<title>_<ts>__<style>__<video>__<image>__<tts>__<bank>_final.mp4`. The old tail
+was compositing noise and actively misleading: this session read `procgen` as a
+render engine and built a wrong diagnosis on it. Obs copy only; archival
+untouched.
+
+**Rented-4090 lane matrix (1 act each), and read the failures correctly:**
+
+| outcome | lanes |
+|---|---|
+| PASS | viz_camera, viz_green, still_flat, still_motion, still_pan, still_word, animatediff15_v3_haunted, ltx_8gb |
+| TIMEOUT (driver's 40 min, render survived -- NOT a defect) | wan_ti2v, fastwan_8gb |
+| OOM at decode (known 24 GB Ada negative) | ltx25_foley_plus, ltx25_mime, ltx25_video |
+| dependency absent on that pod | ltx_video, mesh_stage (portable Blender) |
+| REAL defect | word_razzle -- renders 2 segments from one set of handles and declares no `session_identity()`; fails the same way on the 5080 |
+
+A 3-act AnimateDiff episode also passed unattended in 33.7 min.
+
+**STILL OPEN, and today's audit CONFIRMED it rather than fixing it:** item 3d
+below -- ten of eleven lanes lead the prompt with the cast's face paragraph via
+`motion_common.compose_parts`, 83 words of a hard 100-word cap on `wan_ti2v`, so
+the camera clause falls off the end. That is a SHARED-composer change touching
+eleven lanes on both machines and is deliberately not a drive-by.
+
+Eight pod-driving lessons landed in `docs/RUNPOD_INSTALL.md` section 7A and its
+failure atlas.
+
+---
+
 ## THE QUEUE -- READ THIS FIRST (ordered by the operator, 2026-09-02)
 
 **Standing constraints:** the 5080 loop is untouched -- nothing ships that reduces
@@ -817,6 +876,136 @@ gains `mps` on the `flux2_klein` row (cuda-only today) -> `otr_mac_mps` flips of
 `otr_amd8_rocm` / `otr_amd16_rocm`. ROCm already qualifies for Klein (presents as cuda).
 Needs hardware neither NVIDIA box has.
 
+### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 2026-09-02; awaits his pick)
+
+Operator, 2026-09-02: a fresh set of eyes on whether the AnimateDiff v3 (+ adapter) lane takes
+advantage of the ledger and the per-beat stills, with the VISUAL STYLE obeyed ("I think we lost
+the visual style" -- confirmed: the style reaches that lane as a two-word cue on a fixed base
+checkpoint under a photographic-grime adapter, no still) and stills-in among the first one to
+three arms. The self-contained statement is
+`docs/2026-09-02-animatediff-ledger-experiments/PROBLEM_STATEMENT.md` (11,000 words, grounded by
+a five-reader workflow); four fresh reads (Fable 5.1 cold, Codex, Cursor, Antigravity) and the
+driver's grounded judgment are in `fresh-eyes/`. The judged order: (0) the instrument -- durable
+prompt + seed + request hash on the ledger, a canonical REPLAY mode (today the writer node always
+mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
+adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
+LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
+engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
+plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
+`still-in-peer/driver_anchor.md` section 7 D4); (3) the pack's
+language back into the prompt under a 77-token budget; (4) one timeline per shot (a
+FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
+FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the
+shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
+(Section 4) until then.
+
+**Status 2026-09-02 (evening).** Operator: "I leave it up to you to synthesize and code maybe
+1-3 of the best options." Item 0, the instrument, is CODED after a full four-round arc
+(`instrument/driver_anchor.md`, sections 1-13): every rendered clip carries a versioned ACTUAL
+receipt hashed into `actual_request_sha` and stamped durably as `meta.render_trace`; the writer's
+trailing `replay_from` widget (and `otr_canonical_api_run.py --replay-from`) re-renders a frozen
+bundle (`scripts/otr_freeze_replay_bundle.py`) through the whole canonical graph with no writer,
+TTS, music or stills, node 7 byte-copying the SHA-verified master; `scripts/otr_verify_replay.py`
+is the offline A/A verifier. Item 1, the adapter sweep, is RUNNING on the 5080 overnight profile
+(two styles x 1.0 / 0.5 / 0.25 / 0.0, titles "Adapter <k> <style>", published to `otr/obs/` for
+the operator's eye). Next: the live replay proof (render, freeze, replay twice, verify) once the
+sweep releases the GPU, then item 2, the still-in lab peer -- registered only after the
+`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
+operator's standing rule for any new video pack requires.
+
+**Title-card leak, 2026-09-02 17:45 (operator: "your attempt at a video plan bled into my
+title").** The first three sweep legs were launched with `--title "Adapter <k> anime"` so the
+leg could be told apart in `otr/obs/`; that flag rides the writer's `episode_title` widget and
+so became the on-screen TITLE CARD of three published episodes (the known harness-label path,
+CLAUDE.md "fix the title at the source"). Standing rule from the operator, same minute: every
+canonical leg runs the CLEAN runner, title generated from the story (public_domain: the
+source's own title). Legs 4-8 run without `--title`; a leg is identified by its log, its
+publish timestamp and, now that item 0 is merged, durably by
+`meta.render_trace[*].sampler_inputs.adapter_strength`. The three already-published episodes
+stay in `otr/obs/` (nothing is ever tidied out of it). SOURCE FIX, still open: give the harness a
+`run_label` of its own that reaches the log and the ledger meta but never `episode_title` -- a
+small design item (touches the API runner, the whitelist and the mux's filename), arc before code.
+
+**Every style, not anime (operator, 2026-09-02 evening): "anime is not the only target; all
+visual styles need to craft the episode as well when selected."** The registry carries nine
+(`nodes/_otr_visual_styles.list_style_ids()`: anime, archival_documentary, cartoon,
+paper_origami, recur_frac, sci_fi_radio, shakespeare_stage_realism, storybook_engraving,
+video_art). The two-word-cue defect is style-blind, so every arm of this campaign -- the
+adapter sweep (already anime + storybook_engraving), the still-in lab peer, the pack language
+under the 77-token budget -- is designed and proven PER STYLE, with a non-anime style in every
+proof leg, and judged by one question: is the SELECTED style visibly the episode's style on the
+stills and the video alike.
+
+**First read of the sweep (operator, 2026-09-02 evening, on the three anime legs 1.0 / 0.5 /
+0.25):** "the anime looks improved; which one is better, not sure at the moment." He reviews
+the full candidate set when he is back; the driver's standing instruction meanwhile is "keep
+coding, do your best" and to decide whether a blinded A/B is needed. The instrument's
+render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
+attributable; the first three legs pre-date the merge and carry no trace.
+
+**Item 1 CLOSED by the operator's eye (2026-09-02, ~20:30), six of eight legs watched.**
+Storybook engraving: 0.5 (`the_last_reading_190630`) "very storybook and did the best of
+maintaining the style"; 1.0 (`the_trembling_ground_182739`) "cool rendered 3D realistic
+storybook stuff but drifted into the army men in green coats". Anime: 1.0 "more anime than
+0.0 but drifted into real-life stuff for a while"; 0.5 "some anime but some people in blue
+coats"; 0.25 "maybe the most anime"; 0.0 "definitely animation, not strikingly anime, but
+cool". His delegation: "if you think any of them are an improvement to the haunted we have,
+take your best take." TAKEN: **`ADAPTER_V3_STRENGTH` 1.0 -> 0.5** (the shipped default on
+both boxes; the env override stays the sweep knob; every receipt stamps what ran). 0.25 is
+the standing contender on anime; if storybook 0.25 (leg 7) also beats 0.5 by his eye the
+default moves to 0.25 -- one constant. **The coats finding:** across the traced episodes the
+only prompts that say "coat" say "cream coat" and "charcoal coat" (the cast's own looks, both
+characters), never green or blue; the green army coats and blue uniforms are the base model's
+prior for "coat" under an engraving or anime medium, amplified by the adapter. The GARMENT
+WORD is a style lever -- an input to item 3 (pack language): the motif composer should map
+garments through the pack rather than pass the writer's word raw, and this is the first
+measured prompt-to-picture pair the instrument's trace made citable.
+
+**Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
+Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
+`animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288
+plate minted in-graph from the pack's full language and the ledger's world, repeated in Python
+to the sampler batch, sampled at a strict `OTR_STILLIN_LAB_DENOISE` (default 0.65); a lab id
+on `otr_stillin_lab_5080` (`draft`, never a default); the replay instrument gained a derived
+bundle (`--derive-engine`) so ONE ledger renders on both Ghost siblings; the verifier gained
+the plate-hash rule; `scripts/otr_stillin_probe_report.py` measures motion energy against the
+lane's own A/A band. The design and receipts are `still-in-peer/driver_anchor.md` sections
+1-14. NEXT: merge, the full suite in the main checkout, then the live probe on the 5080 --
+one style per invocation, anime and storybook_engraving first, every leg to `otr/obs/` with
+the story's own title -- and the operator's eye on the triptychs. Stop rules stand (section 7
+D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
+and keeps the plate ends E1 (next arm the E2 probe).
+
+**Item 3 REDEFINED and IN ARC -- Prompt v3, "draw the crux" (operator, 2026-09-02 21:00-22:00).**
+He read every beat of the storybook episode beside the prompt it got, rewrote ten by hand,
+and ruled: draw what the line is ABOUT in the story's one setting, mix the visual style with
+the CRUX of the story on every beat, the world's own motion, no costume or prop the dialogue
+never names, fewer variables ("too many variables -> humans and bags"), get creative, and
+"yes, I want to see more STORY, not just the characters." Mechanically confirmed: the lane's
+character motif is a costume template with fallback pools (coat; lantern / key / ledger /
+satchel), the object beats draw the carried prop, the leaf author is handed no dialogue and
+its one hint field was empty on all 27 beats, and the story brief plus `key_objects` sat unused
+by this lane. Source: `prompt-rule/operator_rewrites.md`; anchor: `prompt-rule/driver_anchor.md`
+(sections 1-7; r1 = Fable cold + Antigravity, five reversals, R1-R10 govern; r2 Codex running).
+**GPU FREEZE (operator, 21:50): "don't waste any GPU runs until the prompting is fixed."** The
+adapter sweep's last leg finished on its own (8/8 published); the overnight chain was NOT
+launched; nothing boots a server until v3 is merged and green. The first GPU run after is ONE
+episode, same seeds, v2 beside v3 (R9). The still-in peer (item 2) and the 0.5 adapter default
+(item 1) merged at 7c231e24 with the full suite queued on CPU; their probes wait behind v3.
+Item 3b (the other video lanes get the same SHAPE, per-lane budgets, talking-face lanes
+exempt) follows once v3 is judged on this lane.
+
+**Operator, 2026-09-02 20:45: "of course I'm really more interested in video art or
+recursive fractal, or both if they are separate."** They are separate packs (`video_art`,
+`recur_frac`), and they are the two LONGEST packs in the registry -- the ones the shipping
+lane's two-word cue serves worst and the ones the peer's full-language plate is built for
+(recur_frac's plate reduces to its positive_tail under the 320-char ceiling; the receipt shows
+what survived). Tonight's GPU chain leads with them on BOTH lanes: after the instrument's
+replay proof, four adapter legs (video_art and recur_frac at the shipped 0.5 and the
+contender 0.25), then the still-in probe on video_art, then on recur_frac. Anime and
+storybook_engraving probes follow on a later night. His eye on those two styles is the
+verdict that matters most to him; the per-style rule stands for the rest.
+
 ---
 
 ## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least)
@@ -1194,6 +1383,40 @@ An i2v anchor for the 8 GB floor lane. Not started; ship-readiness first.
 
 ---
 
+### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
+
+**Not work yet, and explicitly not before v2 ships.** The operator, thinking it
+over away from the desk: *"once we ship v2 we ship an OTR-Lite, similar
+architecture but only the most frictionless auto-download non-gated models, and
+maybe just maybe we can figure an ffmpeg-less solution for a truly streamlined
+workflow."*
+
+**Two halves, and the second one pays a debt nobody connected to it.**
+
+* **Non-gated auto-download only.** Already half-mapped:
+  `scripts/otr_fetch_lane_weights.py` offers UNGATED sources by design and
+  deliberately refuses to paper over the one gated repo (Lightricks/LTX-2.5), so
+  its lane list is effectively the candidate set. Measured on the 4090 pod
+  2026-09-03, the fully-frictionless bundle is `haunted + one z_image precision
+  + stable_audio_3` -- about 20 GB for one complete episode.
+* **ffmpeg-less.** This is not only an install-friction win. `subprocess` calls
+  to ffmpeg/ffprobe are **35 of the pack's 158 Comfy Registry scan findings**
+  (`python_command_injection_risk`), plus most of the 12
+  `python_url_command_execution` ones. An in-process encode path shrinks the
+  largest non-`os.environ` finding class at the same time as removing the binary
+  dependency -- the two goals are the same work. PyAV (`av>=16.0.0`) is already a
+  ComfyUI CORE dependency, so it ships on every install.
+
+**THE ONE KNOWN BLOCKER, and it is where this starts.** This PyAV build has no
+`libass` and no `drawtext`, so CAPTION BURN and CREDITS cannot move in-process
+as-is. The mux, the silent composite and the probe already have PyAV routes. So
+the first question of an OTR-Lite effort is captions and credits without
+libass/drawtext -- not the mux, which is the part that looks hard and is not.
+
+**Related evidence already on disk:** `docs/RUNPOD_INSTALL.md` section 7A (what a
+second machine actually trips over), and the registry finding counts in
+`docs/2026-09-03-registry-review-request-READY.md`.
+
 ### 4.Y BRING `word_razzle` HOME -- it is the one cloud lane whose NAME hides it (operator, 2026-09-03)
 
 **Operator:** *"word_razzle shouldn't be cloud anymore"*, and the reason behind it:
@@ -1245,40 +1468,6 @@ long enough to need two segments. Eight engines declare the identity
 (ghost_signal, humo, ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v);
 the cloud adapters do not.
 
-### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
-
-**Not work yet, and explicitly not before v2 ships.** The operator, thinking it
-over away from the desk: *"once we ship v2 we ship an OTR-Lite, similar
-architecture but only the most frictionless auto-download non-gated models, and
-maybe just maybe we can figure an ffmpeg-less solution for a truly streamlined
-workflow."*
-
-**Two halves, and the second one pays a debt nobody connected to it.**
-
-* **Non-gated auto-download only.** Already half-mapped:
-  `scripts/otr_fetch_lane_weights.py` offers UNGATED sources by design and
-  deliberately refuses to paper over the one gated repo (Lightricks/LTX-2.5), so
-  its lane list is effectively the candidate set. Measured on the 4090 pod
-  2026-09-03, the fully-frictionless bundle is `haunted + one z_image precision
-  + stable_audio_3` -- about 20 GB for one complete episode.
-* **ffmpeg-less.** This is not only an install-friction win. `subprocess` calls
-  to ffmpeg/ffprobe are **35 of the pack's 158 Comfy Registry scan findings**
-  (`python_command_injection_risk`), plus most of the 12
-  `python_url_command_execution` ones. An in-process encode path shrinks the
-  largest non-`os.environ` finding class at the same time as removing the binary
-  dependency -- the two goals are the same work. PyAV (`av>=16.0.0`) is already a
-  ComfyUI CORE dependency, so it ships on every install.
-
-**THE ONE KNOWN BLOCKER, and it is where this starts.** This PyAV build has no
-`libass` and no `drawtext`, so CAPTION BURN and CREDITS cannot move in-process
-as-is. The mux, the silent composite and the probe already have PyAV routes. So
-the first question of an OTR-Lite effort is captions and credits without
-libass/drawtext -- not the mux, which is the part that looks hard and is not.
-
-**Related evidence already on disk:** `docs/RUNPOD_INSTALL.md` section 7A (what a
-second machine actually trips over), and the registry finding counts in
-`docs/2026-09-03-registry-review-request-READY.md`.
-
 ## SECTION 5 -- Bug Bible promotion field -- pending actions only
 
 | Record | Pending action |
@@ -1298,136 +1487,6 @@ second machine actually trips over), and the registry finding counts in
 The active production-fix owner updates `docs/PROD_BUG_LOG.md`; promotion to the Bible is
 tracked in the Bible repo's `otr_coverage_index.yaml` (CLAUDE.md, delta-scrape discipline);
 no plan review or invented fixture creates a row.
-
-### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 2026-09-02; awaits his pick)
-
-Operator, 2026-09-02: a fresh set of eyes on whether the AnimateDiff v3 (+ adapter) lane takes
-advantage of the ledger and the per-beat stills, with the VISUAL STYLE obeyed ("I think we lost
-the visual style" -- confirmed: the style reaches that lane as a two-word cue on a fixed base
-checkpoint under a photographic-grime adapter, no still) and stills-in among the first one to
-three arms. The self-contained statement is
-`docs/2026-09-02-animatediff-ledger-experiments/PROBLEM_STATEMENT.md` (11,000 words, grounded by
-a five-reader workflow); four fresh reads (Fable 5.1 cold, Codex, Cursor, Antigravity) and the
-driver's grounded judgment are in `fresh-eyes/`. The judged order: (0) the instrument -- durable
-prompt + seed + request hash on the ledger, a canonical REPLAY mode (today the writer node always
-mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
-adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
-LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
-engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
-plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
-`still-in-peer/driver_anchor.md` section 7 D4); (3) the pack's
-language back into the prompt under a 77-token budget; (4) one timeline per shot (a
-FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
-FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the
-shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
-(Section 4) until then.
-
-**Status 2026-09-02 (evening).** Operator: "I leave it up to you to synthesize and code maybe
-1-3 of the best options." Item 0, the instrument, is CODED after a full four-round arc
-(`instrument/driver_anchor.md`, sections 1-13): every rendered clip carries a versioned ACTUAL
-receipt hashed into `actual_request_sha` and stamped durably as `meta.render_trace`; the writer's
-trailing `replay_from` widget (and `otr_canonical_api_run.py --replay-from`) re-renders a frozen
-bundle (`scripts/otr_freeze_replay_bundle.py`) through the whole canonical graph with no writer,
-TTS, music or stills, node 7 byte-copying the SHA-verified master; `scripts/otr_verify_replay.py`
-is the offline A/A verifier. Item 1, the adapter sweep, is RUNNING on the 5080 overnight profile
-(two styles x 1.0 / 0.5 / 0.25 / 0.0, titles "Adapter <k> <style>", published to `otr/obs/` for
-the operator's eye). Next: the live replay proof (render, freeze, replay twice, verify) once the
-sweep releases the GPU, then item 2, the still-in lab peer -- registered only after the
-`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
-operator's standing rule for any new video pack requires.
-
-**Title-card leak, 2026-09-02 17:45 (operator: "your attempt at a video plan bled into my
-title").** The first three sweep legs were launched with `--title "Adapter <k> anime"` so the
-leg could be told apart in `otr/obs/`; that flag rides the writer's `episode_title` widget and
-so became the on-screen TITLE CARD of three published episodes (the known harness-label path,
-CLAUDE.md "fix the title at the source"). Standing rule from the operator, same minute: every
-canonical leg runs the CLEAN runner, title generated from the story (public_domain: the
-source's own title). Legs 4-8 run without `--title`; a leg is identified by its log, its
-publish timestamp and, now that item 0 is merged, durably by
-`meta.render_trace[*].sampler_inputs.adapter_strength`. The three already-published episodes
-stay in `otr/obs/` (nothing is ever tidied out of it). SOURCE FIX, still open: give the harness a
-`run_label` of its own that reaches the log and the ledger meta but never `episode_title` -- a
-small design item (touches the API runner, the whitelist and the mux's filename), arc before code.
-
-**Every style, not anime (operator, 2026-09-02 evening): "anime is not the only target; all
-visual styles need to craft the episode as well when selected."** The registry carries nine
-(`nodes/_otr_visual_styles.list_style_ids()`: anime, archival_documentary, cartoon,
-paper_origami, recur_frac, sci_fi_radio, shakespeare_stage_realism, storybook_engraving,
-video_art). The two-word-cue defect is style-blind, so every arm of this campaign -- the
-adapter sweep (already anime + storybook_engraving), the still-in lab peer, the pack language
-under the 77-token budget -- is designed and proven PER STYLE, with a non-anime style in every
-proof leg, and judged by one question: is the SELECTED style visibly the episode's style on the
-stills and the video alike.
-
-**First read of the sweep (operator, 2026-09-02 evening, on the three anime legs 1.0 / 0.5 /
-0.25):** "the anime looks improved; which one is better, not sure at the moment." He reviews
-the full candidate set when he is back; the driver's standing instruction meanwhile is "keep
-coding, do your best" and to decide whether a blinded A/B is needed. The instrument's
-render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
-attributable; the first three legs pre-date the merge and carry no trace.
-
-**Item 1 CLOSED by the operator's eye (2026-09-02, ~20:30), six of eight legs watched.**
-Storybook engraving: 0.5 (`the_last_reading_190630`) "very storybook and did the best of
-maintaining the style"; 1.0 (`the_trembling_ground_182739`) "cool rendered 3D realistic
-storybook stuff but drifted into the army men in green coats". Anime: 1.0 "more anime than
-0.0 but drifted into real-life stuff for a while"; 0.5 "some anime but some people in blue
-coats"; 0.25 "maybe the most anime"; 0.0 "definitely animation, not strikingly anime, but
-cool". His delegation: "if you think any of them are an improvement to the haunted we have,
-take your best take." TAKEN: **`ADAPTER_V3_STRENGTH` 1.0 -> 0.5** (the shipped default on
-both boxes; the env override stays the sweep knob; every receipt stamps what ran). 0.25 is
-the standing contender on anime; if storybook 0.25 (leg 7) also beats 0.5 by his eye the
-default moves to 0.25 -- one constant. **The coats finding:** across the traced episodes the
-only prompts that say "coat" say "cream coat" and "charcoal coat" (the cast's own looks, both
-characters), never green or blue; the green army coats and blue uniforms are the base model's
-prior for "coat" under an engraving or anime medium, amplified by the adapter. The GARMENT
-WORD is a style lever -- an input to item 3 (pack language): the motif composer should map
-garments through the pack rather than pass the writer's word raw, and this is the first
-measured prompt-to-picture pair the instrument's trace made citable.
-
-**Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
-Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
-`animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288
-plate minted in-graph from the pack's full language and the ledger's world, repeated in Python
-to the sampler batch, sampled at a strict `OTR_STILLIN_LAB_DENOISE` (default 0.65); a lab id
-on `otr_stillin_lab_5080` (`draft`, never a default); the replay instrument gained a derived
-bundle (`--derive-engine`) so ONE ledger renders on both Ghost siblings; the verifier gained
-the plate-hash rule; `scripts/otr_stillin_probe_report.py` measures motion energy against the
-lane's own A/A band. The design and receipts are `still-in-peer/driver_anchor.md` sections
-1-14. NEXT: merge, the full suite in the main checkout, then the live probe on the 5080 --
-one style per invocation, anime and storybook_engraving first, every leg to `otr/obs/` with
-the story's own title -- and the operator's eye on the triptychs. Stop rules stand (section 7
-D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
-and keeps the plate ends E1 (next arm the E2 probe).
-
-**Item 3 REDEFINED and IN ARC -- Prompt v3, "draw the crux" (operator, 2026-09-02 21:00-22:00).**
-He read every beat of the storybook episode beside the prompt it got, rewrote ten by hand,
-and ruled: draw what the line is ABOUT in the story's one setting, mix the visual style with
-the CRUX of the story on every beat, the world's own motion, no costume or prop the dialogue
-never names, fewer variables ("too many variables -> humans and bags"), get creative, and
-"yes, I want to see more STORY, not just the characters." Mechanically confirmed: the lane's
-character motif is a costume template with fallback pools (coat; lantern / key / ledger /
-satchel), the object beats draw the carried prop, the leaf author is handed no dialogue and
-its one hint field was empty on all 27 beats, and the story brief plus `key_objects` sat unused
-by this lane. Source: `prompt-rule/operator_rewrites.md`; anchor: `prompt-rule/driver_anchor.md`
-(sections 1-7; r1 = Fable cold + Antigravity, five reversals, R1-R10 govern; r2 Codex running).
-**GPU FREEZE (operator, 21:50): "don't waste any GPU runs until the prompting is fixed."** The
-adapter sweep's last leg finished on its own (8/8 published); the overnight chain was NOT
-launched; nothing boots a server until v3 is merged and green. The first GPU run after is ONE
-episode, same seeds, v2 beside v3 (R9). The still-in peer (item 2) and the 0.5 adapter default
-(item 1) merged at 7c231e24 with the full suite queued on CPU; their probes wait behind v3.
-Item 3b (the other video lanes get the same SHAPE, per-lane budgets, talking-face lanes
-exempt) follows once v3 is judged on this lane.
-
-**Operator, 2026-09-02 20:45: "of course I'm really more interested in video art or
-recursive fractal, or both if they are separate."** They are separate packs (`video_art`,
-`recur_frac`), and they are the two LONGEST packs in the registry -- the ones the shipping
-lane's two-word cue serves worst and the ones the peer's full-language plate is built for
-(recur_frac's plate reduces to its positive_tail under the 320-char ceiling; the receipt shows
-what survived). Tonight's GPU chain leads with them on BOTH lanes: after the instrument's
-replay proof, four adapter legs (video_art and recur_frac at the shipped 0.5 and the
-contender 0.25), then the still-in probe on video_art, then on recur_frac. Anime and
-storybook_engraving probes follow on a later night. His eye on those two styles is the
-verdict that matters most to him; the per-style rule stands for the rest.
 
 ## SECTION 6 -- Open risks
 
