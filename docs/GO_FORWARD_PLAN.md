@@ -129,7 +129,24 @@ directly instead.
   `kokoro-onnx` line present in the shipped `requirements.txt`, and none of `tests/`,
   `.claude/`, `.github/`, `kibitz-runs/` leaked. The registry recorded **19 dependencies**
   (alpha.16 recorded 18) -- the static-list check that alpha.3 taught us to run.
-  Status is `Pending`, which is the 30-minute scan queue, not a verdict.
+  **ITS SCAN HAS SINCE LANDED (2026-09-03 19:06Z): `Flagged`, 158 findings, ALL
+  `severity: info`, ZERO `critical`** -- re-read directly from
+  `?include_status_reason=true`, not carried over from the doc. The delta from
+  alpha.16's 157 is exactly +1 `python_environment_manipulation` (102 -> 103), which is
+  the route gate's own `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added. So
+  the credential fix held across the bump, Flagged-on-info-only is the expected outcome,
+  and **every precondition on the manual review request is now satisfied** -- it is ready
+  to file on the operator's go and nothing else gates it.
+* **pycairo was the ONLY source-build-only dependency -- audited, not assumed
+  (2026-09-04).** Every line in `requirements.txt` was evaluated against a
+  linux / cp310 / x86_64 marker environment (what the extract container is) and then
+  checked against PyPI's own file list for that release. All 17 selected packages resolve
+  to either a manylinux wheel or a pure-python wheel; `kokoro-onnx` and `pycairo` are
+  correctly skipped by their markers. The transitive suspect named in the handoff is also
+  clear: `misaki` is pure-python and `spacy` / `thinc` / `blis` all carry cp310 manylinux
+  wheels. **One residual risk that cannot be settled from here:** kokoro pulls `torch`,
+  and if the container's preinstalled CPU torch does not satisfy the constraint, pip would
+  download multiple GB inside the 600 s extract timeout. Unknowable without the image.
 * **alpha.16 scanned 0 critical / 157 info (2026-09-03), the first zero-critical scan
   since alpha.8.** The two `critical` `prohibited-string` findings that flagged alpha.9
   through alpha.15 were the writer declaring the session-bearer hidden input beside
