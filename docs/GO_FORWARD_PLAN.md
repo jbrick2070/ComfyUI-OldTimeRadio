@@ -1194,6 +1194,40 @@ An i2v anchor for the 8 GB floor lane. Not started; ship-readiness first.
 
 ---
 
+### 4.X OTR-LITE -- a second, frictionless pack AFTER v2 ships (operator idea, 2026-09-03)
+
+**Not work yet, and explicitly not before v2 ships.** The operator, thinking it
+over away from the desk: *"once we ship v2 we ship an OTR-Lite, similar
+architecture but only the most frictionless auto-download non-gated models, and
+maybe just maybe we can figure an ffmpeg-less solution for a truly streamlined
+workflow."*
+
+**Two halves, and the second one pays a debt nobody connected to it.**
+
+* **Non-gated auto-download only.** Already half-mapped:
+  `scripts/otr_fetch_lane_weights.py` offers UNGATED sources by design and
+  deliberately refuses to paper over the one gated repo (Lightricks/LTX-2.5), so
+  its lane list is effectively the candidate set. Measured on the 4090 pod
+  2026-09-03, the fully-frictionless bundle is `haunted + one z_image precision
+  + stable_audio_3` -- about 20 GB for one complete episode.
+* **ffmpeg-less.** This is not only an install-friction win. `subprocess` calls
+  to ffmpeg/ffprobe are **35 of the pack's 158 Comfy Registry scan findings**
+  (`python_command_injection_risk`), plus most of the 12
+  `python_url_command_execution` ones. An in-process encode path shrinks the
+  largest non-`os.environ` finding class at the same time as removing the binary
+  dependency -- the two goals are the same work. PyAV (`av>=16.0.0`) is already a
+  ComfyUI CORE dependency, so it ships on every install.
+
+**THE ONE KNOWN BLOCKER, and it is where this starts.** This PyAV build has no
+`libass` and no `drawtext`, so CAPTION BURN and CREDITS cannot move in-process
+as-is. The mux, the silent composite and the probe already have PyAV routes. So
+the first question of an OTR-Lite effort is captions and credits without
+libass/drawtext -- not the mux, which is the part that looks hard and is not.
+
+**Related evidence already on disk:** `docs/RUNPOD_INSTALL.md` section 7A (what a
+second machine actually trips over), and the registry finding counts in
+`docs/2026-09-03-registry-review-request-READY.md`.
+
 ## SECTION 5 -- Bug Bible promotion field -- pending actions only
 
 | Record | Pending action |
