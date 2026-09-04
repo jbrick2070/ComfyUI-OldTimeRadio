@@ -62,9 +62,11 @@ ALLOWED = {
         "putting the repo on sys.path at :36, deliberately, so that no adapter "
         "reaches for a GPU while the matrix is only asking what it declares. "
         "Importing the owner first would need the path insert first, which is "
-        "exactly the ordering the flag exists to get in front of. A dev tool, "
-        "imported by nothing shipped -- but it DOES ship, because .comfyignore "
-        "excludes neither tools/ nor config/"),
+        "exactly the ordering the flag exists to get in front of. It no longer "
+        "SHIPS -- `tools/` was added to .comfyignore on 2026-09-04 -- but the "
+        "guard still watches it on purpose: an excluded file is one .comfyignore "
+        "edit away from shipping again, and the ratchet should not have to be "
+        "re-widened to notice"),
 }
 
 #: Files not yet migrated to the owner. This set SHRINKS, in the same commit as

@@ -165,3 +165,15 @@ workflows/external_examples/
 # to every installer as a page that cannot work. It stays in git for the
 # developers who run the server beside it.
 viewer/
+
+# 2026-09-04, on a fable pre-publish review: `tools/` is DEVELOPER tooling and
+# nothing shipped imports it (grep clean across nodes/ and __init__.py), yet it
+# was reaching the registry zip -- six .py files that no installer can use.
+# One of them, `tools/engine_matrix.py`, sets OTR_TEST_MODE at import, so it
+# also contributed an `os.environ` finding to the scan for a file that is not
+# part of the product. Excluding it makes the scan's surface equal the pack's
+# actual surface, which is the claim the manual-review request makes.
+#
+# `config/` is NOT excluded and must not be: `config/cast_pools.py` and its
+# siblings are read at render time.
+tools/

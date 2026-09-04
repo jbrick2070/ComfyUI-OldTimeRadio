@@ -27,6 +27,11 @@ PROHIBITED = "AUTH_TOKEN" + "_COMFY_ORG"
 _UNSHIPPED_PREFIXES = (
     "tests/", "kibitz-runs/", ".github/", ".claude/", "docs/",
     "kibitz-plugin/", "tmp/",
+    # 2026-09-04: developer tooling, excluded from the bundle on a fable
+    # pre-publish review -- nothing shipped imports it, and one of its files
+    # was contributing an os.environ finding to the registry scan for code
+    # that is not part of the product.
+    "tools/",
 )
 # scripts/* is excluded except the three subprocess workers that ship.
 _SHIPPED_SCRIPTS = {
