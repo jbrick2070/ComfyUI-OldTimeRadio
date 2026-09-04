@@ -1,468 +1,73 @@
 # OTR Go-Forward Plan
 
-**Forward-only.** Open work and nothing else. Receipts go to `docs/PROD_BUG_LOG.md`,
-`docs/GO_FORWARD_ARCHIVE.md` and the dated receipt docs; rulings go to
-`docs/OTR_STANDING_RULINGS.md`; only what is still TO DO belongs here.
+**THIS FILE IS WORK THAT IS NOT DONE YET.** Operator, 2026-09-04, twice: *"GO_FORWARD
+should be clean with the coming work, not done work"* and *"GO_FORWARD should NOT have
+done stuff -- only stuff that needs to be done."* Finished work lives in
+`docs/HANDOFF_LOG.md` (what happened, with receipts) and `docs/GO_FORWARD_ARCHIVE.md`
+(the receipts themselves, verbatim, never summarized). If you find a paragraph here that
+only reports something already shipped, move it to the archive -- do not delete it, because
+roughly a third of these paragraphs carry an operator RULING and losing one costs far more
+than the length does.
 
-Layout: THE QUEUE (ordered; item 1 is the next thing to do) -> Section 1 the build rows
-behind the queue, in queue order -> Section 2 render work batched by the leg that proves
-it -> Section 3 rulings owed by the operator, each with its default -> Section 4 parked
--> Section 5 Bug Bible promotion field -> Section 6 open risks. Standing traps, recorded
-limits and lifted rulings live in `docs/OTR_STANDING_RULINGS.md` ("KNOWN OPEN" and the
-2026-09-02 lifted-rulings section), not here. `docs/2026-*/` and `kibitz-runs/` are
-gitignored: pointers to them are 5080-local.
+**THE ORDER BELOW IS THE OPERATOR'S, set 2026-09-04 evening:** finish the CODING (the
+correctness bugs, then the design rows that need an arc first), then the SCAN COLLAPSE,
+then prove it on the SECOND MACHINE, then the POD rental, and the REGISTRY LAST -- because
+the manual review request is filed on the first NON-ALPHA version, the same day it
+publishes, so the version under review is the version a stranger would install. In his
+words: *"I want to get all those design and coding done so we can finally try our registry
+fix and see our improvements."*
 
-* **Standing rulings, laws, review routing and the credit ladder:**
-  `docs/OTR_STANDING_RULINGS.md` -- read it, it is not optional. The plan says what to
-  do; that file says what you may not do while doing it.
-* **Closed receipts:** `docs/GO_FORWARD_ARCHIVE.md` (not read to resume).
-* **Machine guide:** `docs/MACHINE_MATRIX.md` (generated; edit `config/machine_classes.json`).
-  **Pod manual:** `docs/RUNPOD_INSTALL.md` (Codex owns it). **Ship-readiness receipts:**
-  `docs/ship-audit-2026-09-01/`. **The highest authority is still `CLAUDE.md`.**
-
-## WHERE TO PICK UP (written 2026-09-04 evening; the last CODE head is `3d4a7077`)
-
-**Tree state:** `v2.0-alpha`, HEAD == origin, clean. Suite baseline **13492 passed /
-126 skipped / 1 xfailed** (2026-09-04 evening). Bible **335 entries** (repo HEAD
-`81a8a9e`; 22 passed / 27 skipped / 3 xfailed). No resident server; VRAM at the
-desktop baseline. Codex CLI: the standard tier is out of credits until
-**2026-09-07 08:34 PDT** and Spark (`gpt-5.3-codex-spark`) overflowed its context on
-a 12 KB plan -- fill the seat with Sonnet/Opus or a second agy model (Gemini 3.1 Pro
-(High) is a distinct reviewer from 3.8 Flash) and say so in the roster. Reviews are
-**one or two lanes per decision** (operator, 2026-09-04), not three.
-
-**NEXT CODER STEP -- the registry-collapse BUILD. The plan is CLOSED (r1-r4):**
-`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` (force-added; read it
-whole before typing; its r4 judgment sits beside it). Shipped already: Phase 0 and 0b,
-the orphan rips (`2f12a696`, `1e373adc`); the two owners `nodes/_otr_shared/env.py`
-and `nodes/_otr_shared/proc.py` plus the shared two-direction ratchet
-`tests/fixtures/ratchet.py`, on disk and INERT -- nothing imports them yet (`3d4a7077`).
-**The next commit is THE RATCHET COMMIT**, sequencing step 2 of the plan: both AST
-guards as named-set ratchets calling the shared helper in both directions (env: every
-`os.environ` spelling, `import os as X` aliases resolved generically, subscript reads,
-`getenv/putenv/unsetenv`, `nodes/**` plus the two roots by explicit path, allowlist =
-the owner and `prestartup_script.py`; proc: execution CALLS only -- `PIPE` and the
-exception classes are not findings); the network guard with its five named files;
-`tests/test_terminal_frame.py` taught `otr_proc` at every import depth with lowercase
-`popen` added to `_SPAWN_CALLS` (`:495` AND `:498` are the receipt); the mux knob
-test's predicate resolved from the mux's own import. Then the batches, one commit
-each, full suite per commit: (a) `_otr_shared` (with `gpu_residency`'s D fix) -> (b)
-audio, image, upscale (spandrel sha256 rides here), video (`eng_ltx25` `import sys`
-and the six `wan_shared` strings ride here), google_api -> (c) `nodes/_otr_*.py` ->
-(d) EVERY remaining `nodes/*.py` (eleven are unprefixed) and the root `__init__.py`
-(env import ABOVE line 51, OUTSIDE the swallowing try/excepts). Every migrated module
-imports the owners ALIASED, `otr_env` / `otr_proc`, at its own depth (`env` and `proc`
-collide with live locals); test seams patch `M.otr_proc.run` in the module's own
-batch. Acceptance: both guards green with empty pending sets, then a canonical leg
-that PUBLISHES to `otr/obs/` (the launcher's profile and roots READ BACK from the leg
-log before any receipt), then the operator bumps `pyproject.toml` and the next scan
-is the receipt (about 9 `info` findings expected, from 158).
-
-**DECISIONS OWED BY THE OPERATOR -- skip these, do not guess:**
-* `nodes/_otr_shared/content_oracle.py` has ZERO production importers (eight test
-  sites; the two "importers" were comment mentions). Rip it, wire its luma-floor and
-  freeze checks into the render path (an ffmpeg pass per clip), or move it under
-  `tests/` / `scripts/` so it stops shipping. `OTR_STANDING_RULINGS` currently keeps
-  its manifest wrappers, so the default is KEEP until ruled.
-* File the Comfy-Org manual review request -- a PUBLIC post; every precondition is met.
-* The `.comfyignore` line for `viewer/index.html`; the `partner_nodes.yaml`
-  `AUTH_TOKEN_COMFY_ORG` scrub (check the parser first).
-* PBUG-20260904-05: the draft 8 GB profiles (`8gb_lite`, `otr_4060_floor`,
-  `otr_4060_viz_12b`) render `media_archive` at 2048 ctx and refuse `science_news`
-  (2,741 tokens) and `original` (3,338) -- a profile-design call; the 4060 proves,
-  the 5080 promotes.
-
-**Still open, forward:** 1.4a row G follow-ups; the symbols `python
-scripts/dead_code_closure.py` lists under "NAMED IN A PROTECTIVE DOC" (each has a
-ruling; `force_vram_offload` is kept on purpose; the P0 contract module is the
-evidence for OPEN PBUG-20260729-03 and stays whole); item 3d, the shared-composer
-face-paragraph change across eleven lanes, is still deliberately not a drive-by.
+**Standing constraints, every chunk, every window:** the 5080 loop is untouched -- nothing
+ships that reduces tomorrow's `obs` count. The pod stays STOPPED until its own item. One
+coder window per file owner (CLAUDE.md section 1). Every chunk = focused tests + full suite
++ Bug Bible + commit AND push + `HEAD == origin/v2.0-alpha`. Reviews are ONE OR TWO lanes
+per decision (operator, 2026-09-04), not three; a design choice with more than one
+defensible answer still gets its arc BEFORE code.
 
 ---
 
-## THE QUEUE -- READ THIS FIRST (ordered by the operator, 2026-09-02)
-
-**Standing constraints:** the 5080 loop is untouched -- nothing ships that reduces
-tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per file
-owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
-AND push + `HEAD == origin/v2.0-alpha`.
-
-**1. THE REGISTRY -- alpha.17 IS PUBLISHED AND VERIFIED (2026-09-03). Two SEPARATE goals
-live here and conflating them is what made this feel stuck: (a) an INSTALLABLE listing,
-which needs an admin approval we cannot self-serve, and (b) the "N Nodes" count on the
-card, which is a different pipeline entirely -- and which, MEASURED 2026-09-03, is
-STALLED ON COMFY-ORG'S SIDE and is not ours to fix at all (see the ANSWERED block
-below; the newest successful extract in a 360-pack sample is 2026-04-28).** The old
-control experiment (republish alpha.8 byte-identical) is CANCELLED -- the cause was found
-directly instead.
-
-* **alpha.17 published 2026-09-03 17:56Z, commit `524426ee`, Action green, and VERIFIED
-  AGAINST THE ARTIFACT rather than the commit.** The CDN zip
-  (`.../2.0.0-alpha.17/node.zip`, 6,397,276 bytes, 814 files) was downloaded and grepped:
-  `OTR_ENABLE_HTTP_RENDER_ROUTES` present in `__init__.py`, the pycairo marker and the
-  `kokoro-onnx` line present in the shipped `requirements.txt`, and none of `tests/`,
-  `.claude/`, `.github/`, `kibitz-runs/` leaked. The registry recorded **19 dependencies**
-  (alpha.16 recorded 18) -- the static-list check that alpha.3 taught us to run.
-  **ITS SCAN HAS SINCE LANDED (2026-09-03 19:06Z): `Flagged`, 158 findings, ALL
-  `severity: info`, ZERO `critical`** -- re-read directly from
-  `?include_status_reason=true`, not carried over from the doc. The delta from
-  alpha.16's 157 is exactly +1 `python_environment_manipulation` (102 -> 103), which is
-  the route gate's own `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added. So
-  the credential fix held across the bump, Flagged-on-info-only is the expected outcome,
-  and **every precondition on the manual review request is now satisfied** -- it is ready
-  to file on the operator's go and nothing else gates it.
-* **THE SCAN COLLAPSE IS THE CODER'S NEXT CHUNK** -- see WHERE TO PICK UP at the
-  top: plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is
-  next. Nothing in it needs the operator except the review filing above.
-* **pycairo was the ONLY source-build-only dependency -- audited, not assumed
-  (2026-09-04).** Every line in `requirements.txt` was evaluated against a
-  linux / cp310 / x86_64 marker environment (what the extract container is) and then
-  checked against PyPI's own file list for that release. All 17 selected packages resolve
-  to either a manylinux wheel or a pure-python wheel; `kokoro-onnx` and `pycairo` are
-  correctly skipped by their markers. The transitive suspect named in the handoff is also
-  clear: `misaki` is pure-python and `spacy` / `thinc` / `blis` all carry cp310 manylinux
-  wheels. **One residual risk that cannot be settled from here:** kokoro pulls `torch`,
-  and if the container's preinstalled CPU torch does not satisfy the constraint, pip would
-  download multiple GB inside the 600 s extract timeout. Unknowable without the image.
-* **alpha.16 scanned 0 critical / 157 info (2026-09-03), the first zero-critical scan
-  since alpha.8.** The two `critical` `prohibited-string` findings that flagged alpha.9
-  through alpha.15 were the writer declaring the session-bearer hidden input beside
-  `api_key_comfy_org` (PBUG-20260902-04); removing it cleared both.
-  `tests/test_registry_prohibited_strings.py` guards every shipped file. Confirmed still
-  true of alpha.17: the four remaining `auth_token_comfy_org` occurrences in `nodes/` are
-  byte-identical to alpha.16 and are a consumer-side NAME CHECK, not a declaration.
-* **THE NODE COUNT WAS A DEPENDENCY BUG, NOT AN APPROVAL PROBLEM -- FIXED IN `aff1f9c4`.**
-  The "N Nodes" badge is fed by Algolia's `comfy_nodes` array, which is populated by
-  Comfy-Org's `node-pack-extract`: a Cloud Build container that boots a headless CPU
-  ComfyUI on Linux, runs a bare `pip install -r requirements.txt` under `set -e`, and
-  reads `/object_info`. **It is independent of Flagged/Active, so no approval would ever
-  have populated it.** Measured: `/versions/2.0.0-alpha.16/comfy-nodes` returns
-  `{"comfy_nodes": null, "totalNumberOfPages": 0}` where
-  `comfyui-videohelpersuite/versions/1.7.9` returns real rows. Cause: `pycairo` publishes
-  21 Windows wheels, 1 sdist and **zero Linux wheels**, so that install had to build from
-  source against `libcairo2-dev` and died. `requirements.txt` now marks it
-  `sys_platform == 'win32'`, mirrored into `pyproject.toml`.
-  **Cost, measured not asserted:** one function. The only `import cairo` in
-  `scope_draw.py` is inside `paint_mandala`, so importing the module never imports cairo;
-  `freq_bars_green`, `cfr_flags`, `find_ffmpeg`, `encode_silent_mp4` are cairo-free, so
-  the scope overlays, caption burn, silent composite and encode sink are untouched.
-  `viz_mxc_mandala` guards `load()` and `assert_usable()` and appears zero times in
-  `otr_canonical.json`. The Linux pod keeps the engine because
-  `scripts/otr_pod_provision.sh` apt-installs the headers and now pip-installs pycairo
-  explicitly -- do NOT "simplify" that line away.
-  **ANSWERED 2026-09-03 18:30Z, AND THE ANSWER CLOSES (b) AS NOT-OURS. DO NOT CHASE
-  KOKORO.** The re-check ran: `/versions/2.0.0-alpha.17/comfy-nodes` is still `null`.
-  The paragraph that stood here read that as "something else in the install also fails
-  on Linux -- next suspects are `kokoro`'s spacy/thinc/blis chain against the 600 s
-  extract timeout". **That is wrong, and acting on it would have burned a coder window
-  on infrastructure we do not own.** It offered a binary -- our fix worked, or our
-  install still fails -- and omitted the third option, which is the true one.
-  `?include_status_reason=true` exposes a field the theory was built without:
-  **`comfy_node_extract_status`**, which has TERMINAL values (`success` and
-  `invalid_format` both observed). Measured across **360 registry packs**: only 64 have
-  ever recorded a `success`, and **the most recent successful extract ANYWHERE in that
-  sample is 2026-04-28**. rgthree (Active, 47 prior successes) has versions sitting
-  `pending` since 2026-05-09; kjnodes (Active, 24 successes) since 2026-05-05;
-  florence2 since 2026-05-06. **Comfy-Org's `node-pack-extract` has produced no
-  successful extract for any pack in over four months.** OTR records zero successes
-  because OTR's first publish was 2026-08-22 -- four months AFTER the pipeline last
-  worked. It never had a chance, and no `requirements.txt` change reaches it.
-  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits -- a package
-  publishing 21 Windows wheels and zero Linux wheels genuinely does not install in that
-  container -- and it is what makes a Linux `pip install -r requirements.txt` work at
-  all, extract pipeline or no. It simply was not the node-count blocker.
-  **Reproduce before re-opening this:** compare the newest `success` timestamp across a
-  broad pack sample against OTR's first publish date. If a pack ever extracts
-  successfully again, the question becomes live and OUR deps become worth re-testing;
-  until then the card's node count is not a work item.
-* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** Active needs ZERO
-  findings of any severity or an admin batch approval; 157 info-level YARA hits (env
-  reads, ffmpeg subprocess, opt-in cloud lanes) keep it Flagged forever on the automated
-  path. The gate is a literal `if issues == ""` on the scanner body -- one info finding
-  and 157 are identical. There is no publisher self-service route to Active, confirmed by
-  reading `Comfy-Org/registry-backend`. Corroborated independently: rgthree's two newest
-  publishes are Flagged too, so the ruleset tightened in late August and comparing against
-  older Active versions of popular packs proves nothing.
-* **ALPHA.17 SCANNED 2026-09-03 19:06Z: 158 findings, ALL `info`, ZERO `critical`, status
-  `Flagged`.** The credential fix held across the bump. The delta from alpha.16's 157 is
-  exactly +1 `python_environment_manipulation` (102 -> 103), which is the route gate's own
-  `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added -- i.e. the one new finding
-  is the feature we shipped, behaving as designed. Flagged with zero criticals is the
-  expected outcome, not a failure.
-* **THE NODE-COUNT HALF IS ALREADY FILED, AND HAS BEEN SINCE 2026-08-24: the operator
-  opened `Comfy-Org/registry-backend#203`.** It is still OPEN with no comments, labels or
-  assignee. It names a cause this window's 480-pack survey could not have found on its own
-  -- **a backfill cron scheduled for February 29th**, a date that does not occur in 2026 and
-  next occurs in 2028. The operator added the survey as a comment on 2026-09-03 and
-  corrected the issue's date window: extraction did not stop in February, it stopped
-  **2026-04-28**, and 19 packs' newest success falls in April with nothing after. Do NOT
-  open a second issue on this; comment on #203.
-* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO,
-  AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision,
-  and the measurement behind it is that **admin approval is PER VERSION.** Verified
-  on `comfyui-video-xy-plot`: all five of its versions carry their own
-  `{"message": "subprocess: ffprobe", "by": "dr.lt.data@gmail.com"}` note, four of
-  them published on the same day. So approving alpha.17 buys nothing for
-  alpha.18, and this branch shipped five versions in five days. Asking now would
-  spend a reviewer's time on a version superseded within the week -- which is the
-  behaviour that actually annoys a maintainer, as distinct from asking at all.
-  **File it on the first NON-ALPHA version, the same day it publishes**, so the
-  version under review is the version a stranger would install. Include the
-  question about node-level review; it costs them less than five separate ones.
-  Everything is ready and needs no further work:
-  `docs/2026-09-03-registry-review-request-READY.md` carries the title, the body,
-  alpha.17's version id, counts read from its own scan, the zero-is-unreachable
-  measurement, and the video-xy-plot precedent. **Re-read it before posting** --
-  the version id, the counts and the "0 critical" claim all move with each new
-  publish, and a request quoting a superseded version is worse than none.
-* **The old NEXT line, kept so the parking is legible:** file the manual review
-  request. Draft ready and retargeted at alpha.17 in
-  `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
-  published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
-  strike that step. **BOTH REMAINING PRECONDITIONS ARE NOW SATISFIED
-  (2026-09-03):** alpha.17's scan landed at 0 critical, and every finding count in the
-  draft has been re-read from alpha.17's own scan (158, not alpha.16's 157). The draft is
-  ready to post as-is. Filing is a public post on Comfy-Org's tracker and needs the
-  operator's explicit go -- it is the only thing still holding it.
-* **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL
-  verification, NOT for scanner probing.** Publishing a small pack under his own publisher
-  to confirm a dependency set actually installs in their Linux container is ordinary use
-  and would have caught the pycairo bug for free, before it cost four version strings.
-  Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in
-  a real security queue, and it is **unnecessary** -- `?include_status_reason=true` already
-  returns all 157 findings itemized by rule, so there is nothing left to discover.
-* DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes.
-  Never version-delete: a soft delete burns the string permanently.
-
-**2. THE KOKORO-ONNX BACKEND -- DONE 2026-09-02, receipts archived.** Both proofs
-published and eyeballed ("this episode is perfect, voices great"). Its one leftover, the
-kokoro-onnx dependency line reaching registry installs, rides the alpha.17 bump in item 1.
-Detail in `docs/GO_FORWARD_ARCHIVE.md` and `docs/2026-09-02-kokoro-onnx/`; row in
-Section 1.1.
-
-**3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
-correctness defects (a gender or voice contradicting the source, a beat that renders the
-wrong picture, a leg that dies late).
-* **3a. Character gender ladder -- DONE 2026-09-02.** Receipt archived; row in Section 1.2.
-* **3b. PROMPT v3 "DRAW THE CRUX" -- HALF A SHIPPED AND PROVEN 2026-09-03. HALF B IS OPEN
-  AND IS THE NEXT CODER WINDOW ON THIS LANE.** The AnimateDiff lane was composing an
-  invented costume plus a leaf written from that costume plus a framing law -- none of the
-  three knew the story, which is why it drew a charcoal coat and a satchel for an episode
-  about film canisters. Half A (`b198026a`'s parent merge `b97cce6d`) composes pack cue +
-  crux kernel (the episode's own `key_objects` in its own setting) + light + world motion +
-  a vantage mapped from the stored mode, reading neither the stored motif nor the leaf nor
-  the law. Render-time only, so a frozen episode replays with a byte-identical seed --
-  `render_request_hash` never included the prompt. **Proven:** same-seed A/B in `otr/obs/`
-  (21:08 old vs 23:59 new, seeds identical 8/8, prompts differ 8/8), every prompt composed
-  live at exactly the token count predicted on CPU, 32.9 tokens against v2's 40.2.
-  Operator verdict on the video_art leg: "surprisingly good... it's about Huckleberry Finn
-  and there's actually a river!"
-  **HALF B -- THE OPERATOR RULED ITS SHAPE 2026-09-03 AND r1 INVERTED ITS
-  MOTIVATING CASE. Read `docs/OTR_STANDING_RULINGS.md` "THE BEAT'S SUBJECT IS A
-  PHYSICAL ARTIFACT" before touching this.** In short: extend the EXISTING batched
-  Ghost author with the beat's dialogue (never a second pass), and have it name a
-  PHYSICAL ARTIFACT of the story, preferring one the beat refers to -- never an
-  abstraction and never a noun the dialogue mentions only to say it is absent.
-  **The truck must NOT be drawn:** "this isn't just some dusty list of truck
-  routes" is a rhetorical negative, Ellie is holding a ledger in an archive, and
-  the r1 panel caught that the item's own worked example had been read backwards.
-  The residual defect is that `resolve_crux_kernel` picks
-  `objects[ordinal % len(objects)]`, so the beat about the ledger drew `pen`
-  because it was the third row. r1 also corrected three inherited claims: the
-  render batch DOES have `IS_CHANGED` now, replay returns before the author runs
-  (so a migration needs an explicit seam at the replay boundary, not a version
-  check in the author), and the beat's own `text` projection is the accessor --
-  not a `_ghost_line_index` join, which silently misses synthesized beats. r2 is
-  running; records in `kibitz-runs/2026-09-03-prompt-v3-half-b/`.
-  **The old framing, kept only so a reader of the history understands what
-  changed:** subject-appropriate motion needs the beat's own dialogue in front
-  of the writer -- Half A buys the story's object, place and light on every beat and cannot
-  buy its motion. He named the gap himself on the ledger episode: "I don't see any trucks
-  though, it does mention a truck once" -- `truck` is in one spoken line and not in
-  `key_objects`, so Half A had no path to it. Half B changes the STORED object, so it needs
-  the version-dispatch discipline r2 specified and a re-author path for replay. Full arc
-  before code. Anchor and the four-round records:
-  `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` and
-  `kibitz-runs/2026-09-02-prompt-v3-crux/`.
-  **Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"`,
-  which reads wrong on a few settings ("a spinning turntable **in the** riverbank"). One
-  small preposition fix; waiting only on his eye, not on Half B.
-* **3c. The open defect list** -- the P0 / source-span cluster, the orphan-occupancy
-  registry (full arc before code), the coverage and routing rows. Section 1.4.
-* **3d. Item 3b-of-the-old-numbering, the OTHER video lanes -- measured, not started.**
-  Ten of eleven lanes lead their prompt with the cast's face paragraph (83 words on one
-  real episode) via `motion_common.compose_parts`. On `wan_ti2v` that is 83 of a hard
-  100-word cap that truncates mid-sentence, so the camera clause silently falls off.
-  **AMENDED by the r3 reviewer:** ADD a crux clause beside `appearance` on the silent
-  image-to-video lanes; do NOT drop the face on redundancy alone -- the foley/mime lanes
-  drop it because their joint latent SPEAKS the prompt, which is not a general I2V rule.
-  Audio-in lanes (HuMo, the h3 audio lane, `ltx_audio_in`) and the two Google
-  text-to-video lanes keep the face unconditionally. Runs after his eye on Half A.
-  Measurements: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/other_lanes_audit.md`.
-
-**4. THE 8 GB SHIP SET -- what the clean room proved becomes a saved dropdown set.**
-Klein stills run on 8 GB under stock launch flags (Leg C5: ~21 s a still) and LTX 2.5
-renders there at ~14 min a clip; the Leg C5 episode PUBLISHED 2026-09-02 12:10
-(`signal_lost_rationed_breath_20260902_060027`, 24 clips, 6 h 35 min; receipt in
-`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`). (a) DONE 2026-09-02: the 8 GB row is PROVEN with its image lane on the
-all-kokoro clean-room episode `signal_lost_the_ledger_of_shadows_20260902_134447` (the
-operator's eyeball), receipt merged into the row's 4060 entry (7 episodes), matrix
-regenerated;
-(b) a shipped `otr_8gb_klein_ltx25` profile and variant (the clean-room profile is
-untracked on the 4060 -- promote it, do not rewrite it); (c) the eight profiles that still
-pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships. Section
-1.5.
-
-**5. THE 4060 TEMPLATE TEST -- the frictionless capstone.** Runs once, after items 1 and
-2, on a tree with the bugs above closed: install from the registry on the 4060, load the
-8 GB saved-dropdown variant, click run, one published episode with zero hand steps. ONE
-JSON ships for now (`otr_canonical`, kokoro on both voice slots -- operator 2026-09-02); a
-4060 dropdown-friendly JSON is saved only after this testing is done, and that save is
-what the test promotes. What is still open on the set is in Section 1.6.
-
-**6. THE LOCAL-LLM ACCEPTANCE SWEEP** -- Leg 0 in-process preflight (Section 1.7,
-~15-20 min, idle GPU), then the four canonical legs of Batch R3.
-
-**7. DOCS DELETION PASS -- DONE 2026-09-02.** `docs/` went 644 tracked files to 237 across
-three deletion-only commits (45895801, 2bf15784, 607a5ee7). Kept set in Section 1.8.
-
-**8. DESIGN ROWS -- each gets a full arc before code, and none is the next coder
-window:** the one-manifest auto-download (1.9), the ship-audit survivors (1.10), the
-adaptation design (1.11), the style / identity decisions (1.12).
-
-**9. THE NEXT POD SESSION -- one rental.** The provisioner's acid test (saved template ->
-provision -> one published episode, zero hand steps) AND a looped lane sweep on the same
-dollar. Receipts file under the 16gb class; there is no 24 GB class or profile by ruling
-(95feac86), and Section 3 L asks whether one is wanted. Section 2, Batch R8.
-
-**DEFERRED BY THE OPERATOR (2026-09-02), not scheduled:**
-* **Token rotation** (Codex's security note, relayed in-session 2026-09-02 and recorded
-  nowhere else: an earlier temporary diagnostic briefly captured inherited HF / OpenRouter /
-  provider credentials; the file was removed and the leak path hardened). Rotate when
-  convenient; nothing in the queue waits on it.
-* The Section 3 question list (A)-(L), each with its default if unruled.
-
-**WATCH -- recorded, not scheduled:**
-* **`obs_publish OK` is not proof of an episode (2026-09-03, cost two GPU legs).** Three
-  replay bugs shipped that morning; TWO of them published green with a broken file --
-  one second of picture in an 85-second episode, because a placeholder wire set the
-  procgen overlay's length and `PostUpscaleProcgenBlend` takes the shorter input. What
-  caught it was measuring the published file's DURATION at every pipeline stage (render /
-  blend / caption / credits / mux), never the log. A stage that changes the duration is
-  the defect. PBUG-20260903-01/02/03; two 7.5 MB casualties are still in `otr/obs/` and are
-  deliberately not swept -- `..._231401` and `..._233738`, both "The Faded Ledger".
-* **An unrelated rotation loop owns the box's spare cycles.** `video_rotation.sh` has run
-  since 2026-08-31 out of session `8a385813`, cycling 16 engine/image lane combos one act
-  at a time, forever, and it deliberately skips AnimateDiff. It is Jeffrey's daily obs
-  proof; leave it running. It does not block a registry publish (that runs in GitHub
-  Actions against the repo, not this box) and holds the resident server on :8000, which
-  only matters for a local boot check.
-* Zero-frame beat: the root fix landed (`415b1ba0`, PBUG-20260831-01: an untimed
-  `music_open`/`music_close` with no timed mirror got no duration; it was also the ghost
-  pool r1's "roughly 70 minutes" death). Owed: one canonical leg of that shape reaches
-  `otr/obs/`, recorded as a "verified live" line under the PBUG; and confirm `shot_b006`
-  (`mode=object source=deterministic_fallback`) was the ghost shot for those music rows,
-  or it is a second defect. No coder time.
-* Whether a PRUNED P0 index is ever accepted has not been measured live (the deterministic
-  rung became reachable at `47c554fa` after the campaign stopped); the next P0 campaign's
-  instrumentation answers it.
-* `OTR_LedgerFreezeCascade` failed twice and the message was never captured -- the
-  runner's eight-frame traceback truncates it. Next occurrence, read the SERVER log.
-* `OTR_VideoRenderBatch` `RenderError` cluster -- triage after items 2 and 3.
-* The two eyeball re-observations (announcer framing, name-splice #2) ride any real
-  render leg -- Batch R5.
+**The `1.x` and `Batch Rn` labels are STABLE ROW IDS, not an order.** Other docs, the
+handoff log and the bug log cite them by number, so they keep their names even though the
+operator's order above moves them around. Read the numbered sections for sequence and the
+row ids for identity.
 
 ---
 
-## SECTION 1 -- THE BUILD ROWS BEHIND THE QUEUE (in queue order; everything here ships without a GPU leg)
+## WHERE TO PICK UP
 
-All of this is provable by the suite, a scoped review, or an offline read. Two windows,
-split by area, both push (CLAUDE.md section 1: the 5080 owns `nodes/`, the canonical and
-its variants and `pyproject.toml`; the 4060 owns the profiles it has proven and the
-fresh-install path). Every chunk = focused tests + full suite + Bug Bible + commit AND
-push + `HEAD == origin/v2.0-alpha`. A row with a design choice in it gets a full kibitz
-arc BEFORE code (substitute seats allowed, roster stated); a grep-and-fix gets one Sonnet
-QA on the diff.
+**Tree:** `v2.0-alpha`, HEAD == origin, clean. Suite baseline **13492 passed / 126 skipped
+/ 1 xfailed**. Bible **335 entries** (repo `81a8a9e`). No resident server; VRAM at the
+desktop baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and
+Spark overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second
+agy model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster
+honestly.
 
-**Running beside the order -- the dead-code campaign and the knob census** (operator
-standing instruction 2026-08-28: keep hunting "until there are no more dead code
-candidates"; STOP RULE = two independent blind deep sweeps returning zero CONFIRMED
-findings). Open: the V5 sweep (18 findings, `docs/2026-08-28-dead-code-hunt-v5/`,
-5080-local) is under adjudication; the live hunt prompt is `docs/DEAD_CODE_HUNT_PROMPT_V5.md`.
-The knob census (`docs/KNOB_CENSUS_PROMPT.md`) is a separate pre-ship pass: the operator
-rules per row and the census informs what the 4060 template pins.
+**THE NEXT COMMIT is the ratchet commit of the scan collapse** (item 3 below). Its plan is
+CLOSED and is `kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` -- read it
+whole before typing. The owners `nodes/_otr_shared/env.py` and `nodes/_otr_shared/proc.py`
+and the shared ratchet `tests/fixtures/ratchet.py` are already on disk and INERT: nothing
+imports them, so the tree's behaviour is unchanged until the migration starts.
 
-### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
+**Decisions owed by the operator (skip, do not guess):** the four in item 6's registry row,
+the Section 3 question list, and PBUG-20260904-05's profile design (the 4060 proves, the
+5080 promotes).
 
-**STATUS 2026-09-02: BUILT, proofs pending (see queue item 2).** Shape as shipped:
-`nodes/_otr_audio_engines/_kokoro_backends.py` (torch path moved verbatim; ONNX path
-CPU by design, explicit provider, 4-thread cap, voices from the existing `.pt` files
-through a digest-named npz); `eng_kokoro.py` selects per `load()` via
-`OTR_KOKORO_BACKEND=auto|torch|onnx`; the prefetch fetches `onnx/model.onnx` at boot only
-when the ONNX backend will be used; canonical nodes 80/81 default both voice slots to
-kokoro on `kokoro_builtin`; a character-side engine-agreement guard; five profiles fixed;
-complementary `kokoro` / `kokoro-onnx` markers in `requirements.txt`; the generated "Voice
-engines" table in the matrix. Design record: `docs/2026-09-02-kokoro-onnx/`.
+---
 
-Measured 2026-09-01: `kokoro-onnx>=0.6.1` + `onnxruntime` pip-install clean on Python 3.13
-(kokoro-onnx pins `>=3.10,<3.14`; espeak-ng ships bundled for win / mac / linux; the torch
-`kokoro` package stays `<3.13`). Receipts: PBUG-20260901-04 and `docs/OTR_STANDING_RULINGS.md`
-"ALL AUDIO LANES SHIP ON KOKORO".
+## 1. THE CORRECTNESS BUGS -- coding, now, no GPU leg needed to FIX
 
-Shape (settle the details in the arc, do not re-derive these):
-* A second backend inside `nodes/_otr_audio_engines/eng_kokoro.py` (247 lines; today it loads
-  `KPipeline`). ONNX path: load model + voices, phonemize with espeak-ng, run onnxruntime,
-  return 24 kHz audio. Prefer the torch backend only when `kokoro` is importable (3.12 boxes);
-  ONNX everywhere else; bark stays the zero-dependency fallback.
-* Weights: kokoro-onnx expects `kokoro-v1.0.onnx` + one `voices-v1.0.bin` (an npz keyed by
-  voice, GitHub release `model-files-v1.1`); the HF mirror `onnx-community/Kokoro-82M-v1.0-ONNX`
-  (ungated; model 86 MB q8f16 to 326 MB full, 55 per-voice `.bin` files at 0.5 MB) uses a
-  different per-voice format. Pick ONE source, fetch it with the pack's existing
-  `_otr_kokoro_voice_prefetch` machinery, and make the announcer/character voice ids map onto
-  the same names the torch path uses so the cast ledger does not change.
-* Registry deps: `kokoro-onnx>=0.6.1` and `onnxruntime>=1.20.1` in both manifests (plain
-  PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video
-  engine holds the GPU; it is an 82M model and faster than realtime on CPU.
-* SHIP SCOPE (operator ruling 2026-09-01: "we can ship all audio lanes with kokoro"): in
-  the same change, `workflows/otr_canonical.json` and every generated variant default BOTH
-  voice slots to kokoro (`char_voice_engine`, `announcer_voice_engine`, `voice_bank`
-  `kokoro_builtin`); indextts2, chatterbox, dia and bark stay in the dropdowns as
-  install-it-yourself upgrades. That dissolves the indextts2-default half of the ship-audit finding (the
-  reference-WAV preflight is the bullet below) and the Section 4 voice-bank item stays parked.
-* THE COMPATIBILITY TABLE IS GENERATED, NOT HAND-KEPT: extend
-  `scripts/otr_machine_matrix.py` to emit a "Voice engines" table into
-  `docs/MACHINE_MATRIX.md` from `nodes/_otr_audio_engines/registry.py` (device_backends,
-  requires_sidecar, requires_vendor, practical_without_gpu, model_requirements) plus a
-  per-engine "ships with the pack / install on your own" column, so README can say "want a
-  better TTS, install it yourself, here is what runs where" and point at one table.
-* DONE WHEN: a clean 3.13 portable install renders a 1-act episode with kokoro voices for
-  announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`,
-  and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
-* **Cloning engines preflight their reference WAVs** (the surviving half of the ship-audit
-  indextts2 finding): preflight the resolved `ref_path` files in `OTR_CastLock` BEFORE the
-  writer call whenever a cloning engine IS selected, so an opt-in indextts2 / chatterbox /
-  dia user fails in seconds, not after a whole script.
-* **The `pyproject.toml` dependency edit auto-fires a registry publish.** It rides the bump
-  AFTER alpha.15 (and alpha.16 if the control runs) resolves -- never while a version is
-  Pending, and never reusing a string (CLAUDE.md 7A).
+Story quality is DONE and is not reopened (operator 2026-08-04). These are CORRECTNESS
+defects: a gender or voice contradicting the source, a beat that renders the wrong
+picture, a leg that dies late.
 
 ### 1.2 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review round, then code
 
-**DONE 2026-09-02.** Round: Antigravity r2 on the driver anchor
-(`docs/2026-09-02-gender-ladder/driver_anchor.md`, sections 8 and 9 carry the fold and the
-proof) -- 7 must-fixes, all grounded and taken. Code: tiers 3-4 in
-`scripts/otr_stamp_character_genders.py` (recall into a committed per-bank
-`character_gender_index.json`, the first-name pool, the body-hash-anchored merge, the
-Shakespeare scene stamper), the verdict fields and the alias-aware join in
-`nodes/_otr_roster_gender.py`, greedy decoding at temperature 0 in the constrained closure.
-Proof: `signal_lost_intensity_in_the_drawingroom_20260902_152901` -- ELIZABETH BENNET female,
-MR. DARCY male, COLONEL FITZWILLIAM male, all `llm_recall` / `recalled` in
-`meta.cast_source_contract.evidence`; the leg before it (`unhand_me_sir_20260902_151527`) is
-the before-picture where Darcy rolled female because the join ignored the aliases. Operator
-rulings folded: ARIEL / PUCK / ROBIN stay on the roll (locked index entries); Dr. Lira Kell is
-female (locked). Left open, recorded in PBUG-20260815-04's follow-up: a given-name alias can
+Left open, recorded in PBUG-20260815-04's follow-up: a given-name alias can
 match a different character with that surname (COLONEL FITZWILLIAM via "fitzwilliam"; right
 here by coincidence) -- a surname-only alias for the short_form tier is the next fork.
+
+Operator rulings folded: ARIEL / PUCK / ROBIN stay on the roll (locked index entries); Dr. Lira Kell is
+female (locked).
 
 **TWO OPERATOR RULINGS, 2026-08-28, and they reshape the spec:**
 
@@ -485,11 +90,6 @@ here by coincidence) -- a surname-only alias for the short_form tier is the next
   The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING
   by the standing ruling -- their characters do not exist, so no lookup of
   any kind applies.
-
-Evidence and the v1 spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` and
-`docs/GO_FORWARD_ARCHIVE.md` (the prose lane stamps `characters: None`; the Shakespeare
-sidecars carry genders; the consumer `_otr_roster_gender.py` is lane-neutral and correct).
-v2 folds v1; the rulings above are baked into v2.
 
 ### 1.3 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
 
@@ -675,239 +275,34 @@ Every row below was re-checked against the real files by the driver before it wa
 written down; the REJECTED list is part of the record precisely so a discarded
 claim is not re-raised as a fresh finding. Line cites drift -- re-pin when touched.
 
-**A. VERIFIED, HIGH -- the output tree is decided TWICE, and the copies disagree.**
-`nodes/_otr_paths.py` is the documented owner (`OTR_OUTPUT_DIR` is "highest
-precedence", :74-106). `nodes/otr_master_audio_mux.py` imports NOTHING from it and
-carries its own `_episodes_root()` (:695) and `_obs_dir()` (:709), neither of which
-reads `OTR_OUTPUT_DIR`. Proven by EXECUTION, not by reading:
-
-```
-OTR_OUTPUT_DIR=D:\RenderOutput , folder_paths=C:\ComfyRoot\output
-_otr_paths.otr_episodes_root()  -> D:\RenderOutput\otr\episodes
-mux._episodes_root()            -> C:\ComfyRoot\output\otr\episodes   AGREE? False
-_otr_paths.otr_obs_dir()        -> D:\RenderOutput\otr\obs
-mux._obs_dir()                  -> C:\ComfyRoot\output\otr\obs        AGREE? False
-```
-
-**Blast radius is the terminal publisher.** `_episodes_root()` gates
-`_inflight_episode_for_stem()` (:797) -- a mismatch silently rejects a valid
-in-flight ledger and falls back to filename-suffix peeling the module itself calls
-fragile. `_obs_dir()` is where `_publish_to_obs()` writes the deliverable. The same
-bare-`folder_paths`-or-`"."` idiom is copy-pasted again in `otr_caption_burn.py`
-(:349) and `otr_silent_composite.py` (:1692).
-
-**Why it has not bitten:** both launchers hand-pin `OTR_OUTPUT_DIR` =
-`--output-directory` = `OTR_OBS_DIR` in lockstep -- by human discipline in two
-separate shell scripts, not by any code invariant.
-
-**CORRECTED BY KIBITZ r1 (2026-09-04) -- the first draft of this row was wrong
-in three ways, and it matters because the first fix proposed would have broken a
-contract test.** Full record in
-`kibitz-runs/2026-09-04-runpod-found-fixes/r1/{judgment,final}.md` (local, gitignored):
-
-* **Four owners, not two.** `_otr_ledger.py:182` reads `OTR_OBS_DIR` too, and
-  `__init__.py:97-108` WRITES `OTR_OUTPUT_DIR` at import inside ComfyUI -- that
-  pin, not "the launcher was skipped", is the mechanism behind the Desktop /
-  bare-`main.py` split.
-* **Two concepts, deliberately named apart.** The *episode workspace root*
-  (`_episodes_root`) IS a true duplicate that ignores `OTR_OUTPUT_DIR` -- delegate
-  it. The *publication root* (`_obs_dir`) is NOT: `_otr_paths.otr_obs_dir()`
-  (:401-429) never reads `OTR_OBS_DIR`, which is a first-class override read by
-  seven files including five launchers and exists to point OUTSIDE the tree (the
-  documented two-tree split). The mux is right to honour it; `_otr_paths` is the
-  incomplete one. "Delegate the mux to `_otr_paths`" for obs would have broken the
-  split AND tripped `_validate_contract` (:220-236 raises on an out-of-tree path).
-* **A contract test pins it.** `tests/test_output_tree_contract.py:48-50` lists
-  `otr_obs_dir` in `_NOARG_HELPERS` and asserts in-tree. Any change ships WITH
-  that test updated, or does not ship.
-* **Open ruling, deciding in r2:** an explicit pin SKIPS the in-tree assert
-  (driver's first lean) or registers as a *declared second authorized root* the
-  way `_otr_ledger.py:168-191` already does (panel 2-1, and now the driver's lean
-  -- it keeps the validator meaningful instead of holing it).
-* Both docstrings -- mux "ONE owner", `_otr_paths` "THE obs dir" -- are false and
-  must become true or go; this is the nvenc shape.
-* **Acceptance:** Path equality is necessary and NOT sufficient. A live headless
-  publish with `OTR_OUTPUT_DIR != folder_paths.get_output_directory()` landing in
-  the watched tree. Caption-burn / silent-composite fallbacks are a rostered
-  follow-up, not equals of `_publish_to_obs`.
-
-**RESOLVED 2026-09-04 (kibitz r2-r3, built the same day).** Ruling R-A: the
-pin is honoured INSIDE `_otr_paths.otr_obs_dir()` and skips the in-tree assert
-for that path only (returned as typed, no `resolve()`); `_validate_contract`
-untouched; the ledger already authorized both roots. The mux's two functions
-are thin delegates (names kept -- the publication tests monkeypatch them).
-r3 grew the scope: the canonical graph's node 84 (`OTR_SilentComposite`, empty
-`output_path`) writes via `_default_out`, and node 93 writes beside it, so the
-"rostered follow-up" above would have left the canonical chain split -- silent
-composite, caption burn AND `portrait_ledger._output_base` now delegate too.
-Enforced by `tests/test_output_root_single_owner.py` (AST, named allowlist:
-`eng_mesh_stage` because ComfyUI's SaveGLB refuses any path outside
-`folder_paths`' own dir -- NOT a leftover twin, do not "retire" it -- and
-`vram_context_test`, a diagnostic outside the contract). conftest now strips
-`OTR_OBS_DIR` at import (the launch recipe sets it on this box). The `__init__`
-pin is preserved deliberately; removing it is its own design item.
-**PAID 2026-09-04 09:43-10:04 PDT -- the live publish matrix, measured.**
-`workflows/otr_canonical.json`, one act, on the 5080 with `--output-directory
-C:\Users\jeffr\otr_accept\A`, `OTR_OUTPUT_DIR=...\otr_accept\B` and
-`OTR_OBS_DIR=C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` (pairwise
-distinct; the shipped soak `.cmd` locksteps all three, so a launcher derived
-from it ran), `OTR_FFMPEG` pinned to a COPY of the binary while the real one
-stayed on PATH, and a watcher recording every ffmpeg process with its parent.
-Result: `RESULT SUCCESS`; nothing new under A; silent, blended and final all
-under B; the watched folder went 113 -> 114 with the mux's LOUD publish line;
-every ffmpeg the server spawned ran from the pinned copy (the PATH binary
-appeared only under pytest parents from the concurrent suites). The leg ran
-the draft `8gb_lite` profile on the canonical default bank (`media_archive`),
-not the shipping 8 GB row: the launcher's profile substitution did not take,
-and the receipt says what ran. Five attempts, each a measurement: attempts 3
-and 4 surfaced PBUG-20260904-05; attempt 5 also exposed PBUG-20260904-06 (the
-ledger's `meta.paths.obs_final` still pointed at the planned archival-name
-file, not the published one) -- fixed in its own commit with a pairing test.
-
-**B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
-copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
-`otr_silent_composite.py:123`) and each self-documents that this defect class has
-already hit the pack twice. The same three correctly delegate `_ffprobe_bin()` to
-`_otr_shared/ffprobe.py`, so the pack knows the right shape and did not use it here.
-Two have live gaps, dormant only because nothing calls them:
-`_otr_shared/encode_sink.py::find_ffmpeg` (:20) never checks `OTR_FFMPEG`, and
-`_otr_shared/content_oracle.py::_ffmpeg` (:88) has no PATH fallback at all (that
-module has zero importers). The rest disagree on what to return when nothing
-resolves (`None` / `""` / bare `"ffmpeg"`).
-
-**RESOLVED 2026-09-04 -- and it was not latent (PBUG-20260904-02).** The count
-was twelve, not nine, plus three sites that ran a literal `"ffmpeg"` with no
-resolver at all (`otr_post_upscale_procgen_blend` -- canonical node 93 -- ,
-`eng_google_lyria`, `foley_stems`). Six copies read the caller's own bare
-default as an operator choice, so on any box with ffmpeg on PATH the pin was
-never consulted: measured live on the 5080, 9 of 10 resolvers ignored
-`OTR_FFMPEG`. The cloud preflights refused env-only installs. ONE owner now:
-`nodes/_otr_shared/ffmpeg.py::resolve_ffmpeg` (explicit choice -> pin -> PATH
--> the Windows install dirs -> `None`; reuses the probe's bare-name rule);
-every runtime site a thin adapter with its own refusal; `resolve_ffprobe`'s
-sibling steps go through it. Guard: `tests/test_ffmpeg_single_resolution.py`,
-three AST rules, NO allowlist. Matrix: `tests/test_ffmpeg_resolution_precedence.py`,
-PATH left available in every case. The nvenc cache is keyed per binary and the
-second cache in front of it (`video_engine._check_nvenc`) is gone.
-Out of scope, named: `scripts/otr_ingest_pd_voices.py:101`,
-`scripts/otr_macbeth_probe.py:603/620/1196` (scripts cannot import the owner
-without the package; convert when a script is next touched).
-
-**C. VERIFIED, LATENT -- the models root is decided twice.**
-`_otr_gguf_backend.py::_models_root()` (:891) existence-gates the legacy
-`C:\ComfyUI-Models` before falling back to `folder_paths.models_dir`.
-`_otr_video_engines/wan_shared.py::configured_models_root()` (:35) returns that
-literal UNCONDITIONALLY with no existence check and no `folder_paths` fallback --
-while its docstring claims "folder_paths is the authority and is probed first",
-which is true of its callers and false of the function. Harmless today because
-every caller probes `folder_paths` itself first, but the docstring invites
-standalone use, and a direct caller would break on exactly the fresh-install box
-this repo's notes keep warning about.
-
-**RESOLVED 2026-09-04 -- delegated, not reworded.** `configured_models_root()`
-now returns `str(_models_root())` through a LAZY import (the module's V-12
-cold-import statement holds, and `tests/test_models_root_single_spelling.py`
-pins both the equality under every env state and the absence of a top-level
-import). The "ONE spelling" sentence is true instead of admitting it was false.
-The third convention, `_otr_paths.comfy_models_dir()` / `OTR_MODELS_DIR`, stays
-parked (cursor r3: do not open a third env in this diff). A FOURTH spelling
-belongs to the same parked item (agy r4): `_otr_image_engines/flux2_klein.py:209-215`
-probes `folder_paths` first, then the two env vars, and never the legacy tree --
-the inverse of `_models_root`'s order. When the merge happens it has four
-owners to retire, not three.
-
-**D. VERIFIED, RISKY -- the widget-drift HARD GATE has a silent escape hatch.**
-`_otr_workflow_validator.py:172` -- `try: expected = _expected_slot_count(...)
-except Exception: continue`. This backs the gate at :497 that exists to catch the
-BUG-210/253/281 silent-widget-shift class. Any node whose `INPUT_TYPES()` raises is
-silently exempted with no log, and the gate can report `widget_vector_drift=0`
-having never checked it. Owed: log the skip at minimum, and decide whether an
-un-introspectable node should fail the gate rather than pass it.
-
-**RESOLVED 2026-09-04 (`ad89a45b`).** A raising `INPUT_TYPES()` is a named drift
-FINDING (node id, type, exception class, repr'd message), so the hard gate
-fails; every class reaching that line is ours (third-party types are skipped
-above it), so there was no foreign-node cost to weigh. Precise blast radius,
-found while writing the public-path test: `validate_workflow_contract` already
-raised on a raising `INPUT_TYPES()` for `OTR_`-prefixed types BEFORE the drift
-gate, so the node's own `validate()` was fail-closed all along -- the hatch
-mattered for the STANDALONE callers of `widget_vector_drift` (the canonical-graph
-integrity test could report zero drift on a class it never checked) and for any
-mapped class without the prefix. The `validate_anyway` tooltip no longer claims
-the switch "never blocks the episode". 7 tests in
-`tests/test_widget_drift_gate_no_silent_exemption.py`.
-
-**E. VERIFIED, DEAD -- 12 symbols with exactly one repo-wide reference (their own
-definition), confirmed by `git grep -n -w -F`:** `MAX_HEADLINE_CLEAN_CHARS`
-(`_otr_scifi_p0_contract.py:23`), `PLATE_DIRNAME`
-(`eng_ghost_signal_stillin_lab.py:72`), `RADIO_HOST_FACE_NEG`
-(`otr_meta_brief_image_prompt.py:322`), `CRT_RED`/`CRT_WHITE`/`CRT_MAGENTA`
-(`video_engine.py:68-71`), `HARNESS_VERSION`/`MACHINE_CEILING_MB`/`NVML_FLOOR_MB`
-(`scripts/_otr_b_spikes/_b_harness.py`), `ffprobe_timebase`
-(`scripts/audit_otr_full_run.py:101`), `corpus_ledgers`
-(`scripts/otr_clean_stage_lab.py:529`), `_negative_phrases`
-(`scripts/otr_style_traceroute.py:213` -- and its logic is duplicated inline in the
-function directly below it, which is the slop shape exactly).
-`MAX_HEADLINE_CLEAN_CHARS` was queried as a possible UNWIRED cap rather than dead
-code; the file answers it at :50 -- "headline/summary are short and bounded by the
-fetcher" -- so the bound exists upstream and the constant is vestigial. Clean delete.
-
-**F. VERIFIED, SMALL -- vestigial rows.** `_otr_structured_call.py:110` calls
-`REPAIR_TEMPERATURE` the shared public export and `_REPAIR_TEMPERATURE` a compat
-alias; it is backwards (the underscore name is the one every call site and test
-uses, the public one has zero consumers). `otr_shot_lock.py:3396` re-imports
-`_stamp_durable` into a scope that already bound it at :3207. `scripts/otr_asset_index.py:264`
-has an `elif engine.startswith("humo")` that cannot fire (only `eng_humo.py` exists,
-so the preceding `== "humo"` always wins). `scripts/otr_machine_matrix.py:124`
-`load_classes(_profiles=None)` never reads the parameter and both call sites pass
-nothing. `_otr_paths.py:449` `episodes_for_obs_dir()` claims to be kept "for
-back-compat with existing imports" and has zero callers.
-
-**RIPPED 2026-09-04 (Phase 0 of the registry collapse; operator directive:
-an orphan is ripped 100% or wired back in).** Every row-E symbol and every
-row-F item above was re-verified on the current tree with `git grep -n -w
--F` before the cut and returns zero references after it. Two corrections
-from the re-verification: `episodes_for_obs_dir()` also had an `__all__`
-entry (gone with the function), and `scripts/otr_asset_index.py`'s
-`elif engine.startswith("humo")` is LIVE -- the registry carries `humo_clip`
-and `humo_diet` -- so it is kept; the audit's "only `eng_humo.py` exists"
-was true of files and false of engine ids. `REPAIR_TEMPERATURE` was folded
-into `_REPAIR_TEMPERATURE`, the spelling every call site and test used.
-
-**PHASE 0b, SAME DAY -- the chain, and the thing that nearly went wrong.**
-Operator: "even though there may be dependency B, what does dependency B lead
-to, dependency C -- follow the dependency chain to find truly rippable code."
-`scripts/dead_code_closure.py` now walks the reference graph to a FIXPOINT and
-prints each round; Phase 0 had already proved the need by orphaning
-`_derive_beats` when it removed `corpus_ledgers`. Calibration took two fixes
-before the tool could be trusted: a class registered by a DECORATOR is reached
-by the side effect and never named again (47 engine adapters), and with tests
-as roots the first cut never opened `tests/` at all. That took 289 candidates,
-five of five hand-checked LIVE, down to 55 with every known-live symbol clear.
-A 73-agent fan-out then verified each one against the dynamic paths a static
-sweep cannot see; 36 of 37 were confirmed dead and one was RESCUED --
-`CharacterAliases` is reached by a pydantic forward-reference string.
-
-**AND THEN THE QA PASS CAUGHT WHAT ALL 73 AGENTS MISSED.** Fifteen of those
-"dead" symbols are protected by `docs/OTR_STANDING_RULINGS.md`, written the day
-before, and `p0_source_char_budget` is the diagnosed-but-unwired fix for OPEN
-`PBUG-20260729-03`. Every agent had asked whether code reaches the symbol; none
-had asked whether the repo already ruled on it. All fifteen were restored before
-the commit, and the sweep now READS those rulings and reports such candidates
-under a separate heading naming the doc that speaks for them. Thirteen cleanly
-cleared symbols shipped; the rest stay, each with its ruling.
-
+**STANDING RULINGS FROM THE AUDIT (rows A-F are built; the receipts are in the archive,
+these sentences are not).**
+* Ruling R-A: the pin is honoured INSIDE `_otr_paths.otr_obs_dir()` and skips the in-tree
+  assert for that path only (returned as typed, no `resolve()`); `_validate_contract`
+  untouched; the ledger already authorized both roots.
+* Enforced by `tests/test_output_root_single_owner.py` (AST, named allowlist:
+  `eng_mesh_stage` because ComfyUI's SaveGLB refuses any path outside `folder_paths`' own
+  dir -- NOT a leftover twin, do not "retire" it -- and `vram_context_test`, a diagnostic
+  outside the contract).
+* The `__init__` pin is preserved deliberately; removing it is its own design item.
+* The third convention, `_otr_paths.comfy_models_dir()` / `OTR_MODELS_DIR`, stays parked
+  (cursor r3: do not open a third env in this diff). A FOURTH spelling belongs to the same
+  parked item (agy r4): `_otr_image_engines/flux2_klein.py:209-215` probes `folder_paths`
+  first, then the two env vars, and never the legacy tree -- the inverse of `_models_root`'s
+  order. When the merge happens it has four owners to retire, not three.
+* Out of scope, named: `scripts/otr_ingest_pd_voices.py:101`,
+  `scripts/otr_macbeth_probe.py:603/620/1196` (scripts cannot import the owner without the
+  package; convert when a script is next touched).
+* Operator directive: an orphan is ripped 100% or wired back in.
+* Operator: "even though there may be dependency B, what does dependency B lead to,
+  dependency C -- follow the dependency chain to find truly rippable code."
+* Fifteen swept symbols are protected by `docs/OTR_STANDING_RULINGS.md`; the sweep now READS
+  those rulings and reports such candidates under a separate heading naming the doc that
+  speaks for them. They stay, each with its ruling. Among them, `p0_source_char_budget` is
+  the diagnosed-but-unwired fix for OPEN `PBUG-20260729-03` -- still owed.
 
 **G. FOLLOW-UPS THE 2026-09-04 ARC SURFACED AND DID NOT BUILD -- each with the
 reason it waits.**
-* `otr_post_upscale_procgen_blend.py` keeps a `sys.path` insert of `nodes/` for
-  ComfyUI's flat loading. Both tool owners it uses (`_otr_shared.ffmpeg`,
-  `_otr_shared.ffprobe`) now import package-relative first with the flat
-  fallback, and its unused flat `_otr_paths` import is gone -- the flat-first
-  spelling had made a SECOND module instance of the owner that no fixture could
-  reach (it kept its own Windows-dir tuple and answered a test the fixture
-  thought it had muted). Only the insert itself remains; it is what the flat
-  fallbacks need.
 * `tests/test_openrouter_slug_curation.py::test_routers_appear_in_both_slot_dropdowns_and_auto_leads`
   passes on this box only because of an UNTRACKED catalog cache ("no OpenRouter
   models cached -- run refresh_catalog_cache" in a clean worktree). A machine-local
@@ -988,18 +383,6 @@ reason it waits.**
   stage refuse a profile whose context cannot hold its own prompt -- in the
   profile/variant layer, never a silent truncation. The 4060 owns the 8 GB rows.
 
-**FIXED IN THIS SESSION -- the audit's best catch was the driver's own slop from
-the night before.** Four rows, all introduced 2026-09-03 and corrected 09-04:
-`_obs_basename`'s broad except returned silently while all eight other fallbacks in
-that file log -- the exact shape that had already hidden a missing `re` import for
-one dev cycle; `_resolve_writer_llm`'s docstring justified `max_new_tokens` by "the
-one caller whose reply length scales with a batch" after the same commit taught that
-caller to bypass the wrapper; the ideogram ladder comment claimed "all four slots in
-three precisions" when the real shape is 3/3/2/1, which also hides a genuine
-mixed-precision requirement (no int8 text encoder exists); and four `_DEFAULT_*`
-aliases were added with a comment justifying them as the error message's lead name,
-which the literal refusal text never reads.
-
 **REJECTED, with reasons -- do not re-raise these.**
 * `_DEFAULT_CLIP` / `_DEFAULT_VAE` "have 7 references": a DRIVER false positive.
   `git grep -w` matched `flux2_klein.py` and `lumina_image.py`, which define their
@@ -1016,110 +399,50 @@ which the literal refusal text never reads.
 * Duplicated engine PROMPT COMPOSERS: ruled 2026-08-23, lanes stay independently
   re-wordable. Only duplicated FACTS and DECISIONS count.
 
+## 2. THE DESIGN ROWS -- each gets its arc BEFORE code
 
-### 1.5 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
+Operator 2026-09-04: *"design rows -- designing, what, yeah let's do this."* Each row
+below has more than one defensible answer, so each takes its arc first and then the
+code. None of them is a drive-by.
 
-Measured 2026-09-02 on the physical RTX 4060 under plain stock launch flags (receipts:
-`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`, PBUG-20260902-01 / -02, Bible 12.145 /
-12.146): Klein 4B Q4 GGUF stills at ~21 s a still after three residency fixes (`9b90189a`,
-`ad6a635f`, `da2b7a36`, each measured on the 5080 first and byte-identical there); LTX 2.5
-(Q3_K_M DiT, 12B encoder pinned to CPU) at ~14 min a clip, so a ~5-hour episode. It WORKS
-on 8 GB; it is not a daily driver at that pace. Klein is already the image default in all
-19 low-VRAM profiles and the 8gb / 12gb / amd classes (ruling 2026-09-01, `c0ebe31f`;
-`docs/OTR_STANDING_RULINGS.md` "IMAGE ENGINE DEFAULTS BY MACHINE CLASS").
+### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
 
-Owed, in order:
-1. **The PROVEN flip.** The Leg C5 episode is in the clean room's obs
-   (`signal_lost_rationed_breath_20260902_060027`, published 2026-09-02 12:10, 24 LTX 2.5
-   clips, 12 Klein stills, 6 h 35 min). When the operator has watched it: add the receipt to `config/machine_classes.json` (`proven[]`
-   on the 8gb class, image column included; `known_limits` keeps the pace), regenerate
-   `docs/MACHINE_MATRIX.md` and the README block (`scripts/otr_machine_matrix.py`), and
-   the 8gb `proof_summary` stops saying "image lane unexercised". Record only what
-   published.
-2. **Ship the profile.** Promote the 4060's untracked `otr_cleanroom_8gb_klein_ltx25`
-   profile as `otr_8gb_klein_ltx25` (writer `google/gemma-4-E2B-it`, image `flux2_klein`,
-   video `ltx25_high_video`, bark voices until Section 1.1 lands so it is 3.13-safe),
-   build its variant (`scripts/build_variants.py --all` then `--check`), add the matrix
-   row, and point README's "8 GB card, Klein stills and LTX 2.5 video" row at it instead
-   of "not a shipped graph yet". `status: draft` until item 1 flips.
-3. **Eight profiles still pair an 8 GB ceiling with the 12B writer and die in the writer
-   preflight** (`Needed=8.13 GB (weights=6.63, kv=1.40 @ n_ctx=2048)` under a 6.8 GB
-   ceiling; the smallest prompt needs 2064 input tokens and P0 reserves 2800 output, so
-   4096 ctx is ~9.5 GB -- ctx is the symptom, the writer MODEL is the cause). Draft set:
-   `otr_8gb_ltx`, `otr_8gb_wan`, `otr_8gb_fastwan`, `8gb_lite`, `cpu_floor`,
-   `otr_amd8_rocm`; SHIPPING pair: `otr_g4_ltx_8gb`, `otr_w45_ltx_8gb` (14.5 GB ceiling
-   next to the only genuinely 8 GB video engine). Repoint all eight to the E2B writer the
-   8gb class already ships, or delete them. Not a one-line edit: the GGUF registry has only
-   the 12B and Qwen3-8B rows and `gemma-2-2b-it` is a TRANSFORMERS row (agy proposed it
-   and was wrong). "Finish retiring the profiles" is no longer an option: `95feac86` keeps
-   `config/profiles` as lab presets and makes the matrix the record.
-4. **The cfg 1.0 promotion A/B** on three real episode prompts (announcer portrait,
-   character portrait, scene beat), the same four cells (nvfp4 / bf16 x cfg 1.0 / 2.0),
-   rendered to a NEW dir under `docs/ship-audit-2026-09-01/image-jury/`, then the
-   operator's eyeball. One seed was a strong lead, not a proof. Section 2, Batch R5.
-
-### 1.6 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
-
-* **One JSON for now (operator 2026-09-02).** `workflows/otr_4060_floor.json` is
-  removed from the gallery (it shipped 2026-08-29 to 2026-09-02 as a bark-voiced
-  zero-download floor, before kokoro ran on 3.13); `config/profiles/otr_4060_floor.json`
-  and its generated variant stay as lab presets. The 4060 dropdown-friendly JSON is
-  saved AFTER the testing below, with kokoro on both voice slots (never bark: bark
-  renders a long announcer line as a tone, PBUG-20260902-03).
-* **The test itself:** a clean portable (Python 3.13) on the 4060 -> Manager install of
-  the Active registry version -> the 8 GB saved-dropdown variant (`workflows/variants/
-  otr_nvidia_8gb_haunted.json`, kokoro on both slots, or the Klein + LTX 2.5 profile from
-  Section 1.5 once it ships) -> run -> `obs_publish OK`, zero hand steps. Any hand step
-  is a bug: file it in `docs/PROD_BUG_LOG.md`, fix it at the root, retry. A pass is what
-  earns the saved 4060 JSON. Section 2, Batch R7.
-* **README model table** from the compatibility workbook's Baseline Combos tab
-  (`outputs/20260828-ungated-models/`, the LIVING fact sheet: edit cells in place, never
-  add a changelog tab) -- or the operator rules that README's injected class table and
-  per-lane facts (66da15da) already cover it and the bullet goes.
-* The knob census (Section 1 header) informs what the template pins.
-
-### 1.7 LOCAL-LLM SWEEP LEG 0 -- the in-process preflight (queue item 6)
-
-Leg 0 = one in-process command (`request_slot` -> ~40-token generate -> `_self_unload`
-per row, with `reset_peak_memory_stats()` around each), ~15-20 min, IDLE GPU, no ComfyUI.
-It fails loudly on a dead row. The four canonical legs that are the real proof, and the
-whole sweep design, are Section 2 Batch R3.
-
-### 1.8 DOCS (queue item 7) -- a DELETION pass, not a review (operator ruling 2026-09-01)
-
-Operator: most of `docs/` is stale and should be deleted unless it carries a useful
-recipe about a video model. The ownership map that survives the pass: README is the
-front door; `docs/MACHINE_MATRIX.md` chooses the profile; `scripts/` own automation;
-`docs/RUNPOD_INSTALL.md` is the sole RunPod manual and recovery guide (Codex owns it);
-bugs and history live only in `docs/PROD_BUG_LOG.md`, the archive and
-`docs/OTR_STANDING_RULINGS.md` (never in this plan). Working rule for the pass: a dated spec, plan, handoff,
-kickoff, brief or log under `docs/` goes unless it is cited by a test, by the Bible
-coverage index, or by a shipping doc, or it records a video-model recipe (measured
-settings, VRAM, canvas, frame counts) that no profile or engine adapter carries yet;
-those recipes move INTO the adapter comment or `docs/MACHINE_MATRIX.md` first. No new
-guide gets written. One commit per batch, deletions only, with the list in the message.
-Runs AFTER this plan rewrite has landed, so no pointer the plan keeps is orphaned.
-
-**DONE 2026-09-02 (45895801, 2bf15784, 607a5ee7; 644 -> 237 tracked docs).** How it
-was run: a scripted citation scan over tests, the Bible coverage index, `nodes/`,
-`scripts/`, README, CLAUDE.md, this plan, the rulings and the ship audit produced 378
-uncited dated docs plus 98 uncited named ones; a 13-agent read of every dated candidate
-returned 373 DELETE / 5 KEEP; the driver then grounded the list against the real tree.
-Citations from the append-only history logs (`HANDOFF_LOG`, `PROD_BUG_LOG`,
-`GO_FORWARD_ARCHIVE`) did not keep a doc -- git history holds all of them. Kept on
-purpose: the five recipe carriers (`2026-07-31-PROBLEM-STATEMENT-under-8gb-still-to-video`
-bench table, `2026-08-02-MEASUREMENT-M2-humo-vram-ladder`,
-`2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames`, `2026-08-16-video-sprint-PLAN` LTX 2.3
-distilled recipe, `2026-08-01-fastwan-8gb-MODEL-MANIFEST` with the LoRA sha256 and the
-licence gap -- these still owe a move into the adapter comments or the matrix); the
-08-26 foley-bed operator rulings; every doc a test, the code, this plan, the ship audit,
-`WRITER_INPUT_MATRIX` or `LANE_BUILD_LESSONS` cites (the 09-02 kokoro-onnx and
-encoder-eviction receipts among them); `COMFY_TEMPLATE_DIFF_PROTOCOL`, `WIDGET_OWNERSHIP_LEGEND`, `SPEC_haunted_image_to_video`
-and its design review, `DEAD_CODE_EXECUTION_PLAN`, the licence attestations, the lane
-receipts, the ship-audit folder, the schema examples and the skills backup. Still
-open from this pass: `workflows/otr_story_only.json` (operator to say whether the
-one-JSON ruling removes it too) and the ~170 dated docs that survived only because a
-history log cites them (a second pass, same rule, if he wants `docs/` smaller still).
+Shape (settle the details in the arc, do not re-derive these):
+* A second backend inside `nodes/_otr_audio_engines/eng_kokoro.py` (247 lines; today it loads
+  `KPipeline`). ONNX path: load model + voices, phonemize with espeak-ng, run onnxruntime,
+  return 24 kHz audio. Prefer the torch backend only when `kokoro` is importable (3.12 boxes);
+  ONNX everywhere else; bark stays the zero-dependency fallback.
+* Weights: kokoro-onnx expects `kokoro-v1.0.onnx` + one `voices-v1.0.bin` (an npz keyed by
+  voice, GitHub release `model-files-v1.1`); the HF mirror `onnx-community/Kokoro-82M-v1.0-ONNX`
+  (ungated; model 86 MB q8f16 to 326 MB full, 55 per-voice `.bin` files at 0.5 MB) uses a
+  different per-voice format. Pick ONE source, fetch it with the pack's existing
+  `_otr_kokoro_voice_prefetch` machinery, and make the announcer/character voice ids map onto
+  the same names the torch path uses so the cast ledger does not change.
+* Registry deps: `kokoro-onnx>=0.6.1` and `onnxruntime>=1.20.1` in both manifests (plain
+  PyPI wheels); `onnxruntime-gpu` optional. Keep the model on CPU by default when a video
+  engine holds the GPU; it is an 82M model and faster than realtime on CPU.
+* SHIP SCOPE (operator ruling 2026-09-01: "we can ship all audio lanes with kokoro"): in
+  the same change, `workflows/otr_canonical.json` and every generated variant default BOTH
+  voice slots to kokoro (`char_voice_engine`, `announcer_voice_engine`, `voice_bank`
+  `kokoro_builtin`); indextts2, chatterbox, dia and bark stay in the dropdowns as
+  install-it-yourself upgrades. That dissolves the indextts2-default half of the ship-audit finding (the
+  reference-WAV preflight is the bullet below) and the Section 4 voice-bank item stays parked.
+* THE COMPATIBILITY TABLE IS GENERATED, NOT HAND-KEPT: extend
+  `scripts/otr_machine_matrix.py` to emit a "Voice engines" table into
+  `docs/MACHINE_MATRIX.md` from `nodes/_otr_audio_engines/registry.py` (device_backends,
+  requires_sidecar, requires_vendor, practical_without_gpu, model_requirements) plus a
+  per-engine "ships with the pack / install on your own" column, so README can say "want a
+  better TTS, install it yourself, here is what runs where" and point at one table.
+* DONE WHEN: a clean 3.13 portable install renders a 1-act episode with kokoro voices for
+  announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`,
+  and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
+* **Cloning engines preflight their reference WAVs** (the surviving half of the ship-audit
+  indextts2 finding): preflight the resolved `ref_path` files in `OTR_CastLock` BEFORE the
+  writer call whenever a cloning engine IS selected, so an opt-in indextts2 / chatterbox /
+  dia user fails in seconds, not after a whole script.
+* **The `pyproject.toml` dependency edit auto-fires a registry publish.** It rides the bump
+  AFTER alpha.15 (and alpha.16 if the control runs) resolves -- never while a version is
+  Pending, and never reusing a string (CLAUDE.md 7A).
 
 ### 1.9 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
 
@@ -1234,6 +557,114 @@ session traces.
 5. **`meta` is a 120-key drawer** -- the cleanup the operator keeps asking for. Scope
    as its own rip with the ledger law (every field one owner).
 
+## 3. THE SCAN COLLAPSE -- the coding that makes the registry fix worth filing
+
+**The plan is CLOSED after a full r1-r4 arc and is the next coder chunk:**
+`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md`, with its round judgments
+beside it and the two measured receipts in
+`docs/2026-09-04-registry-findings-collapse/` (`argv0_receipt.txt` resolves all 35 spawn
+sites; `env_drift_receipt.txt` lists the 14 knobs read with more than one default).
+
+**The invariant:** a machine fact has ONE owner, and a test proves the copies agree. From
+158 `info` findings to about 9, and the `credential-access` tag on one file instead of
+eleven.
+
+**Sequence, each commit full-suite green:**
+
+1. **The ratchet commit** -- both AST guards as named-set ratchets calling
+   `tests/fixtures/ratchet.py` in BOTH directions, the network guard with its five named
+   files, `tests/test_terminal_frame.py` taught `otr_proc` at every import depth with
+   lowercase `popen` added to `_SPAWN_CALLS` (`:495` AND `:498` are the receipt), and the
+   mux knob test's predicate resolved from the mux's own import.
+2. **Batch (a)** `nodes/_otr_shared/**` including `gpu_residency`'s Windows-liveness fix.
+3. **Batch (b)** the engine subpackages, one commit each: audio, image, upscale (the
+   spandrel chunked sha256 rides here), video (`eng_ltx25`'s `import sys` and the six
+   `wan_shared` strings ride here), google_api.
+4. **Batch (c)** `nodes/_otr_*.py`.
+5. **Batch (d)** EVERY remaining `nodes/*.py` -- eleven carry no prefix, so a glob would
+   miss them -- plus the root `__init__.py`, whose env import goes ABOVE line 51 and
+   OUTSIDE the swallowing try/excepts.
+6. **Acceptance** both guards green with empty pending sets, then a canonical leg that
+   PUBLISHES to `otr/obs/`, its launcher's profile and roots READ BACK from the leg log
+   before any receipt is written.
+
+**Every migrated module imports the owners ALIASED** -- `otr_env` / `otr_proc` -- at its own
+depth, because `env` and `proc` collide with live parameter and local names. Test seams
+patch `M.otr_proc.run` in the module's own batch.
+
+**After the batches, re-run `python scripts/dead_code_closure.py`:** migrating a hundred
+files strands helpers, and the sweep now reports anything a standing ruling protects under
+its own heading rather than as a clean candidate.
+
+## 4. PROVE IT ON THE SECOND MACHINE -- the 8 GB set and the 4060 capstone
+
+The 4060 is the only box that can answer whether the pack works somewhere other than
+where it was written. Its profiles and its fresh-install path are ITS to own; the
+5080 owns the workflow JSON, `nodes/`, and profile status promotions.
+
+### 1.5 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
+
+Klein is already the image default in all
+19 low-VRAM profiles and the 8gb / 12gb / amd classes (ruling 2026-09-01, `c0ebe31f`;
+`docs/OTR_STANDING_RULINGS.md` "IMAGE ENGINE DEFAULTS BY MACHINE CLASS").
+
+Owed, in order:
+1. **The PROVEN flip.** The Leg C5 episode is in the clean room's obs
+   (`signal_lost_rationed_breath_20260902_060027`, published 2026-09-02 12:10, 24 LTX 2.5
+   clips, 12 Klein stills, 6 h 35 min). When the operator has watched it: add the receipt to `config/machine_classes.json` (`proven[]`
+   on the 8gb class, image column included; `known_limits` keeps the pace), regenerate
+   `docs/MACHINE_MATRIX.md` and the README block (`scripts/otr_machine_matrix.py`), and
+   the 8gb `proof_summary` stops saying "image lane unexercised". Record only what
+   published.
+2. **Ship the profile.** Promote the 4060's untracked `otr_cleanroom_8gb_klein_ltx25`
+   profile as `otr_8gb_klein_ltx25` (writer `google/gemma-4-E2B-it`, image `flux2_klein`,
+   video `ltx25_high_video`, bark voices until Section 1.1 lands so it is 3.13-safe),
+   build its variant (`scripts/build_variants.py --all` then `--check`), add the matrix
+   row, and point README's "8 GB card, Klein stills and LTX 2.5 video" row at it instead
+   of "not a shipped graph yet". `status: draft` until item 1 flips.
+3. **Eight profiles still pair an 8 GB ceiling with the 12B writer and die in the writer
+   preflight** (`Needed=8.13 GB (weights=6.63, kv=1.40 @ n_ctx=2048)` under a 6.8 GB
+   ceiling; the smallest prompt needs 2064 input tokens and P0 reserves 2800 output, so
+   4096 ctx is ~9.5 GB -- ctx is the symptom, the writer MODEL is the cause). Draft set:
+   `otr_8gb_ltx`, `otr_8gb_wan`, `otr_8gb_fastwan`, `8gb_lite`, `cpu_floor`,
+   `otr_amd8_rocm`; SHIPPING pair: `otr_g4_ltx_8gb`, `otr_w45_ltx_8gb` (14.5 GB ceiling
+   next to the only genuinely 8 GB video engine). Repoint all eight to the E2B writer the
+   8gb class already ships, or delete them. Not a one-line edit: the GGUF registry has only
+   the 12B and Qwen3-8B rows and `gemma-2-2b-it` is a TRANSFORMERS row (agy proposed it
+   and was wrong). "Finish retiring the profiles" is no longer an option: `95feac86` keeps
+   `config/profiles` as lab presets and makes the matrix the record.
+4. **The cfg 1.0 promotion A/B** on three real episode prompts (announcer portrait,
+   character portrait, scene beat), the same four cells (nvfp4 / bf16 x cfg 1.0 / 2.0),
+   rendered to a NEW dir under `docs/ship-audit-2026-09-01/image-jury/`, then the
+   operator's eyeball. One seed was a strong lead, not a proof. Section 2, Batch R5.
+
+### 1.6 THE 4060 TEMPLATE TEST SET -- what is still open before the capstone (queue item 5)
+
+* **One JSON for now (operator 2026-09-02).** `workflows/otr_4060_floor.json` is
+  removed from the gallery (it shipped 2026-08-29 to 2026-09-02 as a bark-voiced
+  zero-download floor, before kokoro ran on 3.13); `config/profiles/otr_4060_floor.json`
+  and its generated variant stay as lab presets. The 4060 dropdown-friendly JSON is
+  saved AFTER the testing below, with kokoro on both voice slots (never bark: bark
+  renders a long announcer line as a tone, PBUG-20260902-03).
+* **The test itself:** a clean portable (Python 3.13) on the 4060 -> Manager install of
+  the Active registry version -> the 8 GB saved-dropdown variant (`workflows/variants/
+  otr_nvidia_8gb_haunted.json`, kokoro on both slots, or the Klein + LTX 2.5 profile from
+  Section 1.5 once it ships) -> run -> `obs_publish OK`, zero hand steps. Any hand step
+  is a bug: file it in `docs/PROD_BUG_LOG.md`, fix it at the root, retry. A pass is what
+  earns the saved 4060 JSON. Section 2, Batch R7.
+* **README model table** from the compatibility workbook's Baseline Combos tab
+  (`outputs/20260828-ungated-models/`, the LIVING fact sheet: edit cells in place, never
+  add a changelog tab) -- or the operator rules that README's injected class table and
+  per-lane facts (66da15da) already cover it and the bullet goes.
+* The knob census (Section 1 header) informs what the template pins.
+
+### 1.7 LOCAL-LLM SWEEP LEG 0 -- the in-process preflight (queue item 6)
+
+Leg 0 = one in-process command (`request_slot` -> ~40-token generate -> `_self_unload`
+per row, with `reset_peak_memory_stats()` around each), ~15-20 min, IDLE GPU, no ComfyUI.
+It fails loudly on a dead row. The four canonical legs that are the real proof, and the
+whole sweep design, are Section 2 Batch R3.
+
 ### 1.13 MAC / AMD -- images only, later (queue item 8 tail)
 
 Operator: Mac and AMD ship images only (ruling 2026-09-01), and he is "not hopeful".
@@ -1245,147 +676,13 @@ gains `mps` on the `flux2_klein` row (cuda-only today) -> `otr_mac_mps` flips of
 `otr_amd8_rocm` / `otr_amd16_rocm`. ROCm already qualifies for Klein (presents as cuda).
 Needs hardware neither NVIDIA box has.
 
-### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 2026-09-02; awaits his pick)
+## 5. THE RENDER PROOFS AND THE POD RENTAL
 
-Operator, 2026-09-02: a fresh set of eyes on whether the AnimateDiff v3 (+ adapter) lane takes
-advantage of the ledger and the per-beat stills, with the VISUAL STYLE obeyed ("I think we lost
-the visual style" -- confirmed: the style reaches that lane as a two-word cue on a fixed base
-checkpoint under a photographic-grime adapter, no still) and stills-in among the first one to
-three arms. The self-contained statement is
-`docs/2026-09-02-animatediff-ledger-experiments/PROBLEM_STATEMENT.md` (11,000 words, grounded by
-a five-reader workflow); four fresh reads (Fable 5.1 cold, Codex, Cursor, Antigravity) and the
-driver's grounded judgment are in `fresh-eyes/`. The judged order: (0) the instrument -- durable
-prompt + seed + request hash on the ledger, a canonical REPLAY mode (today the writer node always
-mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
-adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
-LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
-engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
-plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
-`still-in-peer/driver_anchor.md` section 7 D4); (3) the pack's
-language back into the prompt under a 77-token budget; (4) one timeline per shot (a
-FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
-FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the
-shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
-(Section 4) until then.
-
-**Status 2026-09-02 (evening).** Operator: "I leave it up to you to synthesize and code maybe
-1-3 of the best options." Item 0, the instrument, is CODED after a full four-round arc
-(`instrument/driver_anchor.md`, sections 1-13): every rendered clip carries a versioned ACTUAL
-receipt hashed into `actual_request_sha` and stamped durably as `meta.render_trace`; the writer's
-trailing `replay_from` widget (and `otr_canonical_api_run.py --replay-from`) re-renders a frozen
-bundle (`scripts/otr_freeze_replay_bundle.py`) through the whole canonical graph with no writer,
-TTS, music or stills, node 7 byte-copying the SHA-verified master; `scripts/otr_verify_replay.py`
-is the offline A/A verifier. Item 1, the adapter sweep, is RUNNING on the 5080 overnight profile
-(two styles x 1.0 / 0.5 / 0.25 / 0.0, titles "Adapter <k> <style>", published to `otr/obs/` for
-the operator's eye). Next: the live replay proof (render, freeze, replay twice, verify) once the
-sweep releases the GPU, then item 2, the still-in lab peer -- registered only after the
-`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
-operator's standing rule for any new video pack requires.
-
-**Title-card leak, 2026-09-02 17:45 (operator: "your attempt at a video plan bled into my
-title").** The first three sweep legs were launched with `--title "Adapter <k> anime"` so the
-leg could be told apart in `otr/obs/`; that flag rides the writer's `episode_title` widget and
-so became the on-screen TITLE CARD of three published episodes (the known harness-label path,
-CLAUDE.md "fix the title at the source"). Standing rule from the operator, same minute: every
-canonical leg runs the CLEAN runner, title generated from the story (public_domain: the
-source's own title). Legs 4-8 run without `--title`; a leg is identified by its log, its
-publish timestamp and, now that item 0 is merged, durably by
-`meta.render_trace[*].sampler_inputs.adapter_strength`. The three already-published episodes
-stay in `otr/obs/` (nothing is ever tidied out of it). SOURCE FIX, still open: give the harness a
-`run_label` of its own that reaches the log and the ledger meta but never `episode_title` -- a
-small design item (touches the API runner, the whitelist and the mux's filename), arc before code.
-
-**Every style, not anime (operator, 2026-09-02 evening): "anime is not the only target; all
-visual styles need to craft the episode as well when selected."** The registry carries nine
-(`nodes/_otr_visual_styles.list_style_ids()`: anime, archival_documentary, cartoon,
-paper_origami, recur_frac, sci_fi_radio, shakespeare_stage_realism, storybook_engraving,
-video_art). The two-word-cue defect is style-blind, so every arm of this campaign -- the
-adapter sweep (already anime + storybook_engraving), the still-in lab peer, the pack language
-under the 77-token budget -- is designed and proven PER STYLE, with a non-anime style in every
-proof leg, and judged by one question: is the SELECTED style visibly the episode's style on the
-stills and the video alike.
-
-**First read of the sweep (operator, 2026-09-02 evening, on the three anime legs 1.0 / 0.5 /
-0.25):** "the anime looks improved; which one is better, not sure at the moment." He reviews
-the full candidate set when he is back; the driver's standing instruction meanwhile is "keep
-coding, do your best" and to decide whether a blinded A/B is needed. The instrument's
-render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
-attributable; the first three legs pre-date the merge and carry no trace.
-
-**Item 1 CLOSED by the operator's eye (2026-09-02, ~20:30), six of eight legs watched.**
-Storybook engraving: 0.5 (`the_last_reading_190630`) "very storybook and did the best of
-maintaining the style"; 1.0 (`the_trembling_ground_182739`) "cool rendered 3D realistic
-storybook stuff but drifted into the army men in green coats". Anime: 1.0 "more anime than
-0.0 but drifted into real-life stuff for a while"; 0.5 "some anime but some people in blue
-coats"; 0.25 "maybe the most anime"; 0.0 "definitely animation, not strikingly anime, but
-cool". His delegation: "if you think any of them are an improvement to the haunted we have,
-take your best take." TAKEN: **`ADAPTER_V3_STRENGTH` 1.0 -> 0.5** (the shipped default on
-both boxes; the env override stays the sweep knob; every receipt stamps what ran). 0.25 is
-the standing contender on anime; if storybook 0.25 (leg 7) also beats 0.5 by his eye the
-default moves to 0.25 -- one constant. **The coats finding:** across the traced episodes the
-only prompts that say "coat" say "cream coat" and "charcoal coat" (the cast's own looks, both
-characters), never green or blue; the green army coats and blue uniforms are the base model's
-prior for "coat" under an engraving or anime medium, amplified by the adapter. The GARMENT
-WORD is a style lever -- an input to item 3 (pack language): the motif composer should map
-garments through the pack rather than pass the writer's word raw, and this is the first
-measured prompt-to-picture pair the instrument's trace made citable.
-
-**Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
-Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
-`animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288
-plate minted in-graph from the pack's full language and the ledger's world, repeated in Python
-to the sampler batch, sampled at a strict `OTR_STILLIN_LAB_DENOISE` (default 0.65); a lab id
-on `otr_stillin_lab_5080` (`draft`, never a default); the replay instrument gained a derived
-bundle (`--derive-engine`) so ONE ledger renders on both Ghost siblings; the verifier gained
-the plate-hash rule; `scripts/otr_stillin_probe_report.py` measures motion energy against the
-lane's own A/A band. The design and receipts are `still-in-peer/driver_anchor.md` sections
-1-14. NEXT: merge, the full suite in the main checkout, then the live probe on the 5080 --
-one style per invocation, anime and storybook_engraving first, every leg to `otr/obs/` with
-the story's own title -- and the operator's eye on the triptychs. Stop rules stand (section 7
-D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
-and keeps the plate ends E1 (next arm the E2 probe).
-
-**Item 3 REDEFINED and IN ARC -- Prompt v3, "draw the crux" (operator, 2026-09-02 21:00-22:00).**
-He read every beat of the storybook episode beside the prompt it got, rewrote ten by hand,
-and ruled: draw what the line is ABOUT in the story's one setting, mix the visual style with
-the CRUX of the story on every beat, the world's own motion, no costume or prop the dialogue
-never names, fewer variables ("too many variables -> humans and bags"), get creative, and
-"yes, I want to see more STORY, not just the characters." Mechanically confirmed: the lane's
-character motif is a costume template with fallback pools (coat; lantern / key / ledger /
-satchel), the object beats draw the carried prop, the leaf author is handed no dialogue and
-its one hint field was empty on all 27 beats, and the story brief plus `key_objects` sat unused
-by this lane. Source: `prompt-rule/operator_rewrites.md`; anchor: `prompt-rule/driver_anchor.md`
-(sections 1-7; r1 = Fable cold + Antigravity, five reversals, R1-R10 govern; r2 Codex running).
-**GPU FREEZE (operator, 21:50): "don't waste any GPU runs until the prompting is fixed."** The
-adapter sweep's last leg finished on its own (8/8 published); the overnight chain was NOT
-launched; nothing boots a server until v3 is merged and green. The first GPU run after is ONE
-episode, same seeds, v2 beside v3 (R9). The still-in peer (item 2) and the 0.5 adapter default
-(item 1) merged at 7c231e24 with the full suite queued on CPU; their probes wait behind v3.
-Item 3b (the other video lanes get the same SHAPE, per-lane budgets, talking-face lanes
-exempt) follows once v3 is judged on this lane.
-
-**Operator, 2026-09-02 20:45: "of course I'm really more interested in video art or
-recursive fractal, or both if they are separate."** They are separate packs (`video_art`,
-`recur_frac`), and they are the two LONGEST packs in the registry -- the ones the shipping
-lane's two-word cue serves worst and the ones the peer's full-language plate is built for
-(recur_frac's plate reduces to its positive_tail under the 320-char ceiling; the receipt shows
-what survived). Tonight's GPU chain leads with them on BOTH lanes: after the instrument's
-replay proof, four adapter legs (video_art and recur_frac at the shipped 0.5 and the
-contender 0.25), then the still-in probe on video_art, then on recur_frac. Anime and
-storybook_engraving probes follow on a later night. His eye on those two styles is the
-verdict that matters most to him; the per-style rule stands for the rest.
-
----
-
-## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least)
-
-A leg is 1-3 hours on the one GPU. Run batches SERIALLY -- *"two windows
-resetting one GPU is how each kills the other's leg"* (from the archived
-scheduling note; still true). Reset per `CLAUDE.md` section 4 before every
-leg. A leg that does not reach `otr/obs/` did not pass. **Every canonical leg
-below is also a free chance to** (a) re-observe the two parked eyeball items
-(Batch R5) and (b) watch the two ledger-cleanup behaviour changes named in
-Open risks that have no live receipt yet.
+Batched by the leg that proves them -- test the least. The pod is ONE rental with two
+jobs on the same dollar: the provisioner's acid test (saved template -> provision -> one
+published episode, ZERO hand steps) and then the looped lane sweep for the HuMo 14B /
+LTX 2.5 / indextts2 second-machine receipts. The overnight runners publish and shut the
+GPU off by themselves, so it is one evening, not a campaign.
 
 ### Batch R1 -- THE H3 PROMPT-POLICY VERDICT: read the receipts first, render only if they do not answer
 
@@ -1526,8 +823,7 @@ clean-room profiles are untracked stand-ins on the 4060; the shipped equivalent 
 Section 1.5 item 2. Friction log and every leg receipt (R1, R2, C through C6):
 `docs/ship-audit-2026-09-01/4060_CLEANROOM.md`.
 
-* **Leg C5** (Klein + LTX 2.5, stock flags): PUBLISHED 2026-09-02 12:10, 24 clips,
-  `RESULT SUCCESS` + `obs_publish OK`; the operator eyeball is Section 1.5 item 1. Leg A's question is
+* **Leg C5** (Klein + LTX 2.5, stock flags): the operator eyeball is Section 1.5 item 1. Leg A's question is
   answered by this leg (LTX 2.5 works on 8 GB, not a daily driver); Leg C6 (fp8 encoder)
   is not needed.
 * **Leg B -- OPEN:** `otr_cleanroom_8gb_humo17` (HuMo 1.7B, 13.6 GB of Comfy-Org weights,
@@ -1571,7 +867,217 @@ asks whether a row is wanted).
 
 ---
 
-## SECTION 3 -- RULINGS OWED BY THE OPERATOR (each with its default if unruled)
+## 6. THE REGISTRY -- LAST, and that is a ruling not an accident
+
+### The registry rows, carried forward (the 2026-09-02 queue's item 1)
+
+**Standing constraints:** the 5080 loop is untouched -- nothing ships that reduces
+tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per file
+owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit
+AND push + `HEAD == origin/v2.0-alpha`.
+
+**1. THE REGISTRY -- alpha.17 IS PUBLISHED AND VERIFIED (2026-09-03). Two SEPARATE goals
+live here and conflating them is what made this feel stuck: (a) an INSTALLABLE listing,
+which needs an admin approval we cannot self-serve, and (b) the "N Nodes" count on the
+card, which is a different pipeline entirely -- and which, MEASURED 2026-09-03, is
+STALLED ON COMFY-ORG'S SIDE and is not ours to fix at all (see the ANSWERED block
+below; the newest successful extract in a 360-pack sample is 2026-04-28).** The old
+control experiment (republish alpha.8 byte-identical) is CANCELLED -- the cause was found
+directly instead.
+
+* So the credential fix held across the bump, Flagged-on-info-only is the expected outcome,
+  and **every precondition on the manual review request is now satisfied** -- it is ready
+  to file on the operator's go and nothing else gates it.
+* **THE SCAN COLLAPSE IS THE CODER'S NEXT CHUNK** -- see WHERE TO PICK UP at the
+  top: plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is
+  next. Nothing in it needs the operator except the review filing above.
+* **One residual risk that cannot be settled from here:** kokoro pulls `torch`,
+  and if the container's preinstalled CPU torch does not satisfy the constraint, pip would
+  download multiple GB inside the 600 s extract timeout. Unknowable without the image.
+* **ANSWERED 2026-09-03 18:30Z, AND THE ANSWER CLOSES (b) AS NOT-OURS. DO NOT CHASE
+  KOKORO.**
+  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits -- a package
+  publishing 21 Windows wheels and zero Linux wheels genuinely does not install in that
+  container -- and it is what makes a Linux `pip install -r requirements.txt` work at
+  all, extract pipeline or no. It simply was not the node-count blocker.
+  The Linux pod keeps the engine because
+  `scripts/otr_pod_provision.sh` apt-installs the headers and now pip-installs pycairo
+  explicitly -- do NOT "simplify" that line away.
+  **Reproduce before re-opening this:** compare the newest `success` timestamp across a
+  broad pack sample against OTR's first publish date. If a pack ever extracts
+  successfully again, the question becomes live and OUR deps become worth re-testing;
+  until then the card's node count is not a work item.
+* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** Active needs ZERO
+  findings of any severity or an admin batch approval; 157 info-level YARA hits (env
+  reads, ffmpeg subprocess, opt-in cloud lanes) keep it Flagged forever on the automated
+  path. The gate is a literal `if issues == ""` on the scanner body -- one info finding
+  and 157 are identical. There is no publisher self-service route to Active, confirmed by
+  reading `Comfy-Org/registry-backend`. Corroborated independently: rgthree's two newest
+  publishes are Flagged too, so the ruleset tightened in late August and comparing against
+  older Active versions of popular packs proves nothing.
+* **THE NODE-COUNT HALF IS ALREADY FILED, AND HAS BEEN SINCE 2026-08-24: the operator
+  opened `Comfy-Org/registry-backend#203`.** It is still OPEN with no comments, labels or
+  assignee. It names a cause this window's 480-pack survey could not have found on its own
+  -- **a backfill cron scheduled for February 29th**, a date that does not occur in 2026 and
+  next occurs in 2028. The operator added the survey as a comment on 2026-09-03 and
+  corrected the issue's date window: extraction did not stop in February, it stopped
+  **2026-04-28**, and 19 packs' newest success falls in April with nothing after. Do NOT
+  open a second issue on this; comment on #203.
+* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO,
+  AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision,
+  and the measurement behind it is that **admin approval is PER VERSION.** Verified
+  on `comfyui-video-xy-plot`: all five of its versions carry their own
+  `{"message": "subprocess: ffprobe", "by": "dr.lt.data@gmail.com"}` note, four of
+  them published on the same day. So approving alpha.17 buys nothing for
+  alpha.18, and this branch shipped five versions in five days. Asking now would
+  spend a reviewer's time on a version superseded within the week -- which is the
+  behaviour that actually annoys a maintainer, as distinct from asking at all.
+  **File it on the first NON-ALPHA version, the same day it publishes**, so the
+  version under review is the version a stranger would install. Include the
+  question about node-level review; it costs them less than five separate ones.
+  Everything is ready and needs no further work:
+  `docs/2026-09-03-registry-review-request-READY.md` carries the title, the body,
+  alpha.17's version id, counts read from its own scan, the zero-is-unreachable
+  measurement, and the video-xy-plot precedent. **Re-read it before posting** --
+  the version id, the counts and the "0 critical" claim all move with each new
+  publish, and a request quoting a superseded version is worse than none.
+* **The old NEXT line, kept so the parking is legible:** file the manual review
+  request. Draft ready and retargeted at alpha.17 in
+  `docs/2026-09-02-registry-manual-review-request.md`. **Precondition 2 (grep the
+  published zip for the route gate) IS NOW SATISFIED** -- see the verification above, so
+  strike that step. **BOTH REMAINING PRECONDITIONS ARE NOW SATISFIED
+  (2026-09-03):** alpha.17's scan landed at 0 critical, and every finding count in the
+  draft has been re-read from alpha.17's own scan (158, not alpha.16's 157). The draft is
+  ready to post as-is. Filing is a public post on Comfy-Org's tracker and needs the
+  operator's explicit go -- it is the only thing still holding it.
+* **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL
+  verification, NOT for scanner probing.** Publishing a small pack under his own publisher
+  to confirm a dependency set actually installs in their Linux container is ordinary use
+  and would have caught the pycairo bug for free, before it cost four version strings.
+  Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in
+  a real security queue, and it is **unnecessary** -- `?include_status_reason=true` already
+  returns all 157 findings itemized by rule, so there is nothing left to discover.
+* DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes.
+  Never version-delete: a soft delete burns the string permanently.
+
+**3. THE CORRECTNESS BUGS -- in this order.** Story quality is done; these are
+correctness defects (a gender or voice contradicting the source, a beat that renders the
+wrong picture, a leg that dies late).
+* **3b. PROMPT v3 "DRAW THE CRUX" -- HALF A SHIPPED AND PROVEN 2026-09-03. HALF B IS OPEN
+  AND IS THE NEXT CODER WINDOW ON THIS LANE.**
+  **HALF B -- THE OPERATOR RULED ITS SHAPE 2026-09-03 AND r1 INVERTED ITS
+  MOTIVATING CASE. Read `docs/OTR_STANDING_RULINGS.md` "THE BEAT'S SUBJECT IS A
+  PHYSICAL ARTIFACT" before touching this.** In short: extend the EXISTING batched
+  Ghost author with the beat's dialogue (never a second pass), and have it name a
+  PHYSICAL ARTIFACT of the story, preferring one the beat refers to -- never an
+  abstraction and never a noun the dialogue mentions only to say it is absent.
+  **The truck must NOT be drawn:** "this isn't just some dusty list of truck
+  routes" is a rhetorical negative, Ellie is holding a ledger in an archive, and
+  the r1 panel caught that the item's own worked example had been read backwards.
+  The residual defect is that `resolve_crux_kernel` picks
+  `objects[ordinal % len(objects)]`, so the beat about the ledger drew `pen`
+  because it was the third row. r1 also corrected three inherited claims: the
+  render batch DOES have `IS_CHANGED` now, replay returns before the author runs
+  (so a migration needs an explicit seam at the replay boundary, not a version
+  check in the author), and the beat's own `text` projection is the accessor --
+  not a `_ghost_line_index` join, which silently misses synthesized beats. r2 is
+  running; records in `kibitz-runs/2026-09-03-prompt-v3-half-b/`.
+  **The old framing, kept only so a reader of the history understands what
+  changed:** subject-appropriate motion needs the beat's own dialogue in front
+  of the writer -- Half A buys the story's object, place and light on every beat and cannot
+  buy its motion. He named the gap himself on the ledger episode: "I don't see any trucks
+  though, it does mention a truck once" -- `truck` is in one spoken line and not in
+  `key_objects`, so Half A had no path to it. Half B changes the STORED object, so it needs
+  the version-dispatch discipline r2 specified and a re-author path for replay. Full arc
+  before code. Anchor and the four-round records:
+  `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/` and
+  `kibitz-runs/2026-09-02-prompt-v3-crux/`.
+  **Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"`,
+  which reads wrong on a few settings ("a spinning turntable **in the** riverbank"). One
+  small preposition fix; waiting only on his eye, not on Half B.
+* **3c. The open defect list** -- the P0 / source-span cluster, the orphan-occupancy
+  registry (full arc before code), the coverage and routing rows. Section 1.4.
+* **3d. Item 3b-of-the-old-numbering, the OTHER video lanes -- measured, not started.**
+  Ten of eleven lanes lead their prompt with the cast's face paragraph (83 words on one
+  real episode) via `motion_common.compose_parts`. On `wan_ti2v` that is 83 of a hard
+  100-word cap that truncates mid-sentence, so the camera clause silently falls off.
+  **AMENDED by the r3 reviewer:** ADD a crux clause beside `appearance` on the silent
+  image-to-video lanes; do NOT drop the face on redundancy alone -- the foley/mime lanes
+  drop it because their joint latent SPEAKS the prompt, which is not a general I2V rule.
+  Audio-in lanes (HuMo, the h3 audio lane, `ltx_audio_in`) and the two Google
+  text-to-video lanes keep the face unconditionally. Runs after his eye on Half A.
+  Measurements: `docs/2026-09-02-animatediff-ledger-experiments/prompt-rule/other_lanes_audit.md`.
+
+**4. THE 8 GB SHIP SET -- what the clean room proved becomes a saved dropdown set.**
+(b) a shipped `otr_8gb_klein_ltx25` profile and variant (the clean-room profile is
+untracked on the 4060 -- promote it, do not rewrite it); (c) the eight profiles that still
+pair an 8 GB ceiling with the 12B writer get the E2B writer the 8gb class ships. Section
+1.5.
+
+**5. THE 4060 TEMPLATE TEST -- the frictionless capstone.** Runs once, after items 1 and
+2, on a tree with the bugs above closed: install from the registry on the 4060, load the
+8 GB saved-dropdown variant, click run, one published episode with zero hand steps. ONE
+JSON ships for now (`otr_canonical`, kokoro on both voice slots -- operator 2026-09-02); a
+4060 dropdown-friendly JSON is saved only after this testing is done, and that save is
+what the test promotes. What is still open on the set is in Section 1.6.
+
+**6. THE LOCAL-LLM ACCEPTANCE SWEEP** -- Leg 0 in-process preflight (Section 1.7,
+~15-20 min, idle GPU), then the four canonical legs of Batch R3.
+
+**8. DESIGN ROWS -- each gets a full arc before code, and none is the next coder
+window:** the one-manifest auto-download (1.9), the ship-audit survivors (1.10), the
+adaptation design (1.11), the style / identity decisions (1.12).
+
+**9. THE NEXT POD SESSION -- one rental.** The provisioner's acid test (saved template ->
+provision -> one published episode, zero hand steps) AND a looped lane sweep on the same
+dollar. Receipts file under the 16gb class; there is no 24 GB class or profile by ruling
+(95feac86), and Section 3 L asks whether one is wanted. Section 2, Batch R8.
+
+**DEFERRED BY THE OPERATOR (2026-09-02), not scheduled:**
+* **Token rotation** (Codex's security note, relayed in-session 2026-09-02 and recorded
+  nowhere else: an earlier temporary diagnostic briefly captured inherited HF / OpenRouter /
+  provider credentials; the file was removed and the leak path hardened). Rotate when
+  convenient; nothing in the queue waits on it.
+* The Section 3 question list (A)-(L), each with its default if unruled.
+
+**WATCH -- recorded, not scheduled:**
+* **`obs_publish OK` is not proof of an episode (2026-09-03, cost two GPU legs).** Three
+  replay bugs shipped that morning; TWO of them published green with a broken file --
+  one second of picture in an 85-second episode, because a placeholder wire set the
+  procgen overlay's length and `PostUpscaleProcgenBlend` takes the shorter input. What
+  caught it was measuring the published file's DURATION at every pipeline stage (render /
+  blend / caption / credits / mux), never the log. A stage that changes the duration is
+  the defect. PBUG-20260903-01/02/03; two 7.5 MB casualties are still in `otr/obs/` and are
+  deliberately not swept -- `..._231401` and `..._233738`, both "The Faded Ledger".
+* **An unrelated rotation loop owns the box's spare cycles.** `video_rotation.sh` has run
+  since 2026-08-31 out of session `8a385813`, cycling 16 engine/image lane combos one act
+  at a time, forever, and it deliberately skips AnimateDiff. It is Jeffrey's daily obs
+  proof; leave it running. It does not block a registry publish (that runs in GitHub
+  Actions against the repo, not this box) and holds the resident server on :8000, which
+  only matters for a local boot check.
+* Zero-frame beat: the root fix landed (`415b1ba0`, PBUG-20260831-01: an untimed
+  `music_open`/`music_close` with no timed mirror got no duration; it was also the ghost
+  pool r1's "roughly 70 minutes" death). Owed: one canonical leg of that shape reaches
+  `otr/obs/`, recorded as a "verified live" line under the PBUG; and confirm `shot_b006`
+  (`mode=object source=deterministic_fallback`) was the ghost shot for those music rows,
+  or it is a second defect. No coder time.
+* Whether a PRUNED P0 index is ever accepted has not been measured live (the deterministic
+  rung became reachable at `47c554fa` after the campaign stopped); the next P0 campaign's
+  instrumentation answers it.
+* `OTR_LedgerFreezeCascade` failed twice and the message was never captured -- the
+  runner's eight-frame traceback truncates it. Next occurrence, read the SERVER log.
+* `OTR_VideoRenderBatch` `RenderError` cluster -- triage after items 2 and 3.
+* The two eyeball re-observations (announcer framing, name-splice #2) ride any real
+  render leg -- Batch R5.
+
+---
+
+## 7. RULINGS OWED BY THE OPERATOR -- each with its default if unruled
+
+Skipped by every coder window until he rules. A window that guesses one of these is
+doing work that may be thrown away.
+
+### How to read these rulings
 
 One operator pass clears every row here. Nothing in the queue's first five items waits on
 this section.
@@ -1698,7 +1204,12 @@ extension), never the shipped render recipe.
 
 ---
 
-## SECTION 4 -- PARKED / DEFERRED (out of the working queue)
+## 8. PARKED / DEFERRED -- out of the working queue, kept for the ruling each carries
+
+Nothing here is scheduled. Each row is here because a ruling parked it, and the ruling
+is the reason it must not be quietly re-opened.
+
+### The parked rows
 
 ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
 
@@ -1829,31 +1340,14 @@ the cloud `word_razzle` row -- retire it, or rename it `cloud_word_razzle` so th
 roster is honest either way. Renaming alone would fix the transparency defect
 even if the local lane never lands.
 
-**Separately noted -- FIXED 2026-09-04 (kibitz runpod-found-fixes, ruling R-B;
-PBUG-20260904-03).** `word_razzle` failed the 2026-09-03 pod matrix with
-`SessionIdentityUnavailable` -- it would render 2 segments from one set of
-handles but declares no `session_identity()`. NOT a credentials problem and NOT
-pod-specific: the same refusal fires on the 5080 for any beat long enough to
-need two segments, on every one of the seven remote adapters. (This paragraph
-said "already fixed" for a day while the refusal was untouched; the roster
-test's tripwire was the only honest record.)
-
-The fix is a DECLARATION, not an inference: `_CloudVideoBase` (five rows),
-`google_omni_video` and `google_veo_video` set `session_residency = "remote"`,
-and `beat_session.holds_local_handles()` skips the identity demand for exactly
-them -- fail-closed, so an absent or misspelt attribute still reads as local and
-the demand stands. No `session_identity()` was added to any cloud adapter: an
-identity of handles that do not exist would be theater. The roster test is keyed
-on the declaration and a control pins that no engine declares remote AND a local
-isolation. Eight local engines still declare the identity (ghost_signal, humo,
-ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v).
-
 **Not done, and the predicate question if anyone wants it:** a RECIPE identity
 for remote lanes (model id + resolution + params), so a mid-beat env flip is
 caught for a cloud lane the way weight drift is caught for a local one. Nobody
 has asked for long cloud beats; log it, do not build it.
 
-## SECTION 5 -- Bug Bible promotion field -- pending actions only
+## 9. THE BUG BIBLE FIELD AND THE OPEN RISKS
+
+### Bug Bible promotion field -- pending actions only
 
 | Record | Pending action |
 |---|---|
@@ -1875,7 +1369,7 @@ The active production-fix owner updates `docs/PROD_BUG_LOG.md`; promotion to the
 tracked in the Bible repo's `otr_coverage_index.yaml` (CLAUDE.md, delta-scrape discipline);
 no plan review or invented fixture creates a row.
 
-## SECTION 6 -- Open risks
+### Open risks
 
 - **NO CLIENT BANK HAS EVER RUN LIVE.** Every extensibility wave is proven by the suite
   and by contract tests, and the first real client bundle is still an unproven path end
@@ -1913,7 +1407,7 @@ no plan review or invented fixture creates a row.
 - Lean-mean has one current ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.
   The retired FRONT/TAIL and SW-1 execution model must not be revived.
 
-## After this queue
+### After all of the above
 
 One owner per file (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.

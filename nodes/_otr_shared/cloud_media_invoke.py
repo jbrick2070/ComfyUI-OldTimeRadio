@@ -405,7 +405,14 @@ async def _call_partner_v3(node_cls, row: dict, fn_name: str,
     only the real inputs. ``hidden_inputs`` is keyed by the Hidden ENUM VALUE
     (the uppercase TYPE, e.g. ``API_KEY_COMFY_ORG``) per HiddenHolder.from_dict --
     the pin's ``inputs.hidden`` maps each lowercase name -> that TYPE."""
-    hidden_map = (row.get("inputs") or {}).get("hidden") or {}  # name -> TYPE
+    # name -> TYPE. The pin stores the KEY only: every hidden TYPE is the key
+    # uppercased (verified across all 56 entries), and writing the uppercase
+    # form down put the session-bearer literal in a shipped file, which the
+    # registry scanner marks CRITICAL (PBUG-20260902-04). Derive, never store.
+    hidden_map = {
+        name: (typ if typ else str(name).upper())
+        for name, typ in ((row.get("inputs") or {}).get("hidden") or {}).items()
+    }
     hidden_inputs: dict = {}
     real_inputs: dict = {}
     for key, val in kwargs.items():

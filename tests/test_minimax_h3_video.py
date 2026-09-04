@@ -524,7 +524,7 @@ def test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import():
       a pass -- so the H3 lane refused on every server for a reason that was
       about an import. Dormant until now because ``h3`` is the first contract
       that constrains Sage at all.
-    * ``content_oracle.family_for_engine`` -- the WORST, because it failed
+    * the (since-ripped) content oracle's family table -- the WORST, because it failed
       SOFTLY into ``_FAMILY_FALLBACK``. Every engine added since that table was
       written resolved to family "" in production, which is not in
       MOTION_FAMILIES, so those lanes were silently motion-EXEMPT.
@@ -564,25 +564,6 @@ def test_no_shared_module_reaches_a_sibling_by_an_absolute_nodes_import():
         "absolute `nodes.` imports of a SIBLING package resolve against "
         "sys.path -- this package in the CPU suite, ComfyUI's own node registry "
         "on a live server. Use a relative import:\n  " + "\n  ".join(offenders))
-
-
-def test_the_family_oracle_answers_from_the_REGISTRY_not_the_stale_table():
-    """The soft-failure half of the same bug, asserted on its consequence.
-
-    A lane the fallback table has never heard of must still resolve its family,
-    because ``motion_required_for_engine`` reads that family and an unknown one
-    reads as motion-EXEMPT -- a frozen clip would pass the motion check by never
-    being asked.
-    """
-    from nodes._otr_shared import content_oracle as co
-
-    assert co.family_for_engine("minimax_h3_video") == "image_to_video"
-    assert co.motion_required_for_engine("minimax_h3_video") is True
-    # And every registered local motion lane agrees with the registry, not with
-    # whatever the table happens to still say.
-    for name in vreg.all_engine_names():
-        engine = vreg.get_engine(name)
-        assert co.family_for_engine(name) == getattr(engine, "family", ""), name
 
 
 def test_an_unverifiable_boot_is_not_a_pass():

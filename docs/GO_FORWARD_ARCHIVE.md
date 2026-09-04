@@ -3631,3 +3631,627 @@ Eight pod-driving lessons landed in `docs/RUNPOD_INSTALL.md` section 7A and its
 failure atlas.
 
 ---
+
+
+## ARCHIVED 2026-09-04 evening from ## THE QUEUE -- READ THIS FIRST (ordered by the operator, 2026-09-02)
+
+* **alpha.17 published 2026-09-03 17:56Z, commit `524426ee`, Action green, and VERIFIED
+  AGAINST THE ARTIFACT rather than the commit.** The CDN zip
+  (`.../2.0.0-alpha.17/node.zip`, 6,397,276 bytes, 814 files) was downloaded and grepped:
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` present in `__init__.py`, the pycairo marker and the
+  `kokoro-onnx` line present in the shipped `requirements.txt`, and none of `tests/`,
+  `.claude/`, `.github/`, `kibitz-runs/` leaked. The registry recorded **19 dependencies**
+  (alpha.16 recorded 18) -- the static-list check that alpha.3 taught us to run.
+  **ITS SCAN HAS SINCE LANDED (2026-09-03 19:06Z): `Flagged`, 158 findings, ALL
+  `severity: info`, ZERO `critical`** -- re-read directly from
+  `?include_status_reason=true`, not carried over from the doc. The delta from
+  alpha.16's 157 is exactly +1 `python_environment_manipulation` (102 -> 103), which is
+  the route gate's own `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added.
+
+* **pycairo was the ONLY source-build-only dependency -- audited, not assumed
+  (2026-09-04).** Every line in `requirements.txt` was evaluated against a
+  linux / cp310 / x86_64 marker environment (what the extract container is) and then
+  checked against PyPI's own file list for that release. All 17 selected packages resolve
+  to either a manylinux wheel or a pure-python wheel; `kokoro-onnx` and `pycairo` are
+  correctly skipped by their markers. The transitive suspect named in the handoff is also
+  clear: `misaki` is pure-python and `spacy` / `thinc` / `blis` all carry cp310 manylinux
+  wheels.
+
+* **alpha.16 scanned 0 critical / 157 info (2026-09-03), the first zero-critical scan
+  since alpha.8.** The two `critical` `prohibited-string` findings that flagged alpha.9
+  through alpha.15 were the writer declaring the session-bearer hidden input beside
+  `api_key_comfy_org` (PBUG-20260902-04); removing it cleared both.
+  `tests/test_registry_prohibited_strings.py` guards every shipped file. Confirmed still
+  true of alpha.17: the four remaining `auth_token_comfy_org` occurrences in `nodes/` are
+  byte-identical to alpha.16 and are a consumer-side NAME CHECK, not a declaration.
+
+* **THE NODE COUNT WAS A DEPENDENCY BUG, NOT AN APPROVAL PROBLEM -- FIXED IN `aff1f9c4`.**
+  The "N Nodes" badge is fed by Algolia's `comfy_nodes` array, which is populated by
+  Comfy-Org's `node-pack-extract`: a Cloud Build container that boots a headless CPU
+  ComfyUI on Linux, runs a bare `pip install -r requirements.txt` under `set -e`, and
+  reads `/object_info`. **It is independent of Flagged/Active, so no approval would ever
+  have populated it.** Measured: `/versions/2.0.0-alpha.16/comfy-nodes` returns
+  `{"comfy_nodes": null, "totalNumberOfPages": 0}` where
+  `comfyui-videohelpersuite/versions/1.7.9` returns real rows. Cause: `pycairo` publishes
+  21 Windows wheels, 1 sdist and **zero Linux wheels**, so that install had to build from
+  source against `libcairo2-dev` and died. `requirements.txt` now marks it
+  `sys_platform == 'win32'`, mirrored into `pyproject.toml`.
+  **Cost, measured not asserted:** one function. The only `import cairo` in
+  `scope_draw.py` is inside `paint_mandala`, so importing the module never imports cairo;
+  `freq_bars_green`, `cfr_flags`, `find_ffmpeg`, `encode_silent_mp4` are cairo-free, so
+  the scope overlays, caption burn, silent composite and encode sink are untouched.
+  `viz_mxc_mandala` guards `load()` and `assert_usable()` and appears zero times in
+  `otr_canonical.json`.
+  The re-check ran: `/versions/2.0.0-alpha.17/comfy-nodes` is still `null`.
+  The paragraph that stood here read that as "something else in the install also fails
+  on Linux -- next suspects are `kokoro`'s spacy/thinc/blis chain against the 600 s
+  extract timeout". **That is wrong, and acting on it would have burned a coder window
+  on infrastructure we do not own.** It offered a binary -- our fix worked, or our
+  install still fails -- and omitted the third option, which is the true one.
+  `?include_status_reason=true` exposes a field the theory was built without:
+  **`comfy_node_extract_status`**, which has TERMINAL values (`success` and
+  `invalid_format` both observed). Measured across **360 registry packs**: only 64 have
+  ever recorded a `success`, and **the most recent successful extract ANYWHERE in that
+  sample is 2026-04-28**. rgthree (Active, 47 prior successes) has versions sitting
+  `pending` since 2026-05-09; kjnodes (Active, 24 successes) since 2026-05-05;
+  florence2 since 2026-05-06. **Comfy-Org's `node-pack-extract` has produced no
+  successful extract for any pack in over four months.** OTR records zero successes
+  because OTR's first publish was 2026-08-22 -- four months AFTER the pipeline last
+  worked. It never had a chance, and no `requirements.txt` change reaches it.
+
+* **ALPHA.17 SCANNED 2026-09-03 19:06Z: 158 findings, ALL `info`, ZERO `critical`, status
+  `Flagged`.** The credential fix held across the bump. The delta from alpha.16's 157 is
+  exactly +1 `python_environment_manipulation` (102 -> 103), which is the route gate's own
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` env read that alpha.17 added -- i.e. the one new finding
+  is the feature we shipped, behaving as designed. Flagged with zero criticals is the
+  expected outcome, not a failure.
+
+**2. THE KOKORO-ONNX BACKEND -- DONE 2026-09-02, receipts archived.** Both proofs
+published and eyeballed ("this episode is perfect, voices great"). Its one leftover, the
+kokoro-onnx dependency line reaching registry installs, rides the alpha.17 bump in item 1.
+Detail in `docs/GO_FORWARD_ARCHIVE.md` and `docs/2026-09-02-kokoro-onnx/`; row in
+Section 1.1.
+
+* **3a. Character gender ladder -- DONE 2026-09-02.** Receipt archived; row in Section 1.2.
+
+  The AnimateDiff lane was composing an
+  invented costume plus a leaf written from that costume plus a framing law -- none of the
+  three knew the story, which is why it drew a charcoal coat and a satchel for an episode
+  about film canisters. Half A (`b198026a`'s parent merge `b97cce6d`) composes pack cue +
+  crux kernel (the episode's own `key_objects` in its own setting) + light + world motion +
+  a vantage mapped from the stored mode, reading neither the stored motif nor the leaf nor
+  the law. Render-time only, so a frozen episode replays with a byte-identical seed --
+  `render_request_hash` never included the prompt. **Proven:** same-seed A/B in `otr/obs/`
+  (21:08 old vs 23:59 new, seeds identical 8/8, prompts differ 8/8), every prompt composed
+  live at exactly the token count predicted on CPU, 32.9 tokens against v2's 40.2.
+  Operator verdict on the video_art leg: "surprisingly good... it's about Huckleberry Finn
+  and there's actually a river!"
+
+Klein stills run on 8 GB under stock launch flags (Leg C5: ~21 s a still) and LTX 2.5
+renders there at ~14 min a clip; the Leg C5 episode PUBLISHED 2026-09-02 12:10
+(`signal_lost_rationed_breath_20260902_060027`, 24 clips, 6 h 35 min; receipt in
+`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`). (a) DONE 2026-09-02: the 8 GB row is PROVEN with its image lane on the
+all-kokoro clean-room episode `signal_lost_the_ledger_of_shadows_20260902_134447` (the
+operator's eyeball), receipt merged into the row's 4060 entry (7 episodes), matrix
+regenerated;
+
+**7. DOCS DELETION PASS -- DONE 2026-09-02.** `docs/` went 644 tracked files to 237 across
+three deletion-only commits (45895801, 2bf15784, 607a5ee7). Kept set in Section 1.8.
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.1 KOKORO-ONNX BACKEND (queue item 2) -- the default voice that installs everywhere (design item, kibitz arc BEFORE code)
+
+**STATUS 2026-09-02: BUILT, proofs pending (see queue item 2).** Shape as shipped:
+`nodes/_otr_audio_engines/_kokoro_backends.py` (torch path moved verbatim; ONNX path
+CPU by design, explicit provider, 4-thread cap, voices from the existing `.pt` files
+through a digest-named npz); `eng_kokoro.py` selects per `load()` via
+`OTR_KOKORO_BACKEND=auto|torch|onnx`; the prefetch fetches `onnx/model.onnx` at boot only
+when the ONNX backend will be used; canonical nodes 80/81 default both voice slots to
+kokoro on `kokoro_builtin`; a character-side engine-agreement guard; five profiles fixed;
+complementary `kokoro` / `kokoro-onnx` markers in `requirements.txt`; the generated "Voice
+engines" table in the matrix. Design record: `docs/2026-09-02-kokoro-onnx/`.
+
+Measured 2026-09-01: `kokoro-onnx>=0.6.1` + `onnxruntime` pip-install clean on Python 3.13
+(kokoro-onnx pins `>=3.10,<3.14`; espeak-ng ships bundled for win / mac / linux; the torch
+`kokoro` package stays `<3.13`). Receipts: PBUG-20260901-04 and `docs/OTR_STANDING_RULINGS.md`
+"ALL AUDIO LANES SHIP ON KOKORO".
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.2 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review round, then code
+
+**DONE 2026-09-02.** Round: Antigravity r2 on the driver anchor
+(`docs/2026-09-02-gender-ladder/driver_anchor.md`, sections 8 and 9 carry the fold and the
+proof) -- 7 must-fixes, all grounded and taken. Code: tiers 3-4 in
+`scripts/otr_stamp_character_genders.py` (recall into a committed per-bank
+`character_gender_index.json`, the first-name pool, the body-hash-anchored merge, the
+Shakespeare scene stamper), the verdict fields and the alias-aware join in
+`nodes/_otr_roster_gender.py`, greedy decoding at temperature 0 in the constrained closure.
+Proof: `signal_lost_intensity_in_the_drawingroom_20260902_152901` -- ELIZABETH BENNET female,
+MR. DARCY male, COLONEL FITZWILLIAM male, all `llm_recall` / `recalled` in
+`meta.cast_source_contract.evidence`; the leg before it (`unhand_me_sir_20260902_151527`) is
+the before-picture where Darcy rolled female because the join ignored the aliases.
+
+Evidence and the v1 spec: `docs/2026-08-05-character-gender-ladder-SPEC.md` and
+`docs/GO_FORWARD_ARCHIVE.md` (the prose lane stamps `characters: None`; the Shakespeare
+sidecars carry genders; the consumer `_otr_roster_gender.py` is lane-neutral and correct).
+v2 folds v1; the rulings above are baked into v2.
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.4 OPEN DEFECTS THAT ARE CODING WORK (queue item 3c; a leg may prove some later, none needs a leg to FIX)
+
+**A. VERIFIED, HIGH -- the output tree is decided TWICE, and the copies disagree.**
+`nodes/_otr_paths.py` is the documented owner (`OTR_OUTPUT_DIR` is "highest
+precedence", :74-106). `nodes/otr_master_audio_mux.py` imports NOTHING from it and
+carries its own `_episodes_root()` (:695) and `_obs_dir()` (:709), neither of which
+reads `OTR_OUTPUT_DIR`. Proven by EXECUTION, not by reading:
+
+```
+OTR_OUTPUT_DIR=D:\RenderOutput , folder_paths=C:\ComfyRoot\output
+_otr_paths.otr_episodes_root()  -> D:\RenderOutput\otr\episodes
+mux._episodes_root()            -> C:\ComfyRoot\output\otr\episodes   AGREE? False
+_otr_paths.otr_obs_dir()        -> D:\RenderOutput\otr\obs
+mux._obs_dir()                  -> C:\ComfyRoot\output\otr\obs        AGREE? False
+```
+
+**Blast radius is the terminal publisher.** `_episodes_root()` gates
+`_inflight_episode_for_stem()` (:797) -- a mismatch silently rejects a valid
+in-flight ledger and falls back to filename-suffix peeling the module itself calls
+fragile. `_obs_dir()` is where `_publish_to_obs()` writes the deliverable. The same
+bare-`folder_paths`-or-`"."` idiom is copy-pasted again in `otr_caption_burn.py`
+(:349) and `otr_silent_composite.py` (:1692).
+
+**Why it has not bitten:** both launchers hand-pin `OTR_OUTPUT_DIR` =
+`--output-directory` = `OTR_OBS_DIR` in lockstep -- by human discipline in two
+separate shell scripts, not by any code invariant.
+
+**CORRECTED BY KIBITZ r1 (2026-09-04) -- the first draft of this row was wrong
+in three ways, and it matters because the first fix proposed would have broken a
+contract test.** Full record in
+`kibitz-runs/2026-09-04-runpod-found-fixes/r1/{judgment,final}.md` (local, gitignored):
+
+* **Four owners, not two.** `_otr_ledger.py:182` reads `OTR_OBS_DIR` too, and
+  `__init__.py:97-108` WRITES `OTR_OUTPUT_DIR` at import inside ComfyUI -- that
+  pin, not "the launcher was skipped", is the mechanism behind the Desktop /
+  bare-`main.py` split.
+* **Two concepts, deliberately named apart.** The *episode workspace root*
+  (`_episodes_root`) IS a true duplicate that ignores `OTR_OUTPUT_DIR` -- delegate
+  it. The *publication root* (`_obs_dir`) is NOT: `_otr_paths.otr_obs_dir()`
+  (:401-429) never reads `OTR_OBS_DIR`, which is a first-class override read by
+  seven files including five launchers and exists to point OUTSIDE the tree (the
+  documented two-tree split). The mux is right to honour it; `_otr_paths` is the
+  incomplete one. "Delegate the mux to `_otr_paths`" for obs would have broken the
+  split AND tripped `_validate_contract` (:220-236 raises on an out-of-tree path).
+* **A contract test pins it.** `tests/test_output_tree_contract.py:48-50` lists
+  `otr_obs_dir` in `_NOARG_HELPERS` and asserts in-tree. Any change ships WITH
+  that test updated, or does not ship.
+* **Open ruling, deciding in r2:** an explicit pin SKIPS the in-tree assert
+  (driver's first lean) or registers as a *declared second authorized root* the
+  way `_otr_ledger.py:168-191` already does (panel 2-1, and now the driver's lean
+  -- it keeps the validator meaningful instead of holing it).
+* Both docstrings -- mux "ONE owner", `_otr_paths` "THE obs dir" -- are false and
+  must become true or go; this is the nvenc shape.
+* **Acceptance:** Path equality is necessary and NOT sufficient. A live headless
+  publish with `OTR_OUTPUT_DIR != folder_paths.get_output_directory()` landing in
+  the watched tree. Caption-burn / silent-composite fallbacks are a rostered
+  follow-up, not equals of `_publish_to_obs`.
+
+**RESOLVED 2026-09-04 (kibitz r2-r3, built the same day).** Ruling R-A: the
+pin is honoured INSIDE `_otr_paths.otr_obs_dir()` and skips the in-tree assert
+for that path only (returned as typed, no `resolve()`); `_validate_contract`
+untouched; the ledger already authorized both roots. The mux's two functions
+are thin delegates (names kept -- the publication tests monkeypatch them).
+r3 grew the scope: the canonical graph's node 84 (`OTR_SilentComposite`, empty
+`output_path`) writes via `_default_out`, and node 93 writes beside it, so the
+"rostered follow-up" above would have left the canonical chain split -- silent
+composite, caption burn AND `portrait_ledger._output_base` now delegate too.
+Enforced by `tests/test_output_root_single_owner.py` (AST, named allowlist:
+`eng_mesh_stage` because ComfyUI's SaveGLB refuses any path outside
+`folder_paths`' own dir -- NOT a leftover twin, do not "retire" it -- and
+`vram_context_test`, a diagnostic outside the contract). conftest now strips
+`OTR_OBS_DIR` at import (the launch recipe sets it on this box). The `__init__`
+pin is preserved deliberately; removing it is its own design item.
+**PAID 2026-09-04 09:43-10:04 PDT -- the live publish matrix, measured.**
+`workflows/otr_canonical.json`, one act, on the 5080 with `--output-directory
+C:\Users\jeffr\otr_accept\A`, `OTR_OUTPUT_DIR=...\otr_accept\B` and
+`OTR_OBS_DIR=C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` (pairwise
+distinct; the shipped soak `.cmd` locksteps all three, so a launcher derived
+from it ran), `OTR_FFMPEG` pinned to a COPY of the binary while the real one
+stayed on PATH, and a watcher recording every ffmpeg process with its parent.
+Result: `RESULT SUCCESS`; nothing new under A; silent, blended and final all
+under B; the watched folder went 113 -> 114 with the mux's LOUD publish line;
+every ffmpeg the server spawned ran from the pinned copy (the PATH binary
+appeared only under pytest parents from the concurrent suites). The leg ran
+the draft `8gb_lite` profile on the canonical default bank (`media_archive`),
+not the shipping 8 GB row: the launcher's profile substitution did not take,
+and the receipt says what ran. Five attempts, each a measurement: attempts 3
+and 4 surfaced PBUG-20260904-05; attempt 5 also exposed PBUG-20260904-06 (the
+ledger's `meta.paths.obs_final` still pointed at the planned archival-name
+file, not the published one) -- fixed in its own commit with a pairing test.
+
+**B. VERIFIED, LATENT -- ffmpeg is resolved nine ways.** Three are BYTE-IDENTICAL
+copy-paste (`otr_caption_burn.py:53`, `otr_master_audio_mux.py:49`,
+`otr_silent_composite.py:123`) and each self-documents that this defect class has
+already hit the pack twice. The same three correctly delegate `_ffprobe_bin()` to
+`_otr_shared/ffprobe.py`, so the pack knows the right shape and did not use it here.
+Two have live gaps, dormant only because nothing calls them:
+`_otr_shared/encode_sink.py::find_ffmpeg` (:20) never checks `OTR_FFMPEG`, and
+`_otr_shared/content_oracle.py::_ffmpeg` (:88) has no PATH fallback at all (that
+module has zero importers). The rest disagree on what to return when nothing
+resolves (`None` / `""` / bare `"ffmpeg"`).
+
+**RESOLVED 2026-09-04 -- and it was not latent (PBUG-20260904-02).** The count
+was twelve, not nine, plus three sites that ran a literal `"ffmpeg"` with no
+resolver at all (`otr_post_upscale_procgen_blend` -- canonical node 93 -- ,
+`eng_google_lyria`, `foley_stems`). Six copies read the caller's own bare
+default as an operator choice, so on any box with ffmpeg on PATH the pin was
+never consulted: measured live on the 5080, 9 of 10 resolvers ignored
+`OTR_FFMPEG`. The cloud preflights refused env-only installs. ONE owner now:
+`nodes/_otr_shared/ffmpeg.py::resolve_ffmpeg` (explicit choice -> pin -> PATH
+-> the Windows install dirs -> `None`; reuses the probe's bare-name rule);
+every runtime site a thin adapter with its own refusal; `resolve_ffprobe`'s
+sibling steps go through it. Guard: `tests/test_ffmpeg_single_resolution.py`,
+three AST rules, NO allowlist. Matrix: `tests/test_ffmpeg_resolution_precedence.py`,
+PATH left available in every case. The nvenc cache is keyed per binary and the
+second cache in front of it (`video_engine._check_nvenc`) is gone.
+Out of scope, named: `scripts/otr_ingest_pd_voices.py:101`,
+`scripts/otr_macbeth_probe.py:603/620/1196` (scripts cannot import the owner
+without the package; convert when a script is next touched).
+
+**C. VERIFIED, LATENT -- the models root is decided twice.**
+`_otr_gguf_backend.py::_models_root()` (:891) existence-gates the legacy
+`C:\ComfyUI-Models` before falling back to `folder_paths.models_dir`.
+`_otr_video_engines/wan_shared.py::configured_models_root()` (:35) returns that
+literal UNCONDITIONALLY with no existence check and no `folder_paths` fallback --
+while its docstring claims "folder_paths is the authority and is probed first",
+which is true of its callers and false of the function. Harmless today because
+every caller probes `folder_paths` itself first, but the docstring invites
+standalone use, and a direct caller would break on exactly the fresh-install box
+this repo's notes keep warning about.
+
+**RESOLVED 2026-09-04 -- delegated, not reworded.** `configured_models_root()`
+now returns `str(_models_root())` through a LAZY import (the module's V-12
+cold-import statement holds, and `tests/test_models_root_single_spelling.py`
+pins both the equality under every env state and the absence of a top-level
+import). The "ONE spelling" sentence is true instead of admitting it was false.
+The third convention, `_otr_paths.comfy_models_dir()` / `OTR_MODELS_DIR`, stays
+parked (cursor r3: do not open a third env in this diff). A FOURTH spelling
+belongs to the same parked item (agy r4): `_otr_image_engines/flux2_klein.py:209-215`
+probes `folder_paths` first, then the two env vars, and never the legacy tree --
+the inverse of `_models_root`'s order. When the merge happens it has four
+owners to retire, not three.
+
+**D. VERIFIED, RISKY -- the widget-drift HARD GATE has a silent escape hatch.**
+`_otr_workflow_validator.py:172` -- `try: expected = _expected_slot_count(...)
+except Exception: continue`. This backs the gate at :497 that exists to catch the
+BUG-210/253/281 silent-widget-shift class. Any node whose `INPUT_TYPES()` raises is
+silently exempted with no log, and the gate can report `widget_vector_drift=0`
+having never checked it. Owed: log the skip at minimum, and decide whether an
+un-introspectable node should fail the gate rather than pass it.
+
+**RESOLVED 2026-09-04 (`ad89a45b`).** A raising `INPUT_TYPES()` is a named drift
+FINDING (node id, type, exception class, repr'd message), so the hard gate
+fails; every class reaching that line is ours (third-party types are skipped
+above it), so there was no foreign-node cost to weigh. Precise blast radius,
+found while writing the public-path test: `validate_workflow_contract` already
+raised on a raising `INPUT_TYPES()` for `OTR_`-prefixed types BEFORE the drift
+gate, so the node's own `validate()` was fail-closed all along -- the hatch
+mattered for the STANDALONE callers of `widget_vector_drift` (the canonical-graph
+integrity test could report zero drift on a class it never checked) and for any
+mapped class without the prefix. The `validate_anyway` tooltip no longer claims
+the switch "never blocks the episode". 7 tests in
+`tests/test_widget_drift_gate_no_silent_exemption.py`.
+
+**E. VERIFIED, DEAD -- 12 symbols with exactly one repo-wide reference (their own
+definition), confirmed by `git grep -n -w -F`:** `MAX_HEADLINE_CLEAN_CHARS`
+(`_otr_scifi_p0_contract.py:23`), `PLATE_DIRNAME`
+(`eng_ghost_signal_stillin_lab.py:72`), `RADIO_HOST_FACE_NEG`
+(`otr_meta_brief_image_prompt.py:322`), `CRT_RED`/`CRT_WHITE`/`CRT_MAGENTA`
+(`video_engine.py:68-71`), `HARNESS_VERSION`/`MACHINE_CEILING_MB`/`NVML_FLOOR_MB`
+(`scripts/_otr_b_spikes/_b_harness.py`), `ffprobe_timebase`
+(`scripts/audit_otr_full_run.py:101`), `corpus_ledgers`
+(`scripts/otr_clean_stage_lab.py:529`), `_negative_phrases`
+(`scripts/otr_style_traceroute.py:213` -- and its logic is duplicated inline in the
+function directly below it, which is the slop shape exactly).
+`MAX_HEADLINE_CLEAN_CHARS` was queried as a possible UNWIRED cap rather than dead
+code; the file answers it at :50 -- "headline/summary are short and bounded by the
+fetcher" -- so the bound exists upstream and the constant is vestigial. Clean delete.
+
+**F. VERIFIED, SMALL -- vestigial rows.** `_otr_structured_call.py:110` calls
+`REPAIR_TEMPERATURE` the shared public export and `_REPAIR_TEMPERATURE` a compat
+alias; it is backwards (the underscore name is the one every call site and test
+uses, the public one has zero consumers). `otr_shot_lock.py:3396` re-imports
+`_stamp_durable` into a scope that already bound it at :3207. `scripts/otr_asset_index.py:264`
+has an `elif engine.startswith("humo")` that cannot fire (only `eng_humo.py` exists,
+so the preceding `== "humo"` always wins). `scripts/otr_machine_matrix.py:124`
+`load_classes(_profiles=None)` never reads the parameter and both call sites pass
+nothing. `_otr_paths.py:449` `episodes_for_obs_dir()` claims to be kept "for
+back-compat with existing imports" and has zero callers.
+
+**RIPPED 2026-09-04 (Phase 0 of the registry collapse; operator directive:
+an orphan is ripped 100% or wired back in).** Every row-E symbol and every
+row-F item above was re-verified on the current tree with `git grep -n -w
+-F` before the cut and returns zero references after it. Two corrections
+from the re-verification: `episodes_for_obs_dir()` also had an `__all__`
+entry (gone with the function), and `scripts/otr_asset_index.py`'s
+`elif engine.startswith("humo")` is LIVE -- the registry carries `humo_clip`
+and `humo_diet` -- so it is kept; the audit's "only `eng_humo.py` exists"
+was true of files and false of engine ids. `REPAIR_TEMPERATURE` was folded
+into `_REPAIR_TEMPERATURE`, the spelling every call site and test used.
+
+**PHASE 0b, SAME DAY -- the chain, and the thing that nearly went wrong.**
+Operator: "even though there may be dependency B, what does dependency B lead
+to, dependency C -- follow the dependency chain to find truly rippable code."
+`scripts/dead_code_closure.py` now walks the reference graph to a FIXPOINT and
+prints each round; Phase 0 had already proved the need by orphaning
+`_derive_beats` when it removed `corpus_ledgers`. Calibration took two fixes
+before the tool could be trusted: a class registered by a DECORATOR is reached
+by the side effect and never named again (47 engine adapters), and with tests
+as roots the first cut never opened `tests/` at all. That took 289 candidates,
+five of five hand-checked LIVE, down to 55 with every known-live symbol clear.
+A 73-agent fan-out then verified each one against the dynamic paths a static
+sweep cannot see; 36 of 37 were confirmed dead and one was RESCUED --
+`CharacterAliases` is reached by a pydantic forward-reference string.
+
+**AND THEN THE QA PASS CAUGHT WHAT ALL 73 AGENTS MISSED.** Fifteen of those
+"dead" symbols are protected by `docs/OTR_STANDING_RULINGS.md`, written the day
+before, and `p0_source_char_budget` is the diagnosed-but-unwired fix for OPEN
+`PBUG-20260729-03`. Every agent had asked whether code reaches the symbol; none
+had asked whether the repo already ruled on it. All fifteen were restored before
+the commit, and the sweep now READS those rulings and reports such candidates
+under a separate heading naming the doc that speaks for them. Thirteen cleanly
+cleared symbols shipped; the rest stay, each with its ruling.
+
+* `otr_post_upscale_procgen_blend.py` keeps a `sys.path` insert of `nodes/` for
+  ComfyUI's flat loading. Both tool owners it uses (`_otr_shared.ffmpeg`,
+  `_otr_shared.ffprobe`) now import package-relative first with the flat
+  fallback, and its unused flat `_otr_paths` import is gone -- the flat-first
+  spelling had made a SECOND module instance of the owner that no fixture could
+  reach (it kept its own Windows-dir tuple and answered a test the fixture
+  thought it had muted). Only the insert itself remains; it is what the flat
+  fallbacks need.
+
+**FIXED IN THIS SESSION -- the audit's best catch was the driver's own slop from
+the night before.** Four rows, all introduced 2026-09-03 and corrected 09-04:
+`_obs_basename`'s broad except returned silently while all eight other fallbacks in
+that file log -- the exact shape that had already hidden a missing `re` import for
+one dev cycle; `_resolve_writer_llm`'s docstring justified `max_new_tokens` by "the
+one caller whose reply length scales with a batch" after the same commit taught that
+caller to bypass the wrapper; the ideogram ladder comment claimed "all four slots in
+three precisions" when the real shape is 3/3/2/1, which also hides a genuine
+mixed-precision requirement (no int8 text encoder exists); and four `_DEFAULT_*`
+aliases were added with a comment justifying them as the error message's lead name,
+which the literal refusal text never reads.
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.5 THE 8 GB SHIP SET -- promote what the clean room proved (queue item 4)
+
+Measured 2026-09-02 on the physical RTX 4060 under plain stock launch flags (receipts:
+`docs/ship-audit-2026-09-01/4060_CLEANROOM.md`, PBUG-20260902-01 / -02, Bible 12.145 /
+12.146): Klein 4B Q4 GGUF stills at ~21 s a still after three residency fixes (`9b90189a`,
+`ad6a635f`, `da2b7a36`, each measured on the 5080 first and byte-identical there); LTX 2.5
+(Q3_K_M DiT, 12B encoder pinned to CPU) at ~14 min a clip, so a ~5-hour episode. It WORKS
+on 8 GB; it is not a daily driver at that pace.
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.8 DOCS (queue item 7) -- a DELETION pass, not a review (operator ruling 2026-09-01)
+
+**DONE 2026-09-02 (45895801, 2bf15784, 607a5ee7; 644 -> 237 tracked docs).** How it
+was run: a scripted citation scan over tests, the Bible coverage index, `nodes/`,
+`scripts/`, README, CLAUDE.md, this plan, the rulings and the ship audit produced 378
+uncited dated docs plus 98 uncited named ones; a 13-agent read of every dated candidate
+returned 373 DELETE / 5 KEEP; the driver then grounded the list against the real tree.
+Citations from the append-only history logs (`HANDOFF_LOG`, `PROD_BUG_LOG`,
+`GO_FORWARD_ARCHIVE`) did not keep a doc -- git history holds all of them. Kept on
+purpose: the five recipe carriers (`2026-07-31-PROBLEM-STATEMENT-under-8gb-still-to-video`
+bench table, `2026-08-02-MEASUREMENT-M2-humo-vram-ladder`,
+`2026-08-02-MEASUREMENT-ltx-av-vram-vs-frames`, `2026-08-16-video-sprint-PLAN` LTX 2.3
+distilled recipe, `2026-08-01-fastwan-8gb-MODEL-MANIFEST` with the LoRA sha256 and the
+licence gap -- these still owe a move into the adapter comments or the matrix); the
+08-26 foley-bed operator rulings; every doc a test, the code, this plan, the ship audit,
+`WRITER_INPUT_MATRIX` or `LANE_BUILD_LESSONS` cites (the 09-02 kokoro-onnx and
+encoder-eviction receipts among them); `COMFY_TEMPLATE_DIFF_PROTOCOL`, `WIDGET_OWNERSHIP_LEGEND`, `SPEC_haunted_image_to_video`
+and its design review, `DEAD_CODE_EXECUTION_PLAN`, the licence attestations, the lane
+receipts, the ship-audit folder, the schema examples and the skills backup.
+
+
+## ARCHIVED 2026-09-04 evening from ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 2026-09-02; awaits his pick)
+
+**Status 2026-09-02 (evening).** Operator: "I leave it up to you to synthesize and code maybe
+1-3 of the best options." Item 0, the instrument, is CODED after a full four-round arc
+(`instrument/driver_anchor.md`, sections 1-13): every rendered clip carries a versioned ACTUAL
+receipt hashed into `actual_request_sha` and stamped durably as `meta.render_trace`; the writer's
+trailing `replay_from` widget (and `otr_canonical_api_run.py --replay-from`) re-renders a frozen
+bundle (`scripts/otr_freeze_replay_bundle.py`) through the whole canonical graph with no writer,
+TTS, music or stills, node 7 byte-copying the SHA-verified master; `scripts/otr_verify_replay.py`
+is the offline A/A verifier. Item 1, the adapter sweep, is RUNNING on the 5080 overnight profile
+(two styles x 1.0 / 0.5 / 0.25 / 0.0, titles "Adapter <k> <style>", published to `otr/obs/` for
+the operator's eye). Next: the live replay proof (render, freeze, replay twice, verify) once the
+sweep releases the GPU, then item 2, the still-in lab peer -- registered only after the
+`docs/VIDEO_LANE_PREFLIGHT.md` gates 1-8 and `tests/test_lane_preflight_matrix.py`, as the
+operator's standing rule for any new video pack requires.
+
+The first three sweep legs were launched with `--title "Adapter <k> anime"` so the
+leg could be told apart in `otr/obs/`; that flag rides the writer's `episode_title` widget and
+so became the on-screen TITLE CARD of three published episodes (the known harness-label path,
+CLAUDE.md "fix the title at the source"). Legs 4-8 run without `--title`.
+
+**First read of the sweep (operator, 2026-09-02 evening, on the three anime legs 1.0 / 0.5 /
+0.25):** "the anime looks improved; which one is better, not sure at the moment." He reviews
+the full candidate set when he is back; the driver's standing instruction meanwhile is "keep
+coding, do your best" and to decide whether a blinded A/B is needed. The instrument's
+render-trace rows on legs 4-8 (adapter_strength per shot) are what makes any later A/B
+attributable; the first three legs pre-date the merge and carry no trace.
+
+**Item 1 CLOSED by the operator's eye (2026-09-02, ~20:30), six of eight legs watched.**
+Storybook engraving: 0.5 (`the_last_reading_190630`) "very storybook and did the best of
+maintaining the style"; 1.0 (`the_trembling_ground_182739`) "cool rendered 3D realistic
+storybook stuff but drifted into the army men in green coats". Anime: 1.0 "more anime than
+0.0 but drifted into real-life stuff for a while"; 0.5 "some anime but some people in blue
+coats"; 0.25 "maybe the most anime"; 0.0 "definitely animation, not strikingly anime, but
+cool".
+
+**Item 2 CODED (2026-09-02, later evening), after a full four-round arc (Fable cold +
+Antigravity r1, Codex r2, Cursor r3, Sonnet r4 -- converged; Sonnet QA on the finished diff).**
+`animatediff15_v3_stillin_lab_video`: the haunted lane started from an in-family 512x288
+plate minted in-graph from the pack's full language and the ledger's world, repeated in Python
+to the sampler batch, sampled at a strict `OTR_STILLIN_LAB_DENOISE` (default 0.65); a lab id
+on `otr_stillin_lab_5080` (`draft`, never a default); the replay instrument gained a derived
+bundle (`--derive-engine`) so ONE ledger renders on both Ghost siblings; the verifier gained
+the plate-hash rule; `scripts/otr_stillin_probe_report.py` measures motion energy against the
+lane's own A/A band. The design and receipts are `still-in-peer/driver_anchor.md` sections
+1-14.
+
+
+## ARCHIVED 2026-09-04 evening from ### Batch R7 -- THE 4060 CLEAN ROOM: the legs still owed
+
+* **Leg C5** (Klein + LTX 2.5, stock flags): PUBLISHED 2026-09-02 12:10, 24 clips,
+  `RESULT SUCCESS` + `obs_publish OK`
+
+
+## ARCHIVED 2026-09-04 evening from ### 4.Y BRING `word_razzle` HOME -- it is the one cloud lane whose NAME hides it (operator, 2026-09-03)
+
+**Separately noted -- FIXED 2026-09-04 (kibitz runpod-found-fixes, ruling R-B;
+PBUG-20260904-03).** `word_razzle` failed the 2026-09-03 pod matrix with
+`SessionIdentityUnavailable` -- it would render 2 segments from one set of
+handles but declares no `session_identity()`. NOT a credentials problem and NOT
+pod-specific: the same refusal fires on the 5080 for any beat long enough to
+need two segments, on every one of the seven remote adapters. (This paragraph
+said "already fixed" for a day while the refusal was untouched; the roster
+test's tripwire was the only honest record.)
+
+The fix is a DECLARATION, not an inference: `_CloudVideoBase` (five rows),
+`google_omni_video` and `google_veo_video` set `session_residency = "remote"`,
+and `beat_session.holds_local_handles()` skips the identity demand for exactly
+them -- fail-closed, so an absent or misspelt attribute still reads as local and
+the demand stands. No `session_identity()` was added to any cloud adapter: an
+identity of handles that do not exist would be theater. The roster test is keyed
+on the declaration and a control pins that no engine declares remote AND a local
+isolation. Eight local engines still declare the identity (ghost_signal, humo,
+ltx25, ltx_8gb, ltx_av, ltx_video, minimax_h3, wan_ti2v).
+
+## ARCHIVED 2026-09-04 evening -- lines the forward/archive split did not carry
+
+The forward-only rewrite split each section into work-still-to-do and finished
+narrative. These ruling-bearing lines landed in neither half, so they are kept here
+VERBATIM with their surrounding lines, per the 2026-08-16 rule that losing a ruling
+costs more than the length does.
+
+**From # OTR Go-Forward Plan (plan line 9):**
+
+```
+Layout: THE QUEUE (ordered; item 1 is the next thing to do) -> Section 1 the build rows
+behind the queue, in queue order -> Section 2 render work batched by the leg that proves
+it -> Section 3 rulings owed by the operator, each with its default -> Section 4 parked
+-> Section 5 Bug Bible promotion field -> Section 6 open risks. Standing traps, recorded
+limits and lifted rulings live in `docs/OTR_STANDING_RULINGS.md` ("KNOWN OPEN" and the
+```
+
+**From ## WHERE TO PICK UP (written 2026-09-04 evening; the last CODE head is `3d4a7077`) (plan line 61):**
+
+```
+is the receipt (about 9 `info` findings expected, from 158).
+
+**DECISIONS OWED BY THE OPERATOR -- skip these, do not guess:**
+* `nodes/_otr_shared/content_oracle.py` has ZERO production importers (eight test
+  sites; the two "importers" were comment mentions). Rip it, wire its luma-floor and
+```
+
+**From ### 1.8 DOCS (queue item 7) -- a DELETION pass, not a review (operator ruling 2026-09-01) (plan line 1095):**
+
+```
+`docs/RUNPOD_INSTALL.md` is the sole RunPod manual and recovery guide (Codex owns it);
+bugs and history live only in `docs/PROD_BUG_LOG.md`, the archive and
+`docs/OTR_STANDING_RULINGS.md` (never in this plan). Working rule for the pass: a dated spec, plan, handoff,
+kickoff, brief or log under `docs/` goes unless it is cited by a test, by the Bible
+coverage index, or by a shipping doc, or it records a video-model recipe (measured
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1261):**
+
+```
+mints a new ledger, so a same-ledger A/A cannot run), a blinded two-null scorecard; (1) the
+adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
+LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
+engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
+plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1262):**
+
+```
+adapter strength swept PER STYLE including 0.0 (zero code; env override exists); (2) a still-in
+LAB PEER engine with the lane's own in-family 512x288 plate (never a flip of the shipping
+engine's contract, never a Klein gate on the 4060), one subject-free scene plate per beat with the
+plan untouched (the earlier "cycle frozen to figure" was superseded in the item's own arc,
+`still-in-peer/driver_anchor.md` section 7 D4); (3) the pack's
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1268):**
+
+```
+FrameContract design arc). Deferred: speech-energy scaling, SparseCtrl, per-style checkpoints,
+FreeInit. Cut: the style-aware roll, CameraCtrl, IP-Adapter / PIA / Lightning. Nothing in the
+shipping recipe moves until the operator picks the first arm; the still-in idea stays parked
+(Section 4) until then.
+
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1295):**
+
+```
+`meta.render_trace[*].sampler_inputs.adapter_strength`. The three already-published episodes
+stay in `otr/obs/` (nothing is ever tidied out of it). SOURCE FIX, still open: give the harness a
+`run_label` of its own that reaches the log and the ledger meta but never `episode_title` -- a
+small design item (touches the API runner, the whitelist and the mux's filename), arc before code.
+
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1327):**
+
+```
+default moves to 0.25 -- one constant. **The coats finding:** across the traced episodes the
+only prompts that say "coat" say "cream coat" and "charcoal coat" (the cast's own looks, both
+characters), never green or blue; the green army coats and blue uniforms are the base model's
+prior for "coat" under an engraving or anime medium, amplified by the adapter. The GARMENT
+WORD is a style lever -- an input to item 3 (pack language): the motif composer should map
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1345):**
+
+```
+one style per invocation, anime and storybook_engraving first, every leg to `otr/obs/` with
+the story's own title -- and the operator's eye on the triptychs. Stop rules stand (section 7
+D9): plates that do not read as the style end E1 (next arm E11); no denoise that both moves
+and keeps the plate ends E1 (next arm the E2 probe).
+
+```
+
+**From ### 1.14 ANIMATEDIFF V3 + THE LEDGER + STILLS -- the experiment campaign (operator ask 202 (plan line 1352):**
+
+```
+and ruled: draw what the line is ABOUT in the story's one setting, mix the visual style with
+the CRUX of the story on every beat, the world's own motion, no costume or prop the dialogue
+never names, fewer variables ("too many variables -> humans and bags"), get creative, and
+"yes, I want to see more STORY, not just the characters." Mechanically confirmed: the lane's
+character motif is a costume template with fallback pools (coat; lantern / key / ledger /
+```
+
+**From ## SECTION 2 -- RENDER WORK, BATCHED BY THE LEG THAT PROVES IT (test the least) (plan line 1386):**
+
+```
+scheduling note; still true). Reset per `CLAUDE.md` section 4 before every
+leg. A leg that does not reach `otr/obs/` did not pass. **Every canonical leg
+below is also a free chance to** (a) re-observe the two parked eyeball items
+(Batch R5) and (b) watch the two ledger-cleanup behaviour changes named in
+Open risks that have no live receipt yet.
+```
+
+**From ## SECTION 4 -- PARKED / DEFERRED (out of the working queue) (plan line 1701):**
+
+```
+---
+
+## SECTION 4 -- PARKED / DEFERRED (out of the working queue)
+
+### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
+```

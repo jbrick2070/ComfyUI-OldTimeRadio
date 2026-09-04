@@ -1090,9 +1090,9 @@ class MiniMaxH3AudioInEngine(_MiniMaxH3Base):
     name = "minimax_h3_audio_in"
     #: The family the mouth policy and the ambient-audio router both read.
     #: ``audio_conditioned_video`` is the EXISTING family ``ltx_audio_in`` uses;
-    #: minting a new one would put this lane outside
-    #: ``content_oracle.MOTION_FAMILIES`` and make its frozen clips
-    #: motion-EXEMPT, which is the trap the transplant plan names by name.
+    #: minting a new one would put this lane outside the motion families the
+    #: campaign's held-frame invariant checks (``scripts/otr_w45_campaign.py``)
+    #: and make its frozen clips exempt, the trap the transplant plan names.
     family = "audio_conditioned_video"
     _UNET_DEFAULT = _H3_DEFAULT_UNET_REF2VA
     _RECIPE_RECEIPT = "minimax_h3_ref2va_int8_res_multistep_20step_v1"

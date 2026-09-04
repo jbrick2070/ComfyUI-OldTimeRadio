@@ -29,7 +29,6 @@ import nodes._otr_video_engines  # noqa: F401  (self-registers every engine)
 from nodes import _otr_workflow_apply as wa
 from nodes._otr_shared import role_compat as rc
 from nodes._otr_shared import slot_matrix as sm
-from nodes._otr_shared import content_oracle as co
 from nodes._otr_shared.capability_profiles import load_profile
 from nodes._otr_video_engines import registry as vreg
 
@@ -170,54 +169,3 @@ def _render(path, src, *, dur=1.0):
          "-pix_fmt", "yuv420p", str(path)],
         check=True)
 
-
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_oracle_flags_dark_floor(tmp_path):
-    dark = tmp_path / "dark.mp4"
-    _render(dark, "color=c=black")
-    with pytest.raises(co.ContentOracleError) as exc:
-        co.check_clip(str(dark), "still_flat")           # luma applies to ALL engines
-    assert "DARK" in str(exc.value)
-
-
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_oracle_passes_bright_static_for_static_engine(tmp_path):
-    bright = tmp_path / "bright.mp4"
-    _render(bright, "color=c=gray")
-    v = co.check_clip(str(bright), "still_flat")          # static engine: motion-exempt
-    assert v["ok"] and v["motion_required"] is False and v["mean_yavg"] > 16
-
-
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_oracle_flags_frozen_clip_for_motion_engine(tmp_path):
-    static = tmp_path / "static.mp4"
-    _render(static, "color=c=gray")
-    with pytest.raises(co.ContentOracleError) as exc:
-        co.check_clip(str(static), "ltx_video")           # motion engine + frozen
-    assert "FROZEN" in str(exc.value)
-
-
-@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg not on PATH")
-def test_oracle_passes_moving_clip_for_motion_engine(tmp_path):
-    moving = tmp_path / "moving.mp4"
-    _render(moving, "testsrc2", dur=1.5)
-    v = co.check_clip(str(moving), "ltx_video")
-    assert v["ok"] and v["motion_required"] is True and v["frozen"] is False
-
-
-def test_motion_classification_from_registry():
-    # genuine moving lanes require motion; stills + viz_green are exempt
-    assert co.motion_required_for_engine("ltx_video") is True
-    assert co.motion_required_for_engine("humo_1.7B") is True
-    # This row read `wan_i2v` (Wan 2.2 14B I2V) until that engine retired on
-    # 2026-08-26. It is here to keep the image_to_video FAMILY represented --
-    # the family, not the checkpoint, is what MOTION_FAMILIES classifies, and
-    # with the 14B gone this assertion would otherwise have no image_to_video
-    # lane at all. `wan_ti2v` is the Wan 2.2 **5B** TI2V, a different model on a
-    # different contract, and it earns the row on its own verified merit:
-    # registered, family == "image_to_video", so motion IS required of it. The
-    # 14B's own numbers were never carried across -- only the family claim.
-    assert co.motion_required_for_engine("wan_ti2v") is True
-    assert co.motion_required_for_engine("still_flat") is False
-    assert co.motion_required_for_engine("still_motion") is False
-    assert co.motion_required_for_engine("viz_green") is False

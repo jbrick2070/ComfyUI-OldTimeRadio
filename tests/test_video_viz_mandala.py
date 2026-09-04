@@ -24,7 +24,6 @@ import pytest
 
 import nodes._otr_video_engines  # noqa: F401  (self-registers every engine)
 from nodes._otr_shared import role_compat as rc
-from nodes._otr_shared import content_oracle as co
 from nodes._otr_shared import scope_draw as sd
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
@@ -64,11 +63,6 @@ def test_ambient_master_audio_gate_includes_mandala():
     assert rd._uses_ambient_master_audio(NAME, "abstract") is True
     # a character-face beat is still excluded (contract)
     assert rd._uses_ambient_master_audio(NAME, "abstract", is_char_face=True) is False
-
-
-def test_content_oracle_motion_exempt():
-    assert co.motion_required_for_engine(NAME) is False
-    assert co.family_for_engine(NAME) == "abstract"
 
 
 def test_engine_family_map():

@@ -257,11 +257,12 @@ def test_without_the_membership_extension_the_beat_would_FAIL_AT_PLAN_TIME():
 def test_the_family_is_an_EXISTING_motion_family_not_a_new_one(engine):
     """Minting a family to dodge the mouth check would put the lane outside
     MOTION_FAMILIES and make its frozen clips motion-EXEMPT."""
-    from nodes._otr_shared import content_oracle as co
 
     assert engine.family == "audio_conditioned_video"
-    assert engine.family in co.MOTION_FAMILIES
-    assert co.motion_required_for_engine(LANE) is True
+    # The four families whose clips must show temporal motion -- the set the
+    # w45 campaign's held-frame invariant checks (scripts/otr_w45_campaign.py).
+    assert engine.family in {"audio_driven_face", "audio_conditioned_video",
+                             "image_to_video", "text_to_video"}
 
 
 def test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs():

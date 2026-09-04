@@ -1954,7 +1954,7 @@ def ltx_prompt_diversity_status(trace):
 #: character beat on that engine fail before a single weight loads.
 #:
 #: THE WRONG FIX, named so nobody reaches for it: minting a new family to dodge
-#: the check. A family outside `content_oracle.MOTION_FAMILIES` makes frozen
+#: the check. A family outside the campaign's motion families makes frozen
 #: clips motion-EXEMPT, so the beat would stop being checked for motion at all
 #: -- trading a loud plan-time refusal for a silent quality hole.
 _AUDIO_IN_CHARACTER_ENGINES = ("ltx_audio_in", "minimax_h3_audio_in")

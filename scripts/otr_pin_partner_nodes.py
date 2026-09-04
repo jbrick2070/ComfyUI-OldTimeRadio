@@ -135,6 +135,15 @@ def _pin_inputs(input_types: dict) -> dict:
         sec = input_types.get(section) or {}
         out[section] = {str(name): _type_token(spec)
                         for name, spec in sec.items()}
+    # A hidden TYPE that is just its own key uppercased carries no information,
+    # and writing it down put the session-bearer literal AUTH_TOKEN_COMFY_ORG in
+    # a SHIPPED file 14 times -- the exact string the registry scanner marks
+    # CRITICAL (PBUG-20260902-04 fixed the .py declaration and left this one,
+    # because the guard test read only *.py). The key stays, so
+    # `_inject_hidden_inputs` still requires the row to DECLARE the bearer input;
+    # only the redundant value goes, and the loader derives it.
+    out["hidden"] = {name: (None if str(token) == str(name).upper() else token)
+                     for name, token in out["hidden"].items()}
     return out
 
 

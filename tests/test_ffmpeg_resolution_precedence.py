@@ -149,7 +149,6 @@ def _adapters():
     from nodes import otr_master_audio_mux as mux
     from nodes import otr_silent_composite as sc
     from nodes import video_engine as ve
-    from nodes._otr_shared import content_oracle as co
     from nodes._otr_shared import encode_sink as es
     from nodes._otr_shared import scope_draw as sd
     from nodes._otr_video_engines import render_driver as rd
@@ -168,7 +167,6 @@ def _adapters():
         "silent._ffmpeg_bin": lambda: sc._ffmpeg_bin("ffmpeg"),
         "credits._ffmpeg_bin": lambda: cr._ffmpeg_bin(),
         "video_engine._find_ffmpeg": lambda: ve._find_ffmpeg(),
-        "content_oracle._ffmpeg": lambda: co._ffmpeg("ffmpeg"),
         "encode_sink.find_ffmpeg": lambda: es.find_ffmpeg("ffmpeg"),
         "scope_draw.find_ffmpeg": lambda: sd.find_ffmpeg("ffmpeg"),
         "wrapper_bridge.resolve_ffmpeg": lambda: wb.resolve_ffmpeg("ffmpeg"),
@@ -196,7 +194,6 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     from nodes import otr_master_audio_mux as mux
     from nodes import otr_silent_composite as sc
     from nodes import video_engine as ve
-    from nodes._otr_shared import content_oracle as co
     from nodes._otr_shared import encode_sink as es
     from nodes._otr_shared import scope_draw as sd
     from nodes._otr_video_engines import render_driver as rd
@@ -213,7 +210,6 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     assert wb.resolve_ffmpeg("ffmpeg") == "ffmpeg"
     assert wb._with_resolved_ffmpeg(["ffmpeg", "-y"])[0] == "ffmpeg"
     assert rd._slicer_ffmpeg_bin() == "ffmpeg"
-    assert co._ffmpeg(None) == "ffmpeg"
     with pytest.raises(cr.CreditsDataError, match="ffmpeg not found"):
         cr._ffmpeg_bin()
     from nodes import otr_post_upscale_procgen_blend as pu

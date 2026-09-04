@@ -37,9 +37,14 @@ _SHIPPED_SCRIPTS = {
 
 
 def _shipped_python_files() -> list[Path]:
+    """Every shipped file the scanner reads -- .py AND the data files
+    beside them. The 2026-09-02 fix cleared the .py declaration and this
+    helper only listed *.py, so 14 copies of the literal survived in the
+    shipped Partner pin (nodes/_otr_shared/partner_nodes.yaml) with no
+    test watching them."""
     try:
         out = subprocess.run(
-            ["git", "ls-files", "--", "*.py"],
+            ["git", "ls-files", "--", "*.py", "*.yaml", "*.yml", "*.json"],
             cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
         ).stdout
     except (OSError, subprocess.CalledProcessError) as exc:  # pragma: no cover

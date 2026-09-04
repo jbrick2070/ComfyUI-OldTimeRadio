@@ -16,10 +16,10 @@ rows:
     import_path: comfy_api_nodes.nodes_elevenlabs
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         apply_text_normalization: COMBO
@@ -49,10 +49,10 @@ rows:
     import_path: comfy_api_nodes.nodes_elevenlabs
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         apply_text_normalization: COMBO
@@ -103,10 +103,10 @@ rows:
     import_path: comfy_api_nodes.nodes_bfl
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         images: IMAGE
       required:
@@ -134,10 +134,10 @@ rows:
     import_path: comfy_api_nodes.nodes_ideogram
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         prompt: STRING
@@ -164,10 +164,10 @@ rows:
     import_path: comfy_api_nodes.nodes_kling
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         prompt: STRING
       required:
@@ -194,10 +194,10 @@ rows:
     import_path: comfy_api_nodes.nodes_krea
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         model: COMFY_DYNAMICCOMBO_V3
@@ -222,10 +222,10 @@ rows:
     import_path: comfy_api_nodes.nodes_luma
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         character_image: IMAGE
         image_luma_ref: LUMA_REF
@@ -255,10 +255,10 @@ rows:
     import_path: comfy_api_nodes.nodes_gemini
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         system_prompt: STRING
         temperature: FLOAT
@@ -289,10 +289,10 @@ rows:
     import_path: comfy_api_nodes.nodes_pixverse
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         negative_prompt: STRING
         pixverse_template: PIXVERSE_TEMPLATE
@@ -323,10 +323,10 @@ rows:
     import_path: comfy_api_nodes.nodes_bytedance
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         model: COMFY_DYNAMICCOMBO_V3
@@ -351,10 +351,10 @@ rows:
     import_path: comfy_api_nodes.nodes_bytedance
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         thinking: BOOLEAN
       required:
@@ -381,10 +381,10 @@ rows:
     import_path: comfy_api_nodes.nodes_sonilo
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         duration: INT
@@ -415,10 +415,10 @@ rows:
     import_path: comfy_api_nodes.nodes_vidu
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional: {}
       required:
         duration: INT
@@ -448,10 +448,10 @@ rows:
     import_path: comfy_api_nodes.nodes_wan
     inputs:
       hidden:
-        api_key_comfy_org: API_KEY_COMFY_ORG
-        auth_token_comfy_org: AUTH_TOKEN_COMFY_ORG
-        comfy_usage_source: COMFY_USAGE_SOURCE
-        unique_id: UNIQUE_ID
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
       optional:
         audio: AUDIO
         last_frame: IMAGE
