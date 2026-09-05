@@ -16307,3 +16307,39 @@ hashtable at `powershell.exe` renders `-Profile:none` as a literal (splat at the
 a model value is the EXACT dropdown label with its size suffix. A fifth failure
 was mine at the shell: `-Set "a","b","c"` through bash arrives as ONE string and
 the whole comma list became a single `source_bank` value.
+
+### 2026-09-05 -- CORRECTION: leg C was gemma-2-2b-it in the TECHNICAL slot, not Qwen in the creative slot
+
+The receipt above attributed leg C's failure to `Qwen/Qwen3-8B`. **That was
+wrong, and the production log said so all along.** GPT-6 Astra found it by
+reading `tmp/otr_headless_62693.log` instead of the exception text:
+`:363`, `:376` and `:392` each read `[Selector] slot=technical reuse cache for
+google/gemma-2-2b-it` immediately before the three dossier attempts -- the
+dossier pass runs on the TECHNICAL slot -- and the runaway evidence at `:370` is
+*"The storms in the Pacific were Lowell, Karina, and Marie."* repeated, a
+48-token run three times, with no `<think>` token anywhere in it.
+
+**HOW THE WRONG ANSWER WAS REACHED, because the shape repeats:** the leg pinned
+Qwen to the creative slot, the leg failed, and both the driver and one reviewer
+reasoned from the PIN to the cause. Leg 0 had just shown Qwen emitting `<think>`
+blocks, which made a thinking-model story feel confirmed. A second reviewer
+(Cursor) independently built an even more detailed mechanism for it -- the LMFE
+grammar masking `<think>` off the model's manifold -- and that mechanism is also
+refuted: the dossier passes `text_parser=parse_dossier_sections`
+(`_otr_scifi_news_pro.py:1892`), and `_otr_structured_call.py:954` sets
+`force_json_object=text_parser is None`, so it is UNCONSTRAINED labelled text
+with no `response_format` at all. Two reviewers, two confident and different
+mechanisms, both wrong, because neither opened the run log. **The log names the
+slot; the exception does not.**
+
+**What is actually true:**
+- `google/gemma-2-2b-it` degenerates on the technical-slot dossier -- a measured
+  failure and a rip candidate for that slot. `google/gemma-4-E2B-it` did the same
+  slot clean in leg B, so this is the older gemma-2 row, not a size limit.
+- `Qwen/Qwen3-8B` is UNQUALIFIED, not failed. The leg never reached a
+  creative-slot verdict.
+- The transformers-lane think-suppression gap is REAL and both reviewers agree on
+  it: `_apply_qwen3_no_think` is called only from `_otr_gguf_backend.py:1502`,
+  and all four transformers render sites omit `enable_thinking=False` even though
+  the installed tokenizer supports it (`tokenizer_config.json:230`). It is worth
+  fixing on its own merits and it is NOT the fix for leg C.

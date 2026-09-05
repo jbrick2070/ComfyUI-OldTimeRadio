@@ -534,14 +534,35 @@ Prove all 7 surviving local-LLM rows in BOTH model slots (creative + technical) 
   Extinction Trajectory*, creative 33 / technical 7) and
   `mistralai/Mistral-Nemo-Instruct-2407` + `google/gemma-4-E2B-it` (leg B, 16.2
   min, *The Caretaker's Clause*, creative 77 / technical 8).
-- **`Qwen/Qwen3-8B` FAILS the creative slot on this lane -- a MEASURED failure,
-  and the first real one this row has.** Leg C died in 1.8 min:
-  `NewsProDossierError: pass 'dossier' failed after 3 attempt(s): generation was
-  halted by the in-decode liveness guard: the output repeated a run of tokens
-  verbatim`. Leg 0 shows this row emits `<think>` blocks, so a thinking model
-  cycling on the structured multipass is the obvious suspect -- confirm the
-  think_policy before ruling. It passed the 40-token transport probe, which is
-  exactly why the canonical leg is the acceptance signal and the preflight is not.
+- **LEG C's FAILURE IS `google/gemma-2-2b-it` IN THE **TECHNICAL** SLOT, NOT
+  Qwen. The first attribution written here was WRONG and is corrected
+  (2026-09-05, Astra, from the production log).** The dossier pass runs on the
+  TECHNICAL slot: `tmp/otr_headless_62693.log:363,376,392` reads
+  `[Selector] slot=technical reuse cache for google/gemma-2-2b-it` immediately
+  before each of the three attempts, and the runaway evidence at `:370` is plain
+  list repetition -- *"The storms in the Pacific were Lowell, Karina, and Marie."*
+  over and over, a 48-token run three times, with NO `<think>` anywhere. That is
+  a 2B model degenerating on a long structured factual dossier.
+  **`Qwen/Qwen3-8B` is therefore UNQUALIFIED, not failed** -- the leg never
+  reached a creative-slot verdict. Re-run it with a technical partner that is
+  already proven (gemma-4-E2B-it passed leg B) before ruling on Qwen at all.
+- **`google/gemma-2-2b-it` is the rip candidate for the TECHNICAL slot** on this
+  lane, on a measured failure. Note leg B's `google/gemma-4-E2B-it` (3.0 GB) did
+  the same slot clean, so this is about the older gemma-2 row, not about size.
+- **A REAL, SEPARATE GAP, confirmed by BOTH lanes and by neither's mechanism
+  story:** Qwen3 reasoning suppression exists ONLY on the GGUF lane
+  (`_otr_gguf_backend.py:1502` applies `_apply_qwen3_no_think`). Every
+  transformers render site calls `apply_chat_template(..., tokenize=False,
+  add_generation_prompt=True)` with no `enable_thinking=False` --
+  `OTR_LedgerScriptWriter.py:869`, `_otr_model_loader.py:1899` and `:2108`,
+  `_otr_constrained_generate.py:256` -- while the installed Qwen3-8B
+  `tokenizer_config.json:230` explicitly supports the switch. `Qwen/Qwen3-8B` is
+  also an UNCURATED HF-cache row (`_otr_model_catalog.build_dropdown_choices:786`
+  admits it on `*ForCausalLM`), so there is no catalog row to hang a policy on --
+  the owner has to key on the tokenizer or the model id, not on a curated table.
+  **This did not cause leg C** and must not be sold as its fix; it is worth doing
+  on its own merits, and it is a shared-writer-path capability change, so it gets
+  an arc before code.
 - **A GGUF ACCEPTANCE LEG IS BLOCKED ON A PROFILE, and this is a real gap.**
   `gguf_quant` is a MANAGED widget: `patch_creative` refuses it by design and it
   can only be set through `apply_profile`. The Qwen GGUF rows ship `Q4_K_M` only,
