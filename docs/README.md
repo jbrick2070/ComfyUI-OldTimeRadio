@@ -1,7 +1,12 @@
 # OTR Docs
 
 This folder is intentionally small. Current operator planning lives in
-`GO_FORWARD_PLAN.md`; longer-horizon planning lives in `../ROADMAP.md`.
+`GO_FORWARD_PLAN.md`. There is no separate roadmap: `ROADMAP.md` was
+deleted 2026-09-05 because it had gone dangerously stale -- it still listed
+the dead-code campaign as pending release-runway row 1 the day after that
+campaign finished, and four of the five files it pointed a reader at were
+not in the published bundle. Long-horizon work lives in GO_FORWARD's own
+design rows; finished campaigns live in git history and `HANDOFF_LOG.md`.
 
 ## Current Setup Docs
 

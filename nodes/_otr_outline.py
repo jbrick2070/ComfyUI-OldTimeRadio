@@ -1254,7 +1254,7 @@ def _build_beat_user_prompt(
 # The Stage 2 speaker-assignment call could raise OutlineFailedError
 # uncaught when the creative LLM assigned a beat speaker outside the
 # locked cast, vaporizing a ~112 s ComfyUI run. The constant + helpers
-# below back the locked HOTFIX plan (ROADMAP.md "## HOTFIX -- Outline
+# below back the locked HOTFIX plan (the "HOTFIX -- Outline
 # cast-drift crash"): a deterministic, no-LLM phase skeleton (steps 1
 # and 2), a low falling Stage 2 temperature schedule (step 3), and
 # minimal speaker normalization (step 5).

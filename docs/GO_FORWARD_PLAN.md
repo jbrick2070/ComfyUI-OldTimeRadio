@@ -110,6 +110,73 @@ receipt in `docs/HANDOFF_LOG.md`. Completed narrative goes to
 
 ---
 
+## 0. THE ATTACK ORDER (Fable ruling, 2026-09-05) -- READ THIS BEFORE PICKING A ROW
+
+The operator asked Fable to decide the plan of attack across the open rows and to say
+plainly what to CUT. It ran grounded on the real Windows files. The sections below keep
+their stable row ids; this is the ORDER through them, and two rows are struck outright.
+
+| # | row | why it sits here |
+|---|---|---|
+| **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow. r1 is in and the design fork is CLOSED (the row names the three alternatives it cut). It is the long pole because it owes a five-act GPU leg -- **start the leg first, not last.** |
+| **2nd** | **2.3 PAIR PREPOSITION**, folded into 2.2's commit | Same file family, same author lane. 2.2's five-act leg proves both for the price of one; shipping 2.3 alone buys a leg you then spend again. |
+| **3rd** | **README defects + bundle hygiene**, one commit | The stranger's first two experiences, and neither needs the GPU. Land while 2.2's leg runs. |
+| 4th | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
+| 5th | **2.4, ONE ROW ONLY** | The `provider_side` / `cloud_kling_avatar` regression. See the cut list for why the rest of 2.4 is not coding work. |
+
+**ARC VERDICTS (this is the "match the review to the task" call, made once):**
+* **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
+  what it cut; a second arc re-litigates a settled row.
+* **2.3 -- NO ARC.** One closure, no stored object, no replay seam.
+* **README / bundle hygiene -- NO ARC.** Documentation matching code, and ignore lines.
+* **2.1 -- ONE ROUND**, as its row already says. Not a full four-round arc: the fork is
+  narrow and named (the surname-only alias tier, and where the persistent name index
+  lives). One round settles both.
+
+**CUT, and each cut is reasoned so nobody re-raises it as a fresh idea:**
+* **The Qwen3 think-policy row is CUT for now (section 5).** Leg C's failure was
+  `google/gemma-2-2b-it` in the TECHNICAL slot -- the run log says so -- not Qwen in the
+  creative slot, so `Qwen/Qwen3-8B` is UNQUALIFIED, never failed. The canonical graph
+  ships Gemma-4-12B. A full arc against the shared writer path and four render sites, to
+  improve a model that is neither the default nor qualified, is gold-plating under
+  "improvement, not 100%". It becomes four one-line edits the day a leg qualifies the
+  row; do it then.
+* **The seven inert widgets are DEFERRED INDEFINITELY.** All seven are MID-LIST, so
+  removing them is the three-part migration across 94 shipped workflows, and `dst_slot`
+  is an index into the same `inputs` array that holds the widget descriptors. That exact
+  operation corrupted all 63 workflows once already (CLAUDE.md section 0, 2026-08-28)
+  while three of its four verifying tests stayed green. Zero user-visible benefit,
+  highest blast radius on the list. *"That's being lazy not to remove an inert widget"*
+  is true for a TRAILING widget; these are not trailing.
+* **Most of 2.4 is not a queue, it is a ledger.** Read it: the `full_text` block-join is
+  BLOCKED on an operator ruling, both deterministic-P0-rung rows are TOMBSTONED, and the
+  `scifi_news` P0 convergence, the bark output guard, the small-canvas credits card, the
+  `wants_talking_prompt` freeze and the ShotLock canvas write are each a design row, a
+  render window, or already closed. One closed-spec item is left, named in the table
+  above.
+
+**THE TRAP IN 2.2, recorded here because it would cost a rebuild:** do NOT store the
+finalized prompt on the ghost object. `GHOST_PROMPT_FIELDS`
+(`nodes/_otr_video_engines/ghost_signal_author.py`) is a frozen tuple and
+`validate_ghost_prompt_object` raises on ANY extra key, so adding a field makes every
+accepted ledger malformed and fails closed. The stored object already carries `mode`,
+`motif_cue` and `drawable_beat`, which is everything `finalize_ghost_prompt_v2` needs --
+**recompose on the replay path; never extend the schema.** That single constraint is what
+makes "applied identically to writer output, replay and the deterministic path"
+achievable in one commit.
+
+**AND THE FIRST CONCRETE STEP OF 2.2 IS RESTRUCTURING, NOT PLUMBING.** The gate is
+`_ghost_validate_batch` in `nodes/otr_shot_lock.py`; it keys `seen` on `leaf.casefold()`
+and seeds `already_used` from `drawable_beat` values -- leaves, not prompts, which is half
+the defect. The finalized prompt is ALREADY computed and thrown away: `candidate_fits`
+(`ghost_signal_author.py`) calls `finalize_ghost_prompt_v2` and discards `final` except
+for its token count, and `_ghost_validate_batch` already calls `candidate_fits` with
+exactly those arguments. So: return `final` alongside `(ok, reason)`, move the
+`candidate_fits` call above the uniqueness check, key `seen` on the finalized prompt, and
+seed `already_used` with recomposed prompts.
+
+---
+
 ## 1A. THE SECURITY WORK -- SIX SURFACES CLOSED, NONE OPEN
 
 **Receipts in `docs/HANDOFF_LOG.md`; the narrative is in GO_FORWARD_ARCHIVE.md.**
@@ -194,8 +261,18 @@ The tests that encode the obsolete absolute-leaf rule (`test_ghost_prompt_v2_lan
 
 **Open question:** whether "no adjacent repeat" is the right viewer threshold -- check it against frames rather than more reasoning.
 
-### 2.3 PROMPT v3 HALF B -- the one cheap, unblocked piece
-**Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"` ("a spinning turntable **in the** riverbank"). One small preposition fix; waits only on his eye.
+### 2.3 THE PAIR PREPOSITION -- one closure inside `resolve_crux_kernel`
+
+**RENAMED 2026-09-05.** This row used to be titled "PROMPT v3 HALF B", which is also row
+`3.1`'s title, and the two are NOT the same work: `3.1` is the crux-kernel redesign whose
+arc has r2 in flight, and `_in_place` is a closure inside `resolve_crux_kernel` -- the very
+function `3.1` is about to rewrite. Expect this row to be rebased by that arc.
+
+**Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"`, so a
+place that takes a different preposition reads wrong ("a spinning turntable **in the**
+riverbank"). One closure, `_in_place` in
+`nodes/_otr_video_engines/ghost_signal_author.py`. No stored object, no replay seam, no
+arc -- Sonnet QA on the diff. Fold it into 2.2's commit so one five-act leg proves both.
 
 ### 2.4 OPEN DEFECTS THAT ARE CODING WORK (queue item 3c; a leg may prove some later, none needs a leg to FIX)
 
@@ -411,8 +488,14 @@ many rungs are worth publishing.
 
 **THE LADDER, least invasive first.** Each rung is a version; stop at the first
 pass. Cheap-and-reversible before anything that costs a feature:
-1. Bundle hygiene only -- drop `ROADMAP.md`, the 92 `workflows/variants/*.md`,
-   the 1.7 MB of GitHub social art. Removes nothing a user runs.
+1. Bundle hygiene only -- drop the 92 `workflows/variants/*.md` and the 1.7 MB
+   of GitHub social art. Removes nothing a user runs. (`ROADMAP.md` was the
+   third item on this rung and is DELETED from git outright, 2026-09-05 -- it
+   was stale to the point of misdirection, so this rung is that much smaller.)
+   **Excluding art from the BUNDLE is not deleting it from GIT:**
+   `pyproject.toml` publishes `assets/otr_icon.gif` by raw GitHub URL, so a
+   `git rm -r assets/` would blank the registry listing's card art. This rung
+   is a `.comfyignore` change and nothing else.
 2. Drop the optional CLOUD lanes from the shipped bundle (OpenRouter, Google
    API, Comfy-credits, cloud media). That is 4 of the 5 network findings and
    they are all opt-in, default-off. Local-first is the product anyway.
@@ -609,6 +692,13 @@ Prove all 7 surviving local-LLM rows in BOTH model slots (creative + technical) 
   **This did not cause leg C** and must not be sold as its fix; it is worth doing
   on its own merits, and it is a shared-writer-path capability change, so it gets
   an arc before code.
+  **CUT FOR NOW (Fable ruling, 2026-09-05 -- see section 0).** The arc is against
+  the SHARED writer path and four render sites, to improve a model that is
+  neither the canonical default (the graph ships Gemma-4-12B) nor qualified (the
+  bullet above says so in its own words: UNQUALIFIED, never failed). That is
+  gold-plating under the operator's "improvement, not 100%". It converts to four
+  one-line edits the day a leg qualifies the row -- do it THEN, and do not open
+  the arc before the qualification leg exists.
 - **A GGUF ACCEPTANCE LEG IS BLOCKED ON A PROFILE, and this is a real gap.**
   `gguf_quant` is a MANAGED widget: `patch_creative` refuses it by design and it
   can only be set through `apply_profile`. The Qwen GGUF rows ship `Q4_K_M` only,
@@ -874,7 +964,7 @@ Rulings -- do not re-open:
 - **Activation-path text must change in three places at once** — `nodes/story_packs/banks.json` (`custom_source_bank` row's `guide_ref`, raised by `require_runnable_bank`), the `source_bank` tooltip, and `docs/EXTENDING_OTR.md`. Any future change to folder name, CLI verb or restart behaviour that updates fewer than all three makes the product confidently instruct clients to do the wrong thing. DONE WHEN: the three agree on the shipped activation steps.
 - **Two changed shipped-lane behaviours still need a live receipt** from the ledger-cleanup tail (it runs on EVERY bank): (a) unsafe spoken language on a `content_owned_readonly` bank is repaired at the writer tail rather than reaching G9, so a leg that used to die at freeze may ship a sanitized line; (b) a blank `meta.episode_title` is filled at the tail rather than exploding in `otr_credits_roll`. DONE WHEN: a live leg shows each path taken and published.
 - RULING: No code lands mid-sweep of an active qualification campaign (the 420-rung uniform-code-confound lesson).
-- RULING: There is no standalone SFX provider layer to rebuild. Current video clips are silent and the terminal mux uses the frozen upstream master audio. The future direction in `ROADMAP.md` is to retain and mix selected video-generation audio as inexpensive ambience; do not revive the fast-moving provider/bed stack or claim that future path is already wired.
+- RULING: There is no standalone SFX provider layer to rebuild. Current video clips are silent and the terminal mux uses the frozen upstream master audio. The operator-selected future direction, carried here verbatim in substance when `ROADMAP.md` was deleted on 2026-09-05, is to RETAIN useful audio that video generation already produces and mix it as inexpensive ambience -- deciding which native video audio is worth keeping and how it mixes without disturbing dialogue, music, ledger timing or the frozen master-audio contract. Dedicated SFX provider technology moves too quickly to justify another provider stack. Do not revive the fast-moving provider/bed stack, and do not claim that ambience path is already wired.
 - **Lean-mean: work the one ordered campaign in `docs/LEAN_MEAN_CLEANUP.md`.**
   - RULING: The retired FRONT/TAIL and SW-1 execution model must not be revived.
 
@@ -883,10 +973,17 @@ Rulings -- do not re-open:
 One owner per file (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug
 Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
 
-When the sections above are exhausted, continue with `ROADMAP.md`: lean-mean ->
-RunPod/AMD/Mac -> install -> product docs/v2 release. That is a pointer, not work that
-precedes lean-mean. Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md`
-is its sole current scope, blast-radius, coding-order, and verification authority.
+When the sections above are exhausted, the release runway is: lean-mean -> RunPod/AMD/Mac
+platform acceptance -> install path -> product docs / v2 release. That ORDER is the only
+part of the deleted `ROADMAP.md` worth keeping (deleted 2026-09-05 -- its row 1 was the
+dead-code campaign that finished 2026-09-04, and four of the five files it pointed at are
+not even in the shipped bundle). It is a pointer, not work that precedes lean-mean.
+Lean-mean is not an item in this queue: `docs/LEAN_MEAN_CLEANUP.md` is its sole current
+scope, blast-radius, coding-order, and verification authority. The two runway rungs after
+it are likewise owned elsewhere -- RunPod/AMD/Mac means representative-machine acceptance
+smokes that actually RUN rather than are declared available, and the install path means a
+clean install / bootstrap / profile smoke / log collection on those machines, answering
+which workflow to load and which models are required.
 
 **WATCH -- recorded, not scheduled:**
 * **`obs_publish OK` is not proof of an episode.** Measure the published file's DURATION at every pipeline stage (render / blend / caption / credits / mux), never the log. A stage that changes the duration is the defect. Two 7.5 MB casualties are still in `otr/obs/` and are deliberately not swept -- `..._231401` and `..._233738`, both "The Faded Ledger".

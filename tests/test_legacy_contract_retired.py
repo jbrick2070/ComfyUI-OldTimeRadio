@@ -64,7 +64,6 @@ _ALLOWED_FILES = {
     "docs/2026-05-11-multi-turn-polish-qa-handoff.md",
     "docs/2026-05-12-lfc-clean-break.md",
     "docs/BUG_LOG.md",
-    "ROADMAP.md",
 }
 
 
