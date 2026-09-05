@@ -16488,3 +16488,67 @@ rule was already right; the regression is what stops it being "simplified".
 
 **Registry, read three times through the evening: `2.0.0-alpha.21` is still
 Pending with no `status_reason`.** Nothing posted anywhere.
+
+---
+
+## 2026-09-05 -- TWO CANONICAL GPU LEGS, and the second one corrected me
+
+**Both legs: `RESULT SUCCESS`, `obs_publish OK`, asset verified on disk.** Both
+loaded `workflows/otr_canonical.json` through
+`scripts/otr_headless_canonical.ps1`, three acts, `-Profile none`. Neither was
+given a `--title`.
+
+| leg | server log | outcome | published |
+|---|---|---|---|
+| 1, as shipped | `tmp/otr_headless_63358.log` | 19:57, **0 ghost beats** | `the_rust_of_resistance_20260905_100814`, 28.6 MB |
+| 2, ghost lane forced | `tmp/otr_headless_54066.log` | 53:00, **18 ghost beats** | `the_weight_of_gold_20260905_102950`, 367 MB |
+
+**LEG 1 PASSED AND PROVED THE WRONG THING, which is worth recording.** The
+canonical graph ships `still_flat` on every video role, and the ghost prompt
+lane belongs to exactly two of the 33 registered engines --
+`animatediff15_v3_haunted_video` and `animatediff15_v3_stillin_lab_video`,
+selected by `prompt_profile == "ghost_signal_v1"`. So a plain canonical leg
+authors ZERO ghost beats and exercises none of the day's changes. A green leg
+is not automatically a leg that tested what you changed.
+
+**LEG 2 WAS RUN WITH `OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`**,
+confirmed reaching the server by its own route-freeze warnings (all three roles
+`picked=still_flat -> EFFECTIVE=animatediff15_v3_haunted_video`).
+
+**IT FIRED THE UNIQUENESS DEFECT ON BOTH ATTEMPTS AND COST THE EPISODE ALL 18
+AUTHORED PROMPTS.** This CONTRADICTS what the archive survey earlier the same
+day concluded, and the survey's claim is withdrawn:
+
+```
+attempt 1 rejected: leaf for g017 repeats the one written for g015:
+  'the broadcast console sits on a desk as a light moves'
+attempt 2 rejected: leaf for g012 repeats the one written for g008:
+  'the amber lantern sits on a table as a light moves'
+Ghost Prompt v2: 18 beat(s) authored (deterministic_fallback=18)
+```
+
+The archive was the wrong population: the daily rotation loop deliberately
+skips AnimateDiff, which is the ONLY family that authors ghost prompts, so 23
+of the 27 archived ghost ledgers are eight-beat episodes where four slots and
+eight beats never strain the pool. **An archive records what was RUN, not what
+is possible.** Row 2.2 is vindicated and stays first -- both rejected leaves
+are exact duplicates written for different beats, exactly the case its
+finalized-prompt rule accepts. Correction committed in `e026795a`.
+
+**The preposition change was exercised live and behaved.** The episode's
+settings were `garden, orchard, stone wall, shrubbery`, and the composed
+prompts carry `in the garden` (24), `in the orchard` (4), `in the shrubbery`
+(4) -- all correct, all the unchanged default.
+
+**One known-imperfect case, recorded so it is not re-litigated:** `stone wall`
+composed `in the stone wall`, where `on the` or `against the` would read
+better. "wall" is deliberately LEFT ON THE DEFAULT because the corpus splits
+it: the plural enclosure reading dominates (`stone walls` 7, `damp stone walls`
+4, `concrete walls` 4, `ancient walls` 3 -- "within these walls" is idiomatic),
+while the surface reading is a handful of singulars (`monitor wall`,
+`telemetry wall`). Separating them would need singular-vs-plural dispatch for
+one word. Not worth a mechanism; the operator's bar is improvement, not 100%.
+
+**Also verified on leg 2:** 18/18 distinct deterministic leaves, modes balanced
+6 signal / 6 object / 6 figure. The deterministic pool did NOT exhaust at 18
+beats.
