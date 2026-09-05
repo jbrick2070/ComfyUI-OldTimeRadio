@@ -16414,3 +16414,77 @@ costs nothing.
 `AUTH_TOKEN_COMFY_ORG` is gone from `nodes/_otr_shared/partner_nodes.yaml` (0
 hits). Its only survivors are under `scripts/`, `tests/`, `kibitz-runs/` and
 git's own lost-found, every one of which `.comfyignore` keeps out of the zip.
+
+---
+
+## 2026-09-05 -- the ghost lane, measured before it was coded
+
+**Commits:** `eae7228d`, `b74d235a`. Suite **13570** then **13573 passed / 126
+skipped / 1 xfailed, RC=0**; Bug Bible 22 passed. `HEAD == origin/v2.0-alpha`
+verified after each push; AST clean on every touched `.py`.
+
+**THE METHOD IS THE POINT OF THIS ENTRY.** Row 2.2 was ranked first and about
+to buy a five-act GPU leg. Reading every episode ledger on the box first took
+two minutes and moved the target. **27 ledgers carry `ghost_prompt` objects;
+127 of their 263 beats fell to `deterministic_fallback`; NOT ONE fell to the
+leaf-uniqueness defect row 2.2 is about.** The four episodes over twelve beats
+-- including the 29-beat one whose shape 2.2's DONE WHEN names -- each lost
+their whole batch to a different cause, and the deterministic pool never
+exhausted (29/29, 25/25, 13/13, 12/12 distinct leaves). The defect 2.2
+describes is real in the code and has fired on zero measured episodes.
+
+| what actually rejected the batch | beats |
+|---|---|
+| leaf "requests a person in object mode" | 29 |
+| **`Ghost batch row carries unknown id 'g0010'`** | 25 |
+| response is not JSON (`Expecting ',' delimiter` at col 852) | 21 |
+| leaf "names a texture instead of a thing" | 28 |
+
+**`g0010` is CLOSED.** `opaque_id` spells ordinal 10 as `g010` and
+`build_batch_prompt` shows the model that exact string; the model, having just
+written `g000` through `g009`, continued the pattern it could see. It can only
+happen past ten Ghost beats, which is why the eight-beat dailies never showed
+it. `_canonical_opaque_id` reads the digit run as the integer it is and
+re-spells it, WARNING-logs both spellings, and relaxes nothing else -- an
+unknown prefix, a non-numeric tail, an extra envelope key, an extra row field,
+trailing prose and a missing row are all still hard rejections, and a
+re-spelled id still has to be one the batch asked for.
+
+**The JSON row is DIAGNOSABLE, deliberately not "fixed".** Two things argue
+against the tempting truncation theory: `batch_output_tokens` is
+`64 + 48 * shots`, so that 13-beat batch had 688 tokens against roughly 280
+tokens of text; and `Expecting ',' delimiter` is a structural break where a
+cut-off normally reads `Unterminated string`. An unescaped quote inside a leaf
+fits better -- and "fits better" is not measured, so no code changed on it.
+`_decode_excerpt` now puts a bounded window of the response around the failure
+into the rejection reason, which lands in that beat's `fallback_reason`. Read
+the next occurrence off a ledger and fix the real one.
+
+**2.3, the pair preposition, shipped -- and the corpus corrected it twice.**
+`place_preposition` picks the connector from the place's head noun. Measured
+across 4,393 unique `story_brief_terms.setting` values on 2,140 ledgers:
+* **A bare apostrophe-s test is WRONG**, caught by the Sonnet QA pass on the
+  finished diff BEFORE it shipped. The first draft treated any possessive as
+  its own determiner -- right for "British Columbia's Williston Reservoir",
+  wrong for "the judge's bench". 24 real settings carry a possessive and the
+  CAPITAL separates them 24 for 24: 9 proper names that read wrong with an
+  article, 15 common nouns that read wrong without one.
+* **"station" is not a point in this corpus**, and it is the corpus's biggest
+  head noun at 108 occurrences. A brief writes "orbital station", "space
+  station", "research station" -- interiors. It sat in the AT set until the
+  corpus was read; it is now left to the default. "terminal" (46) stays AT
+  because a brief means the DEVICE.
+The default is unchanged and that was the bar: 7,635 of 8,408 occurrences still
+compose "in the".
+
+**Row 2.4's one open item is closed, test-only**
+(`tests/test_cloud_engine_is_a_three_part_rule.py`). `cloud_kling_avatar`
+declares no `provider_side` at all, so a bare `getattr` calls it LOCAL and
+routes an audio-driven face down the local lane; `google_veo_video` declares
+`provider_side = True` with no `cloud_` prefix and no `node_key`, so a
+prefix-only rule calls Veo LOCAL. Both ship, so no single clause covers both.
+Picked AND forced, per the row's DONE WHEN. No production code changed -- the
+rule was already right; the regression is what stops it being "simplified".
+
+**Registry, read three times through the evening: `2.0.0-alpha.21` is still
+Pending with no `status_reason`.** Nothing posted anywhere.
