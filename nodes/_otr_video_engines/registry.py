@@ -147,7 +147,7 @@ class VideoEngineRegistry(EngineRegistry):
     via the legacy path; ``assert_usable`` raises :class:`EngineUnusable`.
     """
 
-    def _descriptor(self, name: str) -> dict:
+    def _descriptor(self, name: str) -> _role_compat.EngineDescriptor:
         """The role_compat EngineDescriptor for a REGISTERED engine. ``required_inputs``
         is read straight off the adapter -- ``None`` (missing) is the fail-soft trigger
         and is preserved distinct from ``()`` (declared, fits all roles)."""
@@ -247,7 +247,7 @@ default_engine_for_role = _VIDEO_REGISTRY.default_engine_for_role
 assert_usable = _VIDEO_REGISTRY.assert_usable
 
 
-def descriptor_for_engine(name: str) -> dict:
+def descriptor_for_engine(name: str) -> _role_compat.EngineDescriptor:
     """The role_compat EngineDescriptor (``engine_id`` / ``roles`` /
     ``required_inputs``) for a registered video engine. The SHARED builder the C2
     registry override + the C4 capability matrix test both read, so the eligibility

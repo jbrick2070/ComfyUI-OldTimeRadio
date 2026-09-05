@@ -102,7 +102,7 @@ def role_available_inputs(role: str) -> frozenset:
     return ROLE_AVAILABLE_INPUTS[role]
 
 
-def engine_fits_role(descriptor, role: str) -> bool:
+def engine_fits_role(descriptor: EngineDescriptor, role: str) -> bool:
     """True iff ``descriptor`` can serve ``role`` (fail-closed, capability-only).
 
     Eligibility is PURELY capability: every token in the engine's
@@ -129,7 +129,8 @@ def engine_fits_role(descriptor, role: str) -> bool:
     return required_set <= available
 
 
-def filter_engines_for_role(role: str, engine_descriptors: Iterable) -> list:
+def filter_engines_for_role(
+        role: str, engine_descriptors: Iterable[EngineDescriptor]) -> list:
     """Engine ids that fit ``role``, fail-closed, order-preserving.
 
     ``engine_descriptors`` is any iterable of :class:`EngineDescriptor`-shaped

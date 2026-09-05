@@ -179,9 +179,6 @@ class NewsProAssembleError(NewsProError):
     pass
 
 
-class NewsProAuditError(NewsProError):
-    pass
-
 
 # ---------------------------------------------------------------------------
 # Constants (doc s3/s8)
@@ -614,9 +611,6 @@ def _resolve_seed() -> int:
             raise NewsProError(
                 "deal", f"OTR_SCIFI_NEWS_PRO_SEED must be an int, got {raw!r}")
     return random.SystemRandom().randrange(2 ** 63)
-
-
-_RE_NUMERAL = re.compile(r"\d[\d,.]*")
 
 
 def _word_re(term: str) -> "re.Pattern[str]":
@@ -4488,8 +4482,9 @@ def _apply_fable_safety_cleanup(
     content guardrails on generated episodes). This built a projection of every
     spoken row -- intro, scene lines, outro, coda, news read -- scanned it,
     asked the model to rewrite any row matching the profanity / weapon / sexual
-    list, and raised NewsProAuditError when a term survived: two terminal content
-    failures inside the scifi_news_pro lane.
+    list, and raised a terminal audit error when a term survived: two content
+    failures inside the scifi_news_pro lane. That error class went with the
+    scan (2026-09-04) -- nothing else ever raised it.
 
     The projection fed that scan and nothing else -- no receipt, no treatment
     mutation, no patched_news propagation read it -- so it is gone with the scan
