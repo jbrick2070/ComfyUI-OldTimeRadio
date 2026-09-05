@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re as _re
 import math
 import os
 import sys
@@ -457,7 +458,16 @@ class SceneAwareScopes:
 
         plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe,
                                         landscape_bars=landscape_bars)
-        key = str(manifest.get("episode_id") or "scopes")
+        # THE MANIFEST'S episode_id BECOMES A FILENAME, so it is reduced to a
+        # safe token first (2026-09-05). `clip_manifest_json` is a workflow
+        # STRING, so `episode_id` is caller-chosen; unsanitized it is joined
+        # into `otr_scopes_{key}_{ts}.mp4` below and separators or `..` walk the
+        # write out of the tmp tier -- on Windows the `otr_scopes_` prefix does
+        # not stop it, because `..` collapses lexically before the filesystem
+        # sees the path. A filename cannot hold a separator, so whitelist rather
+        # than reject: this is a label, and a stripped one still renders.
+        key = _re.sub(r"[^A-Za-z0-9_.-]", "_",
+                      str(manifest.get("episode_id") or "scopes")).strip("._-") or "scopes"
 
         # -- audio analysis (optional; absent -> zero arrays, NOT _analyze) --
         if audio is not None:

@@ -298,8 +298,21 @@ def test_both_copies_of_the_filter_arg_builder_are_guarded():
 # --------------------------------------------------------------------------- #
 def test_the_ledger_route_serves_no_wildcard_cors():
     """`GET /otr/latest_ledger` is registered on EVERY install with no
-    authentication and answers with the whole ledger plus `fullpath`. A
-    wildcard is what makes that readable cross-origin, so any site visited
-    while ComfyUI runs could take it."""
+    authentication and answers with the whole ledger. A wildcard is what makes
+    that readable cross-origin, so any site visited while ComfyUI runs could
+    take it."""
     src = (REPO / "__init__.py").read_text(encoding="utf-8")
     assert '"Access-Control-Allow-Origin": "*"' not in src
+
+
+def test_the_ledger_route_discloses_no_absolute_path():
+    """It used to answer with `fullpath` -- the operator's own directory tree,
+    Windows username included -- and with `str(exc)` on failure, which names
+    the file it could not open. Both went to an unauthenticated caller
+    (2026-09-05)."""
+    src = (REPO / "__init__.py").read_text(encoding="utf-8")
+    i = src.index('@_otr_PromptServer.instance.routes.get("/otr/latest_ledger")')
+    handler = src[i:src.index("routes.options", i)]
+    assert '"fullpath"' not in handler
+    assert '"reason": str(exc)' not in handler
+    assert '"filename"' in handler, "the basename still identifies the episode"

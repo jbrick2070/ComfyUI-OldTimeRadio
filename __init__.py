@@ -490,17 +490,28 @@ try:
             latest = str(latest_p)
             with open(latest, "r", encoding="utf-8") as f:
                 ledger = _otr_json.load(f)
+            # NO ABSOLUTE PATH IN THE RESPONSE (2026-09-05). This route is
+            # registered on every install and needs no authentication, and
+            # `fullpath` named the operator's own directory tree -- their
+            # Windows username included -- to anyone who could reach it. The
+            # basename is what a reader actually uses, and it identifies the
+            # episode. Nothing shipped consumed `fullpath`: `viewer/` is
+            # excluded from the published bundle and called different routes.
             return _otr_web.json_response({
                 "ok": True,
                 "filename": _otr_os.path.basename(latest),
-                "fullpath": latest,
                 "mtime": _otr_os.path.getmtime(latest),
                 "size": _otr_os.path.getsize(latest),
                 "ledger": ledger,
             }, headers=_OTR_CORS_HEADERS)
         except Exception as exc:
+            # The exception TEXT carries paths too (a FileNotFoundError names
+            # the file it could not open), so it goes to the server log, where
+            # the operator reads it, and never into the HTTP body.
+            print(f"[OldTimeRadio] latest_ledger failed: {exc}")
             return _otr_web.json_response(
-                {"ok": False, "reason": str(exc)},
+                {"ok": False, "reason": "ledger could not be read; see the "
+                                        "ComfyUI console for the reason"},
                 status=500,
                 headers=_OTR_CORS_HEADERS,
             )
@@ -514,119 +525,25 @@ except Exception as _otr_route_err:
     print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
 
 # =====================================================================
-# HTTP routes: POST /otr/video_render_single + POST /otr/video_render_soak
-# Trigger the in-process A-S7.5 render driver (nodes/_otr_video_engines/
-# render_driver.py) in a background thread so the request returns at once;
-# the worker writes a JSON report under output/otr/aship/ the operator polls.
-# In-process == NODE_CLASS_MAPPINGS is populated, so the heavy engine forwards
-# actually run on the GPU (the A-ship gate). Wrapped so a failure cannot break
-# node load.
+# THE TWO POST RENDER-HARNESS ROUTES ARE GONE (2026-09-05).
+# `POST /otr/video_render_single` and `POST /otr/video_render_soak` read
+# caller-supplied paths out of an unauthenticated JSON body and started a
+# background GPU render, writing a report whose FILENAME came from the body's
+# `engine` field. That is the Comfy Registry's second-largest ban class
+# (`policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT`) with an unconfined write inside
+# it. They had been behind `OTR_ENABLE_HTTP_RENDER_ROUTES=1`, default off, and
+# no reviewer verdict in the surveyed corpus says whether an env gate around a
+# ROUTE REGISTRATION discharges the class -- so the answer is to not ship the
+# construct rather than to argue about it.
+#
+# NOTHING SHIPPED CALLED THEM. They were a hand-built GPU-gate harness for the
+# operator to poll during development; the real render path is the canonical
+# workflow through `/prompt`, and `scripts/` (excluded from the published zip)
+# still drives the same `render_driver` entry points in-process. If a future
+# session wants the harness back, it belongs in `scripts/`, not in the module
+# every install imports.
 # =====================================================================
-try:
-    import json as _otr_rj
-    import os as _otr_ro
-    import threading as _otr_threading
-    # The owner is imported INSIDE this block on purpose. The block is executed
-    # standalone in an empty namespace by
-    # tests/test_http_render_route_gate.py::_exec_route_block, so anything it
-    # reaches for has to be reached for HERE -- a module-scope name from further
-    # up __init__.py is not in scope there, the NameError is swallowed by this
-    # very try/except, and the routes silently do not register.
-    try:
-        from .nodes._otr_shared import env as _otr_route_env
-    except (ImportError, KeyError):  # pragma: no cover -- standalone exec
-        # KeyError, not ImportError, and that is the whole point of naming it:
-        # a RELATIVE import evaluated with empty globals raises
-        # KeyError("'__name__' not in globals") before it ever reaches the
-        # import machinery. `except ImportError` does NOT catch that, so the
-        # error escapes to the outer handler, the whole block is swallowed, and
-        # the routes silently do not register -- which is exactly what happened
-        # on 2026-09-04 until the gate test said so.
-        from nodes._otr_shared import env as _otr_route_env  # type: ignore
-    from server import PromptServer as _otr_PS2  # type: ignore
-    from aiohttp import web as _otr_web2  # type: ignore
 
-    def _otr_render_report_dir():
-        # OH-1 (output-tree contract 2026-06-11): probe/soak reports go to
-        # the per-machine state tier episodes/_shared/state via the ONE
-        # path authority (the old top-level otr/aship is RETIRED).
-        from .nodes._otr_paths import otr_state_dir as _otr_state_dir
-        d = str(_otr_state_dir())
-        _otr_ro.makedirs(d, exist_ok=True)
-        return d
-
-    def _otr_run_render_async(report_name, fn):
-        path = _otr_ro.path.join(_otr_render_report_dir(), report_name)
-        with open(path, "w", encoding="utf-8") as f:
-            _otr_rj.dump({"ok": None, "status": "running"}, f)
-
-        def _worker():
-            try:
-                rep = fn()
-            except Exception as exc:  # noqa: BLE001 - report honestly
-                import traceback as _tb
-                rep = {"ok": False, "status": "crashed",
-                       "error": "%s: %s" % (type(exc).__name__, exc),
-                       "traceback": _tb.format_exc()[-2000:]}
-            try:
-                with open(path, "w", encoding="utf-8") as f:
-                    _otr_rj.dump(rep, f, default=str)
-            except Exception:  # noqa: BLE001
-                pass
-
-        _otr_threading.Thread(target=_worker, daemon=True).start()
-        return path
-
-    async def _otr_body(request):
-        try:
-            return await request.json()
-        except Exception:  # noqa: BLE001
-            return {}
-
-    # UNAUTHENTICATED-SIDE-EFFECT GATE (registry manual review draft,
-    # docs/2026-09-02-registry-manual-review-request.md, option (a)). These two
-    # POST routes read caller-supplied file paths out of an unauthenticated JSON
-    # body and start a background render thread -- the same shape the registry
-    # banned another pack for under policy-v0.2: UNAUTHENTICATED_SIDE_EFFECT.
-    # Nothing that ships calls them; they are a hand-built GPU-gate harness for
-    # the operator to poll during dev. Default OFF so a registry install
-    # registers only the read-only ledger GET above; the operator opts in.
-    if _otr_route_env.get("OTR_ENABLE_HTTP_RENDER_ROUTES", "0") == "1":
-        @_otr_PS2.instance.routes.post("/otr/video_render_single")
-        async def _otr_video_render_single(request):
-            body = await _otr_body(request)
-            from .nodes._otr_video_engines import render_driver as _rd
-            assets = {"init_image": body.get("portrait", ""),
-                      "audio_ref": body.get("audio", "")}
-            engine = str(body.get("engine", "humo"))
-            fc = int(body.get("frame_count", 33))
-            path = _otr_run_render_async(
-                "single_%s.json" % engine,
-                lambda: _rd.render_single(engine, assets=assets, frame_count=fc))
-            return _otr_web2.json_response({"started": True, "report_path": path})
-
-        @_otr_PS2.instance.routes.post("/otr/video_render_soak")
-        async def _otr_video_render_soak(request):
-            body = await _otr_body(request)
-            from .nodes._otr_video_engines import render_driver as _rd
-            assets = {"init_image": body.get("portrait", ""),
-                      "audio_ref": body.get("audio", "")}
-            beats = int(body.get("beats", 40))
-            oom = int(body.get("oom_index", 20))
-            fc = int(body.get("frame_count", 25))
-            path = _otr_run_render_async(
-                "soak_report.json",
-                lambda: _rd.run_gpu_soak(n_beats=beats, oom_index=oom,
-                                         frame_count=fc, assets=assets))
-            return _otr_web2.json_response({"started": True, "report_path": path})
-
-        print("[OldTimeRadio] HTTP routes registered: POST /otr/video_render_single,"
-              " POST /otr/video_render_soak")
-    else:
-        print("[OldTimeRadio] HTTP render routes disabled (set "
-              "OTR_ENABLE_HTTP_RENDER_ROUTES=1 to enable the GPU-gate harness)")
-except Exception as _otr_render_route_err:
-    print(f"[OldTimeRadio] render route registration skipped: {_otr_render_route_err}")
 
 # =====================================================================
 # OH-3 janitor (output-tree contract 2026-06-11): server-boot sweep of

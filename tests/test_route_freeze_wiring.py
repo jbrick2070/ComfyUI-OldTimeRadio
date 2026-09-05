@@ -380,8 +380,8 @@ def test_shot_that_diverges_from_its_group_is_terminal(monkeypatch):
 
 
 def test_legacy_ledger_keeps_the_historic_mutating_behaviour(monkeypatch):
-    """The two shipped HTTP entry points (/otr/video_render_single and
-    /otr/video_render_soak) and the legacy CPU fixtures build ledgers by hand
+    """The legacy CPU fixtures (and, until 2026-09-05, the two POST HTTP
+    harness routes that have since been removed) build ledgers by hand
     with no OTR_VideoDirector upstream. A strict assertion would break paths
     never in this contract, so the mutating branch survives -- NAMED and
     logged, not silent."""

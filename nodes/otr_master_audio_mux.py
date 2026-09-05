@@ -1311,9 +1311,10 @@ class OTRMasterAudioMux:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_output_tree, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
+            from _otr_paths import (  # type: ignore
+                confine_to_output_tree, reject_remote_paths)
         reject_remote_paths(silent_video_path=silent_video_path, master_audio_path=master_audio_path,
                              output_path=output_path)
         master_audio_path = _reresolve_master_audio(master_audio_path)
@@ -1336,6 +1337,15 @@ class OTRMasterAudioMux:
                 "archival final goes to %s instead",
                 output_path.strip(), decision.summary(), out,
             )
+        # AND THE SETTLED DESTINATION MUST LAND IN THE OUTPUT TREE
+        # (2026-09-05). Checked HERE, on the final `out`, because the obs rule
+        # above may REPLACE a caller's `output_path` -- confining the widget at
+        # the top of the method would refuse a value this call never uses.
+        # `_is_inside_obs_dir` is a DENY-list for one folder, a publication
+        # rule; it was never containment, and every other local absolute path
+        # reached `ffmpeg -y` verbatim. The permitted roots include the
+        # operator's own `$OTR_OBS_DIR`, so the split above is unchanged.
+        confine_to_output_tree(out, "output_path")
         # THE FOLEY BED, MIXED BEFORE THE COPY AND NEVER INSIDE IT
         # (2026-08-26). ``mux_master_audio`` below is UNCHANGED: it still
         # copies with ``-c:a copy`` and still asserts the muxed audio's PCM

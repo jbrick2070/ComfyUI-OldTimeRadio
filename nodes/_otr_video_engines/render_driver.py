@@ -887,6 +887,77 @@ def _still_spine_episode_id(ledger):
     ).strip()
 
 
+_STILL_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+_STILL_MIN_PNG_BYTES = 67
+
+
+def _otr_tree_root(stills_root):
+    """The ``<output>/otr`` root that ``stills_root`` sits under, or ``""``.
+
+    Derived from the caller's OWN root rather than ``comfy_output_dir()`` on
+    purpose: the root already honours ``$OTR_OUTPUT_DIR``, and a test that
+    passes a ``tmp_path`` stills root stays inside its own tree instead of being
+    refused by the real one.
+    """
+    real = os.path.abspath(str(stills_root or ""))
+    parts = real.split(os.sep)
+    # THE FIRST `otr` COMPONENT, not the last: an episode whose slug is
+    # literally "otr" would otherwise narrow the root to that episode's own
+    # directory and refuse the entire shared pool. The first match is the tree
+    # root in every layout the pack builds.
+    for i, part in enumerate(parts):
+        if part.lower() == "otr":
+            return os.sep.join(parts[: i + 1])
+    return real
+
+
+def _trusted_still_source(candidate, stills_root) -> bool:
+    """True iff ``candidate`` is a still this pack itself wrote. NEVER raises.
+
+    WHY (2026-09-05, the sibling of the dispatcher's ``_trusted_pool_source``).
+    The rows this reads come from ``patched_ledger_json`` / the episode ledger,
+    i.e. from an unauthenticated ``/prompt`` body, and the only gate here was
+    ``os.path.isfile(candidate)``. So a forged ``pool_path`` naming any readable
+    file was ``shutil.copyfile``'d into the episode stills directory, which
+    ComfyUI serves over ``/view`` -- an arbitrary file READ, before any engine or
+    GPU work runs. ``9d3f56a7`` closed exactly this chain in the image
+    dispatcher and never looked at this copier.
+
+    Three conditions, matching the dispatcher's: not a remote path (a UNC value
+    authenticates to the host the workflow named on the stat below), inside this
+    run's own ``otr/`` tree, and a real PNG of at least ``_STILL_MIN_PNG_BYTES``.
+    A False answer is not an error -- the caller simply gets no materialized
+    path and regenerates the still, which is the right outcome for a cache entry
+    that cannot be trusted.
+    """
+    try:
+        text = str(candidate or "").strip()
+        if not text:
+            return False
+        try:
+            from .._otr_paths import is_remote_path
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import is_remote_path  # type: ignore
+        if is_remote_path(text):
+            return False
+        # BOTH SIDES REALPATH'D, symmetrically. Comparing `realpath(value)` to
+        # `abspath(root)` is identical on a plain tree and WRONG behind a
+        # junction, a symlink or a `subst` drive -- there every legitimate pool
+        # entry would be refused and every still silently regenerated.
+        root = os.path.normcase(os.path.realpath(_otr_tree_root(stills_root)))
+        real = os.path.normcase(os.path.realpath(os.path.abspath(text)))
+        if not root or os.path.commonpath([real, root]) != root:
+            return False
+        if not os.path.isfile(real):
+            return False
+        if os.path.getsize(real) < _STILL_MIN_PNG_BYTES:
+            return False
+        with open(real, "rb") as handle:
+            return handle.read(len(_STILL_PNG_MAGIC)) == _STILL_PNG_MAGIC
+    except Exception:  # noqa: BLE001 -- a trust probe must never raise
+        return False
+
+
 def _still_spine_materialize_row(row, stills_root):
     """Repair one image row to an active-episode file, if its source exists.
 
@@ -900,6 +971,15 @@ def _still_spine_materialize_row(row, stills_root):
         return ""
     root = os.path.abspath(str(stills_root))
     current = os.path.abspath(str(row.get("path") or "")) if row.get("path") else ""
+    # `os.path.abspath` PRESERVES a UNC spelling, so this `isfile` used to stat a
+    # host the ledger named -- an SMB session before the trust probe below is
+    # ever consulted (2026-09-05). The row comes from the workflow.
+    try:
+        from .._otr_paths import is_remote_path as _is_remote_row
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import is_remote_path as _is_remote_row  # type: ignore
+    if current and _is_remote_row(current):
+        current = ""
     try:
         if current and os.path.isfile(current):
             if os.path.commonpath((root, current)) == root:
@@ -908,7 +988,7 @@ def _still_spine_materialize_row(row, stills_root):
         pass
     source = ""
     for candidate in (current, str(row.get("pool_path") or "")):
-        if candidate and os.path.isfile(candidate):
+        if candidate and _trusted_still_source(candidate, root):
             source = os.path.abspath(candidate)
             break
     if not source:

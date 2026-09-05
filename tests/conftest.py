@@ -132,9 +132,27 @@ def pytest_collection_modifyitems(config, items):
 # Diagnostic: print this once at session start so a future debugger
 # can see the mask is in place.
 def pytest_sessionstart(session):
+    # THE SUITE WRITES INTO pytest's tmp TREE, AND THAT TREE IS DECLARED HERE
+    # (2026-09-05). The output-tree containment added for the registry punch
+    # list refuses a destination outside `comfy_output_dir()`, the operator's
+    # `$OTR_OBS_DIR`, and `$OTR_EXTRA_OUTPUT_ROOTS`. Roughly forty tests pass a
+    # `tmp_path` destination on purpose -- that IS the shape of the operator
+    # naming a location, so the honest way to make them run is the same knob an
+    # operator would use, not a test-only bypass inside the guard. Declaring the
+    # base temp dir keeps the production default (env unset) untouched, and a
+    # test that escapes even this root still fails, which is what we want.
+    try:
+        base = str(session.config._tmp_path_factory.getbasetemp())
+    except Exception:  # noqa: BLE001 -- never let a fixture detail stop the run
+        import tempfile
+        base = tempfile.gettempdir()
+    existing = (os.environ.get("OTR_EXTRA_OUTPUT_ROOTS") or "").strip()
+    os.environ["OTR_EXTRA_OUTPUT_ROOTS"] = (
+        "%s;%s" % (existing, base) if existing else base)
     sys.stderr.write(
         f"[OTR conftest] CUDA_VISIBLE_DEVICES='{os.environ.get('CUDA_VISIBLE_DEVICES','<unset>')}' "
-        f"OTR_TEST_MODE={os.environ.get('OTR_TEST_MODE','0')}\n"
+        f"OTR_TEST_MODE={os.environ.get('OTR_TEST_MODE','0')} "
+        f"OTR_EXTRA_OUTPUT_ROOTS='{os.environ['OTR_EXTRA_OUTPUT_ROOTS']}'\n"
     )
 
 

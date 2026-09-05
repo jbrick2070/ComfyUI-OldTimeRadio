@@ -919,10 +919,15 @@ class PostUpscaleProcgenBlend:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_output_tree, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
-        reject_remote_paths(source_mp4_path=source_mp4_path, procgen_mp4_path=procgen_mp4_path)
+            from _otr_paths import (  # type: ignore
+                confine_to_output_tree, reject_remote_paths)
+        # `scopes_mp4_path` was missing from this list and is resolved+statted
+        # a few lines below (2026-09-05).
+        reject_remote_paths(source_mp4_path=source_mp4_path,
+                            procgen_mp4_path=procgen_mp4_path,
+                            scopes_mp4_path=scopes_mp4_path)
         ffmpeg = _ffmpeg_bin(ffmpeg)
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
         pgn = Path(procgen_mp4_path).resolve() if procgen_mp4_path else None
@@ -957,6 +962,14 @@ class PostUpscaleProcgenBlend:
                 "a location. The blend always lands beside its source."
                 % (out_suffix,))
         output_path = src.parent / f"{src.stem}{out_suffix}{src.suffix}"
+        # AND THE DESTINATION MUST LAND IN THE OUTPUT TREE (2026-09-05).
+        # This node has no destination widget: the write goes beside `src`, so
+        # `source_mp4_path` chooses the DIRECTORY. The `out_suffix` reject above
+        # pins the filename and never the location -- and with `bypass=True`, or
+        # simply an empty `procgen_mp4_path`, this `shutil.copy2`s any readable
+        # file into that directory with no ffmpeg involved at all. Checked on
+        # the computed destination, after the early returns above.
+        confine_to_output_tree(str(output_path), "source_mp4_path")
 
         if bypass:
             try:

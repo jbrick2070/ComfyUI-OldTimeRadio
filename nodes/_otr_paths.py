@@ -278,6 +278,135 @@ def reject_remote_paths(**named) -> None:
         reject_remote_path(value, field)
 
 
+def _extra_output_roots() -> list:
+    """Operator-declared extra write roots, from ``$OTR_EXTRA_OUTPUT_ROOTS``.
+
+    Separator is ``;`` (a Windows path carries ``:`` in ``C:\\``, so ``os.pathsep``
+    is right on Windows and ``;`` is unambiguous everywhere). Empty by default.
+    An env value is OPERATOR configuration -- a workflow arriving over ``/prompt``
+    cannot set one -- so this widens the contract without widening the attack
+    surface. This is how an operator keeps writing to a destination outside the
+    ComfyUI output tree after :func:`confine_to_output_tree` landed.
+    """
+    raw = (otr_env.get("OTR_EXTRA_OUTPUT_ROOTS") or "").strip()
+    if not raw:
+        return []
+    out = []
+    for chunk in raw.split(";"):
+        text = chunk.strip()
+        if not text:
+            continue
+        try:
+            out.append(Path(text).expanduser().resolve())
+        except Exception:  # noqa: BLE001 -- a bad entry must not break writing
+            continue
+    return out
+
+
+def confine_to_output_tree(value, field: str, *, roots=None) -> str:
+    """``value`` resolved, PROVEN to land under a permitted write root, else raise.
+
+    WHY, and it is a different defect from :func:`reject_remote_path`. That one
+    refuses a path that is off this MACHINE. This one refuses a path that is off
+    the permitted TREE. A node declares ``output_path`` (or a source path whose
+    directory decides where the output lands) in ``INPUT_TYPES``; ComfyUI's
+    unauthenticated ``/prompt`` sets any literal for it -- ``forceInput`` is a
+    frontend hint the server never reads, and a default value is irrelevant
+    because the caller supplies their own. Without this the value reached
+    ``ffmpeg -y``/``shutil.copy2``/``os.replace`` verbatim, so a caller chose an
+    arbitrary local destination and overwrote whatever was there.
+
+    THE PERMITTED ROOTS, in order: the ComfyUI output root
+    (:func:`comfy_output_dir`, which honours ``$OTR_OUTPUT_DIR`` so the 4060 keeps
+    working), the operator's declared publication root (:func:`otr_obs_dir` --
+    ``$OTR_OBS_DIR`` may point anywhere and the mux publishes there by design),
+    ComfyUI's own input directory, and anything in ``$OTR_EXTRA_OUTPUT_ROOTS``.
+    Callers may pass ``roots`` to narrow it further.
+
+    THE INPUT DIRECTORY IS DELIBERATE and worth the sentence. It is where a user
+    drops media, this pack stages engine assets into it
+    (``wrapper_bridge.stage_into_comfy_input``), and a graph that captions a
+    video sitting there would otherwise have its output refused -- the default
+    destination is computed BESIDE the input. Permitting it hands an attacker
+    nothing: ComfyUI core's own unauthenticated ``POST /upload/image`` already
+    writes arbitrary bytes into that directory. The ban class this function
+    closes is a write to an arbitrary location on the box, not a write to a
+    directory ComfyUI itself manages.
+
+    RESOLVED-TO-RESOLVED, deliberately: a mapped network drive resolves to a UNC
+    path (measured, ``Path("U:\\").resolve()`` -> ``\\\\10.55.0.2\\...``), so an
+    output root that lives on one only matches itself after both sides resolve.
+    Call this AFTER :func:`reject_remote_path`, never before -- the remote refusal
+    is about the value as typed, and resolving first would launder a UNC spelling
+    into a local-looking one.
+
+    An empty value returns ``""`` unchanged: every caller reads it as "use my
+    default", and the defaults are already in-tree. A ``..`` segment is refused
+    textually as well as by containment, because the message is clearer and
+    because Windows collapses ``..`` lexically in some spellings before the
+    filesystem ever sees it.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return text
+    # REFUSE A REMOTE PATH HERE TOO, NOT ONLY AT THE CALLER (2026-09-05).
+    # `Path(...).resolve()` below OPENS an SMB session for a UNC value -- a
+    # measured 42 seconds against an unreachable host, and an NTLM handshake
+    # against a reachable one -- so a caller that forgot the refusal would have
+    # this function perform the exact coercion it sits next to. Callers still
+    # call `reject_remote_path` first (the ordering is pinned by a test); this
+    # is the belt, and it costs one string compare. Idempotent by construction.
+    reject_remote_path(text, field)
+    if ".." in text.replace("\\", "/").split("/"):
+        raise OtrPathContractError(
+            "%s contains a '..' traversal segment (%r). Name the destination "
+            "directly; it must land inside the output tree." % (field, text))
+    try:
+        resolved = Path(text).expanduser().resolve()
+    except Exception as exc:  # noqa: BLE001 -- a malformed path is a refusal
+        raise OtrPathContractError(
+            "%s is not a usable path (%r): %s" % (field, text, exc))
+    if roots is None:
+        candidates = [comfy_output_dir()]
+        # `otr_obs_dir()` runs `_validate_contract`, and `comfy_input_dir()`
+        # reads `folder_paths`; both can raise, and `otr_obs_dir` raises the
+        # SAME exception type this function does. Collected defensively so a
+        # contract problem in a root surfaces as "that root does not match"
+        # rather than masquerading as "your path is outside the tree".
+        for _root in (otr_obs_dir, comfy_input_dir):
+            try:
+                candidates.append(_root())
+            except Exception:  # noqa: BLE001 -- an unusable root simply does not match
+                continue
+        candidates += _extra_output_roots()
+    else:
+        candidates = list(roots)
+    permitted = []
+    for root in candidates:
+        try:
+            permitted.append(Path(root).expanduser().resolve())
+        except Exception:  # noqa: BLE001 -- an unresolvable root simply does not match
+            continue
+    for root in permitted:
+        try:
+            if resolved == root or root in resolved.parents:
+                return str(resolved)
+        except Exception:  # noqa: BLE001
+            continue
+    raise OtrPathContractError(
+        "%s resolves to %s, which is outside every permitted write root (%s). "
+        "Set OTR_EXTRA_OUTPUT_ROOTS to authorize another one."
+        % (field, resolved, ", ".join(str(p) for p in permitted) or "none"))
+
+
+def confine_to_output_tree_paths(**named) -> None:
+    """:func:`confine_to_output_tree` for several inputs at once, for its refusal
+    only -- the caller keeps using its own values. Mirrors
+    :func:`reject_remote_paths`, and like it belongs at a node's EXECUTE METHOD."""
+    for field, value in named.items():
+        confine_to_output_tree(value, field)
+
+
 def _validate_episode_id(episode_id: str) -> str:
     """A production write helper's ``episode_id`` must be a non-empty
     single path component and not the reserved system tier. RAISES
@@ -684,6 +813,8 @@ __all__ = [
     "reject_remote_path",
     "reject_remote_paths",
     "is_remote_path",
+    "confine_to_output_tree",
+    "confine_to_output_tree_paths",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",

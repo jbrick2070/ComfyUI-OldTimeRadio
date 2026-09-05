@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re as _re
 
 try:
     from ._otr_shared import env as otr_env
@@ -530,6 +531,17 @@ class OTRVideoRenderBatch:
         # the selected engine wrapper. The frozen audio section is read-only
         # throughout.
         import os
+        # THIS NODE HAD NO REMOTE REFUSAL AT ALL (2026-09-05). Its three path
+        # widgets are staged into ComfyUI's input dir and handed to engines; a
+        # UNC value made this machine authenticate to the host the workflow
+        # named on the first stat. Same refusal, same place (the execute
+        # method), as the five ffmpeg nodes.
+        try:
+            from ._otr_paths import reject_remote_paths
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import reject_remote_paths  # type: ignore
+        reject_remote_paths(portrait_path=portrait_path, audio_path=audio_path,
+                            master_audio_path=master_audio_path)
         from ._otr_video_engines import render_driver as _rd
         manifest_payload = ""
         if mode == "episode":
@@ -540,7 +552,16 @@ class OTRVideoRenderBatch:
             assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
             report = _rd.render_single(engine, assets=assets,
                                        frame_count=int(frame_count))
-            name = "node_single_%s.json" % engine
+            # THE ENGINE LABEL BECOMES A FILENAME (2026-09-05). `engine` is a
+            # workflow STRING, and `"node_single_%s.json" % engine` was written
+            # into the state tier with no whitelist -- separators or `..` walk
+            # the report out of it (on Windows the prefix does not save it,
+            # because `..` collapses lexically). A filename cannot hold a
+            # separator, so reduce it to a token; the report still names the
+            # engine that ran, and an unknown engine already returns a failure
+            # report rather than raising.
+            name = "node_single_%s.json" % (
+                _re.sub(r"[^A-Za-z0-9_.-]", "_", str(engine)).strip("._-") or "unknown")
         else:
             assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
             report = _rd.run_gpu_soak(n_beats=int(beats), oom_index=int(oom_index),

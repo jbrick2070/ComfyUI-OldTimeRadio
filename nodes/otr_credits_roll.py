@@ -1528,9 +1528,10 @@ class OTRCreditsRoll:
         # video_path arrives from the workflow; refuse a remote one before
         # the first stat (2026-09-05).
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_output_tree, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
+            from _otr_paths import (  # type: ignore
+                confine_to_output_tree, reject_remote_paths)
         reject_remote_paths(video_path=video_path)
         if not video_path or not os.path.exists(video_path):
             raise CreditsDataError(
@@ -1565,6 +1566,13 @@ class OTRCreditsRoll:
         credits_clip = base + "_credits" + (ext or ".mp4")
         backdrop_png = base + "_credits_backdrop.png"
         out = base + "_with_credits" + (ext or ".mp4")
+        # AND THE DESTINATIONS MUST LAND IN THE OUTPUT TREE (2026-09-05).
+        # This node has no destination widget either: all six writes are
+        # siblings of `video_path` (backdrop png, credits clip, concat list,
+        # the joined episode), so confining the computed `out` confines the
+        # directory they all share. Checked here, past the TERMINAL exits, so a
+        # call that will never write is never refused.
+        confine_to_output_tree(out, "video_path")
 
         # ---- PRESENTATION-ONLY: everything that makes GLASS ---------------- #
         #

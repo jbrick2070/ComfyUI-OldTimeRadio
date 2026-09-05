@@ -74,6 +74,20 @@ def _replay_master_audio(meta):
 
     bundle = str((meta or {}).get("replay_from") or "").strip()
     rel = str((meta or {}).get("replay_master_audio") or "").strip()
+    # THE BUNDLE COMES FROM THE WIRE, SO REFUSE A REMOTE ONE BEFORE THE STAT
+    # (2026-09-05). `meta` is parsed from the `script_json` workflow STRING, and
+    # the join below was statted with no guard -- a UNC `replay_from` made this
+    # machine authenticate to the host the workflow named. This site was missed
+    # when the remote refusals went in elsewhere. A refusal takes the same loud
+    # fallback the missing-file case already takes.
+    try:
+        from ._otr_paths import is_remote_path as _is_remote_bundle
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import is_remote_path as _is_remote_bundle  # type: ignore
+    if bundle and _is_remote_bundle(bundle):
+        log.warning("[SceneSequencer] REPLAY: replay_from %r is a remote path; "
+                    "refusing to read it, falling back to a one-second batch", bundle)
+        return _silence(1.0), "remote replay_from refused; 1s fallback"
     if not bundle or not rel:
         log.warning("[SceneSequencer] REPLAY: the meta names no master audio "
                     "(replay_from=%r, replay_master_audio=%r); falling back to "
@@ -597,7 +611,20 @@ def _resample_audio(clip_np, src_rate, dst_rate):
             clip_np
         ).astype(np.float32)
 
-DEFAULT_OUT = os.path.join(os.path.expanduser("~"), "Documents", "ComfyUI", "output", "otr", "audio")
+#: The `output_dir` widget's placeholder default. NOTHING READS IT: the per-line
+#: audio goes to the episode's own dir resolved from the ledger, which is why
+#: `output_dir` does not appear anywhere below the signature.
+#:
+#: IT USED TO BE A HARDCODED `~/Documents/ComfyUI/output/otr/audio`, and that is
+#: this developer box's own layout baked into a shipped module (2026-09-05). On a
+#: registry install, on the 4060 (which sets `$OTR_OUTPUT_DIR`), or on any
+#: two-tree split it named a directory that ComfyUI does not use -- and the node
+#: then `os.makedirs`'d it on every render, silently creating an empty tree in a
+#: stranger's home folder. No test could see it: the suite runs on the one box
+#: where the guess happens to be true. A default that is only correct on the
+#: machine it was written on is a portability defect wearing a constant's
+#: clothes, and it is now the empty string, which means "the ledger decides".
+DEFAULT_OUT = ""
 
 
 # -----------------------------------------------------------------------------
@@ -904,10 +931,23 @@ class SceneSequencer:
         scene_transition_ms = 1250
         act_break_ms = 2500
 
-        # Guard: fall back to DEFAULT_OUT if output_dir is empty/None
-        if not output_dir or not output_dir.strip():
-            output_dir = DEFAULT_OUT
-        os.makedirs(output_dir, exist_ok=True)
+        # THE `output_dir` MKDIR IS GONE (2026-09-05). It read
+        # `os.makedirs(output_dir, exist_ok=True)` on a value that came straight
+        # from a workflow STRING, so an unauthenticated `/prompt` caller created
+        # directory trees anywhere the ComfyUI user could write -- and with the
+        # widget left empty, which is how the canonical graph ships, it created
+        # a tree under a HARDCODED `~/Documents/ComfyUI/...` path that only
+        # exists on the box this module was written on.
+        #
+        # Deleting it is the whole fix, because the value is INERT: nothing
+        # below this line reads `output_dir`. The per-line audio goes to the
+        # episode's own directory resolved from the ledger, which is where every
+        # downstream stage looks. Confining the value instead would have been
+        # the wrong shape -- it would make an inert widget able to REFUSE and
+        # kill the render on any install whose output root is not this one's.
+        # The widget itself stays for now: it sits mid-list, and removing it
+        # re-indexes `widgets_values` and every later `dst_slot` across all 63
+        # workflows, which is not work to bundle with a security change.
 
         # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
         # LLM is done by this point (script + plan already generated).

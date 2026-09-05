@@ -397,7 +397,24 @@ def _audio_cache_dir_for(meta: dict) -> str:
     paths = (meta or {}).get("paths") or {}
     audio_dir = paths.get("audio_dir") or ""
     if audio_dir:
-        return os.path.abspath(os.path.join(audio_dir, "audio_cache"))
+        cache_dir = os.path.abspath(os.path.join(audio_dir, "audio_cache"))
+        # THE CACHE DIR MUST LAND IN THE OUTPUT TREE (2026-09-05). `meta` is
+        # parsed from the `ledger_json` / `script_json` workflow STRING, so
+        # `meta.paths.audio_dir` is caller-chosen, and the cache writer below
+        # `os.makedirs` it and `os.replace`s files into it. The env override
+        # above is operator configuration and is deliberately NOT confined --
+        # same rule as every other env knob in this pack. A refusal returns ""
+        # here, which the caller already treats as "no cache dir resolved".
+        try:
+            from ._otr_paths import confine_to_output_tree
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import confine_to_output_tree  # type: ignore
+        try:
+            confine_to_output_tree(cache_dir, "meta.paths.audio_dir")
+        except Exception as exc:  # noqa: BLE001 -- a refusal disables the cache, never raises
+            log.warning("[OTR voice cache] audio_dir refused (%s); no cache dir", exc)
+            return ""
+        return cache_dir
     return ""
 
 
@@ -637,10 +654,38 @@ def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
     because some unrelated line's stamp failed would throw away good, fully
     evidenced audio. Which lines failed is the question; this answers it.
     """
-    from ._otr_ledger import save_ledger_safe, stamp_per_line_audio_meta
+    from ._otr_ledger import (
+        in_flight_ledger_path, save_ledger_safe, stamp_per_line_audio_meta)
 
     paths = (meta or {}).get("paths") or {}
     ledger_path = paths.get("ledger_path") or ""
+    # THE LEDGER TO REWRITE IS THE ONE THIS RUN OPENED, NOT THE ONE THE WIRE
+    # NAMED (2026-09-05). `meta` is parsed from the `ledger_json` / `script_json`
+    # workflow STRING, so `meta.paths.ledger_path` is caller-chosen -- and it
+    # went straight to `save_ledger_safe`, which writes a temp file beside the
+    # target and `os.replace`s over it. That is an arbitrary-JSON-overwrite from
+    # an unauthenticated /prompt. The in-flight singleton knows the real path by
+    # construction and advances through `rename_episode`, so preferring it is
+    # also more correct than trusting a value the wire could have gone stale on.
+    # The wire value is kept only as the headless fallback (no singleton), and
+    # then only when it is inside the output tree.
+    in_flight = in_flight_ledger_path()
+    if in_flight is not None:
+        if ledger_path and str(in_flight) != str(ledger_path):
+            log_.debug(
+                "[OTR voice cache] meta.paths.ledger_path %r ignored; stamping "
+                "the in-flight ledger %s", ledger_path, in_flight)
+        ledger_path = str(in_flight)
+    elif ledger_path:
+        try:
+            from ._otr_paths import confine_to_output_tree
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import confine_to_output_tree  # type: ignore
+        try:
+            ledger_path = confine_to_output_tree(ledger_path, "meta.paths.ledger_path")
+        except Exception as exc:  # noqa: BLE001 -- a refusal skips stamping, never raises here
+            log_.warning("[OTR voice cache] ledger_path refused (%s); stamps skipped", exc)
+            ledger_path = ""
     def _mark_all_failed() -> None:
         if failed_line_ids is not None:
             failed_line_ids.update(lid for lid, _ in stamps)

@@ -160,7 +160,10 @@ workflows/external_examples/
 # `/ledger?path=`; the only thing that serves those routes is
 # `scripts/serve_ledger.py`, which `scripts/*` above stops shipping. The pack's
 # own registered route is `/otr/latest_ledger` (__init__.py) -- a DIFFERENT
-# path -- and it is gated behind OTR_ENABLE_HTTP_RENDER_ROUTES=1 besides. So on
+# path. (This used to add "and it is gated behind
+# OTR_ENABLE_HTTP_RENDER_ROUTES=1 besides", which was never true: that flag
+# gated only the two POST render routes, which were REMOVED 2026-09-05. The
+# ledger GET registers unconditionally on every install and always did.) So on
 # a registry install every one of the page's three fetches 404s: it has shipped
 # to every installer as a page that cannot work. It stays in git for the
 # developers who run the server beside it.

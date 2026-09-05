@@ -321,6 +321,17 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
 def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
     """Load + shape-validate ``config/profiles/<id>.json``. Fail closed."""
     d = profile_dir or PROFILE_DIR
+    # A PROFILE ID NAMES A FILE IN THIS DIRECTORY, NEVER A LOCATION
+    # (2026-09-05). `profile_id` reaches here from OTR_WorkflowValidator's free
+    # STRING widget, so a `/prompt` caller could send `..\..\..\somewhere\x` and
+    # this join would stat and open it -- a UNC spelling would authenticate to
+    # the host it named. Ids are `[a-z0-9_-]` by construction, so a separator or
+    # traversal token is refused rather than rewritten: a silently-renamed id
+    # would load the wrong profile, which is worse than a clear failure.
+    if any(tok in str(profile_id or "") for tok in ("/", "\\", "..", "\x00")):
+        raise ProfileError(
+            f"profile {profile_id!r}: an id names a file in {d!r}, not a path"
+        )
     path = os.path.join(d, f"{profile_id}.json")
     if not os.path.isfile(path):
         try:

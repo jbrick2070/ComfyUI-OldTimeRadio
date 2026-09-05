@@ -1637,7 +1637,11 @@ class OTRSilentComposite:
                                 return float("nan")
                         parts.append(("dir", p, tuple(dir_parts)))
             # 3. Sibling master WAV (composite reads it for timeline length).
-            if base_video_path:
+            # STEP 3 SURVIVED 79dc9828, which named this hook (2026-09-05):
+            # steps 1 and 2 got the remote check and this one did not, so a UNC
+            # `base_video_path` still reached `os.listdir(dirname(...))` during
+            # fingerprinting -- the SMB session the commit set out to prevent.
+            if base_video_path and not _is_remote(base_video_path):
                 base_dir = os.path.dirname(base_video_path)
                 if os.path.isdir(base_dir):
                     try:
@@ -1746,11 +1750,18 @@ class OTRSilentComposite:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_output_tree, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
+            from _otr_paths import (  # type: ignore
+                confine_to_output_tree, reject_remote_paths)
         reject_remote_paths(base_video_path=base_video_path, output_path=output_path)
         out = output_path.strip() or self._default_out(base_video_path)
+        # AND THE DESTINATION MUST LAND IN THE OUTPUT TREE (2026-09-05): it went
+        # to `ffmpeg -y` and to a `.qa.json` `json.dump` beside it, both
+        # verbatim. Checked on the computed `out` so the empty case -- where
+        # `_default_out` builds the destination from `base_video_path`'s stem --
+        # is covered by the same line.
+        confine_to_output_tree(out, "output_path" if output_path.strip() else "base_video_path")
         manifest = {}
         try:
             m = json.loads(clip_manifest_json or "{}")

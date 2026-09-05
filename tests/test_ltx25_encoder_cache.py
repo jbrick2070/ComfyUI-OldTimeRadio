@@ -273,10 +273,10 @@ def test_two_overlapping_owners_both_have_to_let_go(eng):
     """THE CONCURRENCY BUG THE r3 PANEL CAUGHT.
 
     The engine is a process-wide singleton, but each ``run_episode`` keeps its
-    OWN private ownership map. The shipped `/otr/video_render_single` and
-    `/otr/video_render_soak` routes start UNGUARDED DAEMON THREADS
-    (``__init__.py:493-515``) and the soak route reaches ``run_episode``, so two
-    runs really can overlap.
+    OWN private ownership map. The POST harness routes that used to start
+    UNGUARDED DAEMON THREADS were removed 2026-09-05, but overlap is still
+    reachable -- `scripts/` drives the same `render_driver` entry points
+    in-process -- so the ownership contract still has to hold.
 
     With a bare flag, whichever run finished FIRST set the scope to ``None`` --
     and the survivor's remaining beats ran cold while its private map still

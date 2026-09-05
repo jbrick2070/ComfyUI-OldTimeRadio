@@ -409,9 +409,10 @@ class OTRCaptionBurn:
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
         # here, where provenance is known, not at the spawn (2026-09-04).
         try:
-            from ._otr_paths import reject_remote_paths
+            from ._otr_paths import confine_to_output_tree, reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_paths import reject_remote_paths  # type: ignore
+            from _otr_paths import (  # type: ignore
+                confine_to_output_tree, reject_remote_paths)
         reject_remote_paths(video_path=video_path, ledger_path=ledger_path, output_path=output_path)
         # THE HERO TITLE IS NOT A CAPTION, and this node has FIVE no-error
         # passthrough exits. That was harmless while the title was baked into
@@ -439,6 +440,16 @@ class OTRCaptionBurn:
             log.warning("[OTR_CaptionBurn] no timed ledger found; passthrough (no captions)")
             return (video_path, "OTR_CaptionBurn: no timed ledger; passthrough")
         out = output_path.strip() or self._default_out(video_path)
+        # THE DESTINATION MUST LAND IN THE OUTPUT TREE (2026-09-05), and the
+        # check belongs HERE -- on the computed `out`, after the passthrough
+        # exits above -- not on the raw widgets at the top of the method. A
+        # passthrough writes nothing, and refusing a path this call will never
+        # touch is a false alarm. Confining `out` covers BOTH ways a caller
+        # steers the write: the explicit `output_path`, and the empty case,
+        # where `_default_out` puts `<stem>_captioned.mp4` and its .ass sidecar
+        # into `dirname(video_path)` -- so the INPUT decides the directory and
+        # confining `output_path` alone would leave the sink open.
+        confine_to_output_tree(out, "output_path" if output_path.strip() else "video_path")
         try:
             final, report = burn_captions_on_video(
                 video_path, led, out, style=style, fps=int(fps), ffmpeg=ffmpeg,

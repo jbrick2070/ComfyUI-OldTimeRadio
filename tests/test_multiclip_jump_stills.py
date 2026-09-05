@@ -356,9 +356,22 @@ def test_a_duplicate_segment_id_is_TERMINAL():
 # Seam 3 -- the still spine proves EVERY segment
 # ---------------------------------------------------------------------------
 
+# A POOL STILL IS A REAL PNG IN THE REAL POOL (2026-09-05). This fixture used
+# to plant b"still" at tmp_path/<name>.png -- outside the pool, and not an
+# image. That is precisely the shape `render_driver._trusted_still_source` now
+# refuses: a ledger-carried `pool_path` naming any readable file was copied into
+# the episode stills dir, which ComfyUI serves over `/view`, so it was an
+# arbitrary file READ. Production's pool is
+# `<output>/otr/episodes/_shared/cache` (portrait_ledger.stills_root) and every
+# entry in it is a PNG this pack wrote. The fixture now says that.
+_PNG_BYTES = b"\x89PNG\r\n\x1a\n" + bytes(120)
+
+
 def _pool_file(tmp_path, name):
-    path = tmp_path / ("%s.png" % name)
-    path.write_bytes(b"still")
+    pool = tmp_path / "output" / "otr" / "episodes" / "_shared" / "cache"
+    pool.mkdir(parents=True, exist_ok=True)
+    path = pool / ("%s.png" % name)
+    path.write_bytes(_PNG_BYTES)
     return str(path)
 
 

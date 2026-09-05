@@ -12,8 +12,8 @@ The five ingress boundaries, each parameterized over EVERY retired id:
 
   1. the director's ``_resolve_and_validate`` (saved node / custom json),
   2. ``parse_engine_override`` (the OTR_FORCE_ENGINE_MAP force map),
-  3. ``_render_one`` (the path the shipped ``/otr/video_render_single``
-     HTTP endpoint reaches),
+  3. ``_render_one`` (the path ``render_single`` reaches; its POST HTTP
+     endpoint was removed 2026-09-05, the harness in ``scripts/`` remains),
   4. multi-clip session creation (``render_beat_coverage`` on a frozen
      ledger's coverage plan),
   5. the registry's ``assert_usable``.

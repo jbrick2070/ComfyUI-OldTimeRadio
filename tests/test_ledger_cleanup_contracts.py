@@ -43,8 +43,16 @@ def _still_ledger(tmp_path, *, pool_path="", receipt=True):
 
 def test_still_spine_repairs_pool_path_into_active_episode(tmp_path, monkeypatch):
     output_root = tmp_path / "output"
-    pool = tmp_path / "pool.png"
-    pool.write_bytes(b"still")
+    # A POOL STILL IS A REAL PNG IN THE REAL POOL (2026-09-05). This used to
+    # plant b"still" at tmp_path/pool.png -- outside the pool and not an image
+    # -- which is the exact shape `_trusted_still_source` now refuses, because a
+    # ledger-carried `pool_path` naming any readable file was copied into a
+    # `/view`-served directory. Production's pool is
+    # `<output>/otr/episodes/_shared/cache`.
+    pool_dir = output_root / "otr" / "episodes" / "_shared" / "cache"
+    pool_dir.mkdir(parents=True, exist_ok=True)
+    pool = pool_dir / "pool.png"
+    pool.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(120))
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(output_root))
     ledger = _still_ledger(tmp_path, pool_path=str(pool))
 

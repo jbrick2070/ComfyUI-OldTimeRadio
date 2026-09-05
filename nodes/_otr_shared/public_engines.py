@@ -177,10 +177,11 @@ _PUBLIC_ENGINES = {
     # staying dead -- a different feature the operator explicitly does not want
     # confused with this one.
     #
-    # `ltx25_high_mime` is still absent and still spoken for. It is the same
-    # mechanism at 1.00/0.00 and it needs a per-window master gain, so it lands
-    # with its own pass; adding a public id for an unregistered internal engine
-    # would trip the bijection assert below AT IMPORT.
+    # (`ltx25_high_mime` was described here as "still absent and still spoken
+    # for" until 2026-09-05. It ARRIVED on 2026-08-26 and is mapped thirteen
+    # lines below, so the note had been contradicting the table it introduces.
+    # Corrected rather than deleted because a reader who remembers the older
+    # state deserves to know it moved, not to wonder which line is lying.)
     "ltx25_high_foley_plus": "ltx25_foley_plus",
     # MIME, 2026-08-26 -- the third and last row on this lane, and the same
     # mechanism as its sibling at 1.00 foley / 0.00 master. Operator: "foley
