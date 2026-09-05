@@ -138,7 +138,7 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **2.2 GHOST POOL -- RE-SCOPED 2026-09-05, read the row before starting it** | Still the only open row that changes what lands in `otr/obs/` tomorrow, but **the ledgers were measured before it was started and they moved the target.** 127 of 263 real beats fell to the deterministic path and NOT ONE fell to a uniqueness rejection; the four long episodes each died of something else. The cheapest of those, the `g0010` id-padding rejection that cost a whole 25-beat episode, is already CLOSED. The uniqueness change stays correct and stays worth doing -- it just should not buy the GPU leg on its own. |
+| **1st** | **2.2 GHOST POOL -- CONFIRMED LIVE 2026-09-05, read the row's correction block first** | Still the only open row that changes what lands in `otr/obs/` tomorrow. An archive survey said the uniqueness defect had never fired; **a single canonical leg with the ghost lane forced on fired it TWICE and cost that episode all 18 authored prompts.** The archive was the wrong population -- the only two engines that author ghost prompts are AnimateDiff rows, which the daily rotation skips, so 23 of its 27 ghost ledgers are eight-beat episodes that never strain the pool. The survey's other findings stand and one of them, the `g0010` id-padding rejection that cost a whole 25-beat episode, is already CLOSED. |
 | ~~2nd~~ | ~~2.3 PAIR PREPOSITION~~ | **DONE 2026-09-05.** Shipped ahead of 2.2 because the measurement above re-scoped 2.2 and it no longer gates this. `place_preposition` picks the connector from the place's head noun. Two things were caught by looking at real data rather than reasoning: QA on the finished diff found a regression before it shipped (a bare `'s` test dropped the article from fifteen real lowercase possessives -- "in judge's bench"), and reading the 4,393-setting corpus moved "station" out of the AT set, where it would have mis-read the corpus's biggest head noun 100 times over. |
 | ~~3rd~~ | ~~README defects + bundle hygiene~~ | **DONE 2026-09-05 (`eaf33576`), taken first because it needed no GPU.** README had been telling every new user to install IndexTTS2 -- a multi-gigabyte sidecar in a separate Python -- before their first Queue Prompt, for an engine `otr_canonical` does not select; and it claimed Stable Audio 3 self-downloads, which it does not. Bundle hygiene rung 1 landed in the same commit. |
 | 4th | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
@@ -265,11 +265,42 @@ RULINGS (constraints, not history):
 
 ### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, RE-SCOPED 2026-09-05)
 
-> **MEASURE THE LANE BEFORE YOU SPEND ITS GPU LEG (2026-09-05).** Every ledger
-> on the dev box was read before this row was started, and the numbers do not
-> support starting it first. **27 episode ledgers carry `ghost_prompt` objects;
-> 127 of their 263 beats fell to `deterministic_fallback`; and NOT ONE of those
-> fallbacks was a uniqueness rejection.** The four episodes over twelve beats --
+> ## CORRECTION FIRST: THE ARCHIVE SURVEY BELOW WAS THE WRONG POPULATION
+>
+> **The survey concluded the uniqueness defect had never fired. A single live
+> leg fired it TWICE, and it is the reason that episode lost all 18 of its
+> authored prompts (2026-09-05, leg `otr_headless_54066`, canonical, three
+> acts, `OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`):**
+>
+> ```
+> Ghost author: attempt 1 rejected: leaf for g017 repeats the one written
+>   for g015: 'the broadcast console sits on a desk as a light moves'
+> Ghost author: attempt 2 rejected: leaf for g012 repeats the one written
+>   for g008: 'the amber lantern sits on a table as a light moves'
+> Ghost Prompt v2: 18 beat(s) authored (deterministic_fallback=18)
+> ```
+>
+> **WHY THE ARCHIVE MISSED IT, and this is the transferable part:** the ghost
+> prompt lane belongs to exactly TWO engines, `animatediff15_v3_haunted_video`
+> and `animatediff15_v3_stillin_lab_video`, and the daily rotation loop
+> deliberately SKIPS AnimateDiff. So the archive under-represents precisely the
+> lane this row is about -- 23 of its 27 ghost ledgers are eight-beat episodes,
+> where four slots and eight beats never strain the pool. The defect lives at
+> the episode LENGTH the archive barely contains. Measuring the archive was
+> right; treating it as the population was not.
+>
+> **SO ROW 2.2 IS VINDICATED AND STAYS FIRST.** Both rejected leaves are exact
+> duplicates written for different beats; under the finalized-prompt rule a
+> repeated leaf carrying a different motif composes a different prompt and the
+> batch is accepted. That is this row, exactly as written.
+>
+> ---
+>
+> **THE ARCHIVE SURVEY, kept because its other three findings stand
+> (2026-09-05).** Every ledger on the dev box was read before this row was
+> started. **27 episode ledgers carry `ghost_prompt` objects; 127 of their 263
+> beats fell to `deterministic_fallback`; and none of those fallbacks in the
+> ARCHIVE was a uniqueness rejection.** The four episodes over twelve beats --
 > including the 29-beat one whose shape this row's DONE WHEN names -- each lost
 > their whole batch to a DIFFERENT cause:
 >
@@ -309,13 +340,12 @@ RULINGS (constraints, not history):
 > `fallback_reason`. **Read the next occurrence off a ledger and then fix the
 > real one.**
 >
-> **What this row should be re-scoped to before it takes a GPU leg:** the two
-> content validators -- "requests a person in object mode" (29 beats) and
-> "names a texture instead of a thing" (28) -- are what an episode actually
-> dies of, and both are prompt-and-validator DESIGN rows rather than the
-> mechanical change this row describes. The uniqueness change stays correct and
-> stays worth doing; it just is not the first thing, and it should not buy the
-> leg on its own.
+> **THE OTHER THREE CAUSES ARE STILL REAL AND STILL UNOWNED.** The two content
+> validators -- "requests a person in object mode" (29 beats) and "names a
+> texture instead of a thing" (28) -- are prompt-and-validator DESIGN rows
+> rather than the mechanical change this row describes, and they killed more
+> archived beats than anything else. They want their own row and their own arc;
+> they are not part of 2.2.
 
 **Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
 
