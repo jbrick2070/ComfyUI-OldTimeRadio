@@ -1293,16 +1293,6 @@ class CastLock:
                 f"-- non-blocking warning (I-8)"
             )
 
-    # ------------------------------------------------------------------ #
-    def _resolve_policy_claim(self, voice_bank, target_engine,
-                              bank_entries=None, cast=None,
-                              bank_unavailable_route_ids=None):
-        """The QUALIFIED claim only, or None. A compatibility face on
-        ``_resolve_route_claims`` for callers that only ever wanted that tier."""
-        return self._resolve_route_claims(
-            voice_bank, target_engine, bank_entries=bank_entries,
-            cast=cast,
-            bank_unavailable_route_ids=bank_unavailable_route_ids).qualified
 
     # ------------------------------------------------------------------ #
     def _resolve_route_claims(self, voice_bank, target_engine,

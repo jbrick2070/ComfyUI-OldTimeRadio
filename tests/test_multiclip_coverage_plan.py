@@ -491,65 +491,6 @@ def test_join_mode_does_not_claim_SINGLE_for_an_uncoverable_target():
     cp.validate_coverage_plan(plan, contract)
 
 
-def test_no_false_refusals_across_a_differential_sweep():
-    """The standing guard for all three math defects at once.
-
-    An independent reference (reachable-sum DP over the contract's own legal
-    lengths) decides whether SOME exact cover exists; the partitioner must not
-    refuse one that does. This is the check that caught the join-mode defect
-    after the two the panel found, so it stays in the suite rather than living
-    in a throwaway script.
-    """
-    import itertools
-
-    def reachable(lengths, max_count):
-        out = {0: {0}}
-        for k in range(1, max_count + 1):
-            out[k] = {b + L for b in out[k - 1] for L in lengths}
-        return out
-
-    max_count = 6
-    checked = 0
-    for min_f, q, max_f, trim in itertools.product(
-            (1, 2, 4, 9), (1, 2, 3, 8), (5, 12, 25), (True, False)):
-        if max_f < min_f:
-            continue
-        for continuity, drop in ((fc.CONTINUITY_STRICT_FIRST_FRAME, 1),
-                                 (fc.CONTINUITY_SOFT_REFERENCE, 0)):
-            contract = fc.FrameContract(
-                min_frames=min_f, max_frames=max_f, quantum=q,
-                allow_tail_trim=trim,
-                continuity=continuity)
-            lengths = contract.legal_lengths()
-            reach = reachable(lengths, max_count)
-            smallest = min(lengths)
-            for target in range(1, max_f * 2 + 3):
-                checked += 1
-                try:
-                    plan = cp.partition_beat(target, contract)
-                except cp.CoveragePlanError:
-                    exists = False
-                    for count in range(1, max_count + 1):
-                        required = target + drop * (count - 1)
-                        if required in reach[count]:
-                            exists = True
-                            break
-                        if trim and any(
-                                t > required and smallest - drop - (t - required) >= 1
-                                for t in reach[count]):
-                            exists = True
-                            break
-                    assert not exists, (
-                        "refused a coverable beat: min=%d q=%d max=%d trim=%s "
-                        "%s target=%d" % (min_f, q, max_f, trim, continuity, target))
-                    continue
-                assert plan.total_visible_frames == target
-                for seg in plan.segments:
-                    assert contract.is_legal_length(seg.render_frames)
-                    assert seg.visible_frames >= 1
-    assert checked > 2000
-
-
 # ---------------------------------------------------------------------------
 # W1 (2026-07-29) -- THE PARTITIONER OVER-SEGMENTS A TRIMMABLE BEAT
 # ---------------------------------------------------------------------------

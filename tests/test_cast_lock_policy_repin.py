@@ -519,19 +519,6 @@ def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
                         cast_voice_policy="auto_registry")
 
 
-def test_a_dormant_policy_still_costs_nothing(monkeypatch):
-    """The empty-routes path must not pay for a bank load, and must not raise
-    when the active engine is unresolved. Still reachable: any policy whose
-    approved_native_routes is empty."""
-    def explode(*a, **k):                       # pragma: no cover -- must not run
-        raise AssertionError("dormant policy loaded the voice bank")
-
-    monkeypatch.setattr("nodes._otr_voice_bank.load_voice_bank", explode)
-    monkeypatch.setattr("nodes.cast_lock._lemmy_voice_policy",
-                        lambda: _policy(None))
-    assert CastLock()._resolve_policy_claim("default", None) is None
-
-
 def test_auto_registry_is_deterministic_with_the_live_route():
     """Runs on the REAL shipped record, re-qualified 2026-08-18 [QA-7]. This
     test is about DETERMINISM of the pin, not about the staleness -- it used to

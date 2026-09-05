@@ -266,16 +266,6 @@ class SourceDocument(_Transient):
         """Build a validated span into THIS body."""
         return _make_span(self.canonical_body, start, end, role=role)
 
-    def verify_span(self, span: SourceSpan) -> None:
-        """Refuse a span whose text no longer matches its own offsets."""
-        actual = self.canonical_body[span.start_char:span.end_char]
-        if actual != span.text:
-            raise SourceDocumentError(
-                f"span [{span.start_char}:{span.end_char}] (role="
-                f"{span.role!r}) does not match the canonical body it claims "
-                f"to quote"
-            )
-
 
 def build_source_document(
     canonical_body: str,

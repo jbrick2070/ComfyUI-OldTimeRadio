@@ -78,14 +78,6 @@ def test_selection_is_deterministic():
     assert a.receipt() == b.receipt()
 
 
-def test_every_window_is_a_real_slice_of_the_document():
-    doc = _doc()
-    grounding = osg.select_grounding(doc, _keys(7))
-    for span in grounding.windows.values():
-        assert span.text == doc.canonical_body[span.start_char:span.end_char]
-        doc.verify_span(span)
-
-
 def test_windows_respect_the_budget():
     doc = _doc()
     grounding = osg.select_grounding(doc, _keys(4), budget_chars=600)

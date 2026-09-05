@@ -178,12 +178,6 @@ def ltx8():
                             continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
 
 
-def test_legal_lengths_are_the_8n_plus_1_ladder(ltx8):
-    lengths = ltx8.legal_lengths()
-    assert lengths[0] == 9 and lengths[-1] == 161
-    assert all((n - 1) % 8 == 0 for n in lengths)
-
-
 @pytest.mark.parametrize("n,ok", [(8, False), (9, True), (17, True),
                                   (18, False), (161, True), (169, False)])
 def test_is_legal_length(ltx8, n, ok):
@@ -219,16 +213,6 @@ def test_the_169_frame_acceptance_case_decomposes(ltx8):
     successor = ltx8.smallest_legal_at_least(remainder_visible + 1)
     assert successor == 9
     assert first + (successor - 1) == target_visible     # exact sum, no trim
-
-
-def test_discrete_duration_lane_covers_by_trimming():
-    veo = fc.FrameContract(min_frames=100, max_frames=200,
-                           discrete_frames=(100, 150, 200),
-                           allow_tail_trim=True)
-    assert veo.legal_lengths() == (100, 150, 200)
-    assert veo.largest_legal_at_most(175) == 150
-    assert veo.smallest_legal_at_least(120) == 150       # render 150, trim 30
-    assert veo.smallest_legal_at_least(500) is None
 
 
 # ---------------------------------------------------------------------------

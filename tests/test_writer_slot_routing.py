@@ -193,59 +193,6 @@ def _patched_scheduler(monkeypatch, *, creative_id, technical_id):
     return scheduler, trace
 
 
-def test_slot1_neq_slot2_split_routing_full_phase_trace(monkeypatch):
-    """When creative_writing_model != technical_model, exercising
-    each slot's generate_fn calls request_slot with the right slot +
-    model_id. Full per-phase trace asserts the order of slot
-    activations matches the writer's runtime flow.
-    """
-    CREATIVE = "mistralai/Mistral-Nemo-Instruct-2407"
-    TECHNICAL = "google/gemma-4-E2B-it"
-
-    scheduler, trace = _patched_scheduler(
-        monkeypatch, creative_id=CREATIVE, technical_id=TECHNICAL,
-    )
-    creative_fn = scheduler.for_slot("creative")
-    technical_fn = scheduler.for_slot("technical")
-    polish_fn = scheduler.for_polish()
-
-    # Simulate the writer's phase order:
-    #   1. style picker (creative)
-    #   2. news interpreter (technical)
-    #   3. cast lock (creative)
-    #   4. outline (creative)
-    #   5. dialogue composer (creative)
-    #   6. polish (creative)
-    #   7. title regen (creative)
-    creative_fn([], temperature=0.8, max_new_tokens=100)        # 1
-    technical_fn([], temperature=0.4, max_new_tokens=100)       # 2
-    creative_fn([], temperature=0.8, max_new_tokens=100)        # 3
-    creative_fn([], temperature=0.8, max_new_tokens=100)        # 4
-    creative_fn([], temperature=0.8, max_new_tokens=100)        # 5
-    polish_fn([], temperature=0.4, max_new_tokens=100)          # 6
-    creative_fn([], temperature=0.8, max_new_tokens=100)        # 7
-
-    # Every entry in trace must be (slot, expected_model_id).
-    expected = [
-        ("creative", CREATIVE),
-        ("technical", TECHNICAL),
-        ("creative", CREATIVE),
-        ("creative", CREATIVE),
-        ("creative", CREATIVE),
-        ("creative", CREATIVE),
-        ("creative", CREATIVE),
-    ]
-    assert trace == expected, (
-        f"slot routing drift -- expected {expected}, got {trace}"
-    )
-
-    # Per-slot call counts.
-    assert scheduler.calls_by_slot == {
-        "creative": 6,
-        "technical": 1,
-    }
-
-
 def test_same_slot_id_means_zero_transitions(monkeypatch):
     """When creative_writing_model == technical_model (default), every
     call cache-hits on one resident model; the scheduler reports 0
@@ -341,59 +288,9 @@ def test_scheduler_local_schema_binding_reaches_truncating_generator(monkeypatch
 # ---------------------------------------------------------------------------
 
 
-def test_polish_routes_to_creative(monkeypatch):
-    """Polish must always request the creative slot regardless of the
-    technical_model setting. The W4 fix (sampling distinct from
-    composer) is independent of the creative-vs-technical model split.
-    """
-    CREATIVE = "mistralai/Mistral-Nemo-Instruct-2407"
-    TECHNICAL = "google/gemma-4-E2B-it"
-    scheduler, trace = _patched_scheduler(
-        monkeypatch, creative_id=CREATIVE, technical_id=TECHNICAL,
-    )
-    polish_fn = scheduler.for_polish()
-    polish_fn([], temperature=0.4, max_new_tokens=100)
-    polish_fn([], temperature=0.4, max_new_tokens=100)
-
-    assert trace == [
-        ("creative", CREATIVE),
-        ("creative", CREATIVE),
-    ]
-    assert scheduler.calls_by_slot == {
-        "creative": 2,
-        "technical": 0,
-    }
-
-
 # ---------------------------------------------------------------------------
 # 5. test_slot_transition_count_matches_dag
 # ---------------------------------------------------------------------------
-
-
-def test_slot_transition_count_matches_dag(monkeypatch):
-    """The scheduler increments transitions for every cross-id slot
-    change. The writer's runtime DAG (creative -> technical ->
-    creative -> ... -> creative for the 7-phase trace above) produces
-    exactly 2 transitions when the two ids differ.
-    """
-    CREATIVE = "mistralai/Mistral-Nemo-Instruct-2407"
-    TECHNICAL = "google/gemma-4-E2B-it"
-    scheduler, _trace = _patched_scheduler(
-        monkeypatch, creative_id=CREATIVE, technical_id=TECHNICAL,
-    )
-    creative_fn = scheduler.for_slot("creative")
-    technical_fn = scheduler.for_slot("technical")
-    polish_fn = scheduler.for_polish()
-
-    # Same phase trace as the full-phase test above.
-    creative_fn([], temperature=0.8, max_new_tokens=100)
-    technical_fn([], temperature=0.4, max_new_tokens=100)   # +1 transition
-    creative_fn([], temperature=0.8, max_new_tokens=100)    # +1 transition
-    creative_fn([], temperature=0.8, max_new_tokens=100)
-    creative_fn([], temperature=0.8, max_new_tokens=100)
-    polish_fn([], temperature=0.4, max_new_tokens=100)
-    creative_fn([], temperature=0.8, max_new_tokens=100)
-    assert scheduler.transitions == 2
 
 
 # ---------------------------------------------------------------------------

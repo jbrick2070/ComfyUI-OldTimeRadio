@@ -189,15 +189,6 @@ class FrameContract:
             return False
         return (n - int(self.min_frames)) % int(self.quantum) == 0
 
-    def legal_lengths(self) -> tuple:
-        """Every legal length, ascending. Empty when unbounded (nothing to
-        enumerate -- callers must use :meth:`is_legal_length` instead)."""
-        if self.discrete_frames:
-            return tuple(sorted(int(d) for d in self.discrete_frames))
-        if not self.max_frames:
-            return ()
-        return tuple(range(int(self.min_frames), int(self.max_frames) + 1,
-                           int(self.quantum)))
 
     def largest_legal_at_most(self, n: int):
         """The largest legal length <= ``n``, or None if there is none."""

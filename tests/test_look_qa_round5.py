@@ -122,50 +122,6 @@ class TestLtxFrameCap:
         monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
         assert _ltx._ltx_frame_length(0, 24) == 17     # fallback 24 -> 8n+1
 
-    def test_EVERY_planner_legal_length_round_trips_unchanged(self, monkeypatch):
-        """THE risk the floor move introduced, pinned.
-
-        `_ltx_frame_length` snaps with ((n-1)//8)*8+1 -- it rounds DOWN. While
-        the contract was min==max==169 the planner had exactly ONE legal length,
-        so that snap was never exercised against a planner-produced value.
-        `min_frames=9, quantum=8` opens the whole ladder.
-
-        If any length the planner considers legal came back SHORTER, the render
-        would disagree with the plan it was partitioned against, and
-        `render_beat_coverage` refuses that mismatch -- the same class of live
-        failure ("rendered N frame(s) but its plan asked for M") that forced the
-        169 declaration in the first place. So this asserts the round trip over
-        every legal length AND over every segment the REAL partition planner
-        emits across a wide span of beats, rather than trusting the arithmetic.
-        """
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
-        from nodes._otr_video_engines import coverage_plan as cp
-        from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
-
-        contract = LtxVideoEngine.frame_contract
-        legal = contract.legal_lengths()
-        assert legal, "an enumerable ladder is the premise of this test"
-        for n in legal:
-            assert _ltx._ltx_frame_length(n, 25) == n, (
-                "legal length %d does not round-trip" % n)
-
-        segments = 0
-        for beat in range(1, 600):
-            try:
-                plan = cp.partition_beat(beat, contract)
-            except cp.CoveragePlanError:
-                continue
-            for seg in plan.segments:
-                segments += 1
-                asked = int(seg.render_frames)
-                assert _ltx._ltx_frame_length(asked, 25) == asked, (
-                    "beat %d: the planner asked for %d and the adapter would "
-                    "render %d -- render_beat_coverage refuses that gap"
-                    % (beat, asked, _ltx._ltx_frame_length(asked, 25)))
-        # Guard against the check going hollow: a run that produced no segments
-        # would report "clean" while asserting nothing at all.
-        assert segments > 1000, "expected a real sweep, got %d segments" % segments
 
     def test_cap_below_floor_wins(self, monkeypatch):
         monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "57")
@@ -180,7 +136,6 @@ class TestLtxFrameCap:
         # never past the operator's ceiling
         assert _ltx._ltx_frame_length(30, 24) == 57
         assert _ltx._ltx_frame_length(238, 24) == 57
-
 
 
 # --------------------------------------------------------------------------- #

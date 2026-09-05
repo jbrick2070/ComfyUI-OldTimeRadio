@@ -13,7 +13,7 @@ Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 DELIVERY_PROFILE_VERSION = "1"
 # Versions the cache IS_CHANGED + sidecar key on (E.5). Bumping either
@@ -35,14 +35,6 @@ class DeliveryProfile:
     # live consumers read the MODULE constants below directly (cast_lock and
     # the audio cache both do), which is where the real versions live.
     profile_id: str
-
-    def project_text(self, text: str) -> str:
-        """Project the spoken text. Neutral = identity (no transform)."""
-        return text if text is not None else ""
-
-    def overlay_params(self, params: Optional[dict]) -> dict:
-        """Overlay engine params. Neutral = the engine defaults unchanged."""
-        return dict(params or {})
 
 
 _NEUTRAL = DeliveryProfile("neutral")

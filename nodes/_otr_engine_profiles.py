@@ -301,45 +301,6 @@ class EngineProfileResolver:
         ]
         return sorted(local, key=lambda p: (p.rank, p.profile_id))
 
-    def role_default(self, role: str) -> Optional["EngineProfile"]:
-        """The profile flagged ``is_default`` for ``role`` (lowest rank wins if
-        more than one is flagged), or ``None``."""
-        flagged = [p for p in self.rank_chain(role) if p.is_default]
-        return flagged[0] if flagged else None
-
-    def resolve_role_fallback(
-        self, role: str, *, voice_bank: Optional[str] = None,
-        require_bank: bool = False,
-    ) -> "EngineProfile":
-        """Walk the rank chain for ``role``; return the first profile whose
-        engine is registry-usable AND whose commercial gate is not 'stop' AND
-        (when constrained) whose voice bank fits. FAIL CLOSED if none qualify.
-
-        This is the auto-selection / fallback resolver. An opt-in engine gated
-        off (e.g. indextts2 before promotion) is skipped, so the chain naturally
-        falls through to the next usable rank (e.g. bark). It does NOT replace
-        the explicit per-node engine widget -- that stays the live,
-        byte-identical selection until promotion (S6).
-        """
-        for profile in self.rank_chain(role):
-            try:
-                assert_usable(profile.engine, role)
-            except EngineUnusable:
-                continue
-            if gate_state(profile) == "stop":
-                continue
-            banks = profile.allowed_voice_banks
-            if require_bank and not banks:
-                continue
-            if voice_bank is not None and voice_bank not in banks:
-                continue
-            return profile
-        raise EngineUnusable(
-            "", role, EngineUsabilityReason.MALFORMED_CONFIG,
-            f"no usable engine in the rank chain for role '{role}' "
-            f"(all gated-off, stop-gated, or bank-incompatible)",
-        )
-
 
 # ---------------------------------------------------------------------------
 # Lazy, cached, exception-wrapped loading (no module-scope IO -- C-5)

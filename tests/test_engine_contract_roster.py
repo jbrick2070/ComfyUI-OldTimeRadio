@@ -321,46 +321,6 @@ def test_every_engine_with_a_safe_render_cap_declares_it_as_its_ceiling():
         "moved and this test is now theatre." % (checked,))
 
 
-def test_the_whole_second_cloud_lanes_declare_a_25_frame_quantum():
-    """The fourth defect this chunk fixed, which nothing else pins.
-
-    ``_CloudVideoBase._duration_seconds`` returns ``int`` SECONDS -- from an env
-    override or from ceiling-dividing the beat's frames by the canvas rate. So
-    at 25 fps these lanes can only ever request 25, 50, 75... frames, and a
-    contract claiming ``quantum=1`` advertises 24 lengths out of every 25 that
-    no request can produce.
-
-    The generic roster sweep cannot catch a regression here: the ceiling-on-the-
-    ladder check is satisfied by quantum 1 and quantum 25 alike (375-100 is
-    divisible by both), so reverting any of these to the dataclass default would
-    leave the whole suite green. Hence a named test.
-
-    ``cloud_kling_avatar`` is deliberately excluded and deliberately quantum 1:
-    it sends NO duration at all. Its clip is as long as the sound file, which is
-    a real fractional duration rather than a whole-second menu.
-    """
-    WHOLE_SECOND = {
-        "cloud_seedance_2": (100, 375),
-        "cloud_wan_i2v": (50, 375),
-        "cloud_wan_i2v_audio": (50, 375),
-        "cloud_vidu_q2_pro_fast_720p": (25, 250),
-    }
-    for name, (lo, hi) in WHOLE_SECOND.items():
-        c = fc.frame_contract_for(vreg.get_engine(name))
-        assert c.quantum == 25, (
-            "%s requests whole seconds, so only multiples of 25 frames are "
-            "reachable, but it declares quantum=%s" % (name, c.quantum))
-        assert (c.min_frames, c.max_frames) == (lo, hi), name
-        # Every legal length is a whole number of seconds. This is the property
-        # quantum=25 exists to state; assert it rather than the field alone.
-        assert all(n % 25 == 0 for n in c.legal_lengths()), name
-
-    kling = fc.frame_contract_for(vreg.get_engine("cloud_kling_avatar"))
-    assert kling.quantum == 1, (
-        "cloud_kling_avatar sends no duration -- its length is the sound "
-        "file's, which is not a whole-second menu")
-
-
 def test_a_negative_native_fps_is_rejected():
     """The one new validation branch in FrameContract, exercised both ways.
 

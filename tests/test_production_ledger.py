@@ -958,39 +958,6 @@ class TestSetters:
 # Timing back-fill
 # ---------------------------------------------------------------------------
 
-class TestTimingBackfill:
-    def test_apply_line_timings(self, tmp_out):
-        led = Ledger("t", str(tmp_out))
-        led.set_lines([
-            {"line_id": "l001", "char_id": "c01", "text": "A"},
-            {"line_id": "l002", "char_id": "c02", "text": "B"},
-        ])
-        led.apply_line_timings({
-            "l001": {"start_s": 12.4, "dur_s": 2.1, "bark_wav_path": "/tmp/a.wav"},
-            "l002": {"start_s": 14.5, "dur_s": 1.8, "bark_wav_path": "/tmp/b.wav"},
-        })
-        rows = led.data["lines"]
-        assert rows[0]["start_s"] == 12.4
-        assert rows[0]["bark_wav_path"] == "/tmp/a.wav"
-        assert rows[1]["start_s"] == 14.5
-
-    def test_apply_line_timings_ignores_unknown_ids(self, tmp_out):
-        led = Ledger("t", str(tmp_out))
-        led.set_lines([{"line_id": "l001", "text": "Hi"}])
-        led.apply_line_timings({"l999": {"start_s": 1.0, "dur_s": 1.0}})
-        assert led.data["lines"][0]["start_s"] is None
-
-    def test_apply_music_timings(self, tmp_out):
-        # Sfx half of the prior `test_apply_sfx_and_music_timings`
-        # deleted S27 (cleanbreak-tail Item 2) along with set_sfx /
-        # apply_sfx_timings. The music half stays -- music timings
-        # are still part of the active ledger contract.
-        led = Ledger("t", str(tmp_out))
-        led.set_music([{"cue_id": "opening"}])
-        led.apply_music_timings({"opening": {"start_s": 0.0, "dur_s": 12.0, "wav_path": "/tmp/m.wav"}})
-        assert led.data["music"][0]["dur_s"] == 12.0
-        assert led.data["music"][0]["wav_path"] == "/tmp/m.wav"
-
 
 # ---------------------------------------------------------------------------
 # Fault tolerance

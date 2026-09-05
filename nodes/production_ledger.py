@@ -1666,25 +1666,6 @@ class Ledger:
     # Called by SceneSequencer / SignalLostVideo once it knows the timeline
     # positions. The argument is a mapping id -> (start_s, dur_s).
 
-    def apply_line_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
-        for row in self.data["lines"]:
-            t = timing.get(row.get("line_id"))
-            if t:
-                row["start_s"] = _safe_float(t.get("start_s"))
-                row["dur_s"]   = _safe_float(t.get("dur_s"))
-                if t.get("bark_wav_path"):
-                    row["bark_wav_path"] = str(t["bark_wav_path"])
-        return self
-
-    def apply_music_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
-        for row in self.data["music"]:
-            t = timing.get(row.get("cue_id"))
-            if t:
-                row["start_s"] = _safe_float(t.get("start_s"))
-                row["dur_s"]   = _safe_float(t.get("dur_s"))
-                if t.get("wav_path"):
-                    row["wav_path"] = str(t["wav_path"])
-        return self
 
     # -- totals --------------------------------------------------------
 

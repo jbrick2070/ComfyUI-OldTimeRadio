@@ -351,12 +351,6 @@ class CloudMediaSession:
                 (ReservationState.RESERVED, ReservationState.SUBMITTED),
                 ReservationState.RELEASED)
 
-    def abort(self, rid: str) -> None:
-        with self._lock:
-            self._transition(
-                rid,
-                (ReservationState.RESERVED, ReservationState.SUBMITTED),
-                ReservationState.ABORTED)
 
     def spent_usd(self) -> float:
         with self._lock:

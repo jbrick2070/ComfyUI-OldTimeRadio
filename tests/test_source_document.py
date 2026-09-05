@@ -110,27 +110,12 @@ def test_build_source_document_refuses_empty():
         osd.build_source_document("   ")
 
 
-def test_document_span_validates_its_own_text():
-    doc = osd.build_source_document("The traveller returned.")
-    span = doc.span(4, 13)
-    assert span.text == "traveller"
-    assert span.char_count == 9
-    doc.verify_span(span)
-
-
 def test_document_refuses_out_of_range_span():
     doc = osd.build_source_document("short body")
     with pytest.raises(osd.SourceDocumentError):
         doc.span(0, 999)
     with pytest.raises(osd.SourceDocumentError):
         doc.span(5, 5)
-
-
-def test_verify_span_catches_drifted_text():
-    doc = osd.build_source_document("The traveller returned.")
-    drifted = osd.SourceSpan(start_char=4, end_char=13, text="voyager")
-    with pytest.raises(osd.SourceDocumentError):
-        doc.verify_span(drifted)
 
 
 # ---------------------------------------------------------------------------

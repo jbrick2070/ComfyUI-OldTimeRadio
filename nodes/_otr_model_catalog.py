@@ -2013,8 +2013,6 @@ def _make_pbar_tqdm_adapter(pbar: object) -> type:
                 except Exception:
                     pass
 
-        def set_description(self, *_a, **_kw):
-            return None
 
         def close(self):
             return None

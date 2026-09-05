@@ -52,38 +52,6 @@ def test_rank_chain_is_sorted_by_rank():
     assert ranks == sorted(ranks)
 
 
-def test_role_default_is_rank1_flagged():
-    r = _resolver()
-    assert r.role_default("char_voice").engine == "indextts2"
-    assert r.role_default("announcer_voice").engine == "kokoro"
-    assert r.role_default("music").engine == "stable_audio_3"
-
-
-def test_fallback_returns_promoted_indextts2_default(monkeypatch):
-    # indextts2 was PROMOTED 2026-06-04 to the always-usable char_voice default
-    # (no flag); chatterbox stays opt-in. With every opt-in flag off the rank
-    # chain still resolves to indextts2 (rank 1, always usable) -- never crashes,
-    # never silently swaps. bark stays selectable as the rank-3 fallback.
-    monkeypatch.delenv("OTR_ENABLE_INDEXTTS2", raising=False)
-    monkeypatch.delenv("OTR_ENABLE_CHATTERBOX", raising=False)
-    r = _resolver()
-    assert r.resolve_role_fallback("char_voice").engine == "indextts2"
-
-
-def test_fallback_picks_indextts2_when_enabled(monkeypatch):
-    # Registry-level usability only checks the flag (no install IO), so with the
-    # flag on the rank-1 scope default is selected.
-    monkeypatch.setenv("OTR_ENABLE_INDEXTTS2", "1")
-    r = _resolver()
-    assert r.resolve_role_fallback("char_voice").engine == "indextts2"
-
-
-def test_music_fallback_default_is_sa3(monkeypatch):
-    monkeypatch.delenv("OTR_ENABLE_STABLE_AUDIO", raising=False)
-    r = _resolver()
-    assert r.resolve_role_fallback("music").engine == "stable_audio_3"
-
-
 def test_gate_state_maps_three_ways():
     r = _resolver()
     assert EP.gate_state(r.get("announcer_kokoro_v1")) == "clean"
@@ -139,13 +107,6 @@ def test_unknown_license_state_gates_stop():
         commercial_clean=False, license_state="unknown",
     )
     assert EP.gate_state(p) == "stop"
-
-
-def test_resolve_role_fallback_failclosed_when_nothing_usable():
-    r = _resolver()
-    with pytest.raises(EngineUnusable) as ei:
-        r.resolve_role_fallback("no_such_role")
-    assert ei.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
 
 
 def test_bad_runtime_rejected():

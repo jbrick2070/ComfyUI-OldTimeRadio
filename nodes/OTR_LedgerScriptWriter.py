@@ -737,29 +737,6 @@ class _SlotScheduler:
 
         return _make_generate_fn()
 
-    def for_polish(self):
-        """Return a conservative-sampling generate_fn on the creative
-        slot. Retained as a scheduler primitive (wraps the kept
-        make_polish_generate_fn) after the 2026-05-29 lean-down removed
-        the polish *feature* (widget + compose_line pass + symbols);
-        no production caller remains, but the slot-routing contract +
-        its tests keep this creative-slot conservative-sampling helper."""
-        scheduler = self
-
-        def polish_fn(messages, *, temperature, max_new_tokens):
-            cache_entry = scheduler._account_and_get_entry("creative")
-            from . import _otr_model_loader as _OTRML
-
-            base = _OTRML.make_polish_generate_fn(cache_entry)
-            return base(
-                messages,
-                temperature=temperature,
-                max_new_tokens=max_new_tokens,
-            )
-
-        return polish_fn
-
-
 
 def _build_truncating_generate_fn(
     cache_entry: dict,

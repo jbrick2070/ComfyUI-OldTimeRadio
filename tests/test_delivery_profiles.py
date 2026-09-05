@@ -36,27 +36,6 @@ def test_versions_are_pinned_rebaseline_triggers():
     assert dp.DELIVERY_PROJECTION_VERSION == "1"
 
 
-def test_neutral_text_projection_is_identity():
-    from nodes._otr_delivery_profiles import get_delivery_profile
-
-    neutral = get_delivery_profile("neutral")
-    for text in ("Hello.", "  spaced  ", "[VOICE] tagged", "", "a\nb"):
-        assert neutral.project_text(text) == text
-    # None folds to the empty string (never a literal "None" in the prompt).
-    assert neutral.project_text(None) == ""
-
-
-def test_neutral_param_overlay_is_identity_copy():
-    from nodes._otr_delivery_profiles import get_delivery_profile
-
-    neutral = get_delivery_profile("neutral")
-    params = {"temperature": 0.7, "cfg": 0.5}
-    out = neutral.overlay_params(params)
-    assert out == params, "neutral must not change engine params"
-    assert out is not params, "overlay must return a copy, not alias the input"
-    assert neutral.overlay_params(None) == {}
-
-
 def test_unknown_profile_fails_closed():
     from nodes._otr_delivery_profiles import (
         UnknownDeliveryProfile, get_delivery_profile,

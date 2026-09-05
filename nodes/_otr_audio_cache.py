@@ -152,9 +152,6 @@ class AudioCache(Protocol):
         """Return the cache key for ``request`` (``cache_key_for``)."""
         ...
 
-    def has(self, request) -> bool:
-        """True iff a cached entry exists for ``request``."""
-        ...
 
     def get(self, request) -> Optional[AudioCacheRecord]:
         """Return the cached record for ``request`` or ``None`` on a miss."""
