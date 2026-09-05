@@ -127,7 +127,8 @@ def _which_no_cwd(name):
         return None                      # genuinely absent on this box
     if os.path.isabs(found):
         resolved = os.path.abspath(found)
-        if os.path.dirname(resolved) == os.path.abspath(os.getcwd()):
+        if (os.path.normcase(os.path.dirname(resolved))
+                == os.path.normcase(os.path.abspath(os.getcwd()))):
             return None                  # an EXPLICIT cwd entry on PATH
         return resolved
     # A RELATIVE answer IS the implicit-cwd hit. Do not take it -- and do not

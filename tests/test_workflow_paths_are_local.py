@@ -119,45 +119,50 @@ def test_an_ordinary_workflow_path_still_resolves():
 
 
 # --------------------------------------------------------------------------- #
-# the spawn owner refuses a remote ARGUMENT -- the catch-all for the media
-# path widgets, which all end up as ffmpeg arguments
+# the guard lives at the WIDGET boundary, NOT at the spawn
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("argv", [
-    ["ffmpeg", "-i", r"\\attacker-host\share\in.mp4", "out.mp4"],
-    ["ffmpeg", "-i", "in.mp4", r"\\attacker-host\share\out.mp4"],
-    ["ffprobe", "//attacker/share/x.mp4"],
-    ["ffmpeg", "-i", r"\\?\GLOBALROOT\Device\x"],
+def test_the_spawn_owner_does_NOT_carry_this_rule():
+    """A spawn-level UNC rule was written, measured, and REMOVED.
+
+    A mapped network drive BECOMES a UNC path once resolved: on the development
+    box, resolving the mapped drive U: yields a UNC path on the 4060 transfer
+    host. And blend() resolves its inputs before handing them to ffmpeg, so the
+    rule refused a LEGITIMATE render on any install whose output lives on a
+    mapped drive -- including the operator's own transfer drive.
+
+    Provenance is not knowable at the spawn: by then a hostile widget value and
+    a resolved local path look identical. The refusal belongs where the value
+    ARRIVES, which is what reject_remote_paths does at each execute method."""
+    src = (REPO / "nodes/_otr_shared/proc.py").read_text(encoding="utf-8")
+    assert "_no_remote_arguments" not in src, (
+        "the spawn-level UNC rule is back; it breaks mapped-drive installs")
+
+
+@pytest.mark.parametrize("node,rel", [
+    ("OTR_CaptionBurn", "nodes/otr_caption_burn.py"),
+    ("OTR_MasterAudioMux", "nodes/otr_master_audio_mux.py"),
+    ("OTR_SilentComposite", "nodes/otr_silent_composite.py"),
+    ("OTR_PostUpscaleProcgenBlend", "nodes/otr_post_upscale_procgen_blend.py"),
 ])
-def test_a_remote_argument_is_refused_before_any_spawn(argv):
-    """Nothing is launched: the refusal happens in the validator."""
-    from nodes._otr_shared import proc as otr_proc
-    with pytest.raises(otr_proc.ExecutableNotAllowed):
-        otr_proc._check(argv)
+def test_each_media_node_refuses_remote_path_inputs(node, rel):
+    src = (REPO / rel).read_text(encoding="utf-8")
+    assert "reject_remote_paths(" in src, (
+        "%s accepts a workflow path without asking whether it leaves the "
+        "machine. The stat happens BEFORE any spawn, so a downstream guard "
+        "cannot help." % node)
 
 
-@pytest.mark.parametrize("argv", [
-    # THE THREE BARE-argv[0] SPAWNS. An "argv[0] must be absolute" rule was
-    # rejected precisely because it would break these, and each swallows
-    # Exception into "unknown" -- so it would blank the ledger's commit stamp
-    # on every episode with a green run and nothing in the log.
-    ["git", "-C", "C:\\repo", "rev-parse", "--short", "HEAD"],
-    ["git", "rev-parse", "--short", "HEAD"],
-    ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-    # The ordinary render commands, including a MAPPED DRIVE (not UNC) and a
-    # filtergraph that legitimately contains commas.
-    ["ffmpeg", "-y", "-i", r"C:\out\otr\episodes\ep1\a.mp4",
-     "-vf", "ass=ep1.ass,fps=25", r"C:\out\otr\episodes\ep1\b.mp4"],
-    ["ffmpeg", "-i", r"U:\OTR-BACKUP\ep.mp4"],
-    ["ffprobe", "-v", "error", "/home/u/otr/ep.mp4"],
-    ["ffmpeg", "-i", "relative/in.mp4"],
-])
-def test_an_ordinary_command_is_untouched(argv):
-    from nodes._otr_shared import proc as otr_proc
-    otr_proc._check(argv)
+def test_a_mapped_drive_style_local_path_is_never_refused():
+    """The regression this whole relocation exists for."""
+    for value in (r"U:\OTR-BACKUP\ep.mp4", r"Z:\obs\ep.mp4",
+                  r"E:\OTR-BACKUP\ep.mp4"):
+        assert reject_remote_path(value, "output_path") == value
 
 
-def test_the_rule_tolerates_non_string_arguments():
-    """argv carries ints and Paths; a type error here would break every spawn."""
-    import pathlib
-    from nodes._otr_shared import proc as otr_proc
-    otr_proc._check(["ffmpeg", "-crf", 18, pathlib.Path("C:/out/x.mp4"), None])
+def test_the_plural_form_names_the_offending_field():
+    from nodes._otr_paths import reject_remote_paths
+    reject_remote_paths(video_path="C:/a.mp4", output_path="C:/b.mp4")
+    with pytest.raises(OtrPathContractError) as caught:
+        reject_remote_paths(video_path="C:/a.mp4",
+                            output_path=r"\\evil\share\b.mp4")
+    assert "output_path" in str(caught.value)

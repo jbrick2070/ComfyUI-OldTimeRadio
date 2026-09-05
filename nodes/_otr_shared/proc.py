@@ -121,46 +121,6 @@ def _allowed(name: str) -> bool:
             or any(name.startswith(p) for p in ALLOWED_EXECUTABLE_PREFIXES))
 
 
-def _no_remote_arguments(argv: Sequence[Any]) -> None:
-    """No argument may name another MACHINE. Raises :class:`ExecutableNotAllowed`.
-
-    Several nodes take a media path from an ordinary STRING widget, and a
-    workflow JSON arrives over ComfyUI's unauthenticated ``/prompt`` endpoint.
-    Those paths become ffmpeg arguments. On Windows the ordinary file APIs open
-    a UNC path transparently, so handing ``\\\\attacker-host\\share\\x`` to
-    ffmpeg makes this machine open an SMB session and authenticate to a host the
-    WORKFLOW chose -- leaking NTLM material with nothing planted locally first.
-
-    THIS IS DELIBERATELY A RULE ABOUT ARGUMENTS, NOT ABOUT ``argv[0]``. An
-    "argv[0] must be absolute" rule was considered and REJECTED: this owner
-    admits bare ``git`` and ``nvidia-smi`` on purpose (``production_ledger``,
-    ``_otr_ledger``, ``_otr_sys_specs``), and each of those wraps its spawn in
-    ``except Exception`` -> "unknown", so such a rule would blank the ledger's
-    commit stamp on every episode with a green run and a published artifact --
-    a hole no test would see. A UNC rule cannot do that: every argument those
-    three pass is local, and the pack contains no literal UNC path anywhere.
-
-    A MAPPED DRIVE IS NOT UNC. ``U:\\OTR-BACKUP`` is a drive letter and passes,
-    which is what the operator's backup destinations actually look like.
-    """
-    # A LEADING `//` IS ONLY UNC ON WINDOWS. POSIX permits it at the start of a
-    # path and treats it as an ordinary root, so refusing it there would be a
-    # false positive on the one platform that cannot be attacked this way.
-    # A leading `\\` is treated as UNC everywhere: backslash is not a POSIX
-    # separator, so nothing this pack builds starts a real POSIX path with one.
-    remote_prefixes = ("\\\\", "\\/", "/\\") + (("//",) if os.name == "nt" else ())
-    for index, raw in enumerate(argv):
-        if not isinstance(raw, (str, bytes, os.PathLike)):
-            continue
-        text = os.fsdecode(raw) if not isinstance(raw, str) else raw
-        if text[:2] in remote_prefixes:
-            raise ExecutableNotAllowed(
-                "argv[%d] names a UNC/network location (%r). Reading or "
-                "writing one makes this machine authenticate to the host it "
-                "names, and nothing this pack ships needs that."
-                % (index, text[:120]))
-
-
 def _check(argv: Sequence[Any]) -> None:
     if isinstance(argv, (str, bytes)):
         raise ExecutableNotAllowed(
@@ -168,7 +128,6 @@ def _check(argv: Sequence[Any]) -> None:
             f"parse: {argv!r}")
     if not argv:
         raise ExecutableNotAllowed("argv is empty; nothing to run")
-    _no_remote_arguments(argv)
     name = _normalized(argv[0])
     if _allowed(name):
         return

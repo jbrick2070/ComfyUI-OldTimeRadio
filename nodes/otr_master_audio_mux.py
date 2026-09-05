@@ -1295,6 +1295,16 @@ class OTRMasterAudioMux:
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
         ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_MasterAudioMux")
+        # These paths came from the workflow, so they are untrusted input.
+        # A UNC value makes this machine authenticate to the host it names
+        # on the first stat -- BEFORE any spawn -- so the refusal belongs
+        # here, where provenance is known, not at the spawn (2026-09-04).
+        try:
+            from ._otr_paths import reject_remote_paths
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import reject_remote_paths  # type: ignore
+        reject_remote_paths(silent_video_path=silent_video_path, master_audio_path=master_audio_path,
+                             output_path=output_path)
         master_audio_path = _reresolve_master_audio(master_audio_path)
         # DECIDE BEFORE WRITING. The verdict is a pure read, and knowing it
         # first is what lets the archival write choose a lawful destination --

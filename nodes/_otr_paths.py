@@ -244,6 +244,20 @@ def is_reserved_episode_entry(name: str) -> bool:
     return str(name or "").startswith("_")
 
 
+def reject_remote_paths(**named) -> None:
+    """:func:`reject_remote_path` for several inputs at once.
+
+    Called at a node's EXECUTE METHOD, where provenance is known: these values
+    came from the workflow. Deliberately NOT enforced at the spawn -- a mapped
+    network drive RESOLVES to a UNC path (measured: ``Path("U:\\").resolve()``
+    -> ``\\\\10.55.0.2\\4060-TRANSFER\\``), so a rule applied to argv
+    would refuse a legitimate render on any install whose output lives on one.
+    The operator's own transfer drive is such a drive.
+    """
+    for field, value in named.items():
+        reject_remote_path(value, field)
+
+
 def _validate_episode_id(episode_id: str) -> str:
     """A production write helper's ``episode_id`` must be a non-empty
     single path component and not the reserved system tier. RAISES
@@ -648,6 +662,7 @@ __all__ = [
     "comfy_models_dir",
     "OtrPathContractError",
     "reject_remote_path",
+    "reject_remote_paths",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",

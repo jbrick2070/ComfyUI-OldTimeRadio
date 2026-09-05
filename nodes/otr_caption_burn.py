@@ -404,6 +404,15 @@ class OTRCaptionBurn:
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
         ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_CaptionBurn")
+        # These paths came from the workflow, so they are untrusted input.
+        # A UNC value makes this machine authenticate to the host it names
+        # on the first stat -- BEFORE any spawn -- so the refusal belongs
+        # here, where provenance is known, not at the spawn (2026-09-04).
+        try:
+            from ._otr_paths import reject_remote_paths
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import reject_remote_paths  # type: ignore
+        reject_remote_paths(video_path=video_path, ledger_path=ledger_path, output_path=output_path)
         # THE HERO TITLE IS NOT A CAPTION, and this node has FIVE no-error
         # passthrough exits. That was harmless while the title was baked into
         # procgen pixels; it is not once the title lives ONLY in this .ass,
