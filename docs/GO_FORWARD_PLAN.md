@@ -91,6 +91,73 @@ in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
 
 ---
 
+## 1A. THE REGISTRY BAN IS A REAL RCE -- A NODE WIDGET NAMES THE BINARY WE SPAWN
+
+**FOUND 2026-09-04 by reading the registry's own scan record, and REPRODUCED against
+the real modules. This outranks every other row in this plan: it is why the pack is
+not installable, and it is a genuine security defect, not a scanner complaint.**
+
+`GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true` shows
+**alpha.13 and alpha.14 are `Banned`**, with a HUMAN verdict:
+
+> `policy-v0.2: RCE (code execution) -- attacker-reachable via unauthenticated
+> /prompt (node widget) or no-auth route; confirmed by code-level verify-deep.`
+> -- drltdata@comfy.org
+
+**They are right.** Five shipped nodes expose an `ffmpeg` STRING widget
+(`otr_caption_burn.py:313`, `otr_master_audio_mux.py:1046`,
+`otr_post_upscale_procgen_blend.py:743`, `otr_scene_aware_scopes.py:410`,
+`otr_silent_composite.py:1529`). A widget value arrives in the body of ComfyUI's
+`/prompt` -- unauthenticated by default -- and is whatever a downloaded workflow
+`.json` says. It reaches `argv[0]`:
+
+```
+widget -> _ffmpeg_bin(ffmpeg) -> resolve_ffmpeg(preferred)   [_otr_shared/ffmpeg.py:57]
+       -> _explicit()   honours it: it carries a directory   [_otr_shared/ffprobe.py:119]
+       -> _usable()     honours it: the file exists          [_otr_shared/ffprobe.py:101]
+       -> proc.py allowlist passes: basename is "ffmpeg"     [_otr_shared/proc.py:113]
+       -> otr_proc.run([...])  EXECUTES IT
+```
+
+Measured, not argued -- with `OTR_FFMPEG` pinned to a real binary, a widget value
+of `<tmp>\ffmpeg.exe` **beat the operator's pin**, and
+`resolve_ffprobe(ffmpeg=<that>)` produced a SECOND attacker binary via the sibling
+rule (`_sibling_of_ffmpeg`, ffprobe.py:139). The allowlist added in the scan
+collapse does NOT mitigate this: it normalizes argv[0] to the BASENAME, so any file
+named `ffmpeg.exe` anywhere on disk passes.
+
+**The fix has ONE owner.** Every caller that PASSES an argument to
+`resolve_ffmpeg` / `resolve_ffprobe` is passing a widget value; every trusted
+caller passes nothing (inventory in the anchor). So constraining `_explicit` cannot
+break an internal caller. Arc in
+`kibitz-runs/2026-09-04-ffmpeg-widget-rce/` (driver anchor written first; panel
+GPT-6 Astra @ ultra + antigravity).
+
+**Second, smaller, same class and same commit:** `otr_caption_burn.py:254` builds
+`"-vf", f"ass={ass_name},fps=..."` where `ass_name` derives from the `output_path`
+WIDGET (`ass_out = splitext(abspath(out_path))[0]`, :244). A filename containing
+`,` or `'` injects additional ffmpeg FILTERS. It is the ONLY filtergraph in the
+pack that interpolates a widget-derived string -- every other builds from numerics.
+
+**Tooltips on all five widgets must change in the same commit** -- they currently
+advertise the capability being removed ("this widget's value if it runs"). The
+operator explicitly authorised deleting tooltip text for this fix (2026-09-04).
+
+**WHAT THIS CHANGES ABOUT ITEM 4.** The review request drafts predate this finding
+and must not be sent as written: they ask for a review of finding COUNTS and never
+mention the ban or the RCE. Asking a reviewer to re-examine a pack while the thing
+they banned it for is unfixed is the one way to burn the request. Fix first, publish
+a version carrying the fix, THEN ask -- and say plainly that the reported RCE was
+real and is closed.
+
+**Also corrected by the real scan record, because the drafts get both wrong:**
+* The 2 `critical` findings were rule `prohibited-string`. They are ALREADY GONE --
+  absent from alpha.16 and alpha.17. Do not claim credit for fixing them here.
+* `python_url_command_execution` (12) is NOT about error strings. It fires on
+  `cmd = [...]` argv builders that run tools accepting URLs. The 2026-09-04
+  rewording of six ffprobe error strings did not touch that rule, and the drafts'
+  "6 -> 0" line for it is unfounded.
+
 ## 1. THE SCAN COLLAPSE -- the MIGRATION is done; one acceptance step remains
 
 **Batches (a)-(d) and the ratchet commit are SHIPPED** (receipts in
@@ -115,10 +182,6 @@ own `BLOCKED` tables. Do not sweep either up mechanically:**
    the leg log before any receipt is written, and the boot log showing no "Kokoro
    voice prefetch unavailable" line. DEFERRED by the operator (2026-09-04) until
    after the registry: no long render legs before then.
-2. **Re-run `python scripts/dead_code_closure.py`** -- migrating a hundred files
-   strands helpers, and the sweep reports anything a standing ruling protects under
-   its own heading rather than as a clean candidate. Not yet run against the
-   post-migration tree.
 
 **A NOTE THE NEXT WINDOW NEEDS.** The registry floor is NOT zero and never was: the
 closed plan says "the gate is ZERO findings or a manual admin approval; nothing here

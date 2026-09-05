@@ -15889,3 +15889,79 @@ the NEXT spec after this transplant, not a line item in it. And
 `google_omni_video` inherits `CONTINUITY_NONE` rather than declaring it -- a
 one-token fix on a cloud lane outside the 21-lane order, tracked by an
 `EXPECTED_RED` row in the preflight suite.
+
+
+---
+
+## 2026-09-04 -- dead-code closure CLOSED, and the registry ban turns out to be a real RCE
+
+**Commit `963c5ad0` (pushed, HEAD == origin). Suite 13587 passed / 126 skipped /
+1 xfailed, identical to the pre-change baseline. Bug Bible not re-run: this
+change is annotations plus two deletions, no behaviour.**
+
+### The dead-code sweep GO_FORWARD item 1 owed -- DONE, and it came back clean
+
+`python scripts/dead_code_closure.py` against the post-migration tree:
+**rounds 1, 2 AND 3 all report zero.** The ~100-file env/proc migration stranded
+NOTHING, which is the specific risk that row existed to check. 38 candidates
+surfaced; 35 were already ruled on under the sweep's own "NAMED IN A PROTECTIVE
+DOC" heading (mostly `_otr_scifi_p0_contract.py`, held as evidence for OPEN
+PBUG-20260729-03). The 3 that were not are now closed two different ways,
+because "unreferenced" and "dead" are not the same claim:
+
+* **RIPPED -- `NewsProAuditError`, `_RE_NUMERAL`** (both `_otr_scifi_news_pro.py`).
+  Both were orphaned by the 2026-08-05 safety-cleanup retirement -- the content
+  scan that raised the one and used the other is gone by operator directive.
+  Receipt: zero mentions across EVERY file type, not just `*.py`. The historical
+  note in `_apply_fable_safety_cleanup` stays (it is why that function is a
+  no-op) but no longer names a class a reader cannot grep for.
+* **WIRED BACK -- `role_compat.EngineDescriptor`.** Never dead. Four docstrings
+  in two modules already described their own value as "the role_compat
+  EngineDescriptor" -- it was prose the tools cannot see. It is now the real
+  annotation on both builders (`registry._descriptor`, `descriptor_for_engine`)
+  and both consumers (`engine_fits_role`, `filter_engines_for_role`).
+
+**The method worth keeping:** an unreferenced symbol gets ripped only when
+nothing in the repo -- code, docs, JSON, launchers -- still depends on the idea
+it names. When four docstrings assert a shape, the shape is load-bearing, and
+the fix is to make the assertion checkable rather than to delete the subject.
+
+**A trap this session walked into, worth the line:** the idempotence guard for a
+DELETION cannot be `if new_text in source` -- for a rip the replacement is empty
+or a bare newline, so the test is trivially true and the deletion silently does
+not happen. It reported "ALREADY" twice and changed nothing. **For a deletion the
+idempotence test is ABSENCE OF THE ANCHOR.**
+
+### The registry ban is a REAL RCE, and it is not a finding-count problem
+
+Reading `GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true`
+properly for the first time: **alpha.13 and alpha.14 are `Banned`**, by a human
+(`drltdata@comfy.org`), for *"RCE (code execution) -- attacker-reachable via
+unauthenticated /prompt (node widget) or no-auth route; confirmed by code-level
+verify-deep."*
+
+**They are right, and it reproduces.** Five shipped nodes expose an `ffmpeg`
+STRING widget whose value becomes `argv[0]`. Measured against the real modules,
+with `OTR_FFMPEG` pinned to a genuine binary: a widget value of
+`<tmp>\ffmpeg.exe` **beat the operator's pin**, `resolve_ffprobe(ffmpeg=<that>)`
+produced a SECOND attacker binary via the sibling rule, and `proc.py`'s allowlist
+passed it -- because it normalizes argv[0] to the BASENAME, so any file named
+`ffmpeg.exe` anywhere on disk is "allowed". The allowlist shipped in the scan
+collapse is NOT mitigation for this chain; do not let its existence be mistaken
+for one.
+
+Full chain, line numbers and the fix fork are in
+`kibitz-runs/2026-09-04-ffmpeg-widget-rce/driver_anchor.md`, and the item is
+now `GO_FORWARD` **1A**, ahead of everything else.
+
+### Two things the review-request drafts get WRONG and must not be sent with
+
+Both drafts (`...-READY-v2.md`, `...-SHORT.md`) predate the scan record above.
+* They never mention the BAN. Asking for a fresh review while the thing the pack
+  was banned for is unfixed is the one way to burn the request.
+* **The 2 `critical` findings were rule `prohibited-string` and are ALREADY GONE**
+  -- absent from alpha.16 and alpha.17. Do not claim them as work done here.
+* **`python_url_command_execution` is not about error strings.** It fires on
+  `cmd = [...]` argv builders for tools that accept URLs. The 2026-09-04
+  rewording of six ffprobe error strings did not touch that rule, so the drafts'
+  "6 -> 0" line for it is unfounded. Corrected in GO_FORWARD 1A.
