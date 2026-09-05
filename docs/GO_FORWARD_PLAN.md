@@ -172,13 +172,26 @@ own `BLOCKED` tables. Do not sweep either up mechanically:**
 * `nodes/_otr_writer_heartbeat.py` -- a LEAF by contract; a pack import
   reintroduces the cycle that once left two generate transports blind.
 
-**STILL OWED, and it is the only thing left in this item:**
+**THE ACCEPTANCE LEG IS DONE (2026-09-04 evening) -- ITEM 1 IS CLOSED.**
 
-1. **The acceptance leg.** A canonical leg (`workflows/otr_canonical.json`, one act)
-   that PUBLISHES to `otr/obs/`, with the launcher's profile and roots READ BACK from
-   the leg log before any receipt is written, and the boot log showing no "Kokoro
-   voice prefetch unavailable" line. DEFERRED by the operator (2026-09-04) until
-   after the registry: no long render legs before then.
+A one-act canonical leg on `workflows/otr_canonical.json`, run AFTER the security
+build so it doubles as that build's live proof:
+
+    RESULT SUCCESS   prompt 010a3848   Prompt executed in 00:10:17
+    obs_publish OK -> otr/obs/a_name_stripped_bare_20260904_185159__paper_origami
+                      __still_flat__z_image_turbo__kokoro__shakespeare_final.mp4
+    13,062,017 bytes on disk, 1920x1080 h264 + aac
+    v=88.280s a=67.071s tail_budget=21.2s declared -- the A/V gap is IN FAMILY
+      (the five previously published episodes run 22-29s)
+
+Every stage the security build touched actually RAN, which is the point of the
+leg: ProcgenBlend blended, CaptionBurn burned 11 caption events through the
+`ass=` filtergraph, CreditsRoll appended 21.2s, and MasterAudioMux reported
+**audio_byte_identical OK** -- the exact invariant that would have broken had the
+widget been severed inside `_ffmpeg_bin` instead of at the execute method.
+
+ZERO deprecation warnings (every shipped widget carries the bare default, as
+measured) and ZERO refusals from any new guard.
 
 **A NOTE THE NEXT WINDOW NEEDS.** The registry floor is NOT zero and never was: the
 closed plan says "the gate is ZERO findings or a manual admin approval; nothing here

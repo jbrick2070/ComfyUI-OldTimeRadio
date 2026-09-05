@@ -16081,3 +16081,43 @@ resolvers' return value instead.
 operator asked mid-campaign that Fable and Astra be the final judges. This was
 not a stock four-round arc on one document -- r3 was skipped because the design
 had converged and two subagent audits replaced it.
+
+
+---
+
+## 2026-09-04 (night) -- the acceptance leg doubles as the security build's live proof
+
+**RESULT SUCCESS, `obs_publish OK`, 00:10:17.** One-act canonical leg on the real
+`workflows/otr_canonical.json`, run deliberately AFTER the widget/RCE build so
+it would prove that build on a real render rather than only in tests.
+
+Published: `otr/obs/a_name_stripped_bare_20260904_185159__paper_origami__still_flat__z_image_turbo__kokoro__shakespeare_final.mp4`
+-- 13,062,017 bytes, 1920x1080, h264 + aac, verified ON DISK with ffprobe, not
+from the log line.
+
+**The A/V duration gap was checked rather than assumed.** v=88.280s a=67.071s is
+a 21s gap, which looks alarming in isolation; the five previously published
+episodes run 22-29s, so it is the credits tail and in family. `duration_check ...
+tail_budget=21.2s (declared) OK`.
+
+**What the leg proves about the security build**, and this is why it was worth
+the GPU time: every stage the build touched executed --
+* `PostUpscaleProcgenBlend` blended (the node whose raw-input fallback was cut),
+* `OTR_CaptionBurn` burned 11 caption events through the `ass=` filtergraph (the
+  interpolation now validated),
+* `OTR_CreditsRoll` appended 21.2s,
+* `OTR_MasterAudioMux` reported **`audio_byte_identical OK (14063515f740)`** --
+  the byte-identity proof that would have broken had the widget been severed
+  inside `_ffmpeg_bin`, where `audio_pcm_sha` is handed an ALREADY-RESOLVED
+  binary. Severing at the execute method instead is what kept it true.
+
+ZERO `widget is ignored` warnings (correct: every shipped graph carries the bare
+default) and ZERO refusals from `ExecutableNotAllowed`, `OtrPathContractError` or
+the filtergraph validator.
+
+**Registry state at this point:** `2.0.0-alpha.19` published and Pending, 19
+dependencies recorded, publish workflow green. alpha.18's scan landed and
+measures the earlier collapse for the first time: **158 findings -> 12**, all
+`info`, zero critical. Filing the re-review post remains the operator's act;
+`docs/2026-09-04-registry-review-request-SHORT.md` is finalized with the measured
+numbers, and BOTH older drafts are marked DO-NOT-SEND.
