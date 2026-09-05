@@ -179,3 +179,28 @@ So RSS has exactly three honest options, unchanged:
 2. drop RSS from the registry zip (local-only default; the banks that use live
    feeds become a GitHub-only capability).
 3. let the one finding ride the manual review (a human sees SSRF hardening).
+
+## Report 4 assessment: two theories killed by measurement (do not re-raise)
+
+A fourth lane rebuilt its advice from general Bandit/SAST reasoning rather than
+this scanner's measured behaviour, and repeated two theories the before/after
+zips already refute. Recorded here so they are not re-litigated:
+
+* "rgthree passes because subprocess is in `__build__.py` maintenance scripts /
+  location matters / the scanner may exclude `__*__.py`." FALSE. rgthree
+  1.0.2608272350 (Aug 28) ships byte-identical Python and the same
+  `__build__.py`, and was FLAGGED with `$subprocess_run_direct` at
+  `__build__.py:107`. Location is not an exemption; the Aug-21 pass was the old
+  ruleset.
+* "A generic argv wrapper looks risky because the scanner cannot tell if argv is
+  literal, so make commands literal and local." FALSE. The scanner is lexical
+  and never inspects argv. rgthree's `subprocess.run(cmds, check=True)` passes a
+  VARIABLE and passed on the old scanner / flagged on the new one. Literal vs
+  variable, `run` vs `Popen`, ffmpeg-only allowlist -- none of it changes a
+  string match. The ONLY thing that clears `$subprocess_*` is the literal
+  `subprocess.run(` / `subprocess.Popen(` not appearing in a shipped file (which
+  is what proc.py's import-time bind achieves).
+
+Its correct, convergent points: centralize config (env.py already is), no public
+YARA catalog exists, engage Comfy-Org, fix-not-bypass. Its `nodesafe` pointer is
+strictly worse than our calibrated oracle for predicting THIS scanner.
