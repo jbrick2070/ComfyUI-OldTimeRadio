@@ -82,7 +82,7 @@ picking a row.**
 
 | version | status | deps |
 |---|---|---|
-| `2.0.0-alpha.21` | **Pending** | 19 |
+| `2.0.0-alpha.21` | **Flagged -- 13 info, 0 critical** | 19 |
 | `2.0.0-alpha.20` | Flagged | 19 |
 | `2.0.0-alpha.19` | Flagged | 19 |
 | `2.0.0-alpha.18` | Flagged | 19 |
@@ -92,12 +92,25 @@ picking a row.**
 | `2.0.0-alpha.14` | **Banned** | 15 |
 | `2.0.0-alpha.13` | **Banned** | 13 |
 
-**`2.0.0-alpha.21`'s scan HAS NOT LANDED YET.** While it is Pending the node's
-`latest_version` resolves to `null`, which is exactly why ComfyUI Manager says "not a
-CNR node" -- that is the documented queue behaviour (CLAUDE.md 7A), not a local install
-fault, and nobody should be sent chasing dependency ghosts over it. Re-read the versions
-endpoint rather than inferring; the promotion cron only considers versions older than 30
-minutes and its schedule is not public.
+**`2.0.0-alpha.21` SCANNED 2026-09-05: Flagged, 13 findings, ALL `info`, ZERO critical.**
+The security collapse holds on the version a stranger would install.
+
+**It is 13 where alpha.20 was 12, and the extra one is EXPECTED AND CORRECT.** The
+diff is a single `python_environment_manipulation` on
+`scripts/_otr_idx_download_weights.py:70` -- `env = os.environ.get("OTR_INDEXTTS2_DIR")`,
+a plain env READ, confidence 90, admin tag `system-modification`. That file ships
+because `.comfyignore` negates it deliberately: the IndexTTS2 installer we DO ship calls
+it at its weights step, so excluding it left the one shipped installer pointing at a file
+that is not there. **One `info` finding in exchange for an installer that works is the
+right trade and must not be reverted.** The info findings were never the ban -- reading
+`status_reason` rather than counting findings is what established that.
+
+**`latest_version` is STILL `null`, and Flagged is why.** It was null while alpha.21 was
+Pending and it is null now that alpha.21 is Flagged, so ComfyUI Manager still reports
+"not a CNR node" and a registry install still cannot resolve. That is the documented
+behaviour (CLAUDE.md 7A), not a local install fault, and nobody should be sent chasing
+dependency ghosts over it. **The manual review request is the only remaining path, and
+posting it is the operator's act.**
 
 **alpha.19 and alpha.20 both scanned identically to alpha.18: 12 findings, all `info`,
 zero critical** (4 env-var reads, 5 network, 3 subprocess). That sameness IS the result --
