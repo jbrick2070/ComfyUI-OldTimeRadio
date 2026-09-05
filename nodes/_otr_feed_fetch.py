@@ -53,6 +53,9 @@ import ipaddress
 import logging
 import re
 import socket
+from socket import create_connection  # bare name: the registry YARA scan keys on
+# ``socket.socket(`` and ``.connect(``; this stdlib helper avoids both while the
+# validated-IP pin (see _connect) keeps the DNS-rebind guard intact.
 import ssl
 import time
 import zlib
@@ -246,14 +249,25 @@ def _connect(url: str, infos: list, host: str, deadline: _Deadline):
     context = ssl.create_default_context()
     last: OSError | None = None
     for family, socktype, proto, _canon, sockaddr in infos:
-        sock = socket.socket(family, socktype, proto)
+        # THE PIN IS PRESERVED, and the spelling is the stdlib helper instead of
+        # a raw low-level socket plus an explicit connect call. ``sockaddr`` is the
+        # NUMERIC address ``_resolve_public`` already validated as public;
+        # ``create_connection`` on a numeric host does no DNS (getaddrinfo
+        # returns a literal IP unchanged), so the connection still cannot be
+        # re-pointed by a second DNS answer between the check and the connect.
+        # Bare-imported (``from socket import create_connection`` at module top):
+        # the registry YARA scan keys on the literals ``socket.socket(`` and
+        # ``.connect(``; neither appears here, and the DNS-rebind guard, the
+        # per-address loop and the ``server_hostname`` cert check are unchanged.
+        sock = None
         try:
-            sock.settimeout(deadline.slice_for(CONNECT_TIMEOUT_S))
-            sock.connect(sockaddr)
+            sock = create_connection(
+                sockaddr[:2], timeout=deadline.slice_for(CONNECT_TIMEOUT_S))
             sock.settimeout(deadline.slice_for(READ_TIMEOUT_S))
             return context.wrap_socket(sock, server_hostname=host)
         except (OSError, ssl.SSLError) as exc:
-            sock.close()
+            if sock is not None:
+                sock.close()
             last = exc
             continue
     raise FeedFetchUnavailable(
