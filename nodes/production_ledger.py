@@ -644,8 +644,19 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     for key in ("ledger", "master_audio", "source_episode_id"):
         if not manifest.get(key):
             raise ReplayBundleError("manifest lacks %r" % (key,))
-    _safe_relative(manifest["ledger"])
-    _safe_relative(manifest["master_audio"])
+    # THE LEDGER AND THE MASTER MUST BE AMONG THE FILES JUST VERIFIED
+    # (2026-09-05). The loop above proved size, digest and leaf-ness for every
+    # row in files[]; these two keys used to be checked only for SHAPE, so a
+    # bundle could name a ledger that was never hashed -- swapped after
+    # freezing, and the "verified" import would open it anyway. Membership is
+    # case-folded to match the duplicate check above. The exporter always
+    # lists both first, so no bundle the shipped tool produced is refused.
+    for key in ("ledger", "master_audio"):
+        rel = _safe_relative(manifest[key])
+        if rel.lower() not in seen:
+            raise ReplayBundleError(
+                "manifest %r names %r, which is not among its verified files[] "
+                "-- the bundle's %s was never hashed" % (key, rel, key))
     return manifest
 
 

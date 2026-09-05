@@ -131,7 +131,8 @@ def test_freeze_is_immutable_and_refuses_an_existing_bundle(frozen):
         _freeze(frozen["ep"], frozen["bundle"].parent)
 
 
-@pytest.mark.parametrize("tamper", ["digest", "traversal", "absolute", "missing", "duplicate", "schema"])
+@pytest.mark.parametrize("tamper", ["digest", "traversal", "absolute", "missing", "duplicate", "schema",
+                                    "ledger_unlisted", "master_unlisted"])
 def test_the_manifest_rejects_every_unsafe_shape(frozen, tamper):
     bundle = frozen["bundle"]
     mp = bundle / PL.REPLAY_MANIFEST_NAME
@@ -146,6 +147,15 @@ def test_the_manifest_rejects_every_unsafe_shape(frozen, tamper):
         man["files"].append({"path": "stills/gone.png", "bytes": 1, "sha256": "x"})
     elif tamper == "duplicate":
         man["files"].append(dict(man["files"][-1], path=man["files"][-1]["path"].upper()))
+    elif tamper == "ledger_unlisted":
+        # Fable finding 3 (2026-09-05): the ledger key used to be checked for
+        # SHAPE only, never for membership in the files[] just verified -- so
+        # a ledger swapped in after freezing was opened by a "verified" import.
+        (bundle / "audio" / "swapped_ledger.json").write_text("{}", encoding="utf-8")
+        man["ledger"] = "audio/swapped_ledger.json"
+    elif tamper == "master_unlisted":
+        (bundle / "audio" / "swapped_master.wav").write_bytes(b"RIFF" + b"\x00" * 32)
+        man["master_audio"] = "audio/swapped_master.wav"
     else:
         man["schema_version"] = "something_else"
     mp.write_text(json.dumps(man), encoding="utf-8")
