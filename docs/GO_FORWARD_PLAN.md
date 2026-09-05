@@ -78,63 +78,27 @@ desktop baseline. GPT-6 Astra is available at `ultra` reasoning -- the older "Co
 credits out until 09-07" note is dead. **Read section 0 (THE ATTACK ORDER) before
 picking a row.**
 
-**THE REGISTRY LADDER AS MEASURED 2026-09-05, all nine published rows:**
+**THE ONE OPEN REGISTRY ITEM.** Every published version through `2.0.0-alpha.21` is
+Flagged (alpha.13/.14 Banned), so `latest_version` resolves to `null` and **no user can
+install the pack at all** -- ComfyUI Manager says "not a CNR node". That is the
+documented queue behaviour (CLAUDE.md 7A), not a local install fault; do not send anyone
+chasing dependency ghosts over it. Scan records live in `docs/HANDOFF_LOG.md`.
 
-| version | status | deps |
-|---|---|---|
-| `2.0.0-alpha.21` | **Flagged -- 13 info, 0 critical** | 19 |
-| `2.0.0-alpha.20` | Flagged | 19 |
-| `2.0.0-alpha.19` | Flagged | 19 |
-| `2.0.0-alpha.18` | Flagged | 19 |
-| `2.0.0-alpha.17` | Flagged | 19 |
-| `2.0.0-alpha.16` | Flagged | 18 |
-| `2.0.0-alpha.15` | Flagged | 18 |
-| `2.0.0-alpha.14` | **Banned** | 15 |
-| `2.0.0-alpha.13` | **Banned** | 13 |
-
-**`2.0.0-alpha.21` SCANNED 2026-09-05: Flagged, 13 findings, ALL `info`, ZERO critical.**
-The security collapse holds on the version a stranger would install.
-
-**It is 13 where alpha.20 was 12, and the extra one is EXPECTED AND CORRECT.** The
-diff is a single `python_environment_manipulation` on
-`scripts/_otr_idx_download_weights.py:70` -- `env = os.environ.get("OTR_INDEXTTS2_DIR")`,
-a plain env READ, confidence 90, admin tag `system-modification`. That file ships
-because `.comfyignore` negates it deliberately: the IndexTTS2 installer we DO ship calls
-it at its weights step, so excluding it left the one shipped installer pointing at a file
-that is not there. **One `info` finding in exchange for an installer that works is the
-right trade and must not be reverted.** The info findings were never the ban -- reading
-`status_reason` rather than counting findings is what established that.
-
-**`latest_version` is STILL `null`, and Flagged is why.** It was null while alpha.21 was
-Pending and it is null now that alpha.21 is Flagged, so ComfyUI Manager still reports
-"not a CNR node" and a registry install still cannot resolve. That is the documented
-behaviour (CLAUDE.md 7A), not a local install fault, and nobody should be sent chasing
-dependency ghosts over it. **The manual review request is the only remaining path, and
-posting it is the operator's act.**
-
-**alpha.19 and alpha.20 both scanned identically to alpha.18: 12 findings, all `info`,
-zero critical** (4 env-var reads, 5 network, 3 subprocess). That sameness IS the result --
-the collapse 158 -> 12 is measured on the version a stranger would install, and the info
-findings were never the ban. alpha.20 published from `3d133ec1`, artifact byte-identical
-to the commit, 809/809 files, all fourteen security seams present in the zip; three
-canonical GPU legs passed, two publishing to `otr/obs/` and the third to an alternate
-output root (the registry-install shape).
-
-**The re-review post body is `docs/2026-09-05-registry-review-request-ALPHA20.md`** --
-every earlier draft names a version that ships the file read and must not be sent. **The
-operator has said he is not posting anything until he is ready to ship**, so it waits on
-him and on alpha.21's verdict; it is not blocked on us.
-
+RULINGS that govern what may be done about it:
+* **The `info` findings were never the ban.** Reading `status_reason` rather than
+  counting findings is what established that, and 0 of 102 policy-v0.2 approvals had a
+  clean scan. Driving the count down is not the path.
+* **One `info` finding in exchange for a working installer is the right trade and must
+  not be reverted** -- `scripts/_otr_idx_download_weights.py` ships because the IndexTTS2
+  installer we ship calls it.
+* **A manual review request is the only remaining path, and posting it is the operator's
+  act.** Body: `docs/2026-09-05-registry-review-request-ALPHA20.md`. **Every OTHER draft
+  is DO-NOT-SEND** -- they name alpha.19, which ships the arbitrary file read.
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
-* **Post the re-review note.** Body:
-  `docs/2026-09-05-registry-review-request-ALPHA20.md`, at
-  https://github.com/Comfy-Org/registry-backend/issues . Prepared and measured;
-  posting is a public act and yours. **Every OTHER draft is DO-NOT-SEND** -- they
-  name alpha.19, which ships the arbitrary file read.
-* Any FURTHER `pyproject.toml` bump (alpha.20 is already published; each edit
-  auto-fires another publish and burns a version string).
-* Any further `pyproject.toml` bump (each one auto-fires a publish).
+* **Post the re-review note**, at https://github.com/Comfy-Org/registry-backend/issues .
+  Prepared and measured; posting is a public act and his.
+* Any `pyproject.toml` bump -- each edit auto-fires a publish and burns a version string.
 * The rulings in item 6.
 
 **Keep this file clean:** when a row is finished, DELETE it from here and write the
@@ -151,17 +115,12 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **2.2 GHOST POOL -- CONFIRMED LIVE 2026-09-05, read the row's correction block first** | Still the only open row that changes what lands in `otr/obs/` tomorrow. An archive survey said the uniqueness defect had never fired; **a single canonical leg with the ghost lane forced on fired it TWICE and cost that episode all 18 authored prompts.** The archive was the wrong population -- the only two engines that author ghost prompts are AnimateDiff rows, which the daily rotation skips, so 23 of its 27 ghost ledgers are eight-beat episodes that never strain the pool. The survey's other findings stand and one of them, the `g0010` id-padding rejection that cost a whole 25-beat episode, is already CLOSED. |
-| ~~2nd~~ | ~~2.3 PAIR PREPOSITION~~ | **DONE 2026-09-05.** Shipped ahead of 2.2 because the measurement above re-scoped 2.2 and it no longer gates this. `place_preposition` picks the connector from the place's head noun. Two things were caught by looking at real data rather than reasoning: QA on the finished diff found a regression before it shipped (a bare `'s` test dropped the article from fifteen real lowercase possessives -- "in judge's bench"), and reading the 4,393-setting corpus moved "station" out of the AT set, where it would have mis-read the corpus's biggest head noun 100 times over. |
-| ~~3rd~~ | ~~README defects + bundle hygiene~~ | **DONE 2026-09-05 (`eaf33576`), taken first because it needed no GPU.** README had been telling every new user to install IndexTTS2 -- a multi-gigabyte sidecar in a separate Python -- before their first Queue Prompt, for an engine `otr_canonical` does not select; and it claimed Stable Audio 3 self-downloads, which it does not. Bundle hygiene rung 1 landed in the same commit. |
-| 4th | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
-| ~~5th~~ | ~~2.4, ONE ROW ONLY~~ | **DONE 2026-09-05**, pulled forward because it needed no GPU and no arc: `tests/test_cloud_engine_is_a_three_part_rule.py`. See the cut list for why the rest of 2.4 is not coding work. |
+| **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow, and the defect is CONFIRMED LIVE: a canonical leg with the ghost lane forced on rejected the batch on both attempts and cost that episode all 18 authored prompts. It owes a five-act GPU leg -- start the leg first, not last. |
+| 2nd | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
 * **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
   what it cut; a second arc re-litigates a settled row.
-* **2.3 -- NO ARC.** One closure, no stored object, no replay seam.
-* **README / bundle hygiene -- NO ARC.** Documentation matching code, and ignore lines.
 * **2.1 -- ONE ROUND**, as its row already says. Not a full four-round arc: the fork is
   narrow and named (the surname-only alias tier, and where the persistent name index
   lives). One round settles both.
@@ -276,89 +235,31 @@ RULINGS (constraints, not history):
 - Operator's design, his words: *"just have the LLM decide -- ask what the likely gender of this person name is, have the LLM decide, and keep that in an index of names."*
 - The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING by the standing ruling -- their characters do not exist, so no lookup of any kind applies.
 
-### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, RE-SCOPED 2026-09-05)
+### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
 
-> ## CORRECTION FIRST: THE ARCHIVE SURVEY BELOW WAS THE WRONG POPULATION
->
-> **The survey concluded the uniqueness defect had never fired. A single live
-> leg fired it TWICE, and it is the reason that episode lost all 18 of its
-> authored prompts (2026-09-05, leg `otr_headless_54066`, canonical, three
-> acts, `OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`):**
->
-> ```
-> Ghost author: attempt 1 rejected: leaf for g017 repeats the one written
->   for g015: 'the broadcast console sits on a desk as a light moves'
-> Ghost author: attempt 2 rejected: leaf for g012 repeats the one written
->   for g008: 'the amber lantern sits on a table as a light moves'
-> Ghost Prompt v2: 18 beat(s) authored (deterministic_fallback=18)
-> ```
->
-> **WHY THE ARCHIVE MISSED IT, and this is the transferable part:** the ghost
-> prompt lane belongs to exactly TWO engines, `animatediff15_v3_haunted_video`
-> and `animatediff15_v3_stillin_lab_video`, and the daily rotation loop
-> deliberately SKIPS AnimateDiff. So the archive under-represents precisely the
-> lane this row is about -- 23 of its 27 ghost ledgers are eight-beat episodes,
-> where four slots and eight beats never strain the pool. The defect lives at
-> the episode LENGTH the archive barely contains. Measuring the archive was
-> right; treating it as the population was not.
->
-> **SO ROW 2.2 IS VINDICATED AND STAYS FIRST.** Both rejected leaves are exact
-> duplicates written for different beats; under the finalized-prompt rule a
-> repeated leaf carrying a different motif composes a different prompt and the
-> batch is accepted. That is this row, exactly as written.
->
-> ---
->
-> **THE ARCHIVE SURVEY, kept because its other three findings stand
-> (2026-09-05).** Every ledger on the dev box was read before this row was
-> started. **27 episode ledgers carry `ghost_prompt` objects; 127 of their 263
-> beats fell to `deterministic_fallback`; and none of those fallbacks in the
-> ARCHIVE was a uniqueness rejection.** The four episodes over twelve beats --
-> including the 29-beat one whose shape this row's DONE WHEN names -- each lost
-> their whole batch to a DIFFERENT cause:
->
-> | episode | beats | what actually rejected it |
-> |---|---|---|
-> | `..._the_last_reading_20260902_190630` | 29 | leaf `g000` "requests a person in object mode" |
-> | `..._the_weight_of_grief_20260903_005108` | 25 | **`Ghost batch row carries unknown id 'g0010'`** |
-> | `..._viral_tide_20260903_181452` | 13 | response is not JSON (truncated at char 851) |
-> | `..._the_last_crystal_20260903_194649` | 12 | leaf `g000` "names a texture instead of a thing" |
->
-> And the deterministic path did NOT exhaust: all four produced fully distinct
-> leaves (29/29, 25/25, 13/13, 12/12). The largest same-mode run measured
-> anywhere is 12. **So the leaf-uniqueness defect this row describes is real in
-> the code and has not fired on a single measured episode**, while the batch's
-> actual mortality is content validators and transport.
->
-> **DONE 2026-09-05, and it came straight out of that table:** the `g0010`
-> row -- the most common non-content rejection, 25 beats, one whole episode --
-> is closed in `parse_batch_response`. An opaque id is a positional integer, so
-> a digit run that reads as the same integer names the same row;
-> `_canonical_opaque_id` re-spells it, WARNING-logs both spellings, and relaxes
-> nothing else. `tests/test_ghost_batch_id_padding.py`, 19 tests.
->
-> **The JSON row is now DIAGNOSABLE rather than fixed, deliberately.** 21 beats
-> died on `Ghost batch response is not JSON: Expecting ',' delimiter: line 1
-> column 852` and nothing on disk says which bug that was -- a truncated
-> response, an unescaped quote inside a leaf, and prose that was never JSON all
-> produce that shape and want three different fixes. The raw response is stored
-> nowhere. Two things argue AGAINST the obvious truncation theory, which is why
-> it must not be "fixed" on a hunch: `batch_output_tokens` is `64 + 48 * shots`,
-> so that 13-beat batch had 688 tokens against roughly 280 tokens of text; and
-> `Expecting ',' delimiter` is a STRUCTURAL break, where a truncated response
-> normally reads `Unterminated string` or `Expecting value`. An unescaped quote
-> inside a leaf fits the evidence better than a cut-off -- but "fits better" is
-> not measured. `_decode_excerpt` now puts a bounded window of the text
-> around the failure into the rejection reason, which lands in that beat's
-> `fallback_reason`. **Read the next occurrence off a ledger and then fix the
-> real one.**
->
-> **THE OTHER THREE CAUSES ARE STILL REAL AND STILL UNOWNED.** The two content
-> validators -- "requests a person in object mode" (29 beats) and "names a
-> texture instead of a thing" (28) -- are prompt-and-validator DESIGN rows
-> rather than the mechanical change this row describes, and they killed more
-> archived beats than anything else. They want their own row and their own arc;
-> they are not part of 2.2.
+**THE DEFECT IS CONFIRMED LIVE.** A canonical three-act leg with the ghost lane
+forced on (`OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`) was rejected on
+BOTH attempts for repeated leaves and lost all 18 authored prompts to deterministic
+clauses. Receipt in `docs/HANDOFF_LOG.md`.
+
+**WHY NOTHING ELSE WAS COVERING IT, and this decides how to test the fix:** only two
+of the 33 registered engines author ghost prompts -- `animatediff15_v3_haunted_video`
+and `animatediff15_v3_stillin_lab_video`, selected by
+`prompt_profile == "ghost_signal_v1"` -- and the daily rotation loop deliberately
+skips AnimateDiff. The shipped canonical graph runs `still_flat` on every video role
+and authors ZERO ghost beats. **A plain canonical leg cannot prove this row. Force
+the lane.**
+
+**THREE OTHER CAUSES KILL MORE ARCHIVED BEATS THAN THIS ONE, and they are not this
+row.** Measured over the 27 ledgers carrying `ghost_prompt` objects, 127 of 263 beats
+fell to `deterministic_fallback`: 29 on "requests a person in object mode", 28 on
+"names a texture instead of a thing", 21 on a JSON parse failure. The two content
+validators want their own row and their own arc. **The JSON one is now DIAGNOSABLE
+rather than fixed, deliberately -- `_decode_excerpt` puts the text around the failure
+into that beat's `fallback_reason`. Read the next occurrence off a ledger and fix the
+real bug; do not fix it on a hunch.** Truncation is the tempting theory and the
+evidence argues against it: the budget is `64 + 48 * shots` and `Expecting ','
+delimiter` is a structural break, not a cut-off.
 
 **Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
 
@@ -375,19 +276,6 @@ RULINGS (constraints, not history):
 The tests that encode the obsolete absolute-leaf rule (`test_ghost_prompt_v2_lane.py:399-405, 437-451`; `test_ghost_signal_author.py:925-931`) are REPLACED with the new invariant, not deleted.
 
 **Open question:** whether "no adjacent repeat" is the right viewer threshold -- check it against frames rather than more reasoning.
-
-### 2.3 THE PAIR PREPOSITION -- one closure inside `resolve_crux_kernel`
-
-**RENAMED 2026-09-05.** This row used to be titled "PROMPT v3 HALF B", which is also row
-`3.1`'s title, and the two are NOT the same work: `3.1` is the crux-kernel redesign whose
-arc has r2 in flight, and `_in_place` is a closure inside `resolve_crux_kernel` -- the very
-function `3.1` is about to rewrite. Expect this row to be rebased by that arc.
-
-**Cheap and unblocked:** the kernel joins subject and place with a fixed `"in the"`, so a
-place that takes a different preposition reads wrong ("a spinning turntable **in the**
-riverbank"). One closure, `_in_place` in
-`nodes/_otr_video_engines/ghost_signal_author.py`. No stored object, no replay seam, no
-arc -- Sonnet QA on the diff. Fold it into 2.2's commit so one five-act leg proves both.
 
 ### 2.4 OPEN DEFECTS THAT ARE CODING WORK (queue item 3c; a leg may prove some later, none needs a leg to FIX)
 
@@ -432,7 +320,13 @@ MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
   That is a design choice with more than one defensible answer -- what to capture,
   where the capture lives, and whether the deliberate per-beat flip survives it --
   so it takes an arc BEFORE code. Not scheduled.
-- **`provider_side` is a THREE-part rule, not an attribute. DONE 2026-09-05** -- `tests/test_cloud_engine_is_a_three_part_rule.py`, 9 tests, picked AND forced, both engines. `_is_cloud_video_engine` (`render_driver.py`) accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`, and the reason each clause is load-bearing is now MEASURED rather than argued: `cloud_kling_avatar` declares no `provider_side` at all (a bare `getattr` calls it LOCAL and sends an audio-driven face to the local lane), while `google_veo_video` declares `provider_side = True` with no `cloud_` prefix and no `node_key` (a prefix-only rule calls Veo LOCAL). Neither engine is hypothetical, so no single clause covers both, and the test says so with a message aimed at whoever next reaches for the one-liner. **No production code changed** -- the rule was already right; what was missing was the regression that stops it being "simplified". Deliberately NOT added: a single-owner AST guard, because two of the three bare `getattr(eng, "provider_side")` sites in `render_driver.py` are asking a DIFFERENT question (does this engine accept a scene-init still) and banning the spelling would break them.
+- **RULING (2026-09-05), so it is not "simplified" later:** the cloud test in
+  `_is_cloud_video_engine` is a THREE-part rule -- a `cloud_` id prefix OR a
+  `provider_side` attribute OR a `cloud_` `node_key` -- and no single clause covers
+  both shipped engines that need it. Deliberately NOT added: a single-owner AST
+  guard, because two of the three bare `getattr(eng, "provider_side")` sites in
+  `render_driver.py` ask a DIFFERENT question (does this engine accept a scene-init
+  still) and banning the spelling would break them.
 - **Env-read sites missing from the S0b inventory** (two remain): the `OTR_ENABLE_HUMO_HOSTS` reads in `render_driver.py` and `otr_meta_brief_image_prompt.py`, and the recipe / UNET re-read in `eng_ltx_av.py` (`wants_talking_prompt` / `_recipe`) outside `assert_usable`.
 - **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At 512x288 (ltx_8gb) col1 is 65px past its footer even with every droppable ledger row dropped; at 640x360 it is 12px over. Both are drawn anyway and LOGGED at ERROR naming the canvas. At 288 lines the three-column console is already a polite fiction. This is a DESIGN job -- a card laid out for a small canvas -- not more ladder heroics.
 
@@ -460,7 +354,7 @@ The REJECTED list below is part of the record precisely so a discarded claim is 
 * `.kibitz/comfyui.local.md:26` records 23 nodes / 60 links / 132 widget slots; the canonical graph is 23 / 61 / 133. Regenerate with `--force` before the next arc.
 * The `__init__.py:97-108` output pin: preserved deliberately (it is what makes every helper agree inside ComfyUI); removing it changes where Desktop installs render and is its own design item.
 * **BUILD ITEM, arc opened 2026-09-04 -- collapse the registry scan from 158 findings to about five by the one-owner rule** (plan and driver anchor in `docs/2026-09-04-registry-findings-collapse/`, 5080-local). One `os.environ` owner takes the env rule from 103 findings to 1; one process runner takes the subprocess rule (35 sites in 20 files) to ~2; six of twelve "url command" hits are the words `ffprobe -count_frames` inside error strings; the three singletons (OpenProcess, `Path.read_bytes` for a sha256, `__import__("sys")`) each have a clean replacement. It does NOT reach Active -- that needs zero findings or the manual review -- but it turns the human review from a ledger into five lines and drops every `credential-access` tag. Semantics-neutral by construction (no env name, default or precedence moves; the 4060's numbers do not move). Design questions for the arc: typed getters vs casts at the site, a declared knob catalog, the guard's shipping order across batches, whether the sidecar-venv Popen streams share the runner.
-* **Handed over by the shipping window when it stood down (2026-09-04):** (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes` periodically -- non-null confirms the pycairo-marker theory and the card should show ~34 nodes; still-null means something else fails in the Linux extract container (residual suspect: kokoro pulls torch, and a multi-GB download would blow the 600 s extract timeout). (b) **CLOSED 2026-09-03** -- `viewer/` is excluded in `.comfyignore` with the reasoning at the line; re-verified 2026-09-05. (c) The registry manual-review request is ready to file and is a PUBLIC post: it needs his own explicit go, not a peer relay. (d) **CLOSED, verified 2026-09-05** -- the literal `AUTH_TOKEN_COMFY_ORG` is GONE from `nodes/_otr_shared/partner_nodes.yaml` (0 hits). The only survivors in the tree are `scripts/otr_pin_partner_nodes.py`, `tests/test_cloud_media_invoke.py`, `kibitz-runs/` logs and git's own lost-found, and `.comfyignore` excludes every one of those from the bundle, so a reviewer grepping the published zip finds nothing. (e) Optional draft polish for the review request: one line that 47 of the 158 findings are the subprocess/ffmpeg family and 103 are `os.environ` reads, so no single subsystem's removal clears the version -- the argument for a review over another patch.
+* **Handed over by the shipping window when it stood down (2026-09-04):** (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes` periodically -- non-null confirms the pycairo-marker theory and the card should show ~34 nodes; still-null means something else fails in the Linux extract container (residual suspect: kokoro pulls torch, and a multi-GB download would blow the 600 s extract timeout). (b) The registry manual-review request is ready to file and is a PUBLIC post: it needs his own explicit go, not a peer relay. (c) Optional draft polish for the review request: one line that 47 of the 158 findings are the subprocess/ffmpeg family and 103 are `os.environ` reads, so no single subsystem's removal clears the version -- the argument for a review over another patch.
 * **The draft 8 GB profiles cannot write on two of the three banks (PBUG-20260904-05):** `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b` (all `status: draft`) set `gguf_n_ctx: 2048`, and the writer prompt is 2,741 tokens on `science_news` and 3,338 on `original` -- the budget refuses loud before writing a word. `media_archive` FITS, so the fault is the bank-plus-context pairing, not the profile alone. The row that SHIPS, `otr_4060_12b_gguf_offload`, runs the same 12B at `gguf_n_ctx: 4096` and fits. Design call, owed a kibitz arc: retire or re-context the drafts, pair a smaller pinned writer (Qwen3-4B / gemma E4B are on disk), or make the plan stage refuse a profile whose context cannot hold its own prompt -- in the profile/variant layer, never a silent truncation. The 4060 owns the 8 GB rows.
 
 **REJECTED, with reasons -- do not re-raise these.**
@@ -603,19 +497,12 @@ many rungs are worth publishing.
 
 **THE LADDER, least invasive first.** Each rung is a version; stop at the first
 pass. Cheap-and-reversible before anything that costs a feature:
-1. **DONE 2026-09-05 (`eaf33576`), and it costs the ladder nothing to have
-   climbed it early** -- bundle hygiene is correct on its own merits, so it was
-   taken without waiting for a bisect. `.comfyignore` now excludes `assets/`
-   (1.8 MB) and `workflows/variants/*.md` (92 generated launch recipes);
-   `ROADMAP.md` was deleted from git outright the same day. Measured with
-   pathspec against the real tracked list: 92 `.md` out, all 96 variant `.json`
-   still shipping, all four negated `scripts/` files still shipping. Removes
-   nothing a user runs, so **if a later version is still flagged, this rung is
-   already spent and rung 2 is the next real experiment.**
-   **Excluding art from the BUNDLE is not deleting it from GIT:**
-   `pyproject.toml` publishes `assets/otr_icon.gif` by raw GitHub URL, so a
-   `git rm -r assets/` would blank the registry listing's card art. This rung
-   was a `.comfyignore` change and nothing else.
+1. **SPENT 2026-09-05** -- bundle hygiene was taken on its own merits without
+   waiting for a bisect, so **if a later version is still flagged, rung 2 is the
+   next real experiment.** RULING for whoever climbs further: **excluding art
+   from the BUNDLE is not deleting it from GIT** -- `pyproject.toml` publishes
+   `assets/otr_icon.gif` by raw GitHub URL, so a `git rm -r assets/` would blank
+   the registry listing's card art. Every rung is a `.comfyignore` change.
 2. Drop the optional CLOUD lanes from the shipped bundle (OpenRouter, Google
    API, Comfy-credits, cloud media). That is 4 of the 5 network findings and
    they are all opt-in, default-off. Local-first is the product anyway.
