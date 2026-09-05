@@ -16235,3 +16235,33 @@ source outright ("source code string cannot contain null bytes") BEFORE writing.
 The assert-then-parse order is what made it free. The Edit tool landed both patches
 first try. The rule is now absolute: a patch holding any backslash escape never
 goes through a heredoc.
+
+### The live proof, same night -- three canonical legs, and the third is the one that mattered
+
+**`3d133ec1` published `2.0.0-alpha.20`** (workflow green, 809/809 files
+byte-identical to the commit, all fourteen security seams present in the zip,
+19 deps, Pending). Then three legs of the SHIPPED canonical workflow, one at a
+time, through the whole terminal chain the containment touches:
+
+| leg | config | result |
+|---|---|---|
+| 1 | default output root | RESULT SUCCESS 11:15, `obs_publish OK` -- *A Wound Without a Scab* |
+| 2 | `$OTR_OUTPUT_DIR` set to `D:\otr_alt_root_test` | RESULT SUCCESS 10:0x, `obs_publish OK` -- but it landed in the DEFAULT tree |
+| 3 | server booted on `D:\otr_alt_root_test` | RESULT SUCCESS 10:39, `obs_publish OK -> D:\otr_alt_root_test\otr\obs\...` |
+
+Zero containment refusals in any leg; every intermediate asset on disk.
+
+**LEG 2 IS THE FINDING.** It reported SUCCESS and proved nothing:
+`scripts/_otr_soak_server_launch.cmd` sets `OTR_REAL_OUTPUT` to the operator's
+own output path and passes it as `--output-directory`, so `$OTR_OUTPUT_DIR` is
+INERT for every headless leg. The alternate tree was empty and the episode had
+gone to the default root. **That is why no test and no soak could ever have
+caught the hardcoded-home-directory ship-breaker** -- the harness can only
+produce the one configuration in which the bug is invisible. Leg 3 booted
+`main.py` with the launcher's exact flags and its own `--output-directory`,
+then drove the sanctioned runner with `-NoBoot -NoReset -Port`, which still
+loads `workflows/otr_canonical.json`. The episode built and published entirely
+inside the alternate tree: the registry-install and 4060 shape, proven.
+
+Leg 3's boot also gives the route removal a live receipt -- the server printed
+`HTTP route registered: GET /otr/latest_ledger` and nothing else.
