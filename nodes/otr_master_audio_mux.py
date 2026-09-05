@@ -437,6 +437,17 @@ def _quiet_file_sha256(path: str) -> str:
     unreadable file makes the key differ from the next run's, which re-executes
     the node. Never used to prove an identity -- that is
     :func:`mux_master_audio`'s job and it raises."""
+    # A REMOTE PATH IS NEVER OPENED HERE (2026-09-05). This runs from
+    # IS_CHANGED, which ComfyUI calls during fingerprinting with the raw
+    # workflow inputs -- before the execute-time reject_remote_paths guard. A
+    # UNC value would make this open() authenticate to the host the workflow
+    # named. "" is this function's own existing answer for "cannot read it".
+    try:
+        from ._otr_paths import is_remote_path as _is_remote
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import is_remote_path as _is_remote  # type: ignore
+    if _is_remote(path):
+        return ""
     try:
         digest = hashlib.sha256()
         with open(path, "rb") as handle:

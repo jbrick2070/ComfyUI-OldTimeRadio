@@ -244,6 +244,26 @@ def is_reserved_episode_entry(name: str) -> bool:
     return str(name or "").startswith("_")
 
 
+def is_remote_path(value) -> bool:
+    """True when ``value`` names something off this machine. NEVER raises.
+
+    The non-raising twin of :func:`reject_remote_path`, for the places that must
+    not raise: ComfyUI's ``IS_CHANGED`` fingerprint hooks. Those run BEFORE a
+    node executes, with the RAW workflow inputs, so the execute-time refusal
+    cannot protect them -- a UNC value reaches ``open()`` / ``isfile()`` /
+    ``stat()`` during fingerprinting and Windows authenticates to the host the
+    workflow named. Raising there is the wrong answer too: a fingerprint hook
+    that throws can fail validation for an ordinary missing file. Callers
+    instead take the answer they already have for "cannot read it".
+    """
+    try:
+        return reject_remote_path(value, "_probe") is None
+    except OtrPathContractError:
+        return True
+    except Exception:  # noqa: BLE001 -- a predicate must never raise
+        return False
+
+
 def reject_remote_paths(**named) -> None:
     """:func:`reject_remote_path` for several inputs at once.
 
@@ -663,6 +683,7 @@ __all__ = [
     "OtrPathContractError",
     "reject_remote_path",
     "reject_remote_paths",
+    "is_remote_path",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",

@@ -1593,7 +1593,15 @@ class OTRSilentComposite:
         try:
             parts: list = []
             # 1. Base video (source of the assemble/normalize path).
-            if base_video_path and os.path.isfile(base_video_path):
+            # No remote path is STATTED during fingerprinting (2026-09-05):
+            # IS_CHANGED runs before the execute-time guard, so a UNC value
+            # would authenticate to the workflow's chosen host right here.
+            try:
+                from ._otr_paths import is_remote_path as _is_remote
+            except ImportError:  # pragma: no cover -- flat (sys.path) load
+                from _otr_paths import is_remote_path as _is_remote  # type: ignore
+            if (base_video_path and not _is_remote(base_video_path)
+                    and os.path.isfile(base_video_path)):
                 st = os.stat(base_video_path)
                 parts.append(("base", base_video_path, st.st_mtime_ns, st.st_size))
             # 2. Clips from manifest.
@@ -1605,6 +1613,8 @@ class OTRSilentComposite:
                 for k in ("path", "bg_still_path"):
                     p = row.get(k)
                     if not p:
+                        continue
+                    if _is_remote(p):
                         continue
                     if os.path.isfile(p):
                         st = os.stat(p)

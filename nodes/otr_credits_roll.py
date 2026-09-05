@@ -1525,6 +1525,13 @@ class OTRCreditsRoll:
     def roll(self, video_path, clip_manifest_json):
         from .production_ledger import get_ledger
 
+        # video_path arrives from the workflow; refuse a remote one before
+        # the first stat (2026-09-05).
+        try:
+            from ._otr_paths import reject_remote_paths
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import reject_remote_paths  # type: ignore
+        reject_remote_paths(video_path=video_path)
         if not video_path or not os.path.exists(video_path):
             raise CreditsDataError(
                 f"credits input video missing: {video_path!r}")
