@@ -150,3 +150,32 @@ PyAV covers the mux but not caption/credits text filters; moving all
 ffmpeg-dependent nodes out of the zip cuts captions and credits from a registry
 install; the import-spelling is unproven and reads evasion-adjacent to the
 human reviewer who banned alpha.13/.14. That is a product decision, not a patch.
+
+## Oracle cross-validation (2026-09-05, after the fix batch)
+
+The oracle was calibrated on our own alpha.21. To confirm it generalizes, it was
+run against two OTHER packs whose findings the registry records:
+* `comfyui-budgetpixel` 0.1.2 -- predicted 3/3: `$env_read2` at config.py:40,50
+  and `$http1` at client.py:111, matching the registry's finding exactly.
+* `deno-custom-nodes` 0.7.102 -- predicted `$socket2` at
+  deno_advanced_image_source_loader.py:59, matching the registry's finding.
+Three independent packs, all correct. The oracle is a trustworthy predictor.
+
+## RSS: the `create_connection` idea is a dead end
+
+A report proposed replacing the raw `socket.socket(` + `.connect(` in the SSRF
+guard with `socket.create_connection((validated_ip, port))`. The oracle flags
+that as `$socket2` -- the SAME literal Deno 0.7.102 was flagged on -- so it just
+trades two socket findings for one, and under all-or-nothing that is worth
+nothing. Confirmed, not reasoned: Deno's own before/after shows create_connection
+flags and only a urllib3 pool cleared it.
+
+So RSS has exactly three honest options, unchanged:
+1. urllib3 pool pinned to the validated IP (preserves the DNS-rebind guard and
+   SNI) -- REAL work, and it needs NEW tests, because the current RSS suite
+   STUBS `_connect` (`tests/test_feed_fetch_seam.py:126`
+   `monkeypatch.setattr(ff, "_connect", ...)`), so it cannot prove a real
+   socket/TLS refactor equivalent.
+2. drop RSS from the registry zip (local-only default; the banks that use live
+   feeds become a GitHub-only capability).
+3. let the one finding ride the manual review (a human sees SSRF hardening).
