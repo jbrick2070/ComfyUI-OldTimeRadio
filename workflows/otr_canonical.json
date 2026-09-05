@@ -91,7 +91,7 @@
       ],
       "properties": {
         "Node name for S&R": "OTR_WorkflowValidator",
-        "cnr_id": "OldTimeRadio"
+        "cnr_id": "comfyui-old-time-radio"
       },
       "widgets_values": [
         "",

@@ -83,11 +83,19 @@ findings are the single subprocess gateway that shells out to `ffmpeg`.
 
 ## What we already know, so do not re-propose it
 
-1. **A clean scan is NOT the bar.** We sampled the registry's own approvals:
-   **0 of 102 policy-v0.2 approvals had a clean scan, and 31 carried the same
-   subprocess finding we carry.** Driving 13 -> 0 is therefore not the
-   difference between Flagged and Active.
-2. **There is no publisher self-service path to Active.** Confirmed by reading
+1. **WRONG, AND CORRECTED 2026-09-05 -- see item 2.** This said "a clean scan is
+   NOT the bar" on the strength of: 0 of 102 policy-v0.2 approvals had a clean scan,
+   and 31 carried the same subprocess finding we carry. Both numbers are real; the
+   inference was survivorship bias, because an approvals list can only contain
+   versions that needed a human. **Driving 13 -> 0 IS the difference between Flagged
+   and Active**, per the backend source quoted in item 2.
+2. **REFUTED 2026-09-05, and it was the load-bearing error of this campaign.** This
+   brief said "there is no publisher self-service path to Active". Comfy-Org's own
+   `services/registry/registry_svc.go::PerformSecurityCheck` says otherwise:
+   `if issues == "" { SetStatus(NodeVersionStatusActive); SetStatusReason("Passed
+   automated checks") }`. A zero-finding scan promotes automatically, no human. Our
+   "0 of 102 approvals had a clean scan" was survivorship bias -- an approvals list only
+   contains versions that needed a human. Superseded text follows. Confirmed by reading
    `Comfy-Org/registry-backend`. Promotion is their Cloud Scheduler cron hitting
    their own `/security-scan` endpoint (`registry.go:938`, versions older than 30
    minutes only). The scanner is a PRIVATE repo. Any finding at all keeps a

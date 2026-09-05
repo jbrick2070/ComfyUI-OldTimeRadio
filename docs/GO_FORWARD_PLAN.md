@@ -118,10 +118,54 @@ present, Comfy-cloud media on a dropdown row, RSS whenever those source banks ru
 only `_otr_comfy_backend.py` is a real `OTR_ENABLE_*` flag); and `.comfyignore` has SIX
 `!scripts/` negations, not four.
 
+### A CLEAN SCAN AUTO-PROMOTES TO ACTIVE. READ THIS BEFORE ANYTHING ELSE.
+
+**This overturns the belief this whole campaign was run on, and it is quoted from
+Comfy-Org's own source** -- `services/registry/registry_svc.go`,
+`RegistryService.PerformSecurityCheck`, fetched and read 2026-09-05:
+
+```go
+issues, err := sendScanRequest(s.config.SecretScannerURL, ...FileURL)
+...
+if issues == "" {
+    // "No security issues found in node %s@%s. Updating to active."
+    SetStatus(schema.NodeVersionStatusActive).
+    SetStatusReason("Passed automated checks")
+} else {
+    // "Security issues found in node %s@%s. Updating to flagged."
+}
+```
+
+**`issues == ""` is the entire test. No human, no admin, no review.** A version whose
+scan returns nothing is set Active automatically and a Discord note is sent saying so.
+
+**WHY WE BELIEVED OTHERWISE, because the error is instructive:** we measured that 0 of
+102 policy-v0.2 APPROVALS had a clean scan and concluded a clean scan was not the bar.
+That was survivorship bias. An approvals list only contains versions that NEEDED a human
+-- a clean version never appears there because it never needed approving. The measurement
+was right and the inference was wrong.
+
+**So driving the findings to ZERO is a real, publisher-controlled path to Active, and it
+is the only one we have that does not depend on a maintainer replying.** It is also
+expensive: the 13 findings are 5 env reads/writes, 5 network lanes and 3 subprocess
+sites, and `ffmpeg` is load-bearing. Reaching zero means the strip-down ladder's rungs 2
+and beyond, or a smaller shipped surface. **That is a product decision, not a patch --
+but it is now a decision worth making, where before it looked pointless.**
+
+**Also settled from the same file:** `TriggerComfyNodesBackfill` selects on
+`ComfyNodeExtractStatusEQ(Pending)` with NO status filter, so node extraction is
+INDEPENDENT of approval. Our empty node index is a real defect but it does not gate
+Active. Measured the same day: `versions/2.0.0-alpha.21/comfy-nodes`,
+`.../alpha.20/...` and `.../alpha.17/...` all return
+`{"comfy_nodes":null,"totalNumberOfPages":0}`, and `/comfy-nodes?node_id=` returns
+`total: 0` for us against a full node list for `ComfyUI-GGUF`. The pycairo marker
+shipped in alpha.17 did NOT fix extraction.
+
 RULINGS that govern what may be done about it:
-* **The `info` findings were never the ban.** Reading `status_reason` rather than
-  counting findings is what established that, and 0 of 102 policy-v0.2 approvals had a
-  clean scan. Driving the count down is not the path.
+* **The `info` findings were never the BAN** -- the ban was a human verify-deep on a real
+  RCE class, and reading `status_reason` rather than counting findings is what
+  established that. **But they ARE what keeps every version Flagged**, and per the source
+  above, zero findings is what lifts it. Do not conflate the two claims again.
 * **One `info` finding in exchange for a working installer is the right trade and must
   not be reverted** -- `scripts/_otr_idx_download_weights.py` ships because the IndexTTS2
   installer we ship calls it.
