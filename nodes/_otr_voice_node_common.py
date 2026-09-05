@@ -64,6 +64,34 @@ def _resolve_ref_to_disk(ref_path):
     asked for" from "asked for and not found"."""
     if not ref_path:
         return None
+    # A REMOTE REFERENCE IS NEVER RESOLVABLE, AND ASKING COSTS AN SMB SESSION
+    # (2026-09-05). A cast row carrying no `voice_route` is accepted as a LEGACY
+    # reference (`_otr_voice_route.py:1074-1076`), and `resolve_voice_ref_path`
+    # passes an already-absolute value straight through
+    # (`_otr_audio_engines/base.py:140`) -- so a `ledger_json` naming
+    # `\\attacker\share\x.wav` reached `os.path.exists` at eleven call sites and
+    # Windows authenticated to the host the workflow chose. That is the same
+    # coercion `79dc9828` closed at the ffmpeg nodes; this lane was missed
+    # because the value arrives inside a JSON document rather than as a widget.
+    #
+    # The guard lives HERE, in the ONE resolver, rather than at each caller:
+    # every one of them already treats `None` as "asked for and not found" and
+    # degrades correctly, so a refusal needs no new branch anywhere. This is not
+    # the `proc.py` case the standing ruling warns about -- refusing at the spawn
+    # gateway blanked a legitimate ledger stamp, whereas no voice bank this pack
+    # ships is reachable only over UNC. A MAPPED DRIVE still works: the refusal
+    # is textual, and `U:\refs\x.wav` is a drive letter, not a `\\host\share`.
+    try:
+        from ._otr_paths import is_remote_path
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import is_remote_path  # type: ignore
+    if is_remote_path(ref_path):
+        log.warning(
+            "[OTR voice] refusing remote voice reference %r: a reference is a "
+            "local file under the models root, and statting a UNC path "
+            "authenticates this machine to the host the workflow named",
+            ref_path)
+        return None
     from ._otr_audio_engines.base import resolve_voice_ref_path
     return resolve_voice_ref_path(ref_path)
 

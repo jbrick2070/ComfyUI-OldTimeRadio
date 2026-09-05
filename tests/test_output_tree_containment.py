@@ -330,3 +330,38 @@ def test_the_composite_fingerprint_hook_checks_every_step():
     window = src[i:i + 800]
     assert "_is_remote(base_video_path)" in window
     assert "os.listdir" in window, "anchor drifted: this step should still listdir"
+
+
+# --------------------------------------------------------------------------
+# the legacy voice reference -- a UNC path arriving inside a JSON document
+# --------------------------------------------------------------------------
+def test_a_remote_voice_reference_is_refused_before_it_is_statted():
+    """A cast row with no `voice_route` is accepted as a LEGACY reference
+    (`_otr_voice_route.py:1074`), and `resolve_voice_ref_path` passes an
+    already-absolute value straight through (`base.py:140`) -- so a
+    `ledger_json` naming a UNC share reached `os.path.exists` at eleven call
+    sites and Windows authenticated to the host the workflow chose. Found
+    2026-09-05 by GPT-6 Astra; the same coercion class `79dc9828` closed at the
+    ffmpeg nodes, missed here because the value arrives inside JSON rather than
+    as a widget."""
+    from nodes._otr_voice_node_common import _resolve_ref_to_disk
+
+    b = chr(92)                       # built, never escaped
+    assert _resolve_ref_to_disk(b + b + "attacker" + b + "share" + b + "x.wav") is None
+    assert _resolve_ref_to_disk("//attacker/share/x.wav") is None
+    assert _resolve_ref_to_disk("") is None
+    # ...and the legitimate shapes still resolve. A mapped drive is a drive
+    # letter, not a UNC spelling, so the operator's transfer drive keeps working.
+    assert _resolve_ref_to_disk("models/TTS/refs/indextts2/ix_male_warm.wav")
+    assert _resolve_ref_to_disk("U:" + b + "refs" + b + "x.wav")
+
+
+def test_the_guard_lives_in_the_one_resolver():
+    """Eleven call sites reach this resolver and every one already treats None
+    as 'asked for and not found'. Guarding each caller instead would be eleven
+    chances to miss one -- which is how this site survived the first pass."""
+    src = (_NODES / "_otr_voice_node_common.py").read_text(encoding="utf-8")
+    i = src.index("def _resolve_ref_to_disk")
+    body = src[i:i + 2200]
+    assert "is_remote_path" in body, (
+        "the remote refusal belongs inside _resolve_ref_to_disk")

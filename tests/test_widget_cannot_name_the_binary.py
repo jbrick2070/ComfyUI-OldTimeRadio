@@ -37,6 +37,7 @@ were made to return an ABSOLUTE path or ``None``.
 from __future__ import annotations
 
 import ast
+import json
 import os
 import pathlib
 import shutil
@@ -316,3 +317,80 @@ def test_the_ledger_route_discloses_no_absolute_path():
     assert '"fullpath"' not in handler
     assert '"reason": str(exc)' not in handler
     assert '"filename"' in handler, "the basename still identifies the episode"
+
+
+def _scrub_from_shipped_source():
+    """Load the shipped `_otr_scrub_paths` out of `__init__.py`.
+
+    Exec'd from source rather than imported, the same way
+    `test_http_render_route_gate` used to load the route block: importing the
+    package pulls in ComfyUI's `server` module, which does not exist here.
+    """
+    src = (REPO / "__init__.py").read_text(encoding="utf-8")
+    start = src.index("    import re as _otr_re")
+    end = src.index('    @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")')
+    body = src[start:end].split("\n")
+    block = "\n".join(l[4:] if l.startswith("    ") else l for l in body)
+    ns: dict = {}
+    exec(block, ns)                                   # noqa: S102 -- shipped code
+    return ns["_otr_scrub_paths"]
+
+
+def test_the_ledger_route_scrubs_paths_from_the_whole_document():
+    """Removing the top-level `fullpath` was NOT enough, and the first pass at
+    this stopped there. The route returns the ENTIRE ledger, and one live
+    episode ledger carried 75 absolute paths inside it: `meta.paths` has ten
+    keys, and every still, cue and final asset carries its own. The scrub runs
+    on the serialized response and the on-disk record is untouched."""
+    src = (REPO / "__init__.py").read_text(encoding="utf-8")
+    assert '"ledger": _otr_scrub_paths(ledger)' in src, (
+        "the response must serialize a scrubbed projection, not the raw ledger")
+    scrub = _scrub_from_shipped_source()
+
+    b = chr(92)          # a backslash is BUILT here, never escaped in source
+    cases = [
+        ("C:" + b + "Users" + b + "jeffr" + b + "x.mp4", "x.mp4"),
+        ("C:/Users/jeffr/y.png", "y.png"),
+        ("/home/j/a/b.wav", "b.wav"),
+        (b + b + "host" + b + "share" + b + "f.png", "f.png"),
+        ("relative/path.txt", "relative/path.txt"),
+        ("just a sentence about C: drives", "just a sentence about C: drives"),
+        ("", ""),
+    ]
+    for probe, want in cases:
+        assert scrub(probe) == want, (
+            "%r -> %r, want %r" % (probe, scrub(probe), want))
+
+
+def test_the_scrub_never_mutates_the_ledger_it_was_given():
+    """The on-disk record is the production artifact; this is a projection for
+    one HTTP reader. Non-path values must survive untouched, or the route would
+    be lying about the episode rather than merely hiding its location."""
+    scrub = _scrub_from_shipped_source()
+    b = chr(92)
+    doc = {
+        "meta": {"paths": {"audio_dir": "C:" + b + "out" + b + "audio"}},
+        "lines": [{"id": "l1", "wav": "C:" + b + "out" + b + "l1.wav",
+                   "n": 3, "ok": True, "none": None}],
+    }
+    frozen = json.dumps(doc, sort_keys=True)
+    out = scrub(doc)
+    assert out["meta"]["paths"]["audio_dir"] == "audio"
+    assert out["lines"][0]["wav"] == "l1.wav"
+    assert out["lines"][0]["n"] == 3
+    assert out["lines"][0]["ok"] is True
+    assert out["lines"][0]["none"] is None
+    assert json.dumps(doc, sort_keys=True) == frozen, (
+        "the input document was mutated; the response must be a copy")
+
+
+def test_the_scrub_is_depth_bounded():
+    """It walks a document read from disk inside an HTTP handler, so unbounded
+    recursion would be a denial of service the route hands out for free."""
+    scrub = _scrub_from_shipped_source()
+    deep: dict = {}
+    cursor = deep
+    for _ in range(60):
+        cursor["n"] = {}
+        cursor = cursor["n"]
+    assert isinstance(scrub(deep), dict)

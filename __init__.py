@@ -462,6 +462,36 @@ try:
         "Cache-Control": "no-store",
     }
 
+    import re as _otr_re
+
+    #: An absolute local path, in the spellings a ledger actually holds:
+    #: `C:\...`, `C:/...`, a POSIX `/...`, and the UNC `\\host\share`. Matched
+    #: on the WHOLE value -- a sentence that merely mentions a path is prose and
+    #: is left alone, because rewriting narrative text would corrupt the reader's
+    #: view of the episode for no privacy gain.
+    _OTR_ABS_PATH = _otr_re.compile(
+        r"^(?:[A-Za-z]:[\\/]|\\\\|/)[^\r\n]*$")
+
+    def _otr_scrub_paths(value, _depth=0):
+        """Return ``value`` with every absolute-path STRING reduced to its
+        basename. Recursive over dicts and lists; never mutates the input.
+
+        Depth-bounded because this walks a document that arrived from disk, and
+        an unbounded recursion in an HTTP handler is a denial of service the
+        route would hand out for free. A ledger nests ~6 deep; 24 is slack.
+        """
+        if _depth > 24:
+            return value
+        if isinstance(value, dict):
+            return {k: _otr_scrub_paths(v, _depth + 1) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_otr_scrub_paths(v, _depth + 1) for v in value]
+        if isinstance(value, str) and _OTR_ABS_PATH.match(value):
+            # `basename` on a Windows path under POSIX returns the whole string,
+            # so split on both separators rather than trusting os.path here.
+            return value.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or value
+        return value
+
     @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")
     async def _otr_latest_ledger(request):
         try:
@@ -491,18 +521,28 @@ try:
             with open(latest, "r", encoding="utf-8") as f:
                 ledger = _otr_json.load(f)
             # NO ABSOLUTE PATH IN THE RESPONSE (2026-09-05). This route is
-            # registered on every install and needs no authentication, and
-            # `fullpath` named the operator's own directory tree -- their
-            # Windows username included -- to anyone who could reach it. The
-            # basename is what a reader actually uses, and it identifies the
-            # episode. Nothing shipped consumed `fullpath`: `viewer/` is
-            # excluded from the published bundle and called different routes.
+            # registered on every install and needs no authentication, and it
+            # named the operator's own directory tree -- their Windows username
+            # included -- to anyone who could reach it.
+            #
+            # REMOVING THE TOP-LEVEL `fullpath` WAS NOT ENOUGH, and the first
+            # pass at this stopped there. The response returns the whole ledger
+            # DOCUMENT, and that document is full of absolute paths: the ten
+            # keys `_otr_ledger` writes under `meta.paths` (ledger_path,
+            # episode_root, audio_dir, stills/portraits/videos/composited dirs,
+            # obs_dir, obs_final), plus every still's `path` and cache
+            # `pool_path`, the music-cue WAVs, and the final audio/video/publish
+            # targets. One live episode ledger measured 75 of them. So the
+            # scrub happens on the SERIALIZED RESPONSE, recursively, by value:
+            # any string that looks like an absolute local path becomes its
+            # basename. The on-disk ledger is untouched -- this is a projection
+            # for one HTTP reader, not a change to the record.
             return _otr_web.json_response({
                 "ok": True,
                 "filename": _otr_os.path.basename(latest),
                 "mtime": _otr_os.path.getmtime(latest),
                 "size": _otr_os.path.getsize(latest),
-                "ledger": ledger,
+                "ledger": _otr_scrub_paths(ledger),
             }, headers=_OTR_CORS_HEADERS)
         except Exception as exc:
             # The exception TEXT carries paths too (a FileNotFoundError names
