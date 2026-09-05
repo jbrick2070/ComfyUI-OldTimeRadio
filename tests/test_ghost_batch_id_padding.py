@@ -146,3 +146,47 @@ def test_a_clean_batch_logs_no_repair(caplog):
                          logger="OTR.video.ghost_signal_author"):
         gsa.parse_batch_response(_envelope(zip(ELEVEN, LEAVES)), ELEVEN)
     assert not [r for r in caplog.records if "id" in r.getMessage()]
+
+
+# --------------------------------------------------------------------------- #
+# A JSON failure now says WHAT it choked on, not only where.
+# --------------------------------------------------------------------------- #
+
+def test_a_json_failure_carries_the_text_around_it():
+    """21 real beats died on "not JSON" and nothing on disk said why.
+
+    A `JSONDecodeError` names a column. The model's raw response is stored
+    nowhere, so "line 1 column 852" could equally mean a truncated response, an
+    unescaped quote inside a leaf, or prose that was never JSON -- three bugs
+    with three different fixes. The reason now carries the text around the
+    failure, so the NEXT occurrence is readable off the ledger.
+    """
+    broken = ('{"shots": [{"id": "g000", "drawable_beat": "the dial '
+              'reads "OFF" and settles"}]}')
+    with pytest.raises(gsa.GhostAuthorParseError) as caught:
+        gsa.parse_batch_response(broken, ["g000"])
+    message = str(caught.value)
+    assert "not JSON" in message
+    assert "around the failure" in message
+    assert "<<HERE>>" in message
+    assert "OFF" in message
+
+
+def test_the_excerpt_is_bounded_and_stays_on_one_line():
+    filler = "x" * 4000
+    broken = '{"shots": [{"id": "g000", "drawable_beat": "%s\n\n' % filler
+    with pytest.raises(gsa.GhostAuthorParseError) as caught:
+        gsa.parse_batch_response(broken, ["g000"])
+    message = str(caught.value)
+    assert "\n" not in message and "\r" not in message
+    assert len(message) < 400, len(message)
+
+
+def test_a_failure_with_no_position_degrades_quietly():
+    """The excerpt is an ADDITION; its absence must never be an error."""
+    class _NoPos(ValueError):
+        pass
+
+    assert gsa._decode_excerpt("some body", _NoPos("boom")) == ""
+    assert gsa._decode_excerpt("", ValueError("boom")) == ""
+    assert gsa._decode_excerpt(None, ValueError("boom")) == ""

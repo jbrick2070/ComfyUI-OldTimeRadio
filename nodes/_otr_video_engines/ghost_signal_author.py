@@ -836,6 +836,40 @@ def _object_pairs_hook(pairs):
     return dict(pairs)
 
 
+#: How much text either side of a JSON failure the rejection reason carries.
+GHOST_DECODE_EXCERPT_RADIUS = 60
+
+
+def _decode_excerpt(body, exc) -> str:
+    """The text AROUND a JSON failure, as a one-line suffix for the reason.
+
+    A ``JSONDecodeError`` names a column and nothing else, and the model's raw
+    response is not stored anywhere, so a failure at "line 1 column 852" has
+    been unreadable after the fact. That is not hypothetical: across the 27
+    episode ledgers on the dev box, 21 beats fell to the deterministic path on
+    a JSON error and NOTHING on disk says whether the response was truncated,
+    carried an unescaped quote, or was never JSON at all. Those are three
+    different bugs with three different fixes.
+
+    Bounded on purpose -- `GHOST_DECODE_EXCERPT_RADIUS` characters either side,
+    with newlines and tabs escaped so the reason stays one line in the ledger's
+    `fallback_reason` and in the log. Returns "" when the exception carries no
+    position, so the caller's message degrades to what it said before.
+    """
+    pos = getattr(exc, "pos", None)
+    text = str(body or "")
+    if not isinstance(pos, int) or not text:
+        return ""
+    pos = max(0, min(pos, len(text)))
+    start = max(0, pos - GHOST_DECODE_EXCERPT_RADIUS)
+    stop = min(len(text), pos + GHOST_DECODE_EXCERPT_RADIUS)
+    window = text[start:pos] + " <<HERE>> " + text[pos:stop]
+    window = window.replace("\\", "\\\\").replace("\n", "\\n")
+    window = window.replace("\r", "\\r").replace("\t", "\\t")
+    return " -- around the failure: %s%s%s" % (
+        "..." if start else "", window, "..." if stop < len(text) else "")
+
+
 _OPAQUE_ID_DIGITS_RE = re.compile(r"\Ag(\d+)\Z")
 
 
@@ -898,7 +932,8 @@ def parse_batch_response(raw, expected_ids) -> dict:
         raise
     except ValueError as exc:
         raise GhostAuthorParseError(
-            "Ghost batch response is not JSON: %s" % (exc,)) from exc
+            "Ghost batch response is not JSON: %s%s"
+            % (exc, _decode_excerpt(body, exc))) from exc
     if body[end:].strip():
         raise GhostAuthorParseError(
             "Ghost batch response carries trailing content after the JSON "

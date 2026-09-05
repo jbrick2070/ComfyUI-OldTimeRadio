@@ -293,10 +293,29 @@ RULINGS (constraints, not history):
 > `_canonical_opaque_id` re-spells it, WARNING-logs both spellings, and relaxes
 > nothing else. `tests/test_ghost_batch_id_padding.py`, 19 tests.
 >
+> **The JSON row is now DIAGNOSABLE rather than fixed, deliberately.** 21 beats
+> died on `Ghost batch response is not JSON: Expecting ',' delimiter: line 1
+> column 852` and nothing on disk says which bug that was -- a truncated
+> response, an unescaped quote inside a leaf, and prose that was never JSON all
+> produce that shape and want three different fixes. The raw response is stored
+> nowhere. Two things argue AGAINST the obvious truncation theory, which is why
+> it must not be "fixed" on a hunch: `batch_output_tokens` is `64 + 48 * shots`,
+> so that 13-beat batch had 688 tokens against roughly 280 tokens of text; and
+> `Expecting ',' delimiter` is a STRUCTURAL break, where a truncated response
+> normally reads `Unterminated string` or `Expecting value`. An unescaped quote
+> inside a leaf fits the evidence better than a cut-off -- but "fits better" is
+> not measured. `_decode_excerpt` now puts a bounded window of the text
+> around the failure into the rejection reason, which lands in that beat's
+> `fallback_reason`. **Read the next occurrence off a ledger and then fix the
+> real one.**
+>
 > **What this row should be re-scoped to before it takes a GPU leg:** the two
-> content validators and the truncated response are what an episode actually
-> dies of. The uniqueness change stays correct and stays worth doing -- it just
-> is not the first thing, and it should not buy the leg on its own.
+> content validators -- "requests a person in object mode" (29 beats) and
+> "names a texture instead of a thing" (28) -- are what an episode actually
+> dies of, and both are prompt-and-validator DESIGN rows rather than the
+> mechanical change this row describes. The uniqueness change stays correct and
+> stays worth doing; it just is not the first thing, and it should not buy the
+> leg on its own.
 
 **Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
 
