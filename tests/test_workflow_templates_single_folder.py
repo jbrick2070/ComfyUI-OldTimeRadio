@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 TEMPLATE_FOLDER_NAMES = ("example_workflows", "example", "examples", "workflow", "workflows")
@@ -48,3 +49,39 @@ def test_canonical_ships_kokoro_on_both_voice_slots():
     assert by_id[80]["widgets_values"][0] == "kokoro_builtin"
     assert by_id[80]["widgets_values"][3] == "kokoro" and by_id[80]["widgets_values"][4] == "kokoro"
     assert by_id[81]["widgets_values"] == ["kokoro"] and by_id[82]["widgets_values"] == ["kokoro"]
+
+
+def test_the_boot_message_names_only_templates_that_ship():
+    """The FIRST line a new install prints must not name a missing template.
+
+    It did. From 2026-09-02, when the operator's ruling dropped
+    ``otr_4060_floor`` from the gallery, until 2026-09-05, the boot banner told
+    every first-time user to open
+    ``Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_4060_floor``
+    -- a template that no longer shipped. Verified against the PUBLISHED
+    alpha.22 bundle, not the repo, because ``.comfyignore`` decides what ships:
+    ``workflows/`` carried exactly ``otr_canonical.json`` and
+    ``otr_story_only.json``.
+
+    ``otr_4060_floor`` is still a valid PROFILE id for provisioning and the
+    headless runner, which is precisely why the stale name looked plausible and
+    survived three days. This test reads the banner and requires every
+    template-shaped name in it to exist as a shipped graph.
+    """
+    source = (REPO / "__init__.py").read_text(encoding="utf-8")
+    marker = "[OldTimeRadio] Load the show:"
+    assert marker in source, "the boot banner was renamed; re-pin this test"
+    start = source.index(marker)
+    banner = source[start:source.index(")", source.index("print(", start)) + 1]
+
+    shipped = {p.stem for p in (REPO / "workflows").glob("*.json")}
+    assert shipped, "no shipped templates found"
+
+    named = set(re.findall(r"\botr_[a-z0-9_]+\b", banner))
+    # A path reference like workflows/otr_canonical.json is fine either way --
+    # it resolves through the same set.
+    missing = sorted(n for n in named if n not in shipped)
+    assert not missing, (
+        "the boot banner names %r, which workflows/ does not ship (it ships "
+        "%r). A first boot must never point at a template that is not there."
+        % (missing, sorted(shipped)))

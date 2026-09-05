@@ -421,17 +421,26 @@ else:
 # ComfyUI's template gallery serves ONE folder per pack: it registers a static
 # mount at the same URL for every folder named example_workflows / example /
 # examples / workflow / workflows, and the first mount wins. This pack's
-# templates therefore all live in workflows/ (otr_4060_floor, otr_canonical,
-# otr_story_only); an example_workflows/ folder beside it made otr_canonical
-# list in the gallery and 404 on click (2026-09-01 ship audit; the trap is
-# spelled out in docs/2026-08-23-workflow-discoverability-PROBLEM.md).
-# otr_4060_floor is the zero-download floor (viz video, bark voices,
-# musicgen, E2B writer); name it and the 16 GB canonical so a first boot
-# never points at a template that is not there.
+# templates therefore all live in workflows/; an example_workflows/ folder
+# beside it made otr_canonical list in the gallery and 404 on click (2026-09-01
+# ship audit; the trap is spelled out in
+# docs/2026-08-23-workflow-discoverability-PROBLEM.md).
+#
+# NAME ONLY WHAT SHIPS. This line used to point a first-time user at
+# `otr_4060_floor`, which the operator's 2026-09-02 ruling removed from the
+# gallery -- so the very first message a new install prints named a template
+# that is not there, which is the exact failure the paragraph above exists to
+# prevent. Verified against the PUBLISHED bundle rather than the repo, because
+# .comfyignore decides what ships: workflows/ contains exactly
+# otr_canonical.json (with its otr_canonical.jpg thumbnail) and
+# otr_story_only.json. `otr_4060_floor` remains a valid PROFILE id for
+# provisioning and the headless runner; it was never a gallery template after
+# 09-02. If a template is added or dropped, this line changes in the same edit.
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-      "EXTENSIONS > comfyui-old-time-radio > otr_4060_floor  (first episode, "
-      "any card) -- or drag workflows/otr_canonical.json onto the canvas "
-      "(16 GB graph)")
+      "EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the full episode; "
+      "otr_story_only writes the script alone) -- or drag "
+      "workflows/otr_canonical.json onto the canvas. On an 8 GB card load the "
+      "matching saved-dropdown variant from workflows/variants/ instead.")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger
