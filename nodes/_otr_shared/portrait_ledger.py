@@ -80,6 +80,16 @@ def episode_stills_dir(episode_id: str,
     ep = str(episode_id or "").strip()
     if not ep:
         raise PortraitUnresolved("empty episode_id for episode_stills_dir")
+    # VALIDATE THE ID (2026-09-05). This helper is the twin of
+    # _otr_paths.otr_stills_dir, which has always validated -- two helpers for
+    # one directory, one of them guarded. `episode_id` reaches here from the
+    # workflow's own ledger, so a traversal token in it walks the whole stills
+    # directory out of the episodes root. String check only: the _validate_contract
+    # half resolves against comfy_output_dir() and would refuse the output_dir
+    # override this function exists to honour.
+    if any(tok in ep for tok in ("/", "\\", "..", "\x00")):
+        raise PortraitUnresolved(
+            "episode_id %r contains a path separator or traversal token" % (ep,))
     return Path(_output_base(output_dir)) / "otr" / "episodes" / ep / "stills"
 
 

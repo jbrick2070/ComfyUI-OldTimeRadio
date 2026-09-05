@@ -609,6 +609,58 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
     return ep_dir, ep
 
 
+#: PNG magic. A cache source must BE a PNG, not merely exist: the whole point of
+#: the forged-entry attack is that any readable file passes an existence check.
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def _trusted_pool_source(src, output_dir) -> bool:
+    """True iff ``src`` is a still this pack itself wrote. NEVER raises.
+
+    The cache index and the image rows both arrive in ``script_json``, i.e. from
+    an unauthenticated ``/prompt`` body. Before this check the only gate was
+    ``os.path.exists(src)``, so a forged ``pool_path`` pointing at any readable
+    file was copied into the episode stills directory -- which ComfyUI serves
+    over ``/view``. That made it an arbitrary file READ, not merely a stray copy.
+
+    Three conditions, all cheap:
+      * not a remote path -- a UNC value would authenticate to the host the
+        workflow named, on the stat below (the dispatcher had NO remote guard);
+      * inside this run's own ``<output>/otr/`` tree, resolved from the SAME
+        ``output_dir`` the caller already threads to ``episode_stills_dir`` --
+        not ``comfy_output_dir()``, which would refuse every ``output_dir=tmp_path``
+        test;
+      * a real PNG of at least ``_MIN_PNG_BYTES``.
+
+    A False answer is not an error: the caller falls into the existing
+    "no on-disk file; regenerating (LOUD)" path, which is exactly right -- an
+    untrusted cache entry should simply not be a cache hit.
+    """
+    try:
+        text = str(src or "").strip()
+        if not text:
+            return False
+        try:
+            from ._otr_paths import is_remote_path
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import is_remote_path  # type: ignore
+        if is_remote_path(text):
+            return False
+        root = os.path.normcase(os.path.abspath(
+            os.path.join(_pl._output_base(output_dir), "otr")))
+        real = os.path.normcase(os.path.abspath(text))
+        if os.path.commonpath([real, root]) != root:
+            return False
+        if not os.path.isfile(real):
+            return False
+        if os.path.getsize(real) < _MIN_PNG_BYTES:
+            return False
+        with open(real, "rb") as handle:
+            return handle.read(len(_PNG_MAGIC)) == _PNG_MAGIC
+    except Exception:  # noqa: BLE001 -- a trust probe must never raise
+        return False
+
+
 def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     """Copy a still into the EPISODE stills dir (idempotent; readable name
     ``{object_id}_{hash12}.png``). Returns the episode-local path. Lazy
@@ -616,6 +668,16 @@ def _materialize_episode_copy(src_path, ep_dir, object_id, content_hash):
     import shutil
     os.makedirs(str(ep_dir), exist_ok=True)
     dst = os.path.join(str(ep_dir), f"{object_id}_{str(content_hash)[:12]}.png")
+    # THE DESTINATION MUST STAY IN THE EPISODE DIR (2026-09-05). `object_id`
+    # reaches this f-string from the workflow's own ledger, so a value like
+    # `../escaped` walks the copy out of stills/. Asserted here rather than at
+    # the call sites because BOTH callers want it and neither has a reason to
+    # write outside the episode folder.
+    base = os.path.normcase(os.path.abspath(str(ep_dir)))
+    if os.path.commonpath([os.path.normcase(os.path.abspath(dst)), base]) != base:
+        raise ImageRenderError(
+            "image object_id %r would place its still outside the episode "
+            "directory; ids name a file, never a location." % (object_id,))
     if not os.path.exists(dst):
         shutil.copyfile(str(src_path), dst)
     return dst
@@ -1283,6 +1345,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         obj_h = int(obj.get("h") or 0)
         if not oid:
             continue
+        # `oid` becomes a FILENAME (_materialize_episode_copy) and a ledger key.
+        # It arrives from the workflow, so a separator or traversal token in it
+        # is a location, not a name (2026-09-05). Blacklist, not whitelist: live
+        # ids include still_b001, still_music_opening_001, c01 and announcer,
+        # and a portrait id can inherit an LLM-authored char_id.
+        if any(tok in oid for tok in ("/", "\\", "..", "\x00", ":")):
+            raise ImageRenderError(
+                "image object_id %r contains a path separator or traversal "
+                "token; ids name a still, never a location." % (oid,))
         if role not in _role_slots.ROLE_TO_VIDEO_SLOT:
             raise ImageRenderError(
                 f"{oid}: image object declares unknown role {role!r}; cannot "
@@ -1485,7 +1556,9 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     ref_row = im
                     src = str(im.get("pool_path") or im.get("path") or "")
                     break
-            if src and os.path.exists(src):
+            # An untrusted cache source is simply NOT A HIT: fall through to
+            # the LOUD regenerate below rather than copying it (2026-09-05).
+            if src and _trusted_pool_source(src, output_dir):
                 try:
                     dst = _materialize_episode_copy(
                         src, ep_dir, oid,
