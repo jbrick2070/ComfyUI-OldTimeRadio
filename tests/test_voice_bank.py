@@ -12,17 +12,7 @@ import random
 
 import pytest
 
-from nodes._otr_voice_bank import (
-    CASTING_POLICY_VERSION,
-    VoiceBankEntry,
-    VoiceCastingError,
-    announcer_voice_ref,
-    assign_voice_for_slot,
-    get_all_registered_voices,
-    load_voice_bank,
-    stable_cast_seed,
-    voice_ref_usage_keys,
-)
+from nodes._otr_voice_bank import CASTING_POLICY_VERSION, VoiceBankEntry, VoiceCastingError, announcer_voice_ref, assign_voice_for_slot, load_voice_bank, stable_cast_seed, voice_ref_usage_keys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 NODE_SRC = REPO_ROOT / "nodes" / "_otr_voice_bank.py"
@@ -49,12 +39,6 @@ def test_shipped_bank_loads_and_validates():
     from nodes._otr_audio_engines import is_registered
     for e in entries:
         assert is_registered(e.engine), f"bank engine {e.engine!r} not registered"
-
-
-def test_get_all_registered_voices_stable_sorted():
-    voices = get_all_registered_voices()
-    ids = [v.voice_ref_id for v in voices]
-    assert ids == sorted(ids)
 
 
 def test_bank_entries_code_to_schema():

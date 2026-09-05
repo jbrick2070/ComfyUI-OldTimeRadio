@@ -192,14 +192,3 @@ def test_policy_aspects_has_per_role_entries():
     assert aspects["character_video"] == "wide"
 
 
-def test_dispatcher_keeps_character_still_for_humo_14b():
-    # The image dispatcher must NOT skip the character still: humo_14B_169 needs
-    # an init_image, so _still_needed_for_role is True on character_video.
-    pol = _direct_policy()
-    assert disp._still_needed_for_role(pol, "character_video") is True
-    # a role routed to an accepts_still=False engine (viz_green) skips the still.
-    pol_vis = {"video_models": {"music_video_model": {"engine_id": "viz_green"}}}
-    assert disp._still_needed_for_role(pol_vis, "music_visual") is False
-    # unknown role stays fail-safe in the IMAGE phase (keep the still; the
-    # explicit ROLE_TO_VIDEO_SLOT guard runs before the loud resolver)
-    assert disp._still_needed_for_role(pol, "not_a_role") is True

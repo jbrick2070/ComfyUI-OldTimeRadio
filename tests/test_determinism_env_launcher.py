@@ -7,13 +7,7 @@ import random
 import pytest
 import torch
 
-from nodes._otr_determinism import (
-    REQUIRED_DETERMINISM_ENV,
-    apply_module_determinism_defaults,
-    assert_determinism_env_ready,
-    determinism_env_status,
-    deterministic_inference,
-)
+from nodes._otr_determinism import REQUIRED_DETERMINISM_ENV, determinism_env_status, deterministic_inference
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _LAUNCH_CMD = REPO_ROOT / "scripts" / "_otr_soak_server_launch.cmd"
@@ -27,22 +21,6 @@ def test_required_env_keys():
         "CUBLAS_WORKSPACE_CONFIG", "PYTHONHASHSEED",
         "NVIDIA_TF32_OVERRIDE", "TOKENIZERS_PARALLELISM",
     }
-
-
-def test_assert_env_ready_passes_when_all_set(monkeypatch):
-    for k, v in REQUIRED_DETERMINISM_ENV.items():
-        monkeypatch.setenv(k, v)
-    assert assert_determinism_env_ready() is True
-
-
-def test_assert_env_ready_raises_when_missing(monkeypatch):
-    for k, v in REQUIRED_DETERMINISM_ENV.items():
-        monkeypatch.setenv(k, v)
-    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
-    with pytest.raises(RuntimeError):
-        assert_determinism_env_ready()
-    # non-strict reports without raising
-    assert assert_determinism_env_ready(strict=False) is False
 
 
 def test_env_status_reports_actual(monkeypatch):
@@ -127,20 +105,6 @@ def test_model_loader_tf32_disabled():
 
 
 # --- apply_module_determinism_defaults ------------------------------------
-
-def test_apply_module_defaults_disables_tf32():
-    prev_mm = torch.backends.cuda.matmul.allow_tf32
-    prev_cudnn = torch.backends.cudnn.allow_tf32
-    try:
-        torch.backends.cuda.matmul.allow_tf32 = True
-        apply_module_determinism_defaults()
-        assert torch.backends.cuda.matmul.allow_tf32 is False
-        assert torch.backends.cudnn.allow_tf32 is False
-        assert torch.backends.cudnn.deterministic is True
-        assert torch.backends.cudnn.benchmark is False
-    finally:
-        torch.backends.cuda.matmul.allow_tf32 = prev_mm
-        torch.backends.cudnn.allow_tf32 = prev_cudnn
 
 
 # --- scoped deterministic_inference CM ------------------------------------

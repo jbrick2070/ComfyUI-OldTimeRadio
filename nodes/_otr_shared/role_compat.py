@@ -24,7 +24,7 @@ Dependency-free + fail-closed: an unknown role raises :class:`RoleCompatError`
 from __future__ import annotations
 
 import enum
-from typing import Iterable, TypedDict
+from typing import TypedDict
 
 
 class Role(str, enum.Enum):
@@ -127,25 +127,3 @@ def engine_fits_role(descriptor: EngineDescriptor, role: str) -> bool:
     if not required_set <= INPUT_TOKENS:
         return False
     return required_set <= available
-
-
-def filter_engines_for_role(
-        role: str, engine_descriptors: Iterable[EngineDescriptor]) -> list:
-    """Engine ids that fit ``role``, fail-closed, order-preserving.
-
-    ``engine_descriptors`` is any iterable of :class:`EngineDescriptor`-shaped
-    dicts (one per registered engine). Returns the subset of ``engine_id``s the
-    role can actually drive -- the list the director annotates / ShotLock
-    validates against. Raises :class:`RoleCompatError` only for an unknown role.
-    """
-    available = role_available_inputs(role)  # validate role up-front
-    out = []
-    for desc in engine_descriptors or []:
-        if not isinstance(desc, dict):
-            continue
-        engine_id = desc.get("engine_id")
-        if not engine_id:
-            continue
-        if engine_fits_role(desc, role):
-            out.append(engine_id)
-    return out

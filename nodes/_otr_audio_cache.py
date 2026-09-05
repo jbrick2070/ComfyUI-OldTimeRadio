@@ -199,16 +199,6 @@ def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEM
     return str(getattr(record, "request_schema_version", "")) != str(target_request_schema_version)
 
 
-def detect_ledger_schema_version(ledger: dict) -> str:
-    """Read a ledger's schema version (read-only; never mutates the ledger)."""
-    meta = (ledger or {}).get("meta") or {}
-    return str(
-        meta.get("ledger_schema_version")
-        or meta.get("schema_version")
-        or "1"
-    )
-
-
 class FileAudioCache:
     """File-backed :class:`AudioCache` implementation (G0).
 

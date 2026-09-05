@@ -69,39 +69,6 @@ def test_engine_family_map():
     assert rd.engine_family(NAME) == "abstract"
 
 
-def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
-    """G3.3 / lesson L3 (lane 14, 2026-08-11) -- the last of the four.
-
-    The class comment had claimed "CONTINUITY none" since this engine was
-    written while `continuity=` was never passed, so the value was a dataclass
-    DEFAULT -- the right answer nobody had decided.
-
-    NONE is true here for a reason worth stating precisely, because this lane
-    LOOKS stateful and is not: the cairo surface and context ARE reused across
-    frames (for allocation reasons), but `paint_mandala` repaints the full field
-    every frame from that frame's own audio analysis and nothing reads a
-    predecessor frame's PIXELS. So no terminal state exists to inherit.
-
-    Cairo-free: reads the declaration and the AST, never imports the library.
-    """
-    import inspect
-
-    from nodes._otr_video_engines import frame_contract as fcm
-    from nodes._otr_video_engines.eng_viz_mandala import VizMxcMandalaEngine
-
-    eng = vreg.get_engine(NAME)
-    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
-    # DECLARED, not defaulted -- AST, not source TEXT (lesson L20: the comment
-    # above the declaration contains the same literal, so a substring check
-    # would pass with the real keyword deleted; and the resolved VALUE cannot
-    # catch it either, because the dataclass default is the same constant).
-    assert fcm.declares_continuity_kwarg(eng)
-    render_src = inspect.getsource(VizMxcMandalaEngine.render_clip)
-    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
-                                 "continuity_frame"):
-        assert consumes_predecessor not in render_src
-
-
 def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
     """G2 / lesson L19 (lane 14, 2026-08-11), premise re-checked with suspicion.
 

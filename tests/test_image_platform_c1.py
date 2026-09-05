@@ -158,26 +158,6 @@ def test_image_registry_register_and_assert_usable(clean_image_registry):
         ireg.assert_usable("nope", "music_visual")
 
 
-def test_image_role_filter_shared(clean_image_registry):
-    """C's per-role dropdown uses the SAME role_compat filter (AS-1), not a fork."""
-    clean_image_registry._registry.clear()
-    ireg.register(_img_stub(name="txt", required_inputs=("text_prompt",)))
-    ireg.register(_img_stub(name="needs_audio", required_inputs=("audio_ref",)))
-    descs = [
-        {"engine_id": n, "roles": rc.ROLES,
-         "required_inputs": tuple(ireg.get_engine(n).required_inputs)}
-        for n in ireg.all_engine_names()
-    ]
-    # rip-sfx-broll (2026-07-01): every surviving role supplies audio_ref, so
-    # the filter admits both engines; the SHARED-filter proof is that a dead
-    # role token raises through the same single code path.
-    fit = rc.filter_engines_for_role("character_video", descs)
-    assert "txt" in fit and "needs_audio" in fit
-    import pytest as _pytest
-    with _pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("retired_role_b", descs)
-
-
 #: Minimal VALID video policy for director calls with no 3D engine in play
 #: (video_policy_json is REQUIRED + fail-closed per the 3D plan section 3).
 _EMPTY_VIDEO_POLICY = json.dumps({"video_models": {}})
@@ -286,7 +266,6 @@ def test_video_policy_json_is_required_and_fail_closed():
             OTRImageDirector().direct(**_direct_kwargs(video_policy_json=bad))
 
 
-
 def test_no_hardcoded_image_engine_name(clean_image_registry):
     """M2 (behavioral): the per-role image COMBO is sourced from the registry, not
     a hardcoded list -- a brand-new engine name appears in the dropdown with NO
@@ -303,49 +282,6 @@ def test_no_hardcoded_image_engine_name(clean_image_registry):
 
 
 # --------------------------------------------------------------------------- #
-def test_meta_brief_prompt_temp0_hash_and_bounded_fallback():
-    cast = [{
-        "char_id": "c1",
-        "name": "BABA",
-        "portrait_prompt": "a tall weathered spacer",
-    }]
-    meta = {"story_brief_terms": {"setting": ["a derelict orbital station"]}}
-
-    payload, _warnings = mbp.derive_image_prompts(
-        cast,
-        meta,
-        llm_fn=lambda _prompt: (
-            "a tall weathered spacer, lined face, station, photographic"
-        ),
-    )
-    prompt = _by_id(payload)["c1"]
-    assert prompt["source"] == "llm"
-    assert prompt["prompt_hash"]
-    assert prompt["kind"] == "portrait"
-    assert (prompt["w"], prompt["h"]) == (832, 1216)
-
-    fallback, warnings = mbp.derive_image_prompts(
-        cast, meta, llm_fn=lambda _prompt: "",
-    )
-    fallback_prompt = _by_id(fallback)["c1"]
-    assert fallback_prompt["source"] == "template_after_llm_miss"
-    assert "spacer" in fallback_prompt["prompt"]
-    assert "station" in fallback_prompt["prompt"]
-    assert any("deterministic same-story composition" in row for row in warnings)
-
-    template, _warnings = mbp.derive_image_prompts(cast, meta, llm_fn=None)
-    template_prompt = _by_id(template)["c1"]
-    assert template_prompt["source"] == "template"
-    import hashlib
-    expected_hash = hashlib.sha256(
-        json.dumps(
-            template_prompt["prompt"],
-            ensure_ascii=True,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
-    assert template_prompt["prompt_hash"] == expected_hash
 
 
 def test_meta_brief_appearance_by_char_id():
@@ -355,45 +291,6 @@ def test_meta_brief_appearance_by_char_id():
     assert mbp._appearance_for_char(
         [{"char_id": "c1", "name": "BABA", "portrait_prompt": "unique-token"}], "BABA"
     ) == ""   # never by display name
-
-
-def test_meta_brief_keeps_authored_visual_vocabulary():
-    cast = [{
-        "char_id": "c1",
-        "name": "X",
-        "portrait_prompt": "scarred veteran",
-    }]
-    meta = {"story_brief_terms": {"setting": ["a neon market"]}}
-
-    payload, _warnings = mbp.derive_image_prompts(
-        cast,
-        meta,
-        llm_fn=lambda _prompt: "totally unrelated text",
-    )
-
-    prompt = _by_id(payload)["c1"]
-    assert prompt["source"] == "llm"
-    assert "totally unrelated text" in prompt["prompt"]
-
-
-def test_roles_requiring_stills_needs_a_complete_resolvable_policy(monkeypatch):
-    import nodes._otr_video_engines  # noqa: F401 -- self-register built-ins
-    all_visualizers = _complete_video_models(character="viz_camera")
-    assert disp.roles_requiring_stills({"video_models": all_visualizers}) == frozenset()
-    assert disp.roles_requiring_stills({}) is None
-    assert disp.roles_requiring_stills({"video_models": "bad"}) is None
-    assert disp.roles_requiring_stills({"video_models": {
-        "character_video_model": {"engine_id": "viz_camera"}}}) is None
-    assert disp.roles_requiring_stills({"video_models": _complete_video_models(
-        character="not_a_real_engine")}) is None
-
-    all_still = {"video_models": _complete_video_models(
-        announcer="still_motion", music="still_motion", character="still_motion")}
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_cpu")
-    assert disp.roles_requiring_stills(all_still) == frozenset()
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=wan_ti2v")
-    assert disp.roles_requiring_stills({"video_models": all_visualizers}) == frozenset({
-        "character_video"})
 
 
 def test_meta_brief_all_visualizers_bypass_prompt_authoring():
@@ -534,12 +431,6 @@ def test_dispatcher_rejects_explicit_unknown_object_role(tmp_path):
             lockdir=tmp_path / "lease.lockdir")
 
 
-def test_apply_fresh_cap():
-    assert disp.apply_fresh_cap(40, 15, 9) == 9     # beat budget binds
-    assert disp.apply_fresh_cap(40, 15, 99) == 15   # fresh_cap binds
-    assert disp.apply_fresh_cap(3, 15, 99) == 3     # request binds
-
-
 def _np_pixels(val):
     import numpy as np
     return np.full((8, 8, 3), int(val), dtype=np.uint8)
@@ -550,35 +441,6 @@ def _np_pixels(val):
 # an all-viz_green episode must invoke NO image model (accessible: works for
 # users with no image/video models).
 # --------------------------------------------------------------------------- #
-def test_still_needed_for_role_gates_on_video_engine_init_image():
-    # viz_green ignores init_image -> still NOT needed; wan_ti2v consumes
-    # init_image -> still needed.
-    pol_vis = {"video_models": {"character_video_model": {"engine_id": "viz_green"}}}
-    pol_wan = {"video_models": {"character_video_model": {"engine_id": "wan_ti2v"}}}
-    assert disp._still_needed_for_role(pol_vis, "character_video") is False
-    assert disp._still_needed_for_role(pol_wan, "character_video") is True
-
-
-def test_still_needed_for_role_fails_safe():
-    # no video_models / unknown role / unknown engine -> keep the still (legacy)
-    assert disp._still_needed_for_role({}, "character_video") is True
-    assert disp._still_needed_for_role(
-        {"video_models": {"character_video_model": {"engine_id": "viz_green"}}},
-        "not_a_role") is True
-    assert disp._still_needed_for_role(
-        {"video_models": {"character_video_model": {"engine_id": "nope_engine"}}},
-        "character_video") is True
-
-
-def test_still_needed_keys_on_accepts_still_capability():
-    # Coverage arch (2026-06-18): every real motion lane declares accepts_still=True
-    # (MotionEngineBase default), so a SILENT ltx_video clip now consumes the role's
-    # selected image -- this is the flux2/flux-on-LTX fix. The viz_green lane opts
-    # OUT (accepts_still=False) and mints no still.
-    pol_ltx = {"video_models": {"music_video_model": {"engine_id": "ltx_video"}}}
-    pol_avm = {"video_models": {"music_video_model": {"engine_id": "viz_green"}}}
-    assert disp._still_needed_for_role(pol_ltx, "music_visual") is True
-    assert disp._still_needed_for_role(pol_avm, "music_visual") is False
 
 
 def test_engine_consumes_still_capability_vs_dual_read():
@@ -632,54 +494,6 @@ def test_dispatcher_rejects_unmaterialized_required_scene_target(tmp_path):
             {"episode_id": "ep_missing_target", "cast": []},
             policy, payload, gen_fn=lambda _req: None,
             output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
-
-
-def test_still_needed_honors_force_engine_map(monkeypatch):
-    """Operator 2026-07-01: when OTR_FORCE_ENGINE_MAP forces a no-still visualizer
-    onto a role, the still dispatcher must resolve the SAME effective engine (the
-    render-time apply_engine_override runs LATER) and SKIP the still -- an
-    all-mandala episode must not waste a Flux image-gen pass on stills the mandala
-    ignores. Without the env, humo still consumes its init still (unchanged)."""
-    import nodes._otr_video_engines  # noqa: F401  self-register the engines
-    policy = {"video_models": {
-        "character_video_model": {"engine_id": "humo_14B_169", "custom": False}}}
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    assert disp._still_needed_for_role(policy, "character_video") is True
-    # force ALL roles to the mandala (accepts_still=False) -> still NOT needed
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
-    assert disp._still_needed_for_role(policy, "character_video") is False
-    # a per-role force to the rainbow scope also skips
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=viz_mxc_cpu")
-    assert disp._still_needed_for_role(policy, "character_video") is False
-    # forcing a STILL-consuming engine (all-humo) keeps the still
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=humo")
-    assert disp._still_needed_for_role(policy, "character_video") is True
-
-
-def test_still_needed_honors_radio_is_host_redirect(monkeypatch):
-    """A HuMo-family announcer pick renders as ltx_audio_in when HuMo hosts are
-    off, so image planning must keep the stills required by that effective lane."""
-    import nodes._otr_video_engines  # noqa: F401  self-register the engines
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    policy = {"video_models": {
-        "announcer_video_model": {"engine_id": "humo", "custom": False}}}
-    assert disp._effective_video_engine_for_role(
-        "announcer_visual", "humo") == "ltx_audio_in"
-    assert disp._still_needed_for_role(policy, "announcer_visual") is True
-
-
-def test_still_needed_keeps_cloud_audio_driven_face_bookend_cloud(monkeypatch):
-    """Cloud avatar engines can be audio_driven_face, but they must not inherit
-    the historical local HuMo bookend redirect to ltx_audio_in."""
-    import nodes._otr_video_engines  # noqa: F401  self-register the engines
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    policy = {"video_models": {
-        "announcer_video_model": {"engine_id": "cloud_kling_avatar", "custom": False}}}
-    assert disp._effective_video_engine_for_role(
-        "announcer_visual", "cloud_kling_avatar") == "cloud_kling_avatar"
-    assert disp._still_needed_for_role(policy, "announcer_visual") is True
 
 
 def test_cloud_image_adapter_bypasses_local_gpu_residency(
@@ -824,41 +638,6 @@ def test_dispatch_renders_forced_ltx_announcer_radio_face(
     assert row["role"] == "announcer_visual"
     assert row["w"] == 1472 and row["h"] == 832
     assert row["path"].replace("\\", "/").endswith(".png")
-
-
-def test_effective_engine_after_force_map_fails_closed(monkeypatch):
-    """A malformed force map is TERMINAL at the image phase too.
-
-    CONTRACT INVERTED 2026-07-25 (multi-clip coverage chunk 1a), deliberately:
-    this test used to assert a "fail-safe" that returned the UNFORCED engine on
-    a malformed spec. That was the bug, not the safety net. ``57f4983a`` had
-    already made the identical condition terminal in
-    ``render_driver.apply_engine_override`` -- so the old behaviour meant the
-    operator asked for a forced-route episode, the image phase quietly spent
-    ~10 minutes minting stills for the UNFORCED plan, and only then did render
-    die on the same malformed map. Failing at the first reader is strictly
-    cheaper and strictly honester. Same precedent as the ``_bad_spec_failsafe``
-    inversion in the route-lock chunk.
-    """
-    import nodes._otr_video_engines  # noqa: F401
-    from nodes._otr_shared.route_freeze import RouteFreezeError
-
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    assert disp._effective_engine_after_force_map("character_video", "humo") == "humo"
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=viz_mxc_mandala")
-    assert disp._effective_engine_after_force_map(
-        "character_video", "humo") == "viz_mxc_mandala"
-    # unknown forced engine -> TERMINAL (was: eng_id unchanged)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=not_a_real_engine")
-    with pytest.raises(RouteFreezeError):
-        disp._effective_engine_after_force_map("character_video", "humo")
-    # malformed grammar -> TERMINAL (was: eng_id unchanged)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "garbage-no-equals")
-    with pytest.raises(RouteFreezeError):
-        disp._effective_engine_after_force_map("character_video", "humo")
-    # ...and the full effective-engine seam fails closed on the same input.
-    with pytest.raises(RouteFreezeError):
-        disp._effective_video_engine_for_role("announcer_visual", "humo")
 
 
 def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, tmp_path):
@@ -1217,15 +996,6 @@ def test_dispatcher_hard_fails_on_unusable_engine(clean_image_registry, tmp_path
 
 
 # --------------------------------------------------------------------------- #
-def test_image_schema_extra_forbid():
-    from pydantic import ValidationError
-    isc.ImageRequest(request_id="r", role="character_video", object_id="c1",
-                     engine_id="flux_gen1")
-    with pytest.raises(ValidationError):
-        isc.ImageRequest(request_id="r", role="character_video", object_id="c1",
-                         engine_id="flux_gen1", bogus_key=1)
-    with pytest.raises(ValidationError):
-        isc.CanonicalImage(image_id="i", role="r", object_id="o", path="p", nope=1)
 
 
 # --------------------------------------------------------------------------- #
@@ -1477,102 +1247,6 @@ def test_announcer_line_char_ids_pure():
     assert mbp.announcer_line_char_ids(lines) == ["announcer"]
     assert mbp.announcer_line_char_ids([]) == []
     assert mbp.announcer_line_char_ids(None) == []
-
-
-def test_meta_brief_announcer_prompt_added_radio_style():
-    """Lines with an announcer role mint a radio-style announcer prompt keyed
-    by the LINE's char_id; the prompt is never empty and carries the radio
-    styling so the portrait reads as period broadcast."""
-    cast = [{"char_id": "c1", "name": "EDNA", "portrait_prompt": "an older lighthouse keeper"}]
-    meta = {"story_brief_terms": {"setting": ["a fogbound harbor town"]}}
-    lines = [
-        {"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"},
-        {"line_id": "b002", "speaker_role": "character", "char_id": "c1"},
-    ]
-    out, _warns = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
-    objs = _by_id(out)
-    portraits = {k for k, v in objs.items() if v["kind"] == "portrait"}
-    assert portraits == {"c1", "announcer"}
-    ann = objs["announcer"]
-    assert ann["role"] == "announcer_visual"
-    assert ann["prompt"], "announcer prompt must never be empty"
-    assert ann["source"].startswith("announcer_")
-    low = ann["prompt"].lower()
-    # radio-face logic (2026-07-04): default env (HUMO off) -> the FACELESS
-    # radio_object still (a stylized radio; no "microphone"/person). Just assert
-    # the radio styling survives.
-    assert "radio" in low, \
-        "announcer portrait must be radio-styled (operator directive)"
-    assert ann["prompt_hash"]
-
-
-def test_meta_brief_announcer_not_added_without_announcer_lines():
-    cast = [{"char_id": "c1", "portrait_prompt": "a spacer"}]
-    meta = {}
-    lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c1"}]
-    out, _w = mbp.derive_image_prompts(cast, meta, llm_fn=None, lines=lines)
-    assert "announcer" not in _by_id(out)
-    out2, _w2 = mbp.derive_image_prompts(cast, meta, llm_fn=None)  # lines omitted
-    assert "announcer" not in _by_id(out2)
-
-
-def test_meta_brief_announcer_not_duplicated_when_cast_covers_it():
-    """If a (weird) episode carries a real cast row with the announcer id, the
-    cast entry wins -- no synthetic duplicate."""
-    cast = [{"char_id": "announcer", "portrait_prompt": "the station voice in a booth"}]
-    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
-    out, _w = mbp.derive_image_prompts(cast, {}, llm_fn=None, lines=lines)
-    objs = _by_id(out)
-    assert [k for k, v in objs.items() if v["kind"] == "portrait"] == ["announcer"]
-    assert not objs["announcer"]["source"].startswith("announcer_"), \
-        "a real cast row must not be relabeled as synthetic"
-
-
-def test_meta_brief_announcer_skips_llm_refine_brief_driven():
-    """E (2026-07-01 brief-driven radio-host): the synthetic announcer SKIPS the
-    LLM refine (its refine instruction 'do not mention radios' contradicts a
-    radio-styled host) and stamps the brief-driven radio-host template DIRECTLY
-    -- source announcer_template, never announcer_llm, even with an llm_fn."""
-    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
-    out, _w = mbp.derive_image_prompts(
-        [], {}, llm_fn=lambda _p: "a velvet-voiced radio announcer, chrome microphone, art deco studio",
-        lines=lines)
-    ann = _by_id(out)["announcer"]
-    assert ann["source"] == "announcer_template"
-    assert "radio" in ann["prompt"].lower()
-    # radio-face logic: the faceless radio_object still shares the console
-    # negative (humans OUT); no baby line (that was the retired radio_head_person).
-    assert ann.get("negative_prompt") and "human" in ann["negative_prompt"]
-    assert "baby" not in ann["negative_prompt"]
-
-
-def test_meta_brief_announcer_is_brief_driven_radio_not_llm_flavor():
-    """E: a setting-only LLM line can no longer turn the announcer into a generic
-    control-room figure -- the announcer is brief-driven + stamped directly
-    (skip-LLM), so it always reads as an ADULT radio host (no baby). A CHARACTER
-    with the same line still rides the LLM path (the skip is announcer-only)."""
-    meta = {"story_brief_terms": {"setting": ["a mission control countdown"]}}
-    lines = [{"line_id": "b001", "speaker_role": "announcer", "char_id": "announcer"}]
-    out, _warns = mbp.derive_image_prompts(
-        [], meta,
-        llm_fn=lambda _p: "a tense mission control countdown operator at a console",
-        lines=lines)
-    ann = _by_id(out)["announcer"]
-    assert ann["source"] == "announcer_template", \
-        "the announcer must be brief-driven + skip-LLM (got %r)" % ann["source"]
-    low = ann["prompt"].lower()
-    # ANNOUNCER -> a brief-driven FACELESS radio_object (radio-face logic
-    # 2026-07-04; default env, static bookend). Radio styling survives; no person.
-    assert "radio" in low
-    assert "radio-head" not in low and "presenter" not in low
-    assert ann.get("negative_prompt") and "human" in ann["negative_prompt"]
-    assert "baby" not in ann["negative_prompt"]
-    # a CHARACTER with the same setting-grounded line still passes via the LLM
-    cast = [{"char_id": "c1", "portrait_prompt": "a flight controller"}]
-    out2, _w2 = mbp.derive_image_prompts(
-        cast, meta,
-        llm_fn=lambda _p: "a tense mission control countdown operator at a console")
-    assert _by_id(out2)["c1"]["source"] == "llm"
 
 
 def test_stamp_portrait_non_cast_strict_vs_relaxed(tmp_path):

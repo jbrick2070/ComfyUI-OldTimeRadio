@@ -189,22 +189,6 @@ def _read_pack_data(p: Path) -> dict:
         raise StoryPackParseError(f"malformed JSON in story pack {p}: {exc}") from exc
 
 
-def load_pack(path) -> StoryPack:
-    """Load + validate a story pack, fail-loud, cached by absolute path.
-
-    STRICT: prompt_stages keys must be production-allowlisted. A pack carrying
-    pipeline-declared seams (e.g. simple_4) RAISES here by design -- routing
-    goes through load_pack_with_seams."""
-    p = Path(path)
-    key = str(p.resolve())
-    cached = _PACK_CACHE.get(key)
-    if cached is not None:
-        return cached
-    pack = _validate(_read_pack_data(p), str(p))
-    _PACK_CACHE[key] = pack
-    return pack
-
-
 def load_pack_with_seams(path, extra_seams: frozenset) -> StoryPack:
     """Stage 2 routing loader: validate prompt_stages against
     PRODUCTION_SEAM_ALLOWLIST | extra_seams (the pack's pipeline-declared
@@ -230,14 +214,6 @@ def _check_seam(seam: str) -> None:
         raise UnknownSeamError(
             f"unknown seam {seam!r}; allowed: {sorted(PRODUCTION_SEAM_ALLOWLIST)}"
         )
-
-
-def get_pack_prompt_or_none(pack: StoryPack, seam: str):
-    """Pre-migration passthrough: pack value if present+non-empty, else None
-    (caller keeps its Python constant). Unknown seam is still a hard error."""
-    _check_seam(seam)
-    raw = pack.prompt_stages.get(seam, "")
-    return raw if raw.strip() else None
 
 
 def get_pack_prompt(pack: StoryPack, seam: str) -> str:

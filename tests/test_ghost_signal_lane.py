@@ -142,23 +142,6 @@ def _all_ghost_policy():
                              for slot in _role_slots.ROLE_TO_VIDEO_SLOT.values()}}
 
 
-def test_the_image_dispatcher_mints_no_still_for_any_ghost_role():
-    """THE REAL CAPABILITY LOOKUP, not a re-reading of the declaration.
-
-    `still_word` proved that a plan nothing consults is a plan that does not
-    exist -- it declared portrait `never` for months while a portrait was minted
-    for every cast member anyway. So this asks the seam that actually decides.
-    """
-    from nodes import otr_image_gen_dispatcher as dispatcher
-    caps = dispatcher.still_consumer_capabilities(_all_ghost_policy())
-    assert caps is not None, "the all-Ghost policy was rejected as malformed"
-    for role, consumes in caps.items():
-        assert consumes is False, (
-            "role %r would have a still minted for it on an all-Ghost policy "
-            "(capability said %r)" % (role, consumes))
-    assert dispatcher.roles_requiring_stills(_all_ghost_policy()) == frozenset()
-
-
 def test_which_g3_7_seam_actually_covers_ghost_and_which_does_not():
     """WHICH mechanism owns this lane, stated exactly, because the two look alike.
 
@@ -886,29 +869,6 @@ def test_canonicalize_probes_once_and_carries_every_receipt(monkeypatch):
 # --------------------------------------------------------------------------- #
 # Schemas
 # --------------------------------------------------------------------------- #
-
-def test_canonical_clip_accepts_the_new_receipts_and_still_forbids_extras():
-    clip = vschemas.CanonicalClip(
-        clip_id="c1", path="x.mp4",
-        delivery_scale_mode="lanczos_clean_full_frame",
-        cadence_mode="hold_2", cadence_source_frame_count=16,
-        cadence_delivered_frame_count=32, cadence_tail_trim=0,
-        model_frame_count=16)
-    assert clip.cadence_mode == "hold_2"
-    assert clip.model_frame_count == 16
-    with pytest.raises(Exception):
-        vschemas.CanonicalClip(clip_id="c1", path="x.mp4",
-                               not_a_real_field="nope")
-
-
-def test_canonical_clip_defaults_keep_every_receipt_absent():
-    """Absence is load-bearing: a legacy row must not acquire six nulls."""
-    clip = vschemas.CanonicalClip(clip_id="c1", path="x.mp4")
-    for field in ("delivery_scale_mode", "cadence_mode",
-                  "cadence_source_frame_count",
-                  "cadence_delivered_frame_count", "cadence_tail_trim",
-                  "model_frame_count"):
-        assert getattr(clip, field) is None
 
 
 def test_shot_row_subject_sigil_is_optional_string_data():

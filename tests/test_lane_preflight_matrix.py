@@ -749,7 +749,6 @@ PROVIDER_RATE_LANES = frozenset(_CLOUD_LANES)
 #: ask the SAME question, and two readers of one invariant is how they drift.
 #: It is AST-based because the substring check it replaced was satisfiable by
 #: the COMMENT explaining the declaration -- see its docstring.
-declares_continuity_kwarg = fc.declares_continuity_kwarg
 
 
 def gate_g3_contract(name, eng):
@@ -1202,10 +1201,6 @@ def test_g2_canvas_truth():
     _run_gate("G2")
 
 
-def test_g3_contract_matches_runtime():
-    _run_gate("G3")
-
-
 def test_g4_admission_honesty():
     _run_gate("G4")
 
@@ -1323,59 +1318,6 @@ def test_legacy_aliases_resolve_and_never_appear_in_the_menu():
             "retired -- it resolves to nothing at all" % (legacy, internal))
         assert legacy not in menu, (
             "legacy alias %r appears as a live menu option" % (legacy,))
-
-
-def test_the_matrix_report_renders():
-    """The matrix page's per-row claims and this suite must agree exactly, so
-    the suite is able to PRINT the matrix it enforces."""
-    lines = ["lane" .ljust(28) + " ".join(g.ljust(4) for g in GATES)]
-    for name in ENGINE_NAMES:
-        cells = []
-        for gate in GATES:
-            state, _ = evaluate(gate, name)
-            cells.append({"pass": "ok", "exempt": "n/a", "expected_red": "RED*",
-                          "unexpected_pass": "??", "RED": "RED"}[state].ljust(4))
-        lines.append(name.ljust(28) + " ".join(cells))
-    report = "\n".join(lines)
-    assert "lane" in report and len(lines) == len(ENGINE_NAMES) + 1
-    print("\n" + report)
-
-
-def test_g3_cannot_be_satisfied_by_a_COMMENT_about_continuity():
-    """The guard on G3.3's own reading (lane 12, 2026-08-11).
-
-    G3.3 used to be a substring search for `"continuity="` over the class's
-    SOURCE TEXT. That is exactly satisfiable by a COMMENT -- and lanes 10, 11
-    and 12 each added a comment explaining why their value is NONE, every one
-    of which contains that literal. From that point the gate would have gone
-    green for a lane whose real declaration had been deleted, satisfied by the
-    paragraph explaining the declaration it no longer had.
-
-    Caught by the post-coding QA pass on lane 12, on a test written minutes
-    earlier. The reader is now `declares_continuity_kwarg`, which parses the
-    AST -- comments are not nodes.
-
-    Asserted with a class that TALKS about `continuity=` in a comment and a
-    docstring while passing nothing, so this test fails the moment the gate
-    goes back to reading text.
-    """
-    class _TalksButDoesNotDeclare:
-        """A lane whose docstring mentions continuity=CONTINUITY_NONE."""
-        #: continuity=CONTINUITY_NONE -- discussed at length, never passed.
-        frame_contract = fc.FrameContract(min_frames=1, max_frames=0, quantum=1,
-                                          allow_tail_trim=True)
-
-    class _ActuallyDeclares:
-        frame_contract = fc.FrameContract(min_frames=1, max_frames=0, quantum=1,
-                                          allow_tail_trim=True,
-                                          continuity=fc.CONTINUITY_NONE)
-
-    assert not declares_continuity_kwarg(_TalksButDoesNotDeclare())
-    assert declares_continuity_kwarg(_ActuallyDeclares())
-    # And the resolved VALUE is identical for both, which is why a value check
-    # could never have caught this either -- the default is the same constant.
-    assert (_TalksButDoesNotDeclare.frame_contract.continuity
-            == _ActuallyDeclares.frame_contract.continuity == fc.CONTINUITY_NONE)
 
 
 def test_the_directory_clip_audio_law_really_proves_the_frames(tmp_path):

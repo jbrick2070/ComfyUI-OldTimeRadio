@@ -51,19 +51,6 @@ def test_role_available_inputs_unknown_raises():
         rc.role_available_inputs("no_such_role")
 
 
-@pytest.mark.parametrize("dead", ["retired_role_a", "retired_role_b", "sfx"])
-def test_dead_roles_raise_role_compat_error(dead):
-    # rip-sfx-broll: the removed roles are UNKNOWN tokens now -- the string
-    # keys were deleted from ROLE_AVAILABLE_INPUTS with the enum members, so
-    # the whole capability subsystem rejects them loudly.
-    with pytest.raises(rc.RoleCompatError):
-        rc.role_available_inputs(dead)
-    with pytest.raises(rc.RoleCompatError):
-        rc.engine_fits_role(TEXT_ONLY, dead)
-    with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role(dead, [TEXT_ONLY])
-
-
 def test_every_surviving_role_supplies_full_vocabulary():
     # All three roles carry a real beat (audio slice + mintable still), so
     # each supplies the full input vocabulary.
@@ -117,26 +104,3 @@ def test_missing_keys_and_non_dict_excluded_not_raised():
     ) is False
 
 
-def test_filter_engines_for_role_is_order_preserving_and_filtered():
-    descriptors = [
-        AUDIO_FACE,
-        TEXT_ONLY,
-        {"engine_id": "", "roles": tuple(rc.ROLES),
-         "required_inputs": ("text_prompt",)},
-        "garbage",
-        {"no_engine_id": True},
-    ]
-    out = rc.filter_engines_for_role(
-        rc.Role.ANNOUNCER_VISUAL.value, descriptors
-    )
-    assert out == ["humo_like", "abstract_like"]
-
-
-def test_filter_engines_for_role_unknown_role_raises():
-    with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("bogus", [TEXT_ONLY])
-
-
-def test_filter_engines_for_role_empty_iterable():
-    assert rc.filter_engines_for_role(rc.Role.CHARACTER_VIDEO.value, []) == []
-    assert rc.filter_engines_for_role(rc.Role.CHARACTER_VIDEO.value, None) == []

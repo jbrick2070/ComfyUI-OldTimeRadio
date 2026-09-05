@@ -38,7 +38,6 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import re
 import uuid
 from typing import Any, Callable, Mapping, Optional, Protocol, TypeVar
 
@@ -341,17 +340,6 @@ def schema_property_paths(schema: type[BaseModel]) -> tuple[str, ...]:
 
     walk(raw, "")
     return tuple(dict.fromkeys(paths))
-
-
-def schema_path_exists(schema: type[BaseModel], path: str) -> bool:
-    """Whether ``path`` names a declared schema property.
-
-    Audit code normally uses ``[*]`` for array items, but accept a concrete
-    numeric index too so a test cannot accidentally turn a representation detail
-    into a false negative.
-    """
-    normalised = re.sub(r"\[\d+\]", "[*]", path.strip())
-    return normalised in set(schema_property_paths(schema))
 
 
 def _schema_constraint_description(node: Mapping[str, Any]) -> str:
@@ -728,50 +716,6 @@ def invoke_structured_slot(
 # invocation name.  It preserves OpenRouter json_object behavior at every
 # structured boundary.
 _invoke_slot = invoke_structured_slot
-
-
-def apply_field_aliases(
-    aliases: dict[str, tuple[str, ...]],
-    data: Any,
-) -> Any:
-    """Deterministic, whitelist-exact key normalization for ONE model's own
-    top-level keys, for use inside a pydantic ``mode="before"`` validator.
-
-    Maps a declared SYNONYM key to its CANONICAL field name ONLY when the
-    canonical key is absent and EXACTLY ONE synonym is present. An explicit
-    canonical key always wins; 0 or >= 2 synonyms (a collision) leave the field
-    untouched, so a genuinely missing required field still fails LOUD. No-op on
-    canonical input (byte-identical) and on a non-dict ``data`` -- a
-    ``mode="before"`` validator may receive a model instance or another type
-    during internal pydantic operations (e.g. ``model_copy``). Copies the dict
-    once on the first move; never mutates the input. Whitelist-exact and
-    deterministic: no fuzzy or positional matching, so a given input yields the
-    same normalization every run.
-
-    ``aliases`` maps ``canonical_field -> tuple(synonym_keys)`` (top-level keys
-    of the annotated model). This is the single home for the alias rule; the
-    proven nested case (a ``BeatEdit`` whose action arrived under ``lever``) and
-    any future annotated schema route through it via that schema's own
-    ``mode="before"`` validator. pydantic runs that validator on nested models
-    during recursion, so the nested fix needs no path-walking in the core.
-    """
-    if not isinstance(data, dict) or not aliases:
-        return data
-    out: Optional[dict] = None
-    for canonical, synonyms in aliases.items():
-        src = out if out is not None else data
-        if canonical in src:
-            continue  # explicit canonical always wins
-        present = [s for s in synonyms if s in src]
-        if len(present) != 1:
-            continue  # 0 -> nothing to map; >= 2 -> ambiguous, leave fail-loud
-        if out is None:
-            out = dict(data)
-        out[canonical] = out.pop(present[0])
-        log.debug(
-            "[OTR_StructuredCall] field alias: %r -> %r", present[0], canonical,
-        )
-    return out if out is not None else data
 
 
 def validate_tolerant_data(

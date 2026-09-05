@@ -172,19 +172,5 @@ def test_engine_warning_only_for_gated():
     assert EP.engine_warning(r.get("music_musicgen_v1"))           # non-empty
 
 
-def test_collect_engine_warnings_dedups_and_orders():
-    r = _resolver()
-    profiles = [
-        r.get("announcer_kokoro_v1"),   # clean -> nothing
-        r.get("char_indextts2_v1"),     # gated
-        r.get("music_musicgen_v1"),     # gated
-        r.get("char_indextts2_v1"),     # duplicate -> collapsed
-    ]
-    warns = EP.collect_engine_warnings(profiles)
-    assert len(warns) == 2
-    assert any("bilibili" in w.lower() for w in warns)
-    assert any("musicgen" in w.lower() for w in warns)
-
-
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

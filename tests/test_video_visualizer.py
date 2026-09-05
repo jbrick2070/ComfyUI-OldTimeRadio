@@ -45,42 +45,6 @@ def test_serves_all_three_visual_roles():
         "announcer_visual", "music_visual", "character_video"}
 
 
-def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
-    """G3.3 / lesson L3 (lane 11, 2026-08-11).
-
-    The class comment had said "CONTINUITY none" since this engine was written
-    while `continuity=` was never passed, so the value was a dataclass DEFAULT
-    -- the right answer nobody had decided, which is the same shape a wrong one
-    would have had.
-
-    NONE is true here for a reason this lane can state: `render_clip` paints
-    every frame from the beat's own audio analysis and reads no predecessor
-    frame, so there is no terminal state a successor segment could inherit.
-
-    Scoped to THIS lane on purpose -- the other three visualizers each declare
-    their own contract in their own module (no shared base, unlike the still
-    shelf's `_CheapFamilyBase`), so lanes 12-14 each close their own.
-    """
-    import inspect
-
-    from nodes._otr_video_engines import frame_contract as fcm
-
-    eng = vreg.get_engine("viz_green")
-    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
-    # DECLARED, not defaulted -- read from the AST, not the source TEXT. A
-    # substring check for "continuity=" is satisfied by the comment above the
-    # declaration explaining it (the lane 12 QA finding), so it would pass with
-    # the real keyword deleted; the resolved VALUE cannot catch it either,
-    # because the dataclass default is the same constant.
-    assert fcm.declares_continuity_kwarg(eng)
-    # ...and the property that makes NONE honest is still true: nothing in the
-    # render path consumes a predecessor frame.
-    render_src = inspect.getsource(VisualizerEngine.render_clip)
-    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
-                                 "continuity_frame"):
-        assert consumes_predecessor not in render_src
-
-
 # --------------------------------------------------------------------------- #
 # assert_usable -- LOUD, no fallback
 # --------------------------------------------------------------------------- #

@@ -110,20 +110,6 @@ def test_mesh_engine_requires_the_fodder_and_plate_pair_per_beat():
     assert not [row for row in required if row.startswith("still_")], required
 
 
-@pytest.mark.parametrize("engine_id", ("viz_mxc_cpu", "viz_mxc_mandala",
-                                       "viz_camera", "viz_green"))
-def test_visualizer_engines_require_no_images_at_all(engine_id):
-    """Operator, 2026-07-25: "viz = no images". An all-procedural episode must
-    invoke NO image model -- the accessibility floor for a user with no image
-    models installed, and it must survive any contract refactor."""
-    _video_policy, image_policy = _policies_for(engine_id)
-    capabilities = disp.still_consumer_capabilities(image_policy)
-    assert capabilities == {"announcer_visual": False, "music_visual": False,
-                            "character_video": False}
-    assert disp.roles_requiring_stills(image_policy) == frozenset()
-    assert _required_target_ids(engine_id) == []
-
-
 @pytest.mark.parametrize("engine_id", ("still_word", "still_pan", "still_flat",
                                        "still_motion"))
 def test_still_family_consumes_a_still_without_declaring_init_image(engine_id):

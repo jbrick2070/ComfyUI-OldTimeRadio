@@ -373,18 +373,6 @@ def test_a_row_carrying_real_jump_still_requests_validates():
     assert len(ShotRow(**row).jump_still_requests) == len(requests)
 
 
-def test_the_whole_video_section_validates_end_to_end():
-    """The boundary other docs promise exists: model_validate over
-    ledger['video']. Before B4 it hard-failed on the first shot."""
-    from nodes._otr_video_engines.schemas import VideoLedgerSection
-
-    beats = _beats()
-    groups, shots = sl.build_execution_plan(beats, _budget(beats), {}, _policy())
-    section = VideoLedgerSection(execution_groups=groups, shots=shots)
-    assert len(section.shots) == len(shots)
-    assert len(section.execution_groups) == len(groups)
-
-
 def test_shotrow_covers_every_key_the_producers_stamp():
     """Mechanical drift guard. B4's field list was derived from the producers
     rather than from the bug report -- which named a beat_id no producer

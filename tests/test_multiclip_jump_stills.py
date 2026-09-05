@@ -271,21 +271,6 @@ def test_the_merge_is_free_when_nothing_jump_cuts():
     assert out_objects is objects and out_targets is targets and report == []
 
 
-def test_each_segment_gets_its_own_seed_so_the_cut_is_a_real_cut():
-    """A jump CUT, not the same frame twice.
-
-    The per-object seed is derived from the object id, so cloning the prompt
-    under a new id yields a different image of the SAME scene -- which is what
-    a jump cut is. (An operator who selects ``mode=fixed`` gets identical
-    stills by that choice, not by this merge.)
-    """
-    objects, _targets_out, _report = gd.merge_jump_still_requests(
-        _request_ledger(segments=(1, 2)), _objects(), _targets())
-    seeds = {gd.resolve_object_seed({}, obj["object_id"], obj["prompt_hash"],
-                                    kind=obj["kind"]) for obj in objects}
-    assert len(seeds) == 3
-
-
 def test_a_required_beat_with_no_scene_still_is_TERMINAL():
     """The exact bug chunk 4 exists to close, stated as a refusal."""
     with pytest.raises(gd.ImageRenderError, match="renders from nothing"):
@@ -584,31 +569,6 @@ def test_every_falsy_beat_id_refuses_rather_than_collapsing_to_one_id(falsy):
     """
     with pytest.raises(cp.CoveragePlanError, match="beat_id"):
         cp.jump_still_object_id(falsy, 7)
-
-
-def test_a_cloned_bookend_segment_leaves_the_fixed_seed_DELIBERATELY():
-    """The radio bookend pins seed 4242 so it is ONE canonical image.
-
-    A jump segment must not be that same image again, so it drops onto the
-    request-hash seed -- and stays reproducible, because that seed is derived
-    from stable inputs. Pinned because it was a side effect of rewriting the
-    ``kind`` before it was a decision.
-    """
-    base = _objects(kind="scene_open")
-    targets = _targets(kind="scene_open")
-    objects, _t, _r = gd.merge_jump_still_requests(
-        _request_ledger(), base, targets)
-    segment = [obj for obj in objects if obj["kind"] == cp.JUMP_STILL_KIND][0]
-    base_seed = gd.resolve_object_seed({}, base[0]["object_id"],
-                                       base[0]["prompt_hash"], kind="scene_open")
-    segment_seed = gd.resolve_object_seed({}, segment["object_id"],
-                                          segment["prompt_hash"],
-                                          kind=segment["kind"])
-    assert base_seed == 4242
-    assert segment_seed != base_seed
-    # Deterministic, not random: the same episode re-renders the same still.
-    assert segment_seed == gd.resolve_object_seed(
-        {}, segment["object_id"], segment["prompt_hash"], kind=segment["kind"])
 
 
 def test_the_legacy_TEST_MODE_bypass_never_waves_a_jump_shot_through(

@@ -142,129 +142,6 @@ def _doc(words: int = 4000) -> osd.SourceDocument:
     return osd.build_source_document(body, source_ref="unit:one")
 
 
-def test_overview_covers_the_entire_body():
-    doc = _doc()
-    overview = osd.build_source_overview(doc)
-    assert overview.covered_char_count == doc.char_count
-
-
-def test_overview_windows_are_ordered_and_gapless():
-    overview = osd.build_source_overview(_doc())
-    windows = overview.windows
-    assert windows[0].start_char == 0
-    for earlier, later in zip(windows, windows[1:]):
-        assert earlier.end_char == later.start_char
-    assert windows[-1].end_char == overview.covered_char_count
-
-
-def test_every_overview_span_matches_the_body_it_quotes():
-    doc = _doc()
-    overview = osd.build_source_overview(doc)
-    for span in list(overview.windows) + list(overview.evidence):
-        assert span.text == doc.canonical_body[span.start_char:span.end_char]
-        doc.verify_span(span)
-
-
-def test_overview_is_deterministic():
-    doc = _doc()
-    first = osd.build_source_overview(doc)
-    second = osd.build_source_overview(doc)
-    assert first.receipt() == second.receipt()
-
-
-def test_overview_tags_opening_and_closing():
-    doc = _doc()
-    overview = osd.build_source_overview(doc)
-    opening = overview.evidence_for(osd.EVIDENCE_OPENING)
-    closing = overview.evidence_for(osd.EVIDENCE_CLOSING)
-    assert opening is not None and opening.start_char == 0
-    assert closing is not None and closing.end_char == doc.char_count
-
-
-def test_dialogue_evidence_prefers_the_quote_dense_window():
-    quiet = "narration here and there. " * 200
-    talky = '"Story!" cried the Editor. "Tell us." ' * 60
-    doc = osd.build_source_document(quiet + talky + quiet)
-    overview = osd.build_source_overview(doc, window_count=3)
-    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
-    assert '"' in dialogue.text
-
-
-def test_no_dialogue_evidence_when_the_work_has_no_quoted_speech():
-    # Tagging pure narration as "dialogue" would invite a consumer to treat
-    # the author's narration as quoted speech -- the confusion this module
-    # exists to remove. Absent evidence is reported absent.
-    doc = osd.build_source_document("narration only, no quotes at all. " * 200)
-    overview = osd.build_source_overview(doc)
-    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
-    assert overview.receipt()["dialogue_evidence_present"] is False
-
-
-def test_contractions_alone_are_not_quoted_speech():
-    # "don't"/"father's" are elision and possession, not quotation. Counting
-    # them ranked contraction-heavy NARRATION above real dialogue. A work of
-    # nothing but contractions has no quoted speech at all.
-    doc = osd.build_source_document(
-        "he didn't know his father's name and wouldn't ask. " * 80)
-    overview = osd.build_source_overview(doc, window_count=4)
-    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
-
-
-def test_real_speech_outranks_a_much_larger_contraction_block():
-    # The speech is a sixth of the body; before the fix the apostrophes in the
-    # other five sixths could outvote it.
-    contractions = "he didn't know his father's name and wouldn't ask. " * 80
-    real_speech = '"Tell me," she said. "I must know." ' * 20
-    doc = osd.build_source_document(contractions + real_speech)
-    overview = osd.build_source_overview(doc, window_count=2)
-    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
-    assert dialogue is not None
-    # The window carrying the actual quotation marks is the one selected.
-    assert '"' in dialogue.text
-    assert dialogue.start_char == overview.windows[-1].start_char
-
-
-def test_single_quoted_speech_still_counts_at_word_boundaries():
-    doc = osd.build_source_document(
-        "plain narration here. " * 40 + "'Tell me,' she said. " * 20)
-    overview = osd.build_source_overview(doc, window_count=2)
-    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is not None
-
-
-def test_overview_receipt_is_body_free_and_json_serializable():
-    doc = _doc()
-    overview = osd.build_source_overview(doc)
-    receipt = overview.receipt()
-    encoded = json.dumps(receipt)
-    # The receipt proves WHICH material grounded a build without carrying it.
-    assert "w100" not in encoded
-    assert receipt["body_sha256"] == doc.body_sha256
-    assert receipt["covered_char_count"] == doc.char_count
-    assert receipt["window_count"] == len(overview.windows)
-
-
-def test_single_window_and_tiny_body_still_cover_totally():
-    doc = osd.build_source_document("tiny body here")
-    overview = osd.build_source_overview(doc, window_count=8)
-    assert overview.covered_char_count == doc.char_count
-
-
-def test_a_collapsed_window_count_is_reported_not_hidden():
-    # A body too short to split returns one window. That is correct, but a
-    # silent collapse reads downstream as "this work is one undivided block".
-    doc = osd.build_source_document("tiny body here")
-    receipt = osd.build_source_overview(doc, window_count=8).receipt()
-    assert receipt["requested_window_count"] == 8
-    assert receipt["window_count"] == 1
-    assert receipt["window_count_collapsed"] is True
-
-
-def test_an_uncollapsed_window_count_says_so():
-    receipt = osd.build_source_overview(_doc(), window_count=8).receipt()
-    assert receipt["window_count"] == receipt["requested_window_count"] == 8
-    assert receipt["window_count_collapsed"] is False
-
-
 # ---------------------------------------------------------------------------
 # the body must not escape through repr -- logs, tracebacks, f-strings
 # ---------------------------------------------------------------------------
@@ -287,11 +164,6 @@ def test_document_repr_carries_identity_not_the_body():
 def test_span_repr_does_not_carry_its_slice():
     doc = _sentinel_doc()
     assert _SENTINEL not in repr(doc.span(0, 200, role="probe"))
-
-
-def test_overview_repr_does_not_carry_the_body():
-    doc = _sentinel_doc()
-    assert _SENTINEL not in repr(osd.build_source_overview(doc))
 
 
 def test_fetch_result_repr_does_not_carry_the_body():
@@ -347,19 +219,6 @@ def test_structural_serializers_refuse_the_document():
         vars(doc)
     with pytest.raises(osd.SourceDocumentError):
         pickle.dumps(doc)
-
-
-def test_structural_serializers_refuse_the_overview():
-    import dataclasses
-    import pickle
-
-    overview = osd.build_source_overview(_sentinel_doc())
-    with pytest.raises(TypeError):
-        dataclasses.asdict(overview)
-    with pytest.raises(TypeError):
-        vars(overview)
-    with pytest.raises(osd.SourceDocumentError):
-        pickle.dumps(overview)
 
 
 def test_structural_serializers_refuse_a_span():
@@ -425,14 +284,6 @@ def test_coverage_check_catches_an_overlap():
         osd._assert_tiles(overlapping, doc.char_count)
 
 
-def test_the_overview_version_moved_with_its_behaviour():
-    # Dialogue omission, balanced-span counting and the new receipt keys all
-    # changed selection/shape; a v1 receipt is not comparable to a v2 one.
-    assert osd.OVERVIEW_VERSION.endswith("v2")
-    assert osd.build_source_overview(_doc()).receipt()[
-        "overview_version"] == osd.OVERVIEW_VERSION
-
-
 # ---------------------------------------------------------------------------
 # quotation counted as balanced spans, not loose marks
 # ---------------------------------------------------------------------------
@@ -458,16 +309,6 @@ def test_apostrophes_do_not_pair_across_a_long_work():
     assert osd._count_quoted_spans(body) == 0
 
 
-def test_dialect_narration_does_not_outrank_real_speech():
-    dialect = "he was walkin' and talkin' and thinkin' nothin' of it. " * 60
-    speech = '"Tell me," she said. "I must know." ' * 20
-    doc = osd.build_source_document(dialect + speech)
-    overview = osd.build_source_overview(doc, window_count=2)
-    dialogue = overview.evidence_for(osd.EVIDENCE_DIALOGUE)
-    assert dialogue is not None
-    assert '"' in dialogue.text
-
-
 @pytest.mark.parametrize("speech", [
     '"Story!" cried the Editor.',
     "'Tell me,' she said.",
@@ -475,13 +316,6 @@ def test_dialect_narration_does_not_outrank_real_speech():
 ])
 def test_balanced_quotations_are_counted(speech):
     assert osd._count_quoted_spans(speech) >= 1
-
-
-def test_a_possessive_heavy_work_yields_no_dialogue_evidence():
-    doc = osd.build_source_document(
-        "the boys' club and the girls' team and the '90s besides. " * 60)
-    overview = osd.build_source_overview(doc, window_count=4)
-    assert overview.evidence_for(osd.EVIDENCE_DIALOGUE) is None
 
 
 # ---------------------------------------------------------------------------
@@ -531,23 +365,6 @@ def test_legacy_fetchers_still_normalize_with_no_document():
 # ---------------------------------------------------------------------------
 # the real corpus: the property test the panel asked for
 # ---------------------------------------------------------------------------
-
-@pytest.mark.skipif(not CORPUS.is_dir(), reason="public-domain corpus absent")
-def test_every_corpus_source_normalizes_hashes_and_covers():
-    texts = sorted(CORPUS.glob("*.txt"))
-    assert texts, "corpus directory has no sources"
-    for path in texts:
-        raw = path.read_text(encoding="utf-8", errors="replace")
-        body = pd.normalize_public_domain_body(raw)
-        assert pd.normalize_public_domain_body(body) == body, path.name
-
-        doc = osd.build_source_document(body, source_ref=path.stem)
-        assert doc.body_sha256 == osd.canonical_body_sha256(body), path.name
-
-        overview = osd.build_source_overview(doc)
-        assert overview.covered_char_count == doc.char_count, path.name
-        for span in list(overview.windows) + list(overview.evidence):
-            assert span.text == body[span.start_char:span.end_char], path.name
 
 
 @pytest.mark.skipif(not CORPUS.is_dir(), reason="public-domain corpus absent")

@@ -135,41 +135,6 @@ def test_registry_allows_canonicalize_none(clean_video_registry):
 # ---------------------------------------------------------------------------
 
 
-def test_role_compat_filter_shared():
-    descs = [
-        {"engine_id": "abstract", "roles": ("music_visual",),
-         "required_inputs": ()},
-        {"engine_id": "humo", "roles": ("character_video", "announcer_visual"),
-         "required_inputs": ("audio_ref", "init_image")},
-        {"engine_id": "ltx", "roles": ("music_visual",),
-         "required_inputs": ("text_prompt",)},
-    ]
-    # Capability-only (operator 2026-06-22): the per-engine `roles` list is NOT a
-    # gate -- an engine fits every role whose inputs satisfy its required_inputs.
-    assert rc.filter_engines_for_role("announcer_visual", descs) == ["abstract", "humo", "ltx"]
-    assert rc.filter_engines_for_role("character_video", descs) == ["abstract", "humo", "ltx"]
-    assert rc.filter_engines_for_role("music_visual", descs) == ["abstract", "humo", "ltx"]
-    with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("not_a_role", descs)
-    # rip-sfx-broll (2026-07-01): the dead roles raise like any unknown token.
-    with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("retired_role_b", descs)
-
-
-def test_role_compat_fail_closed_on_malformed():
-    """A descriptor declaring an unknown token or missing its engine_id is
-    EXCLUDED, not raised (fail-closed). A missing `roles` key is NO LONGER a
-    failure -- eligibility is capability, not the whitelist (2026-06-22)."""
-    descs = [
-        {"engine_id": "ok", "roles": ("music_visual",), "required_inputs": ()},
-        {"engine_id": "bad_token", "roles": ("music_visual",),
-         "required_inputs": ("nonsense",)},  # unknown token -> excluded
-        {"engine_id": "no_roles", "required_inputs": ()},  # no `roles` key is fine now
-        {"roles": ("music_visual",), "required_inputs": ()},  # no engine_id -> skipped
-    ]
-    assert rc.filter_engines_for_role("music_visual", descs) == ["ok", "no_roles"]
-
-
 # ---------------------------------------------------------------------------
 # AS-2 -- resolver prune + DAG validation
 # ---------------------------------------------------------------------------

@@ -39,17 +39,6 @@ def test_allowlist_equals_authored_set():
     assert sp.PRODUCTION_SEAM_ALLOWLIST == EXPECTED_SEAMS
 
 
-def test_pack_seam_keys_exact(pack):
-    assert set(pack.prompt_stages) == EXPECTED_SEAMS
-
-
-def test_pack_metadata(pack):
-    assert pack.source_bank_id == "media_archive"
-    assert pack.story_model_id == "media_restoration_adventure"
-    assert pack.story_pipeline_id == "legacy_many_pass"
-    assert pack.schema_version == "v2.0"
-
-
 # -- (c) fail-loud matrix ---------------------------------------------------
 
 def _valid() -> dict:
@@ -72,107 +61,7 @@ def _write_obj(tmp_path: Path, obj: dict) -> Path:
     return _write(tmp_path, json.dumps(obj, ensure_ascii=False))
 
 
-def test_missing_file():
-    sp._PACK_CACHE.clear()
-    with pytest.raises(sp.StoryPackNotFoundError):
-        sp.load_pack(REPO / "nodes" / "story_packs" / "does_not_exist.json")
-
-
-def test_malformed_json(tmp_path):
-    sp._PACK_CACHE.clear()
-    with pytest.raises(sp.StoryPackParseError):
-        sp.load_pack(_write(tmp_path, "{ not json"))
-
-
-def test_duplicate_key_top_level(tmp_path):
-    sp._PACK_CACHE.clear()
-    text = ('{"source_bank_id":"a","source_bank_id":"b",'
-            '"story_model_id":"m","story_pipeline_id":"p",'
-            '"schema_version":"v2.0","prompt_stages":{}}')
-    with pytest.raises(sp.StoryPackParseError):
-        sp.load_pack(_write(tmp_path, text))
-
-
-def test_duplicate_key_nested(tmp_path):
-    sp._PACK_CACHE.clear()
-    text = ('{"source_bank_id":"a","story_model_id":"m","story_pipeline_id":"p",'
-            '"schema_version":"v2.0","prompt_stages":'
-            '{"line_composer_system":"x","line_composer_system":"y"}}')
-    with pytest.raises(sp.StoryPackParseError):
-        sp.load_pack(_write(tmp_path, text))
-
-
-def test_unknown_top_level_key(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    obj["bogus_field"] = 1
-    with pytest.raises(sp.StoryPackValidationError):
-        sp.load_pack(_write_obj(tmp_path, obj))
-
-
-def test_missing_required_key(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    del obj["schema_version"]
-    with pytest.raises(sp.StoryPackValidationError):
-        sp.load_pack(_write_obj(tmp_path, obj))
-
-
-def test_unknown_schema_version(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    obj["schema_version"] = "v9.9"
-    with pytest.raises(sp.StoryPackValidationError):
-        sp.load_pack(_write_obj(tmp_path, obj))
-
-
-def test_unknown_seam_key(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    obj["prompt_stages"] = {"not_a_real_seam": "x"}
-    with pytest.raises(sp.UnknownSeamError):
-        sp.load_pack(_write_obj(tmp_path, obj))
-
-
-def test_whitespace_only_seam_value(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    obj["prompt_stages"] = {"line_composer_system": "   \n\t"}
-    with pytest.raises(sp.StoryPackValidationError):
-        sp.load_pack(_write_obj(tmp_path, obj))
-
-
 # -- (d) accessor semantics -------------------------------------------------
-
-def test_get_pack_prompt_present(pack):
-    val = pack.prompt_stages["coda_system"]
-    assert sp.get_pack_prompt(pack, "coda_system") == val
-    assert sp.get_pack_prompt_or_none(pack, "coda_system") == val
-
-
-def test_accessor_absent_seam(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()  # only line_composer_system present
-    p = sp.load_pack(_write_obj(tmp_path, obj))
-    assert sp.get_pack_prompt_or_none(p, "coda_system") is None
-    with pytest.raises(sp.StoryPackValidationError):
-        sp.get_pack_prompt(p, "coda_system")
-
-
-def test_accessor_unknown_seam_raises(pack):
-    with pytest.raises(sp.UnknownSeamError):
-        sp.get_pack_prompt(pack, "not_a_real_seam")
-    with pytest.raises(sp.UnknownSeamError):
-        sp.get_pack_prompt_or_none(pack, "not_a_real_seam")
-
-
-def test_or_none_preserves_exact_content(tmp_path):
-    sp._PACK_CACHE.clear()
-    obj = _valid()
-    obj["prompt_stages"] = {"line_composer_system": "  padded content  "}
-    p = sp.load_pack(_write_obj(tmp_path, obj))
-    # non-empty after strip -> returns the ORIGINAL untrimmed bytes
-    assert sp.get_pack_prompt_or_none(p, "line_composer_system") == "  padded content  "
 
 
 # -- (e) sanctioned-consumer guard (Stage 1b) -------------------------------
@@ -210,22 +99,6 @@ def test_load_pack_with_seams_sole_caller_is_routing():
 
 
 # -- (f) Stage 1b wiring: router sources the seam from the pack -------------
-
-def test_stage1b_router_sources_line_composer_from_pack(pack):
-    """The router returns line_composer_system from the JSON pack of its
-    default lane (media_archive) -> the seam is pack-owned, not a Python
-    constant."""
-    from nodes import _otr_creative_prompt_router as router
-    from nodes import _otr_model_catalog as cat
-
-    modern = [m.repo_id for m in cat.CURATED_LLM_MODELS
-              if m.prompt_profile == "modern"]
-    assert modern, "expected at least one modern curated model"
-    out = router.resolve_creative_system_prompt(modern[0], "line_composer_system")
-    assert out == pack.prompt_stages["line_composer_system"]
-    # outline stays object-identical (not pack-sourced in Stage 1b).
-    out_outline = router.resolve_creative_system_prompt(modern[0], "outline")
-    assert out_outline is O._SYSTEM_PROMPT
 
 
 def test_stage1b_router_fail_loud_on_missing_pack(monkeypatch, tmp_path):

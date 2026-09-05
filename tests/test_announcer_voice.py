@@ -307,16 +307,6 @@ def test_announcer_lines_only_routing(monkeypatch):
     assert done.startswith("announcer:done")
 
 
-def test_node_class_matches_class_registry():
-    from nodes._otr_class_registry import NEW_NODE_SPECS, expected_category
-    from nodes.announcer_voice import AnnouncerVoice
-
-    spec = NEW_NODE_SPECS["OTR_AnnouncerVoice"]
-    assert spec.class_name == "AnnouncerVoice"
-    assert AnnouncerVoice.CATEGORY == expected_category("OTR_AnnouncerVoice")
-    assert AnnouncerVoice.FUNCTION == "generate"
-
-
 def test_node_wired_into_init_by_table_not_literal_key():
     text = (REPO_ROOT / "__init__.py").read_text(encoding="utf-8")
     assert "new_node_modules_table" in text

@@ -115,20 +115,6 @@ def pin_provisional(monkeypatch):
 # ---------------------------------------------------------------------------
 # 1. THE SAFETY PROPERTY: the two tiers are mutually exclusive.
 # ---------------------------------------------------------------------------
-def test_no_shipped_provisional_row_can_pass_as_qualified():
-    """THE test. If this ever fails, an unauditioned voice has acquired the
-    authority of an audition and the tier has become the bug it prevents."""
-    rows = POOLS.LEMMY_VOICE_POLICY["provisional_native_routes"]
-    assert rows, "the shipped provisional tier is empty -- did a row get lost?"
-    for engine, record in rows.items():
-        assert POOLS.is_qualified_route(record) is False, engine
-
-
-def test_the_qualified_row_is_not_a_provisional_row_either():
-    """Exclusion runs both ways: a qualified record carries the two keys the
-    provisional shape bans outright, so it can never be read as the weaker tier."""
-    qualified = POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"]
-    assert POOLS.is_provisional_route(qualified, engine="indextts2") is False
 
 
 def test_every_shipped_provisional_row_is_well_formed():

@@ -229,21 +229,6 @@ def engine_warning(profile: "EngineProfile") -> str:
     return ""
 
 
-def collect_engine_warnings(profiles) -> List[str]:
-    """Ordered, de-duplicated warn notices for the set of profiles selected for
-    an episode (episode-start emission). Clean engines contribute nothing; this
-    is what a node surfaces into render_log + console (I-8 non-blocking warn).
-    """
-    seen = set()
-    out: List[str] = []
-    for p in profiles or ():
-        w = engine_warning(p)
-        if w and w not in seen:
-            seen.add(w)
-            out.append(w)
-    return out
-
-
 class EngineProfileResolver:
     """Resolves casting plans against the loaded profile set (v1)."""
 

@@ -321,22 +321,6 @@ def _lines_timed():
 
 
 class TestSceneStillObjects:
-    def test_b000_present_without_shotlock(self):
-        """The W1 QA assert: the open object exists from PURE helper
-        derivation on the lines -- no ShotLock, no video.shots anywhere."""
-        from nodes import otr_meta_brief_image_prompt as mbp
-        payload, _w = mbp.derive_image_prompts(
-            [], _meta_ok(), llm_fn=None, lines=_lines_timed())
-        objs = mbp.objects_by_id(payload)
-        assert "still_b000_music_open" in objs
-        opn = objs["still_b000_music_open"]
-        assert opn["kind"] == "scene_open"
-        assert opn["beat_id"] == "b000_music_open"
-        assert opn["role"] == "music_visual"
-        assert opn["source"] == "scene_timed"
-        assert "still_b000_music_open" in {
-            row["object_id"] for row in payload["required_scene_targets"]
-        }
 
     def test_every_beat_gets_a_scene_still_target(self):
         # operator 2026-06-18: EVERY beat carries its OWN scene still regardless of
@@ -585,172 +569,6 @@ class TestSceneStillObjects:
         assert not [t for t in targets if t["kind"] == "scene_open"]
         assert not warns
 
-    def test_scene_and_portrait_prompts_preserve_authored_world_terms(self):
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{
-            "char_id": "c01",
-            "name": "HAYES",
-            "portrait_prompt": "a stocky engineer near a radio console",
-        }]
-
-        payload, warnings = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=None, lines=_lines_timed(),
-        )
-
-        objects = mbp.objects_by_id(payload)
-        opening = objects["still_b000_music_open"]
-        assert "radio" in opening["prompt"].lower()
-        assert opening["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        portrait = objects["c01"]
-        assert portrait["kind"] == "portrait"
-        assert "radio console" in portrait["prompt"].lower()
-        assert not portrait["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        assert not any("still_b000" in warning for warning in warnings)
-
-    def test_scene_dims_landscape_div32(self, monkeypatch):
-        from nodes import otr_meta_brief_image_prompt as mbp
-        monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "1475x839")
-        w, h = mbp._landscape_still_dims()
-        assert (w, h) == (1472, 832)         # snapped DOWN to /32
-        monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS")
-        payload, _w = mbp.derive_image_prompts(
-            [], _meta_ok(), llm_fn=None, lines=_lines_timed())
-        opn = mbp.objects_by_id(payload)["still_b000_music_open"]
-        assert opn["w"] % 32 == 0 and opn["h"] % 32 == 0
-        assert opn["w"] > opn["h"]           # landscape
-
-    def test_scene_prompt_is_shared_composer(self):
-        """W1 parity at the OBJECT level: the emitted open prompt IS the
-        shared composer's output (subject parity with the driver locked)."""
-        from nodes import otr_meta_brief_image_prompt as mbp
-        payload, _w = mbp.derive_image_prompts(
-            [], _meta_ok(), llm_fn=None, lines=_lines_timed())
-        opn = mbp.objects_by_id(payload)["still_b000_music_open"]
-        expect = helpers.compose_still_prompt(
-            _meta_ok(), kind="scene_open", role="music_visual",
-            beat_id="b000_music_open")
-        assert opn["prompt"] == expect
-        assert opn["prompt_hash"] == mbp._content_hash(expect)
-
-    def test_character_beat_emits_wide_character_still_bug1(self):
-        """BUG 1 (2026-06-20): a CHARACTER beat (b002, char_voice c01) emits a
-        scene_character object that LEADS with c01's appearance, carries its
-        char_id, uses the WIDE 16:9 character framing, lands at landscape dims,
-        and is NOT a radio booth -- image-model agnostic (role=character_video)."""
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "name": "HAYES",
-                 "appearance": "a stocky mine foreman in a canvas coat"}]
-        payload, _w = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=None, lines=_lines_timed())
-        objs = mbp.objects_by_id(payload)
-        sc = objs["still_b002"]
-        assert sc["kind"] == "scene_character"
-        assert sc["role"] == "character_video"
-        assert sc["char_id"] == "c01"
-        assert sc["prompt"].startswith("a stocky mine foreman in a canvas coat")
-        assert helpers.STILL_FRAMING_SCENE_CHARACTER in sc["prompt"]
-        assert helpers.RADIO_BROADCAST_TAIL not in sc["prompt"]
-        assert sc["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        assert sc["w"] > sc["h"] and sc["w"] % 32 == 0    # landscape 16:9
-
-    def test_character_scene_still_is_beat_aware_via_llm(self):
-        """BUG 1 follow-up (2026-06-20 operator): per-beat character stills must be
-        SHOT/BEAT aware -- two beats of the SAME character get DISTINCT stills
-        derived from each beat's action/emotion (image-model agnostic; the video
-        lane conditions on the same still)."""
-        import re
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "name": "HAYES", "appearance": "a stocky foreman"}]
-        lines = [
-            {"line_id": "b002", "speaker_role": "character", "char_id": "c01",
-             "text": "The reactor is failing!", "traits": "Panicked",
-             "beat_intent": "lunging for the emergency lever",
-             "start_s": 1.0, "dur_s": 2.0},
-            {"line_id": "b003", "speaker_role": "character", "char_id": "c01",
-             "text": "We have to evacuate.", "traits": "Resolute",
-             "beat_intent": "turning to face the frightened crew",
-             "start_s": 3.0, "dur_s": 2.0},
-        ]
-
-        def fake_llm(req):
-            act = (re.search(r"beat_action: (.+)", req) or [None, "still"])[1]
-            return f"a stocky foreman, {act}, face clearly visible"
-
-        payload, _w = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=fake_llm, lines=lines)
-        objs = mbp.objects_by_id(payload)
-        s2, s3 = objs["still_b002"], objs["still_b003"]
-        assert s2["kind"] == "scene_character" and s3["kind"] == "scene_character"
-        assert s2["source"] == "char_scene_llm"
-        assert s2["prompt"] != s3["prompt"]              # beat-aware: distinct
-        assert s2["prompt_hash"] != s3["prompt_hash"]
-        assert "lever" in s2["prompt"] and "crew" in s3["prompt"]
-        assert s2["prompt"].endswith(helpers.NO_TEXT_CLAUSE)
-        assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
-
-    def test_character_scene_still_fallback_no_llm_is_character(self):
-        """No LLM -> the deterministic per-character scene_character composer
-        (char_scene_template). Still a CHARACTER, never a radio booth."""
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "appearance": "a stocky foreman"}]
-        lines = [{"line_id": "b002", "speaker_role": "character", "char_id": "c01",
-                  "text": "Hello", "start_s": 1.0, "dur_s": 2.0}]
-        payload, _w = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=None, lines=lines)
-        s2 = mbp.objects_by_id(payload)["still_b002"]
-        assert s2["kind"] == "scene_character"
-        assert s2["source"] == "char_scene_template"
-        assert s2["prompt"].startswith("a stocky foreman")
-        assert helpers.RADIO_BROADCAST_TAIL not in s2["prompt"]
-
-    def test_character_scene_still_llm_failure_uses_same_story_template(self):
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01", "appearance": "a stocky foreman"}]
-        lines = [{
-            "line_id": "b002",
-            "speaker_role": "character",
-            "char_id": "c01",
-            "text": "The reactor is failing!",
-            "start_s": 1.0,
-            "dur_s": 2.0,
-        }]
-
-        payload, warnings = mbp.derive_image_prompts(
-            cast, _meta_ok(), llm_fn=lambda _prompt: "", lines=lines,
-        )
-
-        scene = mbp.objects_by_id(payload)["still_b002"]
-        assert scene["source"] == "char_scene_template_after_llm_miss"
-        assert scene["prompt"].startswith("a stocky foreman")
-        assert any("deterministic same-story composition" in row for row in warnings)
-
-    def test_portrait_carries_cinematic_grade_bug411(self):
-        """BUG-411 consistency (operator 2026-06-14): portraits now carry the
-        same cinematic GRADE tail as the scene stills, so a still_pan beat in
-        place of HuMo shows the 6/5 graded look. Radio tail stays OFF portraits
-        because a person is not a radio set."""
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{"char_id": "c01",
-                 "portrait_prompt": "a weathered engineer, kind eyes"}]
-        payload, _w = mbp.derive_image_prompts(cast, _meta_ok(), llm_fn=None)
-        port = mbp.objects_by_id(payload)["c01"]
-        assert helpers.IMAGE_GRADE_TAIL in port["prompt"]
-        assert helpers.RADIO_BROADCAST_TAIL not in port["prompt"]
-        # idempotent: the grade tail appears exactly once
-        assert port["prompt"].count(helpers.IMAGE_GRADE_TAIL) == 1
-
-    def test_portrait_adds_missing_cast_gender_anchor(self):
-        from nodes import otr_meta_brief_image_prompt as mbp
-        cast = [{
-            "char_id": "c01",
-            "gender": "female",
-            "portrait_prompt": (
-                "40s, weary neuroscientist landlord, receding hairline with "
-                "salt-and-pepper hair pulled into a tight knot"),
-        }]
-        payload, _w = mbp.derive_image_prompts(cast, _meta_ok(), llm_fn=None)
-        port = mbp.objects_by_id(payload)["c01"]
-        assert "adult woman" in port["prompt"].lower()
 
     def test_payload_versioned_and_portraits_migrated(self):
         from nodes import otr_meta_brief_image_prompt as mbp
@@ -817,30 +635,6 @@ class TestDispatcherStillSpine:
         with pytest.raises(ValueError, match="PRESENT but EMPTY"):
             disp.resolve_engine_for_role(policy, "music_visual")
 
-    def test_seed_request_hash_per_object(self):
-        from nodes import otr_image_gen_dispatcher as disp
-        cfg = {"mode": "request_hash", "request_seed": 7}
-        s1 = disp.resolve_object_seed(cfg, "c1", "ph1")
-        s2 = disp.resolve_object_seed(cfg, "still_b000", "ph2")
-        assert s1 != s2                              # per-object
-        assert s1 == disp.resolve_object_seed(cfg, "c1", "ph1")  # stable
-        fixed = {"mode": "fixed", "request_seed": 7}
-        assert disp.resolve_object_seed(fixed, "anything", "ph") == 7
-
-    def test_bookend_scene_open_fixed_seed(self, monkeypatch):
-        """BUG-411: the radio bookend (kind=scene_open) pins to the
-        deterministic 6/5 seed 4242 (env-overridable), independent of the
-        request-hash; every other kind keeps its per-object hashed seed."""
-        from nodes import otr_image_gen_dispatcher as disp
-        cfg = {"mode": "request_hash", "request_seed": 99}
-        assert disp.resolve_object_seed(
-            cfg, "still_b000_music_open", "phX", kind="scene_open") == 4242
-        # other kinds untouched (no kind, or a non-open kind) -> hashed seed
-        assert disp.resolve_object_seed(
-            cfg, "still_b000_music_open", "phX", kind="scene_beat") != 4242
-        monkeypatch.setenv("OTR_RADIO_BOOKEND_SEED", "777")
-        assert disp.resolve_object_seed(
-            cfg, "anything", "ph", kind="scene_open") == 777
 
     def test_cache_key_gains_kind_w_h(self):
         from nodes import otr_image_gen_dispatcher as disp
@@ -1216,44 +1010,6 @@ class TestPortraitIdentitySeed:
         ) == ("e8e5a5dcacd093e8db11220d218e477a2656763056bb1faca3a61d9f5539"
               "f17d")
 
-    def test_head_seed_pins_are_unchanged(self):
-        import hashlib
-
-        from nodes import otr_image_gen_dispatcher as disp
-
-        assert disp.resolve_object_seed(self.RH, "c01", "pp_portrait") == 1692108723
-        assert 1692108723 == int(
-            hashlib.sha256(b"0:c01:pp_portrait").hexdigest()[:8], 16)
-        assert disp.resolve_object_seed(
-            {"request_seed": 7, "mode": "fixed"}, "still_b002", "ph") == 7
-        assert disp.resolve_object_seed(
-            self.RH, "x", "ph", kind="scene_open") == 4242
-        assert disp.resolve_object_seed(
-            self.RH, "radio_host_portrait", "ph") == 4242
-
-    def test_every_beat_of_one_character_draws_the_portrait_seed(self):
-        from nodes import otr_image_gen_dispatcher as disp
-
-        portrait = disp.resolve_object_seed(self.RH, "c01", "pp_portrait")
-        for oid in ("still_b002", "still_b004", "still_b006"):
-            assert disp.resolve_seed_and_mode(
-                self.RH, oid, "ph_" + oid, kind="scene_character",
-                char_id="c01", portrait_prompt_hash="pp_portrait",
-            ) == (portrait, "seed")
-
-    def test_zimage_reference_rejection_keeps_the_identity_seed(self):
-        """The 2026-08-20 grid fix disables only the corrupt generic latent.
-        It must not also remove the already-proven portrait-derived seed.
-        """
-        from nodes import otr_image_gen_dispatcher as disp
-        from nodes._otr_image_engines import registry as ireg
-
-        assert ireg.get_engine("z_image_turbo").accepts_reference_image is False
-        portrait = disp.resolve_object_seed(self.RH, "c01", "pp_portrait")
-        assert disp.resolve_seed_and_mode(
-            self.RH, "still_b002", "ph_scene", kind="scene_character",
-            char_id="c01", portrait_prompt_hash="pp_portrait",
-        ) == (portrait, "seed")
 
     def test_placement_after_the_mode_gate_keeps_the_fixed_contract(self):
         """Placed before the gate this returns a hashed seed instead of 7, and
@@ -1278,25 +1034,6 @@ class TestPortraitIdentitySeed:
         }
         assert len(seeds) == 3
 
-    def test_incomplete_identity_inputs_fall_back_to_todays_derivation(self):
-        from nodes import otr_image_gen_dispatcher as disp
-
-        today = disp.resolve_object_seed(self.RH, "still_b002", "ph2")
-        assert disp.resolve_seed_and_mode(
-            self.RH, "still_b002", "ph2", kind="scene_character") == (today, "")
-        assert disp.resolve_seed_and_mode(
-            self.RH, "still_b002", "ph2", kind="scene_character",
-            char_id="c01") == (today, "")
-
-    def test_the_kill_switch_reproduces_the_old_behaviour_exactly(self, monkeypatch):
-        from nodes import otr_image_gen_dispatcher as disp
-
-        monkeypatch.setenv("OTR_PORTRAIT_IDENTITY_SEED", "0")
-        today = disp.resolve_object_seed(self.RH, "still_b002", "ph2")
-        seed, mode = disp.resolve_seed_and_mode(
-            self.RH, "still_b002", "ph2", kind="scene_character",
-            char_id="c01", portrait_prompt_hash="pp_portrait")
-        assert (seed, mode) == (today, ""), "the stamped mode must never lie"
 
     def test_anchor_only_when_truthy_keeps_the_head_digest_stable(self):
         """An unconditional append changes EVERY digest, including for objects

@@ -339,20 +339,6 @@ def test_the_declared_canvas_is_832x480_and_32_legal(eng):
     assert eng.render_aspect == "wide"
 
 
-def test_the_frame_contract_is_one_rung_at_the_canvas_rate(eng):
-    """G3.1/G3.2/G3.3. One legal length, declared in FRAMES, at 25 fps, with
-    continuity stated explicitly rather than inherited."""
-    contract = fc.frame_contract_for(eng)
-    assert contract is not fc.SINGLE_ONLY
-    assert contract.discrete_frames == (97,)
-    assert contract.native_fps == 25 == eng.target_fps
-    assert contract.allow_tail_trim is True
-    assert contract.continuity == CONTINUITY_STRICT_FIRST_FRAME
-    assert fc.declares_continuity_kwarg(eng), (
-        "continuity must be passed as a kwarg, not explained in a comment")
-    assert (R.LTX25_FRAMES - 1) % 8 == 0, "the temporal contract"
-
-
 def test_the_only_rung_is_the_only_legal_length(eng):
     """An ask below the rung renders it and trims; an ask above it is a
     REFUSAL here and a partition upstream, never a stretch."""

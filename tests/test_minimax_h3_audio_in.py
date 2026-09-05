@@ -187,22 +187,6 @@ def test_the_lane_ships_the_reference_sizing_that_was_MEASURED(engine):
 # ---------------------------------------------------------------------------
 # 3. Continuity -- the one contract value that is NOT inherited
 # ---------------------------------------------------------------------------
-def test_continuity_is_SOFT_and_the_sibling_is_STRICT(engine, sibling):
-    """`MiniMaxH3ReferenceToVideo` has no `first_frame` input at all: its
-    `ref_images` are identity references presented as `<Picture i>`, and nothing
-    pins frame 0 to any of them. A wrong STRICT claim promises the coverage
-    planner a seam the node cannot deliver."""
-    assert fc.frame_contract_for(engine).continuity == (
-        fc.CONTINUITY_SOFT_REFERENCE)
-    assert fc.frame_contract_for(sibling).continuity == (
-        fc.CONTINUITY_STRICT_FIRST_FRAME)
-    assert not fc.can_chain(engine)
-    assert fc.can_chain(sibling)
-
-
-def test_both_lanes_DECLARE_continuity_rather_than_defaulting(engine, sibling):
-    assert fc.declares_continuity_kwarg(engine)
-    assert fc.declares_continuity_kwarg(sibling)
 
 
 def test_the_reference_node_really_has_no_first_frame_input(engine):

@@ -401,26 +401,6 @@ QUALIFICATION_RECEIPT_REQUIRED_FIELDS = frozenset({
 })
 
 
-def is_qualified_route(route) -> bool:
-    """True only when ``route`` carries a COMPLETE qualification receipt.
-
-    Fail-closed by construction: a missing receipt, a bare string, a non-dict, or
-    a dict missing any required field is UNQUALIFIED. A route that cannot prove
-    it was auditioned has not been auditioned.
-    """
-    if not isinstance(route, dict):
-        return False
-    receipt = route.get("qualification_receipt")
-    if not isinstance(receipt, dict):
-        return False                      # None, or the old bare-string shape
-    missing = QUALIFICATION_RECEIPT_REQUIRED_FIELDS - set(receipt)
-    if missing:
-        return False
-    # Present-but-empty is the same lie in a longer form.
-    return all(str(receipt.get(f, "")).strip() != "" for f in
-               QUALIFICATION_RECEIPT_REQUIRED_FIELDS)
-
-
 # The two lines every LEMMY audition speaks, on every engine, forever.
 #
 # WHY THEY ARE FROZEN HERE. An audition is only evidence if the arms are
@@ -673,17 +653,6 @@ def provisional_route_problems(route, *, engine=None) -> list:
             "ENGINE DISAGREEMENT: provisional_receipt says %r but the route says "
             "%r" % (receipt_engine, route_engine))
     return bad
-
-
-def is_provisional_route(route, *, engine=None) -> bool:
-    """True only when ``route`` is a well-formed PROVISIONAL route.
-
-    Fail-closed exactly like ``is_qualified_route``, and MUTUALLY EXCLUSIVE with
-    it by construction: a provisional route may not carry a qualification receipt
-    or record at all, so no row can ever satisfy both predicates. That property is
-    the safety net under this whole tier and it is unit-pinned.
-    """
-    return not provisional_route_problems(route, engine=engine)
 
 
 LEMMY_VOICE_POLICY = {

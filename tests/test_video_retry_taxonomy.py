@@ -150,16 +150,6 @@ def test_fallback_action_api_stays_deleted():
     assert not hasattr(rt.classify(rt.FailureKind.OOM), "escalate_to_fallback")
 
 
-def test_ledger_schema_slot_survives_but_is_stamped_never():
-    # A5: runtime_fallback_decisions stays a valid (empty) schema slot so old
-    # ledgers parse; nothing in the codebase appends to it anymore.
-    section = sc.VideoLedgerSection(
-        video_revision=1,
-        shots=[sc.ShotRow(shot_id="shot_01", engine_id="humo",
-                          family="audio_driven_face")])
-    assert section.runtime_fallback_decisions == []
-
-
 def test_no_registered_engine_declares_a_fallback():
     for name in ("humo", "humo_1.7B", "still_motion"):
         assert getattr(vreg.get_engine(name), "fallback_engine", None) is None

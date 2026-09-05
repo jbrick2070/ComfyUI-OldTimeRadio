@@ -60,37 +60,6 @@ def _load_canonical() -> dict:
 # --------------------------------------------------------------------------- #
 # all-slots applied to the REAL workflow JSON
 # --------------------------------------------------------------------------- #
-def test_all_slots_set_on_canonical_json():
-    base = load_profile("16gb_full")
-    profile = sm.build_all_role_profile(base, ROLE_ENGINES)
-    # exactly the three video + three image role keys -- a closed set (no legacy
-    # catch-all / b-roll / background keys leak in)
-    assert set(profile["role_overrides"]) == {
-        "announcer_visual", "music_visual", "character_visual",
-        "announcer_image", "music_image", "character_image",
-    }
-    wf = wa.apply_profile(_load_canonical(), profile)
-    schemas = wa.build_offline_schemas()
-    vd = [n for n in wf["nodes"] if n.get("type") == "OTR_VideoDirector"]
-    assert len(vd) == 1
-    slots = wa.serialized_slot_names("OTR_VideoDirector", schemas)
-    vals = vd[0]["widgets_values"]
-    # THE CONTRACT IS THAT THE SAVED VALUE RESOLVES, not that it is spelled a
-    # particular way (lane 3, 2026-08-11). humo_1.7B and humo_1.7B_169 gained
-    # public ids, so the applier now writes their generated menu LABEL where it
-    # used to write the bare internal id -- while an engine with no public row
-    # still gets its bare id. Asserting the literal engine id would have failed
-    # on a rename that is working correctly; asserting the generated label for
-    # every engine would assert a behaviour the applier does not have. What
-    # must hold either way is the round trip.
-    from nodes._otr_shared.public_engines import resolve_engine_id
-    from nodes.otr_video_director import exact_menu_option_for
-    for role, engine in ROLE_ENGINES.items():
-        widget = _VIDEO_WIDGET[role]
-        got = vals[slots.index(widget)]
-        assert resolve_engine_id(got) == engine, (role, widget, got)
-        if engine in _PUBLIC_ROWS:
-            assert got == exact_menu_option_for(engine), (role, widget, got)
 
 
 def test_image_keys_are_exactly_the_three():
@@ -116,44 +85,10 @@ def test_canonical_json_character_granularity_widget():
     assert "character_granularity" in sig.parameters
 
 
-def test_character_image_override_flows_and_stale_key_is_dropped():
-    # silent-drop guard (build_all_role_profile loop over IMAGE_KEYS): a character_image
-    # override must LAND; an unknown/stale image key is ignored and the slot falls to
-    # the baseline -- why the rename must move producers + IMAGE_KEYS together.
-    base = load_profile("16gb_full")
-    ok = sm.build_all_role_profile(base, {}, image_engines={"character_image": "z_image_turbo"})
-    assert ok["role_overrides"]["character_image"] == "z_image_turbo"
-    stale = sm.build_all_role_profile(base, {}, image_engines={"legacy_image_key": "z_image_turbo"})
-    assert stale["role_overrides"]["character_image"] == sm.DEFAULT_IMAGE_BASELINE
-    assert "legacy_image_key" not in stale["role_overrides"]
-
-
 def test_every_chosen_engine_is_capability_eligible():
     for role, engine in ROLE_ENGINES.items():
         desc = vreg.descriptor_for_engine(engine)
         assert rc.engine_fits_role(desc, role), (engine, role)
-
-
-def test_builder_fills_missing_roles_with_baseline():
-    base = load_profile("16gb_full")
-    profile = sm.build_all_role_profile(base, {})   # nothing specified
-    ro = profile["role_overrides"]
-    for role in sm.ALL_ROLES:
-        assert ro[sm.ROLE_TO_PROFILE_KEY[role]] == sm.DEFAULT_VIDEO_BASELINE
-    # the baseline still fits every slot by capability (so an unset matrix is valid)
-    desc = vreg.descriptor_for_engine(sm.DEFAULT_VIDEO_BASELINE)
-    for role in sm.ALL_ROLES:
-        assert rc.engine_fits_role(desc, role), role
-
-
-def test_eligibility_matrix_is_capability_grounded():
-    matrix = sm.build_eligibility_matrix()
-    assert set(matrix) == set(sm.ALL_ROLES)
-    for role, names in matrix.items():
-        for name in names:
-            assert rc.engine_fits_role(vreg.descriptor_for_engine(name), role)
-        # at least the universal still floor is eligible everywhere
-        assert sm.DEFAULT_VIDEO_BASELINE in names, role
 
 
 # --------------------------------------------------------------------------- #

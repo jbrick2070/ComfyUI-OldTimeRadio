@@ -178,25 +178,3 @@ def _iter_dialogue_lines(ledger: dict):
     for line in ledger.get("lines") or []:
         if isinstance(line, dict):
             yield line
-
-
-def stamp_delivery_vectors(ledger: dict) -> dict:
-    """Stamp ``line['delivery'] = {emotion_vector, version}`` on every line.
-
-    Additive -- the default voice path ignores it, so the byte-identical
-    baseline is unaffected. Returns the same ledger object for chaining.
-    """
-    try:
-        from ._otr_script_prep import prepare_text as _prepare_text
-    except ImportError:  # pragma: no cover -- bare-module use in tools
-        _prepare_text = lambda s: s  # noqa: E731
-    for line in _iter_dialogue_lines(ledger):
-        tension = line.get("scene_tension", line.get("tension", 0.0)) or 0.0
-        # v2: derive from PREPARED text (shared normalization; the explicit
-        # tradeoff is losing parenthetical affect cues -- G13).
-        vec = deterministic_delivery_vector(
-            _prepare_text(line.get("text", "")), float(tension))
-        delivery = line.setdefault("delivery", {})
-        delivery["emotion_vector"] = vec
-        delivery["version"] = DELIVERY_TABLE_VERSION
-    return ledger

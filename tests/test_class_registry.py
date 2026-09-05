@@ -2,13 +2,7 @@
 import pathlib
 import re
 
-from nodes._otr_class_registry import (
-    NEW_AUDIO_NODES,
-    NEW_NODE_SPECS,
-    V2_AUDIO_CATEGORY,
-    expected_category,
-    new_node_modules_table,
-)
+from nodes._otr_class_registry import NEW_AUDIO_NODES, NEW_NODE_SPECS, V2_AUDIO_CATEGORY, new_node_modules_table
 
 _PLACEHOLDER_MARKERS = ("[EMOJI]", "[TODO]", "[PLACEHOLDER]", "[FIXME]")
 _EXPECTED_KEYS = {
@@ -36,13 +30,6 @@ def test_display_names_lead_with_space_and_no_placeholder():
         assert s.display_name.strip(), s.key
         for marker in _PLACEHOLDER_MARKERS:
             assert marker not in s.display_name, (s.key, marker)
-
-
-def test_categories_are_consistent():
-    for s in NEW_AUDIO_NODES:
-        assert s.category == V2_AUDIO_CATEGORY
-        assert s.category.startswith("OldTimeRadio")
-        assert expected_category(s.key) == s.category
 
 
 def test_module_paths_and_class_names_well_formed():

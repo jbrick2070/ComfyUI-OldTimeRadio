@@ -251,18 +251,6 @@ def test_p4_1_qualification_still_requires_a_human():
     assert "operator_verdict" in POOLS.QUALIFICATION_RECEIPT_REQUIRED_FIELDS
 
 
-@pytest.mark.parametrize("receipt", [
-    None,
-    "canonical_bark_preset_v1",          # the historical bare-string lie
-    {},
-    {"operator_verdict": ""},            # present-but-empty is the same lie
-])
-def test_p4_2_an_unproven_route_is_never_qualified(receipt):
-    """P4.2 -- Fail-closed: a route that cannot prove it was auditioned has not
-    been auditioned."""
-    assert POOLS.is_qualified_route({"qualification_receipt": receipt}) is False
-
-
 def test_p4_3_the_canonical_route_stays_honestly_unqualified():
     """P4.3 -- Bark's default route is a ROUTING fact, not an audition, and its
     null receipt is what says so."""

@@ -60,41 +60,6 @@ def test_engine_family_map():
     assert rd.engine_family(NAME) == "abstract"
 
 
-def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
-    """G3.3 / lesson L3 (lane 12, 2026-08-11).
-
-    The class comment had claimed "CONTINUITY none" since this engine was
-    written while `continuity=` was never passed, so the value was a dataclass
-    DEFAULT -- the right answer nobody had decided, which is the same shape a
-    wrong one would have had.
-
-    NONE is true here for a reason this lane can state: `render_clip` paints
-    every frame from the beat's own audio analysis and a per-beat rng key, and
-    reads no predecessor frame, so no terminal state exists for a successor to
-    inherit.
-
-    Declared per lane because each visualizer owns its contract -- lane 10's
-    shared-base fix reached the still shelf, not this family.
-    """
-    import inspect
-
-    from nodes._otr_video_engines import frame_contract as fcm
-    from nodes._otr_video_engines.eng_viz_camera import VizCameraEngine
-
-    eng = vreg.get_engine(NAME)
-    assert fcm.frame_contract_for(eng).continuity == fcm.CONTINUITY_NONE
-    # DECLARED, not defaulted -- and read from the AST, not the source TEXT.
-    # A substring check for "continuity=" is satisfied by the comment above the
-    # declaration explaining it (the lane 12 QA finding), so it would pass with
-    # the real keyword deleted. The resolved VALUE cannot catch it either: the
-    # dataclass default is the same constant.
-    assert fcm.declares_continuity_kwarg(eng)
-    render_src = inspect.getsource(VizCameraEngine.render_clip)
-    for consumes_predecessor in ("prev_frame", "last_frame", "init_image",
-                                 "continuity_frame"):
-        assert consumes_predecessor not in render_src
-
-
 def test_the_lane_DECLARES_NO_canvas_and_honours_ANY_request_size():
     """G2 / lesson L19 (lane 12, 2026-08-11).
 

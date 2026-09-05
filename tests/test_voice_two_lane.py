@@ -64,46 +64,6 @@ def test_bark_preset_gender_unknown_is_empty():
 # --------------------------------------------------------------------------- #
 # same_gender_voice_ref_for_preset
 # --------------------------------------------------------------------------- #
-def test_same_gender_pick_is_lowest_id_and_deterministic():
-    bank = (
-        _entry("vz_charlie", gender="male"),
-        _entry("vz_alpha", gender="male"),
-        _entry("vz_bravo", gender="male"),
-        _entry("vz_fem", gender="female"),
-    )
-    # v2/en_speaker_0 is male -> lowest male id == 'vz_alpha'.
-    got = VB.same_gender_voice_ref_for_preset("v2/en_speaker_0", "indextts2", bank=bank)
-    assert got == "vz_alpha"
-    # Deterministic across calls.
-    assert got == VB.same_gender_voice_ref_for_preset(
-        "v2/en_speaker_0", "indextts2", bank=bank)
-
-
-def test_same_gender_respects_engine_and_gender():
-    bank = (
-        _entry("vz_m1", engine="indextts2", gender="male"),
-        _entry("cb_f1", engine="chatterbox", gender="female"),
-    )
-    # female preset, indextts2 -> no female indextts2 ref -> ''.
-    assert VB.same_gender_voice_ref_for_preset(
-        "v2/en_speaker_2", "indextts2", bank=bank) == ""
-    # gender_hint overrides preset-derived gender.
-    assert VB.same_gender_voice_ref_for_preset(
-        "v2/en_speaker_0", "chatterbox", bank=bank, gender_hint="female") == "cb_f1"
-
-
-def test_same_gender_skips_reject_tier():
-    bank = (
-        _entry("vz_aaa", gender="male", tier="reject"),
-        _entry("vz_bbb", gender="male", tier="a"),
-    )
-    assert VB.same_gender_voice_ref_for_preset(
-        "v2/en_speaker_0", "indextts2", bank=bank) == "vz_bbb"
-
-
-def test_same_gender_fail_soft_on_empty():
-    assert VB.same_gender_voice_ref_for_preset("", "indextts2", bank=()) == ""
-    assert VB.same_gender_voice_ref_for_preset("v2/en_speaker_0", "", bank=()) == ""
 
 
 # --------------------------------------------------------------------------- #

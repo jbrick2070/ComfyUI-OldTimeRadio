@@ -33,10 +33,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_voice_bank import (_reserved_ids_from_policy,
-                                   default_char_engine,
-                                   gender_agnostic_fallback_ref,
-                                   load_voice_bank, reserved_voice_ref_ids)
+from nodes._otr_voice_bank import _reserved_ids_from_policy, gender_agnostic_fallback_ref, load_voice_bank, reserved_voice_ref_ids
 
 GENDERS = ("male", "female")
 #: Every engine that draws a cloned character voice. The fallback below is
@@ -55,10 +52,6 @@ def test_the_reservation_is_not_empty():
         "nothing is reserved -- every assertion in this file would pass while "
         "the LLM was being offered Lemmy's own voice"
     )
-
-
-
-
 
 
 def test_reserved_ids_are_still_present_in_the_unfiltered_bank():

@@ -667,25 +667,6 @@ def ending_template_for(slug: str) -> str:
     return ENDING_TEMPLATES.get(tag, ENDING_TEMPLATES[_DEFAULT_ENDING_TAG])
 
 
-def validate_catalog() -> None:
-    """Self-check (run in a test): every entry has a valid ending_tag that is a
-    real climax-class role with a template, plus the core grammar fields. LOUD on
-    any gap."""
-    for s in STYLE_CATALOG:
-        slug = s.get("slug", "?")
-        tag = s.get("ending_tag", "")
-        if tag not in ENDING_TAGS:
-            raise ValueError(f"style {slug!r} has invalid ending_tag {tag!r}")
-        if tag not in CLIMAX_CLASS_ROLES:
-            raise ValueError(
-                f"style {slug!r} ending_tag {tag!r} is not a climax-class role")
-        if tag not in ENDING_TEMPLATES:
-            raise ValueError(f"style {slug!r} ending_tag {tag!r} has no template")
-        for fld in ("label", "sound_world", "story_engine", "ending_mode"):
-            if not str(s.get(fld, "")).strip():
-                raise ValueError(f"style {slug!r} missing {fld}")
-
-
 # ---------------------------------------------------------------------------
 # Helpers (pure)
 # ---------------------------------------------------------------------------

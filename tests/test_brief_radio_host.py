@@ -458,15 +458,6 @@ def test_radio_host_portrait_minted_when_toggle_on(monkeypatch):
     assert rh["w"] > rh["h"]
 
 
-def test_radio_host_portrait_seed_is_pinned():
-    # object_id radio_host_portrait -> the FIXED bookend seed (4242 default),
-    # independent of the request hash, so open/inter/close share ONE face.
-    s = disp.resolve_object_seed({"request_seed": 999, "mode": "request_hash"},
-                                 mbp.RADIO_HOST_PORTRAIT_ID, "anyhash",
-                                 kind="portrait")
-    assert s == 4242
-
-
 # --------------------------------------------------------------------------- #
 # Chunk 4: OTR_ENABLE_HUMO_HOSTS toggle in render_driver
 # --------------------------------------------------------------------------- #

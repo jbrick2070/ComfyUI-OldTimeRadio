@@ -13,14 +13,7 @@ import pathlib
 import pytest
 import torch
 
-from nodes._otr_audio_cache import (
-    AudioCacheRecord,
-    FileAudioCache,
-    cache_key_for,
-    detect_ledger_schema_version,
-    needs_rerender,
-    record_from_request,
-)
+from nodes._otr_audio_cache import AudioCacheRecord, FileAudioCache, cache_key_for, needs_rerender, record_from_request
 from nodes._otr_resolved_request import build_resolved_request
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -139,24 +132,6 @@ def test_iter_records_on_missing_dir_is_empty(tmp_path):
 # (`_otr_voice_node_common`), because the actual defect was that a stale
 # ledger silently got voices reassigned by gender. See
 # tests/test_stale_ledger_voice_degrade_is_audible.py.
-
-
-def test_detect_ledger_schema_version():
-    assert detect_ledger_schema_version({"meta": {"ledger_schema_version": "2"}}) == "2"
-    assert detect_ledger_schema_version({"meta": {"schema_version": "3"}}) == "3"
-    assert detect_ledger_schema_version({"meta": {}}) == "1"
-    assert detect_ledger_schema_version({}) == "1"
-
-
-def test_migration_does_not_rewrite_legacy_raw_script():
-    ledger = {
-        "meta": {"cast_lock_revision": 1},
-        "cast": [{"char_id": "c1", "voice_ref_id": "x"}],
-        "lines": [{"line_id": "l1", "text": "the raw script must not change"}],
-    }
-    snapshot = copy.deepcopy(ledger)
-    detect_ledger_schema_version(ledger)
-    assert ledger == snapshot  # read-only: no mutation of the delegated script
 
 
 def test_source_is_ascii_no_em_dash():

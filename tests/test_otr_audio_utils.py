@@ -1,7 +1,7 @@
 """Tests for the [B, C, T] canonical audio helpers."""
 import torch
 
-from nodes._otr_audio_utils import audio_sha16, canonical_audio, mono_safe
+from nodes._otr_audio_utils import canonical_audio, mono_safe
 
 
 def test_canonical_promotes_1d():
@@ -30,18 +30,6 @@ def test_mono_safe_keeps_mono_byte_path():
     out = mono_safe({"waveform": wf, "sample_rate": 24000})
     assert out["waveform"].shape == (1, 1, 100)
     assert torch.allclose(out["waveform"], wf)
-
-
-def test_audio_sha16_deterministic_and_16_hex():
-    a = {"waveform": torch.ones(1, 1, 100), "sample_rate": 24000}
-    assert audio_sha16(a) == audio_sha16(a)
-    assert len(audio_sha16(a)) == 16
-
-
-def test_audio_sha16_changes_with_content():
-    a = {"waveform": torch.ones(1, 1, 100), "sample_rate": 24000}
-    b = {"waveform": torch.zeros(1, 1, 100), "sample_rate": 24000}
-    assert audio_sha16(a) != audio_sha16(b)
 
 
 if __name__ == "__main__":

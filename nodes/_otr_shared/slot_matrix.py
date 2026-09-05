@@ -16,8 +16,6 @@ helper. UTF-8, no BOM, SFW.
 """
 from __future__ import annotations
 
-import copy
-from typing import Optional
 
 #: role_compat role token -> profile role_overrides KEY (whose widget_mapping
 #: target is the matching OTR_VideoDirector per-role video model widget). These are
@@ -46,33 +44,6 @@ IMAGE_KEYS: tuple = ("announcer_image", "music_image", "character_image")
 DEFAULT_VIDEO_BASELINE = "still_flat"
 DEFAULT_IMAGE_BASELINE = "flux_gen1"
 
-# (No dead-key scrubber: retired role_overrides keys now fail LOUD at
-# apply_profile -- clean break, no silent scrub.)
-
-
-def build_all_role_profile(base_profile: dict, role_engines: Optional[dict] = None,
-                           *, video_baseline: str = DEFAULT_VIDEO_BASELINE,
-                           image_baseline: str = DEFAULT_IMAGE_BASELINE,
-                           image_engines: Optional[dict] = None) -> dict:
-    """A DEEP COPY of ``base_profile`` with ALL THREE video role keys set.
-
-    ``role_engines`` maps a role_compat role token (see :data:`ALL_ROLES`) to the
-    engine for that slot; any role absent falls to ``video_baseline``. Retired
-    role_overrides keys are no longer scrubbed -- they fail LOUD at apply
-    (clean break). The three image slots default to
-    ``image_baseline`` (override per key via ``image_engines``). Pure -- never
-    touches the graph; the applier does that."""
-    role_engines = role_engines or {}
-    image_engines = image_engines or {}
-    profile = copy.deepcopy(base_profile)
-    ro = profile.setdefault("role_overrides", {})
-    # Set the three INDEPENDENT video slots (retired keys fail loud at apply).
-    for role in ALL_ROLES:
-        ro[ROLE_TO_PROFILE_KEY[role]] = role_engines.get(role, video_baseline)
-    for key in IMAGE_KEYS:
-        ro[key] = image_engines.get(key, image_baseline)
-    return profile
-
 
 def eligible_engines_for_role(role: str) -> list:
     """Capability-eligible engine names for ``role`` (the C2 registry override).
@@ -89,9 +60,3 @@ def eligible_engines_for_role(role: str) -> list:
     """
     from .._otr_video_engines import registry as _vreg
     return _vreg.engines_for_role(role)
-
-
-def build_eligibility_matrix() -> dict:
-    """``{role: [eligible engine ids]}`` over the three slots -- the matrix the
-    soak enumerates (capability-grounded, C4)."""
-    return {role: eligible_engines_for_role(role) for role in ALL_ROLES}

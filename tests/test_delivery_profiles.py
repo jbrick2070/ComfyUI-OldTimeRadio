@@ -57,15 +57,6 @@ def test_neutral_param_overlay_is_identity_copy():
     assert neutral.overlay_params(None) == {}
 
 
-def test_apply_delivery_neutral_is_pure_identity():
-    from nodes._otr_delivery_profiles import apply_delivery, get_delivery_profile
-
-    neutral = get_delivery_profile("neutral")
-    text, params = apply_delivery(neutral, "Line one.", {"k": 1})
-    assert text == "Line one."
-    assert params == {"k": 1}
-
-
 def test_unknown_profile_fails_closed():
     from nodes._otr_delivery_profiles import (
         UnknownDeliveryProfile, get_delivery_profile,

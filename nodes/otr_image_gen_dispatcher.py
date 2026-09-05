@@ -156,15 +156,6 @@ def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_vers
     return _content_hash(parts)
 
 
-def resolve_object_seed(seed_cfg, object_id, prompt_hash, kind="") -> int:
-    """The seed alone. See ``resolve_seed_and_mode`` for the full contract.
-
-    Kept as a thin wrapper so every existing call site stays byte-identical --
-    none of them pass a char_id, so none of them can reach the identity branch.
-    """
-    return resolve_seed_and_mode(seed_cfg, object_id, prompt_hash, kind=kind)[0]
-
-
 def resolve_seed_and_mode(
     seed_cfg, object_id, prompt_hash, *, kind="", char_id="",
     portrait_prompt_hash="",
@@ -535,12 +526,6 @@ def _coerce_pixels(result, *, min_bytes: int = _MIN_PNG_BYTES,
     )
 
 
-def apply_fresh_cap(n_requested: int, fresh_cap: int, beat_budget: int) -> int:
-    """Hard cap FRESH renders to ``min(fresh_cap, beat_budget)`` (never over-gen)."""
-    cap = min(int(fresh_cap), int(beat_budget)) if beat_budget else int(fresh_cap)
-    return max(0, min(int(n_requested), cap))
-
-
 def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
     """Rename-proof the EPISODE stills dir (operator ticket 2026-06-11; the
     OTR_MasterAudioMux ``_reresolve_master_audio`` contract applied to the
@@ -656,31 +641,6 @@ def engine_consumes_still(eng) -> bool:
     return "init_image" in tuple(getattr(eng, "required_inputs", ()) or ())
 
 
-def _effective_engine_after_force_map(role: str, eng_id: str) -> str:
-    """Resolve the effective VIDEO engine for ``role`` AFTER applying
-    ``OTR_FORCE_ENGINE_MAP`` -- the SAME all-one-engine override that
-    ``render_driver.apply_engine_override`` applies at render time (operator
-    2026-07-01). The still dispatcher runs BEFORE that render-time override, so
-    without this it resolves the stale node-87 pick (e.g. humo) and mints a full
-    Flux still that the forced no-still visualizer (e.g. ``*=viz_mxc_mandala``)
-    then ignores -- a wasted ~10 min image-gen pass per episode.
-
-    DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a):
-    ``_otr_shared.route_freeze``. This function used to re-parse the env itself
-    and SWALLOW a malformed map (``except Exception: return eng_id``), which is
-    the silent-unforced defect ``render_driver.apply_engine_override`` was made
-    terminal for at ``57f4983a`` -- the image phase would spend ~10 minutes
-    minting stills for a plan that was going to die at render anyway. It is now
-    FAIL-CLOSED at the first reader. Unset env -> ``eng_id`` unchanged."""
-    try:
-        from ._otr_shared import route_freeze as _rf  # type: ignore
-    except ImportError:  # pragma: no cover -- flat test imports
-        from _otr_shared import route_freeze as _rf  # type: ignore
-    snap = _rf.routing_env_snapshot()
-    mapping = _rf.parse_force_map(snap.get("force_engine_map", ""))
-    return _rf.forced_engine_for_role(role, mapping) or eng_id
-
-
 def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
     """Resolve the VIDEO engine the render phase will actually use for ``role``.
 
@@ -751,22 +711,6 @@ def still_consumer_capability(image_policy: dict, role: str):
         return None
 
 
-def _still_needed_for_role(image_policy: dict, role: str) -> bool:
-    """Legacy boolean view of :func:`still_consumer_capability`.
-
-    Direct legacy callers historically fail-safe toward keeping a still when
-    configuration is unknown.  The terminal dispatcher now consumes the
-    tri-state helper directly and refuses to render without proof instead.
-    """
-    capability = still_consumer_capability(image_policy, role)
-    if capability is None:
-        log.warning("[OTR_ImageGenDispatcher] _still_needed_for_role: cannot prove "
-                    "an effective init-image consumer for role=%s; retaining the "
-                    "legacy boolean fail-safe", role)
-        return True
-    return capability
-
-
 def still_consumer_capabilities(image_policy: dict):
     """Return ``{role: True|False|None}`` or ``None`` for malformed policy."""
     if not isinstance(image_policy, dict) or not isinstance(
@@ -776,19 +720,6 @@ def still_consumer_capabilities(image_policy: dict):
         role: still_consumer_capability(image_policy, role)
         for role in _role_slots.ROLE_TO_VIDEO_SLOT
     }
-
-
-def roles_requiring_stills(image_policy: dict):
-    """Return conclusively still-consuming roles, or ``None`` if any role is unknown.
-
-    The compact set is ideal for an all-procedural upstream bypass.  Callers
-    that need per-object mixed-policy behavior should use
-    :func:`still_consumer_capabilities` and preserve ``None`` as uncertainty.
-    """
-    capabilities = still_consumer_capabilities(image_policy)
-    if capabilities is None or any(value is None for value in capabilities.values()):
-        return None
-    return frozenset(role for role, value in capabilities.items() if value)
 
 
 def _coverage_plan_module():

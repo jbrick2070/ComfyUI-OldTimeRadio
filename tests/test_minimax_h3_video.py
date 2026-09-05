@@ -241,13 +241,6 @@ def test_the_contract_publishes_canvas_frames_at_the_canvas_rate(engine):
     assert contract.allow_tail_trim is True
 
 
-def test_continuity_is_DECLARED_not_defaulted(engine):
-    assert fc.declares_continuity_kwarg(engine)
-    assert fc.frame_contract_for(engine).continuity == (
-        fc.CONTINUITY_STRICT_FIRST_FRAME)
-    assert fc.can_chain(engine)
-
-
 def test_a_sub_floor_ask_is_lifted_to_the_trained_floor_never_cut_below(engine):
     contract = fc.frame_contract_for(engine)
     assert contract.smallest_legal_at_least(1) == 129

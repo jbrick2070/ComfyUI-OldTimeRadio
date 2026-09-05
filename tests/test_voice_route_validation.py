@@ -331,13 +331,3 @@ def test_sha256_of_file_returns_none_instead_of_raising(tmp_path, local_ref):
     assert sha256_of_file(str(tmp_path / "absent.bin")) is None
 
 
-def test_the_legacy_helper_cannot_authorize_a_route():
-    """`is_qualified_route` stays as a compatibility check, but it accepts a
-    receipt whose file does not exist -- which is exactly why authorization
-    moved here."""
-    from config.cast_pools import QUALIFICATION_RECEIPT_REQUIRED_FIELDS, is_qualified_route
-    legacy = {"engine": "indextts2",
-              "qualification_receipt": {f: "x" for f in
-                                        QUALIFICATION_RECEIPT_REQUIRED_FIELDS}}
-    assert is_qualified_route(legacy)                      # legacy says yes...
-    assert not validate_qualified_voice_route(legacy, NOW).ok   # ...this does not

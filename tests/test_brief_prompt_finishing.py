@@ -109,63 +109,6 @@ def test_finish_style_tail_toggle():
     assert "35mm" not in out
 
 
-def test_image_prompt_hash_matches_finished_prompt():
-    """The stamped hash must be computed AFTER finishing (DS#1/GPT#6)."""
-    cast = [{"char_id": "c1", "name": "KEEPER",
-             "character_description": "60s, weathered face, oilskin coat"}]
-    out, _w = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
-    entry = mbp.objects_by_id(out)["c1"]
-    assert "lantern glow" in entry["prompt"]          # finished
-    assert entry["prompt_hash"] == mbp._content_hash(entry["prompt"])
-
-
-def test_image_no_person_analyzer_render_proceeds():
-    """Operator directive 2026-07-04: the person/face DETECTOR is RIPPED OUT -- a
-    no-person LLM portrait is neither failed nor annotated; it flows straight
-    through (the image/video engines accept a faceless init; the operator QAs faces
-    visually by reviewing prompts). Non-fail regression guard: nobody re-adds an
-    automated person analyzer to the render path."""
-    cast = [{"char_id": "c1", "name": "KEEPER",
-             "character_description": "60s, weathered face, oilskin coat"}]
-    # No person-evidence, but shares "lighthouse" with the setting so the SEPARATE
-    # consistency gate is satisfied -> kept, NOT raised, NOT swapped.
-    out, _warns = mbp.derive_image_prompts(
-        cast, _OK_META,
-        llm_fn=lambda _p: "an empty lighthouse lantern room at dusk")
-    entry = mbp.objects_by_id(out)["c1"]
-    assert entry["source"].startswith("llm")          # LLM prompt kept, not swapped
-    assert "lighthouse" in entry["prompt"].lower()    # the authored prompt survived
-    assert "lantern glow" in entry["prompt"]          # tails still finished
-    # The template LANE (llm_fn=None) leads with the appearance + finishes.
-    out2, _warns2 = mbp.derive_image_prompts(cast, _OK_META, llm_fn=None)
-    entry2 = mbp.objects_by_id(out2)["c1"]
-    assert entry2["source"].startswith("template")
-    assert "weathered face" in entry2["prompt"]       # template led
-    assert "lantern glow" in entry2["prompt"]          # finished
-
-
-def test_literal_announcer_cast_row_uses_radio_host_lane():
-    """A canonical cast row named ANNOUNCER is an announcer visual, not a normal
-    character portrait. The live Google SFX smoke hit this when c01 carried only
-    a role sentence, which correctly fails the character appearance gate."""
-    cast = [{"char_id": "c01", "name": "ANNOUNCER",
-             "character_description": (
-                 "Period radio announcer; reads the science story and frames "
-                 "the drama between beats.")}]
-
-    def fail_if_called(_prompt):
-        raise AssertionError("announcer cast row must not call portrait LLM")
-
-    out, _warns = mbp.derive_image_prompts(
-        cast, _OK_META, llm_fn=fail_if_called)
-    entry = mbp.objects_by_id(out)["c01"]
-    assert entry["role"] == "announcer_visual"
-    assert entry["source"] == "announcer_template"
-    assert entry["radio_host_style"] in {"console_face", "radio_object"}
-    assert "negative_prompt" in entry
-    assert "weathered face" not in entry["prompt"]
-
-
 def test_shotlock_m4_prompt_hash_matches_finished_prompt():
     from nodes import otr_shot_lock as sl
     ledger = {

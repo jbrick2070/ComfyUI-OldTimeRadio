@@ -63,12 +63,3 @@ def get_delivery_profile(profile_id: str = "neutral") -> DeliveryProfile:
             f"{available_delivery_profiles()}"
         )
     return profile
-
-
-def apply_delivery(profile: DeliveryProfile, text: str, params: Optional[dict]):
-    """Apply a delivery profile -> (projected_text, overlaid_params).
-
-    Pure + deterministic. For neutral this returns the text unchanged and the
-    engine params unchanged.
-    """
-    return profile.project_text(text), profile.overlay_params(params)

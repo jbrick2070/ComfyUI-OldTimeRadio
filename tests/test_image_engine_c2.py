@@ -52,17 +52,6 @@ def test_z_image_protocol_parity():
     assert eng.requires_flag is None            # registry IS the menu (no flag gate)
 
 
-def test_z_image_role_filter_shared():
-    descs = [
-        {"engine_id": n, "roles": tuple(ireg.get_engine(n).roles),
-         "required_inputs": tuple(getattr(ireg.get_engine(n), "required_inputs", ()))}
-        for n in ireg.all_engine_names()
-    ]
-    # needs only text_prompt -> fits every surviving role
-    assert "z_image_turbo" in rc.filter_engines_for_role("announcer_visual", descs)
-    assert "z_image_turbo" in rc.filter_engines_for_role("character_video", descs)
-
-
 def test_z_image_adapter_assert_usable_fail_closed(monkeypatch):
     """The adapter's OWN assert_usable fails closed (MISSING_MODEL) until the
     diffusion-model file is configured -- ABSENT/greyed, never a stub (BUG-046).

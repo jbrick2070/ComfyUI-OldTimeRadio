@@ -1,10 +1,5 @@
 """Tests for the deterministic per-line delivery (emotion) vector."""
-from nodes._otr_delivery_vector import (
-    DELIVERY_TABLE_VERSION,
-    EMOTIONS,
-    deterministic_delivery_vector,
-    stamp_delivery_vectors,
-)
+from nodes._otr_delivery_vector import DELIVERY_TABLE_VERSION, EMOTIONS, deterministic_delivery_vector
 
 
 def test_vector_deterministic():
@@ -28,27 +23,6 @@ def test_neutral_line_is_calm_dominant():
 def test_fear_line_raises_afraid():
     v = deterministic_delivery_vector("Run! Danger! Hide!", 0.9)
     assert v["afraid"] > v["happy"]
-
-
-def test_stamp_is_additive_and_versioned():
-    led = {"lines": [{"speaker_role": "character", "text": "Hello there.", "char_id": "c1"}]}
-    out = stamp_delivery_vectors(led)
-    d = out["lines"][0]["delivery"]
-    assert d["version"] == DELIVERY_TABLE_VERSION
-    assert set(d["emotion_vector"].keys()) == set(EMOTIONS)
-    # original keys preserved (additive)
-    assert out["lines"][0]["text"] == "Hello there."
-
-
-def test_stamp_deterministic():
-    a = {"lines": [{"text": "It is over. Goodbye, old friend...", "char_id": "c1"}]}
-    b = {"lines": [{"text": "It is over. Goodbye, old friend...", "char_id": "c1"}]}
-    assert stamp_delivery_vectors(a) == stamp_delivery_vectors(b)
-
-
-def test_stamp_handles_empty_ledger():
-    assert stamp_delivery_vectors({}) == {}
-    assert stamp_delivery_vectors({"lines": []}) == {"lines": []}
 
 
 # --------------------------------------------------------------------------- #
@@ -129,15 +103,6 @@ def test_select_rederives_on_stale_stamp_version():
 def test_select_derives_when_no_stamp():
     vec, src = select_delivery_vector({}, "Danger! Run!")
     assert src == "derived" and vec["afraid"] > 0.0
-
-
-def test_stamp_now_writes_v2_and_guard_accepts_it():
-    led = {"lines": [{"text": "Help! Is it behind you?", "char_id": "c1"}]}
-    out = stamp_delivery_vectors(led)
-    ln = out["lines"][0]
-    assert ln["delivery"]["version"] == "v2"
-    vec, src = select_delivery_vector(ln, "Help! Is it behind you?")
-    assert src == "stamped:v2" and vec == ln["delivery"]["emotion_vector"]
 
 
 if __name__ == "__main__":

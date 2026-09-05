@@ -21,8 +21,6 @@ from nodes import _otr_style_catalog as CAT  # noqa: E402
 # Chunk 2 -- catalog ending taxonomy
 # ---------------------------------------------------------------------------
 class TestCatalogEndings:
-    def test_validate_catalog_passes(self):
-        CAT.validate_catalog()
 
     def test_all_have_climax_class_tag(self):
         # 100 invention/media styles + 4 faithful ADAPTATION styles (2026-07-14,

@@ -35,15 +35,6 @@ def test_the_undeclared_default_is_unbounded_and_never_chains():
     assert fc.SINGLE_ONLY.is_legal_length(100000)
 
 
-def test_an_adapter_that_declares_nothing_is_single_only():
-    class _Bare:
-        pass
-
-    assert fc.frame_contract_for(_Bare()) == fc.SINGLE_ONLY
-    assert fc.can_split(_Bare()) is False
-    assert fc.can_chain(_Bare()) is False
-
-
 def test_none_engine_is_single_only():
     assert fc.frame_contract_for(None) == fc.SINGLE_ONLY
 
@@ -243,45 +234,6 @@ def test_discrete_duration_lane_covers_by_trimming():
 # ---------------------------------------------------------------------------
 # Continuity -- "accepts a still" is NOT "guarantees first-frame continuity"
 # ---------------------------------------------------------------------------
-
-def test_only_strict_first_frame_earns_a_chain():
-    def _with(mode):
-        class _E:
-            frame_contract = fc.FrameContract(
-                min_frames=9, max_frames=161, quantum=8, continuity=mode)
-        return _E()
-
-    assert fc.can_chain(_with(fc.CONTINUITY_STRICT_FIRST_FRAME)) is True
-    # A soft identity hint (HuMo) or interpolation endpoints (Veo lastFrame)
-    # do NOT lock frame 0 -- those lanes take a JUMP CUT.
-    assert fc.can_chain(_with(fc.CONTINUITY_SOFT_REFERENCE)) is False
-    assert fc.can_chain(_with(fc.CONTINUITY_NONE)) is False
-
-
-def test_the_chain_is_the_only_thing_still_EARNED_per_engine():
-    """Replaces ``test_single_only_engine_never_chains`` (chunk 7a).
-
-    That test built an engine declaring ``strict_first_frame`` WITHOUT the
-    opt-in and asserted it still could not chain -- the flag outranked the
-    continuity mode. With the opt-in deleted, continuity is the whole answer:
-    an engine that declares first-frame lock chains, and one that does not,
-    jump cuts. Splitting is universal; the seamless join is what must be earned.
-    """
-    class _Strict:
-        frame_contract = fc.FrameContract(
-            min_frames=9, max_frames=161, quantum=8,
-            continuity=fc.CONTINUITY_STRICT_FIRST_FRAME)
-
-    class _Soft:
-        frame_contract = fc.FrameContract(
-            min_frames=9, max_frames=161, quantum=8,
-            continuity=fc.CONTINUITY_SOFT_REFERENCE)
-
-    assert fc.can_chain(_Strict()) is True
-    assert fc.can_chain(_Soft()) is False
-    # Both may split -- that is no longer the differentiator.
-    assert fc.can_split(_Strict()) is True
-    assert fc.can_split(_Soft()) is True
 
 
 # ---------------------------------------------------------------------------

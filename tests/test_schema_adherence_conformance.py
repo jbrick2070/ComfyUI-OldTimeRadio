@@ -10,47 +10,12 @@ from typing import Literal
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from nodes._otr_structured_call import (
-    PostValidationError,
-    StructuredCallFailedError,
-    apply_field_aliases,
-    parse_validate_tolerant,
-    structured_call,
-    validate_tolerant_data,
-)
+from nodes._otr_structured_call import PostValidationError, StructuredCallFailedError, parse_validate_tolerant, structured_call, validate_tolerant_data
 
 
 # --------------------------------------------------------------------------- #
 # The shared helper: pure, deterministic, collision-safe
 # --------------------------------------------------------------------------- #
-
-
-def test_apply_field_aliases_does_not_mutate_input():
-    aliases = {"action": ("lever",)}
-    data = {"beat_index": 0, "lever": "KEEP"}
-    out = apply_field_aliases(aliases, data)
-    assert data == {"beat_index": 0, "lever": "KEEP"}  # input untouched
-    assert out == {"beat_index": 0, "action": "KEEP"}  # synonym moved + dropped
-
-
-def test_apply_field_aliases_non_dict_noop():
-    sentinel = ["not", "a", "dict"]
-    assert apply_field_aliases({"a": ("b",)}, sentinel) is sentinel
-    assert apply_field_aliases({"a": ("b",)}, None) is None
-
-
-def test_apply_field_aliases_two_synonyms_is_ambiguous():
-    """>= 2 declared synonyms present + canonical absent -> leave the field
-    failing (no silent pick)."""
-    aliases = {"action": ("lever", "act")}
-    data = {"beat_index": 0, "lever": "KEEP", "act": "SHORTEN_LINE"}
-    out = apply_field_aliases(aliases, data)
-    assert "action" not in out  # ambiguous -> not mapped
-
-
-def test_apply_field_aliases_empty_map_noop():
-    data = {"x": 1}
-    assert apply_field_aliases({}, data) is data
 
 
 # --------------------------------------------------------------------------- #

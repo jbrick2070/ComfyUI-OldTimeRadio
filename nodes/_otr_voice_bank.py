@@ -408,12 +408,6 @@ def unavailable_qualified_route_ids(
     return _BANK_UNAVAILABLE_ROUTE_IDS_CACHE[sha]
 
 
-def get_all_registered_voices(bank: Optional[Tuple[VoiceBankEntry, ...]] = None) -> List[VoiceBankEntry]:
-    """All bank entries, stable-sorted by ``voice_ref_id`` (E.1)."""
-    entries = bank if bank is not None else load_voice_bank()[0]
-    return sorted(entries, key=lambda e: e.voice_ref_id)
-
-
 # Bank-backed voice engines (bark uses v2/en_speaker_* presets, not bank refs);
 # the library-coverage gate over config/voice_reference_bank.json applies to these.
 #
@@ -722,23 +716,6 @@ def filter_by_quality_tier(entries, *, lead: bool = False):
         lead_safe = [e for e in tier_a if "lead_safe" in getattr(e, "style_tags", ())]
         return lead_safe or tier_a
     return pool
-def default_char_engine(
-    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-) -> str:
-    """The default bank-backed char_voice engine (the ``APPROVED_VOICE_ENGINES``
-    legacy-first order, first one with char_voice refs). Matches what CastLock
-    resolves for the canonical ``default`` voice_bank; '' when none. The writer
-    builds voice cards against this; a CastLock voice_bank that resolves a
-    DIFFERENT engine just makes the proposal fail validation -> fall closed."""
-    try:
-        entries = bank if bank is not None else load_voice_bank()[0]
-    except Exception:  # noqa: BLE001
-        return ""
-    with_refs = {e.engine for e in entries if "char_voice" in e.roles}
-    for eng in APPROVED_VOICE_ENGINES:
-        if eng in with_refs:
-            return eng
-    return ""
 
 
 def bark_preset_gender(preset: str) -> str:
@@ -766,34 +743,6 @@ def bark_preset_gender(preset: str) -> str:
     except Exception:  # noqa: BLE001 -- cast_pools optional; fail-soft
         return ""
     return ""
-
-
-def same_gender_voice_ref_for_preset(
-    preset: str,
-    engine: str,
-    *,
-    bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-    gender_hint: str = "",
-) -> str:
-    """Deterministic ``v2/en_speaker_* -> same-gender voice_ref_id`` for
-    ``engine``. Returns the LOWEST ``voice_ref_id`` among the engine's
-    same-gender, non-reject references (stable -> C7), or '' when no such ref
-    exists. ``gender_hint`` overrides the preset-derived gender (use the cast
-    row's gender when known). Pure + fail-soft; never raises."""
-    gender = (gender_hint or bark_preset_gender(preset) or "").strip().lower()
-    if not gender or not engine:
-        return ""
-    try:
-        entries = bank if bank is not None else load_voice_bank()[0]
-    except Exception:  # noqa: BLE001 -- no/broken bank -> bark stays the identity
-        return ""
-    cands = sorted(
-        (e for e in entries
-         if e.engine == engine and e.gender == gender
-         and getattr(e, "quality_tier", "") != "reject"),
-        key=lambda e: e.voice_ref_id,
-    )
-    return cands[0].voice_ref_id if cands else ""
 
 
 def _seeded_announcer_gender(engine: str, episode_seed) -> str:

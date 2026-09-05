@@ -54,30 +54,6 @@ class ImageEngineConfig(_Forbid):
     custom: bool = False
 
 
-class ImageRequest(_Forbid):
-    """One image render request for one (role, object) -- the dispatcher unit.
-
-    The cache key is composed from ``(role, object_id, prompt_hash, seed,
-    engine_id, engine_version)`` (PASS-IMG MUST-FIX #5); ``prompt`` is the
-    LLM-derived text and MUST NOT be a path (the dispatcher asserts this -- a
-    distinct prompt-STRING vs path-STRING contract, SHOULD-FIX).
-    """
-
-    request_id: str
-    role: str
-    object_id: str
-    engine_id: str
-    engine_version: str = "1"
-    prompt: str = ""
-    prompt_hash: str = ""
-    negative_prompt: Optional[str] = None
-    init_image: Optional[str] = None     # PATH to a .png, never an IMAGE tensor
-    seed: int = 0
-    granularity: str = "per_object"
-    width: int = 1024
-    height: int = 1024
-
-
 class CanonicalImage(_Forbid):
     """A rendered still recorded in the ledger (content-addressed on disk).
 

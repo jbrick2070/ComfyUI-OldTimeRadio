@@ -97,23 +97,6 @@ def _mk_registry(root: Path, banks=None, pipelines=None, packs=None,
 # (a) shipped registries + science routing
 # ---------------------------------------------------------------------------
 
-def test_shipped_registries_load_and_route_media_archive():
-    # Roster trim 2026-07-17: science_news is removed; media_archive is the
-    # surviving legacy_many_pass lane exercised for generic load+route.
-    bank = routing.get_bank("media_archive")
-    assert bank.runnable is True
-    assert bank.default_story_model == "media_restoration_adventure"
-    pipe = routing.get_pipeline("legacy_many_pass")
-    assert pipe.executable is False and pipe.declared_seams == frozenset()
-    assert routing.get_pipeline("simple_4_prompt_experimental").executable is False
-    assert "media_archive" in routing.list_bank_ids()
-
-    pack = routing.resolve_story_pack("media_archive")
-    strict = sp.load_pack(
-        REPO / "nodes" / "story_packs" / "media_archive"
-        / "media_restoration_adventure.json")
-    assert pack.prompt_stages == strict.prompt_stages  # byte-identical routing
-
 
 def test_shipped_media_archive_is_runnable_gate():
     assert routing.require_runnable_bank("media_archive").runnable is True
@@ -193,14 +176,6 @@ def test_media_archive_drama_seeds_sidecar_is_not_a_story_pack():
     assert routing.require_runnable_bank("media_archive").runnable is True
     with pytest.raises(routing.UnknownStoryModelError):
         routing.resolve_story_pack("media_archive", "drama_seeds")
-
-
-def test_simple4_pack_strict_load_raises():
-    """The simple_4 pack carries ONLY pipeline-declared seams -- a strict
-    load_pack must reject it (routing is the only admission path)."""
-    with pytest.raises(sp.UnknownSeamError):
-        sp.load_pack(REPO / "nodes" / "story_packs" / "custom_source_bank"
-                     / "simple_4_prompt_experimental.json")
 
 
 # ---------------------------------------------------------------------------
@@ -351,23 +326,6 @@ def test_malformed_registry_json_raises(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # (c) cache split: permissive routed load never satisfies strict load_pack
 # ---------------------------------------------------------------------------
-
-def test_cache_split_guard(tmp_path, monkeypatch):
-    pipe = _pipe_row(declared_seams=["custom_seam"],
-                     passes=[{"pass_id": "p1", "slot": "creative",
-                              "seam_refs": ["custom_seam"], "description": "d"}])
-    pack = _pack_obj(prompt_stages={"custom_seam": "content"})
-    bank = _bank_row(required_seams=[])
-    root = _mk_registry(tmp_path, banks=[bank], pipelines=[pipe],
-                        packs={"tbank/tmodel.json": pack},
-                        monkeypatch=monkeypatch)
-    # routed load succeeds (pipeline-declared seam admitted)
-    routed = routing.resolve_story_pack("tbank")
-    assert routed.prompt_stages["custom_seam"] == "content"
-    # STRICT load of the SAME path still raises -- the permissive result must
-    # not have poisoned the strict cache (kibitz r2 M1).
-    with pytest.raises(sp.UnknownSeamError):
-        sp.load_pack(root / "tbank" / "tmodel.json")
 
 
 def test_load_pack_with_seams_rejects_non_frozenset():

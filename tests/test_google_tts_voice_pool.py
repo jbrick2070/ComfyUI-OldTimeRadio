@@ -15,14 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_voice_bank import (
-    APPROVED_VOICE_ENGINES,
-    VoiceCastingError,
-    assign_voice_for_slot,
-    compute_bank_coverage,
-    default_char_engine,
-    load_voice_bank,
-)
+from nodes._otr_voice_bank import APPROVED_VOICE_ENGINES, VoiceCastingError, assign_voice_for_slot, compute_bank_coverage, load_voice_bank
 
 #: One speaking part per Macbeth II.ii-era roster. Nine is not a stress test;
 #: it is a normal Shakespeare cast.
@@ -44,13 +37,6 @@ def test_google_tts_is_inside_the_coverage_floor():
     cov = compute_bank_coverage(cast_size=5)
     assert "google_tts" in cov
     assert cov["google_tts"]["meets_floor"], cov["google_tts"]
-
-
-def test_appending_google_tts_did_not_move_the_default_engine():
-    """``default_char_engine`` returns the FIRST approved engine with
-    char_voice refs, so google_tts must stay last in the tuple."""
-    assert APPROVED_VOICE_ENGINES[-1] == "google_tts"
-    assert default_char_engine() == "indextts2"
 
 
 def test_every_supported_engine_voice_is_castable():

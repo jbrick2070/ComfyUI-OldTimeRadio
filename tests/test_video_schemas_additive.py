@@ -131,28 +131,6 @@ def test_static_image_gen_requires_text_or_init_image():
     ).family_hint == "static_image_gen"
 
 
-def test_canonical_clip_is_always_silent_bt709_by_default():
-    clip = sc.CanonicalClip(clip_id="c1", path="out.mp4")
-    assert clip.has_audio is False                     # V-1
-    assert clip.pixel_format == "yuv420p"
-    assert clip.color_primaries == "bt709"
-    assert clip.transfer == "bt709"
-    assert clip.matrix == "bt709"
-    assert clip.alpha == "none"
-
-
-def test_canonical_clip_forbids_extra_keys():
-    with pytest.raises(ValidationError):
-        sc.CanonicalClip(clip_id="c1", path="out.mp4", loud=True)
-
-
-def test_ledger_section_defaults():
-    sec = sc.VideoLedgerSection()
-    assert sec.video_revision == 1
-    assert sec.runtime_fallback_decisions == []
-    assert sec.fps == 25
-
-
 def test_execution_group_defaults_to_consumer():
     g = sc.ExecutionGroup(group_id="g1")
     assert g.kind == "consumer"

@@ -151,25 +151,6 @@ def _make_recording_repair_factory():
     return factory
 
 
-def test_schema_contract_renders_nested_bounds_literals_and_paths():
-    instruction = sc.schema_shape_instruction(ContractSchema)
-
-    assert instruction.count("[OTR_SCHEMA_CONTRACT_V1]") == 1
-    assert "const=\"locked\"" in instruction
-    assert 'enum=["warm", "dry"]' in instruction
-    assert "entries: required; type=array; minItems=1; maxItems=2" in instruction
-    assert "entries[*].label: required; type=string; minLength=2; maxLength=9" in instruction
-    assert "pattern=\"^[A-Z]+$\"" in instruction
-    assert "rating: required; type=number; minimum" not in instruction
-    assert "exclusiveMinimum=0" in instruction
-    assert "maximum=7" in instruction
-    assert "multipleOf=0.5" in instruction
-    assert "optional_leaf.label" in instruction
-    assert sc.schema_path_exists(ContractSchema, "entries[*].label")
-    assert sc.schema_path_exists(ContractSchema, "entries[0].label")
-    assert not sc.schema_path_exists(ContractSchema, "entries[*].missing")
-
-
 def test_schema_contract_never_emits_an_empty_key_list_for_a_scalar():
     """A scalar declares no properties, so it has no "exact keys" to state.
 

@@ -287,16 +287,6 @@ def test_stable_audio_missing_hf_token_fails_closed(monkeypatch):
     assert missing.value.reason is EngineUsabilityReason.MISSING_HF_TOKEN
 
 
-def test_node_class_matches_class_registry():
-    from nodes._otr_class_registry import NEW_NODE_SPECS, expected_category
-    from nodes.stable_audio_theme import StableAudioTheme
-
-    spec = NEW_NODE_SPECS["OTR_StableAudioTheme"]
-    assert spec.class_name == "StableAudioTheme"
-    assert StableAudioTheme.CATEGORY == expected_category("OTR_StableAudioTheme")
-    assert StableAudioTheme.FUNCTION == "generate"
-
-
 def test_node_wired_into_init_by_table_not_literal_key():
     text = (REPO_ROOT / "__init__.py").read_text(encoding="utf-8")
     assert "new_node_modules_table" in text

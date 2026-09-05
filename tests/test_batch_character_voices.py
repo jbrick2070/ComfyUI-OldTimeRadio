@@ -267,14 +267,6 @@ def test_gate_in_consumed_without_crashing(monkeypatch):
 # ----------------------------------------------------------------------------
 # Registration + lazy-import contract (C-5 / piece 6)
 # ----------------------------------------------------------------------------
-def test_node_class_matches_class_registry():
-    from nodes._otr_class_registry import NEW_NODE_SPECS, expected_category
-    from nodes.batch_character_voices import BatchCharacterVoices
-
-    spec = NEW_NODE_SPECS["OTR_BatchCharacterVoices"]
-    assert spec.class_name == "BatchCharacterVoices"
-    assert BatchCharacterVoices.CATEGORY == expected_category("OTR_BatchCharacterVoices")
-    assert BatchCharacterVoices.FUNCTION == "generate"
 
 
 def test_node_wired_into_init_by_table_not_literal_key():

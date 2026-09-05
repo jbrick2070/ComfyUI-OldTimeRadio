@@ -85,26 +85,6 @@ def test_registry_humo_selectable_no_flag(monkeypatch):
 # --------------------------------------------------------------------------- #
 # Shared role_compat filter (AS-1): audio_driven_face needs audio_ref+init_image
 # --------------------------------------------------------------------------- #
-def test_humo_role_fit_audio_driven_face():
-    eng = vreg.get_engine("humo")
-    desc = {"engine_id": "humo", "roles": eng.roles,
-            "required_inputs": eng.required_inputs}
-    # announcer_visual, music_visual AND character_video all supply BOTH
-    # init_image and audio_ref, so HuMo capability-FITS all three -- this is
-    # the low-level input-token check only. Whether HuMo is actually ALLOWED to
-    # dispatch for a role is a separate, higher-level policy
-    # (render_driver._enforce_radio_is_host, 2026-06-30): announcer_visual /
-    # music_visual are policy-forbidden ("radio is the host") even though they
-    # fit here; only character_video is both fit AND allowed.
-    for role in ("announcer_visual", "music_visual", "character_video"):
-        assert rc.engine_fits_role(desc, role) is True
-    # rip-sfx-broll (2026-07-01): the dead roles are unknown tokens and raise.
-    import pytest as _pytest
-    for role in ("retired_role_a", "retired_role_b"):
-        with _pytest.raises(rc.RoleCompatError):
-            rc.engine_fits_role(desc, role)
-    assert rc.filter_engines_for_role("character_video", [desc]) == ["humo"]
-    assert rc.filter_engines_for_role("music_visual", [desc]) == ["humo"]
 
 
 # --------------------------------------------------------------------------- #

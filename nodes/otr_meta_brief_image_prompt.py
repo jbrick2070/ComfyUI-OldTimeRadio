@@ -1169,7 +1169,6 @@ def _still_word_fit_card(words: str) -> str:
     return (trimmed or s).strip()
 
 
-
 def _episode_title(meta) -> str:
     """The episode title from meta (``episode_title`` -> ``title``), stripped.
     Empty string when absent. Pure."""
@@ -1481,16 +1480,6 @@ def derive_scene_still_targets(lines, fps: int = 25,
         _add("music_closing_001", "scene_beat", "music_visual",
              "scene_close_pretiming")
     return targets, warnings
-
-
-def objects_by_id(payload) -> dict:
-    """``{object_id: object}`` accessor over the versioned ``{"objects":[...]}``
-    payload (portrait object_ids are the char_ids). Pure, tolerant."""
-    out: dict = {}
-    for obj in (payload or {}).get("objects") or []:
-        if isinstance(obj, dict) and obj.get("object_id"):
-            out.setdefault(str(obj["object_id"]), obj)
-    return out
 
 
 def announcer_line_char_ids(lines) -> list:

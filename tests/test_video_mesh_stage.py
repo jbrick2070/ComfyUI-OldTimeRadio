@@ -539,35 +539,6 @@ def test_the_profile_canvas_agrees_with_the_declaration():
                     "be vacuous, so the enumeration itself is asserted"
 
 
-def test_the_frame_contract_DECLARES_continuity_none_and_says_why():
-    """G3.3 / lesson L3 (lane 10). CONTINUITY_NONE was inherited as a dataclass
-    DEFAULT here -- the right value arrived at by nobody deciding it, which is
-    the same shape a wrong value would have had.
-
-    NONE is honest for this lane for a reason specific to it: build_blender_cmd
-    takes start_angle / arc_degrees, so a chained successor segment would need
-    the predecessor's terminal ORBIT ANGLE threaded forward to continue the
-    turntable, and nothing threads it. A chain would snap the camera back to
-    the arc's start at every segment boundary.
-    """
-    import inspect
-    from nodes._otr_video_engines import frame_contract as fcm
-
-    eng = vreg.get_engine("mesh_stage")
-    contract = fcm.frame_contract_for(eng)
-    assert contract.continuity == fcm.CONTINUITY_NONE
-    # DECLARED, not defaulted -- read from the AST, not the source TEXT. A
-    # substring check for "continuity=" is satisfied by the comment above the
-    # shared declaration explaining it (the lane 12 QA finding), so it would
-    # pass with the real keyword deleted; the resolved VALUE cannot catch it
-    # either, because the dataclass default is the same constant.
-    assert fcm.declares_continuity_kwarg(eng)
-    # ...and the arc arguments that make NONE the honest answer are still real,
-    # so this reasoning cannot quietly stop applying.
-    sig = inspect.signature(ms.build_blender_cmd).parameters
-    assert "start_angle" in sig and "arc_degrees" in sig
-
-
 # --------------------------------------------------------------------------- #
 # Driver maps + capability row (BOTH copies; the 0-E wiring contract)
 # --------------------------------------------------------------------------- #

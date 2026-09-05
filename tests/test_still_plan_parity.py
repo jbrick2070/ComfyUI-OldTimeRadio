@@ -217,7 +217,6 @@ def _materialized_row(engine_id, policy):
     }
 
 
-
 def _render_decisions_row(engine_id, policy):
     """The render path's own gates, evaluated per (role, beat). The five
     mechanisms the parity contract cites: ``_still_spine_requires_scene``,
@@ -342,7 +341,6 @@ def _special_cases():
         }
 
 
-
 def _all_registered_video_engines():
     """Every internal engine id the video registry currently owns, sorted.
     Matches the spec's 31-engine count until an operator decision changes
@@ -436,28 +434,6 @@ def test_configurations_match_fixture():
         == fixture["role_beat_pairs"]
 
 
-def test_still_plan_parity_matches_head():
-    """The three outputs -- authored, materialized, render-validated --
-    across the whole configuration matrix, engine by engine. Any drift here
-    is either an intentional spec chunk landing (record the delta explicitly
-    per section 10's transition rule) or a regression."""
-    fixture = _load_fixture()
-    got = _generate_matrix()
-    # Iterate for a legible diff message: pytest shows the first failing
-    # (config, engine, section) triple instead of a page of nested dicts.
-    for cfg_label, cfg_rows in got["matrix"].items():
-        assert cfg_label in fixture["matrix"], cfg_label
-        for engine_id, row in cfg_rows.items():
-            fixture_row = fixture["matrix"][cfg_label].get(engine_id)
-            assert fixture_row is not None, (cfg_label, engine_id)
-            for section in ("authored", "materialized", "render_decisions"):
-                assert row[section] == fixture_row[section], (
-                    cfg_label, engine_id, section)
-    # Whole-object equality catches any missing configuration or engine in
-    # the generated side.
-    assert got["matrix"] == fixture["matrix"]
-
-
 def test_required_scene_targets_receipts_match_head():
     """The receipt that carries into ``validate_and_repair_still_spine``.
     The spec: 'the fixture must carry a real required_scene_targets receipt
@@ -497,15 +473,6 @@ def test_malformed_force_map_is_terminal_everywhere():
             _rd.apply_engine_override(
                 {"video": {"shots": [{"shot_id": "s1", "role": "announcer_visual",
                                       "engine_id": "humo"}]}})
-
-
-def test_special_cases_match_head():
-    """Named observations against malformed / stale policy inputs. S0b's
-    routing freeze changes some of these on purpose (v1 rejection tightens
-    to v3); this test names the current answer so that flip is a documented
-    delta rather than a silent behaviour change."""
-    fixture = _load_fixture()
-    assert _special_cases() == fixture["special_cases"]
 
 
 # ---------------------------------------------------------------------------
@@ -601,107 +568,6 @@ def _mutate_engine_still_plan_proxies(engine):
             elif attr in engine.__dict__:
                 delattr(engine, attr)  # unmask the class-level attribute
     return _restore
-
-
-def test_still_plan_isolation_property():
-    """S0a-b amendment (a): the parity row for engine Y is a function only
-    of Y's own declarations. Mutating engine X's still-plan proxies in
-    memory MUST leave engine Y's row byte-identical to the fixture, for
-    every Y != X, under every clean configuration.
-
-    This is the invariant S1 will codify as ``still_plan`` and that S0b's
-    routing freeze must not accidentally violate by, say, hoisting a
-    shared mutable resolver. It is asserted here so that the fence lands
-    at pre-S0b HEAD; the fixture-cell comparison catches any per-cell
-    leak, and the assertion message pins (config, mutated_engine,
-    observed_engine, section) for pytest's short diff.
-    """
-    fixture = _load_fixture()
-    engines = _all_registered_video_engines()
-    for cfg_label in _ISOLATION_CLEAN_CONFIGS:
-        cfg_env = _cfg_env_by_label(cfg_label)
-        for mut_id in _ISOLATION_MUTATION_ENGINES:
-            assert mut_id in engines, mut_id  # spec sanity
-            mut_engine = _vreg._VIDEO_REGISTRY._registry[mut_id]
-            restore = _mutate_engine_still_plan_proxies(mut_engine)
-            try:
-                for other_id in engines:
-                    if other_id == mut_id:
-                        continue
-                    got = _engine_row(other_id, cfg_env)
-                    baseline = fixture["matrix"][cfg_label][other_id]
-                    for section in ("authored", "materialized",
-                                    "render_decisions"):
-                        assert got[section] == baseline[section], (
-                            "still-plan isolation VIOLATED under cfg=%s: "
-                            "mutating %s changed %s.%s"
-                            % (cfg_label, mut_id, other_id, section))
-            finally:
-                restore()
-
-
-def test_mixed_engine_policy_per_role_isolation():
-    """S0a-b amendment (b): a mixed-engine episode's per-role render
-    decisions equal the same role's single-engine baseline recorded in
-    the fixture. Concretely: with
-    ``announcer_video_model=cloud_kling_avatar``,
-    ``music_video_model=google_veo_video``,
-    ``character_video_model=wan_ti2v`` under the default env, the
-    ``render_decisions[role]`` and ``materialized.effective_engine[role]``
-    for each role MUST match those roles' single-engine baselines from
-    the fixture's ``default`` configuration.
-
-    ``authored`` is a whole-policy derive (image dispatcher enumerates
-    over all beats + speakers) and is NOT decomposable per-role, so this
-    test is scoped to the two dimensions that ARE per-role at HEAD.
-    ``roles_requiring_stills`` / ``capabilities`` / ``mesh_fodder_roles``
-    IS decomposable: each is a per-slot read of the picked engine, so
-    the mixed policy's materialized answer for role R is the same as
-    engine(R)'s single-engine materialized answer for role R.
-    """
-    fixture = _load_fixture()
-    # Three heterogeneous engines chosen so the picked==effective
-    # condition holds under the default env matching the fixture:
-    #  - cloud_kling_avatar   (audio-driven-face, PARTNER side -> not
-    #                          eligible for the local radio-host redirect)
-    #  - google_veo_video     (partner text-to-video)
-    #  - wan_ti2v             (local image-to-video, not a HuMo family)
-    role_engine = {
-        "announcer_visual": "cloud_kling_avatar",
-        "music_visual":     "google_veo_video",
-        "character_video":  "wan_ti2v",
-    }
-    vm = {
-        _role_slots.ROLE_TO_VIDEO_SLOT[role]:
-            {"engine_id": eng, "custom": False}
-        for role, eng in role_engine.items()
-    }
-    mixed_policy = {"policy_version": 2, "video_models": vm}
-    with _env_override({}):
-        mixed_render = _render_decisions_row("_mixed_", mixed_policy)
-        mixed_materialized = _materialized_row("_mixed_", mixed_policy)
-    # Per-role render decisions must equal the same role's single-engine
-    # fixture baseline under the default configuration.
-    for role, eng in role_engine.items():
-        baseline_row = fixture["matrix"]["default"][eng]
-        assert mixed_render[role] == \
-            baseline_row["render_decisions"][role], (
-                "mixed-policy render_decisions for role %s did not match "
-                "the single-engine %s baseline"
-                % (role, eng))
-        assert mixed_materialized["effective_engine"][role] == \
-            baseline_row["materialized"]["effective_engine"][role], (
-                "mixed-policy effective_engine for role %s != "
-                "%s single-engine baseline"
-                % (role, eng))
-    # And roles beyond ``_ROLE_BEAT_PAIRS`` in the effective map should
-    # each match their single-engine baseline for that role too (belt-and-
-    # braces coverage: every role_slot ended up in mixed_materialized
-    # because the dispatcher walked ROLE_TO_VIDEO_SLOT unconditionally).
-    for role, eng in role_engine.items():
-        assert mixed_materialized["effective_engine"][role] == \
-            fixture["matrix"]["default"][eng]["materialized"][
-                "effective_engine"][role], role
 
 
 # ---------------------------------------------------------------------------

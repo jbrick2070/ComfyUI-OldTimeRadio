@@ -90,8 +90,3 @@ def new_node_modules_table() -> dict:
         spec.key: (spec.module_path, spec.class_name, spec.display_name)
         for spec in NEW_AUDIO_NODES
     }
-
-
-def expected_category(key: str) -> str:
-    """The CATEGORY the node class for ``key`` must declare (test anchor)."""
-    return NEW_NODE_SPECS[key].category

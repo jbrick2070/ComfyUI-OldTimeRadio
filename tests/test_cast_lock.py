@@ -330,14 +330,6 @@ def test_ledger_json_round_trips():
 # ----------------------------------------------------------------------------
 # Registration + hygiene
 # ----------------------------------------------------------------------------
-def test_node_class_matches_class_registry():
-    from nodes._otr_class_registry import NEW_NODE_SPECS, expected_category
-    from nodes.cast_lock import CastLock
-
-    spec = NEW_NODE_SPECS["OTR_CastLock"]
-    assert spec.class_name == "CastLock"
-    assert CastLock.CATEGORY == expected_category("OTR_CastLock")
-    assert CastLock.FUNCTION == "lock"
 
 
 def test_node_wired_into_init_by_table_not_literal_key():

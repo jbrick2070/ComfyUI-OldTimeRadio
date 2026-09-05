@@ -453,24 +453,6 @@ def test_cheap_families_registered():
         assert fam in names, f"cheap family {fam} not registered in the video registry"
 
 
-def test_cheap_family_usable_and_role_filtered():
-    # C2 (2026-06-30): eligibility is CAPABILITY. still_motion (text-only) fits
-    # every surviving role, so it is usable there.
-    assert vreg.assert_usable("still_motion", "character_video") == "still_motion"
-    # the SHARED role filter (AS-1, capability) offers floors per their inputs
-    descs = [
-        {"engine_id": n, "roles": tuple(vreg.get_engine(n).roles),
-         "required_inputs": tuple(getattr(vreg.get_engine(n), "required_inputs", ()))}
-        for n in vreg.all_engine_names()
-    ]
-    cv = rc.filter_engines_for_role("character_video", descs)
-    assert "still_motion" in cv                    # text-only floor fits by capability
-    # rip-sfx-broll (2026-07-01): the input-poor roles are GONE; a dead role
-    # token raises through the same shared filter path.
-    with pytest.raises(rc.RoleCompatError):
-        rc.filter_engines_for_role("retired_role_b", descs)
-
-
 def test_cheap_families_cold_import_clean():
     """The render namespace + the new render nodes import NO heavy lib (V-12)."""
     code = (

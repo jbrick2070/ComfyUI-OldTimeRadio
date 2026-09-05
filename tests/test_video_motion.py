@@ -60,18 +60,6 @@ def test_registry_ltx_selectable_no_flag(monkeypatch):
         assert vreg.assert_usable("ltx_video", role) == "ltx_video"
 
 
-def test_ltx_role_fit_text_to_video():
-    eng = vreg.get_engine("ltx_video")
-    desc = {"engine_id": "ltx_video", "roles": eng.roles,
-            "required_inputs": eng.required_inputs}
-    # capability-only (2026-06-22): ltx_video needs only text_prompt, which EVERY
-    # role supplies -> it fits ALL roles (the roles whitelist is no longer a gate).
-    for role in rc.ROLES:
-        assert rc.engine_fits_role(desc, role) is True
-    assert "ltx_video" in rc.filter_engines_for_role("music_visual", [desc])
-    assert rc.filter_engines_for_role("announcer_visual", [desc]) == ["ltx_video"]
-
-
 def test_ltx_assert_usable_sage_then_install(monkeypatch):
     eng = vreg.get_engine("ltx_video")
     # No flag gate (registry IS the menu). The first gate is the SageAttention

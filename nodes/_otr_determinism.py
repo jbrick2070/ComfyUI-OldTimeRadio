@@ -47,37 +47,6 @@ def determinism_env_status() -> dict:
     }
 
 
-def assert_determinism_env_ready(strict: bool = True) -> bool:
-    """Return True iff every required determinism env var has its expected value.
-
-    With ``strict=True`` raise ``RuntimeError`` naming the offending vars so a
-    determinism run fails loudly at queue time instead of degrading silently.
-    Never calls ``torch.cuda.is_initialized()`` (C-1).
-    """
-    status = determinism_env_status()
-    bad = {k: v[1] for k, v in status.items() if not v[0]}
-    if bad and strict:
-        want = ", ".join(f"{k}={REQUIRED_DETERMINISM_ENV[k]!r}" for k in bad)
-        got = ", ".join(f"{k}={bad[k]!r}" for k in bad)
-        raise RuntimeError(
-            "Determinism env not ready -- launch via the canonical headless "
-            "wrapper. "
-            f"Expected {want}; got {got}. (See C-1.)"
-        )
-    return not bad
-
-
-def apply_module_determinism_defaults() -> None:
-    """Post-import-torch defaults safe for the whole process: TF32 off, cuDNN
-    benchmark off, cuDNN deterministic on. Does NOT enable
-    ``use_deterministic_algorithms`` -- that is scoped to the forward (C-2).
-    """
-    torch.backends.cuda.matmul.allow_tf32 = False
-    torch.backends.cudnn.allow_tf32 = False
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-
 def _enter_sdpa_math(stack: contextlib.ExitStack) -> None:
     """Pin the SDPA MATH backend for the scope, across torch API versions."""
     try:  # torch >= 2.3 preferred API
