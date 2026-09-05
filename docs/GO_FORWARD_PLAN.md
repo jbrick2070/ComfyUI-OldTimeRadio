@@ -72,25 +72,45 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-05, the registry punch list is CLOSED):** `v2.0-alpha`, HEAD ==
-origin at `cc90b261`, clean tree. Suite **13459 passed / 126 skipped / 1 xfailed,
-RC=0**; Bug Bible 22. No resident server; VRAM at the desktop baseline. GPT-6 Astra is available
-at `ultra` reasoning -- the older "Codex credits out until 09-07" note is dead.
+**State (2026-09-05 evening):** `v2.0-alpha`, HEAD == origin. Suite **13470 passed /
+126 skipped / 1 xfailed, RC=0**; Bug Bible 22 passed. No resident server; VRAM at the
+desktop baseline. GPT-6 Astra is available at `ultra` reasoning -- the older "Codex
+credits out until 09-07" note is dead. **Read section 0 (THE ATTACK ORDER) before
+picking a row.**
 
-**`2.0.0-alpha.19` IS PUBLISHED AND FLAGGED -- its scan landed 09-05** (19 deps
-recorded). The record is BYTE-IDENTICAL to alpha.18's: **12 findings, all `info`,
-zero critical** (4 env-var reads, 5 network, 3 subprocess). The collapse
-**158 -> 12** is now measured on the version a stranger would install.
+**THE REGISTRY LADDER AS MEASURED 2026-09-05, all nine published rows:**
 
-**NEXT UP: post the re-review note. `2.0.0-alpha.20` IS PUBLISHED AND VERIFIED.**
-Item 2.9 closed in `cc90b261` (suite 13459, Bug Bible 22); the bump published from
-`3d133ec1` and the artifact is byte-identical to it, 809/809 files, with all
-fourteen security seams present in the zip. Its scan landed: **Flagged, 12 findings,
-all `info`** -- byte-identical to alpha.19's, which is the point, since the info
-findings were never the ban. Three canonical GPU legs passed, two of them publishing
-to `otr/obs/` and the third to an alternate output root (the registry-install shape).
-**The post body is `docs/2026-09-05-registry-review-request-ALPHA20.md`** -- every
-earlier draft names a version that ships the file read and must not be sent.
+| version | status | deps |
+|---|---|---|
+| `2.0.0-alpha.21` | **Pending** | 19 |
+| `2.0.0-alpha.20` | Flagged | 19 |
+| `2.0.0-alpha.19` | Flagged | 19 |
+| `2.0.0-alpha.18` | Flagged | 19 |
+| `2.0.0-alpha.17` | Flagged | 19 |
+| `2.0.0-alpha.16` | Flagged | 18 |
+| `2.0.0-alpha.15` | Flagged | 18 |
+| `2.0.0-alpha.14` | **Banned** | 15 |
+| `2.0.0-alpha.13` | **Banned** | 13 |
+
+**`2.0.0-alpha.21`'s scan HAS NOT LANDED YET.** While it is Pending the node's
+`latest_version` resolves to `null`, which is exactly why ComfyUI Manager says "not a
+CNR node" -- that is the documented queue behaviour (CLAUDE.md 7A), not a local install
+fault, and nobody should be sent chasing dependency ghosts over it. Re-read the versions
+endpoint rather than inferring; the promotion cron only considers versions older than 30
+minutes and its schedule is not public.
+
+**alpha.19 and alpha.20 both scanned identically to alpha.18: 12 findings, all `info`,
+zero critical** (4 env-var reads, 5 network, 3 subprocess). That sameness IS the result --
+the collapse 158 -> 12 is measured on the version a stranger would install, and the info
+findings were never the ban. alpha.20 published from `3d133ec1`, artifact byte-identical
+to the commit, 809/809 files, all fourteen security seams present in the zip; three
+canonical GPU legs passed, two publishing to `otr/obs/` and the third to an alternate
+output root (the registry-install shape).
+
+**The re-review post body is `docs/2026-09-05-registry-review-request-ALPHA20.md`** --
+every earlier draft names a version that ships the file read and must not be sent. **The
+operator has said he is not posting anything until he is ready to ship**, so it waits on
+him and on alpha.21's verdict; it is not blocked on us.
 
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
@@ -118,11 +138,11 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow. r1 is in and the design fork is CLOSED (the row names the three alternatives it cut). It is the long pole because it owes a five-act GPU leg -- **start the leg first, not last.** |
-| **2nd** | **2.3 PAIR PREPOSITION**, folded into 2.2's commit | Same file family, same author lane. 2.2's five-act leg proves both for the price of one; shipping 2.3 alone buys a leg you then spend again. |
+| **1st** | **2.2 GHOST POOL -- RE-SCOPED 2026-09-05, read the row before starting it** | Still the only open row that changes what lands in `otr/obs/` tomorrow, but **the ledgers were measured before it was started and they moved the target.** 127 of 263 real beats fell to the deterministic path and NOT ONE fell to a uniqueness rejection; the four long episodes each died of something else. The cheapest of those, the `g0010` id-padding rejection that cost a whole 25-beat episode, is already CLOSED. The uniqueness change stays correct and stays worth doing -- it just should not buy the GPU leg on its own. |
+| ~~2nd~~ | ~~2.3 PAIR PREPOSITION~~ | **DONE 2026-09-05.** Shipped ahead of 2.2 because the measurement above re-scoped 2.2 and it no longer gates this. `place_preposition` picks the connector from the place's head noun. Two things were caught by looking at real data rather than reasoning: QA on the finished diff found a regression before it shipped (a bare `'s` test dropped the article from fifteen real lowercase possessives -- "in judge's bench"), and reading the 4,393-setting corpus moved "station" out of the AT set, where it would have mis-read the corpus's biggest head noun 100 times over. |
 | ~~3rd~~ | ~~README defects + bundle hygiene~~ | **DONE 2026-09-05 (`eaf33576`), taken first because it needed no GPU.** README had been telling every new user to install IndexTTS2 -- a multi-gigabyte sidecar in a separate Python -- before their first Queue Prompt, for an engine `otr_canonical` does not select; and it claimed Stable Audio 3 self-downloads, which it does not. Bundle hygiene rung 1 landed in the same commit. |
 | 4th | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
-| 5th | **2.4, ONE ROW ONLY** | The `provider_side` / `cloud_kling_avatar` regression. See the cut list for why the rest of 2.4 is not coding work. |
+| ~~5th~~ | ~~2.4, ONE ROW ONLY~~ | **DONE 2026-09-05**, pulled forward because it needed no GPU and no arc: `tests/test_cloud_engine_is_a_three_part_rule.py`. See the cut list for why the rest of 2.4 is not coding work. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
 * **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
@@ -243,7 +263,40 @@ RULINGS (constraints, not history):
 - Operator's design, his words: *"just have the LLM decide -- ask what the likely gender of this person name is, have the LLM decide, and keep that in an index of names."*
 - The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING by the standing ruling -- their characters do not exist, so no lookup of any kind applies.
 
-### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
+### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, RE-SCOPED 2026-09-05)
+
+> **MEASURE THE LANE BEFORE YOU SPEND ITS GPU LEG (2026-09-05).** Every ledger
+> on the dev box was read before this row was started, and the numbers do not
+> support starting it first. **27 episode ledgers carry `ghost_prompt` objects;
+> 127 of their 263 beats fell to `deterministic_fallback`; and NOT ONE of those
+> fallbacks was a uniqueness rejection.** The four episodes over twelve beats --
+> including the 29-beat one whose shape this row's DONE WHEN names -- each lost
+> their whole batch to a DIFFERENT cause:
+>
+> | episode | beats | what actually rejected it |
+> |---|---|---|
+> | `..._the_last_reading_20260902_190630` | 29 | leaf `g000` "requests a person in object mode" |
+> | `..._the_weight_of_grief_20260903_005108` | 25 | **`Ghost batch row carries unknown id 'g0010'`** |
+> | `..._viral_tide_20260903_181452` | 13 | response is not JSON (truncated at char 851) |
+> | `..._the_last_crystal_20260903_194649` | 12 | leaf `g000` "names a texture instead of a thing" |
+>
+> And the deterministic path did NOT exhaust: all four produced fully distinct
+> leaves (29/29, 25/25, 13/13, 12/12). The largest same-mode run measured
+> anywhere is 12. **So the leaf-uniqueness defect this row describes is real in
+> the code and has not fired on a single measured episode**, while the batch's
+> actual mortality is content validators and transport.
+>
+> **DONE 2026-09-05, and it came straight out of that table:** the `g0010`
+> row -- the most common non-content rejection, 25 beats, one whole episode --
+> is closed in `parse_batch_response`. An opaque id is a positional integer, so
+> a digit run that reads as the same integer names the same row;
+> `_canonical_opaque_id` re-spells it, WARNING-logs both spellings, and relaxes
+> nothing else. `tests/test_ghost_batch_id_padding.py`, 19 tests.
+>
+> **What this row should be re-scoped to before it takes a GPU leg:** the two
+> content validators and the truncated response are what an episode actually
+> dies of. The uniqueness change stays correct and stays worth doing -- it just
+> is not the first thing, and it should not buy the leg on its own.
 
 **Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
 
@@ -317,7 +370,7 @@ MECHANICAL defects survive story-engine churn; STORY-QUALITY judgments do not.
   That is a design choice with more than one defensible answer -- what to capture,
   where the capture lives, and whether the deliberate per-beat flip survives it --
   so it takes an arc BEFORE code. Not scheduled.
-- **`provider_side` is a THREE-part rule, not an attribute.** `_is_cloud_video_engine` (`render_driver.py`) accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`. `cloud_kling_avatar` has no `provider_side` attribute, so an `engine_facts` builder using a bare `getattr` would classify it local and send a cloud avatar to local LTX. DONE WHEN: a regression covers picked AND forced `cloud_kling_avatar`.
+- **`provider_side` is a THREE-part rule, not an attribute. DONE 2026-09-05** -- `tests/test_cloud_engine_is_a_three_part_rule.py`, 9 tests, picked AND forced, both engines. `_is_cloud_video_engine` (`render_driver.py`) accepts a `cloud_` id prefix OR the attribute OR `node_key.startswith("cloud_")`, and the reason each clause is load-bearing is now MEASURED rather than argued: `cloud_kling_avatar` declares no `provider_side` at all (a bare `getattr` calls it LOCAL and sends an audio-driven face to the local lane), while `google_veo_video` declares `provider_side = True` with no `cloud_` prefix and no `node_key` (a prefix-only rule calls Veo LOCAL). Neither engine is hypothetical, so no single clause covers both, and the test says so with a message aimed at whoever next reaches for the one-liner. **No production code changed** -- the rule was already right; what was missing was the regression that stops it being "simplified". Deliberately NOT added: a single-owner AST guard, because two of the three bare `getattr(eng, "provider_side")` sites in `render_driver.py` are asking a DIFFERENT question (does this engine accept a scene-init still) and banning the spelling would break them.
 - **Env-read sites missing from the S0b inventory** (two remain): the `OTR_ENABLE_HUMO_HOSTS` reads in `render_driver.py` and `otr_meta_brief_image_prompt.py`, and the recipe / UNET re-read in `eng_ltx_av.py` (`wants_talking_prompt` / `_recipe`) outside `assert_usable`.
 - **The credits card needs a SMALL-CANVAS VARIANT, and the ladder is not it.** At 512x288 (ltx_8gb) col1 is 65px past its footer even with every droppable ledger row dropped; at 640x360 it is 12px over. Both are drawn anyway and LOGGED at ERROR naming the canvas. At 288 lines the three-column console is already a polite fiction. This is a DESIGN job -- a card laid out for a small canvas -- not more ladder heroics.
 

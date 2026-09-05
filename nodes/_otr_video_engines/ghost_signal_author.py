@@ -836,6 +836,43 @@ def _object_pairs_hook(pairs):
     return dict(pairs)
 
 
+_OPAQUE_ID_DIGITS_RE = re.compile(r"\Ag(\d+)\Z")
+
+
+def _canonical_opaque_id(shot_id, expected) -> str:
+    """``shot_id`` as one of ``expected``, or ``""`` if it is not one of them.
+
+    AN OPAQUE ID IS A POSITIONAL INTEGER AND NOTHING ELSE, so a digit run that
+    reads as the same integer names the same row. An exact match is returned
+    untouched; otherwise, and only for the shape ``g<digits>``, the digits are
+    read as the ordinal they are and re-spelled with `opaque_id`. Everything
+    else -- a different prefix, a non-numeric tail, whitespace, a sign -- is
+    still an unknown id.
+
+    MEASURED, which is why the tolerance exists at all. Across the 27 episode
+    ledgers on the dev box carrying `ghost_prompt` objects, 127 of 263 beats
+    fell to the deterministic path, and the most common NON-CONTENT rejection
+    was ``Ghost batch row carries unknown id 'g0010'`` -- 25 beats, a whole
+    25-beat episode losing every authored prompt. `opaque_id` spells ordinal 10
+    as ``g010`` and `build_batch_prompt` puts that exact string in front of the
+    model; the model, having just written ``g000`` through ``g009``, continued
+    the pattern it could see and wrote ``g0010``. It can only happen past ten
+    Ghost beats, which is why the eight-beat dailies never showed it.
+
+    This relaxes the SPELLING of a row's index and nothing else. It cannot
+    admit a row the batch did not ask for, because the re-spelled id still has
+    to be in ``expected``.
+    """
+    text = str(shot_id)
+    if text in expected:
+        return text
+    match = _OPAQUE_ID_DIGITS_RE.match(text)
+    if not match:
+        return ""
+    candidate = opaque_id(int(match.group(1)))
+    return candidate if candidate in expected else ""
+
+
 def parse_batch_response(raw, expected_ids) -> dict:
     """``{opaque_id: drawable_beat}``, or raise.
 
@@ -843,6 +880,12 @@ def parse_batch_response(raw, expected_ids) -> dict:
     ``{"shots": [{"id": "g000", "drawable_beat": "..."}, ...]}`` -- every
     expected id present exactly once, no unknown id, no extra field on the
     envelope or on a row, no trailing object after the JSON.
+
+    ONE TOLERANCE, and it is about spelling rather than content: a row id of
+    the shape ``g<digits>`` is read as the ordinal it spells, so ``g0010``
+    names row 10. See `_canonical_opaque_id` for the measurement that bought
+    it. Every repair is WARNING-logged naming both spellings -- no silent
+    anything -- and every other strictness here is untouched.
     """
     expected = list(expected_ids or ())
     body = _strip_one_fence(raw)
@@ -885,13 +928,20 @@ def parse_batch_response(raw, expected_ids) -> dict:
         if not isinstance(shot_id, str) or not isinstance(leaf, str):
             raise GhostAuthorParseError(
                 "Ghost batch row id/drawable_beat must both be strings")
-        if shot_id not in expected:
+        canonical = _canonical_opaque_id(shot_id, expected)
+        if not canonical:
             raise GhostAuthorParseError(
                 "Ghost batch row carries unknown id %r" % (shot_id,))
-        if shot_id in out:
+        if canonical != shot_id:
+            _LOG.warning(
+                "Ghost batch row id %r read as %r -- an opaque id is a "
+                "positional integer, so a mis-padded spelling names the same "
+                "row. The batch is accepted; the model's own spelling is not "
+                "propagated anywhere.", shot_id, canonical)
+        if canonical in out:
             raise GhostAuthorParseError(
-                "Ghost batch repeats id %r" % (shot_id,))
-        out[shot_id] = _norm(leaf)
+                "Ghost batch repeats id %r" % (canonical,))
+        out[canonical] = _norm(leaf)
     missing = [i for i in expected if i not in out]
     if missing:
         raise GhostAuthorParseError(
@@ -1432,6 +1482,148 @@ GHOST_V3_TERM_LIMIT = 6
 #: "data logs" to "data" changes what is drawn.
 GHOST_V3_KERNEL_MAX_WORDS = 9
 
+#: Places whose HEAD NOUN takes "on the" rather than "in the". A riverbank, a
+#: pier, a rooftop and a flight of stairs are SURFACES you stand on; the fixed
+#: "in the" that shipped until 2026-09-05 composed "a spinning turntable in the
+#: riverbank" on a real episode. Matched on the head noun ONLY -- the place's
+#: last word, lowercased, tried with and without a trailing "s" -- so a
+#: modifier never decides: "coast road" is a road, "road tunnel" is a tunnel.
+#: Deliberately excludes the bare word "bank", which is a building at least as
+#: often as it is a landform; "riverbank" and "embankment" carry the meaning
+#: that matters here without the ambiguity.
+GHOST_V3_PLACE_TAKES_ON = frozenset({
+    "riverbank", "embankment", "levee", "shore", "shoreline", "beach",
+    "coast", "coastline", "waterline", "waterfront", "island", "isle",
+    "peninsula", "spit", "sandbar", "reef", "dune", "street", "road",
+    "roadway", "highway", "freeway", "avenue", "boulevard", "lane",
+    "causeway", "bridge", "overpass", "pier", "jetty", "dock", "wharf",
+    "quay", "pontoon", "gangway", "platform", "roof", "rooftop", "deck",
+    "stair", "staircase", "stairway", "landing", "balcony", "terrace",
+    "porch", "veranda", "walkway", "catwalk", "path", "pathway", "trail",
+    "towpath", "ridge", "hill", "hillside", "hilltop", "slope", "cliff",
+    "clifftop", "bluff", "ledge", "outcrop", "mesa", "escarpment",
+    "sidewalk", "pavement", "plain", "plateau", "moor", "heath", "prairie",
+    "steppe", "tundra", "runway", "tarmac", "apron", "track", "trackbed",
+    "railway", "floor", "floorboards", "stage", "lawn", "ice", "snowfield",
+    "glacier", "surface", "peak",
+})
+
+#: Places whose head noun names a POINT rather than a surface or an enclosure,
+#: and therefore takes "at the": you meet at a crossroads, not in one.
+#:
+#: "STATION" IS DELIBERATELY ABSENT, and it is the single biggest head noun in
+#: the real corpus (108 of 8,408 setting occurrences). The draft had it here
+#: until the corpus was actually read: an OTR brief writes "orbital station",
+#: "space station", "research station", "monitoring station", "relay station"
+#: -- interiors a scene happens INSIDE, not a platform you wait on. "in the
+#: orbital station" is right for 100 of the 108 and "at the radio station" for
+#: about four, so the default wins and the exception is not worth a rule.
+#: "terminal" (46) stays, because an OTR brief means the DEVICE almost every
+#: time -- "data terminal", "computer terminal", "secure terminal" -- and you
+#: stand at one.
+GHOST_V3_PLACE_TAKES_AT = frozenset({
+    "crossroads", "crossroad", "junction", "intersection", "crossing",
+    "gate", "gateway", "threshold", "doorway", "doorstep", "entrance",
+    "exit", "edge", "brink", "verge", "border", "frontier", "boundary",
+    "perimeter", "terminal", "depot", "checkpoint", "outpost",
+    "waystation", "summit", "crest",
+})
+
+#: A place that OPENS with one of these already carries its own preposition --
+#: "under the pier", "aboard the night train" -- so the pair is joined bare.
+#: A second preposition in front of one of these is nonsense, not a nuance.
+GHOST_V3_PLACE_OWN_PREPOSITIONS = frozenset({
+    "in", "on", "at", "under", "underneath", "beneath", "below", "above",
+    "over", "beside", "alongside", "behind", "within", "inside", "outside",
+    "atop", "aboard", "across", "along", "amid", "among", "around", "against",
+    "near", "past", "through", "toward", "towards",
+})
+
+#: A place that OPENS with one of these, or that carries a PROPER-NOUN
+#: possessive anywhere, already carries its own determiner -- "his study",
+#: "British Columbia's Williston Reservoir" -- so the preposition is still
+#: chosen but the article is not added a second time.
+GHOST_V3_PLACE_OWN_DETERMINERS = frozenset({
+    "a", "an", "the", "this", "that", "these", "those", "his", "her", "its",
+    "their", "our", "your", "my", "one", "another", "every", "each", "some",
+    "any", "no",
+})
+
+
+def _place_head_noun(place) -> str:
+    """The place's HEAD NOUN -- its last word, lowercased, hyphen tail only.
+
+    "high-security archive" is an archive; "service walk-path" is a path. The
+    hyphen tail is taken because a hyphenated compound's head is its right
+    half in English, which is the same reason the last WORD is the head.
+    """
+    for raw in reversed(str(place or "").split()):
+        word = "".join(ch for ch in raw if ch.isalpha() or ch == "-").casefold()
+        word = word.strip("-")
+        if word:
+            return word.rsplit("-", 1)[-1] or word
+    return ""
+
+
+#: A PROPER-NOUN possessive: a capitalised word carrying `'s` or a trailing
+#: `s'`. This is the whole test, and the capital is the entire point of it.
+#:
+#: A POSSESSIVE ALONE IS NOT A DETERMINER (caught in QA on 2026-09-05, before
+#: this shipped). The first draft treated any `'s` as proof the place brought
+#: its own article, which is true of "British Columbia's Williston Reservoir"
+#: and FALSE of "the judge's bench". Measured across the 4,393 unique
+#: `story_brief_terms.setting` values on 2,140 episode ledgers: 24 carry a
+#: possessive, and the capital separates them 24 for 24 -- the 9 capitalised
+#: ones are proper names (Victor's study, NASA's Jet Propulsion Laboratory,
+#: Widow's Hill) that read wrong WITH an article, and the 15 lowercase ones
+#: (judge's bench, ship's deck, governor's office, doctor's office) read wrong
+#: WITHOUT one. Without this gate the change would have regressed fifteen real
+#: settings that composed correctly before it.
+_PROPER_POSSESSIVE_RE = re.compile(r"\b[A-Z][\w.]*['’]s\b|\b[A-Z][\w.]*s['’]")
+
+
+def _place_carries_own_determiner(place) -> bool:
+    text = str(place or "")
+    words = text.split()
+    if not words:
+        return False
+    first = "".join(ch for ch in words[0] if ch.isalpha()).casefold()
+    if first in GHOST_V3_PLACE_OWN_DETERMINERS:
+        return True
+    return bool(_PROPER_POSSESSIVE_RE.search(text))
+
+
+def place_preposition(place) -> str:
+    """The whole connector that reads right in front of ``place``.
+
+    Returns ``"in the"``, ``"on the"`` or ``"at the"`` for a plain place; the
+    bare preposition when the place brings its own determiner; and an EMPTY
+    STRING when the place already opens with its own preposition and needs no
+    connector at all.
+
+    This is a lookup with a default, not a grammar engine, and the default is
+    the one that was already shipping -- most settings a brief produces are
+    enclosures and still read "in the". A fix that moved the common case would
+    be a worse defect than the one it closes.
+    """
+    words = str(place or "").split()
+    if not words:
+        return ""
+    first = "".join(ch for ch in words[0] if ch.isalpha()).casefold()
+    if len(words) > 1 and first in GHOST_V3_PLACE_OWN_PREPOSITIONS:
+        return ""
+    head = _place_head_noun(place)
+    singular = head[:-1] if head.endswith("s") else head
+    if head in GHOST_V3_PLACE_TAKES_AT or singular in GHOST_V3_PLACE_TAKES_AT:
+        preposition = "at"
+    elif head in GHOST_V3_PLACE_TAKES_ON or singular in GHOST_V3_PLACE_TAKES_ON:
+        preposition = "on"
+    else:
+        preposition = "in"
+    if _place_carries_own_determiner(place):
+        return preposition
+    return preposition + " the"
+
 
 def _spoken_term(term) -> str:
     """One brief term as a human would say it -- see `_otr_brief_reader`.
@@ -1520,7 +1712,7 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
     places = _setting_terms(meta)
 
     def _in_place(subject):
-        """``<subject> in the <place>``, or the subject alone if that is long."""
+        """``<subject> <connector> <place>``, or the subject alone if long."""
         if not places:
             return subject
         place = places[(ordinal // max(len(objects), 1)) % len(places)]
@@ -1531,9 +1723,18 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
         # as it does for an over-long pair below.
         if place.casefold() == subject.casefold():
             return subject
-        pair = "%s in the %s" % (subject, place)
+        # THE CONNECTOR FOLLOWS THE PLACE (2026-09-05). This used to be a fixed
+        # "in the", which composed "a spinning turntable in the riverbank" --
+        # right for the enclosure that most brief settings are, wrong for every
+        # surface and every point. `place_preposition` returns the whole
+        # connector, article included, and an empty one when the place already
+        # brought its own preposition.
+        connector = place_preposition(place)
+        pair = ("%s %s" % (subject, place) if not connector
+                else "%s %s %s" % (subject, connector, place))
         # WHOLE UNITS ONLY: an over-long pair drops the PLACE, never half of
-        # either phrase.
+        # either phrase. The budget counts the connector actually used, so a
+        # place carrying its own article buys itself one more word.
         return pair if len(pair.split()) <= GHOST_V3_KERNEL_MAX_WORDS else subject
 
     # THE RADIO STAYS ON THE BOOKENDS, and it is an operator rule rather than a
@@ -2111,5 +2312,7 @@ __all__ = [
     "finalize_ghost_prompt_v3", "resolve_crux_kernel", "resolve_world_light",
     "resolve_world_motion", "GHOST_WORLD_MOTION_V3", "GHOST_V3_DROP_ORDER",
     "GHOST_V3_TERM_LIMIT", "GHOST_V3_KERNEL_MAX_WORDS",
+    "place_preposition", "GHOST_V3_PLACE_TAKES_ON", "GHOST_V3_PLACE_TAKES_AT",
+    "GHOST_V3_PLACE_OWN_PREPOSITIONS", "GHOST_V3_PLACE_OWN_DETERMINERS",
     "assert_shell_fits",
 ]
