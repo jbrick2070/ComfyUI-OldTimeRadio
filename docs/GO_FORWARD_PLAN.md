@@ -82,18 +82,25 @@ recorded). The record is BYTE-IDENTICAL to alpha.18's: **12 findings, all `info`
 zero critical** (4 env-var reads, 5 network, 3 subprocess). The collapse
 **158 -> 12** is now measured on the version a stranger would install.
 
-**NEXT UP: the alpha.20 bump, and it is the operator's.** Item 2.9 is CLOSED
-(`cc90b261`): the nine unconfined write sinks, the arbitrary file read the earlier fix
-missed, the remaining UNC stats, and both POST routes. Suite **13459 passed / 126 skipped / 1 xfailed**.
-The coder's next move comes AFTER the bump: download the CDN zip, byte-diff it
-against the commit, read its scan record. Only then does the short note get
-posted, naming alpha.20.
+**NEXT UP: post the re-review note. `2.0.0-alpha.20` IS PUBLISHED AND VERIFIED.**
+Item 2.9 closed in `cc90b261` (suite 13459, Bug Bible 22); the bump published from
+`3d133ec1` and the artifact is byte-identical to it, 809/809 files, with all
+fourteen security seams present in the zip. Its scan landed: **Flagged, 12 findings,
+all `info`** -- byte-identical to alpha.19's, which is the point, since the info
+findings were never the ban. Three canonical GPU legs passed, two of them publishing
+to `otr/obs/` and the third to an alternate output root (the registry-install shape).
+**The post body is `docs/2026-09-05-registry-review-request-ALPHA20.md`** -- every
+earlier draft names a version that ships the file read and must not be sent.
+
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
-* **The alpha.20 bump. 2.9 is green and pushed (`cc90b261`), so this is the next
-  move** -- editing `pyproject.toml` IS the publish. Then the short note (item 4).
-  **All three review drafts are DO-NOT-SEND until alpha.20 exists** -- the SHORT one
-  names alpha.19 and claims every surface is closed; neither is true.
+* **Post the re-review note.** Body:
+  `docs/2026-09-05-registry-review-request-ALPHA20.md`, at
+  https://github.com/Comfy-Org/registry-backend/issues . Prepared and measured;
+  posting is a public act and yours. **Every OTHER draft is DO-NOT-SEND** -- they
+  name alpha.19, which ships the arbitrary file read.
+* Any FURTHER `pyproject.toml` bump (alpha.20 is already published; each edit
+  auto-fires another publish and burns a version string).
 * Any further `pyproject.toml` bump (each one auto-fires a publish).
 * The rulings in item 6.
 
