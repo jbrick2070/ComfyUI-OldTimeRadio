@@ -107,7 +107,7 @@ findings are the single subprocess gateway that shells out to `ffmpeg`.
    Popen 9/9, base64 5/5, urlopen 2/2). Shrinking the bundle has already been
    tried and did nothing.
 4. `.comfyignore` already excludes `tests/`, `kibitz-runs/`, `.github/`,
-   `.claude/`, `docs/`, `tools/`, `viewer/`, `scripts/*` (with four negations
+   `.claude/`, `docs/`, `tools/`, `viewer/`, `scripts/*` (with SIX negations
    for files the shipped adapters resolve at runtime), `assets/`, and
    `workflows/variants/*.md`.
 5. **Deleting a VERSION is a soft delete that burns the version string forever;

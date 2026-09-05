@@ -27,11 +27,18 @@ workflow node carries no `properties.cnr_id`).
 **Their nodes are indexed. Ours are not.** That is the cleanest structural difference
 found between us and every approved pack.
 
-**A correction to our own notes while you are here:** `GET /nodes/<id>/comfy-nodes`
-returns `{"message":"Not Found"}` for **ComfyUI-GGUF, comfyui_controlnet_aux,
-ComfyUI-Crystools, rgthree-comfy AND us**. Our CLAUDE.md cites that endpoint's 404 as
-evidence about our pack. It is evidence about nothing -- it 404s for Active packs with
-millions of downloads. The live endpoint is the `/comfy-nodes/<name>/node` one above.
+**A correction I OWE, because I got this wrong in the first draft of this brief and
+Cursor caught it:** I wrote that CLAUDE.md "cites `/nodes/<id>/comfy-nodes`'s 404 as
+evidence about our pack". It does not. CLAUDE.md:488-495 says the opposite and says it
+correctly -- that endpoint 404s for every pack sampled, the panel is fed by a separate
+extraction service, and *"do not diagnose from the registry page"*. My accusation was a
+misreading of our own notes. What IS true and worth adding: there are FOUR distinct URLs
+here and they must not be conflated --
+`GET /nodes/<id>/comfy-nodes` (pack panel, 404s widely),
+`GET /nodes/<id>/versions/<ver>/comfy-nodes` (the versioned extract receipt, and the only
+object this repo has ever used as proof extract ran),
+`GET /comfy-nodes?node_id=<id>` (pack-scoped index), and
+`GET /comfy-nodes/<ComfyUINodeName>/node` (class-name lookup, section 1 above).
 
 
 ## 1b. THE CARD'S "N Nodes" AND THE NODE INDEX ARE DIFFERENT PIPELINES

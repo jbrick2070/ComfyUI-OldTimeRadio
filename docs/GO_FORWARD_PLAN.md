@@ -100,6 +100,14 @@ below was re-verified against the tree, not taken on the reviewers' word:
   install**, and the ban text was "unauthenticated /prompt (node widget) **or no-auth
   route**". Argue why a scrubbed GET is out of class, or list it as a closed surface with
   its scrub commit. Do not leave it unmentioned.
+* **DO NOT "fix" the gateway claim by routing `eng_indextts2.py:214` through
+  `proc.py`.** That is the obvious repair and it is BLOCKED:
+  `_otr_voice_route.RUNTIME_FINGERPRINT_SOURCES` byte-hashes
+  `nodes/_otr_audio_engines/eng_indextts2.py` (with `scripts/_otr_indextts2_worker.py`
+  and `nodes/_otr_resolved_request.py`), so ANY edit to it withdraws a human-audited
+  voice route even when synthesis is byte-identical. Ripping one symbol from a sibling in
+  that set already demoted the Lemmy route once and had to be reverted. **State the
+  bypass accurately in the evidence packet instead of engineering around it.**
 * Venue: ~20 "manual review request" issues since 2026-08-02 have zero maintainer
   replies. `drltdata@comfy.org` is the only human who has ever acted on this node id.
   Decide the venue deliberately; a GitHub issue is a public receipt, not the mechanism.
