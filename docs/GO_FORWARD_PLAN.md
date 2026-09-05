@@ -520,12 +520,39 @@ Prove all 7 surviving local-LLM rows in BOTH model slots (creative + technical) 
 - A row that cannot do both, and was never tested or implemented, is a RIP candidate under his rule -- but rip only on a measured failure, never on assumption.
 - A leg that never reaches `otr/obs/` did not pass, so the 4 canonical legs are the real proof.
 
-**OPEN WORK:**
-- **Leg 0 -- in-process preflight.** No ComfyUI: `request_slot` -> ~40-token generate -> `_self_unload` per row, with `reset_peak_memory_stats()` around each. One command, ~15-20 min. Fails loudly on a dead row. DONE WHEN: every row generates and unloads cleanly, or a failure is recorded as measured.
-- **4 canonical legs (MINIMUM) -- 7 rows / 2 slots.** Each leg doubles as a ledger-cleanup live-watch and an eyeball re-observation chance. DONE WHEN: all 4 legs publish to `otr/obs/`. Blocked on Leg 0.
-- **Every leg must PIN `--source-bank` to the scifi lane.** Canonical ships `'roll (any eligible bank)'`, and `_otr_scifi_news_pro.py` is the only runner code-verified to drive BOTH slots. Unpinned, a leg can land on a lane that never touches the technical slot and the sweep proves nothing about that row.
-- **`gguf_quant` is ONE per-run widget**, and `unsloth/Qwen3-8B-GGUF` ships only `Q4_K_M` -- so any leg carrying it runs Q4_K_M.
-- **gemma GGUF negative probe.** `Q8_0` / `n_ctx=4096` needs ~14.70 GiB FREE against a 15.92 GiB card with ComfyUI resident; `_otr_gguf_backend.py` compares against `mem_get_info()` FREE with "NO silent context downgrade". Either outcome is informative; record both. DONE WHEN: the outcome is recorded.
+**MEASURED 2026-09-05 (Leg 0 + three canonical legs). What is proven and what is owed:**
+
+- **Leg 0 is DONE and shipped** as `scripts/otr_llm_preflight_leg0.py` (`2573dcd7`).
+  9 local rows x 2 slots: every row loads, generates and unloads in BOTH slots.
+  The one artifact failure is not a row -- `gemma-4-12b-it-Q8_0.gguf` on this box
+  is 1,440 bytes short of a complete download, and the same row passes at
+  `Q4_K_M`. Re-pull or delete that file before the Q8_0 negative probe is
+  attempted.
+- **FOUR ROWS ARE ACCEPTED on real canonical legs**, both published to `otr/obs/`
+  on `source_bank=scifi_news_pro` with both slots exercised (ledger-stamped):
+  `google/gemma-4-12b-it` + `google/gemma-4-E4B-it` (leg A, 19.9 min, *The
+  Extinction Trajectory*, creative 33 / technical 7) and
+  `mistralai/Mistral-Nemo-Instruct-2407` + `google/gemma-4-E2B-it` (leg B, 16.2
+  min, *The Caretaker's Clause*, creative 77 / technical 8).
+- **`Qwen/Qwen3-8B` FAILS the creative slot on this lane -- a MEASURED failure,
+  and the first real one this row has.** Leg C died in 1.8 min:
+  `NewsProDossierError: pass 'dossier' failed after 3 attempt(s): generation was
+  halted by the in-decode liveness guard: the output repeated a run of tokens
+  verbatim`. Leg 0 shows this row emits `<think>` blocks, so a thinking model
+  cycling on the structured multipass is the obvious suspect -- confirm the
+  think_policy before ruling. It passed the 40-token transport probe, which is
+  exactly why the canonical leg is the acceptance signal and the preflight is not.
+- **A GGUF ACCEPTANCE LEG IS BLOCKED ON A PROFILE, and this is a real gap.**
+  `gguf_quant` is a MANAGED widget: `patch_creative` refuses it by design and it
+  can only be set through `apply_profile`. The Qwen GGUF rows ship `Q4_K_M` only,
+  and **no non-draft 16 GB profile pins `Q4_K_M`** -- `16gb_full` pins `Q8_0`,
+  and the only `Q4_K_M` profiles (`8gb_lite`, `cpu_floor`) are 4060/CPU drafts
+  that also pin `gguf_n_ctx=2048` and a technical model. So leg D cannot be
+  expressed on this box today. **The decision owed: promote or add a 16 GB
+  profile that pins `Q4_K_M`** -- that is a config decision, not a test fix.
+
+**STILL OPEN:** leg D (above), the gemma Q8_0 negative probe (blocked on the
+truncated artifact), and a ruling on `Qwen/Qwen3-8B`.
 
 **KNOWN FALSE-GREEN TO DESIGN AROUND:** `meta.slot_calls_by_slot` is incremented ONLY inside `_SlotScheduler._account_and_get_entry`; SIX `request_slot` sites live outside it (`story_orchestrator.py`, `otr_shot_lock.py`, `OTR_LedgerFreezeCascade.py`, the SlotContract path in `OTR_LedgerScriptWriter.py`, the registered `nodes/vram_context_test.py`). The counter proves IN-WRITER generation only; reading it as full-row exercise is a false green. Do not use it as the acceptance signal.
 

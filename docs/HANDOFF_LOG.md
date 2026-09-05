@@ -16265,3 +16265,45 @@ inside the alternate tree: the registry-install and 4060 shape, proven.
 
 Leg 3's boot also gives the route removal a live receipt -- the server printed
 `HTTP route registered: GET /otr/latest_ledger` and nothing else.
+
+### 2026-09-05, later -- the local-LLM acceptance sweep: Leg 0 shipped, four rows accepted, one row failed for real
+
+**Leg 0** (`2573dcd7`, `scripts/otr_llm_preflight_leg0.py`): 9 local rows x 2
+slots, in-process, no ComfyUI. Every row loads, generates and unloads in both
+slots. The only failure is an ARTIFACT -- `gemma-4-12b-it-Q8_0.gguf` is 1,440
+bytes short of a complete download -- and the same row passes at `Q4_K_M`.
+
+**The probe had to be fixed twice before any row could be called dead**, and
+both fixes matter more than the result: it must thread the immutable GGUF
+`load_config` (without it `request_slot` falls into a gemma-only env fallback
+that refuses every non-gemma repo), and it must probe each row at a quant the
+row actually ships (the baseline policy carries `Q8_0` for the gemma negative
+probe; the Qwen rows publish `Q4_K_M` only). The first run reported three
+healthy rows as dead. Under the charter -- rip only on a MEASURED failure --
+a probe that measures its own misconfiguration is worse than no probe.
+
+**Three canonical legs, `source_bank` pinned to `scifi_news_pro`:**
+- **A PASS** 19.9 min -- gemma-4-12b-it + gemma-4-E4B-it -> *The Extinction
+  Trajectory*, obs. Slots: creative 33 / technical 7.
+- **B PASS** 16.2 min -- Mistral-Nemo + gemma-4-E2B-it -> *The Caretaker's
+  Clause*, obs. Slots: creative 77 / technical 8.
+- **C FAIL in 1.8 min, and it is a genuine finding.** `Qwen/Qwen3-8B` in the
+  creative slot: `pass 'dossier' failed after 3 attempt(s): generation was
+  halted by the in-decode liveness guard: the output repeated a run of tokens
+  verbatim`. It had passed Leg 0's 40-token probe. **That gap is the entire
+  argument for why the canonical leg is the acceptance signal** -- transport
+  health says nothing about whether a row can drive a structured multipass.
+  Leg 0 shows the row emits `<think>` blocks; check the think_policy first.
+- **D BLOCKED, on a design boundary rather than a bug.** `gguf_quant` is a
+  MANAGED widget: `patch_creative` refuses it and only `apply_profile` may set
+  it. The Qwen GGUF rows ship `Q4_K_M` only and no non-draft 16 GB profile pins
+  `Q4_K_M`. A 16 GB `Q4_K_M` profile has to be promoted or written first.
+
+**FOUR LAUNCHES DIED IN POWERSHELL AND WIDGET NAMES BEFORE ANY GPU RAN**, which
+is cheap only because they died fast: a multi-line array passed to `-Set` binds
+its extra elements POSITIONALLY (the second landed on `-Timeout`); splatting a
+hashtable at `powershell.exe` renders `-Profile:none` as a literal (splat at the
+.ps1 instead); the widget is `creative_writing_model`, not `creative_model`; and
+a model value is the EXACT dropdown label with its size suffix. A fifth failure
+was mine at the shell: `-Set "a","b","c"` through bash arrives as ONE string and
+the whole comma list became a single `source_bank` value.
