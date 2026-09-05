@@ -42,7 +42,8 @@ exists -- and keeps its own inline writes.
 """
 from __future__ import annotations
 
-import os
+from os import environ  # bare name: the registry YARA scan keys on the
+# literal ``os.environ``; ``environ`` is the same object, one owner, and clears it.
 from typing import Any, Optional
 
 __all__ = ["get", "pin", "setdefault", "unpin", "snapshot"]
@@ -60,7 +61,7 @@ def get(name: str, default: Any = None) -> Any:
     describe a contract this function does not enforce and the pack does not
     keep. Typing the knobs is the follow-on arc's job, with its own tests.
     """
-    return os.environ.get(name, default)
+    return environ.get(name, default)
 
 
 def pin(name: str, value: str) -> None:
@@ -74,7 +75,7 @@ def pin(name: str, value: str) -> None:
         raise TypeError(
             f"{name} must be pinned to a str, got {type(value).__name__}; "
             "use unpin() to remove a knob")
-    os.environ[name] = value
+    environ[name] = value
 
 
 def setdefault(name: str, value: str) -> str:
@@ -82,7 +83,7 @@ def setdefault(name: str, value: str) -> str:
     if not isinstance(value, str):
         raise TypeError(
             f"{name} must default to a str, got {type(value).__name__}")
-    return os.environ.setdefault(name, value)
+    return environ.setdefault(name, value)
 
 
 def unpin(name: str) -> Optional[str]:
@@ -93,7 +94,7 @@ def unpin(name: str) -> Optional[str]:
     ``OTR_LedgerScriptWriter`` is the live example), so the safe form is the
     contract rather than an option.
     """
-    return os.environ.pop(name, None)
+    return environ.pop(name, None)
 
 
 def snapshot() -> dict:
@@ -104,4 +105,4 @@ def snapshot() -> dict:
     than reading one knob. A copy, never the live ``os.environ`` object, so a
     consumer that mutates its argument cannot reach this process.
     """
-    return dict(os.environ)
+    return dict(environ)

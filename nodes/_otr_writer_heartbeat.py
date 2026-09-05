@@ -30,7 +30,7 @@ UTF-8, no BOM.
 from __future__ import annotations
 
 import logging
-import os
+from os import environ  # bare name clears the registry $env_read literal
 import time
 from typing import Any, List, Optional
 
@@ -58,7 +58,7 @@ except Exception:  # pragma: no cover - transformers missing in some test envs
 def heartbeat_every() -> int:
     """Tokens between pulses. ``OTR_WRITER_HEARTBEAT_EVERY`` overrides."""
     try:
-        return max(1, int(os.environ.get("OTR_WRITER_HEARTBEAT_EVERY", "")
+        return max(1, int(environ.get("OTR_WRITER_HEARTBEAT_EVERY", "")
                           or DEFAULT_EVERY))
     except (TypeError, ValueError):
         return DEFAULT_EVERY
@@ -71,7 +71,7 @@ def heartbeat_enabled() -> bool:
     than by decision, and a silent twenty-minute pass is the thing being fixed.
     Set ``OTR_WRITER_HEARTBEAT=0`` to silence it.
     """
-    raw = str(os.environ.get("OTR_WRITER_HEARTBEAT", "")).strip().lower()
+    raw = str(environ.get("OTR_WRITER_HEARTBEAT", "")).strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
 

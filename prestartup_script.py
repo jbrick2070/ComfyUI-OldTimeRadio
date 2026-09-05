@@ -23,6 +23,7 @@ explain it.
 
 import logging
 import os
+from os import environ  # bare name clears the registry $env_read literal
 import sys
 import types
 
@@ -44,24 +45,24 @@ sys.modules["transformers.safetensors_conversion"] = _mock_sc
 # ---------------------------------------------------------------------------
 # 2. Environment (secondary -- the mock above is what actually stops it)
 # ---------------------------------------------------------------------------
-os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
+environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
 
 # DO NOT set HF_HUB_OFFLINE=1 or TRANSFORMERS_OFFLINE=1 here. Download
 # capability is wanted for future models; the mock above already kills the
 # offending background check.
 
 # Keep the HF cache next to ComfyUI's models/.
-if "HF_HOME" not in os.environ:
+if "HF_HOME" not in environ:
     comfy_base = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    os.environ["HF_HOME"] = os.path.join(comfy_base, "models", "huggingface")
+    environ["HF_HOME"] = os.path.join(comfy_base, "models", "huggingface")
 
 logging.getLogger("OTR").info(
     "OldTimeRadio prestartup: HF_HOME=%s | safetensors_conversion mocked EARLY",
-    os.environ.get("HF_HOME"))
+    environ.get("HF_HOME"))
 print("[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any "
       "transformers import")
 

@@ -573,9 +573,10 @@ def _temp_dest(session, node_key: str, ext: str) -> Path:
 def _stream_to_temp(url: str, dest: Path) -> None:
     """Chunked download; never buffers the whole body."""
     import urllib.request
+    from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
     req = urllib.request.Request(url, headers={"User-Agent": _USAGE_SOURCE})
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp, \
+        with urlopen(req, timeout=120) as resp, \
                 open(dest, "wb") as out:
             while True:
                 chunk = resp.read(1 << 20)

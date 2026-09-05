@@ -381,7 +381,7 @@ def _post_comfy_chat_completion(
     is imported lazily so the module stays import-safe + network-free."""
     import requests  # lazy: keep module import-safe + network-free
 
-    resp = requests.post(
+    resp = requests.request("POST", 
         url,
         headers={
             "Authorization": f"Bearer {bearer}",

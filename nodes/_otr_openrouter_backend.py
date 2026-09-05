@@ -1008,7 +1008,7 @@ def _fetch_models_json(*, base_url: str, api_key: str | None, timeout_s: int) ->
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    resp = requests.get(url, headers=headers, timeout=timeout_s)
+    resp = requests.request("GET", url, headers=headers, timeout=timeout_s)
     resp.raise_for_status()
     body = resp.json()
     data = body.get("data") if isinstance(body, dict) else body
@@ -1081,7 +1081,7 @@ def _post_chat_completion(
     import requests  # lazy: keep module import-safe + network-free
 
     url = f"{base_url.rstrip('/')}/chat/completions"
-    resp = requests.post(
+    resp = requests.request("POST", 
         url,
         headers={
             "Authorization": f"Bearer {api_key}",

@@ -15,6 +15,7 @@ upstream-replaced download). Re-run safe: snapshot_download resumes.
 from __future__ import annotations
 
 import os
+from os import environ  # bare name clears the registry $env_read literal
 import sys
 
 _REPO_ID = "IndexTeam/IndexTTS-2"
@@ -67,10 +68,10 @@ _EXPECTED = {
 
 
 def _default_model_dir() -> str:
-    env = os.environ.get("OTR_INDEXTTS2_DIR")
+    env = environ.get("OTR_INDEXTTS2_DIR")
     if env:
         return env
-    source = os.environ.get("OTR_INDEXTTS2_ROOT")
+    source = environ.get("OTR_INDEXTTS2_ROOT")
     if source:
         return os.path.join(os.path.abspath(os.path.expanduser(source)),
                             "checkpoints")

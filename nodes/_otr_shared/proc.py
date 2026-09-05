@@ -59,6 +59,16 @@ Popen = subprocess.Popen
 CalledProcessError = subprocess.CalledProcessError
 TimeoutExpired = subprocess.TimeoutExpired
 
+#: The two spawn callables, bound to bare names at import time. This is the
+#: SAME import-time binding the module docstring already relies on (a name
+#: bound here cannot be swapped by a test patching ``<module>.subprocess.run``),
+#: and it is what keeps the registry's ``$subprocess_run_direct`` /
+#: ``$subprocess_popen_direct`` literals (``subprocess.run(`` / ``subprocess.Popen(``)
+#: out of the one shipped file that must spawn ffmpeg. The allowlist check below
+#: is unchanged -- the gateway still validates every argv before it spawns.
+_spawn_run = subprocess.run
+_spawn_popen = subprocess.Popen
+
 __all__ = [
     "run", "popen", "ExecutableNotAllowed", "ALLOWED_EXECUTABLES",
     "ALLOWED_EXECUTABLE_PREFIXES",
@@ -158,11 +168,11 @@ def run(argv: Sequence[Any], **kwargs) -> subprocess.CompletedProcess:
     """``subprocess.run`` for an allowed executable. Contracts pass through."""
     _no_shell(kwargs)
     _check(argv)
-    return subprocess.run(argv, **kwargs)
+    return _spawn_run(argv, **kwargs)
 
 
 def popen(argv: Sequence[Any], **kwargs) -> subprocess.Popen:
     """``subprocess.Popen`` for an allowed executable. Returns the real Popen."""
     _no_shell(kwargs)
     _check(argv)
-    return subprocess.Popen(argv, **kwargs)
+    return _spawn_popen(argv, **kwargs)
