@@ -1,3 +1,37 @@
+# DO NOT SEND -- superseded and factually wrong (2026-09-05, Astra + Cursor, both independently)
+
+**This draft is retired. Three reasons, each verified against the tree:**
+
+1. **It targets a superseded version.** It asks a reviewer to bless
+   `2.0.0-alpha.20` while `pyproject.toml` is at `2.0.0-alpha.21` and alpha.21
+   is itself Flagged. Asking for a look at a zip that is not the one a stranger
+   installs is how the one human look gets burned.
+2. **"Every `subprocess` call goes through one gateway" is FALSE**, and it is
+   the same false claim that was already caught in the published issue #224.
+   `nodes/_otr_audio_engines/eng_indextts2.py:214` calls `subprocess.Popen`
+   directly, bypassing `nodes/_otr_shared/proc.py`. And the gateway is not an
+   ffmpeg gateway: `ALLOWED_EXECUTABLES` admits `nvidia-smi` and `blender`, and
+   `ALLOWED_EXECUTABLE_PREFIXES` admits `ffprobe`. A verify-deep reviewer greps
+   this in a minute.
+3. **"4 environment reads" is FALSE.** Some are WRITES --
+   `prestartup_script.py` assigns `os.environ["HF_HOME"]`, and
+   `nodes/_otr_shared/env.py::pin()` assigns `os.environ[name] = value`. Reads
+   and process-environment writes are different claims and a reviewer will
+   treat the conflation as carelessness.
+
+**Also unaddressed and it is in the banned class:** `__init__.py:495` still
+registers `GET /otr/latest_ledger` with no auth on every install. The ban text
+was "unauthenticated /prompt (node widget) **or no-auth route**". Either argue
+why a scrubbed GET is out of class, or list it as a closed surface with its
+scrub commit. Do not leave it unmentioned.
+
+**What replaces this:** an alpha.21 evidence packet with its own artifact hash
+and its own findings, the subprocess and environment claims stated accurately,
+and the ledger route addressed. Tracked as an OPEN row in
+`docs/GO_FORWARD_PLAN.md`.
+
+---
+
 # Registry review request for `2.0.0-alpha.20`. POST THIS ONE.
 
 **PREPARED, NOT POSTED. Posting is a PUBLIC ACT and is yours alone.**

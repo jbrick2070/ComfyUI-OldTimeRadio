@@ -84,6 +84,40 @@ install the pack at all** -- ComfyUI Manager says "not a CNR node". That is the
 documented queue behaviour (CLAUDE.md 7A), not a local install fault; do not send anyone
 chasing dependency ghosts over it. Scan records live in `docs/HANDOFF_LOG.md`.
 
+**OPEN: build the alpha.21 evidence packet. The ALPHA20 draft is DO-NOT-SEND** (Astra and
+Cursor, independently, 2026-09-05; the banner at the head of
+`docs/2026-09-05-registry-review-request-ALPHA20.md` carries the detail). Every defect
+below was re-verified against the tree, not taken on the reviewers' word:
+* It asks a reviewer to bless `2.0.0-alpha.20` while `pyproject.toml` is at alpha.21.
+  **Target the version that will still be latest when a human opens it.**
+* **"Every `subprocess` call goes through one gateway" is FALSE** and is the same claim
+  already caught in published issue #224. `eng_indextts2.py:214` calls `subprocess.Popen`
+  directly. The gateway is also not ffmpeg-only: `ALLOWED_EXECUTABLES` admits
+  `nvidia-smi` and `blender`, `ALLOWED_EXECUTABLE_PREFIXES` admits `ffprobe`.
+* **"4 environment reads" is FALSE** -- `prestartup_script.py` and
+  `nodes/_otr_shared/env.py::pin()` WRITE `os.environ`. Say reads and writes separately.
+* **`__init__.py:495` still registers `GET /otr/latest_ledger` with no auth on every
+  install**, and the ban text was "unauthenticated /prompt (node widget) **or no-auth
+  route**". Argue why a scrubbed GET is out of class, or list it as a closed surface with
+  its scrub commit. Do not leave it unmentioned.
+* Venue: ~20 "manual review request" issues since 2026-08-02 have zero maintainer
+  replies. `drltdata@comfy.org` is the only human who has ever acted on this node id.
+  Decide the venue deliberately; a GitHub issue is a public receipt, not the mechanism.
+
+**OPEN and cheap to check: the workflow's `cnr_id` does not match the published pack id.**
+`workflows/otr_canonical.json` node 0 (`OTR_WorkflowValidator`) carries
+`"cnr_id": "OldTimeRadio"` while `pyproject.toml` declares `comfyui-old-time-radio`; 92 of
+the 96 variants carry a `cnr_id` too. Manager reads `cnr_id` to resolve a missing node to
+its pack. DONE WHEN: it is established whether Manager uses this field on the missing-node
+path, and if it does, all 93 graphs carry the published id. **Do not assume it causes the
+install failure** -- the null `latest_version` is sufficient on its own.
+
+**Two claims of ours that reviewers refuted and that must not be repeated:** the network
+findings are NOT all "opt-in, default-off flags" (OpenRouter enables on an API key being
+present, Comfy-cloud media on a dropdown row, RSS whenever those source banks run --
+only `_otr_comfy_backend.py` is a real `OTR_ENABLE_*` flag); and `.comfyignore` has SIX
+`!scripts/` negations, not four.
+
 RULINGS that govern what may be done about it:
 * **The `info` findings were never the ban.** Reading `status_reason` rather than
   counting findings is what established that, and 0 of 102 policy-v0.2 approvals had a
