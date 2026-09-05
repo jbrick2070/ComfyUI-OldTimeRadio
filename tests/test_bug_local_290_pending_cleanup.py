@@ -49,9 +49,19 @@ def _make_pending_dir(
         }
         led_p.write_text(json.dumps(ledger), encoding="utf-8")
     if age_seconds > 0:
-        old_time = time.time() - age_seconds
-        os.utime(d, (old_time, old_time))
+        _age_tree(d, age_seconds)
     return d
+
+
+def _age_tree(d: Path, age_seconds: int) -> None:
+    """Age the dir AND everything beneath it. The sweep measures age from the
+    newest mtime under the dir (an NTFS directory mtime moves only on
+    direct-child changes), so aging the top level alone leaves a fresh ledger
+    inside and the dir reads as in-flight -- which is correct for the sweep
+    and wrong for a fixture claiming to be a 2-hour-old abandoned run."""
+    old_time = time.time() - age_seconds
+    for p in [d] + list(d.rglob("*")):
+        os.utime(p, (old_time, old_time))
 
 
 class TestSweepEmptyPendingDirs:
@@ -96,7 +106,9 @@ class TestSweepEmptyPendingDirs:
         report = sweep_empty_pending_dirs(tmp_path)
         assert not d.exists()
         assert str(d) in report.deleted
-        assert str(d) in report.skipped_no_ledger
+        # It was deleted, so it is NOT also booked as skipped -- the old
+        # assertion pinned exactly that double-booking (2026-09-05).
+        assert str(d) not in report.skipped_no_ledger
 
     def test_keeps_signal_lost_dirs(self, tmp_path):
         """Named episodes (signal_lost_*) are NEVER touched."""
@@ -179,7 +191,7 @@ class TestSweepEmptyPendingDirs:
         assert str(old_with_lines) in report.skipped_has_lines
         assert old_with_lines.exists()
         assert str(old_no_ledger) in report.deleted
-        assert str(old_no_ledger) in report.skipped_no_ledger
+        assert str(old_no_ledger) not in report.skipped_no_ledger
         assert not old_no_ledger.exists()
 
 
@@ -210,3 +222,68 @@ class TestWriterWiring:
         ).read_text(encoding="utf-8")
         assert "from ._otr_pending_cleanup import sweep_empty_pending_dirs" in src
         assert "BUG-LOCAL-290" in src
+
+
+class TestUnreadableIsNotEmpty:
+    """The fix (2026-09-05, Fable gate): 'cannot read the ledger' was being
+    treated as 'may delete the directory'. These pin the four-state
+    disposition so it cannot regress to a bare None."""
+
+    def _old(self):
+        return DEFAULT_PENDING_MAX_AGE_SECONDS + 60
+
+    def test_a_corrupt_ledger_and_its_asset_survive(self, tmp_path):
+        """A truncated ledger beside a rendered WAV. The whole directory used
+        to be rmtree'd. Both must still be there afterwards."""
+        d = _make_pending_dir(tmp_path, "pending_20260101_020202",
+                              lines=3, age_seconds=self._old())
+        led = next((d / "audio").glob("*_ledger.json"))
+        led.write_bytes(led.read_bytes()[: len(led.read_bytes()) // 2])  # truncate
+        asset = d / "audio" / "line_001.wav"
+        asset.write_bytes(b"RIFF" + b"\x00" * 64)
+        _age_tree(d, self._old())          # truncation + asset are "old" too
+        report = sweep_empty_pending_dirs(tmp_path)
+        assert d.exists(), "an unreadable ledger is never permission to delete"
+        assert asset.exists()
+        assert str(d) in report.skipped_unreadable
+        assert str(d) not in report.deleted
+
+    def test_a_bom_prefixed_ledger_is_unreadable_not_empty(self, tmp_path):
+        """json.load raises on a UTF-8 BOM -- a hand edit in the wrong editor.
+        That is the exact case that used to erase a run."""
+        d = _make_pending_dir(tmp_path, "pending_20260101_030303",
+                              lines=2, age_seconds=self._old())
+        led = next((d / "audio").glob("*_ledger.json"))
+        led.write_bytes(b"\xef\xbb\xbf" + led.read_bytes())
+        _age_tree(d, self._old())
+        report = sweep_empty_pending_dirs(tmp_path)
+        assert d.exists()
+        assert str(d) in report.skipped_unreadable
+
+    def test_no_ledger_but_files_present_is_preserved(self, tmp_path):
+        """Absent ledger deletes only on POSITIVE emptiness. A directory with
+        no ledger but a real file under it is not the failed-skeleton case."""
+        d = _make_pending_dir(tmp_path, "pending_20260101_040404",
+                              with_ledger=False, age_seconds=self._old())
+        (d / "audio" / "opening_theme.wav").write_bytes(b"RIFF" + b"\x00" * 64)
+        _age_tree(d, self._old())
+        report = sweep_empty_pending_dirs(tmp_path)
+        assert d.exists()
+        assert str(d) in report.skipped_no_ledger
+        assert str(d) not in report.deleted
+
+    def test_age_is_measured_beneath_the_dir(self, tmp_path):
+        """A dir whose TOP-LEVEL mtime is old but whose audio/ holds a
+        fresh file is in flight, not stale. The old top-level stat missed it
+        because an NTFS dir mtime moves only on direct-child changes."""
+        d = _make_pending_dir(tmp_path, "pending_20260101_050505",
+                              lines=0, age_seconds=self._old())
+        fresh = d / "audio" / "just_written.wav"
+        fresh.write_bytes(b"RIFF" + b"\x00" * 64)     # now -> young
+        report = sweep_empty_pending_dirs(tmp_path)
+        assert d.exists()
+        assert str(d) in report.skipped_too_young
+
+    def test_report_round_trip_carries_the_new_bucket(self, tmp_path):
+        report = sweep_empty_pending_dirs(tmp_path)
+        assert "skipped_unreadable_count" in report.as_dict()

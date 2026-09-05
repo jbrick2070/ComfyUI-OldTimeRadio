@@ -9,8 +9,19 @@ in-flight ledger has a disk anchor from minute 1. When the writer
 node errors out before composing any lines (cancelled queue, RSS
 fetch failure, LLM load failure), the skeleton ledger stays on disk
 with 0 lines + 2 meta keys. Successful runs rename the dir to
-`signal_lost_<title>_<TIMESTAMP>`; aborted runs leave the
+`signal_lost_<title>_<TIMESTAMP>` -- but LATE: the only rename call
+is inside SignalLostVideoRenderer.render_video (video_engine.py), so
+a `pending_*` dir routinely holds the ENTIRE writer + TTS + music +
+assembly stage before it is renamed. Aborted runs leave the
 `pending_*` dir behind forever.
+
+WHAT THIS SWEEP MAY DELETE (tightened 2026-09-05, Fable gate): a dir
+whose ledger is shaped and EMPTY, or a dir with NO ledger and NO
+regular file anywhere beneath it. An UNREADABLE ledger is reported
+and preserved -- "cannot read it" was being treated as "may delete
+it", and the writer's atomic saves mean an unreadable ledger has an
+outside cause. Age is measured from the newest mtime BENEATH the dir,
+because an NTFS directory mtime moves only on direct-child changes.
 
 Live evidence: 17 pending_20260527_* dirs accumulated on
 2026-05-27 between 11:28 and 15:09 (all with 0 lines, all with
@@ -66,6 +77,7 @@ class PendingSweepReport:
         self.skipped_too_young: List[str] = []
         self.skipped_has_lines: List[str] = []
         self.skipped_no_ledger: List[str] = []
+        self.skipped_unreadable: List[str] = []
         self.errors: List[Tuple[str, str]] = []
 
     def as_dict(self) -> dict:
@@ -76,6 +88,7 @@ class PendingSweepReport:
             "skipped_too_young_count": len(self.skipped_too_young),
             "skipped_has_lines_count": len(self.skipped_has_lines),
             "skipped_no_ledger_count": len(self.skipped_no_ledger),
+            "skipped_unreadable_count": len(self.skipped_unreadable),
             "errors_count": len(self.errors),
             "errors": [
                 {"path": p, "reason": r} for (p, r) in self.errors
@@ -83,27 +96,76 @@ class PendingSweepReport:
         }
 
 
-def _ledger_has_lines(audio_dir: Path) -> bool | None:
-    """Inspect the dir's *_ledger.json. Returns True if it has any
-    `lines` rows, False if the ledger is shaped but lines=[],
-    None if no ledger file exists (in-flight rename race or empty
-    dir).
+#: The four things a pending dir's ledger can be. They are DIFFERENT
+#: dispositions, and collapsing two of them is what this module used to do.
+LEDGER_ABSENT = "absent"          # no audio/ dir or no *_ledger.json in it
+LEDGER_UNREADABLE = "unreadable"  # a file is there and we cannot read it
+LEDGER_EMPTY = "empty"            # shaped, lines=[] -- the writer never composed
+LEDGER_HAS_LINES = "has_lines"    # a real ledger; forensic evidence, keep it
+
+
+def _ledger_state(audio_dir: Path) -> str:
+    """Classify the dir's *_ledger.json as one of the four states above.
+
+    UNREADABLE IS NOT ABSENT, and that distinction is the whole fix
+    (2026-09-05). This used to return ``None`` for both "there is no ledger"
+    and "there is a ledger and json.load raised", and the caller read ``None``
+    as permission to delete. A truncated or BOM-prefixed ledger -- an AV
+    transient, a disk fault, a hand edit -- therefore erased everything under
+    the directory. The writer's own saves are atomic (``os.replace`` of a
+    ``.tmp``), so an unreadable ledger has an OUTSIDE cause, which is exactly
+    the case where the contents are worth keeping.
     """
     if not audio_dir.is_dir():
-        return None
+        return LEDGER_ABSENT
     ledgers = list(audio_dir.glob("*_ledger.json"))
     if not ledgers:
-        return None
+        return LEDGER_ABSENT
     # Pick the most-recently-modified ledger if multiple exist
     # (shouldn't happen, but defensive).
-    led_p = max(ledgers, key=lambda p: p.stat().st_mtime)
+    try:
+        led_p = max(ledgers, key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return LEDGER_UNREADABLE
     try:
         with open(led_p, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return None
-    lines = data.get("lines") or []
-    return bool(lines)
+    except (OSError, ValueError, UnicodeDecodeError):
+        # ValueError covers json.JSONDecodeError. UnicodeDecodeError used to
+        # ESCAPE this function entirely, contradicting its never-raises
+        # contract; the writer's outer except swallowed it by accident.
+        return LEDGER_UNREADABLE
+    if not isinstance(data, dict):
+        return LEDGER_UNREADABLE
+    return LEDGER_HAS_LINES if (data.get("lines") or []) else LEDGER_EMPTY
+
+
+def _has_any_regular_file(child: Path) -> bool:
+    """POSITIVE emptiness. A directory with no ledger is deleted only when
+    nothing at all is under it -- which is what a failed skeleton stamp
+    actually leaves, since ``get_ledger`` / ``new_ledger`` only mkdir."""
+    try:
+        return any(p.is_file() for p in child.rglob("*"))
+    except OSError:
+        return True   # cannot prove it empty -> treat as not empty
+
+
+def _newest_mtime_beneath(child: Path) -> float:
+    """The most recent mtime anywhere under ``child``, falling back to the
+    dir's own. On NTFS a directory's mtime moves only on DIRECT-child
+    create/delete/rename, not on writes inside ``audio/`` -- so a long audio
+    stage looked "old" to the top-level stat and the 2-hour guard was weaker
+    than it promised."""
+    newest = child.stat().st_mtime
+    try:
+        for p in child.rglob("*"):
+            try:
+                newest = max(newest, p.stat().st_mtime)
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return newest
 
 
 def sweep_empty_pending_dirs(
@@ -146,7 +208,7 @@ def sweep_empty_pending_dirs(
         report.scanned += 1
 
         try:
-            mtime = child.stat().st_mtime
+            mtime = _newest_mtime_beneath(child)
         except OSError as exc:
             report.errors.append((str(child), f"stat failed: {exc}"))
             continue
@@ -156,13 +218,25 @@ def sweep_empty_pending_dirs(
             continue
 
         audio_dir = child / "audio"
-        ledger_state = _ledger_has_lines(audio_dir)
-        if ledger_state is None:
-            # No ledger -- treat as empty IF age cutoff was met.
-            # Mainly catches abandoned dirs where even the
-            # skeleton stamp failed.
-            report.skipped_no_ledger.append(str(child))
+        ledger_state = _ledger_state(audio_dir)
+
+        if ledger_state == LEDGER_UNREADABLE:
+            # A ledger IS there and we cannot read it. That is never
+            # permission to delete: the writer's saves are atomic, so an
+            # unreadable ledger has an outside cause, and whatever sits
+            # beside it is the only record of that run. Report and leave it.
+            report.skipped_unreadable.append(str(child))
+            continue
+
+        if ledger_state == LEDGER_ABSENT:
+            # No ledger at all. Delete only on POSITIVE emptiness -- the
+            # failed-skeleton case this branch exists for leaves nothing
+            # under the dir. Anything else with no ledger is preserved.
+            if _has_any_regular_file(child):
+                report.skipped_no_ledger.append(str(child))
+                continue
             if dry_run:
+                report.deleted.append(str(child))
                 continue
             try:
                 shutil.rmtree(child)
@@ -173,14 +247,14 @@ def sweep_empty_pending_dirs(
                 )
             continue
 
-        if ledger_state is True:
+        if ledger_state == LEDGER_HAS_LINES:
             # Real ledger with composed lines -- leave it alone.
             # The dir is forensic evidence of a run that got
             # somewhere; the operator may want to inspect it.
             report.skipped_has_lines.append(str(child))
             continue
 
-        # ledger_state is False -- ledger exists but lines=[].
+        # ledger_state is LEDGER_EMPTY -- ledger exists but lines=[].
         # The writer abandoned before composing anything. Eligible
         # for cleanup.
         if dry_run:
@@ -198,12 +272,13 @@ def sweep_empty_pending_dirs(
         log.info(
             "[PendingSweep] BUG-LOCAL-290: deleted %d empty pending dir(s) "
             "(scanned=%d skipped_too_young=%d skipped_has_lines=%d "
-            "skipped_no_ledger=%d errors=%d).",
+            "skipped_no_ledger=%d skipped_unreadable=%d errors=%d).",
             len(report.deleted),
             report.scanned,
             len(report.skipped_too_young),
             len(report.skipped_has_lines),
             len(report.skipped_no_ledger),
+            len(report.skipped_unreadable),
             len(report.errors),
         )
     elif dry_run:
