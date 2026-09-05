@@ -125,6 +125,21 @@ scripts/*
 !scripts/_otr_dia_worker.py
 !scripts/_otr_indextts2_worker.py
 !scripts/_otr_indextts2_install.ps1
+# 2026-09-05, and it is the SAME defect as the 2026-09-01 one above -- found by
+# grepping the PUBLISHED alpha.20 zip rather than the tree. Exactly one runtime
+# `scripts/` path in the whole pack was still unshipped:
+# `nodes/_otr_video_engines/eng_mesh_stage.py:84` builds
+# `STAGE_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "otr_mesh_stage_blender.py")`
+# and hands it to headless Blender, so on a registry install the mesh/3D lane
+# could never start. The script runs INSIDE Blender's bundled python and
+# contains no subprocess, exec, eval or network call (measured: zero hits).
+# The check that finds this class is one line -- grep the shipped nodes for a
+# join onto "scripts" and confirm each target is in the zip.
+!scripts/otr_mesh_stage_blender.py
+# The shipped IndexTTS2 installer calls this at its weights step, so excluding
+# it left the one installer we DO ship pointing at a file that is not there.
+# It is a huggingface_hub `snapshot_download` wrapper: no subprocess, no exec.
+!scripts/_otr_idx_download_weights.py
 
 # 2026-08-22: internal-only material that was shipping to every installer --
 # ~23 MB of it, including the operator's own directives file. None of it is

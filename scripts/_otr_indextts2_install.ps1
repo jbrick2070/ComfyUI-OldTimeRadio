@@ -44,16 +44,24 @@ $Pin = "830f6f8f94a51fea23ab1d639027a86200075a4e"
 Write-Host "IndexTTS2 Path-B install -> $Root"
 
 # 1) uv
+#
+# THIS SCRIPT SHIPS IN THE REGISTRY BUNDLE, SO IT DOES NOT DOWNLOAD AND EXECUTE
+# CODE (2026-09-05). It used to bootstrap uv with
+# `irm https://astral.sh/uv/install.ps1 | iex` -- a remote script piped straight
+# into execution, inside a pack that is asking a security reviewer to trust its
+# account of what it runs. A reviewer greps the zip; so did we, and found it.
+# The operator installs uv once, deliberately, by their own hand; this script
+# then uses it. That is the same one-time cost and none of the exposure.
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Write-Host "uv not found -- bootstrapping via the astral.sh installer"
-    $null = Invoke-NativeChecked "uv bootstrap" "powershell" @(
-        "-ExecutionPolicy", "ByPass", "-NoProfile", "-Command",
-        "irm https://astral.sh/uv/install.ps1 | iex"
-    )
-    $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
-    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        throw "uv bootstrap failed -- install uv manually (https://docs.astral.sh/uv/) and re-run"
-    }
+    throw @"
+uv is required and was not found on PATH.
+
+Install it once, by hand, then re-run this script:
+    winget install --id=astral-sh.uv -e
+  or see https://docs.astral.sh/uv/getting-started/installation/
+
+(This installer deliberately does NOT fetch and execute a remote script.)
+"@
 }
 
 # 2) clone + pin
