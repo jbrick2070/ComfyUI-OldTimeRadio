@@ -82,13 +82,22 @@ recorded). The record is BYTE-IDENTICAL to alpha.18's: **12 findings, all `info`
 zero critical** (4 env-var reads, 5 network, 3 subprocess). The collapse
 **158 -> 12** is now measured on the version a stranger would install.
 
-**NEXT UP:** the GO_FORWARD design rows (item 3) -- every remaining coder item now
-needs an arc before code. Nothing in items 1-2 is owed.
+**NEXT UP, and it is ONE thing: item 2.9, the registry punch list, then alpha.20.**
+The 2026-09-05 consensus (`docs/2026-09-05-registry-plan-consensus/CONSENSUS.md`
+-- Astra + 31 skeptics + Sonnet byte-diff + a 578-pack survey) found that the
+published alpha.19 WILL be banned if the reviewer reaches it: one confirmed
+arbitrary-file-read still live at HEAD, nine unconfined widget->write sinks (the
+reviewer's #3 ban class), and the UNC stats `79dc9828` missed. The reviewer
+processed every flagged version same-day through 09-01 and has not run since --
+that gap is the window. **Do NOT post the SHORT request** (it points the review at
+that artifact). Order: coder closes 2.9 -> operator bumps to alpha.20 -> coder
+byte-diffs the CDN zip and reads its scan -> operator posts one short note naming
+alpha.20. The design rows (item 3) wait behind it.
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
-* **File the registry re-review.** The post body is
-  `docs/2026-09-04-registry-review-request-SHORT.md`, finalized with the real story
-  and MEASURED numbers. **Both older drafts are DO-NOT-SEND** -- see item 4.
+* **The alpha.20 bump, once 2.9 is green and pushed** -- then the short note (item 4).
+  **All three review drafts are DO-NOT-SEND until alpha.20 exists** -- the SHORT one
+  names alpha.19 and claims every surface is closed; neither is true.
 * Any further `pyproject.toml` bump (each one auto-fires a publish).
 * The rulings in item 6.
 
@@ -302,6 +311,44 @@ That is no longer a closed spec with one right answer, so it is a DESIGN item an
 takes an arc before code. Not scheduled. DONE WHEN: an owner is named for the
 pre-writer check and it refuses only what the dispatch could not have resolved.
 
+### 2.9 THE REGISTRY PUNCH LIST -- the alpha.20 gate (consensus 2026-09-05; the r1 arc is DONE, this is r2/r3 work)
+
+**Read `docs/2026-09-05-registry-plan-consensus/CONSENSUS.md` first; it IS the
+anchor.** Every item below was confirmed by two independent skeptics against the real
+files and the published alpha.19 tree. One change set, at the EXECUTE METHODS, never in
+shared resolvers or the spawn gateway.
+
+1. **`confine_to_output_tree(value, field, *, roots=None)` in `nodes/_otr_paths.py`:**
+   after `reject_remote_path`, realpath both sides, `commonpath == root`, textual `..`
+   reject; root = `comfy_output_dir()` (the 4060's `OTR_OUTPUT_DIR` keeps working) plus
+   an operator env allowlist `OTR_EXTRA_OUTPUT_ROOTS`; compare resolved-to-resolved
+   (a mapped drive resolves to UNC).
+2. **Call it on the nine write sinks:** CaptionBurn `out` INCLUDING `_default_out` (it
+   writes beside `video_path`) and the input paths; MasterAudioMux and SilentComposite
+   `out` + inputs; ProcgenBlend `source_mp4_path`/`procgen_mp4_path`/`scopes_mp4_path`;
+   CreditsRoll `video_path`; SceneAwareScopes `episode_id` through `_validate_episode_id`;
+   VideoRenderBatch `engine` whitelisted against the registry before it is a filename;
+   SceneSequencer: delete the dead `output_dir` makedirs (and the inert trailing widget);
+   voice nodes: ledger path / cache dir from `in_flight_ledger_path()`, never wire
+   `meta.paths`.
+3. **LFI-01:** `render_driver._still_spine_materialize_row` (`:909-929`) copies a
+   ledger-carried `pool_path` verbatim into a `/view`-served dir -- the sibling copier
+   `9d3f56a7` missed. Gate it with `_trusted_pool_source` (and use realpath, not abspath).
+4. **UNC stats `79dc9828` missed:** voice `ref_path` open in fingerprinting; blend
+   `scopes_mp4_path`; validator `profile_id` join; composite/scopes manifest paths;
+   `scene_sequencer.py:85`; `otr_video_render_batch.py` (no remote reject at all);
+   `otr_silent_composite.IS_CHANGED` step 3.
+5. **Delete the two POST render routes from `__init__.py`** (nothing shipped calls them;
+   retire `tests/test_http_render_route_gate.py` in the same commit). Optionally drop
+   `fullpath` from the GET.
+6. **Untouched:** the three byte-hashed files, ffmpeg via subprocess, episode content.
+   **Proof:** full suite + Bug Bible; the four widget/link tests if a widget goes; ONE
+   canonical leg to `otr/obs/`. **Review:** Sonnet 5 QA on the diff, then a Fable gate
+   (a missed thread here is a fourth ban and a burned version string).
+7. **Fix two stale sentences while there:** `.comfyignore` (viewer paragraph) and
+   `PROD_BUG_LOG.md:10690` say `/otr/latest_ledger` is env-gated. It is not; only the
+   POSTs are.
+
 ## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
 
 None of these is the next coder window (that is item 1), but every one of them lands
@@ -383,12 +430,21 @@ CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7
 landed 09-05 with a record byte-identical to alpha.18's (12 `info`, zero critical).
 Nothing here is a coder task.
 
-**THE ONE OPEN ITEM: file the re-review post.** It is a PUBLIC act and needs the
-operator's own go.
+**THE ORDER CHANGED ON 2026-09-05 -- the post comes LAST, not first.** The consensus
+panel found the published alpha.19 still carries a confirmed arbitrary-file-read and
+nine unconfined write sinks (item 2.9), and that the reviewer is a code review that
+bans within the day, not a queue that reads issues (zero maintainer replies on ~20
+manual-review issues since 08-02). Sequence: **2.9 green and pushed -> operator bumps
+alpha.20 -> coder byte-diffs the CDN zip against the commit and reads its scan ->
+operator posts ONE short note naming alpha.20** (the two banned surfaces and how they
+closed; the four classes closed since; asks nothing).
 
-**POST THIS:** `docs/2026-09-04-registry-review-request-SHORT.md` -- version filled
-in, every number MEASURED from the real scan record, and it tells the true story:
-*both surfaces you banned us for were real, and both are closed.*
+**REWRITE BEFORE POSTING:** `docs/2026-09-04-registry-review-request-SHORT.md` is
+DO-NOT-SEND as written -- it names alpha.19, claims every surface is closed, says
+`widget_ffmpeg_is_ignored` covers "each node" (it is 6 files), and cites
+`comfyui-video-xy-plot`, a pre-v0.2 human approval that proves nothing about the
+current reviewer. Keep its ban-quote opening and the measured table; change the
+version, drop the xy-plot line, add the 2.9 classes.
 
 **DO NOT POST EITHER OLDER DRAFT.** `...-READY-v2.md` and the 2026-09-03 draft are
 kept only as the alpha.17 record. They are not merely stale, they are WRONG:
