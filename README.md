@@ -6,8 +6,8 @@ inside ComfyUI. Drop it in, queue one workflow, walk away, and a complete episod
 your output folder.
 
 **Pipeline:** story source → LLM script → character voices + announcer + music themes (a
-swappable 7-voice / 5-music engine roster; IndexTTS2 + Kokoro + Stable Audio 3 ship as the
-defaults) → 48 kHz master mix → model-agnostic video (procedural CRT floor by default, or
+swappable 7-voice / 5-music engine roster; the shipped graph runs Kokoro on both voice
+slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic video (procedural CRT floor by default, or
 HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) → final MP4.
 
 100% local by default. No API keys required on NVIDIA and AMD. Optional hosted LLM
@@ -341,14 +341,26 @@ video-role dropdowns default to the **procedural still/CRT floor** (`still_flat`
 video checkpoint required at all), and its image role defaults to **Z-Image-Turbo**
 (Apache-2.0, no license friction). So a first run needs only: the local writer LLM
 (`gemma-4-12b-it` as shipped, or your own choice), Z-Image-Turbo, and the default voice
-and music weights. Two of those fetch themselves on first use (Kokoro, Stable Audio 3).
-**One does not: IndexTTS2**, the character voice the canonical graph ships with. It runs
-in its own separate Python (3.10 + torch 2.8), so before your first Queue Prompt on
-`otr_canonical` either run its one-time installer from a terminal in the pack folder
+and music weights. **The voice weights fetch themselves on first use:** `otr_canonical`
+ships Kokoro on BOTH voice slots (announcer and characters), and Kokoro pulls
+`hexgrad/Kokoro-82M` from Hugging Face the first time it speaks. Nothing to install by
+hand for voices.
+
+**Music does NOT fetch itself.** Stable Audio 3 reads its checkpoint from ComfyUI's own
+`models/checkpoints` folder and fails loudly if it is absent
+(`SA3 checkpoint ... not found`). Before your first Queue Prompt, download
+`stable_audio_3_small_music.safetensors` from the ungated `Comfy-Org/stable-audio-3`
+repo into `ComfyUI/models/checkpoints/` (and `t5gemma_b_b_ul2.safetensors` into
+`models/text_encoders/` if your checkpoint does not carry the conditioner).
+
+**IndexTTS2 is an OPT-IN upgrade, not a first-run requirement.** It is a voice-cloning
+engine that reads a reference WAV, and the shipped graph does not select it -- you only
+need it if you open **OTR_CastLock** and set `char_voice_engine` to `indextts2` yourself. It runs in its
+own separate Python (3.10 + torch 2.8), so choosing it means first running its one-time
+installer from a terminal in the pack folder
 (`powershell -ExecutionPolicy Bypass -File scripts\_otr_indextts2_install.ps1`, which
-builds that environment and downloads its own multi-gigabyte model), or open the
-**OTR_CastLock** node and switch `char_voice_engine` to `bark` (or `kokoro` on Python
-3.12). Skip both and the render runs the writer, then stops with
+builds that environment and downloads its own multi-gigabyte model). Select it without
+installing it and the render writes the script, then stops with
 `IndexTTS2 Path B not installed`. The heavier local video checkpoints — HuMo, LTX,
 Wan, AnimateDiff, MiniMax H3 — are **optional upgrades** you dial in later via the
 `OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
@@ -368,7 +380,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 |---|---|---|
 | 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
-| 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, IndexTTS2 + Kokoro voices, Stable Audio 3 music. Read the IndexTTS2 note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
+| 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, Kokoro voices on both slots, Stable Audio 3 music. Read the Stable Audio 3 download note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
 | AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
 | Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
 
@@ -980,6 +992,6 @@ their authors.
   (noncommercial).
 
 None of these are required for a first run — the canonical workflow's shipped defaults
-(Gemma writer, Z-Image-Turbo, IndexTTS2/Kokoro/Stable Audio, procedural video floor) are all
+(Gemma writer, Z-Image-Turbo, Kokoro voices, Stable Audio 3 music, procedural video floor) are all
 open and commercial-friendly. Check each engine's own license before commercial use of the
 others.
