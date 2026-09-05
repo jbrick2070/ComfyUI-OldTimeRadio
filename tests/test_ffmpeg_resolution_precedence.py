@@ -223,7 +223,7 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     # source -> output, the same way it already handles a missing procgen).
     assert pu._ffmpeg_bin("ffmpeg") == ""
     assert pu._ffmpeg_bin("") == ""
-    assert pu._ffmpeg_bin(r"C:nywherefmpeg.exe") == ""
+    assert pu._ffmpeg_bin(r"C:\anywhere\ffmpeg.exe") == ""
     assert ly._ffmpeg_bin() == "ffmpeg"
     assert fs._ffmpeg_bin() == "ffmpeg"
 
