@@ -45,6 +45,15 @@ def _runtime_script_requirements() -> set[str]:
     for py in NODES.rglob("*.py"):
         if "__pycache__" in py.parts:
             continue
+        # A node that is ITSELF excluded from the bundle imposes no bundle
+        # requirement: if the node is not in the zip, the scripts/ path it
+        # resolves at runtime need not be either. eng_indextts2.py is the case
+        # (2026-09-05): the whole IndexTTS2 surface -- adapter, worker, sidecar
+        # installer, weights downloader -- was dropped from the registry bundle
+        # together, so the worker it joins onto must NOT be demanded here.
+        rel_node = py.relative_to(REPO).as_posix()
+        if _is_excluded(rel_node):
+            continue
         for m in _JOIN.finditer(py.read_text(encoding="utf-8", errors="replace")):
             name = m.group(1) or m.group(2)
             if name:

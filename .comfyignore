@@ -123,8 +123,11 @@ scripts/*
 # files and nothing else under scripts/.
 !scripts/_otr_chatterbox_worker.py
 !scripts/_otr_dia_worker.py
-!scripts/_otr_indextts2_worker.py
-!scripts/_otr_indextts2_install.ps1
+# 2026-09-05: IndexTTS2 is REMOVED FROM THE REGISTRY BUNDLE (see the
+# nodes/_otr_audio_engines/eng_indextts2.py exclusion below and the tolerant
+# import in that package's __init__). Its whole surface leaves the zip -- the
+# adapter, the worker, the sidecar installer and the weights downloader -- so
+# these three negations are gone. All four still ship in the GitHub tree.
 # 2026-09-05, and it is the SAME defect as the 2026-09-01 one above -- found by
 # grepping the PUBLISHED alpha.20 zip rather than the tree. Exactly one runtime
 # `scripts/` path in the whole pack was still unshipped:
@@ -136,10 +139,19 @@ scripts/*
 # The check that finds this class is one line -- grep the shipped nodes for a
 # join onto "scripts" and confirm each target is in the zip.
 !scripts/otr_mesh_stage_blender.py
-# The shipped IndexTTS2 installer calls this at its weights step, so excluding
-# it left the one installer we DO ship pointing at a file that is not there.
-# It is a huggingface_hub `snapshot_download` wrapper: no subprocess, no exec.
-!scripts/_otr_idx_download_weights.py
+
+# 2026-09-05: the ONE node module excluded from the registry bundle, and the
+# reason is the registry scan, not correctness. eng_indextts2.py is byte-hashed
+# by _otr_voice_route.RUNTIME_FINGERPRINT_SOURCES, so the idiomatic spelling fix
+# that cleared every other env/subprocess finding cannot be applied here without
+# demoting the human-approved Lemmy voice route until a GPU re-audition. Rather
+# than pay that, the voice-CLONING engine (which needs a sidecar venv and
+# reference WAVs a registry user does not have anyway) is dropped from the zip.
+# The package __init__ imports it in a try/except, so its absence just means the
+# engine does not register -- kokoro (the shipped default), bark, chatterbox,
+# dia and the cloud engines are all still present. Full capability, Lemmy route
+# and fingerprint all remain in the GitHub tree.
+nodes/_otr_audio_engines/eng_indextts2.py
 
 # 2026-08-22: internal-only material that was shipping to every installer --
 # ~23 MB of it, including the operator's own directives file. None of it is

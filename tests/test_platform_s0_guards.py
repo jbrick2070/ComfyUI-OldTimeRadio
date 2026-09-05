@@ -243,34 +243,53 @@ def test_cpu_floor_profile_is_runnable_on_cpu():
 # indextts2 installer gap: the scripts its errors name must exist
 # --------------------------------------------------------------------------
 
-def test_indextts2_named_install_scripts_exist():
-    """eng_indextts2's fail-closed errors point operators at two scripts;
-    pre-S0 NEITHER existed anywhere in the repo (only the worker did)."""
+def test_indextts2_adapter_and_its_scripts_share_a_bundle_status():
+    """IndexTTS2 ships as a UNIT or not at all -- adapter, worker, installer and
+    weights downloader together.
+
+    All four still EXIST in the tree (the GitHub install keeps full capability
+    and the Lemmy voice route). What must never happen is a MIXED bundle: a
+    shipped adapter whose fail-closed error names an installer the zip does not
+    carry (the 2026-09-01 defect), OR -- the inverse -- a shipped script for an
+    adapter that is not there.
+
+    As of 2026-09-05 the whole IndexTTS2 surface is EXCLUDED from the registry
+    bundle: the adapter is byte-hashed by the voice-route fingerprint, so the
+    idiomatic spelling that cleared every other scan finding cannot be applied
+    to it without demoting the approved Lemmy route, and it is a clone engine a
+    registry user cannot use anyway. So the expected state is: adapter excluded,
+    all three scripts excluded, every file still present in the tree.
+    """
     from pathlib import Path
 
     repo = Path(__file__).resolve().parents[1]
-    eng = (repo / "nodes" / "_otr_audio_engines"
-           / "eng_indextts2.py").read_text(encoding="utf-8")
-    for name in ("_otr_indextts2_install.ps1", "_otr_idx_download_weights.py",
-                 "_otr_indextts2_worker.py"):
-        assert name in eng or name == "_otr_indextts2_worker.py", name
-        assert (repo / "scripts" / name).exists(), (
-            f"scripts/{name} is named by eng_indextts2 error text (or is the "
-            "worker) but does not exist")
+    adapter = "nodes/_otr_audio_engines/eng_indextts2.py"
+    scripts = ("scripts/_otr_indextts2_install.ps1",
+               "scripts/_otr_idx_download_weights.py",
+               "scripts/_otr_indextts2_worker.py")
 
-    import subprocess
+    # 1. Everything still exists in the tree -- exclusion is bundle-only.
+    for rel in (adapter, *scripts):
+        assert (repo / rel).is_file(), f"{rel} vanished from the tree"
 
-    installer = "scripts/_otr_indextts2_install.ps1"
-    subprocess.run(
-        ["git", "ls-files", "--error-unmatch", "--", installer],
-        cwd=repo, text=True, capture_output=True, check=True)
-    ignored = subprocess.run(
-        ["git", "ls-files", "-ci", "--exclude-from=.comfyignore", "--",
-         installer],
-        cwd=repo, text=True, capture_output=True, check=True)
-    assert not ignored.stdout.strip(), (
-        "the shipped IndexTTS2 error names its installer, but the complete "
-        f".comfyignore rules still exclude {installer}")
+    # 2. The adapter's error text still names the installer/downloader, so a
+    #    GitHub user who selects the engine is pointed at the right scripts.
+    eng = (repo / adapter).read_text(encoding="utf-8")
+    for name in ("_otr_indextts2_install.ps1", "_otr_idx_download_weights.py"):
+        assert name in eng, f"eng_indextts2 no longer names {name}"
+
+    # 3. THE INVARIANT: the adapter and its three scripts share one bundle
+    #    status. Ship together, or excluded together -- never mixed.
+    import pathspec
+    spec = pathspec.PathSpec.from_lines(
+        "gitwildmatch", (repo / ".comfyignore").read_text(encoding="utf-8").splitlines())
+    adapter_excluded = spec.match_file(adapter)
+    for rel in scripts:
+        assert spec.match_file(rel) == adapter_excluded, (
+            f"MIXED bundle: eng_indextts2 is "
+            f"{'excluded' if adapter_excluded else 'shipped'} but {rel} is "
+            f"{'excluded' if spec.match_file(rel) else 'shipped'}. IndexTTS2 "
+            "ships as a unit or not at all.")
 
 
 # --------------------------------------------------------------------------
