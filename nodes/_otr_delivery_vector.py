@@ -173,8 +173,3 @@ def select_delivery_vector(line: dict, prepared_text: str,
     return deterministic_delivery_vector(prepared_text, scene_tension), "derived"
 
 
-def _iter_dialogue_lines(ledger: dict):
-    """Yield mutable line dicts from the OTR ledger ``lines`` list."""
-    for line in ledger.get("lines") or []:
-        if isinstance(line, dict):
-            yield line

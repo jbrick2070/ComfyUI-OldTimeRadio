@@ -1,4 +1,4 @@
-"""Uncapped source document + pre-outline overview for source-owned lanes.
+"""Uncapped source document for source-owned lanes.
 
 Why this module exists
 ----------------------
@@ -10,8 +10,7 @@ interpreter that names the cast, the story contract, the outline -- read the
 opening and inferred the rest. An author who is shown a prefix and told to be
 faithful will invent the remainder and believe it complied.
 
-This module owns the two artifacts that fix that, both deterministic and
-model-free:
+This module owns the artifact that fixes that, deterministic and model-free:
 
 ``SourceDocument``
     The COMPLETE canonicalized body, its hash, and the normalization version
@@ -20,12 +19,12 @@ model-free:
     ``meta``, the ledger, or a prompt receipt -- receipts carry offsets and
     hashes, never body text.
 
-``SourceOverview``
-    Deterministic windows that COVER the whole body (not a prefix), plus a
-    few role-tagged evidence spans. Built before the outline exists, so the
-    pre-outline authors can be grounded in the whole work. Every span is
-    validated against the body it claims to quote: ``text ==
-    body[start_char:end_char]``, half-open Unicode character offsets.
+``SourceOverview`` LIVED HERE and was REMOVED 2026-09-05. It built deterministic
+windows covering the whole body plus role-tagged evidence spans, and nothing in
+the pipeline ever constructed it -- ``_otr_source_grounding`` imports only
+``SourceDocument``, ``SourceSpan`` and the private helpers, and reimplements its
+own region logic. Three independent reviewers confirmed no production consumer.
+Its version constant and evidence markers went with it.
 
 Nothing here loads a model, touches the GPU, reads the network, or imports
 anything heavy. Selection is deterministic: same body in, same spans out.
@@ -36,24 +35,11 @@ import hashlib
 import re
 from typing import Sequence
 
-# Version constants. Bump NORMALIZATION_VERSION when the canonical body bytes
-# for an unchanged source would change (that invalidates every stored offset
-# and hash); bump OVERVIEW_VERSION when window/evidence selection changes
-# (offsets stay valid, but a replay would pick different spans).
+# Bump NORMALIZATION_VERSION when the canonical body bytes for an unchanged
+# source would change -- that invalidates every stored offset and hash.
+# (OVERVIEW_VERSION was removed with SourceOverview, 2026-09-05.)
 NORMALIZATION_VERSION = "otr_source_normalization_v1"
-# v2 (QA round 2): dialogue evidence is omitted entirely when a work carries
-# no quoted speech, quotation is counted as balanced spans rather than loose
-# marks, and the receipt gained requested_window_count / collapse and
-# dialogue-presence flags. Selection and receipt shape both changed, so the
-# version moves -- a v1 receipt and a v2 receipt are not comparable.
-OVERVIEW_VERSION = "otr_source_overview_v2"
 
-# Evidence roles the overview tags. Deterministic structural picks -- the
-# opening establishes setting and who is present, the closing holds the
-# ending, the quote-dense window is where the author's own dialogue lives.
-EVIDENCE_OPENING = "opening"
-EVIDENCE_CLOSING = "closing"
-EVIDENCE_DIALOGUE = "dialogue"
 
 # Counting individual marks cannot tell a quotation from an apostrophe: the
 # first fix excluded "don't" and "father's" but still counted the mark in
@@ -316,151 +302,3 @@ def build_source_document(
     )
 
 
-class SourceOverview(_Transient):
-    """Whole-body coverage for the authors that run BEFORE the outline.
-
-    ``windows`` tile the ENTIRE body in order with no gaps, so a consumer can
-    state honestly which part of the work it read. ``evidence`` tags a few of
-    those structural positions by role. Both are derived deterministically;
-    no model participates.
-
-    Transient like the document, and for a sharper reason: its windows hold
-    every character of the body between them, so a structural serializer
-    would reconstruct the whole work from them. ``receipt()`` is the durable
-    form -- see ``_Transient``.
-
-    ``requested_window_count`` keeps what the caller ASKED for beside what it
-    got. A body shorter than two characters per window collapses to a single
-    window; that is correct, but a silent collapse reads downstream as "this
-    work is one undivided block". No silent caps.
-    """
-
-    __slots__ = (
-        "body_sha256", "normalization_version", "overview_version",
-        "windows", "evidence", "source_ref", "requested_window_count",
-    )
-
-    def __init__(self, body_sha256: str, normalization_version: str,
-                 overview_version: str,
-                 windows: tuple[SourceSpan, ...] = (),
-                 evidence: tuple[SourceSpan, ...] = (),
-                 source_ref: str = "",
-                 requested_window_count: int = 0) -> None:
-        self._set("body_sha256", body_sha256)
-        self._set("normalization_version", normalization_version)
-        self._set("overview_version", overview_version)
-        self._set("windows", tuple(windows))
-        self._set("evidence", tuple(evidence))
-        self._set("source_ref", str(source_ref))
-        self._set("requested_window_count", int(requested_window_count))
-
-    def __repr__(self) -> str:
-        return (f"SourceOverview(body_sha256={self.body_sha256[:12]!r}..., "
-                f"windows={len(self.windows)}, evidence={len(self.evidence)}, "
-                f"overview_version={self.overview_version!r}, "
-                f"source_ref={self.source_ref!r})")
-
-    @property
-    def covered_char_count(self) -> int:
-        return sum(w.char_count for w in self.windows)
-
-    def evidence_for(self, role: str) -> SourceSpan | None:
-        for span in self.evidence:
-            if span.role == role:
-                return span
-        return None
-
-    def receipt(self) -> dict:
-        """A body-free record safe to persist in the ledger.
-
-        Offsets, counts, hashes and versions only -- never source text. This
-        is what proves WHICH material grounded a build without duplicating the
-        work into durable metadata.
-        """
-        return {
-            "body_sha256": self.body_sha256,
-            "normalization_version": self.normalization_version,
-            "overview_version": self.overview_version,
-            "source_ref": self.source_ref,
-            "window_count": len(self.windows),
-            "requested_window_count": self.requested_window_count,
-            "window_count_collapsed": (
-                self.requested_window_count > len(self.windows)
-            ),
-            "covered_char_count": self.covered_char_count,
-            "dialogue_evidence_present": any(
-                s.role == EVIDENCE_DIALOGUE for s in self.evidence
-            ),
-            "windows": [
-                {"start_char": w.start_char, "end_char": w.end_char}
-                for w in self.windows
-            ],
-            "evidence": [
-                {
-                    "role": s.role,
-                    "start_char": s.start_char,
-                    "end_char": s.end_char,
-                }
-                for s in self.evidence
-            ],
-        }
-
-
-def _window_bounds(body: str, window_count: int) -> list[tuple[int, int]]:
-    """Split a body into ``window_count`` ordered, gapless ranges.
-
-    Cuts land on whitespace where one is available near the target so a window
-    does not open mid-word; coverage is exact regardless -- every character
-    belongs to exactly one window.
-
-    FLOOR: a body shorter than two characters per requested window collapses
-    to a SINGLE window. Slicing a 10-character work into 8 pieces produces
-    fragments that ground nothing. The collapse is deliberate and is reported
-    through ``SourceOverview.requested_window_count`` rather than hidden.
-    """
-    total = len(body)
-    if window_count < 1:
-        raise SourceDocumentError("window_count must be at least 1")
-    if window_count == 1 or total < window_count * 2:
-        return [(0, total)]
-
-    target = total / window_count
-    bounds: list[tuple[int, int]] = []
-    start = 0
-    for index in range(1, window_count):
-        cut = int(round(target * index))
-        cut = max(start + 1, min(cut, total - (window_count - index)))
-        # Nudge onto the nearest following space so windows start on a word.
-        space = body.find(" ", cut)
-        if space != -1 and space - cut <= max(1, int(target // 10)):
-            cut = space + 1
-        cut = max(start + 1, min(cut, total - (window_count - index)))
-        bounds.append((start, cut))
-        start = cut
-    bounds.append((start, total))
-    return bounds
-
-
-def _densest_quote_window(windows: Sequence[SourceSpan]) -> SourceSpan | None:
-    """The window carrying the most quotation marks per character.
-
-    Returns ``None`` when the work contains no quoted speech at all. That
-    matters: tagging a stretch of pure narration as ``dialogue`` would invite
-    a consumer to treat the author's narration as quoted speech -- the exact
-    class of confusion this whole module exists to remove. Absent evidence is
-    reported as absent.
-
-    Ties break on the EARLIER window so the pick is stable for a given body.
-    """
-    best: SourceSpan | None = None
-    best_density = 0.0
-    for window in windows:
-        if window.char_count <= 0:
-            continue
-        hits = _count_quoted_spans(window.text)
-        if not hits:
-            continue
-        density = hits / window.char_count
-        if best is None or density > best_density:
-            best, best_density = window, density
-    return best
