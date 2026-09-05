@@ -5128,3 +5128,192 @@ Settle the details in the arc, do not re-derive these.
 * **Cloning engines preflight their reference WAVs:** preflight the resolved `ref_path` files in `OTR_CastLock` BEFORE the writer call whenever a cloning engine IS selected, so an opt-in indextts2 / chatterbox / dia user fails in seconds, not after a whole script.
 * **DONE WHEN:** a clean 3.13 portable install renders a 1-act episode with kokoro voices for announcer and characters through `workflows/otr_canonical.json` and publishes to `otr/obs/`, and the same commit passes on the 5080's 3.12 venv with the torch path still selected.
 * **BLOCKED ON / release gate:** the `pyproject.toml` dependency edit auto-fires a registry publish. It rides the bump AFTER alpha.15 (and alpha.16 if the control runs) resolves -- never while a version is Pending, and never reusing a string (CLAUDE.md 7A).
+
+
+---
+
+# Archived 2026-09-05 -- superseded GO_FORWARD sections
+
+Replaced because they described a world that had ended: the scan-collapse
+ratchet commit was named as the NEXT commit hours after it shipped, and item 4
+still instructed the next window to post a review draft that never mentions the
+registry BAN. Kept verbatim for the record; the archive is not read to resume.
+
+## (archived) item 4 (registry)
+
+## 4. THE REGISTRY -- publish the first NON-ALPHA, file the review the same day
+
+Everything above changes shipped code; everything below needs the published pack. The
+review request is a PUBLIC post and needs the operator's explicit go.
+
+**Standing constraints:** the 5080 loop is untouched -- nothing ships that reduces tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per file owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
+
+**1. THE REGISTRY.** Two separate goals: (a) an INSTALLABLE listing (needs an admin approval we cannot self-serve), (b) the card's "N Nodes" count (a different pipeline, stalled on Comfy-Org's side -- not ours).
+* **NEXT CODER CHUNK: the scan collapse ratchet commit.** Plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is what remains. Needs nothing from the operator.
+* **PREP STATUS 2026-09-04 -- three of the five handed-over items are DONE:**
+  (b) `viewer/` is already excluded (`.comfyignore:167`, 2026-09-03) -- nothing owed;
+  (d) the `AUTH_TOKEN_COMFY_ORG` literal is ALREADY SCRUBBED -- `grep` finds ZERO in
+  `nodes/` and `__init__.py`; what remains is the lowercase field NAME
+  `auth_token_comfy_org`, which is pinned data about Comfy's own partner nodes, not
+  a credential; (e) the draft polish is folded into the v2 draft below.
+  STILL OPEN: (a) re-check `GET /nodes/comfyui-old-time-radio/versions/<v>/comfy-nodes`
+  after a publish, and (c) the post itself.
+* **THE DRAFT IS NOW `docs/2026-09-04-registry-review-request-READY-v2.md`.** The
+  2026-09-03 draft is the alpha.17 record and MUST NOT be posted -- its numbers are
+  stale in our favour. The v2 draft carries the measured collapse (103 env files -> 4,
+  35 spawn sites -> 3, three singletons -> 0) and changes the ask from "please
+  overlook 158 findings" to "we collapsed what could be collapsed; here is the diff
+  and why the rest is the render path". It has THREE placeholders only the operator
+  can fill: `<VERSION>`, `<SCAN COUNTS>` from the real post-publish scan, and a
+  re-verified `0 critical`. Do NOT predict the scanner's counts -- our measured
+  source-side change is a different claim, and conflating them is what would make a
+  reviewer distrust the rest.
+* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO, AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision, because admin approval is PER VERSION.
+  **File it on the first NON-ALPHA version, the same day it publishes**, so the version under review is the version a stranger would install. Include the question about node-level review; it costs them less than five separate ones.
+  Draft is ready and needs no further work: `docs/2026-09-03-registry-review-request-READY.md`. **Re-read it before posting** -- the version id, the counts and the "0 critical" claim all move with each new publish, and a request quoting a superseded version is worse than none. Filing is a public post and needs the operator's explicit go.
+* **DO NOT CHASE KOKORO.** The old control experiment (republish alpha.8 byte-identical) is CANCELLED.
+  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits and is what makes a Linux `pip install -r requirements.txt` work at all. The Linux pod keeps the engine because `scripts/otr_pod_provision.sh` apt-installs the headers and pip-installs pycairo explicitly -- do NOT "simplify" that line away.
+  **Reproduce before re-opening this:** compare the newest `success` timestamp across a broad pack sample against OTR's first publish date. If a pack ever extracts successfully again, the question becomes live; until then the card's node count is not a work item.
+* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** There is no publisher self-service route to Active.
+* Do NOT open a second issue on the node count; comment on `Comfy-Org/registry-backend#203` (open, operator-filed).
+* Open risk, unsettleable from here: kokoro pulls `torch`; if the container's preinstalled CPU torch does not satisfy the constraint, pip downloads multiple GB inside the 600 s extract timeout. Unknowable without the image.
+* **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL verification, NOT for scanner probing.** Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in a real security queue, and it is unnecessary -- `?include_status_reason=true` already returns all findings itemized by rule.
+* DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes. Never version-delete: a soft delete burns the string permanently.
+
+
+## (archived) item 1 (scan collapse)
+
+## 1. THE SCAN COLLAPSE -- the MIGRATION is done; one acceptance step remains
+
+**Batches (a)-(d) and the ratchet commit are SHIPPED** (receipts in
+`docs/HANDOFF_LOG.md`). env offender FILES 103 -> 2, spawn files 20 -> 1, all three
+singletons cleared, six of twelve "url command" hits gone. Both PENDING sets now
+contain ONLY the two BLOCKED files below, so the guards are green with nothing left
+to migrate.
+
+**TWO FILES ARE PERMANENTLY BLOCKED, each with its reason recorded in the guards'
+own `BLOCKED` tables. Do not sweep either up mechanically:**
+* `nodes/_otr_audio_engines/eng_indextts2.py` -- byte-hashed by Lemmy's voice
+  qualification. Rides along with the next re-audition wanted for other reasons;
+  ruled and closed, see
+  `docs/2026-09-04-PROBLEM-STATEMENT-indextts2-fingerprint-lock.md`.
+* `nodes/_otr_writer_heartbeat.py` -- a LEAF by contract; a pack import
+  reintroduces the cycle that once left two generate transports blind.
+
+**THE ACCEPTANCE LEG IS DONE (2026-09-04 evening) -- ITEM 1 IS CLOSED.**
+
+A one-act canonical leg on `workflows/otr_canonical.json`, run AFTER the security
+build so it doubles as that build's live proof:
+
+    RESULT SUCCESS   prompt 010a3848   Prompt executed in 00:10:17
+    obs_publish OK -> otr/obs/a_name_stripped_bare_20260904_185159__paper_origami
+                      __still_flat__z_image_turbo__kokoro__shakespeare_final.mp4
+    13,062,017 bytes on disk, 1920x1080 h264 + aac
+    v=88.280s a=67.071s tail_budget=21.2s declared -- the A/V gap is IN FAMILY
+      (the five previously published episodes run 22-29s)
+
+Every stage the security build touched actually RAN, which is the point of the
+leg: ProcgenBlend blended, CaptionBurn burned 11 caption events through the
+`ass=` filtergraph, CreditsRoll appended 21.2s, and MasterAudioMux reported
+**audio_byte_identical OK** -- the exact invariant that would have broken had the
+widget been severed inside `_ffmpeg_bin` instead of at the execute method.
+
+ZERO deprecation warnings (every shipped widget carries the bare default, as
+measured) and ZERO refusals from any new guard.
+
+**A NOTE THE NEXT WINDOW NEEDS.** The registry floor is NOT zero and never was: the
+closed plan says "the gate is ZERO findings or a manual admin approval; nothing here
+reaches zero (ffmpeg is a subprocess and that is the render path)". The collapse buys
+a report a human can read in one screen -- about eleven lines instead of 158, and the
+`credential-access` tag on two files instead of eleven. The route to Active is the
+manual review in item 4.
+
+
+## (archived) item 1A (security)
+
+## 1A. THE REGISTRY BAN -- BOTH SURFACES ARE CLOSED. What is left is the PUBLISH.
+
+**SHIPPED 2026-09-04 in `a9e0383e`.** Suite 13659 passed / 126 skipped /
+1 xfailed. Receipt in `docs/HANDOFF_LOG.md`.
+
+The ban verdict on alpha.13/.14 named two surfaces and **both were real**:
+
+| verdict clause | the actual surface | status |
+|---|---|---|
+| "no-auth route" | `POST /otr/video_render_single` + `/otr/video_render_soak` shipped UNCONDITIONALLY in alpha.13 (`f9986b9f`), reading caller-supplied paths from an unauthenticated body | closed `b198026a`, 2026-09-03 -- in alpha.16+ |
+| "node widget" | the `ffmpeg` STRING widget on 5 nodes reached `argv[0]`, beat the operator's `OTR_FFMPEG` pin, and yielded a SECOND binary via the ffprobe sibling rule | closed `a9e0383e` |
+
+Also closed in the same commit, found by our own review rather than the
+scanner: a `replay_from` widget that accepted a UNC path (SMB/NTLM coercion
+needing nothing planted locally), the wildcard CORS header on the
+unconditionally-registered ledger GET, an unescaped basename interpolated into
+an ffmpeg filtergraph (4 sites, 2 helper copies), and cwd-relative binary
+resolution.
+
+**STILL OPEN, in priority order:**
+
+1. ~~THE PUBLISH~~ **DONE. `2.0.0-alpha.19` is published and Pending**
+   (`531ddda4`, workflow green, 19 dependencies recorded). And alpha.18's scan
+   finally landed, which measures the collapse for the first time:
+   **158 findings -> 12**, all `info`, zero critical. env manipulation 103 -> 4,
+   command-injection 35 -> 3, url-command-execution 12 -> 0, and the
+   bytecode / windows-process / sensitive-file singletons all to 0. (Correction
+   worth keeping: the url-command drop was the SPAWN-OWNER collapse, not the
+   error-string rewording an earlier note credited.)
+2. **File the re-review request.** `docs/2026-09-04-registry-review-request-SHORT.md`
+   is rewritten for the real story ("you were right on both counts, both are
+   closed"). **DO NOT SEND either older draft** -- they never mention the ban,
+   and they claim credit for two `critical` findings that were already gone as
+   of alpha.16 and for a `python_url_command_execution` drop that never happened.
+   Posting is a PUBLIC ACT and is the operator's alone.
+3. **Media-path containment (NOT started).** `_validate_contract`
+   (`_otr_paths.py:224`) is the pack's own containment guard and is called by
+   NOTHING outside that file. Fifteen STRING path widgets exist; the four
+   output-path ones plus `out_suffix`
+   (`otr_post_upscale_procgen_blend.py:757`, which walks out of the episode dir
+   if it carries a separator) let a workflow read one arbitrary file and write a
+   transcode anywhere writable. Fable classified this as DATA LOSS, not RCE, and
+   both r1 lanes cut an unrestricted write-audit from the security build's
+   scope -- so it is its own row, and it wants an arc: containment could break a
+   legitimate render that writes outside `otr/`.
+   The UNC half of this class is ALREADY closed by `proc.py`'s remote-argument
+   rule.
+4. **Schema removal of the five now-inert `ffmpeg` widgets.** Deliberately
+   deferred: keeping the field is what made the security fix a ZERO workflow-JSON
+   change. Measured 2026-09-04: **101** workflow files (not 63 -- that number was
+   never verified), 465 `ffmpeg` widget values, every one the bare literal
+   `"ffmpeg"`. Removal is the 3-part edit (`widgets_values`, the `inputs`
+   descriptor, every later link `dst_slot` repaired BY IDENTITY) plus
+   `build_variants.py --all` and the four verification tests.
+5. **`otr_video_render_batch` exposes the same GPU harness** (`render_single` /
+   `run_gpu_soak`) that the env-gated POST routes call, as an ordinary node with
+   no gate. Not obviously a defect -- every node is invocable by a workflow --
+   but it means gating the routes did not remove the capability. Decide whether
+   that matters before claiming the harness is "off by default".
+
+**THE METHOD THAT FOUND ALL OF THIS, worth repeating:** read the registry's own
+`status_reason` instead of guessing from the scan counts. The counts were never
+the blocker.
+
+
+## (archived) WHERE TO PICK UP
+
+## WHERE TO PICK UP
+
+**State:** `v2.0-alpha`, HEAD == origin, clean tree. Suite baseline **13480 passed / 126
+skipped / 1 xfailed**. Bible **335 entries**. No resident server; VRAM at the desktop
+baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and Spark
+overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second agy
+model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster.
+
+**NEXT COMMIT: the ratchet commit of the scan collapse** (item 1). Read
+`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` whole before typing. The
+owners `nodes/_otr_shared/env.py`, `nodes/_otr_shared/proc.py` and the shared ratchet
+`tests/fixtures/ratchet.py` are on disk and inert until the migration starts.
+
+**Only the operator does these -- stop and ask:** the `pyproject.toml` version bump (a
+publish is his eyeball), the review request (a public post), and the rulings in item 6.
+
+**Keep this file clean:** when a row is finished, delete it from here and write the receipt
+in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
+

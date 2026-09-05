@@ -72,133 +72,85 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State:** `v2.0-alpha`, HEAD == origin, clean tree. Suite baseline **13480 passed / 126
-skipped / 1 xfailed**. Bible **335 entries**. No resident server; VRAM at the desktop
-baseline. Codex CLI standard credits are OUT until **2026-09-07 08:34 PDT** and Spark
-overflows its context on a 12 KB plan -- fill that seat with Sonnet/Opus or a second agy
-model (Gemini 3.1 Pro (High) and 3.8 Flash are different reviewers) and name the roster.
+**State (2026-09-05, end of the security + rip session):** `v2.0-alpha`, HEAD ==
+origin at `9d3f56a7`, clean tree. Suite **13446 passed / 126 skipped / 1 xfailed,
+RC=0**. No resident server; VRAM at the desktop baseline. GPT-6 Astra is available
+at `ultra` reasoning -- the older "Codex credits out until 09-07" note is dead.
 
-**NEXT COMMIT: the ratchet commit of the scan collapse** (item 1). Read
-`kibitz-runs/2026-09-04-registry-findings-collapse/r4/final.md` whole before typing. The
-owners `nodes/_otr_shared/env.py`, `nodes/_otr_shared/proc.py` and the shared ratchet
-`tests/fixtures/ratchet.py` are on disk and inert until the migration starts.
+**`2.0.0-alpha.19` IS PUBLISHED AND PENDING** (19 deps recorded, workflow green).
+alpha.18's scan finally landed and measures the collapse for the first time:
+**158 findings -> 12**, all `info`, zero critical.
 
-**Only the operator does these -- stop and ask:** the `pyproject.toml` version bump (a
-publish is his eyeball), the review request (a public post), and the rulings in item 6.
+**NEXT UP, in order:**
+1. **Fable's finding 2** -- a corrupt ledger lets the pending-sweep `rmtree` a whole
+   `pending_*` directory. Cannot destroy a PUBLISHED episode (the dir is renamed off
+   `pending_*` before video, and `otr/obs/` is a different root) but CAN destroy a
+   failed run's forensics, and an in-flight episode in the two-server configuration.
+   The predicate is backwards: "cannot read the ledger" is treated as "may delete".
+   Fix is in the disposition table of `sweep_empty_pending_dirs`, NOT in
+   `_ledger_has_lines` alone -- see item 2.6.
+2. **The method rip** -- 16 candidates cleared by Astra, verification in flight.
+3. **Fable's finding 3** -- replay import accepts a ledger absent from the manifest's
+   verified `files[]`. Three-line fix in `load_replay_manifest`; do it with the next
+   replay touch.
 
-**Keep this file clean:** when a row is finished, delete it from here and write the receipt
-in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
+**ONLY THE OPERATOR DOES THESE -- stop and ask:**
+* **File the registry re-review.** The post body is
+  `docs/2026-09-04-registry-review-request-SHORT.md`, finalized with the real story
+  and MEASURED numbers. **Both older drafts are DO-NOT-SEND** -- see item 4.
+* Any further `pyproject.toml` bump (each one auto-fires a publish).
+* The rulings in item 6.
+
+**Keep this file clean:** when a row is finished, DELETE it from here and write the
+receipt in `docs/HANDOFF_LOG.md`. Completed narrative goes to
+`docs/GO_FORWARD_ARCHIVE.md`. This file is the to-do list, not the log.
 
 ---
 
-## 1A. THE REGISTRY BAN -- BOTH SURFACES ARE CLOSED. What is left is the PUBLISH.
+## 1A. THE SECURITY WORK -- FOUR SURFACES CLOSED, TWO OPEN
 
-**SHIPPED 2026-09-04 in `a9e0383e`.** Suite 13659 passed / 126 skipped /
-1 xfailed. Receipt in `docs/HANDOFF_LOG.md`.
+**Receipts in `docs/HANDOFF_LOG.md`; the narrative is in GO_FORWARD_ARCHIVE.md.**
+Reading the registry's own `status_reason` -- not the finding counts -- showed
+alpha.13/.14 were BANNED by a human for *"RCE (code execution) -- attacker-reachable
+via unauthenticated /prompt (node widget) or no-auth route"*. Both clauses were real.
 
-The ban verdict on alpha.13/.14 named two surfaces and **both were real**:
+**CLOSED:**
+| surface | commit |
+|---|---|
+| the `ffmpeg` widget reaching `argv[0]` on five nodes | `a9e0383e` |
+| UNC/SMB coercion via `replay_from`, `workflow_json_path`, media paths | `a9e0383e` / `843b79d4` |
+| the same coercion through `IS_CHANGED`, which runs BEFORE the execute guard | `79dc9828` |
+| forged image-cache entries -> arbitrary local FILE READ, served by `/view` | `9d3f56a7` |
+| the no-auth route half (`POST /otr/video_render_*`, unconditional in alpha.13) | `b198026a`, 09-03 |
 
-| verdict clause | the actual surface | status |
-|---|---|---|
-| "no-auth route" | `POST /otr/video_render_single` + `/otr/video_render_soak` shipped UNCONDITIONALLY in alpha.13 (`f9986b9f`), reading caller-supplied paths from an unauthenticated body | closed `b198026a`, 2026-09-03 -- in alpha.16+ |
-| "node widget" | the `ffmpeg` STRING widget on 5 nodes reached `argv[0]`, beat the operator's `OTR_FFMPEG` pin, and yielded a SECOND binary via the ffprobe sibling rule | closed `a9e0383e` |
+**STILL OPEN -- both confirmed by Fable, ranked by it:**
+* **Finding 2, the pending-sweep `rmtree`** -- item 2.6 below.
+* **Finding 3, the replay manifest gap** -- item 2.7 below.
 
-Also closed in the same commit, found by our own review rather than the
-scanner: a `replay_from` widget that accepted a UNC path (SMB/NTLM coercion
-needing nothing planted locally), the wildcard CORS header on the
-unconditionally-registered ledger GET, an unescaped basename interpolated into
-an ffmpeg filtergraph (4 sites, 2 helper copies), and cwd-relative binary
-resolution.
+**THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
+prior session optimised a number that was never the blocker.
 
-**STILL OPEN, in priority order:**
+## 1. THE SCAN COLLAPSE AND THE DEAD-CODE RIP -- DONE
 
-1. ~~THE PUBLISH~~ **DONE. `2.0.0-alpha.19` is published and Pending**
-   (`531ddda4`, workflow green, 19 dependencies recorded). And alpha.18's scan
-   finally landed, which measures the collapse for the first time:
-   **158 findings -> 12**, all `info`, zero critical. env manipulation 103 -> 4,
-   command-injection 35 -> 3, url-command-execution 12 -> 0, and the
-   bytecode / windows-process / sensitive-file singletons all to 0. (Correction
-   worth keeping: the url-command drop was the SPAWN-OWNER collapse, not the
-   error-string rewording an earlier note credited.)
-2. **File the re-review request.** `docs/2026-09-04-registry-review-request-SHORT.md`
-   is rewritten for the real story ("you were right on both counts, both are
-   closed"). **DO NOT SEND either older draft** -- they never mention the ban,
-   and they claim credit for two `critical` findings that were already gone as
-   of alpha.16 and for a `python_url_command_execution` drop that never happened.
-   Posting is a PUBLIC ACT and is the operator's alone.
-3. **Media-path containment (NOT started).** `_validate_contract`
-   (`_otr_paths.py:224`) is the pack's own containment guard and is called by
-   NOTHING outside that file. Fifteen STRING path widgets exist; the four
-   output-path ones plus `out_suffix`
-   (`otr_post_upscale_procgen_blend.py:757`, which walks out of the episode dir
-   if it carries a separator) let a workflow read one arbitrary file and write a
-   transcode anywhere writable. Fable classified this as DATA LOSS, not RCE, and
-   both r1 lanes cut an unrestricted write-audit from the security build's
-   scope -- so it is its own row, and it wants an arc: containment could break a
-   legitimate render that writes outside `otr/`.
-   The UNC half of this class is ALREADY closed by `proc.py`'s remote-argument
-   rule.
-4. **Schema removal of the five now-inert `ffmpeg` widgets.** Deliberately
-   deferred: keeping the field is what made the security fix a ZERO workflow-JSON
-   change. Measured 2026-09-04: **101** workflow files (not 63 -- that number was
-   never verified), 465 `ffmpeg` widget values, every one the bare literal
-   `"ffmpeg"`. Removal is the 3-part edit (`widgets_values`, the `inputs`
-   descriptor, every later link `dst_slot` repaired BY IDENTITY) plus
-   `build_variants.py --all` and the four verification tests.
-5. **`otr_video_render_batch` exposes the same GPU harness** (`render_single` /
-   `run_gpu_soak`) that the env-gated POST routes call, as an ordinary node with
-   no gate. Not obviously a defect -- every node is invocable by a workflow --
-   but it means gating the routes did not remove the capability. Decide whether
-   that matters before claiming the harness is "off by default".
+**Nothing owed. Receipts in `docs/HANDOFF_LOG.md`.** The env/proc single-owner
+migration, the acceptance leg (`obs_publish OK`, 00:10:17, asset verified on disk),
+and two rounds of dead-code rip all shipped:
 
-**THE METHOD THAT FOUND ALL OF THIS, worth repeating:** read the registry's own
-`status_reason` instead of guessing from the scan counts. The counts were never
-the blocker.
+* **37 top-level symbols** ripped (`47bf95d6`) -- `-859` lines from `nodes/`, 220
+  tests removed. Verified by Astra + Gemini 3.8 + Sonnet, unanimous, against a brief
+  that ruled **"it has tests" an INVALID objection** -- that circular justification
+  is what had kept them alive, because `dead_code_closure.py` treats `tests/` as ROOTS.
+* **11 more** (`e5a9fd0f`) that the first rip orphaned -- the chain terminates at
+  round 3.
+* **Two files are now UNTOUCHABLE alongside `eng_indextts2.py`:**
+  `nodes/_otr_resolved_request.py` (byte-hashed by `RUNTIME_FINGERPRINT_SOURCES`;
+  ripping one symbol from it DEMOTED the Lemmy voice route and had to be reverted)
+  and `nodes/_otr_source_grounding.py` (its siblings are ruling-protected).
 
-## 1. THE SCAN COLLAPSE -- the MIGRATION is done; one acceptance step remains
-
-**Batches (a)-(d) and the ratchet commit are SHIPPED** (receipts in
-`docs/HANDOFF_LOG.md`). env offender FILES 103 -> 2, spawn files 20 -> 1, all three
-singletons cleared, six of twelve "url command" hits gone. Both PENDING sets now
-contain ONLY the two BLOCKED files below, so the guards are green with nothing left
-to migrate.
-
-**TWO FILES ARE PERMANENTLY BLOCKED, each with its reason recorded in the guards'
-own `BLOCKED` tables. Do not sweep either up mechanically:**
-* `nodes/_otr_audio_engines/eng_indextts2.py` -- byte-hashed by Lemmy's voice
-  qualification. Rides along with the next re-audition wanted for other reasons;
-  ruled and closed, see
-  `docs/2026-09-04-PROBLEM-STATEMENT-indextts2-fingerprint-lock.md`.
-* `nodes/_otr_writer_heartbeat.py` -- a LEAF by contract; a pack import
-  reintroduces the cycle that once left two generate transports blind.
-
-**THE ACCEPTANCE LEG IS DONE (2026-09-04 evening) -- ITEM 1 IS CLOSED.**
-
-A one-act canonical leg on `workflows/otr_canonical.json`, run AFTER the security
-build so it doubles as that build's live proof:
-
-    RESULT SUCCESS   prompt 010a3848   Prompt executed in 00:10:17
-    obs_publish OK -> otr/obs/a_name_stripped_bare_20260904_185159__paper_origami
-                      __still_flat__z_image_turbo__kokoro__shakespeare_final.mp4
-    13,062,017 bytes on disk, 1920x1080 h264 + aac
-    v=88.280s a=67.071s tail_budget=21.2s declared -- the A/V gap is IN FAMILY
-      (the five previously published episodes run 22-29s)
-
-Every stage the security build touched actually RAN, which is the point of the
-leg: ProcgenBlend blended, CaptionBurn burned 11 caption events through the
-`ass=` filtergraph, CreditsRoll appended 21.2s, and MasterAudioMux reported
-**audio_byte_identical OK** -- the exact invariant that would have broken had the
-widget been severed inside `_ffmpeg_bin` instead of at the execute method.
-
-ZERO deprecation warnings (every shipped widget carries the bare default, as
-measured) and ZERO refusals from any new guard.
-
-**A NOTE THE NEXT WINDOW NEEDS.** The registry floor is NOT zero and never was: the
-closed plan says "the gate is ZERO findings or a manual admin approval; nothing here
-reaches zero (ffmpeg is a subprocess and that is the render path)". The collapse buys
-a report a human can read in one screen -- about eleven lines instead of 158, and the
-`credential-access` tag on two files instead of eleven. The route to Active is the
-manual review in item 4.
+**THE LESSON, because it cost three false-positive rounds:** an AST scan sees CALLS,
+not registrations or type positions. Aliased imports, `@register` decorators, pydantic
+field annotations, and overrides of a base in ANOTHER installed pack are all invisible
+to it. Grep for the PATTERN, never the name.
 
 ## 2. THE EASY CODE -- closed specs, no arc; lands BEFORE the version that gets reviewed
 
@@ -359,6 +311,60 @@ That is no longer a closed spec with one right answer, so it is a DESIGN item an
 takes an arc before code. Not scheduled. DONE WHEN: an owner is named for the
 pre-writer check and it refuses only what the dispatch could not have resolved.
 
+### 2.6 THE PENDING SWEEP DELETES WHAT IT CANNOT READ (Fable, 2026-09-05 -- CONFIRMED)
+
+`nodes/_otr_pending_cleanup.py:100-104` catches `(OSError, json.JSONDecodeError)` and
+returns `None`; the caller reads `None` as "no ledger -- treat as empty if the age
+cutoff was met" at `:159-174` and runs `shutil.rmtree(child)`. A directory is booked
+as `skipped_no_ledger` AND deleted in the same branch. The writer invokes the sweep
+automatically at `OTR_LedgerScriptWriter.py:3421-3441`.
+
+**Blast radius, measured:** a published episode CANNOT be destroyed -- the directory
+is renamed off `pending_*` at `video_engine.py:2014` before video, and `otr/obs/` is a
+different root the sweep never walks. Disk today: **403 `pending_*` dirs, zero `.mp4`
+under any of them.** What CAN be destroyed is a failed run's forensic remains, and --
+in the two-server configuration this box actually runs -- an in-flight episode's whole
+audio stage, because the rename happens much later than the module's docstring assumes.
+
+**THE FIX, and the obvious placements are wrong:**
+1. `_ledger_has_lines` returns FOUR states (absent / unreadable / empty / has_lines).
+   **unreadable** (`OSError`, `JSONDecodeError`, `UnicodeDecodeError`, non-dict) ->
+   report and SKIP, never delete. Returning `False` on error just turns "unreadable"
+   into "empty" and it still gets deleted.
+2. The **absent** branch deletes only on POSITIVE emptiness -- zero regular files
+   anywhere under the child, via `os.walk`.
+3. Age from the NEWEST mtime beneath the dir. `child.stat().st_mtime` moves only on
+   direct-child churn, so a long audio stage looks "old".
+4. Two tests PIN the contradictory disposition and must change with the fix:
+   `tests/test_bug_local_290_pending_cleanup.py:91-99` and `:181-183`.
+
+Wrapping the call in the writer changes nothing -- the writer never sees the disposition.
+
+### 2.7 REPLAY IMPORT ACCEPTS A LEDGER THE MANIFEST NEVER VERIFIED (Fable -- CONFIRMED)
+
+`production_ledger.py:623-642` verifies size, hash and islink for entries in `files[]`
+only; `:643-647` then requires `manifest["ledger"]` to be merely PRESENT and opens it at
+`:693-695` with no digest and no membership check. A frozen bundle's ledger can be
+swapped after freezing without detection. Local-only (UNC is already refused at
+`:611-615`), so it is an INTEGRITY hole, not a remote primitive.
+
+**Fix in `load_replay_manifest`, not `import_replay_bundle`:** require
+`_safe_relative(manifest["ledger"])` and `["master_audio"]` to be in `seen`. That is the
+ONE validator -- `scripts/otr_freeze_replay_bundle.py:174,227` runs it on its own output
+and always lists both, so no bundle the shipped tool ever produced is refused. It also
+replaces the assembler's misleading late "bundle master missing"
+(`scene_sequencer.py:1300-1303`) with a clear error at import.
+
+### 2.8 THE METHOD RIP (in flight 2026-09-05)
+
+The top-level rip never looked at METHODS. Of 447 methods on shipped classes -- after
+excluding ComfyUI hooks, the `FUNCTION` execute methods, the engine protocol surface,
+dunders and DECORATED methods -- 3 are referenced nowhere and 17 only by tests. Astra
+cleared 16 for rip and KEPT two: `emo_list` (on the byte-hashed indextts2 adapter) and
+`load_patcher` (an OVERRIDE of a `ComfyUI-GGUF` base method reached through
+`_cpu_pinned_clip_loader`). Per-method adversarial verification is running; rip only
+what survives, and re-run `dead_code_closure.py` to a fixpoint afterwards.
+
 ## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
 
 None of these is the next coder window (that is item 1), but every one of them lands
@@ -434,44 +440,45 @@ CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7
 - **`meta` is a 120-key drawer** -- scope as its own rip under the ledger law (every field exactly one owner).
   - Operator ruling: this is the cleanup the operator keeps asking for.
 
-## 4. THE REGISTRY -- publish the first NON-ALPHA, file the review the same day
+## 4. THE REGISTRY -- ONE THING LEFT, AND IT IS THE OPERATOR'S
 
-Everything above changes shipped code; everything below needs the published pack. The
-review request is a PUBLIC post and needs the operator's explicit go.
+**`2.0.0-alpha.19` is published and Pending.** Nothing here is a coder task.
 
-**Standing constraints:** the 5080 loop is untouched -- nothing ships that reduces tomorrow's `obs` count. The pod stays STOPPED until item 9. One coder window per file owner (CLAUDE.md section 1); every chunk = focused tests + full suite + Bug Bible + commit AND push + `HEAD == origin/v2.0-alpha`.
+**THE ONE OPEN ITEM: file the re-review post.** It is a PUBLIC act and needs the
+operator's own go.
 
-**1. THE REGISTRY.** Two separate goals: (a) an INSTALLABLE listing (needs an admin approval we cannot self-serve), (b) the card's "N Nodes" count (a different pipeline, stalled on Comfy-Org's side -- not ours).
-* **NEXT CODER CHUNK: the scan collapse ratchet commit.** Plan closed at r4, orphan rips shipped, owners on disk; the ratchet commit is what remains. Needs nothing from the operator.
-* **PREP STATUS 2026-09-04 -- three of the five handed-over items are DONE:**
-  (b) `viewer/` is already excluded (`.comfyignore:167`, 2026-09-03) -- nothing owed;
-  (d) the `AUTH_TOKEN_COMFY_ORG` literal is ALREADY SCRUBBED -- `grep` finds ZERO in
-  `nodes/` and `__init__.py`; what remains is the lowercase field NAME
-  `auth_token_comfy_org`, which is pinned data about Comfy's own partner nodes, not
-  a credential; (e) the draft polish is folded into the v2 draft below.
-  STILL OPEN: (a) re-check `GET /nodes/comfyui-old-time-radio/versions/<v>/comfy-nodes`
-  after a publish, and (c) the post itself.
-* **THE DRAFT IS NOW `docs/2026-09-04-registry-review-request-READY-v2.md`.** The
-  2026-09-03 draft is the alpha.17 record and MUST NOT be posted -- its numbers are
-  stale in our favour. The v2 draft carries the measured collapse (103 env files -> 4,
-  35 spawn sites -> 3, three singletons -> 0) and changes the ask from "please
-  overlook 158 findings" to "we collapsed what could be collapsed; here is the diff
-  and why the rest is the render path". It has THREE placeholders only the operator
-  can fill: `<VERSION>`, `<SCAN COUNTS>` from the real post-publish scan, and a
-  re-verified `0 critical`. Do NOT predict the scanner's counts -- our measured
-  source-side change is a different claim, and conflating them is what would make a
-  reviewer distrust the rest.
-* **PARKED BY THE OPERATOR 2026-09-03: THE REVIEW REQUEST IS THE LAST THING WE DO, AFTER WE SHIP AND DROP THE ALPHA TAG.** Not a deferral -- a sequencing decision, because admin approval is PER VERSION.
-  **File it on the first NON-ALPHA version, the same day it publishes**, so the version under review is the version a stranger would install. Include the question about node-level review; it costs them less than five separate ones.
-  Draft is ready and needs no further work: `docs/2026-09-03-registry-review-request-READY.md`. **Re-read it before posting** -- the version id, the counts and the "0 critical" claim all move with each new publish, and a request quoting a superseded version is worse than none. Filing is a public post and needs the operator's explicit go.
-* **DO NOT CHASE KOKORO.** The old control experiment (republish alpha.8 byte-identical) is CANCELLED.
-  **`aff1f9c4` STAYS.** The pycairo marker is correct on its own merits and is what makes a Linux `pip install -r requirements.txt` work at all. The Linux pod keeps the engine because `scripts/otr_pod_provision.sh` apt-installs the headers and pip-installs pycairo explicitly -- do NOT "simplify" that line away.
-  **Reproduce before re-opening this:** compare the newest `success` timestamp across a broad pack sample against OTR's first publish date. If a pack ever extracts successfully again, the question becomes live; until then the card's node count is not a work item.
-* **STILL FLAGGED IS THE EXPECTED OUTCOME for (a), not a failure.** There is no publisher self-service route to Active.
-* Do NOT open a second issue on the node count; comment on `Comfy-Org/registry-backend#203` (open, operator-filed).
-* Open risk, unsettleable from here: kokoro pulls `torch`; if the container's preinstalled CPU torch does not satisfy the constraint, pip downloads multiple GB inside the 600 s extract timeout. Unknowable without the image.
-* **A REGISTRY-TESTER REPO (operator idea, 2026-09-03): worth it for INSTALL verification, NOT for scanner probing.** Iterating publishes to map which YARA patterns trip is the part to avoid: it is noise in a real security queue, and it is unnecessary -- `?include_status_reason=true` already returns all findings itemized by rule.
-* DONE WHEN a version reads `Active` and a Manager install on the 4060 lands the OTR nodes. Never version-delete: a soft delete burns the string permanently.
+**POST THIS:** `docs/2026-09-04-registry-review-request-SHORT.md` -- version filled
+in, every number MEASURED from the real scan record, and it tells the true story:
+*both surfaces you banned us for were real, and both are closed.*
+
+**DO NOT POST EITHER OLDER DRAFT.** `...-READY-v2.md` and the 2026-09-03 draft are
+kept only as the alpha.17 record. They are not merely stale, they are WRONG:
+* neither mentions the BAN -- they ask for a review of finding COUNTS, as though
+  flagging were the problem. Asking for a re-review while the thing they banned the
+  pack for is unfixed is the one way to burn the request;
+* they claim credit for fixing 2 `critical` findings that were rule
+  `prohibited-string` and were **already gone as of alpha.16**;
+* they credit the `python_url_command_execution` drop to reworded error strings. That
+  rule DID go 12 -> 0, but the SPAWN-OWNER collapse did it, not the wording.
+
+**MEASURED, from `GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true`:**
+
+| rule | alpha.17 | alpha.18 |
+|---|---:|---:|
+| `python_environment_manipulation` | 103 | 4 |
+| `python_command_injection_risk` | 35 | 3 |
+| `python_url_command_execution` | 12 | 0 |
+| `python_network_operations` | 5 | 5 |
+| `windows_process_manipulation` / `bytecode` / `sensitive_file_access` | 1 each | 0 |
+| **total** | **158** | **12** (all `info`, zero critical) |
+
+**Read alpha.19's own scan before posting** -- it clears the 30-minute window on
+Comfy-Org's cron, and the post quotes a version a stranger would install.
+
+**UNCHANGED AND STILL TRUE:** there is no publisher self-service route to Active;
+`Flagged` is the expected outcome, not a failure; the card's "N Nodes" count is a
+different, stalled pipeline and is not a work item; and `aff1f9c4` (the pycairo
+marker) STAYS -- do not "simplify" it away.
 
 ## 5. TESTING -- needs the published pack or a GPU leg
 
