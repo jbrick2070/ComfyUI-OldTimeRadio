@@ -73,7 +73,12 @@ def _ffmpeg_bin(ffmpeg: str = "ffmpeg") -> str:
     straight into every subprocess here (decode, blend, bars), so a box whose
     ffmpeg is reachable only through OTR_FFMPEG blended nothing -- and no
     resolver copy existed for the guard to catch."""
-    return resolve_ffmpeg(ffmpeg) or (str(ffmpeg or "").strip() or "ffmpeg")
+    # NEVER reflect the argument back (2026-09-04). This used to return
+    # `str(ffmpeg).strip()` when resolution found nothing, which handed an
+    # UNRESOLVED caller string straight to argv[0] -- so a rejected value
+    # came back through the fallback and was spawned anyway. "" means "this
+    # box has no ffmpeg", and blend() degrades on it by name.
+    return resolve_ffmpeg(ffmpeg) or ""
 
 try:
     from ._otr_shared import ffprobe as _ffp  # noqa: E402
@@ -87,6 +92,32 @@ except ImportError:  # pragma: no cover -- flat (sys.path) load
 log = logging.getLogger(__name__)
 
 
+#: Characters that are SYNTAX inside an ffmpeg filtergraph, so a filename
+#: carrying one changes what the graph means rather than what it reads:
+#: `,` ends a filter, `;` ends a chain, `[` `]` delimit pad labels, `:` and `=`
+#: separate a filter's options, `'` and `\` are the escaping mechanism itself.
+#: A SPACE is deliberately NOT here -- it is legal in a filename and harmless.
+_FILTERGRAPH_SYNTAX = set(",;:=[]'\\")
+
+
+def _reject_filtergraph_syntax(name: str) -> str:
+    """``name`` unchanged, or ``ValueError`` if it would alter the graph.
+
+    The pack's own episode stems cannot trip this -- every one goes through
+    ``production_ledger._slugify``, which maps ``[^a-z0-9]+`` to ``_`` -- so
+    this can never fire on a normal render. It exists because the stem is
+    reachable from a workflow-supplied path, and `ass={name}` is interpolated
+    into an UNQUOTED filtergraph.
+    """
+    bad = sorted(set(name) & _FILTERGRAPH_SYNTAX)
+    if bad:
+        raise ValueError(
+            "caption filename %r contains ffmpeg filtergraph syntax (%s); "
+            "refusing to build the graph. Rename the output so its stem is "
+            "plain text." % (name, " ".join(repr(c) for c in bad)))
+    return name
+
+
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     """Return (filter_basename, cwd) for the ffmpeg ``ass=`` filter.
 
@@ -98,7 +129,7 @@ def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     paths stay absolute (they are command args, not filtergraph tokens).
     """
     p = Path(ass_path)
-    return (p.name, str(p.parent))
+    return (_reject_filtergraph_syntax(p.name), str(p.parent))
 
 
 # SDH caption resolution (_resolve_captions_ass) was REMOVED here in the
@@ -743,7 +774,7 @@ class PostUpscaleProcgenBlend:
                 "ffmpeg": ("STRING", {
                     "default": "ffmpeg",
                     "multiline": False,
-                    "tooltip": "ffmpeg binary path or PATH-resolvable name.",
+                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
                 }),
                 "bypass": ("BOOLEAN", {
                     "default": False,
@@ -875,6 +906,14 @@ class PostUpscaleProcgenBlend:
         audio_bars: str = "bottom",
     ):
         report_lines: list[str] = []
+        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
+        # operator intent. Discarded HERE, at the node boundary, so no
+        # helper underneath can be handed it.
+        try:
+            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
+        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_PostUpscaleProcgenBlend")
         ffmpeg = _ffmpeg_bin(ffmpeg)
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
         pgn = Path(procgen_mp4_path).resolve() if procgen_mp4_path else None
@@ -930,6 +969,34 @@ class PostUpscaleProcgenBlend:
             except Exception as exc:  # noqa: BLE001
                 msg = (
                     f"PostUpscaleProcgenBlend: procgen missing AND copy "
+                    f"fallback failed: {exc}"
+                )
+                log.warning("[PostUpscaleProcgenBlend] %s", msg)
+                return ("", msg)
+
+        # A MISSING TOOL IS NOT A CRASH (2026-09-04). `_ffmpeg_bin` now
+        # answers "" when this box has no ffmpeg, and every path below spawns
+        # one. Without this, "" reaches otr_proc.run(["", ...]) and the process
+        # owner raises ExecutableNotAllowed -- a RuntimeError, which _run_blend's
+        # CalledProcessError handler does not catch, so the node dies with an
+        # allowlist message instead of "ffmpeg not found".
+        #
+        # Placed AFTER the bypass and procgen-missing exits above on purpose:
+        # both of those only copy, so they must keep working on a box with no
+        # ffmpeg at all rather than start requiring one.
+        if not ffmpeg:
+            try:
+                shutil.copy2(src, output_path)
+                msg = (
+                    f"PostUpscaleProcgenBlend: ffmpeg not found "
+                    f"(OTR_FFMPEG / PATH); skipped blend, copied "
+                    f"source -> output ({src.name} -> {output_path.name})"
+                )
+                log.warning("[PostUpscaleProcgenBlend] %s", msg)
+                return (str(output_path), msg)
+            except Exception as exc:  # noqa: BLE001
+                msg = (
+                    f"PostUpscaleProcgenBlend: ffmpeg not found AND copy "
                     f"fallback failed: {exc}"
                 )
                 log.warning("[PostUpscaleProcgenBlend] %s", msg)

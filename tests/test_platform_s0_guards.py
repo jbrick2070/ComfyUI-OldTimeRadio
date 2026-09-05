@@ -397,9 +397,14 @@ def test_the_ledger_viewer_does_not_ship_without_its_server():
     The page fetches `/ledger?latest=1`, `/list` and `/ledger?path=`. The only
     thing in this repo that serves those routes is `scripts/serve_ledger.py`,
     which the `scripts/*` rule excludes from the registry bundle. The pack's own
-    registered route is `/otr/latest_ledger` -- a DIFFERENT path, and gated
-    behind `OTR_ENABLE_HTTP_RENDER_ROUTES=1` besides. So a registry install got
-    a page whose every fetch 404s.
+    registered route is `/otr/latest_ledger` -- a DIFFERENT path. So a registry
+    install got a page whose every fetch 404s.
+
+    (Corrected 2026-09-04: this used to add "and gated behind
+    `OTR_ENABLE_HTTP_RENDER_ROUTES=1` besides", which is FALSE and worth not
+    repeating -- that flag gates only the two POST render routes. The ledger GET
+    is registered UNCONDITIONALLY on every install, which is precisely why its
+    CORS posture is a live question rather than a dev-only one.)
 
     This pins the PAIR rather than the one file: if a future change ships the
     viewer again it must ship something that answers it, and if it ships the

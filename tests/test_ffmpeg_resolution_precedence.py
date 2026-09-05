@@ -215,8 +215,15 @@ def test_each_adapter_keeps_its_own_answer_on_none(box, monkeypatch):
     from nodes import otr_post_upscale_procgen_blend as pu
     from nodes._otr_audio_engines import eng_google_lyria as ly
     from nodes._otr_video_engines import foley_stems as fs
-    assert pu._ffmpeg_bin("ffmpeg") == "ffmpeg"
-    assert pu._ffmpeg_bin("") == "ffmpeg"
+    # THE BLEND NO LONGER REFLECTS ITS ARGUMENT (2026-09-04). It used to answer
+    # `str(ffmpeg).strip() or "ffmpeg"` when the owner found nothing, so an
+    # UNRESOLVED caller string came back out of the fallback and was spawned --
+    # the one place a rejected value could still reach argv[0]. "" now means
+    # "this box has no ffmpeg", and blend() degrades on it by name (copying
+    # source -> output, the same way it already handles a missing procgen).
+    assert pu._ffmpeg_bin("ffmpeg") == ""
+    assert pu._ffmpeg_bin("") == ""
+    assert pu._ffmpeg_bin(r"C:nywherefmpeg.exe") == ""
     assert ly._ffmpeg_bin() == "ffmpeg"
     assert fs._ffmpeg_bin() == "ffmpeg"
 

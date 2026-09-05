@@ -67,6 +67,13 @@ def _resolve_workflow_path(path: str) -> Path:
     """
     if not path:
         return _DEFAULT_WORKFLOW_PATH
+    # `workflow_json_path` is an ordinary editable widget, so this value
+    # can arrive from an unauthenticated /prompt request (2026-09-04).
+    try:
+        from ._otr_paths import reject_remote_path as _reject_remote
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
+    _reject_remote(path, "workflow_json_path")
     p = Path(path)
     if not p.is_absolute():
         p = _REPO_ROOT / p

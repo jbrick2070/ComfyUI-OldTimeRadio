@@ -448,7 +448,15 @@ try:
     from aiohttp import web as _otr_web  # type: ignore
 
     _OTR_CORS_HEADERS = {
-        "Access-Control-Allow-Origin": "*",
+        # NO WILDCARD (2026-09-04). This route is registered on EVERY
+        # install and needs no authentication, and it answers with the
+        # whole ledger plus `fullpath` -- an absolute path that names the
+        # operator. `*` is what makes that response READABLE cross-origin,
+        # so any site visited while ComfyUI is running could take it.
+        # Nothing shipped consumes this endpoint: `viewer/` is excluded by
+        # .comfyignore, and it called /ledger and /list, which this pack
+        # never registered. Same-origin callers (the ComfyUI front end)
+        # are unaffected -- they never needed the header.
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
         "Cache-Control": "no-store",

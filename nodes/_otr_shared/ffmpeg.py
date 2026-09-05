@@ -21,6 +21,7 @@ name. That test, not this docstring, is what makes "one owner" true.
 """
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from typing import Optional
@@ -52,6 +53,9 @@ _WINDOWS_INSTALL_CANDIDATES = (
     r"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe",
     r"C:\ffmpeg\bin\ffmpeg.exe",
 )
+
+
+_log = logging.getLogger("OTR")
 
 
 def resolve_ffmpeg(preferred=None) -> Optional[str]:
@@ -87,3 +91,43 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
         if os.path.isfile(candidate):
             return candidate
     return None
+
+
+#: Nodes that have already said their widget value is ignored. One line per
+#: node per process -- an operator who typed a path learns it is dead, and a
+#: soak does not print it on every beat.
+_WIDGET_IGNORED_WARNED = set()
+
+
+def widget_ffmpeg_is_ignored(value, node):
+    """The ffmpeg preference a NODE may express: none, ever. Returns ``""``.
+
+    A ComfyUI widget value arrives in the body of an unauthenticated
+    ``/prompt`` request, and is whatever a downloaded workflow JSON says. It is
+    UNTRUSTED INPUT, not operator intent, so it must not name the binary this
+    pack spawns: honouring it let a workflow point argv[0] at any file on disk
+    named ffmpeg, ahead of the operator's own ``OTR_FFMPEG`` pin, and the
+    ffprobe sibling rule turned one such value into a SECOND attacker binary.
+
+    ``OTR_FFMPEG`` remains the way to pin a build, and a workflow cannot set an
+    environment variable -- which is exactly why the pin is the trustworthy
+    channel and the widget is not.
+
+    NOT A BEHAVIOUR CHANGE FOR ANY SHIPPED GRAPH, measured 2026-09-04: all 465
+    ffmpeg widget values across all 101 workflow JSONs are the bare literal
+    ``"ffmpeg"``, which :func:`_explicit` already treats as "no preference".
+    The widget stays in ``INPUT_TYPES`` and in every execute signature, so
+    ``widgets_values``, the ``inputs`` descriptors and every link ``dst_slot``
+    are untouched -- removing it is a separate, scheduled migration.
+    """
+    try:
+        expressed_a_choice = _explicit(value, _BARE_FFMPEG_NAMES) is not None
+    except Exception:  # noqa: BLE001 -- a junk widget value is still ignored
+        expressed_a_choice = bool(value)
+    if expressed_a_choice and node not in _WIDGET_IGNORED_WARNED:
+        _WIDGET_IGNORED_WARNED.add(node)
+        _log.warning(
+            "[%s] the 'ffmpeg' widget is ignored (%r): a workflow value cannot "
+            "name the binary this pack runs. Set the OTR_FFMPEG environment "
+            "variable to pin a build.", node, str(value)[:120])
+    return ""

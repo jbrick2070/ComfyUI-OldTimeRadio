@@ -98,22 +98,98 @@ class FFprobeMissing(FFprobeError):
     """
 
 
-def _usable(candidate):
-    """``candidate`` as something that can actually be run, or ``None``.
+def _which_no_cwd(name):
+    """``name`` found on ``PATH`` as an ABSOLUTE path, never via the cwd.
 
-    A path is accepted when the file EXISTS; a bare name is accepted when
-    ``PATH`` resolves it. Nothing here ever executes the candidate -- a file
-    that exists and is not an ffprobe is a broken install, and the probe call
-    that follows says so far more clearly than a guess here could.
+    THE MECHANISM, because it is not obvious. On Windows CPython inserts
+    ``os.curdir`` at the FRONT of the search list whenever
+    ``NoDefaultCurrentDirectoryInExePath`` is absent from the environment, and
+    passing ``path=`` does NOT suppress that. But the cwd entry it inserts is
+    the literal ``"."``, so a hit against it comes back RELATIVE
+    (``.\ffmpeg.exe``) while every real PATH directory yields an absolute
+    answer. **Refusing a relative answer therefore refuses exactly the implicit
+    cwd hit**, on every Python, without depending on a variable the pack does
+    not control -- which matters because a box that HAPPENS to set that
+    variable cannot demonstrate the hazard at all, and this developer box is
+    one of those (Fable gate, 2026-09-04).
+
+    An EXPLICIT cwd entry on ``PATH`` is refused as well: a workflow must not
+    be able to aim the render at a binary beside the server, and no shipped
+    install puts ComfyUI's working directory on ``PATH``.
+    """
+    if not name or os.path.dirname(str(name)):
+        return None
+    text = str(name).strip()
+    if not text:
+        return None
+    found = shutil.which(text)
+    if not found:
+        return None                      # genuinely absent on this box
+    if os.path.isabs(found):
+        resolved = os.path.abspath(found)
+        if os.path.dirname(resolved) == os.path.abspath(os.getcwd()):
+            return None                  # an EXPLICIT cwd entry on PATH
+        return resolved
+    # A RELATIVE answer IS the implicit-cwd hit. Do not take it -- and do not
+    # give up either: the real PATH may still hold the tool, and returning None
+    # here would break a box whose only ffmpeg is on PATH the moment a file of
+    # that name appeared beside the server.
+    return _first_on_real_path(text)
+
+
+def _first_on_real_path(name):
+    """First match for ``name`` in the ABSOLUTE entries of ``PATH``.
+
+    Used only after :func:`_which_no_cwd` has caught an implicit-cwd hit. An
+    EMPTY ``PATH`` entry means "the current directory" to the OS and a RELATIVE
+    entry resolves against it, so both are skipped along with the cwd itself.
+    """
+    here = os.path.abspath(os.getcwd())
+    if os.name == "nt":
+        suffixes = [s for s in (otr_env.get("PATHEXT")
+                                or ".COM;.EXE;.BAT;.CMD").split(os.pathsep) if s]
+        if os.path.splitext(name)[1]:
+            suffixes = [""] + suffixes
+    else:
+        suffixes = [""]
+    for entry in (otr_env.get("PATH") or "").split(os.pathsep):
+        entry = entry.strip().strip('"')
+        if not entry or not os.path.isabs(entry):
+            continue
+        if os.path.abspath(entry) == here:
+            continue
+        for suffix in suffixes:
+            candidate = os.path.join(entry, name + suffix)
+            if os.path.isfile(candidate):
+                return os.path.abspath(candidate)
+    return None
+
+
+def _usable(candidate):
+    """``candidate`` as an ABSOLUTE path that can actually be run, or ``None``.
+
+    Nothing here ever executes the candidate -- a file that exists and is not
+    an ffprobe is a broken install, and the probe call that follows says so far
+    more clearly than a guess here could.
+
+    ABSOLUTE IS THE CONTRACT (2026-09-04). This used to accept whatever
+    ``os.path.isfile`` matched, which for a BARE name is resolved against the
+    process cwd: with a file named ``ffmpeg`` beside the server,
+    ``resolve_ffmpeg()`` returned the string ``'ffmpeg'``, and Windows
+    ``CreateProcess`` searches the cwd. A relative answer is now refused
+    outright -- a bare name goes to PATH through :func:`_which_no_cwd`, and a
+    path is honoured only when it is already absolute. Callers that legitimately
+    supply a path (an operator pin, a resolved sibling, a Windows install dir)
+    all supply absolute ones.
     """
     if not candidate:
         return None
     text = str(candidate).strip()
     if not text:
         return None
-    if os.path.isfile(text):
-        return text
-    return shutil.which(text)
+    if os.path.dirname(text):
+        return text if os.path.isabs(text) and os.path.isfile(text) else None
+    return _which_no_cwd(text)
 
 
 def _explicit(value, bare_names):
@@ -187,7 +263,7 @@ def resolve_ffprobe(preferred=None, *, ffmpeg=None):
     chosen = _usable(otr_env.get("OTR_FFPROBE"))
     if chosen:
         return chosen
-    chosen = shutil.which("ffprobe")
+    chosen = _which_no_cwd("ffprobe")
     if chosen:
         return chosen
     try:
@@ -199,7 +275,7 @@ def resolve_ffprobe(preferred=None, *, ffmpeg=None):
             # _otr_shared/ itself on sys.path -- INSERTED, so the local file
             # shadows the third-party `ffmpeg` package (Fable gate, 2026-09-04).
             from ffmpeg import resolve_ffmpeg  # type: ignore
-    for candidate in (resolve_ffmpeg(), shutil.which("ffmpeg")):
+    for candidate in (resolve_ffmpeg(), _which_no_cwd("ffmpeg")):
         sibling = _sibling_of_ffmpeg(candidate)
         if sibling:
             return sibling

@@ -74,9 +74,12 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     stage would succeed (the video engines all honour the variable) and the
     episode would die at the end, having spent the whole render.
 
-    The explicit widget argument still wins when it resolves: an operator who
-    typed a path meant it. The env var is consulted only when the passed value
-    does not resolve, and PATH remains the last resort.
+    A NODE WIDGET NO LONGER WINS -- it no longer even arrives (2026-09-04).
+    Each execute method discards its `ffmpeg` widget before anything calls this,
+    so what reaches here is either nothing or a value a TRUSTED caller already
+    resolved. `OTR_FFMPEG` is the operator's channel and PATH the last resort.
+    Left as it was, the next reader would re-wire the widget to match this
+    paragraph and quietly reopen the hole.
 
     ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
     and the widget's own default literal ``"ffmpeg"`` is not a choice: with
@@ -89,13 +92,39 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     return resolve_ffmpeg(ffmpeg) or ""
 
 
+#: Characters that are SYNTAX inside an ffmpeg filtergraph, so a filename
+#: carrying one changes what the graph means rather than what it reads:
+#: `,` ends a filter, `;` ends a chain, `[` `]` delimit pad labels, `:` and `=`
+#: separate a filter's options, `'` and `\` are the escaping mechanism itself.
+#: A SPACE is deliberately NOT here -- it is legal in a filename and harmless.
+_FILTERGRAPH_SYNTAX = set(",;:=[]'\\")
+
+
+def _reject_filtergraph_syntax(name: str) -> str:
+    """``name`` unchanged, or ``ValueError`` if it would alter the graph.
+
+    The pack's own episode stems cannot trip this -- every one goes through
+    ``production_ledger._slugify``, which maps ``[^a-z0-9]+`` to ``_`` -- so
+    this can never fire on a normal render. It exists because the stem is
+    reachable from a workflow-supplied path, and `ass={name}` is interpolated
+    into an UNQUOTED filtergraph.
+    """
+    bad = sorted(set(name) & _FILTERGRAPH_SYNTAX)
+    if bad:
+        raise ValueError(
+            "caption filename %r contains ffmpeg filtergraph syntax (%s); "
+            "refusing to build the graph. Rename the output so its stem is "
+            "plain text." % (name, " ".join(repr(c) for c in bad)))
+    return name
+
+
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
     """(basename, cwd) for the ffmpeg ``ass=`` filter -- reference the subtitle
     file by BASENAME with ffmpeg's cwd set to its folder, so a Windows
     drive-letter colon never reaches the filtergraph parser (mirrors the legacy
     blend node's proven trick)."""
     p = Path(ass_path)
-    return (p.name, str(p.parent))
+    return (_reject_filtergraph_syntax(p.name), str(p.parent))
 
 
 def _build_ass(ledger_path: str, style: str, margin_v: Optional[int],
@@ -312,9 +341,7 @@ class OTRCaptionBurn:
                 }),
                 "ffmpeg": ("STRING", {
                     "default": "ffmpeg",
-                    "tooltip": "ffmpeg binary for the caption burn. Resolution "
-                               "order: this widget's value if it runs, then "
-                               "the OTR_FFMPEG env var, then PATH.",
+                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
                 }),
                 "ledger_path": ("STRING", {
                     "default": "",
@@ -369,6 +396,14 @@ class OTRCaptionBurn:
     def burn(self, video_path, burn_captions=False, caption_style=_DEFAULT_CAPTION_STYLE,
              fps=25, ffmpeg="ffmpeg", ledger_path="", output_path="", gate_in="",
              title_card_plan_json=""):
+        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
+        # operator intent. Discarded HERE, at the node boundary, so no
+        # helper underneath can be handed it.
+        try:
+            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
+        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_CaptionBurn")
         # THE HERO TITLE IS NOT A CAPTION, and this node has FIVE no-error
         # passthrough exits. That was harmless while the title was baked into
         # procgen pixels; it is not once the title lives ONLY in this .ass,

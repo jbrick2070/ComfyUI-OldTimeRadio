@@ -52,6 +52,7 @@ paths). Walkers over ``episodes/`` must skip ``_``-prefixed entries
 from __future__ import annotations
 
 import os
+import re as _re
 from pathlib import Path
 from typing import Optional
 
@@ -65,6 +66,49 @@ class OtrPathContractError(ValueError):
     (empty/invalid episode_id, traversal, or a result outside
     ``otr/{episodes,obs}``). Raised LOUD -- never a silent legacy
     fallback (OH-1, operator law 2026-06-11)."""
+
+
+#: A URL scheme -- `http://`, `file://`, `smb://`. Drive letters ("C:\\") are
+#: NOT schemes: the pattern requires two or more leading letters before "://".
+_URL_SCHEME = _re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://")
+
+
+def reject_remote_path(value, field: str) -> str:
+    """``value`` unchanged when it names something LOCAL, else raise.
+
+    WHY THIS EXISTS, and it is not traversal. A workflow JSON arrives over
+    ComfyUI's unauthenticated ``/prompt`` endpoint, and several nodes take a
+    path from it. On Windows the ordinary file APIs open a UNC path
+    transparently, so merely STATTING ``\\\\attacker-host\\share\\x``
+    makes the machine open an SMB session and authenticate to a host the
+    workflow chose -- handing over NTLM material before any containment or
+    digest check in this pack has run. The file need not exist and nothing need
+    be planted locally first, which makes it strictly cheaper to reach than any
+    of the pack's other path defects.
+
+    Refused: UNC (``\\\\host\\share`` and its ``//host/share`` spelling),
+    the Windows device namespaces ``\\\\?\\`` and ``\\\\.\\``, and
+    anything carrying a URL scheme.
+
+    NOT refused: every ordinary local path, absolute or relative, on any
+    platform -- including ``C:\\...``, whose colon is a drive letter and not a
+    scheme. Nothing this pack ships reads a remote path, so this cannot fire on
+    a real render.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return text
+    normalized = text.replace("\\", "/")
+    if normalized.startswith("//"):
+        raise OtrPathContractError(
+            "%s must name a local path; %r is a UNC/network path. Reading one "
+            "makes this machine authenticate to the host it names."
+            % (field, text))
+    if _URL_SCHEME.match(text):
+        raise OtrPathContractError(
+            "%s must name a local path, not a URL (%r)." % (field, text))
+    return text
+
 
 
 # Walk-up math: this file lives at
@@ -603,6 +647,7 @@ __all__ = [
     "comfy_input_dir",
     "comfy_models_dir",
     "OtrPathContractError",
+    "reject_remote_path",
     "is_reserved_episode_entry",
     "otr_shared_root",
     "otr_shared_cache_dir",

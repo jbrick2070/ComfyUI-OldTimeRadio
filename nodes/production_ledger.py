@@ -603,6 +603,15 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
     """Read and validate a bundle's manifest: schema, relative paths, no
     duplicates (case-folded), every file present with the recorded size and
     SHA-256. Raises ReplayBundleError on any fault; never repairs."""
+    # `bundle_dir` reaches here from OTR_LedgerScriptWriter's `replay_from`
+    # WIDGET, i.e. unauthenticated /prompt input. A UNC value would make
+    # this machine open an SMB session and authenticate to the host the
+    # workflow named, on the very first isfile() below (2026-09-04).
+    try:
+        from ._otr_paths import reject_remote_path as _reject_remote
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
+    _reject_remote(bundle_dir, "replay_from")
     bundle = os.path.abspath(bundle_dir)
     mpath = os.path.join(bundle, REPLAY_MANIFEST_NAME)
     if not os.path.isfile(mpath):
@@ -668,6 +677,15 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     The master WAV is NOT copied here: node 7 (EpisodeAssembler) owns that
     file and copies it onto its canonical name, verified, before it emits
     ``audio_done``."""
+    # `bundle_dir` reaches here from OTR_LedgerScriptWriter's `replay_from`
+    # WIDGET, i.e. unauthenticated /prompt input. A UNC value would make
+    # this machine open an SMB session and authenticate to the host the
+    # workflow named, on the very first isfile() below (2026-09-04).
+    try:
+        from ._otr_paths import reject_remote_path as _reject_remote
+    except ImportError:  # pragma: no cover -- flat (sys.path) load
+        from _otr_paths import reject_remote_path as _reject_remote  # type: ignore
+    _reject_remote(bundle_dir, "replay_from")
     bundle = os.path.abspath(bundle_dir)
     manifest = load_replay_manifest(bundle)
     source_id = str(manifest["source_episode_id"])

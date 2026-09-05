@@ -145,9 +145,12 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     stage would succeed (the video engines all honour the variable) and the
     episode would die at the end, having spent the whole render.
 
-    The explicit widget argument still wins when it resolves: an operator who
-    typed a path meant it. The env var is consulted only when the passed value
-    does not resolve, and PATH remains the last resort.
+    A NODE WIDGET NO LONGER WINS -- it no longer even arrives (2026-09-04).
+    Each execute method discards its `ffmpeg` widget before anything calls this,
+    so what reaches here is either nothing or a value a TRUSTED caller already
+    resolved. `OTR_FFMPEG` is the operator's channel and PATH the last resort.
+    Left as it was, the next reader would re-wire the widget to match this
+    paragraph and quietly reopen the hole.
 
     ONE OWNER ANSWERS NOW (``_otr_shared.ffmpeg.resolve_ffmpeg``, 2026-09-04),
     and the widget's own default literal ``"ffmpeg"`` is not a choice: with
@@ -1528,9 +1531,7 @@ class OTRSilentComposite:
                 }),
                 "ffmpeg": ("STRING", {
                     "default": "ffmpeg",
-                    "tooltip": "ffmpeg binary for the composite encode. "
-                               "Resolution order: this widget's value if it "
-                               "runs, then the OTR_FFMPEG env var, then PATH.",
+                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
                 }),
                 "output_path": ("STRING", {
                     "default": "",
@@ -1722,6 +1723,14 @@ class OTRSilentComposite:
                   ffmpeg="ffmpeg", output_path="", gate_in="",
                   clip_manifest_json="{}",
                   upscale_engine="off", upscale_device="cpu"):
+        # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
+        # operator intent. Discarded HERE, at the node boundary, so no
+        # helper underneath can be handed it.
+        try:
+            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
+        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_SilentComposite")
         out = output_path.strip() or self._default_out(base_video_path)
         manifest = {}
         try:

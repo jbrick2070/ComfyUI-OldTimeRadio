@@ -1090,7 +1090,12 @@ def resolve_ffmpeg(ffmpeg="ffmpeg"):
     except ImportError:  # pragma: no cover -- flat (sys.path) test import
         from _otr_shared.ffmpeg import resolve_ffmpeg as _resolve  # type: ignore
     cand = (ffmpeg or "").strip()
-    return _resolve(cand) or (cand or "ffmpeg")
+    # The fallback is a CONSTANT, never `cand` (2026-09-04): reflecting an
+    # unresolved argument back into argv[0] is how a rejected path gets
+    # spawned anyway. The bare literal is kept deliberately -- argv[0] must
+    # not be None so subprocess raises FileNotFoundError and `run_ffmpeg`
+    # turns it into a NAMED GraphExecutionError.
+    return _resolve(cand) or "ffmpeg"
 
 
 def _with_resolved_ffmpeg(cmd):
