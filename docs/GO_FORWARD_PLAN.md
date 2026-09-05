@@ -120,7 +120,7 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 |---|---|---|
 | **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow. r1 is in and the design fork is CLOSED (the row names the three alternatives it cut). It is the long pole because it owes a five-act GPU leg -- **start the leg first, not last.** |
 | **2nd** | **2.3 PAIR PREPOSITION**, folded into 2.2's commit | Same file family, same author lane. 2.2's five-act leg proves both for the price of one; shipping 2.3 alone buys a leg you then spend again. |
-| **3rd** | **README defects + bundle hygiene**, one commit | The stranger's first two experiences, and neither needs the GPU. Land while 2.2's leg runs. |
+| ~~3rd~~ | ~~README defects + bundle hygiene~~ | **DONE 2026-09-05 (`eaf33576`), taken first because it needed no GPU.** README had been telling every new user to install IndexTTS2 -- a multi-gigabyte sidecar in a separate Python -- before their first Queue Prompt, for an engine `otr_canonical` does not select; and it claimed Stable Audio 3 self-downloads, which it does not. Bundle hygiene rung 1 landed in the same commit. |
 | 4th | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
 | 5th | **2.4, ONE ROW ONLY** | The `provider_side` / `cloud_kling_avatar` regression. See the cut list for why the rest of 2.4 is not coding work. |
 
@@ -345,7 +345,7 @@ The REJECTED list below is part of the record precisely so a discarded claim is 
 * `.kibitz/comfyui.local.md:26` records 23 nodes / 60 links / 132 widget slots; the canonical graph is 23 / 61 / 133. Regenerate with `--force` before the next arc.
 * The `__init__.py:97-108` output pin: preserved deliberately (it is what makes every helper agree inside ComfyUI); removing it changes where Desktop installs render and is its own design item.
 * **BUILD ITEM, arc opened 2026-09-04 -- collapse the registry scan from 158 findings to about five by the one-owner rule** (plan and driver anchor in `docs/2026-09-04-registry-findings-collapse/`, 5080-local). One `os.environ` owner takes the env rule from 103 findings to 1; one process runner takes the subprocess rule (35 sites in 20 files) to ~2; six of twelve "url command" hits are the words `ffprobe -count_frames` inside error strings; the three singletons (OpenProcess, `Path.read_bytes` for a sha256, `__import__("sys")`) each have a clean replacement. It does NOT reach Active -- that needs zero findings or the manual review -- but it turns the human review from a ledger into five lines and drops every `credential-access` tag. Semantics-neutral by construction (no env name, default or precedence moves; the 4060's numbers do not move). Design questions for the arc: typed getters vs casts at the site, a declared knob catalog, the guard's shipping order across batches, whether the sidecar-venv Popen streams share the runner.
-* **Handed over by the shipping window when it stood down (2026-09-04):** (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes` periodically -- non-null confirms the pycairo-marker theory and the card should show ~34 nodes; still-null means something else fails in the Linux extract container (residual suspect: kokoro pulls torch, and a multi-GB download would blow the 600 s extract timeout). (b) `viewer/index.html` SHIPS in the alpha.17 zip and calls three unregistered endpoints; one `.comfyignore` line fixes it, and `.comfyignore` decides what ships -- the operator authorizes that line, neither window just does it. (c) The registry manual-review request is ready to file and is a PUBLIC post: it needs his own explicit go, not a peer relay. (d) `nodes/_otr_shared/partner_nodes.yaml` carries the literal `AUTH_TOKEN_COMFY_ORG` fourteen times as pinned data about Comfy's own partner nodes -- the YARA scanner never read it (YAML), but a human reviewer who greps the zip after reading our request finds the string we said we removed. Scrub to a placeholder BEFORE a reviewer engages, after checking the partner-row parser does not key on the literal. (e) Optional draft polish for the review request: one line that 47 of the 158 findings are the subprocess/ffmpeg family and 103 are `os.environ` reads, so no single subsystem's removal clears the version -- the argument for a review over another patch.
+* **Handed over by the shipping window when it stood down (2026-09-04):** (a) re-check `GET /nodes/comfyui-old-time-radio/versions/2.0.0-alpha.17/comfy-nodes` periodically -- non-null confirms the pycairo-marker theory and the card should show ~34 nodes; still-null means something else fails in the Linux extract container (residual suspect: kokoro pulls torch, and a multi-GB download would blow the 600 s extract timeout). (b) **CLOSED 2026-09-03** -- `viewer/` is excluded in `.comfyignore` with the reasoning at the line; re-verified 2026-09-05. (c) The registry manual-review request is ready to file and is a PUBLIC post: it needs his own explicit go, not a peer relay. (d) **CLOSED, verified 2026-09-05** -- the literal `AUTH_TOKEN_COMFY_ORG` is GONE from `nodes/_otr_shared/partner_nodes.yaml` (0 hits). The only survivors in the tree are `scripts/otr_pin_partner_nodes.py`, `tests/test_cloud_media_invoke.py`, `kibitz-runs/` logs and git's own lost-found, and `.comfyignore` excludes every one of those from the bundle, so a reviewer grepping the published zip finds nothing. (e) Optional draft polish for the review request: one line that 47 of the 158 findings are the subprocess/ffmpeg family and 103 are `os.environ` reads, so no single subsystem's removal clears the version -- the argument for a review over another patch.
 * **The draft 8 GB profiles cannot write on two of the three banks (PBUG-20260904-05):** `8gb_lite`, `otr_4060_floor` and `otr_4060_viz_12b` (all `status: draft`) set `gguf_n_ctx: 2048`, and the writer prompt is 2,741 tokens on `science_news` and 3,338 on `original` -- the budget refuses loud before writing a word. `media_archive` FITS, so the fault is the bank-plus-context pairing, not the profile alone. The row that SHIPS, `otr_4060_12b_gguf_offload`, runs the same 12B at `gguf_n_ctx: 4096` and fits. Design call, owed a kibitz arc: retire or re-context the drafts, pair a smaller pinned writer (Qwen3-4B / gemma E4B are on disk), or make the plan stage refuse a profile whose context cannot hold its own prompt -- in the profile/variant layer, never a silent truncation. The 4060 owns the 8 GB rows.
 
 **REJECTED, with reasons -- do not re-raise these.**
@@ -488,14 +488,19 @@ many rungs are worth publishing.
 
 **THE LADDER, least invasive first.** Each rung is a version; stop at the first
 pass. Cheap-and-reversible before anything that costs a feature:
-1. Bundle hygiene only -- drop the 92 `workflows/variants/*.md` and the 1.7 MB
-   of GitHub social art. Removes nothing a user runs. (`ROADMAP.md` was the
-   third item on this rung and is DELETED from git outright, 2026-09-05 -- it
-   was stale to the point of misdirection, so this rung is that much smaller.)
+1. **DONE 2026-09-05 (`eaf33576`), and it costs the ladder nothing to have
+   climbed it early** -- bundle hygiene is correct on its own merits, so it was
+   taken without waiting for a bisect. `.comfyignore` now excludes `assets/`
+   (1.8 MB) and `workflows/variants/*.md` (92 generated launch recipes);
+   `ROADMAP.md` was deleted from git outright the same day. Measured with
+   pathspec against the real tracked list: 92 `.md` out, all 96 variant `.json`
+   still shipping, all four negated `scripts/` files still shipping. Removes
+   nothing a user runs, so **if a later version is still flagged, this rung is
+   already spent and rung 2 is the next real experiment.**
    **Excluding art from the BUNDLE is not deleting it from GIT:**
    `pyproject.toml` publishes `assets/otr_icon.gif` by raw GitHub URL, so a
    `git rm -r assets/` would blank the registry listing's card art. This rung
-   is a `.comfyignore` change and nothing else.
+   was a `.comfyignore` change and nothing else.
 2. Drop the optional CLOUD lanes from the shipped bundle (OpenRouter, Google
    API, Comfy-credits, cloud media). That is 4 of the 5 network findings and
    they are all opt-in, default-off. Local-first is the product anyway.

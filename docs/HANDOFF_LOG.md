@@ -16343,3 +16343,74 @@ slot; the exception does not.**
   and all four transformers render sites omit `enable_thinking=False` even though
   the installed tokenizer supports it (`tokenizer_config.json:230`). It is worth
   fixing on its own merits and it is NOT the fix for leg C.
+
+---
+
+## 2026-09-05 -- ROADMAP deleted, GO_FORWARD given an attack order, README's first-run lie fixed
+
+**Commits:** `8d5ca952` (ROADMAP + plan), `eaf33576` (README + bundle hygiene).
+Suite **13470 passed / 126 skipped / 1 xfailed, RC=0** on both; Bug Bible 22
+passed. `HEAD == origin/v2.0-alpha` verified after each push; no BOM, no 0-byte
+file, AST clean on every touched `.py`.
+
+**ROADMAP.md is gone.** It said "Updated: 2026-08-22" and its release-runway row
+1 was the dead-code campaign that had finished the day before. It was also
+SHIPPING in the alpha.21 bundle, pointing an installing stranger at five files
+of which four are excluded from that same bundle. The two things worth keeping
+were carried into `docs/GO_FORWARD_PLAN.md` in substance rather than as a
+pointer: the SFX ruling (retain and mix video-generation audio as inexpensive
+ambience; do not revive a provider stack) and the runway ORDER (lean-mean ->
+RunPod/AMD/Mac -> install -> product docs / v2 release). Every other live
+reference was repaired; the survivors are in append-only logs and dated docs,
+where a stale pointer is the record rather than a defect.
+
+**GO_FORWARD has a section 0, THE ATTACK ORDER**, from a grounded Fable ruling.
+Ghost pool first because it is the only open row that changes tomorrow's `obs`
+count and it owes the long-pole GPU leg; the pair-preposition fix folded into
+its commit so one five-act leg proves both; README and bundle hygiene while that
+leg runs; then the gender ladder; then exactly one row of 2.4. Two rows are CUT
+with the reasoning recorded at the row so nobody re-raises them as fresh ideas:
+the Qwen3 think-policy arc (a shared-writer-path arc for a model that is neither
+the canonical default nor qualified) and the seven inert widgets (all mid-list,
+so a 94-workflow `dst_slot` re-index for nothing a user can see -- the same
+operation that corrupted 63 workflows on 2026-08-28 while three of its four
+verifying tests stayed green).
+
+Fable also caught two plan-cleanliness defects. Rows `2.3` and `3.1` both read
+"PROMPT v3 HALF B" while being different jobs -- `3.1` rewrites
+`resolve_crux_kernel` and `2.3` is a closure inside it -- so `2.3` is renamed
+THE PAIR PREPOSITION. And it named the trap in 2.2 before a line was written:
+`GHOST_PROMPT_FIELDS` is a frozen tuple and `validate_ghost_prompt_object`
+raises on ANY extra key, so the finalized prompt must be RECOMPOSED on the
+replay path, never stored -- storing it would make every accepted ledger
+malformed and fail closed.
+
+**README was telling every new user to install a voice the shipped graph never
+selects.** Three claims, all measured against the code:
+- *"IndexTTS2, the character voice the canonical graph ships with"* -- FALSE.
+  `OTR_CastLock` in `workflows/otr_canonical.json` carries `kokoro` on BOTH
+  slots (`['kokoro_builtin', 'auto_registry', True, 'kokoro', 'kokoro',
+  'cuda']`), exactly as the 2026-09-01 standing ruling requires. README had been
+  sending a stranger to a multi-gigabyte sidecar in a separate Python 3.10
+  environment before their first Queue Prompt.
+- *"Two of those fetch themselves on first use (Kokoro, Stable Audio 3)"* --
+  half false. Kokoro does (`_kokoro_backends.py` passes `repo_id
+  "hexgrad/Kokoro-82M"`). SA3 does not: `eng_stable_audio_3.py::load` checks
+  `folder_paths` and raises `EngineUnusable MISSING_MODEL`. README now names the
+  file, the ungated repo and the folder.
+- The canonical row of "Pick the graph" and the licensing paragraph both listed
+  IndexTTS2 among the shipped defaults. Corrected.
+
+**Bundle hygiene rung 1 landed in the same commit, `.comfyignore` only:**
+`assets/` and `workflows/variants/*.md`. Verified with `pathspec` against the
+real tracked list -- 92 `.md` out, all 96 variant `.json` still shipping, all
+four negated `scripts/` files still shipping. **Excluding is not deleting:**
+`pyproject.toml` publishes `assets/otr_icon.gif` by raw GitHub URL, so a
+`git rm -r assets/` would blank the registry card art while the ignore line
+costs nothing.
+
+**Two handed-over registry items were verified CLOSED rather than done again:**
+`viewer/` has been excluded since 2026-09-03, and the literal
+`AUTH_TOKEN_COMFY_ORG` is gone from `nodes/_otr_shared/partner_nodes.yaml` (0
+hits). Its only survivors are under `scripts/`, `tests/`, `kibitz-runs/` and
+git's own lost-found, every one of which `.comfyignore` keeps out of the zip.
