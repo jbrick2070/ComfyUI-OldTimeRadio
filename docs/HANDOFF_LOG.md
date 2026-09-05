@@ -16552,3 +16552,39 @@ one word. Not worth a mechanism; the operator's bar is improvement, not 100%.
 **Also verified on leg 2:** 18/18 distinct deterministic leaves, modes balanced
 6 signal / 6 object / 6 figure. The deterministic pool did NOT exhaust at 18
 beats.
+
+---
+
+## 2026-09-05 -- alpha.23: the first version published at oracle-zero
+
+**Commits `a98bdd22` (RSS), `b84f7f6d` (IndexTTS2 exclusion), `bfc8151f` (bump).
+Suite 13577 passed / 126 skipped / 1 xfailed. HEAD == origin.**
+
+The scanner-discriminator campaign closed the loop. All 13 of alpha.21's YARA
+findings are cleared in the packed set, verified by the calibrated oracle
+(`scripts/otr_registry_scan_oracle.py`, byte-identical to the live alpha.21
+verdict and cross-validated on budgetpixel + deno):
+
+* **10 by idiomatic respelling** -- env (`from os import environ`), network
+  (`requests.request`, bare `urlopen`), subprocess (import-time bind in
+  `proc.py`). No capability lost, no guard weakened.
+* **2 RSS socket findings** by the stdlib `create_connection` pin. Sonnet
+  reviewed it SHIP with a live spy test proving the DNS-rebind guard holds
+  (the internal getaddrinfo only ever sees the validated numeric IP). New
+  `tests/test_feed_fetch_connect_pins.py` drives the REAL `_connect` -- the seam
+  suite had stubbed it.
+* **7 IndexTTS2 findings** by excluding the whole engine surface from the ZIP
+  only. `eng_indextts2.py` is fingerprint-hashed, so it cannot be respelled
+  without a Lemmy re-audition; instead the adapter, worker, installer and
+  weights downloader all leave the bundle via `.comfyignore`. Proven registry
+  shape: with the file absent the full pack imports and "All 25 nodes loaded
+  successfully", indextts2 unregistered, every other voice intact, file
+  byte-identical (fingerprint preserved). GitHub keeps full capability.
+
+Published alpha.23 (operator authorized: "strings are cheap"). CDN artifact
+downloaded and verified: 710 files, no IndexTTS2 surface, feed_fetch present,
+zero real code hits for any flagged literal, version 2.0.0-alpha.23. **Status:
+Pending; awaiting the scan cron verdict.** On the four-pack model this
+auto-passes; the oracle is a prediction, not a guarantee. If it flags, read the
+new `status_reason`, patch the oracle regexes to match, publish alpha.24 -- the
+tree is untouched, only the string is spent.
