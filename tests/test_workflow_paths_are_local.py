@@ -116,3 +116,48 @@ def test_an_ordinary_workflow_path_still_resolves():
     assert wv._resolve_workflow_path("") == wv._DEFAULT_WORKFLOW_PATH
     got = wv._resolve_workflow_path("workflows/otr_canonical.json")
     assert got.is_absolute()
+
+
+# --------------------------------------------------------------------------- #
+# the spawn owner refuses a remote ARGUMENT -- the catch-all for the media
+# path widgets, which all end up as ffmpeg arguments
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("argv", [
+    ["ffmpeg", "-i", r"\\attacker-host\share\in.mp4", "out.mp4"],
+    ["ffmpeg", "-i", "in.mp4", r"\\attacker-host\share\out.mp4"],
+    ["ffprobe", "//attacker/share/x.mp4"],
+    ["ffmpeg", "-i", r"\\?\GLOBALROOT\Device\x"],
+])
+def test_a_remote_argument_is_refused_before_any_spawn(argv):
+    """Nothing is launched: the refusal happens in the validator."""
+    from nodes._otr_shared import proc as otr_proc
+    with pytest.raises(otr_proc.ExecutableNotAllowed):
+        otr_proc._check(argv)
+
+
+@pytest.mark.parametrize("argv", [
+    # THE THREE BARE-argv[0] SPAWNS. An "argv[0] must be absolute" rule was
+    # rejected precisely because it would break these, and each swallows
+    # Exception into "unknown" -- so it would blank the ledger's commit stamp
+    # on every episode with a green run and nothing in the log.
+    ["git", "-C", "C:\\repo", "rev-parse", "--short", "HEAD"],
+    ["git", "rev-parse", "--short", "HEAD"],
+    ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+    # The ordinary render commands, including a MAPPED DRIVE (not UNC) and a
+    # filtergraph that legitimately contains commas.
+    ["ffmpeg", "-y", "-i", r"C:\out\otr\episodes\ep1\a.mp4",
+     "-vf", "ass=ep1.ass,fps=25", r"C:\out\otr\episodes\ep1\b.mp4"],
+    ["ffmpeg", "-i", r"U:\OTR-BACKUP\ep.mp4"],
+    ["ffprobe", "-v", "error", "/home/u/otr/ep.mp4"],
+    ["ffmpeg", "-i", "relative/in.mp4"],
+])
+def test_an_ordinary_command_is_untouched(argv):
+    from nodes._otr_shared import proc as otr_proc
+    otr_proc._check(argv)
+
+
+def test_the_rule_tolerates_non_string_arguments():
+    """argv carries ints and Paths; a type error here would break every spawn."""
+    import pathlib
+    from nodes._otr_shared import proc as otr_proc
+    otr_proc._check(["ffmpeg", "-crf", 18, pathlib.Path("C:/out/x.mp4"), None])

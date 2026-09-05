@@ -15965,3 +15965,119 @@ Both drafts (`...-READY-v2.md`, `...-SHORT.md`) predate the scan record above.
   `cmd = [...]` argv builders for tools that accept URLs. The 2026-09-04
   rewording of six ffprobe error strings did not touch that rule, so the drafts'
   "6 -> 0" line for it is unfounded. Corrected in GO_FORWARD 1A.
+
+
+---
+
+## 2026-09-04 (evening) -- the registry ban was a REAL RCE, and both banned surfaces are now closed
+
+**`a9e0383e` (pushed). Suite 13659 passed / 126 skipped / 1 xfailed (baseline
+13587; +72 new tests). Bug Bible 22 passed. ZERO workflow JSON edits.**
+
+### How it was found, which is the transferable part
+
+By reading the registry's own `status_reason` instead of inferring from finding
+counts: `GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true`.
+**alpha.13 and alpha.14 are `Banned`**, by a human (`drltdata@comfy.org`), for
+*"RCE (code execution) -- attacker-reachable via unauthenticated /prompt (node
+widget) or no-auth route"*. Every prior session had been optimising the FINDING
+COUNT, which was never the blocker. The counts are all `severity: info`, and the
+two `critical` ones (rule `prohibited-string`) had already been gone since
+alpha.16.
+
+**Both clauses of that verdict had real referents:**
+* **"no-auth route"** -- `POST /otr/video_render_single` and
+  `/otr/video_render_soak` shipped UNCONDITIONALLY in alpha.13 (`f9986b9f`),
+  reading caller-supplied paths from an unauthenticated body. Gated behind
+  `OTR_ENABLE_HTTP_RENDER_ROUTES` only on 2026-09-03 (`b198026a`).
+* **"node widget"** -- five nodes exposed an `ffmpeg` STRING widget whose value
+  became `argv[0]`. **Reproduced against the real modules**: with `OTR_FFMPEG`
+  pinned to a real binary, a widget value of `<tmp>\ffmpeg.exe` BEAT the pin;
+  `resolve_ffprobe(ffmpeg=<that>)` produced a SECOND attacker binary through the
+  sibling rule; and `proc.py`'s allowlist passed it because it normalizes
+  `argv[0]` to the BASENAME. The allowlist added in the scan collapse was NOT
+  mitigation for this chain -- do not let its existence suggest otherwise.
+
+### Three designs, two of them wrong, and the panel killed both before any code
+
+* **v1 -- constrain `_explicit`.** Bypassable, and its premise was false. I had
+  claimed "every caller that passes an argument is passing a widget value";
+  `blend()` threads an internally-RESOLVED path into `resolve_ffprobe`, so
+  provenance is not visible there.
+* **v2 -- sever inside `_ffmpeg_bin`.** `otr_master_audio_mux.py:418-419`
+  deliberately hands its ALREADY-RESOLVED binary to `audio_pcm_sha` so the
+  byte-identity proof cannot resolve differently from the encode that just ran.
+  Ignoring the argument there breaks that silently.
+* **v3 -- shipped.** Sever at each node's EXECUTE METHOD; make the resolvers
+  answer with an absolute path or `None`.
+
+**THE CATCH THAT MATTERED MOST, and two lanes had recommended the opposite.**
+Astra and Gemini both proposed enforcing "argv[0] must be absolute" at
+`proc.py`, the single spawn gateway. Fable caught that this owner deliberately
+admits BARE `git` and `nvidia-smi` -- `production_ledger.py:231`,
+`_otr_ledger.py:893`, `_otr_sys_specs.py:118` -- each wrapped in
+`except Exception` -> `"unknown"`. That gate would have blanked the ledger's
+commit stamp on EVERY episode, with a green run and a published `obs` artifact,
+invisible to all 13,587 tests. **A ledger hole with no error is exactly the
+failure the operator's standing directive forbids.** B4 moved into the
+resolvers' return value instead.
+
+### Also closed, found by our own review rather than by the scanner
+
+* **`replay_from` -> UNC -> SMB/NTLM coercion.** `OTR_LedgerScriptWriter`'s
+  `replay_from` widget went VERBATIM to `import_replay_bundle`, whose first act
+  is an `isfile()`. On Windows that opens an SMB session and authenticates to
+  the host the WORKFLOW named -- **nothing needs to be planted locally**, which
+  makes it strictly cheaper to reach than the ffmpeg chain. New
+  `_otr_paths.reject_remote_path` refuses UNC (both spellings), the Windows
+  device namespaces and URL schemes; wired into the replay import and the
+  workflow validator (which documented "absolute -> taken as-is").
+* **`proc.py` refuses a remote ARGUMENT**, which closes the same class for every
+  media-path widget at once. Deliberately a rule about ARGUMENTS, not `argv[0]`,
+  for the ledger reason above -- verified that both `git` spawns, `nvidia-smi`,
+  and a MAPPED DRIVE (`U:\OTR-BACKUP`, not UNC) all still pass.
+* **The wildcard CORS header** on `GET /otr/latest_ledger`, which is registered
+  on every install, needs no auth, and returns the whole ledger plus an absolute
+  `fullpath`. Nothing shipped consumes it.
+* **Filtergraph interpolation.** `ass={basename}` is built from a
+  workflow-derived path at FOUR sites through TWO copies of `_ass_filter_arg`.
+  Validated on the COMPUTED basename, not the widget -- an empty output widget
+  falls back to the stem of the INPUT video, so validating the widget misses the
+  real source.
+
+### Measured, not asserted (CLAUDE.md 0B)
+
+* **5080 resolver output byte-identical** before and after:
+  `...\WinGet\Links\ffmpeg.EXE` / `ffprobe.EXE`.
+* **The cwd hazard is real and now closed.** My first measurement said Python
+  3.12 does not consult cwd; Fable showed that conclusion was right for the
+  wrong reason -- this box SETS `NoDefaultCurrentDirectoryInExePath`, and my
+  decoy was extensionless. With the variable deleted and the decoy planted, raw
+  `shutil.which("ffmpeg")` returns `.\ffmpeg.EXE` while the resolver returns the
+  real PATH binary. **The regression test must `delenv` that variable or it
+  passes vacuously on this machine.**
+* **101 workflow files** (not 63 -- that number was never verified), **465**
+  `ffmpeg` widget values, **every one the bare literal `"ffmpeg"`**, which
+  `_explicit` already treated as no preference. That is what makes the sever a
+  provable no-op for every shipped graph, and why the widget could stay in
+  `INPUT_TYPES` -- keeping it is what made this a zero-JSON change.
+
+### Lessons worth keeping
+
+* **Grep for the PATTERN, not the name.** I twice reported a complete inventory
+  and was twice wrong, both times because a call was ALIASED:
+  `wrapper_bridge.py:1093` reflects raw input as `_resolve(cand) or cand`, and
+  `scene_aware_scopes` has a SECOND consumer at `:558` through `scope_draw`.
+* **A deletion's idempotence test is ABSENCE OF THE ANCHOR.** `if new in text`
+  is trivially true when the replacement is empty, so the guard reports
+  "already done" and deletes nothing.
+* **One reviewer rejected: Fable proposed migrating `eng_indextts2.py:214`'s raw
+  `Popen` to `otr_proc`.** That file is byte-hashed by
+  `RUNTIME_FINGERPRINT_SOURCES`; any change demotes the operator's approved
+  Lemmy voice route. Fable had no way to know. Left alone.
+
+**Roster, stated honestly:** GPT-6 Astra @ ultra (r1, r2, r4), Gemini 3.8 Flash
+(r1, r2), Cursor/Grok (r2), Fable 5.1 and Sonnet as Cowork subagents. The
+operator asked mid-campaign that Fable and Astra be the final judges. This was
+not a stock four-round arc on one document -- r3 was skipped because the design
+had converged and two subagent audits replaced it.

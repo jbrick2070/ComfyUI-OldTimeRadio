@@ -937,6 +937,16 @@ class PostUpscaleProcgenBlend:
         # lands NEXT TO its source inside the per-episode folder
         # (otr/episodes/<ep>/) -- never in obs. (Pre-refactor the blend WAS
         # the terminal deliverable and wrote to otr_obs_dir() directly.)
+        # `out_suffix` is a SUFFIX, not a path. It is an ordinary editable
+        # widget, so it arrives from an unauthenticated /prompt request, and a
+        # value carrying a separator or `..` walks the deliverable straight out
+        # of the per-episode folder (2026-09-04).
+        if any(token in str(out_suffix) for token in ("/", "\\", "..", "\x00")):
+            raise ValueError(
+                "PostUpscaleProcgenBlend: out_suffix %r contains a path "
+                "separator or traversal token; it names a filename SUFFIX, not "
+                "a location. The blend always lands beside its source."
+                % (out_suffix,))
         output_path = src.parent / f"{src.stem}{out_suffix}{src.suffix}"
 
         if bypass:

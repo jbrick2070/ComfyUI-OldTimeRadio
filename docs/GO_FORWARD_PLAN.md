@@ -91,72 +91,64 @@ in `docs/HANDOFF_LOG.md`. This file is the to-do list, not the log.
 
 ---
 
-## 1A. THE REGISTRY BAN IS A REAL RCE -- A NODE WIDGET NAMES THE BINARY WE SPAWN
+## 1A. THE REGISTRY BAN -- BOTH SURFACES ARE CLOSED. What is left is the PUBLISH.
 
-**FOUND 2026-09-04 by reading the registry's own scan record, and REPRODUCED against
-the real modules. This outranks every other row in this plan: it is why the pack is
-not installable, and it is a genuine security defect, not a scanner complaint.**
+**SHIPPED 2026-09-04 in `a9e0383e`.** Suite 13659 passed / 126 skipped /
+1 xfailed. Receipt in `docs/HANDOFF_LOG.md`.
 
-`GET /nodes/comfyui-old-time-radio/versions?include_status_reason=true` shows
-**alpha.13 and alpha.14 are `Banned`**, with a HUMAN verdict:
+The ban verdict on alpha.13/.14 named two surfaces and **both were real**:
 
-> `policy-v0.2: RCE (code execution) -- attacker-reachable via unauthenticated
-> /prompt (node widget) or no-auth route; confirmed by code-level verify-deep.`
-> -- drltdata@comfy.org
+| verdict clause | the actual surface | status |
+|---|---|---|
+| "no-auth route" | `POST /otr/video_render_single` + `/otr/video_render_soak` shipped UNCONDITIONALLY in alpha.13 (`f9986b9f`), reading caller-supplied paths from an unauthenticated body | closed `b198026a`, 2026-09-03 -- in alpha.16+ |
+| "node widget" | the `ffmpeg` STRING widget on 5 nodes reached `argv[0]`, beat the operator's `OTR_FFMPEG` pin, and yielded a SECOND binary via the ffprobe sibling rule | closed `a9e0383e` |
 
-**They are right.** Five shipped nodes expose an `ffmpeg` STRING widget
-(`otr_caption_burn.py:313`, `otr_master_audio_mux.py:1046`,
-`otr_post_upscale_procgen_blend.py:743`, `otr_scene_aware_scopes.py:410`,
-`otr_silent_composite.py:1529`). A widget value arrives in the body of ComfyUI's
-`/prompt` -- unauthenticated by default -- and is whatever a downloaded workflow
-`.json` says. It reaches `argv[0]`:
+Also closed in the same commit, found by our own review rather than the
+scanner: a `replay_from` widget that accepted a UNC path (SMB/NTLM coercion
+needing nothing planted locally), the wildcard CORS header on the
+unconditionally-registered ledger GET, an unescaped basename interpolated into
+an ffmpeg filtergraph (4 sites, 2 helper copies), and cwd-relative binary
+resolution.
 
-```
-widget -> _ffmpeg_bin(ffmpeg) -> resolve_ffmpeg(preferred)   [_otr_shared/ffmpeg.py:57]
-       -> _explicit()   honours it: it carries a directory   [_otr_shared/ffprobe.py:119]
-       -> _usable()     honours it: the file exists          [_otr_shared/ffprobe.py:101]
-       -> proc.py allowlist passes: basename is "ffmpeg"     [_otr_shared/proc.py:113]
-       -> otr_proc.run([...])  EXECUTES IT
-```
+**STILL OPEN, in priority order:**
 
-Measured, not argued -- with `OTR_FFMPEG` pinned to a real binary, a widget value
-of `<tmp>\ffmpeg.exe` **beat the operator's pin**, and
-`resolve_ffprobe(ffmpeg=<that>)` produced a SECOND attacker binary via the sibling
-rule (`_sibling_of_ffmpeg`, ffprobe.py:139). The allowlist added in the scan
-collapse does NOT mitigate this: it normalizes argv[0] to the BASENAME, so any file
-named `ffmpeg.exe` anywhere on disk passes.
+1. **THE PUBLISH.** Bump `pyproject.toml` and push -- that auto-fires the
+   registry publish, so it is a release trigger, not a config edit, and it needs
+   a NEW version string. **The operator's call, per section 7.**
+2. **File the re-review request.** `docs/2026-09-04-registry-review-request-SHORT.md`
+   is rewritten for the real story ("you were right on both counts, both are
+   closed"). **DO NOT SEND either older draft** -- they never mention the ban,
+   and they claim credit for two `critical` findings that were already gone as
+   of alpha.16 and for a `python_url_command_execution` drop that never happened.
+   Posting is a PUBLIC ACT and is the operator's alone.
+3. **Media-path containment (NOT started).** `_validate_contract`
+   (`_otr_paths.py:224`) is the pack's own containment guard and is called by
+   NOTHING outside that file. Fifteen STRING path widgets exist; the four
+   output-path ones plus `out_suffix`
+   (`otr_post_upscale_procgen_blend.py:757`, which walks out of the episode dir
+   if it carries a separator) let a workflow read one arbitrary file and write a
+   transcode anywhere writable. Fable classified this as DATA LOSS, not RCE, and
+   both r1 lanes cut an unrestricted write-audit from the security build's
+   scope -- so it is its own row, and it wants an arc: containment could break a
+   legitimate render that writes outside `otr/`.
+   The UNC half of this class is ALREADY closed by `proc.py`'s remote-argument
+   rule.
+4. **Schema removal of the five now-inert `ffmpeg` widgets.** Deliberately
+   deferred: keeping the field is what made the security fix a ZERO workflow-JSON
+   change. Measured 2026-09-04: **101** workflow files (not 63 -- that number was
+   never verified), 465 `ffmpeg` widget values, every one the bare literal
+   `"ffmpeg"`. Removal is the 3-part edit (`widgets_values`, the `inputs`
+   descriptor, every later link `dst_slot` repaired BY IDENTITY) plus
+   `build_variants.py --all` and the four verification tests.
+5. **`otr_video_render_batch` exposes the same GPU harness** (`render_single` /
+   `run_gpu_soak`) that the env-gated POST routes call, as an ordinary node with
+   no gate. Not obviously a defect -- every node is invocable by a workflow --
+   but it means gating the routes did not remove the capability. Decide whether
+   that matters before claiming the harness is "off by default".
 
-**The fix has ONE owner.** Every caller that PASSES an argument to
-`resolve_ffmpeg` / `resolve_ffprobe` is passing a widget value; every trusted
-caller passes nothing (inventory in the anchor). So constraining `_explicit` cannot
-break an internal caller. Arc in
-`kibitz-runs/2026-09-04-ffmpeg-widget-rce/` (driver anchor written first; panel
-GPT-6 Astra @ ultra + antigravity).
-
-**Second, smaller, same class and same commit:** `otr_caption_burn.py:254` builds
-`"-vf", f"ass={ass_name},fps=..."` where `ass_name` derives from the `output_path`
-WIDGET (`ass_out = splitext(abspath(out_path))[0]`, :244). A filename containing
-`,` or `'` injects additional ffmpeg FILTERS. It is the ONLY filtergraph in the
-pack that interpolates a widget-derived string -- every other builds from numerics.
-
-**Tooltips on all five widgets must change in the same commit** -- they currently
-advertise the capability being removed ("this widget's value if it runs"). The
-operator explicitly authorised deleting tooltip text for this fix (2026-09-04).
-
-**WHAT THIS CHANGES ABOUT ITEM 4.** The review request drafts predate this finding
-and must not be sent as written: they ask for a review of finding COUNTS and never
-mention the ban or the RCE. Asking a reviewer to re-examine a pack while the thing
-they banned it for is unfixed is the one way to burn the request. Fix first, publish
-a version carrying the fix, THEN ask -- and say plainly that the reported RCE was
-real and is closed.
-
-**Also corrected by the real scan record, because the drafts get both wrong:**
-* The 2 `critical` findings were rule `prohibited-string`. They are ALREADY GONE --
-  absent from alpha.16 and alpha.17. Do not claim credit for fixing them here.
-* `python_url_command_execution` (12) is NOT about error strings. It fires on
-  `cmd = [...]` argv builders that run tools accepting URLs. The 2026-09-04
-  rewording of six ffprobe error strings did not touch that rule, and the drafts'
-  "6 -> 0" line for it is unfounded.
+**THE METHOD THAT FOUND ALL OF THIS, worth repeating:** read the registry's own
+`status_reason` instead of guessing from the scan counts. The counts were never
+the blocker.
 
 ## 1. THE SCAN COLLAPSE -- the MIGRATION is done; one acceptance step remains
 
