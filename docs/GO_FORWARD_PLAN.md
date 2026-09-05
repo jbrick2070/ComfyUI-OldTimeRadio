@@ -72,9 +72,9 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-05, all three Fable findings closed):** `v2.0-alpha`, HEAD ==
-origin at `14c6a6db`, clean tree. Suite **13430 passed / 126 skipped / 1 xfailed,
-RC=0**. No resident server; VRAM at the desktop baseline. GPT-6 Astra is available
+**State (2026-09-05, the registry punch list is CLOSED):** `v2.0-alpha`, HEAD ==
+origin at `cc90b261`, clean tree. Suite **13459 passed / 126 skipped / 1 xfailed,
+RC=0**; Bug Bible 22. No resident server; VRAM at the desktop baseline. GPT-6 Astra is available
 at `ultra` reasoning -- the older "Codex credits out until 09-07" note is dead.
 
 **`2.0.0-alpha.19` IS PUBLISHED AND FLAGGED -- its scan landed 09-05** (19 deps
@@ -82,20 +82,16 @@ recorded). The record is BYTE-IDENTICAL to alpha.18's: **12 findings, all `info`
 zero critical** (4 env-var reads, 5 network, 3 subprocess). The collapse
 **158 -> 12** is now measured on the version a stranger would install.
 
-**NEXT UP, and it is ONE thing: item 2.9, the registry punch list, then alpha.20.**
-The 2026-09-05 consensus (`docs/2026-09-05-registry-plan-consensus/CONSENSUS.md`
--- Astra + 31 skeptics + Sonnet byte-diff + a 578-pack survey) found that the
-published alpha.19 WILL be banned if the reviewer reaches it: one confirmed
-arbitrary-file-read still live at HEAD, nine unconfined widget->write sinks (the
-reviewer's #3 ban class), and the UNC stats `79dc9828` missed. The reviewer
-processed every flagged version same-day through 09-01 and has not run since --
-that gap is the window. **Do NOT post the SHORT request** (it points the review at
-that artifact). Order: coder closes 2.9 -> operator bumps to alpha.20 -> coder
-byte-diffs the CDN zip and reads its scan -> operator posts one short note naming
-alpha.20. The design rows (item 3) wait behind it.
+**NEXT UP: the alpha.20 bump, and it is the operator's.** Item 2.9 is CLOSED
+(`cc90b261`): the nine unconfined write sinks, the arbitrary file read the earlier fix
+missed, the remaining UNC stats, and both POST routes. Suite **13459 passed / 126 skipped / 1 xfailed**.
+The coder's next move comes AFTER the bump: download the CDN zip, byte-diff it
+against the commit, read its scan record. Only then does the short note get
+posted, naming alpha.20.
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
-* **The alpha.20 bump, once 2.9 is green and pushed** -- then the short note (item 4).
+* **The alpha.20 bump. 2.9 is green and pushed (`cc90b261`), so this is the next
+  move** -- editing `pyproject.toml` IS the publish. Then the short note (item 4).
   **All three review drafts are DO-NOT-SEND until alpha.20 exists** -- the SHORT one
   names alpha.19 and claims every surface is closed; neither is true.
 * Any further `pyproject.toml` bump (each one auto-fires a publish).
@@ -310,44 +306,6 @@ files:
 That is no longer a closed spec with one right answer, so it is a DESIGN item and
 takes an arc before code. Not scheduled. DONE WHEN: an owner is named for the
 pre-writer check and it refuses only what the dispatch could not have resolved.
-
-### 2.9 THE REGISTRY PUNCH LIST -- the alpha.20 gate (consensus 2026-09-05; the r1 arc is DONE, this is r2/r3 work)
-
-**Read `docs/2026-09-05-registry-plan-consensus/CONSENSUS.md` first; it IS the
-anchor.** Every item below was confirmed by two independent skeptics against the real
-files and the published alpha.19 tree. One change set, at the EXECUTE METHODS, never in
-shared resolvers or the spawn gateway.
-
-1. **`confine_to_output_tree(value, field, *, roots=None)` in `nodes/_otr_paths.py`:**
-   after `reject_remote_path`, realpath both sides, `commonpath == root`, textual `..`
-   reject; root = `comfy_output_dir()` (the 4060's `OTR_OUTPUT_DIR` keeps working) plus
-   an operator env allowlist `OTR_EXTRA_OUTPUT_ROOTS`; compare resolved-to-resolved
-   (a mapped drive resolves to UNC).
-2. **Call it on the nine write sinks:** CaptionBurn `out` INCLUDING `_default_out` (it
-   writes beside `video_path`) and the input paths; MasterAudioMux and SilentComposite
-   `out` + inputs; ProcgenBlend `source_mp4_path`/`procgen_mp4_path`/`scopes_mp4_path`;
-   CreditsRoll `video_path`; SceneAwareScopes `episode_id` through `_validate_episode_id`;
-   VideoRenderBatch `engine` whitelisted against the registry before it is a filename;
-   SceneSequencer: delete the dead `output_dir` makedirs (and the inert trailing widget);
-   voice nodes: ledger path / cache dir from `in_flight_ledger_path()`, never wire
-   `meta.paths`.
-3. **LFI-01:** `render_driver._still_spine_materialize_row` (`:909-929`) copies a
-   ledger-carried `pool_path` verbatim into a `/view`-served dir -- the sibling copier
-   `9d3f56a7` missed. Gate it with `_trusted_pool_source` (and use realpath, not abspath).
-4. **UNC stats `79dc9828` missed:** voice `ref_path` open in fingerprinting; blend
-   `scopes_mp4_path`; validator `profile_id` join; composite/scopes manifest paths;
-   `scene_sequencer.py:85`; `otr_video_render_batch.py` (no remote reject at all);
-   `otr_silent_composite.IS_CHANGED` step 3.
-5. **Delete the two POST render routes from `__init__.py`** (nothing shipped calls them;
-   retire `tests/test_http_render_route_gate.py` in the same commit). Optionally drop
-   `fullpath` from the GET.
-6. **Untouched:** the three byte-hashed files, ffmpeg via subprocess, episode content.
-   **Proof:** full suite + Bug Bible; the four widget/link tests if a widget goes; ONE
-   canonical leg to `otr/obs/`. **Review:** Sonnet 5 QA on the diff, then a Fable gate
-   (a missed thread here is a fourth ban and a burned version string).
-7. **Fix two stale sentences while there:** `.comfyignore` (viewer paragraph) and
-   `PROD_BUG_LOG.md:10690` say `/otr/latest_ledger` is env-gated. It is not; only the
-   POSTs are.
 
 ## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
 

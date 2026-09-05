@@ -16163,3 +16163,75 @@ test-patch anchor into a real NUL byte, so three `str.replace` calls silently
 matched nothing -- and I had not asserted on them. The Edit tool landed all three
 first try. A patch that carries a Windows path or a byte literal goes through the
 file tools, never a heredoc, and every `replace` gets an assert.
+
+---
+
+## 2026-09-05 -- the registry punch list: nine unconfined writes, one arbitrary file read, both POST routes
+
+**`cc90b261`** -- the change set the consensus panel asked for
+(`docs/2026-09-05-registry-plan-consensus/CONSENSUS.md`). Suite **13459 passed / 126 skipped / 1 xfailed**.
+
+**WHAT WAS ACTUALLY WRONG, and it was never the twelve scanner findings.** A survey
+of 578 packs / 3,707 versions showed the Comfy Registry reviewer bans same-day on
+attacker-reachable CLASSES and approves versions with dozens of `info` findings --
+**0 of 102 approvals under policy-v0.2 had a clean scan**, and 31 of them shell out
+via subprocess. Three sessions had been optimising a number that was never the gate.
+
+**The nine write sinks.** Every one of them was a value declared in a node's
+`INPUT_TYPES`, which ComfyUI's unauthenticated `/prompt` sets to any literal --
+guarded only by the UNC/URL refusal, which passes every ordinary local absolute
+path. `confine_to_output_tree` in `_otr_paths.py` now resolves both sides and
+requires the destination under the ComfyUI output root, `$OTR_OBS_DIR`, ComfyUI's
+input dir, or `$OTR_EXTRA_OUTPUT_ROOTS`.
+
+**THE PLACEMENT WAS WRONG THE FIRST TIME AND THE SUITE SAID SO.** The guards went
+on the raw widgets at the top of each execute method, and ~40 tests failed --
+including `test_caption_burn_default_off_passthrough`, which passes a path and
+writes NOTHING. A passthrough that refuses a path it will never touch is a false
+alarm, so every guard moved onto the COMPUTED DESTINATION, past the early exits.
+That is also the more complete fix: with the output widget empty -- **the shipped
+canonical wiring** -- `_default_out` derives the destination from an INPUT path, so
+confining the output widget alone would have left the sink open. The failing tests
+were not noise; they located the design error.
+
+**The arbitrary file read the earlier fix missed.** `9d3f56a7` closed the image
+dispatcher's forged-cache chain and never looked at its sibling:
+`render_driver._still_spine_materialize_row` copied a ledger-carried `pool_path`
+into the episode stills dir -- which ComfyUI serves over `/view` -- behind nothing
+but `os.path.isfile`. No GPU, no engine, reachable from
+`OTR_VideoRenderBatch.patched_ledger_json`. `_trusted_still_source` now requires it
+inside the run's own `otr/` tree, a real PNG, past a size floor. **HEAD was not
+LFI-clean; only alpha.19 was known to be.**
+
+**Both POST render routes are deleted, not gated.** They read caller-supplied paths
+from an unauthenticated body and started a background GPU render, with the body's
+`engine` field becoming a report FILENAME. No verdict in the surveyed corpus says
+whether an env gate around a route REGISTRATION discharges the class, so the answer
+is to not ship the construct. Nothing shipped called them; `scripts/` still drives
+the same entry points in-process.
+
+**Also closed:** the `episode_id` and `engine` labels that became filenames; a
+`profile_id` that could name a path; the wire ledger's `meta.paths.ledger_path`,
+which reached `os.replace` over any JSON on the box (the in-flight singleton owns
+that path now); the UNC stats `79dc9828` missed -- including **step 3 of the very
+hook that commit named**; and `fullpath` plus `str(exc)` in the unauthenticated GET,
+which named the operator's own directory tree to anyone who could reach it.
+
+**Two fixtures were lying about production.** They planted `b"still"` at
+`tmp_path/pool.png` -- outside the pool and not an image, which is exactly the
+attack shape. The real pool is `<output>/otr/episodes/_shared/cache` and holds PNGs
+this pack wrote. A fixture that models the attack instead of the product will
+defend the attack the moment someone closes it.
+
+**The input directory is permitted ON PURPOSE**, and the reasoning is worth keeping:
+core ComfyUI's own unauthenticated `POST /upload/image` already writes arbitrary
+bytes there, so refusing it would cost legitimate graphs and deny an attacker
+nothing. The ban class is a write to an arbitrary location, not to a directory
+ComfyUI itself manages.
+
+**THE HEREDOC TRAP, FOURTH TIME, and this time it cost nothing:** a patch script
+carrying `\x00` in PNG magic went through a quoted heredoc and Python refused the
+source outright ("source code string cannot contain null bytes") BEFORE writing.
+The assert-then-parse order is what made it free. The Edit tool landed both patches
+first try. The rule is now absolute: a patch holding any backslash escape never
+goes through a heredoc.
