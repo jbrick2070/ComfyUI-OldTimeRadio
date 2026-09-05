@@ -160,6 +160,65 @@ sites, and `ffmpeg` is load-bearing. Reaching zero means the strip-down ladder's
 and beyond, or a smaller shipped surface. **That is a product decision, not a patch --
 but it is now a decision worth making, where before it looked pointless.**
 
+**AND IT IS ALL-OR-NOTHING. This is the part that decides whether to start at all.**
+The test is `issues == ""`, so ONE surviving finding flags the version exactly as
+thirteen do. **13 -> 1 is worth precisely as much as 13 -> 13: nothing.** Therefore:
+* **Never spend a session on partial finding reduction.** Removing an `os.environ.get`
+  here and a `requests` call there buys zero until the last one is gone, and every such
+  edit is a real change to shipped behaviour taken for no return. This is the trap the
+  old "the info findings were never the ban" ruling protected us from for the wrong
+  reason, and it still protects us for the right one.
+* **The only question worth answering first is whether zero is REACHABLE at all** with a
+  pack that still does what OTR does. `ffmpeg` alone may settle it -- if the shipped
+  bundle cannot mux an episode without a `subprocess` call, and the scanner flags every
+  `subprocess` call, then no version of the FULL product can ever scan clean and the
+  ladder terminates at "a smaller pack" (OTR-Lite / the sandbox), not at "this pack,
+  cleaned". **Answer that before touching a line of code.**
+**AND THE ANSWER IS: ZERO IS REACHABLE, WITHOUT GUTTING THE PRODUCT.** Measured
+2026-09-05 by downloading real published bundles off `cdn.comfy.org` and grepping them.
+
+**The control that matters is `rgthree-comfy 1.0.2608210019`,** because it was created
+**2026-08-21** -- AFTER the rule change that flagged our alpha.9, so it was scanned by
+the CURRENT scanner -- and its `status_reason` is the literal string
+**`Passed automated checks`**, i.e. it auto-promoted on a clean scan. Its bundle
+contains:
+
+| pattern | hits in the CLEAN-SCANNED rgthree bundle |
+|---|---|
+| `subprocess` | **12**, in 3 files |
+| `requests.` / `urlopen(` | **3** |
+| `os.environ` | 0 |
+
+Including `subprocess.Popen(['git', 'add', '.'], ...)` and, at `__build__.py:107`,
+**`subprocess.run(cmds, check=True)` where `cmds` is a bare VARIABLE** -- the exact shape
+our `proc.py:161` uses and is flagged for.
+
+**So all three of these are FALSE and must not be repeated:**
+* "any `subprocess` call flags" -- rgthree has twelve and scanned clean;
+* "a variable argv flags where a list literal does not" -- rgthree passes a variable;
+* "any network call flags" -- rgthree has three and scanned clean.
+
+Older corroboration, CONFOUNDED by age but pointing the same way:
+`comfyui-videohelpersuite 1.7.9` also reads `Passed automated checks` and ships **61
+`subprocess` hits and 9 `os.environ` hits** -- an entire pack built on shelling out to
+ffmpeg, scanned clean. It was created 2025-12-17, so it may predate the rule change;
+cite rgthree, not VHS, when the date matters.
+
+**THEREFORE THE STRIP-DOWN LADDER IS THE WRONG TOOL.** We do not need to remove ffmpeg,
+the cloud lanes or the env reads. Something NARROWER than "uses subprocess / network /
+env" separates a flagged call site from a clean one, and **finding that discriminator is
+now the single highest-value open question on the registry.**
+
+**The next step, and it is cheap:** pull more recently-created bundles whose reason is
+`Passed automated checks`, grep them for our three flagged patterns, and diff the call
+sites that survive against ours. One candidate worth testing first, because it would
+explain everything: rgthree's `subprocess` lives entirely in `__build__.py`,
+`__commit__.py` and `__update_comfy__.py`, which are DEV scripts nothing imports at
+runtime -- so the scanner may do reachability from the node entry points rather than a
+flat file grep. **That theory is not yet confirmed and one fact already strains it:** our
+own `scripts/_otr_idx_download_weights.py` is imported by nothing and is invoked only by
+a PowerShell installer, and it still produced finding 13. Test it, do not assume it.
+
 **Also settled from the same file:** `TriggerComfyNodesBackfill` selects on
 `ComfyNodeExtractStatusEQ(Pending)` with NO status filter, so node extraction is
 INDEPENDENT of approval. Our empty node index is a real defect but it does not gate
