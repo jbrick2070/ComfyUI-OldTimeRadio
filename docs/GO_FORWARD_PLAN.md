@@ -112,9 +112,14 @@ resolution.
 
 **STILL OPEN, in priority order:**
 
-1. **THE PUBLISH.** Bump `pyproject.toml` and push -- that auto-fires the
-   registry publish, so it is a release trigger, not a config edit, and it needs
-   a NEW version string. **The operator's call, per section 7.**
+1. ~~THE PUBLISH~~ **DONE. `2.0.0-alpha.19` is published and Pending**
+   (`531ddda4`, workflow green, 19 dependencies recorded). And alpha.18's scan
+   finally landed, which measures the collapse for the first time:
+   **158 findings -> 12**, all `info`, zero critical. env manipulation 103 -> 4,
+   command-injection 35 -> 3, url-command-execution 12 -> 0, and the
+   bytecode / windows-process / sensitive-file singletons all to 0. (Correction
+   worth keeping: the url-command drop was the SPAWN-OWNER collapse, not the
+   error-string rewording an earlier note credited.)
 2. **File the re-review request.** `docs/2026-09-04-registry-review-request-SHORT.md`
    is rewritten for the real story ("you were right on both counts, both are
    closed"). **DO NOT SEND either older draft** -- they never mention the ban,
