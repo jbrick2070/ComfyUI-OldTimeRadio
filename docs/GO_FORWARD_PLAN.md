@@ -389,6 +389,52 @@ CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7
 - **`meta` is a 120-key drawer** -- scope as its own rip under the ledger law (every field exactly one owner).
   - Operator ruling: this is the cleanup the operator keeps asking for.
 
+### 4B. THE STRIP-DOWN BISECT -- operator's idea, 2026-09-05, NOT YET RUN
+
+**His framing, and it is the right experiment:** *"we hack this workflow down
+... what are registry liabilities, we hack off that feature from the least
+invasive to the worse to see if we can get a pass."*
+
+Everything else we have done infers what the reviewer objects to. This MEASURES
+it. Publish progressively reduced versions of the pack until one passes, and the
+feature whose removal flipped the verdict IS the liability -- no more reading
+verdict prose for other packs and reasoning by analogy.
+
+**WHY IT IS NOT THE SANDBOX PACK, and why we may want both:** the sandbox
+(`docs/2026-09-05-sandbox-pack-DESIGN.md`) asks "does a CLEAN pack go Active
+without a human at all?" -- a question about the SYSTEM, answerable in two
+publishes of a throwaway id. The bisect asks "which of OUR features is
+disqualifying?" -- a question about THIS pack, and it costs a version string per
+rung on our own listing. Run the sandbox first: if a clean pack still needs a
+human, the bisect can only ever measure what a human dislikes, which changes how
+many rungs are worth publishing.
+
+**THE LADDER, least invasive first.** Each rung is a version; stop at the first
+pass. Cheap-and-reversible before anything that costs a feature:
+1. Bundle hygiene only -- drop `ROADMAP.md`, the 92 `workflows/variants/*.md`,
+   the 1.7 MB of GitHub social art. Removes nothing a user runs.
+2. Drop the optional CLOUD lanes from the shipped bundle (OpenRouter, Google
+   API, Comfy-credits, cloud media). That is 4 of the 5 network findings and
+   they are all opt-in, default-off. Local-first is the product anyway.
+3. Drop the RSS feed fetcher (the 5th network finding). Costs the
+   `media_archive` / `scifi_news_pro` source lanes their live feeds.
+4. Drop the sidecar TTS engines (Chatterbox, Dia, IndexTTS2) -- removes the one
+   direct `subprocess.Popen` and the two byte-hashed findings with it. Costs
+   three voice engines; kokoro remains.
+5. Drop the Blender mesh lane.
+6. Only then: the ffmpeg media path (PyAV migration), which Astra measured as
+   FEASIBLE for encode but which leaves the gateway findings anyway.
+
+**RULES IT INHERITS:** every rung is READ from
+`?include_status_reason=true`, never predicted; never version-delete (it burns
+the string); never bump while a version is Pending; and the strip is done on a
+BRANCH, never on the shipped tree -- rung 4 onward removes real features and
+must not reach `v2.0-alpha` by accident.
+
+**DONE WHEN:** a rung passes, or the ladder is exhausted and we know the pack
+cannot pass automatically -- which is itself the answer, and the one that makes
+the manual-exception request the only route.
+
 ## 4. THE REGISTRY -- ONE THING LEFT, AND IT IS THE OPERATOR'S
 
 **`2.0.0-alpha.19` is published and Flagged -- the expected outcome.** Its scan
