@@ -16121,3 +16121,45 @@ measures the earlier collapse for the first time: **158 findings -> 12**, all
 `info`, zero critical. Filing the re-review post remains the operator's act;
 `docs/2026-09-04-registry-review-request-SHORT.md` is finalized with the measured
 numbers, and BOTH older drafts are marked DO-NOT-SEND.
+
+---
+
+## 2026-09-05 -- Fable's two remaining findings closed; the method rip shipped; GO_FORWARD made current
+
+**`31dc6861`** -- **the pending sweep no longer deletes what it cannot read.**
+`_ledger_has_lines` returned `None` for BOTH "no ledger" and "ledger unreadable",
+and the caller took `None` as permission to `rmtree` the whole `pending_*` dir.
+Now four states: absent / unreadable / empty / has_lines. Unreadable is reported
+and preserved; absent deletes only on POSITIVE emptiness (zero regular files
+beneath); age is the newest mtime BENEATH the dir, because an NTFS directory
+mtime moves only on direct-child changes. `UnicodeDecodeError` used to ESCAPE the
+reader entirely, contradicting its never-raises contract -- caught now.
+Two tests that PINNED the double-booking ("deleted" AND "skipped" for one dir)
+were corrected; five new cases added. **The fixture had to change too**: it aged
+only the top-level dir with `os.utime`, so the ledger it had just written inside
+was fresh and every fixture dir read as in-flight under the new rule. A fixture
+that ages the top level alone lies about a 2-hour-old abandoned run.
+
+**`14c6a6db`** -- **replay import requires its ledger and master to be among the
+files it verified.** Two membership checks in `load_replay_manifest`, the ONE
+validator the exporter also runs on its own output -- it always `_add`s both
+first, so no shipped bundle is refused. Two tamper cases added to the existing
+parametrized refusal test.
+
+**`e413ac00`** -- **13 methods ripped** (the subroutine pass). Three-way verified: Astra
+kept `emo_list` (byte-hashed) and `load_patcher` (an override of a ComfyUI-GGUF
+base, reached through `_cpu_pinned_clip_loader` -- invisible to any scan of this
+repo); a 32-agent hunt-then-refute workflow kept `require_window` on the
+`_otr_source_grounding.py` carve-out; the driver caught that `window_for` sits in
+the SAME protected file four lines away and was on the RIP list. A file-level
+carve-out cannot keep one method and rip its neighbour.
+
+**GO_FORWARD was actively wrong, not merely stale** (`4ea420f4`): item 4 told the
+next window to post a review draft that never mentions the BAN. Four sections
+rewritten, 167 lines archived verbatim.
+
+**THE HEREDOC TRAP BIT AGAIN, THIRD TIME:** a quoted heredoc turned `\x00` in a
+test-patch anchor into a real NUL byte, so three `str.replace` calls silently
+matched nothing -- and I had not asserted on them. The Edit tool landed all three
+first try. A patch that carries a Windows path or a byte literal goes through the
+file tools, never a heredoc, and every `replace` gets an assert.

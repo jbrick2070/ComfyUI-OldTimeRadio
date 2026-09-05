@@ -72,27 +72,18 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-05, end of the security + rip session):** `v2.0-alpha`, HEAD ==
-origin at `9d3f56a7`, clean tree. Suite **13446 passed / 126 skipped / 1 xfailed,
+**State (2026-09-05, all three Fable findings closed):** `v2.0-alpha`, HEAD ==
+origin at `14c6a6db`, clean tree. Suite **13430 passed / 126 skipped / 1 xfailed,
 RC=0**. No resident server; VRAM at the desktop baseline. GPT-6 Astra is available
 at `ultra` reasoning -- the older "Codex credits out until 09-07" note is dead.
 
-**`2.0.0-alpha.19` IS PUBLISHED AND PENDING** (19 deps recorded, workflow green).
-alpha.18's scan finally landed and measures the collapse for the first time:
-**158 findings -> 12**, all `info`, zero critical.
+**`2.0.0-alpha.19` IS PUBLISHED AND FLAGGED -- its scan landed 09-05** (19 deps
+recorded). The record is BYTE-IDENTICAL to alpha.18's: **12 findings, all `info`,
+zero critical** (4 env-var reads, 5 network, 3 subprocess). The collapse
+**158 -> 12** is now measured on the version a stranger would install.
 
-**NEXT UP, in order:**
-1. **Fable's finding 2** -- a corrupt ledger lets the pending-sweep `rmtree` a whole
-   `pending_*` directory. Cannot destroy a PUBLISHED episode (the dir is renamed off
-   `pending_*` before video, and `otr/obs/` is a different root) but CAN destroy a
-   failed run's forensics, and an in-flight episode in the two-server configuration.
-   The predicate is backwards: "cannot read the ledger" is treated as "may delete".
-   Fix is in the disposition table of `sweep_empty_pending_dirs`, NOT in
-   `_ledger_has_lines` alone -- see item 2.6.
-2. **The method rip** -- 16 candidates cleared by Astra, verification in flight.
-3. **Fable's finding 3** -- replay import accepts a ledger absent from the manifest's
-   verified `files[]`. Three-line fix in `load_replay_manifest`; do it with the next
-   replay touch.
+**NEXT UP:** the GO_FORWARD design rows (item 3) -- every remaining coder item now
+needs an arc before code. Nothing in items 1-2 is owed.
 
 **ONLY THE OPERATOR DOES THESE -- stop and ask:**
 * **File the registry re-review.** The post body is
@@ -107,7 +98,7 @@ receipt in `docs/HANDOFF_LOG.md`. Completed narrative goes to
 
 ---
 
-## 1A. THE SECURITY WORK -- FOUR SURFACES CLOSED, TWO OPEN
+## 1A. THE SECURITY WORK -- SIX SURFACES CLOSED, NONE OPEN
 
 **Receipts in `docs/HANDOFF_LOG.md`; the narrative is in GO_FORWARD_ARCHIVE.md.**
 Reading the registry's own `status_reason` -- not the finding counts -- showed
@@ -122,10 +113,10 @@ via unauthenticated /prompt (node widget) or no-auth route"*. Both clauses were 
 | the same coercion through `IS_CHANGED`, which runs BEFORE the execute guard | `79dc9828` |
 | forged image-cache entries -> arbitrary local FILE READ, served by `/view` | `9d3f56a7` |
 | the no-auth route half (`POST /otr/video_render_*`, unconditional in alpha.13) | `b198026a`, 09-03 |
+| the pending sweep deleting what it could not READ (Fable finding 2) | `31dc6861` |
+| replay import trusting a ledger the manifest never verified (Fable finding 3) | `14c6a6db` |
 
-**STILL OPEN -- both confirmed by Fable, ranked by it:**
-* **Finding 2, the pending-sweep `rmtree`** -- item 2.6 below.
-* **Finding 3, the replay manifest gap** -- item 2.7 below.
+**Nothing from the security reviews remains open.**
 
 **THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
 prior session optimised a number that was never the blocker.
@@ -311,60 +302,6 @@ That is no longer a closed spec with one right answer, so it is a DESIGN item an
 takes an arc before code. Not scheduled. DONE WHEN: an owner is named for the
 pre-writer check and it refuses only what the dispatch could not have resolved.
 
-### 2.6 THE PENDING SWEEP DELETES WHAT IT CANNOT READ (Fable, 2026-09-05 -- CONFIRMED)
-
-`nodes/_otr_pending_cleanup.py:100-104` catches `(OSError, json.JSONDecodeError)` and
-returns `None`; the caller reads `None` as "no ledger -- treat as empty if the age
-cutoff was met" at `:159-174` and runs `shutil.rmtree(child)`. A directory is booked
-as `skipped_no_ledger` AND deleted in the same branch. The writer invokes the sweep
-automatically at `OTR_LedgerScriptWriter.py:3421-3441`.
-
-**Blast radius, measured:** a published episode CANNOT be destroyed -- the directory
-is renamed off `pending_*` at `video_engine.py:2014` before video, and `otr/obs/` is a
-different root the sweep never walks. Disk today: **403 `pending_*` dirs, zero `.mp4`
-under any of them.** What CAN be destroyed is a failed run's forensic remains, and --
-in the two-server configuration this box actually runs -- an in-flight episode's whole
-audio stage, because the rename happens much later than the module's docstring assumes.
-
-**THE FIX, and the obvious placements are wrong:**
-1. `_ledger_has_lines` returns FOUR states (absent / unreadable / empty / has_lines).
-   **unreadable** (`OSError`, `JSONDecodeError`, `UnicodeDecodeError`, non-dict) ->
-   report and SKIP, never delete. Returning `False` on error just turns "unreadable"
-   into "empty" and it still gets deleted.
-2. The **absent** branch deletes only on POSITIVE emptiness -- zero regular files
-   anywhere under the child, via `os.walk`.
-3. Age from the NEWEST mtime beneath the dir. `child.stat().st_mtime` moves only on
-   direct-child churn, so a long audio stage looks "old".
-4. Two tests PIN the contradictory disposition and must change with the fix:
-   `tests/test_bug_local_290_pending_cleanup.py:91-99` and `:181-183`.
-
-Wrapping the call in the writer changes nothing -- the writer never sees the disposition.
-
-### 2.7 REPLAY IMPORT ACCEPTS A LEDGER THE MANIFEST NEVER VERIFIED (Fable -- CONFIRMED)
-
-`production_ledger.py:623-642` verifies size, hash and islink for entries in `files[]`
-only; `:643-647` then requires `manifest["ledger"]` to be merely PRESENT and opens it at
-`:693-695` with no digest and no membership check. A frozen bundle's ledger can be
-swapped after freezing without detection. Local-only (UNC is already refused at
-`:611-615`), so it is an INTEGRITY hole, not a remote primitive.
-
-**Fix in `load_replay_manifest`, not `import_replay_bundle`:** require
-`_safe_relative(manifest["ledger"])` and `["master_audio"]` to be in `seen`. That is the
-ONE validator -- `scripts/otr_freeze_replay_bundle.py:174,227` runs it on its own output
-and always lists both, so no bundle the shipped tool ever produced is refused. It also
-replaces the assembler's misleading late "bundle master missing"
-(`scene_sequencer.py:1300-1303`) with a clear error at import.
-
-### 2.8 THE METHOD RIP (in flight 2026-09-05)
-
-The top-level rip never looked at METHODS. Of 447 methods on shipped classes -- after
-excluding ComfyUI hooks, the `FUNCTION` execute methods, the engine protocol surface,
-dunders and DECORATED methods -- 3 are referenced nowhere and 17 only by tests. Astra
-cleared 16 for rip and KEPT two: `emo_list` (on the byte-hashed indextts2 adapter) and
-`load_patcher` (an OVERRIDE of a `ComfyUI-GGUF` base method reached through
-`_cpu_pinned_clip_loader`). Per-method adversarial verification is running; rip only
-what survives, and re-run `dead_code_closure.py` to a fixpoint afterwards.
-
 ## 3. THE DESIGN ROWS -- each gets its arc BEFORE code; ALSO before the registry, because a code change after the publish is a new version and a new review
 
 None of these is the next coder window (that is item 1), but every one of them lands
@@ -442,7 +379,9 @@ CONSTRAINT: ceiling by arithmetic is 1,520 words (19 voiced beats at act_count 7
 
 ## 4. THE REGISTRY -- ONE THING LEFT, AND IT IS THE OPERATOR'S
 
-**`2.0.0-alpha.19` is published and Pending.** Nothing here is a coder task.
+**`2.0.0-alpha.19` is published and Flagged -- the expected outcome.** Its scan
+landed 09-05 with a record byte-identical to alpha.18's (12 `info`, zero critical).
+Nothing here is a coder task.
 
 **THE ONE OPEN ITEM: file the re-review post.** It is a PUBLIC act and needs the
 operator's own go.
@@ -472,8 +411,8 @@ kept only as the alpha.17 record. They are not merely stale, they are WRONG:
 | `windows_process_manipulation` / `bytecode` / `sensitive_file_access` | 1 each | 0 |
 | **total** | **158** | **12** (all `info`, zero critical) |
 
-**Read alpha.19's own scan before posting** -- it clears the 30-minute window on
-Comfy-Org's cron, and the post quotes a version a stranger would install.
+**alpha.19's own scan is READ (09-05): identical to alpha.18's, so the table above
+is the number the post quotes** -- for the version a stranger would install.
 
 **UNCHANGED AND STILL TRUE:** there is no publisher self-service route to Active;
 `Flagged` is the expected outcome, not a failure; the card's "N Nodes" count is a
