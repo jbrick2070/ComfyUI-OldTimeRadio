@@ -2953,3 +2953,19 @@ Second passive screenshot05:23:32.916PDT retained privately in
 Finished-document review confirmed matrix scope/exclusions; did not separately
 reverify the root's run/test timestamps. Only the3documentation files are staged
 for this checkpoint; the incomplete canonical/derived/test bundle stays local.
+
+### Step67 -- 2026-09-06 05:31-05:39 PDT, concept selection completes; brief starts
+
+Same single04:50:36.149 GUI Run. Selection320tokens05:31:16.894,
+372tokens05:33:23.413 (903.1s,0.4tok/s), followed automatically by
+original_brief05:33:23.421 using technical Gemma slot/cache. Brief64tokens
+05:35:58.872 and128tokens05:38:33.206. Healthy progress; not full writing,
+rendering or publishing success. No new error/OOM/401/download or rename.
+
+Read-only checkpoints05:31:34.313 and05:38:51.486PDT each retain1screenshot
+and full available Logs tree in private4060-heartbeat-20260906-0531/0538
+HTML/Markdown files. No input/requeue/restart/installed edit/cleanup/hand setup
+or explicit sleep. Pending one-act source bundle,92variant regeneration and
+source-only GUI-progress patch remain deferred to active-run completion.
+Only documentation milestone goes to Git; no registry publication. Existing
+heartbeat continues quietly between meaningful stage changes.
