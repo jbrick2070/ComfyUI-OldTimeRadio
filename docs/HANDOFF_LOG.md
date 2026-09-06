@@ -16588,3 +16588,61 @@ Pending; awaiting the scan cron verdict.** On the four-pack model this
 auto-passes; the oracle is a prediction, not a guarantee. If it flags, read the
 new `status_reason`, patch the oracle regexes to match, publish alpha.24 -- the
 tree is untouched, only the string is spent.
+
+---
+
+## 2026-09-05 -- 2.1 GENDER LADDER closed, and alpha.23 went ACTIVE
+
+**alpha.23 auto-promoted: status_reason "Passed automated checks", ~95 minutes
+after publish, no human involved.** latest_version resolves to it, so the pack
+installs from the registry again -- the first installable version since the
+alpha.13/.14 ban. The oracle predicted the verdict exactly (0 findings -> Active),
+so the method is proven end to end: iterate to oracle-zero locally, publish once.
+Read the registry 2-3 times before concluding; the first read after promotion
+still served latest_version=None from a stale replica.
+
+**2.1 shipped as a 3-round kibitz arc, and the panel replaced the driver's design
+in every round.** Roster stated honestly: r1/r2 = Codex (spark, xhigh) +
+Antigravity; r3 = Antigravity + Sonnet, substituted after Codex hit its Spark
+usage limit (CLAUDE.md: fill the seat, never block).
+
+* **r1 killed a build that would have broken the render path.** The driver's
+  anchor claimed tiers 3-4 were unbuilt -- a grep scoped to nodes/ only. Both
+  lanes found the whole four-rung ladder already shipped 09-02 in
+  scripts/otr_stamp_character_genders.py, with persistent indexes (19 + 84
+  names). Building from that anchor would have put an LLM call in nodes/.
+* **r2 corrected the row itself.** "Tier 4 keeps the ladder total" is false -- it
+  declines by design, pinned by a test, and the 40/40/20 roll is the real floor.
+  Shakespeare's backlog is 11 rows, not 32, and all 11 are group speakers,
+  operator-locked, or cached unsure: a stamper re-run changes zero rows.
+* **A grounded fan-out then found a WORSE defect neither round looked for**, and
+  it reproduced live: MR BENNET resolved FEMALE citing his own daughter.
+* **r3 broke both of the driver's proposed clauses by measurement.** The
+  token-count guard cost 274 false declines against 242 fixes, and it broke the
+  regression test THIS campaign had just added.
+
+WHAT SHIPPED: given-name and bare-title aliases stop being join keys (filtered on
+READ, so every committed sidecar is repaired with no re-stamp, and on WRITE so a
+re-stamp cannot reintroduce them); a GENDER-CONTRADICTION guard; and a
+courtesy-title rung that answers LAST, cites nobody, and stamps
+gender_source=title_honorific / gender_confidence=stated -- deliberately NOT the
+stamper's "title", which means a fact the SOURCE stated.
+
+Measured: MR BENNET -> male citing nobody; COLONEL FITZWILLIAM -> unknown;
+MISS CUTHBERT / MR CUTHBERT now resolve to Marilla and Matthew (a family that
+used to abstain uselessly); all six agreeing/ungendered titles keep their
+citations; 255/255 rows still resolve by their own name.
+Suite 13583 passed / 126 skipped / 1 xfailed.
+
+**Carried, deliberately not fixed:** MRS BENNET still cites Elizabeth (female
+title, female row -- right gender, wrong citation, the cosmetic class).
+Shakespeare cross-dressing lanes are a latent risk with ZERO live instances
+today. A stray worktree .claude/worktrees/awesome-brahmagupta-a509b4/ holds an
+older copy of this module.
+
+**2.2 GHOST POOL is mapped but NOT built, and the map changed the row:** the
+finalized prompt is safe as a uniqueness key (200 identical runs -> 1 output; 18
+clauses x 2 motifs -> 36/36 distinct), but the BOOKEND motif table collapses to 2
+distinct motifs on every seed tried and all 4 music_visual beats share one. The
+uniqueness ladder fixes character beats and CANNOT fix bookend exhaustion -- that
+is a separate floor the row does not account for.

@@ -16,8 +16,18 @@ What this module will and will not do
 -------------------------------------
 It reads a confirmed record and abstains honestly. A slot that no tier resolves,
 or whose candidates disagree, comes back "unknown" and is left to the existing
-roll -- no worse than today. It never guesses from a name, never calls an LLM, and
-never overwrites a confirmed sidecar fact.
+roll -- no worse than today. It never calls an LLM and never overwrites a
+confirmed sidecar fact.
+
+ONE NARROW EXCEPTION, added 2026-09-05 and named here rather than left implied:
+the slot's own leading COURTESY TITLE is read. A title is not a name guess -- it
+is a gendered form of address carried by the slot string itself, and `MR`/`MRS`
+are near-deterministic where a first-name frequency lookup is ambiguous by
+construction. It is still WEAKER than any record, so it is used two ways only:
+to DISQUALIFY a candidate row whose recorded gender it contradicts, and to answer
+LAST when no roster tier matched anything. It never outranks a confirmed row, and
+it cites nobody. The honest caveat: a cast slot is written by the adaptation
+model, so a title is a statement by that writer rather than by the source.
 
 Deliberately a separate module from `_otr_character_roster`, whose docstring
 states the render path reads a confirmed record and never infers. That module runs
@@ -57,6 +67,30 @@ _HONORIFICS = frozenset({
     # "Dr. Grimesby Roylott", "Prof. Challenger") -- seven live hints carry "Dr."
     "dr", "prof", "capt", "col", "gen", "lt", "sgt", "hon", "mme", "mlle",
 })
+
+#: The subset of `_HONORIFICS` that STATES a gender, and the gender it states.
+#: Derived from that table rather than re-declared, because a hand-picked subset
+#: drifts: an earlier draft of this work listed nine titles and silently omitted
+#: KING/QUEEN, DUKE/DUCHESS, COUNT/COUNTESS, MONSIEUR/MADAME, HERR/FRAU and
+#: twenty more that `_HONORIFICS` already carries.
+#:
+#: DR, PROF, CAPTAIN, COLONEL, REVEREND, NURSE and the rest are deliberately
+#: ABSENT: they state a rank or a profession, not a gender, and treating them as
+#: evidence is how a guard starts refusing correct joins.
+_GENDERED_HONORIFICS: dict = {
+    "mr": "male", "sir": "male", "lord": "male", "king": "male",
+    "duke": "male", "prince": "male", "don": "male", "friar": "male",
+    "father": "male", "brother": "male", "uncle": "male", "count": "male",
+    "baron": "male", "earl": "male", "monsieur": "male", "herr": "male",
+    "signor": "male", "senor": "male", "sire": "male", "master": "male",
+    "mrs": "female", "ms": "female", "miss": "female", "lady": "female",
+    "queen": "female", "duchess": "female", "princess": "female",
+    "madam": "female", "madame": "female", "mademoiselle": "female",
+    "mother": "female", "sister": "female", "aunt": "female",
+    "countess": "female", "baroness": "female", "frau": "female",
+    "signora": "female", "senora": "female", "dame": "female",
+    "mistress": "female", "widow": "female", "mme": "female", "mlle": "female",
+}
 
 _BINARY = ("male", "female")
 
@@ -308,11 +342,52 @@ _CONFIDENCE_FOR_SOURCE = {
     "roster": "known", "relation": "known", "title": "known", "group": "known",
     "back_reference": "known", "pronouns": "known", "supplement": "known",
     "llm_recall": "recalled", "name_frequency": "inferred",
+    # The render-time courtesy-title rung. DELIBERATELY NOT `title`: the stamper
+    # writes `title` for a gender the SOURCE stated about the person (`Aunt Em`,
+    # `Mrs. Dorman` carry it), and reusing it would make a read of the slot's own
+    # spelling indistinguishable from a confirmed source fact -- the exact
+    # citation dishonesty this rung exists to avoid.
+    "title_honorific": "stated",
 }
 
 
 def confidence_for_source(gender_source) -> str:
     return _CONFIDENCE_FOR_SOURCE.get(str(gender_source or ""), "")
+
+
+def _bare_token(value) -> str:
+    return str(value or "").strip().lower().strip(".,'")
+
+
+def _alias_is_a_join_key(stamped_alias, row_name) -> bool:
+    """True unless the stamped alias is this row's GIVEN NAME or a bare TITLE.
+
+    The parameter is `stamped_alias`, not `alias`: the forbidden-pattern sweep
+    (`tests/_s28_forbidden_sweep.py`) bans a bare `alias` identifier because it
+    marks BACK-COMPAT aliasing, which the no-legacy policy forbids. This is a
+    roster character alias -- a different thing wearing the same word.
+
+    A surname ("darcy", "scrooge") identifies the person and is what the alias
+    list is for. A given name does not: it is shared with everyone else who
+    carries it, including people the source never gave a row to. A bare title
+    ("father", "professor") identifies nobody at all.
+
+    The given name is taken from the HONORIFIC-STRIPPED row name, so `Dr. Lira
+    Kell` yields "lira" rather than "dr" -- reading the raw first token would
+    mistake the title for the name and leave the real given-name key in place.
+    A single-token row name (`Aunt Em` -> `Em`) has no given/surname split to
+    make, so its alias is kept.
+    """
+    token = _bare_token(stamped_alias)
+    if not token:
+        return False
+    if token in _HONORIFICS:
+        return False
+    bare = strip_honorifics(row_name)
+    parts = [p for p in bare.split() if p]
+    if len(parts) >= 2 and token == _bare_token(parts[0]):
+        return False
+    return True
 
 
 def _candidate_names(row: Mapping) -> tuple:
@@ -325,19 +400,96 @@ def _candidate_names(row: Mapping) -> tuple:
     ELIZABETH BENNET pinned female, MR. DARCY missed the join and rolled FEMALE).
     A surname alias shared by two rows makes both rows match, which is the
     ambiguous_join abstention by construction -- never a coin flip.
+
+    NOT EVERY STAMPED ALIAS IS A SAFE JOIN KEY (2026-09-05). `_aliases_for` in
+    the stamper borrows `mention_forms`, which also emits the GIVEN NAME and, for
+    a prose title it does not know, the TITLE ITSELF. The committed sidecars
+    carry both mistakes: `Fitzwilliam Darcy -> ['darcy', 'fitzwilliam']` and
+    `Father Brown -> ['brown', 'father']`. A given-name key lets a DIFFERENT
+    person take the row -- COLONEL FITZWILLIAM (who has no row of his own)
+    resolved MALE citing DARCY -- and the two-row disagreement that normally
+    abstains cannot fire when the other person is absent from the roster.
+    So both kinds are filtered on READ, which repairs every sidecar already on
+    disk without a re-stamp.
+
+    Dropping them costs nothing the ladder cannot recover: a given name is still
+    reachable through the `qualified` prefix tier (ELIZABETH still matches
+    ELIZABETH BENNET). The measured exception is a title PLUS a given name --
+    `MISS ELIZABETH` now abstains and falls to the roll, which is the honest
+    answer rather than a confident wrong citation.
     """
     names = []
+    row_name = ""
     for key in ("name", "roster_name"):
         n = _norm(row.get(key))
         if n and n not in names:
             names.append(n)
+        if not row_name:
+            row_name = str(row.get(key) or "")
     aliases = row.get("aliases")
     if isinstance(aliases, (list, tuple)):
         for a in aliases:
             n = _norm(a)
-            if n and n not in names:
+            if n and n not in names and _alias_is_a_join_key(a, row_name):
                 names.append(n)
     return tuple(names)
+
+
+def slot_honorific_gender(slot_name) -> str:
+    """The gender the slot's LEADING courtesy title states, or "".
+
+    Only the leading run is read: "MR" in `MR BENNET` addresses the person, while
+    a title appearing later belongs to someone else's name.
+    """
+    for word in str(slot_name or "").split():
+        token = _bare_token(word)
+        if not token:
+            continue
+        if token in _GENDERED_HONORIFICS:
+            return _GENDERED_HONORIFICS[token]
+        if token in _HONORIFICS:
+            continue  # an ungendered rank -- keep looking through the run
+        return ""
+    return ""
+
+
+def _honorific_verdict(stated: str) -> Optional[RosterGenderVerdict]:
+    """The LAST rung: the slot's own courtesy title, once the roster has nothing.
+
+    It cites NOBODY (`matched` is empty) precisely because it identified nobody --
+    that is the honest shape for evidence that came from the slot's spelling
+    rather than from a record. It sits below every roster tier and above the
+    40/40/20 roll, which is what a slot for a person the source never gave a row
+    to used to fall straight through to.
+    """
+    if stated not in _BINARY:
+        return None
+    return RosterGenderVerdict(
+        stated, "courtesy title in the slot states %s" % (stated,),
+        "title_rung", (), gender_source="title_honorific",
+        gender_confidence=confidence_for_source("title_honorific"))
+
+
+def _contradicts(slot_gender: str, row: Mapping) -> bool:
+    """True when the slot's stated gender and the row's recorded gender disagree.
+
+    THE GUARD THAT CLOSES THE WRONG-PERSON JOIN (2026-09-05). `MR BENNET`
+    resolved FEMALE citing ELIZABETH BENNET -- her father, pinned as his own
+    daughter, with a confidence of `recalled`. That is worse than not joining at
+    all: the roll would have given him 40% male.
+
+    The test is a GENDER CONTRADICTION, never a token count. A token-count guard
+    was measured and rejected: it produced 274 false declines (`DR. ROYLOTT`,
+    `MR. DARCY`, `MR. SCROOGE`, `MISS EYRE` -- every title that AGREES with its
+    row, plus every ungendered rank) against 242 real fixes. This form has zero.
+
+    An ungendered rank (`DR`, `COLONEL`, `PROFESSOR`) states nothing, so it never
+    refuses anything.
+    """
+    if slot_gender not in _BINARY:
+        return False
+    row_gender = str(row.get("gender") or "").strip().lower()
+    return row_gender in _BINARY and row_gender != slot_gender
 
 
 def _verdict_from(rows: Sequence, tier: str) -> RosterGenderVerdict:
@@ -387,41 +539,60 @@ def resolve_roster_gender(slot_name, characters: Iterable) -> RosterGenderVerdic
     Ambiguity abstains. A tier that matches only unknown-gender rows abstains too,
     and does NOT fall through to a looser tier: the source named this person and
     declined to gender them, which is an answer.
+
+    THE HONORIFIC IS READ TWICE, and both readings are subordinate to the roster.
+    A slot's leading courtesy title states a gender, so it (1) DISQUALIFIES a
+    candidate row whose recorded gender contradicts it -- which is what stops
+    `MR BENNET` binding his daughter, and also lets `MISS CUTHBERT` and
+    `MR CUTHBERT` pick the right sibling out of a pair that used to abstain --
+    and (2) answers LAST, only once every roster tier has found nothing at all.
+    Second place matters: 26 rows in the corpus are already resolved by the
+    pronoun rung with real textual evidence, and a title rung running earlier
+    would throw that evidence away to restate the same value with less standing.
     """
     slot = _norm(slot_name)
     rows = [dict(r) for r in (characters or []) if isinstance(r, Mapping)]
+    stated = slot_honorific_gender(slot)
     if not slot or not rows:
-        return RosterGenderVerdict("unknown", "no_roster", "none", ())
+        return _honorific_verdict(stated) or RosterGenderVerdict(
+            "unknown", "no_roster", "none", ())
+
+    # The guard is a PER-ROW filter, not a per-tier veto: a tier keeps the
+    # candidates the title does not contradict, so a mixed-gender surname pair
+    # resolves to the right person instead of abstaining.
+    def _allowed(candidates):
+        return [r for r in candidates if not _contradicts(stated, r)]
 
     exact = [r for r in rows if slot in _candidate_names(r)]
     if exact:
         return _verdict_from(exact, "exact")
 
     slot_short = _strip_honorifics(slot)
-    short_form = [
+    short_form = _allowed([
         r for r in rows
         if slot_short and slot_short in tuple(
             _strip_honorifics(n) for n in _candidate_names(r)
         )
-    ]
+    ])
     if short_form:
         return _verdict_from(short_form, "short_form")
 
-    qualified = [
+    qualified = _allowed([
         r for r in rows
         if any(n.startswith(slot + " ") for n in _candidate_names(r))
-    ]
+    ])
     if qualified:
         return _verdict_from(qualified, "qualified")
 
-    contains = [
+    contains = _allowed([
         r for r in rows
         if any(n and slot.startswith(n + " ") for n in _candidate_names(r))
-    ]
+    ])
     if contains:
         return _verdict_from(contains, "contains")
 
-    return RosterGenderVerdict("unknown", "no_match", "none", ())
+    return _honorific_verdict(stated) or RosterGenderVerdict(
+        "unknown", "no_match", "none", ())
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent

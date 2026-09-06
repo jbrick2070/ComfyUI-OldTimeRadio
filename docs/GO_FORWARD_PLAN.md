@@ -261,7 +261,6 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 | # | row | why it sits here |
 |---|---|---|
 | **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow, and the defect is CONFIRMED LIVE: a canonical leg with the ghost lane forced on rejected the batch on both attempts and cost that episode all 18 authored prompts. It owes a five-act GPU leg -- start the leg first, not last. |
-| 2nd | **2.1 GENDER LADDER** | A real design fork with one review round owed, then code. It is a CORRECTNESS defect (a character's voice contradicting the source), so it survives the story-quality freeze. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
 * **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
@@ -365,20 +364,6 @@ Every row here edits shipped `nodes/`. With the collapse's guards in place, a ro
 an env read or a spawn fails the suite, so this is exactly the work that must land before
 the publish and cannot move the findings once it does. Story quality is DONE and is not
 reopened (operator 2026-08-04); these are CORRECTNESS defects.
-
-### 2.1 CHARACTER GENDER LADDER (queue item 3a) -- the SPEC REWRITE is written; next is ONE review round, then code
-
-- **Run ONE review round on the rewritten spec, then write the code.** DONE WHEN: the round is recorded and the ladder is implemented and green.
-- **Decide the surname-only alias tier (open fork).** A given-name alias can match a different character with that surname (COLONEL FITZWILLIAM via "fitzwilliam"), so short_form needs a surname-only alias rule. DONE WHEN: the rule is specified and a wrong-character match is impossible. Recorded in PBUG-20260815-04's follow-up.
-- **Implement tier 3 as an LLM verdict on the name**, cached in a PERSISTENT name index so each name is asked once, ever. DONE WHEN: a repeat name costs zero LLM calls.
-- **Keep tier 4 name-frequency as the deterministic floor**, so the ladder stays TOTAL when the LLM call fails. DONE WHEN: an LLM failure still yields a gender.
-
-RULINGS (constraints, not history):
-- ARIEL / PUCK / ROBIN stay on the roll (locked index entries); Dr. Lira Kell is female (locked).
-- **Shakespeare: fill ONLY the 32 `unknown` roster rows.** KNOWN rows from the parsed dramatis personae stay untouchable; the ladder's lower tiers may fill the blanks.
-- **THE WEB-SEARCH TIER IS REPLACED, not plumbed.** There is no web call.
-- Operator's design, his words: *"just have the LLM decide -- ask what the likely gender of this person name is, have the LLM decide, and keep that in an index of names."*
-- The invented lanes (original, scifi_news_pro, media_archive) KEEP ROLLING by the standing ruling -- their characters do not exist, so no lookup of any kind applies.
 
 ### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
 

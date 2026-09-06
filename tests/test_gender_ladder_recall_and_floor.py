@@ -392,14 +392,187 @@ def test_the_join_reads_the_stamped_aliases_so_mr_darcy_is_a_man():
     assert out["MR. DARCY"]["gender"] == "male" and out["ELIZABETH BENNET"]["gender"] == "female"
 
 
-def test_a_given_name_alias_matches_and_that_is_the_recorded_limit():
-    """Leg 2 (2026-09-02): COLONEL FITZWILLIAM resolved through Darcy's given-name alias
-    "fitzwilliam" -- the right gender by coincidence. This pins the behaviour so a change
-    to surname-only aliases is a deliberate fork, not a drift."""
-    rows = [{"name": "Fitzwilliam Darcy", "gender": "male", "gender_source": "llm_recall",
-             "aliases": ["darcy", "fitzwilliam"]}]
+def _pride_prejudice_rows():
+    """The REAL committed sidecar, not a fixture. The admission rule says an
+    invented fixture never establishes a production bug, and this row IS the one
+    that produced the defect on leg 2."""
+    import json
+    from pathlib import Path
+    p = (Path(__file__).resolve().parents[1] / "config" / "source_banks"
+         / "public_domain_story" / "sources"
+         / "pride_prejudice_proposal.provenance.json")
+    return json.loads(p.read_text(encoding="utf-8"))["characters"]
+
+
+def test_a_given_name_alias_is_not_a_join_key():
+    """THE DELIBERATE FORK (2026-09-05), taken with the panel's convergence.
+
+    Leg 2 (2026-09-02) recorded that COLONEL FITZWILLIAM resolved through Darcy's
+    GIVEN-NAME alias "fitzwilliam" -- the right gender by coincidence, citing the
+    wrong character. The predecessor test pinned that behaviour and said a change
+    to surname-only aliases would be a deliberate fork. This is that fork.
+
+    The Colonel has NO ROW of his own, so the two-row `ambiguous_join` abstention
+    could never fire: a fix had to work with the other person ABSENT.
+    """
+    rows = _pride_prejudice_rows()
+
+    # THE DEFECT, now an honest abstention that falls through to the roll.
     v = RG.resolve_roster_gender("COLONEL FITZWILLIAM", rows)
-    assert (v.gender, v.tier, v.matched) == ("male", "short_form", ("FITZWILLIAM DARCY",))
+    assert (v.gender, v.tier, v.matched) == ("unknown", "none", ()), v
+
+    # WHAT MUST NOT REGRESS. A given name stays reachable through the `qualified`
+    # prefix tier, so dropping the alias costs nothing here.
+    for slot, gender, tier in (("ELIZABETH", "female", "qualified"),
+                               ("ELIZABETH BENNET", "female", "exact"),
+                               ("MISS BENNET", "female", "short_form"),
+                               ("MR. DARCY", "male", "short_form"),
+                               ("DARCY", "male", "exact")):
+        v = RG.resolve_roster_gender(slot, rows)
+        assert (v.gender, v.tier) == (gender, tier), (slot, v)
+
+    # A title plus a given name no longer JOINS -- and it no longer needs to.
+    # Dropping the given-name key cost `MISS ELIZABETH` its (correct) answer for
+    # exactly as long as this file had no title rung; the rung now answers it
+    # from the slot's own honorific, with the right gender and no false citation.
+    v = RG.resolve_roster_gender("MISS ELIZABETH", rows)
+    assert (v.gender, v.tier, v.matched) == ("female", "title_rung", ()), v
+    # and a title that contradicts the only plausible row still refuses to bind it
+    v = RG.resolve_roster_gender("MISS DARCY", rows)
+    assert (v.gender, v.matched) == ("female", ()), v
+
+
+def _prose_rows(stem):
+    """Any shipped prose sidecar, by stem. Real files, never authored dicts."""
+    import json
+    from pathlib import Path
+    p = (Path(__file__).resolve().parents[1] / "config" / "source_banks"
+         / "public_domain_story" / "sources" / ("%s.provenance.json" % stem))
+    return json.loads(p.read_text(encoding="utf-8"))["characters"]
+
+
+def test_a_gendered_title_cannot_bind_a_row_it_contradicts():
+    """MR BENNET was resolving FEMALE, citing his own daughter.
+
+    `pride_prejudice_proposal` ships two rows -- Elizabeth Bennet and Fitzwilliam
+    Darcy -- and Mr. Bennet has none. So the two-row `ambiguous_join` abstention
+    could not fire, and the join answered confidently with the wrong person. That
+    is worse than not joining: the 40/40/20 roll would have given him 40% male.
+
+    The guard is a GENDER CONTRADICTION, never a token count. A token-count guard
+    was measured first and rejected -- 274 false declines against 242 fixes.
+    """
+    rows = _prose_rows("pride_prejudice_proposal")
+
+    # THE DEFECT: answered by the slot's own title, citing NOBODY, because it
+    # identified nobody.
+    v = RG.resolve_roster_gender("MR BENNET", rows)
+    assert (v.gender, v.tier, v.matched) == ("male", "title_rung", ()), v
+    assert v.gender_source == "title_honorific", v
+    assert v.gender_confidence == "stated", v
+
+    # A title that AGREES with the row keeps its citation -- the guard is
+    # gender-selective, not a blanket refusal.
+    for slot, gender in (("MRS BENNET", "female"), ("MISS BENNET", "female")):
+        v = RG.resolve_roster_gender(slot, rows)
+        assert (v.gender, v.tier, v.matched) == (
+            gender, "short_form", ("ELIZABETH BENNET",)), (slot, v)
+
+
+def test_the_title_guard_never_refuses_an_agreeing_or_ungendered_title():
+    """The regression set that killed the token-count guard. Every one of these
+    resolves correctly TODAY and must keep both its gender AND its citation.
+
+    DR / COLONEL / PROFESSOR state a rank, not a gender, so they can never
+    disqualify anything -- a guard that refused them dropped confirmed characters
+    to a coin flip.
+    """
+    for stem, slot, gender, matched in (
+            ("pride_prejudice_proposal", "MR. DARCY", "male", "FITZWILLIAM DARCY"),
+            ("speckled_band", "DR. ROYLOTT", "male", "DR. GRIMESBY ROYLOTT"),
+            ("cradle_protocol", "DR. KELL", "female", "DR. LIRA KELL"),
+            ("frankenstein", "DR. FRANKENSTEIN", "male", "VICTOR FRANKENSTEIN"),
+            ("jane_eyre_wedding", "MISS EYRE", "female", "JANE EYRE"),
+            ("christmas_carol_marley", "MR. SCROOGE", "male", "EBENEZER SCROOGE"),
+    ):
+        v = RG.resolve_roster_gender(slot, _prose_rows(stem))
+        assert (v.gender, v.tier, v.matched) == (
+            gender, "short_form", (matched,)), (slot, v)
+
+
+def test_a_gendered_title_picks_the_right_sibling_instead_of_abstaining():
+    """The improvement that fell out of the guard, on a real two-row family.
+
+    Marilla and Matthew Cuthbert share the surname alias `cuthbert` and disagree
+    on gender, so a bare CUTHBERT slot correctly abstains as `ambiguous_join`.
+    With a title in the slot the ambiguity is gone, and the join can name the
+    right sibling rather than giving up.
+    """
+    rows = _prose_rows("anne_green_gables_apology")
+    v = RG.resolve_roster_gender("MISS CUTHBERT", rows)
+    assert (v.gender, v.matched) == ("female", ("MARILLA CUTHBERT",)), v
+    v = RG.resolve_roster_gender("MR CUTHBERT", rows)
+    assert (v.gender, v.matched) == ("male", ("MATTHEW CUTHBERT",)), v
+    # the bare surname still abstains -- the title is what disambiguates
+    v = RG.resolve_roster_gender("CUTHBERT", rows)
+    assert (v.gender, v.evidence) == ("unknown", "ambiguous_join"), v
+
+
+def test_the_title_rung_never_outranks_a_record():
+    """It answers LAST. 26 corpus rows are already resolved by the pronoun rung
+    with real textual evidence; a title rung running earlier would discard that
+    to restate the same value with less standing."""
+    rows = _prose_rows("christmas_carol_marley")
+    v = RG.resolve_roster_gender("MR. SCROOGE", rows)
+    assert v.gender_source == "pronouns", ("a record must win over the title", v)
+    assert v.tier != "title_rung", v
+    # an ungendered title states nothing, so it cannot answer at all
+    assert RG.slot_honorific_gender("COLONEL FITZWILLIAM") == ""
+    assert RG.slot_honorific_gender("DR. WATSON") == ""
+    assert RG.slot_honorific_gender("MR BENNET") == "male"
+    assert RG.slot_honorific_gender("MADAME VALMONDE") == "female"
+    # a rank BEFORE a gendered title still reads the gendered one
+    assert RG.slot_honorific_gender("DR. MRS. HUDSON") == "female"
+
+
+def test_a_bare_title_is_not_a_join_key():
+    """`mention_forms` strips titles with a 27-entry Shakespeare table, so prose
+    titles were stamped as if they were names: `Father Brown -> ['brown',
+    'father']`, `Professor Challenger -> [..., 'professor']`. A title identifies
+    nobody, so it is not a join key."""
+    assert RG._alias_is_a_join_key("brown", "Father Brown") is True
+    assert RG._alias_is_a_join_key("father", "Father Brown") is False
+    assert RG._alias_is_a_join_key("professor", "Professor Challenger") is False
+    # the given name of the honorific-STRIPPED name, so the title is not mistaken
+    # for the name: "Dr. Lira Kell" -> given "lira", not "dr"
+    assert RG._alias_is_a_join_key("lira", "Dr. Lira Kell") is False
+    assert RG._alias_is_a_join_key("kell", "Dr. Lira Kell") is True
+    # a single-token name has no given/surname split to make, so its key stays
+    assert RG._alias_is_a_join_key("em", "Aunt Em") is True
+
+
+def test_every_shipped_row_still_resolves_by_its_own_name():
+    """The filter runs on READ against sidecars already on disk, so the whole
+    committed corpus is the regression surface. Measured 2026-09-05: 255 rows,
+    zero mismatches."""
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "config" / "source_banks"
+    checked = 0
+    for pf in root.rglob("*provenance*.json"):
+        try:
+            rows = json.loads(pf.read_text(encoding="utf-8")).get("characters") or []
+        except Exception:
+            continue
+        for row in rows:
+            name = str(row.get("name") or "")
+            gender = str(row.get("gender") or "").lower()
+            if not name or gender not in ("male", "female"):
+                continue
+            checked += 1
+            v = RG.resolve_roster_gender(name, rows)
+            assert v.gender == gender, (pf.name, name, gender, v)
+    assert checked > 200, "the corpus shrank; this guard is no longer meaningful"
 
 
 def test_verdict_defaults_and_read_through_confidence():

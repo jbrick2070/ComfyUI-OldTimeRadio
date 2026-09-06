@@ -152,11 +152,25 @@ def _candidates(source: Dict[str, Any]) -> List[str]:
 
 def _aliases_for(name: str) -> List[str]:
     """Extra join keys, because the render extracts "SCROOGE", not "EBENEZER
-    SCROOGE". The existing join tiers cannot bridge that on their own."""
+    SCROOGE". The existing join tiers cannot bridge that on their own.
+
+    `mention_forms` is a PRONOUN-SCAN helper: it yields every form the prose
+    might refer to the person by, which is right for scanning text and wrong for
+    a join key. It also emits the GIVEN NAME, and -- because it strips titles
+    with the 27-entry Shakespeare table -- it emits prose TITLES as if they were
+    names. Both reached the committed sidecars
+    (`Fitzwilliam Darcy -> [..., 'fitzwilliam']`, `Father Brown -> [..., 'father']`),
+    and the given-name key let COLONEL FITZWILLIAM resolve MALE citing DARCY.
+
+    The join rule lives in ONE place -- `_otr_roster_gender._alias_is_a_join_key`,
+    which the render join applies on read -- and is applied here on write so a
+    re-stamp cannot reintroduce what the reader just filtered out.
+    """
     from nodes._otr_gender_pronoun_scan import mention_forms
+    from nodes._otr_roster_gender import _alias_is_a_join_key
 
     forms = [f for f in mention_forms(name) if f != name.strip().lower()]
-    return [f for f in forms if f]
+    return [f for f in forms if f and _alias_is_a_join_key(f, name)]
 
 
 def _decide(name: str, text: str, others: List[str]) -> Tuple[str, str, str]:
