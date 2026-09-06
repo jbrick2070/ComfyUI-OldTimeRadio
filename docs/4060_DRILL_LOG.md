@@ -3066,3 +3066,20 @@ unknown visual-evidence gap, no capture exception or LockApp returned.
 Zero input/retries/activation/requeue/restart/installed edit/manual setup.
 Pending default generation stays deferred; documentation-only Git milestone.
 No cleanup or registry publication.
+
+### Step74 -- 2026-09-06 06:52-06:59 PDT, dialogue saved; opening brief derived
+
+Same one-act Run. Second exchange d004/d00592tokens completes06:52:08.956,
+OK first attempt06:52:08.957;4voiced beats composed. Six incremental saves
+reach6lines153words06:53:59.568. Produced-open brief86tokens completes
+06:57:26.373; derive OK06:57:26.375 (cast2), next creative call follows.
+Read-only exact episode ledger check06:58:40.853 verifies28218bytes,
+valid JSON and real6-element lines array.153words is the logged count, not
+an independent recount. Still intermediate writing, no completed media PASS.
+
+One passive Logs screenshot06:58:39.990PDT remains BLACK, no exception
+or returned LockApp. Private4060-heartbeat-20260906-0658.html/.md preserve
+original screenshot/full available old tree, exact log delta and disk receipt.
+No new OOM/401/error/download/rename/terminal result. No input/retry/requeue,
+installed edit/manual setup/cleanup/registry action. Pending source generation
+stays deferred to idle. Documentation-only milestone.

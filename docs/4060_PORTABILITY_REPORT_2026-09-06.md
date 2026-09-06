@@ -232,3 +232,9 @@ At06:44:50 all6slot drama contracts were saved and marked episode_valid=True.
 Dialogue composition followed, with first exchange d002/d003 OK on attempt1
 at06:48:27. Still RUNNING, no new error or manual setup.06:51 screenshot
 remains black; writing/media/publishing completion is not yet established.
+
+At06:52:08 the second dialogue exchange passed on attempt1. The ledger
+reached6lines153words06:53:59; read-only06:58 inspection confirms the matching
+28218-byte valid JSON with6line entries. Produced-open brief derive passed
+06:57:26 and writing continues. No new errors/setup; screenshot remains black.
+Durable dialogue is progress, not final audio/video/obs publication success.
