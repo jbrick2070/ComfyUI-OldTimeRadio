@@ -11241,3 +11241,161 @@ naming rule moves again, that test goes red in the same commit.
 **Evidence.** The leg's ledger under `C:\Users\jeffr\otr_accept\B\otr\episodes\
 signal_lost_the_flaking_oxide_20260904_094319\audio\` (scratch, not committed);
 the published mp4 in the watched folder (obs 113 -> 114).
+
+## PBUG-20260905-01 -- 4060 alpha.24 Gemma12B offload retry dies on nested meta quant state
+
+- surfaced: MRKT physical RTX4060 Laptop (8GB Ada), explicit Manager alpha.24
+  install, shipped canonical from Templates, one act. Submitted once at
+  2026-09-05 22:03:28 PDT; failed after44.94s.
+- symptom: load_llm failed for model_id='google/gemma-4-12b-it':
+  Tensor.item() cannot be called on meta tensors.
+- observed path: initial NF4 CPU/disk-dispatch refusal; console explicitly
+  logged RETRYING with fp32 CPU offload at22:03:34.911. The retry loaded
+  weights, then Accelerate execution-hook attachment called state_dict;
+  bitsandbytes QuantState.as_dict(packed=True) called nested_offset=self.offset.item().
+  A missed dispatch-error substring CANNOT explain this attempt: retry ran.
+  No explicit CUDA OOM or HTTP401 was observed.
+- runtime: ComfyUI0.34.5, Python3.13.12, torch2.12.1+cu130,
+  transformers5.14.1, accelerate1.14.0, bitsandbytes0.50.1.
+- root cause: confirmed boundary is quant-state serialization during
+  permitted offload. Precise root repair remains under review; not yet a
+  proven dependency-version, canonical-widget or double-quant toggle fix.
+- source: nodes/_otr_model_loader.py978-1025. Installed loader and canonical
+  SHA256 match fresh development checkout f727a5c4; installed pyproject alpha.24.
+  Canonical writer widgets are aligned. Its14.5 ceiling is admission, NOT
+  actual allocation: this card's12B loader budget is6.8GiB.
+- fix: none applied; original install and workflow preserved. Workflow owner
+  is now4060; nodes/scripts/tests/pyproject/registry remain5080-owned.
+- verify idea: reproduce first-load versus offload-retry with exact runtime;
+  distinguish intended dispatch/meta-backed storage from invalid quant state;
+  protect5080 behavior before a separately recorded GUI acceptance leg.
+- evidence: private local4060-portability-log.html (148 events,56 captures)
+  and4060-story-writer-error.txt. No raw private diagnostics committed.
+  RESULT SUCCESS/obs_publish/file-on-disk acceptance not achieved.
+- bible-worthy: candidate, pending root-cause and existing-coverage check.
+- status: OPEN -- physical4060 reproduction; /kibitz in progress.
+
+## PBUG-20260905-02 -- E2B guard rejects CPU vision modules and overstates the cause
+
+- surfaced: user changed both slots to google/gemma-4-E2B-it and submitted
+  a separate one-act follow-up. Observed active then FAILED in16.39s.
+- symptom: BUG-LOCAL-098 NF4 quantized load did not materialize;
+  linear4bit_count=525, is_loaded_in_4bit=True, first off_cuda_modules in
+  model.vision_tower on CPU; vram_delta=0.00GiB is telemetry only.
+- mechanism: nodes/_otr_model_loader.py541-582 scans EVERY Linear4bit
+  weight device. Lines1032-1087 reject any non-CUDA weight, without intended
+  placement/text-only modality distinction, then assert second-load silent
+  fp16 fallback. CPU placement alone does not establish that diagnosis.
+  The same loader explicitly allows CPU offload at978-1025.
+- root cause: rejection predicate confirmed. Valid intended offload versus
+  inactive vision allocation versus genuinely invalid materialization is
+  still UNVERIFIED. This does NOT prove generation would succeed without
+  the guard. The12B exception in-01 precedes this guard: distinct boundaries.
+  Related prior incident PBUG-20260825-04 used a now-retired VRAM-delta predicate.
+- fix: none applied. No blanket guard deletion, arbitrary model swap,
+  restart/requeue, dependency change or canonical reconfiguration.
+- verify idea: explicit tests for valid offload, unexpected CPU/meta,
+  absent quantization, broken scan, quant metadata and8-bit separation;
+  preserve orphan-lifecycle tests. Fresh-process/repeated-load comparison
+  is not supplied by this user's intervening clicks.
+- evidence: private4060-lower-model-followup.html (6 captures) and
+ 4060-lower-model-error.txt; no RESULT SUCCESS or obs_publish.
+- bible-worthy: candidate; check prior BUG098 coverage before promotion.
+- status: OPEN -- live failure/source-grounded predicate; /kibitz in progress.
+
+### 2026-09-05 22:20 PDT clarification for PBUG-20260905-01/-02
+
+User canceled Kibitz before completion. Both bugs remain OPEN and unfixed;
+one completed review is not four-round approval. Direct installed-source
+inspection confirms a narrower loader contract mismatch: in Transformers
+5.14.1, bnb4 preprocessing excludes planned CPU/disk modules only when the
+offload flag is true AND the input device_map is a dict. OTR's retry retains
+the string auto map. Preprocessing precedes final auto-map inference. This
+supports explicit pre-quantization placement as an owner implementation
+candidate, not a proven passing fix. The observed12B state_dict failure still
+requires regression and live proof; E2B's rejection must not simply be removed.
+
+Native Gemma text-only class selection is a separate footprint candidate with
+config/checkpoint-key obligations, not a drop-in proven repair. The user's
+subsequent cache-deletion suspicion is being checked read-only. No evidence
+currently establishes stale links or corrupt model files as either root cause.
+
+## PBUG-20260905-03 -- Post-purge Gemma12B load crashes backend with access violation
+
+- surfaced: physical MRKT RTX4060 Laptop8GB Ada; existing ComfyUI0.34.5,
+  alpha.24 canonical freshly opened through Templates. Only act_count3→1
+  changed. One Run22:41:32.554 PDT after user-authorized model-cache purge.
+  Existing dependency environment, extra packs and authentication retained.
+- observed: OTR announced23.9GB Gemma download;8/8files complete06:16 at
+ 22:47:49.447. NF4 CPU/disk refusal triggers automatic FP32-CPU-offload retry
+ 22:47:54.119, then Loading weights0/677 and Windows fatal exception:
+  access violation. Desktop confirms exit3221225477 /0xC0000005.
+- boundary: torch/storage.py471 __getitem__ -> Transformers
+  core_model_loading.py1215 _materialize_copy,1239 _job,955 materialize_tensors,
+ 990 convert,1695 convert_and_load_state_dict_in_model; OTR loader1020.
+  Fatal stack observed22:48:36; exact native exception timestamp unavailable.
+- root cause: UNDETERMINED. No explicit CUDA OOM or HTTP401. Native crash
+  differs from the prior catchable meta-tensor/guard failures; neither cache
+  corruption nor missing native library is proved. Desktop's generic
+  explanation is not diagnostic proof. Do not claim cache purge fixed-01/-02.
+- logging finding: current comfyui.log stops at CPU-offloadretry, omitting
+  fatal native stderr/stack. Dedicated Comfy Logs GUI retained it, and its
+  complete accessibility elements plus crash dialog were captured externally.
+- acceptance: FAIL. No RESULT SUCCESS/obs_publish OK. Exact new episode
+  directory contains only7451-byte pending skeleton ledger; no final media.
+- fix: none; no rerun, restart, dependency change or source/workflow repair.
+  User takes over for freshinstall. Native-loader/dependency defect remains
+ 5080-owned; workflow ownership4060 remains unchanged.
+- evidence: docs/4060_DRILL_LOG.md Step23; private
+ 4060-post-reset-run-part1.html,4060-post-reset-run-part2.html,
+ 4060-post-reset-crash.txt. No raw private diagnostic payload committed.
+- status: OPEN -- physical reproduction; no root-cause/fix qualification.
+
+### 2026-09-05 23:00 PDT update for PBUG-20260905-01
+
+User explicitly assigns fix/log/diagnosis to4060. User-run22:52:07 reproduces
+the same nested meta-quant-state exception after43.82seconds and after retry;
+not a demonstrated reinstall or another native access violation. Current
+installed loader/canonical/dependencies remain alpha.24 baseline.
+
+Candidate implemented in developer and installed loader for a separately
+labeled diagnostic: retry-only conservative meta-skeleton placement BEFORE
+bnbconversion, concrete device_map, intendedCPUmodules unquantized at load
+dtype. No guaranteeFP32 based on flagname. Strict offCUDA NF4guard and fresh
+double-quant config remain. First successfulGPU/fullGPU branch unchanged.
+Six focused tests+real installed-library metadata checks PASS; independent
+diff review clean. Fullpytest unavailable; configured Biblecheckout absent.
+No registry/version/dependency/workflow change, commit or push. Candidate is
+NOT qualified; original zero-hand-step portability result remains FAIL.
+See4060_DRILL_LOG Step24 and private4060-loader-candidate.patch. Bugs-02/-03
+remain open; this placement fix is not evidence those boundaries are resolved.
+
+23:07 live update: patched one-act GUI leg submitted23:04:44.645 reaches
+weightload677/677, CUDAwarmup20.4s and two successful newsranking calls
+(14tokens35.1s;2tokens5.4s). Writer starts1act and reuses cache for dossier.
+PBUG-01's prior exception boundary is passed in this live attempt. Status
+remains candidate/live-progress, not episode-qualified or full-regression
+verified. No additionalRun, OOMtuning, dependency or workflow change.
+
+23:14:23 checkpoint: the dossier writer itself reaches 192 tokens at 0.4
+tok/s (491.0s); no recurrence of the original loader exception observed in
+this attempt. Practical latency remains a portability concern. The visible
+200-token widget is a legacy per-line composer budget, not a global cap on
+this custom lane; its dossier requests 700 tokens per attempt and further
+multi-pass writing remains. Do not lower caps or switch models mid-attempt.
+Candidate is still unpublished and not episode/full-regression qualified.
+
+### 2026-09-05 23:30 PDT source-candidate update for PBUG-20260905-01
+
+User explicitly requests canonical-repository commit/push. Loader source
+matches the active installed candidate exactly. Seven focused tests now pass,
+including permanent8.00/15.99GiB budget/device-map selection coverage. Executed
+baseline-versus-candidate AST checks print identical6.8GiB/auto and13.5GiB/
+allGPU results respectively. This protects the normal5080 code path, not a
+claim of measured5080 rendering performance. The changed behavior is confined
+to the NF4 CPU-dispatch refusal retry, on any machine reaching that condition.
+
+Canonical JSON and pyproject stay unchanged. Source commit is a candidate,
+not registry publication: fullsuite/Bible unavailable, full episode pending,
+original zero-hand-step result FAIL, bugs-02/-03 still open. See drill Step28
+for source provenance, test scope and the no-active-run-mutation receipt.

@@ -582,6 +582,46 @@ def _bug098_scan_linear4bit_devices(model) -> tuple[int, list[str]]:
     return count, off_cuda
 
 
+def _plan_nf4_cpu_offload(model_config, *, load_dtype, max_memory, attn_impl):
+    """Resolve placement BEFORE bnb replaces linear modules (PBUG-20260905-01).
+
+    Passing ``auto`` with the offload flag is insufficient: Transformers only
+    excludes CPU/disk modules from NF4 conversion when given a concrete map.
+    Plan from an empty, unquantized skeleton at the actual load dtype. This is
+    deliberately conservative: it prices CPU weights and the largest layer's
+    GPU staging reserve without pretending those weights cost four bits.
+    No checkpoint weights are read, allocated, or downloaded by this planner.
+    """
+    from copy import deepcopy
+
+    from accelerate import infer_auto_device_map, init_empty_weights
+    from transformers import AutoModelForCausalLM
+
+    if model_config is None:
+        raise ModelLoaderError("NF4 CPU-offload planning requires a resolved model config")
+    with init_empty_weights(include_buffers=True):
+        skeleton = AutoModelForCausalLM.from_config(
+            deepcopy(model_config),
+            trust_remote_code=False,
+            dtype=load_dtype,
+            attn_implementation=attn_impl,
+        )
+        skeleton.tie_weights()
+    device_map = infer_auto_device_map(
+        skeleton,
+        max_memory=dict(max_memory) if max_memory is not None else None,
+        no_split_module_classes=list(skeleton._no_split_modules or []),
+        dtype=load_dtype,
+    )
+    if not isinstance(device_map, dict) or not device_map:
+        raise ModelLoaderError("NF4 CPU-offload planner did not return an explicit device map")
+    if "disk" in device_map.values():
+        raise ModelLoaderError("NF4 CPU-offload plan exceeds the declared CPU budget; disk offload is not configured")
+    if all(device == "cpu" for device in device_map.values()):
+        raise ModelLoaderError("NF4 CPU-offload plan leaves no modules on CUDA; cannot validate a CUDA NF4 load")
+    return device_map
+
+
 def _apply_matmul_precision_policy() -> None:
     """TF32 OFF for byte-identical determinism (I-2 / C-1); Ampere+ (sm80+)
     gets 'high' matmul precision for LLM throughput. The capability probe is
@@ -990,19 +1030,20 @@ def load_llm(
                 # an 8 GB card died on a REFUSAL, not on memory. The 8-bit
                 # branch above already passes llm_int8_enable_fp32_cpu_offload
                 # (the flag covers 4-bit too, despite the int8 name); extend
-                # the same permission here as a LOUD one-shot retry: GPU-fit
-                # modules stay NF4 on CUDA, overflow runs fp32 on CPU --
-                # slower per token, but it LOADS, and only a genuine CUDA OOM
-                # can still end it. Anything but this exact refusal re-raises.
+                # the same permission here as a LOUD one-shot retry. Resolve
+                # placement before conversion so CPU modules stay unquantized
+                # at load_dtype, while GPU modules use NF4. The flag's int8
+                # name does not guarantee CPU fp32 in the bnb4 implementation.
+                # Anything but this exact refusal re-raises.
                 if not (needs_4bit
                         and "dispatched on the cpu" in str(_dispatch_err).lower()):
                     raise
                 log.warning(
                     "[StoryOrchestrator] %s exceeds the GPU budget for a full "
-                    "NF4 load (%s); RETRYING with fp32 CPU offload -- "
-                    "CPU-resident layers run at fp32, expect a slower writer. "
-                    "Per operator directive the only remaining killer is a "
-                    "real OOM.", _stripped_model_id, _dispatch_err)
+                    "NF4 load (%s); RETRYING with explicit unquantized CPU "
+                    "offload -- CPU-resident layers use load dtype %s; "
+                    "expect a slower writer.",
+                    _stripped_model_id, _dispatch_err, load_dtype)
                 _runtime_log(
                     f"[StoryOrchestrator] NF4 CPU-offload retry active for "
                     f"{_stripped_model_id} (loud degradation, not a kill)")
@@ -1017,6 +1058,16 @@ def load_llm(
                 )
                 _retry_kwargs = dict(common_kwargs)
                 _retry_kwargs["quantization_config"] = _offload_quant
+                _retry_kwargs["device_map"] = _plan_nf4_cpu_offload(
+                    model_config,
+                    load_dtype=load_dtype,
+                    max_memory=common_kwargs.get("max_memory"),
+                    attn_impl=attn_impl,
+                )
+                _runtime_log(
+                    "[StoryOrchestrator] NF4 explicit offload device_map="
+                    f"{_retry_kwargs['device_map']!r} (unquantized sizing)"
+                )
                 model = AutoModelForCausalLM.from_pretrained(
                     load_target,
                     local_files_only=True,

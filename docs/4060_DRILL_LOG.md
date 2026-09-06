@@ -1109,3 +1109,515 @@ Open on this box: PBUG-20 (news-read validator rejects real people named in
 the source) is independent of this fix and still kills scifi_news_pro legs at
 the writer. PBUG-11 (GGUF cache epoch) still blocks the 12B in-pipeline;
 repro at `scripts/repro_pbug11_gguf_cache.py`, 16 s, deterministic.
+
+## Step20 -- 2026-09-05 alpha.24 GUI test fails; workflow ownership moves to MRKT
+
+Explicit alpha.24 Pending selection,4.59M ZIP, Manager Completed, Apply Changes
+restart, console all25 nodes loaded. Manager retained a disabled old commit
+card; subsequent read-only files confirm alpha.24 and loader/canonical hash
+parity with development f727a5c4. No reinstall or manual repair.
+
+Loaded shipped canonical from Extensions templates: LTX098-low16:9 x3,
+ZImageTurbo x3, Kokoro/Kokoro, MusicGen. Only act_count3->1 for the requested
+original run. One Run click22:03:28 PDT;12B failed44.94s (PBUG-20260905-01).
+User later chose E2B and submitted another run; failed16.39s (-02).
+These do not establish that every Gemma model fails.
+
+Correction: Normal node mode is not the blend bypass. Blend93.bypass=true,
+composite84.upscale_engine=off. SignalLostVideo's false widget is draw_scopes,
+NOT a render bypass; procedural source rendering remains enabled. No modes
+were changed. This does not explain writer loading failures.
+
+Existing environment: cached Gemma, preexisting HF_TOKEN resolution and enabled
+AnimateDiff/auto-messaging packs. Agent installed no extra packs, seeded no
+cache, entered no token, used no SSH/backend API/install repair commands.
+Not pristine cold-install or unauthenticated-gating proof. Application auto-swept
+three empty stale pending directories; no agent cleanup, recovery unverified.
+Original verdict FAIL stays unchanged: no success/obs_publish/episode receipt.
+Private evidence148 events/56 captures plus6 follow-up captures stays in the
+Codex output directory, not published with machine-private diagnostics.
+
+User requested /kibitz and transferred workflow ownership to4060. Fresh isolated
+source checkout D:\otr-4060-testing\ComfyUI-OldTimeRadio, branchv2.0-alpha,
+baselinef727a5c4 (ownership ruling). No installed source edits. Nodes/scripts/
+tests/pyproject/registry remain5080-owned. Both reviewer CLIs available.
+Optional ComfyUI profile missing in installed older kibitz and repository;
+doctor NOT READY for that missing optional file. Four generic prompts/script
+are intact; running supplied fan-out script unchanged. Driver is Codex, not
+Claude; report actual roster. Plan docs/4060-gemma-canonical-review-plan.md.
+
+Peer substring-match theory is future fragility, not this12B cause: retry line
+is explicit. llama_cpp is isolated to selected nativeGGUF path, not the NF4
+load that failed. It is undeclared and must be checked before proposing GGUF
+as a zero-hand-step alternative; no missing-binding failure was reproduced.
+
+Current step: complete/ground four-round review before any canonical decision.
+No source-code fix, registry publish, process restart or new render undertaken.
+
+### Step20 addendum -- 22:20 PDT, user cancels Kibitz and questions cache state
+
+User explicitly requested proceeding without Kibitz. Campaign stopped, not
+completed: Codex gpt-5.5/high r1 review produced a substantive file; initial
+Antigravity call rejected gemini-3.5-pro as unknown; retry with the installed
+gemini-3.1-pro-high was canceled. Only the verified reviewer process tree was
+stopped. ComfyUI/model processes were not stopped or restarted.
+
+User reports deleting a models folder and suspects surviving links. Read-only
+inspection finds the active installation's models directory and its immediate
+subdirectories are ordinary directories, not reparse points. Captured run logs
+resolve HF_HOME to that installation's models/huggingface, not evidence of an
+empty cache. Gemma12B/E2B/E4B directories still exist there with August creation
+timestamps. This does not identify which folder the user deleted or prove all
+snapshot files are intact. More precise bounded cache inventory is in progress.
+
+The user is considering deleting models/workflow/links for a fresh start.
+No deletion, link repair, dependency change, cache seeding or new render has
+been performed. Exact targets, shared-model impact and recovery must be
+confirmed before any destructive reset. Existing logs and workflow source
+remain preserved. A cache purge is not a demonstrated fix for either trace.
+
+At22:21 PDT, bounded read-only inventory found115.114GiB (123602286958 bytes,
+271 ordinary files) under the active install-local models tree, including
+78695817400 bytes in its HF cache. The registered ComfyUI-Shared/models tree
+contains32 empty directories and zero files. No reparse points were found
+anywhere under either model tree. The captured run's HF cache is the populated
+install-local tree; surviving ordinary cached files explain rapid loading
+without establishing which separate folder the user previously deleted.
+
+User now explicitly authorizes deleting all models. Latest scope is models
+only: preserve saved workflows, development/installed code and evidence.
+No files have yet been removed. Computer Use deletion requires action-time
+confirmation of the now-resolved115.114GiB target. This is a destructive
+clean-reset request, not an implemented loader fix or a passing portability run.
+
+### Step21 -- 22:24 PDT, user-confirmed model purge completed
+
+User confirmed deletion after the115.114GiB scope was stated. Computer Use
+observed0 active ComfyUI jobs and closed the app. File Explorer opened the
+exact install-local models directory; selected all31 child folders; Delete
+reported: These31 items are too big to recycle. Do you want to permanently
+delete them? The automation's Yes attempt returned window bounds changed,
+then Explorer windows disappeared. User subsequently stated deleted. Do NOT
+claim an unambiguously successful automation click: completion is user-reported
+and independently verified by read-only filesystem inspection at22:24:07 PDT.
+
+Active models directory now contains0 immediate items. The registered shared
+models tree still contains32 empty category directories, no model files.
+The instance-generated model-path YAML names only that shared root. ComfyUI
+Desktop/backend processes were absent in the bounded process check. Model
+files were permanently removed rather than recycled; no recovery copy made.
+Workflows, installed/development code, outputs and prior evidence preserved.
+This reset includes a user hand step and cannot change the original FAIL.
+Next attempt must be separately identified as a fresh-model-cache run, not
+a clean application/dependency installation or an unauthenticated gating test.
+
+### Step21 correction -- 22:27 PDT, additional user HF cache discovered
+
+Reopened existing instance via GUI after the two model stores verified0 files.
+Startup automatically contactedHF for Kokoro voices before any Run click and
+reported a separate user-level .cache/huggingface/hub location. That location
+was omitted by the first bounded two-store inventory. It is NOT a stale
+symlink: all six model trees and their parent directories are ordinary dirs.
+Read-only totals at22:27:04 PDT:76 files,7408357092 bytes. Model caches:
+1038lab/KokoroTTS40 bytes; hexgrad/Kokoro-82M341870448 bytes;
+latent-consistency/lcm-lora-sdv1-5 134621596 bytes;
+lllyasviel/control_v11p_sd15_normalbae1445158164 bytes;
+stable-diffusion-v1-5/stable-diffusion-v1-5 5482652240 bytes;
+suno/bark4054604 bytes. All directory creation dates predate startup; Kokoro
+contents partly changed during startup, so its total is not all preexisting.
+No Gemma directories were present in that user hub.
+
+The fresh-cache run label is withdrawn pending completion of reset: no Run
+was clicked, no workflow execution occurred. Restored editedE2B tab was NOT
+run; opened Templates, but selecting the off-screen OTR extension returned
+point outside window bounds. Closed ComfyUI again. No new install, model
+repair, workflow edit, or token action. Additional shared-per-user cache
+deletion needs exact-scope action-time confirmation. Original failure evidence
+and the completed115.114GiB model removal remain valid, but ALL model caches
+are not yet cleared. Reset GUI evidence:4060-model-reset.html in private Codex
+output folder; startup/cache-discovery evidence kept separately.
+
+### Step22 -- 22:30-22:34 PDT, remaining user cache removed; first-time scope clarified
+
+User confirmed the six additional model-cache directory deletions at action
+time. Explorer selected exactly those six directories, leaving .locks and
+the three hub metadata files unselected. Standard Delete completed; settled
+Explorer view contains four items and no models-- directories. Independent
+read-only verification at22:32:42 PDT confirmed all six exact paths absent
+and matching original-path Recycle Bin records present. These six folders
+are recoverable through Recycle Bin; payload integrity was not checked.
+The earlier115.114GiB permanent deletion remains a separate operation.
+
+The same verification found29 files,15039463 bytes,10 directories and zero
+reparse points in the OLD instance-local models tree after its earlier
+startup. Therefore that tree is no longer empty. Shared models remains
+zero files/bytes with32 empty category directories and no reparse points.
+Do not claim a machine-wide zero-cache state or silently delete this new
+material. The old instance is not the intended next test environment.
+Bounded metadata inventory at22:33:18 PDT identifies28 Kokoro voice .pt files
+under TTS (14655831 bytes) and one Xet log under huggingface (383632 bytes).
+All creation/write times are after the22:26:07 startup. No contents read.
+
+User clarified the purpose: a person who has never used ComfyUI should be
+able to download it and start OTR with the least friction. Model deletion
+alone does not test that. Next attempt uses Desktop New Instance rather
+than reusing the old dependency environment, saved workflow or node packs.
+Existing source, workflows, outputs and failed-run evidence remain intact.
+The existing Desktop application and Windows user profile remain; this
+is not a fresh OS, Desktop-installer test, or unauthenticated gating test.
+
+GUI launched existing Comfy Desktop1.0.46 and clicked New Instance. Setup
+default: ComfyUI(1), Standalone, Stable recommended v0.34.5, Python3.13.12,
+NVIDIA detected/recommended,2256MB package, ~4.96GB required,583.08GB free.
+No settings changed; Continue not clicked. Paused for the Computer Use
+skill's action-time software-install confirmation. This confirmation is
+automation-policy friction, not ComfyUI product friction. No new install,
+render, loader fix, workflow edit, token action or extra-node install yet.
+
+Private timestamped screenshot artifacts:4060-additional-cache-reset.html
+and4060-first-time-setup.html alongside the prior private evidence. These
+artifact writes and read-only verification are documentation/diagnostic
+operations, not hidden installation steps. Prior FAIL verdict unchanged.
+
+### Step22 correction -- 22:39 PDT, unnecessary new-instance proposal withdrawn
+
+User points out ComfyUI is already installed and asks whether uninstalling
+and reinstalling is necessary. Agent had overinterpreted first-time-user
+experience as permission/need to create a second ComfyUI environment.
+That proposal is withdrawn. No Continue/install action was submitted.
+GUI clicked Back to Dashboard and a settled screenshot confirms only the
+existing local ComfyUI v0.34.5 instance remains. No new environment created,
+no uninstall, no render and no further deletion in this correction.
+
+Keep existing ComfyUI for the OTR fresh-model startup test. Do not describe
+that as a clean dependency installation or a demonstrated Gemma-loader fix.
+The extra-instance setup detour and associated confirmation were agent/
+automation overhead, not required beginner-guide steps. UI capture first
+showed an occluding non-target window; no click was made from that image.
+Target Comfy window was activated and reobserved before cancellation.
+Timestamped screenshot evidence:4060-setup-correction.html, private output.
+
+### Step23 -- 22:40-22:43 PDT, existing-instance one-act test submitted
+
+User explicitly requests launch existing ComfyUI, open workflow and run;
+reiterates1 act. GUI launched existing instance, not New Instance. Startup
+22:40:13.031; console at22:40:26.674 confirms all25 OTR nodes loaded. Restored
+editedE2B tab was not run. Templates > scroll left categories twice >
+EXTENSIONS > comfyui-old-time-radio > otr_canonical loaded shipped template.
+Both writer roles visibly returned to Gemma4-12b-it. Two decrement clicks
+changed act_count3 to2 to1; settled screenshot confirms1, batch count1.
+No other workflow value or node mode changed.
+
+Run clicked exactly once22:41:32.554 PDT. Console got prompt22:41:32.640;
+writer start22:41:32.787 explicitly act_count=1. Canonical validator OK:
+23 nodes,61 links,widget_vector_drift=0. Source roll chose Folger Shakespeare;
+its noncommercial-use warning is preserved verbatim in private evidence.
+Only a pending skeleton ledger (0 lines/words) exists at this checkpoint;
+not an episode-success artifact.
+
+At22:41:32.909 OTR announced automatic Gemma4-12b-it download23.9GB. GUI
+file counter reached7/8; that is not88 percent of bytes. HF warned this
+cache does not support symlinks and caching still works with possible
+additional disk use. No Developer Mode, administrator launch, environment
+change, manual download, extra pack installation or other workaround.
+Existing AnimateDiff startup missing-motion-model warning is environmental,
+not evidence canonical requires it. Existing extra packs and authentication
+state remain: do not claim a pristine dependency install or no-auth test.
+
+GUI LOGS bottom panel renders console pixels without accessibility text.
+Read-only current comfyui.log snapshot supplemented timestamps; then Open
+logs in a new window exposed full console text directly through GUI. No
+further filesystem polling needed. This diagnostic read and artifact writes
+are disclosed evidence collection, not hidden installation/run commands.
+At22:43 checkpoint run IN PROGRESS downloading; no fatal error, OOM,401,
+RESULT SUCCESS or obs_publish OK observed. No rerun submitted.
+Private evidence:4060-post-reset-run-part1.html (40 timestamped events).
+
+### Step23 result -- 22:48-22:50 PDT, FAIL WITH FINDINGS; user takes over
+
+Automatic Gemma download completed8/8 files after06:16. Persisted log records
+completion22:47:49.447, model loading22:47:49.450, NF4 enable22:47:49.891 and
+the CPU/disk-placement refusal plus automatic FP32-CPU-offload retry at
+22:47:54.119. GUI then shows Loading weights0/677 and:
+Windows fatal exception: access violation.
+
+Captured stack begins torch/storage.py471 __getitem__, Transformers
+core_model_loading.py1215 _materialize_copy,1239 _job,955 materialize_tensors,
+990 convert,1695 convert_and_load_state_dict_in_model; from_pretrained
+reaches OTR nodes/_otr_model_loader.py1020 load_llm. Complete native console
+accessibility elements preserve the rest through threading._bootstrap.
+The document_text field was capped at20000characters; the full tree was
+captured, not silently treated as a complete truncated document.
+
+Fatal exception first observed22:48:36 PDT. Desktop subsequently confirms
+ComfyUI exited unexpectedly, exit3221225477 /0xC0000005. Its generic native-
+library explanation is application wording, NOT a verified root diagnosis.
+No explicit CUDA OOM or writer401 observed. No restart/rerun/tuning/fix.
+Only the user's original one-act Run was submitted. No RESULT SUCCESS or
+obs_publish OK; acceptance FAIL. This is a new native crash boundary, not
+proof the earlier meta-tensor exception was repaired by deleting caches.
+
+Final read-only receipt22:49:27-22:49:39: comfyui.log99lines ends at the
+22:47:54.119 retry and omits fatal native stderr; GUI evidence is essential.
+Exact pending_20260905_224132 episode directory contains only audio/
+pending_20260905_224132_ledger.json7451bytes, written22:41:32.8646833.
+No final episode or media file anywhere inside that exact directory;
+zero reparse points/read errors. No broad output scan or weight-content read.
+
+Waiting friction: GUI remaining-file counter offered no useful byte progress
+or ETA for roughly six minutes. Considered manually inspecting cache growth
+but did not. Recorded bounded waits and screenshots; no recurring automation
+created. All initial warnings and automatic download messages are retained.
+
+One optional final log-window activation returned foreground window did not
+report a process id. User then took over for a fresh install; agent stopped
+all GUI input immediately, with no recovery/restart attempt. Evidence saved
+outside the install folder:4060-post-reset-run-part2.html and
+4060-post-reset-crash.txt. Parts1+2 contain61 timestamped events; original
+failed run and model-reset logs are preserved. Next installation is a new,
+user-performed setup, not an agent-completed reinstall or passing result.
+
+### Step24 -- 22:51-23:03 PDT, user-return failure and authorized loader repair
+
+User returns control and explicitly asks4060 to fix, log and diagnose. The
+original GUI-only qualification remains FAIL; hand repair is a separate phase.
+Same-instance startup22:51:46.831; all25nodes22:51:56.104. User prompt
+22:52:07.194: Gemma4-12b-it bothslots, act_count1, media_archive_rss.
+Retry22:52:10.644; failure22:52:50.997:
+load_llm failed for model_id='google/gemma-4-12b-it': Tensor.item() cannot be called on meta tensors
+Prompt executed in43.82seconds follows the exception; not SUCCESS. GUI0active,
+Failed, View details clicked once; full error/screenshots preserved privately
+in4060-user-return-diagnosis.html. No agent Run before the repair.
+
+Read-only audit22:55: loader/canonical match alpha.24 and development baseline;
+same instance/Python, old dependency metadata timestamps. Fresh reinstall NOT
+established. Stack: Accelerate hooks.py471 state_dict -> bnb modules.py606 ->
+functional.py565 nested_offset=self.offset.item(). No explicit OOM or401.
+No valid episode reported. Source/config/dependency/log reads were manual
+diagnostics, not part of a mouse-only install claim.
+
+Fetched branch: no incoming commits. Pull --rebase refused, verbatim:
+error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+Preserved dirty logs, no stash/reset/commit/push. No remoteGPU/Kibitz.
+
+Candidate correction: NF4 refusal retry only creates an empty skeleton from
+the same config/class, ties weights, infers conservative unquantized-size
+placement, and passes a concrete map BEFORE bnb conversion. CPU layers stay
+ordinary at load dtype, not guaranteedFP32. Disk/allCPU plans fail explicitly.
+No double-quant toggle, guard deletion, model swap, dependency/cache change,
+workflow widget edit or additional automatic retry. Successful first-load and
+fullGPU call paths unchanged in executed tests, not physical5080measurement.
+
+Six stdlib contract tests PASS. Installed-runtime offline Gemma config/meta
+probe succeeds: embedding/tiedhead+10decoderlayersGPU, remainderCPU; noCUDA
+initialization, weights, downloads or generation. Installed HF/bnb tiny-meta
+check PASS:7GPU-planned NF4linears and7CPU-planned ordinarylinears. Completed
+independent diff review: no blocking findings. Fullsuite attempted but cannot
+run: No module named pytest. Configured BugBiblecheckout absent. No dependency
+install, shipping approval or claim of full regression verification.
+
+23:00:07 HAND REPAIR: targeted installed-loader patch matches devcandidate
+SHA25691D74E2C2BCA6D237FCCF2E71ACE6C69A1BBC56CED2141463E2FCCCB4B805B47.
+Exact private4060-loader-candidate.patch preserves the reversible diff;
+original tracked source is recoverable from baseline. Runtime still unproven.
+GUIrestart: Menu > OpenDashboard > existingComfyUI Moreactions > Stop.
+Generic unsaved-work warning led to Cancel; Ctrl+S had no observable effect,
+so workflow Graphmenu > Save preserved existing1actvalues and removed dirty
+marker. ReturnedDashboard > Moreactions > Stop > confirmStop. User-input
+interruption/occludingCodex was handled with fresh observation, no blind
+click retry or Codex input. Full click timestamps/screenshots in private log.
+
+### Step25 -- 23:03-23:07 PDT, patched diagnostic act progresses past loader
+
+Restart console23:03:13.492 confirms all25nodes. Startup also logs
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+in asyncio _ProactorBasePipeTransport._call_connection_lost; server proceeds.
+Preserved, not attributed to OTR. Existing extra-pack warnings remain.
+
+Agent Run exactly once23:04:44.645 (server gotprompt23:04:44.736), after
+GUI verifies act_count1, Gemma12Bbothslots, batch1,0active. Restored user
+workflow saved without widget changes; zoom/minimap navigation only.
+Zoom UIA set_value failed verbatim: read UIA value read-only state: Requested property was not in the CacheRequest (0x80070057)
+Keyboard entry then minimap drag succeeded. This is automation overhead.
+
+Validator23nodes61links, widget_vector_drift0. Cached model, no modeldownload
+this attempt. ExplicitCPUoffloadretry23:04:50.447; weights677/677 complete
+23:04:55.486 in4seconds. Subsequent meta-device warning describes ordinary
+CPU-offloaded parameters; it is not the earlier nested quant-state exception.
+CUDA warmup completes20.4seconds. Live generation: newsranking14tokens in
+35.1seconds at0.4tok/s, then cached-model bodyrerank2tokens in5.4seconds.
+This is physical evidence of load AND generation past PBUG-20260905-01.
+It is not a full episode or performance qualification.
+
+23:05:57.286 Writer starts1act on RSS/Scifi route; selected source body9678
+characters. New skeleton pending_20260905_230557_ledger.json,0lines/0words.
+23:05:58.021 scifi_news_pro_dossier attempt1/3 starts and reuses modelcache.
+No OOM401, no secondRun, no active-run edits. Acceptance remains INPROGRESS;
+no RESULTSUCCESS/obs_publish/final episode verified. Evidence through68events
+saved4060-diagnostic-repair-part1.html andpart2.html outside installation.
+Later monitoring follows separately; user-return log preserves first6events.
+
+### Step26 -- 23:08-23:10 PDT, workflow audit and continued writer activity
+
+Read-only comparison completed 23:08:40: the saved user workflow differs
+behaviorally from installed and development canonicals only in act_count,
+3 to 1. max_new_tokens_cap is 200 in all three; both Gemma12B selections,
+procgen mode and other widget values are unchanged. All 23 node identities,
+types and modes and all 61 named connections match. Frontend Save reordered
+input arrays on nodes 1,7,85,86 and consistently adjusted eight numeric
+target-slot indices; no named connection was changed. Layout/viewport and
+frontend state were excluded. This checks saved files, not the queued payload.
+
+Passive console capture 23:10:08 shows writer heartbeat 64 tokens, 0.4 tok/s,
+164.0 seconds during scifi_news_pro_dossier attempt 1/3. This is actual writer
+output, not only warmup/news ranking. Same act remains active; no additional
+Run, widget change, cancellation or patch. Full result still unverified.
+
+Asked user whether to continue the same-act checks every five minutes as a
+thread monitor or remain in this turn. No answer/automation at this checkpoint;
+active-turn observation continues. Slow CPU offload is recorded as friction,
+not called a hang. No duration-based timeout or tuning introduced.
+
+23:12:14 console capture reaches 128 tokens, 0.4 tok/s, 327.6 seconds.
+Private 4060-diagnostic-repair-part3.html saves events 68-74 inclusive;
+checkpoints together preserve events 0-74 without replacing earlier files.
+No download was observed in this cached-model diagnostic attempt.
+
+Duration/UI finding: max_new_tokens_cap=200 is the legacy per-line composer
+ceiling, not a global ceiling on the scifi_news_pro custom runner. The dossier
+explicitly requests 700 tokens per attempt (_otr_scifi_news_pro.py:265,1886).
+At the observed 0.4 tok/s, a full 700-token decode would take about 29 minutes
+for that one call, excluding overhead; EOS may occur earlier and rates vary.
+This is not an episode ETA, and no token cap/route was modified. A read-only
+search initially used incorrect lowercase writer filename and reported
+The system cannot find the file specified. (os error 2); corrected via rg.
+
+Read-only stage audit: dossier is up to three attempts per source window;
+pitch, treatment, cast aliases and newsread follow with up to three attempts
+each, whole-play script up to four, then voice casting up to three. These
+later calls use remaining configured context capacity, not the legacy 200
+widget. Retries are conditional, not required calls. Shared-tail reflection,
+summary and data-dependent ledger judging/repair also remain. A multi-hour
+writer phase is plausible at the current rate but no duration is established.
+No optimizer, model substitution, token-limit change or cancellation applied.
+
+Source pointers: OTR_LedgerScriptWriter.py:2257,3417; _otr_scifi_news_pro.py:
+1576,1868,1915,2913,3615,4704; _otr_structured_call.py:89;
+_otr_story_brief.py:570,837; _otr_ledger_clean.py:620,1580.
+Post-edit git diff --check passes. Changed code remains loader plus the six
+focused regression tests; documentation changes are preserved and uncommitted.
+
+23:14:23 PDT checkpoint: dossier attempt 1/3 has reached 192 tokens,
+0.4 tok/s, 491.0 seconds, with no new error. Same single act remains active.
+No RESULT SUCCESS, obs_publish OK or final episode is verified. Background
+checks have not been enabled: five-minute cadence confirmation is pending.
+Stopping this chat turn would not stop the render, but would end active-turn
+observation; do not describe an unscheduled watcher as running. Preserve the
+current act and inspect its continuation before any subsequent run action.
+
+### Step27 -- 23:20-23:22 PDT, overnight monitoring enabled
+
+User explicitly approved five-minute checks while sleeping and autonomous
+overnight continuation. Subsequent user authorization adds other plausible
+8 GB model trials ONLY IF this current act fully succeeds. Native same-task
+heartbeat 4060-overnight-otr-trials was created ACTIVE at 23:20:26.010 PDT,
+then updated with exact-trial success matching. App tool confirms creation,
+view and update; persisted configuration verifies five-minute cadence and
+this task as target. No standalone task, alternate model or external handoff.
+Earlier statements that monitoring was pending are historical checkpoints,
+superseded by this entry. No first scheduled execution is claimed yet.
+
+Active identity: GUI Run 2026-09-05 23:04:44.645 PDT, server acceptance
+23:04:44.736; writer start 23:05:57.286; pending_20260905_230557. The later
+pending timestamp reflects prior warmup/news ranking, not a second Run.
+Do not confuse this with pending_20260905_224132 (native crash) or the
+22:52 user-run meta-tensor failure. Completion must belong to this exact
+trial: RESULT SUCCESS, obs_publish OK, and the corresponding final episode
+on disk, following an explicit episode rename if recorded. Historical
+success entries and a skeleton ledger are not completion evidence.
+
+23:20 initial capture showed 256 tokens/649.6s at 0.4 tok/s; screenshot was
+occluded by Codex, while accessibility belonged to the Comfy console. One
+Comfy Logs activation restored a useful image. Refreshed 23:21:09 capture
+confirms 320 tokens/810.4s at 0.4 tok/s, dossier attempt 1/3. No new error,
+download, Run, model switch, cancellation or installed-code edit. Healthy
+slow generation is left alone; unchanged output alone never triggers retry.
+
+Monitoring rules: save timestamped screenshots/full accessibility states,
+append compact drill entries, record clicks, download sizes or unknown size,
+waits, exact errors and hand-step friction. Report meaningful changes only.
+Original GUI-only result remains FAIL; patched results remain separately
+labeled. On OOM, writer401 or a required extra-pack request: preserve failure,
+stop active testing and diagnose safely; no tuning, credentials or installs.
+If baseline fails, conditional other-model campaign does not start. After
+failure, source-grounded findings and recoverable candidate tests/fixes may
+be prepared in the development checkout under existing fix authority, then
+pause the monitor once useful authorized work is exhausted.
+
+After full baseline success, choose a finite prioritized UI-offered model
+checklist, beginning with alternative writer models plausible on 8 GB. Use
+separate named workflow copies, one act per trial, serially. Preserve the
+baseline, change only the selected model, keep downloads app-managed, check
+free disk capacity before large downloads, and record all setup friction.
+No cache purge/seeding, new node packs, authentication change, broad upgrades,
+publishing or external messages. Pause after the feasible checklist and
+morning evidence summary, rather than launching endless repeats.
+
+Evidence continuity: part4 preserves events75-79 inclusive and exists on
+disk (536330bytes). New overnight-setup part5 begins event80. One diagnostic
+read attempted CODEX_HOME, which was unset: Join-Path reported Cannot bind
+argument to parameter 'Path' because it is null. Test-Path then reported a
+null path. The resulting 'No automations directory exists' message was not
+valid evidence; explicit C:\Users\jeffr\.codex\automations verification
+was used instead. Creation subsequently produced the verified config there.
+These are scheduling diagnostics, not install/run steps. No OS power or
+security settings changed; local execution needs the host on and app running,
+and GUI interaction needs an unlocked desktop.
+
+Part5 saved and verified at 23:22:18 PDT: 764898bytes, events80-83 inclusive.
+All events0-83 now have durable evidence checkpoints. git diff --check passes.
+Automation remains ACTIVE on this task; no first scheduled execution or
+future success is asserted by this setup receipt.
+
+### Step28 -- 23:27-23:30 PDT, canonical repository synchronization
+
+User directs that patches live in the canonical repository and be uploaded
+to Git, explicitly retaining4060 ownership of canonical changes. User also
+raises5080 regression risk and requests the term separate JSON for any future
+machine-specific workflow. This loader correction needs no workflow-value,
+node-link or schema change; the canonical JSON remains untouched. Future
+hardware-specific settings will be considered as a separate JSON only when
+evidence establishes the need, not as a substitute for repairing shared code.
+
+Verified local checkout origin jbrick2070/ComfyUI-OldTimeRadio, branch
+v2.0-alpha, baseline f727a5c4. Fresh fetch found no incoming commits. Installed
+loader and source loader remain byte-identical, SHA256
+91D74E2C2BCA6D237FCCF2E71ACE6C69A1BBC56CED2141463E2FCCCB4B805B47.
+No additional installed-code edit, restart, model call, queue action or
+dependency change. This phase only prepares source/test/documentation Git work.
+
+Before/after numeric proof executes the real memory-planning and device-map
+selection AST from baseline and candidate for Gemma12B NF4:
+- 8.00GiB: both GPU6.8GiB/CPU32GiB, initial device_map auto.
+- 15.99GiB: both GPU13.5GiB/CPU32GiB, device_map {"":0}, allGPU.
+Those extracted ASTs are identical. Private check-branch-parity.py contains
+the reproducible comparison; driver read and reran it successfully. No model
+library imports or GPU calls. This is code-path parity, NOT a physical5080
+performance measurement. The changed retry is conditional on the specific
+NF4 CPU-dispatch refusal, not hardcoded to a4060; any device reaching that
+same refusal gets the correction. Successful allGPU loading bypasses it.
+
+Added a permanent regression for both hardware-selection cases to
+tests/test_nf4_explicit_cpu_offload.py. All seven focused tests PASS in0.006s;
+the six original tests remain intact. Loader itself is unchanged since the
+live diagnostic started. Prior independent finished-diff review was clean.
+AST parsing, nonempty/noBOM checks and git diff --check pass. No token-pattern
+matches in the source/documentation diff. Fullpytest and BugBible remain
+unavailable; full episode and physical5080 qualification remain unverified.
+
+Prepare one candidate commit containing only loader, focused tests, drill log
+and appended production findings. Preserve the unrelated untracked historical
+review-plan document. Private HTML/screenshots stay outside Git. Do not change
+pyproject.toml, registry version, tags or release settings: this is a source
+branch push, not a registry release or a clean-install PASS declaration.
