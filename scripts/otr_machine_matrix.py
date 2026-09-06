@@ -324,6 +324,44 @@ def _tier(vram):
 _ORDER = ["8 GB", "10-15 GB", "16 GB+", "unstated"]
 
 
+
+#: ENGINE -> the third-party ComfyUI node pack it needs, and whether its weights
+#: are Hugging Face gated. NEITHER fact can live in requirements.txt or
+#: pyproject.toml: a node pack is not a pip distribution, and gating is a
+#: property of the weights repo rather than of any package we declare. So the
+#: guide is the only place a reader can learn it before a render fails.
+#:
+#: DERIVED, not guessed:
+#:   packs   -- nodes/_otr_video_engines/wrapper_bridge.py `_PACK_FOR_PREFIX`
+#:              mapped onto the class prefixes each engine module emits,
+#:              FOLLOWING INHERITANCE (eng_ghost_signal_official subclasses
+#:              GhostSignalEngine, so the haunted lane inherits its ADE_ graph).
+#:   gating  -- the `gated` flags in scripts/otr_provision.py's artifact groups.
+#: Re-derive both when an engine changes its graph or its weights repo.
+_EXTRA_INSTALL = {
+    "animatediff15_v3_haunted_video": "ComfyUI-AnimateDiff-Evolved",
+    "animatediff15_v3_stillin_lab_video": "ComfyUI-AnimateDiff-Evolved",
+    "ltx25_high_video": "ComfyUI-GGUF + gated weights",
+    "ltx25_high_foley_plus": "ComfyUI-GGUF + gated weights",
+    "ltx25_high_mime": "ComfyUI-GGUF + gated weights",
+    "ltx_video": "ComfyUI-GGUF",
+    "ltx_av": "ComfyUI-GGUF",
+    "wan_ti2v": "ComfyUI-GGUF",
+    "wan22_high_video": "ComfyUI-GGUF",
+}
+
+
+def extra_install_for(cells) -> str:
+    """What a user must install BEYOND this pack for that row to render."""
+    needs = []
+    for key in ("video", "image", "writer", "music", "char_voice"):
+        val = str(cells.get(key) or "")
+        for engine, pack in _EXTRA_INSTALL.items():
+            if engine and engine in val and pack not in needs:
+                needs.append(pack)
+    return ", ".join(needs) if needs else "none"
+
+
 def render() -> str:
     profs = load_profiles()
     L = []
@@ -363,8 +401,16 @@ def render() -> str:
       "and matches land in PROSE -- searching it for `humo` finds the word "
       "`humorous` and invents a receipt.\n")
     A("## What works on what machine\n")
-    A("| your machine | writer | video | voice | music | image | status |")
-    A("|---|---|---|---|---|---|---|")
+    A("**Read the `extra install` column before you pick a row.** A lane that "
+      "needs a third-party ComfyUI node pack cannot say so in "
+      "`requirements.txt` or `pyproject.toml`, because a node pack is not a pip "
+      "distribution -- so the requirement is invisible until the render fails "
+      "with a missing class. That has already cost one divergence between the "
+      "PROVEN path and the DOCUMENTED path (PBUG-20260829-09), when the box "
+      "that proved the lane had git-cloned the pack by hand. `gated` means the "
+      "weights need a Hugging Face licence acceptance before they download.\n")
+    A("| your machine | writer | video | voice | music | image | extra install | status |")
+    A("|---|---|---|---|---|---|---|---|")
     for row in classes:
         label = row.get("label", "?")
         # Read the ROW, never a profile it may not name. Every machine value
@@ -376,10 +422,10 @@ def render() -> str:
         cells = merged_row(row)
         conf = (row.get("proof_summary")
                 or "`%s`, unproven" % cells.get("status", "draft"))
-        A("| **%s** | %s | %s | %s | %s | %s | %s |" % (
+        A("| **%s** | %s | %s | %s | %s | %s | %s | %s |" % (
             label, cells.get("writer", "--"), cells.get("video", "--"),
             cells.get("char_voice", "--"), cells.get("music", "--"),
-            cells.get("image", "--"), conf))
+            cells.get("image", "--"), extra_install_for(cells), conf))
     A("")
     A("**Use the machine key, not an experimental profile name.** Run these "
       "with the exact Python executable that launches ComfyUI (shown as "

@@ -27,12 +27,14 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 ## What works on what machine
 
-| your machine | writer | video | voice | music | image | status |
-|---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
-| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `draft`, unproven |
-| **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | `draft`, unproven |
+**Read the `extra install` column before you pick a row.** A lane that needs a third-party ComfyUI node pack cannot say so in `requirements.txt` or `pyproject.toml`, because a node pack is not a pip distribution -- so the requirement is invisible until the render fails with a missing class. That has already cost one divergence between the PROVEN path and the DOCUMENTED path (PBUG-20260829-09), when the box that proved the lane had git-cloned the pack by hand. `gated` means the weights need a Hugging Face licence acceptance before they download.
+
+| your machine | writer | video | voice | music | image | extra install | status |
+|---|---|---|---|---|---|---|---|
+| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | ComfyUI-GGUF | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
+| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
+| **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | none | `draft`, unproven |
 
 **Use the machine key, not an experimental profile name.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
 
