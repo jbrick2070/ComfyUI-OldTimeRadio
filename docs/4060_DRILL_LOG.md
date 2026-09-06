@@ -1785,3 +1785,25 @@ fix is justified by healthy slow progress; stay quiet while stage unchanged.
 Private4060-overnight-20260906-002322.html preserves3 timestamped events,
 one screenshot/full-tree capture, verified253687bytes. Prior evidence intact.
 This heartbeat changes documentation only; the existing act remains active.
+
+### Step35 -- 2026-09-06 00:29 PDT, treatment and cast aliases complete
+
+Scheduled wake00:29:52.535. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Treatment reached384tokens/891.7s at00:24:13.424,
+then finished397/923.6s at00:24:45.270. Cast-aliases attempt1/3 began
+00:24:45.273, reached64/152.1s at00:27:17.353, and finished105/249.6s
+at00:28:54.930. News-read attempt1/3 began00:28:54.938 with technical-slot
+cache reuse. Rate remains0.4tok/s. No new error, OOM,401 or download.
+No matching RESULT SUCCESS, obs_publish OK or final episode verified;
+other-model trials remain conditional and idle. Intermediate stages only.
+
+One passive visible console screenshot/full accessibility tree; read-only
+persisted-log tail supplies exact timestamps. No activation/click/key input,
+manual wait, new Run, installed edit, JSON/model/cache/dependency change,
+restart/cancellation or hand tuning. Fresh fetch/pull already up to date.
+Step34 documentation push90c6b9b was remote-verified. Historical untracked
+review-plan remains untouched; no source/JSON change justified by this check.
+
+Private4060-overnight-20260906-002952.html preserves3 timestamped events,
+one screenshot/full-tree capture, verified249808bytes. Prior evidence intact.
+Documentation-only checkpoint; active single act remains untouched.
