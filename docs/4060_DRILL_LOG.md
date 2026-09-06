@@ -4238,3 +4238,72 @@ the field contract requires and Step100 recorded as missing. Verdict Apache2.0 /
 STILL OPEN: the Qwen source change remains UNCOMMITTED in the D: checkout (this
 step installed it, it did not commit it), and no Qwen trial has run. Speed, VRAM,
 prose, constrained JSON and any episode result remain NOT TESTED.
+
+### Step 105 — September 6, 14:28–14:34 PDT: E2B retest FAILED on BUG-LOCAL-098; vision tower is the cause
+
+Operator asked why E2B was reported at 0.4tok/s, correctly observing that the
+number makes no sense for a small model. IT WAS NEVER E2B. Attribution corrected
+from the existing records: 0.4tok/s was gemma-4-12b-it (the 09:07 writer);
+0.5tok/s was E4B (portability report, 13:56); E2B has never emitted a single
+token. Its 13:58 trial died during a first download, which is not a speed result.
+
+Restarted the pre-existing instance through the native Comfy Desktop launcher
+(instance "ComfyUI", not New Instance, not Comfy Cloud). Fresh boot 14:28:58.795;
+"All 25 nodes loaded successfully" 14:29:09.272; server 14:29:09.351. No OTR skip
+or error. The AnimateDiffEvo missing-motion-model error is the pre-existing extra
+pack and is unrelated contamination.
+
+Pre-Run GUI verification, read from the canvas before any click: creative and
+technical slots BOTH `google/gemma-4-E2B-it (3.0 GB)`, num_characters2,
+act_count1, batch counter1, "0 active". Exactly one Run submitted.
+Got prompt 14:30:47.891. Writer echoed act_count=1, num_characters=2, both slots
+E2B, seed_source=public_domain_source.
+
+Note the path difference from Step99: this run rolled the PUBLIC DOMAIN source
+bank, so NewsCuration was never reached and the 65-second news deadline was not
+the thing under test. Automatic download started 14:30:48.089.
+
+FAILED 14:34:01.694, "Prompt executed in 193.79 seconds". Exact terminal error:
+
+```
+BUG-LOCAL-098: NF4 quantized load did not materialize for 'google/gemma-4-E2B-it'.
+linear4bit_count=525 is_loaded_in_4bit=True
+off_cuda_modules=['model.vision_tower.patch_embedder.input_proj=cpu',
+ 'model.vision_tower.encoder.layers.0.self_attn.q_proj.linear=cpu',
+ 'model.vision_tower.encoder.layers.0.self_attn.k_proj.linear=cpu',
+ 'model.vision_tower.encoder.layers.0.self_attn.v_proj.linear=cpu',
+ 'model.vision_tower.encoder.layers.0.self_attn.o_proj.linear=cpu']...
+vram_delta=0.00GiB (telemetry)
+```
+
+DIAGNOSIS. Every listed off-CUDA module is `model.vision_tower.*`. The TEXT
+decoder placed on CUDA; the guard refused because the VISION tower did not.
+E2B is a multimodal checkpoint driven in text-only mode, so those vision weights
+are never executed by the writer -- they are cargo that consumed the device
+budget and then tripped a correctness guard.
+
+ROOT CAUSE IS A SCOPING GAP, not a new defect. Commit 49ea213 added a native
+text-decoder load for exactly this problem, but scoped it to one exact string:
+`nodes/_otr_model_loader.py:1141` reads
+`_e4b_text_retry = _stripped_model_id == "google/gemma-4-E4B-it"`. E2B shares the
+architecture and the failure and is excluded, so it loads the COMPOSITE model
+(text + vision + audio towers) into a `{0: '3.2GiB', 'cpu': '32GiB'}` plan, spills
+the vision tower to CPU, and dies on the guard.
+
+FORWARD RISK, recorded before it costs a trial: `Qwen/Qwen3.5-4B` is ALSO a
+multimodal checkpoint (HF class AutoModelForMultimodalLM, task image-text-to-text)
+carrying `loader_backend="transformers_multimodal_text_only"`. On this evidence it
+is likely to hit the SAME composite-load wall. Its trial should not be spent until
+this is addressed.
+
+The `vram_delta=0.00GiB` in the message is the known false-zero telemetry from the
+old installed sampler, not a new measurement, and is not evidence about placement.
+
+DISPOSITION. gemma-4-E2B-it: FAIL (BUG-LOCAL-098 composite multimodal load). Not
+OOM, not 401, not a speed result. E2B speed on this card remains NOT MEASURED.
+Evidence: `comfyui-e2b-retest-20260906-1434.log`, failure UI captured.
+Weights are now cached, so a re-run after a fix pays no second download. One
+orphaned 7,387,685,822-byte `.incomplete` blob from the 14:00 killed run remains
+on disk (mtime 14:00:49) and is preserved, not deleted -- it is also direct
+evidence that the 13:59 timeout left its download worker running until the
+process was stopped.
