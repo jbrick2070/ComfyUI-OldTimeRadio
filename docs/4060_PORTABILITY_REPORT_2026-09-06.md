@@ -238,3 +238,12 @@ reached6lines153words06:53:59; read-only06:58 inspection confirms the matching
 28218-byte valid JSON with6line entries. Produced-open brief derive passed
 06:57:26 and writing continues. No new errors/setup; screenshot remains black.
 Durable dialogue is progress, not final audio/video/obs publication success.
+
+At07:02:14 the title 'Behind the Loose Brick' was written under the same
+pending directory. Latest ledger log is6lines170words, after an earlier174word
+save. Optional source-term telemetry reports0/5 landed; recorded as a content
+observation, not a terminal failure. An accelerate move warning precedes the
+reflection model reload. Its NF4 dispatch refusal automatically recovered via
+the existing CPU-offload retry;677weights loaded, CUDAwarmup completed and
+reflection reached64tokens07:05:18. No manual recovery, CUDA OOM or401.
+Run remains active;07:06 screenshot remains black and final PASS unverified.

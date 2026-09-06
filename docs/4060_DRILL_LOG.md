@@ -3083,3 +3083,28 @@ original screenshot/full available old tree, exact log delta and disk receipt.
 No new OOM/401/error/download/rename/terminal result. No input/retry/requeue,
 installed edit/manual setup/cleanup/registry action. Pending source generation
 stays deferred to idle. Documentation-only milestone.
+
+### Step75 -- 2026-09-06 06:59-07:07 PDT, title written; reflection reload recovers
+
+Same one-act Run and pending episode directory; no logged rename. Narrator
+intro rewrite06:59:29 and outro07:00:33 bring logged total to174words.
+Optional key-term telemetry07:00:33.233 reports0/5 landed: content-fidelity
+observation retained, not a terminal failure or silently repaired output.
+Title 'Behind the Loose Brick' written07:02:14.548. At07:02:14.557 warning:
+`You shouldn't move a model that is dispatched using accelerate hooks.`
+Next ledger save07:02:15.430 reports6lines170words; both counts retained,
+reason for reduction not inferred. Reflection begins07:02:15.431.
+
+Automatic Gemma reload again encounters the NF4 CPU/disk-dispatch refusal
+07:02:18.698 and recovers through existing explicit CPU-offload retry; no
+agent action or newly observed CUDA OOM.677weights loaded07:02:29.281,
+warmup complete07:02:46.189; reflection64tokens07:05:18.382 at0.4tok/s.
+No401/download/extra-pack request or terminal result; no finished-media PASS.
+
+Single passive screenshot07:06:02.094PDT remains BLACK; no capture exception
+or LockApp returned. Full available old tree/screenshot and exact warning,
+refusal/recovery and current log delta retained privately in
+4060-heartbeat-20260906-0705.html/.md. Initial22-line disk tail missed earlier
+delta, so expanded45-line read preserved it. No input/retry/requeue/restart,
+installed edit/manual setup/cleanup/registry action. Source generation deferred
+to idle; documentation-only milestone.
