@@ -1068,9 +1068,28 @@ def load_llm(
                     f"(total_vram={total_vram:.2f} GiB)"
                 )
             else:
+                # REPORT THE PLACEMENT THAT WAS ACTUALLY REQUESTED, not the
+                # branch's name (2026-09-06). This line used to read
+                # "device_map=auto path" whenever the card was under 14.5 GiB,
+                # but device_map is only set above when max_memory is not None.
+                # A row whose id matches no size tag in _plan_max_memory gets
+                # max_memory=None, so NO device_map reaches from_pretrained and
+                # accelerate's auto dispatch never runs -- bitsandbytes places
+                # the whole model on one device instead. Both cases logged the
+                # same sentence, and this is the single line an operator greps
+                # after a multi-hour run to decide whether layers were
+                # offloaded. Claiming a dispatch that did not happen sends the
+                # next diagnosis to the wrong subsystem, which it did.
+                _placement = common_kwargs.get("device_map")
                 _runtime_log(
-                    f"[StoryOrchestrator] device_map=auto path "
-                    f"(total_vram={total_vram:.2f} GiB < 14.5 GiB)"
+                    f"[StoryOrchestrator] sub-14.5 GiB path "
+                    f"(total_vram={total_vram:.2f} GiB): "
+                    + (f"device_map={_placement!r} with "
+                       f"max_memory={common_kwargs.get('max_memory')!r}"
+                       if _placement is not None else
+                       "no device_map and no max_memory passed -- "
+                       "bitsandbytes places the model on a single device; "
+                       "accelerate auto-dispatch does NOT run")
                 )
 
         try:
