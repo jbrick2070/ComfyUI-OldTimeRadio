@@ -98,3 +98,36 @@ act. Record every download, size, wait and error. Require RESULT SUCCESS,
 obs_publish OK and the actual episode file. An OOM or authorization failure is
 a terminal finding, not an invitation to tune or obtain a token. No separate
 4060 JSON is justified by these file-readiness checks alone.
+
+## September6 live development follow-up
+
+User deferred registry publication and authorized the reviewed installed-source
+patch as an explicitly hand-patched development trial. GUI one-act Run started
+04:50:36.149PDT. Real anonymous metadata resolved all5 defaults/36,818,738,352
+bytes before the writer. By04:58, ZImage12,309,866,400bytes/232.6s,
+Qwen8,044,982,048bytes/196.2s and VAE335,304,388bytes/7.3s were verified;
+LTX was downloading. This is not all-assets READY or a render/publish pass.
+
+Native aliases matter for the guide: this Desktop instance prepends its shared
+`unet` directory to diffusion-model roots via legacy alias mapping. The first
+verified ZImage final was there, not in a folder literally named diffusion_models.
+Never prescribe a manual move; native resolution remains the authority.
+
+Observed UX issue: Comfy's queue remains at0percent during transfer even while
+the Logs panel shows bytes advancing. A subsequent DEV-only correction uses
+the standard Comfy ProgressBar in the current execution context, aggregating
+only missing bytes over all files. It reserves the final1percent until every
+receipt/native recheck and final cancellation check passes; progress-hook
+interruptions propagate. Exact console bytes remain unchanged and completion
+logs include the native path. Total-only constructor avoids requiring the newer
+node_id keyword. No new thread, JSON/widget, network endpoint or GPU behavior.
+This follow-up is not applied to the active run; offline/GUI qualification of
+the progress presentation is recorded separately from download receipts.
+
+Progress follow-up verification: six new tests and extended existing assertions
+passed with77visual +7NF4 tests (84total). Independent scoped review found no
+actionable issues. Native hook is source-verified on installed ComfyUI0.34.5;
+total-only constructor compatibility is stub-tested, not a matrix of physical
+hosts/frontend versions. Live progress presentation is still unqualified because
+the ongoing trial intentionally retains the pre-progress installed candidate.
+By04:59:58, LTX6,340,744,492bytes also verified in124.6s; T5 transfer then began.

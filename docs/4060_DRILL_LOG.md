@@ -2816,3 +2816,49 @@ is deferred until final work. Quiet on unchanged state. Latest04:53:28 progress:
 9,099,542,528/12,309,866,400bytes at171.1s for firstfile; no failure/READY yet.
 Archive verified3,040,904bytes,40events22screenshots. Historical review plan
 remains untracked/excluded; raw private evidence will not be pushed publicly.
+
+### Step64 -- 2026-09-06 04:54–05:00 PDT, four verified weights; source-only progress fix
+
+Same one-act trial remains active; no additional Run/restart/installed edit.
+Console-verified completed automatic transfers:
+
+| Asset | Verified bytes | Completion PDT | Transfer seconds |
+| --- | ---: | --- | ---: |
+| ZImage BF16 | 12,309,866,400 | 04:54:29.923 | 232.6 |
+| Qwen3-4B encoder | 8,044,982,048 | 04:57:46.139 | 196.2 |
+| ae VAE | 335,304,388 | 04:57:53.480 | 7.3 |
+| LTX098 distilled | 6,340,744,492 | 04:59:58.052 | 124.6 |
+
+FifthfileT5 starts04:59:58.054,9,787,841,024bytes planned; no all-assets READY
+or writer start at05:00:13. Progress briefly slowed during Qwen then recovered;
+no cancellation, timeout or hand adjustment. Second requested20s observation
+wait measured11.9852s, interrupted by agent message. Checkpoint HTML retains
+2 passive screenshots/4events. Exact completion timestamps above come from
+persisted logs; screenshots are checkpoints, not continuous video of each
+transition. All byte-progress lines remain in private appended log snapshots.
+
+Artifact path check first looked in2 literal diffusion_models folders and failed;
+both errors retained verbatim. Reading actual native folder registration and
+generated Desktop YAML explained that later default legacy unet alias is
+prepended. Verified ordinary ZImage final in Desktop sharedmodels/unet, exact
+12,309,866,400bytes; did not move/copy/rehash it or repair paths. A separate
+missing extra_model_paths.yaml lookup was also recorded, no repair attempted.
+
+Observed0percent GUI display is now corrected in DEV SOURCE ONLY: use Comfy's
+normal execution-context ProgressBar(total-only constructor), byte-weighted
+across missing files,0..99percent until transfer/native checks and final cancel
+pass. No background thread/server call/JSON change; hook interruptions propagate.
+Completed-transfer logs now include actual native destination. Current installed
+bridge remains original candidateSHA256BC16A7B5367D7A8C6A3FFF5AF49CFDDDF8D5D11974D5337DBF33AA6D6EBF7092;
+its running behavior was not changed to disguise the finding.
+
+Six new progress tests plus extended existing assertions cover aggregation,
+missing-only byte weighting, no premature100percent, verification/native drift,
+BaseException during/final progress, final cancellation and skipped-download
+paths. Full focused rerun:77visual tests in0.299s plus7NF4 tests in0.005s,84PASS.
+Independent scoped review found no actionable issues. Tests are stdlib fixtures,
+no model/network/GPU calls. Current Comfy constructor/hook source inspected;
+old constructor behavior stubbed, not a cross-version GUI benchmark. Full pytest
+remains unavailable from earlier environment check. Canonical hash unchanged.
+This progress follow-up is not installed or live-GUI-qualified yet; registry
+publication remains deferred. Healthy current trial continues under heartbeat.

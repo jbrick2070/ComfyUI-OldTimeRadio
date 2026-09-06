@@ -443,15 +443,41 @@ class MetadataTests(NoNetworkTestCase):
 
 class RuntimeBridgeTests(_NativeFixtureCase):
     @contextmanager
-    def runtime(self, *, forbid_hf=False, cancel=None, metadata_size=None, after_download=None):
+    def runtime(self, *, forbid_hf=False, cancel=None, metadata_size=None,
+                after_download=None, metadata_sizes=None, gui_update=None):
         prefix = "_visual_assets_runtime_fixture"
         payload = b"runtime fixture, never model weights"
-        trace = SimpleNamespace(heads=[], downloads=[], cancel_calls=0)
+        trace = SimpleNamespace(heads=[], downloads=[], cancel_calls=0,
+                                bars=[], gui_updates=[], events=[], native_passes=0,
+                                verified_downloads=0)
 
         def cancel_check():
             trace.cancel_calls += 1
+            trace.events.append(("cancel", trace.cancel_calls))
             if cancel is not None:
                 return cancel(trace.cancel_calls)
+
+        class FakeProgressBar:
+            # Deliberately total-only: the production helper must remain
+            # compatible with OTR's older context-owned constructor shape.
+            def __init__(self, total):
+                trace.bars.append(total)
+                trace.events.append(("bar", total, len(trace.heads)))
+
+            def update_absolute(self, value):
+                trace.gui_updates.append(value)
+                trace.events.append(("gui", value))
+                if gui_update is not None:
+                    gui_update(trace, value)
+
+        native_requests = bridge.native_requests
+
+        def traced_native_requests(*args, **kwargs):
+            trace.native_passes += 1
+            trace.events.append(("native_start", trace.native_passes))
+            result = native_requests(*args, **kwargs)
+            trace.events.append(("native_end", trace.native_passes))
+            return result
 
         def module(name, **attrs):
             value = ModuleType(name)
@@ -464,22 +490,30 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             return "https://huggingface.co/%s/resolve/%s/%s" % (
                 repo, kwargs.get("revision", "main"), filename)
 
+        def file_payload(filename):
+            size = (metadata_sizes or {}).get(filename.rsplit("/", 1)[-1], len(payload))
+            return (payload * ((size + len(payload) - 1) // len(payload)))[:size]
+
         def metadata(url, **kwargs):
             trace.heads.append((url, kwargs))
+            body = file_payload(url)
             return SimpleNamespace(commit_hash="a" * 40,
-                                   etag=hashlib.sha256(payload).hexdigest(),
-                                   size=len(payload) if metadata_size is None else metadata_size)
+                                   etag=hashlib.sha256(body).hexdigest(),
+                                   size=len(body) if metadata_size is None else metadata_size)
 
         def fake_download(spec, destination, pinned, **kwargs):
+            body = file_payload(spec["filename"])
             trace.downloads.append((dict(spec), Path(destination), dict(pinned)))
             kwargs["cancel"]()
-            kwargs["progress"](0, len(payload))
+            kwargs["progress"](0, len(body))
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(payload)
-            kwargs["progress"](len(payload), len(payload))
+            destination.write_bytes(body)
+            kwargs["progress"](len(body), len(body))
             if after_download is not None:
                 after_download(trace, destination)
-            return {"status": "downloaded", "verified": True, "bytes_verified": len(payload)}
+            trace.verified_downloads += 1
+            trace.events.append(("verified", trace.verified_downloads))
+            return {"status": "downloaded", "verified": True, "bytes_verified": len(body)}
 
         modules = {
             prefix: module(prefix),
@@ -498,6 +532,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
                                    get_folder_paths=self.folders.get_folder_paths),
             "comfy": module("comfy", model_management=SimpleNamespace(
                 throw_exception_if_processing_interrupted=cancel_check)),
+            "comfy.utils": module("comfy.utils", ProgressBar=FakeProgressBar),
             "huggingface_hub": module("huggingface_hub", hf_hub_url=hub_url, get_hf_file_metadata=metadata),
         }
 
@@ -512,6 +547,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
                 mock.patch.object(bridge, "__package__", prefix), \
                 mock.patch.object(bridge, "__spec__", importlib.util.spec_from_file_location(
                     prefix + "._otr_visual_assets", MODULE_PATH)), \
+                mock.patch.object(bridge, "native_requests", side_effect=traced_native_requests), \
                 mock.patch("builtins.__import__", side_effect=guard), \
                 mock.patch.object(bridge, "_open_stream", side_effect=AssertionError("real transport forbidden")):
             yield trace
@@ -525,6 +561,8 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         self.assertEqual(result["receipts"], [])
         self.assertEqual(trace.heads, [])
         self.assertEqual(trace.downloads, [])
+        self.assertEqual(trace.bars, [])
+        self.assertEqual(trace.gui_updates, [])
         self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in installed})
 
     def test_missing_canonical_downloads_exact_five_then_native_rechecks(self):
@@ -555,6 +593,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             with self.assertRaises(bridge.VisualAssetError):
                 bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
         self.assertEqual(trace.downloads, [])
+        self.assertEqual(trace.bars, [])
         self.assertTrue(all(row["path"] is None for row in self.requests()))
 
     def test_cancellation_after_metadata_stops_before_transfer(self):
@@ -578,6 +617,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             with self.assertRaisesRegex(bridge.VisualAssetError, "selection changed"):
                 bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
         self.assertEqual(len(trace.downloads), 5)
+        self.assertNotIn(1000, trace.gui_updates)
 
     def test_replay_runtime_does_not_fetch_live_visual_choices(self):
         prompt = canonical_prompt()
@@ -587,6 +627,108 @@ class RuntimeBridgeTests(_NativeFixtureCase):
         self.assertEqual(result["status"], "not-covered")
         self.assertEqual(trace.downloads, [])
         self.assertEqual(trace.heads, [])
+        self.assertEqual(trace.bars, [])
+        self.assertEqual(trace.gui_updates, [])
+
+    def test_gui_progress_is_one_monotonic_aggregate_after_metadata(self):
+        def check_final(trace, value):
+            if value == 1000:
+                self.assertEqual(trace.verified_downloads, 5)
+                self.assertEqual(trace.native_passes, 2)
+                self.assertIn(("native_end", 2), trace.events)
+                self.assertEqual(trace.events[-2][0], "cancel")
+
+        with self.runtime(gui_update=check_final) as trace:
+            result = bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(trace.bars, [1000])
+        self.assertIn(("bar", 1000, 10), trace.events)
+        self.assertEqual(trace.gui_updates[0], 0)
+        self.assertEqual(trace.gui_updates, sorted(trace.gui_updates))
+        self.assertTrue(all(value <= 990 for value in trace.gui_updates[:-1]))
+        self.assertEqual(trace.gui_updates[-1], 1000)
+        self.assertEqual(trace.gui_updates.count(1000), 1)
+
+    def test_gui_progress_weights_only_missing_metadata_bytes(self):
+        for category, token in (("diffusion_models", DEFAULT_UNET),
+                                ("vae", DEFAULT_VAE), ("checkpoints", DEFAULT_CKPT)):
+            self.folders.put(category, token)
+        with self.runtime(metadata_sizes={DEFAULT_CLIP: 11, DEFAULT_T5: 33}) as trace:
+            result = bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(len(trace.heads), 4)
+        self.assertEqual([row[2]["size"] for row in trace.downloads], [11, 33])
+        self.assertEqual(trace.bars, [1000])
+        self.assertEqual(trace.gui_updates, [0, 0, 247, 247, 990, 1000])
+
+    def test_gui_progress_cannot_complete_before_transfer_verification(self):
+        failure = ValueError("fixture transfer verification failed")
+
+        def reject_transfer(trace, destination):
+            self.assertLessEqual(max(trace.gui_updates), 990)
+            self.assertNotIn(1000, trace.gui_updates)
+            raise failure
+
+        with self.runtime(after_download=reject_transfer) as trace:
+            with self.assertRaises(ValueError) as caught:
+                bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertIs(caught.exception, failure)
+        self.assertEqual(trace.verified_downloads, 0)
+        self.assertNotIn(1000, trace.gui_updates)
+
+    def test_gui_progress_baseexception_interrupt_propagates_during_transfer(self):
+        class Interrupted(BaseException):
+            pass
+
+        interruption = Interrupted("fixture native progress interruption")
+
+        def interrupt_update(trace, value):
+            if value > 0:
+                raise interruption
+
+        with self.runtime(gui_update=interrupt_update) as trace:
+            with self.assertRaises(Interrupted) as caught:
+                bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertIs(caught.exception, interruption)
+        self.assertEqual(len(trace.downloads), 1)
+        self.assertEqual(trace.verified_downloads, 0)
+        self.assertNotIn(1000, trace.gui_updates)
+
+    def test_gui_progress_baseexception_interrupt_propagates_at_final_update(self):
+        class Interrupted(BaseException):
+            pass
+
+        interruption = Interrupted("fixture final native progress interruption")
+
+        def interrupt_update(trace, value):
+            if value == 1000:
+                raise interruption
+
+        with self.runtime(gui_update=interrupt_update) as trace:
+            with self.assertRaises(Interrupted) as caught:
+                bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertIs(caught.exception, interruption)
+        self.assertEqual(trace.verified_downloads, 5)
+        self.assertEqual(trace.native_passes, 2)
+        self.assertEqual(trace.gui_updates[-1], 1000)
+
+    def test_final_cancel_prevents_gui_completion(self):
+        class Interrupted(BaseException):
+            pass
+
+        interruption = Interrupted("fixture interruption after native recheck")
+
+        def cancel(count):
+            if trace.native_passes == 2:
+                raise interruption
+
+        with self.runtime(cancel=cancel) as trace:
+            with self.assertRaises(Interrupted) as caught:
+                bridge.ensure_prompt_visual_assets(canonical_prompt(), "63")
+        self.assertIs(caught.exception, interruption)
+        self.assertEqual(trace.verified_downloads, 5)
+        self.assertEqual(trace.native_passes, 2)
+        self.assertNotIn(1000, trace.gui_updates)
 
 
 class TransportBoundaryTests(NoNetworkTestCase):

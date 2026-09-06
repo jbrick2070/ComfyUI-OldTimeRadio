@@ -167,3 +167,9 @@ The queue stays at0percent during transfer; actual bytes/progress are visible
 under Toggle Bottom Panel > LOGS and the separate Logs window. Log this UI
 friction for the onboarding guide. Active run remains under observation;
 earlier failed trials and clean-install qualification limits are unchanged.
+
+By04:59:58PDT four automatic transfers had verified successfully (ZImage,
+Qwen encoder, VAE and LTX); T5 was still downloading. The0percent-display
+finding has a separate source-only native-progress correction with84focused
+tests passing and clean independent review. It is not installed into the active
+trial. No whole-episode/GPU-capacity/publish success has yet been established.

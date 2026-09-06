@@ -260,6 +260,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                                ltx=ltx, env=otr_env.snapshot())
     missing = [r for r in requests if r["path"] is None]
     receipts = []
+    gui_progress = None
     for item in requests:
         if item["path"] is not None:
             log.info("[OTR.assets] EXISTING %s/%s bytes=%d native=%s "
@@ -289,6 +290,13 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         log.info("[OTR.assets] missing files=%d total_download_bytes=%d; "
                  "no packs, no substitution, no resume/retry",
                  len(missing), sum(item["metadata"]["size"] for item in missing))
+        # Use Comfy's native execution-context hook, not a server/API call or
+        # worker thread. The total-only constructor also supports older Comfy.
+        from comfy.utils import ProgressBar
+        total_download_bytes = sum(item["metadata"]["size"] for item in missing)
+        completed_bytes = 0
+        gui_progress = ProgressBar(1000)
+        gui_progress.update_absolute(0)
         for item in missing:
             cancel()
             # Native order wins; never silently switch to a writable alternate.
@@ -297,6 +305,11 @@ def ensure_prompt_visual_assets(prompt, unique_id):
             last_report = [0.0]
 
             def progress(done, total):
+                # A final chunk is not yet hash-verified/published. Reserve the
+                # last 1% until every receipt and native-loader recheck passes.
+                # Do not swallow interruption raised by Comfy's progress hook.
+                gui_progress.update_absolute(min(
+                    990, 990 * (completed_bytes + done) // total_download_bytes))
                 now = time.monotonic()
                 if done in (0, total) or now - last_report[0] >= 5:
                     log.info("[OTR.assets] DOWNLOAD %s bytes=%d/%d elapsed_s=%.1f",
@@ -310,9 +323,10 @@ def ensure_prompt_visual_assets(prompt, unique_id):
             if not _same_file(native, destination):
                 raise VisualAssetError("download completed but native loader does not resolve "
                                        "the destination; no path repair")
-            log.info("[OTR.assets] %s %s bytes_verified=%d elapsed_s=%.1f",
+            completed_bytes += item["metadata"]["size"]
+            log.info("[OTR.assets] %s %s bytes_verified=%d elapsed_s=%.1f native=%s",
                      receipt["status"].upper(), item["token"], receipt["bytes_verified"],
-                     time.monotonic() - started)
+                     time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
         after = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
                                 ltx=ltx, env=otr_env.snapshot())
@@ -322,6 +336,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
             raise VisualAssetError("visual asset selection changed or remains missing after "
                                    "download; stopping before writer")
     cancel()
+    if gui_progress is not None:
+        gui_progress.update_absolute(1000)
     log.info("[OTR.assets] READY engines=%s files=%d (availability only; "
              "render/GPU/publish success not qualified)", ",".join(sorted(engines)), len(requests))
     return {"status": "ready", "engines": sorted(engines), "receipts": receipts,
