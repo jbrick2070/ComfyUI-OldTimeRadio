@@ -3872,10 +3872,15 @@ Actual one-token warmup completes13:33:29.426 in5.5s, passing the former failure
 point. At13:35:30.785 the first concept generation heartbeat reports64tokens,
 0.5tok/s,121.3s. Slow offloading is confirmed progress, not a stall.
 
-Passive GUI observations13:33:47.570 and13:36:27 retain exactly one active
+Passive GUI observations13:33:47.570 and13:36:28.647 retain exactly one active
 writer; no input after Run. Initial100 sampler rows through13:34:28 show sampled
 maximum6911MiB, not per-process/full-run/guaranteed peak or8GB qualification.
 Sampler continues. Full boot/runtime/log, timestamps, all seven captured GUI
 states, install proof and raw sampled rows are private. No terminal OOM/401,
 completed story, media, credits, publication or full PASS yet. Leave this one
 trial running; do not patch the installed loader or queue another act.
+
+13:38 checkpoint: the same original_concept call reports128tokens at
+13:37:37.689,0.5tok/s,248.2s. No error or added Run. The exact second passive
+screenshot timestamp above is corrected from the earlier approximate prose;
+the private capture retains its original timestamp. No runtime/source change.
