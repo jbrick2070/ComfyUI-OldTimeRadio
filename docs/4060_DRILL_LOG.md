@@ -3884,3 +3884,26 @@ trial running; do not patch the installed loader or queue another act.
 13:37:37.689,0.5tok/s,248.2s. No error or added Run. The exact second passive
 screenshot timestamp above is corrected from the earlier approximate prose;
 the private capture retains its original timestamp. No runtime/source change.
+
+### Step 96 — September 6, 13:46–13:48 PDT: first E4B concept call completes
+
+Same sole13:33:17.822 GUI trial, E4B/E4B, one act/batch1. Console heartbeats
+advance192tokens13:39:46.085,256tokens13:41:54.452,320tokens13:43:55.043 and
+382tokens13:45:52.274. That last call took742.8s at about0.5tok/s. The next
+original_select call starts13:45:52.280 and reuses the cachedE4B. This is real
+phase progress, not a finished story or episode.
+
+Passive GUI13:47:46.074 confirms one active writer. No clicks, keys, settings,
+additional Run, downloads, source/install edits or process control. The exact
+episode remains pending_20260906_133318; independent read-only snapshot13:47:37
+finds only its3917-byte skeleton ledger, still with zero content counts and no
+final assets. No renamed folder was inferred and no reparse point was followed.
+Early skeleton persistence does not contradict console-confirmed progress.
+
+Existing sampler continuation preserves629new rows through13:47:02.564.
+Cumulative848valid one-second observations show sampled maximum6975MiB of8188.
+This is not per-process/full-run/guaranteed peak or8GBqualification. No OOM,
+401, terminal failure, credits or publication observed. Private1347HTML/MD
+retain the exact screenshot/tree, full console and bounded runtime tail, all
+new raw samples and Git preflight. Logging/monitoring continue without
+interrupting the active trial.

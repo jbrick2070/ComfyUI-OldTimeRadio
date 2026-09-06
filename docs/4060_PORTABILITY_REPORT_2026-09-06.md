@@ -478,3 +478,9 @@ heartbeat at0.5tok/s. The former meta/CUDA failure is not recurring so far.
 CPU offloading is slow; no complete story or episode qualification yet.
 No settings, downloads, hand model steps or extra Runs were added. This remains
 a hand-patched development trial, not a clean-install PASS. See Step95.
+
+September 6, 13:48 progress: E4B completed its first concept-generation call
+with382tokens in742.8s and advanced to concept selection using the cached model.
+The same one-act trial remains active without additional inputs or downloads.
+No terminal failure, complete story, credits or publication yet. CPU offloading
+is slow but progressing; no runtime or settings change. Drill Step96.
