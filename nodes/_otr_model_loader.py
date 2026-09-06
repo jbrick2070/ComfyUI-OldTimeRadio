@@ -493,78 +493,61 @@ def _plan_max_memory(
     model_id: str, total_vram: float, *, cuda_available: bool,
     quant_policy: str,
 ):
-    """VRAM-budget plan for the transformers loader.
+    """No artificial VRAM cap. Always ``None``.
 
-    Returns the ``max_memory`` dict for ``from_pretrained`` or ``None``.
-    The integer key ``0`` names CUDA device 0, so on a CUDA-less host the
-    only honest plan is ``None`` (plain CPU/MPS load). The pre-S0 code
-    built the CUDA-keyed dict from model-id string tags alone, handing
-    transformers a device map for hardware that does not exist on
-    cpu/mps hosts (fresh-install breaker).
+    OPERATOR DIRECTIVE 2026-09-06: "remove all caps, just let the system take
+    up as much memory as it needs", and "no crawling". This function is kept
+    as the seam its callers and tests already reference; it no longer imposes
+    a budget.
 
-    2026-08-25: every budget below (3.2GiB for a 2B-tag, 6.8GiB for a
-    9b/12b/e4b/4b-it tag, ``total_vram - 2.5`` above 12 GiB) was sized for a
-    4-BIT (NF4) footprint -- the S1 comment above ``load_llm`` records that
-    "its resolved value for every production id was NF4" back when these
-    numbers were chosen, i.e. a tagged model_id was ALWAYS quantized at the
-    time. ``quant_policy="none"`` pairing with a small tagged model (e.g.
-    ``otr_4060_floor``'s ``google/gemma-4-E2B-it``) postdates this function
-    and was never threaded back in -- so an UNQUANTIZED bf16 load (needing
-    roughly 4x a 4-bit footprint) was still being capped at the 4-bit number,
-    with the remainder silently CPU-offloaded by ``device_map="auto"``. Live
-    symptom on an 8 GB RTX 4060 tonight: the 3-4B ``E2B`` model ran
-    noticeably SLOWER than the 12B NF4 model on the same card -- exactly what
-    partial CPU offload looks like, every forward pass paying PCIe
-    round-trips for the CPU-resident layers.
+    WHAT WAS REMOVED, and why every one of these numbers was a liability:
 
-    So this budget applies ONLY to an actually-quantized load. An
-    unquantized (``quant_policy == "none"``) request returns ``None`` here,
-    unconditionally, before any ``total_vram``/tag branching -- no cap, no
-    artificial CPU-offload escape hatch. The model either fits fully on GPU
-    (the normal case for a profile that chose a small model BECAUSE it chose
-    no quantization) or ``model = model.to(device)`` (the existing
-    ``quant_config is None and max_memory is None`` branch, already
-    exercised today by every non-tagged model_id) raises a fast, honest CUDA
-    OOM instead of a silent multi-minute-per-line render that looks hung.
+      * ``{0: "3.2GiB"}``  for a 2B-tagged id
+      * ``{0: "6.8GiB"}``  for a 9b/12b/e4b/4b-it-tagged id
+      * ``{0: total_vram - 2.5}`` above 12 GiB (the "Sovereignty Buffer")
+      * a ``"cpu": "32GiB"`` lane alongside each of them
+
+    The budgets were guesses keyed on a SUBSTRING OF THE MODEL NAME, and they
+    were priced as though everything quantizes to 4 bits. Both premises are
+    false, and the campaign paid for it three separate times on an 8 GB 4060:
+
+      * gemma-4-12b-it needs 6.95 GiB resident and was capped at 6.8 GiB. It
+        missed by 0.15 GiB, spilled to CPU, and wrote at 0.4 tok/s.
+      * gemma-4-E2B-it needs 6.01 GiB -- 5.12 GiB of it NON-quantizable
+        embeddings -- and was capped at 3.2 GiB because its name contains
+        "2b-it". It never emitted a token.
+      * gemma-4-E4B-it was pushed 41 of its 42 decoder layers onto the CPU and
+        wrote at 0.5 tok/s.
+
+    Each figure is measured from the row's own checkpoint header, not
+    estimated. A cap that forces a partial CPU placement does not save a
+    render; it converts a fast render into a useless one, because every
+    forward pass then pays a PCIe round trip per CPU-resident layer.
+
+    WITH NO CAP THE OUTCOME IS BINARY AND HONEST. No ``max_memory`` means the
+    caller sets no ``device_map`` either (it is only set when a budget
+    exists), so bitsandbytes places the model on a single device: it fits, or
+    it raises a CUDA OOM that names the real problem. That is the operator's
+    standing rule that an OOM is the only acceptable killer, and it is what
+    "no crawling" means in code. gemma-4-E4B-it is the known casualty -- its
+    text decoder is 8.38 GiB against a 7.99 GiB card, so it genuinely does not
+    fit here and will now say so instead of pretending.
+
+    THE >= 14.5 GiB CARD IS UNAFFECTED, and this is not an assertion. That
+    path passes an explicit ``device_map={"": 0}``; an explicit dict device
+    map is used verbatim, so ``infer_auto_device_map`` never runs and
+    ``max_memory`` was never consulted there in the first place. Removing it
+    changes nothing on a 16 GB card. A 12-14.5 GiB card DOES change: it loses
+    the 2.5 GiB reserve and now places on one device. No such hardware is in
+    this campaign, and it is recorded here rather than discovered later.
+
+    ``cuda_available`` and ``quant_policy`` are retained in the signature
+    because callers pass them positionally by keyword and the two historical
+    contracts they encoded -- no CUDA-keyed plan on a CUDA-less host, and no
+    4-bit-sized cap on an unquantized load -- are both satisfied by returning
+    ``None`` unconditionally.
     """
-    if not cuda_available:
-        return None
-    if quant_policy not in ("bnb_nf4", "bnb_8bit"):
-        return None
-    sid = (model_id or "").lower()
-    # PBUG-20260829-07: this MUST be a bare-token match, never a substring.
-    # `"2b-it" in "google/gemma-4-12b-it"` is TRUE -- "12b-it" ENDS in "2b-it"
-    # -- so the 12B model was handed the 2-BILLION budget (3.2GiB) on every
-    # card under 12 GiB, and then spilled to CPU because it obviously did not
-    # fit. Measured on the shipped function before the fix:
-    #     gemma-4-12b-it @ 8.00 GB -> {0: '3.2GiB'}   <-- the 2B budget
-    #     gemma-4-E4B-it @ 8.00 GB -> {0: '6.8GiB'}
-    # Invisible on a >=12 GiB box because the branch below returns first,
-    # which is the fourth "the dev card masks it" defect of 2026-08-29.
-    # A digit immediately before the tag means a DIFFERENT size (12b, 22b),
-    # so the character preceding the match must not be a digit.
-    def _has_size_tag(tags) -> bool:
-        for tag in tags:
-            start = 0
-            while True:
-                i = sid.find(tag, start)
-                if i < 0:
-                    break
-                if i == 0 or not sid[i - 1].isdigit():
-                    return True
-                start = i + 1
-        return False
-
-    is_actually_2b = _has_size_tag(("2b-it", "2b_it")) or (
-        sid.endswith("2b") and not (len(sid) >= 3 and sid[-3].isdigit()))
-    if total_vram >= 12.0:
-        return {0: f"{total_vram - 2.5:.1f}GiB", "cpu": "32GiB"}
-    if is_actually_2b:
-        return {0: "3.2GiB", "cpu": "32GiB"}
-    if any(tag in sid for tag in ("9b", "12b", "e4b", "4b-it")):
-        return {0: "6.8GiB", "cpu": "32GiB"}
     return None
-
 
 def _bug098_scan_linear4bit_devices(model) -> tuple[int, list[str]]:
     """Model-local BUG-LOCAL-098 check: for every ``bitsandbytes.Linear4bit``
@@ -998,25 +981,9 @@ def load_llm(
             cuda_available=torch.cuda.is_available(),
             quant_policy=_policy.quant_policy)
 
-        # A NATIVE-TEXT ROW DOES NOT GET THE SIZE-TAG BUDGET (PBUG-20260906-07).
-        # Those budgets were calibrated against COMPOSITE loads, and they are
-        # priced as though everything quantizes. That is false for exactly the
-        # rows this path serves. Measured from gemma-4-E2B-it's own checkpoint
-        # header: its text decoder is 6.01 GiB resident, of which 5.12 GiB is
-        # NON-quantizable embeddings (2.75B params, bf16) and only 0.88 GiB is
-        # NF4 linears. Its tag budget is 3.2GiB -- smaller than the embedding
-        # table alone -- so keeping the cap would spill real decoder layers to
-        # CPU and trip the very BUG-098 tripwire this change exists to stop,
-        # having dropped the towers for nothing.
-        #
-        # Passing no budget means no `device_map` either (it is only set below
-        # when max_memory is not None), so bitsandbytes places the model on one
-        # device: it either fits or raises an honest CUDA OOM. That is the same
-        # argument _plan_max_memory already makes for unquantized loads -- "no
-        # cap, no artificial CPU-offload escape hatch" -- applied to the other
-        # case where the 4-bit pricing is wrong. A loud OOM is worth more than
-        # a silent multi-minute-per-line render: the measured cost of that
-        # escape hatch on this card was 0.4-0.5 tok/s.
+        # _plan_max_memory now returns None for every row (operator directive
+        # 2026-09-06: no caps, no crawling), so there is no budget left to drop
+        # here. The row's LOAD SHAPE is still resolved from the catalog.
         # Imported here on purpose: the only other binding in this function is
         # inside the `context_cap is None` else-branch above, and request_slot
         # always passes a context_cap, so relying on it would NameError on the
@@ -1026,14 +993,6 @@ def load_llm(
             _otr_catalog_mode.text_only_load_mode(_stripped_model_id)
             == "native_text_decoder"
         )
-        if _native_text_row and max_memory is not None:
-            _runtime_log(
-                f"[StoryOrchestrator] {_stripped_model_id} loads its native "
-                f"text decoder; dropping the composite size-tag budget "
-                f"{max_memory!r} so placement is not planned against a cap "
-                f"that priced towers and unquantizable embeddings wrongly"
-            )
-            max_memory = None
         if max_memory is not None and total_vram >= 12.0:
             _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {total_vram - 2.5:.1f}GB Budget")
 

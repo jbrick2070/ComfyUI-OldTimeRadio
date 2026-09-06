@@ -195,20 +195,27 @@ class ExplicitOffloadTests(unittest.TestCase):
         # The flagship branch is nested inside quant_config is not None;
         # this test's explicit NF4 case satisfies that enclosing condition.
         code = compile(ast.Module(body=selections, type_ignores=[]), str(SOURCE), "exec")
-        for total, expected_budget, expected_map in (
-            (8.00, {0: "6.8GiB", "cpu": "32GiB"}, "auto"),
-            (15.99, {0: "13.5GiB", "cpu": "32GiB"}, {"": 0}),
-        ):
+        # Operator directive 2026-09-06: no caps. The planner returns None on
+        # every card, so no max_memory and no "cpu" spill lane ever reaches
+        # from_pretrained. What REMAINS hardware-scoped is the device
+        # SELECTION, and that is the part the 16 GB box depends on: at
+        # >=14.5 GiB the flagship branch still pins the whole model to device 0.
+        for total, expected_map in ((8.00, None), (15.99, {"": 0})):
             with self.subTest(total_vram=total):
                 budget = planner("google/gemma-4-12b-it", total,
                                  cuda_available=True, quant_policy="bnb_nf4")
-                self.assertEqual(budget, expected_budget)
+                self.assertIsNone(budget, "no card gets a cap any more")
                 ns = {"max_memory": budget, "common_kwargs": {}, "total_vram": total,
                       "_stripped_model_id": "google/gemma-4-12b-it",
                       "_runtime_log": lambda *a: None}
                 exec(code, ns)
-                self.assertEqual(ns["common_kwargs"]["max_memory"], expected_budget)
-                self.assertEqual(ns["common_kwargs"]["device_map"], expected_map)
+                self.assertNotIn(
+                    "max_memory", ns["common_kwargs"],
+                    "a budget must not reach from_pretrained")
+                self.assertEqual(
+                    ns["common_kwargs"].get("device_map"), expected_map,
+                    "8 GB places on a single device with no map; the flagship "
+                    "card still forces 100% GPU via {'': 0}")
 
     def test_ordinary_cpu_modules_are_allowed_but_cpu_or_meta_nf4_still_rejected(self):
         scan = production_function("_bug098_scan_linear4bit_devices")
