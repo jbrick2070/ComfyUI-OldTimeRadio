@@ -1921,3 +1921,23 @@ was remote-verified. Preserve the historical untracked review-plan document.
 Private4060-overnight-20260906-005953.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260681bytes. Prior evidence
 intact. Documentation-only checkpoint; existing single act left running.
+
+### Step40 -- 2026-09-06 01:06 PDT, voice casting continues
+
+Scheduled wake01:06:53.076. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Read-only persisted log shows casting-voices
+attempt1/3 progressing:64tokens/154.3s at01:01:37.641,128/306.4s at
+01:04:09.725 and192/457.8s at01:06:41.048, still0.4tok/s. No new runtime
+error, OOM,401, download, stage transition or completion. Matching RESULT
+SUCCESS, obs_publish OK and final episode remain unverified; no new trial.
+
+One passive screenshot is background-only; full accessibility tree remains
+stale. No activation/input/security interaction or additional recovery attempt.
+No Run, installed/JSON/model/cache/dependency change, restart/cancel, manual
+wait or hand tuning. Read-only persisted log supplies actual current progress;
+do not infer it from the stale tree. Fresh fetch/pull already up to date;
+Step39 pusha6f197c was remote-verified. Historical untracked review plan intact.
+
+Private4060-overnight-20260906-010653.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260529bytes. Prior evidence
+intact. Documentation-only checkpoint; healthy slow act remains untouched.
