@@ -394,3 +394,20 @@ Screenshots remain black and the inner accessibility document is stale despite
 the outer title progressing to ShotLock. No blind input or restart. Exact private
 evidence and an independently checked artifact snapshot are retained separately;
 this remains a hand-patched development run, not a clean human-install PASS.
+
+September 6, 12:01 update: the same one-act 12B trial has completed all eight
+Z-Image Turbo stills (1472x832, 13,686,636 bytes combined). LTX video shots are
+rendering; music opening, b001 and b002 have logged assembly completions. The
+application automatically repaired the stale master-audio reference after the
+earlier directory rename. No user repair, new Run or model change. Known false
+zero-MB peak readings remain unusable; no new terminal OOM/401 observed. Credits,
+final publication and episode proof remain pending. Screenshot visibility has
+returned without input; earlier black-capture cause is still undetermined.
+
+The user's next writer choice is Gemma 4 E4B, with new model-family integration
+deferred. The exact [Google model](https://huggingface.co/google/gemma-4-E4B-it)
+reports public/ungated/Apache-2.0 in anonymous metadata checked September 6 at
+11:54. Installed OTR already includes its unauthenticated automatic-download
+path. This does not yet establish a fresh anonymous application download,
+whole-workflow 8 GB fit or storytelling qualification. Current 12B run and
+canonical default were not changed to record this preference. See drill Step 89.

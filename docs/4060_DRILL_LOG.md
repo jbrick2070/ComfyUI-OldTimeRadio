@@ -3561,3 +3561,47 @@ pointing to the preliminary video are not final-publication proof. Supplemental
 Kokoro snapshot found af_heart.pt modified11:07:21.4837511 at523,425bytes;
 these are observed file bytes, not a verified network-transfer size. No cache
 or credential changes were made. Audio/video artifacts are this same trial only.
+
+### Step 89 — September 6, 11:37–12:01 PDT: eight stills complete; LTX rendering
+
+The same sole 09:07 one-act development run completed its remaining image-prompt
+calls by 11:51:12, still about 0.4 tokens/sec. The app automatically freed writer
+residue before the first local still. All eight Z-Image Turbo stills completed
+between 11:51:59 and 11:55:55: 1472x832, eight steps, normal sampler. No manual
+asset placement, prompt repair or model change. At 11:55:55 the app re-resolved
+the master-audio path from the old pending directory to the already logged
+renamed episode directory; this was automatic recovery, not another rename.
+
+LTX video rendering began 11:55:56. Music opening assembled 11:57:26 (250 frames),
+b001 11:59:09 (325 frames), b002 12:00:12 (276 frames). b003 was still rendering
+at this checkpoint. Repeated zero-MB render peaks are the known installed
+telemetry defect, not measurements. No new terminal exception, OOM or writer
+401 in the captured range. Credits, RESULT SUCCESS, obs_publish OK and the
+corresponding final episode remain pending. No component result is an end-to-end
+PASS, and this remains hand-patched development, not a clean human install.
+
+Independent read-only inventory at 12:00:54: 16 ordinary episode files totaling
+119,154,286 bytes, including eight stills totaling 13,686,636 bytes and an
+8,994-byte stills manifest. No reparse points. The only MP4 in this episode tree
+was still the 86,822,851-byte preliminary Procgen video. Logged LTX temporary
+outputs outside that tree were not inspected; this is not evidence of failure.
+Generated artifact sizes are not network download sizes. No new weight transfer
+or transfer-byte total was observed.
+
+Fresh passive capture at 12:01:06 is visible again: act_count=1, batch=1, both
+writer slots still Gemma 4 12B, one active OTR_VideoRenderBatch. No activation or
+input restored it; prior black-capture cause remains undetermined. No retry was
+needed. Private 1200 HTML/MD retain the screenshot, full available accessibility,
+initial log tail and raw log continuation. An earlier expanded display was
+line-wrapped and tool-truncated; the subsequent raw capture preserves the range
+without inventing missing lines. No blind input, additional Run, restart or
+installed/model/cache/dependency/environment/credential/JSON change.
+
+User decision at 11:53: prefer already-integrated Gemma 4 E4B as the NEXT writer
+candidate; defer new model-family integration. The active run remains 12B.
+Anonymous public Hugging Face metadata rechecked at 11:54 reports the exact
+google/gemma-4-E4B-it repository public, ungated and Apache-2.0; the installed
+catalog marks requires_auth=False and has automatic first-use download support.
+This metadata/source check is not an anonymous cold application download or
+8 GB/story-quality qualification. No weights were downloaded for this research,
+and no canonical default was changed by this decision.
