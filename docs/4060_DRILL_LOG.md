@@ -1998,3 +1998,25 @@ Private4060-overnight-20260906-011353.html preserves5 timestamped events,
 one background screenshot/full stale tree, exact runtime warning/refusal and
 both audit-tool errors, verified265526bytes. Prior evidence intact. Only drill/
 bug documentation updated; the same active runtime and canonical JSON stay fixed.
+
+### Step42 -- 2026-09-06 01:18 PDT, user reaffirms full4060 test continuation
+
+User requests: keep going; a full4060 test is required. Confirmed existing
+same-thread heartbeat4060-overnight-otr-trials remains ACTIVE with five-minute
+interval; no duplicate schedule or schedule modification. Same single GUI
+RunSeptember5 23:04:44.645 and pending_20260905_230557. Read-only persisted
+log at01:18:42 shows story-brief reflection128tokens/293.7s at01:16:38.920,
+still0.4tok/s. No new runtime failure, download or episode completion.
+
+One passive capture remains background-only with stale full accessibility
+tree. No GUI activation/input, Run, restart/cancel, installed/JSON/model/cache/
+dependency change, manual wait or hand repair. Fresh fetch/pull already up to
+date; Step41 source-branch documentation push1575c15 was remote-verified.
+Historical untracked review plan preserved. User reaffirmation does not make
+this a second act or erase original GUI-only FAIL. Continue until the same
+trial has matching RESULT SUCCESS, obs_publish OK and a final episode file,
+or a recorded terminal failure; intermediate writer success is insufficient.
+
+Private4060-overnight-20260906-011842.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260680bytes. Prior evidence
+intact. Documentation-only checkpoint; overnight monitoring remains active.
