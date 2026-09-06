@@ -2643,3 +2643,23 @@ hand-copying weights, wholesale provisioning, lower-precision substitution,
 NVFP4 selection and UI manipulation: none performed. Next live gate needs
 usable GUI plus the candidate delivered through the normal release/install
 path; no registry publication is authorized by this development checkpoint.
+
+### Step60 -- 2026-09-06 04:04 PDT, source candidate pushed, live test blocked
+
+04:03:45 fetch succeeded; HEAD/tracking both69a4b14 before staging. Explicitly
+staged11 owned source/test/doc files, cached diff-check clean. Preserved and
+excluded historical untracked docs/4060-gemma-canonical-review-plan.md; private
+screenshots/raw audit were not staged. Commit/push04:04:00–04:04:03 succeeded:
+2f67fc4e3c8ffde4086c57625c796c100ba77557,
+`Add pre-writer visual-weight readiness with verified transfers`.
+Local HEAD, origin/v2.0-alpha and git ls-remote all matched that full SHA.
+Private receipt records exact Git output.78 focused tests/limits are inStep59.
+
+No installed patch, model download or new GUI run accompanies this push.
+Source candidate is available on the canonical branch, not released in Manager;
+no pyproject/tag/registry mutation. Main/log screenshots remain unusable even
+after fresh inventory. Further GUI testing cannot proceed safely until ComfyUI
+is visible and the candidate is delivered/installed normally. Do not silently
+copy it into custom_nodes or obtain weights by hand. Original/diagnostic FAIL
+and paused heartbeat remain unchanged. This is a source handoff, not full4060
+qualification or a physical5080 test. No separate JSON was fabricated.
