@@ -2431,3 +2431,106 @@ and repository checks only. Fresh fetch/pull already up to date; Step55 push
 Private4060-overnight-20260906-030925.html preserves3 timestamped events,
 one background screenshot/full stale tree and exact new log interval,
 verified261552bytes. Prior evidence intact; same act and heartbeat continue.
+
+### Step57 -- 2026-09-06 03:15 PDT, terminal missing ZImage model; FAIL
+
+Scheduled wake03:15:55.158. Same single GUI RunSeptember5 23:04:44.645;
+active episode signal_lost_the_frequency_of_friction_20260906_014652.
+Read-only persisted log at03:16:19:final image-prompt call finishes77tokens/
+181.4s at03:10:17.678. At03:10:17.723 the first dispatcher object
+still_music_opening_001 (scene_beat/music_visual) resolves z_image_turbo.
+At03:10:17.727 adapter usability fails before image generation:
+
+`still_music_opening_001: image engine 'z_image_turbo' failed ADAPTER-level usability for role 'music_visual' (image engine 'z_image_turbo' is not usable for role '': missing_model -- z_image_turbo diffusion model not found (resolved 'z_image_turbo_bf16.safetensors', not installed): install a z_image_turbo*.safetensors in diffusion_models (nvfp4 for Blackwell) or point OTR_ZIMAGE_UNET at one (+ OTR_ZIMAGE_CLIP Qwen3-4B TE / OTR_ZIMAGE_VAE Flux ae)). NO FALLBACK -- fix the engine's weights/flags/host requirements or select a usable engine.`
+
+Exact full traceback preserved BEFORE read-only source diagnosis in private
+4060-overnight-20260906-031555.html:3 timestamped events, one background-only
+screenshot/full stale accessibility tree, verified266147bytes. The traceback
+runs from z_image_turbo.py506 EngineUnusable through dispatcher1658/1665,
+then dispatch2286 and Comfy execution. At03:10:17.779:
+`Prompt executed in 04:05:32`. UI Run to terminal log is04:05:33.134;
+neither elapsed message nor an existing MP4 constitutes success.
+
+Terminal verdict: HAND-PATCHED DIAGNOSTIC FAIL WITH FINDINGS. No ZImage/LTX
+sampling reached; no RESULT SUCCESS or obs_publish OK in this trial's complete
+log interval. The expected output/otr/obs directory does not exist. This was
+missing weights, NOT an OOM, writer401, capacity measurement, haunted variant
+dropdown defect or extra-pack request. Do not obey the error's hand-install/
+environment-variable suggestions or select Blackwell NVFP4 for this Ada GPU.
+No other-model campaign, repeated Run, cancellation, restart or tuning follows.
+
+Read-only artifact audit03:18:52 verifies root final_video_path equals
+meta.procgen_path (the existing170782765-byte intermediate MP4); masterWAV
+35359964bytes, opening774444bytes, closing518444bytes remain. Ledger duration
+184.16625s,18 routed video shots, video.warnings empty, images key ABSENT;
+root final_audio_path key PRESENT with null. No image files observed in the
+episode tree. Initial audit mistakenly selected root fields from meta and
+displayed null placeholders; corrected with explicit key-presence checks,
+never treated those placeholders as evidence of absent root paths.
+
+GUI visibility remains background-only/stale tree: no activation/input/recovery
+attempt. Read-only source audits requested locally for provisioning coverage,
+resolver order and preflight UX; no models/runtime/GPU imports or network calls
+by reviewers. Root refreshed debug/4060/documentation rules; remote/model steps
+are overridden by this local task. Two oversized context reads were truncated
+(reported original token counts17014 and15230; outer tool warnings15620 and
+11437); complete selected files were subsequently read in bounded chunks.
+Configured Bug Bible path remains absent. No installed source, JSON, models,
+cache, dependency, authentication or registry changes. Step56 push20189e1
+was remote-verified; repository already up to date, unrelated review plan kept.
+
+Local audits confirm the provisioning gap: cache miss reaches registry/adapter
+usability before generation; no ZImage download exists in that route. Shipped
+validator is structural only; canonical23nodes has no provisioning/download
+metadata. Boot prefetch is Kokoro-only. .comfyignore94 excludes scripts/*;
+advertised development provisioning/fetch scripts are absent from alpha.24.
+Eight relevant shipped files match development exactly. Root independently
+grounded these boundaries, the installed script inventory and obsolete README
+defaults. Generic Manager model-download offerings were NOT inspected.
+
+The whole development provisioner would install GGUF/LTXVideo/AnimateDiff
+unconditionally; it was considered and explicitly not invoked. Proposed
+product repair is a shipped GUI weight-only selected-engine asset plan before
+writing, using native-loader roots and all dependencies; keep no-fallback
+guards, deduplicate roles, validate interrupted downloads, preserve Ada versus
+Blackwell behavior. No new runtime implementation or test qualification claimed.
+Missing Qwen/VAE/LTX and LTX memory capacity are not proved by this ZImage refusal.
+
+Audit friction: canonical reviewer hit absent web directory, absent
+nodes/_otr_shared/engine_registry.py, PowerShell empty-pipe ParserError and
+absent MANIFEST.in; corrected targeted reads completed. Exact errors and full
+artifact receipt are preserved in private4060-terminal-audit-20260906-0318.md,
+verified5663bytes. Other review reported no command errors/truncation. Both
+reviewers stayed read-only, no runtime imports, GPU/models/network/process/UI.
+
+PBUG-20260906-01 appended. Morning portability report drafted and outdated
+README canonical-default section corrected in development only; independent
+finished-document review requested. Original install FAIL and this diagnostic
+FAIL remain separate. Existing source candidatec61ac222 has passed its writer
+boundary live but remains not full-episode/registry/physical5080 qualified.
+At03:25:10PDT the same heartbeat was paused after terminal failure; tool result
+and saved config both confirm PAUSED, five-minute recurrence and task preserved.
+No further model trial or Run was issued; Comfy process/assets left untouched.
+
+Finished-document reviewer found two README issues: remaining old canonical
+defaults in intro/run table, and a blanket commercial-friendly assertion
+contradicting MusicGen's commercial_clean=False metadata. Corrected those and
+the same stale canonical-floor statements in the model/role/troubleshooting
+sections; no external licensing determination or changed model selection.
+Review's first bounded read emitted exact `Warning: truncated output (original token count: 1787)`;
+smaller reads completed. Recheck requested for the corrected documentation.
+Unrelated historical matrix rows/gating claims are not requalified by this audit.
+Root03:28 mixed-object validation output hid the trailing canonical-hash fields;
+JSON output immediately recovered them, with no state change. Changed documents
+are nonempty/noBOM and git diff --check passes. Canonical JSON remains unchanged.
+
+One bounded reviewer-mailbox wait (maximum30s; exact elapsed not returned) ended
+on the review result. The same independent reviewer found no blockers in the
+corrected scoped documentation: defaults/qualification consistent, blanket
+commercial clearance removed, report/drill/PBUG links resolve. Recheck had no
+errors/truncation/mutations. No further review or runtime test was needed for
+this documentation-only chunk. Broad untouched documentation/variants/gating
+claims remain outside review. Canonical SHA256 remains
+2C0BE6029FD058BD2E7D8120A617FB3F37E91403F875A48864489890972554BF.
+Terminal evidence, intermediate assets and failed-run identity are preserved;
+the next product work is asset readiness/provisioning, not another model trial.

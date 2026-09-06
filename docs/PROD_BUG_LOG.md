@@ -11427,3 +11427,55 @@ unverified; original GUI-only FAIL and bugs-02/-03 remain open. Drill Step41
 records exact timing, saved receipt limits, reload source context and private
 warning/error evidence. Current screenshots cannot show the console (stale
 tree/background capture); progress is from disclosed read-only persisted logs.
+
+## PBUG-20260906-01 -- alpha.24 canonical reaches first image without visual weights
+
+- Status: OPEN, live physical4060 one-act diagnostic failure, not a capacity
+  verdict. Original GUI-only qualification also remains FAIL WITH FINDINGS.
+- Receipt: one GUI Run2026-09-05 23:04:44.645PDT, both Gemma4-12B writer
+  slots; episode renamed by app to
+  signal_lost_the_frequency_of_friction_20260906_014652. Terminal03:10:17.727
+  September6, server elapsed04:05:32. Full traceback archived privately in
+  4060-overnight-20260906-031555.html before source diagnosis.
+- Symptom: first scene still, still_music_opening_001, music_visual,
+  z_image_turbo, fails ADAPTER-level usability. Exact root text:
+  `image engine 'z_image_turbo' is not usable for role '': missing_model -- z_image_turbo diffusion model not found (resolved 'z_image_turbo_bf16.safetensors', not installed): install a z_image_turbo*.safetensors in diffusion_models (nvfp4 for Blackwell) or point OTR_ZIMAGE_UNET at one (+ OTR_ZIMAGE_CLIP Qwen3-4B TE / OTR_ZIMAGE_VAE Flux ae)`.
+- Proven path: dispatcher1630-1669 checks registry then adapter before gen_fn
+  at1716+. Adapter resolver236+ returns default filename/unverified when no
+  candidate resolves; assert_usable504+ raises MISSING_MODEL. Native model
+  loading/render_image520+ has not run. No ZImage/LTX sampling, OOM or writer401.
+- Root cause: missing selected visual-model readiness/provisioning in the
+  installed GUI path. WorkflowValidator490-553 validates graph/widgets, not
+  asset presence; canonical has23 nodes and no asset-download metadata or
+  provisioning node. prestartup70-99 invokes Kokoro voice prefetch only.
+  Development provisioning/fetch manifests exist, but .comfyignore94 excludes
+  scripts/* and both advertised CLI entrypoints are absent from installed
+  alpha.24. Eight relevant shipped files byte-match development, ruling out
+  a local adapter/dispatcher/canonical divergence for this failure.
+- Additional onboarding defect: README339+ still described still_flat video
+  and StableAudio3, despite the tested canonical's LTX098-low/ZImage/MusicGen
+  selection; README455+ advertised absent CLI scripts. Corrected canonical
+  description and qualification warning in development docs this checkpoint.
+- Do NOT use the development provisioner wholesale: install_node_packs571+
+  unconditionally installs GGUF/LTXVideo/AnimateDiff. It violates this trial's
+  zero-new-pack boundary. No such installer, environment override, manual
+  checkpoint copy, fallback, model switch or requeue was attempted.
+- Candidate direction, NOT implemented: ship a GUI-accessible selected-engine
+  weight-only asset plan/provisioner before expensive writing. Use actual native
+  loader roots and all dependencies (ZImage DiT/Qwen3/ae), deduplicate roles,
+  preserve fail-closed verification and exact engine selections, and distinguish
+  Ada from Blackwell. Removing the adapter check only moves failure deeper.
+- Verification needed: built registry artifact/empty visual roots; complete and
+  partial installs; interrupted download atomicity; existing assets/no download;
+  role deduplication; no extra packs/shell installer dependency; hardware-safe
+  selection; full GUI one-act RESULT SUCCESS + obs_publish OK + final asset.
+  Missing Qwen/VAE/LTX weights were NOT independently established by this
+  failure, and LTX capacity remains untested. Generic Manager downloads were
+  not inspected; absence is scoped to OTR's integrated packaged path.
+- Terminal assets: master audio and procedural MP4 exist; final_video_path
+  still equals procgen_path, images key ABSENT, output/otr/obs absent. No
+  RESULT SUCCESS or obs_publish OK in this run. No conditional model campaign.
+- Bible candidate: selected-engine transitive assets must be resolvable or
+  provisionable before expensive upstream generation. Configured Bible checkout
+  absent; no promotion or executable coverage claimed. See drillStep57 and
+  docs/4060_PORTABILITY_REPORT_2026-09-06.md. No runtime fix or registry release.

@@ -7,8 +7,13 @@ your output folder.
 
 **Pipeline:** story source → LLM script → character voices + announcer + music themes (a
 swappable 7-voice / 5-music engine roster; the shipped graph runs Kokoro on both voice
-slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic video (procedural CRT floor by default, or
-HuMo / LTX / Wan / AnimateDiff / MiniMax H3 once you dial a heavier lane in) → final MP4.
+slots, with MusicGen for music) → 48 kHz master mix → model-agnostic video
+(LTX 0.9.8 low by default; other engines remain selectable) → final MP4.
+
+**Alpha.24 qualification warning:** the mouse-only fresh-install path is not yet
+qualified. See [the physical 4060 report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
+before queuing the canonical: missing visual weights were detected only after
+hours of writing and audio generation.
 
 100% local by default. No API keys required on NVIDIA and AMD. Optional hosted LLM
 and all-cloud routes exist; they stay off unless you turn them on. One exception as
@@ -300,7 +305,7 @@ gated rows below.
 
 > **The LTX 2.5 gate bites late, and that is why it is listed here** (added 2026-08-29 after
 > it stopped a clean-machine install). Nothing in a default first run touches it — the
-> canonical workflow ships on the procedural video floor — so you meet it only when you
+> canonical workflow selects the older LTX 0.9.8 line — so you meet it only when you
 > select an `ltx25_*` row in `OTR_VideoDirector`. Its repo reports `"gated": "auto"`:
 > approval is automatic, but the terms click and a token are both still required, and an
 > unauthenticated fetch returns **HTTP 401** rather than anything that reads like a licence
@@ -333,25 +338,26 @@ repo and the two steps it is missing.
 
 ### 4. Install the models
 
-**If you are on an 8 GB card, load the 8 GB variant named in "Pick the graph" below;
-its downloads are listed there.**
+The machine-specific variants in "Pick the graph" are separate saved JSONs.
+They are not substitutes for the exact canonical test reported here.
 
-The shipped 16 GB canonical workflow (`otr_canonical`) is lighter than you'd expect: its
-video-role dropdowns default to the **procedural still/CRT floor** (`still_flat`, no GPU
-video checkpoint required at all), and its image role defaults to **Z-Image-Turbo**
-(Apache-2.0, no license friction). So a first run needs only: the local writer LLM
-(`gemma-4-12b-it` as shipped, or your own choice), Z-Image-Turbo, and the default voice
-and music weights. **The voice weights fetch themselves on first use:** `otr_canonical`
-ships Kokoro on BOTH voice slots (announcer and characters), and Kokoro pulls
-`hexgrad/Kokoro-82M` from Hugging Face the first time it speaks. Nothing to install by
-hand for voices.
+The alpha.24 canonical JSON (`otr_canonical`) selects **LTX 0.9.8 low (16:9)**
+for all three video roles, **Z-Image-Turbo** for all three image roles,
+**Kokoro** for both voice slots, and **MusicGen**. It does not select `still_flat`
+or Stable Audio 3. The local writer is `gemma-4-12b-it` in both writer slots.
 
-**Music does NOT fetch itself.** Stable Audio 3 reads its checkpoint from ComfyUI's own
-`models/checkpoints` folder and fails loudly if it is absent
-(`SA3 checkpoint ... not found`). Before your first Queue Prompt, download
-`stable_audio_3_small_music.safetensors` from the ungated `Comfy-Org/stable-audio-3`
-repo into `ComfyUI/models/checkpoints/` (and `t5gemma_b_b_ul2.safetensors` into
-`models/text_encoders/` if your checkpoint does not carry the conditioner).
+**The alpha.24 mouse-only fresh-install path is not qualified.** A physical RTX
+4060 one-act diagnostic completed writing and audio, then failed after about
+four hours because the Z-Image diffusion model was unresolved. Its graph validator
+checked structure, not visual-model availability. The installed package has no
+integrated canonical visual-weight provisioning step, and excludes the CLI
+provisioning/fetch scripts advertised later in this README. Do not treat those
+development-checkout commands as an available registry-install GUI step.
+
+Kokoro and MusicGen fetched through their application paths in that diagnostic;
+this did not establish Z-Image or LTX readiness. A procedural intermediate MP4 is
+not the final AI-visual episode. See the [4060 portability report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
+for the exact result, evidence, prerequisites gap, and qualification limits.
 
 **IndexTTS2 is an OPT-IN upgrade, not a first-run requirement.** It is a voice-cloning
 engine that reads a reference WAV, and the shipped graph does not select it -- you only
@@ -361,13 +367,13 @@ installer from a terminal in the pack folder
 (`powershell -ExecutionPolicy Bypass -File scripts\_otr_indextts2_install.ps1`, which
 builds that environment and downloads its own multi-gigabyte model). Select it without
 installing it and the render writes the script, then stops with
-`IndexTTS2 Path B not installed`. The heavier local video checkpoints — HuMo, LTX,
-Wan, AnimateDiff, MiniMax H3 — are **optional upgrades** you dial in later via the
+`IndexTTS2 Path B not installed`. Other local video checkpoints — HuMo,
+Wan, AnimateDiff, MiniMax H3 — are **optional alternatives** you dial in later via the
 `OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
 before downloading any of them. If a model is missing, the engine fails **loudly** and stops —
 it never silently substitutes another model or quietly produces garbage. There is no automatic
-fallback: the procedural CRT path is a route you **select** (and the canonical workflow ships
-with it selected), not a net that catches a failed engine. Watch the console on the first run;
+fallback: the procedural CRT path is a route you **select**, not a net that catches a
+failed engine. The canonical already requires LTX visual weights. Watch the console on the first run;
 it names any missing weight and where it expects it.
 
 ### 5. Run it
@@ -380,7 +386,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 |---|---|---|
 | 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
-| 16 GB or more, GUI authoring baseline | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, `still_flat` video for every role, Z-Image-Turbo stills, Kokoro voices on both slots, Stable Audio 3 music. Read the Stable Audio 3 download note in section 4 first. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple; use the headless command below to apply that row atomically |
+| GUI authoring baseline, exact alpha.24 canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, MusicGen music. Fresh-install qualification failed on the 4060; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
 | AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
 | Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
 
@@ -572,8 +578,8 @@ redistribution. See [License & Credits](#license--credits) for the full list.
 
 The four `viz_*` lanes are pure numpy/PIL/ffmpeg with no model at all and no GPU
 requirement. The `still_*` lanes cost whatever your chosen IMAGE model costs,
-since the video side is a pan or a hold over a still. `still_flat` is the
-canonical workflow's shipped default for every video role.
+since the video side is a pan or a hold over a still. These are selectable
+alternatives; the alpha.24 canonical selects LTX 0.9.8 low for every video role.
 
 ### Cloud lanes -- no local VRAM, but they are paid services
 
@@ -655,16 +661,16 @@ The video layer is **model-agnostic**: a registry of pluggable engine adapters, 
 **per role**, with no single model treated as "primary." You pick the engine for each kind of
 beat, and that pick is honoured exactly: a missing or OOMing engine **fails loudly** and stops
 the render rather than swapping in a substitute you did not choose. The frozen audio is never
-touched either way. If you want the zero-GPU procedural CRT path, select it — it is the
-canonical workflow's shipped default, not a rescue lane.
+touched either way. If you want the zero-GPU procedural CRT path, select it — it is
+an explicit alternative, not the alpha.24 canonical default or a rescue lane.
 
 **Roles** (each selectable in `OTR_VideoDirector`):
 
 | Role | What it is | Canonical default |
 |------|------------|-------------------------------|
-| `announcer_visual` | the announcer bookends | `still_flat` (image-model still, no video model) |
-| `music_visual` | opening/closing theme bookends | `still_flat` (image-model still, no video model) |
-| `character_video` | character dialogue beats | `still_flat` (image-model still, no video model) |
+| `announcer_visual` | the announcer bookends | `ltx098_low_video (16:9)` |
+| `music_visual` | opening/closing theme bookends | `ltx098_low_video (16:9)` |
+| `character_video` | character dialogue beats | `ltx098_low_video (16:9)` |
 
 (The former `sfx` speaker role and `scene_broll` / `background_abstract` video roles were
 removed in the 2026-07-01 cleanbreak — old ledgers using them fail loud by design.)
@@ -825,8 +831,8 @@ appear there as they render.
 - **An engine "fails loudly" mid-render** — that's by design; check the log for the missing
   model/dependency. The render stops there rather than substituting a different engine, so fix
   the named dependency (or select the procedural CRT path) and run it again.
-- **Out of VRAM on a local video tier** — use the canonical procedural path or an
-  explicit lighter/cloud profile.
+- **Out of VRAM on a local video tier** — preserve the failure before evaluating a
+  separately selected lighter route. The alpha.24 canonical is not a procedural floor.
 - **No audio under the end credits** — known limitation: the credits scroll can outlast the
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
@@ -840,9 +846,9 @@ appear there as they render.
 - **`kokoro ONNX model not found`** — the one-time boot fetch of the 326 MB model did not
   complete (offline boot, or `HF_HUB_OFFLINE=1`). Run the `huggingface-cli download`
   line the message prints, then queue again; nothing downloads during a render.
-- **`IndexTTS2 Path B not installed`** — the 16 GB canonical graph's character voice needs its
-  own one-time installer (`scripts\_otr_indextts2_install.ps1`, section 4), or switch
-  `char_voice_engine` to `bark`.
+- **`IndexTTS2 Path B not installed`** — this concerns an opt-in voice engine, not
+  the alpha.24 canonical's Kokoro/Kokoro defaults. See the separate setup and
+  packaging limitations in section 4 before changing a tested workflow.
 - **A still takes about 42 minutes on an 8 GB card, and the log says `loaded partially;
   0.00 MB usable`** — the writer LLM was still on the card when the image stage began.
   Fixed in commit `da2b7a36` (2026-09-02); update the pack. Nothing in the launch line
@@ -993,7 +999,7 @@ their authors.
 - The `shakespeare` story bank adapts Folger Digital Texts, which are CC BY-NC 3.0
   (noncommercial).
 
-None of these are required for a first run — the canonical workflow's shipped defaults
-(Gemma writer, Z-Image-Turbo, Kokoro voices, Stable Audio 3 music, procedural video floor) are all
-open and commercial-friendly. Check each engine's own license before commercial use of the
-others.
+Do not treat the canonical defaults as a blanket commercial-use clearance.
+The canonical selects MusicGen, whose OTR engine metadata explicitly sets
+`commercial_clean = False`. Review the exact source, engine and weight licenses
+before commercial use; a successful render is not a license receipt.
