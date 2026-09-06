@@ -11765,3 +11765,44 @@ then warmup completes in5.5s. First main-generation heartbeat13:35:30.785:
 64tokens,0.5tok/s. The original failure point has been passed with real model
 weights; whole-story/episode/8GB qualification is still OPEN. No second Run,
 mid-flight patch, dependency/canonical change or hand model/cache repair.
+
+### PBUG-20260906-07 — September 6, 14:34 PDT: text-only multimodal rows load their vision tower
+
+LIVE FAILURE, physical 8GB RTX4060, installed one-act GUI trial, both writer
+slots `google/gemma-4-E2B-it`. Run 14:30:47.891, failed 14:34:01.694, "Prompt
+executed in 193.79 seconds". No OOM, no 401, no timeout.
+
+```
+BUG-LOCAL-098: NF4 quantized load did not materialize for 'google/gemma-4-E2B-it'.
+linear4bit_count=525 is_loaded_in_4bit=True
+off_cuda_modules=['model.vision_tower.patch_embedder.input_proj=cpu',
+ 'model.vision_tower.encoder.layers.0.self_attn.q_proj.linear=cpu', ...]
+```
+
+Every off-CUDA module is `model.vision_tower.*`; the text decoder placed on
+CUDA. E2B is a multimodal checkpoint driven TEXT-ONLY by the writer
+(`loader_backend="transformers_multimodal_text_only"`), so the vision and audio
+towers are never executed -- yet they consume the device budget and then trip a
+correctness guard that has no notion of which modules the lane actually runs.
+
+`otr_runtime.log` establishes the mechanism, and it is NOT the one first
+recorded: the CPU-offload retry never fired. The initial `device_map="auto"`
+load with `max_memory={0:'3.2GiB','cpu':'32GiB'}` SUCCEEDED -- bitsandbytes
+never raised the "dispatched on the cpu" ValueError that gates the retry -- and
+the post-load tripwire refused the result. The native text-decoder path added by
+49ea213 lives INSIDE that retry and is additionally scoped to the exact string
+`google/gemma-4-E4B-it` (`_otr_model_loader.py:1141`), so it was unreachable for
+E2B on two independent counts.
+
+Same log, E4B at 13:33 for contrast: initial load raised, retry fired, native
+text decoder used, `linear4bit_count=9`, `materialized_on_cuda=True`. Its offload
+map placed `embed_tokens`, `lm_head` and `layers.0` on GPU and layers **1-41
+plus norm, rotary_emb and the per-layer projection stack on CPU** -- 41 of 42
+decoder layers over PCIe, which is the measured 0.5tok/s.
+
+STATUS: OPEN. Affects `google/gemma-4-E2B-it` today and is expected to affect
+`Qwen/Qwen3.5-4B` (HF class AutoModelForMultimodalLM, config `qwen3_5` /
+`qwen3_5_text`) for the same reason. Fix direction under review: load the native
+text decoder on the INITIAL load for text-only rows, keyed on catalog metadata
+rather than an exact-id ladder, failing loud when a config cannot be split.
+E2B speed on this card remains NOT MEASURED -- it has still never emitted a token.
