@@ -1564,7 +1564,7 @@
         "Node name for S&R": "OTR_StableAudioTheme"
       },
       "widgets_values": [
-        "musicgen"
+        "stable_audio_3"
       ],
       "color": "#234035",
       "bgcolor": "#162821"
@@ -2140,15 +2140,15 @@
         "Node name for S&R": "OTR_VideoDirector"
       },
       "widgets_values": [
-        "animatediff15_v3_haunted_video",
-        "animatediff15_v3_haunted_video",
-        "animatediff15_v3_haunted_video",
-        "flux2_klein",
-        "flux2_klein",
-        "flux2_klein",
+        "still_flat (16:9)",
+        "still_flat (16:9)",
+        "still_flat (16:9)",
+        "z_image_turbo",
+        "z_image_turbo",
+        "z_image_turbo",
         25,
-        512,
-        288,
+        832,
+        480,
         "request_hash",
         42,
         "{}",

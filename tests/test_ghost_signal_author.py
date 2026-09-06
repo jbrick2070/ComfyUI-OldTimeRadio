@@ -972,6 +972,38 @@ def test_an_exhausted_fallback_pool_raises_instead_of_duplicating():
                                ledger_meta=_DET_META, used=spent, total=1)
 
 
+def test_a_collision_reason_never_claims_the_leaves_are_the_same():
+    """THE REASON IS SPLICED INTO THE WRITER'S ONE RETRY, so it must be true.
+
+    The banana route collapses synonyms, so `revolver` and `pistol` finalize to
+    ONE prompt. The first version of this check said "same motif AND same leaf",
+    which the model can see is false and therefore cannot act on -- it spends the
+    retry, and the whole batch falls to deterministic clauses. That is the exact
+    failure the uniqueness fix exists to end, re-entered through its own error
+    message.
+    """
+    from nodes import otr_shot_lock as sl
+    meta = {"freeze_timestamp": "2026-08-22T22:27:56.943819+00:00",
+            "source_bank": "media_archive"}
+    motif = "lean silhouette with a rust revolver"
+    a = "an outline lifts the revolver into a narrow band"
+    b = "an outline lifts the pistol into a narrow band"
+    sig = lambda leaf: gsa.ghost_prompt_signature(
+        role="character_video", style=STYLE, mode="figure",
+        motif_cue=motif, drawable_beat=leaf, ledger_meta=meta)
+    if sig(a) != sig(b):
+        pytest.skip("the banana table no longer collapses these two leaves")
+    specs = [{"id": "g000", "beat_id": "g000", "role": "character_video",
+              "mode": "figure", "motif_cue": motif, "ordinal": 0},
+             {"id": "g001", "beat_id": "g001", "role": "character_video",
+              "mode": "figure", "motif_cue": motif, "ordinal": 1}]
+    with pytest.raises(gsa.GhostAuthorValidationError) as excinfo:
+        sl._ghost_validate_batch({"g000": a, "g001": b}, specs, STYLE, meta, [])
+    msg = str(excinfo.value)
+    assert "same leaf" not in msg, msg
+    assert a in msg and b in msg, ("both leaves must be shown", msg)
+
+
 def test_the_same_leaf_under_a_different_motif_is_not_a_duplicate():
     """THE DEFECT THIS ROW EXISTS TO FIX, stated as an invariant.
 

@@ -442,8 +442,14 @@ def test_one_beat_is_one_clip_and_one_prompt():
     beats = {s["source_line_ids"][0] if s["source_line_ids"]
              else s["shot_id"][len("shot_"):] for s in shots}
     assert len(beats) == len(shots)
+    # NOT a leaf-uniqueness assertion any more (2026-09-05). Two beats may
+    # share a leaf when their motifs differ -- they render different pictures,
+    # and rejecting them is the defect this lane's uniqueness fix removed. What
+    # must stay one-to-one is beat -> shot, which the assertions above cover.
+    # The picture-level invariant is asserted in signature space in
+    # tests/test_ghost_signal_author.py.
     leaves = [s["ghost_prompt"]["drawable_beat"] for s in shots]
-    assert len(set(leaves)) == len(leaves)
+    assert all(str(leaf).strip() for leaf in leaves), leaves
     for shot in shots:
         plan = shot.get("coverage_plan") or {}
         segments = plan.get("segments")

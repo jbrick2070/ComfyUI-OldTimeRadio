@@ -1153,7 +1153,7 @@ def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
     mode = str(spec.get("mode") or "")
     role = normalize_role(spec.get("role"))
     ordinal = int(spec.get("ordinal") or 0)
-    lowered = {str(u) for u in used if str(u)}
+    spent = {str(u) for u in used if str(u)}
 
     def _signature(candidate):
         return ghost_prompt_signature(
@@ -1166,7 +1166,7 @@ def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
         # unique and the fit check reports the real error. Silently skipping it
         # here would spend the pool on a composer defect.
         sig = _signature(candidate)
-        return (not sig) or sig not in lowered
+        return (not sig) or sig not in spent
 
     if role != "character_video":
         phase = _bookend_phase(spec.get("beat_id"), ordinal, total)
@@ -1924,8 +1924,18 @@ def ghost_prompt_signature(*, role, style, mode, motif_cue, drawable_beat,
     deterministic clauses on both attempts. Growing the pool could not fix a
     check that was looking at a quarter of the frame.
 
-    This keys on what actually reaches the sampler, so capacity becomes clauses
-    x motifs instead of clauses.
+    IT IS THE ADMISSION PROMPT, NOT THE RENDER PROMPT, and the difference is
+    worth stating because the obvious "simplification" is wrong. The render
+    calls `finalize_ghost_prompt_v3` (`render_driver.py`), whose parameters do
+    NOT include `motif_cue` or `drawable_beat` -- two beats with different
+    signatures can render identical text, by design (see the note on
+    `finalize_ghost_prompt_v3`: author and render no longer compose identical
+    text for a v3 beat). What this function guarantees is agreement with
+    `finalize_ghost_prompt_v2`, the ADMISSION finalizer, byte for byte. Do not
+    re-point the render at it.
+
+    Keying here on all four slots rather than the leaf alone makes capacity
+    clauses x motifs instead of clauses.
 
     IT MUST AGREE WITH `finalize_ghost_prompt_v2` BYTE FOR BYTE, which is why it
     repeats that function's banana call verbatim -- same `variety_key`, same
@@ -1958,9 +1968,15 @@ def ghost_prompt_signature(*, role, style, mode, motif_cue, drawable_beat,
                 positive, variety_key=variety_key,
                 shield_quoted_card_text=False).text
         return positive.casefold()
-    except Exception:
-        # Composition failures are the fit check's to report, with its own
-        # message. A signature that cannot be computed simply has no opinion.
+    except (_gsp.GhostPromptError, GhostBudgetError):
+        # NARROW ON PURPOSE. A composition refusal is the fit check's to report,
+        # with its own message, so returning "" here is honest. A bare
+        # `except Exception` was NOT: it also swallowed ImportError, and since
+        # "" reads as "free" to the dedupe, one unimportable banana module would
+        # silently switch uniqueness OFF for the whole episode while
+        # `candidate_fits` -- which catches only these two -- still raised. The
+        # repo already bans this shape one function away, because a broad except
+        # once laundered our own programming error into "the model failed".
         return ""
 
 

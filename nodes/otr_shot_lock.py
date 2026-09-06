@@ -2664,7 +2664,7 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
     # rejected them anyway: a forced-lane leg was rejected on both attempts and
     # lost all 18 authored prompts to deterministic clauses. Capacity is now
     # clauses x motifs. Signatures are already case-folded by construction.
-    seen = {str(sig): "a replayed row"
+    seen = {str(sig): ("a replayed row", None)
             for sig in (already_used or ()) if str(sig)}
     for spec in specs:
         leaf = leaves.get(spec["id"], "")
@@ -2679,12 +2679,24 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
         # An uncomputable signature is not a duplicate of anything; the fit
         # check below reports the real composition error.
         if key and key in seen:
+            # THE REASON MUST BE TRUE, because it is spliced verbatim into the
+            # writer's informed retry below ("YOUR PREVIOUS ANSWER WAS
+            # REJECTED: ..."). Saying "same leaf" here was a lie: the banana
+            # route collapses synonyms, so two DIFFERENT leaves (`revolver` and
+            # `pistol`) finalize to one prompt. A model told to fix a same-leaf
+            # collision it cannot see spends its one retry and the whole batch
+            # falls to deterministic clauses -- the exact failure this check
+            # exists to prevent. Name the real cause and show BOTH leaves.
+            other_id, other_leaf = seen[key]
             raise _gsa.GhostAuthorValidationError(
-                "the prompt for %s finalizes to the one already used for %s "
-                "(same motif AND same leaf): %r"
-                % (spec["id"], seen[key], leaf))
+                "the prompt for %s finalizes to the same prompt already used "
+                "for %s -- the leaves may differ and still make one picture. "
+                "this leaf: %r; the other leaf: %s"
+                % (spec["id"], other_id, leaf,
+                   repr(other_leaf) if other_leaf is not None
+                   else "(a replayed row)"))
         if key:
-            seen[key] = spec["id"]
+            seen[key] = (spec["id"], leaf)
         fits, why = _gsa.candidate_fits(
             role=spec["role"], style=style, mode=spec["mode"],
             motif_cue=spec["motif_cue"], drawable_beat=leaf, ledger_meta=meta)
