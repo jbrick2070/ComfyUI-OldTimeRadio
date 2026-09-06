@@ -4080,3 +4080,46 @@ Still open from Step100 and unaffected by this ruling: the required audit file
 `docs/model-license-qwen--qwen3.5-4b.md` does not exist, the Qwen source change
 is uncommitted, and Qwen3.5-4B speed/VRAM/prose/JSON/episode results on this
 8GB card remain NOT TESTED.
+
+### Step 102 — September 6, ~14:45 PDT: operator leaderboard photo; Qwen 3.5 4B confirmed, but it is a GGUF ranking
+
+Operator supplied a photo of a third-party leaderboard headed "SCORED FOR NVIDIA
+RTX4060 — CREATIVE WRITING — 4K CONTEXT", top10 of 30. Transcribed exactly as
+shown; these are the leaderboard's numbers, NOT measurements taken on this box:
+
+1. Qwen3.54B (BEST) — 4.66B, Q6_K, ~56tok/s, GOOD FIT, 53
+2. Phi-4-mini3.8B — Q8_0, 49tok/s, GOOD FIT, 49.2
+3. Qwen3.535B A3B — IQ3_M, 8tok/s, NEEDS RAM OFFLOAD, 44.9
+4. Phi-4-multimodal14B — 5.57B, Q5_K_M, 50tok/s, GOOD FIT, 44.7
+5. Falcon-H1R7B — 7.59B, Q5_K_M, 40tok/s, TIGHT FIT, 43.9
+6. Qwen3.59B — 8.65B, Q4_K_M, 7tok/s, NEEDS (offload), 42.5
+
+The #1 pick AGREES with the row already added in Step100, so the model choice is
+confirmed. The material caveat is the LANE, and it is not a detail:
+
+* Every ranked entry is a GGUF quant (Q6_K, Q8_0, Q5_K_M, IQ3_M). The ~56tok/s
+  figure belongs to Qwen3.54B at Q6_K under llama.cpp.
+* OTR's curated `Qwen/Qwen3.5-4B` row is the TRANSFORMERS lane
+  (`transformers_multimodal_text_only`, ordinary NF4 policy, 8.68GB official
+  safetensors on disk). It is a DIFFERENT quantization and a different runtime,
+  so the leaderboard's tok/s is not a prediction for what this row will do here.
+  Our own throughput number remains NOT MEASURED.
+* OTR does have a native GGUF lane (`gguf_native`, in-process llama-cpp-python,
+  no Ollama/sidecar/port), but read-only inspection confirms it has NO DOWNLOAD
+  PATH: `nodes/_otr_gguf_backend.py` contains no `hf_hub_download` /
+  `snapshot_download` call, and a row resolves only against an existing file at
+  `<models_root>\LLM\converted\<subdir>\<file>.gguf` with a pinned size+sha256.
+  Provisioning goes through `scripts/hf_download_driver.py` — a HAND STEP.
+* Therefore a GGUF Qwen3.5 row would violate BOTH the operator's stated
+  requirement (ungated AND auto-download) and the campaign's zero-hand-steps
+  final gate. The transformers row is the only lane that satisfies them today.
+* Registered GGUF rows for reference, neither of them Qwen3.5:
+  `unsloth/Qwen3-4B-Instruct-2507-GGUF` and `unsloth/Qwen3-8B-GGUF`.
+  Phi-4-mini and Phi-4-multimodal are not in the catalog in any lane.
+
+DISPOSITION: proceed with the transformers `Qwen/Qwen3.5-4B` row as already
+wired, and MEASURE its actual tokens/sec on this card rather than inheriting the
+leaderboard's GGUF figure. If measured NF4 throughput lands far below ~56tok/s,
+that gap is a LANE finding — the correct follow-up would be auto-download support
+for the `gguf_native` lane, which is a source item requiring its own review, not
+a manual file drop.
