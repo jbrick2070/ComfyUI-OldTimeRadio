@@ -411,3 +411,23 @@ reports public/ungated/Apache-2.0 in anonymous metadata checked September 6 at
 path. This does not yet establish a fresh anonymous application download,
 whole-workflow 8 GB fit or storytelling qualification. Current 12B run and
 canonical default were not changed to record this preference. See drill Step 89.
+
+September 6, 12:27 outcome: the 09:07 one-act 12B run finished after 3h01m38s.
+Eight generated stills and eight LTX clips completed. obs_publish OK and both
+final files are verified: 55,757,150-byte OBS viewing copy and 69,523,021-byte
+archival copy, 89.760s video. However, credits were omitted after a newly
+confirmed Windows path failure; this is not a clean PASS. The node-level
+ok=true video report is not a whole-workflow verdict, and no literal RESULT
+SUCCESS was found in the audited log/report. Actual VRAM peak remains UNKNOWN.
+
+The 263-character credits backdrop path was written by FFmpeg but unreadable
+through ordinary bundled-Python I/O; extended-path inspection sees the real
+PNG. The no-Git credits data stage succeeded before this presentation failure.
+PBUG-20260906-05 records the source candidate: bounded credits-generated paths
+that retain episode identity and existing safe-path behavior. Independent
+review, 23 prior tests, 18 new path regressions and an isolated real Windows
+synthetic-media smoke pass. The new suite first failed against pre-fix source,
+including the real zero-tail fallback. Installed qualification remains pending.
+Comfy was fully stopped and verified
+at 12:16:52. Original outputs/evidence are preserved, no hand output repair.
+Next writer remains E4B, one act, after regression checks and reviewed install.

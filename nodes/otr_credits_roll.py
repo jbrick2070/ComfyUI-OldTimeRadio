@@ -38,6 +38,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 
 try:
     from ._otr_shared import env as otr_env
@@ -1255,6 +1256,55 @@ def _scanlines(base):
 # =========================================================================== #
 # Duration + backdrop
 # =========================================================================== #
+def _credits_artifact_paths(video_path: str) -> tuple[str, str, str]:
+    """Keep ordinary names; bound Windows credits suffix growth when possible.
+
+    FFmpeg can write a >260-character path which the bundled Python cannot
+    stat, open or remove. Compact the generated paths, not the input or the
+    episode identity. No long-path registry setting or extended-prefix argv is
+    required. Non-Windows and already-short paths retain their existing names.
+    """
+    base, ext = os.path.splitext(video_path)
+    ext = ext or ".mp4"
+    legacy = (base + "_credits" + ext, base + "_credits_backdrop.png",
+              base + "_with_credits" + ext)
+    if os.name != "nt":
+        return legacy
+
+    def fits(paths):
+        clip, backdrop, joined = paths
+        generated = (clip, backdrop, joined, clip + ".base.png",
+                     clip + ".scroll.png", joined + ".concat.txt",
+                     os.path.splitext(joined)[0] + "_final.mp4")
+        return all(len(os.path.abspath(p).encode("utf-16-le", "surrogatepass"))
+                   // 2 <= 250 for p in generated)
+
+    if fits(legacy):
+        return legacy
+
+    parent = os.path.dirname(video_path)
+    stem = os.path.basename(base)
+    captioned = stem.endswith("_captioned")
+    # Outermost-first, once each: these are graph stages, not title words.
+    for suffix in ("_captioned", "_procgen_blended", "_silent"):
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+    # Mux publication matches the FULL episode id on a name boundary. Never
+    # shorten a title/id or guess which ledger owns an arbitrary input video.
+    episode_id = os.path.basename(os.path.abspath(parent))
+    if not stem or stem.casefold() != episode_id.casefold():
+        return legacy
+
+    scratch = os.path.join(parent, "credits_" + uuid.uuid4().hex[:16])
+    joined = os.path.join(parent, stem + ("_captioned" if captioned else "")
+                          + "_with_credits" + ext)
+    compact = (scratch + ext, scratch + ".png", joined)
+    # An exceptionally deep output root may still be too long. Preserve the
+    # existing honest presentation failure rather than truncate episode identity
+    # or move outputs outside their confined directory.
+    return compact if fits(compact) else legacy
+
+
 def compute_credits_duration_s(roll_px: int, view_h: int,
                                pps: float = _SCROLL_PPS) -> tuple:
     """Returns (dur_s, effective_pps) for the CLASSIC credits roll.
@@ -1552,10 +1602,7 @@ class OTRCreditsRoll:
         h = vp["h"] or 1080
         layout = build_credits_layout(led.data, w=w, h=h, manifest=manifest)
 
-        base, ext = os.path.splitext(video_path)
-        credits_clip = base + "_credits" + (ext or ".mp4")
-        backdrop_png = base + "_credits_backdrop.png"
-        out = base + "_with_credits" + (ext or ".mp4")
+        credits_clip, backdrop_png, out = _credits_artifact_paths(video_path)
         # AND THE DESTINATIONS MUST LAND IN THE OUTPUT TREE (2026-09-05).
         # This node has no destination widget either: all six writes are
         # siblings of `video_path` (backdrop png, credits clip, concat list,

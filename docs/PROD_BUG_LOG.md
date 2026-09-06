@@ -11655,3 +11655,59 @@ claim. No binding, dependency, pyproject or installed-runtime change. Active
 one-act trial remains untouched. Status OPEN until a built/installed package
 is live-verified; missing binding policy remains separate. Historical peaks
 remain UNKNOWN and are not backfilled. Shared Bible absent; no promotion.
+
+## PBUG-20260906-05 -- Windows credits path exceeds bundled Python's limit
+
+- Status: OPEN; physical cause confirmed, source candidate and isolated media
+  smoke verified; installed one-act retest pending.
+- Reproduction: the sole September 6 09:07 one-act 12B development run finished
+  its eight Z-Image stills and eight LTX clips, then credits at 12:08:43.886
+  reported `PRESENTATION FAILURE` and returned the body with `NO credits tail`.
+  FFmpeg returned 0 and reported one PNG frame, but the node rejected the file.
+- Root cause confirmed read-only: generated backdrop path is 263 characters
+  (filename only 110). FFmpeg wrote an ordinary 987,053-byte PNG. Bundled
+  Python 3.13.12 returns exists=False and os.stat raises winerror=3 for the
+  normal path; the same path with Windows extended-length prefix is readable
+  and has the expected size. .NET also sees the ordinary file. No failed PNG
+  encoding, missing model or new Git dependency. Normal-path cleanup likewise
+  left the backdrop behind; original evidence was not renamed or repaired.
+- Source cause: every credits artifact extends the full accumulated input
+  basename. Backdrop, overlay PNGs, tail, concat list and mux-final suffix can
+  cross the path boundary. Correcting only exists() would leave other I/O broken.
+- Bounded source candidate: retain non-Windows and safe existing filenames.
+  For long Windows canonical paths, use unique short credits scratch names in
+  the same confined directory and peel only recognized terminal graph suffixes
+  from the joined filename. Preserve the FULL episode identity and captions
+  marker for ledger/mux/OBS routing. Account for all six generated paths and
+  the downstream final suffix, measured as absolute UTF-16 lengths.
+- Unknown suffix chains, nested body directories and exceptionally deep output
+  roots retain existing behavior; this is not a universal long-path fix or a
+  concurrent multi-variant final-naming solution. No identity truncation,
+  registry setting change, extended-prefix FFmpeg arguments, source-copy
+  fallback or relaxed truth/presentation checks.
+- Outcome: obs_publish OK at 12:08:46.778 and both final files verified, but no
+  credits tail. Archive 69,523,021 bytes, OBS 55,757,150 bytes; video 89.760s,
+  audio 89.759417s. GUI job completed in 10,898.42s. No literal RESULT SUCCESS
+  in the audited log/report; the earlier node_episode_report ok=true accounts
+  for video beats only. Strict campaign PASS remains unestablished.
+- Recovery: exact user-authorized Comfy shutdown after preserving screenshots,
+  error and files. One Menu click had no visible effect. A child exited during
+  the first process-stop sequence; fresh counted verification at 12:16:52
+  confirmed zero Comfy processes and zero instance listeners before source work.
+- Verification to date: 23 prior provenance/layout tests PASS. Separate real
+  Windows CPU-media smoke reproduces the 263-character legacy path and, with
+  compact paths, appends a 13.033s credits tail to a synthetic 2s body: 15.040s,
+  376 frames, valid silent H.264. A mid-tail frame visibly contains the console
+  and transcript. This is not a repaired episode, GPU or installed workflow test.
+  At 12:30 the 18 focused path regressions were RED on pre-fix source (one
+  failure, eleven errors) and GREEN on the candidate. Real old roll zero-tail
+  failure is distinct from helper-absent errors. Final independent review has
+  no blockers. Actual installed one-act E4B retest remains pending.
+
+### PBUG-20260906-02 follow-up -- Git-independent data stage reached live
+
+The September 6 09:07 rerun passed the strict credits layout/code-receipt stage
+and reached backdrop extraction; the new failure above is presentation I/O,
+not missing .git metadata. No Git installation or fabricated .git was needed.
+Do not close full live credits/clean-package qualification until the credits
+tail actually renders in the installed workflow and final success is verified.

@@ -3605,3 +3605,80 @@ catalog marks requires_auth=False and has automatic first-use download support.
 This metadata/source check is not an anonymous cold application download or
 8 GB/story-quality qualification. No weights were downloaded for this research,
 and no canonical default was changed by this decision.
+
+### Step 90 — September 6, 12:04–12:27 PDT: published body; credits path defect
+
+Same one-act 12B run: b005 completed 12:04:10, b006 12:06:07, closing music
+12:07:04. All eight LTX clips persisted; 6,006,502 bytes combined. Known old
+allowlist warnings and false-zero peaks recur, not new model defects. A 24-frame
+tail warning was followed by normal 2268-to-2244-frame master reconciliation.
+Silent composite completed 12:08:12, blend bypassed, captions 12:08:43 with
+17 events from six speech lines.
+
+Credits at 12:08:43.886 returned the body with NO credits tail after a backdrop
+extraction check failed despite FFmpeg rc=0. The app then published normally:
+obs_publish OK 12:08:46.778, audio-byte identity OK, prompt completed 12:08:46.782
+after 03:01:38. Independent final-file/header checks confirm archive 69,523,021
+bytes and OBS 55,757,150 bytes; both 1920x1080 H.264, 25fps, 2244 frames,
+89.760s video / 89.759417s audio. Archive audio is stereo 48kHz PCM; OBS is AAC.
+Header checks are not a complete playback/artistic evaluation. The earlier
+node_episode_report is ok=true for eight accounted video beats, not full graph
+success. No literal RESULT SUCCESS found; strict PASS is not established, and
+missing credits remains a real finding. Private 1210 screenshot/log and 1216
+diagnosis/shutdown archives preserve evidence. Completed GUI job shows 10898.42s.
+
+PBUG-20260906-05 is confirmed: FFmpeg wrote the 987,053-byte backdrop at a
+263-character path, but the same bundled Python cannot stat that normal path;
+extended-length access succeeds. No model or Git fault. No manual file rename,
+Windows setting change or output repair. Strict credits data validation had
+already succeeded, so the Git-independent receipt fix reached the live layout
+stage without requiring Git software; complete credits qualification is still open.
+
+At 12:14:25 one observed Menu click had no visible effect. Exact Comfy process
+shutdown began 12:15:55 under user authority. A child exited before its stop
+call, producing a retained process-not-found error; fresh count verification
+12:16:52 confirmed zero Comfy processes and zero instance listeners. No blanket
+Python kill, no requeue or installed edit before shutdown.
+
+The reviewed source candidate bounds Windows credits-generated path growth,
+preserves episode identity/recognized caption suffixes and leaves non-Windows
+or safe paths unchanged. No GPU, model, JSON, dependency or registry change.
+Prior 23 provenance/layout tests PASS. A separate synthetic CPU-media smoke
+at 12:26:46 reproduces the old 263-character boundary and successfully appends
+13.033s of real credits to a 2s body (15.040s, 376 frames). A saved mid-tail
+frame visibly contains the console/transcript. First smoke setup failed before
+file creation because its test-directory label exceeded the available path
+budget by one character; only that fixture label was shortened, and the error
+is retained. No completed episode was repaired.
+
+At 12:30:09 the 18 focused path regressions were RED against the pre-fix Git
+HEAD: one failure and eleven errors. The actual old roll returned zero tail;
+helper-absent errors are reported separately, not passed off as media failures.
+At 12:30:10 the same 18 tests PASS against the working source, alongside the
+23 prior provenance/layout tests. Independent final review found no blockers.
+The private 1230 receipt retains full outputs, the initial smoke harness error,
+and the real synthetic-media evidence. Installed one-act E4B retest remains
+pending; E4B is not yet running and no canonical writer default was changed.
+
+At 12:34 a fresh anonymous public metadata check confirmed the exact E4B repo
+reports private=false and gated=false. An unauthenticated HEAD of the weight
+file returned the normal download redirect; no weight body was downloaded.
+Installed catalog/loader confirm first-use auto-download defaults on and no
+mandatory token for E4B. Existing optional authentication was not inspected or
+removed. This is access verification, not a clean cold application trial.
+
+### Step 91 — September 6, 12:40–12:44 PDT: source regression checkpoint
+
+Main reran nine focused stdlib suites at 12:44:27–29: 174 tests PASS, including
+18 new credits-path tests and the existing provenance, visual-asset, one-act,
+LTX-health and nullable-VRAM suites. This is the exact current count, not a
+claim that every repository test ran. Full pytest remains unavailable. Two
+changed Python files pass AST/nonempty/no-BOM checks; git diff --check is clean.
+
+Independent read-only preflight found all eleven production files from the
+earlier reviewed LTX-health/VRAM commits still at their pre-fix installed bytes;
+the development files match the reviewed commit exactly. No unrelated change
+is present in that scoped set. Credits is the separate twelfth production file.
+These fixes do not change models, recipe choices, dependencies or canonical
+JSON. A fresh zero-runtime check and exact-file verification are required before
+installing the reviewed set; no live retest or clean-install PASS claimed here.
