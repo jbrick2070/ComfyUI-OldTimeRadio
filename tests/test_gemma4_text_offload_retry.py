@@ -248,6 +248,13 @@ class E4BRetryBoundaryTests(unittest.TestCase):
             self.assertIs(self.ns.get("model"), self.model)
             return real_validate(info)
 
+        def native_validate(info, *, model_id=None):
+            self.events.append("native_validate")
+            self.native_validation_calls.append(info)
+            return ["model.vision_tower", "model.audio_tower"]
+
+        self.native_validation_calls = []
+
         self.ns.update({
             "AutoModelForCausalLM": SimpleNamespace(from_pretrained=load),
             "load_target": "fake-local-snapshot", "model_config": self.config,
@@ -259,9 +266,25 @@ class E4BRetryBoundaryTests(unittest.TestCase):
             "_validate_e4b_text_loading_info": validate,
             "_runtime_log": lambda *args: None,
             "log": SimpleNamespace(warning=lambda *args: None),
+            # PBUG-20260906-07: the initial load now resolves its config and
+            # kwargs ahead of the try, so the extracted boundary reads them.
+            # A COMPOSITE row (which is every row this class exercises) sees
+            # _native_text_row False and the untouched parent config, which is
+            # exactly the pre-existing behaviour these contracts pin.
+            "_native_text_row": False,
+            "_init_config": self.config,
+            "_init_kwargs": dict(self.common),
+            "_validate_native_text_loading_info": native_validate,
         })
 
     def execute(self):
+        # Production builds _init_kwargs from common_kwargs immediately before
+        # the try, so a test that mutates common_kwargs after setUp must see
+        # that mutation. Rebuilding here rather than in setUp keeps the harness
+        # faithful instead of freezing a stale copy.
+        if not self.ns.get("_native_text_row"):
+            self.ns["_init_config"] = self.ns["model_config"]
+        self.ns["_init_kwargs"] = dict(self.ns["common_kwargs"])
         exec(self.code, self.ns)
 
     def test_exact_e4b_retry_uses_same_copied_native_text_config_for_plan_and_load(self):

@@ -123,9 +123,28 @@ class ExplicitOffloadTests(unittest.TestCase):
               "attn_impl": "sdpa", "_stripped_model_id": "test-model",
               "BitsAndBytesConfig": lambda **kw: kw, "torch": SimpleNamespace(bfloat16="bf16"),
               "_plan_nf4_cpu_offload": planner, "_runtime_log": lambda *a: None,
-              "log": SimpleNamespace(warning=lambda *a: None)}
+              "log": SimpleNamespace(warning=lambda *a: None),
+              # PBUG-20260906-07: "test-model" is not a curated native-text
+              # row, so it takes the composite path -- the parent config and
+              # a plain copy of common_kwargs, i.e. exactly what this test
+              # already asserts is unchanged.
+              "_native_text_row": False,
+              "_init_config": self.config,
+              "_init_kwargs": dict(common),
+              "_validate_native_text_loading_info": lambda info, **kw: (_ for _ in ()).throw(
+                  AssertionError("composite row must not validate a native text load")),
+              }
         code = compile(ast.Module(body=[boundary], type_ignores=[]), str(SOURCE), "exec")
-        exec(code, ns)
+
+        def run():
+            # Production recomputes these from common_kwargs immediately before
+            # the try, so refresh them here rather than reusing a stale copy --
+            # this test deliberately mutates common_kwargs between execs.
+            ns["_init_config"] = self.config
+            ns["_init_kwargs"] = dict(common)
+            exec(code, ns)
+
+        run()
         self.assertIs(ns["model"], token_model)
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0]["device_map"], "auto")
@@ -138,14 +157,14 @@ class ExplicitOffloadTests(unittest.TestCase):
         calls.clear()
         plans.clear()
         common["device_map"] = {"": 0}  # actual >=14.5GiB production branch
-        exec(code, ns)
+        run()
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["device_map"], {"": 0})
         self.assertEqual(plans, [])
         calls.clear()
         common["device_map"] = "auto"
         ns["AutoModelForCausalLM"] = SimpleNamespace(from_pretrained=lambda *a, **kw: calls.append(kw) or token_model)
-        exec(code, ns)
+        run()
         self.assertEqual(len(calls), 1)
         self.assertEqual(plans, [])
 
@@ -153,7 +172,7 @@ class ExplicitOffloadTests(unittest.TestCase):
             raise ValueError("unrelated configuration failure")
         ns["AutoModelForCausalLM"] = SimpleNamespace(from_pretrained=refuse)
         with self.assertRaisesRegex(ValueError, "unrelated configuration failure"):
-            exec(code, ns)
+            run()
         self.assertEqual(plans, [])
         ns["AutoModelForCausalLM"] = SimpleNamespace(from_pretrained=load_model)
         ns["needs_4bit"] = False

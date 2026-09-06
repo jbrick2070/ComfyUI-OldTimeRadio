@@ -702,6 +702,116 @@ def _validate_e4b_text_loading_info(info):
             f"E4B text load rejected unexpected_keys: {unexplained!r}")
 
 
+def _native_text_load_config(model_config):
+    """The text sub-config for a multimodal row loaded text-only.
+
+    FAMILY-AGNOSTIC BY DESIGN. It asks only what it actually needs: does the
+    parent config expose a ``text_config`` that names its own ``model_type``?
+    Verified shapes at the time of writing, read from the real config.json of
+    each cached row:
+
+        gemma4          -> gemma4_text           (E2B, E4B)
+        qwen3_5         -> qwen3_5_text          (Qwen3.5-4B)
+        gemma4_unified  -> gemma4_unified_text   (12B -- NOT opted in)
+
+    Note the deliberate absence of a model_type allowlist. The row opts in
+    through the catalog's ``text_only_load`` field, which is a reviewed
+    per-row decision; re-checking the family here would just be a second
+    ladder to forget to update. What this function DOES enforce is that the
+    config can actually be split, and it raises rather than silently handing
+    back the composite -- a quiet fallback here would reintroduce the exact
+    tower-loading bug this path exists to remove.
+
+    This is a sibling of ``_e4b_text_offload_config`` rather than a
+    replacement: that one serves the E4B CPU-offload RETRY and is pinned by
+    its own exact-E4B test contracts. This one serves the INITIAL load.
+    """
+    from copy import deepcopy
+
+    text_config = getattr(model_config, "text_config", None)
+    parent_type = getattr(model_config, "model_type", None)
+    text_type = getattr(text_config, "model_type", None)
+    if text_config is None or not text_type:
+        raise ModelLoaderError(
+            f"native text load requires a text_config with a model_type; "
+            f"{parent_type!r} exposes {text_type!r}. This row is marked "
+            f"text_only_load=native_text_decoder in the catalog but its "
+            f"checkpoint config cannot be split -- fix the row, do not fall "
+            f"back to the composite load."
+        )
+    return deepcopy(text_config)
+
+
+def _registry_supplies_text_prefix_mapping(text_model_type: str) -> bool:
+    """True when Transformers itself already strips the multimodal prefix.
+
+    Transformers ships a checkpoint conversion registry, and for some families
+    it ALREADY renames ``model.language_model.*`` down to ``model.*`` --
+    verified in the installed build: ``qwen3_5_text`` has a PrefixChange doing
+    exactly that, while ``gemma4_text`` has no entry at all.
+
+    So OTR must supply its own ``key_mapping`` only where the registry is
+    silent. Supplying one on top of the registry's would be a second rename of
+    an already-renamed key. Any failure to consult the registry answers False,
+    which keeps OTR's explicit mapping -- the conservative direction, because
+    that mapping is anchored and idempotent on a checkpoint that still carries
+    the prefix.
+    """
+    try:
+        from transformers.conversion_mapping import (
+            get_checkpoint_conversion_mapping,
+        )
+    except Exception:  # noqa: BLE001 -- older build without the registry
+        return False
+    try:
+        return bool(get_checkpoint_conversion_mapping(text_model_type))
+    except Exception:  # noqa: BLE001 -- registry shape changed; assume silent
+        return False
+
+
+def _validate_native_text_loading_info(info, *, model_id: str):
+    """Reject an incomplete native-text load; report the dropped towers.
+
+    THE PROPERTY THAT MATTERS IS ``missing_keys == []``: Transformers will
+    happily hand back a model whose absent weights were randomly initialized,
+    which reads as a successful load and generates confident nonsense. Every
+    text weight must have come from the checkpoint.
+
+    ``unexpected_keys`` is the opposite case and is EXPECTED here -- loading a
+    text decoder out of a composite checkpoint leaves the vision and audio
+    towers unclaimed, which is the entire point. Rather than police them
+    against a prefix allowlist that has to be extended per family, they are
+    summarized into the log so the drop is visible and auditable.
+
+    Returns the distinct top-level prefixes that were dropped, for logging.
+    """
+    required = ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")
+    if not isinstance(info, dict) or any(field not in info for field in required):
+        raise RuntimeError(
+            f"native text load for {model_id!r} returned an incomplete "
+            f"loading report")
+    for field in ("missing_keys", "mismatched_keys", "error_msgs"):
+        values = info[field]
+        if not isinstance(values, (list, tuple, set, frozenset)):
+            raise RuntimeError(
+                f"native text load for {model_id!r} returned malformed {field}")
+        if values:
+            raise RuntimeError(
+                f"native text load for {model_id!r} rejected {field}: "
+                f"{list(values)[:8]!r} -- text weights would be randomly "
+                f"initialized, which generates fluent nonsense rather than "
+                f"failing")
+    if info.get("conversion_errors"):
+        raise RuntimeError(
+            f"native text load for {model_id!r} reported checkpoint "
+            f"conversion errors")
+    dropped = sorted({
+        ".".join(str(key).split(".")[:2])
+        for key in info["unexpected_keys"] if isinstance(key, str)
+    })
+    return dropped
+
+
 def _apply_matmul_precision_policy() -> None:
     """TF32 OFF for byte-identical determinism (I-2 / C-1); Ampere+ (sm80+)
     gets 'high' matmul precision for LLM throughput. The capability probe is
@@ -887,6 +997,43 @@ def load_llm(
             _stripped_model_id, total_vram,
             cuda_available=torch.cuda.is_available(),
             quant_policy=_policy.quant_policy)
+
+        # A NATIVE-TEXT ROW DOES NOT GET THE SIZE-TAG BUDGET (PBUG-20260906-07).
+        # Those budgets were calibrated against COMPOSITE loads, and they are
+        # priced as though everything quantizes. That is false for exactly the
+        # rows this path serves. Measured from gemma-4-E2B-it's own checkpoint
+        # header: its text decoder is 6.01 GiB resident, of which 5.12 GiB is
+        # NON-quantizable embeddings (2.75B params, bf16) and only 0.88 GiB is
+        # NF4 linears. Its tag budget is 3.2GiB -- smaller than the embedding
+        # table alone -- so keeping the cap would spill real decoder layers to
+        # CPU and trip the very BUG-098 tripwire this change exists to stop,
+        # having dropped the towers for nothing.
+        #
+        # Passing no budget means no `device_map` either (it is only set below
+        # when max_memory is not None), so bitsandbytes places the model on one
+        # device: it either fits or raises an honest CUDA OOM. That is the same
+        # argument _plan_max_memory already makes for unquantized loads -- "no
+        # cap, no artificial CPU-offload escape hatch" -- applied to the other
+        # case where the 4-bit pricing is wrong. A loud OOM is worth more than
+        # a silent multi-minute-per-line render: the measured cost of that
+        # escape hatch on this card was 0.4-0.5 tok/s.
+        # Imported here on purpose: the only other binding in this function is
+        # inside the `context_cap is None` else-branch above, and request_slot
+        # always passes a context_cap, so relying on it would NameError on the
+        # normal path.
+        from . import _otr_model_catalog as _otr_catalog_mode
+        _native_text_row = (
+            _otr_catalog_mode.text_only_load_mode(_stripped_model_id)
+            == "native_text_decoder"
+        )
+        if _native_text_row and max_memory is not None:
+            _runtime_log(
+                f"[StoryOrchestrator] {_stripped_model_id} loads its native "
+                f"text decoder; dropping the composite size-tag budget "
+                f"{max_memory!r} so placement is not planned against a cap "
+                f"that priced towers and unquantizable embeddings wrongly"
+            )
+            max_memory = None
         if max_memory is not None and total_vram >= 12.0:
             _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {total_vram - 2.5:.1f}GB Budget")
 
@@ -1114,13 +1261,53 @@ def load_llm(
                 if torch.cuda.is_available() else 0.0
             )
 
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    load_target,
-                    local_files_only=True,
-                    config=model_config,
-                    **common_kwargs,
+            # NATIVE TEXT DECODER ON THE **INITIAL** LOAD (PBUG-20260906-07).
+            # Not on a retry: gemma-4-E2B-it proved a retry is unreachable
+            # here. bitsandbytes' validate_environment only refuses a
+            # device_map that is a DICT (quantizer_bnb_4bit.py: `isinstance(
+            # device_map, dict)`), and this path passes the STRING "auto", so
+            # no ValueError is raised, the composite load "succeeds" with its
+            # towers dispatched to CPU, and only the post-load tripwire notices
+            # -- 193.79 seconds later. The towers must never be built at all.
+            _init_config = model_config
+            _init_kwargs = dict(common_kwargs)
+            if _native_text_row:
+                _init_config = _native_text_load_config(model_config)
+                _init_kwargs["output_loading_info"] = True
+                _text_type = getattr(_init_config, "model_type", "")
+                if not _registry_supplies_text_prefix_mapping(_text_type):
+                    _init_kwargs["key_mapping"] = {
+                        r"^model\.language_model\.": "model.",
+                    }
+                _runtime_log(
+                    f"[StoryOrchestrator] {_stripped_model_id} loading NATIVE "
+                    f"TEXT DECODER ({_text_type}); towers are not "
+                    f"materialized. key_mapping supplied by "
+                    f"{'OTR' if 'key_mapping' in _init_kwargs else 'transformers registry'}"
                 )
+
+            try:
+                if _native_text_row:
+                    model, _native_info = AutoModelForCausalLM.from_pretrained(
+                        load_target,
+                        local_files_only=True,
+                        config=_init_config,
+                        **_init_kwargs,
+                    )
+                    _dropped = _validate_native_text_loading_info(
+                        _native_info, model_id=_stripped_model_id)
+                    _runtime_log(
+                        f"[StoryOrchestrator] native text coverage OK for "
+                        f"{_stripped_model_id}; dropped tower prefixes="
+                        f"{_dropped!r}"
+                    )
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        load_target,
+                        local_files_only=True,
+                        config=_init_config,
+                        **_init_kwargs,
+                    )
             except ValueError as _dispatch_err:
                 # Operator directive 2026-08-29: guards do not kill a render;
                 # an OOM is the only killer. bnb-4bit's validate_environment
@@ -1159,6 +1346,15 @@ def load_llm(
                 _retry_kwargs["quantization_config"] = _offload_quant
                 _e4b_text_retry = _stripped_model_id == "google/gemma-4-E4B-it"
                 _retry_config = model_config
+                if _native_text_row:
+                    # A native-text row must NOT silently regain its towers on
+                    # the retry. The initial load already resolved the text
+                    # config and the correct key_mapping; carry both, or this
+                    # handler would quietly undo the fix.
+                    _retry_config = _init_config
+                    if "key_mapping" in _init_kwargs:
+                        _retry_kwargs["key_mapping"] = _init_kwargs["key_mapping"]
+                    _retry_kwargs["output_loading_info"] = True
                 if _e4b_text_retry:
                     _retry_config = _e4b_text_offload_config(model_config)
                     _retry_kwargs["key_mapping"] = {r"^model\.language_model\.": "model."}
@@ -1185,6 +1381,25 @@ def load_llm(
                     )
                     _validate_e4b_text_loading_info(_e4b_loading_info)
                     _runtime_log("[StoryOrchestrator] E4B native text checkpoint coverage OK")
+                elif _native_text_row:
+                    # output_loading_info=True was set above, so this call
+                    # returns a (model, info) PAIR. Binding that pair straight
+                    # to `model` would not fail here -- it would fail much
+                    # later inside .eval() or the BUG-098 scan, as an
+                    # AttributeError that names nothing useful.
+                    model, _native_retry_info = AutoModelForCausalLM.from_pretrained(
+                        load_target,
+                        local_files_only=True,
+                        config=_retry_config,
+                        **_retry_kwargs,
+                    )
+                    _dropped_retry = _validate_native_text_loading_info(
+                        _native_retry_info, model_id=_stripped_model_id)
+                    _runtime_log(
+                        f"[StoryOrchestrator] native text coverage OK on the "
+                        f"CPU-offload retry for {_stripped_model_id}; dropped "
+                        f"tower prefixes={_dropped_retry!r}"
+                    )
                 else:
                     model = AutoModelForCausalLM.from_pretrained(
                         load_target,

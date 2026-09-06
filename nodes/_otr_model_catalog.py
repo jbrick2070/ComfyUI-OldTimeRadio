@@ -139,6 +139,23 @@ class CuratedModel:
     provider: Literal[
         "local", "openrouter", "comfy_credits", "google_api", "gguf_native",
     ] = "local"
+    # How a MULTIMODAL checkpoint driven text-only is actually loaded.
+    #
+    # "composite"           -- load the whole checkpoint, towers included.
+    # "native_text_decoder" -- load ONLY the text decoder; the vision/audio
+    #                          towers are never materialized.
+    #
+    # THIS IS A SEPARATE FIELD FROM loader_backend ON PURPOSE, and the reason
+    # is a live near-miss (PBUG-20260906-07). `loader_backend ==
+    # "transformers_multimodal_text_only"` looks like the natural dispatch key
+    # and is NOT sufficient: `google/gemma-4-12b-it` carries that exact value,
+    # so dispatching on it would silently change the 16 GB box's qualified
+    # canonical writer while fixing an 8 GB one. Opting a row in is a
+    # deliberate, per-row, reviewable decision -- never inferred.
+    #
+    # Default "composite" keeps every pre-existing row, and any fixture that
+    # omits the field, loading exactly as before.
+    text_only_load: Literal["composite", "native_text_decoder"] = "composite"
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -164,6 +181,11 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         context_window=8192,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
+        # Vision tower is dead weight for the writer. Transformers' own
+        # conversion registry already strips this family's prefix
+        # (conversion_mapping.py: "qwen3_5_text" -> language_model/model), so
+        # OTR supplies no key_mapping of its own here.
+        text_only_load="native_text_decoder",
     ),
     CuratedModel(
         repo_id="mistralai/Mistral-Nemo-Instruct-2407",
@@ -199,13 +221,17 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="PASS",
         approx_safetensors_gb=6.0,
         notes="Multimodal architecture (matformer / Gemma-3n family) used "
-        "in text-only mode. Compact technical-slot option.",
+        "in text-only mode. Compact technical-slot option. Of its 2011 "
+        "checkpoint tensors only 600 are the text decoder; 1410 are audio and "
+        "vision towers the writer never executes, which is why this row loads "
+        "the native text decoder (PBUG-20260906-07).",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
         context_window=8192,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
+        text_only_load="native_text_decoder",
     ),
     CuratedModel(
         repo_id="google/gemma-4-E4B-it",
@@ -522,6 +548,23 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
 
 def _by_repo_id() -> dict[str, CuratedModel]:
     return {m.repo_id: m for m in _active_curated_models()}
+
+
+def text_only_load_mode(model_id: str) -> str:
+    """``"native_text_decoder"`` or ``"composite"`` for a selected model id.
+
+    Accepts a badged dropdown label as well as a bare repo id -- the picker
+    shows ``'google/gemma-4-E2B-it (3.0 GB)'`` and a saved graph stores that
+    string, so an exact-match lookup on the raw widget value would quietly
+    miss and fall back to the composite path.
+
+    An id with NO curated row returns ``"composite"``: an uncurated local
+    cache hit keeps loading exactly as it does today. This is the loader's
+    single source of truth for the question, so the decision lives with the
+    row's other honesty fields rather than in an id ladder inside the loader.
+    """
+    row = _by_repo_id().get(_strip_label_suffix(model_id))
+    return getattr(row, "text_only_load", "composite") or "composite"
 
 
 GATED_CURATED_MODELS: frozenset[str] = frozenset(
@@ -2109,6 +2152,7 @@ def _make_pbar_tqdm_adapter(pbar: object) -> type:
 __all__ = [
     "CuratedModel",
     "CURATED_LLM_MODELS",
+    "text_only_load_mode",
     "GATED_CURATED_MODELS",
     "DEFAULT_LLM",
     "TEST_TECHNICAL_LLM",
