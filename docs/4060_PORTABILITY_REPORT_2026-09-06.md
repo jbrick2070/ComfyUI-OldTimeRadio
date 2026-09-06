@@ -431,3 +431,31 @@ including the real zero-tail fallback. Installed qualification remains pending.
 Comfy was fully stopped and verified
 at 12:16:52. Original outputs/evidence are preserved, no hand output repair.
 Next writer remains E4B, one act, after regression checks and reviewed install.
+
+September 6, 12:55 update: source credits fix db8bca2 is pushed and verified.
+After fresh full-stop checks, twelve reviewed production files were updated
+and byte/AST verified; no dependency, model/cache, credentials or JSON changed.
+This also installs the earlier LTX-health and truthful unknown-VRAM corrections.
+Nine focused source suites passed 174 tests at 12:44; full pytest not claimed.
+
+Normal GUI restart loaded all 25 nodes. The sole next Run at 12:52:31.252 has
+E4B in both writer slots, one act, batch one. OTR began its automatic E4B
+download; no manual weight placement or login step. The application's 9.0 GB
+download estimate and 4.5 GB menu label are not measured totals. The inherited
+optional authentication still prevents calling this an anonymous clean trial.
+An independent read-only NVIDIA sampler now records machine-wide memory; early
+83/8188 MiB samples occurred during download, not loaded-model qualification.
+No complete E4B result, credits-tail or end-to-end PASS yet. See drill Step 92.
+
+September 6, 13:01 outcome: E4B's automatic download succeeded in about 4m06s,
+but its first generation FAILED with a meta-versus-CUDA tensor mismatch. The
+existing NF4 CPU-offload retry fired correctly; this is a separate integration
+defect in the multimodal embedding path, not a 401 or recorded CUDA OOM.
+Actual stored weights are 15,992,595,884 bytes, substantially above the app's
+9.0 GB download estimate. No manual model placement or token step was needed.
+
+No media/publish/credits result exists for this trial. Full Comfy shutdown was
+verified 13:01:33, and evidence/download sizes/378 usable memory observations
+are preserved. The 1517 MiB sampled maximum occurred during failed warmup and
+does not qualify E4B's full memory requirement. A narrowly scoped text-only
+offload candidate is under examination; no E4B fix or second Run yet. Step 93.

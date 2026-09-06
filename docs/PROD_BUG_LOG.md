@@ -11702,7 +11702,10 @@ remain UNKNOWN and are not backfilled. Shared Bible absent; no promotion.
   At 12:30 the 18 focused path regressions were RED on pre-fix source (one
   failure, eleven errors) and GREEN on the candidate. Real old roll zero-tail
   failure is distinct from helper-absent errors. Final independent review has
-  no blockers. Actual installed one-act E4B retest remains pending.
+  no blockers. Source committed/pushed as db8bca2. Twelve reviewed production
+  files, including this credits fix and earlier LTX-health/VRAM corrections,
+  were installed after fresh zero-runtime checks; exact byte/AST verification
+  passed 12:47:03. Actual one-act E4B retest remains pending.
 
 ### PBUG-20260906-02 follow-up -- Git-independent data stage reached live
 
@@ -11711,3 +11714,28 @@ and reached backdrop extraction; the new failure above is presentation I/O,
 not missing .git metadata. No Git installation or fabricated .git was needed.
 Do not close full live credits/clean-package qualification until the credits
 tail actually renders in the installed workflow and final success is verified.
+
+## PBUG-20260906-06 -- E4B multimodal PAD lookup bypasses CPU-offload hooks
+
+- Status: OPEN; physical one-act reproduction and read-only source mechanism
+  confirmed. No production E4B fix or repeat Run yet.
+- The sole 12:52:31 E4B trial completed automatic download at 12:56:38.035.
+  Existing NF4 recovery fired 12:56:42.525, 2076 weights loaded, then warmup
+  and first generation hit `Tensor on device meta is not on the expected
+  device cuda:0!`. Terminal 12:56:44.776; 253.52s job. No OOM or 401 observed.
+- Installed Gemma4 composite forward calls the embedding module and then
+  reads its `.weight` PAD row directly. Accelerate's offload post-forward hook
+  has already returned that weight to meta. E4B enables the per-layer-embedding
+  branch; torch.where requires matching devices even for text-only inputs.
+- Native text loading is a candidate only. Explicit copied text subconfig,
+  correct text-skeleton planning, anchored checkpoint mapping and tied-head/
+  required-text key/shape coverage must be verified. Class-only substitution,
+  whole-class preloading or suppressed missing weights would be unsafe.
+  Keep the 12B and initial all-GPU paths unchanged; no site-packages edits.
+- No episode media/publish/credits result. Only a 9,703-byte skeleton ledger.
+  Comfy and the independent sampler fully stopped, zero counts 13:01:33.
+  Full error/screenshots/download inventory/sampling receipts retained privately.
+- Actual completed E4B weight file is 15,992,595,884 bytes (15.993 GB), not the
+  app's 9 GB download estimate. Menu 4.5 GB is not a memory measurement. The
+  two unquantized BF16 embedding-table shapes alone imply 6.5 GiB; do not infer
+  8 GB fit from effective parameter count. No canonical default change.

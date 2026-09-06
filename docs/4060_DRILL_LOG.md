@@ -3682,3 +3682,107 @@ is present in that scoped set. Credits is the separate twelfth production file.
 These fixes do not change models, recipe choices, dependencies or canonical
 JSON. A fresh zero-runtime check and exact-file verification are required before
 installing the reviewed set; no live retest or clean-install PASS claimed here.
+
+Source fix committed and pushed as db8bca2 at 12:45:33–35; actual remote HEAD
+verified, unrelated untracked review plan preserved. Fresh install preflight
+12:46:36–38 confirmed zero Comfy processes and zero instance listeners. All
+twelve target files matched their exact reviewed baseline, with no reparse
+ancestors or unrelated deviations. The reviewed patch was applied only to
+those production files. At 12:47:03 all twelve byte-match committed source
+and pass AST/nonempty/no-BOM checks. No dependency, model/cache, credential,
+workflow JSON or registry edits. This remains explicit hand-patched development.
+
+Normal app restart: launch pre-existing Comfy Desktop at 12:47:25.790;
+first captured dashboard 12:47:40.669. Click existing ComfyUI Stable v0.34.5
+instance card at 12:47:53.917, observe Starting. No New Instance, cloud or
+installer action. Private 1247 receipt preserves source push, before/after
+install verification and the exact twelve-file set. GUI evidence is retained
+with the next trial's startup/settings sequence; Run has not yet been clicked.
+
+### Step 92 — September 6, 12:48–12:55 PDT: E4B one-act trial started
+
+Fresh boot loaded all 25 OTR nodes at 12:48:15.779. Existing unrelated node-pack
+and optional-library warnings remain contamination, not instructions to install
+anything. A two-line Proactor callback exception appeared at 12:48:16; no full
+trace was present, and startup/queue operation continued. Manager finished its
+cache update automatically at 12:50:15. No corrective action was taken.
+
+Normal UI selected E4B for both writer slots. Initial menu/label captures did
+not always reflect the immediately preceding input, so fresh observations and
+one explicit creative-selection confirmation were retained. Exact cause of this
+UI/capture delay is undetermined. Both final values, act_count=1, batch=1 and
+zero active jobs were visibly confirmed before the SOLE Run at 12:52:31.252.
+Got prompt 12:52:31.334; writer independently confirms both E4B slots, one act
+and two characters at 12:52:31.551. No canonical JSON/default writer change,
+backend queue call or additional Run. Current pending directory is
+pending_20260906_125231; follow a later rename only when explicitly logged.
+
+The source-bank roll selected shakespeare_folger; the app flags this source as
+non-commercial. No external publication was performed. All five existing visual
+assets are READY. At 12:52:31.682 OTR began automatic first-use E4B download,
+announcing 9.0 GB; this is its estimate, not observed transfer bytes. The menu's
+4.5 GB is also not measured VRAM. A degraded non-symlink cache warning followed;
+no elevation, Developer Mode, cache/link/environment fix or token change.
+
+At 12:55:21, read-only exact E4B cache inventory found ten ordinary files,
+32,227,732 bytes combined, including tokenizer data and a zero-byte incomplete
+weight placeholder. No reparse points followed. This is an on-disk checkpoint,
+not transfer progress or evidence that a download stalled. No completed E4B
+weight load, writer result, OOM or 401 observed yet.
+
+A separate read-only NVIDIA sampler started 12:55:10, about one-second machine-
+wide observations, to supplement the absent Python NVML binding. Initial ten
+samples show 83 MiB used of 8188 MiB, GPU utilization 0% during download. These
+are actual sampled total-device values, not per-process or complete peak proof;
+no model allocation, dependency installation or historical backfill. Private
+1252 HTML/MD retain fifteen startup/settings/Run captures, full available trees,
+exact boot/run log and every input/wait. All results remain IN PROGRESS.
+
+### Step 93 — September 6, 12:56–13:01 PDT: E4B download succeeds; writer fails
+
+The sole E4B trial completed automatic download at 12:56:38.035: eight files
+fetched in about 4m06s. The first-use download worked without manual model
+placement or an authentication step. Existing ambient authentication still
+prevents calling this an anonymous clean-room trial.
+
+At 12:56:42.525 the NF4 CPU-dispatch refusal triggered the existing recovery;
+2076 weights loaded at 12:56:43.490, then offloaded parameters were on meta.
+Warmup at 12:56:44.588 reported the device error as non-fatal, but actual first
+generation failed at 12:56:44.776 with the same exact error:
+
+```text
+RuntimeError: Tensor on device meta is not on the expected device cuda:0!
+```
+
+The job ended 12:56:44.870 after 253.52s. This is writer FAIL, not OOM, 401 or
+story-quality evidence. No publish, audio/video or credits-tail test was reached.
+The exact pending episode contains only its 9,703-byte skeleton ledger.
+
+Independent 12:59 inventory: model.safetensors is 15,992,595,884 bytes
+(15.993 GB / 14.894 GiB), modified 12:56:38.0309774. Ten ordinary E4B cache files
+total 16,024,823,616 bytes; metadata/tokenizer total 32,227,732. No reparse points
+or weight-body reads/hashes. These are logical disk sizes, not measured network
+transfer volume. The app's 9.0 GB estimate does not describe the stored weights;
+the 4.5 GB menu label must not be treated as a total-VRAM qualification.
+
+Read-only source diagnosis identifies a distinct offload integration defect:
+Gemma4's multimodal forward calls an embedding module, then directly reads its
+weight after Accelerate has returned that CPU-offloaded weight to meta. E4B's
+per-layer-embedding branch then calls torch.where with mixed meta/CUDA tensors.
+The earlier NF4 retry fired correctly. Native text-only loading is a candidate,
+not yet a fix: copied text config, explicit checkpoint-prefix mapping, tied-head
+and text-weight coverage checks are required. No site-packages or cache repair.
+
+Failure GUI captured 12:58:14; one View details click at 12:59:19 retained with
+the full persisted traceback in private 1258 HTML/MD. Exact Comfy shutdown began
+13:01:30: verified backend, app and crashpad stopped; already-exited children
+were skipped. Fresh checks 13:01:33 confirm zero Comfy processes/listeners and
+no Comfy window. Own read-only NVIDIA sampler was also stopped and verified.
+No second Run or restart. Private 1301 receipt retains shutdown and all samples.
+
+Sampler observed 379 rows from 12:55:10–13:01:31; 378 usable, with a sampled
+maximum of 1517 MiB at 12:56:44.550 during failed warmup. This is NOT a complete
+run peak or proof of E4B fit. The shutdown row had an Unknown Error and is excluded.
+Sampler exit 1 followed its explicit stop, not a render failure. Audit friction:
+two Split-Path parameter-set errors preceded corrected read-only ancestor checks;
+full error wording is preserved privately. No source-code fix for E4B yet.
