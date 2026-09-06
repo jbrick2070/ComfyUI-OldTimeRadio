@@ -1657,3 +1657,23 @@ Private evidence4060-overnight-20260905-233751.html contains5 event records,
 including3 screenshot/full-tree captures. This separate checkpoint follows
 diagnostic-repair parts1-5 without overwriting them. Only documentation is
 updated for this heartbeat; source candidate and active runtime remain fixed.
+
+### Step30 -- 23:48-23:50 PDT, third dossier call continues
+
+Scheduled wake23:48:51.833; previous check verification23:43:09. Same single
+Run23:04:44.645 and pending_20260905_230557. Third dossier call remains
+attempt1/3, with heartbeats64tokens/161.0s at23:43:06.352,128/310.4s at
+23:45:35.783 and192/460.3s at23:48:05.594; rate remains0.4tok/s. No new
+error, OOM,401, download or completion. No RESULT SUCCESS, obs_publish OK
+or final episode verified. Other-model campaign remains conditional and idle.
+
+One passive Comfy Logs screenshot/full-tree capture was already visible and
+current; no activation, click, keypress or other UI input was needed. Exact
+times supplemented from a read-only persisted-log tail. No manual sleep,
+installed edit, dependency/cache/model change, restart, cancellation or Run.
+Fresh fetch/pull reports already up to date. Updated only this drill entry;
+no new source/JSON changes or defect diagnosis. Preserve quiet monitoring
+while the same writer stage is healthy and unchanged.
+
+Private4060-overnight-20260905-234851.html stores3 timestamped event records
+and the screenshot/full accessibility tree, without replacing prior evidence.
