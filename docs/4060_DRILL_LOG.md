@@ -4481,3 +4481,72 @@ STATUS: NOT a PASS yet. Development PASS still requires this SAME trial's exact
 RESULT SUCCESS, obs_publish OK and a final episode file on disk. Writer prose is
 one stage; credits, publication and the video lanes are untested on this row.
 E2B remains FAIL-until-proven; only its load and writer throughput are qualified.
+
+### Step 109 — September 6, 15:39–15:55 PDT: caps removed; writer speed run for every candidate LLM
+
+Operator directives: "remove all caps, just let the system take up as much
+memory as it needs", "no crawling", and a tokens/sec speed run for every LLM on
+the 4060 without a full workflow. The isolated-measurement carve-out in
+CLAUDE.md section 0A was struck in August, so this run is authorized ONLY as the
+new operator decision that clause requires. It qualifies nothing on its own; no
+figure here is an episode PASS.
+
+The in-flight E2B one-act trial was stopped at 15:39:26 to free the GPU. Its
+writer result was already banked (Step108) and a full-episode attempt has to be
+re-run against the no-caps build anyway. Exact PID/parent/creation checks before
+the stop; zero Comfy processes, zero 8188/8000 listeners, and nvidia-smi
+reporting **0 MiB / 8188 MiB** afterwards -- a genuinely idle card for the
+measurement.
+
+METHOD. `otr_llm_speedrun.py` drives OTR'S OWN production loader
+(`nodes._otr_model_loader.load_llm` + `make_generate_fn`, BASELINE_POLICY,
+quant=bnb_nf4), not a reimplementation, with `auto_download_if_missing` for
+acquisition. One 1940s-radio prompt, 8-token warmup, then 192 new tokens timed
+with `torch.cuda.synchronize()` either side. Models unloaded and the allocator
+reset between rows. Archived as
+`4060-llm-speedrun-20260906-1550.json` with the script.
+
+RESULTS, physical RTX 4060 Laptop 8 GB, card idle at start:
+
+```
+row                     tok/s   peak VRAM   load s   text_only_load
+Qwen/Qwen3.5-4B         14.47     2.99 GiB   12.31   native_text_decoder
+google/gemma-4-E2B-it   12.42     6.06 GiB    9.29   native_text_decoder
+google/gemma-4-12b-it    8.66     7.25 GiB   34.61   composite
+google/gemma-4-E4B-it    4.11     8.72 GiB   16.21   composite
+```
+
+Against the campaign's earlier measurements on the same card: gemma-4-12b-it was
+**0.4 tok/s** and gemma-4-E4B-it **0.5 tok/s**. Every row improved; 12B by about
+22x and E2B from never emitting a token at all.
+
+THE HEADLINE IS 12B. It fits at 7.25GiB inside 7.99GiB and writes at
+8.66tok/s. The best-quality writer in the catalog is now usable on this card,
+which the 6.8GiB cap had made impossible by a margin of 0.15GiB.
+
+QWEN IS THE EFFICIENCY WINNER and confirms the operator's leaderboard photo: the
+fastest row AND the lightest by a wide margin, 2.99GiB peak, leaving roughly
+5GiB free. Its first download completed cleanly -- both shards present
+(5,329,398,688 + 3,990,429,408 = 9,319,828,096 bytes, exactly the row's declared
+figure), zero `.incomplete` files. This also gives the shard-completeness fix its
+first REAL positive case: `shards_declared=2 has_weights=True`, while every
+unsharded row still reports through the old single-blob rule.
+
+CORRECTION TO THE "FITS OR FAILS LOUDLY" CLAIM, recorded because it matters.
+E4B did NOT raise a CUDA OOM. Its peak is **8.72GiB on an 8.00GiB card**: on
+Windows the NVIDIA driver oversubscribes into shared system memory rather than
+refusing, so removing the caps does not guarantee a loud failure -- it can still
+degrade quietly, and E4B's 4.11tok/s is what that degradation looks like. The
+earlier prediction that E4B would OOM is WRONG and is retracted here. The caps
+removal is still right (every row got faster) but its stated failure mode is
+softer than claimed.
+
+NOT TESTED, with reasons: `mistralai/Mistral-Nemo-Instruct-2407` needs a 24GB
+first download and is ~12GiB resident, so it would oversubscribe heavily -- not
+run rather than assumed to fail. `google/gemma-2-2b-it` is the one genuinely
+gated row (`requires_auth=True`) and no token is acquired under campaign rules.
+Both remain NOT TESTED, not FAIL.
+
+Prose quality was NOT scored here and this run does not rank storytelling. All
+four produced a plausible atmospheric opening; choosing between them on story
+quality needs the separate blind comparison in the ranking plan.
