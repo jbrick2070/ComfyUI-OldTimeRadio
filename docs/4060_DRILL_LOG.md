@@ -3128,3 +3128,45 @@ also preserved privately. Unknown screenshot cause, no exception/LockApp.
 No input/retry/requeue/restart/installed edit/manual setup/cleanup/registry
 action. Pending source generation deferred. Intermediate writer progress only;
 documentation-only milestone, not full episode PASS.
+
+### Step77 -- 2026-09-06 07:34-07:43 PDT, writer DONE; audio/procgen; explicit rename
+
+Same sole one-act Run. Cleanup07:34:54.038 reports6voiced rows,2automatically
+repaired,0still unclean,11calls. Writer DONE07:34:54.104:6lines153words,
+estimated1.1min. Writer elapsed2h31m44.267s; Run-to-writerDONE2h44m17.955s.
+Freeze07:34:55.715 is frozen_with_warns,2soft gaps; warnings retained.
+Repeated accelerate move warning and PyTorch dropout/deprecation warnings
+retained verbatim privately; no manual fixes.
+
+Kokoro torch/CUDA rendered4character+2announcer clips. Speech sequence50.9236s;
+assembled master audio_done07:35:54.390 is67.92s/48kHz,3segments/2musicrows.
+Read-only disk check07:41:50 confirms master13041372bytes; opening/closing
+music cues774444/518444bytes. Ledger records both voicesKokoro/musicMusicGen;
+that metadata is not independent fresh-weight acquisition proof.
+
+Intermediate procgen video encoded1699frames at1920x1080/25fps, h264_nvenc,
+in48.8s. Saved07:36:45.093,logged67.6MB; exact file70886151bytes. This is
+ledger meta.procgen_path, NOT final LTX/ZImage episode or publishing PASS.
+App explicitly renames pending_20260906_050309 at07:36:45.155-.162 to
+signal_lost_behind_the_loose_brick_20260906_073554, directory moved=True,
+durablepaths9/memorypaths7 rebased. Follow this exact episode identity now.
+
+ShotLock active: briefOK07:36:45.188; automaticGemma reload again recovers
+NF4dispatch refusal through existingCPUoffload;677weights/warmupcomplete.
+Derivation4characterbeats starts07:37:12.142;64tokens07:39:45.462 at0.4tok/s.
+No CUDA OOM/401/extra-pack request/terminal result. Main returned title4%ShotLock.
+
+HFWindows symlink-degraded-cache warning reveals an alternate user HF cache
+outside Comfy's model root. No DeveloperMode/admin/security changes. Read-only
+inventory finds newlywritten Kokoro voices af_aoede.pt523425bytes (07:35:02)
+and bm_george.pt523430bytes (07:35:11), total1046855bytes. Exact per-file
+transfer timings/network bytes absent: automatic acquisition inferred, not a
+verified transfer receipt. MainKokoro weights/othervoices retain earlier01:45
+timestamps. Include alternatecache in eventual clean-start inventory; no delete.
+
+07:41:08.809 passive screenshot remains BLACK; full available old tree and
+exact logs/cache/file receipts in private4060-heartbeat-20260906-0740.html/.md.
+Initial45-line tail missed phase transition; expanded170lines preserved it.
+07:27/07:34 routine private checkpoints also retained. No input/retry/requeue,
+installed edit/hand setup/cleanup/registry action. Defaultbundle generation
+still deferred whileactive; documentation-only milestone, no final PASS.

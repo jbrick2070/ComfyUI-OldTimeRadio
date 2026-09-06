@@ -253,3 +253,16 @@ advanced to ledger line checks after another automatic reload recovered via
 existing CPU offload. Repeated accelerate warning is retained; no manual
 recovery or terminal failure.07:20 screenshot remains black. Audio/video/obs
 and matching final episode file are still unqualified.
+
+Writer DONE07:34:54:6lines153words after2h31m44s writing. Kokoro CUDA
+rendered4character/2announcer clips, and67.92s master audio was saved
+(13041372bytes). Intermediate procgen MP4 exists70886151bytes, but is NOT
+final LTX/ZImage output. App explicitly renamed the same episode to
+signal_lost_behind_the_loose_brick_20260906_073554 at07:36:45. ShotLock now
+generates shot descriptions; no terminal success/obs publication yet.
+
+Two freeze soft gaps and PyTorch/HF cache warnings are retained. Alternate
+user HF cache contains earlierKokoro weights and2new voice files totaling
+1046855bytes; precise download timings/network bytes unavailable. No manual
+setup or warning suppression. This cache must be included in final clean-start
+inventory.07:41 screenshot remains black. Development baseline still RUNNING.
