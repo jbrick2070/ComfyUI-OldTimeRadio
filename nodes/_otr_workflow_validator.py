@@ -4,12 +4,17 @@ Per ADR docs/2026-05-13-S14_2-active-validation-ADR.md (Option B,
 locked in S24/C12; implementation in S26 Sprint 3).
 
 Placed as the first node in a workflow JSON, this validator reads the
-workflow JSON file from disk (the live one ComfyUI is executing) and
+configured workflow JSON file from disk and
 runs the same `validate_workflow_contract` check that
 `tests/test_workflow_live_passes_validator.py` runs in CI. Violations
 raise the typed exception from `_workflow_validation`, which
 ComfyUI surfaces as a red-bordered node error in the canvas -- the
 same channel as every other OTR node failure.
+
+After the structural check, hidden ComfyUI PROMPT / UNIQUE_ID inputs let
+the shipped visual-asset helper prepare the directly gated LIVE engine
+selections before the writer starts. The disk fixture is never the source
+of those selections. Skipping the structural check does not skip assets.
 
 INPUT_TYPES:
   - workflow_json_path (STRING, optional default): absolute path to the
@@ -281,17 +286,24 @@ class WorkflowValidator:
                                "informational in the validation report.",
                 }),
             },
+            # Hidden runtime context adds no serialized widget slots or links.
+            "hidden": {"prompt": "PROMPT", "unique_id": "UNIQUE_ID"},
         }
 
     @classmethod
     def IS_CHANGED(cls, workflow_json_path: str, validate_anyway: bool,
                    strict_unknown_types: bool, profile_id: str = "",
-                   master_hash: str = "", generated_by: str = "") -> str:
+                   master_hash: str = "", generated_by: str = "",
+                   prompt=None, unique_id=None) -> str | float:
         """Re-run on any change to the inputs OR to the workflow JSON
         on disk. mtime + path is the canonical change signal. Uses the
         SAME repo-root resolution as `_load_workflow` (GATE B S2 defect
         fix) so a relative path hashes the real file's mtime instead of
-        a CWD-dependent phantom."""
+        a CWD-dependent phantom. Live GUI runs always recheck asset readiness:
+        ComfyUI supplies UNIQUE_ID during its cache check but PROMPT can be
+        empty there, so prompt truthiness is not a valid live-run signal."""
+        if unique_id is not None and str(unique_id).strip():
+            return float("nan")
         try:
             p = _resolve_workflow_path(workflow_json_path)
             mtime = p.stat().st_mtime_ns if p.is_file() else 0
@@ -471,7 +483,7 @@ class WorkflowValidator:
                  strict_unknown_types: bool,
                  profile_id: str = "",
                  master_hash: str = "",
-                 generated_by: str = ""):
+                 generated_by: str = "", prompt=None, unique_id=None):
         # The stamp assertion + env export run FIRST whenever profile_id is
         # non-empty -- validate_anyway only skips the CONTRACT check below,
         # never this (decision doc section 4; CI rejects snapshots shipping
@@ -485,6 +497,8 @@ class WorkflowValidator:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))
             log.info(msg)
+            from ._otr_visual_assets import ensure_prompt_visual_assets
+            ensure_prompt_visual_assets(prompt, unique_id)
             return (msg,)
 
         from ._workflow_validation import validate_workflow_contract
@@ -552,6 +566,8 @@ class WorkflowValidator:
             + (f" | {stamp_msg}" if stamp_msg else "")
         )
         log.info(msg)
+        from ._otr_visual_assets import ensure_prompt_visual_assets
+        ensure_prompt_visual_assets(prompt, unique_id)
         return (msg,)
 
 

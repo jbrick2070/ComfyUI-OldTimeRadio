@@ -14,6 +14,9 @@ slots, with MusicGen for music) → 48 kHz master mix → model-agnostic video
 qualified. See [the physical 4060 report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
 before queuing the canonical: missing visual weights were detected only after
 hours of writing and audio generation.
+The development branch now contains a
+[pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
+it has offline tests, but has not been released or cold-install/GPU qualified.
 
 100% local by default. No API keys required on NVIDIA and AMD. Optional hosted LLM
 and all-cloud routes exist; they stay off unless you turn them on. One exception as

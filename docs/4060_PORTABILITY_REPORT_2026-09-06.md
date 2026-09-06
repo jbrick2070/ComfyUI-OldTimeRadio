@@ -119,3 +119,18 @@ downloads, already-installed files, three-role deduplication, correct loader
 roots, and Ada/Blackwell choices; prove zero new node packs. Then rerun one act
 through the GUI and require all three final-success receipts. Until then,
 neither this canonical nor a changed model choice is qualified by this run.
+
+## Development follow-up, September6 04:00 PDT
+
+A [pre-writer visual-weight readiness candidate](4060_VISUAL_ASSET_READINESS.md)
+now exists in development source: hidden live prompt inspection at the existing
+validator gate, five weight-only default assets, native-loader identity,
+anonymous pinned metadata and no-clobber verified transfers. Canonical JSON
+and existing model choices are unchanged. Offline checks passed71 new tests
+plus7 earlier loader tests. This does not change any trial verdict above.
+
+Full pytest and Bug Bible remain unavailable. No actual new metadata/model
+download, installed-code change, release or second GUI Run occurred. The
+03:57 passive screenshot still showed background-only pixels/stale console
+text; usable GUI access and a normally distributed candidate are required for
+the next one-act qualification. See drillSteps58–59 for the development log.

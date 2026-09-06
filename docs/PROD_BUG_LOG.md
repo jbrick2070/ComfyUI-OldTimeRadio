@@ -11479,3 +11479,22 @@ tree/background capture); progress is from disclosed read-only persisted logs.
   provisionable before expensive upstream generation. Configured Bible checkout
   absent; no promotion or executable coverage claimed. See drillStep57 and
   docs/4060_PORTABILITY_REPORT_2026-09-06.md. No runtime fix or registry release.
+
+### PBUG-20260906-01 follow-up -- development candidate, not live-qualified
+
+September6 04:00PDT: implemented the selected-engine readiness boundary at the
+already-wired validator gate using hidden live PROMPT/UNIQUE_ID; no canonical
+JSON/widget/link change. Shipped nodes/ helper covers the five default
+ZImage/LTX098 files, deduplicates roles, preserves native loader selection,
+refuses missing custom/contradictory paths, and fetches only allowlisted weights
+with anonymous pinned metadata, exact size/SHA verification, cancellation and
+no-clobber publication. Other literal engines retain existing checks with an
+explicit coverage warning. Details/limitations in
+docs/4060_VISUAL_ASSET_READINESS.md.
+
+Offline21+10+40 tests PASS; earlier NF4 seven tests PASS. Full pytest absent,
+Bible checkout absent. No real model request/download/load, installed change,
+registry release or requeue. Passive GUI capture remains background-only.
+Original alpha.24 and patched-act verdicts remain FAIL; this candidate is not
+evidence that ZImage or LTX fits the4060, that the5080 was physically tested, or
+that a stranger can finish an episode. Retest the built/installed package.

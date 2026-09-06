@@ -2534,3 +2534,112 @@ claims remain outside review. Canonical SHA256 remains
 2C0BE6029FD058BD2E7D8120A617FB3F37E91403F875A48864489890972554BF.
 Terminal evidence, intermediate assets and failed-run identity are preserved;
 the next product work is asset readiness/provisioning, not another model trial.
+
+### Step58 -- 2026-09-06 03:45 PDT, user resumes canonical correction
+
+User: keep going, all logged. Fetch/pull already up to date at69a4b14; prior
+terminal act and installed copy preserved, historical untracked review plan
+excluded. Heartbeat remains paused while development proceeds; no new GUI Run.
+Passive computer-use screenshot remains background-only/full tree stale, so
+no activation/input/recovery attempted. A new GUI trial requires usable UI;
+source development and offline tests do not require bypassing this limitation.
+
+Debug/documentation/review skills used for bounded correction. Historical
+memory lookup contained obsolete August cleanup/Manager proposal only; current
+source/runtime evidence controls, old permissions/setup are not reused. Two
+local subagents audited the pre-writer boundary and visual-weight download
+contracts, with no runtime/model imports, GPU, downloads or network actions.
+
+Design: existing validator63 already gates Writer1 via279 and Director87
+via269. Hidden PROMPT/UNIQUE_ID inputs can inspect the actual queued literals
+without adding widgets, changing JSON links or rereading stale saved selections.
+Comfy IS_CHANGED sees an empty hidden PROMPT (execution.py91/212); unique_id
+must force readiness recheck so model deletions cannot hide behind the cache.
+Keep structural checks first, preserve all-replay behavior, refuse ambiguous
+mixed replay/live routing, no model/precision fallback, no node-pack installer.
+Plan five default assets only for selected ZImage/LTX098: DiT/Qwen3/ae plus
+LTX checkpoint/T5; deduplicate repeated roles. Installed native-resolver choices
+must remain unchanged. No int8 substitution or automatic Blackwell NVFP4.
+
+The dev fetcher's legacy tuples provide no pinned revision/size/hash and its
+minimal size check is insufficient; shipped Kokoro/LLM helpers are specialized.
+New shipped weight-only boundary will pin server-reported content metadata,
+stream into owned temporary files with cancellation/byte progress/disk checks,
+verify exact size/SHA, and publish without overwriting another file. No real
+model metadata request or download has been made during this development work.
+
+Read-only friction so far: root rg literal nodes/_otr* produced os error123;
+a combined read reported truncated output6697tokens; a guessed host_policy.py
+path produced os error2. Relevant reads were narrowed. Reviewer searches hit
+absent install.py and eng_z_image_turbo.py (os2), literal *.py path(os123),
+and truncated outputs15554/5712tokens, then recovered. Boundary reviewer used
+a wrong relative workflow path once (Get-Content missing path, null-array
+index error, rg os3), corrected with absolute path; guessed ltx_8gb.py(os2)
+was corrected to eng_ltx_8gb.py. Downloader implementation preparation had
+PowerShell `An empty pipe element is not allowed.`; corrected before any write.
+All task-state writes are development source/tests/logs or private evidence,
+not installed code, caches/models/authentication/dependencies or registry state.
+
+### Step59 -- 2026-09-06 04:03 PDT, offline candidate and visibility gate
+
+Added nodes/_otr_visual_assets.py and _otr_visual_asset_download.py, plus
+hidden live context integration in _otr_workflow_validator.py. Exact scope,
+five-source manifest and limitations documented in
+docs/4060_VISUAL_ASSET_READINESS.md. Updated README qualification pointer,
+terminal report follow-up and existing PBUG-20260906-01; no new invented PBUG.
+No canonical JSON/widget/link/model/precision change. SHA256 remains
+2C0BE6029FD058BD2E7D8120A617FB3F37E91403F875A48864489890972554BF.
+
+Validator live readiness rechecks every queue; existing gated Writer/Director
+links unchanged. All-replay bypasses live choices; mixed replay/live and
+dynamic/custom selection ambiguity fail before download. Unsupported literal
+engines retain their checks with explicit coverage warning. Existing native
+tokens/files are preserved; no automatic architecture/precision swap. Native
+path disagreement, empty/stale entries or missing nondefault weights are not
+repaired. Covered default downloads use anonymous source/commit metadata,
+exact size/SHA verification,30s network timeout, progress/cancel checks,
+per-file disk margin, persistent OS lock and atomic no-clobber publication.
+No retries/resume, package installer or extra packs. READY is availability only.
+
+Independent review found and corrected exception precedence during lock
+cleanup, a missing mid-stream BaseException/transport-closure test, HTTPError
+response cleanup, and a too-absolute temp-cleanup doc sentence. Root also
+guarded existing nested-ZImage/basename disagreement. Final review: no
+blocking findings. Candidate nodes/ files match no active .comfyignore
+exclusion; actual built registry artifact/scan still unverified. No pyproject,
+requirements, version, tag, publish-workflow or installed-copy changes.
+
+Windows Comfy venv Python -B focused results:
+
+- Downloader21 PASS (root0.143s; owner final0.135s).
+- Validator10 PASS (root0.012s).
+- Planner/native/metadata/mocked integration40 PASS at04:00:38 (0.076s).
+- Earlier NF4 CPU-offload7 PASS at04:00:38 (0.005s).
+Total78 focused tests, of which71 new; synthetic temporary files/streams only.
+No actual model metadata request, download/load, GPU or network fixture action.
+Fullpytest attempted, exact `No module named pytest`, exit1; repeated alone
+after a multi-command audit to retain its own exit. Configured old test
+interpreter/Bible checkout absent. No test dependency installed. Six touched
+Python files AST-parse, no BOM/nonempty; canonical JSON parses; diff-check clean
+at04:02:28. Full suite and physical5080 qualification are not claimed.
+
+Evidence: resume03:45 archive260622bytes. Passive Comfy Logs screenshot
+03:57:06.016 remains castle/background-only and stale text; private HTML
+4060-dev-checkpoint-20260906-0357.html259603bytes retains full returned tree,
+even though displayed tool text truncated. Fresh returned-window inventory
+04:02 followed by main-canvas passive screenshot04:02:43.107 also shows only
+background, no usable Comfy controls. Archived separately as
+4060-main-visibility-20260906-0402.html357431bytes; no activation/input retry. Computer Use
+rules prevent acting on stale/invisible controls; desktop-lock state unproven.
+Heartbeat stillPAUSED, verified04:02:52. No extra GUI Run, asset receipt, or
+conditional model campaign. Original/diagnostic verdicts both remain FAIL.
+
+All diagnostic friction, including wrong-path lookups, truncations, initial
+validator test StopIteration and corrected planner fixture package warning,
+is preserved in private4060-asset-candidate-audit-20260906.md with exact known
+messages and honest per-command timestamp limits. Source-read corrections
+used actual rg-discovered paths; no product repair was hidden. Considered
+hand-copying weights, wholesale provisioning, lower-precision substitution,
+NVFP4 selection and UI manipulation: none performed. Next live gate needs
+usable GUI plus the candidate delivered through the normal release/install
+path; no registry publication is authorized by this development checkpoint.
