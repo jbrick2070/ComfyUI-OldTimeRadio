@@ -2195,3 +2195,23 @@ Private4060-overnight-20260906-014753.html preserves8 timestamped events,
 one background screenshot/full stale tree, complete runtime intervals, exact
 warnings/audit errors and artifact/cache metadata, verified288927bytes.
 Documentation-only checkpoint; continue the same renamed active trial.
+
+### Step47 -- 2026-09-06 02:00 PDT, ShotLock derivation continues
+
+Scheduled wake02:00:53.893. Same single GUI RunSeptember5 23:04:44.645;
+active renamed episode signal_lost_the_frequency_of_friction_20260906_014652.
+Read-only persisted log: same ShotLock derivation128tokens/300.6s at
+01:54:26.978,192/449.8s at01:56:56.247 and256/596.8s at01:59:23.181,
+still0.4tok/s. No new runtime error, OOM,401, download or stage transition.
+No matching RESULT SUCCESS/obs_publish observed. Existing procgen MP4 is
+intermediate, not final AI-visual acceptance; LTX/ZImage execution unverified.
+
+One passive screenshot remains background-only/full accessibility tree stale;
+no activation/input or repeated recovery. No Run, restart/cancel, installed/
+JSON/model/cache/dependency change, manual wait or hand tuning. Fresh fetch/
+pull already up to date; Step46 push59b96d8 was remote-verified. Historical
+untracked review plan preserved; no other-model trial. Keep healthy run active.
+
+Private4060-overnight-20260906-020053.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260623bytes. Prior evidence
+intact. Documentation-only checkpoint; renamed single act remains untouched.
