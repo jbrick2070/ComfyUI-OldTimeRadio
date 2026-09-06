@@ -16,10 +16,13 @@ Presentation model (operator lock 2026-07-03):
   credits-aware mux (node 85) so its guard permits it.
 
 Hard contracts:
-- NO FALLBACKS. A missing RECEIPT (title/style/cast/engines/seed/commit) RAISES
+- NO FALLBACKS. A missing RECEIPT (title/style/cast/engines/seed/code) RAISES
   CreditsDataError before mux. Only probe fields ([SYSTEM]/VRAM) and pure in-world
   flavor text may be soft; frozen story facts (spine/news) are omitted-if-absent,
   never a quiet "(not recorded)".
+- Code identity is COMMIT for Git checkouts, SOURCE SHA-256 for packaged Python
+  source. Registry ZIPs need no developer-only .git directory. SOURCE is not a
+  commit or release version; malformed existing Git metadata still raises.
 - LOOK CONTRACT (operator 2026-06-17, amended by the 2026-07-28 wiring arc):
   the backdrop under the console is the drama's LAST FRAME, held and darkened;
   the radial console panel is composited at partial alpha so it ghosts through
@@ -146,31 +149,18 @@ def _require(container, key, source):
 # --------------------------------------------------------------------------- #
 # Declared sources (date / GPU / git -- each has a declared source, no ad-hoc)
 # --------------------------------------------------------------------------- #
-def _git_short_sha() -> str:
-    """Repo-file read (.git/HEAD -> ref). Raises when unresolvable (the
-    COMMIT line is a receipt)."""
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    head_path = os.path.join(repo, ".git", "HEAD")
+def _code_receipt() -> tuple[str, str]:
+    """Read code identity from this installed package, never Comfy's parent Git."""
     try:
-        with open(head_path, "r", encoding="utf-8") as f:
-            head = f.read().strip()
-        if head.startswith("ref:"):
-            ref = head.split(None, 1)[1].strip()
-            ref_path = os.path.join(repo, ".git", *ref.split("/"))
-            if os.path.exists(ref_path):
-                with open(ref_path, "r", encoding="utf-8") as f:
-                    return f.read().strip()[:8]
-            packed = os.path.join(repo, ".git", "packed-refs")
-            with open(packed, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.endswith(ref) and not line.startswith("#"):
-                        return line.split()[0][:8]
-            raise FileNotFoundError(ref)
-        return head[:8]
-    except Exception as exc:  # noqa: BLE001
-        raise CreditsDataError(
-            f"git short SHA unresolvable from {head_path!r}: {exc}") from exc
+        from ._otr_code_provenance import code_receipt, CodeProvenanceError
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_code_provenance import code_receipt, CodeProvenanceError
+    from pathlib import Path
+
+    try:
+        return code_receipt(Path(os.path.abspath(__file__)).parents[1])
+    except CodeProvenanceError as exc:
+        raise CreditsDataError(f"code provenance unresolvable: {exc}") from exc
 
 
 def _sys_specs() -> dict:
@@ -346,7 +336,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
                             % (frames, fps, clip_count)))
     ledger_grid.append(("SEED:", "cast %s%s" % (
         seed, " (%s)" % gp.get("seed_source") if gp.get("seed_source") else "")))
-    ledger_grid.append(("COMMIT:", _git_short_sha()))
+    ledger_grid.append(_code_receipt())
     ledger_grid.append(("REV:", "img %s · vid %s" % (
         img.get("image_revision"), ren.get("video_revision"))))
     col1.append(("grid", {"header": "[ PRODUCTION LEDGER ]", "rows": ledger_grid}))

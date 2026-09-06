@@ -589,7 +589,7 @@ class TestWriterB2aSurface:
         #   3  technical_model            catalog default repo_id
         #   4  custom_premise             ""
         #   5  include_act_breaks         True
-        #   6  act_count                  "3"
+        #   6  act_count                  "1"
         #   7  creativity                 "balanced"
         #   8  perfect_run_spacesaver     False
         #   9  min_p                      0.05
@@ -652,10 +652,11 @@ class TestWriterB2aSurface:
             f"refine_target_grade removal, plus the trailing replay_from "
             f"widget appended 2026-09-02 for the canonical replay)"
         )
-        # Slot 6: act_count must ship as "3" (the classic setup/complication/
-        # resolution shape) -- there is no 'auto' choice left to fall back to.
-        assert wv[6] == "3", (
-            f"act_count (slot 6) must ship '3'; got {wv[6]!r}"
+        # 2026-09-06 operator directive: the shipped template starts with
+        # ONE ACT for first-run portability. The generic node/legacy-input
+        # fallback remains separate; all other saved choices stay unchanged.
+        assert wv[6] == "1", (
+            f"act_count (slot 6) must ship '1'; got {wv[6]!r}"
         )
         # Slot 13: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).

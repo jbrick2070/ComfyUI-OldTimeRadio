@@ -11516,3 +11516,46 @@ holds final completion through verification/native checks and logs actual native
 destinations.84focused tests PASS; independent scoped review clean. This later
 correction is NOT installed into the current run and its GUI is not live-tested.
 No canonical JSON change, version bump or registry publication. See drill63–65.
+
+## PBUG-20260906-02 -- registry install finishes rendering but credits require .git/HEAD
+
+- Status: OPEN; live physical MRKT RTX4060 development trial, September6.
+- Reproduction: normal alpha.24 registry package plus documented NF4/asset
+  readiness development fixes; canonical settings, one act, sole GUI Run
+  04:50:36.149. Same episode explicitly renamed to
+  signal_lost_behind_the_loose_brick_20260906_073554. At08:29:38.206, after
+  eight ZImage stills, eight LTX098 clips and captions, CreditsDataError stops
+  the prompt. Terminal duration03:39:01. No obs_publish OK/final episode.
+- Symptom: `git short SHA unresolvable` from installed `.git/HEAD`,
+  `FileNotFoundError: [Errno 2] No such file or directory`. Full verbatim
+  traceback retained privately in4060-heartbeat-20260906-0828.md.
+- Root cause: nodes/otr_credits_roll.py::_git_short_sha assumes every runtime
+  package is a Git checkout. build_credits_layout unconditionally calls it
+  for the COMMIT row. Registry ZIP is a valid installation without .git.
+- Fix pending: truthful code provenance for packaged source without inventing
+  a commit; preserve real Git-checkout identity and all other strict credits
+  receipts. Never hand-create .git or bypass credits to finish a trial.
+- Verification: offline packaged/no-Git and genuine Git source tests, malformed
+  identity fail-closed, no parent-repository attribution; then exact GUI
+  canonical RESULT SUCCESS + obs_publish OK + matching final file. Unit tests
+  cannot qualify the live fix. No GPU/hardware/model knob change required.
+- Bible candidate: runtime provenance must use an identity available in the
+  shipped artifact, not developer-only metadata. Configured Bible checkout
+  absent; no promotion claimed. See drillStep80 and portability report.
+
+### PBUG-20260906-02 follow-up -- reviewed source candidate, live retest pending
+
+September6: replaced unconditional Git row with a typed code receipt. Git
+checkouts retain COMMIT/eight-character ID, including proper worktree and
+packed-ref resolution. Registry packages show explicit SOURCE/SHA256 of root
+and nodes Python source. No release/version/commit inference, external Git
+process, parent repository lookup or new dependency. Existing corrupt Git,
+missing/unreadable source and unsupported source links/reparse points remain
+loud. Other title/cast/model/seed/ledger requirements remain strict.
+
+23focused tests PASS, including real layout/abridgment and malformed sources.
+Internal source review blockers addressed and focused recheck clean. Existing
+regular Git reader and candidate return identical ID on the same checkout;
+no physical5080 claim. Full pytest unavailable, Bug Bible absent. Source only,
+not installed or live-render-qualified; status OPEN until canonical GUI
+RESULT SUCCESS + obs_publish OK + matching final file and later clean install.

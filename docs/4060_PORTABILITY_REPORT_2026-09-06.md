@@ -283,3 +283,34 @@ LTXloading began08:19:17 afterappautomatically corrected thestalemasteraudio
 directorypath. Textencoder loadedonCPU; noCUDA OOM/401 ormanualrepair observed.
 NVMLinconclusive/acceleratewarnings retained;08:19GUIscreenshot remainsblack.
 Baseline continues; finalLTXclips,RESULTSUCCESS,obs_publish andepisodepending.
+
+At08:29:38 the baseline FAILED in OTR_CreditsRoll after03:39:01: a registry
+installation has no .git/HEAD, but the credits reader requires it. This is a
+package-provenance portability defect, not an OOM. No final publish/episode
+PASS. Exact traceback and screenshots preserved privately; drillStep80 and
+PBUG-20260906-02 retain the findings. No metadata fabrication or bypass.
+
+Before failure, all8actual LTX clips completed and were independently probed:
+H264,512x288,25fps, valid frame counts/durations. Kokoro/MusicGen audio and
+8ZImage stills also completed. Captioned silent MP4 exists34969409bytes, but
+is intermediate. Thus baseline model components executed; whole workflow and
+fresh-human install remain FAIL, not qualified. Other model trials not started.
+
+Additional findings: ltx_8gb triggers a NOT-an-LTX diagnostic despite actual
+LTXV sampling; zero-MB VRAM peak reports are unusable measurement. A25-frame
+tail warning was followed by master reconciliation1723->1699frames and a
+one-frame closing loop-fill. Blend stayed bypassed. GUI screenshot is still
+black, so interactive work cannot proceed from blind coordinates.
+
+Source development follow-up: credits now distinguish real Git COMMIT from a
+package SOURCE fingerprint (Python bytes only, never a fabricated commit).
+23focused tests and scoped review pass; original/new regular Git reader values
+match. This does not physically qualify5080 or fix the already-failed run.
+Installed package remains unchanged; GUI rerun pending visible usable interface.
+
+One-act default completed in source: canonical and92generated JSONs change
+only act_count3->1; story-only is regenerated with its documented stale-field
+synchronization. Generator check92/0, all94graph link/widget checks and real
+canonical/story schemas pass.110focused stdlib tests pass across credits,
+templates, visual assets and NF4; full pytest unavailable/Bible absent. No
+version bump, registry publication, cleanup or further model trial yet.

@@ -3220,3 +3220,97 @@ PNGsizes andgenerated-outputinspection. Initial18linetailmissedtransition;
 recoveredcontinuousdeltafromprior08:11:23.860timestamp,includinguntimestamped
 samplerbars. NoGUIinput/retry/requeue/installededit/manualsetup/cleanup/registry.
 Pendingdefaultbundle/92variantgenerationremain deferredwhileactive.
+
+### Step 80 — September 6, 08:19–08:35 PDT: eight LTX clips, then terminal credits failure
+
+The same 04:50:36 GUI Run FAILED at08:29:38.206 after03:39:01. App-renamed
+episode signal_lost_behind_the_loose_brick_20260906_073554 is the exact target.
+No RESULT SUCCESS, obs_publish OK or final episode proof. Do not treat its
+captioned silent intermediate as a completed episode or clean-install pass.
+
+LTXV sampling completed all8clips at512x288,25fps; persisted08:28:42.463;
+VideoRenderBatch ok=True08:28:42.672. Read-only existing ffprobe verified all8
+H264 clips08:30:30.613–.880, with bytes/frames/seconds:
+
+| Beat | Bytes | Frames | Seconds |
+| --- | ---: | ---: | ---: |
+| music_opening_001 | 266644 | 250 | 10.00 |
+| b001 | 845925 | 429 | 17.16 |
+| b002 | 420851 | 166 | 6.64 |
+| b003 | 609009 | 152 | 6.08 |
+| b004 | 721178 | 212 | 8.48 |
+| b005 | 383572 | 115 | 4.60 |
+| b006 | 327885 | 199 | 7.96 |
+| music_closing_001 | 246868 | 200 | 8.00 |
+
+All files ordinary, not links; motion appearance not yet visually reviewed.
+Together with8ZImage stills and completed Kokoro/MusicGen audio, this proves
+these component executions on4060, not the end-to-end publication contract.
+
+Findings retained: every LTX segment reports render-phase peak0MB (invalid
+peak evidence, not zero GPU use); four LTX-OPEN HEALTH warnings classify
+actual ltx_8gb as NOT an LTX engine (suspected stale allowlist; not yet fixed).
+25-frame tail-floor warning was followed by automatic A/V master reconcile
+1723->1699 and one-frame closing loop-fill200/201. Composite budget1699 OK.
+PostUpscaleProcgenBlend explicitly bypass=True; filename is not proof of blend.
+CaptionBurn produced14events from6speech lines08:29:38.160.
+
+Terminal CreditsDataError: git short SHA unresolvable from the installed
+pack's .git/HEAD: FileNotFoundError, Errno2. _git_short_sha reads Git metadata
+unconditionally; a normal registry ZIP has no .git. Failure occurs in
+build_credits_layout's COMMIT row after images/video/captions, not from OOM/401.
+No fake .git, credits bypass, source-file copy or manual repair performed.
+Next is a package-aware source-provenance fix with Git-checkout regression
+coverage, not a change to model selection or the episode ledger.
+
+Private4060-heartbeat-20260906-0828.html/.md saved and statverified08:35:24:
+34885/50930bytes. Preserve verbatim log/traceback, complete recovered render
+delta, every clip metadata receipt and08:29:18.748 passive screenshot (BLACK,
+old available tree, before terminal exception). Zero GUI input/retry/requeue.
+No manual downloads/install changes/deletion/registry publication. The GUI
+capture gap remains unresolved; usable visible UI is required for next Run.
+
+### Step 81 — September 6, 08:35–08:53 PDT: source credits fix and one-act defaults
+
+Development only; installed files and failed trial remain unchanged. Added
+package-aware code receipt at existing credits row: COMMIT keeps the genuine
+eight-character Git ID; no-.git packages show SOURCE with the first16hex of
+a SHA-256 fingerprint over rootPython entrypoints and nodes/**/*.py. This is
+explicitly Python source identity, not a release version, whole-package hash,
+workflow identity or fabricated commit. No parent-Comfy Git lookup, external
+Git command, new dependency or GPU/model branch. Corrupt existing Git and
+missing/unreadable/linked source fail closed. Other credits receipts unchanged.
+
+23focused stdlib tests PASS, including real credits layout wiring and retained
+SOURCE row after abridgment. Internal read-only review caught linked-source
+attribution and suppressed root-enumeration errors; both fixed and regression
+tested, focused recheck clean. No Kibitz/remoteGPU/LM service was used.
+Read-only source audit compares original and new regular Git paths on the same
+checkout: both b5229164. This is measured code-path parity, not physical5080 QA.
+
+Normal offline build_variants --all:92emitted,3existing unratified cloud
+choices refused; --check:92variants,0failures. Both child processes report25
+OTR nodes loaded and route registration skipped (no server module); these are
+offline imports, NOT Comfy runtime boots. Test-child CUDA masked/HF offline;
+no queue, model load/download or installed edit. Generated launch recipes
+unchanged. All3one-act stdlib tests PASS. Canonical+92variants semantic diffs
+are ONLY act_count3->1. Story-only regenerated from canonical also synchronizes
+pre-existing cnr_id and visual_style fields; documented derived parity retained.
+Known haunted labels untouched. Generic runtime/new-node act fallback stays3.
+
+08:48:30–08:49:18 offline audit: existing widget assertions invoked directly;
+full widget parity and exact link destination indexes PASS on all94graphs.
+Real25class/25schema coverage verified; canonical23nodes61links and story-only
+3nodes6links pass actual structural contract and zero widget-vector drift.
+TouchedPython AST/nonempty/no-BOM and JSON parse checks PASS.77visual asset
+tests+7NF4 tests PASS again08:49:44. Total110focused stdlib tests (23+3+77+7),
+plus direct structural assertions; NOT a full pytest-suite result. Both Comfy
+and bundled Python report No module named pytest. Bug Bible checkout absent.
+
+08:44:57 passiveLogs and08:46:03 passiveMain captures remain black; main tree
+still says an old writer is running, contradicting current persisted terminal
+log. Source of stale/black GUI remains unknown; no lock diagnosis or blind
+input. Private postfailure HTMLs preserve both captures. Persisted log tail
+still ends with08:29:38 failure at08:50:22. No restart/requeue/installed patch,
+manual asset provision, cleanup or registry release. Next live qualification
+requires visible usable GUI and the reviewed candidate actually installed.
