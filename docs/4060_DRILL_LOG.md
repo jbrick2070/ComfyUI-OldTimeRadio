@@ -3907,3 +3907,138 @@ This is not per-process/full-run/guaranteed peak or8GBqualification. No OOM,
 retain the exact screenshot/tree, full console and bounded runtime tail, all
 new raw samples and Git preflight. Logging/monitoring continue without
 interrupting the active trial.
+
+### Step 97 — September 6, 13:50–13:56 PDT: user switches off slow E4B
+
+The user requested the smallest built-in workflow writer after observing the
+continuing 0.5tok/s performance. The repaired E4B trial is USER ABORTED with a
+performance finding, not an OOM, completed episode or PASS. The source patch
+passed the prior load failure but did not establish acceptable 8GB performance.
+CPU offload is recorded; transfer timing was not independently profiled.
+
+Cancel clicked once at13:51:46.855. Console acknowledged interrupt13:51:47.178,
+but writer heartbeats continued192tokens13:51:50.188 and256tokens13:53:59.124.
+GUI still showed one active writer after two minutes. This cancellation latency
+is additional friction. No second Run or model change while it was active.
+Under the explicit switch request and standing scoped-shutdown authorization,
+the exact Comfy Desktop parent was stopped13:54:26.393. Descendants exited;
+an identity guard stopped the loop during that exit race. Fresh13:54:35 checks
+found zero exact Comfy processes, zero8188/8000 listeners and no Comfy window.
+No blanket Python kill, source change, cache deletion or output repair.
+
+The owned one-second sampler was separately stopped13:54:59. Its1288 valid
+samples show maximum6975/8188MiB; post-shutdown Unknown Error readings are not
+valid zero-memory evidence. This is sampled machine-wide usage, not a guaranteed
+or per-process peak. Full stop receipt, errors and UI captures remain private.
+
+Smallest is qualified by the user's ungated/automatic-download requirement:
+installed catalog Gemma2-2B has a lower2.6GB badge but is gated; E2B has a3.0GB
+badge and is the smallest labelled ungated native auto-download choice. These
+badges are estimates, not measured VRAM. The smaller Qwen GGUF artifact requires
+manual placement when absent in the installed backend, so is not substituted.
+Normal existing-app launch13:55:01 followed full stop; existing-instance click
+and boot wait are captured. Next trial will verify actual dropdown E2B/E2B,
+one act, batch1 and zero active before one Run. No new model family or packs.
+
+### Step 98 — September 6, 13:55–13:59 PDT: E2B one-act trial starts
+
+Existing-instance click13:55:37.766, all25 OTR nodes loaded13:55:55.624.
+Startup displayed "Failed to load subgraph blueprints" with "x89" at13:56:06.
+One normal Refresh13:56:14.507 and passive wait (including explicit12seconds)
+restored the workflow by13:56:34.574. No frontend file/cache repair.
+
+Creative dropdown opened13:56:41.225; menu explicitly lists E2B(3.0GB).
+Selection13:56:52.775 did not stick: fresh13:56:58 screenshot still E4B.
+Reopen13:57:06.082 and visible-row click13:57:13.273 set creative E2B.
+Technical opened13:57:20.564; selection13:57:28.944 also did not stick.
+Fresh13:57:43 screenshot caught the unchanged E4B; reopened13:57:51.558,
+settled-menu observation13:57:56.987, visible-row click13:58:04.725.
+Both E2B selections, act_count=1, batch1 and zero active were then verified.
+These input/settle retries are recorded UI automation friction, not proof of
+a catalog defect. All screenshots and attempted inputs are archived privately.
+
+SOLE Run13:58:14.445, prompt received13:58:14.535. Validator passes23nodes,
+61links; five existing visual assets READY. No other graph changes or added
+Run. Normal automatic E2B download starts13:58:16.819; displayed6.0GB is an
+estimate, actual transfer/stored size not yet measured. Windows HF-cache
+symlink warning is recorded without changing Developer Mode, privileges,
+environment or cache. No token or manual file placement step.
+
+New owned machine-wide NVIDIA sampler starts13:57:29.439 beforeRun, with
+83/8188MiB idle baseline. Previous E4B sampler is closed, not duplicated.
+E2B load/generation/VRAM/speed/media/credits and whole-episode result remain
+unqualified at this download checkpoint. Keep exactly one trial running.
+
+### Step 99 — September 6, 13:59–14:01 PDT: E2B first-download timeout; Qwen requested
+
+The E2B trial FAILED13:59:21.837 after67.29seconds. Exact error begins:
+"NewsCuration exceeded 65s; orphan worker still on GPU. Halting workflow to
+prevent the next visual stage from racing the orphan's CUDA kernels."
+The65second wrapper included the initial Hub download. No download completion,
+model load or generated token was observed; the error's GPU assertion is not
+independent evidence that this download worker had reached CUDA.
+No OOM or401 was observed. E2B speed/fit remain NOT TESTED.
+
+Read-only13:59:40 cache snapshot: nine metadata/tokenizer files32,227,540logical
+bytes, one0logicalbyte incomplete weight, no completed model.safetensors and
+no reparse ancestors/descendants. Zero logical length does not prove zero
+network transfer. Final download size remains unknown; partial cache preserved.
+
+Failure UI and View details captured before shutdown. Initial stop guard
+refused an ISO-string/date-object comparison; no process changed. Fresh exact
+PID/path/creation-tick checks corrected that diagnostic representation and
+stopped the Comfy parent14:00:53.139. Fresh checks verify zero exact Comfy
+processes, listeners8188/8000 and windows. Owned sampler stopped14:00:54.777.
+No blanket Python kill, source repair, second E2B Run or manual model placement.
+
+The user's new photo explicitly requests Qwen3.5 4B instead. This supersedes
+the E2B choice and earlier new-family deferral. Official Qwen/Qwen3.5-4B
+metadata is public/ungated/Apache2.0; its two weight shards total9,319,828,096
+bytes (disk, not VRAM). It is not currently in the writer dropdown. Native
+OTR integration and the shared first-download timeout need source work before
+its one-act GUI trial; no Qwen weights loaded/downloaded or result yet.
+
+### Step 100 — September 6, ~14:20 PDT: Qwen3.5-4B row present in source; install path is the dropdown, not a manual install
+
+Read-only source review (no Comfy running, no Run, no download). The Step99
+statement that Qwen3.5-4B "is not currently in the writer dropdown" is now
+SUPERSEDED by uncommitted working-tree work already present on `v2.0-alpha`
+at HEAD `bcff1a2`:
+
+* `nodes/_otr_model_catalog.py:146` — curated `CuratedModel` row
+  `Qwen/Qwen3.5-4B`, `requires_auth=False`, backend
+  `transformers_multimodal_text_only`, `vram_fit_tier="WARN"`,
+  `approx_safetensors_gb=8.68` (disk, not VRAM), Apache-2.0,
+  `chat_template_kind="transformers_default"`, `context_window=8192`.
+* `nodes/_otr_model_catalog.py` `CURATED_CONTEXT_OVERRIDES` — `8192`.
+* `nodes/_otr_loader_backends.py` — new `chat_template_kwargs()` returning
+  `{"enable_thinking": False}` for this exact repo id only; wired into
+  `encode_messages_for_row`, `_otr_constrained_generate`, and the writer's
+  truncating generate path. Template formatting only; no sampling change.
+* `nodes/_otr_model_loader.py` — refuses BEFORE download when the environment
+  lacks native `Qwen3_5ForCausalLM` for both `qwen3_5` and `qwen3_5_text`.
+* `nodes/story_orchestrator.py` — news curation now performs
+  download/`request_slot`/`make_generate_fn` on the owning thread BEFORE the
+  65s and 40s generation budgets, with `raise_if_processing_interrupted()`
+  boundaries. This targets the Step99 E2B first-download timeout class.
+
+INSTALL PROCEDURE for an ungated auto-download writer LLM (the answer to the
+operator's question). There is no manual model install and no file placement:
+
+1. If the repo id is already curated, it is simply a GUI dropdown pick on the
+   writer node: `creative` slot and `technical` slot are chosen independently.
+2. First Run downloads it automatically from the Hub to the resolved HF cache;
+   no token is needed for an ungated repo (`requires_auth=False`).
+3. If the repo id is NOT curated, adding it is a source change — one
+   `CuratedModel` row plus a `CURATED_CONTEXT_OVERRIDES` entry — under the
+   seven gates in `docs/LLM_PREFLIGHT_GUIDE.md`, plus a
+   `docs/model-license-<sanitized>.md` audit file in the same change.
+
+OPEN GAPS, recorded not repaired: the Qwen row is `WARN`, and
+`LLM_PREFLIGHT_GUIDE` Gate2 rules that a WARN row does not belong in the
+dropdown until soaked; the audit file `docs/model-license-qwen--qwen3.5-4b.md`
+required by the field contract does NOT exist yet (only the
+`model-license-audit-targets.txt` line was added); and the whole change is
+uncommitted. 8GB speed, VRAM, prose/JSON gates and any episode result for
+Qwen3.5-4B remain NOT TESTED. Gemma slow-writer throughput (~0.4 tok/s
+observed earlier) is the motivating symptom, not a measured Qwen comparison.
