@@ -1677,3 +1677,40 @@ while the same writer stage is healthy and unchanged.
 
 Private4060-overnight-20260905-234851.html stores3 timestamped event records
 and the screenshot/full accessibility tree, without replacing prior evidence.
+
+### Step31 -- 23:56 PDT, third dossier call completes and fourth begins
+
+Scheduled wake23:56:21.963. Same single Run23:04:44.645 and episode identity
+pending_20260905_230557. Third dossier call reaches256tokens/611.1s at
+23:50:36.485,320/763.2s at23:53:08.594 and ends366/870.1s at23:54:55.430.
+A fourth internal dossier attempt1/3 begins23:54:55.434 using the same cache.
+No new error, OOM,401, download or episode completion. No RESULT SUCCESS,
+obs_publish OK or final episode verified; no other-model trial started.
+
+One passive console screenshot/full accessibility tree capture agreed with
+the persisted-log tail; no activation, click, keypress or queue action.
+No manual sleep or active-run modification. Fresh fetch/pull was up to date.
+Private4060-overnight-20260905-235621.html preserves3 event records and one
+screenshot/full-tree capture. A bounded read-only source-window audit was
+requested to determine expected dossier call count; repeated helper labels
+alone are not evidence of a retry loop, and no intervention was made.
+
+Bounded source audit completed at00:02 PDT on September6: the finite window
+loop invokes a fresh _pass_dossier for every source window, resetting its
+attempt counter. The fourth attempt1/3 is consistent with the fourth source
+window, not retry/thrash evidence. Each digest caps at3600 characters,
+including repeated framing; body windows overlap239 characters and may
+rewind their cut to a sentence boundary, making stride variable. The pending
+ledger records9678 body characters but not the full source/framing or window
+coordinates. Exact total/remaining calls cannot be determined from that
+metadata; do not assume the fourth is last. Coverage receipts are assembled
+after the loop. No runtime interaction, model imports/calls or source edits
+were used for this audit; article/full-ledger content was not printed.
+
+Audit-tool friction: one read-only rg call used invalid Windows wildcard
+file arguments and returned os error123; directory plus -g corrected it,
+without runtime effect. Final persisted-log check at00:02 PDT shows fourth
+call heartbeats64tokens/154.4s at23:57:29.803 and128/313.6s at00:00:09.084,
+still0.4tok/s, with no new failure. Private evidence file verified253243bytes.
+No hand repair or tuning was attempted. Commit only this documentation;
+preserve the unrelated historical review-plan document and all JSONs.
