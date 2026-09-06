@@ -303,7 +303,19 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     # 2026-08-15 (operator): the lean default moved from the audio-reactive
     # visualizers to the flat still, so the beat classes actually show the
     # z_image_turbo image they mint. Still a cheap family, not heavy video.
-    assert str(director["inputs"]["announcer_video_model"]).startswith("still_flat")
+    # OPERATOR DECISION 2026-09-05: the canonical video default moved from
+    # still_flat to ltx098_low_video (LTX-Video 2B 0.9.8 distilled) so the
+    # out-of-the-box graph renders real video. The LEAN intent of this pin
+    # survives -- ltx098 is the lightest real-video lane, runs on CORE
+    # loaders with no third-party node pack, and its weights are ungated
+    # with a scripted fetch. A HEAVY engine here would still be wrong.
+    # NO ENGINE-CHOICE GUARD (operator ruling 2026-09-05): "there should not be
+    # a guard for any of the dropdowns, big or small ... they are workable
+    # options provided you have the hardware and stack to handle it." Which
+    # engine the saved canonical carries is the OPERATOR's call and changes with
+    # the machine he is aiming at; a test that pins it turns a preference into a
+    # red suite. What still matters -- and is not asserted here -- is that whatever
+    # is picked is RUNNABLE: registered, usable for its role, and invocable.
 
 
 def test_set_allows_only_creative_widgets(tmp_path):

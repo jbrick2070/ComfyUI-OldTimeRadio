@@ -86,7 +86,11 @@ def test_production_workflow_visual_structure_pinned():
     #                              out_suffix, crush, green_only, scopes, audio_bars]
     assert len(wv93) == 11, (
         "node 93 widgets_values must be 11 (caption widgets removed): %r" % wv93)
-    assert wv93[5] is False, "node 93 bypass must stay OFF"
+    # bypass (index 5) is NOT pinned. Operator ruling 2026-09-05: a saved widget
+    # value the operator chooses -- dropdown or toggle -- is not the suite's to
+    # guard; he turned the procgen blend OFF for the low-friction canonical, and
+    # a test asserting otherwise just turns a preference into a red suite. The
+    # STRUCTURE above (11 widgets, caption inputs gone) is what this pin is for.
     n93_input_names = [i.get("name") for i in n93["inputs"]]
     assert ("burn_captions" not in n93_input_names
             and "caption_style" not in n93_input_names), (
@@ -111,10 +115,12 @@ def test_production_workflow_visual_structure_pinned():
     # also made the visual half of a voice/portrait gender check impossible.
     # still_flat is a cheap_families engine, so the LEAN intent of this pin is
     # intact: heavy video stays a profile override, never a saved default.
-    assert wv87[0].startswith("still_flat"), (
-        "announcer_video_model regressed off the lean still default: %r" % wv87[0])
-    assert wv87[1].startswith("still_flat"), (
-        "music_video_model regressed off the lean still default: %r" % wv87[1])
+    # OPERATOR DECISION 2026-09-05: the canonical video default moved from
+    # still_flat to ltx098_low_video (LTX-Video 2B 0.9.8 distilled) so the
+    # out-of-the-box graph renders real video. The LEAN intent of this pin
+    # survives -- ltx098 is the lightest real-video lane, runs on CORE
+    # loaders with no third-party node pack, and its weights are ungated
+    # with a scripted fetch. A HEAVY engine here would still be wrong.
     # rip-sfx-broll (2026-07-01): widgets_values shrank 19 -> 15; clean-UI removals
     # (2026-07-03) dropped allow_auto_fallback (15->14), episode_duration_target
     # (14->13), then consolidated the legacy catch-all video slot -> character promoted to video
@@ -125,12 +131,15 @@ def test_production_workflow_visual_structure_pinned():
     # WAN 8GB launch contract (2026-07-24): OLD pin 14 -> NEW pin 15
     # (+max_render_frames=0 appended at index 14 -- 0 = UNPINNED, so the saved
     # canonical keeps today's behaviour and only a tier profile pins a ceiling).
+    # NO ENGINE-CHOICE GUARD (operator ruling 2026-09-05): "there should not be
+    # a guard for any of the dropdowns, big or small ... they are workable
+    # options provided you have the hardware and stack to handle it." Which
+    # engine the saved canonical carries is the OPERATOR's call and changes with
+    # the machine he is aiming at; a test that pins it turns a preference into a
+    # red suite. What still matters -- and is asserted below -- is that whatever
+    # is picked is RUNNABLE: registered, usable for its role, and invocable.
     assert len(wv87) == 15, wv87
     assert wv87[14] == 0, "canonical must ship the render ceiling UNPINNED"
-    assert wv87[2].startswith("still_flat"), (
-        "character_video_model must stay on the lean still lane: %r"
-        % wv87[2])
-    assert wv87[3:6] == ["z_image_turbo", "z_image_turbo", "z_image_turbo"]
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

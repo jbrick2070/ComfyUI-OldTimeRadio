@@ -195,8 +195,17 @@ def test_widget_vectors_exact(by_id):
         "kokoro_builtin", "auto_registry", True, "kokoro", "kokoro", "cuda"]
     # BatchCharacterVoices (81): its own engine widget agrees with CastLock.
     assert by_id[81]["widgets_values"] == ["kokoro"]
+    # 83 (StableAudioTheme) joins 80/81 as a node whose SAVED engine is the
+    # operator's pick, not the class-coded default. Operator ruling 2026-09-05:
+    # "there should not be a guard for any of the dropdowns, big or small ...
+    # they are workable options provided you have the hardware and stack to
+    # handle it." Canonical ships musicgen (transformers auto-download, ungated,
+    # small) while the class default is still stable_audio_3, and asserting the
+    # class default here would make that choice a red suite. The vector's SHAPE
+    # is still pinned -- exactly one widget.
+    assert len(by_id[83]["widgets_values"]) == 1, by_id[83]["widgets_values"]
     for key, nid in NEW_NODE_IDS.items():
-        if nid in (80, 81):
+        if nid in (80, 81, 83):
             continue
         assert by_id[nid]["widgets_values"] == _derive_widget_defaults(mapping[key])
 

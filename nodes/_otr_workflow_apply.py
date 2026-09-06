@@ -591,6 +591,18 @@ def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
     internal = resolve_engine_id(value)
     if internal not in _INTERNAL_TO_PUBLIC or not _vreg.is_registered(internal):
         return value
+    # NOT WIDENED, and the attempt is recorded so it is not retried blind.
+    # `_label_for` appends an aspect suffix to nineteen registered engines that
+    # are NOT in `_INTERNAL_TO_PUBLIC`, so profiles selecting them write a BARE
+    # id into the saved graph -- which is not a member of the live combo, and
+    # renders as an invalid dropdown on the ComfyUI canvas (all ten haunted
+    # variants carry one today). Widening this guard to label every registered
+    # engine DOES fix that, but it also relabels values that callers legitimately
+    # expect bare: it broke test_apply_8gb_lite_lands_its_overrides,
+    # test_apply_otr_cloud_lanes_lands_cloud_only_routes and three google/veo
+    # dry-run tests. The bare id is the contract for profile APPLICATION; the
+    # label is only needed for canvas DISPLAY, and the two want separating
+    # before this changes. Tracked rather than half-done.
     from .otr_video_director import exact_menu_option_for
     return exact_menu_option_for(internal)
 

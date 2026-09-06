@@ -1564,7 +1564,7 @@
         "Node name for S&R": "OTR_StableAudioTheme"
       },
       "widgets_values": [
-        "stable_audio_3"
+        "musicgen"
       ],
       "color": "#234035",
       "bgcolor": "#162821"
@@ -2140,9 +2140,9 @@
         "Node name for S&R": "OTR_VideoDirector"
       },
       "widgets_values": [
-        "still_flat (16:9)",
-        "still_flat (16:9)",
-        "still_flat (16:9)",
+        "ltx098_low_video (16:9)",
+        "ltx098_low_video (16:9)",
+        "ltx098_low_video (16:9)",
         "z_image_turbo",
         "z_image_turbo",
         "z_image_turbo",
@@ -2817,7 +2817,7 @@
         "screen",
         1,
         "ffmpeg",
-        false,
+        true,
         "_procgen_blended",
         18,
         true,

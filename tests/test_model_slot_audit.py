@@ -63,13 +63,16 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
         "announcer_voice": _widgets(_node(workflow, "OTR_AnnouncerVoice"))["engine"],
         "music": _widgets(_node(workflow, "OTR_StableAudioTheme"))["engine"],
     }
-    # Operator ruling 2026-09-01/02: kokoro voices BOTH slots on the one shipped
-    # graph (least-friction default; the cloning engines stay in the dropdowns).
-    assert audio_nodes == {
-        "char_voice": "kokoro",
-        "announcer_voice": "kokoro",
-        "music": "stable_audio_3",
-    }
+    # NO ENGINE-CHOICE PIN (operator ruling 2026-09-05): "there should not be a
+    # guard for any of the dropdowns, big or small ... they are workable options
+    # provided you have the hardware and stack to handle it." Which engine the
+    # saved graph carries is the operator's call and moves with the machine he
+    # is aiming at -- music went stable_audio_3 -> musicgen for the low-friction
+    # canonical, and pinning it here would have turned that into a red suite.
+    #
+    # WHAT IS STILL WORTH ASSERTING is that whatever is saved is RUNNABLE for
+    # the role it sits in. A dropdown may offer an engine this machine cannot
+    # feed; a SAVED one that no role can use is a broken graph, not a choice.
     for role, engine in audio_nodes.items():
         assert audio_engines.assert_usable(engine, role) == engine
 
@@ -87,14 +90,15 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
     # LEAN default (cheap_families), not a heavy video engine, so the
     # lean-canonical intent below is unchanged. The assert_usable / invocable
     # checks that follow are what prove the new picks are genuinely runnable.
-    expected_video = {
-        "announcer_visual": "still_flat",
-        "music_visual": "still_flat",
-        "character_video": "still_flat",
-    }
+    # NO ENGINE-CHOICE GUARD (operator ruling 2026-09-05): "there should not be
+    # a guard for any of the dropdowns, big or small ... they are workable
+    # options provided you have the hardware and stack to handle it." Which
+    # engine the saved canonical carries is the OPERATOR's call and changes with
+    # the machine he is aiming at; a test that pins it turns a preference into a
+    # red suite. What still matters -- and is asserted below -- is that whatever
+    # is picked is RUNNABLE: registered, usable for its role, and invocable.
     for role, widget in video_slots.items():
         engine = video_director._engine_id_from_pick(director[widget])
-        assert engine == expected_video[role]
         assert video_registry.assert_usable(engine, role) == engine
         assert getattr(video_registry.get_engine(engine), "invocable", True) is True
 
@@ -105,7 +109,6 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
     }
     for role, widget in image_slots.items():
         engine = director[widget]
-        assert engine == "z_image_turbo"
         assert image_registry.assert_usable(engine, role) == engine
 
 
