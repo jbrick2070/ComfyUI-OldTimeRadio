@@ -38,6 +38,7 @@ Why this exists (BUG-LOCAL-085):
 """
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -52,6 +53,11 @@ _REG_KEY = "Environment"
 _REG_HF_HOME = "HF_HOME"
 _DEFAULT_HF_HOME = r"C:\ComfyUI-Models\huggingface"
 _WEIGHT_SUFFIXES = (".safetensors", ".bin")
+# Twin of _otr_model_catalog._WEIGHT_INDEX_NAMES -- keep the two in step.
+_WEIGHT_INDEX_NAMES = (
+    "model.safetensors.index.json",
+    "pytorch_model.bin.index.json",
+)
 
 _CACHE: dict[str, str | None] = {"hf_home": None, "resolved": False}
 
@@ -145,8 +151,51 @@ def _model_id_to_cache_dirname(model_id: str) -> str:
     return "models--" + model_id.replace("/", "--")
 
 
+def _shards_named_by_index(snapshot_path: Path) -> set[str] | None:
+    """Shard filenames a sharded repo's index declares, or None if unsharded.
+
+    Empty set means an index exists but is unreadable -- treated as incomplete.
+    Deliberate twin of ``_otr_model_catalog._shards_named_by_index``; this
+    module stays importable on its own (it resolves HF_HOME before the catalog
+    is loaded), so the pair is duplicated rather than shared. Change both.
+    """
+    for index_name in _WEIGHT_INDEX_NAMES:
+        index_path = snapshot_path / index_name
+        try:
+            if not index_path.is_file():
+                continue
+            weight_map = json.loads(
+                index_path.read_text(encoding="utf-8")
+            ).get("weight_map")
+        except (OSError, ValueError, AttributeError):
+            return set()
+        if not isinstance(weight_map, dict) or not weight_map:
+            return set()
+        return {
+            str(name) for name in weight_map.values() if isinstance(name, str)
+        }
+    return None
+
+
 def _snapshot_has_weights(snapshot_path: Path) -> bool:
-    """Return True only for a snapshot with a materialized weight blob."""
+    """Return True only for a snapshot with a COMPLETE materialized weight set.
+
+    Shard completeness is part of the answer: returning True on the first
+    nonzero weight file reports a half-downloaded multi-shard repo as present,
+    which short-circuits the very download that would repair it. See the fuller
+    account in ``_otr_model_catalog._snapshot_has_weights``.
+    """
+    declared = _shards_named_by_index(snapshot_path)
+    if declared is not None:
+        if not declared:
+            return False
+        for shard_name in declared:
+            try:
+                if (snapshot_path / shard_name).stat().st_size <= 0:
+                    return False
+            except OSError:
+                return False
+        return True
     try:
         for child in snapshot_path.iterdir():
             if child.suffix.lower() not in _WEIGHT_SUFFIXES:

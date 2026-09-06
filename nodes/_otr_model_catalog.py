@@ -669,6 +669,13 @@ def _gguf_native_row_on_disk(repo_id: str) -> bool:
 # a metadata-only pull lands config.json with no weight symlink at all).
 _WEIGHT_SUFFIXES = (".safetensors", ".bin")
 
+# A SHARDED repo publishes one of these alongside its shards; its ``weight_map``
+# names every shard the load needs. See _snapshot_has_weights.
+_WEIGHT_INDEX_NAMES = (
+    "model.safetensors.index.json",
+    "pytorch_model.bin.index.json",
+)
+
 
 def _safe_snapshot_mtime(path: Path) -> float:
     try:
@@ -677,14 +684,66 @@ def _safe_snapshot_mtime(path: Path) -> float:
         return 0.0
 
 
+def _shards_named_by_index(snapshot_path: Path) -> set[str] | None:
+    """Shard filenames a sharded repo's index declares, or None if unsharded.
+
+    Returns an EMPTY set for an index that exists but cannot be read or names
+    nothing -- the caller treats that as incomplete (fail closed), because a
+    corrupt index is itself evidence of a half-finished pull.
+    """
+    for index_name in _WEIGHT_INDEX_NAMES:
+        index_path = snapshot_path / index_name
+        try:
+            if not index_path.is_file():
+                continue
+            import json as _json
+            weight_map = _json.loads(
+                index_path.read_text(encoding="utf-8")
+            ).get("weight_map")
+        except (OSError, ValueError, AttributeError):
+            return set()  # present but unreadable -> incomplete, fail closed
+        if not isinstance(weight_map, dict) or not weight_map:
+            return set()
+        return {
+            str(name) for name in weight_map.values() if isinstance(name, str)
+        }
+    return None
+
+
 def _snapshot_has_weights(snapshot_path: Path) -> bool:
-    """True iff `snapshot_path` holds at least one materialized weight blob.
+    """True iff `snapshot_path` holds a COMPLETE materialized weight set.
 
     Follows HF symlinks: a snapshot weight entry is a symlink into
     ``../../blobs/<sha>``; ``stat().st_size`` resolves through the link to
     the real blob size, so a present-but-unmaterialized (broken/absent)
     link never counts. Returns False on any read error -- fail closed.
+
+    SHARD COMPLETENESS IS PART OF "HAS WEIGHTS" (2026-09-06). The older rule
+    returned True on the FIRST nonzero weight file it found, which is wrong for
+    every multi-shard repo -- and the rows an 8 GB card must consider are
+    multi-shard (Qwen/Qwen3.5-4B is 9,319,828,096 bytes over two shards, well
+    past HF's 5 GB default shard size). A first download interrupted after
+    shard 1 lands -- an operator cancel, a dropped connection, a ComfyUI
+    restart, all of which happened during this campaign -- left one shard
+    materialized. That made ``on_disk`` True, which makes
+    ``auto_download_if_missing`` short-circuit the download, and ``load_llm``
+    has no network fallback: the repo would then fail to load on every
+    subsequent attempt with no way back except manually clearing the cache.
+    A partially downloaded model is NOT on disk, and saying so cost nothing
+    but a re-download.
     """
+    declared = _shards_named_by_index(snapshot_path)
+    if declared is not None:
+        if not declared:
+            return False  # index present but unusable -> incomplete
+        for shard_name in declared:
+            shard = snapshot_path / shard_name
+            try:
+                if shard.stat().st_size <= 0:  # follows symlink to the blob
+                    return False
+            except OSError:
+                return False  # missing / broken symlink -> shard not present
+        return True
     try:
         for child in snapshot_path.iterdir():
             if child.suffix.lower() not in _WEIGHT_SUFFIXES:
