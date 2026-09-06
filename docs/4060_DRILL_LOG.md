@@ -2235,3 +2235,23 @@ untracked review plan preserved. Continue healthy slow derivation unchanged.
 Private4060-overnight-20260906-020753.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260595bytes. Prior evidence
 intact. Documentation-only checkpoint; same renamed act remains active.
+
+### Step49 -- 2026-09-06 02:14 PDT, ShotLock reaches640 tokens
+
+Scheduled wake02:14:54.093. Same single GUI RunSeptember5 23:04:44.645;
+active episode signal_lost_the_frequency_of_friction_20260906_014652.
+Read-only persisted log:512tokens/1195.1s at02:09:21.539,576/1341.1s at
+02:11:47.498,640/1489.7s at02:14:16.127,still0.4tok/s. Same ShotLock
+derivation; no new runtime error, OOM,401, download or stage transition.
+No RESULT SUCCESS/obs_publish observed; existing procgen MP4 is intermediate,
+not final AI-visual acceptance. No additional model trial or queue.
+
+One passive screenshot remains background-only/full tree stale. No activation/
+input/recovery, Run, restart/cancel, installed/JSON/model/cache/dependency
+change, manual wait or hand tuning. Fresh fetch/pull already up to date;
+Step48 push6009595 was remote-verified. Historical review plan preserved.
+Healthy slow generation is not a reason to intervene or lower its budget.
+
+Private4060-overnight-20260906-021454.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260624bytes. Prior evidence
+intact. Documentation-only checkpoint; same full4060 act continues.
