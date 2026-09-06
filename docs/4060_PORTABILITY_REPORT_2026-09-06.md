@@ -469,3 +469,12 @@ No real model weights or CUDA were loaded by these diagnostics; no 8 GB fit,
 speed, physical 5080 or full episode PASS is claimed. One independent finished
 diff review is clean. No canonical JSON, dependency or registry change.
 Installed live requalification remains pending. See drill Step 94.
+
+September 6, 13:36 live update: source fix49ea213 is pushed and the installed
+loader byte-matches it. The sole normal-GUI retest started13:33:17.822 with E4B
+in both slots, one act/batch1. It passes strict native-text checkpoint coverage,
+loads nine CUDA NF4 modules, completes warmup in5.5s and produces a64-token
+heartbeat at0.5tok/s. The former meta/CUDA failure is not recurring so far.
+CPU offloading is slow; no complete story or episode qualification yet.
+No settings, downloads, hand model steps or extra Runs were added. This remains
+a hand-patched development trial, not a clean-install PASS. See Step95.

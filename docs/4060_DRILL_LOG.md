@@ -3836,3 +3836,46 @@ Source/tests must be committed/pushed, installed with fresh off-state checks,
 and qualified by one normal GUI act. Current campaign remains hand-patched
 development, not a clean-install PASS. Private bridge script/full output,
 review roster, scoped source diff and regression receipts are retained.
+
+### Step 95 — September 6, 13:30–13:36 PDT: installed E4B fix starts generating
+
+Source/tests/docs commit 49ea213 was pushed and actual remote HEAD matched at
+13:30:02. Only the unrelated untracked review-plan document remains outside the
+commit. Fresh off-state checks at 13:30:39 find zero Comfy processes/listeners;
+installed loader matches its pre-fix source blob and all ancestors are ordinary,
+non-reparse paths. The reviewed loader hunk alone was applied to the installed
+plugin; exact byte equality to AST-tested DEV, nonempty/no-BOM verified13:31:07.
+No dependency, model/cache, credentials, JSON, node-pack or registry change.
+
+Normal UI sequence, all captured privately: launch pre-existing Comfy Desktop
+13:31:16.763; observe dashboard13:31:28.333; click existing instance13:31:40.204;
+passively observe loaded workflow13:32:19.821. Boot started13:31:43.616 and all
+25 OTR nodes loaded13:31:57.046. Existing unrelated node-pack/optional dependency
+warnings were logged, not acted on. No new node pack was required by this graph.
+E4B/E4B, act_count=1 and batch=1 persisted from the prior UI selection.
+
+A read-only one-second NVIDIA sampler started13:32:48.171 before Run. Fresh
+UI observation13:33:05.586 verifies both E4B slots, act1, batch1, zero active.
+The SOLE repaired-trial Run click was13:33:17.822; prompt received13:33:17.909.
+Canonical validator passes23nodes/61links, five existing visual assets READY.
+Writer independently confirms both E4B slots and one act. The automatic source
+roll now uses original_llm, not the previous failed Shakespeare draw; this is
+not a controlled narrative comparison. Episode pending_20260906_133318.
+This cached retest requires no new weight download or model-file hand step.
+
+Live native-text checkpoint coverage is OK at13:33:23. Runtime NF4 tripwire:
+9 Linear4bit modules, is_loaded_in_4bit=True, materialized_on_cuda=True.
+Recorded explicit map places the main embedding, tied head and first decoder
+layer on GPU0; layers1–41 and the large per-layer embedding are offloaded to CPU.
+This is the loader's map, not an independent live tensor interrogation.
+Actual one-token warmup completes13:33:29.426 in5.5s, passing the former failure
+point. At13:35:30.785 the first concept generation heartbeat reports64tokens,
+0.5tok/s,121.3s. Slow offloading is confirmed progress, not a stall.
+
+Passive GUI observations13:33:47.570 and13:36:27 retain exactly one active
+writer; no input after Run. Initial100 sampler rows through13:34:28 show sampled
+maximum6911MiB, not per-process/full-run/guaranteed peak or8GB qualification.
+Sampler continues. Full boot/runtime/log, timestamps, all seven captured GUI
+states, install proof and raw sampled rows are private. No terminal OOM/401,
+completed story, media, credits, publication or full PASS yet. Leave this one
+trial running; do not patch the installed loader or queue another act.

@@ -11756,3 +11756,12 @@ planning keeps the main input embedding on CUDA and per-layer embeddings on
 CPU, without CUDA initialization or real weight-body loading. One independent
 finished-diff review clean. Production/live status remains OPEN pending the
 next installed one-act GUI trial; this is not a confirmed 8 GB runtime fix.
+
+### PBUG-20260906-06 installed retest — September 6, 13:36 PDT
+
+49ea213 is pushed, installed and byte-verified. Sole one-act E4B GUI retest
+13:33:17.822 passes strict text-weight coverage and CUDA NF4 materialization,
+then warmup completes in5.5s. First main-generation heartbeat13:35:30.785:
+64tokens,0.5tok/s. The original failure point has been passed with real model
+weights; whole-story/episode/8GB qualification is still OPEN. No second Run,
+mid-flight patch, dependency/canonical change or hand model/cache repair.
