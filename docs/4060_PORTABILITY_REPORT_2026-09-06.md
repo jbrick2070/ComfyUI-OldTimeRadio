@@ -141,3 +141,16 @@ The installed copy is stillalpha.24 without the candidate's new modules;
 restart did not apply the correction. GUI visibility is no longer the blocker,
 but normal candidate publication/installation remains pending. No act was
 requeued; see drillStep61 and the fresh-boot screenshot/audit records.
+
+At04:41PDT the user changed delivery order: get the local workflow working,
+push fixes to Git, and update the registry at the end. The reviewed three-file
+asset-readiness correction was explicitly applied to installed alpha.24 as a
+development HAND STEP. Exact installed/source hashes match;78 focused offline
+tests pass again. Canonical JSON/model choices are unchanged. This does not
+qualify the clean-install path or prove visual GPU capacity.
+
+GUI restart is paused at Desktop's Stop confirmation (unsaved-work warning);
+the final Stop and Run have not been clicked. No new model downloads, version
+bump or registry publication occurred. See drillStep62. Next action requires
+confirmation of that warning, followed by GUI restart and one-act development
+test. Registry clean-install qualification remains a separate final gate.

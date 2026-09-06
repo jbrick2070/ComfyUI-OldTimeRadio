@@ -2711,3 +2711,45 @@ plan present before these log edits. Candidate remains source-only; original
 and diagnostic FAIL unchanged. GUI blocker is resolved; normal publication/
 installation is the remaining gate. Await explicit release/install direction,
 do not silently patch custom_nodes or spend another act on unchanged alpha.24.
+
+### Step62 -- 2026-09-06 04:35–04:42 PDT, user defers registry; local development patch
+
+User explicitly authorizes canonical fixes and Git pushes, then directs registry
+publication to the END, after getting the workflow working. This supersedes the
+Step61 release-first gate. No pyproject/version/tag/registry write occurred.
+Read-only Git fetch/pull04:35:39 was already up to date at26ac5ff. GitHub's latest
+visible publish run34012505244 was alpha.24/success, not this source candidate.
+
+04:41:33 applied the reviewed candidate locally with apply_patch: two new Python
+helpers and narrow validator changes, identical to committed source2f67fc4.
+This is an explicit HAND STEP in a DEVELOPMENT diagnostic, never a clean-install
+pass. No model copying, cache seeding, path repair, extra pack or workflow edit.
+Installed package version remains alpha.24 plus recorded development patches.
+All three installed SHA256 values match DEV; all three parse successfully with
+the installed Python using AST only. No model imports or downloads in that check.
+Canonical JSON/model choices unchanged. Exact hashes and UI events are retained
+in the private asset-trial audit. Existing writer NF4 patch remains in place.
+
+04:41 screenshot shows0active, act_count1, both Gemma4-12B slots, LTX098-low16:9
+and ZImageTurbo roles. The previously unobservable Desktop menu is now visible.
+Clicked Open Dashboard once at04:41:56 to locate the existing-instance restart;
+immediate canvas capture unchanged, so inventory follows before further input.
+No Run has been clicked at this checkpoint. Registry work remains deferred.
+
+04:42:15 dashboard screenshot shows existing ComfyUI Running/Stablev0.34.5.
+04:42:20.744 clicked its More actions37;04:42:26.562 clicked visible Stop
+at screenshot626,709. Immediate capture still showed the menu; did not retry.
+04:42:34.746 fresh observation showed the confirmation, verbatim:
+"This will stop ComfyUI. Any unsaved work will be lost. The window stays open
+so you can relaunch anytime." Final Stop NOT clicked. Computer-use skill
+requires confirmation for this warning; paused for user approval. No process
+control workaround, hidden command/API, model provisioning or new Run.
+
+At04:42–04:43 reran the installed Python's focused offline unittest commands:
+71 visual tests in0.262s and7 NF4 tests in0.004s, bothOK. No model/network/GPU
+calls. Independent read-only audit found no new installed Comfy/Hub API issue.
+Private4060-asset-trial-20260906-0441.html retains11 chronological events and
+6 screenshots; exact operational errors are in4060-asset-trial-audit-20260906.md.
+Archive first apply_patch failed on an unprefixed embedded accessibility line;
+correctly line-prefixed retry succeeded. No explicit sleep call in this segment.
+78 testPASS is not a one-act result. Prior strict/diagnostic failures unchanged.
