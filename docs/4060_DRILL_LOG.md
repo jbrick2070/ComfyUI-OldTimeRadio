@@ -2041,3 +2041,49 @@ untracked review plan preserved. Actual progress comes from read-only log.
 Private4060-overnight-20260906-012453.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260590bytes. Prior evidence
 intact. Documentation-only checkpoint; same single act remains untouched.
+
+### Step44 -- 2026-09-06 01:31 PDT, produced summary complete; ledger clean underway
+
+Scheduled wake01:31:53.419. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Produced-story summary finishes106tokens/256.7s
+at01:26:58.020. At01:26:58.027 the app again warns verbatim:
+`You shouldn't move a model that is dispatched using accelerate hooks.`
+ledger_clean_act_summary attempt1/2 starts01:26:58.941 and automatically
+reloads the same Gemma12B snapshot. NF4 CPU-dispatch refusal/retry occurs
+01:27:03.399; full refusal text retained privately. Weights677/677 complete
+01:27:09.117 in5s; expected offload-meta notice01:27:09.228; warmup19.7s
+completes01:27:28.906. Act summary produces22tokens/59.3s at01:28:28.242.
+This is app-managed reload/work, not an agent resubmission or new download.
+
+Line-judge attempt1/2 begins01:28:28.260, finishes55tokens/129.8s at
+01:30:38.038. At01:30:38.045 the app reports verbatim:
+`[ledger_clean] dropped 1 judge finding(s) that were not usable for this line: 'ANNOUNCER:' (not in this line)`
+Next line-judge attempt1/2 starts01:30:38.047, finishes21tokens/50.4s at
+01:31:28.411; another starts01:31:28.421. Reuses creative cache;0.4tok/s.
+The dropped unusable finding is an app guard action, not a manual repair.
+Bounded read-only source/metadata lookup requested for finite line scope and
+per-line retry numbering; do not assume repeated labels mean failed retries.
+
+No terminal runtime failure, OOM,401, requested extra pack, download or
+matching RESULT SUCCESS/obs_publish OK/final episode verified. Same single
+act remains active; other-model campaign idle. One passive screenshot remains
+background-only/full tree stale. No GUI activation/input, Run, restart/cancel,
+installed/JSON/model/cache/dependency change, manual wait or hand tuning.
+Fresh fetch/pull already up to date; Step43 pushd9c3797 was remote-verified.
+Historical untracked review-plan document preserved.
+
+Bounded metadata/source audit:16 of18 saved rows satisfy cleaner's voiced,
+non-skipped,nonempty predicate;0 protected fact-component rows. With shipped
+one-vote/whole-line settings and attribution judging disabled,16 base line
+judge checks are expected. Each invokes a fresh structured call with at most
+2 attempts, so attempt1/2 resets per line. Repairs/rechecks may add calls;
+the generic label does not prove which row is currently being judged.
+Terminal voiced-row verdict plus subsequently saved meta.ledger_clean counts,
+repair outcomes and context_verified establish this stage's completion.
+Receipt is currently absent, as expected during the loop; no completion claim.
+No full script/article/ledger printed and no runtime interaction in the audit.
+
+Private4060-overnight-20260906-013153.html preserves5 timestamped events,
+one background screenshot/full stale tree, exact reload/guard messages and
+bounded audit findings, verified267610bytes. Prior evidence intact. Only drill
+documentation changes; existing one-act runtime and canonical JSON stay fixed.
