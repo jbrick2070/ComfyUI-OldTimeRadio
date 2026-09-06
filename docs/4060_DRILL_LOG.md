@@ -4360,3 +4360,63 @@ must fail LOUDLY, never silently fall back to the composite.
 
 A design panel is reviewing this before any code is written. Evidence:
 `otr_runtime-e2b-retest-20260906-1434.log`.
+
+### Step 107 — September 6, ~15:15 PDT: offline evidence that the text-only fix applies to E2B unchanged
+
+Read-only probes of the CACHED weights and configs. No load, no CUDA, no
+download, no Comfy running. These convert the Step106 fix direction from a
+plausible design into a measured one.
+
+CONFIG SHAPES. `_e4b_text_offload_config` requires `model_type == "gemma4"`,
+`text_config.model_type == "gemma4_text"` and tied embeddings on both. Read from
+each cached `config.json`:
+
+```
+gemma-4-E2B-it    model_type=gemma4          text_config=gemma4_text          tie=True/True
+gemma-4-E4B-it    model_type=gemma4          text_config=gemma4_text          tie=True/True
+gemma-4-12b-it    model_type=gemma4_unified  text_config=gemma4_unified_text  tie=True/True
+```
+
+E2B and E4B are IDENTICAL on every field the helper checks, so the helper would
+accept E2B today with no change to its precondition. It is misnamed, not
+model-specific. 12B differs and the helper correctly rejects it -- which is the
+real reason the 2026-09-06 author scoped the call, but the scope was expressed as
+an exact id string when the code already had a precise CONFIG-SHAPE test for it.
+
+CHECKPOINT KEY PREFIXES, read from the safetensors headers (header only; no
+tensor bodies were read):
+
+```
+gemma-4-E2B-it   2011 tensors:  audio_tower 751 | vision_tower 658 |
+                                language_model 600 | embed_audio 1 | embed_vision 1
+gemma-4-E4B-it   2130 tensors:  audio_tower 751 | vision_tower 658 |
+                                language_model 719 | embed_audio 1 | embed_vision 1
+```
+
+**1,410 of E2B's 2,011 tensors -- 70% -- are audio and vision towers the writer
+never executes.** Only 600 are the text decoder. The existing anchored mapping
+`{r"^model\.language_model\.": "model."}` therefore applies to E2B exactly as to
+E4B, and the four multimodal prefixes `_validate_e4b_text_loading_info` already
+permits as unexplained extras (`model.audio_tower.`, `model.vision_tower.`,
+`model.embed_audio.`, `model.embed_vision.`) are precisely E2B's remaining keys.
+
+CONCLUSION. Two independent things block E2B, and only both together explain it:
+the exact-id check at `_otr_model_loader.py:1141`, AND the fact that the native
+text path exists only inside a retry E2B never enters (Step106). A fix that
+addresses one and not the other changes nothing.
+
+QWEN CROSS-CHECK, from the Hub rather than disk (metadata only, anonymous):
+`Qwen/Qwen3.5-4B` publishes `model.safetensors-00001-of-00002.safetensors`
+(5,329,398,688 bytes), `model.safetensors-00002-of-00002.safetensors`
+(3,990,429,408) and `model.safetensors.index.json`. It IS sharded, which
+independently justifies the shard-completeness fix pushed this session -- a
+partial pull of that repo would have reported on-disk and poisoned the cache.
+
+Its published `chat_template.jinja` was also read directly. The generation tail
+is `{%- if enable_thinking is defined and enable_thinking is false %}` ->
+closed `<think>\n\n</think>` envelope, `{%- else %}` -> OPEN `<think>`. So the
+kwarg IS honored (the preflight's "silently dropped" concern is REFUTED for this
+model), the template is a THINKING template rather than the "non-thinking" one
+the row's note claimed, and omitting the kwarg anywhere forces reasoning. The
+row note is corrected and the wiring is now pinned by
+`tests/test_chat_template_kwargs_wired.py`.
