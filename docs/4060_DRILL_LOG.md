@@ -2753,3 +2753,66 @@ Private4060-asset-trial-20260906-0441.html retains11 chronological events and
 Archive first apply_patch failed on an unprefixed embedded accessibility line;
 correctly line-prefixed retry succeeded. No explicit sleep call in this segment.
 78 testPASS is not a one-act result. Prior strict/diagnostic failures unchanged.
+
+### Step63 -- 2026-09-06 04:47–04:53 PDT, approved restart; new one-act trial active
+
+User explicitly approves Stop/restart and continued autonomous work. Computer
+Use confirms Stop53 at04:47:54.869;04:48:10 shows instance no longer Running.
+Clicks existing instance34 at04:48:16.818. Fresh boot04:48:18.873; all25 OTR
+nodes successfully loaded04:48:27.937; server04:48:28.164. Physical RTX4060
+Laptop8188MB confirmed again. No shell process-control or hidden run API.
+
+Requested20s startup wait measured11.3185s, interrupted by audit message.
+04:48:54 passive main capture was occluding dashboard; one activation04:49:01
+restored canvas. Restart reset zoom19percent. Wheel-600 at220,380 yielded21;
+Zoom Controls98 opened percentage editor. UIA set_value failed verbatim:
+`read UIA value read-only state: Requested property was not in the CacheRequest (0x80070057)`.
+Reobserved, clicked editor131, Ctrl+A, typed77, Enter, closed popup and clicked
+minimap802,739. This is view-only navigation, NOT workflow/model editing.
+04:50:27 screenshot verifies act_count1 and both Gemma4-12B writer slots.
+
+EXACT active-trial receipt: Run81 clicked once04:50:36.149; persisted console
+`got prompt`04:50:36.227. No extra Run. Validator04:50:36.308:23nodes61links,
+widget_vector_drift=0, then real automatic visual-weight readiness BEFORE
+writer execution. Main GUI shows1active/Workflow Validator0percent. No episode
+identifier yet: writer has not started. Do not confuse this with Sep5 trials.
+
+Pinned anonymous metadata produced the five-file plan by04:50:37.294:
+
+| Default asset | Planned bytes |
+| --- | ---: |
+| z_image_turbo_bf16.safetensors | 12,309,866,400 |
+| qwen_3_4b.safetensors | 8,044,982,048 |
+| ae.safetensors | 335,304,388 |
+| ltxv-2b-0.9.8-distilled.safetensors | 6,340,744,492 |
+| t5xxl_fp16.safetensors | 9,787,841,024 |
+| Total | 36,818,738,352 |
+
+Exact pinned revisions/content hashes/progress retained privately. First ZImage
+transfer begins04:50:37.295 and advances; completion not yet claimed. No packs,
+precision change, manual downloads, cache seeding or model/path substitutions.
+Free disk before download: C580,079,497,216bytes. Hub warns requests are
+unauthenticated; did not acquire a token. Existing ambient writer authentication
+and pre-existing extra packs mean this remains a DEVELOPMENT diagnostic.
+
+04:51:08 Toggle Bottom Panel66;04:51:19 LOGS visibly shows byte progress.
+04:51:28 Open logs in new window156; new returned log window6293130. Never
+opened/typed TERMINAL. Queue remains0percent while bytes advance: new UX
+friction, not evidence of a stalled transfer. Separate Comfy Logs includes old
+history, so attribute errors by current persisted boot/run timestamps. Full
+tree output was presentation-truncated; archive retains the available full tree.
+
+Private4060-asset-run-20260906-0450.html records40events/22screenshots; audit
+contains exact current log snapshot and action/error/wait chronology. No
+installed/source change during this active trial; canonical settings unchanged.
+Observe only while active. Original strict and earlier diagnostic FAIL stand;
+no RESULT SUCCESS/obs_publish/final file yet. Registry remains deferred.
+
+04:53 restored existing five-minute heartbeat4060-overnight-otr-trials toACTIVE,
+replacing obsolete Sep5 trial/window assumptions with this exact04:50:36 run.
+No duplicate monitor. It observes only while running and preserves OOM/401/
+no-extra-pack boundaries; source fixes/Git pushes remain authorized and registry
+is deferred until final work. Quiet on unchanged state. Latest04:53:28 progress:
+9,099,542,528/12,309,866,400bytes at171.1s for firstfile; no failure/READY yet.
+Archive verified3,040,904bytes,40events22screenshots. Historical review plan
+remains untracked/excluded; raw private evidence will not be pushed publicly.

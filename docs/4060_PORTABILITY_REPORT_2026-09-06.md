@@ -154,3 +154,16 @@ the final Stop and Run have not been clicked. No new model downloads, version
 bump or registry publication occurred. See drillStep62. Next action requires
 confirmation of that warning, followed by GUI restart and one-act development
 test. Registry clean-install qualification remains a separate final gate.
+
+At04:47 the user approved the Stop warning. The existing instance restarted,
+loaded all25 nodes, and the one-act GUI run was submitted exactly once at
+04:50:36.149PDT. The reviewed preflight is now executing for real: it obtained
+anonymous pinned metadata for five missing visual weights (36,818,738,352
+bytes total) and began automatic transfers before writing. No model/JSON change
+or new pack accompanied the run. This demonstrates the previously missing
+pre-writer asset path has started, not that downloads/render/publish succeeded.
+
+The queue stays at0percent during transfer; actual bytes/progress are visible
+under Toggle Bottom Panel > LOGS and the separate Logs window. Log this UI
+friction for the onboarding guide. Active run remains under observation;
+earlier failed trials and clean-install qualification limits are unchanged.
