@@ -2619,6 +2619,31 @@ def _ghost_unload_writer(warnings):
             "writer weights")
 
 
+def _ghost_replayed_signatures(replayed, specs, *, style, meta):
+    """The finalized prompts of the rows replay already decided.
+
+    Every beat replay settled is a picture the viewer will see, so a freshly
+    authored beat may not land on it. The stored object carries `mode`,
+    `motif_cue` and `drawable_beat`; `role` comes from the spec for that
+    `beat_id`, which is why the specs are passed in rather than guessed.
+
+    Replay CONTRIBUTES ONLY. A stored artifact is never re-judged here -- it
+    was validated on admission and a frozen row is not this function's to
+    reject.
+    """
+    _gsa, _gsp = _ghost_modules()
+    role_for = {spec["beat_id"]: spec.get("role") for spec in (specs or ())}
+    out = []
+    for beat_id, obj in (replayed or {}).items():
+        sig = _gsa.ghost_prompt_signature(
+            role=role_for.get(beat_id), style=style, mode=obj.get("mode"),
+            motif_cue=obj.get("motif_cue"),
+            drawable_beat=obj.get("drawable_beat"), ledger_meta=meta)
+        if sig:
+            out.append(sig)
+    return out
+
+
 def _ghost_validate_batch(leaves, specs, style, meta, names,
                           already_used=()):
     """Raise unless EVERY leaf in the batch is acceptable.
@@ -2628,13 +2653,19 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
     each row happened to take, which is neither reproducible nor auditable.
     """
     _gsa, _gsp = _ghost_modules()
-    # SEEDED WITH THE REPLAYED LEAVES. Uniqueness is a property of the EPISODE
-    # the viewer watches. The deterministic path was given `already_used` and
-    # the authored path was not, so a freshly written leaf could duplicate a
-    # replayed one and nothing would notice. Case-folded so both paths agree on
-    # what "the same" means.
-    seen = {str(leaf).casefold(): "a replayed row"
-            for leaf in (already_used or ())}
+    # SEEDED WITH THE REPLAYED SIGNATURES. Uniqueness is a property of the
+    # EPISODE the viewer watches. The deterministic path was given
+    # `already_used` and the authored path was not, so a freshly written leaf
+    # could duplicate a replayed one and nothing would notice.
+    #
+    # THE KEY IS THE FINALIZED PROMPT, NOT THE LEAF (2026-09-05). Four slots
+    # make the picture and the leaf is one of them, so two beats sharing a leaf
+    # under DIFFERENT motifs render different frames. Keying on the leaf
+    # rejected them anyway: a forced-lane leg was rejected on both attempts and
+    # lost all 18 authored prompts to deterministic clauses. Capacity is now
+    # clauses x motifs. Signatures are already case-folded by construction.
+    seen = {str(sig): "a replayed row"
+            for sig in (already_used or ()) if str(sig)}
     for spec in specs:
         leaf = leaves.get(spec["id"], "")
         ok, reason = _gsa.validate_drawable_beat(
@@ -2642,12 +2673,18 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
         if not ok:
             raise _gsa.GhostAuthorValidationError(
                 "leaf for %s rejected (%s): %r" % (spec["id"], reason, leaf))
-        key = leaf.casefold()
-        if key in seen:
+        key = _gsa.ghost_prompt_signature(
+            role=spec["role"], style=style, mode=spec["mode"],
+            motif_cue=spec["motif_cue"], drawable_beat=leaf, ledger_meta=meta)
+        # An uncomputable signature is not a duplicate of anything; the fit
+        # check below reports the real composition error.
+        if key and key in seen:
             raise _gsa.GhostAuthorValidationError(
-                "leaf for %s repeats the one written for %s: %r"
+                "the prompt for %s finalizes to the one already used for %s "
+                "(same motif AND same leaf): %r"
                 % (spec["id"], seen[key], leaf))
-        seen[key] = spec["id"]
+        if key:
+            seen[key] = spec["id"]
         fits, why = _gsa.candidate_fits(
             role=spec["role"], style=style, mode=spec["mode"],
             motif_cue=spec["motif_cue"], drawable_beat=leaf, ledger_meta=meta)
@@ -2668,6 +2705,7 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
     _gsa, _gsp = _ghost_modules()
     if gen is None:
         return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
+                                         style=style, ledger_meta=meta,
                                          already_used=already_used),
                 "deterministic_fallback", "no writer model configured")
 
@@ -2715,6 +2753,7 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
                         "informed retry")
         return leaves, "writer_llm", ""
     return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
+                                     style=style, ledger_meta=meta,
                                      already_used=already_used),
             "deterministic_fallback", reason)
 
@@ -2872,7 +2911,8 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
                 # EVERY leaf already decided by replay, so a fallback cannot
                 # collide with one. Uniqueness is a property of the EPISODE the
                 # viewer watches, not of whichever subset this call authored.
-                already_used=[obj["drawable_beat"] for obj in out.values()])
+                already_used=_ghost_replayed_signatures(
+                    out, specs, style=style, meta=meta))
         finally:
             _ghost_unload_writer(warnings)
         for spec in needs:

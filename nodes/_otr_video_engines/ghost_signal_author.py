@@ -1134,21 +1134,44 @@ def _bookend_phase(beat_id, ordinal, total) -> str:
     return "opening" if int(ordinal) * 2 < int(total or 1) else "closing"
 
 
-def deterministic_leaf(spec, *, episode_seed, used=(), total=0) -> str:
+def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
+                       used=(), total=0) -> str:
     """One complete checked-in clause for a spec, unique within the batch.
 
     Deterministic collision PROBING rather than modulo-and-hope: two beats in
     the same mode would otherwise land on the same clause about one time in
     six, and an episode that says the same sentence twice is exactly the
     repetition this sprint exists to remove.
+
+    ``used`` CARRIES SIGNATURES, NOT LEAVES (2026-09-05). Two beats may share a
+    leaf when their motifs differ, because the picture is made of four slots and
+    the leaf is one of them -- see `ghost_prompt_signature`. Deduping on the
+    leaf rejected beats that render differently and cost a whole leg its
+    authored prompts. ``style`` and ``ledger_meta`` are required because a
+    signature cannot be computed without them.
     """
     mode = str(spec.get("mode") or "")
     role = normalize_role(spec.get("role"))
     ordinal = int(spec.get("ordinal") or 0)
+    lowered = {str(u) for u in used if str(u)}
+
+    def _signature(candidate):
+        return ghost_prompt_signature(
+            role=spec.get("role"), style=style, mode=mode,
+            motif_cue=spec.get("motif_cue"), drawable_beat=candidate,
+            ledger_meta=ledger_meta)
+
+    def _free(candidate):
+        # An uncomputable signature has no opinion -- the candidate is taken as
+        # unique and the fit check reports the real error. Silently skipping it
+        # here would spend the pool on a composer defect.
+        sig = _signature(candidate)
+        return (not sig) or sig not in lowered
+
     if role != "character_video":
         phase = _bookend_phase(spec.get("beat_id"), ordinal, total)
         candidate = GHOST_FALLBACK_BOOKENDS.get((phase, mode), "")
-        if candidate and candidate not in used:
+        if candidate and _free(candidate):
             return candidate
     pool = GHOST_FALLBACK_CLAUSES.get(mode) or ()
     if not pool:
@@ -1156,34 +1179,40 @@ def deterministic_leaf(spec, *, episode_seed, used=(), total=0) -> str:
             "no deterministic Ghost clause pool for mode %r" % (mode,))
     start = _hash_int(episode_seed, spec.get("beat_id"), mode,
                       GHOST_AUTHOR_VERSION) % len(pool)
-    lowered = {str(u).casefold() for u in used}
     for step in range(len(pool)):
         candidate = pool[(start + step) % len(pool)]
-        if candidate.casefold() not in lowered:
+        if _free(candidate):
             return candidate
     raise GhostAuthorError(
-        "the %s fallback pool is exhausted: %d clauses, all already used in "
-        "this episode. The authored path forbids duplicate leaves, so the "
-        "deterministic path may not quietly ship one -- widen the pool."
-        % (mode, len(pool)))
+        "the %s fallback pool is exhausted: %d clauses, every one of which "
+        "finalizes to a prompt already used in this episode. The authored path "
+        "forbids duplicate prompts, so the deterministic path may not quietly "
+        "ship one -- widen the pool." % (mode, len(pool)))
 
 
-def deterministic_batch(specs, *, episode_seed, already_used=()) -> dict:
+def deterministic_batch(specs, *, episode_seed, style, ledger_meta,
+                        already_used=()) -> dict:
     """``{opaque_id: leaf}`` -- a complete batch, never a partial salvage.
 
-    ``already_used`` carries leaves decided elsewhere in the SAME episode --
+    ``already_used`` carries SIGNATURES decided elsewhere in the SAME episode --
     replayed rows, typically. Without it a mixed episode could hand two beats
-    the same checked-in clause, because each call would probe for collisions
-    only against its own subset, and an episode that says the same sentence
-    twice is the repetition this sprint exists to remove.
+    the same picture, because each call would probe for collisions only against
+    its own subset, and an episode that shows the same frame twice is the
+    repetition this sprint exists to remove.
     """
     out = {}
-    used = [str(leaf) for leaf in (already_used or ())]
+    used = [str(sig) for sig in (already_used or ()) if str(sig)]
     total = len(specs or ())
     for spec in specs or ():
-        leaf = deterministic_leaf(spec, episode_seed=episode_seed,
-                                  used=used, total=total)
-        used.append(leaf)
+        leaf = deterministic_leaf(spec, episode_seed=episode_seed, style=style,
+                                  ledger_meta=ledger_meta, used=used,
+                                  total=total)
+        sig = ghost_prompt_signature(
+            role=spec.get("role"), style=style, mode=spec.get("mode"),
+            motif_cue=spec.get("motif_cue"), drawable_beat=leaf,
+            ledger_meta=ledger_meta)
+        if sig:
+            used.append(sig)
         out[spec["id"]] = leaf
     return out
 
@@ -1881,6 +1910,58 @@ def _banana_module():
     except ImportError:  # pragma: no cover -- flat test imports
         import _otr_banana_route as _br  # type: ignore
     return _br
+
+
+def ghost_prompt_signature(*, role, style, mode, motif_cue, drawable_beat,
+                           ledger_meta=None, banana_enabled=None) -> str:
+    """The uniqueness key for one Ghost v2 beat: its FINALIZED positive prompt.
+
+    WHY THE LEAF WAS THE WRONG KEY (the 2026-09-05 defect). Four slots make the
+    picture -- style cue, motif, leaf and mode law -- and the duplicate check
+    read only the leaf (`key = leaf.casefold()`, `otr_shot_lock.py`). Two beats
+    carrying the same leaf under DIFFERENT motifs render different pictures and
+    were rejected anyway, so a forced-lane leg lost all 18 authored prompts to
+    deterministic clauses on both attempts. Growing the pool could not fix a
+    check that was looking at a quarter of the frame.
+
+    This keys on what actually reaches the sampler, so capacity becomes clauses
+    x motifs instead of clauses.
+
+    IT MUST AGREE WITH `finalize_ghost_prompt_v2` BYTE FOR BYTE, which is why it
+    repeats that function's banana call verbatim -- same `variety_key`, same
+    gate, same `shield_quoted_card_text=False` -- rather than approximating it.
+    A cheap key that disagreed with the real prompt would admit a true duplicate
+    or reject a distinct one, and either way the disagreement would only show up
+    on a GPU leg.
+
+    It skips what finalize does that CANNOT change the string: the protected
+    component check, the character ceiling and the tokenizer. Those decide
+    whether a candidate FITS, which is `candidate_fits`'s question, not this
+    one's.
+
+    Returns "" when the candidate cannot be composed at all. An empty signature
+    is never equal to another empty one for dedupe purposes -- the caller treats
+    it as "no opinion" and lets the fit check produce the real error.
+    """
+    try:
+        composed = _gsp.compose_ghost_prompt_v2(
+            role=role, style=style, mode=mode, motif_cue=motif_cue,
+            drawable_beat=drawable_beat)
+        positive = str(composed["positive"])
+        meta = ledger_meta if isinstance(ledger_meta, dict) else {}
+        banana = _banana_module()
+        variety_key = str(meta.get("freeze_timestamp") or "")
+        gate_on = (banana.banana_gate(meta, lane="video")
+                   if banana_enabled is None else bool(banana_enabled))
+        if gate_on:
+            positive = banana.apply(
+                positive, variety_key=variety_key,
+                shield_quoted_card_text=False).text
+        return positive.casefold()
+    except Exception:
+        # Composition failures are the fit check's to report, with its own
+        # message. A signature that cannot be computed simply has no opinion.
+        return ""
 
 
 def finalize_ghost_prompt_v2(*, role, style, mode, motif_cue, drawable_beat,

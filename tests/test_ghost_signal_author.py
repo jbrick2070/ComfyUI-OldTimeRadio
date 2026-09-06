@@ -514,22 +514,51 @@ def _timeline_specs(seed=1013426535):
     return gsa.build_ghost_author_specs(rows, model_id="m/x")
 
 
-def test_every_deterministic_clause_is_unique_within_an_episode():
+#: The deterministic path finalizes like every other path, so it needs the
+#: style and the ledger meta to compute a signature at all.
+_DET_META = {"freeze_timestamp": "2026-09-05T00:00:00+00:00",
+             "source_bank": "original"}
+
+
+def _det_batch(specs, seed=1013426535, already_used=()):
+    return gsa.deterministic_batch(specs, episode_seed=seed, style=STYLE,
+                                   ledger_meta=_DET_META,
+                                   already_used=already_used)
+
+
+def _signatures(specs, batch):
+    by_id = {spec["id"]: spec for spec in specs}
+    return [gsa.ghost_prompt_signature(
+        role=by_id[i]["role"], style=STYLE, mode=by_id[i]["mode"],
+        motif_cue=by_id[i]["motif_cue"], drawable_beat=leaf,
+        ledger_meta=_DET_META) for i, leaf in batch.items()]
+
+
+def test_every_deterministic_picture_is_unique_within_an_episode():
+    """THE INVARIANT MOVED FROM THE LEAF TO THE FINALIZED PROMPT (2026-09-05).
+
+    Four slots make the picture and the leaf is one of them, so two beats may
+    legitimately SHARE a leaf when their motifs differ -- they render different
+    frames. Asserting distinct leaves was the bug: it rejected work that was
+    never duplicated. What must be distinct is what reaches the sampler.
+    """
     for seed in (1013426535, 7, 999999):
         specs = _timeline_specs(seed)
-        batch = gsa.deterministic_batch(specs, episode_seed=seed)
-        assert len(set(batch.values())) == len(batch), seed
+        batch = _det_batch(specs, seed)
+        sigs = _signatures(specs, batch)
+        assert all(sigs), seed
+        assert len(set(sigs)) == len(sigs), seed
 
 
 def test_the_opening_and_closing_bookends_differ():
     specs = _timeline_specs()
-    batch = gsa.deterministic_batch(specs, episode_seed=1013426535)
+    batch = _det_batch(specs)
     assert batch["g000"] != batch[specs[-1]["id"]]
 
 
 def test_every_deterministic_clause_is_a_complete_valid_leaf():
     specs = _timeline_specs()
-    batch = gsa.deterministic_batch(specs, episode_seed=1013426535)
+    batch = _det_batch(specs)
     for spec in specs:
         ok, why = gsa.validate_drawable_beat(
             batch[spec["id"]], mode=spec["mode"], names=NAMES)
@@ -541,7 +570,7 @@ def test_no_free_text_ever_reaches_a_deterministic_clause():
     pool = {c for group in gsa.GHOST_FALLBACK_CLAUSES.values() for c in group}
     pool |= set(gsa.GHOST_FALLBACK_BOOKENDS.values())
     specs = _timeline_specs()
-    batch = gsa.deterministic_batch(specs, episode_seed=1013426535)
+    batch = _det_batch(specs)
     assert set(batch.values()) <= pool
 
 
@@ -923,12 +952,50 @@ def test_the_validator_contract_rides_the_template_hash():
 
 
 def test_an_exhausted_fallback_pool_raises_instead_of_duplicating():
-    """The authored path forbids duplicate leaves; the deterministic path used
-    to ship one silently once its six-clause pool ran out."""
+    """The authored path forbids duplicate pictures; the deterministic path used
+    to ship one silently once its six-clause pool ran out.
+
+    Exhaustion is now measured in SIGNATURE space: the pool is spent only when
+    every clause finalizes to a prompt this beat has already used. Feeding the
+    raw leaves would no longer exhaust anything, which is the whole point of the
+    change -- so the test spends the pool the way the allocator really does.
+    """
     spec = _spec(mode="object")
     pool = gsa.GHOST_FALLBACK_CLAUSES["object"]
+    spent = [gsa.ghost_prompt_signature(
+        role=spec["role"], style=STYLE, mode=spec["mode"],
+        motif_cue=spec["motif_cue"], drawable_beat=leaf,
+        ledger_meta=_DET_META) for leaf in pool]
+    assert all(spent), "a clause that cannot finalize would not spend the pool"
     with pytest.raises(gsa.GhostAuthorError, match="exhausted"):
-        gsa.deterministic_leaf(spec, episode_seed=7, used=list(pool), total=1)
+        gsa.deterministic_leaf(spec, episode_seed=7, style=STYLE,
+                               ledger_meta=_DET_META, used=spent, total=1)
+
+
+def test_the_same_leaf_under_a_different_motif_is_not_a_duplicate():
+    """THE DEFECT THIS ROW EXISTS TO FIX, stated as an invariant.
+
+    A forced-lane leg was rejected on BOTH attempts for "repeated leaves" and
+    lost all 18 authored prompts to deterministic clauses. The leaves repeated;
+    the pictures did not.
+    """
+    spec = _spec(mode="object")
+    leaf = gsa.GHOST_FALLBACK_CLAUSES["object"][0]
+    a = gsa.ghost_prompt_signature(
+        role=spec["role"], style=STYLE, mode=spec["mode"],
+        motif_cue="a rust satchel emblem", drawable_beat=leaf,
+        ledger_meta=_DET_META)
+    b = gsa.ghost_prompt_signature(
+        role=spec["role"], style=STYLE, mode=spec["mode"],
+        motif_cue="a cracked porcelain cup", drawable_beat=leaf,
+        ledger_meta=_DET_META)
+    assert a and b and a != b, "same leaf, different motif -> different picture"
+    # and the signature is exactly what the render will send
+    fin = gsa.finalize_ghost_prompt_v2(
+        role=spec["role"], style=STYLE, mode=spec["mode"],
+        motif_cue="a rust satchel emblem", drawable_beat=leaf,
+        ledger_meta=_DET_META, token_measure_fn=_measure_stub)
+    assert a == fin["positive"].casefold()
 
 
 def test_the_figure_share_is_floor_half_and_the_docstring_says_so():

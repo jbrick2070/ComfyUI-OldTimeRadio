@@ -484,11 +484,28 @@ def test_a_deterministic_leaf_never_collides_with_a_replayed_one():
              "sanitized_intent": "", "normalized_emotion": "",
              "mapped_arc": ""} for s in specs]
     built = gsa.build_ghost_author_specs(rows, model_id="m/x")
-    whole = gsa.deterministic_batch(built, episode_seed=1013426535)
-    taken = [whole[built[0]["id"]], whole[built[1]["id"]]]
+    from nodes import _otr_visual_styles as vs
+    style = vs.get_visual_style({"visual_style": "archival_documentary"})
+    meta = {"freeze_timestamp": "2026-09-05T00:00:00+00:00",
+            "source_bank": "original"}
+
+    def sig(spec, leaf):
+        return gsa.ghost_prompt_signature(
+            role=spec["role"], style=style, mode=spec["mode"],
+            motif_cue=spec["motif_cue"], drawable_beat=leaf, ledger_meta=meta)
+
+    whole = gsa.deterministic_batch(built, episode_seed=1013426535,
+                                    style=style, ledger_meta=meta)
+    taken = [sig(built[0], whole[built[0]["id"]]),
+             sig(built[1], whole[built[1]["id"]])]
     rest = gsa.deterministic_batch(built[2:], episode_seed=1013426535,
+                                   style=style, ledger_meta=meta,
                                    already_used=taken)
-    assert not (set(rest.values()) & set(taken))
-    assert len(set(rest.values())) == len(rest)
+    # THE EPISODE-WIDE INVARIANT, now in signature space: a freshly allocated
+    # beat may not finalize to a picture a replayed beat already holds.
+    rest_sigs = [sig(spec, rest[spec["id"]]) for spec in built[2:]]
+    assert all(rest_sigs)
+    assert not (set(rest_sigs) & set(taken))
+    assert len(set(rest_sigs)) == len(rest_sigs)
 
 
