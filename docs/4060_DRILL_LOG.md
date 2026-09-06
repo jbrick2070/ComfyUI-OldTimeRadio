@@ -3515,3 +3515,49 @@ GUI input, activation, restart, installed/source-code/dependency/environment
 change, model/cache/link repair or registry publication. Capture cause remains
 undetermined; no explicit locked-desktop evidence. Prior failed trials remain
 FAIL; this development run is not a clean-install qualification.
+
+### Step 88 — September 6, 10:52–11:10 PDT: writer/audio complete; ShotLock active
+
+Same sole09:07 one-act development run. Reflection completed10:52:34.015;
+produced-story summary10:55:06.832. Ledger cleanup automatically reloaded Gemma,
+recovered through explicit CPU offload10:55:15.011, and completed warmup10:55:42.
+Six voiced rows were checked; one non-speech segment was repaired by the app.
+A later judge finding absent from its target line was discarded, not accepted
+as evidence. No manual prose repair. Writer DONE11:07:13.655:6lines,179words,
+about2hours from the soleRun. Freeze11:07:15 landed frozen_with_warns with2soft
+gaps; these warnings are not a terminal episode result.
+
+Kokoro produced4character and2announcer clips; scene audio72.76s. Audio enhancement
+and MusicGen theme assembly yielded an89.76s master at11:08:14.904. The initial
+Procgen encode completed11:09:19.229:2244frames,25fps,1920x1080,in62.3s;
+log reports82.8MB. This is an intermediate, not the final generated-visual episode.
+The app explicitly renamed pending_20260906_090709 to
+signal_lost_the_ledger_of_the_gable_name_20260906_110815 at11:09:19.282–288.
+Follow that logged directory from now on. ShotLock began11:09:19; another known
+NF4 CPU-offload recovery succeeded11:09:21.053,677weights loaded11:09:26.115,
+warmup11:09:47.753. Four character beats entered visual-prompt derivation.
+
+New observed friction11:07:21: HuggingFace warned that Kokoro's separate user
+cache cannot use symlinks and may consume more disk space. No Developer Mode,
+elevation, cache move/link repair or environment suppression was applied. Transfer
+byte counts were not exposed by the observed log; do not invent download sizes.
+RNN dropout and deprecated weight_norm warnings are retained privately, as are
+the repeated accelerate move-dispatched-model warnings. No terminalOOM/401.
+
+Passive captures11:10:10.520 and11:10:45.269 stayed black after fresh-window
+selection and one retry; no input/activation. Outer title now names ShotLock,
+but the accessibility document still names the writer, demonstrating stale inner
+UI evidence. Persisted log is the liveness evidence. Private1109HTML/MD retain
+screenshots/full available trees/exact logs; private1102 checkpoint also retained.
+No source-code/installed/model/cache/dependency/JSON change or additionalRun.
+Credits, generated stills/motion, RESULT SUCCESS, obs_publish and final episode
+remain unqualified for this trial. Monitoring continues without interruption.
+
+Read-only artifact snapshot11:09:51–11:11:15 confirmed7ordinary episode files,
+105,416,211bytes: master17,233,852;2musicWAVs1,292,888combined; preliminaryMP4
+86,822,851; ledger58,247; treatment7,721; canon652. No reparse points. Ledger
+still has0scenes/shots/clips; publication_eligibility=true and final_video_path
+pointing to the preliminary video are not final-publication proof. Supplemental
+Kokoro snapshot found af_heart.pt modified11:07:21.4837511 at523,425bytes;
+these are observed file bytes, not a verified network-transfer size. No cache
+or credential changes were made. Audio/video artifacts are this same trial only.

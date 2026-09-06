@@ -378,3 +378,19 @@ retained, with no terminal error or manual intervention. No new model transfer
 reported. Reflection/render/credits/publish remain unqualified; severe0.4tok/s
 writer latency is still recorded as usability friction, not a reason to tune
 this active test. No source-code/installed change or registry publication.
+
+September6 11:10: writer completed11:07:13 (6lines,179words), roughly2hours
+after the one-act Run. Kokoro voices and MusicGen-backed assembly produced
+an89.76s master. The initial Procgen video encoded2244frames in62.3s and was
+saved11:09:19; it is an intermediate, not final episode proof. The log explicitly
+renamed the trial directory to signal_lost_the_ledger_of_the_gable_name_20260906_110815.
+ShotLock is now deriving visual prompts after another successful automatic NF4
+CPU-offload recovery. Credits/publish/generated visuals still unqualified.
+
+Additional recorded friction: Kokoro's separate user-level HuggingFace cache
+reported degraded non-symlink storage. No permissions, environment or cache were
+modified; network byte counts were not shown, so download sizes are unobserved.
+Screenshots remain black and the inner accessibility document is stale despite
+the outer title progressing to ShotLock. No blind input or restart. Exact private
+evidence and an independently checked artifact snapshot are retained separately;
+this remains a hand-patched development run, not a clean human-install PASS.
