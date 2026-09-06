@@ -2087,3 +2087,29 @@ Private4060-overnight-20260906-013153.html preserves5 timestamped events,
 one background screenshot/full stale tree, exact reload/guard messages and
 bounded audit findings, verified267610bytes. Prior evidence intact. Only drill
 documentation changes; existing one-act runtime and canonical JSON stay fixed.
+
+### Step45 -- 2026-09-06 01:40 PDT, per-line cleaner checks continue
+
+Scheduled wake01:40:23.549. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Read-only persisted-log interval from01:31:28.421
+retained in full privately (generated-text previews omitted). Judge call ends
+57tokens/143.1s at01:33:51.512; app guard reports at01:33:51.514:
+`[ledger_clean] dropped 1 judge finding(s) that were not usable for this line: 'Ella Wawrzynek:' (not in this line)`
+Subsequent21-token checks finish01:34:45.633/54.1s,01:35:36.345/50.7s,
+01:36:26.646/50.3s,01:37:17.491/50.8s,01:38:07.105/49.6s,
+01:38:56.502/49.4s and01:39:45.220/48.7s. Latest22tokens/51.8s ends
+01:40:37.022; next line judge begins01:40:37.026. Each new call displays
+attempt1/2 and reuses cache; same cleaner stage,0.4tok/s. App guard behavior
+is recorded, not an agent repair or proof of failed retries.
+
+No terminal runtime failure, OOM,401, extra-pack request, download or verified
+RESULT SUCCESS/obs_publish OK/final episode. Other-model trials remain idle.
+One passive screenshot remains background-only/full tree stale. No activation/
+input, Run, restart/cancel, installed/JSON/model/cache/dependency change,
+manual wait or hand tuning. Fresh fetch/pull already up to date; Step44
+push51a8508 was remote-verified. Historical untracked review plan preserved.
+
+Private4060-overnight-20260906-014023.html preserves4 timestamped events,
+one background screenshot/full stale tree and complete intervening log
+messages, verified264044bytes. Prior evidence intact. Documentation-only
+checkpoint; healthy slow act remains active and untouched.
