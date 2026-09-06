@@ -11559,3 +11559,75 @@ regular Git reader and candidate return identical ID on the same checkout;
 no physical5080 claim. Full pytest unavailable, Bug Bible absent. Source only,
 not installed or live-render-qualified; status OPEN until canonical GUI
 RESULT SUCCESS + obs_publish OK + matching final file and later clean install.
+
+### PBUG-20260906-02 follow-up -- installed candidate, one-act GUI rerun active
+
+September6 09:07PDT: full Comfy shutdown verified before reviewed candidate
+installation; source and installed credits/helper bytes match e5cb6dc. Existing
+Git software was not installed or required for this change, and no .git was
+created in the package. New sole GUI Run09:07:08.249, writer log confirmsact1.
+Currentepisodepending_20260906_090709; source interpretation completed09:22:40,
+writer continues. No live credits/finalpublish proof yet; keep statusOPEN.
+
+## PBUG-20260906-03 -- real LTX098 clips falsely reported as non-LTX open
+
+- Status: OPEN; live diagnostic false positive, source correction in progress.
+- Reproduction: the physical4060 one-act run that later failed in credits,
+  signal_lost_behind_the_loose_brick_20260906_073554. At08:28:42.465 the open
+  health check warns for music_opening_001,b001,b006,music_closing_001, all
+  engine_id=ltx_8gb and exists=True. Eight actual LTX098 clips independently
+  probe as H264,512x288,25fps. This is not a missing-clip or procgen render.
+- Symptom: `rendered on 'ltx_8gb' (exists=True) -- NOT an LTX engine`.
+  Exact warning/manifest evidence archived privately in the08:28checkpoint.
+- Root cause: render_driver._LTX_OPEN_ENGINES lists five older LTX IDs but
+  omits the real low-memory LTX098 adapter ltx_8gb. The diagnostic incorrectly
+  treats its valid clips as a fallback; strict mode would also falsely raise.
+- Narrow correction: recognize the exact ltx_8gb ID. Do not accept arbitrary
+  ltx-prefixed names, non-LTX engines or missing clips; preserve strict/env
+  and sanctioned-gap semantics. No prompt, recipe, GPU budget or JSON change.
+  This is distinct from the bookend motion-prompt debt PBUG-20260903-06.
+- Verification: red/green actual-function tests for existing/missing clips,
+  strict/env behavior and exact accepted roster, plus regression of all five
+  older LTX IDs. The current installed run is unchanged and may still warn.
+- Bible candidate: classification of render receipts must include every real
+  supported engine in that family and still require actual output. Shared
+  Bible checkout unavailable; no promotion or physical5080 run claimed.
+
+## PBUG-20260906-04 -- unavailable VRAM telemetry is logged as a zero-MB peak
+
+- Status: OPEN; installed cause confirmed read-only, no source fix installed.
+- Live witness: the same physical4060 LTX098 run repeatedly prints
+  `VRAM render-phase peak 0 MB` while sampling and decoding real video.
+  Exact08:20–08:28 receipts retained privately. Historical peak is UNKNOWN.
+- Installed diagnosis09:23:21PDT: declared Comfy interpreter3.13.12 has no
+  pynvml module and neither pynvml nor nvidia-ml-py distribution. Exact error:
+  `ModuleNotFoundError: No module named 'pynvml'`; failure_phase=binding_import,
+  memory_query_attempts=0. No NVML initialization or memory query was reached,
+  so this establishes neither a driver fault nor zero memory usage.
+- Root cause: gpu_residency.nvml_available catches the import failure and
+  returnsFalse. motion_common.VramPeakProbe skips starting its sampler but
+  keeps peak_mb initialized0; stop returns that sentinel as a measurement.
+  Separately, probe_used_mb maps every query error to0, so handle availability
+  alone cannot prove a successful memory read.
+- Required correction: propagate unmeasured/failed telemetry distinctly from
+  a measured value through peak collection and reporting. Preserve legacy
+  admission/floor safety, and never replace a missing historical peak with a
+  post-render instantaneous reading. Audit all numeric-format consumers before
+  introducing nullable peaks. Optional dependency policy is separate from the
+  truthful-reporting fix and from registry release authorization.
+- No package installed, no environment/runtime change, no Torch/Comfy/model
+  import or GPU computation. Independent read-only diagnosis and main source
+  grounding agree. Private receipt4060-nvml-diagnosis-20260906-0923.md.
+- Bible candidate: telemetry absence must not be normalized into a plausible
+  measurement. Shared Bible checkout absent; no promotion claimed.
+
+### PBUG-20260906-03 follow-up -- source correction verified, live install unchanged
+
+September6: exact ltx_8gb added to the existing LTX allowlist; no other
+production logic changes. Actual-driver stdlib test route runs14tests with
+1failure and1error before the edit,14PASS after; existing five-engine behavior
+and strict/missing-clip/sanctioned-gap/non-LTX guards retained. Independent
+finished-diff review clean; main regression run124focusedtestsPASS09:27:03–06.
+Full pytest unavailable. Only source/tests/docs change; the active09:07
+installed driver remains old. Status staysOPEN for live qualified package;
+no physical5080 claim.

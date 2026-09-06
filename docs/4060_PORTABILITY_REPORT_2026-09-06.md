@@ -332,3 +332,15 @@ gotprompt09:07:08.348, writeract_count1. Currentepisodepending_20260906_090709,
 media_archive_rss; all5existingvisualassetsREADY, no new visual transfer.
 NF4 automatic CPU-offload recovery completed weightloading; writer is running.
 This development rerun awaits actual credits, finalpublish and episode proof.
+
+September6 09:27 source-only follow-up: a one-ID correction recognizes real
+ltx_8gb clips in the LTX-open health check (PBUG-20260906-03).14targeted
+red/green tests plus prior110regressions pass; independent review clean.
+No installed driver change during the active run, no recipe/GPU/JSON change,
+and no claim to fix the separate bookend-prompt debt or qualify5080hardware.
+
+The false zero-MB peak has an installed cause: pynvml is absent, so its sampler
+never starts but returns initialized0. The09:23read-only diagnostic failed at
+binding import before any NVML memory query. Historical peak is UNKNOWN.
+Logged PBUG-20260906-04; no binding installed or telemetry fix applied. Current
+act continues into cast descriptions after source interpretation completed.

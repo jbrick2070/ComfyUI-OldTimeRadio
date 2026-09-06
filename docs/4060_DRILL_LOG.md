@@ -3388,3 +3388,42 @@ qualified. No registry publish, reset, manual model provisioning or extraRun.
 On terminal failure or confirmed stall preserve evidence, fully close verified
 Comfy processes and verify absence before a justified next trial; do not kill
 healthy slow generation. Every rerun remains ONE ACT.
+
+### Step 84 — September 6, 09:20–09:28 PDT: healthy writer and source-only health fix
+
+The passive native screenshot shows the writer, one active/running job and
+act_count 1. No clicks, keys or second Run. Log progress reaches 396 tokens at
+09:22:39.995, followed by news_interpreter OK at09:22:40.005. The first cast
+description starts09:22:40.010 and reaches64tokens09:25:25.284, about0.4tok/s.
+Same pending_20260906_090709; no rename or terminal error. Healthy slow work
+left alone. No installed edits, downloads, restart, cancellation or provisioning.
+Private09:20HTML/MD preserve the screenshot, accessibility tree and exact log.
+
+Source fetch/pull was already up to date at6f90a7f. The earlier live false
+LTX-OPEN warning is corrected in source by adding only exact ltx_8gb to the
+existing five-ID allowlist, plus a comment. No prompt, recipe, GPU budget or
+JSON changes; the separate bookend-prompt debt is not fixed by this change.
+Actual-driver stdlib tests:14tests before the edit,1failure and1error; all14
+pass after. Independent finished-diff review clean. Missing clips, strict/env
+handling, sanctioned gaps, unknown IDs, existing five LTX lanes and manifest
+nonmutation remain covered. Main09:27:03–06 regression:14LTX+23credits+
+3templates+46assets+21download+10validator+7NF4 =124PASS. Not full pytest or a
+physical5080 test. The installed driver remains unchanged during this act.
+
+Independent installed telemetry diagnosis09:23:21.922–.929 found no pynvml
+module or pynvml/nvidia-ml-py distribution. Exact error: ModuleNotFoundError:
+No module named 'pynvml'; binding_import phase, zero memory-query attempts.
+Main rechecked the installed source: availabilityFalse skips sampling, but the
+initialized peak0 is returned as a measurement. Historical peak is UNKNOWN,
+not zero; no driver failure established. No binding installed or telemetry fix
+applied. Recorded PBUG-20260906-03 and-04 plus the credits rerun follow-up.
+Shared Bug Bible remains absent; no promotion claimed.
+
+Audit friction: initial source reads used wrong lesson/module paths; rg found
+the correct paths. Truncated instruction output was completed in narrow reads.
+One combined documentation patch was rejected because its expected final-line
+context was incomplete; read-back confirmed none of its three docs changed,
+then the corrected context was used. Errors retained privately, no user hand
+step required. Next telemetry work must audit numeric consumers and preserve
+admission safety; a post-render sample cannot become a historical render peak.
+No registry publication, reset, other-model trial or new workflow JSON.

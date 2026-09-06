@@ -5987,10 +5987,10 @@ def apply_engine_override(ledger):
 
 
 #: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
-#: the prompt-only ltx_video, the LTX 2.5 HQ I2V lane, and the additive LTX-AV
-#: audio lane.
+#: ltx_video, the native LTX 0.9.8 low-memory lane (manifest ID ltx_8gb),
+#: the LTX 2.5 HQ I2V lane, and the additive LTX-AV audio lane.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx25_video", "ltx_audio_in",
+    {"ltx_video", "ltx_8gb", "ltx25_video", "ltx_audio_in",
      # The foley and mime lanes (2026-08-26) render the LTX 2.5 picture graph
      # unchanged -- only the audio latent's fate differs -- so an open that
      # renders on one is every bit as real an LTX open as `ltx25_video`.
