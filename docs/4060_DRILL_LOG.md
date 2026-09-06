@@ -1873,3 +1873,27 @@ Private4060-overnight-20260906-004422.html preserves8 timestamped events,
 one black screenshot/full-tree capture and both activation errors, verified
 104692bytes. Prior screenshots remain intact. Documentation-only checkpoint;
 healthy slow runtime is not interrupted by this GUI-observation limitation.
+
+### Step38 -- 2026-09-06 00:52 PDT, generation continues; console still obscured
+
+Scheduled wake00:52:52.904. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Read-only persisted log advances within the same
+creative call (script-stage inference):384tokens/888.6s at00:46:46.517,
+448/1039.2s at00:49:17.087 and512/1190.0s at00:51:47.889, still0.4tok/s.
+No new runtime error, OOM,401, download, stage transition or completion.
+Matching RESULT SUCCESS, obs_publish OK and final episode remain unverified;
+no conditional other-model trial started.
+
+One passive capture now shows a scenic background rather than black, but not
+the console; full accessibility tree remains stale at192tokens. This is NOT
+recovered visual access or proof of a locked/unlocked state. No activation
+retry or input was attempted after Step37's exhausted bounded recovery.
+Keep GUI input stopped while console visibility remains unavailable; preserve
+the evidence limitation and continue authorized read-only log observation.
+No security/power/lock-screen interaction, Run, installed/JSON/model/cache/
+dependency change, manual wait or hand repair/tuning. Fresh fetch/pull already
+up to date; Step37 pushf3f9b4e was remote-verified. Historical review plan intact.
+
+Private4060-overnight-20260906-005252.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260658bytes. Prior evidence
+intact. Documentation-only checkpoint; runtime remains active and untouched.
