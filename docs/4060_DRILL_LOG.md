@@ -2113,3 +2113,85 @@ Private4060-overnight-20260906-014023.html preserves4 timestamped events,
 one background screenshot/full stale tree and complete intervening log
 messages, verified264044bytes. Prior evidence intact. Documentation-only
 checkpoint; healthy slow act remains active and untouched.
+
+### Step46 -- 2026-09-06 01:47-01:54 PDT, audio/procgen complete; AI visuals pending
+
+Scheduled wake01:47:53.692. SAME single GUI RunSeptember5 23:04:44.645.
+ACTIVE EPISODE ID is now signal_lost_the_frequency_of_friction_20260906_014652,
+explicitly renamed by the app from pending_20260905_230557 at01:49:00.202-210.
+Do not requeue or search for a new trial when the old pending path is absent.
+Renamed ledger lives in that episode's audio directory with the matching
+episode ID plus _ledger.json. App rebased9 durable and7 memory paths.
+
+Cleaner finishes its remaining checks:21tokens/50.6s01:41:27.667,
+21/51.9s01:42:19.602,27/63.3s01:43:22.925,21/51.8s01:44:14.743,
+21/49.7s01:45:04.426. Verdict01:45:04.427:16 voiced rows read, nothing to
+clean. Saved receipt confirms17 calls including1 briefing,0 dirty/F1/F2/
+repairs/unclean/no_model;context_verified.ok=true across16prompts. Cleanup
+complete/missing0; brief and produced-summary statusesok. Freeze01:45:05.312
+is frozen_with_warns, with rights_not_stamped and identity_not_applicable.
+Publication eligibilitytrue/blocking0 is NOT an obs_publish success receipt.
+
+Audio proceeds automatically: Kokoro CUDA backend logged01:45:18.056 for
+characters and01:45:30.979 for announcer; engine stamps Kokoro/Kokoro.
+MusicGen-small loads611/611 weights by01:46:11.206; opening10s/closing8s
+music-cue WAVs exist. Audio enhance reports167.2s01:46:50.861. Assembler
+resamples both themes32000->48000Hz, joins3segments with500ms crossfades,
+and masters -11.07LUFS toward -14LUFS (gain-2.93dB), -1dBFS peak ceiling.
+Master WAV saved01:46:51.719; read-only file check confirms35,359,964bytes.
+audio_done01:46:51.770:184.17s,48000Hz,8839980samples,3segments. Current
+ledger duration184.16625s; final_audio_path stillnull, so master existence is
+intermediate evidence rather than final episode acceptance.
+
+Initial procedural render starts01:46:51.800:1920x1080,25fps,4605frames;
+NVIDIA h264_nvenc selected01:46:53.967. All250-frame progress messages are
+preserved privately. Encode finishes01:49:00.157 in126.2s (36.5fps); MP4
+saved01:49:00.159, application reports162.9MB/184.2s. Read-only exact-path
+stat after the explicit rename confirms170,782,765bytes. Its basename is
+signal_lost_the_frequency_of_friction_20260906_014652.mp4 in the renamed
+audio directory. Both procgen_path and current final_video_path point there.
+Installed video_engine uses a math-driven CRT renderer: this initial MP4 is
+NOT proof of LTX or Z-Image execution and MUST NOT satisfy final acceptance.
+Saved visual receipt currently0clips,3shots,0PNGpaths. No LTX/Z-Image load or
+sampling completion seen in the inspected interval; not a failure claim.
+
+Downstream ShotLock continues after rename: brief statusok01:49:00.240,
+Gemma load01:49:00.252, explicit CPU-map retry01:49:02.073, weights677/677
+01:49:07.090, warmup19.2s complete01:49:26.352. At01:49:26.359 derivation
+announces12character beats,batch15,reply budget1770tokens. It generates
+64tokens/151.8s at01:51:58.225,0.4tok/s. No manual reload or new Run.
+Matching RESULT SUCCESS and obs_publish OK remain unobserved; the full
+AI-visual episode is unverified and conditional other-model trials stay idle.
+
+New download/cache friction is retained verbatim in the private interval:
+HuggingFace symlink-cache warnings for Kokoro01:45:08.217 and MusicGen
+01:45:34.899; PyTorch dropout/one-layer warning01:45:08.306 and weight_norm
+deprecation01:45:08.378. The app also repeats the Accelerate model-move warning
+01:45:05.335. None terminated the observed processing. No warning suppression,
+Developer Mode/security/symlink change or cache repair was attempted.
+Exact download byte counts/start-end transfer times were NOT exposed by the
+persisted log or inaccessible console; report UNKNOWN, not model-load time.
+Read-only logical cache footprints (not wire transfer bytes): Kokoro6files/
+328,784,877bytes in the per-user HuggingFace cache; MusicGen14files/
+2,367,654,011bytes in ComfyUI models/huggingface. Different cache roots mean
+clearing only ComfyUI models would not cover both; this is not proof that the
+earlier Gemma failures were caused by stale caches. Free bytes at metadata
+check:C572,378,222,592;D1,013,913,284,608. No files deleted/copied/seeded.
+
+Evidence-tool friction: initial mixed-object PowerShell table hid cache/disk
+columns; explicit JSON formatting corrected the read-only display. Independent
+log read hit OpenText sharing violation, followed by null Dispose/ReadLine
+errors. Same-command timestamp01:49:35.1034164 (exact startunknown); complete
+error text retained privately. Its IntervalLines0/emptyarray was invalid, not
+proof of no events; subsequent read-sharing-compatible access succeeded.
+Pending ledger absence was resolved only via the explicit rename pointer.
+
+One passive screenshot remains background-only/full tree stale. No GUI
+activation/input, restart/cancel, installed/JSON/model/dependency/cache change,
+manual wait or hand tuning. App-managed downloads/audio/render/rename only.
+Fresh fetch/pull already up to date; Step45 push334ec8a was remote-verified.
+Historical untracked review plan preserved. Original GUI-only FAIL unchanged.
+Private4060-overnight-20260906-014753.html preserves8 timestamped events,
+one background screenshot/full stale tree, complete runtime intervals, exact
+warnings/audit errors and artifact/cache metadata, verified288927bytes.
+Documentation-only checkpoint; continue the same renamed active trial.
