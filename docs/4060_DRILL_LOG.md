@@ -4307,3 +4307,56 @@ orphaned 7,387,685,822-byte `.incomplete` blob from the 14:00 killed run remains
 on disk (mtime 14:00:49) and is preserved, not deleted -- it is also direct
 evidence that the 13:59 timeout left its download worker running until the
 process was stopped.
+
+### Step 106 — September 6, ~14:45 PDT: CORRECTION — E2B never reached the offload retry
+
+Step105's root-cause statement is CORRECTED by `otr_runtime.log`, which carries
+the loader detail the console log does not. Extending the E4B exact-id check
+would have fixed NOTHING, because E2B never reaches that code.
+
+E2B, 14:33:43–14:34:00:
+
+```
+[14:33:45] device_map=auto path (total_vram=8.00 GiB < 14.5 GiB)
+[14:34:00] LLM model loaded from canonical snapshot (no HTTP checks)
+[14:34:00] [BUG-098 tripwire] post-load: linear4bit_count=525
+           is_loaded_in_4bit=True materialized_on_cuda=False vram_delta=0.00GiB
+```
+
+There is NO "NF4 CPU-offload retry active" line. E2B's INITIAL
+`from_pretrained` with `device_map="auto"` and `max_memory={0:'3.2GiB',
+'cpu':'32GiB'}` SUCCEEDED — bitsandbytes never raised the "dispatched on the
+cpu" ValueError that gates the retry block at `_otr_model_loader.py:1104`. It
+placed 525 Linear4bit modules, left vision-tower modules on CPU, and the
+post-load BUG-098 tripwire then refused the model. The native text-decoder path
+lives INSIDE the retry, so it was unreachable for E2B regardless of the id check.
+
+E4B, same log at 13:33, is the contrast that proves it: its initial load DID
+raise, the retry fired, the native text decoder loaded, `linear4bit_count=9`,
+`materialized_on_cuda=True`, `vram_delta=1.29GiB`, and the model ran.
+
+THE E4B DEVICE MAP ALSO EXPLAINS THE 0.5 tok/s, and it is worth recording
+exactly. The offload plan put `model.embed_tokens`, `lm_head` and
+`model.layers.0` on GPU and layers **1 through 41 — every remaining layer —
+plus norm, rotary_emb and the per-layer projection stack on CPU**. Forty-one of
+forty-two decoder layers ran over PCIe. That is not a model being slow; that is
+one layer of GPU inference dragging a CPU model behind it.
+
+REVISED ROOT CAUSE. For a row whose catalog `loader_backend` is
+`transformers_multimodal_text_only`, OTR loads the COMPOSITE checkpoint — text
+decoder plus vision and audio towers — and only ever considers the text-only
+decoder as a RETRY after a failure. The towers are never executed by the writer,
+yet they consume the device budget on the initial load, and on E2B they are what
+pushed real modules off CUDA into the tripwire.
+
+REVISED FIX DIRECTION, not yet implemented: load the native text decoder on the
+INITIAL load for text-only rows, so the towers are never materialized at all.
+On E2B that should leave the text decoder alone inside the 3.2GiB plan and
+place it entirely on GPU — the first configuration in this campaign with a
+realistic chance of a fast writer on 8GB. Keyed on catalog metadata rather than
+an exact-id ladder, it would also cover `Qwen/Qwen3.5-4B`, whose text config is
+`qwen3_5_text`. A row that declares the backend but whose config cannot be split
+must fail LOUDLY, never silently fall back to the composite.
+
+A design panel is reviewing this before any code is written. Evidence:
+`otr_runtime-e2b-retest-20260906-1434.log`.
