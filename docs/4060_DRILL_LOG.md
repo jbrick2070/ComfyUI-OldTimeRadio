@@ -1766,3 +1766,22 @@ untracked historical review-plan document. No new source/JSON patch justified.
 Private4060-overnight-20260906-001622.html preserves3 timestamped events,
 one screenshot/full-tree capture, verified255434bytes. Previous checkpoints
 remain intact. Documentation-only checkpoint; healthy slow run left untouched.
+
+### Step34 -- 2026-09-06 00:23 PDT, treatment continues without intervention
+
+Scheduled wake00:23:22.429. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Treatment attempt1/3 continues:256tokens/588.2s
+at00:19:09.909,320/740.0s at00:21:41.669, still0.4tok/s. No new error,
+OOM,401, download, stage transition or episode completion. Matching RESULT
+SUCCESS, obs_publish OK and final episode remain unverified. No new trial.
+
+One passive visible console screenshot/full accessibility tree, with exact
+times supplemented by read-only persisted-log inspection. Zero UI input;
+no manual wait, installed/JSON/model change, restart, cancel or hand tuning.
+Fresh fetch/pull already up to date; Step33 documentation push89c95b8 was
+remote-verified. Preserve the untracked historical review plan. No source
+fix is justified by healthy slow progress; stay quiet while stage unchanged.
+
+Private4060-overnight-20260906-002322.html preserves3 timestamped events,
+one screenshot/full-tree capture, verified253687bytes. Prior evidence intact.
+This heartbeat changes documentation only; the existing act remains active.
