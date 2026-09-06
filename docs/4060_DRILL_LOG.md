@@ -1897,3 +1897,27 @@ up to date; Step37 pushf3f9b4e was remote-verified. Historical review plan intac
 Private4060-overnight-20260906-005252.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260658bytes. Prior evidence
 intact. Documentation-only checkpoint; runtime remains active and untouched.
+
+### Step39 -- 2026-09-06 00:59 PDT, script call finished; voice casting begins
+
+Scheduled wake00:59:53.006. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Read-only persisted-log progress:576tokens/1339.7s
+at00:54:17.653,640/1486.4s at00:56:44.276; script call finishes701/1625.4s
+at00:59:03.273, around0.4tok/s. At00:59:03.274 the app reports verbatim:
+`[scifi_news_pro] stripped a conversational wrapper: 1 line(s) before TITLE:, 0 after END. (the script itself is untouched)`
+This is app-managed normalization, not an agent hand step. Casting-voices
+attempt1/3 starts00:59:03.279 and technical-slot cache reuse follows
+00:59:03.280. The observed transition moves beyond the previously inferred
+script call; full writer/episode acceptance is still not established.
+
+No new runtime error, OOM,401 or download. Matching RESULT SUCCESS,
+obs_publish OK and final episode remain unverified; no other-model trial.
+One passive screenshot remains background-only and full accessibility tree
+stale; GUI input remains stopped, with no activation recovery repeated.
+No Run, installed/JSON/model/cache/dependency change, restart/cancel, manual
+wait or hand tuning. Fresh fetch/pull already up to date; Step38 push13f2a4c
+was remote-verified. Preserve the historical untracked review-plan document.
+
+Private4060-overnight-20260906-005953.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260681bytes. Prior evidence
+intact. Documentation-only checkpoint; existing single act left running.
