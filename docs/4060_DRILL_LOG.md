@@ -4123,3 +4123,51 @@ leaderboard's GGUF figure. If measured NF4 throughput lands far below ~56tok/s,
 that gap is a LANE finding — the correct follow-up would be auto-download support
 for the `gguf_native` lane, which is a source item requiring its own review, not
 a manual file drop.
+
+### Step 103 — September 6, ~15:00 PDT: Gemma-4-12B slowness diagnosed as forced CPU spill, not a tunable
+
+Operator reports Gemma4 is disappointing and suspects a VRAM setting, possibly a
+low-VRAM flag. The VRAM half of that hunch is CORRECT. The flag half is not.
+
+Offline read-only probe (Comfy NOT running, no CUDA initialization, no download,
+no source edit). Ran the shipped `nodes/_otr_model_loader.py::_plan_max_memory`
+directly with `cuda_available=True, quant_policy="bnb_nf4"`. Exact output:
+
+```
+google/gemma-4-12b-it        @  8.00 GB -> {0: '6.8GiB', 'cpu': '32GiB'}
+google/gemma-4-12b-it        @ 16.00 GB -> {0: '13.5GiB', 'cpu': '32GiB'}
+google/gemma-4-E4B-it        @  8.00 GB -> {0: '6.8GiB', 'cpu': '32GiB'}
+google/gemma-4-E2B-it        @  8.00 GB -> {0: '3.2GiB', 'cpu': '32GiB'}
+Qwen/Qwen3.5-4B              @  8.00 GB -> None
+```
+
+THE ARITHMETIC. The curated row records gemma-4-12b-it NF4 as **7.15GiB
+allocated / 7.29GiB peak**, measured on the 16GB RTX5080. The 8GB plan caps
+CUDA device0 at **6.8GiB** and opens a 32GiB `cpu` lane. 6.8 < 7.15, so
+`device_map="auto"` MUST place part of the model on the CPU; every forward pass
+then pays a PCIe round trip for the CPU-resident layers. That is precisely the
+symptom this function's own docstring already documents ("ran noticeably SLOWER
+... exactly what partial CPU offload looks like"), and it matches the observed
+writer throughput of roughly 0.4tokens/sec and the explicit CPU-offload
+recovery logged at 11:09:21.053.
+
+THIS IS NOT A TUNABLE, and raising the cap is the wrong fix. The card reports
+8188MiB total = 7.99GiB. Fitting a 7.29GiB peak alongside the CUDA context and
+the running ComfyUI process leaves no usable margin even with a perfect budget.
+Gemma-4-12B is not an 8GB model in the transformers NF4 lane. The correct fix is
+a smaller writer, which is the direction the operator already chose.
+
+A ComfyUI `--lowvram` flag would NOT help. That flag governs ComfyUI's OWN model
+manager for diffusion/VAE weights. The writer loads through transformers +
+accelerate and never consults it; the placement decision is made entirely by the
+`max_memory` plan above. Do not add the flag expecting a writer speedup.
+
+NOTED FOR THE QWEN TRIAL: `Qwen/Qwen3.5-4B @ 8.00 GB -> None`. No size tag in the
+plan's tag list matches that repo id, so no artificial cap and no `cpu` spill
+lane is offered. For a ~4.66B model under NF4 that is the DESIRED outcome — it
+should sit entirely on the GPU. Confirm at load rather than assuming; an
+unexpected miss would surface as an honest CUDA OOM, not a silent crawl.
+
+VRAM figures above are the recorded 5080 measurement and the plan's own literals.
+No new VRAM measurement was taken on this 4060; NVML remains unavailable in the
+installed Comfy Python (09:23 finding).
