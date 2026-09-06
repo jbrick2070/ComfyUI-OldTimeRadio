@@ -150,8 +150,14 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # Official shards: 9,319,828,096 bytes / 2**30. Disk, not VRAM.
         approx_safetensors_gb=8.68,
         notes="Official Apache-2.0, ungated Qwen3.5 text-only native "
-        "Transformers lane. Non-thinking chat template; ordinary NF4 policy. "
-        "8GB speed, memory and episode qualification pending; not soak-tested.",
+        "Transformers lane; ordinary NF4 policy. THINKING template, suppressed "
+        "-- read from the published chat_template.jinja 2026-09-06: with "
+        "add_generation_prompt it emits a closed '<think>\\n\\n</think>' "
+        "envelope when enable_thinking is false and an OPEN '<think>' "
+        "otherwise, so chat_template_kwargs must reach every generate call or "
+        "the model is forced to reason (see test_chat_template_kwargs_wired). "
+        "Two shards, 9,319,828,096 bytes. 8GB speed, memory and episode "
+        "qualification pending; not soak-tested.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
