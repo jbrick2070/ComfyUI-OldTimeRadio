@@ -1744,3 +1744,25 @@ remote heads matched at00:02:53. Preserve the untracked historical review plan.
 Private4060-overnight-20260906-000822.html preserves4 timestamped events and
 one screenshot/full-tree capture, verified256474bytes. No checkpoint is
 overwritten; documentation-only checkpoint follows, with runtime unchanged.
+
+### Step33 -- 2026-09-06 00:16 PDT, pitch complete; treatment underway
+
+Scheduled wake00:16:22.328. Same single GUI Run23:04:44.645 on September5,
+pending_20260905_230557. Pitch finished174tokens/406.5s at00:09:21.634;
+scifi_news_pro_treatment attempt1/3 began00:09:21.645 with creative-slot
+cache reuse. Treatment heartbeats64tokens/148.7s at00:11:50.323,
+128/292.0s at00:14:13.700 and192/435.8s at00:16:37.438 remain0.4tok/s.
+No new error, OOM,401, download or verified episode completion. Matching
+RESULT SUCCESS, obs_publish OK and final episode remain unverified. No
+conditional other-model trial started; this is intermediate writer progress.
+
+One passive visible console screenshot/full accessibility tree, supplemented
+by a read-only persisted-log tail. No activation, click, keypress, queue,
+manual wait, active installed edit, restart, cancellation or JSON/model change.
+No hand repair/tuning needed or attempted. Fresh fetch/pull already up to date;
+previous Step32 documentation push3af8154 was remote-verified. Preserve the
+untracked historical review-plan document. No new source/JSON patch justified.
+
+Private4060-overnight-20260906-001622.html preserves3 timestamped events,
+one screenshot/full-tree capture, verified255434bytes. Previous checkpoints
+remain intact. Documentation-only checkpoint; healthy slow run left untouched.
