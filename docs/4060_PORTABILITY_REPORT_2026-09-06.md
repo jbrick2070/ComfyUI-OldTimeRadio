@@ -211,3 +211,9 @@ At05:58:00 cast locked (announcer+2characters), with actual act_count1 and
 4scene beats. Macro outline started05:58:01 and reached64tokens06:00:30.
 No new failure or setup step.06:02 passive screenshot remains black; logs-only
 progress evidence continues and the active workload is untouched.
+
+At06:12:31 outline succeeded with4voiced+2announcer beats and the6-row
+skeleton was saved. Read-only06:17 verification found the matching20419-byte
+JSON ledger and6-element lines array. Dramatic-state generation is now active.
+This proves an intermediate durable skeleton, not completed words/audio/video
+or obs publication. No new error; passive screenshot remains black.
