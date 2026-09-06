@@ -4042,3 +4042,41 @@ required by the field contract does NOT exist yet (only the
 uncommitted. 8GB speed, VRAM, prose/JSON gates and any episode result for
 Qwen3.5-4B remain NOT TESTED. Gemma slow-writer throughput (~0.4 tok/s
 observed earlier) is the motivating symptom, not a measured Qwen comparison.
+
+### Step 101 — September 6, ~14:35 PDT: operator ruling — WARN rows are NOT hidden from the dropdown
+
+Operator directive, verbatim intent: do not hide a model from the dropdowns.
+If someone chooses it and does not have it, it auto-downloads, period. This
+SUPERSEDES the 2026-08-25 Gate2 ruling that a WARN-tier row does not belong in
+the picker, and it RETRACTS the first "open gap" recorded in Step100 — the
+Qwen3.5-4B row being `vram_fit_tier="WARN"` is NOT a reason to remove or hide
+it.
+
+Read-only verification that the CODE already behaves as the operator requires
+(no source change was needed, and none was made):
+
+* `nodes/_otr_model_catalog.py::build_dropdown_choices` iterates
+  `_active_curated_models()` with NO tier filter. Every curated row is listed,
+  PASS or WARN. `_active_curated_models()` filters only on remote-lane enablement,
+  never on `vram_fit_tier`.
+* Labels carry `vram_badge_for(repo_id)` — the VRAM cost is stated in the label,
+  which is the honesty mechanism the operator's 2026-08-01 directive asked for.
+  Disclosure at the moment of choosing, not removal from the menu.
+* Selection is explicitly never gated on cache state: the builder's own docstring
+  records that download-state badges were removed and that "a model that is not
+  already cached is simply fetched by `auto_download_if_missing` on first Queue."
+* `Qwen/Qwen3.5-4B` carries `requires_auth=False`, so the auto-download needs no
+  token.
+
+The module docstring line "Only entries with vram_fit_tier == PASS are advertised
+... as 16 GB-ready" was checked and is NOT a dropdown filter — it scopes a label
+phrase only. Left unchanged.
+
+`docs/LLM_PREFLIGHT_GUIDE.md` Gate2 is amended in this same change to record the
+new ruling and demote the 2026-08-25 text to history, so a future editor does not
+re-introduce a tier filter on the strength of a stale guide.
+
+Still open from Step100 and unaffected by this ruling: the required audit file
+`docs/model-license-qwen--qwen3.5-4b.md` does not exist, the Qwen source change
+is uncommitted, and Qwen3.5-4B speed/VRAM/prose/JSON/episode results on this
+8GB card remain NOT TESTED.

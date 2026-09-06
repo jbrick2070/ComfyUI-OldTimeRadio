@@ -70,9 +70,16 @@ field that decides whether a row belongs in front of a user.
 * **PASS** -- soak-tested to load and generate inside the ceiling. The only tier
   a shipping row should carry.
 * **WARN** -- "needs quantization or offload"; not soak-tested. **Operator ruling
-  2026-08-25: a WARN row does not belong in the dropdown.** Rows that do not fit
-  nicely are ripped, not carried. There is precedent: two community WARN-tier 12B
-  rows were pruned on 2026-05-23, and `Qwen/Qwen2.5-14B-Instruct` on 2026-08-25.
+  2026-09-06 SUPERSEDES the 2026-08-25 ruling: a WARN row STAYS IN THE DROPDOWN.**
+  Operator: do not hide a row from the picker; if someone chooses a model they do
+  not have, it auto-downloads, period. That is the designed behaviour, not a
+  defect. What a tier owes the user is HONESTY AT THE MOMENT OF CHOOSING, not
+  absence -- the `vram_badge_for` number in the label and truthful `notes` are how
+  an unsoaked row declares itself. Ripping a row remains an explicit operator
+  decision about a specific model; it is never an automatic consequence of tier.
+  *(History, no longer the rule: under the 2026-08-25 ruling two community
+  WARN-tier 12B rows were pruned on 2026-05-23 and `Qwen/Qwen2.5-14B-Instruct` on
+  2026-08-25. Those removals stand; the rule behind them does not.)*
 * **UNKNOWN / FAIL** -- never ship.
 
 Verify with `catalog.check_vram_fit(repo_id, context_tokens)` rather than by eye.
