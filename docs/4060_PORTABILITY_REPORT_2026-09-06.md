@@ -227,3 +227,8 @@ At06:32:40 continuity completed359tokens, extracted4facts/3active props and
 saved the ledger. The next writer stage logged45SlotContract tokens06:34:35.
 Still RUNNING without new error or setup.06:36 passive screenshot remains
 black; current disk-log evidence establishes progress, not final episode PASS.
+
+At06:44:50 all6slot drama contracts were saved and marked episode_valid=True.
+Dialogue composition followed, with first exchange d002/d003 OK on attempt1
+at06:48:27. Still RUNNING, no new error or manual setup.06:51 screenshot
+remains black; writing/media/publishing completion is not yet established.

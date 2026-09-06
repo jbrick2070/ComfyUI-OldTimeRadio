@@ -3050,3 +3050,19 @@ tree. Full screenshot/tree and exact current log snapshot saved privately in
 capture exception. No retry/input/activation/power change or hand setup.
 No requeue/installed edits/cleanup/registry action. Pending default bundle
 and92variant regeneration stay deferred to idle; documentation-only milestone.
+
+### Step73 -- 2026-09-06 06:44-06:51 PDT, slot contracts saved; dialogue starts
+
+Same one-act Run. All6slot drama contracts saved06:44:50.978, sources llm6,
+episode_valid=True. Prompt context built06:44:50.979; first dialogue exchange
+d002/d00390tokens completes06:48:27.410 (216.4s), OK on first attempt at
+06:48:27.411. Next creative call follows. No new OOM/401/error/download,
+rename or terminal result; this is intermediate composition, not media PASS.
+
+06:44 and06:51 private checkpoints preserve one BLACK passive screenshot
+each and their full available old Logs trees/current disk-log snapshots.
+Latest capture06:51:02.531PDT,4060-heartbeat-20260906-0650.html/.md;
+unknown visual-evidence gap, no capture exception or LockApp returned.
+Zero input/retries/activation/requeue/restart/installed edit/manual setup.
+Pending default generation stays deferred; documentation-only Git milestone.
+No cleanup or registry publication.
