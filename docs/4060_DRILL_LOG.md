@@ -1621,3 +1621,39 @@ and appended production findings. Preserve the unrelated untracked historical
 review-plan document. Private HTML/screenshots stay outside Git. Do not change
 pyproject.toml, registry version, tags or release settings: this is a source
 branch push, not a registry release or a clean-install PASS declaration.
+
+### Step29 -- 23:37-23:40 PDT, first scheduled overnight check
+
+Heartbeat4060-overnight-otr-trials first observed execution began at
+23:37:51.646 PDT. Read latest drill/bug entries and private push receipt;
+fresh fetch/pull reports already up to date. Source commit c61ac222 is
+confirmed pushed: localHEAD, origin/v2.0-alpha and remote branch matched
+at23:31:21. Seven focused tests passed after that push. It included loader,
+tests and both logs, not the canonical JSON, pyproject or private screenshots.
+This closes Step28's prepared-push action; registry/episode qualification
+remains unverified. Untracked historical review-plan document is preserved.
+
+Same active identity: single GUI Run23:04:44.645, writer pending_20260905_230557.
+Persisted log shows first dossier call ending with427tokens/1095.5s at
+23:24:13.607, followed by another dossier attempt1/3 at23:24:13.613. During
+this check the second call reaches320tokens/846.3s at23:38:19.950, then ends
+with368tokens/971.6s at23:40:25.303. Another dossier attempt1/3 begins at
+23:40:25.316 and reuses the same model cache. These are successive internal
+calls within the same act, not agent resubmissions. Rate stays around0.4tok/s.
+No new error, OOM,401 or download. No RESULT SUCCESS/obs_publish/final episode
+verified; conditional other-model trials have not started.
+
+UI friction: initial Comfy Logs screenshot was occluded by Codex and its
+inactive accessibility tree lagged the persisted log. One Comfy Logs window
+activation restored its visible console; a second observation resolved the
+one-frame accessibility lag. Full trees and images are preserved rather than
+treating capped document_text as the complete log. Read-only comfyui.log tail
+provided exact message timestamps; this is disclosed diagnostic collection.
+No Run click, widget/model change, cancellation, restart or installed edit.
+No manual wait/sleep was inserted; the scheduled interval and check duration
+are timestamped. Healthy slow generation remains untouched.
+
+Private evidence4060-overnight-20260905-233751.html contains5 event records,
+including3 screenshot/full-tree captures. This separate checkpoint follows
+diagnostic-repair parts1-5 without overwriting them. Only documentation is
+updated for this heartbeat; source candidate and active runtime remain fixed.

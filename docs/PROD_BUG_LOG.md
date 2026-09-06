@@ -11399,3 +11399,10 @@ Canonical JSON and pyproject stay unchanged. Source commit is a candidate,
 not registry publication: fullsuite/Bible unavailable, full episode pending,
 original zero-hand-step result FAIL, bugs-02/-03 still open. See drill Step28
 for source provenance, test scope and the no-active-run-mutation receipt.
+
+23:40 overnight checkpoint: source candidate was pushed as c61ac222, with
+seven passing focused tests; no registry release. Same diagnostic act has
+completed two dossier calls (427tokens/1095.5s;368tokens/971.6s), then begins
+a third. No loader-error recurrence observed. Full episode qualification and
+the separate-02/-03 defects remain open. See drill Step29/private screenshot
+checkpoint; no active-run intervention or additional model trial.
