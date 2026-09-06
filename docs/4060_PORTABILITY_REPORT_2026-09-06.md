@@ -206,3 +206,8 @@ new OOM/auth/terminal error. Two passive native screenshots at05:53 returned
 black pixels despite available log text. This is a documented visual-evidence
 gap of unknown cause, not an OTR render failure. Current persisted logs prove
 stage progress; usable GUI must be re-established before interactive testing.
+
+At05:58:00 cast locked (announcer+2characters), with actual act_count1 and
+4scene beats. Macro outline started05:58:01 and reached64tokens06:00:30.
+No new failure or setup step.06:02 passive screenshot remains black; logs-only
+progress evidence continues and the active workload is untouched.
