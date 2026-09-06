@@ -1546,7 +1546,8 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         if not otr_env.get("OTR_TEST_MODE"):
             _LOG.info("[OTR video] ltx_8gb VRAM render-phase peak %s MB @ %dx%d len=%d",
-                      render_peak, width, height, n)
+                      int(render_peak) if render_peak is not None else "unknown",
+                      width, height, n)
         # `native_frame_count` / `extension_mode` (2026-08-06). This adapter is
         # in ``frame_contract.PLANNING_CAP_ENGINES`` -- it is listed there
         # SPECIFICALLY so its beats are split into real segments -- and it was

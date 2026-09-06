@@ -938,7 +938,8 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             _LOG.info(
                 "[OTR video] %s VRAM render-phase peak %s MB @ %dx%d "
                 "model_len=%d canvas_len=%d",
-                self.name, render_peak, width, height, model_length, n)
+                self.name, int(render_peak) if render_peak is not None else "unknown",
+                width, height, model_length, n)
         return {"out_path": path, "frame_count": n,
                 "vram_peak_mb": render_peak,
                 "recipe": self._recipe_receipt(),

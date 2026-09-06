@@ -1594,9 +1594,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # it should not survive.
         validate_silent_clip_contract(ffprobe_clip_fields(path),
                                       self.target_fps)
-        if peak:
-            _LOG.info("[%s] render-window VRAM peak: %d MB", self.name,
-                      int(peak))
+        _LOG.info("[%s] render-window VRAM peak: %s MB", self.name,
+                  int(peak) if peak is not None else "unknown")
 
         raw = {
             "out_path": path, "frame_count": n, "vram_peak_mb": peak,
@@ -1931,7 +1930,7 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
             "[OTR video] %s FOLEY decode: %d sample(s) x%dch @%d Hz "
             "(%.3f s over %d frame(s)) decode_peak_mb=%s elapsed_s=%.3f -> %s",
             self.name, samples, channels, sample_rate, duration_s,
-            int(frame_count), int(decode_peak) if decode_peak else "n/a",
+            int(frame_count), int(decode_peak) if decode_peak is not None else "unknown",
             decode_elapsed_s, os.path.basename(stem_path))
         return {
             "foley_path": stem_path,

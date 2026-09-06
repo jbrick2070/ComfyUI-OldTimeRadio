@@ -3427,3 +3427,47 @@ then the corrected context was used. Errors retained privately, no user hand
 step required. Next telemetry work must audit numeric consumers and preserve
 admission safety; a post-render sample cannot become a historical render peak.
 No registry publication, reset, other-model trial or new workflow JSON.
+
+### Step 85 — September 6, 09:47–10:00 PDT: one-act progress and truthful VRAM source fix
+
+Passive09:47 and09:54 screenshots show one active writer and act_count1.
+No clicks, keys, additional Run, cancellation, restart, new download or installed
+change. Source fetch/pull09:53 was already up to date. Same09:07 development
+run and pending_20260906_090709; no logged rename or terminal error. Outline
+success09:51:28.372:6beats (4voiced,2announcer,0music_inter). DramaticState
+completed09:59:12.391, followed by continuity-ledger generation. Around0.4tok/s
+remains a substantial usability cost, not a proven stall. Credits/publish/final
+episode not yet reached. Monitoring stays active; previous failures stay FAIL.
+
+SOURCE-ONLY PBUG-20260906-04 correction: optional sample_used_mb returns None
+when NVML binding/init/handle/query fails, preserving a genuine measured0.
+Legacy probe_used_mb still returns its original integer/default0 contract;
+availability/floor/admission functions and their existing behavior are unchanged.
+The peak sampler records its first synchronous sample, retries after an initial
+failure, retains the maximum successful observation, and freezes its result at
+stop even if an in-flight query returns later. No post-render read may replace
+a missing render peak. Beat/episode aggregation preserves unknown and zero;
+human logs say unknown, while receipts serialize missing measurements as null.
+Mixed successful/failed samples report only an observed maximum, not proof of
+complete sampling coverage or the true peak. No hardware-specific branch added.
+
+Red/green:24producer tests at09:56:32 yielded8failures/11errors before the fix;
+24PASS09:57:21. Consumer15tests yielded10failures09:57:35, then15PASS09:58:14
+and after explicit-unknown logging10:00:15. Main10:00:31–35 independently ran
+163focused tests:24producer+15consumer+14LTXhealth+23credits+3templates+
+46assets+21downloads+10validator+7NF4, all PASS. Tests use actual pure modules
+with fake NVML and mocked render/media boundaries; no GPU/model loading.
+Independent producer and consumer review found no functional blockers; explicit
+unknown log wording was incorporated. Full pytest unavailable; no physical5080
+qualification. Sequential probe lifecycle is covered, not concurrent start calls.
+
+No pynvml binding installed; this fixes truthfulness, not telemetry availability.
+The active installed sampler/driver remains unchanged and may still report the
+known false0/falseLTX warning. Package/live verification remains OPEN. No model,
+cache, environment, dependency, pyproject, recipe or canonicalJSON change.
+Private screenshots/logs/test receipts retained under the09:47/09:54/09:57
+checkpoints. No user hand step. Developer audit friction retained: an rg literal
+wildcard was invalid on Windows and corrected with -g; a test harness initially
+hit the import guard at pydantic before its render boundary was mocked. That
+initial harness output was tool-truncated and is explicitly labeled, never
+claimed complete. Subsequent red/green outputs were captured in full.

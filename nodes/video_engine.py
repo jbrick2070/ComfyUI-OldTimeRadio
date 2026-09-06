@@ -1536,8 +1536,10 @@ def _write_story_treatment(out_path, episode_title, led,
         W_(f"  File        :  {os.path.basename(out_path)}")
         W_(f"  Size        :  {size_mb:.1f} MB")
         _vram_peak = (meta.get("render_engines") or {}).get("vram_peak_mb")
-        if _vram_peak:
+        if _vram_peak is not None:
             W_(f"  VRAM peak   :  {_vram_peak} MB")
+        else:
+            W_("  VRAM peak   :  unknown")
         W_()
 
         # SYSTEM -- the machine + software stack this episode was rendered on,

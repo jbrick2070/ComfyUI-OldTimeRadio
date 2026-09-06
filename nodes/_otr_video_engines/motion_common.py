@@ -200,9 +200,7 @@ def vram_used_mb():
     """Machine-wide VRAM used (MB) via the shared NVML probe, or ``None`` when
     NVML is unavailable (e.g. the CPU box). Never ComfyUI ``get_free_memory()``
     (this-process view only -- it cannot see a sidecar's allocation)."""
-    if not _GR.nvml_available():
-        return None
-    return _GR.probe_used_mb()
+    return _GR.sample_used_mb()
 
 
 class VramPeakProbe:
@@ -213,39 +211,52 @@ class VramPeakProbe:
     A post-render single read (the pattern this replaces) fires AFTER the GPU work
     and misses the sampler / text-encode peak; this thread samples every
     ``interval_s`` for the duration of the window so an additively-resident encoder
-    or LoRA delta that breaches mid-render is actually caught. A pure no-op (peak
-    stays 0) when NVML is unavailable (the CPU box); ``threading`` is stdlib so the
-    cold-import invariant (V-12) holds. Use ``start()`` before the render call and
-    ``stop()`` after the decoded IMAGE is in hand."""
+    or LoRA delta can be observed mid-render. ``None`` means no successful sample;
+    zero is a valid reading. Failed samples do not erase an observed maximum, but
+    this sampled maximum is not proof of complete coverage or the true peak.
+    ``threading`` is stdlib so the cold-import invariant (V-12) holds. Use
+    ``start()`` before the render call and ``stop()`` in its ``finally`` block.
+    A probe is single-use; stopping freezes its result even if an in-flight
+    query outlasts the bounded join. No post-render replacement sample is taken.
+    """
 
     def __init__(self, interval_s=1.0):
+        import threading
         self._interval = float(interval_s)
-        self._stop = None
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
         self._thread = None
-        self.peak_mb = 0
+        self.peak_mb = None
+
+    def _sample(self):
+        # Query outside the lock: even a stuck NVML call cannot block stop().
+        used = vram_used_mb()
+        with self._lock:
+            if not self._stop.is_set() and used is not None:
+                if self.peak_mb is None or used > self.peak_mb:
+                    self.peak_mb = used
 
     def _loop(self):
-        while not self._stop.is_set():
-            used = vram_used_mb()
-            if used is not None and used > self.peak_mb:
-                self.peak_mb = used
-            self._stop.wait(self._interval)
+        while not self._stop.wait(self._interval):
+            self._sample()
 
     def start(self):
         import threading
-        if vram_used_mb() is None:           # NVML absent (CPU box) -> no-op probe
+        if self._thread is not None or self._stop.is_set():
             return self
-        self._stop = threading.Event()
+        # Retain the synchronous boundary sample, including measured zero.
+        # Continue sampling after initial failure so transient NVML loss can heal.
+        self._sample()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
         return self
 
     def stop(self):
-        if self._stop is not None:
-            self._stop.set()
+        self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
-        return self.peak_mb
+        with self._lock:
+            return self.peak_mb
 
 
 # --------------------------------------------------------------------------- #

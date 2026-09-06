@@ -11631,3 +11631,27 @@ finished-diff review clean; main regression run124focusedtestsPASS09:27:03–06.
 Full pytest unavailable. Only source/tests/docs change; the active09:07
 installed driver remains old. Status staysOPEN for live qualified package;
 no physical5080 claim.
+
+### PBUG-20260906-04 follow-up -- source reporting fixed, live package still pending
+
+September6 10:00PDT: optional sample_used_mb now distinguishes NVML import,
+init, handle and query failure from a valid0. Legacy integer probe and all
+availability/floor/admission behavior are preserved; this does not repair their
+pre-existing ambiguity if a query fails after the availability check.
+
+VramPeakProbe starts unknown, retains its synchronous sample, permits recovery
+after initial failure, and freezes after stop. A late returning query cannot
+mutate the reported result. Real zero and positive samples survive adapter,
+shot, beat, episode, batch and credits paths. Removed the instantaneous
+post-render fallback. Human logs explicitly say unknown; missing receipts stay
+null. Aggregates mean maximum successful observation, not full sampling coverage.
+
+24producer+15consumer regression tests fail before and pass after the fix;
+main10:00:31–35 ran all163focused tests PASS including prior124regressions.
+Independent functional source review clean; explicit-unknown log follow-up
+incorporated. Actual pure leaves run under guarded stdlib test routes with fake
+NVML/render I/O, no model/GPU calls. Full pytest unavailable; no physical5080
+claim. No binding, dependency, pyproject or installed-runtime change. Active
+one-act trial remains untouched. Status OPEN until a built/installed package
+is live-verified; missing binding policy remains separate. Historical peaks
+remain UNKNOWN and are not backfilled. Shared Bible absent; no promotion.

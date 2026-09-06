@@ -1011,11 +1011,10 @@ class HuMoEngine(_MC.MotionEngineBase):
             results = _wb.run_graph(graph, classes, external_results=external)
         finally:
             render_peak = probe.stop()
-            if render_peak:
-                _LOG.info("[%s] render-window VRAM peak: %d MB  "
-                          "(length=%d canvas=%dx%d)",
-                          self.name, int(render_peak), int(length),
-                          int(width), int(height))
+            _LOG.info("[%s] render-window VRAM peak: %s MB  "
+                      "(length=%d canvas=%dx%d)",
+                      self.name, int(render_peak) if render_peak is not None else "unknown",
+                      int(length), int(width), int(height))
         images = results[self._TERMINAL][0]                   # VAEDecode IMAGE batch
         self._retain_model_patchers(results, prepared)
         frames = _wb.images_to_uint8(images)
@@ -1140,7 +1139,7 @@ class HuMoEngine(_MC.MotionEngineBase):
                 # a missing one. The WAN lanes closed the same gap at
                 # eng_wan_ti2v.py; this mirrors it, and ONE stamp serves all
                 # four registered HuMo tiers because they share this return.
-                "vram_peak_mb": int(render_peak) if render_peak else None,
+                "vram_peak_mb": int(render_peak) if render_peak is not None else None,
                 "recipe": self._recipe_receipt(),
                 **self._clip_telemetry(width, height)}
 

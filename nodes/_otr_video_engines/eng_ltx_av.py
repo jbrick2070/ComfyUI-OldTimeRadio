@@ -1335,8 +1335,8 @@ class _LtxAvBase(_MC.MotionEngineBase):
             _wb.reclaim_idle_models(reason="%s post-decode" % self.name)
         # Telemetry: log the MEASURED render-window peak (VramPeakProbe). No
         # ceiling enforcement -- the operator's tier JSON owns the OOM budget.
-        if peak:
-            _LOG.info("[%s] render-window VRAM peak: %d MB", self.name, int(peak))
+        _LOG.info("[%s] render-window VRAM peak: %s MB", self.name,
+                  int(peak) if peak is not None else "unknown")
         if images is None:                       # success path always sets images
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)

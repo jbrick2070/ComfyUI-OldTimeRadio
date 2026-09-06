@@ -287,7 +287,7 @@ def test_render_shot_prefers_clip_peak(monkeypatch):
     assert used == 9999
 
 
-def test_render_shot_falls_back_when_no_clip_peak(monkeypatch):
+def test_render_shot_keeps_unknown_when_no_clip_peak(monkeypatch):
     import nodes._otr_video_engines.render_driver as rd
 
     def fake(engine_name, request, *, force_oom, host_caps=None, profile=None,
@@ -295,7 +295,11 @@ def test_render_shot_falls_back_when_no_clip_peak(monkeypatch):
         return {"path": "x"}
 
     monkeypatch.setattr(rd, "_render_one", fake)
-    monkeypatch.setattr(rd._mc, "vram_used_mb", lambda: 777)
+
+    def unexpected_post_sample():
+        raise AssertionError("An instantaneous post-render read is not a peak")
+
+    monkeypatch.setattr(rd._mc, "vram_used_mb", unexpected_post_sample)
     _clip, _shot, _att, used = rd.render_shot(
         {"shot_id": "s1", "engine_id": "ltx_audio_in"}, {})
-    assert used == 777
+    assert used is None

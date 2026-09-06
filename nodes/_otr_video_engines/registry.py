@@ -495,8 +495,8 @@ CAPABILITIES = {
     # cousin ltx_audio_in, which DOES carry requires_vendor "nvidia" because it
     # hard-gates on NVML telemetry in assert_usable. This lane does not: it
     # SAMPLES a VRAM peak for the receipt via VramPeakProbe, which degrades to
-    # None off a CUDA box, and it never refuses on the reading. A vendor gate
-    # here would advertise an enforcement that does not run.
+    # None when no NVML sample succeeds, and never refuses on the reading.
+    # A vendor gate here would advertise an enforcement that does not run.
     #
     # needs_fp8_te / needs_fp4_te are both False: the DiT is a Q3_K_M GGUF and
     # the Gemma-4 12B text encoder is a Q5_K_M GGUF, so neither fp8 nor fp4

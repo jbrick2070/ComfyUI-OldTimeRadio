@@ -1284,9 +1284,10 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # M7: PROVE the silent-clip color/stream contract on the emitted mp4.
         validate_silent_clip_contract(ffprobe_clip_fields(path), self.target_fps)
         if not otr_env.get("OTR_TEST_MODE"):
-            post_mb = _MC.vram_used_mb() or 0
+            post_mb = _MC.vram_used_mb()
             _LOG.info("[OTR video] wan_ti2v VRAM render-phase peak %s MB / post %s "
-                      "MB", render_peak, post_mb)
+                      "MB", int(render_peak) if render_peak is not None else "unknown",
+                      int(post_mb) if post_mb is not None else "unknown")
         # NEWBUG-1 (2026-07-20): thread the MEASURED render-window peak into the raw
         # so _clip_from_raw stamps it -> the manifest vram_peak_mb receipt is populated
         # for the wan lane (was ALWAYS None: the peak was logged, never returned).

@@ -4584,7 +4584,7 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
     floor, so a proven model path must prove itself. A forced soak OOM simply
     raises loud like any other failure.
 
-    Returns ``(clip, shot, [engine], vram_used_mb)``."""
+    Returns ``(clip, shot, [engine], observed_peak_mb)``; an unknown peak is None."""
     sid = shot["shot_id"]
     eng = shot["engine_id"]
     out_shot = dict(shot)
@@ -4603,9 +4603,9 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
         raise RenderError(
             "shot %s engine %r failed to render; fallbacks are disabled (%s) -- "
             "fix the engine or its inputs: %s" % (sid, eng, kind, exc)) from exc
-    # Prefer the engine's MEASURED render-window peak (LTX-AV threads it onto the
-    # clip via VramPeakProbe) over the instantaneous post-render read, so the
-    # episode report records the true render-phase peak; fall back when absent.
+    # Only the engine's render-window observations can supply this peak.
+    # A post-render instantaneous read is not a peak, and must not fill an
+    # unknown receipt. A successful zero sample is a measurement, not absence.
     clip_peak = clip.get("vram_peak_mb") if isinstance(clip, dict) else None
     if isinstance(clip, dict):
         # THE RECEIPT RIDES THE CLIP (campaign item 0): built here, where the
@@ -4619,7 +4619,7 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
         except Exception as exc:  # noqa: BLE001 -- never fail a render for a receipt
             _LOG.warning("[OTR video] receipt for shot %s not built: %s: %s",
                          sid, type(exc).__name__, exc)
-    return clip, out_shot, [eng], (clip_peak or _mc.vram_used_mb())
+    return clip, out_shot, [eng], clip_peak
 
 
 def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
@@ -4644,7 +4644,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     exactly: one request, one ``render_shot``, no session threaded, nothing
     assembled. That is every beat today.
 
-    Returns ``(clip, out_shot, attempts, vram_used_mb)`` -- the same tuple
+    Returns ``(clip, out_shot, attempts, observed_peak_mb)`` -- the same tuple
     :func:`render_shot` returns, because the caller must not care how many
     renders it took to make one beat.
     """
@@ -4768,11 +4768,10 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     foley_rendered = []
     out_shot = dict(shot)
     attempts = []
-    # The beat's PEAK, not its last segment's (2026-07-26 QA panel). Taking
-    # whatever the final segment happened to report under-reports a beat whose
-    # heaviest render was segment 1, which is the number the episode report
-    # exists to carry.
-    peak_used = 0
+    # Maximum successful observation across segments, not the last segment.
+    # Mixed known/unknown telemetry reports only what was observed; it does
+    # not assert complete sampling coverage. No observations remains None.
+    peak_used = None
     terminal = None
     # PER-SEGMENT IDENTITY (operator ask, 2026-08-01). A beat that renders as
     # one clip has always been traceable -- it IS the beat, and the ledger's
@@ -4841,7 +4840,9 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                 host_caps=host_caps, profile=profile,
                 segment=_bs.SegmentSlot(session, index, beat_id))
             attempts = list(attempts) + list(seg_attempts or ())
-            peak_used = max(int(peak_used), int(seg_used or 0))
+            if seg_used is not None:
+                peak_used = (int(seg_used) if peak_used is None
+                             else max(peak_used, int(seg_used)))
             path = str((clip or {}).get("path") or "")
             if not path:
                 raise RenderError(
@@ -5082,9 +5083,9 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # Same trap as the extension receipts this function was just repaired for,
     # one field over: a beat-scope value left unassigned silently becomes a
     # segment-scope one. Written UNCONDITIONALLY for that reason. ``None`` when
-    # nothing was measured, which is the convention every consumer already uses
-    # -- never 0, which would read as "measured, and it was free".
-    beat_clip["vram_peak_mb"] = int(peak_used) if peak_used else None
+    # nothing was measured. Preserve 0 only when it came from a successful
+    # sample; a missing observation must never invent that number.
+    beat_clip["vram_peak_mb"] = peak_used
     beat_clip["vram_admission"] = admission
     _LOG.warning(
         "[OTR video] BEAT %s assembled from %d %s segment(s) -> %d frame(s) "
@@ -5142,7 +5143,8 @@ def run_episode(ledger, *, oom_shot_id=None,
     # profiling pass. Additive + read-only -- collecting a path NEVER affects the
     # render; the frozen master is only ever read.
     amp_rows = []
-    vram_peak = 0
+    # Maximum observed sample, not proof that every beat/window was sampled.
+    vram_peak = None
     # Stills-first VRAM discipline (operator 2026-06-12, "evict flux when all
     # stills are done"): every portrait + scene still is already minted to disk
     # by the image phase -- build_request_from_shot only RESOLVES ledger paths,
@@ -5429,8 +5431,9 @@ def run_episode(ledger, *, oom_shot_id=None,
                     if key in clip:
                         row[key] = clip[key]
             trace.append(row)
-            if used:
-                vram_peak = max(vram_peak, int(used))
+            if used is not None:
+                vram_peak = (int(used) if vram_peak is None
+                             else max(vram_peak, int(used)))
             # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
             # the next beat reclaims only when it crosses to a different engine.
             _last_engine = str(out_shot.get("engine_id") or "")

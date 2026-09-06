@@ -344,3 +344,21 @@ never starts but returns initialized0. The09:23read-only diagnostic failed at
 binding import before any NVML memory query. Historical peak is UNKNOWN.
 Logged PBUG-20260906-04; no binding installed or telemetry fix applied. Current
 act continues into cast descriptions after source interpretation completed.
+
+September6 10:00 update: the same one-act rerun completed its six-beat outline
+at09:51:28 and DramaticState at09:59:12, then entered continuity generation.
+Native screenshots show one running writer and act_count1. Around0.4tok/s is
+still severe startup friction. No new terminal error, live credits completion,
+obs_publish OK or final episode proof; this remains development, not clean-room
+PASS. No interruption or installed changes during this healthy run.
+
+The VRAM reporting defect now has a source-only correction. Failed NVML reads
+remain unknown, real zero remains a measurement, and only successful render-window
+samples contribute to reported peaks. Post-render instantaneous readings no
+longer fill missing peaks. Human logs say unknown; JSON receipts use null.
+Mixed sampling reports an observed maximum, not a guaranteed complete peak.
+Legacy admission/floor interfaces and numeric behavior remain unchanged.
+No binding/dependency installation or GPU-specific model/recipe/JSON change.
+Main163focused tests PASS, with independent source review; full pytest and
+physical5080 qualification are not claimed. Installed code remains unchanged;
+PBUG-20260906-04 stays OPEN for live/package verification and binding policy.

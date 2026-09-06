@@ -247,7 +247,20 @@ def probe_used_mb(device_index: int = 0) -> int:
     process on the device). Returns 0 if NVML is unavailable -- callers that
     gate on a floor MUST distinguish that case (see :func:`nvml_available`);
     NEVER use ComfyUI ``get_free_memory()`` here (this-process allocator view
-    only -- it cannot see a sidecar's allocation)."""
+    only -- it cannot see a sidecar's allocation). Telemetry should instead use
+    :func:`sample_used_mb`, which does not conflate a failed query with zero."""
+    used = sample_used_mb(device_index)
+    return 0 if used is None else used
+
+
+def sample_used_mb(device_index: int = 0) -> Optional[int]:
+    """Machine-wide used VRAM in MB, or ``None`` when no reading was obtained.
+
+    Import, initialization, handle and memory-query failures are all unknown,
+    not measurements of zero. Keep the legacy admission API separate. Shutdown
+    follows successful initialization even if querying fails; cleanup failure
+    does not discard a valid reading. No device allocation or model loading.
+    """
     try:
         import pynvml  # type: ignore
         pynvml.nvmlInit()
@@ -261,7 +274,7 @@ def probe_used_mb(device_index: int = 0) -> int:
             except Exception:  # noqa: BLE001
                 pass
     except Exception:  # noqa: BLE001
-        return 0
+        return None
 
 
 def nvml_available(device_index: int = 0) -> bool:
@@ -324,6 +337,6 @@ def wait_until_stable(attempts: int = 3, sleep_s: float = 2.0, delta_mb: int = 2
 
 __all__ = [
     "LeaseContext", "LeaseTimeout", "LeaseError",
-    "acquire", "release", "probe_used_mb", "nvml_available",
+    "acquire", "release", "probe_used_mb", "sample_used_mb", "nvml_available",
     "wait_until_below_mb", "wait_until_stable", "is_held", "read_owner",
 ]
