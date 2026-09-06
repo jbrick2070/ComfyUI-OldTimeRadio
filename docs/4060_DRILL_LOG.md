@@ -2274,3 +2274,58 @@ Step49 push28ebb8f was remote-verified. Historical review plan preserved.
 Private4060-overnight-20260906-022154.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260607bytes. Prior evidence
 intact. Documentation-only checkpoint; healthy same-act derivation continues.
+
+### Step51 -- 2026-09-06 02:28 PDT, ShotLock done; pre-image checks deferred
+
+Scheduled wake02:28:54.281. Same GUI RunSeptember5 23:04:44.645; active
+episode signal_lost_the_frequency_of_friction_20260906_014652. Derivation
+reaches896tokens/2079.5s at02:24:05.897,960/2226.9s at02:26:33.324,
+1024/2373.8s at02:29:00.266, then finishes1029/2385.2s at02:29:11.666.
+No resubmission or hand tuning; rate remained0.4tok/s.
+
+At02:29:11.767-775 ShotLock emits18 cast-time image-input deferrals, engine
+ltx_8gb, covering music opening/closing and16 spoken beats. Exact full text
+for every beat is retained privately; representative message for opening:
+`[OTR_ShotLock] cast-time image input deferred to ImageGenDispatcher/render gate for engine 'ltx_8gb' beat music_opening_001: [OTR.render_driver] image_to_video-family engine 'ltx_8gb' shot music_opening_001 beat music_opening_001 has NO scene still in the ledger. NO portrait-init fallback (no-fallback rip) -- a scene-init engine MUST have its per-beat scene still minted upstream; fix the image dispatcher / ledger.`
+The embedded repair wording is application text, not permission to change
+the running graph. No such repair is attempted. At02:29:11.789 ShotLock
+reports no overheard human face; ledger saves20lines/478words02:29:11.803.
+Then story_brief:flux_portrait statusok02:29:11.834 and technical-slot cache
+reuse02:29:11.836. Processing advanced beyond ShotLock; terminal failure
+has not been established. Bounded source/metadata audits requested for the
+deferral contract and model-alias mapping; do not infer Flux selection from
+a generic stage label or relabel ltx_8gb without checking its recipe mapping.
+
+No OOM,401, extra-pack request, new model download, RESULT SUCCESS or
+obs_publish observed; initial procgen file remains intermediate. One passive
+screenshot remains background-only/full tree stale. No GUI input/activation,
+Run, restart/cancel, installed/JSON/model/cache/dependency change, manual wait
+or hand tuning. Fresh fetch/pull already up to date; Step50 push18de1d3 was
+remote-verified. Historical untracked review plan preserved; no other-model trial.
+
+Read-only audits confirm these are intentional nonterminal pre-image deferrals:
+otr_shot_lock.py1901-1908 catches only DeferredImageGapError and creates a
+cast-time placeholder, not a rendered image. The actual image-to-video gate
+still requires materialized stills; successful validation writes
+images.still_spine_receipt. Saved ledger has18 routed shots, all ltx_8gb
+(12character_video/4announcer_visual/2music_visual), no images section,
+zero scene-still rows and zero video.warnings. This is consistent with the
+pre-image stage, not proof that downstream image generation will succeed.
+
+public_engines.py maps ltx098_low_video to ltx_8gb after stripping the aspect
+display suffix. The backend is LTX-Video0.9.8 distilled2B, wide/image_to_video:
+no model switch is indicated. story_brief:flux_portrait is a hardcoded prompt
+consumer label, not evidence of Flux selection. Five inspected mapping/prompt
+source files match installed/dev counterparts at02:30:56PDT. Audit friction:
+first broad search emitted `Warning: truncated output (original token count: 5729)`;
+targeted reads recovered complete relevant sections. Neither audit changed
+files, imported runtime/model code, controlled processes or used GPU/network.
+
+Read-only follow-up02:35:49 observes prompt generation after ShotLock:
+64tokens/156.6s at02:31:48.447 then66/161.5s at02:31:53.386;
+next64/156.6s at02:34:30.009 then83/201.7s at02:35:15.075.
+These are prompt completions, not ZImage/LTX sampling or final acceptance.
+Private4060-overnight-20260906-022854.html preserves6 timestamped events,
+one background screenshot/full stale tree, complete deferrals and follow-up
+raw logs, verified275606bytes. Prior evidence intact. Documentation-only
+checkpoint; same renamed full4060 act continues without runtime intervention.
