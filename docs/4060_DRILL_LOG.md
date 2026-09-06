@@ -1807,3 +1807,35 @@ review-plan remains untouched; no source/JSON change justified by this check.
 Private4060-overnight-20260906-002952.html preserves3 timestamped events,
 one screenshot/full-tree capture, verified249808bytes. Prior evidence intact.
 Documentation-only checkpoint; active single act remains untouched.
+
+### Step36 -- 2026-09-06 00:36 PDT, news-read complete; creative call underway
+
+Scheduled wake00:36:52.612. Same GUI RunSeptember5 23:04:44.645 and episode
+pending_20260905_230557; no additional queue. News-read reached64tokens/
+150.2s at00:31:25.195, then finished78/182.9s at00:31:57.866. Creative-slot
+cache reuse at00:31:57.876 was followed by64/148.4s at00:34:26.253 and
+128/294.2s at00:36:52.055, still0.4tok/s. No explicit subsequent StructuredCall
+stage label appeared. A bounded read-only source lookup was requested to
+identify that call without runtime interaction or guessing from output text.
+No new error, OOM,401 or download; no matching RESULT SUCCESS, obs_publish OK
+or final episode verified. Conditional other-model trials remain idle.
+
+One passive visible console screenshot/full accessibility capture at00:37:12.822;
+read-only persisted-log inspection supplies exact timestamps. Zero UI input,
+manual wait, new Run, installed edit, JSON/model/cache/dependency change,
+restart/cancellation or hand tuning. Fresh fetch/pull already up to date.
+Step35 documentation pushd1bc55d was remote-verified; historical untracked
+review plan remains untouched. No active-run intervention is justified.
+
+Source-only audit identifies the next call as high-confidence script-stage
+inference: immediately after news_read the runner enters scifi_news_pro_script
+and _pass_script with creative_fn, with no intervening model call. That markup
+ladder invokes creative_fn directly rather than StructuredCall, explaining
+the absent label. Generic heartbeats alone do not prove the exact live stage
+or attempt number. Later pass_receipts/script and parse attempt_trace can
+confirm; required receipt persistence follows downstream casting/assembly.
+No runtime/model calls or source changes were used for this interpretation.
+
+Private4060-overnight-20260906-003652.html preserves4 timestamped events,
+one screenshot/full-tree capture, verified247391bytes. Prior evidence intact.
+Documentation-only checkpoint; no source/JSON modification or new trial.
