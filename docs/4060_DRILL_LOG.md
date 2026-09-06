@@ -1839,3 +1839,37 @@ No runtime/model calls or source changes were used for this interpretation.
 Private4060-overnight-20260906-003652.html preserves4 timestamped events,
 one screenshot/full-tree capture, verified247391bytes. Prior evidence intact.
 Documentation-only checkpoint; no source/JSON modification or new trial.
+
+### Step37 -- 2026-09-06 00:44-00:46 PDT, run advances; GUI capture unavailable
+
+Scheduled wake00:44:22.764. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Persisted-log heartbeats for the same creative call
+(script-stage inference from Step36):192tokens/443.3s at00:39:21.191,
+256/590.5s at00:41:48.381 and320/737.1s at00:44:15.017, still0.4tok/s.
+No new runtime error, OOM,401, download or completion. Matching RESULT SUCCESS,
+obs_publish OK and final episode remain unverified; no other-model trial.
+
+New evidence-capture friction: one passive console capture is black except
+cursor, and its full accessibility tree lags at192tokens. Read-only window
+inventory still returned Comfy Logs, workflow and dashboard, with no lock or
+security surface. This does NOT prove the desktop is unlocked. One console
+activation attempt failed verbatim: `failed to activate captured window`.
+Refreshed returned-window selection and rehydrated the unique console; the
+single bounded activation retry failed verbatim with the same message.
+Stopped GUI input after those two failures. No click/key/Run action, restart,
+cancellation, OS power/security setting change or lock-screen interaction.
+Focus outcome is unverified. Root cause of black capture is undetermined;
+do not relabel it a render failure or assume that Windows locked itself.
+
+Read-only log checks remain available and confirm later progress than the
+stale GUI tree. Subsequent checks may request passive captures, but must not
+repeat activation while this visibility condition persists. Preserve missing
+visual evidence honestly; do not infer completion from an inaccessible view.
+No hand repair/tuning, installed edit, JSON/model/cache/dependency change or
+manual sleep. Fresh fetch/pull already up to date; Step36 push5557945 was
+remote-verified. Historical untracked review plan remains untouched.
+
+Private4060-overnight-20260906-004422.html preserves8 timestamped events,
+one black screenshot/full-tree capture and both activation errors, verified
+104692bytes. Prior screenshots remain intact. Documentation-only checkpoint;
+healthy slow runtime is not interrupted by this GUI-observation limitation.
