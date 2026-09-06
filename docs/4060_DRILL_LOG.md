@@ -3170,3 +3170,23 @@ Initial45-line tail missed phase transition; expanded170lines preserved it.
 07:27/07:34 routine private checkpoints also retained. No input/retry/requeue,
 installed edit/hand setup/cleanup/registry action. Defaultbundle generation
 still deferred whileactive; documentation-only milestone, no final PASS.
+
+### Step78 -- 2026-09-06 07:52-07:58 PDT, ShotLock done; image prompts active
+
+Same one-act Run/renamed episode. Shotderivation394tokens complete07:52:54.514
+(942.3s). Eight per-beat missing-scene-still notices07:52:54.599-.602 explicitly
+defer cast-time imageinput to ImageGenDispatcher/rendergate for ltx_8gb:
+music_opening_001,b001-b006,music_closing_001. Exact messages retained privately.
+Not terminal at this stage: nextnode proceeds. Do not assume eventual repair
+or make handfallback/ledger changes; actual dispatcher/rendergate still untested.
+
+Ledger saved8lines198words07:52:54.620, including musicmirrors, not extraacts.
+Image-prompt briefstatusOK07:52:54.640;100tokenprompt complete07:56:55.681
+(241.0s). Returned maintitle4%OTR_MetaBriefImagePromptGen. No ZImage sampling
+receipt yet, no CUDA OOM/401/download/terminal result.
+
+07:57:31.129 passive screenshot remains BLACK; full available old tree and
+exact currentlog retained in4060-heartbeat-20260906-0757.html/.md.07:50
+routine checkpoint preserved privately too. Unknown screenshotcause; no
+exception/LockApp/input/retry/requeue/restart/installed edit/handfix/cleanup.
+Pending sourcegeneration deferred; documentation-only Git milestone, no registry.

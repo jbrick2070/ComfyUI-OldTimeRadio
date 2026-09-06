@@ -266,3 +266,10 @@ user HF cache contains earlierKokoro weights and2new voice files totaling
 1046855bytes; precise download timings/network bytes unavailable. No manual
 setup or warning suppression. This cache must be included in final clean-start
 inventory.07:41 screenshot remains black. Development baseline still RUNNING.
+
+Shot derivation completed07:52:54 (394tokens,942.3s), then image-prompt
+generation began. Eight missing-scene-still notices explicitly defer to the
+ImageGenDispatcher/rendergate; retained as observations, not silently fixed
+or assumed resolved. Ledger now8rows including musicmirrors.100token image
+prompt completed07:56:55; no ZImage/LTX sampling or terminal result yet.
+07:57 screenshot remains black. Same development run continues unchanged.
