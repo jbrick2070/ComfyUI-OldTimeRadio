@@ -1941,3 +1941,60 @@ Step39 pusha6f197c was remote-verified. Historical untracked review plan intact.
 Private4060-overnight-20260906-010653.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260529bytes. Prior evidence
 intact. Documentation-only checkpoint; healthy slow act remains untouched.
+
+### Step41 -- 2026-09-06 01:13 PDT, fixed story saved; reflection reload succeeds
+
+Scheduled wake01:13:53.167. Same single GUI RunSeptember5 23:04:44.645 and
+pending_20260905_230557. Voice casting reached256tokens/611.7s at01:09:14.966,
+then finished307/732.5s at01:11:15.764. App saved successive ledger states:
+2lines/39words01:11:15.792;14/36401:11:15.806;18/45601:11:16.315 and
+01:11:16.330. Delivery stamp16, delivery-differs0; cast requested2/locked2.
+At01:11:16.330 the app reports fixed story complete, cast2/scenes1/
+character_words325. Episode canon written01:11:16.333 with script title.
+These are app-managed outputs, not manual changes or full episode acceptance.
+
+At01:11:16.338 the app warns verbatim:
+`You shouldn't move a model that is dispatched using accelerate hooks.`
+Then run_story_brief_reflection attempt1/3 begins01:11:17.652, automatically
+reloads the same Gemma12B from its existing snapshot, and enables NF4. The
+usual CPU/disk-dispatch refusal at01:11:21.967 triggers the candidate's explicit
+unquantized CPU-map retry. Full third-party refusal text is retained in the
+private checkpoint. Weights677/677 complete01:11:26.675 in4s; at01:11:26.778:
+`Some parameters are on the meta device because they were offloaded to the cpu.`
+CUDA warmup completes01:11:45.178 in18.4s; reflection produces64tokens/147.9s
+at01:14:13.202. Warning/refusal did not terminate this reload: subsequent
+generation is observed. Do not conflate expected offload metadata with the
+earlier fatal nested meta-tensor exception. No model download reported.
+
+One passive screenshot remains background-only and full tree stale; no
+activation/input or new recovery attempt. Read-only persisted-log collection
+preserves exact warnings and timing; a bounded metadata/source audit was
+requested for saved pass receipts and automatic reload context. No active
+installed/JSON/model/cache/dependency edit, Run, restart/cancel, manual wait,
+hand tuning or security/power interaction. Fresh fetch/pull already up to date;
+Step40 pushd96ebde was remote-verified. Historical untracked review plan intact.
+No OOM,401, requested extra pack, RESULT SUCCESS, obs_publish OK or final
+episode verified. Original GUI-only FAIL stands; other-model trials remain idle.
+
+Saved metadata confirms10 completed news-pro runner calls: dossier4, then
+pitch/treatment/cast_aliases/news_read/script/casting1 each. Earlier ranking
+and later reflection are excluded. Script attempt1 accepted and selected,
+structural_retries0,salvaged=false; casting1 completed. Act_count1,18lines/
+456words,castlocked,sourcecoveragecomplete; final audio/video path fields
+still empty. This qualifies intermediate story receipt only, not the episode.
+
+Source ordering explains the reload: lane returns run_story_spine=False;
+shared tail explicitly unloads writer before story-brief reflection, then
+reflection reacquires the technical slot. Teardown calls model.to(cpu), which
+is wrapped by Accelerate's warning emitter; OTR catches teardown exceptions.
+This matches observed warning timing, not proof of a fatal error or a reason
+to change the active run. Bounded audit used metadata/source only.
+Audit-tool friction: malformed rg regex returned `error: unclosed group`;
+guessed nodes/_otr_slot_scheduler.py returned os error2. Both complete error
+texts are in the private checkpoint; corrected lookup found scheduler in
+OTR_LedgerScriptWriter.py. No runtime effect and no source edit.
+
+Private4060-overnight-20260906-011353.html preserves5 timestamped events,
+one background screenshot/full stale tree, exact runtime warning/refusal and
+both audit-tool errors, verified265526bytes. Prior evidence intact. Only drill/
+bug documentation updated; the same active runtime and canonical JSON stay fixed.

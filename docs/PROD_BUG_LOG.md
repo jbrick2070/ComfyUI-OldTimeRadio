@@ -11406,3 +11406,24 @@ completed two dossier calls (427tokens/1095.5s;368tokens/971.6s), then begins
 a third. No loader-error recurrence observed. Full episode qualification and
 the separate-02/-03 defects remain open. See drill Step29/private screenshot
 checkpoint; no active-run intervention or additional model trial.
+
+### 2026-09-06 01:11 PDT diagnostic progress for PBUG-20260905-01
+
+Same hand-patched one-act run now saves an18-line/456-word fixed story. Saved
+receipts confirm10 news-pro runner calls (dossier4 plus six other passes),
+script accepted first attempt with0 structural retries/salvaged=false,
+casting completed once,act_count1,lockedcast and complete source coverage.
+No final audio/video paths yet; this is intermediate story qualification only.
+
+Existing shared-tail ordering unloads the writer before story-brief reflection,
+so the app automatically reloads the same Gemma12B. Teardown emits Accelerate's
+model-move warning; the subsequent NF4 CPU-dispatch refusal triggers the same
+explicit-map retry and passes677/677 weights plus18.4s CUDA warmup. Reflection
+produces64tokens by01:14:13.202. The warning did not terminate that observed
+reload. No agent Run/restart, installed edit, model switch or tuning occurred.
+
+Full episode/registry/full-regression/physical5080 qualification remains
+unverified; original GUI-only FAIL and bugs-02/-03 remain open. Drill Step41
+records exact timing, saved receipt limits, reload source context and private
+warning/error evidence. Current screenshots cannot show the console (stale
+tree/background capture); progress is from disclosed read-only persisted logs.
