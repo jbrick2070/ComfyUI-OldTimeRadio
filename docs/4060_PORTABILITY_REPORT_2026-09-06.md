@@ -247,3 +247,9 @@ reflection model reload. Its NF4 dispatch refusal automatically recovered via
 the existing CPU-offload retry;677weights loaded, CUDAwarmup completed and
 reflection reached64tokens07:05:18. No manual recovery, CUDA OOM or401.
 Run remains active;07:06 screenshot remains black and final PASS unverified.
+
+Reflection completed07:13:51 and produced-story summary07:16:41. The writer
+advanced to ledger line checks after another automatic reload recovered via
+existing CPU offload. Repeated accelerate warning is retained; no manual
+recovery or terminal failure.07:20 screenshot remains black. Audio/video/obs
+and matching final episode file are still unqualified.

@@ -3108,3 +3108,23 @@ refusal/recovery and current log delta retained privately in
 delta, so expanded45-line read preserved it. No input/retry/requeue/restart,
 installed edit/manual setup/cleanup/registry action. Source generation deferred
 to idle; documentation-only milestone.
+
+### Step76 -- 2026-09-06 07:13-07:21 PDT, reflection and summary done; line checks
+
+Same one-act Run, unchanged pending directory. Reflection280tokens complete
+07:13:51.149 (664.9s); produced-story summary71tokens complete07:16:41.860
+(170.7s). At07:16:41.863 another warning, verbatim:
+`You shouldn't move a model that is dispatched using accelerate hooks.`
+Ledger-clean act summary triggers automatic Gemma reload. NF4 dispatch
+refusal07:16:50.617 again recovers through existing CPU-offload retry;
+677weights loaded07:16:55.317, warmup complete07:17:15.110 (19.7s).
+Clean-act summary21tokens complete07:18:08.105; line judging active through
+07:19:10.856. No manual recovery, CUDA OOM,401,download or terminal result.
+
+Single passive Logs screenshot07:20:31.105PDT remains BLACK, full available
+old tree retained. Private4060-heartbeat-20260906-0720.html/.md include exact
+new warning/refusal/recovery and stage timestamps.07:13 routine checkpoint
+also preserved privately. Unknown screenshot cause, no exception/LockApp.
+No input/retry/requeue/restart/installed edit/manual setup/cleanup/registry
+action. Pending source generation deferred. Intermediate writer progress only;
+documentation-only milestone, not full episode PASS.
