@@ -4420,3 +4420,64 @@ model), the template is a THINKING template rather than the "non-thinking" one
 the row's note claimed, and omitting the kwarg anywhere forces reasoning. The
 row note is corrected and the wiring is now pinned by
 `tests/test_chat_template_kwargs_wired.py`.
+
+### Step 108 — September 6, 15:21 PDT: native text decoder INSTALLED; E2B goes 0.4 -> 11.5 tok/s
+
+The fix from Step106/107 is implemented, pushed (7a21c5c), installed and proven
+on hardware. Full shutdown verified before the installed edit (exact PID/parent/
+creation check on 7584 and 25372, both this instance's `ComfyUI\main.py`; zero
+processes and zero 8188/8000 listeners after). Restart via the app's own
+"Restart ComfyUI"; fresh boot 15:21:03.056, all 25 nodes 15:21:11.915, no skips.
+One Run, act_count1, batch1, E2B in both slots, got prompt 15:21:39.463.
+
+LOADER EVIDENCE, verbatim from `otr_runtime.log`:
+
+```
+[15:21:43] sub-14.5 GiB path (total_vram=8.00 GiB): no device_map and no
+           max_memory passed -- bitsandbytes places the model on a single
+           device; accelerate auto-dispatch does NOT run
+[15:21:43] google/gemma-4-E2B-it loading NATIVE TEXT DECODER (gemma4_text);
+           towers are not materialized. key_mapping supplied by OTR
+[15:21:49] native text coverage OK; dropped tower prefixes=
+           ['model.audio_tower','model.embed_audio','model.embed_vision',
+            'model.vision_tower']
+[15:21:49] [BUG-098 tripwire] linear4bit_count=276 is_loaded_in_4bit=True
+           materialized_on_cuda=True vram_delta=6.03GiB
+[15:21:50] WARMUP: CUDA kernels compiled in 0.5s
+[15:21:51] VRAM_SNAPSHOT phase=NewsCuration current_gb=6.043 peak_gb=6.134
+[15:21:55] VRAM_SNAPSHOT phase=NewsCurationDeep current_gb=6.043 peak_gb=6.170
+```
+
+EVERY PREDICTION FROM STEP107 HELD.
+* `materialized_on_cuda` False -> **True**: the guard that killed the 14:34 run
+  passes, because the modules it was failing on no longer exist in the graph.
+* `linear4bit_count` 525 -> **276**. The tower linears are simply not there.
+* `vram_delta=6.03GiB` against the 6.01GiB computed offline from the checkpoint
+  header -- a 0.3% miss, and the first REAL VRAM figure this campaign has had
+  from this row (the prior reading was the known false 0.00).
+* Peak 6.170GiB inside 7.99GiB, fully GPU-resident, no CPU lane offered.
+* Warmup 0.5s against E4B's 5.5s.
+
+THROUGHPUT, from the writer's own heartbeats:
+
+```
+[15:23:35] 192 tok | 11.5 tok/s
+[15:23:41] 256 tok | 11.5 tok/s
+[15:23:47] 320 tok | 11.4 tok/s
+[15:23:49] 348 tok | 11.4 tok/s   (creative slot done)
+[15:23:56]  64 tok |  9.1 tok/s   (second pass, cache reused)
+```
+
+**11.5 tok/s against the 0.4 tok/s of gemma-4-12b-it and the 0.5 tok/s of E4B --
+roughly 25x.** Prose is coherent and in character ("Asha: I am prioritizing
+certainty over speed"). The slow-writer problem on this card was never model
+quality or model size: it was loading 70% dead multimodal cargo, overflowing the
+budget, and running the decoder over PCIe.
+
+Both news phases completed without touching the 65s/40s deadlines, and the
+creative slot reused the cached model rather than reloading it.
+
+STATUS: NOT a PASS yet. Development PASS still requires this SAME trial's exact
+RESULT SUCCESS, obs_publish OK and a final episode file on disk. Writer prose is
+one stage; credits, publication and the video lanes are untested on this row.
+E2B remains FAIL-until-proven; only its load and writer throughput are qualified.
