@@ -2329,3 +2329,26 @@ Private4060-overnight-20260906-022854.html preserves6 timestamped events,
 one background screenshot/full stale tree, complete deferrals and follow-up
 raw logs, verified275606bytes. Prior evidence intact. Documentation-only
 checkpoint; same renamed full4060 act continues without runtime intervention.
+
+### Step52 -- 2026-09-06 02:42 PDT, image-prompt generation continues
+
+Scheduled wake02:42:24.580. Same single GUI RunSeptember5 23:04:44.645;
+active episode signal_lost_the_frequency_of_friction_20260906_014652.
+Read-only persisted log at02:43:07:64tokens/154.9s at02:37:50.029 then
+67/162.1s at02:37:57.159; next64/149.5s at02:40:26.670 then80/186.5s
+at02:41:03.631,still0.4tok/s. Image-prompt stage continues; no new stage
+transition, error, OOM,401, download or extra-pack request observed. These
+prompt completions do not establish image/video sampling, RESULT SUCCESS
+or obs_publish. Existing procgen MP4 remains intermediate, not final acceptance.
+
+One passive screenshot remains background-only/full accessibility tree stale;
+no GUI activation/input/recovery attempt. No Run, restart/cancel, installed/
+JSON/model/cache/dependency change, manual wait or hand tuning. No additional
+model trial. Computer-use skill refreshed; authorized read-only log/source-
+repository checks only. Fresh fetch/pull already up to date; Step51 push
+b88199b was remote-verified. Historical untracked review plan preserved.
+
+Private4060-overnight-20260906-024224.html preserves3 timestamped events,
+one background screenshot/full stale tree and verbatim new log interval,
+verified261326bytes. Prior evidence intact. Documentation-only checkpoint;
+the same healthy slow one-act diagnostic continues under the active heartbeat.
