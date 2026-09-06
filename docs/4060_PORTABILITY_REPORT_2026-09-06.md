@@ -273,3 +273,13 @@ ImageGenDispatcher/rendergate; retained as observations, not silently fixed
 or assumed resolved. Ledger now8rows including musicmirrors.100token image
 prompt completed07:56:55; no ZImage/LTX sampling or terminal result yet.
 07:57 screenshot remains black. Same development run continues unchanged.
+
+ActualZImageTurbo execution succeeded for8scene stills across all3image roles:
+1472x832,8steps, minted08:15:22–08:19:16 withautomaticVRAMmanagement. All8PNG
+files verified on disk(total9735309bytes); openingimage visually valid. This
+supplies the8previouslydeferred scene images, not a finalvideo/publishPASS.
+
+LTXloading began08:19:17 afterappautomatically corrected thestalemasteraudio
+directorypath. Textencoder loadedonCPU; noCUDA OOM/401 ormanualrepair observed.
+NVMLinconclusive/acceleratewarnings retained;08:19GUIscreenshot remainsblack.
+Baseline continues; finalLTXclips,RESULTSUCCESS,obs_publish andepisodepending.

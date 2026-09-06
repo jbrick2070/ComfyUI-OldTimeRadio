@@ -3190,3 +3190,33 @@ exact currentlog retained in4060-heartbeat-20260906-0757.html/.md.07:50
 routine checkpoint preserved privately too. Unknown screenshotcause; no
 exception/LockApp/input/retry/requeue/restart/installed edit/handfix/cleanup.
 Pending sourcegeneration deferred; documentation-only Git milestone, no registry.
+
+### Step79 -- 2026-09-06 08:14-08:22 PDT, all8 ZImage stills minted; LTX load starts
+
+Same one-act Run/renamed episode. Final imageprompt80tokens completes08:14:36.736.
+Actual dispatcher resolves all3image roles toZImageTurbo, verifiedBF16asset.
+App pipeline-residue release and Comfy dynamicVRAM/textencoder eviction run
+automatically; no agent tuning. Eight1472x832 stills,8steps/cfg1/shift3/euler-normal,
+minted08:15:22.399 through08:19:16.170. All8ordinaryPNGfiles independently
+statverified08:19:59, total9735309bytes, manifest8937bytes. Privateaudit records
+every scene/seed/time/size and fullsampler output. OpeningPNG visually inspected:
+valid stylizedradioframe; other7statverified, notvisuallyreviewed. No OOM/401.
+
+This supplies actualstills for all8previouslydeferred beats. Lastsave08:19:16.352,
+firstresolve-to-lastsave4m39.590s. Styled8/8; ledger saved08:19:16.395. Real
+ZImagecomponent execution nowevidenced; downstreamLTX/finalpublishnotyetqualified.
+NVMLre-probe inconclusive notices and repeatedacceleratewarning retained.
+Stagedmodelsize isnotresidentGPUpeak; nopeakVRAMclaimfromthese logs.
+
+LTXscene-openbriefOK08:19:16.406. Appautomatically re-resolves stalepre-rename
+masteraudiopath08:19:16.423(samefile); nohandrepair. Pre-renderresiduefreeOK,
+reported6.81GBfree, thenper-beataudioslicing/LTXmodelload. Separatetextencoder
+9083.39MBloaded08:19:23.519 explicitlyonCPU,not9GBGPUallocationorOOM.
+NoLTXsampler/finalclipreceipt yet; baselineRUNNING,notRESULTSUCCESS/obsPASS.
+
+08:19:14.101passiveGUIscreenshot remainsBLACK/fullavailableoldtree. Private
+4060-heartbeat-20260906-0818.html/.mdpreserve fullcurrentdelta,closinghandoff,
+PNGsizes andgenerated-outputinspection. Initial18linetailmissedtransition;
+recoveredcontinuousdeltafromprior08:11:23.860timestamp,includinguntimestamped
+samplerbars. NoGUIinput/retry/requeue/installededit/manualsetup/cleanup/registry.
+Pendingdefaultbundle/92variantgenerationremain deferredwhileactive.
