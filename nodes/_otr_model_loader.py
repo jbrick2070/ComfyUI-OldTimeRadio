@@ -622,6 +622,58 @@ def _plan_nf4_cpu_offload(model_config, *, load_dtype, max_memory, attn_impl):
     return device_map
 
 
+def _e4b_text_offload_config(model_config):
+    """Use the native text decoder only for E4B's NF4 CPU-offload retry.
+
+    The composite Gemma4 forward reads the PAD embedding weight directly after
+    its module's offload hook has returned it to meta (PBUG-20260906-06).
+    Native text forward uses the embedding modules and their hooks normally.
+    Keep the original composite config intact for every other loading path.
+    """
+    from copy import deepcopy
+
+    text_config = getattr(model_config, "text_config", None)
+    if (getattr(model_config, "model_type", None) != "gemma4"
+            or getattr(text_config, "model_type", None) != "gemma4_text"
+            or getattr(model_config, "tie_word_embeddings", None) is not True
+            or getattr(text_config, "tie_word_embeddings", None) is not True):
+        raise ModelLoaderError(
+            "E4B text offload requires a Gemma4 text config with tied embeddings")
+    return deepcopy(text_config)
+
+
+def _validate_e4b_text_loading_info(info):
+    """Reject incomplete text loads; only the omitted multimodal towers may differ.
+
+    Transformers can return a model with randomly initialized missing weights.
+    Its public loading report filters the native decoder's declared shared-KV
+    extras and tied head, so no blanket text-key exception is needed here.
+    RuntimeError deliberately reaches load_llm's existing orphan-model cleanup.
+    """
+    required = ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")
+    if not isinstance(info, dict) or any(field not in info for field in required):
+        raise RuntimeError("E4B text load returned an incomplete loading report")
+    for field in required:
+        values = info[field]
+        if not isinstance(values, (list, tuple, set, frozenset)):
+            raise RuntimeError(f"E4B text load returned malformed {field}")
+        if field != "unexpected_keys" and values:
+            raise RuntimeError(f"E4B text load rejected {field}: {values!r}")
+    if info.get("conversion_errors"):
+        raise RuntimeError("E4B text load reported checkpoint conversion errors")
+    multimodal_prefixes = (
+        "model.audio_tower.", "model.vision_tower.",
+        "model.embed_audio.", "model.embed_vision.",
+    )
+    unexplained = [key for key in info["unexpected_keys"] if not (
+        isinstance(key, str) and any(
+            key.startswith(prefix) and len(key) > len(prefix)
+            for prefix in multimodal_prefixes))]
+    if unexplained:
+        raise RuntimeError(
+            f"E4B text load rejected unexpected_keys: {unexplained!r}")
+
+
 def _apply_matmul_precision_policy() -> None:
     """TF32 OFF for byte-identical determinism (I-2 / C-1); Ampere+ (sm80+)
     gets 'high' matmul precision for LLM throughput. The capability probe is
@@ -1058,8 +1110,17 @@ def load_llm(
                 )
                 _retry_kwargs = dict(common_kwargs)
                 _retry_kwargs["quantization_config"] = _offload_quant
+                _e4b_text_retry = _stripped_model_id == "google/gemma-4-E4B-it"
+                _retry_config = model_config
+                if _e4b_text_retry:
+                    _retry_config = _e4b_text_offload_config(model_config)
+                    _retry_kwargs["key_mapping"] = {r"^model\.language_model\.": "model."}
+                    _retry_kwargs["output_loading_info"] = True
+                    _runtime_log(
+                        "[StoryOrchestrator] E4B NF4 CPU-offload retry uses the "
+                        "native text decoder with strict checkpoint coverage")
                 _retry_kwargs["device_map"] = _plan_nf4_cpu_offload(
-                    model_config,
+                    _retry_config,
                     load_dtype=load_dtype,
                     max_memory=common_kwargs.get("max_memory"),
                     attn_impl=attn_impl,
@@ -1068,12 +1129,22 @@ def load_llm(
                     "[StoryOrchestrator] NF4 explicit offload device_map="
                     f"{_retry_kwargs['device_map']!r} (unquantized sizing)"
                 )
-                model = AutoModelForCausalLM.from_pretrained(
-                    load_target,
-                    local_files_only=True,
-                    config=model_config,
-                    **_retry_kwargs,
-                )
+                if _e4b_text_retry:
+                    model, _e4b_loading_info = AutoModelForCausalLM.from_pretrained(
+                        load_target,
+                        local_files_only=True,
+                        config=_retry_config,
+                        **_retry_kwargs,
+                    )
+                    _validate_e4b_text_loading_info(_e4b_loading_info)
+                    _runtime_log("[StoryOrchestrator] E4B native text checkpoint coverage OK")
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        load_target,
+                        local_files_only=True,
+                        config=_retry_config,
+                        **_retry_kwargs,
+                    )
             _runtime_log(
                 f"LLM model loaded from "
                 f"{'canonical snapshot' if snapshot_path else 'model_id with cache_dir'} "

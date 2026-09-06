@@ -11739,3 +11739,20 @@ tail actually renders in the installed workflow and final success is verified.
   app's 9 GB download estimate. Menu 4.5 GB is not a memory measurement. The
   two unquantized BF16 embedding-table shapes alone imply 6.5 GiB; do not infer
   8 GB fit from effective parameter count. No canonical default change.
+
+### PBUG-20260906-06 follow-up — September 6, 13:29 PDT
+
+A narrow source candidate now uses the native Gemma4 text decoder only inside
+the exact E4B NF4 CPU-offload retry. Planning/loading share a copied tied text
+config and explicit anchored checkpoint mapping. A strict public loading-info
+check rejects missing/mismatched/error text weights and unexplained extras;
+only omitted audio/vision prefixes are permitted. Existing cleanup owns
+validation failures; initial/all-GPU and 12B paths remain unchanged.
+
+Verification: 23 new and seven existing stdlib tests PASS, two five-test tiny
+CPU proof suites PASS, driver production-helper/public-API bridge PASS with
+bit-exact logits and unchanged generation configuration. Real E4B config/meta
+planning keeps the main input embedding on CUDA and per-layer embeddings on
+CPU, without CUDA initialization or real weight-body loading. One independent
+finished-diff review clean. Production/live status remains OPEN pending the
+next installed one-act GUI trial; this is not a confirmed 8 GB runtime fix.

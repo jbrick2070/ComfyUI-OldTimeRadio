@@ -3786,3 +3786,53 @@ run peak or proof of E4B fit. The shutdown row had an Unknown Error and is exclu
 Sampler exit 1 followed its explicit stop, not a render failure. Audit friction:
 two Split-Path parameter-set errors preceded corrected read-only ancestor checks;
 full error wording is preserved privately. No source-code fix for E4B yet.
+
+### Step 94 — September 6, 13:05–13:29 PDT: E4B retry-only source candidate
+
+The actual error from Step 93 is now reproduced with tiny synthetic CPU Gemma
+models and real Accelerate offload hooks. Native text forward avoids the direct
+PAD-weight lookup and preserves bit-exact logits in the CPU fixture. A separate
+public from_pretrained proof verifies anchored checkpoint mapping, tied-head
+loading, strict missing/mismatched-weight reporting and permitted multimodal
+extras. Both five-test proofs pass; neither loads real model tensors or CUDA.
+
+Proof friction was retained verbatim privately: the first subprocess guard was
+incompatible with Windows asyncio inheritance; the first public-report validator
+incorrectly demanded an internal conversion_errors field absent from the public
+API. Only private harnesses were corrected. Missing required text tensors do not
+automatically raise in Transformers, so the production change explicitly checks
+the returned loading report. No site-packages or dependency edits.
+
+Source nodes/_otr_model_loader.py now scopes native-text loading to the existing
+NF4 CPU-offload retry for exact google/gemma-4-E4B-it. It deep-copies the validated
+tied text config, uses that same config for planning and loading, and maps only
+the anchored model.language_model. prefix. It rejects incomplete/malformed load
+reports and unexpected text keys; only four exact omitted audio/vision prefixes
+are allowed. Validation runs after model assignment and uses the existing orphan
+cleanup path. Initial/all-GPU and 12B paths, tokenizer, generation controls,
+budgets, node contracts and all JSONs remain unchanged.
+
+Independent finished-diff reviewer canonical_audit found no blocker. The driver
+reviewed both private proof scripts/receipts and the new 23-test stdlib suite.
+At 13:26:12–13, seven existing NF4 tests plus 23 new exact-E4B tests PASS.
+Hardware-scoped selection tests retain 8 GB and 15.99 GB budgets; this is not a
+physical 5080 run. The full repository pytest suite is not claimed. The separate
+Bug Bible checkout specified by older local rules is absent on this installation;
+it was not fetched or recreated. Git fetch/rebase at 13:23:52 was already current.
+
+At 13:27:58–13:28:06 the driver's production-helper bridge also PASSed: actual
+AutoModelForCausalLM public loading with production config/report helpers,
+bit-exact synthetic logits before/after offload, tied head and unchanged
+generation config. A real E4B config/meta-only production plan keeps the input
+embedding and head on CUDA 0, first decoder layer on CUDA, remaining layers and
+the large per-layer embedding on CPU. CUDA was never initialized; one device
+query was stubbed. The warning "Device 0 is not available, available devices
+are []" reflects that deliberate CPU-only harness guard, not a physical outage.
+No real checkpoint body was loaded. The plan is conservative and may be slow;
+8 GB execution and actual input placement remain live checks.
+
+Comfy has not restarted and there is no second E4B Run at this checkpoint.
+Source/tests must be committed/pushed, installed with fresh off-state checks,
+and qualified by one normal GUI act. Current campaign remains hand-patched
+development, not a clean-install PASS. Private bridge script/full output,
+review roster, scoped source diff and regression receipts are retained.

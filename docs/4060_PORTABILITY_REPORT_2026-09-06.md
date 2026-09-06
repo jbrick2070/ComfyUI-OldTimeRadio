@@ -459,3 +459,13 @@ verified 13:01:33, and evidence/download sizes/378 usable memory observations
 are preserved. The 1517 MiB sampled maximum occurred during failed warmup and
 does not qualify E4B's full memory requirement. A narrowly scoped text-only
 offload candidate is under examination; no E4B fix or second Run yet. Step 93.
+
+September 6, 13:29 development update: the exact-E4B NF4 CPU-offload retry now
+has a native-text source candidate, with strict checkpoint-coverage validation.
+Thirty focused stdlib tests pass; two five-test synthetic CPU proof suites and
+a production-helper/public-API bridge also pass. The conservative meta-only
+plan keeps input embeddings on CUDA and the large per-layer table on CPU.
+No real model weights or CUDA were loaded by these diagnostics; no 8 GB fit,
+speed, physical 5080 or full episode PASS is claimed. One independent finished
+diff review is clean. No canonical JSON, dependency or registry change.
+Installed live requalification remains pending. See drill Step 94.
