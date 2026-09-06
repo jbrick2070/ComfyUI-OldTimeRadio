@@ -4171,3 +4171,70 @@ unexpected miss would surface as an honest CUDA OOM, not a silent crawl.
 VRAM figures above are the recorded 5080 measurement and the plan's own literals.
 No new VRAM measurement was taken on this 4060; NVML remains unavailable in the
 installed Comfy Python (09:23 finding).
+
+### Step 104 — September 6, 14:22 PDT: Qwen3.5-4B row INSTALLED into the running pack
+
+Operator instruction: install the row. Done, with Comfy verified fully stopped
+first (exact process/listener check immediately before the edit: zero Comfy
+processes, zero 8188/8000 listeners). No Run was submitted and no model was
+downloaded by this step.
+
+PRE-INSTALL EQUIVALENCE PROOF. All six affected installed files were compared
+byte-for-byte against `git show HEAD:<file>` and every one was IDENTICAL. The
+installed pack therefore carried no local divergence in these files, so copying
+the working tree installs EXACTLY the uncommitted Qwen change and nothing else.
+Installed originals were first copied to private evidence under
+`installed-backup-qwen-20260906/<name>.orig` (91,199 / 12,551 / 113,267 /
+16,760 / 296,321 / 73,834 bytes).
+
+Installed 14:22:00.472–14:22:01.279 PDT, source -> pack, verified identical
+after copy:
+
+```
+_otr_model_catalog.py         91,960 bytes
+_otr_loader_backends.py       12,951 bytes
+_otr_model_loader.py         114,859 bytes
+_otr_constrained_generate.py  16,893 bytes
+OTR_LedgerScriptWriter.py    296,397 bytes
+story_orchestrator.py         74,522 bytes
+```
+
+All six were checked for BOM, zero length and AST parse BEFORE the copy and
+again on the installed copies: 0 failures both times.
+
+Six files, not one, and each is load-bearing for this row: the catalog carries
+the row itself; `_otr_loader_backends` supplies `enable_thinking=False` so the
+model does not spend its budget inside a `<think>` block; `_otr_model_loader`
+refuses BEFORE an 8.68GB download when the environment lacks native
+`Qwen3_5ForCausalLM`; the writer and constrained-generate paths forward those
+template kwargs; and `story_orchestrator` moves download/load AHEAD of the 65s
+and 40s news budgets — without which Qwen's FIRST download would blow the same
+budget that killed the E2B trial at Step99.
+
+POST-INSTALL DROPDOWN VERIFICATION, offline, against the INSTALLED catalog (no
+network, no CUDA, filesystem cache scan only). Curated rows 5 -> 6, labels now:
+
+```
+Qwen/Qwen3.5-4B (4.3 GB)
+mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)
+google/gemma-4-E2B-it (3.0 GB)
+google/gemma-4-E4B-it (4.5 GB)
+google/gemma-4-12b-it (11.9 GB)
+google/gemma-2-2b-it (2.6 GB)
+```
+
+The badges are the estimator's own figures, not measurements taken here. Two
+things worth recording: the row IS visible with an honest cost, per the
+2026-09-06 ruling; and the badge prices `gemma-4-12b-it` at 11.9GB against a
+7.99GiB card, independently consistent with the Step103 CPU-spill diagnosis.
+
+Also written this step: `docs/model-license-qwen--qwen3.5-4b.md`, the audit file
+the field contract requires and Step100 recorded as missing. Verdict Apache2.0 /
+`mit_equivalent`, from an anonymous Hub metadata read on 2026-09-06 returning
+`License: apache-2.0`, 4659.9M parameters, architecture `qwen3_5`, model class
+`AutoModelForMultimodalLM`, no download gate. The 4659.9M figure matches the
+"4.66B" on the operator's leaderboard photo.
+
+STILL OPEN: the Qwen source change remains UNCOMMITTED in the D: checkout (this
+step installed it, it did not commit it), and no Qwen trial has run. Speed, VRAM,
+prose, constrained JSON and any episode result remain NOT TESTED.
