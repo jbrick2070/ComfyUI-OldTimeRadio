@@ -2896,3 +2896,60 @@ ACTIVE, observe-only while running. Future GUI-progress source fix2ca1453
 stays unapplied to the active installation. Source/docs fixes were pushed;
 registry remains deferred. This is asset availability success, not full4060
 render/publish qualification or a zero-hand-step clean-install PASS.
+
+### Step66 -- 2026-09-06 05:06-05:22 PDT, writer advances; expanded campaign and one-act default
+
+Source/docs receipt17ba209b86342d7bea9963d0cf4a8573a3148a1a was pushed
+05:06:45; HEAD/tracking/remote matched. Writer first64tokens05:06:19.432,
+128at05:08:57.269,192at05:11:29.330,256at05:14:03.208,320at05:16:44.805.
+First concept357tokens05:18:20.239 (879.2s,0.4tok/s), then original_select
+05:18:20.259. Same one-act trial; this is progress, not a final episode PASS.
+
+User expands the campaign: all plausible physical8GB video/audio choices,
+then scoped reset and final registry/GUI human test; default canonical ONE ACT.
+[Persistent campaign plan](4060_MODEL_QUALIFICATION_PLAN.md) inventories every
+source-declared video/audio menu family, thirteen current candidate/control
+cells including baseline, exclusions and unresolved prerequisite rows. Missing
+normal provisioning remains a product finding, never a reason to seed a cache
+or install forbidden packs. H3 historical raw clips do not qualify full episodes.
+
+Current source-only preparation: canonical node1 act_count string3->1 (same
+33descriptor/value slots, same models/engines/links). Standard stdlib builder
+derived story-only, also synchronizing its old cnr_id and real visual_style
+drift: sci_fi_radio->roll(any style). Generic new-node/legacy-input default3
+unchanged. Explicit canonical test updated; new stdlib tests cover canonical,
+story parsed-object parity and future generated inheritance. Two selected
+tests PASS0.022s plus77visual PASS0.459s and7NF4 PASS0.007s,86focused checks.
+Independent finished-diff review found no new blocker; stale layout comment
+corrected. This is not a full-suite or GPU qualification claim.
+
+All92 generated variants still inherit3. Full generator schema discovery
+imports nodes/token helper/routes; deferred until active workload ends instead
+of assuming test/CUDA environment flags fence all side effects. No fabricated
+schema fixture or hand-edited variants. Default bundle remains UNCOMMITTED,
+UNPUSHED and UNRELEASED pending regeneration/check and final tests. Do not
+stage it with this documentation checkpoint. Future GUI-progress patch2ca1453
+also remains unapplied to the current installed run.
+
+Passive Comfy Logs screenshot05:15:31.851PDT, full available tree retained:
+private4060-writer-campaign-20260906-0515.html218966bytes,1screenshot.
+No click/key/extra Run/stop/installed edit, new download, deletion, registry
+publication or explicit sleep in this interval. No new OOM/401. No continuous
+screenshot coverage claimed. Exact diagnostic errors and timestamp limitations
+are in4060-campaign-expansion-audit-20260906.md. Source fetch/pull was current;
+unrelated historical untracked review plan preserved.
+
+Existing five-minute heartbeat updated in place and verified ACTIVE05:19:43,
+now carries expanded matrix, default synchronization and end-stage reset/
+release/human-test sequencing. Source repo, evidence and results are excluded
+from cleanup; exact model/cache/link targets must be inventoried first. Native
+UI deletion/software installation action-time confirmation still applies while
+the user sleeps. Healthy active run stays observe-only; no blanket promise that
+every menu entry works and no relabeling of original clean-install FAIL.
+
+05:21:04.293: original_select64tokens,0.4tok/s,164.0s; still progressing.
+Second passive screenshot05:23:32.916PDT retained privately in
+4060-concept-selection-20260906-0523.html with full available tree. No input.
+Finished-document review confirmed matrix scope/exclusions; did not separately
+reverify the root's run/test timestamps. Only the3documentation files are staged
+for this checkpoint; the incomplete canonical/derived/test bundle stays local.

@@ -181,3 +181,16 @@ warmup completed05:03:40.919. No manual asset provision or extra pack was
 needed. Current result: asset-readiness path verified; episode still RUNNING.
 Original clean-install FAIL remains unchanged, and full4060 PASS still requires
 the matching RESULT SUCCESS, obs_publish OK and final episode file.
+
+At05:18:20 the writer completed its first357-token concept and advanced to
+original_select. This is live forward progress at about0.4tok/s, not completed
+writing or media success. The user has expanded the work to the
+[video/audio campaign and final clean-start gate](4060_MODEL_QUALIFICATION_PLAN.md).
+
+The requested one-act shipped default is prepared in DEV source only. The
+canonical's sole change is act_count3->1; its derived story-only copy also
+synchronizes pre-existing style/registry-id drift. All92 generated variants
+await normal regeneration after the current run is idle.86focused checks
+passed, but inheritance/full-suite/live qualification is not complete. This
+default bundle is not yet committed, pushed, released or installed. No cleanup
+or new registry publication has occurred; logs/evidence/source are preserved.
