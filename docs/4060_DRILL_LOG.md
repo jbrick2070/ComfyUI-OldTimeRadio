@@ -3471,3 +3471,20 @@ wildcard was invalid on Windows and corrected with -g; a test harness initially
 hit the import guard at pydantic before its render boundary was mocked. That
 initial harness output was tool-truncated and is explicitly labeled, never
 claimed complete. Subsequent red/green outputs were captured in full.
+
+### Step 86 — September 6, 10:10–10:12 PDT: continuity complete; black capture recurs
+
+The same09:07 one-act development run completed its continuity ledger at
+10:10:34.480:292tokens in682.1s, about0.4tok/s;3facts and2activeprops. Ledger
+saved10:10:34.506, then another technical-selector call. No logged rename,
+terminal error, OOM,401,credits completion or finalpublish result.
+
+Passive screenshot10:11:15.708 is black. Fresh returned-window selection and
+one passive retry10:11:45.349 remain black except the cursor. No capture-tool
+exception. Full available accessibility still says one running writer but may
+be stale; current persisted log supplies recent liveness evidence. No explicit
+locked-desktop error or LockApp observation, so the cause remains undetermined.
+No blind input, activation, restart, requeue or installed/source change. Healthy
+recent writer progress does not justify a kill. Private1011HTML/MD preserve
+both screenshots, full available trees and exact log. Continue passive monitoring;
+credits, final episode and clean-human qualification remain pending.

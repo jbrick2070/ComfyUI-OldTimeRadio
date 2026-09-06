@@ -362,3 +362,9 @@ No binding/dependency installation or GPU-specific model/recipe/JSON change.
 Main163focused tests PASS, with independent source review; full pytest and
 physical5080 qualification are not claimed. Installed code remains unchanged;
 PBUG-20260906-04 stays OPEN for live/package verification and binding policy.
+
+September6 10:11: continuity generation completed10:10:34 (292tokens,3facts,
+2props). The one-act writer has no new terminal failure. Screenshot capture
+became black again and stayed black after one fresh-window passive retry;
+cause is undetermined, not proven desktop lock. No blind input or interruption.
+Both captures and log are preserved; final credits/publish proof still pending.
