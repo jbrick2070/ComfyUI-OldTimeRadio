@@ -3314,3 +3314,77 @@ input. Private postfailure HTMLs preserve both captures. Persisted log tail
 still ends with08:29:38 failure at08:50:22. No restart/requeue/installed patch,
 manual asset provision, cleanup or registry release. Next live qualification
 requires visible usable GUI and the reviewed candidate actually installed.
+
+### Step 82 — September 6, 08:57–09:00 PDT: user restart authority and UI restored
+
+User explicitly authorizes full Comfy shutdown after a terminal error or
+confirmed stuck state, including killing Comfy processes, then restarting.
+Save evidence first; target only verified Comfy Desktop/server children and
+verify process/listener absence. Never blanket-kill Python, interrupt healthy
+slow generation, or treat every ordinary warning as a terminal failure.
+
+User opened a fresh Comfy instance: startup08:57:14.909, serverready08:57:32.552.
+08:58read-only process inventory shows ComfyDesktop plus its venv parent and
+standalone-Python server child, with8188owned by that child. Killing only the
+venv parent would not prove full shutdown.08:59:19.892 native screenshot is
+VISIBLE again; queue0active, Runavailable, act_count1, bothGemma12B, all3LTX098
+and all3ZImage selections visible. Former black/stale GUI blocker is resolved
+at this checkpoint, not retroactively. OldLogs/main windows gone; rediscover
+fresh window objects. No agentRun/kill/restart at this checkpoint.
+
+Fresh boot also logs verbatim `Exception in callback
+_ProactorBasePipeTransport._call_connection_lost()` with its handle line;
+server remains listening and UIidle. This observation is not itself evidence
+of a new terminal render failure. Credits/source fix is pushed but not yet
+installed; the next development step is complete shutdown, apply reviewed
+candidate, restart and verify before a single GUI rerun. Original actFAIL
+remains unchanged; no cleanup or registry publication.
+
+### Step 83 — September 6, 09:01–09:07 PDT: full shutdown, reviewed candidate, ONE act
+
+User again explicitly said "Remember do 1 act". Native screenshot verifies
+act_count1 before shutdown and immediately before the only new Run; batch1.
+09:01:02.085 Menu element click had no observed popup;09:01:20.410 coordinate
+click exposed popup accessibility.09:04:17.394 QuitDesktop click did not close
+the app or listener. No tool exception; no blind repeat. Save screenshots and
+full available trees before proceeding. One earlier passive capture lacks an
+exact timestamp and is explicitly bounded, not backfilled.
+
+09:04:47–48 use the user's explicit complete-shutdown authority: select only
+verified ComfyDesktop executable and this instance's Comfy main.py processes,
+recheck PID creation/executable identity, stop Desktop parent and crashpad;
+all other verified Desktop/server children exited. Verify ZERO residual Comfy
+processes and ZERO instance-port listeners. No blanket Python kill.
+
+While fully stopped, add reviewed nodes/_otr_code_provenance.py and patch
+nodes/otr_credits_roll.py plus nodes/_otr_visual_assets.py to source e5cb6dc.
+One initial credits patch was rejected on expected-context mismatch (assistant
+omitted the .git path component); no credits mutation from that rejected
+patch. Regenerated exact patch from observed diff, applied, verified09:05:51:
+all3 candidate files and unchanged NF4loader/downloadhelper/validator are
+byte-identical to DEV. Independent preflight found no overlap. No installed
+JSON, model/cache/link, dependency, environment or pyproject change. This is
+an explicit HAND-PATCHED DEVELOPMENT step, not a human-install PASS.
+
+09:06:00–01 rerun23credits+3oneact tests:26PASS. Launch pre-existing Desktop
+09:06:01.165; click existing instance card09:06:26.306. No installer. Await
+startup:09:06:29.624; all25nodes09:06:43.141; serverready09:06:43.426. Existing
+extra packs/ambient writer authentication still contaminate clean-room claims;
+no pack install or credential acquisition. Startup warnings archived verbatim.
+
+09:07:08.249 EXACTLY ONE GUI Run, gotprompt09:07:08.348. No settings changed:
+Gemma12B bothslots, LTX098-low16:9 x3, ZImageTurbo x3, Kokoro/Kokoro/MusicGen,
+Procgen sourceNormal and upscale/blendbypass retained. Preflight23nodes61links,
+widgetdrift0; all5 prior app-downloaded visual files found, availabilityREADY
+09:07:08.520. No new visual transfer. Writer09:07:09.195 confirmsact_count1,
+2characters, media_archive_rss. Current episode pending_20260906_090709; follow
+ONLY an explicitly logged rename. Automatic NF4 CPU-offload recovery09:07:13.806,
+677weights loaded09:07:21.339; UI1active/1running. Not terminal failure or OOM.
+
+Private evidence:4060-restart-gui-20260906-0904.html,
+4060-pre-restart-20260906-0904.md,4060-credits-rerun-20260906-0907.html/.md.
+Original08:29creditsFAIL remainsFAIL; current credits/render/publish not yet
+qualified. No registry publish, reset, manual model provisioning or extraRun.
+On terminal failure or confirmed stall preserve evidence, fully close verified
+Comfy processes and verify absence before a justified next trial; do not kill
+healthy slow generation. Every rerun remains ONE ACT.

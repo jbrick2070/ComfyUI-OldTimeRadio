@@ -11,6 +11,12 @@ mouse-only quick start. The complete chronological record is
 [PBUG-20260906-01](PROD_BUG_LOG.md#pbug-20260906-01----alpha24-canonical-reaches-first-image-without-visual-weights).
 Screenshots and verbatim tracebacks remain in the task's private evidence directory.
 
+Latest checkpoint, September6 09:07PDT: a NEW one-act development rerun is
+running after verified full Comfy shutdown and the reviewed credits candidate
+was applied. GUI and writer log both confirm act_count1. This is not yet a
+workflow PASS, and it cannot qualify as a clean-install PASS. See drillStep83;
+all earlier failures below remain recorded outcomes.
+
 ## Scope and result
 
 - Physical MRKT RTX 4060 Laptop, 8 GB, Ada; no other GPU or SSH.
@@ -314,3 +320,15 @@ synchronization. Generator check92/0, all94graph link/widget checks and real
 canonical/story schemas pass.110focused stdlib tests pass across credits,
 templates, visual assets and NF4; full pytest unavailable/Bible absent. No
 version bump, registry publication, cleanup or further model trial yet.
+
+September6 09:07 update: the user restored visible Comfy and authorized full
+Comfy shutdown after terminal error/confirmed stall. QuitDesktop had no effect;
+verified Comfy-only process stop left zero Comfy processes/listeners before
+applying credits/provenance and native-download-progress source changes. Six
+relevant installed files match e5cb6dc; prior NF4/readiness files unchanged.
+No installed JSON/model/cache/environment/dependency edits.23credits+3oneact
+tests passed again. Restart loaded25nodes; exactly one GUI Run09:07:08.249,
+gotprompt09:07:08.348, writeract_count1. Currentepisodepending_20260906_090709,
+media_archive_rss; all5existingvisualassetsREADY, no new visual transfer.
+NF4 automatic CPU-offload recovery completed weightloading; writer is running.
+This development rerun awaits actual credits, finalpublish and episode proof.
