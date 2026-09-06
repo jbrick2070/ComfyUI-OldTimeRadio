@@ -761,6 +761,19 @@ def _llm_rank_news_candidates(
         # worker was still alive on GPU). The cache-invalidation we added
         # in BUG-LOCAL-111 (commit 27e54e9) also fires here so the orphan
         # worker doesn't poison the next phase's CUDA state.
+        # Download/load on the owning thread BEFORE the generation deadline.
+        # A first multi-GB download is not a 65-second news-generation call;
+        # timing it in an abandoned worker left acquisition running after FAIL.
+        from . import _otr_model_loader as _OTRML
+        _OTRML.raise_if_processing_interrupted()
+        log.info("[NewsFetcher] Preparing technical model for NewsCuration; "
+                 "download/load precede the 65s generation budget")
+        cache_entry = _OTRML.request_slot(
+            "technical", model_id, policy=policy, load_config=load_config,
+        )
+        gen_fn = _OTRML.make_generate_fn(cache_entry)
+        _OTRML.raise_if_processing_interrupted()
+
         def _do_rank_call():
             # 2026-04-29 fix: transformers rejects temperature=0.0 with
             # "must be strictly positive". For greedy-deterministic
@@ -774,11 +787,6 @@ def _llm_rank_news_candidates(
             # bakes top_p=0.92 (the canonical surface does not expose
             # per-call top_p override -- acceptable for a stochastic-
             # argmax ranker at temperature=0.05).
-            from . import _otr_model_loader as _OTRML
-            cache_entry = _OTRML.request_slot(
-                "technical", model_id, policy=policy, load_config=load_config,
-            )
-            gen_fn = _OTRML.make_generate_fn(cache_entry)
             return gen_fn(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.05,
@@ -895,16 +903,21 @@ def _llm_rerank_with_bodies(
             f"Best index:"
         )
 
+        from . import _otr_model_loader as _OTRML
+        _OTRML.raise_if_processing_interrupted()
+        log.info("[NewsFetcher] Preparing technical model for NewsCurationDeep; "
+                 "download/load precede the 40s generation budget")
+        cache_entry = _OTRML.request_slot(
+            "technical", model_id, policy=policy, load_config=load_config,
+        )
+        gen_fn = _OTRML.make_generate_fn(cache_entry)
+        _OTRML.raise_if_processing_interrupted()
+
         def _do_rerank_call():
             # Same temperature=0.05 trick as headline rank: transformers
             # rejects 0.0; tiny positive value is effectively argmax.
             #
             # LLM slot: technical -- single-index body rerank.
-            from . import _otr_model_loader as _OTRML
-            cache_entry = _OTRML.request_slot(
-                "technical", model_id, policy=policy, load_config=load_config,
-            )
-            gen_fn = _OTRML.make_generate_fn(cache_entry)
             return gen_fn(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.05,

@@ -484,3 +484,26 @@ with382tokens in742.8s and advanced to concept selection using the cached model.
 The same one-act trial remains active without additional inputs or downloads.
 No terminal failure, complete story, credits or publication yet. CPU offloading
 is slow but progressing; no runtime or settings change. Drill Step96.
+
+September 6, 13:56 outcome: user requested a smaller writer, so repaired E4B
+was cancelled and fully stopped. It remains USER ABORTED / PERFORMANCE FINDING,
+not OOM or PASS. Cancel was acknowledged but did not promptly terminate writer
+generation; scoped full shutdown was required. The load fix works past its
+former failure, but0.5tok/s does not establish a practical4060 default.
+Next candidate is built-in E2B, the smallest labelled ungated native automatic-
+download choice; Gemma2-2B's smaller badge is gated. No new family, dependency,
+registry or canonical JSON change. One act remains mandatory. Drill Step97.
+
+September 6, 13:59: E2B/E2B one-act/batch1 trial submitted once13:58:14.445.
+Automatic download began13:58:16.819;6.0GB is the app estimate, not measured
+size or total VRAM. A startup blueprint warning recovered by normal Refresh;
+two model selections needed observed retries before Run. No manual model,
+token, pack or source change. Load, speed and final credits still pending.
+Full ordered screenshots, inputs, waits and console evidence: drill Step98.
+
+September 6, 14:01 outcome: E2B FAILED before generation. Initial automatic
+download was inside NewsCuration's65second generation timeout; the workflow
+halted at67.29seconds with an orphan-worker warning. Not OOM/401 and not an
+E2B speed measurement. Full scoped Comfy/sampler shutdown verified. User now
+requests Qwen3.5 4B; native integration and first-download ownership fix are
+being examined, with no Qwen run or fit claim yet. Drill Step99.

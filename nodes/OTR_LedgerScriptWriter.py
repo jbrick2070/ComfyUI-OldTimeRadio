@@ -868,6 +868,7 @@ def _build_truncating_generate_fn(
             )
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
+            **_OTRLB.chat_template_kwargs(cache_entry.get("model_id", "")),
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 

@@ -143,6 +143,23 @@ class CuratedModel:
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     CuratedModel(
+        repo_id="Qwen/Qwen3.5-4B",
+        requires_auth=False,
+        loader_backend="transformers_multimodal_text_only",
+        vram_fit_tier="WARN",
+        # Official shards: 9,319,828,096 bytes / 2**30. Disk, not VRAM.
+        approx_safetensors_gb=8.68,
+        notes="Official Apache-2.0, ungated Qwen3.5 text-only native "
+        "Transformers lane. Non-thinking chat template; ordinary NF4 policy. "
+        "8GB speed, memory and episode qualification pending; not soak-tested.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+    ),
+    CuratedModel(
         repo_id="mistralai/Mistral-Nemo-Instruct-2407",
         # 2026-08-25: was True. The Hugging Face API reports `"gated": false`
         # for this repo -- the flag was demanding an HF_TOKEN for a model that
@@ -1481,6 +1498,7 @@ HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
 # clamp, so C7 audio byte-identity holds. Every other row stays at its
 # soak-tested 8192 (a WARN-tier override stays clamped by the hard limit).
 CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
+    "Qwen/Qwen3.5-4B": 8192,
     "mistralai/Mistral-Nemo-Instruct-2407": 16384,
     "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,

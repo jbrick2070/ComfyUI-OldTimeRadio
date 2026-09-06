@@ -432,6 +432,18 @@ def _require_transformers_model_support(
 ) -> None:
     """Fail early when a selected model needs a newer Transformers build."""
     normalized = str(model_id or "").split(" ", 1)[0].strip()
+    if normalized == "Qwen/Qwen3.5-4B":
+        from transformers.models.auto.modeling_auto import (
+            MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+        )
+        if any(MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.get(kind) != "Qwen3_5ForCausalLM"
+               for kind in ("qwen3_5", "qwen3_5_text")):
+            raise ModelLoaderError(
+                "Qwen/Qwen3.5-4B requires native Transformers Qwen3_5ForCausalLM "
+                "support for both qwen3_5 and qwen3_5_text. This environment "
+                "cannot load its text decoder; refusing before model download."
+            )
+        return
     if normalized not in _GEMMA4_UNIFIED_MODEL_IDS:
         return
     if installed_version is None:
@@ -459,6 +471,22 @@ def _require_transformers_model_support(
 # ---------------------------------------------------------------------------
 # S0 portability helpers (docs/2026-07-09-platform-portability-final.md)
 # ---------------------------------------------------------------------------
+
+
+def raise_if_processing_interrupted() -> None:
+    """Check Comfy's cancellation flag without hiding real import failures.
+
+    Non-Comfy library/test use has no Comfy cancellation owner. Blocking Hub
+    transfer and model load remain non-preemptible; callers check boundaries
+    so cancellation cannot proceed from a completed download into GPU loading.
+    """
+    try:
+        from comfy.model_management import throw_exception_if_processing_interrupted
+    except ModuleNotFoundError as exc:
+        if exc.name not in {"comfy", "comfy.model_management"}:
+            raise
+        return
+    throw_exception_if_processing_interrupted()
 
 
 def _plan_max_memory(
@@ -1845,10 +1873,12 @@ def request_slot(
     from . import _otr_hf_env as _otr_hf
 
     _resolved_hf_home = _otr_hf.ensure_hf_home()
+    raise_if_processing_interrupted()
     _otr_catalog.auto_download_if_missing(
         normalized,
         hub_root=_Path(_resolved_hf_home) / "hub",
     )
+    raise_if_processing_interrupted()
 
     # Step 8: if a different model is resident, unload it. Then load.
     if LLM_CACHE.get("model_id") not in (None, normalized):
@@ -2018,8 +2048,10 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             messages, "_otr_fail_on_output_limit", False,
         ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
+        from ._otr_loader_backends import chat_template_kwargs
         prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            **chat_template_kwargs(cache_entry.get("model_id", "")),
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         context_cap = int(cache_entry.get("context_cap") or 8192)
@@ -2227,8 +2259,10 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
             messages, "_otr_fail_on_output_limit", False,
         ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
+        from ._otr_loader_backends import chat_template_kwargs
         prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            **chat_template_kwargs(cache_entry.get("model_id", "")),
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         context_cap = int(cache_entry.get("context_cap") or 8192)

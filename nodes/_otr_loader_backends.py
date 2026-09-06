@@ -108,6 +108,17 @@ def check_context_window(row: Any) -> None:
         )
 
 
+def chat_template_kwargs(model_id: str) -> dict:
+    """Use Qwen3.5's official direct-response switch on every native surface.
+
+    Other models keep their exact previous template arguments. This controls
+    template formatting, not sampling or a synthetic prompt rewrite.
+    """
+    if str(model_id or "").split(" ", 1)[0] == "Qwen/Qwen3.5-4B":
+        return {"enable_thinking": False}
+    return {}
+
+
 def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
     """Sprint D D2c -- per-backend message encoding dispatch.
 
@@ -128,10 +139,8 @@ def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
     Returns the encoded inputs ready to pass into model.generate().
     Raises ValueError on an unknown chat_template_kind.
 
-    The dispatch is metadata-driven only. No `repo_id` substring
-    matching, no per-row special cases. Adding a new tokenizer
-    family means classifying it via chat_template_kind on the
-    catalog row -- no edits here.
+    Backend dispatch is metadata-driven. Shared exact-model template options
+    keep this compatibility surface aligned with the live writer factories.
     """
     kind = row.chat_template_kind
     if kind == "transformers_default":
@@ -143,6 +152,7 @@ def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
             normalized,
             return_tensors="pt",
             add_generation_prompt=True,
+            **chat_template_kwargs(getattr(row, "repo_id", "")),
         )
     if kind == "raw_completion":
         joined = "\n".join(m.get("content", "") for m in messages)

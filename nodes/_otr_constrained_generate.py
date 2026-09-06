@@ -253,8 +253,10 @@ def make_constrained_generate_fn(
             raise ModelLoaderError("torch not available") from exc
 
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
+        from ._otr_loader_backends import chat_template_kwargs
         prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            **chat_template_kwargs(cache_entry.get("model_id", "")),
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
