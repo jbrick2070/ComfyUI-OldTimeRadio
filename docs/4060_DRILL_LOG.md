@@ -3488,3 +3488,30 @@ No blind input, activation, restart, requeue or installed/source change. Healthy
 recent writer progress does not justify a kill. Private1011HTML/MD preserve
 both screenshots, full available trees and exact log. Continue passive monitoring;
 credits, final episode and clean-human qualification remain pending.
+
+### Step 87 — September 6, 10:19–10:42 PDT: composition and automatic reflection reload
+
+Same09:07 one-act run, still pending_20260906_090709. Slot contracts completed
+10:23:00.962:6slots, allLLM, episode_valid=True. Two grouped dialogue calls
+completed10:27:20.527 and10:31:05.883, both first attempt;4voicedbeats composed.
+Ledger6rows204words saved10:33:23.151. Produced-open brief completed10:36:52,
+intro rewritten10:38:40, outro10:39:01;189words then185aftertitleprocessing.
+Optional key-term telemetry1/5 is not a terminal prose gate. Nothing manually
+rewritten or tuned. Each checkpoint's full log and black screenshots retained
+privately:1019,1026,1033,1041HTML/MD, including one fresh-window passive retry.
+
+Title chosen10:41:19.401: The Ledger of the Gable Name. episode_canon.json
+written in the SAME pending directory; this is not evidence of a folder rename.
+10:41:19.411 warning: `You shouldn't move a model that is dispatched using
+accelerate hooks.` Reflection call10:41:20.233 automatically reloads Gemma.
+The known NF4 refusal again recovers through explicit CPU offload10:41:23.418;
+677weights loaded10:41:31.615, warmup complete10:41:42.553(10.8s). Existing
+cache resolved, no new model transfer reported. This is app behavior, no hand
+repair, new selection or additional Run. No terminal OOM/401/failure observed.
+
+Reflection, final credits, rendering and publication remain pending. Healthy
+writer continues around0.4tok/s, despite severe elapsed-time friction. No blind
+GUI input, activation, restart, installed/source-code/dependency/environment
+change, model/cache/link repair or registry publication. Capture cause remains
+undetermined; no explicit locked-desktop evidence. Prior failed trials remain
+FAIL; this development run is not a clean-install qualification.

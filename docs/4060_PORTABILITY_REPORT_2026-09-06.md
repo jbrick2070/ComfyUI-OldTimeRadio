@@ -368,3 +368,13 @@ September6 10:11: continuity generation completed10:10:34 (292tokens,3facts,
 became black again and stayed black after one fresh-window passive retry;
 cause is undetermined, not proven desktop lock. No blind input or interruption.
 Both captures and log are preserved; final credits/publish proof still pending.
+
+September6 10:42: the same one-act run has composed its six-row draft and chosen
+The Ledger of the Gable Name. The title is written under the existing pending
+folder, not a logged folder rename. Reflection automatically reloads Gemma;
+the known NF4 CPU-offload recovery works again, weights/warmup complete10:41:42.
+Accelerate's move-dispatched-model warning and persistent black capture are
+retained, with no terminal error or manual intervention. No new model transfer
+reported. Reflection/render/credits/publish remain unqualified; severe0.4tok/s
+writer latency is still recorded as usability friction, not a reason to tune
+this active test. No source-code/installed change or registry publication.
