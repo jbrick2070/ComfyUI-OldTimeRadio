@@ -217,3 +217,8 @@ skeleton was saved. Read-only06:17 verification found the matching20419-byte
 JSON ledger and6-element lines array. Dramatic-state generation is now active.
 This proves an intermediate durable skeleton, not completed words/audio/video
 or obs publication. No new error; passive screenshot remains black.
+
+At06:19:15 dramatic state completed and was stamped; continuity generation
+followed automatically and reached128tokens06:24:06. Still RUNNING without
+new setup or errors; the06:25 passive screenshot remains black. No final
+writer/media/publication success established.

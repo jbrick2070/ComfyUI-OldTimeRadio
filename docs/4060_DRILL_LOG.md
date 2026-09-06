@@ -3023,3 +3023,16 @@ tree; private4060-heartbeat-20260906-0617.html/.md retain the evidence gap
 and exact current disk-log lines. No retry/activation/input/power changes.
 Run stays untouched; pending JSON bundle and generator remain deferred to
 idle. Documentation-only milestone, no source application or registry release.
+
+### Step71 -- 2026-09-06 06:19-06:26 PDT, dramatic state stamped; continuity active
+
+Same sole one-act Run. Dramatic-state169tokens complete06:19:15.952,
+stamped with ledger save06:19:15.962; continuity generation starts06:19:15.966,
+128tokens06:24:06.298 at0.4tok/s. No new error/OOM/401/download/rename or
+terminal result. Still intermediate writer work, not final episode success.
+
+Single passive screenshot06:25:39.988PDT remains BLACK; full available old
+Logs tree and exact current disk-log snapshot retained privately in
+4060-heartbeat-20260906-0625.html/.md. No retry/input/activation or power
+changes. No installed edits/requeue/manual setup/cleanup/registry action.
+Pending source bundle/generation stays deferred. Only docs milestone pushed.
