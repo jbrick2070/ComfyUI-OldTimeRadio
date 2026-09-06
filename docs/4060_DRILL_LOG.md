@@ -2255,3 +2255,22 @@ Healthy slow generation is not a reason to intervene or lower its budget.
 Private4060-overnight-20260906-021454.html preserves3 timestamped events,
 one background screenshot/full stale tree, verified260624bytes. Prior evidence
 intact. Documentation-only checkpoint; same full4060 act continues.
+
+### Step50 -- 2026-09-06 02:21 PDT, ShotLock reaches832 tokens
+
+Scheduled wake02:21:54.202. Same GUI RunSeptember5 23:04:44.645; active
+episode signal_lost_the_frequency_of_friction_20260906_014652. Read-only
+persisted log:704tokens/1636.0s at02:16:42.414,768/1782.4s at02:19:08.831,
+832/1929.1s at02:21:35.537,0.4tok/s. Same ShotLock derivation; no new
+runtime error, OOM,401, download or stage change. No RESULT SUCCESS/
+obs_publish observed; procgen MP4 remains intermediate, AI-visual execution
+and final acceptance unverified. No additional model trial or queue.
+
+One passive screenshot remains background-only/full tree stale. No activation/
+input/recovery, Run, restart/cancel, installed/JSON/model/cache/dependency
+change, manual wait or hand tuning. Fresh fetch/pull already up to date;
+Step49 push28ebb8f was remote-verified. Historical review plan preserved.
+
+Private4060-overnight-20260906-022154.html preserves3 timestamped events,
+one background screenshot/full stale tree, verified260607bytes. Prior evidence
+intact. Documentation-only checkpoint; healthy same-act derivation continues.
