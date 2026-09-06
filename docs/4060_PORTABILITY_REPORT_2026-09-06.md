@@ -199,3 +199,10 @@ At05:33:23 the372-token concept selection completed and original_brief began
 automatically using the technical Gemma slot/cache;128brief tokens were logged
 05:38:33. Still RUNNING, with no new error or additional setup. No final
 writing/media/publishing qualification yet; installed runtime remains unchanged.
+
+At05:48:07 creative front and news_interpreter reported OK; by05:53:02 the
+first cast description completed and the second began. Still RUNNING with no
+new OOM/auth/terminal error. Two passive native screenshots at05:53 returned
+black pixels despite available log text. This is a documented visual-evidence
+gap of unknown cause, not an OTR render failure. Current persisted logs prove
+stage progress; usable GUI must be re-established before interactive testing.

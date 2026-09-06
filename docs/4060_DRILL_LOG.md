@@ -2969,3 +2969,25 @@ or explicit sleep. Pending one-act source bundle,92variant regeneration and
 source-only GUI-progress patch remain deferred to active-run completion.
 Only documentation milestone goes to Git; no registry publication. Existing
 heartbeat continues quietly between meaningful stage changes.
+
+### Step68 -- 2026-09-06 05:48-05:54 PDT, creative front OK; screenshot gap
+
+Same one-act run: original_brief362tokens completed05:48:07.177 (883.7s).
+Creative front OK and news_interpreter OK05:48:07.179,5key_terms/cast2.
+Cast-description generation began automatically; first124-token description
+completed05:53:02.985, second began05:53:02.991. No new OOM/401/download or
+terminal error. Intermediate writer stages are not completed episode proof.
+
+Read-only native Logs captures05:53:03.199 and05:53:57.724PDT returned BLACK
+pixels, with available accessibility text. Fresh window discovery and one passive
+retry did not restore visible evidence; no exception was emitted. Cause unknown,
+not proof of desktop lock or OTR failure. No LockApp window was returned. Old
+boot history appears in the retained tree, so current persisted timestamps own
+stage attribution. Both captures/full trees and exact new log lines retained
+in private4060-heartbeat-20260906-0553.html/.md. Do not claim visible proof.
+
+No input/activation/requeue/restart/installed edit or power/security changes.
+Healthy computation continues, but fresh usable UI is required before later
+interactive work; never bypass an observed desktop lock. Pending source bundle
+and92variant generation stay deferred. Logs-only monitoring remains useful;
+no manual repair, cleanup or registry publication.
