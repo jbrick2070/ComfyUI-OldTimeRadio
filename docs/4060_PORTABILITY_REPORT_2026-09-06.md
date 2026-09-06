@@ -134,3 +134,10 @@ download, installed-code change, release or second GUI Run occurred. The
 03:57 passive screenshot still showed background-only pixels/stale console
 text; usable GUI access and a normally distributed candidate are required for
 the next one-act qualification. See drillSteps58–59 for the development log.
+
+At04:29PDT the user's fresh ComfyUI process restored a visible canonical
+canvas. All25 OTR nodes loaded and act_count1 was visible with0active jobs.
+The installed copy is stillalpha.24 without the candidate's new modules;
+restart did not apply the correction. GUI visibility is no longer the blocker,
+but normal candidate publication/installation remains pending. No act was
+requeued; see drillStep61 and the fresh-boot screenshot/audit records.

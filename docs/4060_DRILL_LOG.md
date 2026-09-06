@@ -2663,3 +2663,51 @@ is visible and the candidate is delivered/installed normally. Do not silently
 copy it into custom_nodes or obtain weights by hand. Original/diagnostic FAIL
 and paused heartbeat remain unchanged. This is a source handoff, not full4060
 qualification or a physical5080 test. No separate JSON was fabricated.
+
+### Step61 -- 2026-09-06 04:27–04:31 PDT, user fresh boot restores GUI
+
+User: "i booted a fresh comfy fo yu". Inspected locally with Computer Use;
+4060 skill's remote/model-calling steps do not apply to this user-authorized
+physical laptop test. Documentation checklist distinguishes process restart
+from installation. No other GPU, SSH, model reviewer or hidden run API.
+
+04:28:09 returned-window inventory found one Comfy Desktop window2491222,
+titleComfyUI. Passive capture04:28:16 showed occluding Codex, not the requested
+Comfy content; no input to Codex.04:28:27 activated the fresh returned Comfy
+window once; success. Immediate04:28:29 screenshot was blank startup content
+with accessibility listing startup stages. Began20s wait04:28:48; measured
+sleep20.0304s, next observation04:29:16. Canonical canvas was now visible,
+Run enabled,0active, act_count1, both Gemma4-12B slots and baseline LTX098-low
+16:9/ZImageTurbo3+3 visible. No widget or workflow change, no Run.
+
+04:29:39 clicked Desktop Menu element18 to seek logs. Immediate screenshot
+showed no menu contents; refreshed returned-window inventory04:29:46.
+New untitled Comfy window3868874 captured04:30:01 exposed only a tiny "Menu"
+surface, no actionable log item. No speculative click, typing or retry.
+Persisted console log was inspected read-only instead. This UI detour is
+recorded, not silently counted as successful log navigation.
+
+Current boot log initially length0 at04:27:39, then populated. Startup exact
+04:27:39.394; RTX4060Laptop8188MB/Python3.13.12/ComfyUI0.34.5 verified.
+04:28:26.318 `[OldTimeRadio] OK - All 25 nodes loaded successfully`;
+04:28:26.545 Starting server. No new prompt queued. Installedpyproject remains
+2.0.0-alpha.24; both new asset-helper modules absent and installed validator
+differs from DEV0de9e68. A fresh process did NOT install the candidate.
+
+Fresh console repeats disabled Triton ImportError and AnimateDiffEvo's
+`No motion models found` error from the pre-existing extra pack. Exact lines
+and native/DEV hashes retained in private4060-fresh-boot-audit-20260906.md.
+No pack/model installation or remediation; neither is a new render failure.
+Manager's local custom-node-list read completed04:28:32.084, registry-data
+fetch04:30:22.276, cache read04:30:22.492. Registry transfer byte size not
+exposed; no model download observed or initiated. Do not claim zero network
+traffic merely because no model downloaded.
+
+Private4060-fresh-boot-20260906-0427.html652184bytes:12 chronological events,
+5 screenshots, full available trees, one activation, one Menu click, one
+bounded wait. No tool errors; menu-observation limitation preserved. Gitfetch
+04:31:24 succeeded, HEAD/tracking0de9e68; only historical untracked review
+plan present before these log edits. Candidate remains source-only; original
+and diagnostic FAIL unchanged. GUI blocker is resolved; normal publication/
+installation is the remaining gate. Await explicit release/install direction,
+do not silently patch custom_nodes or spend another act on unchanged alpha.24.
