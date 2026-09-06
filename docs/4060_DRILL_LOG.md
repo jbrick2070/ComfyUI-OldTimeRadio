@@ -1714,3 +1714,33 @@ call heartbeats64tokens/154.4s at23:57:29.803 and128/313.6s at00:00:09.084,
 still0.4tok/s, with no new failure. Private evidence file verified253243bytes.
 No hand repair or tuning was attempted. Commit only this documentation;
 preserve the unrelated historical review-plan document and all JSONs.
+
+### Step32 -- 2026-09-06 00:08-00:10 PDT, dossier complete; pitch underway
+
+Scheduled wake00:08:22.165. Same single GUI Run2026-09-05 23:04:44.645 and
+pending_20260905_230557; no additional queue. Fourth dossier call finished
+187tokens/459.6s at00:02:35.070. Pending ledger saved00:02:35.078, then
+scifi_news_pro_pitch attempt1/3 began00:02:35.091 with creative-slot cache
+reuse. Pitch heartbeats64tokens/149.6s at00:05:04.712 and128/297.3s at
+00:07:32.383 remain0.4tok/s. No new error, OOM,401 or download. No matching
+RESULT SUCCESS, obs_publish OK or final episode verified; other-model trials
+remain conditional and have not started.
+
+Bounded read-only pending-ledger metadata check now resolves Step31's unknown
+window count: coverage_complete=true and news_seed_receipt_match=true;
+four windows, each exactly one attempt, covering body ranges0-3227,
+2988-6200,5961-8906,8667-9678. Body9678 characters; repeated header295;
+overlap239; digest cap3600. All dossier windows finished, with no dossier
+retries. This is a completed intermediate stage, not full writer/act success.
+
+One passive visible Comfy Logs screenshot/full accessibility tree capture;
+zero activation/click/key input. Exact timestamps supplemented from a
+read-only persisted-log tail; metadata audit printed no article/full ledger.
+No manual wait, hand repair/tuning, installed edit, JSON/model/dependency/cache
+change, restart or cancellation. Fresh fetch/pull reports already up to date.
+Previous Step31 documentation commit203a196 was pushed and local/tracking/
+remote heads matched at00:02:53. Preserve the untracked historical review plan.
+
+Private4060-overnight-20260906-000822.html preserves4 timestamped events and
+one screenshot/full-tree capture, verified256474bytes. No checkpoint is
+overwritten; documentation-only checkpoint follows, with runtime unchanged.
