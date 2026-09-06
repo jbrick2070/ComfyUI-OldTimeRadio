@@ -2862,3 +2862,37 @@ old constructor behavior stubbed, not a cross-version GUI benchmark. Full pytest
 remains unavailable from earlier environment check. Canonical hash unchanged.
 This progress follow-up is not installed or live-GUI-qualified yet; registry
 publication remains deferred. Healthy current trial continues under heartbeat.
+
+### Step65 -- 2026-09-06 05:03–05:05 PDT, all assets READY; writer started automatically
+
+Same sole04:50:36.149 GUI Run. Final T5 transfer verified05:03:09.810,
+9,787,841,024bytes in191.8s. All5downloads total36,818,738,352bytes; native
+rechecks passed and `[OTR.assets] READY engines=ltx_8gb,z_image_turbo files=5`
+at05:03:09.811.12m33.662s from Run click through availability readiness.
+Read-only disk checks verify each exact final length, ordinary files/no symlink:
+Desktop sharedmodels/unet(ZImage), clip(Qwen/T5), vae(ae), checkpoints(LTX).
+No manual model placement, cache seeding, path repair or additional packs.
+
+Writer begins05:03:09.837 automatically with bothGemma4-12B,act_count1,
+2characters, balanced, original_llm seed. Active episode is
+pending_20260906_050309; skeleton ledger05:03:09.920. Follow explicit future
+rename only. No duplicate Run. First NF4 budget refusal05:03:13.770 activates
+existing reviewed explicit unquantized CPU-offload retry (CPU bfloat16 dtype).
+677weights load05:03:20.280; offloaded meta-device notice05:03:20.438 is not a
+thrown exception. CUDA warmup completed05:03:40.919 (20.5s). Generation/episode
+success not established yet; no OOM or writer401 in this checkpoint.
+
+OTR's built-in PendingSweep reports deleting5stale empty pending directories
+at05:03:10.088 (scanned22, skipped_too_young1, skipped_has_lines16,errors0).
+No per-folder identities/recovery receipts exposed in the message. Reported
+to user and archived verbatim; no manual cleanup or deletion by this agent.
+
+Requested45s passive wait completed45.0251s. New private
+4060-assets-ready-20260906-0503.html678830bytes retains5events/3screenshots;
+first-download archive789669bytes retained. Audit contains all continued
+persisted-log lines without gap. No screenshot is asserted to be continuous
+recording. Heartbeat updated with this episode and completed preflight; remains
+ACTIVE, observe-only while running. Future GUI-progress source fix2ca1453
+stays unapplied to the active installation. Source/docs fixes were pushed;
+registry remains deferred. This is asset availability success, not full4060
+render/publish qualification or a zero-hand-step clean-install PASS.

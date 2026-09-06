@@ -131,3 +131,9 @@ total-only constructor compatibility is stub-tested, not a matrix of physical
 hosts/frontend versions. Live progress presentation is still unqualified because
 the ongoing trial intentionally retains the pre-progress installed candidate.
 By04:59:58, LTX6,340,744,492bytes also verified in124.6s; T5 transfer then began.
+
+At05:03:09.810 T5's9,787,841,024bytes verified in191.8s; all5files resolve
+and READY emitted05:03:09.811. Exact final lengths/ordinary files were observed
+on disk. Writer started automatically05:03:09.837 for one act. This validates
+the installed development asset path, not a built registry package, visual
+GPU capacity, episode publication or the future progress-display correction.

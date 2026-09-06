@@ -173,3 +173,11 @@ Qwen encoder, VAE and LTX); T5 was still downloading. The0percent-display
 finding has a separate source-only native-progress correction with84focused
 tests passing and clean independent review. It is not installed into the active
 trial. No whole-episode/GPU-capacity/publish success has yet been established.
+
+At05:03:09.811 all five weights were verified and native-loader readiness
+passed. The one-act writer started automatically at05:03:09.837 as
+pending_20260906_050309; Gemma loaded through explicit CPU offload and CUDA
+warmup completed05:03:40.919. No manual asset provision or extra pack was
+needed. Current result: asset-readiness path verified; episode still RUNNING.
+Original clean-install FAIL remains unchanged, and full4060 PASS still requires
+the matching RESULT SUCCESS, obs_publish OK and final episode file.

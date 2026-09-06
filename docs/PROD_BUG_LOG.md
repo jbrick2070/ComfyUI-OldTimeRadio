@@ -11498,3 +11498,21 @@ registry release or requeue. Passive GUI capture remains background-only.
 Original alpha.24 and patched-act verdicts remain FAIL; this candidate is not
 evidence that ZImage or LTX fits the4060, that the5080 was physically tested, or
 that a stranger can finish an episode. Retest the built/installed package.
+
+### PBUG-20260906-01 follow-up -- live asset readiness verified, episode pending
+
+September6 05:03PDT: user-authorized local development candidate, restarted
+through GUI and queued exactly once04:50:36.149, anonymously downloaded all
+five selected native weights (36,818,738,352bytes), verified exact size/hash and
+native resolution, and emitted READY05:03:09.811 BEFORE writer start05:03:09.837.
+All five final file lengths independently observed; no manual provision or extra
+pack. Current episodepending_20260906_050309 remains active. Original failure
+is preserved; status stays OPEN pending full render/publish and normal package
+qualification. No OOM/auth failure at this checkpoint; no GPU-capacity claim.
+
+Observed follow-up friction: main queue stays0percent during transfers; exact
+bytes are in LOGS. Source-only correction2ca1453 adds native aggregate progress,
+holds final completion through verification/native checks and logs actual native
+destinations.84focused tests PASS; independent scoped review clean. This later
+correction is NOT installed into the current run and its GUI is not live-tested.
+No canonical JSON change, version bump or registry publication. See drill63–65.
