@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.28"
+version = "2.0.0-alpha.29"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -17,7 +17,14 @@ dependencies = [
     "numpy>=1.24",
     "feedparser>=6.0",
     "beautifulsoup4>=4.12",
-    "tokenizers>=0.22,<=0.23",
+    # FLOOR ONLY -- never re-add an upper bound. `<=0.23` EXCLUDES 0.23.1 under
+    # PEP 440, while transformers 5.16 requires tokenizers>=0.23.1,<0.24.0. The two
+    # are unsatisfiable, and ComfyUI Manager installs requirements ONE LINE AT A TIME
+    # so the resolver never saw the conflict -- it silently downgraded tokenizers to
+    # 0.22.2, transformers then failed its own import check, and ComfyUI would not
+    # start at all (exit 1). Measured on a Mac mini M4, 2026-09-07. transformers owns
+    # this constraint; we only keep a floor so the dependency stays declared.
+    "tokenizers>=0.22",
     "sentencepiece>=0.1.99",
     # CUDA-only library; no marker here blocked the whole registry install on
     # macOS (2026-09-01 ship audit). The loader already fails loud when bnb is

@@ -23,8 +23,23 @@ feedparser>=6.0
 # failing runs with a message that blamed the feeds. Not optional.
 beautifulsoup4>=4.12
 
-# Tokenizers (required by transformers 5.10.x, listed for clarity)
-tokenizers>=0.22,<=0.23
+# Tokenizers. FLOOR ONLY -- never re-add an upper bound here.
+# 2026-09-07, measured on a Mac mini M4 (ComfyUI Desktop 0.34.6, py3.13, the
+# bundled transformers 5.16.1): the old pin read `tokenizers>=0.22,<=0.23`, and
+# under PEP 440 `<=0.23` EXCLUDES 0.23.1 -- while transformers 5.16 requires
+# `tokenizers>=0.23.1,<0.24.0`. The two are mutually unsatisfiable. ComfyUI
+# Manager installs this file ONE LINE AT A TIME (`uv pip install <one req>`), so
+# the resolver never saw both constraints together: it silently DOWNGRADED a
+# working tokenizers 0.23.2 to 0.22.2 and reported success. transformers then
+# failed its own dependency_versions_check on import, which killed
+# comfy/sd1_clip.py -> comfy/model_base.py -> execution.py -> main.py.
+# ComfyUI did not start AT ALL -- exit code 1, every launch.
+# The trap is that ComfyUI Manager IS a ComfyUI extension, so a bricked boot
+# means the UI cannot be used to install the fixed version. Recovery needs a
+# terminal, which is precisely the audience a registry install is meant to spare.
+# transformers already pins tokenizers correctly and is the right owner of that
+# constraint; this line only keeps a floor so the dependency stays declared.
+tokenizers>=0.22
 sentencepiece>=0.1.99
 
 # CUDA-only; the bare line blocked the whole registry install on macOS (2026-09-01

@@ -12269,3 +12269,113 @@ the shipped writer in five places. The canonical has selected `Qwen/Qwen3.5-4B`
 since 2026-09-06 -- a model chosen precisely because 12B does not fit an 8 GB
 card. The README was telling 8 GB owners the default was a model that cannot run
 for them.
+
+## PBUG-20260907-05 -- the shipped `tokenizers` pin bricked ComfyUI on install; the UI could not recover
+
+**Measured on a rented Mac mini M4 (10-core, 16 GB unified, macOS 26.6.2), ComfyUI
+Desktop 0.34.6 standalone `mac-mps`, Python 3.13.12, torch 2.12.1, bundled
+transformers 5.16.1. This is the first Apple Silicon install this pack has ever had.**
+
+**SEVERITY: install-bricking, and it shipped in every current version.** A ComfyUI
+Manager install of `2.0.0-alpha.24` -- the newest ACTIVE registry version -- left
+ComfyUI unable to start at all. Not a failed workflow: `main.py` exits 1 on every
+launch.
+
+```
+ImportError: tokenizers>=0.23.1,<0.24.0 is required for a normal functioning of
+this module, but found tokenizers==0.22.2.
+```
+
+**Root cause, one line.** Both `requirements.txt:27` and `pyproject.toml:20` shipped
+
+```
+tokenizers>=0.22,<=0.23
+```
+
+Under PEP 440 `<=0.23` **excludes 0.23.1**. The bundled `transformers` 5.16.1
+requires `tokenizers>=0.23.1,<0.24.0`. The two constraints are mutually
+unsatisfiable. The pin's own comment called it "listed for clarity" -- it was
+redundant *and* wrong; `transformers` already pins `tokenizers` correctly and is
+the right owner of that constraint.
+
+**Why no resolver caught it, and this is the part worth keeping.** ComfyUI Manager
+does not resolve the requirements file as a set. It runs **one `uv pip install`
+per requirement line** -- confirmed in the install log:
+
+```
+## ComfyUI-Manager: EXECUTE => [... '-m', 'uv', 'pip', 'install', 'transformers>=5.10.4,<6.0']
+## ComfyUI-Manager: EXECUTE => [... '-m', 'uv', 'pip', 'install', 'soundfile>=0.12']
+...
+```
+
+So uv never saw our pin and transformers' pin together. Asked in isolation to
+satisfy `tokenizers>=0.22,<=0.23`, it did exactly that: it **downgraded** a
+working `tokenizers 0.23.2` to `0.22.2` and reported success. The breakage lands
+one process-start later, in a traceback that names ComfyUI core files and never
+mentions this pack:
+
+`transformers/dependency_versions_check.py` -> `comfy/sd1_clip.py` ->
+`comfy/text_encoders/qwen35.py` -> `comfy/ldm/hidream_o1/model.py` ->
+`comfy/model_base.py` -> `comfy/lora.py` -> `comfy/hooks.py` ->
+`comfy/model_patcher.py` -> `execution.py` -> `main.py:250`.
+
+**THE TRAP, and it is the reason this is not merely a bad pin.** ComfyUI Manager
+*is a ComfyUI extension*. A bricked boot means no server, which means no Manager,
+which means **the UI cannot be used to install the fixed version**. The operator
+attempted exactly that during this session -- clicking Install for a newer version
+against a dead server -- and the on-disk pack never changed (`custom_nodes/`
+mtime unmoved). Recovery requires a terminal and a hand-written `uv pip install`,
+which is precisely the audience a one-click registry install exists to spare.
+
+**Reproducible receipt, run against the live venv:**
+
+```
+$ uv pip install --dry-run 'tokenizers>=0.22,<=0.23'     # what .24 / .28 ship
+  Would uninstall 1 package
+  Would install 1 package
+   - tokenizers==0.23.2
+   + tokenizers==0.22.2
+
+$ uv pip install --dry-run 'tokenizers>=0.22'            # alpha.29
+  Would make no changes
+```
+
+The shipped pin does not merely permit a broken state -- it *converts a working
+install into the broken one*.
+
+**Blast radius: not Mac-specific.** Nothing in the failure is Apple Silicon. Any
+host whose ComfyUI ships `transformers` >= 5.11 gets the same downgrade and the
+same dead boot. The Mac is only where it was first run.
+
+**Fix (`2.0.0-alpha.29`).** Upper bound removed in both files; floor kept so the
+dependency stays declared:
+
+```
+tokenizers>=0.22
+```
+
+**Version state at time of writing, for whoever reads this next.** `.25`, `.26`
+and `.27` are Flagged and `.28` was Pending, so Manager served `.24`. Confirmed
+empirically -- the Nodes Manager card offered `2.0.0-alpha.24`, dated Sep 5 2026,
+publisher `fluxus`, 4 downloads. The "cannot resolve install target" outcome did
+not occur. **`.28` carried the identical bad pin**, so approving it would not have
+fixed anything; `.29` is the first version that installs without bricking.
+
+### Install-path friction measured on the same run (LEG 1, human path, no terminal)
+
+Click-to-restart elapsed: **276 s (4 m 36 s)**.
+
+1. **There is no button labelled "Manager" anywhere in the UI.** The entry point is
+   **Extensions** -> a panel headed "Nodes Manager". Any doc or README instructing
+   a user to "open ComfyUI Manager" dead-ends on ComfyUI 0.34.6.
+2. **The card's Install button sits below the fold** at the default pane size
+   (<=800x450); it is unreachable without resizing the window.
+3. **Serial dependency installs dominate the wall clock** -- one `uv pip install`
+   per line -- and the UI reports only "Installing 0 of 1" throughout, with no
+   per-package progress.
+4. **First boot then blocks on a ~326 MB Kokoro ONNX fetch** plus per-voice `.pt`
+   downloads, logged to console but invisible in the UI.
+5. **Manager's own logger throws during restart** --
+   `ValueError: I/O operation on closed file` at
+   `comfyui_manager/prestartup_script.py:328` -- a full traceback that looks fatal
+   and appears to be benign.
