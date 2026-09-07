@@ -1330,3 +1330,99 @@ RTX 4060. Everything below is either UNDONE or UNPROVEN; the finished work is in
     OpenRouter slugs (`openrouter/auto` is defensible -- the pack stamps the
     resolved model per run, so a router run is auditable after the fact) and the
     audio cache that Gemini TTS's documented voice drift demands.
+
+---
+
+## Zero-friction install campaign -- UPDATE after the first real attempt, 2026-09-06 ~23:40
+
+This supersedes the status (not the reasoning) of sections A-H above. alpha.25 was
+published, the 4060 was wiped to 106 GB of nothing, and the challenge was actually
+run: Manager install -> restart -> Browse Templates -> Run, touching only the mouse.
+Full narrative in `4060_DRILL_LOG.md` Step 111; bugs in `PROD_BUG_LOG.md`
+PBUG-20260906-08 / -09; portable rules promoted as Bug Bible 12.157 / 12.158.
+
+### CLOSED by this attempt
+
+* **A.1 (wire the progress bar) -- done, and it was the blocker.** Wiring it is what
+  broke every LLM download: the adapter was a hand-rolled tqdm look-alike and
+  `snapshot_download` writes `.total` back onto the bar and calls `.refresh()`.
+  Fixed at the root by subclassing `tqdm.std.tqdm` (commit 730ecd1). The lesson is
+  now portable as Bible 12.157: `tqdm_class` is the tqdm PROTOCOL, not a callback.
+* **B.4 (publish alpha.25) -- done.** And it taught something section 7A did not
+  say: **Pending does NOT block an explicit install.** `Latest` still resolved to
+  alpha.24, but alpha.25 was listed and installable by name from the version chip,
+  with Status shown as `Unknown`. A publisher can test a Pending version instead of
+  waiting on Comfy-Org's 30-minute cron.
+* **C.6 (run the test) -- run, and it FAILED at the writer.** Everything up to the
+  script writer passed: 25/25 nodes, template loads, Run accepted with zero
+  configuration, 36.8 GB of visual assets auto-downloaded with pinned revisions and
+  sha256, filed into the correct model directories. Then the writer died. Hand steps
+  to a loaded runnable template were SIX, five of them Manager's own; a stranger's
+  path is four.
+* **G.14 (this box cannot run pytest) -- UNBLOCKED, and the workaround is cheap.**
+  `pip install --target <scratch> pytest pytest-asyncio` plus `PYTHONPATH=<scratch>`
+  runs pytest on the ComfyUI interpreter WITHOUT adding anything to the venv (proved:
+  `find_spec('pytest')` is still None in the venv afterwards). That keeps the
+  clean-install environment honest while making the 576 blocked tests runnable. It
+  immediately earned its keep on the Bible repo, catching a Three-File Contract
+  violation the YAML parse could not see. **The 576 OTR tests still need running --
+  the technique exists now, the run does not.**
+
+### NEW -- found by actually running it, in priority order
+
+1. **Publish alpha.26 and re-run the challenge.** 730ecd1 fixes both blockers but is
+   NOT published; a registry user today still gets alpha.25, which cannot write a
+   script on any cold cache. This is the single highest-value action in this file.
+   Operator's call (a `pyproject.toml` edit auto-fires the publish).
+2. **The size badge understates every row by about half, and it is now measured
+   twice, not argued.** gemma-4-12b badged 11.9 GB downloaded **23.9 GB**; Qwen
+   badged 4.3 GB downloaded **8.7 GB**. This is F.12/F.13's `/2` rule reaching the
+   user-facing label. An 8 GB owner reads the badge to decide what they can afford,
+   so it is not cosmetic.
+3. **`no resume/retry` on a 36.8 GB first fetch.** The planner prints it itself. A
+   dropped connection 11 GB into a 12 GB file restarts that file at zero. The run
+   also showed a real ~50-second stall (57 MB/s -> 0.6 MB/s -> recovered), so the
+   condition is not hypothetical.
+4. **A token was present and unused.** Startup logged
+   `[hf_token] HF_TOKEN resolved from os.environ (len=37)` and the asset downloader
+   still warned "sending unauthenticated requests". Unauthenticated MUST keep
+   working (a stranger has no token) but a resolved token should be used when it
+   exists -- higher rate limits, fewer stalls.
+5. **kokoro's numpy pin is unsatisfiable against ComfyUI's numpy.** pip reported
+   `kokoro 0.7.16 requires numpy==1.26.4, but you have numpy 2.5.1` and
+   `requires misaki[en]>=0.7.16, but you have misaki 0.7.4`. kokoro is the DEFAULT
+   announcer voice, so this sits directly on the first-run path. Not yet observed
+   failing at runtime; must be watched on the next full render.
+6. **54 of 97 shipped graphs still select `mistralai/Mistral-Nemo-Instruct-2407`**
+   and 23 select gemma-4-12b. Only the two SHIPPED TEMPLATES were fixed in 730ecd1.
+   The rest take their writer from `config/profiles/*.json`, which is the 5080's
+   surface and a much larger blast radius -- do it as its own change, with the
+   before/after measurement §0B requires.
+7. **Music default is still `musicgen` (CC-BY-NC), not `stable_audio_3`.** Confirmed
+   in the shipped canonical template during this drill. Every published episode
+   therefore still carries a non-commercial bed. This is H.16 unchanged, and it is a
+   licensing exposure rather than a defect.
+8. **Manager keeps a database record for a pack whose files were deleted by hand.**
+   It offered Uninstall (version `49c3a57`) for a directory that no longer existed,
+   and Install only appeared after clicking Uninstall. Not our bug, but it is a real
+   step for anyone who removes a pack manually, and it cost time in this drill.
+9. **Two cosmetic template-gallery findings.** The gallery SEARCH does not reach
+   extension templates (searching "radio" returned 2 of 540 core templates, neither
+   ours -- ours are only reachable by expanding EXTENSIONS), and both OTR entries
+   render as blank gradient thumbnails because no cover art ships.
+
+### UNCHANGED and still owed
+
+A.2 (wire `caption_support_gap()` -- the probe still has no caller), A.3 (three
+`viz_mxc_mandala` selections -> `viz_mxc_cpu`), B.5 (bundle `static-ffmpeg`),
+D.7/D.8/D.9 (Mac: widen `z_image_turbo` and `ltx_8gb`, run one act, read `otr/obs/`),
+E.10/E.11 (AMD entirely unproven; `torch.version.hip` is the discriminator),
+F.12 (`_assert_policy_admits_vram` still uses the discredited `/2` heuristic),
+H.17 (restore GGUF rows as a documented opt-in lane), H.18 (cloud deferred).
+
+### The standing rule this drill confirms
+
+The test is worth running BEFORE it can pass. Two blockers, one of them a total
+cold-cache failure of the shipped package, were invisible to a green test suite, to
+270 passing unit tests, and to five successful episodes rendered on a warm box. They
+appeared within fourteen minutes of a stranger's path being walked literally.
