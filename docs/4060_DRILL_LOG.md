@@ -4813,3 +4813,57 @@ episode is still owed as live confirmation.
 any of the three runs, so the dependency half of "zero friction" remains
 unproven; `ComfyUI-AnimateDiff-Evolved` and the auto-messaging pack remain in
 `custom_nodes`. This is a clean-PACK test.
+
+### Step 114 — September 7, 10:05–10:39: stable_audio_3 renders. First licence-clean music bed.
+
+```
+[OTR.assets] DOWNLOADED stable_audio_3_small_music.safetensors
+             bytes_verified=2270384940 elapsed_s=59.5
+[OTR.assets] READY engines=ltx_8gb,stable_audio_3,z_image_turbo files=7
+[OTR_MasterAudioMux] obs_publish OK ->
+  the_far_shore_relay_20260907_101548__anim__lx8g__zimg__koko__news__q354b__sa3_final.mp4
+Prompt executed in 00:33:38
+```
+
+51.0 MB. `files=7` where every previous run said 5. The weights are on disk:
+2,165 MB checkpoint plus a 1,132 MB t5gemma text encoder.
+
+**WHY THIS MATTERS BEYOND ONE EPISODE.** `musicgen` is CC-BY-NC. Every episode
+this card had ever published carried a non-commercial music bed, and the reason
+was not a choice -- it was three stacked defects that made the licence-clean
+alternative impossible to select. The `__sa3` now visible in the filename is the
+short-code work paying off immediately: the licence-relevant fact is legible at a
+glance in the folder the operator actually watches.
+
+**THREE BUGS, EACH HIDING THE NEXT.** Found by changing one dropdown in the UI
+and pressing Run -- the exact "test canonical with dropdown changes" the operator
+asked for.
+
+| layer | defect | symptom |
+| --- | --- | --- |
+| 1 | audio chain's `gate_in` was `link=None` in the shipped graph | planner never saw the music node |
+| 2 | the transitive walk required `gate[1] == 0`; chain hops use slot 2 | still `READY engines=ltx_8gb,z_image_turbo` |
+| 3 | `native_requests` had no `stable_audio_3` branch | engine named, `files=5`, nothing requested |
+
+Layer 3 is the worst of them: membership in `_COVERED` SUPPRESSED the "coverage
+unavailable" note that would otherwise have announced it. It looked handled
+precisely because it was half-handled. Layer 2 was mine, introduced while fixing
+layer 1 and caught only because the live run still printed the old engine list.
+
+**TWO OPERATIONAL FINDINGS, neither fixed, both affecting how this box is
+tested.**
+
+* **ComfyUI caches the validator node**, so the asset preflight does NOT re-run
+  when only a downstream engine changes. Change a dropdown, press Run, and
+  nothing is re-planned until the validator's own inputs change or the server
+  restarts. This directly undercuts "change the dropdowns each time and Run",
+  and it cost three confusing runs here before it was spotted.
+* **Browse Templates caches client-side.** `/api/workflow_templates` served the
+  CORRECTED template (verified: node 81 `gate_in` link 290) while the canvas kept
+  loading the stale one through a full hard reload. Verification had to go via a
+  user workflow instead. A user who updates the pack may keep getting the old
+  template, which is a real first-run hazard.
+
+**Cumulative on this card:** 9 episodes published, 3 of them today after the
+alpha.25 clean-install drill exposed the tqdm blocker, the dead writer default,
+MAX_PATH, and now the music lane.
