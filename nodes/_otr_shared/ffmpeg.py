@@ -120,6 +120,96 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
 _WIDGET_IGNORED_WARNED = set()
 
 
+#: One probe per resolved binary per process. `ffmpeg -filters` and
+#: `-encoders` each spawn a subprocess and print thousands of lines; a render
+#: asks this question once per beat otherwise.
+_CAPABILITY_CACHE: dict = {}
+
+#: What burning captions actually needs. `otr_caption_burn` composes an
+#: `ass={name}` filter and re-encodes with libx264, so a build missing either
+#: cannot do the job however well it renders video.
+CAPTION_FILTER = "ass"
+CAPTION_ENCODER = "libx264"
+
+
+def probe_ffmpeg_capabilities(path=None) -> dict:
+    """What THIS ffmpeg build can do. Never raises; unknowns answer ``None``.
+
+    Returns ``{"path", "ass", "libx264"}`` where the two capability values are
+    True, False, or None when the probe could not run at all (binary missing,
+    subprocess refused, timeout). None is deliberately NOT False: "we could not
+    ask" and "it answered no" justify different messages, and a caller that
+    treats them the same will refuse a working box on a failed subprocess.
+
+    WHY THIS EXISTS. A Homebrew ffmpeg carries libass and libx264 by default,
+    so a Mac that ran `brew install ffmpeg` burns captions fine. A MINIMAL
+    build -- notably the binary bundled inside imageio-ffmpeg, the obvious
+    candidate for an automatic fallback -- typically ships neither. Without
+    this probe that box renders the whole episode and then dies at the caption
+    stage, twenty minutes of writer, voices, music and video after the point
+    where the answer was already knowable.
+    """
+    # An explicit path still has to EXIST. Without this a caller passing a
+    # dead path got every capability as None, which caption_support_gap then
+    # read as "could not ask, do not refuse" and reported no problem at all --
+    # a missing binary silently answering "fine".
+    resolved = _usable(path) if path else resolve_ffmpeg()
+    if not resolved:
+        return {"path": None, CAPTION_FILTER: None, CAPTION_ENCODER: None}
+    cached = _CAPABILITY_CACHE.get(resolved)
+    if cached is not None:
+        return dict(cached)
+
+    import subprocess
+
+    def _lists(flag):
+        try:
+            done = subprocess.run(
+                [resolved, "-hide_banner", flag],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+        except Exception:  # noqa: BLE001 -- a probe must never kill a render
+            return None
+        return (done.stdout or "") + (done.stderr or "")
+
+    filters = _lists("-filters")
+    encoders = _lists("-encoders")
+    result = {
+        "path": resolved,
+        # Match the filter NAME in its own column, not anywhere in the blob:
+        # "ass" appears inside "subtitles", "pass", "compass" and others.
+        CAPTION_FILTER: None if filters is None else any(
+            CAPTION_FILTER in line.split() for line in filters.splitlines()),
+        CAPTION_ENCODER: None if encoders is None else any(
+            CAPTION_ENCODER in line.split() for line in encoders.splitlines()),
+    }
+    _CAPABILITY_CACHE[resolved] = dict(result)
+    return result
+
+
+def caption_support_gap(path=None) -> Optional[str]:
+    """A sentence naming what stops this ffmpeg burning captions, else None.
+
+    Answers None when captions will work AND when the probe could not run --
+    an unrunnable probe is not evidence of a missing feature, and refusing a
+    render on it would be the guess this function exists to avoid.
+    """
+    caps = probe_ffmpeg_capabilities(path)
+    if caps["path"] is None:
+        return ("no ffmpeg was found on this host, so captions cannot be "
+                "burned; install ffmpeg (macOS: `brew install ffmpeg`) or set "
+                "OTR_FFMPEG to a full build")
+    missing = [name for name in (CAPTION_FILTER, CAPTION_ENCODER)
+               if caps[name] is False]
+    if not missing:
+        return None
+    return ("the ffmpeg at %s is a minimal build missing %s; caption burning "
+            "needs both the `ass` filter (libass) and the libx264 encoder. "
+            "Install a full build -- macOS `brew install ffmpeg` ships both -- "
+            "or set OTR_FFMPEG to one, or turn burn_captions off."
+            % (caps["path"], " and ".join(missing)))
+
+
 def widget_ffmpeg_is_ignored(value, node):
     """The ffmpeg preference a NODE may express: none, ever. Returns ``""``.
 
