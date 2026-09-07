@@ -123,7 +123,58 @@ def _resolve_slot(inputs, slot, custom, kind):
                            "engine selection for %s" % (kind, slot))
 
 
-def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
+def _image_slot_for(video_slot) -> str:
+    """The image slot paired with a per-role VIDEO slot. Derived from the slot
+    name rather than hand-listed, so a new role cannot pair itself wrongly."""
+    return str(video_slot).replace("_video_model", "_image_model")
+
+
+def _registry_consumes_still(engine_id) -> bool:
+    """Does ``engine_id`` consume the role's still? THE ONE AUTHORITY, borrowed.
+
+    Delegates to :func:`otr_image_gen_dispatcher.engine_consumes_still` -- the
+    same predicate the still dispatcher itself keys on -- so the preflight's
+    DEMAND and the dispatcher's MINTING are one decision, never two that can
+    drift. Raises on an unknown/unregistered id; the caller fails safe.
+
+    Lazy imports keep this module cold-import clean (no torch, no ComfyUI at
+    import time), which the module docstring promises.
+    """
+    try:
+        from .otr_image_gen_dispatcher import engine_consumes_still
+        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
+        from ._otr_video_engines import registry as _vreg
+    except ImportError:  # pragma: no cover -- flat test imports
+        from otr_image_gen_dispatcher import engine_consumes_still
+        import _otr_video_engines  # noqa: F401
+        from _otr_video_engines import registry as _vreg
+    eid = str(engine_id)
+    if not _vreg.is_registered(eid):
+        raise KeyError(eid)
+    return bool(engine_consumes_still(_vreg.get_engine(eid)))
+
+
+def _proven_no_still(engine_id, consumes_still) -> bool:
+    """``True`` ONLY when the registry affirmatively proves ``engine_id`` mints
+    no still, so that role's image weights are provably unused.
+
+    **FAIL-SAFE IN EXACTLY ONE DIRECTION, deliberately.** An unknown engine, an
+    unregistered id, or any registry/import failure returns ``False`` -- require
+    the weights. Skipping a download that render then needs is a broken episode;
+    requiring one it does not need costs only the bytes this function exists to
+    stop spending. Absence of proof is never taken as proof of absence.
+    """
+    if not engine_id:
+        return False
+    probe = consumes_still if consumes_still is not None else _registry_consumes_still
+    try:
+        return probe(engine_id) is False
+    except Exception:  # noqa: BLE001 -- any doubt at all -> require the weights
+        return False
+
+
+def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
+                consumes_still=None):
     """Inspect only this validator's direct gate consumers in the LIVE prompt.
 
     No saved-JSON reads or traversal of unrelated workflow branches. Replay
@@ -202,8 +253,47 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
             videos[slot] = resolve_video(picked)
         effective = freeze_video(videos)
         result["engines"].update(resolve_video(v) for v in effective.values() if v)
+        # AN IMAGE ENGINE IS ONLY REQUIRED IF ITS ROLE'S VIDEO LANE CONSUMES THE
+        # STILL (PBUG-20260907-03). The four `viz_*` visualizers are procedural
+        # and audio-reactive: they declare `accepts_still = False` and an
+        # explicit `still_plan = ()`, the image dispatcher honours that and mints
+        # nothing, and the VIDEO dropdown already tells the operator so in words
+        # -- "(audio-reactive, no scene image)". Only this preflight disagreed,
+        # and it demanded the full image set anyway.
+        #
+        # THE COST WAS NOT THEORETICAL. A 2026-09-07 4060 episode published as
+        # `..._vmcp__none__...` -- image field `none`, because NOT ONE still was
+        # minted -- after the preflight had downloaded 20.6 GB of z_image_turbo
+        # weights to reach it. Both AMD profiles pair `viz_mxc_cpu` with
+        # `z_image_turbo`, so the configuration that exists to be the LOW-friction
+        # one carried the largest unused download in the pack.
+        #
+        # NOTHING IS HIDDEN FROM ANY DROPDOWN, and that is an operator rule, not
+        # a preference: all 12 image engines stay listed and selectable, the pick
+        # is still resolved here (so an empty or unresolvable slot refuses
+        # exactly as loudly as before), and the ONLY thing that changes is
+        # whether its weights are fetched. The skip is logged per role rather
+        # than inferred silently.
+        no_still = {}
+        try:
+            from ._otr_shared.role_slots import ROLE_TO_VIDEO_SLOT
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_shared.role_slots import ROLE_TO_VIDEO_SLOT
+        for role, vslot in ROLE_TO_VIDEO_SLOT.items():
+            lane = effective.get(role)
+            lane = resolve_video(lane) if lane else ""
+            if _proven_no_still(lane, consumes_still):
+                no_still[_image_slot_for(vslot)] = lane
         for slot in _IMAGE_SLOTS:
-            result["engines"].add(_resolve_slot(inputs, slot, custom, "image"))
+            picked = _resolve_slot(inputs, slot, custom, "image")
+            lane = no_still.get(slot)
+            if lane:
+                result["skipped"].append(
+                    "%s=%s not downloaded: this role's video lane %s mints no still "
+                    "(accepts_still=False), so its image weights are provably unused"
+                    % (slot, picked, lane))
+                continue
+            result["engines"].add(picked)
     # MUSIC ENGINE, same prompt, its own node class. Read only; an absent node
     # or an unset widget is a skip so a graph without theme music still plans.
     for node in [n for n in scoped if n.get("class_type") == _MUSIC_NODE]:

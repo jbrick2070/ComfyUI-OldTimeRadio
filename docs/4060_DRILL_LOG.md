@@ -4898,10 +4898,30 @@ Yet the preflight had required the full z_image_turbo set to get there:
 ```
 
 So the same run that demanded 20.6 GB of image weights then reported using none
-of them. On the two AMD JSONs, which pair `viz_mxc_cpu` with `z_image_turbo`,
-that is 20.6 GB downloaded to render nothing -- on the configuration that exists
-to be the low-friction one. (Operator recollection that viz minted no stills was
-correct, and this re-confirms it after the registry/workflow cleanup.)
+of them. (Operator recollection that viz minted no stills was correct, and this
+re-confirms it after the registry/workflow cleanup.)
+
+**CORRECTION TO THIS ENTRY'S FIRST DRAFT, made the same day before the fix
+shipped.** It claimed the two AMD JSONs suffer this. THEY DO NOT. Both set
+`character_visual` to `still_motion`, which DOES consume a still, so
+`z_image_turbo` is genuinely required there and their download set is unchanged.
+The claim was written from the video slots alone without reading
+`role_overrides.character_visual`. The measured figure, over all 116 profiles
+that declare visual role overrides: **30 have at least one no-still lane, and 19
+drop their image weights entirely** -- among them SIX `shipping` profiles
+(`16gb_full`, `otr_4060_12b_gguf_offload`, `otr_w45_viz_camera`,
+`otr_w45_viz_green`, `otr_w45_viz_mxc_cpu`, `otr_w45_viz_mxc_mandala`,
+`otr_w45_viz_camera_kokoro_all`, `otr_w45_animatediff15_v3_haunted_video`).
+The saving is ALL-OR-NOTHING per engine id, which is why partial-viz profiles
+like `otr_sbcov_1` are listed as touched but unchanged: the engine set is a SET,
+and their `character_visual` still pulls the same row.
+
+**AND IT ANSWERS THE ANIMATEDIFF QUESTION.** Ghost Signal
+(`animatediff15_v3_haunted_video`) is a no-still lane too, deliberately and by
+documented contract -- `ghost_signal_prompt.py`: *"it declares
+`accepts_still = False`, so no still is ever minted for it and no image carries
+the look. Everything the viewer sees is decided by the text in this module."*
+Four of the nineteen are AnimateDiff/Ghost lanes, not visualizers.
 
 **WHY IT CANNOT BE EXPRESSED TODAY.** There is no way to say "this lane needs no
 images". Verified against the live server: the image dropdown offers 12 real

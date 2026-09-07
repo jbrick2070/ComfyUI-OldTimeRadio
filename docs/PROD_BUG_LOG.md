@@ -12175,3 +12175,56 @@ time when the planner has not pre-fetched them. A run with `stable_audio_3`
 selected was in flight when this was written -- if it succeeds, the defect is a
 multi-GB download surfacing twenty minutes into a render instead of up front; if
 it fails, the lane is simply broken. Either way the planner should have seen it.
+
+## PBUG-20260907-03 -- the asset preflight demanded image weights the chosen video lane can never use
+
+**Verified by a live published artifact** (4060, 2026-09-07):
+`bloodstained_stairs_20260907_121450__arch__vmcp__none__koko__pubd__q354b__sa3_final.mp4`
+-- the `none` in the image field is the episode reporting that NOT ONE still was
+minted, after `[OTR.assets] READY engines=stable_audio_3,z_image_turbo files=5`
+had already fetched 20.6 GB of `z_image_turbo`.
+
+**Root cause, one line.** `_otr_visual_assets.plan_prompt` added every
+`*_image_model` slot to the download set unconditionally:
+
+```python
+for slot in _IMAGE_SLOTS:
+    result["engines"].add(_resolve_slot(inputs, slot, custom, "image"))
+```
+
+It never asked whether that role's VIDEO lane consumes a still.
+
+**The prescription already existed in three places; only this reader ignored it.**
+Each engine declares `accepts_still` plus an explicit `still_plan`;
+`otr_image_gen_dispatcher.engine_consumes_still` is documented as *"the ONE
+capability the still dispatcher keys on, so coverage is decided in a single
+place with NO per-(image,video) whitelist"*; the video dropdown already prints
+`(audio-reactive, no scene image)`; and `otr_meta_brief_image_prompt` SHORT-
+CIRCUITS TO `{"objects": []}` when every effective lane is no-still. So the
+weights were not merely unused -- they were unusable, and the brief phase knew.
+
+**Fix.** The preflight now borrows that same predicate rather than inventing a
+rule, pairing each image slot to its role's post-freeze video engine. FAIL-SAFE
+IN ONE DIRECTION: unknown / unregistered / any raise -> require the weights.
+Absence of proof is never proof of absence, because skipping a download render
+then needs is a broken episode while requiring a spare one costs only bytes.
+
+**NOTHING IS HIDDEN FROM ANY DROPDOWN** (standing operator rule). All 12 image
+engines stay listed and selectable, the pick is still resolved so an empty or
+unresolvable slot refuses exactly as loudly as before, and each skip is logged
+per role. Only the fetch changes.
+
+**Blast radius, MEASURED across all 116 profiles declaring visual role
+overrides** (section 0B -- this is shared code and it reaches BOTH boxes):
+30 have >= 1 no-still lane; **19 drop their image weights entirely**, six of
+them `shipping`, including the 16 GB `16gb_full`. No profile gains a download
+and none loses one it can use. Four of the nineteen are AnimateDiff/Ghost lanes
+rather than visualizers.
+
+**Corrected in the same session:** the first draft of the drill-log entry claimed
+the two AMD JSONs suffer this. They do not -- both set `character_visual` to
+`still_motion`, which consumes stills, so their set is unchanged.
+
+Coverage: `tests/test_preflight_still_consumer_gate.py` (18 tests -- the four
+visualizers proven against the LIVE registry, the fail-safe direction, and
+end-to-end plan sets).
