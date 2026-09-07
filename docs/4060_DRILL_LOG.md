@@ -4550,3 +4550,55 @@ Both remain NOT TESTED, not FAIL.
 Prose quality was NOT scored here and this run does not rank storytelling. All
 four produced a plausible atmospheric opening; choosing between them on story
 quality needs the separate blind comparison in the ranking plan.
+
+### Step 110 — September 6, 17:22 PDT: FIRST COMPLETE EPISODE. Qwen3.5-4B one-act publishes.
+
+The campaign's first end-to-end episode on the physical 8GB RTX4060.
+
+One Run, act_count1, batch1, got prompt 16:49:28.256, both writer slots
+`Qwen/Qwen3.5-4B`. Finished 17:22:02.658, **"Prompt executed in 00:32:34"**,
+against this morning's 4h05m failure.
+
+```
+[17:22:00.382] [OTR_CreditsRoll] appended 21.1s console
+               (hero='THE ASH ON THE GLASS' backdrop=body final frame)
+[17:22:02.633] [OTR_MasterAudioMux] LOUD publish: final episode ->
+               ...\output\otr\obs\the_ash_on_the_glass_20260906_170119__anime__
+               ltx_8gb__z_image_turbo__kokoro__original_final.mp4 (42524256 bytes)
+[17:22:02.654] [OTR_MasterAudioMux] obs_publish OK -> (same path)
+```
+
+Verified on disk: 42,524,256 bytes in `output/otr/obs/`. **Zero
+`Exception during processing`, zero tracebacks, zero FAILED in the whole log.**
+
+ON THE THIRD GATE, STATED PRECISELY. The literal string `RESULT SUCCESS` does
+NOT appear, and it was never going to: node code never emits it. It is a
+HARNESS marker -- `scripts/otr_bank_engine_sweep.py:243` and
+`scripts/otr_gpu_soak_matrix.py:308` both test `"RESULT SUCCESS" in out` against
+captured headless output. In a GUI trial the observable equivalent is
+`obs_publish OK` + the final file on disk + a clean `Prompt executed`, and all
+three hold. This is recorded as a GUI-path PASS, not as a claim that a
+harness-only string was seen.
+
+WHAT THIS TRIAL PROVES, each measured this run:
+* `Qwen/Qwen3.5-4B` as a writer on 8GB: loads native text decoder, key_mapping
+  supplied by the transformers registry, `materialized_on_cuda=True`,
+  `vram_delta=2.90GiB`.
+* `ltx098_low_video (16:9)` on 8GB: **8 clips persisted** at 512x288, then
+  `[OTR_SilentComposite] assembled 9 beats -> 1686 frames @25fps 1920x1080`.
+  The README rated this lane "maybe" for 8GB; it is now measured.
+* Z-Image Turbo stills on 8GB: 9 stills.
+* Kokoro voices, MusicGen music, captions: all clean.
+* **CREDITS PASSED** -- the exact stage that failed the 08:29 trial on a
+  missing `.git/HEAD`. The pre-run check at 17:0x had already shown the
+  installed resolver returning `('SOURCE:', 'sha256 17ecc4a16ddfed0f')`
+  instead of raising.
+* Upscale/blend bypassed as configured (`PostUpscaleProcgenBlend bypass=True`).
+
+STILL NOT PROVEN, and not claimed: this is a HAND-PATCHED development install,
+not a clean one. Ambient writer authentication and pre-existing extra node packs
+(AnimateDiff-Evolved, an auto-messaging pack) remain contamination. The final
+human PASS additionally requires ZERO hand steps from a registry install, which
+has not been attempted. Story quality was not scored.
+
+Evidence: `comfyui-qwen-PASS-20260906-1722.log`.
