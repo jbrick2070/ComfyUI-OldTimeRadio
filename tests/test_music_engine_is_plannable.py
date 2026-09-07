@@ -58,9 +58,9 @@ def _prompt():
                           "music_image_model": "z_image_turbo",
                           "character_image_model": "z_image_turbo"}},
         "81": {"class_type": AUDIO_HEAD, "inputs": {"gate_in": ["63", 0]}},
-        "82": {"class_type": "OTR_AnnouncerVoice", "inputs": {"gate_in": ["81", 0]}},
+        "82": {"class_type": "OTR_AnnouncerVoice", "inputs": {"gate_in": ["81", 2]}},
         "83": {"class_type": MUSIC,
-               "inputs": {"gate_in": ["82", 0], "engine": "stable_audio_3"}},
+               "inputs": {"gate_in": ["82", 2], "engine": "stable_audio_3"}},
     }
 
 
@@ -103,11 +103,89 @@ class PlannerReachesTheMusicNodeTests(unittest.TestCase):
         self.assertNotIn("stable_audio_3", engines,
                          "fixture no longer reproduces the orphaned chain")
 
+    def test_the_walk_does_not_care_which_output_slot_carries_the_gate(self):
+        """The bug in the FIRST cut of this fix, and the reason the live run
+        still logged 'READY engines=ltx_8gb,z_image_turbo' with the graph
+        correctly wired.
+
+        The old code required `gate[1] == 0`. That is true of the validator's
+        single output and FALSE of every chain hop -- the audio nodes pass their
+        gate on from output slot 2, so the shipped prompt reads ['81', 2] and
+        ['82', 2]. Requiring slot 0 rejected exactly the hops the walk exists to
+        follow. `gate_in` is keyed by NAME in the API prompt, so which slot
+        feeds it is the source node's business.
+        """
+        for slot in (0, 1, 2, 7):
+            prompt = _prompt()
+            prompt["82"]["inputs"]["gate_in"] = ["81", slot]
+            prompt["83"]["inputs"]["gate_in"] = ["82", slot]
+            self.assertIn("stable_audio_3", _plan(prompt)["engines"],
+                          "gate carried on output slot %d was not followed" % slot)
+
     def test_a_deep_chain_does_not_loop_forever(self):
         """The walk is iterative; a cycle in gate_in must terminate."""
         prompt = _prompt()
-        prompt["81"]["inputs"]["gate_in"] = ["83", 0]   # 81 <- 83 <- 82 <- 81
+        prompt["81"]["inputs"]["gate_in"] = ["83", 2]   # 81 <- 83 <- 82 <- 81
         _plan(prompt)  # must return rather than hang
+
+
+class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
+    """Being PLANNED is not the same as being FETCHED, and that gap was real.
+
+    Once the gate fix let the planner see the music engine, the live run logged
+
+        READY engines=ltx_8gb,stable_audio_3,z_image_turbo files=5
+
+    -- the engine named, and still only the five VISUAL files requested.
+    `native_requests` had branches for the image and video engines only, so
+    nothing ever turned `stable_audio_3` into a request. Membership in
+    `_COVERED` even suppressed the "coverage unavailable" note that would
+    otherwise have said so out loud, which is why it looked handled.
+    """
+
+    class _FolderPaths:
+        """Nothing is installed, so every request resolves to 'missing'."""
+
+        @staticmethod
+        def get_full_path(category, token):
+            return None
+
+        @staticmethod
+        def get_folder_paths(category):
+            return [str(ROOT / "_nonexistent" / category)]
+
+    class _SA3:
+        _CKPT = "stable_audio_3_small_music.safetensors"
+        _TENC = "t5gemma_b_b_ul2.safetensors"
+
+    def test_selecting_the_music_engine_requests_its_two_files(self):
+        reqs = VA.native_requests({"stable_audio_3"},
+                                  folder_paths=self._FolderPaths(),
+                                  sa3=self._SA3(), env={})
+        got = {(r["category"], r["token"]) for r in reqs}
+        self.assertEqual(
+            got,
+            {("checkpoints", self._SA3._CKPT),
+             ("text_encoders", self._SA3._TENC)},
+            "the music engine must request the checkpoint AND its text encoder")
+        for r in reqs:
+            self.assertIsNotNone(
+                r["spec"], "%s has no MANIFEST spec, so it can never download"
+                % r["token"])
+
+    def test_both_files_are_in_the_allowlist(self):
+        """download_verified refuses anything not in MANIFEST.values(), so a
+        request whose spec is absent would fail at transfer rather than here."""
+        for category, token in (("checkpoints", self._SA3._CKPT),
+                                ("text_encoders", self._SA3._TENC)):
+            self.assertIn((category, token), VA.MANIFEST,
+                          "%s/%s is not allowlisted" % (category, token))
+
+    def test_it_refuses_rather_than_silently_skipping_without_an_adapter(self):
+        with self.assertRaises(VA.VisualAssetError):
+            VA.native_requests({"stable_audio_3"},
+                               folder_paths=self._FolderPaths(),
+                               sa3=None, env={})
 
 
 class ShippedGraphWiresTheAudioChainTests(unittest.TestCase):

@@ -109,8 +109,18 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
             if not isinstance(node, dict) or node_id in seen_ids:
                 continue
             gate = (node.get("inputs") or {}).get("gate_in")
+            # NO SOURCE-SLOT CONSTRAINT, and that is deliberate. The old code
+            # required `gate[1] == 0`, which happens to be true for the
+            # validator's single output and is FALSE for every chain hop: the
+            # audio nodes pass their gate on from output slot 2, so
+            # `gate_in` reads ['81', 2] and ['82', 2]. Requiring slot 0 rejected
+            # exactly the hops this walk exists to follow, and the first cut of
+            # this fix still logged "READY engines=ltx_8gb,z_image_turbo" with
+            # the graph correctly wired. The API prompt keys inputs by NAME, so
+            # `gate_in` is already unambiguous -- which output slot happens to
+            # carry the gate is the source node's business, not ours.
             if (isinstance(gate, (list, tuple)) and len(gate) == 2
-                    and str(gate[0]) in reachable and gate[1] == 0):
+                    and str(gate[0]) in reachable):
                 seen_ids.add(node_id)
                 reachable.add(str(node_id))
                 scoped.append(node)
@@ -174,7 +184,8 @@ def _same_file(left, right):
         return False
 
 
-def native_requests(engines, *, folder_paths, zimage=None, ltx=None, env=None):
+def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
+                    env=None):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -230,6 +241,27 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, env=None):
             raise VisualAssetError("LTX098 adapter resolution is unavailable")
         add("checkpoints", ltx._ckpt_name(), authority=ltx._ckpt_path())
         add("text_encoders", ltx._t5_name(), authority=ltx._t5_path())
+    if "stable_audio_3" in engines:
+        # PBUG-20260907-02, third layer. The MANIFEST rows and `_COVERED` for
+        # stable_audio_3 landed on 2026-09-06, but NOTHING TURNED THE ENGINE
+        # INTO A REQUEST -- this function only ever had branches for the image
+        # and video engines. So once the planner could finally see the music
+        # engine it logged
+        #     READY engines=ltx_8gb,stable_audio_3,z_image_turbo files=5
+        # -- the engine named, and still only the five visual files requested.
+        # Being in `_COVERED` even suppressed the "coverage unavailable" note
+        # that would otherwise have said so out loud.
+        #
+        # `_CKPT` / `_TENC` are the adapter's own resolved names and already
+        # honour OTR_SA3_CKPT / OTR_SA3_TEXT_ENCODER, so an operator pin is
+        # passed through as `explicit` exactly as the Z-Image branch does with
+        # its own env keys.
+        if sa3 is None:
+            raise VisualAssetError("stable_audio_3 adapter resolution is unavailable")
+        add("checkpoints", sa3._CKPT,
+            explicit=str((env or {}).get("OTR_SA3_CKPT") or ""))
+        add("text_encoders", sa3._TENC,
+            explicit=str((env or {}).get("OTR_SA3_TEXT_ENCODER") or ""))
     return requests
 
 
@@ -298,16 +330,18 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths
     from comfy import model_management
-    zimage = ltx = None
+    zimage = ltx = sa3 = None
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo as zimage
     if "ltx_8gb" in engines:
         from ._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
         ltx = Ltx8gbEngine()
+    if "stable_audio_3" in engines:
+        from ._otr_audio_engines import eng_stable_audio_3 as sa3
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
     requests = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                               ltx=ltx, env=otr_env.snapshot())
+                               ltx=ltx, sa3=sa3, env=otr_env.snapshot())
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -379,7 +413,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
         after = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                                ltx=ltx, env=otr_env.snapshot())
+                                ltx=ltx, sa3=sa3, env=otr_env.snapshot())
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):
