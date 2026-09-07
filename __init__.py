@@ -432,15 +432,18 @@ else:
 # that is not there, which is the exact failure the paragraph above exists to
 # prevent. Verified against the PUBLISHED bundle rather than the repo, because
 # .comfyignore decides what ships: workflows/ contains exactly
-# otr_canonical.json (with its otr_canonical.jpg thumbnail) and
-# otr_story_only.json. `otr_4060_floor` remains a valid PROFILE id for
+# otr_canonical.json and its otr_canonical.jpg thumbnail. otr_story_only.json
+# and the workflows/variants/ tree were deleted 2026-09-07 while the canonical
+# is being proven on Apple Silicon, so the gallery serves ONE template and this
+# line names one. `otr_4060_floor` remains a valid PROFILE id for
 # provisioning and the headless runner; it was never a gallery template after
 # 09-02. If a template is added or dropped, this line changes in the same edit.
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-      "EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the full episode; "
-      "otr_story_only writes the script alone) -- or drag "
-      "workflows/otr_canonical.json onto the canvas. On an 8 GB card load the "
-      "matching saved-dropdown variant from workflows/variants/ instead.")
+      "EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped "
+      "graph -- pick it, then Queue Prompt) -- or drag "
+      "workflows/otr_canonical.json onto the canvas. There is one graph now: "
+      "set its device dropdowns to match your hardware, per the README's "
+      "\"Pick the graph\" table.")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger

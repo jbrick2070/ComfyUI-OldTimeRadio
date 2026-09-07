@@ -36,7 +36,7 @@ def test_exactly_one_template_folder_exists():
 
 def test_gallery_lists_exactly_the_ruled_graphs():
     listed = sorted(p.stem for p in (REPO / "workflows").glob("*.json"))
-    assert listed == ["otr_canonical", "otr_story_only"], listed
+    assert listed == ["otr_canonical"], listed
 
 
 def test_canonical_ships_kokoro_on_both_voice_slots():

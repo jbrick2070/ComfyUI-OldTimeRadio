@@ -25,14 +25,16 @@ up yet, so its pictures come from Google's paid image API and need a key -- see 
 Mac row in "Pick the graph" below.
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
-> EXTENSIONS → comfyui-old-time-radio**. You will see two entries:
-> **`otr_canonical`** (the one shipped graph: Kokoro voices for announcer and
-> characters, Qwen3.5-4B writer, Z-Image stills -- pick it, then **Queue Prompt**; or
-> drag `workflows/otr_canonical.json` onto the canvas; on an 8 GB card load the matching
-> saved-dropdown variant from "Pick the graph" instead),
-> and `otr_story_only` (skip it for a first episode: it only writes the script, no
-> voices, music or video; it exists for comparing writer models). The 25 `OTR_`
-> nodes are the parts; the workflow is the thing you run.
+> EXTENSIONS → comfyui-old-time-radio**. There is exactly one entry,
+> **`otr_canonical`** -- pick it, then **Queue Prompt**. (Or drag
+> `workflows/otr_canonical.json` onto the canvas; it is the same file.) The 25
+> `OTR_` nodes are the parts; the workflow is the thing you run.
+>
+> **One graph, and you set its dropdowns.** There are no per-machine saved JSONs
+> at the moment: the machine-specific variants were removed while the canonical
+> is being proven on Apple Silicon, and they will be regenerated from it once it
+> is final. Load the canonical and change the dropdowns named in "Pick the graph"
+> below to match your hardware.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below). Check out `v2.0-alpha` to get the current pipeline — or skip the
@@ -343,8 +345,9 @@ repo and the two steps it is missing.
 
 ### 4. Install the models
 
-The machine-specific variants in "Pick the graph" are separate saved JSONs.
-They are not substitutes for the exact canonical test reported here.
+The per-machine rows in "Pick the graph" are dropdown changes to the one
+canonical graph, not separate saved JSONs. They are not substitutes for the
+exact canonical test reported here.
 
 The alpha.24 canonical JSON (`otr_canonical`) selects **LTX 0.9.8 low (16:9)**
 for all three video roles, **Z-Image-Turbo** for all three image roles,
@@ -396,11 +399,11 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 | you have | load this | what it renders |
 |---|---|---|
-| 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
+| 8 GB card, ready for real video | `otr_canonical`, then set the three **OTR_VideoDirector** video roles to `animatediff15_v3_haunted_video (16:9)` and `llm_device` -> `cuda` in **OTR_LedgerScriptWriter** | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
-| AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
-| Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
+| AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical`, then set `llm_device` -> `cuda` (ROCm torch reports as cuda) and `device_policy` -> `cuda` | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
+| Apple Silicon Mac (draft, being proven on real hardware now) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys and no image weights at all: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. Whether `mps` actually executes is being measured on a real M4 -- until that lands, treat this row as unproven |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
