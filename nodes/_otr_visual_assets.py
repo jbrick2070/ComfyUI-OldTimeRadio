@@ -27,13 +27,31 @@ _SOURCES = (
     ("vae", "Comfy-Org/z_image_turbo", "split_files/vae/ae.safetensors"),
     ("checkpoints", "Lightricks/LTX-Video", "ltxv-2b-0.9.8-distilled.safetensors"),
     ("text_encoders", "comfyanonymous/flux_text_encoders", "t5xxl_fp16.safetensors"),
+    # MUSIC, added 2026-09-06. stable_audio_3 is ungated and commercially
+    # clean, and the engine already declares ["cuda", "mps"] -- but its ONLY
+    # fetcher lived in scripts/, which .comfyignore strips from the published
+    # bundle. So a registry install selecting it hit EngineUnusable "fetch
+    # Comfy-Org/stable-audio-3 (ungated) first" with nothing able to do the
+    # fetching. That left musicgen as the only music engine that self-supplies,
+    # and musicgen is CC-BY-NC -- so every published episode carried a
+    # non-commercial music bed by default. Filenames verified against the live
+    # Hub listing and against eng_stable_audio_3._CKPT / ._TENC.
+    ("checkpoints", "Comfy-Org/stable-audio-3",
+     "checkpoints/stable_audio_3_small_music.safetensors"),   # 2,270,384,940 B
+    ("text_encoders", "Comfy-Org/stable-audio-3",
+     "text_encoders/t5gemma_b_b_ul2.safetensors"),            # 1,187,264,003 B
 )
 MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
             {"repo_id": repo, "filename": filename}
             for category, repo, filename in _SOURCES}
 _VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_model")
 _IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
-_COVERED = frozenset({"z_image_turbo", "ltx_8gb"})
+_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "stable_audio_3"})
+#: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
+#: class with a single ``engine`` widget rather than per-role slots, so it gets
+#: its own pass; an absent node is a skip, not a refusal, because a graph
+#: without theme music is legitimate.
+_MUSIC_NODE = "OTR_StableAudioTheme"
 
 
 class VisualAssetError(RuntimeError):
@@ -99,6 +117,12 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
             if not picked or picked.startswith("+ Add Custom"):
                 raise VisualAssetError("visual asset preflight requires an explicit image "
                                        "engine selection for " + slot)
+            result["engines"].add(picked)
+    # MUSIC ENGINE, same prompt, its own node class. Read only; an absent node
+    # or an unset widget is a skip so a graph without theme music still plans.
+    for node in [n for n in scoped if n.get("class_type") == _MUSIC_NODE]:
+        picked = _literal(node.get("inputs") or {}, "engine")
+        if picked and not picked.startswith("+ Add Custom"):
             result["engines"].add(picked)
     for engine in sorted(result["engines"] - _COVERED):
         result["skipped"].append("%s: automatic visual-weight coverage unavailable; "
