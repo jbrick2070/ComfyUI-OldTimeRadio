@@ -588,6 +588,18 @@ this box's environment.
 
 ## THE FRICTIONLESS-INSTALL ANSWER: LOW and HIGH on 8 GB, every value measured
 
+> **SUPERSEDED 2026-09-07 -- READ `docs/4060_PORTABILITY_ANSWER.md` INSTEAD.**
+> This section was honest when written and is kept as history. FIVE of its rows
+> have since been overturned by this box's OWN published episodes: LTX and
+> z_image_turbo both completed episodes (5 and 8 respectively), stable_audio_3
+> is on disk and backs 3 published episodes, and the HIGH writer it calls
+> UNPROVEN is now `Qwen/Qwen3.5-4B` -- published 4x and the shipped
+> `DEFAULT_LLM`. An operator following the table below TODAY would pick the
+> CC-BY-NC music bed and avoid two lanes that work. The one row still live is
+> the unresolved `llama_cpp_python` 0.3.35 STATUS_ILLEGAL_INSTRUCTION fault,
+> which was routed around by moving to a Transformers-lane writer, not fixed.
+
+
 Operator's ask (2026-08-29): *"how can we get Claude to see how frictionless our
 best frictionless setup low and high capabilities are on the 4060 and decide
 what dropdowns those JSONs should have."* Friction is defined as six observable
