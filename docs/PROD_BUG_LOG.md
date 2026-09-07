@@ -12075,3 +12075,40 @@ byte-identical. It also guards itself: a test asserts the fixture still
 reproduces the original overflow, so a shortened id cannot make the suite pass
 while proving nothing. 391 tests pass across the 23 modules that touch these
 paths.
+
+### PBUG-20260907-01 follow-up — September 7, ~01:20: how the procgen half would have failed
+
+Two things an adversarial audit of the fix established that the measurement did
+not, both about the procgen temporaries.
+
+**IT WOULD NOT HAVE CRASHED. It would have silently shipped a worse episode.**
+ffmpeg cannot open the 266-unit `__nobars_tmp`, `check=True` raises
+CalledProcessError, and the handler degrades to `shutil.copy2(src, output_path)`
+-- so the procgen blend AND the audio bars vanish behind a single warning while
+`output_path` (254 units, under the 260 OS limit) still writes and the render
+reports success. That is the worst shape this bug could take: a clean-looking
+episode, a green log, and two whole visual layers missing. A crash would have
+been kinder.
+
+**IT IS LATENT, NOT DEAD, AND THE CLASS DEFAULT POINTS THE WRONG WAY.**
+`bypass` is `True` in `workflows/otr_canonical.json` node 93 and in all 95 files
+under `workflows/variants/`, which is why the temporaries have never been built
+and why the 2026-09-06 run logged `bypass=True, copied ..._silent.mp4`. But the
+CLASS default is `False` (`otr_post_upscale_procgen_blend.py:784`), so a node
+freshly dragged from the node menu, or an API `/prompt` that omits the widget,
+takes the blend path on its FIRST run. Everything else is already wired:
+`procgen_mp4_path` is linked from node 12 and `audio_bars` is `'bottom'` in all
+96 graphs, so `want_bars` needs nothing but that one widget. One click, or one
+API call that trusts the default, away from live.
+
+**The deliverable rename at that site was reviewed separately** and is clean:
+`<id>_silent_procgen_blended.mp4` -> `<id>_procgen_blended.mp4` (254 -> 247).
+Every occurrence of the old literal outside the node is a comment or a
+docstring; no glob, `startswith` or `endswith` reads it; and `_procgen_blended`
+is a recognised stage suffix in all four strip lists that recover the episode id
+(`otr_caption_burn:290`, `otr_credits_roll:1306`, `otr_master_audio_mux:920`
+and `:1174`), so the shortened name still reduces correctly.
+
+**The credits half had the same silent-loss shape.** `clip.scroll.png` lands on
+exactly 260 units, so with the compaction inert the credits clip render would
+have failed there too rather than announcing a length problem.
