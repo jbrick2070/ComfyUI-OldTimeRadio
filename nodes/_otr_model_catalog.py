@@ -965,6 +965,31 @@ def dropdown_choices(hub_root: Path | None = None) -> list[str]:
     return [e.label for e in build_dropdown_choices(hub_root=hub_root)]
 
 
+def default_llm_option() -> str:
+    """The exact COMBO label for :data:`DEFAULT_LLM`, size suffix included.
+
+    THE SUFFIX IS PART OF THE VALUE. A saved graph must carry the label the
+    dropdown offers -- a bare repo id matches no choice, and an unmatched COMBO
+    can resolve to index 0, so a graph that SAYS one model silently runs
+    another. That failure is already recorded (2026-08-04, both writer widgets
+    rendering red) and is why callers must never hand-build "repo_id (N GB)".
+
+    WHY THIS EXISTS (PBUG-20260906-09). Four test modules hard-coded
+    ``"google/gemma-4-12b-it (11.9 GB)"``. When DEFAULT_LLM moved to Qwen those
+    literals did not, so the tests asserted the OLD default was shipped -- they
+    pinned the drift in place instead of catching it, and a test that fails
+    when the default legitimately changes is a test that will be edited rather
+    than believed. Deriving the label here means one edit to DEFAULT_LLM moves
+    the constant, the shipped graphs' checker, and every test at once.
+
+    Cache-independent by construction: it composes the same way
+    :func:`build_dropdown_choices` composes a curated row
+    (``repo_id + vram_badge_for(repo_id)``) and never scans the HF cache, so it
+    answers identically on a cold box and a warm one.
+    """
+    return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
+
+
 # ---------------------------------------------------------------------------
 # OpenRouter slot-slug picker dropdowns (S1)
 # ---------------------------------------------------------------------------
@@ -2162,7 +2187,24 @@ def auto_download_if_missing(
     }
     if progress_pbar is not None:
         kwargs["tqdm_class"] = _make_pbar_tqdm_adapter(progress_pbar)
-    return str(_snapshot_download(**kwargs))  # type: ignore[operator]
+    result = str(_snapshot_download(**kwargs))  # type: ignore[operator]
+    # Drive the node's bar to complete explicitly. The mirrored bars only ever
+    # see bytes that actually TRANSFER: a file already in the blob cache
+    # returns from hf_hub_download before any progress object exists, so on a
+    # resumed download (the likely next run after any failure) the aggregate
+    # total counts only the remaining shards, and if EVERY file is cached the
+    # total stays 0 and the adapter never publishes at all. The bar would then
+    # sit wherever it was left while the download had in fact finished.
+    # ComfyUI's ProgressBar also throttles updates below its 0.5%/100ms floor
+    # unless value >= total, so the last mirrored write can be dropped even in
+    # the ordinary case. One unconditional write on the way out fixes both, and
+    # mirrors what the visual asset planner already does on its own way out.
+    if progress_pbar is not None:
+        try:
+            progress_pbar.update_absolute(1000, 1000)  # type: ignore[attr-defined]
+        except BaseException:  # noqa: BLE001 -- a bar must not fail a download
+            pass
+    return result
 
 
 def _make_pbar_tqdm_adapter(pbar: object) -> type:
@@ -2226,13 +2268,28 @@ def _make_pbar_tqdm_adapter(pbar: object) -> type:
             is worse than no progress indicator, so every failure is swallowed:
             a ProgressBar whose update_absolute throws, a None or zero total mid
             aggregation, and a bar touched after close all have to be survivable.
+
+            WHY BaseException AND NOT Exception. tqdm's own ``refresh()`` is::
+
+                self._lock.acquire()
+                self.display()
+                self._lock.release()
+
+            with NO try/finally (verified in the installed tqdm 4.70.0,
+            std.py). Anything this method raises therefore strands
+            ``_lock``, and because TqdmDefaultWriteLock keeps its th_lock as a
+            CLASS attribute the next ``refresh()`` on ANY tqdm anywhere in the
+            process blocks forever. A KeyboardInterrupt arriving inside
+            update_absolute would deadlock the whole ComfyUI server, not just
+            this download. Losing one Ctrl-C during a progress paint is the far
+            cheaper failure, so the guard is total.
             """
             try:
                 total = self.total
                 if total:
                     pbar.update_absolute(int(self.n), int(total))  # type: ignore[attr-defined]
-            except Exception:  # noqa: BLE001 -- never break the download
-                pass
+            except BaseException:  # noqa: BLE001 -- see docstring: tqdm's
+                pass              # refresh() leaks its lock on ANY raise
             return True
 
     return _PBarTqdm
@@ -2261,6 +2318,7 @@ __all__ = [
     "scan_local_llm_cache",
     "build_dropdown_choices",
     "dropdown_choices",
+    "default_llm_option",
     "openrouter_catalog_dropdown_choices",
     "OPENROUTER_ENABLE_SENTINEL",
     "OPENROUTER_EMPTY_CACHE_SENTINEL",

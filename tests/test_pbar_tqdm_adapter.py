@@ -35,9 +35,14 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "nodes"))
+sys.path.insert(0, str(ROOT))
 
-import _otr_model_catalog as CATALOG  # noqa: E402
+# Imported as part of the `nodes` PACKAGE, not flat off nodes/ as most of the
+# suite does. auto_download_if_missing lazily runs `from ._otr_hf_auth import
+# resolve_hf_token_runtime`, which raises "attempted relative import with no
+# known parent package" under a flat import -- so the flat form can construct
+# the adapter but can never reach the function that installs it.
+from nodes import _otr_model_catalog as CATALOG  # noqa: E402
 
 
 class _RecordingPBar:
@@ -165,6 +170,121 @@ class NeverBreaksTheDownloadTests(unittest.TestCase):
         cls = CATALOG._make_pbar_tqdm_adapter(_RecordingPBar())
         bar = cls(total=10, name="huggingface_hub.snapshot_download")
         bar.close()
+
+
+class LockInvariantTests(unittest.TestCase):
+    """tqdm's refresh() leaks its lock if display() raises ANYTHING.
+
+    Installed tqdm 4.70.0, std.py refresh():
+
+        self._lock.acquire()
+        self.display()
+        self._lock.release()
+
+    No try/finally. TqdmDefaultWriteLock holds th_lock as a CLASS attribute, so
+    a single escaped exception blocks the next refresh() on every tqdm in the
+    process -- a whole-server deadlock, not a lost progress bar. `except
+    Exception` is not enough because KeyboardInterrupt is a BaseException.
+    """
+
+    def test_a_keyboardinterrupt_from_the_sink_does_not_escape(self):
+        class _Interrupting:
+            def update_absolute(self, value, total=None):
+                raise KeyboardInterrupt
+
+        cls = CATALOG._make_pbar_tqdm_adapter(_Interrupting())
+        bar = cls(total=1000)
+        bar.update(500)
+        bar.refresh()   # would strand the lock if display() raised
+        bar.close()
+
+    def test_the_shared_tqdm_lock_still_works_afterwards(self):
+        """The real symptom: an unrelated bar hangs. If the lock were stranded
+        this call would block forever rather than fail."""
+        from tqdm.std import tqdm as tqdm_base
+
+        class _Interrupting:
+            def update_absolute(self, value, total=None):
+                raise KeyboardInterrupt
+
+        cls = CATALOG._make_pbar_tqdm_adapter(_Interrupting())
+        bar = cls(total=10)
+        bar.update(1)
+        bar.refresh()
+        bar.close()
+
+        import io as _io
+
+        other = tqdm_base(total=3, file=_io.StringIO())
+        other.update(1)
+        other.refresh()
+        other.close()
+
+
+class CompletionTests(unittest.TestCase):
+    """The bar must reach 100% even when nothing transferred.
+
+    A file already in the blob cache returns before any progress object is
+    built, so a resumed download aggregates only the remaining shards and a
+    fully-cached repo aggregates nothing at all. Without an explicit write on
+    the way out the node's bar sits where it was left while the download had
+    actually finished.
+    """
+
+    def test_auto_download_drives_the_bar_to_complete(self):
+        """The real function, with the downloader injected. Simulates the
+        fully-cached case: the fake transfers nothing, so the mirrored bars
+        never publish, and only the explicit completion write can finish it."""
+        import tempfile
+
+        pbar = _RecordingPBar()
+        seen = {}
+
+        def _fake_snapshot(**kwargs):
+            seen.update(kwargs)
+            return "C:/fake/snapshot"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = CATALOG.auto_download_if_missing(
+                "Qwen/Qwen3.5-4B",
+                hub_root=Path(tmp),
+                progress_pbar=pbar,
+                _snapshot_download=_fake_snapshot,
+            )
+
+        self.assertEqual(out, "C:/fake/snapshot")
+        self.assertIn("tqdm_class", seen, "the adapter must still be wired in")
+        self.assertTrue(pbar.calls, "the bar never moved at all")
+        self.assertEqual(
+            pbar.calls[-1], (1000, 1000),
+            "the last write must complete the bar; without it a resumed or "
+            "fully-cached download leaves the node's bar part-way while the "
+            "download has actually finished")
+
+    def test_a_throwing_bar_cannot_fail_the_download(self):
+        """The completion write is on the success path -- if it could raise, a
+        finished 24 GB download would be reported as a failed node."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = CATALOG.auto_download_if_missing(
+                "Qwen/Qwen3.5-4B",
+                hub_root=Path(tmp),
+                progress_pbar=_ThrowingPBar(),
+                _snapshot_download=lambda **kw: "C:/fake/snapshot",
+            )
+        self.assertEqual(out, "C:/fake/snapshot")
+
+    def test_the_completion_write_source_is_present(self):
+        """Guards the call itself, since the surrounding function needs a real
+        hub root to execute end to end here."""
+        import inspect
+
+        source = inspect.getsource(CATALOG.auto_download_if_missing)
+        self.assertIn("update_absolute(1000, 1000)", source,
+                      "auto_download_if_missing must complete the bar on exit")
+        self.assertIn("except BaseException", source,
+                      "the completion write must not be able to fail a download")
 
 
 class SubclassShapeTests(unittest.TestCase):

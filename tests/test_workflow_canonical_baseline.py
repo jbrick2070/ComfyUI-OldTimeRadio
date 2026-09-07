@@ -30,6 +30,22 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
+def _default_llm_option() -> str:
+    """The shipped writer label, derived from DEFAULT_LLM rather than pinned.
+
+    Imported lazily and by path so this module keeps working when `nodes/` is
+    not already on sys.path, which is how the rest of the suite reaches it.
+    """
+    import sys
+
+    nodes_dir = str(REPO_ROOT / "nodes")
+    if nodes_dir not in sys.path:
+        sys.path.insert(0, nodes_dir)
+    from _otr_model_catalog import default_llm_option
+
+    return default_llm_option()
+
+
 def _load_canonical_workflow() -> dict:
     return json.loads(CANONICAL_JSON.read_text(encoding="utf-8"))
 
@@ -82,14 +98,21 @@ class TestWriterCanonicalModelSlots:
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane, not the independent GGUF Q8 row whose
         # context downgrade motivated the earlier Mistral canvas pin.
-        # 2026-08-04: THE SIZE SUFFIX IS PART OF THE COMBO VALUE. The live
-        # choice list offers 'google/gemma-4-12b-it (11.9 GB)', so the bare id
-        # matched nothing: the operator reported both dropdowns rendering RED
-        # on opening the graph, and an unmatched COMBO can resolve to index 0
-        # of the list -- which here is Mistral-Nemo. The canvas said Gemma and
-        # could have run Mistral. Pinned in full so the suffix cannot be lost.
-        expected_creative = "google/gemma-4-12b-it (11.9 GB)"
-        expected_technical = "google/gemma-4-12b-it (11.9 GB)"
+        # 2026-08-04: THE SIZE SUFFIX IS PART OF THE COMBO VALUE. A bare repo
+        # id matches nothing: the operator reported both dropdowns rendering
+        # RED on opening the graph, and an unmatched COMBO can resolve to index
+        # 0 of the list. The canvas said one model and could have run another.
+        # Pinned in full so the suffix cannot be lost.
+        #
+        # 2026-09-06 (PBUG-20260906-09): DERIVED, no longer a literal. This
+        # assertion used to hard-code the Gemma label. When DEFAULT_LLM moved
+        # to Qwen the literal did not move with it, so the test asserted the
+        # OLD default was shipped -- it pinned the drift instead of catching
+        # it. default_llm_option() composes the label the same way the dropdown
+        # does, so one edit to DEFAULT_LLM now moves the constant, the shipped
+        # graphs and this check together.
+        expected_creative = _default_llm_option()
+        expected_technical = _default_llm_option()
         assert widgets[2] == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "
             f"got {widgets[2]!r}."

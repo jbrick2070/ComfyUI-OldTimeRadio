@@ -11906,3 +11906,79 @@ ALSO OBSERVED, not fixed here: the dropdown badge understates real download size
 by roughly half on every row (gemma-4-12b badged 11.9 GB downloaded 23.9 GB;
 Qwen badged 4.3 GB downloaded 8.7 GB). That is GO_FORWARD_PLAN item F.13, the
 `approx_safetensors_gb / 2` rule, now confirmed live twice rather than argued.
+
+### PBUG-20260906-08 follow-up -- September 6, ~23:55 PDT: one correction and two more defects
+
+**CORRECTION to the entry above, and it was my claim, not a measurement.** I wrote
+that the 36.8 GB of visual assets survived "because the asset planner calls
+`hf_hub_download` directly and never passes a `tqdm_class`". That is WRONG.
+`nodes/_otr_visual_assets.py` does not use huggingface_hub's downloader at all:
+it pins the revision and sha with `hf_hub_url` + `get_hf_file_metadata`
+(:294-301) and then streams the bytes itself over raw `urllib`
+(`build_opener` / `Request`, :16-18), reporting through a plain
+`progress(done, total)` callback. There is no tqdm object anywhere on that path.
+The conclusion was right -- the visual lane cannot be hit by this bug -- but the
+reason was wrong, and the real reason is stronger: the two lanes share no
+download code whatsoever.
+
+The same reading answers the open question about the unused token. Those metadata
+calls pass **`token=False` explicitly** (:221, :227), which is why startup logs
+`[hf_token] HF_TOKEN resolved from os.environ (len=37)` and the very next line
+warns "You are sending unauthenticated requests to the HF Hub". It is a deliberate
+argument, not a lost environment variable.
+
+**TWO FURTHER DEFECTS in the fix itself**, found by adversarially verifying the
+committed adapter against the installed libraries rather than against reasoning.
+Neither was reachable from the traceback that started this entry.
+
+**(a) `except Exception` was not enough, and the failure mode is a whole-server
+deadlock.** tqdm's own `refresh()`, verified in the installed tqdm 4.70.0
+`std.py`, is:
+
+```python
+self._lock.acquire()
+self.display()
+self._lock.release()
+```
+
+with NO try/finally. Anything `display()` raises therefore strands `_lock`, and
+`TqdmDefaultWriteLock` holds its `th_lock` as a CLASS attribute, so the next
+`refresh()` on ANY tqdm anywhere in the process blocks forever. `except
+Exception` does not catch `KeyboardInterrupt`, so a Ctrl-C landing inside
+`update_absolute` would hang the whole ComfyUI server rather than this download.
+The guard is now `except BaseException`. Losing one Ctrl-C during a progress
+paint is the cheaper failure by a wide margin.
+
+**(b) The bar could never reach 100% on the most likely next run.** A file
+already in the blob cache returns from `hf_hub_download` BEFORE any progress
+object exists, so on a resumed download the aggregate total counts only the
+remaining shards, and on a fully cached repo it stays 0 and the adapter never
+publishes at all -- leaving the node's bar part-way while the download had in
+fact finished. ComfyUI's `ProgressBar.update_absolute` also throttles below its
+0.5%/100ms floor unless `value >= total`, so even the ordinary case can drop its
+final write. `auto_download_if_missing` now writes `update_absolute(1000, 1000)`
+unconditionally on the way out, wrapped so it can never fail a completed
+download -- the same thing the visual asset planner already does at
+`_otr_visual_assets.py:364`.
+
+**A THIRD defect, in the TESTS, and it is PBUG-20260906-09 wearing a different
+coat.** Four test modules hard-coded `"google/gemma-4-12b-it (11.9 GB)"`:
+`test_canonical_headless_api.py`, `test_one_act_template_stdlib.py`,
+`test_workflow_canonical_baseline.py` and a docstring in
+`test_saved_workflow_model_values_resolve.py`. Those assertions did not catch the
+drift -- they PINNED it, asserting that the old default was still shipped, and
+the first of them would have gone red on the very next CI run after the fix. A
+test that fails when a default legitimately changes is a test that gets edited
+rather than believed. New `_otr_model_catalog.default_llm_option()` composes the
+label exactly as the dropdown does (`DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)`,
+cache-independent), and the assertions now derive from it, so one edit to
+DEFAULT_LLM moves the constant, the shipped graphs and every check together. The
+stdlib-only module keeps its purity: it now asserts the structural half (both
+writer slots agree, and the value carries its size suffix) and defers "which
+model" to `test_shipped_template_writer_default.py`.
+
+VERIFIED: 16 tests in the adapter and shipped-template modules, 44 across every
+module touched. The pre-existing failure of
+`test_headless_process_selectors_never_claim_the_interactive_gui` was confirmed
+to be unrelated by stashing this work and reproducing it identically -- it spawns
+PowerShell against a `.psm1` and fails on this box for environment reasons.

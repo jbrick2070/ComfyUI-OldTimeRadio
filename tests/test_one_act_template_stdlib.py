@@ -30,8 +30,20 @@ class OneActTemplateTests(unittest.TestCase):
     def test_canonical_starts_with_one_act_and_same_writers(self):
         values = writer_widgets(load_graph(REPO / "workflows/otr_canonical.json"))
         self.assertEqual(values["act_count"], "1")
-        for slot in ("creative_writing_model", "technical_model"):
-            self.assertEqual(values[slot], "google/gemma-4-12b-it (11.9 GB)")
+        # WHICH model is authoritative in test_shipped_template_writer_default,
+        # which ties it to DEFAULT_LLM. This module is deliberately stdlib-only
+        # (see the docstring) so it must not import the catalog to learn the
+        # label. It previously hard-coded 'google/gemma-4-12b-it (11.9 GB)';
+        # when DEFAULT_LLM moved to Qwen the literal did not, so the assertion
+        # pinned the drift in place rather than catching it (PBUG-20260906-09).
+        # What belongs HERE is the structural half: both writer slots agree,
+        # and the value is a real COMBO label carrying its size suffix.
+        creative = values["creative_writing_model"]
+        self.assertEqual(values["technical_model"], creative,
+                         "both writer slots must select the same model")
+        self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB\)$",
+                         "the size suffix is part of the COMBO value; a bare "
+                         "repo id matches no choice and can resolve to index 0")
         self.assertEqual(len(values), 33)
 
     def test_story_only_is_exactly_derived_and_one_act(self):

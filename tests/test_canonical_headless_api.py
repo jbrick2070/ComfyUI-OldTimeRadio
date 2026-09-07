@@ -28,6 +28,16 @@ if str(SCRIPTS) not in sys.path:
 import otr_canonical_api_run as canonical  # noqa: E402
 
 
+def _default_llm_option() -> str:
+    """The shipped writer label, derived from DEFAULT_LLM rather than pinned."""
+    nodes_dir = str(REPO_ROOT / "nodes")
+    if nodes_dir not in sys.path:
+        sys.path.insert(0, nodes_dir)
+    from _otr_model_catalog import default_llm_option
+
+    return default_llm_option()
+
+
 RETIRED_FULL_WORKFLOW_HARNESSES = {
     "COMBO_MATRIX.md",
     "FABLE_SOAK_REVIEW.md",
@@ -290,16 +300,20 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
     # lane binds LMFE schema constraints; this is not the Q8 GGUF path.
     #
-    # 2026-08-04: THE SIZE SUFFIX IS PART OF THE VALUE. The COMBO choice list
-    # is 'google/gemma-4-12b-it (11.9 GB)', so the bare id matched no choice:
-    # the operator saw both dropdowns render RED on opening the graph, and an
-    # unmatched COMBO can resolve to index 0 -- which on this widget is
-    # Mistral-Nemo. A graph that said Gemma could run Mistral. Asserted in
-    # full here so the suffix cannot be dropped again.
-    assert writer["inputs"]["creative_writing_model"] == \
-        "google/gemma-4-12b-it (11.9 GB)"
-    assert writer["inputs"]["technical_model"] == \
-        "google/gemma-4-12b-it (11.9 GB)"
+    # 2026-08-04: THE SIZE SUFFIX IS PART OF THE VALUE. A bare repo id matches
+    # no choice: the operator saw both dropdowns render RED on opening the
+    # graph, and an unmatched COMBO can resolve to index 0 of the list. A graph
+    # that said one model could run another. Asserted in full here so the
+    # suffix cannot be dropped again.
+    #
+    # 2026-09-06 (PBUG-20260906-09): DERIVED, not pinned. This assertion
+    # hard-coded the Gemma label; when DEFAULT_LLM moved to Qwen the literal
+    # stayed, so the test asserted the OLD default was shipped and pinned the
+    # drift in place instead of catching it. The index-0 hazard described above
+    # is also why the derivation must keep the suffix.
+    _expected_writer_model = _default_llm_option()
+    assert writer["inputs"]["creative_writing_model"] == _expected_writer_model
+    assert writer["inputs"]["technical_model"] == _expected_writer_model
     # 2026-08-15 (operator): the lean default moved from the audio-reactive
     # visualizers to the flat still, so the beat classes actually show the
     # z_image_turbo image they mint. Still a cheap family, not heavy video.

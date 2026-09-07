@@ -3,7 +3,7 @@
 WHY THIS FILE EXISTS -- it was predicted, then it happened.
 
 The 2026-08-07 slug audit (`kibitz-runs/2026-08-07-slugfest/`) flagged that
-`workflows/otr_canonical.json` hardcodes `"google/gemma-4-12b-it (11.9 GB)"` --
+`workflows/otr_canonical.json` saves a full COMBO label, e.g. `"Qwen/Qwen3.5-4B (4.3 GB)"` --
 a SIZE-SUFFIXED label -- and warned that if the suffix ever changed without the
 JSON being updated, saved workflows would stop matching the dropdown.
 
