@@ -1656,3 +1656,147 @@ without Mac/AMD hardware. It is not a substitute for running it there.
 **Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
 *"I'm not sure we need to regression test every combo at this stage."* Three
 configurations that install clean beat 33 lanes with thin evidence.
+
+---
+
+# 2026-09-07 -- FIRST MAC HARDWARE RUN (Mac mini M4, 16 GB, macOS 26.6.2)
+
+Section 4 above says *"Mac and AMD -- no hardware, on either box."* That is no
+longer true for Mac. This section replaces the guesses with measurements.
+
+Box: Mac mini M4, 10-core, **16 GB unified**, macOS 26.6.2, ComfyUI Desktop
+0.34.6 standalone `mac-mps`, Python 3.13.12, torch 2.12.1. `Device: mps`, all 25
+OTR nodes loaded, zero import failures. Canonical as retargeted at `a62f3567`.
+
+## 1. THE MPS QUESTION, ANSWERED
+
+The standing hypothesis was that `nodes/` carries ~40 `torch.cuda.is_available()`
+checks and zero `torch.backends.mps.is_available()` checks, so selecting `mps`
+silently routes to CPU. **Counted: 40 cuda call sites, and exactly one
+`torch.backends.mps` occurrence -- which is a docstring, not a check.** The
+hypothesis was right about the code shape and **wrong about the writer.**
+
+**The writer genuinely runs on the GPU.** `llm_device` flows
+`OTR_LedgerScriptWriter` -> `_policy.device` -> `_otr_model_loader.py:1459`:
+
+```python
+if quant_config is None and max_memory is None:
+    model = model.to(device)          # device == "mps"
+```
+
+The canonical runs quant `none` with `max_memory=None`, so that branch is taken
+and `.to("mps")` executes verbatim. Confirmed on the live process, not inferred:
+`footprint -p <pid>` reported **14 GB phys_footprint** while
+`AGXMetalG16G_B0.bundle` -- the Apple GPU Metal driver -- was mapped into the
+address space, with `IOAccelerator` regions resident. That is Metal executing.
+
+**`[StoryOrchestrator] CUDA warmup complete` prints on this Mac and means
+nothing.** It is a hardcoded string in the warmup block; the warmup runs on
+whatever device the model is on. Cosmetic, and actively misleading to anyone
+diagnosing a Mac run. Worth renaming; not a routing fault.
+
+**Where an mps selection IS disregarded -- confirmed by reading the code:**
+
+* **Kokoro TTS, and it reaches every Python 3.13 install.** `voice_device="mps"`
+  is accepted by the widget and ignored by the engine: on 3.13 the backend is
+  `kokoro-onnx`, whose session is built from an explicit provider list, CPU by
+  default. The code says so itself (`_kokoro_backends.py:19`). See
+  PBUG-20260907-08.
+* **Upscale lane, deliberately.** `_otr_upscale_engines/_resolve.py:20` is the
+  repo's only device resolver and its docstring reads *"Rejects: `mps` (until a
+  Mac integration receipt lands)"*. It raises rather than degrading -- the
+  correct failure shape, just not yet lifted.
+* **The VRAM budgeter is blind, not wrong.** `total_vram` comes from
+  `torch.cuda.get_device_properties(0)` behind `torch.cuda.is_available()`, so it
+  is `0` here and the 10.0 GB ceiling widget enforces nothing on Mac. Harmless
+  today only because `_plan_max_memory` returns `None` for every row.
+* **`bark` declares `["cuda", "cpu"]` and omits `mps` on purpose**
+  (`registry.py:206`) -- correctly declared, unlike Kokoro's.
+
+**The one line in the writer path that is already device-aware** is the GGUF
+backend, `_otr_gguf_backend.py:643`:
+`default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0`.
+This is the pattern the rest of the tree should converge on.
+
+## 2. ONE JSON OR TWO -- the operator's question, answered
+
+Operator, 2026-09-07: *"my goal is I run it on cuda, mac, it works everywhere --
+not all dropdowns -- but want ONE json to work. If that's impossible we need two
+jsons."*
+
+**One JSON is achievable, and a second JSON would not fix the real problem
+anyway.** The blocker is not the graph. It is that device selection is expressed
+as a literal string in the saved widget (`"mps"` in three nodes: writer,
+`OTR_CastLock`, `OTR_VideoDirector`), so the graph names a device that only one
+class of machine has.
+
+**Recommended shape, in the operator's own words** (*"if cuda is available use
+it, if not ... it automatically finds it"*):
+
+1. Add ONE shared resolver -- `cuda -> mps -> cpu` -- and route every device
+   decision through it. `_otr_gguf_backend.py:643` already shows the idiom;
+   `_otr_upscale_engines/_resolve.py` is the natural home for the general form.
+2. Add `"auto"` to the three device dropdowns and make it the canonical's saved
+   value. `auto` resolves per host, so the SAME json runs on the 5080 and here.
+   `cuda` / `mps` / `cpu` stay selectable for anyone pinning deliberately.
+3. Where a lane genuinely cannot honour a device, **say so at selection time**
+   rather than in a log line -- Kokoro's `voice_device` is the live example.
+
+That is a code change, not a workflow change, and it is the only version of
+"one json" that survives contact with a third platform.
+
+## 3. THE HARD CONSTRAINT: 16 GB IS NOT ENOUGH FOR THE SHIPPED CANONICAL
+
+Full numbers in PBUG-20260907-06. The short form:
+
+* writer `phys_footprint` **14 GB** on a **16 GB** machine
+* swap 0.00 M -> **5.6 GB**, free memory to **1 %**
+* **ComfyUI OOM-killed by macOS mid-render, twice**
+* throughput while it lasted: **3.7 -> 6.4 tok/s**
+
+**And the quant dropdown cannot rescue it.** Both bnb lanes are off on darwin by
+declared intent (`bitsandbytes ... sys_platform != 'darwin'`), so `none` is the
+only selectable policy on Apple Silicon -- and `none` is what does not fit.
+A Mac operator has no in-UI move.
+
+**Three real options, operator's call:**
+
+1. **Ship the GGUF lane on Mac.** `Q4_K_M` on the 4B writer is ~2.5 GB and the
+   backend is already MPS-correct. Blocked only by PBUG-20260907-07:
+   `llama-cpp-python` is declared nowhere. This is the cheapest path to a Mac
+   episode and it needs a platform-wheel decision, not a Mac tester.
+2. **A smaller writer for the 16 GB tier**, selected by the machine class rather
+   than by hand.
+3. **Declare 16 GB unified out of scope** for the transformers lane and say so in
+   the README, which is more honest than a canonical that OOMs.
+
+## 4. WHAT THIS SESSION DID NOT PROVE
+
+**No episode reached `otr/obs/`, so by the operator's own standard this leg did
+not pass.** Two runs were started; the first died when its host session
+restarted (the ComfyUI server was a child of that session -- a harness fault,
+not an OTR one), the second was OOM-killed. Both got as far as correct
+structured writer output -- outline beats, character descriptions, schema-valid
+JSON -- and neither reached TTS, music, video or publish. **Everything downstream
+of the writer is still unproven on Apple Silicon.**
+
+What IS proven on Mac: the pack installs, boots, registers all 25 nodes, passes
+the visual-asset preflight (`READY engines=stable_audio_3`, with all three
+`z_image_turbo` slots correctly refused as provably unused), fetches
+`stable_audio_3` weights, and drives the writer on Metal.
+
+## 5. FOR WHOEVER PICKS THIS UP
+
+1. **`2.0.0-alpha.29` is committed but NOT pushed.** This rented Mac has no
+   GitHub credentials (no `gh`, no keychain entry, no SSH key). The commit is
+   `a7ab7011`; a `git format-patch` of it was handed to the operator directly.
+   It is the tokenizers install-brick fix, PBUG-20260907-05 -- the highest
+   priority item here, because **every currently published version bricks a
+   ComfyUI install**, `.28` included.
+2. **Do not re-install this pack from the registry onto a working box** until
+   `.29` (or later) is the served version. It will brick the boot, and because
+   Manager is itself a ComfyUI extension you will not be able to use the UI to
+   undo it.
+3. The 40-site cuda/mps audit is classified above by lane, but only the sites on
+   the canonical's path were read line by line. The remaining lanes -- video,
+   post, upscale beyond `_resolve.py`, the vram-log helpers -- are unaudited.

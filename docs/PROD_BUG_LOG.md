@@ -12379,3 +12379,105 @@ Click-to-restart elapsed: **276 s (4 m 36 s)**.
    `ValueError: I/O operation on closed file` at
    `comfyui_manager/prestartup_script.py:328` -- a full traceback that looks fatal
    and appears to be benign.
+
+## PBUG-20260907-06 -- the canonical cannot fit a 16 GB Mac, and the quant dropdown cannot make it fit
+
+**First real Apple Silicon hardware evidence for this pack.** Mac mini M4
+(10-core, 16 GB unified, macOS 26.6.2), ComfyUI Desktop 0.34.6 standalone
+`mac-mps`, Python 3.13.12, torch 2.12.1, `Device: mps`, all 25 OTR nodes loaded.
+`workflows/otr_canonical.json` as retargeted at `a62f3567` -- act_count 1,
+`Qwen/Qwen3.5-4B`, `llm_device=mps`, `llm_quant_policy=none`, ceiling 10.0 GB.
+
+**MEASURED, and the numbers are the finding:**
+
+| quantity | value |
+| --- | --- |
+| writer process `phys_footprint` while generating | **14 GB** |
+| machine total | 16 GB unified, shared with macOS |
+| swap at peak | **5.6 GB** (from 0.00 M at idle) |
+| system free memory at peak | **1 %** |
+| writer throughput | **3.7 -> 6.4 tok/s** (warms up, then holds ~6) |
+| outcome | ComfyUI **OOM-killed by macOS** mid-render, twice |
+
+`ps rss` reports only 0.33 GB for that process and is useless here -- Apple
+Silicon unified/GPU memory does not land in RSS. `footprint -p <pid>` is the
+number that matters. Anyone sizing this pack on a Mac from `ps` will be wrong by
+40x.
+
+**THE PART THAT MAKES THIS STRUCTURAL, NOT JUST TIGHT.** The obvious lever does
+not exist on this platform. `llm_quant_policy` offers
+`["bnb_nf4", "bnb_8bit", "none"]`, and its own tooltip says *"bnb lanes are OFF
+on ROCm/MPS/CPU tiers (missing bitsandbytes fails loud)"* -- consistent with
+`bitsandbytes>=0.42.0; sys_platform != 'darwin'` in `requirements.txt`, which
+deliberately does not install bitsandbytes on macOS. **So on Apple Silicon
+`none` is the only selectable quant, and `none` is exactly the setting that does
+not fit.** There is no dropdown a Mac operator can change to make the shipped
+canonical run.
+
+**The 10.0 GB ceiling widget is inert here, separately.** `_otr_model_loader.py`
+computes `total_vram` from `torch.cuda.get_device_properties(0)` guarded by
+`torch.cuda.is_available()`, which is `False` on this box -- so `total_vram = 0`
+and the budgeter is blind. It did not cause the OOM (`_plan_max_memory` returns
+`None` for every row by operator directive 2026-09-06, so no cap was applied
+either way), but a Mac operator setting a ceiling gets no enforcement from it.
+
+**Not a regression and not caused by the render.** ComfyUI booted clean, the
+preflight gate passed, and the writer produced correct structured output
+throughout (`OTR_Outline.beat[...]`, character descriptions, schema-valid JSON).
+The pipeline is working; the machine is too small for the configuration.
+
+**Collateral worth naming:** the render starves the operator's remote-desktop
+session (DeskIn, ~0.7 GB) on the same 16 GB, so the box appears to "freeze"
+during a run. On a rented remote Mac that reads as a hung machine, not as memory
+pressure.
+
+**No fix applied.** The canonical is CUDA-and-Mac shared and the sizing decision
+is the operator's. Options are recorded in `docs/GO_FORWARD_PLAN.md`.
+
+## PBUG-20260907-07 -- the only lane that could fit a 16 GB Mac has an undeclared dependency
+
+Following from PBUG-20260907-06: with both bnb lanes unavailable on darwin, the
+GGUF lane is the only remaining way to shrink the writer, and the code is
+already correct for it. `nodes/_otr_gguf_backend.py:643` is the **one genuinely
+device-aware line in the writer path**:
+
+```python
+default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0
+```
+
+llama.cpp's Metal backend takes `n_gpu_layers` exactly as CUDA does, so an
+`mps` selection is honoured here rather than silently downgraded. `gguf_quant`
+offers `["Q8_0", "Q4_K_M"]`; `Q4_K_M` on a 4B writer is roughly 2.5 GB, which
+fits this machine with room to spare.
+
+**But `llama-cpp-python` is declared NOWHERE** -- not in `requirements.txt`, not
+in `pyproject.toml`. So the single configuration that could run this pack on a
+16 GB Mac cannot be reached from a clean install. This is the same class of
+defect as the `accelerate`, `feedparser`, `pyloudnorm` and `pycairo` gaps already
+recorded in `requirements.txt`: shipping code whose enabling package nobody asked
+pip to install.
+
+Not fixed here: adding a llama.cpp dependency is a platform-wheel decision with
+real consequences on Windows and Linux, and it wants the operator's call rather
+than a Mac tester's.
+
+## PBUG-20260907-08 -- `voice_device` is silently unused by the Kokoro backend every Python 3.13 install gets
+
+The canonical sets `OTR_CastLock.voice_device = "mps"`. On Python 3.13 -- which
+is what ComfyUI Desktop and the Windows portable build both ship -- the selected
+Kokoro backend is `kokoro-onnx`, because the torch `kokoro` line is gated
+`python_version < "3.13"`. That backend is `OnnxKokoroBackend`, and it builds its
+onnxruntime session from an explicit provider list, **CPU by default**
+(`_kokoro_backends.py:337-349`).
+
+The code is honest about it -- `_kokoro_backends.py:19` states the
+*"``voice_device`` stamp is logged as unused by this backend, once, at load"* --
+so this is not a hidden fault. **The defect is in the workflow surface, not the
+engine:** the canonical still presents `voice_device` as a meaningful choice and
+an operator who selects `mps` gets CPU synthesis with no dropdown feedback,
+only a line in a log they were never told to read.
+
+Related and already documented in `nodes/_otr_audio_engines/registry.py:206`:
+`bark` deliberately does not list `mps` in `device_backends`, because `_load_bark`
+has no MPS branch and `torch.cuda.is_available()` being `False` drops it to the
+working CPU path. That one is declared correctly. Kokoro's is not.
