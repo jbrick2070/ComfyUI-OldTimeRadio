@@ -54,6 +54,24 @@ _WINDOWS_INSTALL_CANDIDATES = (
     r"C:\ffmpeg\bin\ffmpeg.exe",
 )
 
+#: The same courtesy for macOS, added 2026-09-06. Homebrew does not put its
+#: bin directory on the PATH of a GUI-launched app -- ComfyUI Desktop is
+#: started by Finder/launchd, not by a login shell, so `ffmpeg` on PATH misses
+#: even when `brew install ffmpeg` has plainly succeeded. Without this the
+#: renderer refuses on a correctly-provisioned Mac, and every terminal step
+#: goes with it: the caption burn, the credits roll, the silent composite and
+#: the audio mux.
+#:
+#: Apple Silicon first (/opt/homebrew), then Intel Homebrew and MacPorts.
+#: There is no QuickTime/AVFoundation alternative worth reaching for -- the
+#: whole render chain speaks ffmpeg command lines, and ffmpeg already uses
+#: Apple's VideoToolbox for hardware paths, so finding the binary IS the fix.
+_MACOS_INSTALL_CANDIDATES = (
+    "/opt/homebrew/bin/ffmpeg",   # Homebrew, Apple Silicon
+    "/usr/local/bin/ffmpeg",      # Homebrew, Intel
+    "/opt/local/bin/ffmpeg",      # MacPorts
+)
+
 
 _log = logging.getLogger("OTR")
 
@@ -69,7 +87,10 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
        default and carries no information, so it is not a choice.
     2. ``$OTR_FFMPEG`` -- the operator's explicit pin.
     3. ``ffmpeg`` on ``PATH``.
-    4. the well-known Windows install locations above.
+    4. the well-known Windows and macOS install locations above. Both exist
+       for the same reason: a GUI-launched ComfyUI does not inherit the PATH a
+       login shell would have given it, so an ffmpeg the user definitely
+       installed is invisible to step 3.
 
     NEVER RAISES. "This box has no ffmpeg" is a fact, and each caller has
     already decided what that fact costs it -- an empty string, its own
@@ -86,7 +107,7 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
     chosen = _usable("ffmpeg")  # PATH, through the one function that reads it
     if chosen:
         return chosen
-    for raw in _WINDOWS_INSTALL_CANDIDATES:
+    for raw in _WINDOWS_INSTALL_CANDIDATES + _MACOS_INSTALL_CANDIDATES:
         candidate = os.path.expandvars(raw)
         if os.path.isfile(candidate):
             return candidate
