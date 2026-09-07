@@ -1049,10 +1049,26 @@ def load_llm(
                 raise ModelLoaderError(
                     f"llm.quant_policy={_policy.quant_policy!r} requires "
                     "bitsandbytes, which is not importable on this host. "
-                    "Set llm.quant_policy='none' in the platform profile "
-                    "(bnb lanes are OFF on ROCm/MPS/CPU tiers) or install "
-                    "bitsandbytes. NO silent bf16 fallback."
+                    "Install bitsandbytes, or set llm.quant_policy='none' in "
+                    "the platform JSON and check the model fits unquantized "
+                    "(roughly 4x its 4-bit size). NO silent bf16 fallback."
                 ) from _bnb_err
+            # THIS GUARD IS THE WHOLE TEST, AND IT IS A RUNTIME ONE.
+            # It used to advise that "bnb lanes are OFF on ROCm/MPS/CPU tiers",
+            # and every non-CUDA JSON shipped quant_policy="none" on that
+            # sentence's authority. It was a POLICY, not a measurement, and it
+            # was expensive: it forced Qwen3.5-4B to 8.06 GiB unquantized on an
+            # 8 GB AMD card that a 2.90 GiB NF4 load would have fitted with
+            # room to spare -- the tier missed by 0.07 GiB for no hardware
+            # reason. The installed bitsandbytes (0.50.1) advertises cpu, cuda,
+            # hpu, mps, triton and xpu backends, so the premise was also stale.
+            #
+            # The non-CUDA JSONs now request bnb_nf4 like everyone else and let
+            # THIS import decide. Where bitsandbytes really is unavailable the
+            # failure is loud and names the exact one-value fix, which is the
+            # behaviour the operator asked for: find out what actually works
+            # rather than assume. No claim is made that NF4 succeeds on ROCm,
+            # MPS or CPU -- none of those has been tested on real hardware.
         if needs_8bit:
             quant_config = BitsAndBytesConfig(
                 load_in_8bit=True,
