@@ -60,6 +60,10 @@ def _install(monkeypatch, payload):
 _FULL = {
     "meta": {"visual_style": "cartoon", "source_bank": "public_domain",
              "char_voice_engine": "indextts2",
+             # Added 2026-09-07 with the writer + music fields. Both are real
+             # ledger keys, confirmed against a production ledger on the 4060.
+             "creative_writing_model": "Qwen/Qwen3.5-4B",
+             "music_engine": "musicgen",
              "image_engines": {"by_role": {"character_video": {"z_image_turbo": 4}}}},
     "video": {"shots": [{"engine_id": "wan_ti2v"} for _ in range(8)]},
 }
@@ -74,12 +78,32 @@ def test_the_pipeline_suffix_tail_is_gone(monkeypatch):
         assert noise not in got, (noise, got)
 
 
-def test_the_name_carries_all_five_choices(monkeypatch):
+def test_the_name_carries_every_choice_as_a_short_code(monkeypatch):
+    """Operator ruling 2026-09-07: four characters (five for the writer).
+
+    Spelled in full these fields put the name at 249 of its 250-unit budget on
+    a ComfyUI Desktop install -- one unit -- and two more dimensions were wanted
+    in it. The codes come from `_otr_shared/shortcodes.py`, whose own tests keep
+    the table complete against the live dropdowns and engine registry.
+    """
     _install(monkeypatch, _FULL)
     got = mux._obs_basename(ARCHIVAL)
-    for field in ("cartoon", "wan_ti2v", "z_image_turbo", "indextts2",
-                  "public_domain"):
+    for field in ("cart", "wti2", "zimg", "idx2", "pubd", "q354b", "mgen"):
         assert field in got, (field, got)
+    # and the spelled-out forms are GONE -- that is the point of the change
+    for spelled in ("cartoon", "wan_ti2v", "z_image_turbo", "indextts2",
+                    "public_domain", "musicgen"):
+        assert spelled not in got, (spelled, got)
+
+
+def test_the_writer_and_music_dimensions_are_present(monkeypatch):
+    """Added 2026-09-07. The writer LLM and the music engine were invisible in
+    the published name, so two episodes differing only by writer were
+    indistinguishable in the folder the operator actually watches."""
+    _install(monkeypatch, _FULL)
+    got = mux._obs_basename(ARCHIVAL)
+    assert "q354b" in got, got
+    assert "mgen" in got, got
 
 
 def test_episode_leads_and_style_follows(monkeypatch):
@@ -88,8 +112,8 @@ def test_episode_leads_and_style_follows(monkeypatch):
     _install(monkeypatch, _FULL)
     got = mux._obs_basename(ARCHIVAL)
     assert got.startswith("arms_at_the_ready_20260903_092133__")
-    assert got.index("cartoon") < got.index("wan_ti2v") < got.index("z_image_turbo")
-    assert got.index("wan_ti2v") < got.index("public_domain")
+    assert got.index("cart") < got.index("wti2") < got.index("zimg")
+    assert got.index("wti2") < got.index("pubd")
 
 
 def test_the_final_marker_survives(monkeypatch):
@@ -107,9 +131,13 @@ def test_a_lane_with_no_stills_says_none_rather_than_lying(monkeypatch):
     _install(monkeypatch, payload)
     got = mux._obs_basename(ARCHIVAL)
     assert "__none__" in got
-    # and the engine's role suffix is trimmed -- position already implies it
-    assert "animatediff15_v3_haunted__" in got
-    assert "haunted_video" not in got
+    # The engine id is coded WHOLE. The old `_trim_engine` stripped a trailing
+    # `_video`/`_image` because the field position implied the role -- but the
+    # shortcode table is keyed on the engine id exactly as the registry spells
+    # it, so trimming first would hand it a name it has never heard of and
+    # spell the lane `unk`.
+    assert "adhv" in got, got
+    assert "animatediff" not in got, got
 
 
 def test_it_fails_soft_to_the_archival_name(monkeypatch):
@@ -152,4 +180,4 @@ def test_a_very_long_title_is_capped(monkeypatch):
     got = mux._obs_basename(long_stem)
     assert len(got) <= mux._OBS_NAME_MAX + 8, len(got)
     assert got.endswith("_final.mp4")
-    assert "cartoon" in got, "the fields must survive the trim, not the title"
+    assert "cart" in got, "the fields must survive the trim, not the title"

@@ -65,11 +65,26 @@ class TableShapeTests(unittest.TestCase):
         """Live labels carry a size badge, an aspect tag or a trailing note; the
         table is written against the bare value."""
         self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B (4.3 GB)"), "q354b")
-        self.assertEqual(SC.code_for("video_lane", "ltx098_low_video (16:9)"), "l098")
+        self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B"), "q354b",
+                         "the ledger stores the bare id, the dropdown a badged "
+                         "one; both must resolve")
+        # An id that is spelled the same in both vocabularies, so the aspect tag
+        # and the trailing note still have to be stripped.
         self.assertEqual(
             SC.code_for("video_lane",
                         "viz_mxc_cpu (16:9) (audio-reactive, no scene image)"),
             "vmcp")
+
+    def test_the_video_table_speaks_engine_ids_not_dropdown_labels(self):
+        """Pins the vocabulary that actually reaches a filename. `ltx_8gb` is
+        what every published episode on disk carries; `ltx098_low_video` is what
+        the operator clicked. Keying on the latter spelled every lane 'unk'."""
+        self.assertEqual(SC.code_for("video_lane", "ltx_8gb"), "lx8g")
+        self.assertEqual(SC.code_for("video_lane", "still_pan"), "stpa")
+        self.assertEqual(SC.code_for("video_lane", "ltx098_low_video"), "unk",
+                         "a dropdown label must NOT be silently aliased here; "
+                         "guessing the label->engine mapping would put a "
+                         "wrong-but-plausible code in a filename")
 
     def test_an_unknown_value_degrades_instead_of_raising(self):
         """A custom model is allowed by the dropdown. A finished render must not
@@ -81,16 +96,59 @@ class TableShapeTests(unittest.TestCase):
 class CompletenessTests(unittest.TestCase):
     """A table with a hole is worse than no table: two engines collide on 'unk'."""
 
+    #: video_lane is DELIBERATELY ABSENT: its dropdown offers labels
+    #: (`ltx098_low_video`) while the ledger records engine ids (`ltx_8gb`), and
+    #: it is the engine id that reaches the filename. It is covered by
+    #: `test_every_video_engine_id_has_a_code` against the engine registry.
     LIVE = {
         "llm": ("OTR_LedgerScriptWriter", "creative_writing_model"),
         "source_bank": ("OTR_LedgerScriptWriter", "source_bank"),
         "visual_style": ("OTR_LedgerScriptWriter", "visual_style"),
-        "video_lane": ("OTR_VideoDirector", "announcer_video_model"),
         "image_gen": ("OTR_VideoDirector", "announcer_image_model"),
-        "tts": ("OTR_AnnouncerVoice", "engine"),
         "music_gen": ("OTR_StableAudioTheme", "engine"),
         "upscaler": ("OTR_SilentComposite", "upscale_engine"),
     }
+
+    def test_every_voice_engine_has_a_code(self):
+        """tts is checked against the PROFILES, not the announcer dropdown.
+
+        The published name is built from `meta.char_voice_engine`, and the
+        char_voice set carries `indextts2` while the announcer dropdown does
+        not. Checking the dropdown alone reported a complete table that would
+        have spelled every indextts2 episode `unk` -- the gap surfaced from an
+        old test fixture rather than from this check, so the check moved.
+        """
+        try:
+            from nodes import _otr_engine_profiles as profiles
+        except Exception as exc:  # pragma: no cover
+            self.skipTest("engine profiles unavailable: %s" % exc)
+        engines = set()
+        for role in ("char_voice", "announcer_voice"):
+            engines.update(profiles._LEGACY_FIRST_ENGINES.get(role) or ())
+        missing = [e for e in sorted(engines) if SC.code_for("tts", e) == "unk"]
+        self.assertFalse(missing, "voice engines with no code: %s" % missing)
+
+    def test_every_video_engine_id_has_a_code(self):
+        """The video dimension carries two vocabularies and only one of them
+        reaches a filename.
+
+        The operator picks `ltx098_low_video (16:9)` from the dropdown, but the
+        ledger stores `engine_id` and `_obs_basename` builds the published name
+        from THAT -- which is why every episode in otr/obs/ on this box reads
+        `ltx_8gb`. Keying this table on the dropdown labels would have spelled
+        every video lane `unk`. So the authority here is the engine registry.
+        """
+        try:
+            from nodes._otr_video_engines import registry as engines
+        except Exception as exc:  # pragma: no cover
+            self.skipTest("video engine registry unavailable: %s" % exc)
+        missing = [engine_id for engine_id in sorted(engines.CAPABILITIES)
+                   if SC.code_for("video_lane", engine_id) == "unk"]
+        self.assertFalse(
+            missing,
+            "these video engine ids reach the published filename with no code, "
+            "so their episodes would all be named 'unk':\n  "
+            + "\n  ".join(missing))
 
     def _object_info(self):
         import json

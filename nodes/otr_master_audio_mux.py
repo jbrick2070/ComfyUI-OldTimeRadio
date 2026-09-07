@@ -973,10 +973,24 @@ def _obs_basename(final: str) -> str:
             for eng, n in (per or {}).items():
                 img[eng] += int(n or 0)
 
-        def _trim_engine(name):
-            # `animatediff15_v3_haunted_video` -> `animatediff15_v3_haunted`;
-            # the role is already implied by the field position.
-            return re.sub(r"_(video|image)$", "", str(name or ""))
+        try:
+            from ._otr_shared.shortcodes import code_for as _code_for
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_shared.shortcodes import code_for as _code_for  # type: ignore
+
+        def _code(dimension, value, fallback="none"):
+            """One field: the short code for ``value``, sanitised.
+
+            NOTE THERE IS NO `_trim_engine` ANY MORE. It used to strip a
+            trailing `_video`/`_image` because the field position already
+            implies the role, but the shortcode table is keyed on the engine id
+            EXACTLY as the registry spells it -- `google_veo_video`,
+            `still_motion` -- so trimming first would turn a real id into one
+            the table has never heard of and spell the lane `unk`.
+            """
+            if not value:
+                return fallback
+            return _obs_field(_code_for(dimension, str(value)), fallback)
 
         # The show prefix is constant across every episode, so it buys nothing
         # in a folder of them; the title and timestamp are the identity. The
@@ -984,12 +998,27 @@ def _obs_basename(final: str) -> str:
         # `_published_obs_path` must accept the name written here
         # (PBUG-20260904-06: it demanded the prefix this line strips).
         title = re.sub("^" + re.escape(_SHOW_PREFIX), "", stem)
+        # SHORT CODES, four characters (five for the writer), operator ruling
+        # 2026-09-07. Spelled in full these five fields put the name at 249 of
+        # its 250-unit budget on a ComfyUI Desktop install -- one unit -- and
+        # two more dimensions were wanted in it. Coded, all seven fit in 215.
+        # The table lives in `_otr_shared/shortcodes.py`; a test reads the live
+        # dropdowns and the engine registry so a new engine cannot ship unnamed.
+        #
+        # The UPSCALER is deliberately absent: it is the eighth dimension the
+        # operator asked for, but nothing records it -- a grep of a real ledger
+        # finds no `upscal`, `esrgan` or `spandrel` anywhere. Naming a field
+        # `unk` on every episode would be noise, and defaulting it to `off`
+        # would be a lie on any run that upscaled. Stamping it into the ledger
+        # is a provenance fix owed separately.
         fields = [
-            _obs_field(meta.get("visual_style"), "nostyle"),
-            _obs_field(_trim_engine(vid.most_common(1)[0][0]) if vid else None),
-            _obs_field(_trim_engine(img.most_common(1)[0][0]) if img else None),
-            _obs_field(meta.get("char_voice_engine"), "novoice"),
-            _obs_field(meta.get("source_bank"), "nobank"),
+            _code("visual_style", meta.get("visual_style"), "nostyle"),
+            _code("video_lane", vid.most_common(1)[0][0] if vid else None),
+            _code("image_gen", img.most_common(1)[0][0] if img else None),
+            _code("tts", meta.get("char_voice_engine"), "novoice"),
+            _code("source_bank", meta.get("source_bank"), "nobank"),
+            _code("llm", meta.get("creative_writing_model"), "nollm"),
+            _code("music_gen", meta.get("music_engine"), "nomus"),
         ]
         name = "%s__%s_final%s" % (_obs_field(title, "episode"),
                                    "__".join(fields), ext or ".mp4")

@@ -5,16 +5,28 @@ concatenates the choices that produced it:
 
     <title>_<ts>__<style>__<video>__<image>__<tts>__<bank>_final.mp4
 
-Measured on the 4060 with a 65-character episode id, that name reached **249 of
-the 250-unit budget** -- one unit of headroom -- because the components are
-spelled in full: ``archival_documentary`` is 20 characters, ``shakespeare_folger``
-18, ``ltx098_low_video`` 16, ``z_image_turbo`` 13. The operator also wants three
-MORE dimensions in the name (the writer LLM, the music engine and the upscaler),
-which the current spelling cannot afford at any title length.
+MEASURED, and one correction worth keeping. An earlier estimate put that name at
+249 of a 250-unit path budget -- one unit from failing -- but that figure was
+built from DROPDOWN LABELS (``ltx098_low_video``, ``shakespeare_folger``) when
+the name is actually built from ledger values (``ltx_8gb``, ``shakespeare``).
+The real numbers for the episode that failed, both measured:
 
-With four-character codes the same name measures 200. That is the difference
-between a name that fits every title and one that is already over the line for
-anything longer than the episode that failed.
+    old, 5 fields spelled in full   name 130/150   path 221/250
+    new, 7 fields as short codes    name 106/150   path 197/250
+
+So the published name was NOT about to overflow MAX_PATH; the path overflow was
+in the ``episodes/`` tree, where the id appears twice (see
+``_otr_shared/pathbudget.py``). What the codes actually buy here is different
+and still worth having: ``_OBS_NAME_MAX`` caps this name at 150 and TRIMS THE
+TITLE to fit, so every character the components spend is one the operator's
+episode title loses in the folder he watches daily. Coding them buys 24
+characters of title back AND makes room for the writer and music dimensions,
+which were previously invisible -- two episodes differing only by writer were
+indistinguishable.
+
+That mistake has a lesson in it, and it is the same one that nearly broke this
+table: there are TWO vocabularies for several dimensions, and only the ledger's
+reaches a filename. Measure with the values the code actually writes.
 
     OPERATOR RULING: four characters, with one deliberate exception -- the
     writer LLM may use five, so a row can carry both family and parameter
@@ -74,6 +86,19 @@ VISUAL_STYLE = {
     "visual_storybased": "vstb",
 }
 
+#: KEYED ON ENGINE IDS, NOT DROPDOWN LABELS -- and the difference is not
+#: cosmetic. The video dimension is the one place the pack carries TWO
+#: vocabularies: the operator picks ``ltx098_low_video (16:9)`` from the
+#: dropdown, but the ledger records ``engine_id`` and the published name is
+#: built from that, which is why every obs episode on disk reads ``ltx_8gb``.
+#: A table keyed on the labels would have spelled every single video lane
+#: ``unk``. The ids below are ``_otr_video_engines.registry.CAPABILITIES``, and
+#: the completeness test reads that registry rather than the dropdown for this
+#: one dimension.
+#:
+#: The dropdown labels are deliberately NOT aliased in here. Mapping label to
+#: engine is someone else's job and guessing it would put a wrong-but-plausible
+#: code in a filename, which is worse than the ``unk`` that would announce it.
 VIDEO_LANE = {
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
@@ -82,23 +107,22 @@ VIDEO_LANE = {
     "cloud_vidu_q2_pro_fast_720p": "cvdu",
     "cloud_wan_i2v": "cwan",
     "cloud_wan_i2v_audio": "cwna",
-    "wan22_high_fast": "w22f",
-    "wan22_high_video": "w22v",
+    "fastwan_8gb": "fw8g",
     "google_omni_video": "gomn",
     "google_veo_video": "gveo",
-    "humo14_high_audio_in_portrait": "h14p",
-    "humo14_high_audio_in_wide": "h14w",
-    "humo17_high_audio_in_portrait": "h17p",
-    "humo17_high_audio_in_wide": "h17w",
-    "ltx25_high_foley_plus": "l25f",
-    "ltx25_high_mime": "l25m",
-    "ltx25_high_video": "l25v",
-    "ltx098_low_video": "l098",
-    "ltx23_low_audio_in": "l23a",
-    "ltx23_high_video": "l23v",
+    "humo": "humo",
+    "humo_1.7B": "h17",
+    "humo_1.7B_169": "h17w",
+    "humo_14B_169": "h14w",
+    "ltx25_foley_plus": "l25f",
+    "ltx25_mime": "l25m",
+    "ltx25_video": "l25v",
+    "ltx_8gb": "lx8g",
+    "ltx_audio_in": "lxai",
+    "ltx_video": "lxvd",
     "mesh_stage": "mesh",
-    "h3_low_audio_in": "h3la",
-    "h3_low_video": "h3lv",
+    "minimax_h3_audio_in": "mh3a",
+    "minimax_h3_video": "mh3v",
     "still_flat": "stfl",
     "still_motion": "stmo",
     "still_pan": "stpa",
@@ -107,6 +131,7 @@ VIDEO_LANE = {
     "viz_green": "vgrn",
     "viz_mxc_cpu": "vmcp",
     "viz_mxc_mandala": "vmmn",
+    "wan_ti2v": "wti2",
     "word_razzle": "wraz",
 }
 
@@ -125,6 +150,13 @@ IMAGE_GEN = {
     "z_image_turbo": "zimg",
 }
 
+#: The UNION of `char_voice` and `announcer_voice` from
+#: `_otr_engine_profiles._LEGACY_FIRST_ENGINES`, not the announcer dropdown.
+#: The published name is built from `meta.char_voice_engine`, and the char_voice
+#: set carries `indextts2` -- which the announcer dropdown does not offer, so a
+#: table checked only against that dropdown looked complete while spelling every
+#: indextts2 episode `unk`. It was caught by an existing test fixture, not by
+#: the completeness check, which is why that check now reads the profiles.
 TTS = {
     "kokoro": "koko",
     "chatterbox": "chat",
@@ -132,6 +164,7 @@ TTS = {
     "elevenlabs": "elev",
     "google_tts": "gtts",
     "bark": "bark",
+    "indextts2": "idx2",
 }
 
 MUSIC_GEN = {
