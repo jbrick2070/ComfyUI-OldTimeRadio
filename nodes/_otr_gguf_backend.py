@@ -316,119 +316,45 @@ class GGUFRow:
 # GGUF_ARTIFACTS verbatim -- one table, one authority. It used to graft a
 # sha=None slot onto every gemma quant here, which silently discarded any
 # sha the table might carry (A6).
-GGUF_ROWS: tuple[GGUFRow, ...] = (
-    GGUFRow(
-        repo_id=ROW_ID,  # unsloth/gemma-4-12b-it-GGUF
-        subdir="gemma-4-12b-it",
-        artifacts=dict(GGUF_ARTIFACTS),
-        # 8192, NOT the 4096 default (2026-08-01). The default was a placeholder
-        # that understated this model by 32x and made the P0 pass structurally
-        # impossible to run on it:
-        #
-        #   the FILE declares      gemma4.context_length = 262144  (read from the
-        #                          real Q4_K_M GGUF metadata on this box)
-        #   P0 needs               _P0_PROMPT_OVERHEAD_TOKENS 2600
-        #                        + _P0_BASE_OUTPUT_TOKENS     2800  = 5400
-        #   the row allowed        4096                             -> REFUSED
-        #
-        # P0's own contract is written against _P0_LOCAL_CONTEXT_CAP = 8192
-        # (_otr_scifi_p0_contract.py:45), measured on Mistral-Nemo -- so 8192 is
-        # the number the pass was designed for, not a guess. The live failure was
-        # "GGUF ... cannot fit the complete requested output: requested_output=
-        # 2800, provider_output_cap=512", and raising n_ctx alone could never fix
-        # it because the ROW capped n_ctx at 4096 in the first place.
-        #
-        # COST, so this is not free-lunch reasoning: KV is 0.7 GB per 1k cells,
-        # so 8192 costs 5.60 GB against 2.80 at 4096. With Q4_K_M weights at
-        # 6.63 GB that is 12.23 GB resident -- under the 14.5 GB tier ceiling the
-        # campaign profiles declare, with ~2.3 GB of headroom. Going higher is
-        # possible for the model but not for this card.
-        context_window=8192,
-        kv_gb_per_1k=KV_GB_PER_1K_CTX,          # 0.7
-        vram_fit_tier="PASS",
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-        requires_auth=False,
-        stop_tokens=(),
-        think_policy="none",
-    ),
-    GGUFRow(
-        repo_id="unsloth/Qwen3-8B-GGUF",
-        subdir="Qwen3-8B",
-        # PINNED at the 2026-07-16 live bake-off: 3x RESULT SUCCESS + obs asset,
-        # both writer slots Qwen, ctx=8192 on CUDA, peak ~11.8 GB (< 14.5),
-        # no silent fallback. size/sha256 from the download gate; kv measured
-        # 5.60 GB @ n_ctx=8192 -> 0.70 GB / 1k. vram_fit_tier UNKNOWN -> PASS.
-        artifacts={
-            "Q4_K_M": (
-                "Qwen3-8B-Q4_K_M.gguf",
-                5027784512,
-                "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
-            ),
-        },
-        context_window=8192,
-        kv_gb_per_1k=0.70,
-        vram_fit_tier="PASS",
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-        requires_auth=False,
-        stop_tokens=(),
-        think_policy="qwen3_no_think",
-    ),
-    GGUFRow(
-        repo_id="unsloth/Qwen3-4B-Instruct-2507-GGUF",
-        subdir="Qwen3-4B-Instruct-2507",
-        # THE 8 GB WRITER. Fetched 2026-08-29 to the canonical path with NO HF
-        # token at all (huggingface_hub token=False, 197 s) -- the repo is
-        # ungated and Apache-2.0 read off its own LICENSE file, not the card
-        # metadata. size and sha256 below are MEASURED from that artifact on
-        # disk, per the A6 rule; nothing here is copied from a model card.
-        #
-        # WHY THIS ROW AND NOT A BIGGER ONE. Under NF4 the embedding table
-        # stays bf16, which is what put gemma-4-12b at a 6.97 GiB floor and
-        # made it unloadable on an 8 GB card (PBUG-20260829-07 arithmetic
-        # note). GGUF quantizes the embeddings too, so the same class of model
-        # gets materially cheaper here. At 2.33 GiB of weights plus ~1.13 GiB
-        # of KV at 8K, the whole-card envelope is ~5.0-6.5 GiB including CUDA
-        # context and the desktop -- which is the number that matters, not the
-        # weights alone.
-        #
-        # think_policy IS "none", AND THAT IS A MEASURED CLAIM. This model's
-        # chat_template contains no `<think>` and exposes no `enable_thinking`
-        # knob (checked against tokenizer_config.json on the Hub). Its sibling
-        # Qwen3.5-4B DOES emit `<think>` by default, which is why that one is
-        # NOT this row. It matters because the writer emits LMFE-constrained
-        # JSON and a reasoning preamble fights the constraint.
-        artifacts={
-            "Q4_K_M": (
-                "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
-                2497281120,
-                "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597",
-            ),
-        },
-        context_window=8192,
-        # MEASURED 2026-08-29 on the RTX 4060 8 GB, two independent points read
-        # off the backend's own physical-free preflight rather than derived:
-        #     kv 2.80 GB @ n_ctx 4096  ->  0.684 GB / 1k
-        #     kv 5.70 GB @ n_ctx 8192  ->  0.696 GB / 1k
-        # Pinned at the CONSERVATIVE 0.70 rather than the lower 0.684: this
-        # number gates admission, and under-pricing KV on an 8 GB card is the
-        # direction that ends in an OOM instead of a refusal.
-        # NOT PERFECTLY LINEAR -- the two points differ, so there is a small
-        # fixed term in the estimate. Anyone extrapolating far outside
-        # 4096-8192 should measure again rather than trusting the slope.
-        kv_gb_per_1k=0.70,
-        # UNPROVEN until a live leg publishes on this row. Not "PASS" on the
-        # strength of arithmetic -- a dropdown row is a promise the model will
-        # load, and no episode has been rendered with this writer yet.
-        vram_fit_tier="UNKNOWN",
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-        requires_auth=False,
-        stop_tokens=(),
-        think_policy="none",
-    ),
-)
+GGUF_ROWS: tuple[GGUFRow, ...] = ()
+"""NO GGUF WRITER ROWS SHIP. Operator directive 2026-09-06.
+
+The lane's machinery is retained -- GGUFRow, the registry validators and
+`_models_root` (which the video and audio engines import for path resolution,
+nothing to do with LLMs) -- but no row is offered, so `gguf_native` peers no
+longer reach the writer dropdown.
+
+WHY, in the operator's framing: "think about the friction for the average
+user", and "the less friction we have in LLMs the better". A GGUF writer row
+was a dead end for anyone who had not hand-built the lane, and it failed in
+three independent ways at once, all verified on this 8 GB box on 2026-09-06:
+
+  1. `llama_cpp` imports but its native library does not load --
+     "Failed to load shared library ... llama.dll ... Could not find module".
+  2. No `.gguf` artifact exists under any resolved models root.
+  3. The lane has NO download path. `_otr_gguf_backend` contains no
+     `hf_hub_download` or `snapshot_download` call; artifacts arrive only via
+     `scripts/hf_download_driver.py`, which is a hand step.
+
+So the row could not load, could not be repaired automatically, and could not
+tell the user why -- while sitting in the picker as a promise that it would
+work. `docs/LLM_PREFLIGHT_GUIDE.md` opens by calling exactly that shape of
+entry the defect the guide exists to prevent.
+
+The reason to keep it is gone as well. The lane existed because llama.cpp was
+faster than transformers on a small card. That gap was OUR BUG, not
+transformers': with the tower and cap fixes of 2026-09-06 the transformers lane
+measures 14.47 tok/s (Qwen3.5-4B), 12.42 (gemma-4-E2B-it) and 8.66
+(gemma-4-12b-it) on this same 8 GB card, all ungated and all auto-downloading.
+
+Every profile that selected a GGUF row was repointed to its transformers twin
+in the same change -- gemma-4-12b-it-GGUF -> google/gemma-4-12b-it, and
+Qwen3-4B-Instruct-2507-GGUF -> Qwen/Qwen3.5-4B -- so no profile loses a model,
+and each gains automatic download.
+
+Restoring a row means restoring the download path with it. An entry here is a
+promise that the model will load.
+"""
 
 
 def _build_rows_by_repo() -> dict[str, GGUFRow]:

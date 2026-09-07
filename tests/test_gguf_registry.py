@@ -21,6 +21,22 @@ from nodes._otr_shared.llm_policy import BASELINE_POLICY, LLMRuntimePolicy
 GEMMA = GGF.ROW_ID  # unsloth/gemma-4-12b-it-GGUF
 QWEN = "unsloth/Qwen3-8B-GGUF"
 
+# NO GGUF WRITER ROW SHIPS as of 2026-09-06 (operator directive: remove the
+# friction). Everything below asserts the CONTENT of shipped rows -- their
+# quants, sizes, shas, context windows and catalog projection -- so with an
+# empty registry these are assertions about models that no longer exist, not
+# regressions. The file is retained rather than deleted because it is the
+# executable specification a future row must satisfy: restoring a row means
+# restoring the download path AND turning this suite back on.
+#
+# The backend MACHINERY is unaffected and stays covered by
+# tests/test_gguf_backend.py, which monkeypatches its own rows.
+pytestmark = pytest.mark.skipif(
+    not GGF.GGUF_ROWS,
+    reason="no GGUF writer row ships; row-content contracts are dormant "
+           "(see nodes/_otr_gguf_backend.GGUF_ROWS)",
+)
+
 
 def _qwen_policy(**over):
     base = dict(gguf_quant="Q4_K_M", gguf_n_ctx=8192)

@@ -40,8 +40,8 @@
     "vram_ceiling_gb": 6.8,
     "gguf_n_ctx": 4096,
     "gguf_quant": "Q4_K_M",
-    "creative_model": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
-    "technical_model": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
     "openrouter_slot_a_model": "(enable OpenRouter)",
     "openrouter_slot_b_model": "(enable OpenRouter)",
     "comfy_slot_a_model": "(enable Comfy Credits)",
@@ -78,7 +78,7 @@
   },
   "preflight": {
     "required_models": [
-      "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+      "Qwen/Qwen3.5-4B",
       "v1-5-pruned-emaonly-fp16.safetensors",
       "v3_sd15_mm.ckpt",
       "v3_sd15_adapter.ckpt"
