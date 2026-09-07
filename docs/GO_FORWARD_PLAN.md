@@ -1200,3 +1200,133 @@ pre-select `viz_mxc_mandala`, whose pycairo dependency is pinned
 `otr_mac_mps`, `otr_amd8_rocm` and `otr_amd16_rocm`. `viz_mxc_cpu` is the
 sibling that installs everywhere. The engine itself stays; only the selected
 value changes.
+
+---
+
+## Zero-friction install campaign -- open items as of 2026-09-06 evening
+
+Written after the first four complete episodes ever produced on the 8 GB
+RTX 4060. Everything below is either UNDONE or UNPROVEN; the finished work is in
+`4060_DRILL_LOG.md` Steps 100-110 and the commits they name.
+
+### A. Before the clean-install test -- cheap, and the test is worse without them
+
+1. **Wire the download progress bar.** `auto_download_if_missing` accepts a
+   `progress_pbar` and forwards it into `snapshot_download`, but a pack-wide grep
+   finds NO caller that passes one -- the adapter is dead code. A first run
+   therefore fetches ~20 GB behind a node that never moves. Before the
+   nuke-and-reinstall test this is not cosmetic: without it we cannot tell
+   "downloading normally" from "hung", and that ambiguity would waste the one shot
+   the test gives us.
+2. **Wire `caption_support_gap()`.** `cbb38d4` added the probe and its tests;
+   NOTHING CALLS IT. Until it is invoked from the same validator hook that fires
+   the visual-asset check on Run, a minimal ffmpeg still renders the whole episode
+   and dies at the caption burn. The point is failing at minute 0 instead of
+   minute 20; wiring it into the caption node would deliver almost none of that.
+3. **Three `viz_mxc_mandala` selections.** `otr_mac_mps`, `otr_amd8_rocm` and
+   `otr_amd16_rocm` pre-select an engine whose pycairo dependency is pinned
+   `sys_platform == 'win32'` (pycairo publishes zero Linux wheels). `viz_mxc_cpu`
+   is the sibling that installs everywhere. The ENGINE STAYS -- Windows users keep
+   it in the dropdown; only the selected value changes. This is a live bug on AMD,
+   not only Mac.
+
+### B. The publish -- operator's call, and it gates everything user-facing
+
+4. **alpha.25.** `pyproject.toml` still reads `2.0.0-alpha.24`, stamped
+   2026-09-05. `nodes/_otr_visual_assets.py` -- the ONLY thing that makes Z-Image
+   and LTX auto-download -- landed 2026-09-06 and is therefore NOT in the
+   published package, along with the native text decoder, the cap removal, the
+   credits fix, the six clean writer rows and the Qwen default. A registry user
+   today gets the alpha.24 that failed on this card in the morning. Editing
+   `pyproject.toml` AUTO-FIRES the publish, and `(node_id, version)` is uniquely
+   indexed -- a burned version string never returns.
+5. **Bundle `static-ffmpeg` into that same bump.** It is the only zero-friction
+   answer for a Mac with no ffmpeg: `imageio-ffmpeg`'s bundled binary is stripped
+   and typically lacks `libass`, so captions break after a full render. An
+   `install.py` downloader is CLOSED -- that subprocess-spawning shape is what got
+   alpha.9/.10/.11 Flagged. Since a dependency edit fires a publish anyway,
+   alpha.25 is the one moment it costs nothing extra. The `caption_support_gap()`
+   probe from item 2 then VERIFIES whatever binary it fetches rather than trusting
+   it.
+
+### C. The clean-install test -- the only real proof
+
+6. Sequence, in order, none of it optional: publish -> **wait for Active, not
+   Pending** (a new version lands Pending and Comfy-Org's cron only considers
+   versions older than 30 minutes; while Pending `latest_version` is null and
+   Manager says "not a CNR node", which looks like our bug and is not) -> inventory
+   exactly what is about to be deleted and get sign-off -> wipe the INSTALLED pack
+   and its HF model cache -> install from Manager by EXACT version -> open a
+   template -> press Run -> touch nothing but the mouse.
+   **Never delete:** `D:\otr-4060-testing` (the checkout), the private evidence
+   tree, or `ComfyUI-Shared\models` unless explicitly cleared.
+   **Record every hand step.** Zero is the pass. A non-zero list IS the remaining
+   work.
+
+### D. Mac -- one unknown, answered by running, not by estimating
+
+7. **Widen `z_image_turbo` AND `ltx_8gb` to `["cuda","cpu","mps"]`, run one act on
+   a real Mac, read `otr/obs/`.** Binary: it published or it did not. Operator
+   ruling 2026-09-06, and it is the right one -- every advance today came from
+   running something, and the arithmetic that said Qwen "misses 8 GB by 0.07 GiB"
+   was true and useless. Peak-memory readings are DIAGNOSTICS ON FAILURE (a near
+   miss worth a second try, or the wrong model), never a precondition for trying.
+   `ltx_8gb` is the higher-value half: if AI video runs on Metal, Mac gets the
+   whole ladder instead of one rung.
+8. SDXL adapter only if item 7 fails -- specced in the section above.
+9. Neither widening merges on reasoning alone. A dropdown entry is a promise.
+
+### E. AMD -- entirely unproven
+
+10. No AMD hardware exists in this campaign. Everything about AMD is inference
+    from ROCm reusing the `torch.cuda` namespace, which is why the AMD tiers
+    declare `device_backend: "cuda"` and why cuda-only engines are admissible
+    there. Plausible is not measured.
+11. **`torch.version.hip` vs `torch.version.cuda` is the clean discriminator**
+    between a real NVIDIA box and a ROCm one; `torch.cuda.is_available()` alone
+    cannot tell them apart. Worth using wherever the distinction actually matters
+    -- bitsandbytes availability above all.
+
+### F. Correctness debt found today, not yet fixed
+
+12. **The VRAM admission gate is wrong in both directions.**
+    `_assert_policy_admits_vram` still refuses a load when
+    `approx_safetensors_gb / 2` exceeds `llm_vram_ceiling_gb`. Measured on this
+    card: `gemma-4-E4B-it` is priced 4.5 GiB and PASSES, then actually uses
+    8.72 GiB and oversubscribes; `gemma-4-12b-it` is priced 11.95 GiB and would be
+    REFUSED under a 6.8 ceiling despite fitting in 7.25 GiB at 8.66 tok/s. The
+    size-tag budgets were removed on 2026-09-06; this second gate survived and
+    still uses the same discredited heuristic.
+13. `unsloth/Llama-3.2-3B-Instruct`'s badge shows ~3.2 GB (the /2 rule) while an
+    unquantized load really costs 5.98 GiB -- the badge understates the row on
+    exactly the non-CUDA hosts it exists for.
+
+### G. Unverified because this box cannot run pytest
+
+14. 576 tests could NOT be collected here; pytest is absent from both available
+    interpreters. Their status is UNKNOWN, not passing. Four files were edited
+    today and MUST be run on a box that has pytest before the publish:
+    `test_plan_max_memory_size_tags.py` (rewritten to the no-caps contract),
+    `test_audio_c7_b3sum_guards.py` and `test_vram_envelope_c4.py` (both re-pinned
+    from Mistral-Nemo to Qwen), and `test_gguf_registry.py` (skipped while no GGUF
+    row ships). The 270 unittest-runnable tests all pass.
+
+### H. Decisions taken, recorded so they are not reopened
+
+15. **Writer: Qwen/Qwen3.5-4B.** Settled on a controlled comparison -- same
+    `media_archive` bank, 8 lines each. Qwen is concrete AND differentiates
+    character voice; 12B edges it on specificity of stakes. The gap is small;
+    Qwen's 2.99 GiB vs 7.25 and 14.47 vs 8.66 tok/s are not.
+16. **Music: `stable_audio_3`** is the licence-correct default -- musicgen is
+    `commercial_clean = False` (CC-BY-NC), so every published episode currently
+    carries a non-commercial bed. SA3 now auto-downloads (222227b) but has NOT
+    rendered on any card. One render settles it.
+17. **GGUF writer rows stay retired** as shipping defaults (they cannot
+    auto-download), but the deletion was too blunt: it removed the only quantized
+    writer for AMD/Mac/CPU. Restoring them as a DOCUMENTED OPT-IN lane -- never a
+    default, README section 2b-ii intact -- is the consistent position and is
+    still owed.
+18. **Cloud stays deferred**, blocked on two operator ratifications: concrete
+    OpenRouter slugs (`openrouter/auto` is defensible -- the pack stamps the
+    resolved model per run, so a router run is auditable after the fact) and the
+    audio cache that Gemini TTS's documented voice drift demands.
