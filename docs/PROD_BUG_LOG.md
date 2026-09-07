@@ -12112,3 +12112,66 @@ and `:1174`), so the shortened name still reduces correctly.
 **The credits half had the same silent-loss shape.** `clip.scroll.png` lands on
 exactly 260 units, so with the compaction inert the credits clip render would
 have failed there too rather than announcing a length problem.
+
+## PBUG-20260907-02 -- the audio chain is orphaned from the validator gate, so music can never be planned
+
+LIVE, physical 8 GB RTX 4060, 2026-09-07 09:35. The canonical template was loaded
+from Browse Templates and the Theme Music engine was changed in the UI from
+`musicgen` to `stable_audio_3` -- nothing else touched. The asset planner then
+logged:
+
+```
+[OTR.assets] READY engines=ltx_8gb,z_image_turbo files=5
+```
+
+`stable_audio_3` is absent from the engine set even though it is the selected
+music engine and IS in `_COVERED`. Its weights were never planned and never
+pre-downloaded. This is why `stable_audio_3` has never rendered on any card
+despite its manifest entry and auto-download landing on 2026-09-06 (222227b):
+the code that would trigger it cannot be reached.
+
+ROOT CAUSE, traced in `workflows/otr_canonical.json`. `plan_prompt` scopes ONLY
+nodes whose `gate_in` links directly to this validator's `unique_id`
+(`_otr_visual_assets.py:83-91`). Gate wiring in the shipped graph:
+
+    OTR_WorkflowValidator      id=63
+      -> OTR_LedgerScriptWriter  id=1   gate_in <- 63    scoped
+      -> OTR_VideoDirector       id=87  gate_in <- 63    scoped
+
+    OTR_BatchCharacterVoices   id=81  gate_in link=None  <-- UNWIRED
+      -> OTR_AnnouncerVoice      id=82  gate_in <- 81
+        -> OTR_StableAudioTheme  id=83  gate_in <- 82
+
+The music node is two hops down a chain whose HEAD has an unconnected
+`gate_in`. The input exists on node 81 and is simply not linked, so the whole
+audio chain hangs off nothing. A transitive walk from the validator would not
+help either -- the chain never reaches it.
+
+So the `_MUSIC_NODE` scan added on 2026-09-06 is DEAD CODE. It is correct code
+in an unreachable place, which is the third instance of that shape in two days
+(PBUG-20260906-08's progress adapter had no caller; PBUG-20260906-09's
+DEFAULT_LLM never reached the graph).
+
+A SECOND CONSEQUENCE, and it may matter more than the download. The gate exists
+so nothing runs before the validator passes. An ungated audio chain is free to
+begin executing before validation, which is exactly the ordering the gate was
+introduced to guarantee. Voices are expensive; starting them before the graph is
+validated spends GPU time on a run that may be refused.
+
+FIX SHAPE, not yet applied -- it needs BOTH halves and touches the shipping
+graph:
+1. Wire `OTR_BatchCharacterVoices.gate_in` to the validator's gate output, which
+   restores the ordering guarantee and connects the chain.
+2. Make `plan_prompt` walk the gate chain TRANSITIVELY, since after (1) the
+   music node is still two hops from the validator and the current scope rule is
+   one hop. The replay isolation the docstring protects is preserved: a
+   transitive walk from THIS validator still cannot reach another validator's
+   subgraph.
+
+Both halves are required; either alone leaves the music engine unplanned.
+
+NOT YET VERIFIED: whether the music node fetches its own weights at execution
+time when the planner has not pre-fetched them. A run with `stable_audio_3`
+selected was in flight when this was written -- if it succeeds, the defect is a
+multi-GB download surfacing twenty minutes into a render instead of up front; if
+it fails, the lane is simply broken. Either way the planner should have seen it.
