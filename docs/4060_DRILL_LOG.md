@@ -4602,3 +4602,99 @@ human PASS additionally requires ZERO hand steps from a registry install, which
 has not been attempted. Story quality was not scored.
 
 Evidence: `comfyui-qwen-PASS-20260906-1722.log`.
+
+### Step 111 — September 6, 22:31–22:58 PDT: registry install of alpha.25 from a wiped box, by explicit version
+
+**The question this step exists to answer:** can a stranger install this pack from
+ComfyUI Manager, open a shipped template, press Run, and get an episode — without a
+terminal, a token, or a hand-placed file? Everything before this step proved the pack
+works on a box that had been hand-tended for weeks. This is the first attempt to prove
+it works on one that has not.
+
+**Starting state (verified, not assumed).** 106 GB deleted: the installed pack, the
+65 GB Hugging Face cache, and the Shared visual weights. Preserved by rule:
+`D:\otr-4060-testing`, the private evidence tree, and the six published obs episodes.
+After the wipe ComfyUI booted with ZERO `OldTimeRadio` lines in its log and every OTR
+node rendering red / `UNKNOWN` with "2 errors found" — the correct stranger state, and
+the thing that makes the rest of this step mean anything.
+
+**Hand steps to a loaded, runnable template — SIX, and five of them are Manager's, not
+ours.** Recorded as a user would experience them:
+1. Extensions button -> Nodes Manager.
+2. Click the pack card -> Node Pack Info.
+3. **Uninstall.** Manager still held a database record (`Enabled: off`, version
+   `49c3a57`, an Uninstall button) for a pack whose files no longer existed. This step
+   is an ARTIFACT OF HOW THIS TEST WIPED THE BOX, not friction a real stranger meets —
+   a fresh machine has no such record. It is logged because it cost real time and would
+   cost it again to anyone who deletes a pack by hand.
+4. Click the version chip -> `Select Version`.
+5. Pick `2.0.0-alpha.25` -> Install.
+6. `Apply Changes` (restart backend).
+
+For a stranger taking the default that is FOUR steps — Extensions, search, Install,
+restart — and none of those are OTR's to remove. **The operator's guidance that the
+version selector existed was correct and this window was wrong twice about it**: the
+chip is the control, and the list opens off it.
+
+**PENDING DOES NOT BLOCK AN EXPLICIT INSTALL — this is new and it matters.** alpha.25
+was still `NodeVersionStatusPending` and `Latest` therefore still resolved to alpha.24,
+exactly as section 7A predicts. But **alpha.25 was listed and installable by name**, and
+the info panel showed its Status as `Unknown` rather than `Active` — the Pending state
+made visible. Section 7A's warning is about `latest_version` resolving to null; it is
+NOT a bar on installing a named version. A publisher can therefore test a Pending
+version rather than waiting on Comfy-Org's 30-minute cron.
+
+**Result of the install:** `custom_nodes\comfyui-old-time-radio\pyproject.toml` reads
+`version = "2.0.0-alpha.25"`; after restart `/object_info` returns **25 OTR nodes**; the
+canvas re-resolved with zero red nodes and the "2 errors found" banner gone.
+
+**HONEST LIMIT ON THE DEPENDENCY HALF, and it is the weakest part of this test.** All 19
+declared dependencies are present in the venv — transformers 5.14.1, bitsandbytes
+0.50.1, accelerate 1.14.0, kokoro 0.7.16, kokoro-onnx 0.6.1, pycairo 1.29.1, and the
+rest. **But nothing was installed today.** The newest `.dist-info` in the venv is dated
+2026-09-05 21:57, so every requirement was ALREADY SATISFIED from the alpha.24 era and
+pip fetched nothing. **The venv was never wiped, so this run does NOT prove the
+dependency list installs from cold** — it proves the code install path and the node
+registration. The static-list lesson from alpha.3 vs alpha.4 remains verified only by
+the registry's recorded metadata, not by a cold pip run on this box.
+
+**Templates.** `Templates -> EXTENSIONS -> comfyui-old-time-radio` shows exactly two
+entries, `otr_canonical` and `otr_story_only` — confirming the gallery is the
+non-recursive pinned pair, not the 96 generated variants. Two cosmetic findings: the
+gallery SEARCH does not reach extension templates (searching "radio" returned 2 of 540
+core templates and neither was ours), and both OTR thumbnails render as blank gradients
+because no cover art ships.
+
+**The Run.** `otr_canonical` loaded with the most complex tier already selected —
+`ltx098_low_video (16:9)` on all three video slots, `z_image_turbo` on all three image
+slots, `story_scaffold=auto`, `source_bank=roll (any eligible bank)`. Run was pressed
+with NOTHING else touched. The workflow validated (`OK -- 23 nodes, 61 links,
+widget_vector_drift=0`) and the asset planner immediately printed five pinned downloads
+totalling **36,818,738,352 bytes**:
+
+| file | bytes |
+| --- | --- |
+| `Comfy-Org/z_image_turbo` diffusion_models/z_image_turbo_bf16 | 12,309,866,400 |
+| `Comfy-Org/z_image_turbo` text_encoders/qwen_3_4b | 8,044,982,048 |
+| `Comfy-Org/z_image_turbo` vae/ae | 335,304,388 |
+| `Lightricks/LTX-Video` ltxv-2b-0.9.8-distilled | 6,340,744,492 |
+| `comfyanonymous/flux_text_encoders` t5xxl_fp16 | 9,787,841,024 |
+
+Every line carries a pinned `revision=` and a `sha256=`. Throughput ~60 MB/s.
+
+**Two things to fix that this step exposed, neither of them fatal:**
+* **`no packs, no substitution, no resume/retry`** is printed by the planner itself. A
+  dropped connection 11 GB into a 12 GB file starts that file again from zero. On a
+  36.8 GB first run over a domestic link that is a real risk, and resume is the cheapest
+  possible mitigation.
+* **The HF rate-limit warning fires on every cold start** ("You are sending
+  unauthenticated requests to the HF Hub"). That is CORRECT for a no-token design and
+  must stay ungated, but it reads as a fault to a first-time user and deserves one line
+  of reassurance next to it.
+
+**Contamination still present and disclosed:** `ComfyUI-AnimateDiff-Evolved` and
+`comfyui-decadetw-auto-messaging-realtime` remain in `custom_nodes`, and the venv is the
+pre-existing one. This is a CLEAN-PACK test, not a clean-machine test.
+
+**Status at time of writing: the download is in flight and no episode has published.**
+The step is not a PASS until `otr/obs/` has the artifact.

@@ -2166,37 +2166,74 @@ def auto_download_if_missing(
 
 
 def _make_pbar_tqdm_adapter(pbar: object) -> type:
-    """Build a minimal tqdm-shaped class that forwards update() into a
-    ComfyUI ProgressBar. huggingface_hub's tqdm_class hook expects a
-    context-manager class with update(), set_description(), __enter__,
-    __exit__.
+    """Build a REAL tqdm subclass that mirrors progress into a ComfyUI ProgressBar.
+
+    WHY THIS SUBCLASSES tqdm INSTEAD OF IMITATING IT (PBUG-20260906-08, found by
+    the alpha.25 clean-install drill on the 4060). The previous version was a
+    hand-rolled stand-in that kept its counters PRIVATE (`self._total`) and
+    implemented only update / close / __enter__ / __exit__ / __iter__. That is not
+    the contract huggingface_hub actually uses. `snapshot_download` builds two
+    parent bars from this class and then, for every file, runs
+    `_snapshot_download._AggregatedTqdm.__init__`:
+
+        reconstruct_progress.total = (reconstruct_progress.total or 0) + total
+        transfer_progress.total = (transfer_progress.total or 0) + total
+        reconstruct_progress.refresh()
+
+    which READS `.total`, WRITES `.total` back, and calls `.refresh()`. The
+    stand-in had none of the three, so every LLM download died with
+    `AttributeError: '_PBarTqdm' object has no attribute 'total'` the moment a
+    cold cache needed one. The five visual assets survived the same run only
+    because the asset planner uses `hf_hub_download` directly and never passes a
+    `tqdm_class`.
+
+    Adding `total` and `refresh` by hand would have fixed that traceback and left
+    the next attribute to be discovered by the next user, because the surface is
+    whatever huggingface_hub decides to touch. Subclassing the real tqdm makes the
+    whole surface exist and stay WRITABLE, and it costs no new dependency: tqdm is
+    a hard requirement of huggingface_hub itself.
+
+    Two details that are load-bearing, both read off the installed
+    `huggingface_hub/utils/tqdm.py::_create_progress_bar`:
+      * `name=` is injected ONLY for huggingface_hub's own tqdm subclass. We are a
+        vanilla-tqdm subclass, so we normally never see it, but it is popped
+        defensively because a future version passing it would raise TqdmKeyError.
+      * we must NOT pass `disable=True` to silence the console. tqdm short-circuits
+        `update()` when disabled and `display()` is then never called, which
+        silently forwards nothing. Writing to a throwaway buffer keeps the console
+        clean while leaving the update path live.
     """
+    import io
 
-    class _PBarTqdm:
+    from tqdm.std import tqdm as _tqdm_base
+
+    class _PBarTqdm(_tqdm_base):  # type: ignore[misc, valid-type]
         def __init__(self, *args, **kwargs):
-            self._total = kwargs.get("total")
-            self._n = 0
+            kwargs.pop("name", None)
+            # Not `disable=True`: see the docstring. A private buffer keeps the
+            # bar off the console without turning the update path off.
+            kwargs.setdefault("file", io.StringIO())
+            super().__init__(*args, **kwargs)
 
-        def __enter__(self):
-            return self
+        def display(self, *args, **kwargs):
+            """Mirror the bar into ComfyUI instead of drawing it.
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
+            tqdm calls this from refresh(), from update() once the interval has
+            elapsed, and from close(). Returning True without calling super()
+            means nothing is ever rendered to the buffer either.
 
-        def update(self, n: int = 1):
-            self._n += int(n)
-            if self._total and hasattr(pbar, "update_absolute"):
-                try:
-                    pbar.update_absolute(self._n, int(self._total))  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-
-
-        def close(self):
-            return None
-
-        def __iter__(self):
-            return iter(())
+            This MUST NOT raise. A progress indicator that kills a 24 GB download
+            is worse than no progress indicator, so every failure is swallowed:
+            a ProgressBar whose update_absolute throws, a None or zero total mid
+            aggregation, and a bar touched after close all have to be survivable.
+            """
+            try:
+                total = self.total
+                if total:
+                    pbar.update_absolute(int(self.n), int(total))  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001 -- never break the download
+                pass
+            return True
 
     return _PBarTqdm
 

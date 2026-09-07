@@ -11806,3 +11806,103 @@ STATUS: OPEN. Affects `google/gemma-4-E2B-it` today and is expected to affect
 text decoder on the INITIAL load for text-only rows, keyed on catalog metadata
 rather than an exact-id ladder, failing loud when a config cannot be split.
 E2B speed on this card remains NOT MEASURED -- it has still never emitted a token.
+
+## PBUG-20260906-08 -- the download progress bar made every LLM download impossible
+
+LIVE FAILURE, physical 8 GB RTX 4060, registry install of `2.0.0-alpha.25`, clean
+box (pack + 65 GB HF cache + Shared visual weights wiped). Run 22:57:53.955,
+failed 23:12:03.538, "Prompt executed in 00:14:09".
+
+```
+[OTR] Downloading google/gemma-4-12b-it -- 23.9 GB (first run only)
+AttributeError: '_PBarTqdm' object has no attribute 'total'
+  _otr_model_catalog.py:2165 auto_download_if_missing -> snapshot_download
+  huggingface_hub/_snapshot_download.py:458 _AggregatedTqdm.__init__
+```
+
+ROOT CAUSE. alpha.25 wired a ComfyUI ProgressBar into `auto_download_if_missing`
+(GO_FORWARD_PLAN item A.1 -- the adapter existed but no caller passed one, so it
+was dead code until that run). `_make_pbar_tqdm_adapter` returned a hand-rolled
+tqdm LOOK-ALIKE that kept its counters private (`self._total`) and implemented
+only `update` / `close` / `__enter__` / `__exit__` / `__iter__`. That is not the
+contract huggingface_hub uses. `snapshot_download` builds two parent bars from
+the class and then, once per file, runs:
+
+```python
+reconstruct_progress.total = (reconstruct_progress.total or 0) + total
+transfer_progress.total = (transfer_progress.total or 0) + total
+reconstruct_progress.refresh()
+```
+
+an attribute READ, an attribute WRITE, and a method the stand-in did not have.
+
+WHY IT LOOKED LIKE IT WORKED. The same run downloaded 36.8 GB of visual assets
+successfully, because the asset planner calls `hf_hub_download` directly and
+never passes a `tqdm_class`. Only the LLM lane takes the adapter, so only the
+LLM lane died -- and it died on EVERY model, making the shipped pack unable to
+write a script on any cold cache. The failure was also partly silent: the two
+NewsFetcher passes caught it and degraded ("LLM ranking failed ... falling back
+to shuffle order"), so the first visible symptom was the script writer.
+
+FIX (root, not the traceback). `_PBarTqdm` now SUBCLASSES `tqdm.std.tqdm` and
+overrides only `display()` to mirror into the ComfyUI ProgressBar. Adding
+`total` and `refresh` by hand would have fixed this traceback and left the next
+attribute for the next user, because the surface is whatever huggingface_hub
+decides to touch. tqdm is a hard dependency of huggingface_hub, so this adds no
+requirement. Two details are load-bearing: `disable=True` must NOT be used to
+silence the console (tqdm short-circuits `update()` when disabled and `display()`
+never runs, so it would forward nothing while looking correct -- a private
+`io.StringIO` is used instead), and `name=` is popped defensively because
+`_create_progress_bar` injects it only for huggingface_hub's own subclass today.
+
+VERIFIED. `tests/test_pbar_tqdm_adapter.py` (9 tests) drives huggingface_hub's
+own `_create_progress_bar` with the exact kwargs `_snapshot_download` passes and
+replays the aggregation verbatim; the old implementation was re-created in a
+scratch harness and reproduces `AttributeError: ... has no attribute 'total'`
+against the same test, so the coverage is a real regression and not a
+restatement. Live re-run 23:31:13 reached
+`[OTR] Downloading Qwen/Qwen3.5-4B -- 8.7 GB` with no AttributeError.
+
+## PBUG-20260906-09 -- the shipped templates ignored DEFAULT_LLM (23.9 GB first run)
+
+LIVE, same run as PBUG-20260906-08. `_otr_model_catalog.DEFAULT_LLM` had been
+set to `Qwen/Qwen3.5-4B` when the writer decision was settled, but
+`workflows/otr_canonical.json` and `workflows/otr_story_only.json` still had
+`google/gemma-4-12b-it (11.9 GB)` saved in BOTH writer widgets:
+
+```
+[OTR_LedgerScriptWriter] start: creative_model='google/gemma-4-12b-it',
+                                technical_model='google/gemma-4-12b-it'
+[OTR] Downloading google/gemma-4-12b-it -- 23.9 GB (first run only)
+```
+
+Nothing was wrong with the constant and nothing was wrong with the graph; they
+disagreed, and THE GRAPH IS WHAT RUNS. This is exactly the failure CLAUDE.md
+section 0 names: code not wired into the JSON is dead. Cost to a first-run user:
+23.9 GB instead of 8.7 GB, on top of the 36.8 GB of visual assets, for a model
+the campaign had already measured as slower and larger.
+
+FIX. Both shipped templates repointed to `Qwen/Qwen3.5-4B (4.3 GB)`. The edit is
+surgical and was proven so against `git show HEAD:` -- links identical, `inputs`
+descriptors identical, widget COUNT identical, exactly two values changed per
+file, on `OTR_LedgerScriptWriter` widgets resolved BY NAME
+(`creative_writing_model`, `technical_model`) rather than by hardcoded index.
+`build_variants.py --check` still reports 92 variants, 0 failures.
+
+VERIFIED. `tests/test_shipped_template_writer_default.py` asserts both shipped
+templates select `DEFAULT_LLM`, resolving slots through `serialized_slot_names`
+so it cannot be fooled by positional drift, and asserts the saved label is an
+exact member of the live dropdown. Live re-run 23:31:12 logged
+`creative_model='Qwen/Qwen3.5-4B', technical_model='Qwen/Qwen3.5-4B'`.
+
+STILL OPEN, deliberately not swept in this change: a census of all 97 shipped
+graphs found 54 still selecting `mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)`
+and 23 selecting gemma-4-12b. Those are per-PROFILE values set from
+`config/profiles/*.json`, not inherited from canonical, so they are a separate
+and much larger blast radius on the 5080's shipping surface. The two SHIPPED
+TEMPLATES are what Browse Templates offers a stranger, and they are fixed.
+
+ALSO OBSERVED, not fixed here: the dropdown badge understates real download size
+by roughly half on every row (gemma-4-12b badged 11.9 GB downloaded 23.9 GB;
+Qwen badged 4.3 GB downloaded 8.7 GB). That is GO_FORWARD_PLAN item F.13, the
+`approx_safetensors_gb / 2` rule, now confirmed live twice rather than argued.
