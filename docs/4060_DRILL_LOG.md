@@ -4767,3 +4767,49 @@ test. `ComfyUI-AnimateDiff-Evolved` and `comfyui-decadetw-auto-messaging-realtim
 remain in `custom_nodes`, and the venv was never wiped -- no dependency was
 installed on any of these runs, so the dependency half of "zero friction"
 remains unproven.
+
+### Step 113 — September 7, 01:06–01:48: RUN 3 PUBLISHES. The clean install renders end to end.
+
+```
+[OTR_MasterAudioMux] obs_publish OK -> otr\obs\
+  the_far_shore_relay_20260907_011456__arch__lx8g__zimg__koko__news__q354b__mgen_final.mp4
+[OTR_MasterAudioMux] audio_byte_identical OK (1b39710fd036)
+[OTR_MasterAudioMux] duration_check v=135.040s a=109.814s OK
+Prompt executed in 00:42:28
+```
+
+102.9 MB, 135 seconds, 17 video clips, 19 ledger lines. The FIRST episode ever
+produced on this card from a registry install rather than a hand-tended tree,
+and the first carrying the coded publish name.
+
+**What it took: three runs and three distinct defects.** Run 1 died at 14:09 on
+the progress-bar adapter (PBUG-20260906-08) and also exposed the dead writer
+default (PBUG-20260906-09). Run 2 died at 40:54 on Windows MAX_PATH
+(PBUG-20260907-01), four characters over. Run 3 completed.
+
+**The published name is the visible change.** Beside its predecessors:
+
+```
+the_scalpels_cut_20260906_190603__cartoon__still_pan__z_image_turbo__kokoro__media_archive_final.mp4
+the_far_shore_relay_20260907_011456__arch__lx8g__zimg__koko__news__q354b__mgen_final.mp4
+```
+
+Seven dimensions in less space than five, with the writer LLM (`q354b`) and the
+music engine (`mgen`) visible for the first time.
+
+**AN HONEST LIMIT ON WHAT THIS RUN PROVES.** The episode id
+`signal_lost_the_far_shore_relay_20260907_011456` is 46 characters, not the 65
+of the one that failed, so every path fit and THE COMPACTION NEVER FIRED -- the
+archival copy is still
+`..._silent_procgen_blended_captioned_with_credits_final.mp4`. That is exactly
+the designed behaviour (short installs keep their ordinary names, asserted by
+`test_render_chain_path_budget.test_short_installs_keep_their_ordinary_names`)
+and it proves the fixes do not regress the normal path. It does NOT exercise the
+compaction in production. The compaction is proven by the chain test against the
+real 65-character id and by the write probe, not by this render. A long-titled
+episode is still owed as live confirmation.
+
+**Also still true:** the venv was never wiped and no dependency was installed on
+any of the three runs, so the dependency half of "zero friction" remains
+unproven; `ComfyUI-AnimateDiff-Evolved` and the auto-messaging pack remain in
+`custom_nodes`. This is a clean-PACK test.
