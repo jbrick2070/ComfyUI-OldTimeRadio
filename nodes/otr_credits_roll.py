@@ -54,6 +54,11 @@ try:  # ComfyUI loads these node modules flat as well as packaged
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
     from _otr_shared import ffprobe as _ffp  # type: ignore
 
+try:
+    from ._otr_shared.pathbudget import compact_scratch, path_fits
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared.pathbudget import compact_scratch, path_fits  # type: ignore
+
 log = logging.getLogger("OldTimeRadio")
 
 # --------------------------------------------------------------------------- #
@@ -1272,12 +1277,24 @@ def _credits_artifact_paths(video_path: str) -> tuple[str, str, str]:
         return legacy
 
     def fits(paths):
+        # PBUG-20260907-01. `joined + ".concat.txt"` and the mux's
+        # `_final.mp4` USED TO BE CHECKED HERE, and that made this whole
+        # function self-defeating: the compacted tuple keeps `joined` (only the
+        # scratch files shrink), so whenever the overflow came from a
+        # joined-derived path, `fits(compact)` failed for exactly the same
+        # reason `fits(legacy)` did and the function silently returned the long
+        # names it was built to avoid. Measured on the 4060 with a 65-character
+        # id: scratch shrank 254 -> 190, while joined.concat.txt stayed 265 and
+        # joined_final.mp4 stayed 260, so legacy was returned every time.
+        #
+        # Both now own their own budget -- `append_credits` builds the concat
+        # list through `compact_scratch`, and the mux compacts `_final.mp4`
+        # through `compact_artifact` -- so checking them here only forces this
+        # function to give up on paths it could otherwise fix.
         clip, backdrop, joined = paths
         generated = (clip, backdrop, joined, clip + ".base.png",
-                     clip + ".scroll.png", joined + ".concat.txt",
-                     os.path.splitext(joined)[0] + "_final.mp4")
-        return all(len(os.path.abspath(p).encode("utf-16-le", "surrogatepass"))
-                   // 2 <= 250 for p in generated)
+                     clip + ".scroll.png")
+        return all(path_fits(p) for p in generated)
 
     if fits(legacy):
         return legacy
@@ -1296,8 +1313,15 @@ def _credits_artifact_paths(video_path: str) -> tuple[str, str, str]:
         return legacy
 
     scratch = os.path.join(parent, "credits_" + uuid.uuid4().hex[:16])
-    joined = os.path.join(parent, stem + ("_captioned" if captioned else "")
-                          + "_with_credits" + ext)
+    # `_captioned` is DROPPED from the compacted joined name, and that is the
+    # difference between this branch working and not. It is a STAGE suffix, not
+    # identity: the folder already carries the episode id, and both
+    # `otr_master_audio_mux._PIPELINE_SUFFIXES` and its `_default_out` strip
+    # `_with_credits` to recover that id, so `<id>_with_credits.mp4` is a name
+    # they already understand. Keeping it put joined at 254 units -- over
+    # budget on its own -- so the compacted tuple failed its own check and fell
+    # back to the long names. Dropping it lands joined at 245.
+    joined = os.path.join(parent, stem + "_with_credits" + ext)
     compact = (scratch + ext, scratch + ".png", joined)
     # An exceptionally deep output root may still be too long. Preserve the
     # existing honest presentation failure rather than truncate episode identity
@@ -1514,7 +1538,14 @@ def append_credits(body_path: str, credits_path: str, out_path: str) -> str:
         raise CreditsDataError(f"body video missing: {body_path!r}")
     if not os.path.exists(credits_path):
         raise CreditsDataError(f"credits clip missing: {credits_path!r}")
-    lst = out_path + ".concat.txt"
+    # PBUG-20260907-01. This was `out_path + ".concat.txt"`, which adds 11
+    # characters to an already-suffixed name and reached 265 units on a deep
+    # ComfyUI Desktop install -- past MAX_PATH, so the open() below raised
+    # FileNotFoundError naming a directory that exists. Pure scratch: written
+    # here, handed to ffmpeg's concat demuxer, deleted below, and identified by
+    # nothing. Keeps its ordinary name wherever that fits.
+    lst = compact_scratch(os.path.dirname(os.path.abspath(out_path)),
+                          os.path.basename(out_path) + ".concat", ".txt")
     with open(lst, "w", encoding="utf-8") as f:
         for p in (body_path, credits_path):
             f.write("file '%s'\n" % p.replace("\\", "/").replace("'", r"'\''"))

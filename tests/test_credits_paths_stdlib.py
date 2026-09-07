@@ -228,7 +228,19 @@ class CreditsPathTests(unittest.TestCase):
         _, _, joined = self.cr._credits_artifact_paths(BODY)
         stem = ntpath.splitext(ntpath.basename(joined))[0]
         self.assertTrue(self.belongs_to_episode(stem, EPISODE))
-        self.assertEqual(stem, EPISODE + "_captioned_with_credits")
+        # PBUG-20260907-01: `_captioned` is now DROPPED from the compacted
+        # joined name. It is a stage suffix, not identity, and keeping it put
+        # the path at 254 units -- over budget on its own, so the compacted
+        # tuple failed its own fits() check and the whole function fell back to
+        # the long names it exists to avoid.
+        #
+        # THE CONTRACT BELOW IS THE POINT, and it is what caught the first cut
+        # of that change: the suffix must be a member of the mux's real
+        # _PIPELINE_SUFFIXES, read out of the source by AST. `_with_credits`
+        # was NOT in that tuple, so the mux could not have recovered the
+        # episode id from this name and would have republished under a stem
+        # that is not the episode's. The tuple gained it in the same commit.
+        self.assertEqual(stem, EPISODE + "_with_credits")
         self.assertIn(stem[len(EPISODE):], self.obs_suffixes)
 
     def test_scratch_names_are_unique_but_joined_episode_identity_is_stable(self):

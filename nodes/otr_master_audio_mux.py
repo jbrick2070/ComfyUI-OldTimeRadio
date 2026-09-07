@@ -51,6 +51,11 @@ try:  # ComfyUI loads these node modules flat as well as packaged
 except ImportError:  # pragma: no cover -- flat (sys.path) test import
     from _otr_shared import ffprobe as _ffp  # type: ignore
 
+try:
+    from ._otr_shared.pathbudget import compact_artifact
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared.pathbudget import compact_artifact  # type: ignore
+
 # The show prefix the published (watching) filename drops. Spelled once, in the
 # ledger, whose `_published_obs_path` must accept the name written here; bound
 # at import so a test that stubs the ledger module cannot silently change the
@@ -895,10 +900,25 @@ def _publication_decision(silent_video_path: str):
 
 #: Pipeline-stage suffixes the archival stem accumulates on its way through the
 #: graph. They are meaningful in `otr/episodes/` and pure noise in `otr/obs/`.
+#:
+#: ORDER IS LOAD-BEARING: the consumer breaks on the FIRST match, so every
+#: compound tail must precede the shorter tails it contains. `_with_credits`
+#: sits after `_captioned_with_credits` for exactly that reason -- placed any
+#: earlier it would eat only the tail of `<id>_captioned_with_credits` and leave
+#: a stray `_captioned` behind.
+#:
+#: `_with_credits` ADDED 2026-09-07 (PBUG-20260907-01). Once
+#: `otr_credits_roll` may emit a compacted `<id>_with_credits.mp4` -- dropping
+#: the `_captioned` stage suffix so the path fits MAX_PATH -- this list was the
+#: only place that could no longer recover the episode id from it, which would
+#: have republished the episode under a stem that is not its id. Caught by
+#: `test_credits_paths_stdlib`, which extracts THIS tuple from the source and
+#: asserts the credits node's output suffix is a member. `_default_out` below
+#: already carried `_with_credits`; only this list lacked it.
 _PIPELINE_SUFFIXES = ("_silent_procgen_blended_captioned_with_credits",
                       "_procgen_blended_captioned_with_credits",
                       "_captioned_with_credits", "_procgen_blended",
-                      "_captioned", "_blend", "_silent")
+                      "_with_credits", "_captioned", "_blend", "_silent")
 
 #: Cap so a long title plus six fields cannot approach the Windows path limit.
 _OBS_NAME_MAX = 150
@@ -1157,7 +1177,22 @@ class OTRMasterAudioMux:
                     ep = ep[: -len(suffix)]
             out_dir = episodes_root / ep
         os.makedirs(out_dir, exist_ok=True)
-        return os.path.join(str(out_dir), f"{stem}_final.mp4")
+        # PBUG-20260907-01. This was `os.path.join(out_dir, f"{stem}_final.mp4")`
+        # and measured 260 units on a ComfyUI Desktop install with a
+        # 65-character episode id -- Windows' MAX_PATH is 260 INCLUDING the NUL,
+        # so 260 already fails, and it fails as FileNotFoundError on a directory
+        # that exists.
+        #
+        # compact_artifact drops only the STAGE suffixes when the ordinary name
+        # will not fit, so the deliverable becomes `<id>_final.mp4` (237) and
+        # still reduces to the episode id. That reduction is what every
+        # name-bound reader downstream relies on: `_obs_basename` strips
+        # `_final` and then `_PIPELINE_SUFFIXES`; `_episode_stem` and the strip
+        # list just above do the same; and `scripts/otr_pod_obs_bridge.py` keys
+        # on the `_final` marker, which is preserved. PBUG-20260904-06 was
+        # exactly a name-bound reader refusing a renamed artifact, so the
+        # marker and the id-reduction are both deliberately kept.
+        return compact_artifact(str(out_dir), stem, "_final", ".mp4")
 
     def _publish_to_obs(self, final: str) -> str:
         """OUTPUT HYGIENE (operator directive 2026-06-09): the FINAL playable

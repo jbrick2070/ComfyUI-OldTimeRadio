@@ -94,16 +94,28 @@ class SidecarBudgetTests(unittest.TestCase):
         self.assertFalse(set(name) & _FILTERGRAPH_SYNTAX,
                          "compacted sidecar name would break the filtergraph")
 
-    def test_the_budget_matches_the_credits_node(self):
-        """Two modules solving one rule is how the first one drifted. If these
-        ever disagree, the render fails in whichever stage has the larger
-        number."""
-        import nodes.otr_credits_roll as credits
+    def test_every_stage_reads_the_budget_from_the_one_owner(self):
+        """Two modules solving one rule is how the first one drifted.
 
-        source = Path(credits.__file__).read_text(encoding="utf-8")
-        self.assertIn("<= 250", source,
-                      "the credits node's budget moved; keep the two in step")
-        self.assertEqual(_WINDOWS_PATH_BUDGET, 250)
+        This used to grep the credits node for the literal `<= 250`. That check
+        is obsolete in the better direction: the credits node no longer spells
+        the number at all, it calls `path_fits` from
+        `_otr_shared/pathbudget.py`, which is now the single owner alongside the
+        existing one-owner modules for ffmpeg and ffprobe. Asserting the shared
+        import is stronger than asserting a matching magic number.
+        """
+        from nodes._otr_shared import pathbudget
+
+        self.assertEqual(_WINDOWS_PATH_BUDGET, pathbudget.WINDOWS_PATH_BUDGET)
+        for module_name in ("otr_credits_roll", "otr_master_audio_mux",
+                            "otr_post_upscale_procgen_blend",
+                            "otr_caption_burn"):
+            source = (ROOT / "nodes" / (module_name + ".py")).read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "pathbudget import", source,
+                "%s must take the budget from _otr_shared.pathbudget rather "
+                "than spelling its own" % module_name)
 
 
 if __name__ == "__main__":

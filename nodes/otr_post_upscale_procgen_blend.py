@@ -66,6 +66,11 @@ try:
 except ImportError:  # pragma: no cover -- flat (sys.path) load
     from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore  # noqa: E402
 
+try:
+    from ._otr_shared.pathbudget import compact_artifact, compact_scratch  # noqa: E402
+except ImportError:  # pragma: no cover -- flat (sys.path) load
+    from _otr_shared.pathbudget import compact_artifact, compact_scratch  # type: ignore  # noqa: E402
+
 
 def _ffmpeg_bin(ffmpeg: str = "ffmpeg") -> str:
     """The pack's ONE ffmpeg answer, kept as a string. This node's widget
@@ -961,7 +966,16 @@ class PostUpscaleProcgenBlend:
                 "separator or traversal token; it names a filename SUFFIX, not "
                 "a location. The blend always lands beside its source."
                 % (out_suffix,))
-        output_path = src.parent / f"{src.stem}{out_suffix}{src.suffix}"
+        # PBUG-20260907-01. `src.parent / f"{src.stem}{out_suffix}{src.suffix}"`
+        # measured 254 units on a ComfyUI Desktop install with a 65-character
+        # episode id: under the 260 hard limit, but over the 250 budget, and the
+        # budget exists precisely because a name that merely fits gets handed to
+        # a later stage that appends to it. compact_artifact drops only the
+        # STAGE suffixes when needed, so `<id>_silent_procgen_blended.mp4`
+        # becomes `<id>_procgen_blended.mp4` and still reduces to the episode id
+        # for every reader that strips those suffixes to recover it.
+        output_path = Path(compact_artifact(
+            str(src.parent), src.stem, str(out_suffix), src.suffix))
         # AND THE DESTINATION MUST LAND IN THE OUTPUT TREE (2026-09-05).
         # This node has no destination widget: the write goes beside `src`, so
         # `source_mp4_path` chooses the DIRECTORY. The `out_suffix` reject above
@@ -1083,8 +1097,22 @@ class PostUpscaleProcgenBlend:
                      and pgn is not None)
         run_cwd = str(Path(captions_ass_path).parent) if captions_ass_path else None
         _main_captions = None if want_bars else captions_ass_path
+        # PBUG-20260907-01. These two temporaries are the LONGEST paths the
+        # render chain ever builds: they take the already-suffixed blend stem
+        # and add another 12 characters. Measured on a ComfyUI Desktop install
+        # with a 65-character episode id, `__nobars_tmp` reached 266 units and
+        # `__bars_tmp` 264, against Windows' 260-unit MAX_PATH -- both would
+        # fail with FileNotFoundError the moment audio_bars is on. They survived
+        # the 2026-09-06 run only because the node was bypassed.
+        #
+        # compact_scratch, not compact_artifact: these are pure scratch, written
+        # by ffmpeg and read back by ffmpeg in this same function, and nothing
+        # anywhere identifies them by name. They keep their ordinary names on
+        # every path that fits, so no working install changes behaviour.
         _main_out = (
-            output_path.with_name(output_path.stem + "__nobars_tmp" + output_path.suffix)
+            Path(compact_scratch(str(output_path.parent),
+                                 output_path.stem + "__nobars_tmp",
+                                 output_path.suffix))
             if want_bars else output_path)
 
         def _run_blend(out_mp4, caps):
@@ -1120,8 +1148,10 @@ class PostUpscaleProcgenBlend:
         if want_bars:
             _bw, _bh = (src_dims if src_dims else (1920, 1080))
             _fps = _probe_fps(src, ffmpeg)
-            bars_tmp = output_path.with_name(
-                output_path.stem + "__bars_tmp" + output_path.suffix)
+            bars_tmp = Path(compact_scratch(
+                str(output_path.parent),
+                output_path.stem + "__bars_tmp",
+                output_path.suffix))
             bars_path = _render_bars_only_mp4(src, bars_tmp, _bw, _bh, _fps, ffmpeg)
             _bars_ok = False
             if bars_path is not None:
