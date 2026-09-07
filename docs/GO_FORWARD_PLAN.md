@@ -1489,3 +1489,64 @@ in a Flagged zip against an Active one -- alpha.24 (Active) and alpha.25
 
 **This supersedes nothing above; it outranks it.** Every item in the earlier
 sections assumes the pack can be installed.
+
+### The natural experiment ran, and the correlation is strong: SHIPPED DOWNLOADER CODE IS WHAT GETS US FLAGGED
+
+Ran immediately after the note above, on the four published zips from the two
+adjacent pairs with opposite outcomes. This costs nothing and should have been
+done months ago.
+
+**PAIR 1 -- alpha.24 (Active) vs alpha.25 (Flagged), one day apart.** alpha.25
+adds exactly THREE files and removes none:
+
+    + nodes/_otr_code_provenance.py
+    + nodes/_otr_visual_asset_download.py
+    + nodes/_otr_visual_assets.py
+
+**PAIR 2 -- alpha.22 (Flagged) vs alpha.23 (Active).** alpha.23 REMOVES exactly
+four files and adds none:
+
+    - nodes/_otr_audio_engines/eng_indextts2.py
+    - scripts/_otr_idx_download_weights.py
+    - scripts/_otr_indextts2_install.ps1
+    - scripts/_otr_indextts2_worker.py
+
+**THE PATTERN IS THE SAME IN BOTH DIRECTIONS.** The Flagged build is the one
+carrying a bespoke DOWNLOADER or INSTALLER; the Active build is the one where it
+is absent. `_otr_idx_download_weights.py` fetches weights and
+`_otr_indextts2_install.ps1` is a PowerShell installer; `_otr_visual_assets.py`
+streams weights over raw `urllib` (`build_opener` / `Request`, the only raw-net
+addition in the whole diff).
+
+**AND IT IS A DEFECT CLASS THIS REPO HAS ALREADY BEEN BURNED BY.** Section B.5
+of this plan records that an `install.py` downloader is CLOSED because "that
+subprocess-spawning shape is what got alpha.9/.10/.11 Flagged". Nine flags now,
+same shape, three separate times.
+
+**WHAT THIS DOES NOT PROVE.** The scanner is private; this is correlation across
+two pairs, not a stated reason, and the static-pattern census is explicitly
+AGAINST a naive reading: alpha.22 (Flagged) and alpha.23 (Active) have
+IDENTICAL counts -- 23 subprocess sites, 2 raw-net sites, 4 exec/eval sites, in
+the same files. So it is not "any subprocess" or "any network call"; those live
+happily in Active builds. What differs is a module whose PURPOSE is fetching or
+installing.
+
+**THE LEAD THAT FOLLOWS FROM IT, and it is a good one.** The LLM lane downloads
+just as much and has never been the differing file, because it goes through
+`huggingface_hub.snapshot_download` -- a declared dependency, present in every
+Active build. The visual lane does NOT: it hand-rolls the transfer over urllib
+(confirmed while chasing the unused-token question -- `_otr_visual_assets.py`
+pins metadata with `hf_hub_url`/`get_hf_file_metadata` at :294-301 and then
+streams bytes itself, passing `token=False` at :221 and :227).
+
+**Routing the visual assets through `hf_hub_download` would close four open
+items at once:** the flag hypothesis, the `no resume/retry` the planner prints
+itself, the resolved-but-unused HF_TOKEN, and the 50-second stall observed on
+the 36.8 GB fetch -- huggingface_hub retries and resumes by default. It is the
+same library, already shipped, already used by the writer lane.
+
+**NEXT, in order:** (1) port the visual-asset transfer to `hf_hub_download` and
+delete the bespoke downloader module; (2) publish and observe whether the next
+version goes Active -- that IS the experiment, and it is one publish; (3) if it
+still flags, ask Comfy-Org with these four zips as evidence rather than guessing
+a fourth time.
