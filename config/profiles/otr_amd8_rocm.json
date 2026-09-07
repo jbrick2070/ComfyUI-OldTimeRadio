@@ -11,9 +11,9 @@
     "announcer_visual": "viz_mxc_cpu",
     "music_visual": "viz_mxc_mandala",
     "character_visual": "still_motion",
-    "announcer_image": "flux2_klein",
-    "music_image": "flux2_klein",
-    "character_image": "flux2_klein"
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
   },
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",
@@ -36,12 +36,12 @@
   "llm": {
     "device": "cuda",
     "attn_impl": "sdpa",
-    "quant_policy": "bnb_nf4",
+    "quant_policy": "none",
     "vram_ceiling_gb": 6.8,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",
-    "creative_model": "Qwen/Qwen3.5-4B",
-    "technical_model": "Qwen/Qwen3.5-4B",
+    "creative_model": "unsloth/Llama-3.2-3B-Instruct",
+    "technical_model": "unsloth/Llama-3.2-3B-Instruct",
     "openrouter_slot_a_model": "(enable OpenRouter)",
     "openrouter_slot_b_model": "(enable OpenRouter)",
     "comfy_slot_a_model": "(enable Comfy Credits)",
