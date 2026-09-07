@@ -63,6 +63,66 @@ def _literal(inputs, name, default=None):
     return value.strip()
 
 
+#: The dropdown sentinel that means "I will name my own engine". The directors
+#: resolve it through their ``custom_models_json`` widget.
+_ADD_CUSTOM = "+ Add Custom"
+
+
+def _custom_models(inputs):
+    """The director's ``custom_models_json`` as a slot -> engine_id mapping.
+
+    Unparseable or absent JSON is an empty mapping, not a refusal: the caller
+    below still refuses a sentinel with no entry, and that refusal names the
+    slot, which is a far better message than a JSON error.
+    """
+    import json
+
+    raw = inputs.get("custom_models_json")
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(k): str(v).strip() for k, v in parsed.items()
+            if isinstance(v, (str, int, float)) and str(v).strip()}
+
+
+def _resolve_slot(inputs, slot, custom, kind):
+    """The engine a slot selects, resolving the custom-model escape hatch.
+
+    THE SENTINEL USED TO BE AN UNCONDITIONAL REFUSAL HERE, and that was a real
+    defect: `otr_video_director` and `otr_image_director` BOTH support
+    ``+ Add Custom Model`` and resolve it through their ``custom_models_json``
+    widget, but this preflight rejected the run before either got the chance.
+    So the documented escape hatch worked in one half of the pipeline and was
+    hard-refused by the other -- an operator who declared a perfectly valid
+    custom engine could not start a render at all.
+
+    A custom engine is simply not in `_COVERED`, so it flows on to the existing
+    "automatic visual-weight coverage unavailable; existing adapter checks
+    remain" note. That is the correct outcome: we cannot auto-download an engine
+    we do not have an allowlisted manifest row for, and we must not pretend to.
+    Refusing is still right when the sentinel is chosen and NOTHING declares it
+    -- that is an incomplete graph, and the message now says which slot.
+    """
+    picked = _literal(inputs, slot)
+    if picked and not picked.startswith(_ADD_CUSTOM):
+        return picked
+    if picked.startswith(_ADD_CUSTOM):
+        declared = custom.get(slot, "")
+        if declared:
+            return declared
+        raise VisualAssetError(
+            "visual asset preflight: %s is '+ Add Custom Model' but "
+            "custom_models_json declares no '%s' entry; name the engine there "
+            "or pick one from the dropdown" % (slot, slot))
+    raise VisualAssetError("visual asset preflight requires an explicit %s "
+                           "engine selection for %s" % (kind, slot))
+
+
 def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
     """Inspect only this validator's direct gate consumers in the LIVE prompt.
 
@@ -135,21 +195,15 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
         result["skipped"].append("no directly gated VideoDirector; native adapter checks remain")
     for node in directors:
         inputs = node.get("inputs") or {}
+        custom = _custom_models(inputs)
         videos = {}
         for slot in _VIDEO_SLOTS:
-            picked = _literal(inputs, slot)
-            if not picked or picked.startswith("+ Add Custom"):
-                raise VisualAssetError("visual asset preflight requires an explicit video "
-                                       "engine selection for " + slot)
+            picked = _resolve_slot(inputs, slot, custom, "video")
             videos[slot] = resolve_video(picked)
         effective = freeze_video(videos)
         result["engines"].update(resolve_video(v) for v in effective.values() if v)
         for slot in _IMAGE_SLOTS:
-            picked = _literal(inputs, slot)
-            if not picked or picked.startswith("+ Add Custom"):
-                raise VisualAssetError("visual asset preflight requires an explicit image "
-                                       "engine selection for " + slot)
-            result["engines"].add(picked)
+            result["engines"].add(_resolve_slot(inputs, slot, custom, "image"))
     # MUSIC ENGINE, same prompt, its own node class. Read only; an absent node
     # or an unset widget is a skip so a graph without theme music still plans.
     for node in [n for n in scoped if n.get("class_type") == _MUSIC_NODE]:
