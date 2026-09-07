@@ -32,6 +32,7 @@ inside the burn path. NO ``-shortest``. UTF-8, no BOM, SFW.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -116,6 +117,57 @@ def _reject_filtergraph_syntax(name: str) -> str:
             "refusing to build the graph. Rename the output so its stem is "
             "plain text." % (name, " ".join(repr(c) for c in bad)))
     return name
+
+
+#: Same budget the credits node uses (`_credits_artifact_paths`): Windows'
+#: MAX_PATH is 260 UTF-16 code units and 250 leaves room for the suffixes a
+#: later stage appends. Measured in UTF-16 units, not characters, because that
+#: is what the Win32 API counts.
+_WINDOWS_PATH_BUDGET = 250
+
+
+def _path_fits(path: str) -> bool:
+    return (len(os.path.abspath(path).encode("utf-16-le", "surrogatepass")) // 2
+            <= _WINDOWS_PATH_BUDGET)
+
+
+def _ass_sidecar_path(out_path: str) -> str:
+    """Where the generated ``.ass`` goes. Ordinary name unless it cannot fit.
+
+    PBUG-20260907-01. The sidecar was unconditionally
+    ``splitext(abspath(out_path))[0] + ".ass"``, which repeats the episode id a
+    SECOND time inside a directory already named after it. On a ComfyUI Desktop
+    install the tree above `output/` is 76 characters before the episode folder
+    is even reached, so a 65-character episode id produced a 264-unit path and
+    Python raised ``FileNotFoundError: [Errno 2]`` -- the errno for a missing
+    parent, which is why the message names a directory that plainly exists.
+    Measured on the 4060: the 254-unit `_silent_procgen_blended.mp4` beside it
+    wrote fine and the 264-unit `.ass` did not. The whole 40-minute render then
+    failed at the final stage.
+
+    THE COMPACTION IS SAFE HERE AND WOULD NOT BE ON THE OUTPUT MP4. This file
+    is consumed once, immediately, by the ffmpeg call below, and
+    :func:`_ass_filter_arg` passes ffmpeg the BASENAME with cwd set to this
+    folder -- so the name carries no contract with ffmpeg, with the ledger, or
+    with any downstream node. The captioned mp4 is different: `otr_credits_roll`
+    identifies its input by matching the stem against the episode id, so
+    renaming THAT would silently drop the credits stage into its legacy branch.
+    Compact the scratch file, never the episode identity -- the same rule
+    `_credits_artifact_paths` already states.
+
+    Non-Windows and already-short paths keep the ordinary name, so nothing that
+    currently works changes name.
+    """
+    ordinary = os.path.splitext(os.path.abspath(out_path))[0] + ".ass"
+    if os.name != "nt" or _path_fits(ordinary):
+        return ordinary
+    parent = os.path.dirname(ordinary)
+    digest = hashlib.sha1(
+        os.path.basename(ordinary).encode("utf-8", "surrogatepass")
+    ).hexdigest()[:12]
+    # Deterministic per output, so a re-run overwrites its own sidecar instead
+    # of littering, and two variants burned into the same folder never collide.
+    return os.path.join(parent, f"otr_captions_{digest}.ass")
 
 
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
@@ -270,7 +322,7 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
     # SERVER'S working directory instead of the episode folder. The destination
     # mp4 is already resolved and already lives beside the episode, so it is the
     # honest source for this. Found in QA.
-    ass_out = os.path.splitext(os.path.abspath(out_path))[0] + ".ass"
+    ass_out = _ass_sidecar_path(out_path)
     ass_path, report = _build_ass(ledger_path, style, margin_v,
                                   title_plan=title_plan, ass_out=ass_out)
     if not ass_path:
