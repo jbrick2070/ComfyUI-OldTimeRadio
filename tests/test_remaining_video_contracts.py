@@ -97,7 +97,17 @@ def test_canonical_director_ships_the_ceiling_unpinned():
     widgets = _node_of(_canonical(), "OTR_VideoDirector")["widgets_values"]
     # APPENDED last (BUG-LOCAL-097): the 14 prior slots keep their positions.
     assert len(widgets) == 15
-    assert widgets[:14][-2:] == ["cuda", "fp8_ok"]
+    # NOT ["cuda", "fp8_ok"]: the canonical carries the picks for whichever
+    # machine is under test (operator ruling 2026-09-07). What this guard is for
+    # is POSITION -- slots 12 and 13 are device_policy and dtype_policy -- so
+    # assert membership in the live dropdowns and let the pick move.
+    _opt = OTRVideoDirector.INPUT_TYPES()["optional"]
+    _device_options = _opt["device_policy"][0]
+    _dtype_options = _opt["dtype_policy"][0]
+    assert widgets[12] in _device_options, (
+        "slot 12 is device_policy; %r is not one of %r" % (widgets[12], _device_options))
+    assert widgets[13] in _dtype_options, (
+        "slot 13 is dtype_policy; %r is not one of %r" % (widgets[13], _dtype_options))
     assert widgets[14] == 0
 
 

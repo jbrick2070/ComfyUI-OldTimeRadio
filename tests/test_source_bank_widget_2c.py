@@ -279,7 +279,12 @@ class TestHeadlessSurface:
         assert node1["widgets_values"][23] == "(select Google API model)"
         assert node1["widgets_values"][24] == "(select Google API model)"
         assert node1["widgets_values"][25] == ""
-        assert node1["widgets_values"][26] == "cuda"
+        # NOT "cuda": the canonical is retargeted to whichever machine is
+        # under test (operator ruling 2026-09-07), so pin the SLOT, not the pick.
+        _llm_device_options = spec["optional"]["llm_device"][0]
+        assert node1["widgets_values"][26] in _llm_device_options, (
+            "slot 26 is llm_device; %r is not one of %r"
+            % (node1["widgets_values"][26], _llm_device_options))
         assert node1["widgets_values"][31] == "Q8_0"
 
 

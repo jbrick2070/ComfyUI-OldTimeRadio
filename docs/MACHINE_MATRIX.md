@@ -97,13 +97,13 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 <details><summary>4 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `still_motion`, `viz_camera`, `wan_ti2v`
+Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
 | `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | kokoro |
 | `otr_4060_viz_12b` | viz_camera | kokoro |
-| `otr_mac_mps` | still_motion | kokoro |
+| `otr_mac_mps` | viz_camera | kokoro |
 | `otr_nv40_12gb` | wan_ti2v | indextts2 |
 
 </details>

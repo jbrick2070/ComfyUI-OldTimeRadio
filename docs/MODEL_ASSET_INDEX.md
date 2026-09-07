@@ -66,7 +66,7 @@ Anything not listed there is a manual install -- see its row below.
 | `mesh_stage` | 3 weight file(s) | manual download | 1 profile(s) |
 | `minimax_h3` | 5 weight file(s) | explicit operator-local `otr_fetch_lane_weights.py minimax_h3` | - |
 | `visualizer` | nothing on disk | - | - |
-| `viz_camera` | nothing on disk | - | 7 profile(s) |
+| `viz_camera` | nothing on disk | - | 8 profile(s) |
 | `viz_mandala` | nothing on disk | - | - |
 | `viz_rainbow` | nothing on disk | - | - |
 | `wan_ti2v` | 4 weight file(s) | `otr_fetch_lane_weights.py wan_ti2v` | 9 profile(s) |
