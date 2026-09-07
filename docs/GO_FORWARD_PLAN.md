@@ -1590,3 +1590,69 @@ default install button today gets alpha.24, which cannot write a script on a
 cold cache (PBUG-20260906-08). The install instructions must say the version may
 need choosing by hand. That is friction we cannot remove, but hiding it is worse
 than naming it.
+
+---
+
+# HANDOFF: 4060 -> 5080, 2026-09-07
+
+**Posted here because no 5080 window was live** (`ListAgents`: every OTR peer
+offline). The direct window-to-window channel is the preferred route and was
+tried first; this is the documented async fallback, not a request to relay
+through the operator.
+
+**THE FULL BRIEF IS `docs/4060_PORTABILITY_ANSWER.md`.** It supersedes the
+2026-08-29 "FRICTIONLESS-INSTALL ANSWER" in the drill log, which is now
+banner-marked as stale. Summary of what the 5080 needs:
+
+## 1. PULL BEFORE YOU EDIT -- today's 4060 work lands in YOUR files
+
+| commit | file | effect on the 16 GB box |
+|---|---|---|
+| `f6fbb59` | `nodes/_otr_visual_assets.py` | image weights are no longer fetched when the role's video lane declares `accepts_still=False`. **Measured across 116 profiles: 19 drop image weights, six `shipping`, including the 16 GB `16gb_full`.** No profile gains a download or loses one it can use. |
+| `e4b5dfe` | `nodes/_otr_visual_assets.py` | `+ Add Custom Model` resolves through `custom_models_json` in the preflight instead of being hard-refused |
+
+`nodes/` is the 5080's surface under CLAUDE.md 0B. These were made here because
+the defect was found here, on a live 8 GB run; the blast radius is stated in
+both commit messages and was measured, not asserted.
+
+## 2. THE THREE CONFIGURATIONS ARE NOTED, NOT SAVED -- KEEP IT THAT WAY
+
+Operator, 2026-09-07: *"do not save the 3 jsons just note them, they will be
+saved later"* / *"I'm not saving a duplicate json until all testing is done with
+all machines."* No profile JSON was added. Do not add them; do not promote them.
+
+They share one zero-friction core -- `Qwen/Qwen3.5-4B` + `kokoro` +
+`stable_audio_3`, with no token, key, node pack or hand step -- and differ only
+in the video lane:
+
+    FLOOR   viz_mxc_cpu  ~12.2 GB  16:16      PROVEN as a complete combination
+    STILLS  still_pan    ~31.5 GB             LANE proven, COMBINATION NOT
+    MOTION  ltx_8gb      ~46.5 GB  27-42 min  PROVEN as a complete combination
+
+**Tier 2's gap is real and named:** its four published episodes all predate both
+the current writer default and the licence-clean music bed, so `still_pan` has
+never run with `q354b` + `sa3`. It must not be promoted until one episode does.
+That run is the cheapest missing evidence in the set and the 4060 keeps it.
+
+## 3. WHAT THE 5080 IS ASKED TO DO
+
+1. **Re-measure the three on 16 GB** and record the deltas. One card's numbers
+   are not a portability claim -- that is the entire reason the 4060 exists.
+2. **Status promotion stays yours.** Nothing here is promoted.
+3. **Ask Comfy-Org about the Flagged status.** The section immediately above
+   this one already reached that conclusion and named the third guess as a guess.
+   Two hypotheses are spent; the evidence to ask with is unusually good.
+4. **The ~38 stale tests** pinning superseded decisions: a discrete single-pass
+   task, zero user-facing defects.
+
+## 4. WHAT IS STILL UNPROVEN BY ANYONE
+
+**Mac and AMD -- no hardware, on either box.** One piece of real evidence does
+exist: `viz_mxc_cpu` declares `cuda` alongside `cpu`/`mps`, so FLOOR's engine is
+the same engine the Mac and AMD profiles select, and it published here in 16:16
+with zero model weights. That is the only Mac/AMD video evidence obtainable
+without Mac/AMD hardware. It is not a substitute for running it there.
+
+**Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
+*"I'm not sure we need to regression test every combo at this stage."* Three
+configurations that install clean beat 33 lanes with thin evidence.
