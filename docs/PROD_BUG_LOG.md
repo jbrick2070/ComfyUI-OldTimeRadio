@@ -11982,3 +11982,96 @@ module touched. The pre-existing failure of
 `test_headless_process_selectors_never_claim_the_interactive_gui` was confirmed
 to be unrelated by stashing this work and reproducing it identically -- it spawns
 PowerShell against a `.psm1` and fails on this box for environment reasons.
+
+## PBUG-20260907-01 -- Windows MAX_PATH kills the render at the last stage
+
+LIVE FAILURE, physical 8 GB RTX 4060, registry install of `2.0.0-alpha.25` plus
+the PBUG-20260906-08/09 fixes, ComfyUI Desktop. Run 23:31:12, failed 00:12:07,
+"Prompt executed in 00:40:54". The script, the voices, the music, every still
+and all eight LTX video beats completed; the episode died at the caption burn.
+
+```
+OTR_CaptionBurn: no captions (could not write
+  ...signal_lost_..._silent_procgen_blended_captioned.ass:
+  FileNotFoundError: [Errno 2] No such file or directory)
+```
+
+naming a directory that plainly existed.
+
+ROOT CAUSE. Windows MAX_PATH is 260 UTF-16 code units INCLUDING the terminating
+NUL, so 260 already fails, and the overflow surfaces as a MISSING PARENT -- which
+is why the message points at a directory rather than at the length. Proven by a
+write probe on the real directory: 254 units succeeded, 264 raised the exact
+production error.
+
+THE ARITHMETIC, and it is structural rather than unlucky. A ComfyUI Desktop
+install spends 96 units before `episodes\` ends. The episode id is then spelled
+TWICE -- once as the folder, once as the filename stem -- and every stage
+APPENDS rather than replaces, so the stem grows `<id>` -> `<id>_silent` ->
+`<id>_silent_procgen_blended` -> `<id>_silent_procgen_blended_captioned`. With a
+65-character id that is 264 units and four characters over.
+
+FIXING THE CAPTION STAGE ALONE WAS NOT ENOUGH. A chain-wide measurement found
+five stages over the line, of which only one had ever fired:
+
+                            before   after
+    ProcgenBlend             254      247
+    ProcgenBlend __nobars     266      186
+    ProcgenBlend __bars       264      186
+    CaptionBurn               264      241
+    CreditsRoll .concat.txt   265      186
+    CreditsRoll .scroll.png   260      201
+    CreditsRoll joined        254      244
+    Mux _final.mp4            260      237
+
+The procgen temporaries survived only because the node was bypassed on that run
+(`bypass=True, copied ..._silent.mp4`), and the mux was never reached. Luck.
+
+THE EXISTING COMPACTION IN `otr_credits_roll` COULD NEVER WORK, and that is the
+most interesting part. `_credits_artifact_paths` already had a 250-unit budget
+check and a scratch-name fallback, but its compacted tuple keeps `joined`
+unchanged (only the scratch files shrink) while its own `fits()` derived
+`.concat.txt` and `_final.mp4` FROM `joined`. So whenever the overflow came from
+a joined-derived path, `fits(compact)` failed for exactly the reason
+`fits(legacy)` did and it silently returned the long names it exists to avoid.
+Instrumented: scratch fell 254 -> 190 while `joined.concat.txt` stayed 265 and
+`joined_final.mp4` stayed 260.
+
+FIX. New `nodes/_otr_shared/pathbudget.py` is the single owner, beside the
+existing one-owner modules for ffmpeg and ffprobe. It carries `path_length`
+(UTF-16 units, not characters -- a CJK or emoji title is one char and two
+units), `path_fits`, `long_path` (the `\?\` extended-length prefix, for syscall
+boundaries only and never stored, since a prefixed string would leak into
+ledgers and break equality), `strip_stage_suffixes`, `compact_artifact` and
+`compact_scratch`. Every stage now takes the rule from it.
+
+The distinction that makes it safe is scratch vs deliverable. The procgen
+temporaries, the caption `.ass` and the concat list are SCRATCH -- written by
+ffmpeg, read by ffmpeg, identified by nothing -- so they collapse to a short
+deterministic digest. The blend output, the captioned master and `_final.mp4`
+are DELIVERABLES, so they drop only STAGE suffixes and still reduce to the
+episode id. That is the rule `_credits_artifact_paths` already stated and the
+other nodes never adopted: compact the generated artifacts, never the identity.
+
+`LongPathsEnabled` was deliberately NOT used. It is machine-wide, needs
+elevation, and a stranger installing from ComfyUI Manager will not have set it.
+A fix the user has to perform is not a fix for a zero-friction install.
+
+A NAME-BOUND READER NEARLY BROKE AND AN EXISTING TEST CAUGHT IT. Dropping
+`_captioned` from the compacted joined name is what makes it fit (254 -> 244),
+but `otr_master_audio_mux._PIPELINE_SUFFIXES` carried `_captioned_with_credits`
+and NOT bare `_with_credits`, so the mux could no longer recover the episode id
+and would have republished the episode under a stem that is not its id --
+PBUG-20260904-06 repeating exactly. `test_credits_paths_stdlib` extracts that
+tuple from the source by AST and asserts membership; it went red, and the tuple
+gained `_with_credits` in the same commit, positioned after the compound tails
+because the consumer breaks on first match.
+
+VERIFIED. `tests/test_render_chain_path_budget.py` walks the chain END TO END
+with the real failing id and the real Desktop depth -- per-node arithmetic is
+exactly how these drifted apart -- asserting the hard limit, the 250 budget, the
+id-reduction contract for every deliverable, and that shallow installs stay
+byte-identical. It also guards itself: a test asserts the fixture still
+reproduces the original overflow, so a shortened id cannot make the suite pass
+while proving nothing. 391 tests pass across the 23 modules that touch these
+paths.

@@ -4698,3 +4698,72 @@ pre-existing one. This is a CLEAN-PACK test, not a clean-machine test.
 
 **Status at time of writing: the download is in flight and no episode has published.**
 The step is not a PASS until `otr/obs/` has the artifact.
+
+### Step 112 — September 6–7, 22:57–01:06: the clean install renders, then dies at the last stage
+
+Step 111 got a stranger's install to the Run button. This step is what happened
+after it, and it took three separate defects to get an episode out.
+
+**Run 1, 22:57–23:12, FAILED at 14:09.** 36.8 GB of visual assets downloaded
+correctly -- five files, pinned revisions, sha256 each, filed into the right
+model directories -- and then the script writer died instantly on
+`AttributeError: '_PBarTqdm' object has no attribute 'total'`. The progress bar
+wired up in alpha.25 to make downloads visible is what made every LLM download
+impossible; `snapshot_download` writes `.total` back onto the bar it built from
+our class and then calls `.refresh()`. PBUG-20260906-08. The same run also
+exposed that the shipped templates still selected `google/gemma-4-12b-it`
+(23.9 GB) while `DEFAULT_LLM` had been Qwen for a day -- PBUG-20260906-09, a
+constant that never reached the graph, which is CLAUDE.md section 0 exactly.
+
+**Run 2, 23:31–00:12, FAILED at 40:54.** Both fixes held: `Downloading
+Qwen/Qwen3.5-4B -- 8.7 GB` completed in 2m48s through the code path that had
+been dying instantly, and the writer ran at 11.5 tok/s. Script, 59.0s of
+mastered 48 kHz stereo, every still, and all eight LTX beats completed. Then the
+caption burn died on `FileNotFoundError` for a path that was four characters
+over Windows MAX_PATH. PBUG-20260907-01.
+
+**What the second failure taught that the first did not.** Fixing the caption
+stage alone would have moved the failure one stage down: a chain-wide
+measurement found FIVE stages over 260 units, and three of them had never fired
+only because the procgen node was bypassed on that run and the render never
+reached the mux. The credits node already had a compaction for this exact
+problem and it could never work -- its compacted tuple kept the `joined` name
+while its own budget check derived two paths from it, so it failed for the same
+reason the uncompacted set did and silently returned the long names.
+
+**The measured chain, before and after:**
+
+| stage | before | after |
+| --- | --- | --- |
+| ProcgenBlend | 254 | 247 |
+| ProcgenBlend `__nobars_tmp` | 266 | 186 |
+| ProcgenBlend `__bars_tmp` | 264 | 186 |
+| CaptionBurn | 264 | 241 |
+| CreditsRoll `.concat.txt` | 265 | 186 |
+| CreditsRoll `.scroll.png` | 260 | 201 |
+| CreditsRoll joined | 254 | 244 |
+| Mux `_final.mp4` | 260 | 237 |
+
+**Two operator rulings landed in this step.** Short codes for every naming
+dimension -- four characters, five for the writer LLM -- so the published name
+carries seven dimensions in 106 characters instead of five in 130, and the
+episode title stops being trimmed to fit. And: be proactive, compact every
+generated asset, not only the one that happened to fail. Both are implemented.
+
+**Three wrong-vocabulary bugs were found while implementing that**, all the same
+shape and all invisible to a green suite: the video table was keyed on dropdown
+labels (`ltx098_low_video`) when the ledger and the filename use engine ids
+(`ltx_8gb`); the voice table was checked against the announcer dropdown when the
+name is built from `char_voice_engine`, whose set carries `indextts2`; and my
+own "the obs name is at 249 of 250" claim was computed with dropdown labels and
+was wrong -- the real figure was 130 of a 150 name cap. The lesson is one line:
+**measure with the values the code actually writes.**
+
+**Run 3 started 01:06** with every fix deployed and 25/25 nodes loaded. Result
+recorded below when it lands.
+
+**Still true and unchanged:** this is a CLEAN-PACK test, not a clean-machine
+test. `ComfyUI-AnimateDiff-Evolved` and `comfyui-decadetw-auto-messaging-realtime`
+remain in `custom_nodes`, and the venv was never wiped -- no dependency was
+installed on any of these runs, so the dependency half of "zero friction"
+remains unproven.
