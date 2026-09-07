@@ -4867,3 +4867,51 @@ tested.**
 **Cumulative on this card:** 9 episodes published, 3 of them today after the
 alpha.25 clean-install drill exposed the tqdm blocker, the dead writer default,
 MAX_PATH, and now the music lane.
+
+### Step 115 — September 7, 12:02–12:18: viz lane proven; and it demands 20.6 GB it never uses
+
+```
+[OTR video] viz_mxc_cpu 1472x832 x250 frames (audio=True)
+obs_publish OK -> bloodstained_stairs_20260907_121450__arch__vmcp__none__koko__pubd__q354b__sa3_final.mp4
+Prompt executed in 00:16:16
+```
+
+**THE VIZ VIDEO LANE WORKS AND COSTS NOTHING TO INSTALL.** Switching all three
+video slots to `viz_mxc_cpu` dropped `ltx_8gb` out of the asset plan entirely,
+exactly as the registry declares (`model_requirements=[]`,
+`device_backends=['cuda','cpu','mps']`). At 16:16 it is also the FASTEST episode
+this card has produced -- against 27-42 minutes for the LTX lane -- because it
+renders procedurally with no model load/unload cycles.
+
+**THIS IS THE ONLY MAC/AMD VIDEO EVIDENCE OBTAINABLE WITHOUT MAC/AMD HARDWARE.**
+`viz_mxc_cpu` declares `cuda` as well as `cpu`/`mps`, so proving it here proves
+the same engine the three machine JSONs select. All three -- `otr_mac_mps`,
+`otr_amd8_rocm`, `otr_amd16_rocm` -- pick it.
+
+**AND THE DEFECT, WHICH THE EPISODE'S OWN FILENAME PROVES.** The published name
+reads `__vmcp__none__`: the image field is `none` because
+`image_engines.by_role` came back EMPTY -- the viz lane minted no stills at all.
+Yet the preflight had required the full z_image_turbo set to get there:
+
+```
+[OTR.assets] READY engines=stable_audio_3,z_image_turbo files=5
+```
+
+So the same run that demanded 20.6 GB of image weights then reported using none
+of them. On the two AMD JSONs, which pair `viz_mxc_cpu` with `z_image_turbo`,
+that is 20.6 GB downloaded to render nothing -- on the configuration that exists
+to be the low-friction one. (Operator recollection that viz minted no stills was
+correct, and this re-confirms it after the registry/workflow cleanup.)
+
+**WHY IT CANNOT BE EXPRESSED TODAY.** There is no way to say "this lane needs no
+images". Verified against the live server: the image dropdown offers 12 real
+engines plus `+ Add Custom Model` and NO `none` row, and the preflight REFUSES
+an empty slot outright. The `none` in the filename is a post-hoc label written
+after the render found nothing, never a choice. Fixing it means adding a row --
+never hiding one, per the standing operator rule that a chosen row is always
+auto-downloaded and nothing is hidden from a dropdown.
+
+**FIXED IN THE SAME SESSION, adjacent:** the preflight also hard-refused
+`+ Add Custom Model` even though both directors resolve it through
+`custom_models_json`, so the documented escape hatch was rejected before either
+director ran. It now resolves the sentinel the way the directors do (e4b5dfe).
