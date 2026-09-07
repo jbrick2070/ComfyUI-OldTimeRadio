@@ -1550,3 +1550,43 @@ delete the bespoke downloader module; (2) publish and observe whether the next
 version goes Active -- that IS the experiment, and it is one publish; (3) if it
 still flags, ask Comfy-Org with these four zips as evidence rather than guessing
 a fourth time.
+
+### REFUTED: removing the bespoke downloader did NOT unflag the package (2026-09-07 12:05)
+
+alpha.27 shipped the huggingface_hub port -- no `from urllib.request import`, no
+`build_opener`, no hand-written redirect handler -- and came back
+**NodeVersionStatusFlagged** at 12:05:30, same as .25 and .26.
+
+**THE HYPOTHESIS IS DEAD AND SHOULD NOT BE RE-RUN.** The correlation across four
+zips was real -- Flagged builds carried a fetcher, Active builds did not -- but
+it is not causal, or not sufficient. One version string bought that answer,
+which was the stated price.
+
+**What the port is still worth keeping for**, independent of the flag: resume and
+retry on a 36.8 GB first fetch that previously restarted a 12 GB file from zero
+and was measured stalling for 50 seconds; the operator's token on transfers; and
+the library's redirect handling instead of ours. Those were separately-recorded
+open items and they are closed. The port was not wasted, it just did not do the
+one thing it was published to test.
+
+**THE REMAINING CORRELATE, recorded as a CANDIDATE and nothing more.** alpha.25
+added three files to the Active alpha.24: `_otr_visual_asset_download.py`,
+`_otr_visual_assets.py` and `_otr_code_provenance.py`. The first two are now
+library-backed and still Flagged. `_otr_code_provenance.py` is present in .25,
+.26 and .27 (all Flagged) and absent from .24 (Active). It reads `.git/HEAD`
+and SHA-256-hashes `nodes/**/*.py` to fingerprint the package's own code -- a
+shape a scanner could read as tamper-detection. That is a guess, and it is the
+THIRD guess in a row about a scanner whose rules are private.
+
+**STOP GUESSING. ASK.** Section 7A already says it: promotion is Comfy-Org's
+private scanner, there is no publisher self-service path to Active, and waiting
+or asking are the only moves. We now have unusually good evidence to ask WITH --
+four published zips, two adjacent pairs whose outcomes flip, a documented
+intervention that failed, and nine flags across fourteen versions. That is a
+concrete question, not a complaint.
+
+**AND SAY IT IN THE README UNTIL IT IS RESOLVED.** A stranger pressing the
+default install button today gets alpha.24, which cannot write a script on a
+cold cache (PBUG-20260906-08). The install instructions must say the version may
+need choosing by hand. That is friction we cannot remove, but hiding it is worse
+than naming it.
