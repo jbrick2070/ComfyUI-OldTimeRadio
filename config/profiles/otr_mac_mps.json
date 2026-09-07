@@ -10,10 +10,10 @@
   "role_overrides": {
     "announcer_visual": "viz_mxc_cpu",
     "music_visual": "viz_mxc_mandala",
-    "character_visual": "still_motion",
-    "announcer_image": "google_image",
-    "music_image": "google_image",
-    "character_image": "google_image"
+    "character_visual": "viz_camera",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
   },
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",
@@ -21,7 +21,7 @@
     "char_voice_engine": "kokoro",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "still_motion"
+    "video_render_engine": "viz_camera"
   },
   "features": {
     "burn_captions": true,

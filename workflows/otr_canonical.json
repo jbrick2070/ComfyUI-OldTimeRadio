@@ -532,10 +532,10 @@
         "(select Google API model)",
         "(select Google API model)",
         "",
-        "cuda",
+        "mps",
         "sdpa",
-        "bnb_nf4",
-        14.5,
+        "none",
+        10.0,
         4096,
         "Q8_0",
         ""
@@ -1312,7 +1312,7 @@
         true,
         "kokoro",
         "kokoro",
-        "cuda"
+        "mps"
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2141,9 +2141,9 @@
         "Node name for S&R": "OTR_VideoDirector"
       },
       "widgets_values": [
-        "ltx098_low_video (16:9)",
-        "ltx098_low_video (16:9)",
-        "ltx098_low_video (16:9)",
+        "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
+        "viz_mxc_mandala (16:9) (audio-reactive, no scene image)",
+        "viz_camera (16:9) (audio-reactive, no scene image)",
         "z_image_turbo",
         "z_image_turbo",
         "z_image_turbo",
@@ -2153,8 +2153,8 @@
         "request_hash",
         42,
         "{}",
-        "cuda",
-        "fp8_ok",
+        "mps",
+        "no_fp8_no_fp4",
         0
       ],
       "color": "#2B3C5A",
