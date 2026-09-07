@@ -2083,9 +2083,24 @@ def request_slot(
 
     _resolved_hf_home = _otr_hf.ensure_hf_home()
     raise_if_processing_interrupted()
+    # PASS THE PROGRESS BAR. auto_download_if_missing has accepted a
+    # progress_pbar since it was written and forwards it into
+    # snapshot_download as a tqdm_class, but NO caller ever supplied one --
+    # the adapter was dead code. A first run therefore fetched several GB
+    # behind a node that never moved, which is indistinguishable from a hang
+    # and is the first thing a new user sees. ComfyUI's own ProgressBar is
+    # only importable inside a running server, so a failure to construct one
+    # must not touch the download: absent bar, previous behaviour exactly.
+    _pbar = None
+    try:
+        from comfy.utils import ProgressBar as _ComfyProgressBar
+        _pbar = _ComfyProgressBar(100)
+    except Exception:  # noqa: BLE001 -- headless, tests, or a Comfy without it
+        _pbar = None
     _otr_catalog.auto_download_if_missing(
         normalized,
         hub_root=_Path(_resolved_hf_home) / "hub",
+        progress_pbar=_pbar,
     )
     raise_if_processing_interrupted()
 
