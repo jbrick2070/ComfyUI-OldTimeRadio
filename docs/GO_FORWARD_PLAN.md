@@ -1426,3 +1426,66 @@ The test is worth running BEFORE it can pass. Two blockers, one of them a total
 cold-cache failure of the shipped package, were invisible to a green test suite, to
 270 passing unit tests, and to five successful episodes rendered on a warm box. They
 appeared within fourteen minutes of a stranger's path being walked literally.
+
+---
+
+## THE BIGGEST REMAINING FRICTION IS NOT OUR CODE -- 9 OF 14 RELEASES ARE FLAGGED (2026-09-07 ~02:00)
+
+Recorded the moment alpha.26 was published, from
+`https://api.comfy.org/nodes/comfyui-old-time-radio/versions`:
+
+    NodeVersionStatusFlagged    9
+    NodeVersionStatusActive     2
+    NodeVersionStatusBanned     2
+    NodeVersionStatusPending    1   (alpha.26, 2026-09-07T08:50:55Z)
+
+    alpha.26  Pending
+    alpha.25  FLAGGED
+    alpha.24  Active
+    alpha.23  Active
+    alpha.22  FLAGGED
+    alpha.21  FLAGGED
+    alpha.20  FLAGGED
+    alpha.19  FLAGGED
+
+**WHY THIS MATTERS MORE THAN ANY BUG FIXED TONIGHT.** A Flagged version does not
+resolve as `latest_version`, so ComfyUI Manager's default install path does not
+offer it. Installing alpha.25 in the clean-install drill required opening the
+version chip and picking the exact string by hand -- the operator's own
+guidance, "you can still install flagged you just need to click to see the
+options", is exactly right and is exactly the friction the whole campaign exists
+to remove. We can make the package perfect and a stranger still cannot install
+it by pressing the obvious button.
+
+**WHAT IS AND IS NOT KNOWN.** Section 7A already records that promotion is
+Comfy-Org's private security scanner and that there is NO publisher self-service
+path to Active. What is NOT known is WHY the majority of our versions fail it
+while alpha.23 and alpha.24 passed. Two Banned versions (alpha.13, alpha.14) sit
+below them, and alpha.9/.10/.11 were Flagged for a documented reason -- an
+`install.py` that spawned a subprocess -- which is why that shape is closed. The
+current flags have no such known cause.
+
+**THE OBVIOUS SUSPECTS, none verified.** `.comfyignore` strips the exec()-using
+probe/smoke scripts, but that list has not been re-audited since the pack grew;
+the pack now ships `prestartup_script.py`, `patches/`, and node modules that
+spawn ffmpeg via `subprocess`, any of which a scanner may read as executable
+behaviour. The one thing that would settle it is comparing what actually SHIPS
+in a Flagged zip against an Active one -- alpha.24 (Active) and alpha.25
+(Flagged) are one day apart and diffable.
+
+**NEXT ACTIONS, in order:**
+1. Download the alpha.24 and alpha.25 zips from the registry and diff their file
+   lists. Two adjacent versions, one Active and one Flagged, is the cleanest
+   natural experiment available and costs nothing.
+2. Re-audit `.comfyignore` against what the scanner plausibly objects to, and
+   verify by downloading the published zip rather than by assuming -- section 7A
+   already insists on that and it has not been done since alpha.16.
+3. Ask Comfy-Org. Section 7A says waiting or asking are the only moves, and
+   nine flags across one pack is worth a question rather than another guess.
+4. Until it is resolved, the README install instructions must say plainly that
+   the version may need selecting by hand, because a stranger hitting the
+   default button today gets alpha.24 -- the build that cannot write a script on
+   a cold cache.
+
+**This supersedes nothing above; it outranks it.** Every item in the earlier
+sections assumes the pack can be installed.
