@@ -206,6 +206,36 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         text_only_load="native_text_decoder",
     ),
     CuratedModel(
+        repo_id="unsloth/Llama-3.2-3B-Instruct",
+        requires_auth=False,
+        loader_backend="transformers_safetensors",
+        vram_fit_tier="WARN",
+        # 6,425,499,648 bytes of safetensors = 5.98 GiB. Disk, not VRAM.
+        approx_safetensors_gb=6.43,
+        notes="THE NO-QUANTIZATION ROW. Exists for hosts where bitsandbytes "
+        "is unavailable -- AMD/ROCm above all -- because every other curated "
+        "row needs 4-bit to fit 8 GB and NF4 is a compiled-CUDA path. At "
+        "3,212,749,824 params it is 5.98 GiB in bf16, so it fits a 7.99 GiB "
+        "card UNQUANTIZED with roughly 2 GiB spare, and needs no bitsandbytes "
+        "at all. Plain llama architecture, AutoModelForCausalLM, safetensors, "
+        "no trust_remote_code. "
+        "MIND THE BADGE: vram_badge_for halves approx_safetensors_gb, which "
+        "assumes a 4-bit load, so the picker will show ~3.2 GB while an "
+        "unquantized load really costs 5.98 GiB. The badge understates this "
+        "row on exactly the hosts it is for. "
+        "LICENCE IS NOT PERMISSIVE -- Llama 3.2 Community Licence, see "
+        "docs/model-license-unsloth--llama-3.2-3b-instruct.md. Ungated on this "
+        "mirror (meta-llama's own repo is gated), verified 2026-09-06. "
+        "8 GB speed, memory and episode qualification all pending; no AMD "
+        "hardware has run it.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="community",
+        license_audit_status="research_lane",
+    ),
+    CuratedModel(
         repo_id="mistralai/Mistral-Nemo-Instruct-2407",
         # 2026-08-25: was True. The Hugging Face API reports `"gated": false`
         # for this repo -- the flag was demanding an HF_TOKEN for a model that
@@ -1625,6 +1655,10 @@ HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
 # soak-tested 8192 (a WARN-tier override stays clamped by the hard limit).
 CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "Qwen/Qwen3.5-4B": 8192,
+    # Llama 3.2 advertises 131072; pinned to the soak-tested 8192 like every
+    # other row. Its KV cache is what would eat the ~2 GiB of headroom that
+    # makes an unquantized load fit 8 GB at all.
+    "unsloth/Llama-3.2-3B-Instruct": 8192,
     "mistralai/Mistral-Nemo-Instruct-2407": 16384,
     "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,
