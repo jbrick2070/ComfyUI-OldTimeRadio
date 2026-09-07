@@ -1,7 +1,8 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the five allowlisted default
-files below can be fetched. Existing native loader choices are preserved, not
+No model imports or network at module import. Only the SEVEN allowlisted default
+files below can be fetched (three z_image_turbo, two ltx_8gb, two stable_audio_3 --
+it said five until the stable_audio_3 rows landed 2026-09-06). Existing native loader choices are preserved, not
 rehash-qualified, and readiness is NOT a claim of GPU/render compatibility.
 Other engines keep their existing adapter checks with explicit uncovered logs.
 """
@@ -123,6 +124,33 @@ def _resolve_slot(inputs, slot, custom, kind):
                            "engine selection for %s" % (kind, slot))
 
 
+def _default_role_video_slots():
+    """``{role: video_slot}`` from the shared authority, or ``{}`` if it cannot
+    be reached.
+
+    THIS MODULE IS COLD-IMPORT CLEAN AND ISOLATION-TESTABLE BY CONTRACT -- its
+    own docstring promises no model imports at module import, and
+    ``tests/test_visual_assets_stdlib.py`` loads it with NO parent package to
+    hold it to that. A hard ``from ._otr_shared.role_slots import ...`` inside
+    ``plan_prompt`` broke that: run alone the file failed 19 tests, while a full
+    suite run PASSED because an earlier test had already put ``_otr_shared`` in
+    ``sys.modules``. An order-dependent green is worse than a red one.
+
+    ``{}`` is the FAIL-SAFE value: no role pairs to a slot, so nothing is
+    skipped and every image engine is required -- the same direction as
+    :func:`_proven_no_still`. Production never takes that path;
+    :func:`ensure_prompt_visual_assets` injects the real map explicitly.
+    """
+    try:
+        from ._otr_shared.role_slots import ROLE_TO_VIDEO_SLOT
+    except Exception:  # noqa: BLE001 -- isolation harness / flat import context
+        try:
+            from _otr_shared.role_slots import ROLE_TO_VIDEO_SLOT  # type: ignore
+        except Exception:  # noqa: BLE001
+            return {}
+    return dict(ROLE_TO_VIDEO_SLOT)
+
+
 def _image_slot_for(video_slot) -> str:
     """The image slot paired with a per-role VIDEO slot. Derived from the slot
     name rather than hand-listed, so a new role cannot pair itself wrongly."""
@@ -174,7 +202,7 @@ def _proven_no_still(engine_id, consumes_still) -> bool:
 
 
 def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
-                consumes_still=None):
+                consumes_still=None, role_video_slots=None):
     """Inspect only this validator's direct gate consumers in the LIVE prompt.
 
     No saved-JSON reads or traversal of unrelated workflow branches. Replay
@@ -275,11 +303,9 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
         # whether its weights are fetched. The skip is logged per role rather
         # than inferred silently.
         no_still = {}
-        try:
-            from ._otr_shared.role_slots import ROLE_TO_VIDEO_SLOT
-        except ImportError:  # pragma: no cover -- flat test imports
-            from _otr_shared.role_slots import ROLE_TO_VIDEO_SLOT
-        for role, vslot in ROLE_TO_VIDEO_SLOT.items():
+        pairing = (role_video_slots if role_video_slots is not None
+                   else _default_role_video_slots())
+        for role, vslot in dict(pairing).items():
             lane = effective.get(role)
             lane = resolve_video(lane) if lane else ""
             if _proven_no_still(lane, consumes_still):
@@ -535,8 +561,20 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     """Called by the already-wired validator before the writer may execute."""
     from ._otr_shared.public_engines import resolve_engine_id
     from ._otr_shared import route_freeze, env as otr_env
+    # Resolved through the GUARDED helper, not a hard import: the runtime-bridge
+    # tests fake a package tree in sys.modules and stub only the submodules this
+    # function needs, so a bare import here is an isolation break that a full-suite
+    # run hides (an earlier test leaves `_otr_shared` in sys.modules) and a
+    # single-file run exposes. An empty map is fail-safe -- nothing is skipped and
+    # every image engine is required -- but it must never be SILENT, because that
+    # is the fix quietly not applying.
+    role_video_slots = _default_role_video_slots()
+    if not role_video_slots:
+        log.warning("[OTR.assets] role->video-slot map unavailable; requiring every "
+                    "selected image engine (no no-still skipping this run)")
     plan = plan_prompt(prompt, unique_id, resolve_video=resolve_engine_id,
-                       freeze_video=route_freeze.freeze_role_engines)
+                       freeze_video=route_freeze.freeze_role_engines,
+                       role_video_slots=role_video_slots)
     for note in plan["skipped"]:
         log.warning("[OTR.assets] %s", note)
     engines = plan["engines"] & _COVERED

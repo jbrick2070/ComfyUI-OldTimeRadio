@@ -122,3 +122,48 @@ def test_an_empty_image_slot_still_refuses_even_on_a_no_still_lane():
     with pytest.raises(va.VisualAssetError) as err:
         _plan(prompt)
     assert "music_image_model" in str(err.value)
+
+
+# --------------------------------------------------------------------------
+# THE ISOLATION CONTRACT, and why it is pinned here.
+#
+# The first cut of this fix hard-imported `_otr_shared.role_slots` inside
+# `plan_prompt`. Run as part of the full suite that PASSED, because an earlier
+# test had already put `_otr_shared` into `sys.modules`; run alone,
+# `tests/test_visual_assets_stdlib.py` failed 19 tests, because it deliberately
+# loads this module with NO parent package to hold it to the cold-import-clean
+# promise in its own docstring.
+#
+# AN ORDER-DEPENDENT GREEN IS WORSE THAN A RED, so the mapping is now INJECTED
+# (the pattern `resolve_video` / `freeze_video` already use) and the fallback
+# resolver never raises. These tests pin both halves.
+# --------------------------------------------------------------------------
+def test_the_role_slot_map_resolver_never_raises():
+    assert isinstance(va._default_role_video_slots(), dict)
+
+
+def test_an_unavailable_role_map_skips_NOTHING_and_requires_every_engine():
+    """`{}` is the fail-safe value, in the same direction as _proven_no_still:
+    no role pairs to a slot, so no skip is possible and every selected image
+    engine is required -- exactly the pre-fix behaviour."""
+    plan = va.plan_prompt(_prompt(ALL_VIZ), "1",
+                          resolve_video=lambda e: e,
+                          freeze_video=lambda vm: {"announcer_visual": "viz_mxc_cpu"},
+                          role_video_slots={})
+    assert "z_image_turbo" in plan["engines"]
+    assert not [n for n in plan["skipped"] if "mints no still" in n]
+
+
+def test_the_injected_map_is_what_drives_the_skip():
+    """Injecting only ONE role proves the pairing is read from the map rather
+    than assumed from slot ordering: the other two roles keep their weights."""
+    plan = va.plan_prompt(_prompt(ALL_VIZ), "1",
+                          resolve_video=lambda e: e,
+                          freeze_video=lambda vm: {"announcer_visual": "viz_mxc_cpu"},
+                          role_video_slots={"announcer_visual": "announcer_video_model"})
+    notes = " ".join(plan["skipped"])
+    assert "announcer_image_model" in notes
+    assert "music_image_model" not in notes
+    assert "character_image_model" not in notes
+    # the engine is still required, because two roles still consume a still
+    assert "z_image_turbo" in plan["engines"]

@@ -79,17 +79,16 @@ PyYAML>=6.0
 # not accept it and raised TypeError on the first clip, while newer builds
 # (0.9.x) do. Both now work.
 #
-# NOT YET IN `pyproject.toml`, deliberately: that file's static dependency
-# list is what the Comfy Registry reads, and editing it AUTO-FIRES a publish
-# (see CLAUDE.md 7A). Both lines below ride the NEXT deliberate version bump.
+# BOTH LINES ARE NOW IN `pyproject.toml` and have been since alpha.15/.16.
+# This block used to say they were deliberately held back waiting on a version
+# bump; that stopped being true three versions ago and the stale note was
+# still here at alpha.28. A shipped file must not describe a state the repo
+# left behind -- the two files are in sync and a test proves it.
 #
-# THE REASON FOR WAITING CHANGED ON 2026-08-29, so do not read the old one.
-# It used to be "a version is still Pending". alpha.12 has since resolved --
-# to Flagged, joining alpha.9, .10 and .11. `latest_version` therefore still
-# resolves to alpha.8 (2026-08-25), which is what every registry install
-# actually receives. A bump today would publish alpha.13 into the same wall
-# and deliver nothing, so the bump waits on the flag being cleared -- which
-# needs Comfy-Org, not us. When it clears, bump ONCE carrying both lines.
+# WHAT REMAINS TRUE, and it is the reason the sync is checked by hand: the
+# Comfy Registry reads pyproject's STATIC list and editing that file
+# AUTO-FIRES a publish (CLAUDE.md 7A), so the two lists can only ever be
+# reconciled ON a deliberate bump, never casually.
 #
 # 2026-09-01, MEASURED ON A CLEAN WINDOWS PORTABLE INSTALL (Python 3.13.14):
 # kokoro cannot be pip-installed on Python 3.13 at all. 0.7.16 pins
@@ -162,10 +161,10 @@ pyloudnorm>=0.1.1
 # its own message. (The previous comment here claimed every scope overlay
 # raises ImportError without it -- that was never true; only the mandala does.)
 #
-# Mirror this marker into pyproject.toml on the next deliberate version bump,
-# the same way the kokoro lines above are waiting to ride one. The registry
-# reads pyproject's static list for DISPLAY, but the extractor installs from
-# THIS file, so this line is the one that unblocks the node count.
+# THIS MARKER IS MIRRORED IN `pyproject.toml` (alpha.17 onward); the note that
+# used to say it was still waiting for a bump was stale. The registry reads
+# pyproject's static list for DISPLAY, but node-pack-extract installs from THIS
+# file, so this is the line that governs the node count.
 pycairo>=1.24; sys_platform == 'win32'
 # Pillow: image handling in the cloud-image engine and the media canonicaliser.
 pillow>=10.0

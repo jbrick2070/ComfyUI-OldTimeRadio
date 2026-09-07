@@ -27,7 +27,7 @@ Mac row in "Pick the graph" below.
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
 > EXTENSIONS → comfyui-old-time-radio**. You will see two entries:
 > **`otr_canonical`** (the one shipped graph: Kokoro voices for announcer and
-> characters, Gemma-4-12B writer, Z-Image stills -- pick it, then **Queue Prompt**; or
+> characters, Qwen3.5-4B writer, Z-Image stills -- pick it, then **Queue Prompt**; or
 > drag `workflows/otr_canonical.json` onto the canvas; on an 8 GB card load the matching
 > saved-dropdown variant from "Pick the graph" instead),
 > and `otr_story_only` (skip it for a first episode: it only writes the script, no
@@ -287,8 +287,10 @@ Prefer the login file above.
 ### 3. Hugging Face token — only if you pick a gated model
 
 **Most people need no token at all.** The shipped canonical workflow pins
-`google/gemma-4-12b-it`, which is Apache-2.0 and ungated, so a normal first run downloads
-without any account. You only need a token if you switch the writer dropdown to one of the
+`Qwen/Qwen3.5-4B`, which is Apache-2.0 and ungated, so a normal first run downloads
+without any account. It is 8.68 GB on disk and 2.99 GiB resident under NF4 -- chosen
+because a default should be the row most likely to work on the machine of someone who
+has changed nothing, and it is measured at 14.47 tok/s on a physical 8 GB RTX 4060. You only need a token if you switch the writer dropdown to one of the
 gated rows below.
 
 **Gated — you must accept the terms on the model page first, then supply a token:**
@@ -346,8 +348,15 @@ They are not substitutes for the exact canonical test reported here.
 
 The alpha.24 canonical JSON (`otr_canonical`) selects **LTX 0.9.8 low (16:9)**
 for all three video roles, **Z-Image-Turbo** for all three image roles,
-**Kokoro** for both voice slots, and **MusicGen**. It does not select `still_flat`
-or Stable Audio 3. The local writer is `gemma-4-12b-it` in both writer slots.
+**Kokoro** for both voice slots, and **Stable Audio 3**. It does not select
+`still_flat`. The local writer is `Qwen/Qwen3.5-4B` in both writer slots.
+
+The music engine moved from MusicGen to Stable Audio 3 in `2.0.0-alpha.28`.
+MusicGen is **CC-BY-NC**, so every episode the shipped template produced carried
+a non-commercial music bed unless the operator knew to change the dropdown.
+Stable Audio 3 is commercially clean and ungated, adds 3.22 GiB to the first
+run, and was the node's own declared default all along -- only the saved graph
+still pinned MusicGen. MusicGen remains selectable in the dropdown.
 
 **The alpha.24 mouse-only fresh-install path is not qualified.** A physical RTX
 4060 one-act diagnostic completed writing and audio, then failed after about
@@ -389,7 +398,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 |---|---|---|
 | 8 GB card, ready for real video | `workflows/variants/otr_nvidia_8gb_haunted.json` (drag it onto the canvas) | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
-| GUI authoring baseline, exact alpha.24 canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Gemma-4-12B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, MusicGen music. Fresh-install qualification failed on the 4060; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
+| GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
 | AMD GPU on Linux (draft, unproven on real hardware) | `workflows/variants/otr_amd8_rocm.json` or `otr_amd16_rocm.json` (drag onto the canvas) | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
 | Apple Silicon Mac (draft, unproven on real hardware) | `workflows/variants/otr_mac_mps.json` (drag onto the canvas) | images only, and as shipped the picture roles use `google_image`, a paid Google API that needs `OTR_GOOGLE_API_KEY` -- the local Klein engine is ruled for Mac but not yet wired for Apple's GPU backend. Switch the three image dropdowns in **OTR_VideoDirector** to a still or visualizer lane if you want a fully local run |
 
@@ -790,9 +799,10 @@ widgets.
 
 ### Optional: hosted LLM via OpenRouter (off by default)
 
-The writer runs locally out of the box — the shipped canonical workflow pins Gemma-4-12B for
-both the creative and technical slots (Mistral-Nemo is only the code-level fallback for a
-freshly-dropped, unconfigured node). You can optionally route either slot to a hosted frontier
+The writer runs locally out of the box — the shipped canonical workflow pins Qwen3.5-4B for
+both the creative and technical slots, and it is also the code-level fallback for a
+freshly-dropped, unconfigured node (it replaced Mistral-Nemo there, a 24 GB download that
+then does not fit an 8 GB card at all). You can optionally route either slot to a hosted frontier
 model via OpenRouter — it activates as soon as `OPENROUTER_API_KEY` is set (no separate opt-in
 flag anymore), is cost-guarded, and fails closed. Full walkthrough:
 [`docs/openrouter-setup.md`](docs/openrouter-setup.md).

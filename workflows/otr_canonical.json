@@ -1565,7 +1565,7 @@
         "Node name for S&R": "OTR_StableAudioTheme"
       },
       "widgets_values": [
-        "musicgen"
+        "stable_audio_3"
       ],
       "color": "#234035",
       "bgcolor": "#162821"

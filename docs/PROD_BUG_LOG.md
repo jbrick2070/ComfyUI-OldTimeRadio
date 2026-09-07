@@ -12228,3 +12228,44 @@ the two AMD JSONs suffer this. They do not -- both set `character_visual` to
 Coverage: `tests/test_preflight_still_consumer_gate.py` (18 tests -- the four
 visualizers proven against the LIVE registry, the fail-safe direction, and
 end-to-end plan sets).
+
+## PBUG-20260907-04 -- the shipped template pinned a CC-BY-NC music bed as its default
+
+**Verified by live published artifacts:** of the ten episodes in `otr/obs/` on the
+4060, seven carry a MusicGen bed -- including every episode published before
+2026-09-06 late. The shipped `workflows/otr_canonical.json` selected
+`musicgen` in `OTR_StableAudioTheme`, and **MusicGen is CC-BY-NC**. So the
+default path produced a non-commercially-licensed music bed for anyone who did
+not know to change the dropdown, on a pack whose whole premise is press Run.
+
+**THE NODE'S OWN DEFAULT WAS ALREADY CORRECT.** `StableAudioTheme.INPUT_TYPES()`
+declares `default="stable_audio_3"`. Only the SAVED GRAPH still pinned
+`musicgen`, so the template had been quietly overriding its own node's declared
+answer -- exactly the class of drift a saved widget value can hide, because
+nothing compares the two.
+
+**Why it survived this long, and it is recorded in the code:** `stable_audio_3`
+is ungated and commercially clean and the engine already declared
+`["cuda", "mps"]`, but its ONLY fetcher lived in `scripts/`, which
+`.comfyignore` strips from the published bundle. A registry install selecting it
+hit `EngineUnusable` with nothing able to do the fetching. **That left musicgen
+as the only music engine that self-supplies.** The fetcher gap was closed on
+2026-09-06 (`sa3` added to the visual-asset MANIFEST); this entry closes the
+other half -- the default that was chosen because of it.
+
+**Fix.** `otr_canonical.json` now selects `stable_audio_3`. Cost: +3.22 GiB on
+first run (2.11 checkpoint + 1.11 text encoder). MusicGen remains fully
+selectable in the dropdown -- nothing is hidden or removed.
+
+**Blast radius, measured:** the diff is ONE line, and `build_variants.py --all`
+regenerated all 92 variants with **zero** variant files changed -- every variant
+declares its own `music_engine` in its profile, so none inherited the canonical
+default. The change therefore reaches exactly the template a new user loads and
+nothing else. Verified with all four workflow checks (`--check` 92/0, plus the
+widget-alignment, widget-input-parity and link-target-index suites: 217 passed).
+
+**Also corrected in the same change:** the README advertised `Gemma-4-12B` as
+the shipped writer in five places. The canonical has selected `Qwen/Qwen3.5-4B`
+since 2026-09-06 -- a model chosen precisely because 12B does not fit an 8 GB
+card. The README was telling 8 GB owners the default was a model that cannot run
+for them.

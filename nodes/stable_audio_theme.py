@@ -7,7 +7,7 @@ picks its engine from the shared audio-engine registry, dispatching FAIL-CLOSED:
 Every music engine is a self-contained ``clip`` engine (the legacy
 batch-delegation path was retired in the audio clean-break, 1c):
 
-  * ``musicgen`` (default, ``clip``) -> a per-cue prompt from the Meta brief
+  * ``musicgen`` (``clip``; NOT the default -- see below) -> a per-cue prompt from the Meta brief
     (``_otr_music_prompt.compose_music_prompt``), a per-cue external seed
     (``_seed_to_int64(music_rng_seed, slot)``, G1), the adapter ``generate_clip``
     call, and ``pack_audio_batch`` into the AUDIO-batch contract (C-4).
@@ -45,7 +45,14 @@ _CUE_SLOTS = ("opening", "closing")
 class StableAudioTheme:
     """Generic theme-music node. Registered as ``OTR_StableAudioTheme``.
 
-    Engine order: musicgen (legacy byte-identical default) > stable_audio_music.
+    Engine order: ``_LEGACY_FIRST_ENGINES['music']``, whose index 0 -- the
+    ``INPUT_TYPES`` default -- is ``stable_audio_3``, NOT musicgen.
+    Corrected 2026-09-07 (alpha.28): this line had said "musicgen (legacy
+    byte-identical default)" long after the registry order moved, and the
+    SHIPPED canonical graph was still pinning musicgen to match a sentence
+    rather than the code. MusicGen is CC-BY-NC, so that stale default put a
+    non-commercial music bed under every episode a new user rendered.
+    See PBUG-20260907-04. musicgen remains fully selectable.
     """
 
     CATEGORY = "OldTimeRadio/v2/audio"
