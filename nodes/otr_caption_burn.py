@@ -32,7 +32,6 @@ inside the burn path. NO ``-shortest``. UTF-8, no BOM, SFW.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from pathlib import Path
@@ -119,16 +118,18 @@ def _reject_filtergraph_syntax(name: str) -> str:
     return name
 
 
-#: Same budget the credits node uses (`_credits_artifact_paths`): Windows'
-#: MAX_PATH is 260 UTF-16 code units and 250 leaves room for the suffixes a
-#: later stage appends. Measured in UTF-16 units, not characters, because that
-#: is what the Win32 API counts.
-_WINDOWS_PATH_BUDGET = 250
+try:
+    from ._otr_shared.pathbudget import (WINDOWS_PATH_BUDGET, compact_artifact,
+                                         compact_scratch, path_fits)
+except ImportError:  # pragma: no cover -- flat (sys.path) test import
+    from _otr_shared.pathbudget import (WINDOWS_PATH_BUDGET, compact_artifact,  # type: ignore
+                                        compact_scratch, path_fits)
 
-
-def _path_fits(path: str) -> bool:
-    return (len(os.path.abspath(path).encode("utf-16-le", "surrogatepass")) // 2
-            <= _WINDOWS_PATH_BUDGET)
+#: Kept as module names so the existing tests and any reader of this file still
+#: find them here, but the RULE lives in `_otr_shared/pathbudget.py`. Spelling
+#: it twice is exactly how the caption node drifted from the credits node.
+_WINDOWS_PATH_BUDGET = WINDOWS_PATH_BUDGET
+_path_fits = path_fits
 
 
 def _ass_sidecar_path(out_path: str) -> str:
@@ -158,16 +159,40 @@ def _ass_sidecar_path(out_path: str) -> str:
     Non-Windows and already-short paths keep the ordinary name, so nothing that
     currently works changes name.
     """
-    ordinary = os.path.splitext(os.path.abspath(out_path))[0] + ".ass"
-    if os.name != "nt" or _path_fits(ordinary):
-        return ordinary
-    parent = os.path.dirname(ordinary)
-    digest = hashlib.sha1(
-        os.path.basename(ordinary).encode("utf-8", "surrogatepass")
-    ).hexdigest()[:12]
-    # Deterministic per output, so a re-run overwrites its own sidecar instead
-    # of littering, and two variants burned into the same folder never collide.
-    return os.path.join(parent, f"otr_captions_{digest}.ass")
+    ordinary = os.path.splitext(os.path.abspath(out_path))[0]
+    return compact_scratch(os.path.dirname(ordinary),
+                           os.path.basename(ordinary), ".ass")
+
+
+
+
+def _captioned_name(in_dir: str, stem: str) -> str:
+    """``<stem>_captioned.mp4`` in ``in_dir``, compacted only if it cannot fit.
+
+    PBUG-20260907-01, second half. The episode id already names the FOLDER, and
+    the composite chain then repeats it in the filename and appends a stage
+    suffix per hop: ``<id>_silent`` -> ``<id>_silent_procgen_blended`` ->
+    ``<id>_silent_procgen_blended_captioned.mp4``. On a ComfyUI Desktop install
+    that reached 264 UTF-16 units against Windows' 260-unit MAX_PATH. ffmpeg
+    would still WRITE it, but `otr_master_audio_mux` opens with
+    ``os.path.isfile(silent_video_path)`` and Python cannot stat a path that
+    long, so the next stage would report the freshly written master as missing.
+
+    WHAT IS DROPPED, AND WHY IT IS SAFE. Only the STAGE suffixes go -- never the
+    episode id, which this repo's own `_credits_artifact_paths` docstring
+    forbids shortening. `<id>_captioned.mp4` is 241 units on the box that
+    failed, and it is a name the credits node ALREADY understands: it strips
+    ``_captioned``, ``_procgen_blended`` and ``_silent`` from the stem and then
+    requires what remains to equal the episode id. `<id>_captioned` reduces to
+    `<id>` and matches, so the credits stage keeps its ordinary path instead of
+    silently dropping into the legacy long-name branch that would fail anyway.
+    The stage suffixes carry no information the folder does not already have.
+
+    If even the compacted form will not fit, the ordinary name is returned so
+    the failure is loud and in the same place as before, rather than quietly
+    renamed into something still broken.
+    """
+    return compact_artifact(in_dir, stem, "_captioned", ".mp4")
 
 
 def _ass_filter_arg(ass_path: str) -> tuple[str, str]:
@@ -434,7 +459,7 @@ class OTRCaptionBurn:
         stem = os.path.splitext(os.path.basename(video_path or "episode"))[0]
         in_dir = os.path.dirname(os.path.abspath(video_path)) if video_path else ""
         if in_dir and os.path.isdir(in_dir):
-            return os.path.join(in_dir, f"{stem}_captioned.mp4")
+            return _captioned_name(in_dir, stem)
         # The pack's ONE output-root owner answers (2026-09-04); this read
         # `folder_paths` itself.
         try:
