@@ -80,15 +80,41 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video):
         return result
     if not isinstance(prompt, dict) or not prompt:
         raise VisualAssetError("visual asset preflight requires the live queued prompt")
+    # THE GATE CHAIN IS WALKED TRANSITIVELY, not one hop (PBUG-20260907-02).
+    #
+    # This used to collect only nodes whose `gate_in` named THIS validator
+    # directly, and the audio branch is two hops away:
+    #
+    #     validator -> BatchCharacterVoices -> AnnouncerVoice -> StableAudioTheme
+    #
+    # so the music engine was never read and `stable_audio_3` was never planned.
+    # Selecting it therefore killed the render 5m40s in, after the whole script
+    # had been written, with "SA3 checkpoint not found ... fetch it first" -- the
+    # licence-clean music engine was unusable on every card while musicgen
+    # (CC-BY-NC) was the only thing that worked.
+    #
+    # THE REPLAY ISOLATION THE DOCSTRING PROTECTS IS UNCHANGED. Reachability
+    # still starts at THIS validator and follows gate edges only, so another
+    # validator's subgraph remains unreachable -- a frozen replay bundle's live
+    # widgets still cannot trigger a download. Widening from one hop to N hops
+    # along the same edges does not cross that boundary; it just stops losing
+    # the far end of our own chain.
     scoped = []
-    for node in prompt.values():
-        if not isinstance(node, dict):
-            continue
-        inputs = node.get("inputs") or {}
-        gate = inputs.get("gate_in")
-        if (isinstance(gate, (list, tuple)) and len(gate) == 2
-                and str(gate[0]) == str(unique_id) and gate[1] == 0):
-            scoped.append(node)
+    seen_ids = set()
+    reachable = {str(unique_id)}
+    pending = True
+    while pending:
+        pending = False
+        for node_id, node in prompt.items():
+            if not isinstance(node, dict) or node_id in seen_ids:
+                continue
+            gate = (node.get("inputs") or {}).get("gate_in")
+            if (isinstance(gate, (list, tuple)) and len(gate) == 2
+                    and str(gate[0]) in reachable and gate[1] == 0):
+                seen_ids.add(node_id)
+                reachable.add(str(node_id))
+                scoped.append(node)
+                pending = True  # its own consumers may now be reachable
     writers = [n for n in scoped if n.get("class_type") == "OTR_LedgerScriptWriter"]
     replay = [bool(_literal(n.get("inputs") or {}, "replay_from", "")) for n in writers]
     if any(replay):

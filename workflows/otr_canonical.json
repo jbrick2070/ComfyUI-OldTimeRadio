@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 95,
-  "last_link_id": 289,
+  "last_link_id": 290,
   "nodes": [
     {
       "id": 63,
@@ -85,7 +85,8 @@
           "type": "STRING",
           "links": [
             269,
-            279
+            279,
+            290
           ]
         }
       ],
@@ -1349,7 +1350,7 @@
           "name": "gate_in",
           "shape": 7,
           "type": "STRING",
-          "link": null
+          "link": 290
         },
         {
           "localized_name": "engine",
@@ -3467,6 +3468,14 @@
       6,
       7,
       10,
+      "STRING"
+    ],
+    [
+      290,
+      63,
+      0,
+      81,
+      2,
       "STRING"
     ]
   ],
