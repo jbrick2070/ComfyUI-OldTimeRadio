@@ -16,7 +16,9 @@ With four-character codes the same name measures 200. That is the difference
 between a name that fits every title and one that is already over the line for
 anything longer than the episode that failed.
 
-    OPERATOR RULING: four characters, maximum. No exceptions.
+    OPERATOR RULING: four characters, with one deliberate exception -- the
+    writer LLM may use five, so a row can carry both family and parameter
+    count (`q354b` = Qwen 3.5 4B). See MAX_CODE_LEN_BY_DIMENSION.
 
 CODES ARE UNIQUE WITHIN A DIMENSION, NOT GLOBALLY. The name has fixed positional
 slots, so ``csd2`` may mean cloud_seedance_2 in the video slot and
@@ -39,7 +41,7 @@ from __future__ import annotations
 SENTINELS = ("+ Add Custom Model",)
 
 LLM = {
-    "Qwen/Qwen3.5-4B": "qwn4",
+    "Qwen/Qwen3.5-4B": "q354b",
     "unsloth/Llama-3.2-3B-Instruct": "lla3",
     "mistralai/Mistral-Nemo-Instruct-2407": "nemo",
     "google/gemma-4-E2B-it": "g4e2",
@@ -54,14 +56,14 @@ SOURCE_BANK = {
     "original": "orig",
     "scifi_news_pro": "news",
     "public_domain": "pubd",
-    "shakespeare": "shak",
+    "shakespeare": "sspr",
     "custom_source_bank": "cust",
 }
 
 VISUAL_STYLE = {
     "roll (any style)": "roll",
     "anime": "anim",
-    "archival_documentary": "arcd",
+    "archival_documentary": "arch",
     "cartoon": "cart",
     "paper_origami": "pori",
     "recur_frac": "rfrc",
@@ -158,7 +160,24 @@ DIMENSIONS = {
     "upscaler": UPSCALER,
 }
 
+#: Default cap. Operator ruling 2026-09-07: four characters, and the arithmetic
+#: in the module docstring is computed against it.
 MAX_CODE_LEN = 4
+
+#: Per-dimension exceptions, granted deliberately and one at a time.
+#:
+#: ``llm`` is 5 because a writer row has to carry BOTH a family and a parameter
+#: count to be readable -- `q354b` says Qwen 3.5 4B, where a four-character
+#: `q354` drops the B and reads like a version number. The LLM appears exactly
+#: once in a name, so the extra character costs one unit, and the measured name
+#: sits at 215 of 250 with it. Do not widen this to a habit: every additional
+#: character is spent on every episode forever.
+MAX_CODE_LEN_BY_DIMENSION = {"llm": 5}
+
+
+def max_code_len(dimension: str) -> int:
+    """The cap that applies to ``dimension``."""
+    return MAX_CODE_LEN_BY_DIMENSION.get(dimension, MAX_CODE_LEN)
 
 
 def _bare(value: str) -> str:

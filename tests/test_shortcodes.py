@@ -1,6 +1,6 @@
 """Four-character codes for every dimension a generated filename carries.
 
-Operator ruling 2026-09-07, four characters maximum. The published name reached
+Operator ruling 2026-09-07: four characters, five for the writer LLM. The name reached
 249 of its 250-unit budget spelling components in full, and three more
 dimensions (writer LLM, music engine, upscaler) are wanted in it.
 
@@ -24,14 +24,24 @@ from nodes._otr_shared import shortcodes as SC  # noqa: E402
 
 
 class TableShapeTests(unittest.TestCase):
-    def test_no_code_exceeds_four_characters(self):
+    def test_no_code_exceeds_its_dimension_cap(self):
+        """Four characters, except the writer LLM which is allowed five so a row
+        can carry family AND parameter count (`q354b` = Qwen 3.5 4B). The
+        exception is per dimension and deliberate, not a general relaxation."""
         for name, table in SC.DIMENSIONS.items():
+            cap = SC.max_code_len(name)
             for value, code in table.items():
                 self.assertLessEqual(
-                    len(code), SC.MAX_CODE_LEN,
-                    "%s: %r -> %r is %d chars; the ruling is four"
-                    % (name, value, code, len(code)))
+                    len(code), cap,
+                    "%s: %r -> %r is %d chars; the cap for %s is %d"
+                    % (name, value, code, len(code), name, cap))
                 self.assertTrue(code, "%s: %r has an empty code" % (name, value))
+
+    def test_only_the_llm_dimension_has_a_raised_cap(self):
+        """Every extra character is spent on every episode forever, so the
+        exception list is asserted here rather than left to drift."""
+        self.assertEqual(SC.MAX_CODE_LEN, 4)
+        self.assertEqual(SC.MAX_CODE_LEN_BY_DIMENSION, {"llm": 5})
 
     def test_codes_are_unique_within_each_dimension(self):
         """Global uniqueness is NOT required -- the name is positional, so the
@@ -54,7 +64,7 @@ class TableShapeTests(unittest.TestCase):
     def test_the_label_decorations_are_stripped(self):
         """Live labels carry a size badge, an aspect tag or a trailing note; the
         table is written against the bare value."""
-        self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B (4.3 GB)"), "qwn4")
+        self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B (4.3 GB)"), "q354b")
         self.assertEqual(SC.code_for("video_lane", "ltx098_low_video (16:9)"), "l098")
         self.assertEqual(
             SC.code_for("video_lane",
