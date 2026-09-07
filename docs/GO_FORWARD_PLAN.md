@@ -1130,3 +1130,73 @@ which workflow to load and which models are required.
 * `OTR_LedgerFreezeCascade` failed twice and the message was never captured -- the runner's eight-frame traceback truncates it. Next occurrence, read the SERVER log.
 * `OTR_VideoRenderBatch` `RenderError` cluster -- triage after items 2 and 3.
 * The two eyeball re-observations (announcer framing, name-splice #2) ride any real render leg -- Batch R5.
+
+---
+
+## SDXL image lane for Apple Silicon (queued 2026-09-06)
+
+**WHY.** OTR has NO local image engine that can run on a Mac. Every entry in
+`nodes/_otr_image_engines/registry.py` declares `device_backends: ["cuda"]` --
+`flux_gen1`, `flux2_klein`, `lumina_image`, `ideogram4_local`, `z_image_turbo` --
+and the only one offering `cpu`/`mps` is `cloud_flux_pro`, a paid cloud lane.
+So `otr_mac_mps` ships `google_image`, a paid Google API needing
+`OTR_GOOGLE_API_KEY`. Attempting to swap Z-Image in is refused by the validator
+itself: *"engine excluded from profile 'otr_mac_mps' enable-set
+(requires_cuda)"*.
+
+This is the last thing standing between a Mac and a stills tier. It is NOT
+about the writer (Qwen3.5-4B at 8.06 GiB bf16 is comfortable in 16 GB unified),
+NOT about voices (kokoro declares `["cuda","cpu","mps"]` and self-installs),
+NOT about music (stable_audio_3 declares `["cuda","mps"]` and now
+auto-downloads, 222227b), and NOT about ffmpeg (macOS paths landed in 0c85e09,
+capability probe in cbb38d4).
+
+**WHY SDXL AND NOT THE ALTERNATIVES.**
+* **SDXL community fine-tune** (Juggernaut XL, DreamShaper XL, RealVisXL) --
+  ungated `.safetensors`, ~6.5-8 GB, loads through the stock
+  `CheckpointLoaderSimple` that `z_image_turbo` and `ltx_8gb` already use, so
+  the adapter sits close to code that exists. Native MPS with no custom CUDA
+  kernels. RAIL++-M permits commercial use. **The pick.**
+* **SD 1.5 fine-tune** -- <4 GB, bulletproof on every platform. The floor
+  option if SDXL is tight; worth shipping alongside rather than instead.
+* `flux2_klein` -- OTR already has the adapter, but it loads
+  `flux-2-klein-4b-Q4_K_M.gguf` through **ComfyUI-GGUF's `UnetLoaderGGUF`**, a
+  third-party pack, and `K_M` quants are reported to garble on MPS. Viable only
+  with a non-K quant or an MLX/mflux backend -- both larger than this item.
+* `z_image_turbo` -- its `["cuda"]` is very likely a record of where it was
+  TESTED, not a requirement: the registry says `needs_fp8_te: False`, the
+  adapter ranks `nvfp4 > fp8 > bf16` with a **bf16 fallback**, and the bf16
+  weights are what the 4060 actually used on 2026-09-06. BUT reported peak is
+  ~15 GB on an M3 Air, which is uncomfortable against 16 GB shared with the OS.
+  Plausibly a 24 GB+ Mac option, not a 16 GB default.
+* PixArt-Sigma -- **AGPL-3.0.** Riskier to ship than MusicGen's CC-BY-NC, which
+  was already rejected as a default. Not a candidate.
+
+**ORDER OF WORK.** Cheapest experiment first; it may make the adapter optional.
+
+1. **One Mac render, two one-line experiments, before any adapter is written.**
+   Widen `z_image_turbo` to `["cuda","cpu","mps"]` and render one act; measure
+   PEAK unified memory, not just success. Same session, widen `ltx_8gb` the
+   same way -- if AI video also runs on MPS, Mac gains tier 1 and the whole
+   ladder, which no amount of image work would give it.
+2. If Z-Image peaks too high (or fails), write the SDXL adapter: capability
+   entry with `device_backends: ["cuda","cpu","mps"]`,
+   `practical_without_gpu: True`, `model_requirements`, plus a
+   `nodes/_otr_visual_assets.py` MANIFEST entry so it auto-downloads on Run
+   like Z-Image and LTX do.
+3. Verify the ungated repo BEFORE wiring: read gating from repo metadata, not
+   from the licence name. `meta-llama` vs the `unsloth` mirror is the worked
+   example of why (see `docs/model-license-unsloth--llama-3.2-3b-instruct.md`).
+4. Ship the Mac JSON only once a real Mac has rendered one act end to end.
+
+**HARD CONSTRAINT, carried from today.** A dropdown entry is a promise the
+model will load. Do NOT widen any `device_backends` on reasoning alone -- the
+z_image and ltx widenings in step 1 are EXPERIMENTS to be measured on Apple
+hardware, and stay unmerged until one does. No Mac exists in this campaign.
+
+**ALSO OWED ON MAC, independent of the image lane:** three shipped configs
+pre-select `viz_mxc_mandala`, whose pycairo dependency is pinned
+`sys_platform == 'win32'` because pycairo publishes zero Linux wheels --
+`otr_mac_mps`, `otr_amd8_rocm` and `otr_amd16_rocm`. `viz_mxc_cpu` is the
+sibling that installs everywhere. The engine itself stays; only the selected
+value changes.
