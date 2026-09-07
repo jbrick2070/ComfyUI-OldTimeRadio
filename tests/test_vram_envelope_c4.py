@@ -39,20 +39,39 @@ _ORCHESTRATOR_PATH = _REPO_ROOT / "nodes" / "story_orchestrator.py"
 # ---------------------------------------------------------------------------
 
 
-def test_default_llm_is_mistral_nemo():
-    """L-1: DEFAULT_LLM must remain `mistralai/Mistral-Nemo-Instruct-2407`.
+def test_default_llm_is_pinned_to_the_portable_row():
+    """L-1: DEFAULT_LLM must remain pinned, now to `Qwen/Qwen3.5-4B`.
 
-    This is the audio C7 byte-identical baseline. Any change here
-    requires a deliberate baseline-reset sprint (out of Sprint C
-    scope per §8 deferred items).
+    RESET PERFORMED 2026-09-06, deliberately, on operator direction -- this
+    guard previously required Mistral-Nemo and warned that changing it needed a
+    baseline-reset rather than a casual edit. That warning was honoured: the
+    reset is recorded here, in the constant's own docstring, in the sibling
+    guard in tests/test_audio_c7_b3sum_guards.py, and in the commit.
+
+    WHY. The default is what a user gets having configured nothing, so it must
+    be the row most likely to run on the smallest supported card.
+    Mistral-Nemo is not broken -- it is soak-tested and runs well on 16 GB at
+    12.0 GB resident -- but it is a 24 GB download that does NOT fit the 8 GB
+    target at all. Qwen3.5-4B was measured on a physical 8 GB RTX 4060 on
+    2026-09-06 at 2.99 GiB resident and 14.47 tok/s, the smallest and fastest
+    row tested, and carried a complete one-act episode to obs_publish there.
+
+    ON THE C7 CLAIM THIS GUARD USED TO MAKE. The audio C7 tests do NOT read
+    DEFAULT_LLM: tests/test_audio_c7_clamp_counter.py binds its own
+    MISTRAL_NEMO literal and passes it explicitly to
+    resolve_creative_system_prompt, and the prompt-routing guards read source
+    text. So the byte-identity coupling asserted here was weaker than stated.
+    That said, the full pytest suite could NOT be run on the box that made this
+    change (pytest is absent from both interpreters there), so "no C7 test
+    depends on this constant" is established by reading, not by execution, and
+    should be confirmed on a machine that can run the suite.
     """
     catalog = importlib.import_module("nodes._otr_model_catalog")
-    assert catalog.DEFAULT_LLM == "mistralai/Mistral-Nemo-Instruct-2407", (
-        f"DEFAULT_LLM drift: expected "
-        f"'mistralai/Mistral-Nemo-Instruct-2407', got "
-        f"{catalog.DEFAULT_LLM!r}. Audio C7 baseline pinned to "
-        "Mistral-Nemo -- any change requires a deliberate baseline-reset "
-        "sprint, not a casual edit."
+    assert catalog.DEFAULT_LLM == "Qwen/Qwen3.5-4B", (
+        f"DEFAULT_LLM drift: expected 'Qwen/Qwen3.5-4B', got "
+        f"{catalog.DEFAULT_LLM!r}. The writer default is pinned to the row "
+        "that fits the smallest supported card -- changing it is a deliberate "
+        "reset, documented in the constant's docstring, not a casual edit."
     )
 
 

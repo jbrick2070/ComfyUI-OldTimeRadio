@@ -52,11 +52,29 @@ except ImportError:  # pragma: no cover -- flat / standalone load
 # Any future rename / casing fix happens here, not in scattered string literals.
 # ---------------------------------------------------------------------------
 
-DEFAULT_LLM = "mistralai/Mistral-Nemo-Instruct-2407"
-"""Fallback for empty/unsaved writer inputs; Audio C7 baseline.
+DEFAULT_LLM = "Qwen/Qwen3.5-4B"
+"""Fallback for empty/unsaved writer inputs.
 
-The saved canonical workflow intentionally overrides both slots with the
-runtime-qualified ``google/gemma-4-12b-it`` row.
+WAS ``mistralai/Mistral-Nemo-Instruct-2407`` until 2026-09-06. That row is the
+single highest-friction writer in the catalog and it was the value a
+freshly-dropped node fell back to: a **24 GB** download that then does NOT fit
+an 8 GB card at all (12.0 GB resident badge). A default should be the row most
+likely to work on the machine of someone who has changed nothing.
+
+Qwen3.5-4B is that row, measured on a physical 8 GB RTX 4060 on 2026-09-06:
+8.68 GB to download, **2.99 GiB resident** under NF4, **14.47 tok/s** -- the
+fastest and smallest of every row tested -- ungated, Apache-2.0, and it carried
+a complete one-act episode end to end (obs_publish OK, 32m34s) on that card.
+Mistral-Nemo remains in the catalog and remains selectable; it is simply no
+longer what you get by accident.
+
+ALSO FIXES A LATENT MISMATCH. Every curated dropdown label is
+``repo_id + vram_badge_for(repo_id)``, so the option list holds
+``'... (12.0 GB)'`` while this constant is the BARE id -- the declared default
+was never a member of its own option list, and ComfyUI fell through to whichever
+row happened to sit at index 0. That fallback is undefined behaviour dressed as
+a default. Consumers normalize through ``_strip_label_suffix``, so a bare id
+here is correct; what was wrong was pointing it at a row an 8 GB user cannot run.
 """
 
 TEST_TECHNICAL_LLM = "google/gemma-4-E2B-it"
