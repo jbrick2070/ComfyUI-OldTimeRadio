@@ -7,15 +7,11 @@ Other engines keep their existing adapter checks with explicit uncovered logs.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
 import logging
 import os
 from pathlib import Path
 import re
 import time
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 log = logging.getLogger(__name__)
 
@@ -291,30 +287,104 @@ def _pin_metadata(spec, *, hf_hub_url, get_hf_file_metadata):
     return {"commit": commit, "sha256": pinned.etag, "size": pinned.size, "url": pinned_url}
 
 
-class _HTTPSOnlyRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if urlsplit(newurl).scheme != "https":
-            raise VisualAssetError("visual weight transport refused non-HTTPS redirect")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+def _hf_fetch(spec, metadata, progress=None):
+    """Fetch one allowlisted file through huggingface_hub; return its local path.
 
+    REPLACES A HAND-ROLLED urllib DOWNLOADER (2026-09-07), and the reason is not
+    tidiness. Diffing four published zips showed the Comfy Registry scanner
+    Flags precisely the versions that ship a bespoke fetcher: alpha.25 added
+    this module and was Flagged where alpha.24 was Active; alpha.23 REMOVED an
+    indextts2 weight-downloader and a PowerShell installer and went Active where
+    alpha.22 was Flagged. Nine of fourteen versions are Flagged, and a Flagged
+    version never resolves as `latest_version`, so Manager's default install
+    button does not offer it -- which is the single largest piece of friction in
+    the whole zero-friction campaign. The LLM lane moves just as many bytes and
+    has never been a differing file, because it goes through this same library.
 
-@contextmanager
-def _open_stream(url):
+    IT ALSO FIXES THREE REAL DEFECTS the loop could not:
+      * RESUME and RETRY. The planner used to print "no resume/retry" about
+        itself; a drop 11 GB into a 12 GB file restarted that file at zero, and
+        a real 50-second stall was measured mid-way through a 36.8 GB fetch.
+      * THE OPERATOR'S TOKEN. `_pin_metadata` deliberately passes `token=False`
+        for METADATA (pinning must not depend on a credential), which is why
+        startup logs a resolved HF_TOKEN and the next line still warns
+        "unauthenticated". The TRANSFER may legitimately use it, so a token is
+        passed when one exists and omitted when it does not -- an anonymous
+        install keeps working unchanged.
+      * HTTPS and redirect handling are the library's, not a hand-written
+        `HTTPRedirectHandler` subclass that had to be reasoned about here.
+
+    The revision is PINNED to the commit `_pin_metadata` already verified, so
+    this cannot follow a branch that moved. Verification is unchanged and still
+    ours: `fetch_verified` hashes the returned bytes against the pinned sha256
+    before publishing, so a poisoned or stale cache entry is still refused.
+    """
+    from huggingface_hub import hf_hub_download
+
+    kwargs = {
+        "repo_id": spec["repo_id"],
+        "filename": spec["filename"],
+        "revision": metadata["commit"],
+    }
+    token = _resolve_transfer_token()
+    if token:
+        kwargs["token"] = token
+    if progress is not None:
+        kwargs["tqdm_class"] = _progress_tqdm(progress, metadata["size"])
     try:
-        request = Request(url, headers={"Accept-Encoding": "identity",
-                                       "User-Agent": "OTR-visual-weight-readiness"})
-        with build_opener(_HTTPSOnlyRedirect()).open(request, timeout=30) as response:
-            yield response
-    except HTTPError as exc:
+        return hf_hub_download(**kwargs)
+    except VisualAssetError:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- never leak a signed CDN URL
+        raise VisualAssetError(
+            "visual weight transfer failed (%s) for %s/%s"
+            % (type(exc).__name__, spec["repo_id"], spec["filename"])) from None
+
+
+def _resolve_transfer_token():
+    """The operator's HF token if one is set, else None. Never raises."""
+    try:
+        from ._otr_hf_auth import resolve_hf_token_runtime
+    except ImportError:  # pragma: no cover -- flat (sys.path) import
         try:
-            exc.close()  # open() failed before the response context was entered.
-        finally:
-            raise VisualAssetError("visual weight download HTTP %d; no retry/token acquisition" %
-                                   exc.code) from None
-    except (URLError, TimeoutError) as exc:
-        # URLs in external exceptions can contain signed CDN query parameters.
-        raise VisualAssetError("visual weight network failure (%s); no retry" %
-                               type(exc).__name__) from None
+            from _otr_hf_auth import resolve_hf_token_runtime  # type: ignore
+        except ImportError:
+            return None
+    try:
+        return resolve_hf_token_runtime()
+    except Exception:  # noqa: BLE001 -- an anonymous install must still work
+        return None
+
+
+def _progress_tqdm(progress, total_bytes):
+    """A real tqdm subclass that forwards byte counts to ``progress``.
+
+    Subclassed rather than imitated, for the reason PBUG-20260906-08 cost a
+    whole run: huggingface_hub treats `tqdm_class` as the tqdm PROTOCOL -- it
+    reads and WRITES `.total` and calls `.refresh()` -- so a hand-rolled
+    look-alike raises AttributeError mid-transfer. Inheriting gives the entire
+    surface for free and cannot drift when the library touches a new attribute.
+    """
+    import io
+
+    from tqdm.std import tqdm as _tqdm_base
+
+    class _ProgressTqdm(_tqdm_base):  # type: ignore[misc, valid-type]
+        def __init__(self, *args, **kwargs):
+            kwargs.pop("name", None)
+            kwargs.setdefault("file", io.StringIO())  # keep the console clean
+            super().__init__(*args, **kwargs)
+
+        def display(self, *args, **kwargs):
+            # MUST NOT RAISE: a progress bar may never fail a 12 GB transfer,
+            # and tqdm's refresh() leaks its class-level lock on any exception.
+            try:
+                progress(int(self.n or 0), int(self.total or total_bytes))
+            except BaseException:  # noqa: BLE001
+                pass
+            return True
+
+    return _ProgressTqdm
 
 
 def ensure_prompt_visual_assets(prompt, unique_id):
@@ -352,7 +422,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      item["category"], item["token"], item["path"].stat().st_size, item["path"])
     if missing:
         from huggingface_hub import hf_hub_url, get_hf_file_metadata
-        from ._otr_visual_asset_download import download_verified
+        from ._otr_visual_asset_download import fetch_verified
         # Finish source validation and report total bytes before transferring.
         for item in missing:
             cancel()
@@ -371,8 +441,12 @@ def ensure_prompt_visual_assets(prompt, unique_id):
             log.info("[OTR.assets] PLAN %s/%s revision=%s bytes=%d sha256=%s",
                      item["spec"]["repo_id"], item["spec"]["filename"],
                      meta["commit"], meta["size"], meta["sha256"])
+        # "no resume/retry" was true of the hand-rolled loop and is FALSE
+        # now: the transfer goes through huggingface_hub, which resumes and
+        # retries. A log line that still claimed otherwise would be read as
+        # a live warning by the next operator staring at a 36.8 GB fetch.
         log.info("[OTR.assets] missing files=%d total_download_bytes=%d; "
-                 "no packs, no substitution, no resume/retry",
+                 "no packs, no substitution; resume/retry via huggingface_hub",
                  len(missing), sum(item["metadata"]["size"] for item in missing))
         # Use Comfy's native execution-context hook, not a server/API call or
         # worker thread. The total-only constructor also supports older Comfy.
@@ -400,8 +474,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                              item["token"], done, total, now - started)
                     last_report[0] = now
 
-            receipt = download_verified(item["spec"], destination, item["metadata"],
-                                        open_stream=_open_stream, cancel=cancel, progress=progress)
+            receipt = fetch_verified(item["spec"], destination, item["metadata"],
+                                     fetch=_hf_fetch, cancel=cancel, progress=progress)
             receipts.append(receipt)
             native = _native_path(folder_paths, item["category"], item["token"])
             if not _same_file(native, destination):

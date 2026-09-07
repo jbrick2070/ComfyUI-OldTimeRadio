@@ -344,3 +344,161 @@ class DownloadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FetchVerifiedTests(unittest.TestCase):
+    """`fetch_verified` is the LIBRARY transport, added 2026-09-07.
+
+    The hand-rolled `download_verified` owns a socket, and comparing four
+    published zips showed the Comfy Registry scanner Flags exactly the versions
+    that ship a bespoke downloader -- nine of fourteen, and a Flagged version
+    never resolves as `latest_version`, so Manager's default button never offers
+    it. `fetch_verified` hands the bytes to huggingface_hub and keeps every
+    guarantee that made the loop trustworthy.
+
+    THE POINT OF THESE TESTS: the library verified its own TRANSFER; it did not
+    verify our pinned CONTENT. A stale or poisoned cache entry, a truncated
+    file, or a fetch that returns the wrong path must all still be refused here.
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.root, ignore_errors=True))
+        self.body = b"visual weight fixture payload"
+        self.source = self.root / "cache" / "blob.safetensors"
+        self.source.parent.mkdir(parents=True, exist_ok=True)
+        self.source.write_bytes(self.body)
+        self.destination = self.root / "models" / "checkpoints" / "final.safetensors"
+        self.spec = {"repo_id": "Comfy-Org/fixture", "filename": "blob.safetensors"}
+        self.metadata = {
+            "commit": "a" * 40,
+            "sha256": hashlib.sha256(self.body).hexdigest(),
+            "size": len(self.body),
+            "url": "https://huggingface.co/Comfy-Org/fixture/resolve/main/blob.safetensors",
+        }
+
+    def invoke(self, **kwargs):
+        arguments = {
+            "fetch": lambda spec, meta, progress=None: str(self.source),
+            "disk_free": lambda _p: self.metadata["size"] + download.DISK_MARGIN_BYTES,
+        }
+        arguments.update(kwargs)
+        return download.fetch_verified(
+            self.spec, self.destination, self.metadata, **arguments)
+
+    def test_a_verified_fetch_publishes_the_final(self):
+        receipt = self.invoke()
+        self.assertEqual(receipt["status"], "downloaded")
+        self.assertTrue(receipt["verified"])
+        self.assertEqual(receipt["bytes_verified"], len(self.body))
+        self.assertEqual(self.destination.read_bytes(), self.body)
+
+    def test_a_content_hash_mismatch_is_refused(self):
+        """The library checked its own transfer, not our pinned sha256."""
+        self.metadata["sha256"] = "b" * 64
+        with self.assertRaises(download.VisualAssetDownloadError):
+            self.invoke()
+        self.assertFalse(self.destination.exists())
+
+    def test_a_truncated_fetch_is_refused(self):
+        self.source.write_bytes(self.body[:-3])
+        with self.assertRaises(download.VisualAssetDownloadError):
+            self.invoke()
+        self.assertFalse(self.destination.exists())
+
+    def test_a_fetch_that_returns_no_file_is_refused(self):
+        with self.assertRaises(download.VisualAssetDownloadError):
+            self.invoke(fetch=lambda s, m, progress=None: str(self.root / "absent"))
+        self.assertFalse(self.destination.exists())
+
+    def test_an_existing_destination_is_preserved_untouched(self):
+        self.destination.parent.mkdir(parents=True, exist_ok=True)
+        self.destination.write_bytes(b"operator's own file")
+        receipt = self.invoke(fetch=self._forbidden_fetch)
+        self.assertEqual(receipt["status"], "exists")
+        self.assertFalse(receipt["verified"])
+        self.assertEqual(self.destination.read_bytes(), b"operator's own file")
+
+    def _forbidden_fetch(self, *_args, **_kwargs):
+        raise AssertionError("an existing destination must not be re-fetched")
+
+    def test_insufficient_disk_refuses_before_fetching(self):
+        with self.assertRaises(download.VisualAssetDownloadError):
+            self.invoke(fetch=self._forbidden_fetch, disk_free=lambda _p: 1)
+
+    def test_the_allowlist_and_pin_validation_still_run(self):
+        for broken in ({"commit": "zz"}, {"sha256": "short"}, {"size": 0}):
+            metadata = dict(self.metadata, **broken)
+            with self.assertRaises(ValueError):
+                download.fetch_verified(self.spec, self.destination, metadata,
+                                        fetch=self._forbidden_fetch)
+
+    def test_cancellation_is_honoured_before_any_publish(self):
+        class Stop(Exception):
+            pass
+
+        def cancel():
+            raise Stop()
+
+        with self.assertRaises(Stop):
+            self.invoke(cancel=cancel)
+        self.assertFalse(self.destination.exists())
+
+    def test_progress_reaches_full_only_after_verification(self):
+        seen = []
+        self.invoke(progress=lambda done, total: seen.append((done, total)))
+        self.assertEqual(seen[0], (0, len(self.body)))
+        self.assertEqual(seen[-1], (len(self.body), len(self.body)))
+
+    def test_it_reports_resume_support(self):
+        """The loop could not resume and said so in the planner's own log line;
+        the library can, and the receipt records the difference."""
+        self.assertTrue(self.invoke()["resume_supported"])
+
+    def test_a_cross_device_fetch_still_publishes_via_copy(self):
+        """The fetched file may live in an HF cache on another VOLUME, where
+        os.link raises EXDEV. This caught a real gap: the first cut's fallback
+        copied to a temp and then called os.link again, so a filesystem with no
+        hard links at all raised a bare OSError instead of publishing.
+        """
+        def cross_device(src, dst):
+            raise OSError(18, "Invalid cross-device link")
+
+        with mock.patch.object(download.os, "link", side_effect=cross_device):
+            receipt = self.invoke()
+        self.assertEqual(receipt["status"], "downloaded")
+        self.assertTrue(receipt["verified"])
+        self.assertEqual(self.destination.read_bytes(), self.body)
+
+    def test_the_fallback_is_still_no_clobber(self):
+        """os.link was chosen because it cannot overwrite. The fallback keeps
+        that with O_CREAT|O_EXCL rather than an os.replace that would clobber."""
+        def cross_device(src, dst):
+            raise OSError(18, "Invalid cross-device link")
+
+        self.destination.parent.mkdir(parents=True, exist_ok=True)
+        self.destination.write_bytes(b"someone else's final")
+        with mock.patch.object(download.os, "link", side_effect=cross_device):
+            # The pre-lock existence check returns first; force past it to
+            # exercise the publish itself.
+            self.assertFalse(download._publish_link(self.source, self.destination))
+        self.assertEqual(self.destination.read_bytes(), b"someone else's final")
+
+    def test_the_fallback_leaves_no_partial_final_on_failure(self):
+        def cross_device(src, dst):
+            raise OSError(18, "Invalid cross-device link")
+
+        class Boom(Exception):
+            pass
+
+        def exploding_copy(*_args, **_kwargs):
+            raise Boom()
+
+        self.destination.parent.mkdir(parents=True, exist_ok=True)
+        with mock.patch.object(download.os, "link", side_effect=cross_device), \
+                mock.patch.object(download.shutil, "copyfileobj",
+                                  side_effect=exploding_copy):
+            with self.assertRaises(Boom):
+                download._publish_link(self.source, self.destination)
+        self.assertFalse(self.destination.exists(),
+                         "a partial final was left for the native loader")

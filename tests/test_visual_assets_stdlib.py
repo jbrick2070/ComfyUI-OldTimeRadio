@@ -19,6 +19,20 @@ from unittest import mock
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "nodes" / "_otr_visual_assets.py"
+
+def fake_module(name, **attrs):
+    """A stand-in module for sys.modules patching, usable at class scope.
+
+    The runtime fixture has an identical local helper; this one exists so the
+    transport tests can patch `huggingface_hub` without building the whole
+    runtime store.
+    """
+    value = ModuleType(name)
+    value.__path__ = []
+    for key, item in attrs.items():
+        setattr(value, key, item)
+    return value
+
 _original_import = builtins.__import__
 
 
@@ -527,7 +541,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
             prefix + "._otr_video_engines.eng_ltx_8gb": module(prefix + "._otr_video_engines.eng_ltx_8gb",
                 Ltx8gbEngine=lambda: self.ltx),
             prefix + "._otr_visual_asset_download": module(prefix + "._otr_visual_asset_download",
-                download_verified=fake_download),
+                fetch_verified=fake_download),
             "folder_paths": module("folder_paths", get_full_path=self.folders.get_full_path,
                                    get_folder_paths=self.folders.get_folder_paths),
             "comfy": module("comfy", model_management=SimpleNamespace(
@@ -549,7 +563,7 @@ class RuntimeBridgeTests(_NativeFixtureCase):
                     prefix + "._otr_visual_assets", MODULE_PATH)), \
                 mock.patch.object(bridge, "native_requests", side_effect=traced_native_requests), \
                 mock.patch("builtins.__import__", side_effect=guard), \
-                mock.patch.object(bridge, "_open_stream", side_effect=AssertionError("real transport forbidden")):
+                mock.patch.object(bridge, "_hf_fetch", side_effect=AssertionError("real transport forbidden")):
             yield trace
 
     def test_complete_store_never_imports_hf_or_downloader(self):
@@ -732,21 +746,102 @@ class RuntimeBridgeTests(_NativeFixtureCase):
 
 
 class TransportBoundaryTests(NoNetworkTestCase):
-    def test_http_error_closes_response_and_does_not_expose_signed_url(self):
-        body = io.BytesIO(b"fixture forbidden response")
-        url = "https://example.invalid/fixture?signature=private-test-value"
-        failure = bridge.HTTPError(url, 403, "Forbidden", {}, body)
-        opener = SimpleNamespace(open=mock.Mock(side_effect=failure))
-        with mock.patch.object(bridge, "build_opener", return_value=opener):
+    """The transport is huggingface_hub now, not a hand-rolled urllib opener.
+
+    Ported 2026-09-07. Comparing four published zips showed the Comfy Registry
+    scanner Flags exactly the versions that ship a bespoke downloader, and a
+    Flagged version never resolves as `latest_version` -- so Manager's default
+    install button does not offer it. The property this class has always
+    protected is unchanged and still matters: a transport failure must never
+    surface a signed CDN URL.
+    """
+
+    def test_a_transfer_failure_never_exposes_a_signed_url(self):
+        secret = "https://cdn.example.invalid/blob?X-Amz-Signature=private-test-value"
+
+        def boom(**kwargs):
+            raise RuntimeError("connection reset while fetching " + secret)
+
+        spec = {"repo_id": "Comfy-Org/z_image_turbo",
+                "filename": "split_files/vae/ae.safetensors"}
+        meta = {"commit": "a" * 40, "sha256": "b" * 64, "size": 7}
+        with mock.patch.dict(sys.modules, {"huggingface_hub": fake_module(
+                "huggingface_hub", hf_hub_download=boom)}):
             with self.assertRaises(bridge.VisualAssetError) as caught:
-                with bridge._open_stream(url):
-                    self.fail("HTTP error stream yielded")
-        self.assertTrue(body.closed)
-        self.assertIn("403", str(caught.exception))
-        self.assertNotIn("example.invalid", str(caught.exception))
-        self.assertNotIn("signature", str(caught.exception))
-        self.assertNotIn("private-test-value", str(caught.exception))
-        self.assertEqual(opener.open.call_count, 1)
+                bridge._hf_fetch(spec, meta)
+        message = str(caught.exception)
+        self.assertNotIn("X-Amz-Signature", message)
+        self.assertNotIn("private-test-value", message)
+        self.assertNotIn("cdn.example.invalid", message)
+        # It still says WHAT failed, by public allowlisted identity.
+        self.assertIn("RuntimeError", message)
+        self.assertIn("Comfy-Org/z_image_turbo", message)
+
+    def test_the_transfer_is_pinned_to_the_verified_commit(self):
+        """A revision that is not the pinned commit could follow a moved branch,
+        which is the whole point of `_pin_metadata` verifying it twice."""
+        seen = {}
+
+        def capture(**kwargs):
+            seen.update(kwargs)
+            return __file__
+
+        spec = {"repo_id": "Comfy-Org/z_image_turbo",
+                "filename": "split_files/vae/ae.safetensors"}
+        meta = {"commit": "c" * 40, "sha256": "d" * 64, "size": 7}
+        with mock.patch.dict(sys.modules, {"huggingface_hub": fake_module(
+                "huggingface_hub", hf_hub_download=capture)}):
+            bridge._hf_fetch(spec, meta)
+        self.assertEqual(seen["revision"], "c" * 40)
+        self.assertEqual(seen["repo_id"], spec["repo_id"])
+        self.assertEqual(seen["filename"], spec["filename"])
+
+    def test_an_anonymous_install_sends_no_token(self):
+        """A stranger has no HF_TOKEN and the fetch must still be attempted."""
+        seen = {}
+
+        def capture(**kwargs):
+            seen.update(kwargs)
+            return __file__
+
+        spec = {"repo_id": "Comfy-Org/z_image_turbo", "filename": "x.safetensors"}
+        meta = {"commit": "e" * 40, "sha256": "f" * 64, "size": 7}
+        with mock.patch.dict(sys.modules, {"huggingface_hub": fake_module(
+                "huggingface_hub", hf_hub_download=capture)}),                 mock.patch.object(bridge, "_resolve_transfer_token", return_value=None):
+            bridge._hf_fetch(spec, meta)
+        self.assertNotIn("token", seen)
+
+    def test_a_resolved_token_is_used_for_the_transfer(self):
+        """Metadata pinning deliberately passes token=False; the TRANSFER may
+        use the operator's token, which is why HF_TOKEN resolved at startup and
+        the next line still warned 'unauthenticated'."""
+        seen = {}
+
+        def capture(**kwargs):
+            seen.update(kwargs)
+            return __file__
+
+        spec = {"repo_id": "Comfy-Org/z_image_turbo", "filename": "x.safetensors"}
+        meta = {"commit": "0" * 40, "sha256": "1" * 64, "size": 7}
+        with mock.patch.dict(sys.modules, {"huggingface_hub": fake_module(
+                "huggingface_hub", hf_hub_download=capture)}),                 mock.patch.object(bridge, "_resolve_transfer_token", return_value="hf_x"):
+            bridge._hf_fetch(spec, meta)
+        self.assertEqual(seen.get("token"), "hf_x")
+
+    def test_no_raw_network_call_remains_in_the_module(self):
+        """The reason for the port. If a hand-rolled opener comes back, the
+        published version is liable to be Flagged again."""
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        # CODE-SHAPED patterns only. The docstring deliberately NAMES the old
+        # opener to explain why it went, so matching a bare identifier would
+        # fail on the very comment that records the decision.
+        for banned in ("from urllib.request import", "import urllib.request",
+                       "build_opener(", "urlopen(", "urlretrieve("):
+            self.assertNotIn(
+                banned, source,
+                "%r reintroduces a bespoke downloader into the shipped "
+                "package; the registry scanner Flags versions that carry one"
+                % banned)
 
 
 if __name__ == "__main__":

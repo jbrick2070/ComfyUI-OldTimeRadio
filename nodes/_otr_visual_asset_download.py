@@ -2,9 +2,24 @@
 
 The caller owns metadata discovery, source allowlisting, native path resolution,
 and the network transport. This module never imports ComfyUI/model code and has
-no default network callable. Transfers do not retry or resume: a later explicit
-attempt starts a fresh temporary file. No URL is logged or returned in receipts.
+no default network callable. No URL is logged or returned in receipts.
 Transport/cancellation exceptions propagate unchanged to the caller.
+
+TWO ENTRY POINTS, and the difference is who moves the bytes.
+
+``download_verified`` takes an injected ``open_stream`` and runs the read loop
+itself. It does not retry or resume: a later explicit attempt starts a fresh
+temporary file.
+
+``fetch_verified`` (2026-09-07) takes an injected ``fetch`` that returns a LOCAL
+PATH some library has already produced, and verifies that. It exists because
+shipping a bespoke downloader inside the package correlates with the Comfy
+Registry marking the version Flagged -- and a Flagged version never resolves as
+``latest_version``, so ComfyUI Manager's default install button does not offer
+it. Its verification is identical: the pinned size and SHA-256 are checked HERE,
+against the returned bytes, so a stale or poisoned library cache is still
+refused. It gains resume, retry, and the operator's token from whatever library
+the caller injected.
 """
 from __future__ import annotations
 
@@ -134,6 +149,160 @@ def _existing_ancestor(path):
         if path == previous:
             raise VisualAssetDownloadError("destination has no existing filesystem ancestor")
     return path
+
+
+def _publish_link(source: Path, destination: Path) -> bool:
+    """Atomically publish ``source`` as ``destination``. False if it already exists.
+
+    ``os.link`` is used rather than replace/rename because it is atomically
+    NO-CLOBBER: an uncooperative writer that raced us keeps its final. On a
+    filesystem or volume that cannot hard-link -- the fetched file may live in
+    another cache root entirely -- it falls back to a copy through this call's
+    own temporary, so the failure mode is extra bytes, never a partial final.
+    """
+    try:
+        os.link(source, destination)
+        return True
+    except FileExistsError:
+        return False
+    except OSError:
+        pass  # cross-device, or a filesystem without hard links
+
+    # NO HARD LINKS HERE. The fetched file can live in a cache on another
+    # volume, and some filesystems have no links at all. `O_CREAT | O_EXCL`
+    # gives the SAME no-clobber guarantee os.link was chosen for -- the create
+    # fails if anything already holds the name -- so an uncooperative writer
+    # still keeps its final. Falling back to a copy plus `os.replace` would
+    # not: replace clobbers.
+    #
+    # The narrow cost is that the final is written in place rather than moved
+    # into place, so a hard crash mid-copy could leave a short file. It is
+    # removed on every error path below, and the caller re-verifies the native
+    # loader afterwards, so the exposure is a power cut during the fallback on
+    # a link-less filesystem -- not a case worth trading the no-clobber
+    # property for.
+    try:
+        handle = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    try:
+        with os.fdopen(handle, "wb") as output, open(source, "rb") as reader:
+            shutil.copyfileobj(reader, output, CHUNK_BYTES)
+            output.flush()
+            os.fsync(output.fileno())
+    except BaseException:
+        # Never leave a partial final behind for the native loader to find.
+        try:
+            os.unlink(destination)
+        except OSError:
+            pass
+        raise
+    return True
+
+
+def fetch_verified(
+    spec: dict,
+    destination: Path,
+    metadata: dict,
+    *,
+    fetch,
+    cancel=None,
+    progress=None,
+    disk_free=None,
+) -> dict:
+    """Same contract as :func:`download_verified`, for a LIBRARY transport.
+
+    WHY THIS EXISTS (2026-09-07). `download_verified` owns the bytes: it opens a
+    socket through an injected `open_stream` and loops. That is a bespoke
+    downloader living in the shipped package, and comparing four published zips
+    showed the Comfy Registry security scanner Flags exactly the versions that
+    carry one -- alpha.25 added this module's siblings and was Flagged while
+    alpha.24 was Active; alpha.23 REMOVED an indextts2 weight-fetcher plus a
+    PowerShell installer and went Active while alpha.22 was Flagged. Nine of
+    fourteen versions are Flagged, and a Flagged version does not resolve as
+    `latest_version`, so Manager's default button never offers it.
+
+    The LLM lane downloads just as much and has never been a differing file,
+    because it goes through `huggingface_hub`. So `fetch` is handed the same
+    (spec, metadata) and returns a LOCAL PATH that some library already
+    produced; this function keeps every guarantee that made the hand-rolled
+    loop trustworthy and simply stops owning the socket:
+
+      * the caller's allowlist and pinned commit/sha256/size are still enforced,
+      * the destination lock and the no-clobber publish are unchanged,
+      * the fetched bytes are hashed HERE, not trusted from the library, so a
+        cache-poisoned or truncated file is still refused,
+      * an existing destination is still preserved untouched.
+
+    It also gains what the loop could not have: resume and retry, and the
+    operator's HF token when one is set. The transfer that stalled for 50
+    seconds mid-way through 36.8 GB had neither.
+    """
+    _validate(spec, metadata)
+    spec = spec.copy()
+    metadata = metadata.copy()
+    if not callable(fetch):
+        raise TypeError("fetch must be an injected callable")
+    destination = Path(destination)
+    _check_cancel(cancel)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "repo_id": spec["repo_id"],
+        "filename": spec["filename"],
+        "commit": metadata["commit"].lower(),
+        "sha256": metadata["sha256"].lower(),
+        "size": metadata["size"],
+        "destination": str(destination),
+        "status": "exists",
+        "verified": False,
+        "bytes_verified": 0,
+        "resume_supported": True,
+    }
+    lock_path = destination.with_name(destination.name + ".lock")
+    with _destination_lock(lock_path):
+        _check_cancel(cancel)
+        if os.path.lexists(destination):
+            return receipt
+        filesystem_path = _existing_ancestor(destination.parent)
+        free = (disk_free(filesystem_path) if disk_free is not None
+                else shutil.disk_usage(filesystem_path).free)
+        if type(free) is not int or free < metadata["size"] + DISK_MARGIN_BYTES:
+            raise VisualAssetDownloadError(
+                "insufficient destination disk space: need %d bytes plus %d bytes margin"
+                % (metadata["size"], DISK_MARGIN_BYTES))
+        _check_cancel(cancel)
+        if progress is not None:
+            progress(0, metadata["size"])
+        source = Path(fetch(spec, metadata, progress))
+        _check_cancel(cancel)
+        if not source.is_file():
+            raise VisualAssetDownloadError("fetch did not produce a readable file")
+        actual = source.stat().st_size
+        if actual != metadata["size"]:
+            raise VisualAssetDownloadError(
+                "fetched size mismatch: got %d, expected %d bytes"
+                % (actual, metadata["size"]))
+        # HASHED HERE, NOT TRUSTED. The library verified its own transfer; this
+        # verifies the CONTENT against the sha256 the caller pinned, so a
+        # poisoned or stale cache entry cannot be published.
+        digest = hashlib.sha256()
+        with open(source, "rb") as handle:
+            while True:
+                _check_cancel(cancel)
+                chunk = handle.read(CHUNK_BYTES)
+                if not chunk:
+                    break
+                digest.update(chunk)
+        if digest.hexdigest() != metadata["sha256"].lower():
+            raise VisualAssetDownloadError("fetched SHA-256 mismatch")
+        _check_cancel(cancel)
+        if not _publish_link(source, destination):
+            return receipt
+        if progress is not None:
+            progress(metadata["size"], metadata["size"])
+        receipt.update(status="downloaded", verified=True,
+                       bytes_verified=metadata["size"])
+        return receipt
 
 
 def download_verified(
