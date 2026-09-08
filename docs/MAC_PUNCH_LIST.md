@@ -3,6 +3,23 @@
 Written 2026-09-08. The machine is rented and expires 2026-09-14, so this is
 ordered by what buys the most closure per hour, not by tidiness.
 
+## The most valuable thing this machine produced is not a Mac fix
+
+Read this before the lists, because it changes what the rental was for.
+
+The writer-unload ordering bug, ffmpeg 9's removed `-vsync`, and the `tokenizers`
+boot brick are all LATENT ON EVERY PLATFORM. The 5080 has been paying two
+needless `from_pretrained` + warmup cycles per episode -- roughly 25-40 s each --
+for as long as that ordering has been wrong. Nothing about it is Apple Silicon.
+
+What the Mac has is NO SLACK: no separate VRAM to offload into, and an OOM that
+kills the machine instead of raising. Shared waste that is invisible on a
+discrete card becomes fatal here, and fatal is easy to find. That is a better
+argument for keeping a low-slack machine in the loop than any portability result
+this rental produced -- and it suggests the next such bug is found the same way,
+by running the real pipeline somewhere unforgiving, not by auditing for
+portability.
+
 ## Where things actually stand
 
 **PROVEN on this M4 / 16 GB, with episodes in `otr/obs/`:**
@@ -86,9 +103,24 @@ bonus, and on CUDA the win is ~25-40 s per avoided reload rather than survival.
 * **PBUG-20260908-04** -- WITHDRAWN. I claimed `--profile` ignored a profile's
   render/video sections; it does not, and the 5080 window caught it.
 * `humo_1.7B`, `humo_1.7B_169`, `lumina_image`, `flux_gen1`, `mesh_stage`,
-  `ltx_video`, the three `ltx25_*`, both `minimax_*` -- all NEVER TESTED, and all
-  flagged unsafe to attempt at 16 GB by the 60-engine inventory. Leave them.
-  An OOM here kills the machine, so "try it and see" is not a free move.
+  `ltx_video`, the three `ltx25_*`, both `minimax_*` -- all NEVER TESTED.
+
+  **THAT "UNSAFE AT 16 GB" JUDGEMENT IS A SIZE ESTIMATE, NOT A MEASUREMENT, and
+  it must be read as one.** It comes from summing declared artifact sizes against
+  a 16 GB ceiling. That is exactly the shape of reasoning behind every
+  `device_backends: ["cuda"]` row this session found to be untested policy rather
+  than a hardware fact -- `ltx_8gb` was "cuda-only" until it published two
+  episodes here, and `bark` was `["cuda","cpu"]` until it ran on `mps`. An
+  estimate that says "probably will not fit" is not the same claim as "was tried
+  and failed", and this document should not let the two blur.
+
+  The reason to leave them anyway is different and still good: an OOM on unified
+  memory kills the machine, so "try it and see" costs a reboot rather than a
+  stack trace. That is a decision about the COST OF BEING WRONG, not confidence
+  that the estimate is right. If one of these is ever wanted, the honest route is
+  to check its concurrently-resident footprint against
+  `motion_common.unified_memory_budget_mb()` first and let the guard refuse it,
+  not to launch it and watch.
 
 ## E. Loose ends with a deadline
 
