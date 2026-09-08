@@ -13156,7 +13156,7 @@ fatal load. Offered as a pointer for a targeted test, NOT as a verified cause.
 
 ---
 
-### PBUG-20260908-04 — there are TWO profile appliers, and `--profile` uses the narrow one
+### PBUG-20260908-04 — WITHDRAWN, THE DEFECT DOES NOT EXIST (see the retraction at the end of this entry)
 
 **Verified by direct execution against the shipped code, 2026-09-08.** Affects
 every machine, not only the Mac: the queue path is shared.
@@ -13226,3 +13226,79 @@ offline first and count the failures, THEN decide.
 Until then the reliable way to set a tier on the API path is to edit the
 workflow JSON's widget values directly, which is what the canonical run already
 does for engine dropdowns.
+
+
+---
+
+### PBUG-20260908-04 RETRACTION — I filed a defect that is not there
+
+**Withdrawn the same day, on a correction from the 5080 window, verified here
+before accepting it.**
+
+`scripts/otr_api.apply_profile_to_workflow` ends at `otr_api.py:925` with:
+
+```python
+return apply_profile(workflow, profile, schemas=schemas)
+```
+
+It passes the WHOLE profile to `nodes/_otr_workflow_apply.apply_profile`, the
+strict applier, exactly as its own docstring at `:878` says it does. The
+four-section loop I read builds a local list named `flat` which is used for one
+thing: the `[otr_api] RESOLVED PROFILE ... -- %d overrides` line printed
+immediately after it. **"16 overrides" is a log summary, not the count of what
+was applied.** `flat` is never passed anywhere.
+
+I read the loop, saw four sections, and stopped reading before the return.
+
+**Everything the entry above concluded is void:**
+
+* `render.*`, `video.*`, `llm.*` and `audio.*` ARE applied on the `--profile`
+  path. `_flatten_profile_values` emits 25 keys for `otr_mac_adiff` and every
+  one of them goes through the widget mapping.
+* `otr_mac_mps`'s `llm.device: mps` and `quant_policy: none` are binding. They
+  were not "correct by coincidence".
+* Blast radius on the 5080 is ZERO. Nothing is silently inert.
+* The two remedies I offered the operator were both wrong: pointing the runner
+  at `apply_profile` is a NO-OP because it already does, and editing the
+  workflow JSON would have "worked" while leaving the real cause untouched --
+  the worst kind of fix, because it would have looked like a success.
+
+#### What is still open, and it is a DIFFERENT question
+
+`video.max_render_frames = 17` flattens, maps to an `OTR_VideoDirector` widget,
+and reaches `apply_profile`. The render still produced 125 latents. **The knob
+binds but does not govern**, and the governing quantity has not been identified.
+
+Candidates, none confirmed:
+
+* AnimateDiff's sliding-context path deriving its own latent count from audio
+  duration, overriding the widget;
+* `max_render_frames` capping a different quantity than the latent count, i.e.
+  never having been the governing knob;
+* the node re-deriving the value at execute time, after apply;
+* an `OTR_*_MAX_FRAMES` env override winning over the widget.
+
+**The measurement that discriminates them** (named by the 5080 window): read the
+widget value on `OTR_VideoDirector` in the SUBMITTED graph -- not the profile,
+the submitted JSON -- and compare it against what the engine logs as its
+frame/latent decision. Widget 17 with engine 125 proves the widget is not the
+governing knob and turns the question into which one is.
+
+**THE MEASUREMENT WAS TAKEN, and it is unambiguous.** Running `apply_profile`
+over the submitted graph and dumping `OTR_VideoDirector`:
+
+```
+  [0..2] animatediff15_v3_haunted_video   (role_overrides applied)
+  [3..5] sd15
+  [6]    25          fps
+  [7]    512         render.canvas_w   APPLIED
+  [8]    288         render.canvas_h   APPLIED
+  [12]   mps         video.device_policy   APPLIED
+  [13]   no_fp8_no_fp4
+  [14]   17          video.max_render_frames   APPLIED
+```
+
+Widget 14 carries 17. The engine logged `latents passed in (125)`. **The widget
+binds and does not govern**, which eliminates "the value never arrived" and
+leaves the four candidates above. This is the third attempt at this knob, so per
+CLAUDE.md's two-strikes rule it goes to a panel before any more code.
