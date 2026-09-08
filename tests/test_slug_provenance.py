@@ -371,7 +371,7 @@ ENGINE_COVERAGE = {
     "sonilo": "exempt",
     # --- image: local ---------------------------------------------------------
     "z_image_turbo": "local", "flux_gen1": "local", "flux2_klein": "local",
-    "lumina_image": "local",
+    "lumina_image": "local", "sd15": "local",
     # ideogram4_local (2026-08-22): LOCAL weights on disk, no provider slug to
     # collect -- the four artifacts are resolved through folder_paths exactly
     # like the other local image engines.

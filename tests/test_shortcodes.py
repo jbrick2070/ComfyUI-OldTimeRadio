@@ -150,6 +150,35 @@ class CompletenessTests(unittest.TestCase):
             "so their episodes would all be named 'unk':\n  "
             + "\n  ".join(missing))
 
+    def test_every_image_engine_id_has_a_code(self):
+        """The image dimension is keyed on the REGISTRY, for the same reason
+        `tts` and `video_lane` above are.
+
+        `image_gen` used to be covered only by the live-dropdown check below,
+        which skips whenever no ComfyUI is listening on :8188 -- so in the
+        suite it never ran, and `sd15` reached the published filename as `unk`
+        for a full day after it was registered. That is the third time this
+        table has been checked against a vocabulary that is not the one
+        reaching the filename. The registry is the authority here because
+        `_obs_basename` builds the name from the ledger's engine id.
+        """
+        try:
+            import nodes._otr_image_engines  # noqa: F401 -- import registers
+            from nodes._otr_image_engines import registry as images
+        except Exception as exc:  # pragma: no cover
+            self.skipTest("image engine registry unavailable: %s" % exc)
+        engine_ids = sorted(images._IMAGE_REGISTRY.all_engine_names())
+        self.assertTrue(
+            engine_ids,
+            "the image registry is empty, so this check would pass vacuously")
+        missing = [engine_id for engine_id in engine_ids
+                   if SC.code_for("image_gen", engine_id) == "unk"]
+        self.assertFalse(
+            missing,
+            "these image engine ids reach the published filename with no "
+            "code, so their episodes would all be named 'unk':\n  "
+            + "\n  ".join(missing))
+
     def _object_info(self):
         import json
         import urllib.error
