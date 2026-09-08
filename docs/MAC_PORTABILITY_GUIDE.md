@@ -49,8 +49,33 @@ is enough to trigger an OOM kill. Note `ps` under-reports badly on Apple Silicon
 
 ## 2. What CANNOT work locally on Apple Silicon, and why
 
-**There is no local image engine and no local video-diffusion engine on this
-platform.** This is not a bug to fix; it is declared in the registries:
+**CORRECTED 2026-09-07 (this entry previously said Apple Silicon has no local
+image engine -- that was wrong).** `z_image_turbo` LOADS AND EXECUTES ON METAL.
+It is blocked by MEMORY, not by the device:
+
+```
+Requested to load ZImageTEModel_   loaded completely;  7672.25 MB   full load: True
+Requested to load Lumina2          loaded completely; 11739.54 MB   full load: True
+...
+RuntimeError: MPS backend out of memory (MPS allocated: 13.01 GiB,
+  other allocations: 5.96 GiB, max allowed: 20.13 GiB). Tried to allocate 1.46 GiB
+```
+
+Both models load fully; it dies in the KSampler needing about 20.4 GiB against a
+20.13 GiB ceiling -- it misses by roughly 300 MB. The checkpoint alone is
+12.3 GB.
+
+**So the honest statement is about RAM, not about Metal: no local image engine
+fits in 16 GB. A 32 GB Mac would very likely have one**, and that is a hardware
+question the operator can act on rather than a portability defect anyone can
+patch. The `["cuda"]` declaration is wrong in KIND -- the engine is not
+CUDA-only, it is large.
+
+The same applies to image-to-video: `ltx_8gb` passed its engine gate on mps and
+then failed at the still its own lane needed, for exactly this reason.
+
+**The rest of the picture, unchanged:** everything below is still declared
+`["cuda"]` and untested on Metal:
 
 * **Image** -- `z_image_turbo`, `flux_gen1`, `flux2_klein`, `lumina_image`,
   `ideogram4_local` are all `["cuda"]`. Only `cloud_*` / `google_image` / `ideo`

@@ -69,3 +69,21 @@ would genuinely add to this platform.
    here -- spectral flatness and a human ear could. See PBUG-20260907-11.
 4. **Record what a user must DO**, not just pass/fail: the pip install, the
    manual download, the launch flag. That is the deliverable.
+
+
+---
+
+## Measured 2026-09-07 -- Tier 2 results
+
+| engine | result | evidence |
+| --- | --- | --- |
+| `z_image_turbo` (image) | **RUNS ON METAL, OOMs at 16 GB** | text encoder 7.67 GB + Lumina2 11.74 GB both `full load: True`; KSampler needed ~20.4 GiB against a 20.13 GiB ceiling. Checkpoint is 12.3 GB. **Memory-blocked, not device-blocked** -- the `["cuda"]` row is wrong in kind |
+| `ltx_8gb` (LTX 0.9.8) | **INCONCLUSIVE -- blocked upstream** | with `["cuda","mps"]` patched in locally it PASSED the engine gate on mps, then failed at the still it consumes, because that still comes from `z_image_turbo` (above). Its own adapter never got to run. LTX 0.9.8 remains untested on Metal, for a reason one step removed from itself |
+| `animatediff15_v3_*` | weights fetched, UNTESTED | `v1-5-pruned-emaonly-fp16` (1.99 GB) + `v3_sd15_mm.ckpt` (1.56 GB) now on disk. Both adapters contain zero NVIDIA-specific code. **These are SD1.5-class and far smaller than z_image, so they are the best remaining candidate for local video on 16 GB** |
+
+**What this changes about the plan:** the blocker for local image AND
+image-to-video on this box is a 12.3 GB image model on 16 GB of shared RAM.
+Testing more large models on this machine measures the RAM, not the port. The
+useful remaining tests are the SMALL ones -- animatediff (3.5 GB of weights) --
+and, if a bigger Mac ever appears, a re-run of z_image_turbo which is ~300 MB
+short of fitting here.
