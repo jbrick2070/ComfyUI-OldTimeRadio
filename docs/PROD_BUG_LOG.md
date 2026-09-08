@@ -12704,6 +12704,12 @@ Device: mps
 Using pytorch attention
 ```
 
+**CONFIRMED BY EAR, 2026-09-07.** The operator listened to the MPS/PyTorch-attention
+cue and the CPU reference side by side: *"Both sound like music."* The same
+operator's verdict on the sub-quadratic cue was *"like a broken cassette tape
+going backwards"*. That is the acceptance test for this fix -- the spectral
+numbers agree, but they were never what settled it.
+
 **Consequence for the record:** the first published Apple Silicon episode
 (`magnetic_pulse_20260907_201810`, PBUG/GO_FORWARD 2026-09-07) was rendered
 BEFORE this fix. It proves the pipeline end to end, and its music bed is noise.
