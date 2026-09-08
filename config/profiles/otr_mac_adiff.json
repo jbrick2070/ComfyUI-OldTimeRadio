@@ -1,6 +1,6 @@
 {
   "id": "otr_mac_adiff",
-  "display_name": "Apple Silicon MPS -- AnimateDiff haunted lane (Mac-only, ADDITIVE). Same M4/16 GB substrate as otr_mac_mps: kokoro voices, stable_audio_3 music, Qwen3.5-4B writer on Metal at quant_policy none. The ONE difference is the three video roles, which run animatediff15_v3_haunted_video instead of the procgen visualizers -- SD1.5 + the v3 motion module + the v3 domain adapter, about 3.65 GB and the cheapest complete video lane in the pack (the 4060 measured 4.9 GB fully resident, no offload). It is text_to_video, so it mints NO still and the image roles are inert. NEEDS the pinned ComfyUI-AnimateDiff-Evolved pack AND an extra_model_paths entry for 'animatediff_models', which Comfy Desktop does not generate -- see docs/MAC_PORTABILITY_GUIDE.md section 8. Exists as its own profile so the 5080's haunted lane and otr_mac_mps are both untouched.",
+  "display_name": "Apple Silicon MPS -- AnimateDiff haunted lane (Mac-only, ADDITIVE). Same M4/16 GB substrate as otr_mac_mps: kokoro voices, stable_audio_3 music, Qwen3.5-4B writer on Metal at quant_policy none. The ONE difference is the three video roles, which run animatediff15_v3_haunted_video instead of the procgen visualizers -- SD1.5 + the v3 motion module + the v3 domain adapter, about 3.65 GB and the cheapest complete video lane in the pack (the 4060 measured 4.9 GB fully resident, no offload). It is text_to_video, so it mints NO still and the image roles are inert. NEEDS the pinned ComfyUI-AnimateDiff-Evolved pack AND an extra_model_paths entry for 'animatediff_models', which Comfy Desktop does not generate -- see docs/MAC_PORTABILITY_GUIDE.md section 8. Exists as its own profile so the 5080's haunted lane and otr_mac_mps are both untouched. NOTE: this lane's clip length is NOT cappable -- it declares max_frames=0 (one unsplittable timeline) and is deliberately outside PLANNING_CAP_ENGINES, so do not add video.max_render_frames here; see kibitz-runs/2026-09-08-frame-cap/r1/final.md.",
   "status": "draft",
   "platform": "mac",
   "device_backend": "mps",
@@ -58,8 +58,7 @@
   },
   "video": {
     "device_policy": "mps",
-    "dtype_policy": "no_fp8_no_fp4",
-    "max_render_frames": 17
+    "dtype_policy": "no_fp8_no_fp4"
   },
   "image": {
     "dtype_policy": "no_fp8_no_fp4"

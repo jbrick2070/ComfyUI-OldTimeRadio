@@ -188,30 +188,50 @@ def test_the_adiff_profile_differs_from_the_base_one_only_where_it_should():
         assert base["role_overrides"][role] != adiff["role_overrides"][role]
 
 
-def test_the_adiff_render_cap_is_the_reason_the_profile_exists():
-    """MEASURED 2026-09-08. On the bare canonical, ghost_signal planned 125
-    latents against AnimateDiff-Evolved's 16-frame context window -- about eight
-    sliding windows per sampler step, 124 s/step, ~41 minutes for one clip. Per
-    window the Mac is only ~1.5x slower than the 4060 that renders this lane in
-    3-3.6 minutes; the whole gap is clip length.
+def test_the_adiff_lane_is_not_given_a_render_cap_it_cannot_honour():
+    """THE INVERSE OF WHAT THIS TEST USED TO ASSERT, and the reason is measured.
 
-    THE KNOB IS `video.max_render_frames`, NOT `render.frame_budget`, and the
-    first version of this profile set the wrong one. It shipped with
-    frame_budget 17 and the very next run still planned 125 latents -- caught by
-    watching the log rather than by any test. capability_profiles.py:148 states
-    the distinction outright: frame_budget is "the soak/single harness per-clip
-    frame count (every 16GB tier declares 25 there and must NOT be capped to
-    it)", while the planner reads video.max_render_frames through
-    otr_shot_lock._stamp_coverage_plan. Two plausible names, one of which does
-    nothing here."""
-    p = _profile("otr_mac_adiff")
-    cap = (p.get("video") or {}).get("max_render_frames")
-    assert cap, (
-        "otr_mac_adiff has no video.max_render_frames -- render.frame_budget "
-        "does NOT cap the coverage planner, so the lane will plan long clips "
-        "and sample them in many sliding windows")
-    assert 0 < cap <= 33, (
-        "max_render_frames %r puts this back into multi-window sampling" % cap)
+    An earlier version required otr_mac_adiff to carry `video.max_render_frames`,
+    on my belief that it capped the AnimateDiff clip length. It does not, and
+    setting it would BACKFIRE:
+
+    * `eng_ghost_signal.py:523-533` declares max_frames=0, quantum=1,
+      continuity=CONTINUITY_NONE -- "a beat is ONE timeline ... there is no
+      ceiling to split on". The lane is deliberately outside
+      `frame_contract.PLANNING_CAP_ENGINES` (`frame_contract.py:319`), so
+      `effective_frame_contract` returns its contract unchanged.
+    * With continuity=NONE the planner would assign join_mode="jump"
+      (`coverage_plan.py:195-197`), so a 17-frame cap splits a 250-frame beat
+      into ~15 jump-cut segments. Each still floors at the 16-frame context
+      window, so the render samples ~240 latents instead of 125 -- roughly TWICE
+      the cost, and fifteen cuts where there was one continuous beat.
+
+    The 125 latents in the log were never the clip length: they are
+    `ceil(target/hold)` source frames (`eng_ghost_signal.py:323`), restored to
+    250 delivered frames by the hold selector. The clip is audio-locked and
+    `validate_coverage_plan` refuses any plan that drifts from it
+    (`coverage_plan.py:478-482`).
+
+    Established by a kibitz round after two wrong guesses at this knob; the
+    reasoning is in kibitz-runs/2026-09-08-frame-cap/r1/final.md."""
+    video = _profile("otr_mac_adiff").get("video") or {}
+    assert "max_render_frames" not in video, (
+        "otr_mac_adiff carries a render cap. This lane declares itself "
+        "unsplittable (max_frames=0) and is outside PLANNING_CAP_ENGINES, so "
+        "the cap cannot govern it -- and if the lane were ever added to that "
+        "tuple, the cap would split the beat into jump cuts at ~2x the latent "
+        "cost. Remove it.")
+
+
+def test_the_ghost_lane_stays_out_of_the_planner_cap_list():
+    """Guards the other half: if someone adds this lane to PLANNING_CAP_ENGINES
+    to make the cap 'work', the profile's cap becomes live and the beat starts
+    jump-cutting. Both halves have to stay true together."""
+    from nodes._otr_video_engines import frame_contract as fc
+    assert "animatediff15_v3_haunted_video" not in fc.PLANNING_CAP_ENGINES, (
+        "the ghost lane declares max_frames=0 and continuity=NONE; capping it "
+        "produces ~15 jump-cut segments and ~240 latents where one continuous "
+        "beat sampled 125")
 
 
 def test_the_adiff_profile_stays_draft_until_a_clip_lands():
