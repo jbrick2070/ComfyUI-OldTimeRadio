@@ -12535,3 +12535,49 @@ guards above make that a diagnosable question instead of a dead render.
 **Not Mac-only in principle:** nothing in either guard is platform-specific, and
 either could fire on any host whose generator returns a bad sample. Apple
 Silicon is only where it was first observed.
+
+## PBUG-20260907-10 -- the shipped canonical's music lane is Windows-only
+
+**Measured on a Mac mini M4.** A clean canonical run reached the video stage --
+writer, Kokoro voices, Stable Audio 3 and the mp4 encoder all resolved -- and
+died on the first music shot:
+
+```
+[OTR video] render FAILED (no fallback) shot shot_music_opening_001
+  engine viz_mxc_mandala: EngineUnusable: ... missing_model --
+  viz_mxc_mandala needs pycairo (pip install pycairo)
+```
+
+`viz_mxc_mandala` is the only engine in the tree that imports `cairo`
+(`eng_viz_mandala.py`, plus `scope_draw.paint_mandala` which only it calls), and
+`pycairo` is declared **`sys_platform == 'win32'`** in `requirements.txt`.
+
+**The marker is correct and the canonical was wrong.** pycairo publishes Windows
+wheels, one sdist, and no Linux wheels; on macOS the sdist needs libcairo
+headers that a stock box does not have. Confirmed here: `uv pip install
+'pycairo>=1.24'` resolved to the **sdist** and failed to build -- there is no
+`libcairo` anywhere on this machine and no Homebrew to provide it. So the
+dependency genuinely cannot be satisfied on a stock Mac, exactly as the marker
+says.
+
+**Which means the shipped default only ever rendered on Windows.** The
+requirements comment already recorded that Linux loses the mandala visualizer;
+what nobody noticed is that `workflows/otr_canonical.json` *selects that engine*
+for the music role. Fallbacks are disabled by design
+(`FailureKind.DEPENDENCY_MISSING`, "no fallback"), so on macOS **and Linux** the
+canonical cannot complete a render -- after doing all of the expensive work
+first.
+
+**Fix.** The canonical's `music_video_model` is now
+`viz_green (16:9) (audio-reactive, no scene image)`, which imports no cairo.
+`viz_mxc_mandala`'s own docstring names the zero-dependency alternates and calls
+itself "the pycairo UPGRADE"; it remains fully selectable for anyone on Windows
+who wants it. Nothing is hidden or removed.
+
+The three roles stay visually distinct -- `viz_mxc_cpu` / `viz_green` /
+`viz_camera` -- and all three declare `["cuda", "cpu", "mps"]`, so the one
+canonical now renders on every platform the pack targets rather than on one.
+
+**Rule this suggests:** the shipped default must only select engines whose
+dependencies install unconditionally. An engine behind a platform marker is a
+legitimate opt-in, never a default.
