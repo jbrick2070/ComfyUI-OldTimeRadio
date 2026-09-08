@@ -164,83 +164,58 @@ Neither is a functional fault. Both should be reworded to name the actual device
 
 ---
 
-## 7. What is proven on Apple Silicon, and what is not
+## 7. PROVEN on Apple Silicon -- an episode reached `otr/obs/`
 
-**Proven:** the pack installs, boots, registers all 25 nodes with zero import
-failures, resolves `Device: mps`, passes the visual-asset preflight
-(`READY engines=stable_audio_3`, with all three `z_image_turbo` slots correctly
-refused as provably unused), fetches Stable Audio 3 weights, and drives the
-writer on Metal at **~6.5 tok/s** through news curation, outline beats and
-character descriptions.
+**2026-09-07, 20:21 -- the first OTR episode ever produced on Apple Silicon.**
 
-**Not proven:** everything downstream of the writer. **No episode has reached
-`otr/obs/` on this machine.** TTS, music, video and publish are all unmeasured on
-Apple Silicon. By the operator's own standard -- *a leg that does not reach
-`otr/obs/` did not pass* -- Mac has not passed.
+```
+otr/obs/magnetic_pulse_20260907_201810__rfrc__vcam__none__koko__news__q354b__sa3_final.mp4
+  duration  135.1 s
+  video     h264 1920x1080 @ 25 fps, 3378 frames (encoded 2695 frames in 24.5 s, 110.2 fps)
+  audio     aac 48000 Hz stereo
+  RMS       -53 -> -37 dBFS across the timeline (varying: real content, not the
+            silent fallback the NaN guard would have produced)
+  SA3       ZERO non-finite warnings
+```
 
-`otr_obs_dir()` resolves to
-`<comfy output>/otr/obs` (`OTR_OBS_DIR` unset). The directory does not exist
-until the first successful publish, so its absence on a fresh box is expected,
-not a fault.
+The whole path, fully local, no image weights and no API keys: Qwen3.5-4B writer
+on Metal -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg
+encode -> published. By the operator's own standard -- *a leg that does not reach
+`otr/obs/` did not pass* -- **Apple Silicon passes.**
 
+### What it took, in order
 
----
+Five defects stood between a fresh Mac install and that file. Each was real, and
+none was "Apple Silicon can't do this":
 
-## 8. There is NO local image or video-diffusion engine on Apple Silicon
+1. **`tokenizers>=0.22,<=0.23`** -- excluded 0.23.1 and bricked ComfyUI's boot
+   entirely (PBUG-20260907-05). Fixed in alpha.29.
+2. **The canonical shipped `viz_mxc_mandala`**, whose `pycairo` dependency is
+   Windows-only, as the music lane -- so the shipped default could never render
+   on macOS *or Linux* (PBUG-20260907-10). Now `viz_green`.
+3. **ffmpeg was never a declared dependency** -- the run died at the mp4 encode
+   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
+4. **ffprobe was the other half** -- imageio ships ffmpeg alone, and the
+   visualizer probes back every clip it encodes. Now `ffmpeg-downloader`, which
+   installs a matched pair.
+5. **SA3 returned 100% NaN** -- and the cause was OTR's own determinism wrapper
+   meeting an MPS `baddbmm` bug, not the model (PBUG-20260907-09b).
 
-Not a runtime discovery -- it is **declared in the registries**, so it can be
-read without spending a render. Every engine carries a `device_backends` list.
+### Still unmeasured
 
-**Video** (`nodes/_otr_video_engines/registry.py`):
-
-| runs on mps | cuda only |
-| --- | --- |
-| `viz_green`, `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera` | every LTX (`ltx_video`, `ltx_8gb`, `ltx25_video`, `ltx25_mime`, `ltx25_foley_plus`, `ltx_audio_in`) |
-| `still_motion`, `still_flat`, `still_pan`, `still_word` | `wan_ti2v`, `fastwan_8gb`, `humo`, `mesh_stage` |
-| `word_razzle` | `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` |
-| every `cloud_*` and `google_*` (API keys) | `minimax_h3_video`, `minimax_h3_audio_in` |
-
-**Image** (`nodes/_otr_image_engines/registry.py`): `flux_gen1`, `flux2_klein`,
-`lumina_image` and `z_image_turbo` are **all `[cuda]`**. Only `cloud_flux_pro`
-and `google_image` list `mps`, and both are paid APIs.
-
-**The consequence, and it is the shape of Mac support rather than a bug.** The
-four `still_*` video lanes DO declare `mps` -- but on Apple Silicon nothing
-local can produce the still they consume, so they are unreachable without an
-API key. That leaves the visualizer lanes as **the only fully-local video path
-that exists on this platform**.
-
-So the shipped Mac canonical (`viz_mxc_cpu` / `viz_mxc_mandala` / `viz_camera`,
-minting no stills, downloading no image weights) is not a conservative choice.
-It is the only local configuration Apple Silicon can run at all.
-
-**Practical:** a declaration is enforced before any work happens, so selecting
-one of the cuda-only rows on a Mac raises `EngineUnusable` immediately and the
-failure teaches nothing. Read `device_backends` first.
-
-### But at least one of those declarations looks untested rather than measured
-
-**`ltx_8gb` -- "LTX 0.9.8" -- deserves a real measurement before it is written
-off.** It is a different engine from `ltx_video`, and the distinction matters:
-
-| row | weights | plausible on Mac? |
-| --- | --- | --- |
-| `ltx_video` | `ltx-2.3-22b-dev-gguf` + `gemma-3-12b` encoder | no -- 22B, never a 16 GB model |
-| `ltx_8gb` | `ltxv-2b-0.9.8-distilled` | **maybe** -- 2B distilled, all-in-one |
-
-Grepping the 0.9.8 adapter (`eng_ltx_8gb.py`) for hard NVIDIA dependencies --
-`nvenc`, `nvml`, `triton`, `flash_attn`, `torch.cuda`, `.cuda()`, `sm_*`, `fp8`,
-`nvfp4` -- returns **nothing**. It drives stock ComfyUI nodes (`CLIPLoader`,
-`CLIPTextEncode`), pins its text encoder to CPU (`t5_device="cpu"`) and diffuses
-on whatever device ComfyUI resolved, which is `mps` here.
-
-So its `["cuda"]` row is very likely the same shape as the stale
-`bitsandbytes ... sys_platform != 'darwin'` marker: **a policy nobody has
-retested, not a hardware fact.** The honest blocker is more likely MEMORY than
-device -- the recipe's `t5xxl_fp16` encoder is roughly 9 GB by itself, on top of
-the 2B diffusion model, which is the same 16 GB wall as section 3.
-
-**This is unmeasured either way.** Flipping the declaration to test it is a real
-experiment worth running on Apple Silicon hardware; asserting it works, or that
-it cannot, would both be guesses. What IS established is that nothing in the
-adapter code forbids it.
+* **Wall clock.** This run took roughly 24 minutes end to end; no clean
+  before/after comparison against a CUDA box has been made.
+* **Memory headroom.** It completed at ~44% free, but earlier runs OOM-killed at
+  quant `none`. The margin is thin and not characterised.
+* **Repeatability.** ONE episode. Nothing here proves the second one lands.
+* **Audio quality.** OTR drives `stable_audio_3_small_music` -- the
+  consistency-distilled member of Comfy-Org's base/non-base pair -- at
+  `steps=100, cfg=7.0`, while Comfy-Org's own template for a non-base checkpoint
+  uses `steps=8, cfg=1` (verified locally against both shipped templates). The
+  source comment claiming "cfg=7.0 (SA3 native default)" is not supported by
+  Comfy-Org's own default for the checkpoint this pack loads. The music is
+  audible and the episode publishes; whether it SOUNDS better or worse at the
+  intended recipe is untested, and the operator has explicitly deprioritised
+  chasing it.
+* Every lane outside the canonical: no local image or video-diffusion engine
+  exists on this platform at all (section 8).

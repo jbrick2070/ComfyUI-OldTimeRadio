@@ -1800,3 +1800,101 @@ the visual-asset preflight (`READY engines=stable_audio_3`, with all three
 3. The 40-site cuda/mps audit is classified above by lane, but only the sites on
    the canonical's path were read line by line. The remaining lanes -- video,
    post, upscale beyond `_resolve.py`, the vram-log helpers -- are unaudited.
+
+---
+
+# 2026-09-07, 20:21 -- APPLE SILICON PASSES: an episode reached `otr/obs/`
+
+Supersedes section 4 of the earlier entry ("no episode has reached `otr/obs/` on
+Apple Silicon"). It has.
+
+```
+otr/obs/magnetic_pulse_20260907_201810__rfrc__vcam__none__koko__news__q354b__sa3_final.mp4
+  135.1 s | h264 1920x1080 @ 25 fps, 3378 frames | aac 48 kHz stereo | 216 MB
+  RMS -53 -> -37 dBFS across the timeline (real content, not the silent fallback)
+  Stable Audio 3: ZERO non-finite warnings
+```
+
+Fully local: Qwen3.5-4B writer on Metal -> Kokoro voices -> Stable Audio 3 music
+-> visualizer video -> ffmpeg encode -> published. No image weights, no API keys.
+
+## What actually blocked it -- five defects, none of them "Mac can't"
+
+1. **PBUG-20260907-05** `tokenizers>=0.22,<=0.23` excluded 0.23.1 and stopped
+   ComfyUI booting at all. Every published version `.24`-`.28` carries it.
+   Fixed in `2.0.0-alpha.29`.
+2. **PBUG-20260907-10** the canonical selected `viz_mxc_mandala` for music, whose
+   `pycairo` dependency installs on Windows only -- so the shipped default could
+   never render on macOS **or Linux**. Now `viz_green`.
+3. **ffmpeg was never a declared dependency.** The run died at the mp4 encode
+   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
+4. **ffprobe was the other half.** imageio ships ffmpeg alone and the visualizer
+   probes back every clip it encodes. Now `ffmpeg-downloader` (matched pair).
+5. **PBUG-20260907-09b** Stable Audio 3 returned 100% NaN -- caused by OTR's own
+   determinism wrapper (`fill_uninitialized_memory`) meeting an MPS `baddbmm`
+   bug that ignores `beta=0`. Not the model, not the dtype, not the sampler.
+
+**Three of those five are cross-platform defects that Mac merely exposed first**
+(2, 3 and 4 all affect Linux; 1 affects any host with transformers >= 5.11).
+
+## The SA3 config question, measured and DEFERRED
+
+Comfy-Org ships checkpoints in matched base/non-base pairs with different
+recipes -- verified locally against both shipped templates:
+
+```
+audio_stable_audio_3_medium.json       steps=8  cfg=1 lcm simple   (non-base)
+audio_stable_audio_3_medium_base.json  steps=50 cfg=7 lcm simple   (base)
+```
+
+OTR loads `stable_audio_3_small_music` -- the **non-base** member -- at
+`steps=100, cfg=7.0, dpmpp_3m_sde_gpu`. That is the base recipe plus double the
+steps, on a distilled checkpoint.
+
+**A/B measured on this Mac** (same checkpoint, seed, prompt; one 12 s cue):
+
+| | OTR recipe | Comfy recipe |
+| --- | --- | --- |
+| wall clock | 22.3 s | **2.1 s** (10.6x) |
+| peak | 0.0003 dBFS | 0.0003 dBFS |
+| RMS | -14.76 dBFS | -16.17 dBFS |
+| noise floor | -37.4 dB | -32.8 dB |
+| flat factor | 33.5 | 42.2 |
+
+Both valid, non-silent, unclipped. **The numbers do not separate them on
+quality**, and at 2 cues an episode the saving is ~40 s of a ~24 min run -- ~3%,
+because the writer dominates, not the music. Changing the default would also
+force a CUDA golden re-baseline.
+
+**Decision: values LEFT AS THEY ARE**, pending a listening test. Only the false
+provenance comment was corrected -- the source claimed `cfg=7.0` is the "SA3
+native default", and Comfy-Org's own default for the checkpoint this pack loads
+is `cfg=1`. Operator, 2026-09-07: *"we just need it to run and produce music and
+not fail the episode."* It does.
+
+## What is STILL unproven on Apple Silicon
+
+* **Repeatability.** ONE episode. Nothing proves the second lands.
+* **Memory margin.** It finished at ~44% free, but earlier runs OOM-killed at
+  quant `none`; the headroom is thin and uncharacterised.
+* **Wall clock vs CUDA.** ~24 min end to end here; no clean comparison made.
+* **Everything outside the canonical.** There is no local image engine and no
+  local video-diffusion engine on this platform -- `flux_gen1`, `flux2_klein`,
+  `lumina_image`, `z_image_turbo` and every LTX/Wan/AnimateDiff row declare
+  `["cuda"]`. The visualizer lanes are the only fully-local video path Apple
+  Silicon has, which is why the shipped Mac canonical is not a conservative
+  choice but the only one that runs.
+* **`ltx_8gb` (LTX 0.9.8) may be mis-declared.** Its adapter contains no
+  NVIDIA-specific code; its `["cuda"]` row looks untested rather than measured.
+  Unverified either way.
+
+## For the 5080
+
+1. **`2.0.0-alpha.29` and everything after it are committed but NOT pushed** --
+   this rented Mac has no GitHub credentials. Patches were handed to the operator
+   directly. The tokenizers fix is the urgent one: **every currently published
+   version bricks a ComfyUI install.**
+2. Re-run the CUDA goldens against these commits. Nothing here should move CUDA
+   output -- the determinism change is guarded on `torch.backends.mps.is_available()`
+   and the ffmpeg/ffprobe steps resolve last -- but that is an argument, and the
+   goldens are the measurement.

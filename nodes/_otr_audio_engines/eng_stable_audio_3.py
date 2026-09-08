@@ -210,7 +210,22 @@ class StableAudio3Engine:
         # window + prompt change. All knobs env-overridable for A/B tuning.
         # Defaults TUNED 2026-06-14 (roundtable). context=12s (= the longest
         # cue) so each short cue is a coherent SLICE of a tight musical phrase,
-        # not an aimless fragment of a 30s piece; cfg=7.0 (SA3 native default)
+        # not an aimless fragment of a 30s piece; cfg=7.0 -- NOT, as this comment long claimed, the "SA3 native
+        # default": Comfy-Org ships its checkpoints in matched base/non-base
+        # pairs and gives each its own recipe, verified against the two
+        # templates in comfyui_workflow_templates 0.11.55 --
+        #   audio_stable_audio_3_medium.json       steps=8  cfg=1 lcm simple
+        #   audio_stable_audio_3_medium_base.json  steps=50 cfg=7 lcm simple
+        # We load stable_audio_3_small_music, the NON-base (distilled) member,
+        # so Comfy-Org's own default for it is cfg=1 / 8 steps. Ours is the
+        # base recipe and then double the steps. MEASURED A/B on a Mac mini M4
+        # (same checkpoint, seed and prompt, one 12 s cue): ours 22.3 s, theirs
+        # 2.1 s -- 10.6x -- with both producing valid non-silent audio at an
+        # identical 0.0003 dBFS peak (RMS -14.76 vs -16.17, noise floor -37.4
+        # vs -32.8). The numbers do not separate them on quality, and 2 cues an
+        # episode makes the saving ~40 s of a ~24 min run, so the values are
+        # LEFT AS THEY ARE pending a listening test; changing them also forces
+        # a CUDA golden re-baseline. Only the false provenance claim is fixed
         # for stronger prompt adherence; sampler/steps stay Stable Audio's
         # reference dpmpp_3m_sde_gpu @ 100 (determinism proven by the byte-
         # identical golden). All env-overridable; the operator never NEEDS to set them.
