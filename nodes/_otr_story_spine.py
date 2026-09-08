@@ -24,9 +24,17 @@ def _unload_writer_llm(meta: dict) -> None:
         log.warning("writer LLM unload failed: %r", exc)
 
 
-def run_post_script_spine(led: Any, meta: dict) -> None:
-    """Unload the writer and scrub the accepted ledger without reauthoring."""
-    _unload_writer_llm(meta)
+def run_post_script_spine(led: Any, meta: dict, *, unload: bool = True) -> None:
+    """Unload the writer and scrub the accepted ledger without reauthoring.
+
+    ``unload=False`` performs the scrub and leaves the writer model resident,
+    for a caller that has MORE LLM phases still to run. The writer tail is that
+    caller: it used to take the unload here and then immediately reload for
+    ``run_story_brief_reflection``, ``run_ledger_clean`` and the cast-coverage
+    repair. Default stays True so every other caller is unchanged.
+    """
+    if unload:
+        _unload_writer_llm(meta)
     try:
         from ._otr_ledger_scrub import scrub_ledger
         ledger_data = getattr(led, "data", led)

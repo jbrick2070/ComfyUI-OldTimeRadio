@@ -1088,20 +1088,20 @@ class WriterTailMixin:
         # Producer-owned banks already performed their fixed tail and only need
         # the writer-model unload here. Neither path judges story length or
         # quality and neither can author a replacement story.
+        # THE UNLOAD USED TO BE HERE AND IT WAS TOO EARLY (2026-09-08).
+        # `_otr_writer_vram`'s own docstring states the invariant -- "evict the
+        # writer LLM after the LAST LLM phase" -- but three more LLM phases run
+        # below this line: run_story_brief_reflection, run_ledger_clean /
+        # run_ledger_cleanup, and the cast-coverage repair. Each was appended to
+        # this tail after the unload was placed, and each got a fresh
+        # from_pretrained plus warmup because of it. The single unload now sits
+        # at the real boundary, after the last of them.
         if ctx.run_story_spine:
             try:
                 from . import _otr_story_spine as _OTRSPINE
             except ImportError:  # pragma: no cover
                 import _otr_story_spine as _OTRSPINE  # type: ignore
-            _OTRSPINE.run_post_script_spine(led, meta)
-        else:
-            try:
-                from . import _otr_writer_vram as _OTRVRAM
-            except ImportError:  # pragma: no cover
-                import _otr_writer_vram as _OTRVRAM  # type: ignore
-            meta["writer_llm_unload"] = (
-                _OTRVRAM.unload_writer_llm_after_script()
-            )
+            _OTRSPINE.run_post_script_spine(led, meta, unload=False)
 
         # The first structurally complete inline ledger is authoritative.
         # stamp_actual files the receipt at word_budget.actual_receipts[stage]
@@ -1249,12 +1249,10 @@ class WriterTailMixin:
             )
         meta.update(_story_delta)
 
-        # The metadata reflections may have reloaded either writer slot.
-        # Reclaim it unconditionally before TTS/image/video consumers.
-        from . import _otr_writer_vram as _OTRVRAM_FINAL
-        meta["writer_llm_unload"] = (
-            _OTRVRAM_FINAL.unload_writer_llm_after_script()
-        )
+        # (The unconditional reclaim that used to sit here was ALSO too early:
+        # run_ledger_clean and run_ledger_cleanup below both drive
+        # creative_generate_fn. Moved to the real boundary at the end of this
+        # function.)
 
         # Sprint D D2b: stamp creative slot identity into meta so
         # FreezeCascade preserves it via the existing script_json
@@ -1430,6 +1428,32 @@ class WriterTailMixin:
             )
             if meta["cast_coverage_repair"].get("repaired"):
                 _PL.refresh_ledger_text_metrics(led)
+
+        # THE WRITER'S LAST LLM PHASE ENDS HERE, so this is where the model is
+        # evicted -- once, for the whole tail, exactly as
+        # `_otr_writer_vram.unload_writer_llm_after_script` has always claimed
+        # to do. Downstream TTS / image / video consumers still get a
+        # writer-free machine; they simply get it after the writer has finished
+        # writing instead of three reloads earlier.
+        #
+        # WHY THIS IS THE MEMORY FIX AND NOT JUST A SPEED ONE. `unload_llm`
+        # clears LLM_CACHE, but the Slot Drama Contract's `_sdc_cache` and
+        # `_sdc_gen_fn` (OTR_LedgerScriptWriter.py:4448) are locals of the
+        # still-live run() frame, and the generate closure captures both the
+        # cache entry and the model directly (_otr_constrained_generate.py:234).
+        # Those aliases keep the old model alive, `model.to("cpu")` turns it
+        # into an ~8.7 GB CPU-resident copy that cannot be reaped, and the
+        # reload then builds another beside it. On a discrete card that is
+        # merely wasteful; on unified memory it is two copies of the writer in
+        # the same 16 GB and it killed the machine three times. Not reloading
+        # while those aliases are live is the only thing that actually fixes it.
+        try:
+            from . import _otr_writer_vram as _OTRVRAM_FINAL
+        except ImportError:  # pragma: no cover
+            import _otr_writer_vram as _OTRVRAM_FINAL  # type: ignore
+        meta["writer_llm_unload"] = (
+            _OTRVRAM_FINAL.unload_writer_llm_after_script()
+        )
 
         # THE DELIVERED WORD RECEIPT IS RESTAMPED HERE, on every lane, because
         # the window above is the last thing that touches canonical `text`:

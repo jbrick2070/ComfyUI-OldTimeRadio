@@ -427,12 +427,22 @@ def test_run_story_spine_true_runs_once(tmp_path, monkeypatch):
     monkeypatch.setattr(
         spine,
         "run_post_script_spine",
-        lambda led, meta: calls.append((led, meta)),
+        lambda led, meta, **kwargs: calls.append((led, meta, kwargs)),
     )
     ctx = _make_ctx(tmp_path, monkeypatch, run_story_spine=True)
     OTR_LedgerScriptWriter()._run_writer_tail(ctx)
 
-    assert calls == [(ctx.led, ctx.meta)]
+    assert [(c[0], c[1]) for c in calls] == [(ctx.led, ctx.meta)]
+    # AND THE TAIL MUST DEFER THE UNLOAD (2026-09-08). The spine's own unload
+    # fired before three further LLM phases -- the brief reflection, ledger
+    # clean/cleanup, and the cast-coverage repair -- so each got a fresh
+    # from_pretrained plus warmup. On unified memory that reload happened while
+    # the Slot Drama Contract's closure still referenced the old model, putting
+    # two ~8.7 GB copies in the same RAM. The single unload now sits after the
+    # last LLM phase; if this kwarg goes missing the premature reloads are back.
+    assert calls[0][2].get("unload") is False, (
+        "the writer tail must call the spine with unload=False -- it still has "
+        "LLM phases to run after it")
 
 
 def _spy_title_regen(monkeypatch):
