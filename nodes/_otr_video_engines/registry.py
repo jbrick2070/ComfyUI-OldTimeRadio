@@ -594,7 +594,10 @@ CAPABILITIES = {
     # dependency-lock.json.
     "animatediff15_v3_haunted_video": {
         "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
+        # EXPERIMENT 2026-09-08, NOT a committed claim: mps added locally.
+        # Adapter has zero NVIDIA-specific code, same profile as ltx_8gb
+        # which proved out tonight. Reverted unless a render proves it.
+        "device_backends": ["cuda", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
@@ -606,7 +609,10 @@ CAPABILITIES = {
     # cost row: admission-unenforced in the evidence manifest, like its parent.
     "animatediff15_v3_stillin_lab_video": {
         "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
+        # EXPERIMENT 2026-09-08, NOT a committed claim: mps added locally.
+        # Adapter has zero NVIDIA-specific code, same profile as ltx_8gb
+        # which proved out tonight. Reverted unless a render proves it.
+        "device_backends": ["cuda", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",

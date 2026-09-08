@@ -196,3 +196,33 @@ indistinguishable from a tested-and-failed one, and the next person cannot tell
 which they are looking at. A genuine NVIDIA dependency (nvenc, NVML, triton,
 flash-attn, bitsandbytes CUDA kernels, an `nvfp4` artifact) is a real reason;
 "never tried it" is not.
+
+### The 30-second test that settles it
+
+Before believing a `["cuda"]` row, grep the adapter:
+
+```bash
+grep -cE 'nvenc|nvml|triton|flash_attn|torch\.cuda|\.cuda\(\)|sm_[0-9]|nvfp4' <adapter>.py
+```
+
+**Zero hits means the row is probably untested policy, not a hardware fact.**
+That single check was right three times on 2026-09-08:
+
+| engine | grep | outcome |
+| --- | --- | --- |
+| `ltx_8gb` | 0 hits | **runs on Metal.** Published a full episode; the row was wrong |
+| `eng_ghost_signal*` (animatediff) | 0 hits | under test |
+| `bark` | had a literal `cuda if available else cpu` | **runs on mps** once given the chance |
+
+And the counter-example that keeps the rule honest -- `z_image_turbo` is
+genuinely unusable on a Mac, but **not for the reason its row implies**: bf16 is
+simply too large for 16 GB, and its int8 variant dies on
+`aten::_int_mm`, which PyTorch's MPS backend does not implement. Real limits
+exist; they are just rarely the ones a bare `["cuda"]` is standing in for.
+
+**A row that was never tested should say so:**
+
+```python
+# device_backends: ["cuda"] -- mps UNTESTED, no hardware available. The adapter
+# contains no NVIDIA-specific code, so this row may simply be untried.
+```
