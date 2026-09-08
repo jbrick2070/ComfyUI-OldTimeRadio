@@ -12481,3 +12481,57 @@ Related and already documented in `nodes/_otr_audio_engines/registry.py:206`:
 `bark` deliberately does not list `mps` in `device_backends`, because `_load_bark`
 has no MPS branch and `torch.cuda.is_available()` being `False` drops it to the
 working CPU path. That one is declared correctly. Kokoro's is not.
+
+## PBUG-20260907-09 -- Stable Audio 3 emits NaN on `mps`, and one bad sample destroyed a 14-minute render
+
+**Measured on a Mac mini M4 (16 GB unified), ComfyUI Desktop 0.34.6 `mac-mps`,
+torch 2.12.1, `Device: mps`.** The canonical's music engine (`stable_audio_3`)
+generated successfully -- two cues, 100 steps each, ~5-6 it/s on Metal -- and
+returned a waveform containing **NaN samples**.
+
+**The failure chain, and note where it surfaced versus where it was caused:**
+
+```
+[OTR.sa3] cue_window start=4.0s total=12.0s dur=8.0s ...   <- SA3 on mps
+stable_audio_theme.py:446  RuntimeWarning: invalid value encountered in cast
+scene_sequencer.py:1757    RuntimeWarning: invalid value encountered in cast
+video_engine.py:1816       RuntimeWarning: invalid value encountered in cast
+video_engine.py _render_crt:
+    grid_alpha = max(6, int((15 + vol * 25) * (0.35 + 0.65 * signal)))
+ValueError: cannot convert float NaN to integer
+```
+
+`(arr * 32767.0).clip(...).astype(np.int16)` does not fail on NaN -- it writes
+**silent garbage** and numpy only mutters a RuntimeWarning. So the NaN travelled
+the entire chain: music cue WAV -> EpisodeAssembler -> master WAV -> video
+engine. The CRT visualizer derives `vol` and `signal` from the episode audio and
+feeds them to `int()`, which is where it finally died -- **at the last step of a
+14-minute render, blaming the video engine for an audio-engine fault.**
+
+**Two defects, fixed separately, because they are genuinely two.**
+
+1. **The audio boundary did not check its input.** `stable_audio_theme.py` now
+   counts non-finite samples, replaces them with silence, and logs a LOUD named
+   warning with the count and percentage. Sanitising at this single
+   source-most point keeps every downstream consumer clean, and it matches what
+   `scene_sequencer.py` already does at its own boundaries (`np.isfinite` at
+   :491, :503, :520). It is deliberately not silent: a non-finite sample means
+   the generator misbehaved, and hiding that behind slightly-wrong audio is the
+   worst available outcome.
+2. **A visual renderer must not be able to crash on its input signal.**
+   `video_engine.py` routes the per-frame scalars (`vol`, `signal`, `loss`)
+   through a `_finite()` helper. A dark frame is a better answer than a lost
+   episode, whatever upstream engine produced the sample. Five floats a frame.
+
+**ROOT CAUSE OF THE NaN ITSELF IS STILL OPEN, and it is a model/platform
+question rather than a pack one.** ComfyUI loads SA3 as
+`model weight dtype torch.float16` on this box, and fp16 overflow on Metal is
+the leading hypothesis -- the first cue (start=0.0s) produced no warning and the
+second (start=4.0s) did, which is consistent with an accumulating overflow
+rather than a systematic fault. Untested next step: launch ComfyUI with
+`--force-fp32` (or bf16) and see whether the non-finite count drops to zero. The
+guards above make that a diagnosable question instead of a dead render.
+
+**Not Mac-only in principle:** nothing in either guard is platform-specific, and
+either could fire on any host whose generator returns a bad sample. Apple
+Silicon is only where it was first observed.

@@ -540,11 +540,23 @@ class _CRTRenderer:
         if total <= 0:
             return Image.new("RGB", (self.w, self.h), CRT_BG)
         fi = max(0, min(int(fi), total - 1))
-        vol = float(self.volume[fi])
+        # Every per-frame scalar below feeds int() conversions and PIL colour
+        # arithmetic, neither of which survives a NaN. These come from the
+        # episode audio, so ONE non-finite sample anywhere upstream used to
+        # abort the whole encode -- measured 2026-09-07 on a Mac mini M4, where
+        # Stable Audio 3 on `mps` emitted NaN and this function died on
+        # `int((15 + vol * 25) * ...)` at the last step of a 14-minute render.
+        #
+        # The audio-side fault is fixed at its source in stable_audio_theme.py.
+        # This guard is not a duplicate of that: a visual renderer should not be
+        # able to CRASH on its input signal no matter which upstream engine
+        # produced it, and a black-ish frame is a better answer than a lost
+        # episode. Cheap -- five floats per frame.
+        vol = _finite(self.volume[fi])
         freq = self.freqs[fi]
         wave = self.waves[fi]
-        signal = float(self._signal[fi])
-        loss = float(self._loss[fi])
+        signal = _finite(self._signal[fi])
+        loss = _finite(self._loss[fi])
         t = fi / fps
         pad = self._pad
         ly = self._divider_y
@@ -1032,6 +1044,21 @@ def _check_nvenc(ffmpeg_path):
         log.info("[Video] Encoder: %s",
                  "NVIDIA h264_nvenc" if verdict else "CPU libx264")
     return verdict
+
+
+
+def _finite(value, default: float = 0.0) -> float:
+    """``float(value)``, with any non-finite result replaced by ``default``.
+
+    Exists because the per-frame visual scalars are derived from episode audio
+    and then fed to ``int()`` and PIL colour maths, where a NaN is a hard
+    ValueError rather than a bad pixel. See the note at the read site.
+    """
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return default
+    return out if math.isfinite(out) else default
 
 
 def _encode_mp4(frames_iter, total_frames, audio_path, output_path,

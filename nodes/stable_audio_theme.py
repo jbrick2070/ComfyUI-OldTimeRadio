@@ -443,6 +443,41 @@ class StableAudioTheme:
             arr = np.atleast_2d(arr)          # [C, T]
             if arr.ndim > 2:
                 arr = arr.reshape(arr.shape[-2], arr.shape[-1])
+            # NON-FINITE GUARD, and it is the source-most point OTR owns.
+            #
+            # 2026-09-07, Mac mini M4: Stable Audio 3 running on `mps` returned
+            # a waveform containing NaN. Cast straight to int16 that is silent
+            # garbage -- numpy only mutters `RuntimeWarning: invalid value
+            # encountered in cast` -- and the NaN then travelled the whole
+            # chain: music cue WAV -> EpisodeAssembler -> master WAV ->
+            # video_engine, where the CRT visualizer derives `vol`/`signal`
+            # from the audio and died on
+            #     grid_alpha = max(6, int((15 + vol * 25) * ...))
+            #     ValueError: cannot convert float NaN to integer
+            # A single bad sample thereby destroyed a 14-minute render at its
+            # final step, and blamed the video engine for an audio fault.
+            #
+            # Sanitising HERE keeps every downstream consumer clean with one
+            # guard, and matches what scene_sequencer.py already does at its own
+            # boundaries (np.isfinite checks at :491, :503, :520).
+            #
+            # It is deliberately LOUD: a non-finite sample means the generator
+            # misbehaved, and on Apple Silicon that is a real open question
+            # (SA3 loads as float16 there -- fp16 overflow on Metal is the
+            # leading hypothesis). Silence would hide a model fault behind
+            # slightly-wrong audio, which is the worst shape this can take.
+            _nonfinite = int(np.count_nonzero(~np.isfinite(arr)))
+            if _nonfinite:
+                log.warning(
+                    "[OTR.sa3] cue %s: %d non-finite sample(s) of %d (%.4f%%) "
+                    "from the generator -- replaced with silence. The audio is "
+                    "usable but WRONG at those samples; the generator, not this "
+                    "writer, is at fault. On Apple Silicon see "
+                    "docs/MAC_LESSONS_LEARNED.md (SA3 emits NaN on mps).",
+                    cue_id, _nonfinite, int(arr.size),
+                    100.0 * _nonfinite / max(1, int(arr.size)),
+                )
+                arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
             pcm = (arr * 32767.0).clip(-32768, 32767).astype(np.int16)
             n_ch = int(pcm.shape[0])
             interleaved = pcm.T.copy(order="C")   # (T, C) for WAV
