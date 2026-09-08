@@ -82,6 +82,17 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# SD 1.5 (2026-09-07): the small local still engine -- one ungated 1.99 GB
+# checkpoint through CheckpointLoaderSimple, no split files and no text-encoder
+# download. It is the only local image engine that fits 16 GB of Apple Silicon
+# unified memory; every Z-Image variant fails there (bf16 OOMs, int8_convrot
+# hits an unimplemented aten::_int_mm on MPS, nvfp4 is NVIDIA-only). Its own
+# guard, so a quirk in one adapter never blocks another from registering.
+try:  # pragma: no cover - trivial guard
+    from . import sd15 as _sd15  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Lumina-Image 2.0 (native lightweight/Apache-2.0), a model-agnostic image peer
 # from the C2 dep/license matrix: registers identically, greyed until its weights
 # exist. Its own guard so a quirk never blocks the others -- and proves the

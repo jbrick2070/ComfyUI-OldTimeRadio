@@ -153,6 +153,19 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["ideogram-4-nvfp4", "ideogram-4-uncond-nvfp4",
                                "qwen3vl-8b-nvfp4", "flux2-vae"]},
+    # SD 1.5 (2026-09-07): the SMALL local image engine, and the only one that
+    # fits a 16 GB Apple Silicon box. mps IS DECLARED EXPLICITLY AND ON PURPOSE
+    # -- copying z_image_turbo's ["cuda"] row (directly below) would have made
+    # this engine register fine and then never be offered on a Mac, silently,
+    # which is the exact failure docs/ADDING_IMAGE_AND_VIDEO_LANES.md warns
+    # about. cpu is listed because a 1.99 GB SD 1.5 genuinely does run there,
+    # slowly; practical_without_gpu stays False because "runs" is not
+    # "practical" for a 20-step sampler.
+    "sd15": {"required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["sd15-v1-5-pruned-emaonly-fp16"]},
     "z_image_turbo": {"required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
