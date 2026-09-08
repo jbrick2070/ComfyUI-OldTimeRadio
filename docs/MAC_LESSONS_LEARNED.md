@@ -1,5 +1,31 @@
 # Mac (Apple Silicon) -- lessons learned
 
+**WHAT THIS SESSION WAS TESTING.** Operator, 2026-09-07: *"that's what we are
+testing for -- the lowest friction path to renders using my canonical json."*
+Not tuning, not quality, not benchmarking: **can a person install this pack and
+press Run on the shipped graph, and get an episode?**
+
+Read the findings below through that lens. Every one of the six defects was
+FRICTION ON THE PRESS-RUN PATH, and each stopped a render outright:
+
+| # | defect | where it stopped you |
+| --- | --- | --- |
+| 1 | `tokenizers` pin | ComfyUI would not boot AT ALL |
+| 2 | `viz_mxc_mandala` needs Windows-only `pycairo` | first music shot, no fallback |
+| 3 | ffmpeg never declared | the mp4 encode |
+| 4 | ffprobe was the other half | the clip-contract check after encoding |
+| 5 | SA3 100% NaN | crashed the render at minute 14 |
+| 6 | sub-quadratic attention on MPS | rendered, but the music was noise |
+
+**Four of the six are not Mac-specific** -- 1 breaks any host with transformers
+>= 5.11, and 2, 3 and 4 break Linux too. Apple Silicon was the machine that
+happened to walk the whole path first.
+
+**Not in scope, deliberately:** sampling-quality tuning, story quality, and
+benchmark comparisons. Where the evidence pointed at a tuning change (the SA3
+step count, section 9) it is recorded and NOT applied, because a change that
+does not reduce friction is not what this was for.
+
 **First real Apple Silicon hardware session, 2026-09-07.** Mac mini M4 (10-core,
 16 GB unified), macOS 26.6.2, ComfyUI Desktop 0.34.6 standalone `mac-mps`,
 Python 3.13.12, torch 2.12.1, `Device: mps`.
