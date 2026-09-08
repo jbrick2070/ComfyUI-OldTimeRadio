@@ -182,3 +182,39 @@ Apple Silicon. By the operator's own standard -- *a leg that does not reach
 `<comfy output>/otr/obs` (`OTR_OBS_DIR` unset). The directory does not exist
 until the first successful publish, so its absence on a fresh box is expected,
 not a fault.
+
+
+---
+
+## 8. There is NO local image or video-diffusion engine on Apple Silicon
+
+Not a runtime discovery -- it is **declared in the registries**, so it can be
+read without spending a render. Every engine carries a `device_backends` list.
+
+**Video** (`nodes/_otr_video_engines/registry.py`):
+
+| runs on mps | cuda only |
+| --- | --- |
+| `viz_green`, `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera` | every LTX (`ltx_video`, `ltx_8gb`, `ltx25_video`, `ltx25_mime`, `ltx25_foley_plus`, `ltx_audio_in`) |
+| `still_motion`, `still_flat`, `still_pan`, `still_word` | `wan_ti2v`, `fastwan_8gb`, `humo`, `mesh_stage` |
+| `word_razzle` | `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` |
+| every `cloud_*` and `google_*` (API keys) | `minimax_h3_video`, `minimax_h3_audio_in` |
+
+**Image** (`nodes/_otr_image_engines/registry.py`): `flux_gen1`, `flux2_klein`,
+`lumina_image` and `z_image_turbo` are **all `[cuda]`**. Only `cloud_flux_pro`
+and `google_image` list `mps`, and both are paid APIs.
+
+**The consequence, and it is the shape of Mac support rather than a bug.** The
+four `still_*` video lanes DO declare `mps` -- but on Apple Silicon nothing
+local can produce the still they consume, so they are unreachable without an
+API key. That leaves the visualizer lanes as **the only fully-local video path
+that exists on this platform**.
+
+So the shipped Mac canonical (`viz_mxc_cpu` / `viz_mxc_mandala` / `viz_camera`,
+minting no stills, downloading no image weights) is not a conservative choice.
+It is the only local configuration Apple Silicon can run at all.
+
+**Practical:** do not spend a test run selecting `z_image_turbo`, any LTX, Wan or
+AnimateDiff on a Mac. They raise `EngineUnusable` from their declaration before
+any work happens; the failure carries no new information. Read
+`device_backends` first.
