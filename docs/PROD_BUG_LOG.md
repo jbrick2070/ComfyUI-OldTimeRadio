@@ -13302,3 +13302,85 @@ Widget 14 carries 17. The engine logged `latents passed in (125)`. **The widget
 binds and does not govern**, which eliminates "the value never arrived" and
 leaves the four candidates above. This is the third attempt at this knob, so per
 CLAUDE.md's two-strikes rule it goes to a panel before any more code.
+
+---
+
+### PBUG-20260908-05 — forcing SDPA on MPS fixed the audio and made every diffusion lane ~14x slower
+
+**Measured 2026-09-08 on a Mac mini M4 / 16 GB, torch 2.12.1.** Filed against my
+own fix from the same morning.
+
+#### What the fix did, and why it was right
+
+`prestartup_script.py` forces PyTorch (SDPA) attention on MPS before ComfyUI
+chooses, because ComfyUI's sub-quadratic default produces STRUCTURALLY WRONG
+audio there. That is measured and not in dispute:
+
+```
+CPU / any attention        spectral flatness 0.158   zcr 0.048   <- music
+MPS / pytorch attention    spectral flatness 0.156   zcr 0.054   <- music
+MPS / sub-quadratic        spectral flatness 0.432   zcr 0.148   <- noise
+```
+
+Plus the NaN half: sub-quadratic calls `torch.baddbmm(<uninit>, q, k, beta=0)`
+and MPS does not honour `beta=0` (PBUG-20260907-09b).
+
+#### What it also did, unmeasured until now
+
+**SDPA is ~14x SLOWER than sub-quadratic on MPS for the attention shapes video
+diffusion uses.** Benchmarked directly on the real shape -- one 16-frame
+AnimateDiff context window at 512x288, i.e. `16 x 8 heads x 2304 tokens x 40`,
+fp16 on `mps`:
+
+```
+PyTorch SDPA (forced)             1490.2 ms per attention call
+chunked baddbmm (sub-quadratic)    107.9 ms per attention call
+                                   -> SDPA is 13.8x slower
+```
+
+Extrapolated across a 20-step render (~8 windows x ~16 attention layers x 20
+steps): **~64 minutes of attention under SDPA against ~4.6 minutes** under
+sub-quadratic. That accounts almost exactly for the otherwise unexplained gap
+between this machine at 119-145 s/step and an RTX 4060 at 9-10.7 s/step on the
+same lane -- a 14x ratio far wider than the raw compute difference between an M4
+GPU and an Ada card.
+
+#### Why this went unnoticed all day
+
+Every render-cost figure measured on this machine was taken with the forcing
+active, and each slow result was attributed to the hardware. The AnimateDiff
+lane's ~44 minutes for a 10-second beat was investigated three times as a
+FRAME-COUNT problem -- two wrong knobs and a kibitz round -- before anyone
+questioned the attention backend. The operator's prompt was "I think you're
+running on CPU"; it was not CPU (`Device: mps`, fp16, 3.2% process CPU while
+sampling), but the instinct that the number was too slow to be hardware was
+correct.
+
+#### The conflict is real, and a global choice cannot resolve it
+
+Sub-quadratic on MPS is WRONG for audio and 13.8x FASTER for video attention.
+The current fix is global (`optimized_attention` is a module-level binding at
+`comfy/ldm/modules/attention.py:857`), so it necessarily trades one for the
+other. A per-model or per-call scope is the shape of a real fix;
+`optimized_attention_for_device` (`:906`) is the seam.
+
+#### NOT YET ESTABLISHED, and the reason this is a report rather than a patch
+
+**Whether sub-quadratic corrupts VIDEO on MPS as it does audio.** The
+`baddbmm(beta=0)` defect is not audio-specific in principle, and no video
+diffusion has ever been rendered on this machine WITHOUT the forcing -- every
+`ltx_8gb`, `sd15` and AnimateDiff receipt to date was produced under SDPA. If
+video is also corrupted, the slowness is simply the price and there is nothing
+to fix. An A/B is running: same graph, same seed, `OTR_MPS_PYTORCH_ATTENTION=0`,
+judged on BOTH rate and pixels.
+
+**Do not act on the speed number alone.** A 14x speedup that renders garbage is
+not a speedup, and this pack has already been caught once today reading a valid
+h264 file with correct duration as a success.
+
+#### Consequence if it holds
+
+Every cost figure in `docs/MAC_PORTABILITY_GUIDE.md` was measured under the slow
+backend: the ~22 min still-lane episode, `ltx_8gb`'s 39-67 min, `flux2_klein`'s
+~8 min per still, AnimateDiff's ~44 min per beat. They are upper bounds, not the
+platform's capability.
