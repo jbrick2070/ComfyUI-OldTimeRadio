@@ -445,6 +445,46 @@ def free_vram_mb():
 _UNIFIED_HEADROOM_MB = 1536.0
 
 
+def unified_memory_budget_mb():
+    """The budget a Metal host actually has for weights, or ``None``.
+
+    NOT ``free_vram_mb()``, and the difference is the whole of
+    PBUG-20260908-02. ``torch.mps.recommended_max_memory()`` measures the METAL
+    WORKING SET; a model ComfyUI has parked on its "offload device: cpu" is
+    invisible to that number while consuming the same physical pages. Budgeting
+    against it therefore misses exactly the memory that killed the machine.
+
+    Physical RAM is the real ceiling on unified memory, so that is the basis.
+
+    THE MULTIPLIER IS CALIBRATED ON TWO RECEIPTS AND NOTHING ELSE, and it is
+    stated that way so nobody mistakes it for a model:
+
+      * ``ltx_8gb``   16.1 GiB of concurrent weights -- SURVIVED (on swap,
+        slowly), and published episodes
+      * ``wan_ti2v``  21.2 GiB of concurrent weights -- KILLED THE MACHINE
+
+    15.9 GiB of physical RAM sits below BOTH, so a bare-RAM threshold would
+    refuse a lane with receipts. 1.15x puts the line at about 18.3 GiB, between
+    the two observations and closer to the survivor. Two points do not make a
+    curve; widen this the moment a third receipt lands, in either direction.
+    """
+    try:
+        import subprocess
+        raw = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                             capture_output=True, text=True, timeout=5).stdout
+        physical_mb = float(raw.strip()) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 -- not macOS / sysctl absent
+        return None
+    if not math.isfinite(physical_mb) or physical_mb <= 0:
+        return None
+    return physical_mb * _UNIFIED_SWAP_TOLERANCE
+
+
+#: How far past physical RAM a Metal host has been OBSERVED to survive. See
+#: :func:`unified_memory_budget_mb` for the two receipts this rests on.
+_UNIFIED_SWAP_TOLERANCE = 1.15
+
+
 def unified_memory_weight_refusal(engine_name, weight_mb, free_mb,
                                   headroom_mb=None):
     """Would loading ``weight_mb`` of weights exceed this host's budget?
@@ -715,6 +755,19 @@ def resolved_weight_mb(engine_name):
     if not split:
         return None
     encoder_names, resident_names = split
+    # PBUG-20260908-02: ON APPLE SILICON THE EVICTION DOES NOT HAPPEN, so the
+    # two-phase split below is a fiction there and every artifact is charged.
+    # Three engines, three logs: wan_ti2v passed free_after_use=True and got
+    # "0 models unloaded." immediately before the load that killed the machine;
+    # flux2_klein passed it with keep={"unet"} and held a 7.67 GB encoder
+    # through sampling at 23.5 s/step out of swap; ltx_8gb never attempted an
+    # unload at all. "offload device: cpu" is ComfyUI working as designed, and
+    # on unified memory host RAM IS the accelerator's memory, so the move frees
+    # nothing. Charging the encoder is the conservative direction and it is the
+    # measured one.
+    if _unified_memory_backend():
+        resident_names = list(resident_names) + list(encoder_names)
+        encoder_names = []
     if not encoder_names and not resident_names:
         return None
     try:
@@ -762,8 +815,11 @@ def refuse_if_weights_exceed_unified_memory(engine_name):
         weight_mb = resolved_weight_mb(engine_name)
         if weight_mb is None:
             return
+        budget_mb = unified_memory_budget_mb()
+        if budget_mb is None:
+            return
         message = unified_memory_weight_refusal(
-            engine_name, weight_mb, free_vram_mb())
+            engine_name, weight_mb, budget_mb)
     except MotionBudgetError:
         raise
     except Exception:  # noqa: BLE001 -- a guard must never be the failure
@@ -1265,6 +1321,7 @@ __all__ = [
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
     "assert_frame_affordable", "cost_row_may_refuse", "QUALIFIED_COST_ROWS",
     "unified_memory_weight_refusal", "resolved_weight_mb",
+    "unified_memory_budget_mb",
     "_loader_filenames", "_encoder_is_evicted",
     "refuse_if_weights_exceed_unified_memory",
     "compute_real_frame_budget",

@@ -35,38 +35,44 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nodes._otr_video_engines import motion_common as mc  # noqa: E402
 
 
-#: The Metal working-set ceiling measured on the Mac mini M4 / 16 GB where all
-#: six ground-truth rows below were observed. NOT 16384 -- Metal recommends
-#: about 75% of physical RAM, and using the raw RAM figure here would silently
-#: loosen every threshold in this file.
-M4_16GB_FREE_MB = 12123.7
+#: The budget for a 16 GB Mac, as :func:`motion_common.unified_memory_budget_mb`
+#: computes it: physical RAM x 1.15, the observed swap tolerance.
+#:
+#: THIS USED TO BE THE METAL WORKING-SET CEILING (12123.7 MiB) AND THAT WAS THE
+#: WRONG POOL -- PBUG-20260908-02. ComfyUI parks a text encoder on its "offload
+#: device: cpu", where `torch.mps.recommended_max_memory()` cannot see it and it
+#: consumes the same physical pages regardless. Budgeting against the Metal
+#: ceiling therefore ignored exactly the memory that killed the machine.
+M4_16GB_BUDGET_MB = 16384.0 * 1.15
 
-#: (label, peak_resident_mb, must_refuse). peak is max(largest text encoder,
-#: sum of everything else) -- the two-phase model documented on
-#: ``resolved_weight_mb``. Sizes are the real on-disk byte counts.
+#: (label, concurrent_resident_mb, must_refuse).
+#:
+#: EVERY ARTIFACT IS SUMMED, because on this platform every artifact IS
+#: concurrently resident -- PBUG-20260908-02. The earlier version of this table
+#: gave each row an eviction credit (`max(encoder, sum(rest))`) and it was
+#: fiction: wan_ti2v passed free_after_use=True and logged "0 models unloaded"
+#: right before the load that killed the box, flux2_klein held a 7.67 GB encoder
+#: through sampling, and ltx_8gb never attempted an unload at all.
 GROUND_TRUTH = [
     # --- the two that actually failed on this machine -------------------
-    ("wan_ti2v fp16: umt5 10835, UNET 9536, VAE 1344 -- KILLED THE MACHINE",
-     max(10835.0, 9536.0 + 1344.0), True),
-    # THE ROW THAT ONLY THE SUM CATCHES. Every other refusing row is over the
-    # line on its single largest artifact too, so they all pass against an
-    # implementation that never adds the resident set up (agy review). Here no
-    # individual artifact is close: 6000 + 5200 = 11200 refuses, while
-    # max(6000, 5200) = 6000 sails through. This is HuMo's shape -- fully
-    # resident by contract, so the guard MUST add.
-    ("a fully-resident lane: UNET 6000 + encoder 5200, nothing big alone",
-     6000.0 + 5200.0, True),
-    ("z_image_turbo bf16: 12309 ckpt -- OOM in the KSampler at ~20.4 GiB",
-     max(8044.0, 12309.0), True),
-    # --- the four that actually ran -------------------------------------
-    ("ltx_8gb: t5xxl 9787 UNLOADS before ckpt 6340 -- PUBLISHED EPISODES",
-     max(9787.0, 6340.0), False),
-    ("wan_ti2v GGUF: the SHIPPED 9.37 GB set (LANE_INFO), Q5_K_M 3810 + VAE",
-     max(4145.0, 3810.0 + 1409.0), False),
-    ("animatediff haunted: sd15 1990 + mm 1560 + adapter 95",
-     max(0.0, 1990.0 + 1560.0 + 95.0), False),
-    ("flux2_klein: qwen_3_4b 8044 encoder UNLOADS before Q4 2600 + vae 330",
-     max(8044.0, 2600.0 + 330.0), False),
+    ("wan_ti2v fp16: umt5 10835 + UNET 9536 + VAE 1344, ALL RESIDENT "
+     "(log: '0 models unloaded') -- KILLED THE MACHINE",
+     10835.0 + 9536.0 + 1344.0, True),
+    ("a hypothetical lane at 20 GiB, no single artifact near the line",
+     7000.0 + 7000.0 + 6480.0, True),
+    # --- the four that ran ----------------------------------------------
+    # NOTE ltx_8gb: 15.75 GiB EXCEEDS this machine's 15.9 GiB of physical RAM
+    # and it still published episodes, on swap, slowly. That is precisely why
+    # the budget is physical RAM x 1.15 and not physical RAM: a bare-RAM
+    # threshold refuses a lane with receipts.
+    ("ltx_8gb: t5xxl 9787 + ckpt 6340 both resident -- PUBLISHED EPISODES",
+     9787.0 + 6340.0, False),
+    ("flux2_klein: qwen_3_4b 7672 + Q4 2592 + vae 336 -- RAN at 23.5 s/step",
+     7672.0 + 2592.0 + 336.0, False),
+    ("wan_ti2v GGUF: the SHIPPED set, Q5_K_M 3810 + umt5 3860 + VAE 1310",
+     3810.0 + 3860.0 + 1310.0, False),
+    ("animatediff haunted: sd15 1990 + mm 1560 + adapter 95 (4060: 4.9 GB)",
+     1990.0 + 1560.0 + 95.0, False),
 ]
 
 
@@ -75,7 +81,7 @@ GROUND_TRUTH = [
 def test_the_guard_reproduces_what_the_hardware_did(label, peak_mb,
                                                     must_refuse):
     """Six configurations, six known outcomes, no calibration."""
-    verdict = mc.unified_memory_weight_refusal("eng", peak_mb, M4_16GB_FREE_MB)
+    verdict = mc.unified_memory_weight_refusal("eng", peak_mb, M4_16GB_BUDGET_MB)
     if must_refuse:
         assert verdict, (
             "%s -- this configuration DID fail on the hardware and the guard "
@@ -91,30 +97,32 @@ def test_the_guard_reproduces_what_the_hardware_did(label, peak_mb,
             "than the guard not existing. Got: %s" % (label, verdict))
 
 
-def test_a_text_encoder_is_not_summed_with_the_model_it_feeds():
-    """The bug the first implementation had, pinned directly.
+def test_ltx_survives_only_because_the_budget_allows_swap():
+    """ltx_8gb holds 15.75 GiB concurrently on a machine with 15.9 GiB of
+    physical RAM, and it published episodes anyway -- slowly, on swap.
 
-    ltx_8gb declares 16.1 GB of artifacts and runs in an 11.8 GiB budget. If
-    peak is ever computed as a plain sum again, this fails."""
-    encoder, unet = 9787.0, 6340.0
+    This pins the reason the budget is not simply physical RAM: that threshold
+    would refuse a lane that demonstrably works. It also pins the other side --
+    the tolerance is not unlimited, and wan_ti2v's 21.2 GiB is past it."""
+    physical_only = 16384.0
     assert mc.unified_memory_weight_refusal(
-        "ltx_8gb", max(encoder, unet), M4_16GB_FREE_MB) is None
+        "ltx_8gb", 9787.0 + 6340.0, physical_only - 1000.0), (
+        "sanity: against a bare-RAM budget LTX would be refused, which is the "
+        "mistake the swap tolerance exists to avoid")
     assert mc.unified_memory_weight_refusal(
-        "ltx_8gb", encoder + unet, M4_16GB_FREE_MB), (
-        "the summed figure SHOULD refuse -- that is why summing is wrong, not "
-        "why the threshold is wrong")
+        "ltx_8gb", 9787.0 + 6340.0, M4_16GB_BUDGET_MB) is None
 
 
 @pytest.mark.parametrize("weight_mb,free_mb", [
-    (None, M4_16GB_FREE_MB),          # nothing resolved
+    (None, M4_16GB_BUDGET_MB),          # nothing resolved
     (99999.0, None),                  # no probe (CPU box, older torch)
-    (0.0, M4_16GB_FREE_MB),           # engine declares no weights
-    (-5.0, M4_16GB_FREE_MB),          # nonsense size
+    (0.0, M4_16GB_BUDGET_MB),           # engine declares no weights
+    (-5.0, M4_16GB_BUDGET_MB),          # nonsense size
     (99999.0, 0.0),                   # probe returned zero
     (99999.0, -1.0),                  # probe returned nonsense
-    (float("nan"), M4_16GB_FREE_MB),  # NaN size
+    (float("nan"), M4_16GB_BUDGET_MB),  # NaN size
     (99999.0, float("inf")),          # infinite budget
-    ("big", M4_16GB_FREE_MB),         # non-numeric
+    ("big", M4_16GB_BUDGET_MB),         # non-numeric
 ])
 def test_it_fails_open_on_every_input_it_cannot_trust(weight_mb, free_mb):
     """Allow whenever the number is not real.
@@ -144,9 +152,9 @@ def test_a_broken_headroom_override_falls_back_rather_than_disarming(bad):
     the escape hatch silently became a disable switch. Asserting on a model that
     is only refused BECAUSE of the reservation is what catches that; asserting
     on one that is refused anyway would have passed against the bug."""
-    just_over_with_reservation = M4_16GB_FREE_MB - 800.0   # fits raw, not with 1.5 GiB
+    just_over_with_reservation = M4_16GB_BUDGET_MB - 800.0   # fits raw, not with 1.5 GiB
     verdict = mc.unified_memory_weight_refusal("eng", just_over_with_reservation,
-                                               M4_16GB_FREE_MB,
+                                               M4_16GB_BUDGET_MB,
                                                headroom_mb=bad)
     assert verdict, ("a malformed headroom override (%r) disarmed the "
                      "reservation -- it must fall back to the default" % (bad,))
@@ -155,10 +163,10 @@ def test_a_broken_headroom_override_falls_back_rather_than_disarming(bad):
 def test_headroom_none_means_the_default_not_a_broken_override():
     """``None`` is the ordinary "operator said nothing" path, not garbage; it
     reads the env/default rather than being rejected."""
-    just_over = M4_16GB_FREE_MB - 800.0
-    assert mc.unified_memory_weight_refusal("eng", just_over, M4_16GB_FREE_MB,
+    just_over = M4_16GB_BUDGET_MB - 800.0
+    assert mc.unified_memory_weight_refusal("eng", just_over, M4_16GB_BUDGET_MB,
                                             headroom_mb=None)
-    assert mc.unified_memory_weight_refusal("eng", 1000.0, M4_16GB_FREE_MB,
+    assert mc.unified_memory_weight_refusal("eng", 1000.0, M4_16GB_BUDGET_MB,
                                             headroom_mb=None) is None
 
 
@@ -167,7 +175,7 @@ def test_the_refusal_names_the_way_out():
     quantised build is the fix, because for every lane refused so far one
     exists and is the SHIPPED configuration."""
     verdict = mc.unified_memory_weight_refusal("wan_ti2v", 20000.0,
-                                               M4_16GB_FREE_MB)
+                                               M4_16GB_BUDGET_MB)
     assert verdict
     assert "quantised" in verdict
     assert "otr_fetch_lane_weights" in verdict
@@ -317,43 +325,60 @@ def test_the_resolver_follows_the_env_override_the_loader_follows(monkeypatch):
         "open the fp16 override -- this is the crash, unguarded")
 
 
-def test_resolved_weight_mb_is_max_encoder_then_sum_of_the_rest(monkeypatch,
-                                                                tmp_path):
-    """End-to-end through a fake folder_paths, with the real two-phase model.
-
-    Encoder 9000 MiB alone; UNET 6000 + VAE 1000 = 7000 together. Peak is 9000,
-    NOT 16000 -- the distinction that keeps ltx_8gb runnable."""
-    # 6000 + 1000 = 7000 RESIDENT beats the 5000 encoder, so the answer is
-    # decided by the SUM. The first version used a 9000 encoder, which meant an
-    # implementation that ignored the resident set entirely -- or max()'d it
-    # instead of summing -- returned the same number and passed (agy review).
-    sizes = {"enc.safetensors": 5000, "unet.safetensors": 6000,
-             "vae.safetensors": 1000}
-    for name, mb in sizes.items():
-        f = tmp_path / name
-        with open(f, "wb") as fh:
-            fh.truncate(mb * 1024 * 1024)
-
+def _fake_folder_paths(tmp_path, encoder_name):
     class _FakeFolderPaths:
         @staticmethod
         def get_full_path(category, name):
-            if category in ("text_encoders", "clip") and name != "enc.safetensors":
-                return None
-            if category not in ("text_encoders", "clip") and name == "enc.safetensors":
+            is_enc = category in ("text_encoders", "clip")
+            if is_enc != (name == encoder_name):
                 return None
             p = tmp_path / name
             return str(p) if p.exists() else None
+    return _FakeFolderPaths
 
-    monkeypatch.setitem(sys.modules, "folder_paths", _FakeFolderPaths)
+
+def _stage(tmp_path, sizes):
+    for name, mb in sizes.items():
+        with open(tmp_path / name, "wb") as fh:
+            fh.truncate(mb * 1024 * 1024)
+
+
+SIZES = {"enc.safetensors": 5000, "unet.safetensors": 6000,
+         "vae.safetensors": 1000}
+
+
+def test_on_unified_memory_every_artifact_is_charged(monkeypatch, tmp_path):
+    """PBUG-20260908-02: the eviction does not happen on Metal, so the encoder
+    is charged alongside the model rather than given its own phase.
+
+    5000 + 6000 + 1000 = 12000. A two-phase answer would be max(5000, 7000) =
+    7000, and the gap between them is an entire text encoder -- which is exactly
+    the amount by which the machine was under-charged when it died."""
+    _stage(tmp_path, SIZES)
+    monkeypatch.setitem(sys.modules, "folder_paths",
+                        _fake_folder_paths(tmp_path, "enc.safetensors"))
     monkeypatch.setattr(mc, "_loader_filenames",
                         lambda n: (["enc.safetensors"],
                                    ["unet.safetensors", "vae.safetensors"]))
-    peak = mc.resolved_weight_mb("anything")
-    assert peak == pytest.approx(7000, rel=0.01), (
-        "expected max(encoder 5000, resident 6000+1000); a plain sum gives "
-        "12000, ignoring the resident set gives 5000, and max()-ing the "
-        "resident set instead of summing gives 6000 -- all three are wrong "
-        "and all three are distinguishable at these numbers")
+    monkeypatch.setattr(mc, "_unified_memory_backend", lambda: True)
+    assert mc.resolved_weight_mb("anything") == pytest.approx(12000, rel=0.01)
+
+
+def test_on_a_discrete_card_the_two_phase_credit_still_applies(monkeypatch,
+                                                               tmp_path):
+    """CUDA is the platform where free_after_use demonstrably WORKS -- the 5080
+    measured a 5-7 GB lower peak from it (PBUG-20260902-01). So the eviction
+    credit is correct there and must not be removed by the Metal fix.
+
+    max(encoder 5000, resident 6000 + 1000) = 7000."""
+    _stage(tmp_path, SIZES)
+    monkeypatch.setitem(sys.modules, "folder_paths",
+                        _fake_folder_paths(tmp_path, "enc.safetensors"))
+    monkeypatch.setattr(mc, "_loader_filenames",
+                        lambda n: (["enc.safetensors"],
+                                   ["unet.safetensors", "vae.safetensors"]))
+    monkeypatch.setattr(mc, "_unified_memory_backend", lambda: False)
+    assert mc.resolved_weight_mb("anything") == pytest.approx(7000, rel=0.01)
 
 
 def test_one_unresolvable_artifact_makes_the_whole_answer_none(monkeypatch):
@@ -465,7 +490,7 @@ def _fake_unified_torch():
 def test_the_impure_half_actually_raises_on_an_oversized_engine(monkeypatch):
     """The mutation test: stub the guard's body to `return` and this fails."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
-    monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_FREE_MB)
+    monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 20000.0)
     with pytest.raises(mc.MotionBudgetError) as excinfo:
         mc.refuse_if_weights_exceed_unified_memory("some_engine")
@@ -476,7 +501,7 @@ def test_the_impure_half_allows_an_engine_that_fits(monkeypatch):
     """The other half of the mutation test: a guard hard-wired to raise fails
     here, and a guard hard-wired to return fails above."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
-    monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_FREE_MB)
+    monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 3000.0)
     mc.refuse_if_weights_exceed_unified_memory("some_engine")
 

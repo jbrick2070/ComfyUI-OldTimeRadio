@@ -614,24 +614,30 @@ not an optimisation, it is frequently the only version that can run.
 **What it costs you.** Everything below was hit in one sitting on 2026-09-08, in
 this order, on a machine that already had ComfyUI working.
 
-### 10.0 Before you spend the download: K_M quants may garble on Metal
+### 10.0 K_M quants do NOT garble on Metal -- SETTLED 2026-09-08
 
-**Two independent sources say the same thing, and neither is settled.** Commit
-`5f1b94b4` passed over `flux2_klein` for Apple Silicon partly because
-*"K_M quants garble on MPS"*, and city96's ComfyUI-GGUF issue #177 reports GREEN
-OUTPUT from `Q*_K` Flux weights on Metal. A 2026 web sweep judged #177 to
-predate a PyTorch MPS integer-operation fix and to be contradicted by later
-successful Flux-family GGUF runs -- so it may well be stale. Nobody has settled
-it on this stack.
+**The concern was real and it is now answered.** Commit `5f1b94b4` passed over
+`flux2_klein` for Apple Silicon partly because *"K_M quants garble on MPS"*, and
+city96's ComfyUI-GGUF issue #177 reports GREEN OUTPUT from `Q*_K` Flux weights
+on Metal. A web sweep judged #177 to predate a PyTorch MPS integer-operation fix
+and to be contradicted by later Flux-family GGUF runs.
 
-Both engines below default to a K_M build: `flux-2-klein-4b-Q4_K_M.gguf` and
-`Wan2.2-TI2V-5B-Q5_K_M.gguf` with a `umt5-xxl-encoder-Q5_K_M.gguf` beside it.
+**Measured here, and the sweep was right.** `flux-2-klein-4b-Q4_K_M.gguf`
+through `UnetLoaderGGUF` minted a clean 1472x832 still on the first attempt --
+coherent subject, correct style adherence, no green cast, no smearing, no noise.
+Receipt: `otr/episodes/signal_lost_the_dark_sea_beyond_the_glass_20260908_095959/
+stills/still_music_opening_001_d94b2a43c4e6.png`, 20 steps, guidance 4.0.
 
-**So judge the PIXELS, not the exit code.** A garbled render exits zero. Open the
-first still or the first clip and look at it before you conclude a lane works.
-If it comes out green, smeared, or noise, try a non-K quant (`Q4_0`, `Q5_0`,
-`Q8_0`) before blaming memory or the adapter -- and record what you saw, because
-that is a finding worth a PBUG either way.
+So a K_M quant is not a reason to avoid a lane on this platform. **The habit is
+still worth keeping**: a garbled render exits ZERO, so open the first still or
+clip and look at it before concluding a lane works. That is how this was
+settled, and it is the only way it could have been.
+
+`wan_ti2v`'s shipped set is also K_M (`Wan2.2-TI2V-5B-Q5_K_M.gguf` plus a
+`umt5-xxl-encoder-Q5_K_M.gguf`), so this result removes one of the two objections
+to it. The other one -- the open Wan temporal-corruption defect on this exact
+macOS/torch generation, section 11 -- still stands, and it is the disqualifying
+one.
 
 ### 10.1 The repo ships the installer -- point it at the right tree
 

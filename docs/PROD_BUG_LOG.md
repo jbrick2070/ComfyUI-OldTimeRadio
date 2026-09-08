@@ -12906,3 +12906,91 @@ protection that existed before this session touched it.
 **Also noted:** an empty-string stamp reaches `.to("")` in bark. Unreachable via
 CastLock (it admits only `cuda|cpu|mps`) but reachable by any caller that
 bypasses the ledger. Closed in bark; the siblings still have it.
+
+---
+
+### PBUG-20260908-02 — `free_after_use` is a NO-OP on Apple Silicon, in every engine that relies on it
+
+**Verified on a live production artifact:** three separate ComfyUI runs on a Mac
+mini M4 / 16 GB (macOS 26.6, torch 2.12.1, ComfyUI Desktop 0.34.6 `mac-mps`),
+one of which hard-killed the machine.
+
+**Severity: this is the mechanism behind the machine kill**, not a performance
+note. Every engine that keeps its peak under a memory ceiling by evicting the
+text encoder before the diffusion model loads is, on Metal, holding both.
+
+#### The evidence, in three engines
+
+`wan_ti2v`, fp16 route, `logs/wan_run2.log` — the last four lines before the OS
+killed everything:
+
+```
+Requested to load WanTEModel
+loaded completely;  10835.48 MB loaded, full load: True
+CLIP/text encoder model load device: cpu, offload device: cpu, current: cpu
+Requested to load WanVAE
+loaded completely;   1344.09 MB loaded, full load: True
+Requested to load WAN22
+0 models unloaded.                      <-- the eviction did not happen
+loaded completely;   9536.40 MB loaded, full load: True
+```
+
+`eng_wan_ti2v.py:1224` passes `free_after_use=True`, and its own comment says it
+exists so "the umt5 text-encode frees before the 5B UNET". It did not. 10.8 GB
+stayed resident while a 9.5 GB UNET loaded beside it.
+
+`flux2_klein`, `logs/klein_run.log` — same shape, survived on swap:
+
+```
+Requested to load Flux2TEModel_
+loaded completely;   7672.25 MB loaded, full load: True
+CLIP/text encoder model load device: cpu, offload device: cpu, current: cpu
+Requested to load Flux2
+loaded completely;   2591.64 MB loaded, full load: True
+```
+
+`flux2_klein.py:421` passes `free_after_use=True, keep={"unet"}`. The encoder
+stayed. `footprint -p` reported **20 GB phys_footprint (22 GB peak) on a 16 GB
+machine**, 5.78 GB of swap in use, and sampling ran at 23.5 s/step out of swap
+where `sd15` mints a still in seconds.
+
+`ltx_8gb`, `logs/ltx_sd15.log` — **zero** "models unloaded" lines at all; it
+never attempted an eviction, and survived only because its two artifacts total
+16.1 GiB rather than 21.2.
+
+#### Why it matters beyond the crash
+
+**"Offload" is not a thing on unified memory, and the log says so out loud.**
+`offload device: cpu` is ComfyUI doing exactly what it is designed to do — move
+the model to host RAM. On Apple Silicon host RAM *is* the accelerator's memory.
+The transfer frees nothing, and no counter in the process reports the problem:
+`torch.mps.recommended_max_memory()` measures the Metal working set, and a model
+parked on "cpu" is invisible to it while consuming the same physical pages.
+
+**This invalidates a mitigation the fleet already relies on.** PBUG-20260902-01
+(fix `9b90189a`) added `free_after_use` to the three local image engines because
+without it the 4060 took ~42 minutes for one Klein still with the encoder pinned
+on the card. That fix is real and was proven byte-identical on the 5080 with a
+5-7 GB lower peak. **It does not reach Metal.** The Mac reproduces the exact
+pre-fix symptom — encoder resident, sampler starved, minutes per step — with the
+fix present and passing its argument.
+
+#### What is NOT yet known
+
+Whether this is ComfyUI's `mps` model-management path declining to evict, or
+`wrapper_bridge.run_graph`'s `free_after_use` not reaching it, or a held
+reference (the beat-session hoist pins loaders for some engines, but `ltx_8gb`
+does not hoist and still never unloaded). The three logs establish the BEHAVIOUR
+on three engines; they do not isolate the cause. Do not fix by guessing.
+
+#### The immediate consequence for anything that reasons about peak memory
+
+`nodes/_otr_video_engines/motion_common.resolved_weight_mb` computes
+`max(largest evicted encoder, sum of the rest)` and reads the eviction from the
+adapter's own `run_graph(free_after_use=True)` call. That model is correct on
+CUDA and **wrong on Metal**, because the call is there and the eviction is not.
+It happened to classify all six known-outcome configurations correctly, which is
+luck about where the numbers fell rather than a validated model. Until this PBUG
+is understood, treat every artifact as concurrently resident when reasoning
+about an Apple Silicon budget — and note the empirical bracket the two receipts
+give: 16.1 GiB of concurrent weights survived (on swap), 21.2 GiB did not.

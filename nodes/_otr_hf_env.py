@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from pathlib import Path
 
 try:
@@ -51,7 +52,34 @@ log = logging.getLogger("OTR._otr_hf_env")
 
 _REG_KEY = "Environment"
 _REG_HF_HOME = "HF_HOME"
-_DEFAULT_HF_HOME = r"C:\ComfyUI-Models\huggingface"
+#: The Windows box's models root. It is the ONE default on that platform and
+#: nothing here changes that.
+_DEFAULT_HF_HOME_WINDOWS = r"C:\ComfyUI-Models\huggingface"
+
+
+def _default_hf_home() -> str:
+    r"""The HF cache root to fall back to when nothing else names one.
+
+    WHY THIS IS A FUNCTION AND NOT THE CONSTANT IT USED TO BE. The constant was
+    ``r"C:\ComfyUI-Models\huggingface"`` unconditionally. On Windows that is an
+    absolute path; on macOS and Linux it is a perfectly LEGAL RELATIVE FILENAME,
+    backslashes and colon included. So instead of failing, the process quietly
+    created a directory literally named ``C:\ComfyUI-Models\huggingface`` inside
+    whatever the working directory happened to be -- the repo checkout, in the
+    case that found this -- and downloaded models into it.
+
+    MEASURED 2026-09-08: 8.7 GB of duplicate cache, including a second copy of
+    the Qwen3.5-4B writer, sitting untracked in the repo tree beside a perfectly
+    good 66 GB cache in ``~/.cache/huggingface``. Nothing errored, nothing
+    warned, and `git status` was the only symptom.
+
+    Off Windows the answer is Hugging Face's OWN default, ``~/.cache/huggingface``
+    -- the same root every other tool on the machine already uses, so a model
+    fetched by any of them is a model this pack does not fetch again.
+    """
+    if sys.platform == "win32":
+        return _DEFAULT_HF_HOME_WINDOWS
+    return str(Path.home() / ".cache" / "huggingface")
 _WEIGHT_SUFFIXES = (".safetensors", ".bin")
 # Twin of _otr_model_catalog._WEIGHT_INDEX_NAMES -- keep the two in step.
 _WEIGHT_INDEX_NAMES = (
@@ -97,7 +125,9 @@ def ensure_hf_home() -> str:
     Order of precedence:
         1. os.environ['HF_HOME']  (already in process env)
         2. HKCU\\Environment\\HF_HOME  (Windows User-scope)
-        3. _DEFAULT_HF_HOME  ('C:\\ComfyUI-Models\\huggingface')
+        3. :func:`_default_hf_home` -- 'C:\\ComfyUI-Models\\huggingface' on
+           Windows, '~/.cache/huggingface' (Hugging Face's own default)
+           everywhere else
 
     Result is cached for the lifetime of the process. Idempotent --
     safe to call from multiple module init paths.
@@ -122,7 +152,7 @@ def ensure_hf_home() -> str:
             source = "HKCU\\Environment"
         else:
             # 3. Default
-            resolved = _DEFAULT_HF_HOME
+            resolved = _default_hf_home()
             source = "default"
 
     # Export so downstream HF tooling picks it up automatically.
