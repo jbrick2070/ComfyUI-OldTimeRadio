@@ -13153,3 +13153,76 @@ it did not cause the kill, but every one of those 157 log lines is off by 2x.
 cached memory as available, so the arithmetic concludes nothing needs freeing
 and prints "0 models unloaded" — which is exactly the line observed before the
 fatal load. Offered as a pointer for a targeted test, NOT as a verified cause.
+
+---
+
+### PBUG-20260908-04 — there are TWO profile appliers, and `--profile` uses the narrow one
+
+**Verified by direct execution against the shipped code, 2026-09-08.** Affects
+every machine, not only the Mac: the queue path is shared.
+
+`scripts/otr_canonical_api_run.py --profile <id>` calls
+`scripts/otr_api.apply_profile_to_workflow` (`otr_api.py:876`), which builds its
+override list from exactly four places:
+
+```python
+for section in ("role_overrides", "slot_overrides", "features"):
+    ...
+flat.append(f"seed_policy.request_seed={sp.get('request_seed')}")
+flat.append(f"seed_policy.seed_mode={sp.get('seed_mode')}")
+```
+
+That is the "16 overrides" the runner reports. **A profile's `render`, `video`,
+`llm`, `audio`, `image` and `preflight` sections are never read on this path.**
+
+Meanwhile `nodes/_otr_workflow_apply.apply_profile` describes itself in the
+module docstring as "the ONE applier", flattens the WHOLE profile through
+`_flatten_profile_values` (`:513`), maps each dotted key onto a widget through
+`load_widget_mapping()`, and RAISES `ProfileError` on any key it cannot map. The
+mapping is populated for exactly the keys the other applier drops -- confirmed
+live:
+
+```
+video.max_render_frames  -> MAPPED (OTR_VideoDirector)
+render.canvas_w          -> MAPPED (OTR_VideoDirector)
+render.frame_budget      -> MAPPED (OTR_VideoRenderer)
+llm.quant_policy         -> MAPPED (OTR_LedgerScriptWriter)
+```
+
+#### How it was found, and what it cost
+
+Chasing AnimateDiff clip length on the Mac. `ghost_signal` planned 125 latents
+against a 16-frame context window -- eight sliding windows per sampler step,
+~120 s/step. Two separate profile edits were made to cap it
+(`render.frame_budget`, then `video.max_render_frames`) and the very next run
+planned 125 latents both times. The knob was never the problem: neither key
+reaches the graph through `--profile`.
+
+The surrounding comment at `otr_api.py:898-914` explains a DIFFERENT change --
+the removal of a cross-validation gate that refused engine combinations before
+they had been tried, per an explicit operator ruling. It says nothing about
+render/video sections, so this omission reads as incidental scope rather than a
+decision.
+
+#### Consequences worth knowing before touching it
+
+* Every `--profile` run to date has applied ENGINE CHOICES ONLY. Tier settings
+  appeared to work when they happened to match the canonical's committed widget
+  values, which is most of the time and is why this went unnoticed.
+* On the Mac specifically, `otr_mac_mps`'s `llm.device: mps` and
+  `quant_policy: none` are not being applied by `--profile` either. They match
+  the canonical's defaults, so the runs were correct by coincidence.
+* `workflows/variants/` is EMPTY, so the variant path that would apply the full
+  profile does not currently exist for any machine.
+
+#### The fix is not obviously safe, which is why this is a report and not a patch
+
+Pointing the runner at `apply_profile` is the correct-looking change, but that
+function RAISES on any unmapped key. With 116 profiles in `config/profiles/`,
+switching appliers could surface a large number of latent mapping gaps at once,
+on every machine. Sequence it: run `apply_profile` over all committed profiles
+offline first and count the failures, THEN decide.
+
+Until then the reliable way to set a tier on the API path is to edit the
+workflow JSON's widget values directly, which is what the canonical run already
+does for engine dropdowns.
