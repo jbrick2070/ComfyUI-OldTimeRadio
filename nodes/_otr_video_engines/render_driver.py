@@ -4340,6 +4340,16 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
                           request_template=request)
     except TypeError:
         eng.assert_usable(host_caps=_caps, profile=_prof)
+    # THE UNIFIED-MEMORY WEIGHT FLOOR (2026-09-08). Runs here, at the gate,
+    # because this is the last point before handles are touched and the only
+    # place a refusal is still cheap. It asks one question the engine's own
+    # assert_usable does not: do the weights FIT? On CUDA that question is
+    # survivable (ComfyUI offloads to host RAM) and the check is a no-op. On
+    # Apple Silicon the offload device is the same physical memory, so an
+    # oversized model does not fail the render -- it kills the machine, with no
+    # traceback to read afterwards. Fail-OPEN everywhere it cannot get an exact
+    # number; see motion_common.refuse_if_weights_exceed_unified_memory.
+    _mc.refuse_if_weights_exceed_unified_memory(engine_name)
     if segment is not None:
         if getattr(segment.session, "engine", None) is not eng:
             raise RenderError(
@@ -4800,6 +4810,14 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     # work, and a one-segment plan carrying a tail trim owes exactly that --
     # but ``segment_count > 1`` would call it single-clip and route it to the
     # ping-pong path.
+    # THE WEIGHT FLOOR RUNS BEFORE THE SESSION OPENS, NOT INSIDE _render_one
+    # (agy review). BeatSession.open() calls engine.prepare(), which hoists the
+    # loaders -- i.e. it puts the weights in memory. On a coverage beat that
+    # happens BEFORE the first _render_one, so a guard that only lived there was
+    # checking after the load it exists to prevent: on unified memory the
+    # machine would already be gone. Checked in both places on purpose; it is a
+    # dictionary lookup and a stat, and being early twice costs nothing.
+    _mc.refuse_if_weights_exceed_unified_memory(engine)
     with _bs.BeatSession(engine, host_caps=host_caps, profile=profile,
                          beat_id=beat_id,
                          segment_count=plan.segment_count,

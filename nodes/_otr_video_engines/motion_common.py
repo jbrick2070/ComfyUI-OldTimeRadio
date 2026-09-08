@@ -27,6 +27,7 @@ shared GPU lease + the dep-free registry error types. torch / diffusers / the LT
 from __future__ import annotations
 
 import math
+import os
 import sys
 
 from .._otr_shared import gpu_residency as _GR
@@ -400,6 +401,375 @@ def free_vram_mb():
         return max(0.0, ceiling_b - held_b) / (1024.0 * 1024.0)
     except Exception:  # noqa: BLE001 -- older torch, no torch.mps -> unknown
         return None
+
+
+# -- the unified-memory weight floor ---------------------------------------
+#
+# WHY THIS EXISTS AND WHY IT IS NOT THE COST MODEL. The cost model above is a
+# calibrated PREDICTION of peak VRAM, and it is deliberately fail-OPEN --
+# :data:`QUALIFIED_COST_ROWS` is empty, so ``cost_row_may_refuse`` is False for
+# every engine and no render is ever refused by it. That is an operator ruling
+# (the measurement campaign was declined), and this check does not touch it.
+#
+# This is a different, much dumber question that needs no calibration at all:
+# DO THE WEIGHTS THEMSELVES FIT? It is answered from file sizes on disk, before
+# anything is loaded, at zero cost.
+#
+# IT ONLY FIRES ON UNIFIED MEMORY, AND THE ASYMMETRY IS REAL, NOT TIMIDITY.
+# On CUDA a model larger than VRAM is survivable: ComfyUI offloads to host RAM,
+# so "weights > VRAM" is slow rather than fatal, and refusing it would break
+# working NVIDIA configurations. On Apple Silicon the offload device IS the same
+# physical RAM -- there is nowhere to offload TO. Exceeding it does not fail the
+# render, it takes the whole machine down: no traceback, no OOM exception, the
+# OS simply kills the process (and, at the ceiling, everything else the user had
+# open). That is the failure this guard exists to convert into a sentence.
+#
+# MEASURED, 2026-09-08, and the reason this was written: wan_ti2v with the fp16
+# UNET loaded cleanly on Metal -- WanTEModel 10835 MB, WanVAE 1344 MB (mps,
+# bf16), then "WAN22 ... loaded completely; 9536.40 MB, full load: True" -- and
+# the machine died at that line. Nothing in the pack objected, because nothing
+# was asking this question. The shipped config for that lane is the 9.37 GB
+# GGUF set (scripts/otr_fetch_lane_weights.py LANE_INFO), not the fp16 one.
+#
+# FAIL-OPEN BY CONSTRUCTION. Every path that cannot get a real number returns
+# None (allow). A false refusal blocks a configuration that works; a false
+# allowance leaves things exactly as they are today. Given the guard is
+# uncalibrated, only one of those errors is acceptable, so the check compares a
+# LOWER BOUND (resident weight bytes) against the budget and never tries to
+# predict activations.
+
+#: Headroom (MiB) reserved beyond the weights for activations, the allocator,
+#: ComfyUI itself and the OS. Deliberately modest: this is a floor check, and
+#: inflating it would start refusing configurations nobody has shown to fail.
+#: Env ``OTR_UNIFIED_MEMORY_HEADROOM_MB``.
+_UNIFIED_HEADROOM_MB = 1536.0
+
+
+def unified_memory_weight_refusal(engine_name, weight_mb, free_mb,
+                                  headroom_mb=None):
+    """Would loading ``weight_mb`` of weights exceed this host's budget?
+
+    PURE. Returns a refusal sentence, or ``None`` to allow. The caller decides
+    what to raise; see :func:`refuse_if_weights_exceed_unified_memory` for the
+    impure half that resolves the sizes and knows about the backend.
+
+    ``weight_mb`` is the sum of the engine's resolved artifacts ON DISK -- a
+    LOWER bound on residency, since it charges nothing for activations. So a
+    refusal here means the weights alone do not fit, which is unambiguous.
+    """
+    try:
+        weight = float(weight_mb)
+        free = float(free_mb)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(weight) and math.isfinite(free)):
+        return None
+    if weight <= 0 or free <= 0:
+        return None
+    if headroom_mb is None:
+        try:
+            headroom_mb = float(otr_env.get("OTR_UNIFIED_MEMORY_HEADROOM_MB",
+                                            _UNIFIED_HEADROOM_MB))
+        except (TypeError, ValueError):
+            headroom_mb = _UNIFIED_HEADROOM_MB
+    # A MALFORMED OVERRIDE FALLS BACK; IT DOES NOT DISARM (cursor review). The
+    # first version clamped with ``max(0.0, ...)``, so a negative value became a
+    # headroom of ZERO -- i.e. the escape hatch turned into a kill switch for
+    # the reservation, quietly, for anyone who typed a minus sign. Non-finite,
+    # negative and unparseable all mean "the operator did not say", so they all
+    # mean the default.
+    try:
+        headroom = float(headroom_mb)
+    except (TypeError, ValueError):
+        headroom = _UNIFIED_HEADROOM_MB
+    if not math.isfinite(headroom) or headroom < 0:
+        headroom = _UNIFIED_HEADROOM_MB
+    budget = free - headroom
+    if weight <= budget:
+        return None
+    return (
+        "%s needs %.1f GiB of weights resident and this host has %.1f GiB of "
+        "accelerator budget (%.1f GiB free, less %.1f GiB reserved for "
+        "activations and the OS). On UNIFIED memory there is no separate host "
+        "RAM to offload into -- the offload device is the same physical memory "
+        "-- so loading this would not fail the render, it would take the "
+        "MACHINE down. Refusing at the gate instead. Fix it by fetching a "
+        "quantised build of this lane if one exists (see LANE_INFO in "
+        "scripts/otr_fetch_lane_weights.py), or run it on a host with more "
+        "memory. Override with OTR_UNIFIED_MEMORY_HEADROOM_MB only if you "
+        "know why."
+        % (engine_name or "engine", weight / 1024.0, max(0.0, budget) / 1024.0,
+           free / 1024.0, headroom / 1024.0))
+
+
+def _unified_memory_backend():
+    """True when the accelerator shares physical memory with the host (Metal).
+
+    Never raises; False when torch is absent or CUDA is present -- a discrete
+    card has somewhere to offload to, so this guard does not apply there."""
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available():
+            return False
+        return bool(torch.backends.mps.is_available())
+    except Exception:  # noqa: BLE001 -- no torch / no mps -> not unified
+        return False
+
+
+#: folder_paths categories searched when resolving a declared artifact, in
+#: order. The first two entries are the TEXT ENCODER categories and the split
+#: matters -- see :func:`resolved_weight_mb`.
+_ENCODER_CATEGORIES = ("text_encoders", "clip")
+_WEIGHT_CATEGORIES = ("checkpoints", "diffusion_models", "unet", "vae",
+                      "loras", "animatediff_models", "audio_encoders",
+                      "clip_vision")
+
+
+#: Values an adapter uses in a loader-name slot to mean "there is no file
+#: here" (``eng_humo``'s optional LoRA slot returns "none"). Treating one as a
+#: filename makes it unresolvable, which -- under all-or-nothing -- silently
+#: disarms the guard for that whole engine.
+_LOADER_NAME_PLACEHOLDERS = frozenset({"none", "skip", "off", "null", "-", ""})
+
+
+def _encoder_is_evicted(engine_name):
+    """Does this adapter FREE its text encoder before the model loads?
+
+    THE ANSWER IS A PER-ENGINE CONTRACT AND THE ADAPTERS STATE IT. An agy
+    review caught the first version assuming the two-phase shape universally,
+    from the loader-dict KEY names. That is false for HuMo, which
+    ``eng_humo._session_node_ids`` documents as rendering "FULLY RESIDENT by
+    contract (BUG-265: forcing inter-node eviction fragmented the allocator
+    into an OOM)" -- its umt5, whisper, UNET and VAE are all held at once. The
+    same docstring says WAN uses ``free_after_use=True`` "precisely so umt5 and
+    the diffusion UNET are never co-resident". Two engines, opposite contracts,
+    and guessing wrong in the HuMo direction UNDER-COUNTS by the size of a text
+    encoder -- an allow on a configuration that would take the machine down.
+
+    So read what the adapter does rather than what its dict keys are called:
+    ``run_graph(..., free_after_use=True)`` in the adapter's own source is the
+    eviction, and its absence is full residency.
+
+    DEFAULTS TO FULLY RESIDENT (returns False). That is the conservative
+    direction: summing everything can only over-count, and over-counting on an
+    engine nobody has classified produces a refusal the operator can override,
+    while under-counting produces a crash they cannot."""
+    try:
+        import ast
+        import inspect
+        import textwrap
+        from . import registry as _vreg
+        eng = _vreg.get_engine(engine_name)
+    except Exception:  # noqa: BLE001 -- unregistered -> conservative
+        return False
+
+    def _calls_with_eviction(cls):
+        """AST, NOT a substring search, and the difference is not pedantry.
+
+        The first version did ``"free_after_use=True" in source`` and reported
+        HuMo as evicting -- because ``eng_humo._session_node_ids``' docstring
+        contains the sentence "WAN renders with ``free_after_use=True``" while
+        explaining that HuMo does the OPPOSITE. Prose about another engine's
+        behaviour read as this engine's behaviour, and it flipped the answer to
+        the unsafe side on the single heaviest lane in the pack."""
+        try:
+            src = textwrap.dedent(inspect.getsource(cls))
+            tree = ast.parse(src)
+        except Exception:  # noqa: BLE001 -- no source (frozen / exec'd)
+            return False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            for kw in node.keywords or ():
+                if kw.arg != "free_after_use":
+                    continue
+                value = kw.value
+                if isinstance(value, ast.Constant) and value.value is True:
+                    return True
+        return False
+
+    try:
+        # Walk the MRO: fastwan_8gb subclasses wan_ti2v and inherits its graph
+        # runner, so the eviction it relies on is declared in the parent.
+        for cls in type(eng).__mro__:
+            if cls is object:
+                continue
+            if _calls_with_eviction(cls):
+                return True
+    except Exception:  # noqa: BLE001
+        return False
+    return False
+
+
+def _loader_filenames(engine_name):
+    """(encoder_basenames, resident_basenames) an adapter will ACTUALLY load.
+
+    NOT ``model_requirements``. That field is the S5 wizard's informational
+    asset-id list and its entries are not filenames -- ``wan_ti2v`` declares
+    ``["wan2.2-ti2v-5b"]`` while its loader consumes
+    ``Wan2.2-TI2V-5B-Q5_K_M.gguf``, an umt5 encoder and ``wan2.2_vae.safetensors``.
+    A cursor review caught the first version of this reading the wizard tokens,
+    which meant ``folder_paths`` resolved nothing, which meant the guard
+    fail-opened on the ONE engine that had just killed the machine. The tests
+    passed anyway because they only exercised the pure arithmetic, never the
+    resolver -- so this function now has its own, and they run against the real
+    adapters.
+
+    DUCK-TYPED AND DELIBERATELY NARROW. There is no uniform weight-name surface
+    across 33 video adapters, so this reads the two that exist today
+    (``_loader_names()`` returning a unet/clip/vae dict, and the
+    ``_ckpt_name()``/``_t5_name()`` pair) and returns ``None`` for everything
+    else. An engine this cannot read is UNGUARDED, not blocked; when a lane
+    needs covering, give it ``resident_weight_files()`` returning the same
+    two-tuple and this picks it up first."""
+    try:
+        from . import registry as _vreg
+        eng = _vreg.get_engine(engine_name)
+    except Exception:  # noqa: BLE001 -- unregistered / import-time failure
+        return None
+    if eng is None:
+        return None
+
+    explicit = getattr(eng, "resident_weight_files", None)
+    if callable(explicit):
+        try:
+            encoders, resident = explicit()
+            return list(encoders or []), list(resident or [])
+        except Exception:  # noqa: BLE001
+            return None
+
+    loader_names = getattr(eng, "_loader_names", None)
+    if callable(loader_names):
+        try:
+            names = loader_names() or {}
+        except Exception:  # noqa: BLE001
+            return None
+        if isinstance(names, dict) and names:
+            def _real(value):
+                return (isinstance(value, str)
+                        and value.strip().lower()
+                        not in _LOADER_NAME_PLACEHOLDERS)
+
+            if not _encoder_is_evicted(engine_name):
+                # Fully resident: NOTHING gets its own phase, everything sums.
+                return [], [v for v in names.values() if _real(v)]
+            encoders = [v for k, v in names.items()
+                        if k in ("clip", "text_encoder", "te") and _real(v)]
+            resident = [v for k, v in names.items()
+                        if k not in ("clip", "text_encoder", "te") and _real(v)]
+            return encoders, resident
+
+    ckpt_name = getattr(eng, "_ckpt_name", None)
+    if callable(ckpt_name):
+        try:
+            resident = [ckpt_name()]
+        except Exception:  # noqa: BLE001
+            return None
+        encoders = []
+        t5_name = getattr(eng, "_t5_name", None)
+        if callable(t5_name):
+            try:
+                encoders = [t5_name()]
+            except Exception:  # noqa: BLE001
+                encoders = []
+        if not _encoder_is_evicted(engine_name):
+            resident = list(resident) + list(encoders)
+            encoders = []
+
+        def _real(value):
+            return (isinstance(value, str)
+                    and value.strip().lower()
+                    not in _LOADER_NAME_PLACEHOLDERS)
+
+        return [e for e in encoders if _real(e)], [r for r in resident
+                                                   if _real(r)]
+    return None
+
+
+def resolved_weight_mb(engine_name):
+    """PEAK concurrent residency (MiB) of ``engine_name``'s loader artifacts,
+    or ``None`` when they cannot all be resolved.
+
+    NOT the sum. The first version of this summed every artifact and that was
+    WRONG in the one direction a guard must never be wrong: it refused
+    ``ltx_8gb``, which is proven working on this exact host. LTX declares
+    16.1 GB of artifacts and runs fine in a 11.8 GiB budget, because its 9.8 GB
+    T5 encoder loads, encodes, and UNLOADS before the 6.3 GB checkpoint is
+    touched. They are never resident together, so their sum is a number that
+    describes no moment in the render.
+
+    The model here is the two phases ComfyUI actually runs, which is a property
+    of ComfyUI's loader rather than per-engine calibration:
+
+      phase 1  the text encoder, alone          -> largest encoder artifact
+      phase 2  UNET + VAE + LoRAs, together     -> sum of everything else
+
+    and the peak is the larger of the two. Both observed directly in the logs
+    on 2026-09-08: LTX loaded t5xxl then released it before the checkpoint;
+    wan_ti2v loaded WanTEModel, then WanVAE and WAN22 together -- and it was
+    that second phase, 10.8 GiB of UNET plus VAE, that killed the machine.
+
+    ALL-OR-NOTHING still: one unresolvable artifact returns None and the guard
+    allows, because a partial number looks like an answer and is not one."""
+    split = _loader_filenames(engine_name)
+    if not split:
+        return None
+    encoder_names, resident_names = split
+    if not encoder_names and not resident_names:
+        return None
+    try:
+        import folder_paths  # type: ignore
+    except ImportError:
+        return None
+
+    def _size_mb(name):
+        if not isinstance(name, str) or not name:
+            return None
+        for category in _ENCODER_CATEGORIES + _WEIGHT_CATEGORIES:
+            try:
+                path = folder_paths.get_full_path(category, name)
+            except Exception:  # noqa: BLE001 -- unknown category on this host
+                continue
+            if path and os.path.exists(path):
+                try:
+                    return os.path.getsize(path) / (1024.0 * 1024.0)
+                except OSError:
+                    return None
+        return None
+
+    encoder_peak = 0.0
+    for name in encoder_names:
+        size = _size_mb(name)
+        if size is None:
+            return None
+        encoder_peak = max(encoder_peak, size)
+    resident_sum = 0.0
+    for name in resident_names:
+        size = _size_mb(name)
+        if size is None:
+            return None
+        resident_sum += size
+    return max(encoder_peak, resident_sum)
+
+
+def refuse_if_weights_exceed_unified_memory(engine_name):
+    """Raise :class:`MotionBudgetError` when ``engine_name``'s weights cannot
+    fit this host's unified memory. No-op on CUDA, on CPU, and whenever any
+    input cannot be resolved. Never raises anything else."""
+    try:
+        if not _unified_memory_backend():
+            return
+        weight_mb = resolved_weight_mb(engine_name)
+        if weight_mb is None:
+            return
+        message = unified_memory_weight_refusal(
+            engine_name, weight_mb, free_vram_mb())
+    except MotionBudgetError:
+        raise
+    except Exception:  # noqa: BLE001 -- a guard must never be the failure
+        return
+    if message:
+        raise MotionBudgetError(message)
 
 
 def _cost_model_for(engine_name):
@@ -894,6 +1264,9 @@ __all__ = [
     "VramPeakProbe",
     "FRAME_COST_MODEL", "FRAME_MOTION_FLOOR", "free_vram_mb",
     "assert_frame_affordable", "cost_row_may_refuse", "QUALIFIED_COST_ROWS",
+    "unified_memory_weight_refusal", "resolved_weight_mb",
+    "_loader_filenames", "_encoder_is_evicted",
+    "refuse_if_weights_exceed_unified_memory",
     "compute_real_frame_budget",
     "MotionEngineBase",
 ]
