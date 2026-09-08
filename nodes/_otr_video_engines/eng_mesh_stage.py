@@ -733,6 +733,17 @@ class MeshStageEngine(_CheapFamilyBase):
             _LOG.info("[eng_mesh_stage] VRAM barrier: empty_cache before "
                       "Blender spawn (torch mesher and Blender-GPU never "
                       "run concurrently)")
+        # METAL (2026-09-08). The cuda branch above is a no-op on Apple Silicon,
+        # so this barrier did nothing there -- and it matters MORE on unified
+        # memory, not less: Blender is about to compete for the SAME physical
+        # RAM the torch mesher is holding, with no separate VRAM pool to fall
+        # back on. Checked second and independently, so an NVIDIA host takes the
+        # branch above and never reaches this one.
+        elif getattr(torch, "mps", None) and torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+            _LOG.info("[eng_mesh_stage] unified-memory barrier: "
+                      "torch.mps.empty_cache() before Blender spawn (Blender "
+                      "competes for the same RAM the mesher holds)")
 
     # ---- E-2: cache lookup / fill ----
     def _request_mesh_subject_id(self, request):

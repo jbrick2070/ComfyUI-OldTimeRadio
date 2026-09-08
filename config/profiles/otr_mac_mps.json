@@ -1,7 +1,7 @@
 {
   "id": "otr_mac_mps",
-  "display_name": "Apple Silicon MPS (draft, UNVERIFIED on hardware)",
-  "status": "draft",
+  "display_name": "Apple Silicon MPS -- VERIFIED on an M4 / 16 GB (2026-09-08: six episodes in otr/obs/). Press Run and it works with NO downloads: the three visual lanes are procgen (viz_mxc_cpu / viz_green / viz_camera), voices are kokoro, music is stable_audio_3. The image roles name sd15 -- INERT under this wiring, because no viz_* lane consumes a still, and the engine that mints one the moment you switch a lane to still_flat / still_pan / still_word (fetch its 2.1 GB checkpoint first). For local video diffusion swap a lane to ltx098_low_video and read docs/MAC_PORTABILITY_GUIDE.md section 7. 16 GB is the floor and it is tight; a 32 GB Mac has more headroom but nothing above has been measured there.",
+  "status": "shipping",
   "platform": "mac",
   "device_backend": "mps",
   "gpu_vendor": "apple",
@@ -9,11 +9,11 @@
   "allow_sidecars": false,
   "role_overrides": {
     "announcer_visual": "viz_mxc_cpu",
-    "music_visual": "viz_mxc_mandala",
+    "music_visual": "viz_green",
     "character_visual": "viz_camera",
-    "announcer_image": "z_image_turbo",
-    "music_image": "z_image_turbo",
-    "character_image": "z_image_turbo"
+    "announcer_image": "sd15",
+    "music_image": "sd15",
+    "character_image": "sd15"
   },
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",
@@ -48,7 +48,13 @@
     "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
-    "lane_allowlist": ["gguf", "openrouter", "comfy_credits", "google_api"]
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
   },
   "video": {
     "device_policy": "mps",
@@ -71,8 +77,10 @@
     "beats": 40
   },
   "preflight": {
-    "required_models": [],
-    "required_keys": ["OTR_GOOGLE_API_KEY"]
+    "required_models": [
+      "v1-5-pruned-emaonly-fp16.safetensors"
+    ],
+    "required_keys": []
   },
   "launch": {
     "sage_attention": false,

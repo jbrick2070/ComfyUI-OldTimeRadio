@@ -438,8 +438,21 @@ def _capability_row(name: str) -> dict:
 
 
 def _is_local_gpu_lane(name: str) -> bool:
+    """A lane that loads local weights onto an accelerator -- the population
+    every gate below is written for.
+
+    THIS USED TO READ ``== ["cuda"]`` AND THAT WAS A TRAP (2026-09-08). The
+    exact-match made the predicate a test of the ROW rather than of the LANE:
+    the moment ``ltx_8gb`` earned a second backend and became
+    ``["cuda", "mps"]``, it stopped matching and SILENTLY dropped out of G1 and
+    the render_canvas gate -- the one lane that had just been proven on a
+    second platform lost its coverage for having done so, and nothing failed to
+    say it. Any future lane that gains a backend would have been exempted the
+    same way. Membership plus "needs a GPU to be practical" is the property the
+    gates actually depend on; a cloud lane is excluded by
+    ``practical_without_gpu``, as before."""
     row = _capability_row(name)
-    return (list(row.get("device_backends") or []) == ["cuda"]
+    return ("cuda" in list(row.get("device_backends") or [])
             and not row.get("practical_without_gpu", False))
 
 

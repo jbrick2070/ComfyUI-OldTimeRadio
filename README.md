@@ -18,11 +18,15 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
-100% local by default. No API keys required on NVIDIA and AMD. Optional hosted LLM
-and all-cloud routes exist; they stay off unless you turn them on. One exception as
-of this writing: the Apple Silicon **draft** profile has no local image engine wired
-up yet, so its pictures come from Google's paid image API and need a key -- see the
-Mac row in "Pick the graph" below.
+100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
+any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
+turn them on.
+
+(That Apple Silicon line used to read "no local image engine wired up yet, so its
+pictures come from Google's paid image API and need a key". As of 2026-09-08 that is
+wrong on both counts: `sd15` mints stills locally and `ltx_8gb` renders local video
+diffusion, both measured on a Mac mini M4 / 16 GB. See the Mac row in "Pick the graph"
+and `docs/MAC_PORTABILITY_GUIDE.md`.)
 
 > **Already installed it? Load the show:** **Workflow → Browse Templates →
 > EXTENSIONS → comfyui-old-time-radio**. There is exactly one entry,
@@ -403,7 +407,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
 | AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical`, then set `llm_device` -> `cuda` (ROCm torch reports as cuda) and `device_policy` -> `cuda` | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
-| Apple Silicon Mac (draft; first real-hardware session 2026-09-07) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys and no image weights at all: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_mxc_mandala`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. **PROVEN on real hardware 2026-09-07: an episode published to `otr/obs/`** -- 135 s, 1080p25, h264+aac, fully local, no image weights and no API keys. Qwen3.5-4B writer on Metal (~6.5 tok/s) -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg. Getting there needed five fixes, all shipped: the `tokenizers` pin that bricked the boot (alpha.29), a music lane whose `pycairo` dependency is Windows-only, ffmpeg AND ffprobe never being declared dependencies at all, and a 100%-NaN Stable Audio 3 caused by our own determinism wrapper meeting an MPS `baddbmm` bug. **Keep `llm_quant_policy` at `none`** -- NF4 runs at 0.3-0.5 tok/s on Metal (vs 14.47 on CUDA) and cannot clear the 40 s NewsCuration budget. 16 GB is thin: the writer peaks near 14 GB and has OOM-killed. ONE episode is not repeatability. **Running on a Mac? Start with `docs/MAC_PORTABILITY_GUIDE.md`** -- what works out of the box, what needs manual steps, and what cannot work locally. Measurements behind it: `docs/MAC_LESSONS_LEARNED.md` |
+| Apple Silicon Mac (VERIFIED; sessions 2026-09-07 and 2026-09-08) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys, **zero downloads on the press-Run path**: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_green`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. (`viz_mxc_mandala` was in this list and is NOT usable out of the box -- its `pycairo` dependency has no macOS wheel; `brew install cairo pkg-config` first, or use `viz_green`.) You are not stuck there: `sd15` (2.1 GB) mints stills locally and unlocks `still_flat` / `still_pan` / `still_word`, and `ltx_8gb` (6.3 GB + 9.8 GB text encoder) is real local video diffusion on Metal -- both measured on this machine, both in `docs/MAC_PORTABILITY_GUIDE.md` sections 5, 7 and 9. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. **PROVEN on real hardware 2026-09-07: an episode published to `otr/obs/`** -- 135 s, 1080p25, h264+aac, fully local, no image weights and no API keys. Qwen3.5-4B writer on Metal (~6.5 tok/s) -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg. Getting there needed five fixes, all shipped: the `tokenizers` pin that bricked the boot (alpha.29), a music lane whose `pycairo` dependency is Windows-only, ffmpeg AND ffprobe never being declared dependencies at all, and a 100%-NaN Stable Audio 3 caused by our own determinism wrapper meeting an MPS `baddbmm` bug. **Keep `llm_quant_policy` at `none`** -- NF4 runs at 0.3-0.5 tok/s on Metal (vs 14.47 on CUDA) and cannot clear the 40 s NewsCuration budget. 16 GB is thin: the writer peaks near 14 GB and has OOM-killed. ONE episode is not repeatability. **Running on a Mac? Start with `docs/MAC_PORTABILITY_GUIDE.md`** -- what works out of the box, what needs manual steps, and what cannot work locally. Measurements behind it: `docs/MAC_LESSONS_LEARNED.md` |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
@@ -441,9 +445,10 @@ it does not silently rewrite the graph currently open in ComfyUI.
   required); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
   explicit profile overrides. Episode length is set by act count, not a word target.
 - **OS:** Windows or Linux for the proven NVIDIA paths (RTX 4060 8 GB and RTX 5080 16 GB
-  have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as an
-  unverified draft profile (`otr_mac_mps`) whose pictures come from a paid Google API
-  today -- read the Mac row in "Pick the graph" before you start.
+  have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as
+  `otr_mac_mps`, verified on a Mac mini M4 / 16 GB -- fully local, no API key, with
+  `sd15` stills and `ltx_8gb` video diffusion both measured on Metal. Read
+  `docs/MAC_PORTABILITY_GUIDE.md` before you start; 16 GB is the floor and it is tight.
 - **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
   Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
   backend yet (bark replaces it with three dropdown changes).
@@ -480,7 +485,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
-Apple Silicon is still the unproven experimental `otr_mac_mps` profile; CPU-only is `cpu_floor`. Neither is promoted to a machine key or PROVEN until a named physical system publishes an episode.
+Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is `cpu_floor`, still unproven -- no named system has published on it.
 
 <!-- END GENERATED: machine-matrix -->
 

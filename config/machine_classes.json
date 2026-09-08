@@ -112,6 +112,46 @@
       "artifacts": 3,
       "scope": "isolated 864x480x90 cold, warm-1, and warm-2 model-family clips below the canonical 124-model-frame floor; not the OTR engine adapter or a canonical episode",
       "evidence": "vram-recipe-lab cell h3-mime-i2v-action-demo-f90/20260814T012207Z-ff39579c4625; run SHA-256 28beec62e28e372d85ae011a9f789bff7c15cb8ff4f39d1779f11842e2f60501; media and machine gates passed; peaks 7.147/6.788/6.788 GiB; human-approved"
+    },
+    {
+      "engine": "viz_camera",
+      "label": "procgen visualizer lanes",
+      "level": "PROVEN",
+      "hardware": "Mac mini M4, 16 GB unified, Apple Silicon (MPS)",
+      "date": "2026-09-07",
+      "episodes": 2,
+      "scope": "full published OTR episodes on the zero-download press-Run path: viz_mxc_cpu / viz_green / viz_camera video, Qwen3.5-4B writer on Metal, Kokoro voices, Stable Audio 3 music; no image weights invoked",
+      "evidence": "otr/obs/ 20260907_201810 (rfrc/vcam) and 20260907_214731 (cart/vcam); docs/MAC_PORTABILITY_GUIDE.md sections 1-4"
+    },
+    {
+      "engine": "sd15",
+      "label": "SD 1.5 local still engine",
+      "level": "PROVEN",
+      "hardware": "Mac mini M4, 16 GB unified, Apple Silicon (MPS)",
+      "date": "2026-09-08",
+      "episodes": 3,
+      "scope": "full published OTR episodes whose scene stills were minted locally on Metal at 768x432 (long side clamped by OTR_SD15_MAX_SIDE); it is the still supplier for every still_* and ltx_8gb receipt below, so those episodes are its receipts too",
+      "evidence": "otr/obs/ 20260908_005546, 20260908_030426, 20260908_042821; [OTR.image.sd15] minted still lines in logs/sd15_run.log, ltx_sd15.log, chain_stills3.log"
+    },
+    {
+      "engine": "ltx_8gb",
+      "label": "LTX 0.9.8 2B local video diffusion",
+      "level": "PROVEN",
+      "hardware": "Mac mini M4, 16 GB unified, Apple Silicon (MPS)",
+      "date": "2026-09-08",
+      "episodes": 2,
+      "scope": "full published OTR episodes with real local video diffusion on Metal, including one with all three video roles on LTX; the shipped device_backends row said [\"cuda\"] and was untested policy, corrected to [\"cuda\",\"mps\"] by this receipt",
+      "evidence": "otr/obs/ 20260908_012201 (vart/lx8g) and 20260908_030426 (sbke/lx8g); docs/MAC_PORTABILITY_GUIDE.md section 7 carries the install steps and the 16 GB cost"
+    },
+    {
+      "engine": "still_motion",
+      "label": "the four still_* lanes (motion / pan / flat / word)",
+      "level": "PROVEN",
+      "hardware": "Mac mini M4, 16 GB unified, Apple Silicon (MPS)",
+      "date": "2026-09-08",
+      "episodes": 2,
+      "scope": "full published OTR episodes covering all four still_* lanes across two runs, every still supplied locally by sd15; three video dropdowns exist so no single run can cover four lanes",
+      "evidence": "otr/obs/ 20260908_005546 (arch/stmo) covers still_motion; 20260908_042821 (cart/stwo) covers still_pan + still_flat + still_word; docs/MAC_PORTABILITY_GUIDE.md section 9"
     }
   ],
   "measurements": [

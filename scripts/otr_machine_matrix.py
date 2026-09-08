@@ -448,9 +448,13 @@ def render() -> str:
       "Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro "
       "backend packaged yet; there, run `--profile otr_4060_floor` for the bark "
       "route or switch the OTR_CastLock voice dropdowns to bark.")
-    A("\nApple Silicon is still the unproven experimental `otr_mac_mps` profile; "
-      "CPU-only is `cpu_floor`. Neither is promoted to a machine key or "
-      "PROVEN until a named physical system publishes an episode.\n")
+    A("\nApple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a "
+      "Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and "
+      "2026-09-08, including local `sd15` stills and local `ltx_8gb` video "
+      "diffusion. It is not promoted to a machine key: a machine key implies a "
+      "measured VRAM tier, and one 16 GB Mac is one data point, not a tier. "
+      "Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is "
+      "`cpu_floor`, still unproven -- no named system has published on it.\n")
     A("")
 
     A("## How to read the confidence column\n")

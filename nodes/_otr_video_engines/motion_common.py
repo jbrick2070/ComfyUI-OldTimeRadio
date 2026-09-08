@@ -354,19 +354,51 @@ _BUDGET_MARGIN = 0.85
 
 
 def free_vram_mb():
-    """Machine-wide FREE VRAM (MB) via a ZERO-COST ``torch.cuda.mem_get_info``
-    read, or ``None`` when torch/CUDA is unavailable (the CPU box / unit tests).
+    """FREE accelerator memory (MB), or ``None`` when nothing can be probed
+    (the CPU box / unit tests).
 
     This is the "probe" the dynamic frame budget uses: 0 bytes allocated, 0 GPU
     time, no render. NEVER a render-probe (try-then-OOM corrupts the allocator).
-    Pure telemetry; never raises."""
+    Pure telemetry; never raises.
+
+    TWO BACKENDS, AND THEY DO NOT MEAN THE SAME THING (2026-09-08, Apple
+    Silicon). CUDA is checked FIRST and its path is byte-for-byte what it always
+    was, so nothing on an NVIDIA box changes.
+
+    * CUDA -- ``torch.cuda.mem_get_info()`` free bytes. MACHINE-WIDE: it already
+      excludes memory other processes hold on the card.
+    * METAL -- ``recommended_max_memory()`` (Metal's per-process working-set
+      ceiling, about 75% of physical RAM) minus ``driver_allocated_memory()``
+      (what THIS process holds). That is a PER-PROCESS headroom figure, not a
+      machine-wide one: it does not know about the browser, Xcode, or a second
+      ComfyUI competing for the same unified RAM, so on a busy desktop it reads
+      OPTIMISTIC where the CUDA number would not. ``_BUDGET_MARGIN`` absorbs
+      some of that; a Mac that OOMs anyway should lower
+      ``OTR_VIDEO_BUDGET_MARGIN`` rather than have this function lie.
+
+    WHY THIS MATTERS MORE THAN IT LOOKS. Returning ``None`` is not neutral --
+    :func:`compute_real_frame_budget` treats ``None`` as "no budget known" and
+    stops predicting. So before this, the dynamic frame budget was silently and
+    ENTIRELY disabled on every Mac: every motion engine flew blind and reacted
+    to OOM instead of avoiding it, which is exactly the failure mode the probe
+    exists to prevent. The `free=nan MB` in a Mac render log is that.
+    """
     try:
         import torch  # type: ignore
-        if not torch.cuda.is_available():
+        if torch.cuda.is_available():
+            free_b, _total_b = torch.cuda.mem_get_info()
+            return float(free_b) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 -- no torch/CUDA -> try Metal, then give up
+        return None
+    try:
+        if not torch.backends.mps.is_available():
             return None
-        free_b, _total_b = torch.cuda.mem_get_info()
-        return float(free_b) / (1024.0 * 1024.0)
-    except Exception:  # noqa: BLE001 -- no torch/CUDA -> caller trusts the target
+        ceiling_b = float(torch.mps.recommended_max_memory())
+        held_b = float(torch.mps.driver_allocated_memory())
+        if ceiling_b <= 0:
+            return None
+        return max(0.0, ceiling_b - held_b) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 -- older torch, no torch.mps -> unknown
         return None
 
 

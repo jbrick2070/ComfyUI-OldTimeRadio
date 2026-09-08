@@ -41,7 +41,9 @@ Design (per Jeffrey's go-forward feedback 2026-05-30):
   * SDH line rules: <=2 lines, <=44 chars/line, target <=17 CPS (hard cap 20),
     min 1.0 s on screen, no overlap (later cue start clamps earlier cue end).
 
-This module is pure stdlib and import-safe (no side effects at import). The
+This module is import-safe (no side effects at import). It is NOT pure stdlib
+and has not been since it started sharing title-card arithmetic: it imports
+``_otr_title_card`` (numpy) and ``_otr_shared.env``. The
 node burn step (P1+) calls :func:`build_ass_from_ledger`; the CLI builds an
 ``.ass`` next to a given ledger and prints the file plus a lint report for QA.
 
@@ -62,12 +64,64 @@ try:
 except ImportError:  # loaded with nodes/ on sys.path
     import _otr_title_card as _OTRTC  # type: ignore
 
+# The ONE owner of the process environment under nodes/ (pinned by
+# tests/test_env_single_owner.py -- a bare os.environ read here is a regression,
+# not a shortcut).
+try:
+    from ._otr_shared import env as otr_env  # type: ignore
+except ImportError:  # loaded with nodes/ on sys.path
+    from _otr_shared import env as otr_env  # type: ignore
+
 # -- ASS coordinate space ---------------------------------------------------
 # The header pins these, so every position and size in the file is expressed in
 # them and libass scales the whole lot to whatever the video actually is. The
 # title planner works in the PROCGEN frame's pixels, which need not match, so
 # the emitter scales into this space rather than moving PlayRes -- moving it
 # would silently rescale every SDH caption's font and margins too.
+# -- monospace face --------------------------------------------------------
+# Consolas is a WINDOWS font. It is not on macOS and not on most Linux boxes,
+# and an ASS ``Style:`` line naming a face the renderer cannot find does not
+# error -- libass asks fontconfig for a substitute and silently gets a
+# PROPORTIONAL sans. So every Mac render of the CRT caption variant and of the
+# hero title card has been quietly drawn in the wrong face, in the wrong
+# metrics, with no warning anywhere. (Confirmed on an M4 2026-09-08.)
+#
+# The fix has to be a NAME chosen per platform, not a list: an ASS style line
+# holds exactly one family. Windows keeps Consolas, so the CUDA machines render
+# byte-identically to before this change.
+#
+#: Sentinel for a style's ``font`` slot: "whatever this platform calls its
+#: monospace face". Resolved at EMIT time, not import time, so an operator can
+#: change it on an already-booted server.
+MONO = "<monospace>"
+
+#: Faces that ship with the OS, so no download and no fontconfig guesswork.
+#: Menlo has been in every macOS since 10.6; DejaVu Sans Mono is the near
+#: universal Linux monospace and the one Pillow/matplotlib vendor.
+_MONO_BY_PLATFORM = {"win32": "Consolas", "darwin": "Menlo"}
+_MONO_FALLBACK = "DejaVu Sans Mono"
+
+
+def mono_font() -> str:
+    """The monospace family name to write into an ASS ``Style:`` line.
+
+    ``OTR_CAPTION_MONO_FONT`` overrides it outright -- that is the escape hatch
+    for a machine whose OS font is missing or whose operator wants a different
+    teletype face, and it is also what makes this falsifiable: set it to a
+    garbage name and the captions should visibly change face.
+    """
+    override = (otr_env.get("OTR_CAPTION_MONO_FONT") or "").strip()
+    if override:
+        return override
+    return _MONO_BY_PLATFORM.get(sys.platform, _MONO_FALLBACK)
+
+
+def _resolve_font(name: str) -> str:
+    """Map the :data:`MONO` sentinel to a real family; pass anything else
+    through untouched (``sdh_standard`` asks for Arial and means it)."""
+    return mono_font() if name == MONO else name
+
+
 PLAY_RES_X = 1920
 PLAY_RES_Y = 1080
 
@@ -112,7 +166,7 @@ STYLES = {
     },
     # Themed variant for QA comparison only. Green CRT, thin outline (no box).
     "otr_crt": {
-        "font": "Consolas",
+        "font": MONO,
         "size": 50,
         "primary": "&H0066FF33",   # opaque OTR green (#33FF66 -> bbggrr 66FF33)
         "outline_col": "&H00000000",
@@ -235,10 +289,16 @@ TITLE_STYLE_NAME = "TITLE"
 # to move, not `core vs outline`, which was already passing.
 TITLE_OUTLINE_W = 6
 TITLE_SHADOW = 2
-_TITLE_STYLE_LINE = (
-    f"Style: {TITLE_STYLE_NAME},Consolas,48,&H0041FF00,&H000000FF,&H00000000,"
-    f"&H00000000,1,0,0,0,100,100,0,0,1,{TITLE_OUTLINE_W},{TITLE_SHADOW},7,0,0,0,1"
-)
+def _title_style_line() -> str:
+    """The hero title card's ASS style row. A FUNCTION rather than the module
+    constant it used to be, because the face is now resolved per platform (and
+    per ``OTR_CAPTION_MONO_FONT``) and a constant would freeze whatever the
+    server booted with."""
+    return (
+        f"Style: {TITLE_STYLE_NAME},{mono_font()},48,&H0041FF00,&H000000FF,"
+        f"&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,{TITLE_OUTLINE_W},"
+        f"{TITLE_SHADOW},7,0,0,0,1"
+    )
 
 
 def _ass_header(style: dict, margin_v: int) -> str:
@@ -247,12 +307,12 @@ def _ass_header(style: dict, margin_v: int) -> str:
         "Style: SDH,{font},{size},{primary},&H000000FF,{outline_col},{back},"
         "{bold},0,0,0,100,100,0,0,{bs},{outline},{shadow},2,{mx},{mx},{mv},1"
     ).format(
-        font=s["font"], size=s["size"], primary=s["primary"],
+        font=_resolve_font(s["font"]), size=s["size"], primary=s["primary"],
         outline_col=s["outline_col"], back=s["back"], bold=s["bold"],
         bs=s["border_style"], outline=s["outline"], shadow=s["shadow"],
         mx=CAPTION_MARGIN_X, mv=margin_v,
     )
-    style_line = style_line + "\n" + _TITLE_STYLE_LINE
+    style_line = style_line + "\n" + _title_style_line()
     return (
         "[Script Info]\n"
         "; OTR SDH open captions -- generated by scripts/otr_captions.py\n"
