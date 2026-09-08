@@ -13378,6 +13378,37 @@ judged on BOTH rate and pixels.
 not a speedup, and this pack has already been caught once today reading a valid
 h264 file with correct duration as a success.
 
+#### UPDATE, same day: the attention op is NOT corrupt at any shape
+
+ComfyUI's real `attention_sub_quad` was compared against `attention_pytorch`
+numerically on `mps`, fp16, same inputs, across video AND audio-like shapes:
+
+```
+shape                             seq  heads   sub_quad vs SDPA
+AnimateDiff window 512x288       2304      8          0.0207%
+SD1.5 image 512x512              4096      8          0.0203%
+long seq, few heads              8192      4          0.0208%
+longer seq, few heads           16384      4          0.0247%
+very long, 1 head               32768      1          0.0354%
+```
+
+All finite, all within fp16 rounding of the reference. `attention_split` and
+`attention_basic` agree to the same tolerance. **The isolated op is fine.**
+
+That does not disprove the measured SA3 noise -- flatness 0.432 against 0.156
+was real -- but it means the attention implementation alone does not explain it.
+The likeliest remaining explanation is the OTHER fix made the same morning:
+`_otr_determinism.py` sets `torch.utils.deterministic.fill_uninitialized_memory
+= False` on MPS, which addresses `baddbmm`'s uninitialized-buffer defect
+directly. If that is what fixed the audio, then the attention forcing is
+REDUNDANT and is costing ~14x on every diffusion lane for nothing.
+
+**The discriminating test is already running.** Arm B renders with
+`OTR_MPS_PYTORCH_ATTENTION=0`, so it produces both a video sampler rate under
+sub-quadratic AND an SA3 cue whose spectral flatness can be measured with the
+same metric that established the bug. Flatness near 0.156 means the forcing can
+go; near 0.432 means it stays and the slowness is the price.
+
 #### Consequence if it holds
 
 Every cost figure in `docs/MAC_PORTABILITY_GUIDE.md` was measured under the slow
