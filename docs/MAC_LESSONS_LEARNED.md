@@ -1,5 +1,13 @@
 # Mac (Apple Silicon) -- lessons learned
 
+**READ THE COUNT IN CONTEXT: 2026-09-07 WAS DAY ONE.** Operator: *"today was the
+first day we tried a Mac render."* Six defects in a single session is not decay,
+neglect, or a pack that "used to work on Mac" -- **this path had never been
+executed on Apple Silicon by anyone**. Every one of these is a first-contact
+finding, which is exactly what a first run is for, and four of the six turned out
+not to be Mac problems at all. A platform nobody has run is not a platform that
+is broken; it is a platform that is unmeasured. It is measured now.
+
 **WHAT THIS SESSION WAS TESTING.** Operator, 2026-09-07: *"that's what we are
 testing for -- the lowest friction path to renders using my canonical json."*
 Not tuning, not quality, not benchmarking: **can a person install this pack and
