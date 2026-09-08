@@ -842,6 +842,81 @@ place entirely.
 
 ---
 
+## 10.6 The writer, not the video lane, is what kills a 16 GB Mac
+
+**This is the most important thing on this page, and it was found by asking the
+right question rather than by testing harder.**
+
+Three renders took the whole machine down on 2026-09-08. Two of them I blamed on
+the video lane and spent hours shortening clips. The operator's observation
+ended that:
+
+> The LTX lane carries **16.1 GB** of weights and published episodes here. The
+> AnimateDiff lane carries **2.4 GB** and cannot finish. So the video lane is
+> not the variable.
+
+It was not. The writer is common to both, and the heavier lane survived only
+because its episode made fewer writer cycles.
+
+### What was actually happening
+
+`Qwen/Qwen3.5-4B` is ~8.7 GB, and one episode loaded it **four times**. The
+reason is an ordering bug that is wrong on every platform:
+`_otr_writer_vram.unload_writer_llm_after_script`'s own docstring says "evict the
+writer LLM after the LAST LLM phase", but the call sat at
+`_otr_writer_tail.py:1102`, with three more LLM phases below it -- the brief
+reflection, ledger clean/cleanup, and the cast-coverage repair. Each was
+appended to the tail *after* the unload was placed, and each got a fresh
+`from_pretrained` plus warmup in response. On a discrete card that is 25-40
+wasted seconds a time. Here it was fatal, for a reason that took three
+independent reviews to pin down:
+
+**`unload_llm` clears the cache but not every reference.** The Slot Drama
+Contract's `_sdc_cache` and `_sdc_gen_fn` (`OTR_LedgerScriptWriter.py:4448`) are
+locals of the still-live `run()` frame, and the generate closure captures the
+cache entry *and* the model directly (`_otr_constrained_generate.py:234-242`).
+Those aliases keep the old model alive. `model.to("cpu")` then turns it into an
+~8.7 GB CPU-resident copy that cannot be reaped -- and on unified memory "cpu"
+is the same physical RAM -- so the reload builds a second copy beside the first.
+**Two writers, ~17 GB, on a 16 GB machine.** The kill lands mid-`from_pretrained`
+with no traceback.
+
+### Two fixes, and the honest order of importance
+
+1. **The unload moved to the real boundary** (`_otr_writer_tail.py`, after the
+   cast-coverage repair). Four loads become two, and no reload happens while
+   those aliases are live. **This is the fix.**
+2. **`torch.mps.empty_cache()` in the teardown** (`_otr_model_loader.py`). The
+   teardown implemented its documented six-step sequence only for CUDA; steps
+   4-6 had no Metal counterpart, so `.to("cpu")` left the Metal pool held until
+   the next load washed it. Useful -- it closes a 2x window across the gap where
+   the video models load -- but it cannot free a referenced CPU copy, so on its
+   own it does not stop the kill.
+
+### What to check if this comes back
+
+```bash
+grep -c "Loading LLM model" <server log>     # 2 per episode, not 4
+grep -c "proceeding with caution" <log>      # informational, see below
+```
+
+**`vram_fit=WARN@4.3 GB` is lying to you by 2x.** `_estimate_resident_gb`
+divides every non-GGUF model's disk size by two
+(`_otr_model_catalog.py:1828, 1898`), i.e. it assumes NF4 regardless of
+`quant_policy`. The Mac profile runs `quant_policy: "none"`, so the true
+residency is >= 8.68 GB plus KV -- 87% of the 10 GB ceiling, not 43%. The gate
+only refuses at 1.5x the ceiling, so it admits either way; but do not read that
+number as headroom.
+
+### The general lesson, which cost the most time
+
+Every kill looked like a video-lane problem because a video lane was on screen
+when it happened. The thing to measure on this platform is not the lane you
+selected -- it is **how many times the biggest model in the pipeline is loaded**,
+and whether anything still holds a reference when it is.
+
+---
+
 ## 11. What the wider world reports, and why we stopped testing by trying
 
 **Method note, and it is the point of this section.** Everything above section 10
