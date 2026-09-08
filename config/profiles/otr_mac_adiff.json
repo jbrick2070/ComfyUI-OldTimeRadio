@@ -58,7 +58,8 @@
   },
   "video": {
     "device_policy": "mps",
-    "dtype_policy": "no_fp8_no_fp4"
+    "dtype_policy": "no_fp8_no_fp4",
+    "max_render_frames": 17
   },
   "image": {
     "dtype_policy": "no_fp8_no_fp4"

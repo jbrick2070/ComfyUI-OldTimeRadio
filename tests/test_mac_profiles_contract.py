@@ -160,17 +160,30 @@ def test_the_adiff_profile_differs_from_the_base_one_only_where_it_should():
         assert base["role_overrides"][role] != adiff["role_overrides"][role]
 
 
-def test_the_adiff_frame_budget_is_the_reason_the_profile_exists():
+def test_the_adiff_render_cap_is_the_reason_the_profile_exists():
     """MEASURED 2026-09-08. On the bare canonical, ghost_signal planned 125
     latents against AnimateDiff-Evolved's 16-frame context window -- about eight
     sliding windows per sampler step, 124 s/step, ~41 minutes for one clip. Per
     window the Mac is only ~1.5x slower than the 4060 that renders this lane in
-    3-3.6 minutes; the whole gap is clip length. If this number drifts back up,
-    the profile has lost its purpose."""
-    render = _profile("otr_mac_adiff")["render"]
-    assert render["frame_budget"] <= 33, (
-        "frame_budget %r puts this back into multi-window sampling"
-        % render["frame_budget"])
+    3-3.6 minutes; the whole gap is clip length.
+
+    THE KNOB IS `video.max_render_frames`, NOT `render.frame_budget`, and the
+    first version of this profile set the wrong one. It shipped with
+    frame_budget 17 and the very next run still planned 125 latents -- caught by
+    watching the log rather than by any test. capability_profiles.py:148 states
+    the distinction outright: frame_budget is "the soak/single harness per-clip
+    frame count (every 16GB tier declares 25 there and must NOT be capped to
+    it)", while the planner reads video.max_render_frames through
+    otr_shot_lock._stamp_coverage_plan. Two plausible names, one of which does
+    nothing here."""
+    p = _profile("otr_mac_adiff")
+    cap = (p.get("video") or {}).get("max_render_frames")
+    assert cap, (
+        "otr_mac_adiff has no video.max_render_frames -- render.frame_budget "
+        "does NOT cap the coverage planner, so the lane will plan long clips "
+        "and sample them in many sliding windows")
+    assert 0 < cap <= 33, (
+        "max_render_frames %r puts this back into multi-window sampling" % cap)
 
 
 def test_the_adiff_profile_stays_draft_until_a_clip_lands():
