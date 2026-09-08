@@ -207,7 +207,15 @@ CAPABILITIES = {
     # path already covered by "cpu" -- there is no separate MPS code path to
     # declare.
     "bark": {"required_toolchain": None, "requires_sidecar": False,
-             "device_backends": ["cuda", "cpu"], "requires_vendor": None,
+             # mps added 2026-09-07 ON A MEASUREMENT, not a guess: Bark ran on a
+             # Mac mini M4 in 40.8 s producing 4.6 s of structured speech
+             # (spectral flatness 0.070, finite). The old ["cuda","cpu"] row and
+             # the `cuda if available else cpu` line in _otr_bark_lib.py:132 both
+             # denied Apple Silicon a device it demonstrably has. Bark is a
+             # transformers model, so it is NOT affected by the ComfyUI
+             # sub-quadratic attention fault that hits ComfyUI-native models on
+             # Metal (PBUG-20260907-11).
+             "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
              "needs_fp8_te": False, "needs_fp4_te": False,
              "practical_without_gpu": False, "sidecar_conditional": False,
              "model_requirements": ["suno-bark"]},

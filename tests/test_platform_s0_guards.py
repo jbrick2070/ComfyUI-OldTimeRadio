@@ -197,10 +197,22 @@ def test_bark_registry_row_admits_cpu_but_stays_impractical_there():
     device_backends now. It still is not a PRACTICAL cpu_floor choice: bark
     is a ~1B-parameter three-stage autoregressive stack, so
     practical_without_gpu stays False and the profile-fit reason below must
-    become REASON_IMPRACTICAL_ON_CPU rather than REASON_REQUIRES_CUDA."""
+    become REASON_IMPRACTICAL_ON_CPU rather than REASON_REQUIRES_CUDA.
+
+    2026-09-07, THE SAME CORRECTION AGAIN, ON THE SAME KIND OF EVIDENCE: "mps"
+    now belongs here too. Bark was MEASURED on a Mac mini M4 (torch 2.12.1) --
+    40.8 s producing 4.6 s of structured speech, spectral flatness 0.070,
+    finite output. The old row and `_otr_bark_lib.py:132`'s
+    `"cuda" if torch.cuda.is_available() else "cpu"` both denied Apple Silicon
+    a device it demonstrably has. Bark is a transformers model, so it is not
+    touched by the ComfyUI sub-quadratic attention fault that breaks
+    ComfyUI-NATIVE models on Metal (PBUG-20260907-11).
+
+    `practical_without_gpu` is UNCHANGED and still False: that field is about
+    running with NO GPU at all, and mps is a GPU. CPU remains impractical."""
     from nodes._otr_audio_engines import registry as areg
 
-    assert areg.CAPABILITIES["bark"]["device_backends"] == ["cuda", "cpu"]
+    assert areg.CAPABILITIES["bark"]["device_backends"] == ["cuda", "cpu", "mps"]
     assert areg.CAPABILITIES["bark"]["practical_without_gpu"] is False
 
 
