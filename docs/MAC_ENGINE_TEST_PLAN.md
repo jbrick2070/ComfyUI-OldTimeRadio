@@ -87,3 +87,37 @@ Testing more large models on this machine measures the RAM, not the port. The
 useful remaining tests are the SMALL ones -- animatediff (3.5 GB of weights) --
 and, if a bigger Mac ever appears, a re-run of z_image_turbo which is ~300 MB
 short of fitting here.
+
+
+---
+
+## PROVEN 2026-09-08 -- a local image lane on Apple Silicon
+
+```
+otr/obs/the_tick_that_breaks_reason_20260908_005546__arch__stmo__unk__koko__pubd__q354b__sa3_final.mp4
+  h264 1920x1080 + aac | 82.7 s | 79 MB | rendered in 22:22
+  lane token `stmo` = still_motion -- the video lane that CONSUMES a still
+  4 stills minted by sd15, zero image errors, memory ended at 86% free
+```
+
+`[OTR.image.sd15] minted still 768x432 seed=... steps=20 cfg=7.00
+sampler=dpmpp_2m/karras ckpt=v1-5-pruned-emaonly-fp16` -- and 768x432 IS the
+`_fit_native` clamp doing its job on an 832-wide request, so the two-headed
+failure mode never had a chance to appear.
+
+| engine | status |
+| --- | --- |
+| `sd15` | **PASS -- proven end to end, published to `otr/obs/`** |
+| `still_motion` | **PASS** -- consumed the stills, encoded, published |
+| `z_image_turbo` | FAIL on Mac in every variant (section above) |
+
+**What this unblocks.** `ltx_8gb` (LTX 0.9.8) passed its engine gate on `mps`
+and then failed only because no still could be minted. With `sd15` supplying
+stills, image-to-video on Apple Silicon is testable for the first time.
+
+**One cosmetic thing to note, not a fault:** the inter-beat reclaim logs
+`free_gb_after=nan` on Mac. That is `_vram_snapshot` reading CUDA-only memory
+APIs, exactly as recorded in the 2026-09-07 portability sweep -- the reclaim
+itself ran fine (`unload_llm, _unload_bark, gc.collect, soft_empty_cache`), only
+its telemetry is blind. Harmless; the shared-resolver fix for it was
+deliberately deprioritised as tidiness rather than capability.
