@@ -127,6 +127,40 @@ def _load_bark(model_id="suno/bark", device=None):
     global _BARK_CACHE
     import torch
 
+    # A STAMPED DEVICE THAT DOES NOT EXIST FALLS BACK -- it does not fail.
+    #
+    # This repo runs one canonical across a CUDA 5080, a CUDA 4060 and an Apple
+    # Silicon Mac, and workflows/otr_canonical.json currently stamps
+    # voice_device="mps" by operator ruling while the Mac is the machine under
+    # test. Before 2026-09-07 bark IGNORED that stamp entirely and auto-picked
+    # cuda, so the mismatch was invisible on NVIDIA. Threading the stamp through
+    # (the correct fix, so a Mac finally gets its GPU) removed that accidental
+    # protection and would have made an unprofiled NVIDIA run try mps and die.
+    # Caught by the codex review lane before the operator's boxes ever saw it.
+    #
+    # So the stamp is HONOURED WHERE IT IS REAL and falls through where it is
+    # not. That is strictly safer than both the old behaviour (stamp ignored
+    # everywhere) and the naive fix (stamp obeyed blindly), and it needs no
+    # per-machine profile to keep NVIDIA working.
+    if device is not None:
+        _d = str(device).strip().lower()
+        if not _d:
+            # An empty stamp is not a device. Unreachable through the ledger
+            # (CastLock admits only cuda|cpu|mps) but reachable by any caller
+            # that bypasses it, and `.to("")` is a confusing failure to debug.
+            device = None
+            _d = ""
+        if _d.startswith("cuda") and not torch.cuda.is_available():
+            log.warning("[Bark] ledger asked for %r but this host has no CUDA; "
+                        "auto-detecting instead.", device)
+            device = None
+        elif _d == "mps" and not (
+                getattr(torch.backends, "mps", None) is not None
+                and torch.backends.mps.is_available()):
+            log.warning("[Bark] ledger asked for 'mps' but this host has no MPS; "
+                        "auto-detecting instead.", )
+            device = None
+
     # Auto-detect device: CUDA, then MPS, then CPU.
     #
     # This line used to read `"cuda" if torch.cuda.is_available() else "cpu"`,

@@ -12852,3 +12852,57 @@ and the roster audit reports zero failed registrations.
    Syntax valid, semantics destroyed. That is precisely the value of the second
    window, and it is the mirror of the mandala-in-the-canonical defect that the
    5080 structurally could not see about itself.
+
+## PBUG-20260908-01 -- the voice adapters obey a ledger device stamp without checking it exists
+
+**Found while fixing bark; bark is FIXED and the three siblings are NOT.**
+Recorded so this is not rediscovered from scratch, and because the operator was
+asleep when it surfaced -- changing three more CUDA-facing device paths
+unattended is not a call to make at 1am.
+
+`workflows/otr_canonical.json` currently stamps `voice_device="mps"` by operator
+ruling, while the Mac is the machine under test. The voice adapters thread that
+stamp straight into a device call with no availability check:
+
+```
+eng_musicgen.py:65,:72     getattr(self, "requested_device", None) or "cuda" -> .to(device)
+eng_kokoro.py:235-238      the torch backend receives the stamp raw
+eng_stable_audio.py:88-97  torch.Generator(device=dev)
+```
+
+So an UNPROFILED run of the current canonical on an NVIDIA box asks for `mps`
+and fails. The NVIDIA profiles rewrite the stamp to `cuda`, which is why this has
+not bitten -- the exposure is the unprofiled path.
+
+**Bark was different only because it USED to ignore the stamp entirely.** It
+auto-probed `cuda if available else cpu`, so the mismatch was invisible there.
+Threading the stamp through (2026-09-07, so a Mac finally gets its GPU) removed
+that accidental protection and turned a latent fleet-wide issue into an active
+one for bark specifically. That regression was caught by the codex review lane
+before it reached the operator's boxes.
+
+**The fix applied to bark, and the shape the siblings want.** Honour a stamped
+device WHERE IT IS REAL; fall through to auto-detect where it is not:
+
+```
+stamp=mps  on CUDA-only host -> cuda      (was: fail)
+stamp=mps  on Apple Silicon  -> mps       (the Mac fix, preserved)
+stamp=cuda on Apple Silicon  -> mps
+stamp=cpu  anywhere          -> cpu       (always honoured)
+```
+
+This is strictly safer than both the old behaviour (stamp ignored everywhere,
+so a Mac never got its GPU) and the naive fix (stamp obeyed blindly, so a
+mismatched fleet crashes), and it needs no per-machine profile.
+
+**Argument against doing the same to the siblings, which deserves an answer
+rather than a silent fix:** failing loud on an impossible stamp is defensible --
+it tells the operator their profile is wrong instead of quietly rendering on
+different hardware than they asked for. That is a real design choice with two
+defensible answers, which by CLAUDE.md's 2026-08-17 amendment makes it arc-worthy
+rather than a grep-and-fix. Bark's case was not a choice: it was restoring
+protection that existed before this session touched it.
+
+**Also noted:** an empty-string stamp reaches `.to("")` in bark. Unreachable via
+CastLock (it admits only `cuda|cpu|mps`) but reachable by any caller that
+bypasses the ledger. Closed in bark; the siblings still have it.
