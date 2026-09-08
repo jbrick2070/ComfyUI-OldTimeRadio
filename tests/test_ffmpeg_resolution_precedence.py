@@ -54,6 +54,11 @@ def box(tmp_path, monkeypatch):
     # the install-location tuples above. Its own precedence (last, after every
     # real install) is asserted separately below.
     monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: None)
+    # Step 5 gained a SECOND source (2026-09-07): ffmpeg-downloader, which is
+    # tried before the imageio wheel because it installs a matched
+    # ffmpeg+ffprobe PAIR and imageio ships ffmpeg alone. Both must be stubbed
+    # for "this box has nothing" to be reachable in a test.
+    monkeypatch.setattr(ffm, "_downloaded_ffmpeg", lambda: None)
     return SimpleNamespace(path=str(path_bin), env=str(env_bin),
                            explicit=str(explicit), tmp=tmp_path)
 
@@ -329,3 +334,29 @@ def test_a_broken_imageio_ffmpeg_is_none_and_never_raises(box, monkeypatch):
     except Exception as exc:  # noqa: BLE001
         raise AssertionError(f"resolve_ffmpeg raised {exc!r}") from exc
     assert result is None
+
+
+def test_the_downloaded_pair_is_preferred_over_the_imageio_wheel(box, monkeypatch):
+    """imageio-ffmpeg ships ffmpeg with NO sibling ffprobe, and several engines
+    probe back the clips they encode. When both sources are present the matched
+    pair must win, or the box silently ends up with no ffprobe."""
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setattr(ffm, "_downloaded_ffmpeg", lambda: box.env)
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: box.explicit)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.env
+
+
+def test_a_broken_downloader_falls_through_to_imageio(box, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+
+    def _explode():
+        raise RuntimeError("ffmpeg-downloader not installed")
+
+    monkeypatch.setattr(ffm, "_downloaded_ffmpeg", _explode)
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: box.explicit)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.explicit
+
+
+def test_path_still_outranks_the_downloaded_pair(box, monkeypatch):
+    monkeypatch.setattr(ffm, "_downloaded_ffmpeg", lambda: box.env)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.path

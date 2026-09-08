@@ -212,3 +212,16 @@ aiohttp>=3.9
 # its own ffmpeg keeps using it and nothing changes on the boxes that work
 # today.
 imageio-ffmpeg>=0.5
+# ...and ffprobe, which imageio-ffmpeg does NOT ship. Measured 2026-09-07 on a
+# Mac mini M4: with only imageio-ffmpeg present, an episode rendered its audio,
+# encoded its video frames, and then died in eng_visualizer.py at
+#     validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)
+# -- the visualizer encodes a clip and probes it back to verify the contract,
+# so shipping ffmpeg alone is only half the dependency.
+# ffmpeg-downloader installs a MATCHED ffmpeg + ffprobe pair into one directory
+# on Windows, Linux and macOS, which is what `_otr_shared.ffprobe` wants: it
+# finds ffprobe as a SIBLING of the ffmpeg this box runs. Light deps
+# (platformdirs, tabulate). Binaries are fetched by `ffdl install`, and
+# resolve_ffmpeg prefers this pair over the imageio wheel precisely because of
+# the sibling; the imageio wheel remains the fallback for plain encoding.
+ffmpeg-downloader>=0.5

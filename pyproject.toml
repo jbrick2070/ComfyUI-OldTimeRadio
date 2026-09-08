@@ -97,6 +97,11 @@ dependencies = [
     # encoder everywhere. Resolved LAST, after OTR_FFMPEG / PATH / real system
     # installs, so boxes that already work are untouched.
     "imageio-ffmpeg>=0.5",
+    # ffprobe too -- imageio-ffmpeg ships only ffmpeg, and the visualizer probes
+    # back every clip it encodes (eng_visualizer.py validate_silent_clip_contract).
+    # ffmpeg-downloader installs a matched ffmpeg+ffprobe PAIR in one directory,
+    # which is how _otr_shared.ffprobe finds ffprobe (as an ffmpeg sibling).
+    "ffmpeg-downloader>=0.5",
 ]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
