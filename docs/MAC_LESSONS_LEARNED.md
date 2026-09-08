@@ -231,13 +231,21 @@ it was ungated and it was auto installed. That's the main [thing]."*
 Record this before someone "improves" it away. The music engine was chosen on
 two hard requirements, and quality was never one of them:
 
-1. **Ungated** -- commercially clean, no licence acceptance, no HF token. This is
-   why `musicgen` was replaced: MusicGen is CC-BY-NC, and the shipped default was
-   silently producing non-commercially-licensed beds for anyone who never touched
-   the dropdown (PBUG-20260907-04).
-2. **Auto-installs** -- the weights fetch themselves at boot with no manual step
-   and no gated download. On a pack whose whole premise is *press Run*, an engine
-   that needs a human to go and accept a licence is not a candidate.
+1. **A friendlier COMMERCIAL LICENCE than MusicGen.** Operator, same day: *"it
+   had a friendlier commercial licence than musicgen."* This is the reason
+   `musicgen` was replaced: MusicGen is **CC-BY-NC**, so the shipped default was
+   silently producing non-commercially-licensed music beds for every user who
+   never touched the dropdown (PBUG-20260907-04).
+2. **Ungated** -- no licence click, no HF token, nothing to accept before the
+   weights will download.
+3. **Auto-installs** -- the weights fetch themselves at boot with no manual step.
+   On a pack whose premise is *press Run*, an engine needing a human to go accept
+   something is not a candidate.
+
+**(1) and (2) are INDEPENDENT tests and it is worth keeping them apart.**
+MusicGen is *ungated but non-commercial* -- freely downloadable, and still
+unusable for a commercial episode. A model can pass either check and fail the
+other, so both must be applied.
 
 **What this rules out, permanently, regardless of how good it sounds:**
 
