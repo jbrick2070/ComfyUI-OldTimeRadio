@@ -70,7 +70,41 @@ from scripts._otr_evidence_citations import refuse_if_cited  # noqa: E402
 #: the citation guard refuses either way if the resolved directory holds cited
 #: bytes, so the default cannot be overwritten by forgetting the flag.
 CAMPAIGN = "lemmy_cross_engine"
-_EPISODES = r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes"
+
+#: The reference Windows machine's real episodes root. It stays the default
+#: THERE because the citations above resolve against it.
+_EPISODES_WINDOWS = r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes"
+
+
+def _episodes_root() -> str:
+    r"""The episodes root to write into.
+
+    THIS WAS THE BARE WINDOWS LITERAL AND IT LEAKED (2026-09-08). On macOS and
+    Linux ``C:\Users\jeffr\...`` is not an invalid path, it is a legal RELATIVE
+    filename, so importing this module and running it created a directory tree
+    literally named ``C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes``
+    under the working directory -- in the case that found it, the repo checkout,
+    populated by a TEST run with real bark wavs and a MANIFEST.json. Same defect
+    and same day as ``_otr_hf_env._DEFAULT_HF_HOME``, which did it with 8.7 GB of
+    model cache.
+
+    Windows keeps the literal, because the provisional cast-pool records cite
+    that directory's MANIFEST.json and six of its clips by sha256 and those
+    citations must keep resolving. Everywhere else this defers to the pack's own
+    ``otr_episodes_root()``, i.e. ComfyUI's configured output dir -- which is
+    where a deliverable belongs on any platform, and is what ``--out-dir``
+    overrides anyway.
+    """
+    if sys.platform == "win32":
+        return _EPISODES_WINDOWS
+    try:
+        from nodes._otr_paths import otr_episodes_root
+        return str(otr_episodes_root())
+    except Exception:  # noqa: BLE001 -- outside a ComfyUI tree
+        return os.path.join(_REPO, "otr", "episodes")
+
+
+_EPISODES = _episodes_root()
 _OUT_DIR = os.path.join(_EPISODES, CAMPAIGN)
 
 #: One seed for every clip, so the arms differ only in the engine.
