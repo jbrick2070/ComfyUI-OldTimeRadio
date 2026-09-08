@@ -48,6 +48,37 @@ _LOG = logging.getLogger("OTR.video.viz_mxc_mandala")
 
 
 @register
+
+def _pycairo_hint() -> str:
+    """What a user on THIS platform must actually do to get pycairo.
+
+    `pip install pycairo` is correct on Windows and useless on macOS, where
+    pycairo publishes no wheel: pip falls back to the sdist, which needs
+    libcairo headers a stock Mac does not have. Measured 2026-09-07 on a Mac
+    mini M4 -- `uv pip install 'pycairo>=1.24'` resolved to the sdist and failed
+    to build, no libcairo anywhere, no Homebrew. Telling a Mac operator to run
+    the pip line sends them into that wall with no explanation.
+
+    Linux is the same shape for a different reason: pycairo ships Windows wheels
+    and an sdist and no Linux wheels, so it needs the distro's cairo dev
+    package first.
+    """
+    import sys
+    if sys.platform == "darwin":
+        return ("viz_mxc_mandala needs pycairo, which has NO macOS wheel -- "
+                "`pip install pycairo` will fail to build. It needs cairo "
+                "itself first: `brew install cairo pkg-config` then "
+                "`pip install pycairo`. Without Homebrew this engine cannot "
+                "run on macOS; use viz_mxc_cpu, viz_green or viz_camera "
+                "instead -- they are zero-dependency and need no cairo.")
+    if sys.platform.startswith("linux"):
+        return ("viz_mxc_mandala needs pycairo, which publishes no Linux wheel "
+                "-- install your distro's cairo headers first (e.g. "
+                "`apt install libcairo2-dev pkg-config`), then "
+                "`pip install pycairo`. Or use viz_mxc_cpu / viz_green / "
+                "viz_camera, which need no cairo.")
+    return "viz_mxc_mandala needs pycairo (pip install pycairo)"
+
 class VizMxcMandalaEngine:
     """The pycairo Cosmic Radio Mandala engine (engine_id ``viz_mxc_mandala``)."""
 
@@ -126,7 +157,7 @@ class VizMxcMandalaEngine:
         except ImportError as exc:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "viz_mxc_mandala needs pycairo (pip install pycairo)",
+                _pycairo_hint(),
                 kind="video") from exc
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(None):
@@ -152,7 +183,7 @@ class VizMxcMandalaEngine:
         except ImportError as exc:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "viz_mxc_mandala needs pycairo (pip install pycairo)",
+                _pycairo_hint(),
                 kind="video") from exc
         from .._otr_shared import scope_draw as _sd
         if not _sd.find_ffmpeg(None):
