@@ -33,11 +33,39 @@ from nodes._otr_video_engines import registry as vreg  # noqa: E402
 
 MAC_PROFILES = ("otr_mac_mps", "otr_mac_adiff")
 
-#: Engines measured NOT to work on this platform, with the reason. A Mac profile
-#: naming one of these is shipping a known failure.
+#: Engines a Mac profile must not SELECT BY DEFAULT, with the reason. Note the
+#: two reasons are different in kind, and neither is visible to
+#: ``cp.availability()`` -- which is exactly why this dict exists rather than
+#: leaning on the device rows.
+#:
+#: ``viz_mxc_mandala``'s row says ["cuda","cpu","mps"] and that row is CORRECT:
+#: it is pure CPU vector graphics and genuinely runs on any device. What stops
+#: it here is a missing SYSTEM LIBRARY (pycairo publishes no macOS wheel), which
+#: is a different axis from the device, and deliberately not a
+#: ``required_toolchain`` -- registry.py:315 explains that pycairo is kept out
+#: of the main requirements so a box without libcairo cannot break any OTHER
+#: engine's install. It is reachable after `brew install cairo pkg-config`; it
+#: must simply not be the DEFAULT a Mac reader lands on.
+#:
+#: ``z_image_turbo`` is a hardware fact rather than an install step: 12.3 GB
+#: bf16 needs ~20.4 GiB in the KSampler at 16 GB, and the int8 build hits
+#: aten::_int_mm, which MPS does not implement. No amount of installing fixes
+#: that one.
 BANNED_ON_MAC = {
-    "viz_mxc_mandala": "pycairo has no macOS wheel; assert_usable refuses",
+    "viz_mxc_mandala": ("pycairo has no macOS wheel, so assert_usable refuses "
+                        "until `brew install cairo pkg-config` -- not a "
+                        "default a Mac reader should land on"),
     "z_image_turbo": "12.3 GB bf16 OOMs at 16 GB; int8 hits aten::_int_mm",
+}
+
+
+#: Engines a DRAFT Mac profile may name while their own registry row still says
+#: they do not run here. Each entry is a promise that somebody looked.
+DRAFT_KNOWN_INADMISSIBLE = {
+    "animatediff15_v3_haunted_video": (
+        "row is [\"cuda\"], reverted from [\"cuda\",\"mps\"] on 2026-09-08 "
+        "because no clip had landed. The registry comment says to add mps only "
+        "after one does; the profile and the row move together, on a receipt."),
 }
 
 
@@ -219,3 +247,16 @@ def test_availability_is_computed_and_its_verdict_is_recorded(name, decls):
     if p["status"] == "shipping":
         assert not bad, (
             "%s is shipping but these roles are inadmissible: %r" % (name, bad))
+        return
+
+    # A DRAFT PROFILE STILL HAS TO KNOW WHAT IT IS CARRYING. An earlier version
+    # of this test asserted nothing at all on the draft branch, which a Sonnet
+    # mutation audit correctly called a no-op: otr_mac_adiff really does have
+    # three requires_cuda roles and the test sailed past them. "Draft" licenses
+    # a KNOWN inadmissible engine, not an unexamined one.
+    unexpected = {role: v for role, v in bad.items()
+                  if v[0] not in DRAFT_KNOWN_INADMISSIBLE}
+    assert not unexpected, (
+        "%s is a draft carrying inadmissible role(s) nobody has accounted for: "
+        "%r. Either the engine earned its backend row, or this dict should say "
+        "why it has not." % (name, unexpected))
