@@ -12753,3 +12753,48 @@ numbers agree, but they were never what settled it.
 (`magnetic_pulse_20260907_201810`, PBUG/GO_FORWARD 2026-09-07) was rendered
 BEFORE this fix. It proves the pipeline end to end, and its music bed is noise.
 It is a path receipt, not a good episode.
+
+## PBUG-20260907-12 -- four consecutive registry versions Flagged; the install-brick fix may not reach anyone
+
+**Observed on the live registry, 2026-09-07, immediately after publishing
+`2.0.0-alpha.29`:**
+
+```
+2.0.0-alpha.29   Pending
+2.0.0-alpha.28   Flagged
+2.0.0-alpha.27   Flagged
+2.0.0-alpha.26   Flagged
+2.0.0-alpha.25   Flagged
+2.0.0-alpha.24   Active     <- latest_version, what Manager actually serves
+2.0.0-alpha.23   Active
+2.0.0-alpha.22   Flagged
+```
+
+**Four consecutive Flagged versions is a pattern, not an accident**, and it has a
+concrete cost that is now measurable rather than theoretical:
+
+`latest_version` resolves to **alpha.24**, and alpha.24 carries
+`tokenizers>=0.22,<=0.23` -- the pin that **prevents ComfyUI from starting at
+all** (PBUG-20260907-05). So every registry install today gets a pack that bricks
+the host, and the fix (`.29`) cannot reach anyone unless it clears review.
+
+**This changes the priority of the flag question.** It was previously a
+housekeeping annoyance -- versions not being promoted. It is now the thing
+standing between users and a working install, and the evidence to raise it with
+Comfy-Org is unusually good:
+
+* a specific, reproducible, install-bricking defect in the currently-served
+  version, with a one-line dependency fix;
+* a receipt showing the shipped pin converts a WORKING install into a broken one
+  (`uv pip install --dry-run` output in PBUG-20260907-05);
+* the fix already published and awaiting review.
+
+**Not diagnosed here:** WHY these versions are flagged. That is Comfy-Org's
+process and no evidence in this repo explains it. Three hypotheses were already
+spent per earlier GO_FORWARD notes; do not guess a fourth. Ask, with the above.
+
+**Operator workaround until it clears:** install from the git clone rather than
+the registry, or do not update an install that already works. **Do not
+re-install from Manager** -- it will serve `.24` and brick the boot, and because
+Manager is itself a ComfyUI extension, a bricked boot cannot be repaired from
+the UI.
