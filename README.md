@@ -172,8 +172,10 @@ want to qualify a still-consuming profile.
 Only needed if you select a `*-GGUF` writer row. It is the established lane
 for running a large writer on a small card off NVIDIA: bitsandbytes NF4 is
 CUDA-only, so the committed Mac, AMD and CPU experimental profiles
-(`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm`, `cpu_floor`) use GGUF
-through in-process llama.cpp. The new `--machine amd` front door instead uses
+(`otr_amd8_rocm`, `otr_amd16_rocm`, `cpu_floor`) use GGUF through in-process
+llama.cpp. **`otr_mac_mps` does NOT** — it is `shipping` rather than
+experimental, and its proven writer is transformers at `quant_policy: "none"`
+on `mps`; GGUF is allowlisted there but has never been run. The new `--machine amd` front door instead uses
 the smaller E2B Transformers writer with `quant_policy=none`; that route is a
 draft candidate until physical AMD hardware publishes an episode. No Ollama,
 no sidecar process, no extra port.
@@ -419,7 +421,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, the three procgen visualizer lanes (`viz_mxc_cpu` / `viz_green` / `viz_camera`) for the video roles -- NOT LTX, which is a selectable upgrade -- Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
 | AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical`, then set `llm_device` -> `cuda` (ROCm torch reports as cuda) and `device_policy` -> `cuda` | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
-| Apple Silicon Mac (VERIFIED; sessions 2026-09-07 and 2026-09-08) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys, **zero downloads on the press-Run path**: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_green`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. (`viz_mxc_mandala` was in this list and is NOT usable out of the box -- its `pycairo` dependency has no macOS wheel; `brew install cairo pkg-config` first, or use `viz_green`.) You are not stuck there: `sd15` (2.1 GB) mints stills locally and unlocks `still_flat` / `still_pan` / `still_word`, and `ltx_8gb` (6.3 GB + 9.8 GB text encoder) is real local video diffusion on Metal -- both measured on this machine, both in `docs/MAC_PORTABILITY_GUIDE.md` sections 5, 7 and 9. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. **PROVEN on real hardware 2026-09-07: an episode published to `otr/obs/`** -- 135 s, 1080p25, h264+aac, fully local, no image weights and no API keys. Qwen3.5-4B writer on Metal (~6.5 tok/s) -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg. Getting there needed five fixes, all shipped: the `tokenizers` pin that bricked the boot (alpha.29), a music lane whose `pycairo` dependency is Windows-only, ffmpeg AND ffprobe never being declared dependencies at all, and a 100%-NaN Stable Audio 3 caused by our own determinism wrapper meeting an MPS `baddbmm` bug. **Keep `llm_quant_policy` at `none`** -- NF4 runs at 0.3-0.5 tok/s on Metal (vs 14.47 on CUDA) and cannot clear the 40 s NewsCuration budget. 16 GB is thin: the writer peaks near 14 GB and has OOM-killed. ONE episode is not repeatability. **Running on a Mac? Start with `docs/MAC_PORTABILITY_GUIDE.md`** -- what works out of the box, what needs manual steps, and what cannot work locally. Measurements behind it: `docs/MAC_LESSONS_LEARNED.md` |
+| Apple Silicon Mac (VERIFIED; sessions 2026-09-07 and 2026-09-08) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys, **zero downloads on the press-Run path**: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_green`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. (`viz_mxc_mandala` was in this list and is NOT usable out of the box -- its `pycairo` dependency has no macOS wheel; `brew install cairo pkg-config` first, or use `viz_green`.) You are not stuck there: `sd15` (2.1 GB) mints stills locally and unlocks `still_flat` / `still_pan` / `still_word`, and `ltx_8gb` (6.3 GB + 9.8 GB text encoder) is real local video diffusion on Metal -- both measured on this machine, both in `docs/MAC_PORTABILITY_GUIDE.md` sections 5, 7 and 9. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. **PROVEN on real hardware 2026-09-07: an episode published to `otr/obs/`** -- 135 s, 1080p25, h264+aac, fully local, no image weights and no API keys. Qwen3.5-4B writer on Metal (~6.5 tok/s) -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg. Getting there needed five fixes, all shipped: the `tokenizers` pin that bricked the boot (alpha.29), a music-beat VIDEO lane (`viz_mxc_mandala`) whose `pycairo` dependency is Windows-only, ffmpeg AND ffprobe never being declared dependencies at all, and a 100%-NaN Stable Audio 3 caused by our own determinism wrapper meeting an MPS `baddbmm` bug. **Keep `llm_quant_policy` at `none`** -- NF4 runs at 0.3-0.5 tok/s on Metal (vs 14.47 on CUDA) and cannot clear the 40 s NewsCuration budget. 16 GB is thin: the writer peaks near 14 GB and has OOM-killed. ONE episode is not repeatability. **Running on a Mac? Start with `docs/MAC_PORTABILITY_GUIDE.md`** -- what works out of the box, what needs manual steps, and what cannot work locally. Measurements behind it: `docs/MAC_LESSONS_LEARNED.md` |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
@@ -443,7 +445,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
    (the selectors cannot be combined).
 3. For a saved GUI graph, hit **Queue Prompt**.
 4. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
-   graph rolls a random story bank each run and renders through the procedural still/CRT floor
+   graph rolls a random story bank each run and renders through the procgen visualizer lanes
    — the fast, guaranteed-to-complete path. Swap dropdowns once you're ready for a specific bank
    or a GPU video engine.
 5. Find the finished episode in **`output/otr/obs/`**.
@@ -453,8 +455,9 @@ it does not silently rewrite the graph currently open in ComfyUI.
 ## Requirements
 
 - **GPU:** an NVIDIA card is recommended for the local video engines. The shipped canonical
-  workflow renders through the procedural still/CRT floor by default (no GPU video model
-  required); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
+  workflow renders through the procgen VISUALIZER lanes by default (`viz_mxc_cpu` /
+  `viz_green` / `viz_camera` — audio-reactive, no scene still, no GPU video model
+  required; it does not select `still_flat`); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
   explicit profile overrides. Episode length is set by act count, not a word target.
 - **OS:** Windows or Linux for the proven NVIDIA paths (RTX 4060 8 GB and RTX 5080 16 GB
   have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as
@@ -719,8 +722,9 @@ audio-in), Wan (TI2V / I2V), AnimateDiff (Ghost Signal, three shipped cadence pe
 H3 (personal license only, see the licensing note above), `mesh_stage`, and the cheap CPU
 floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are offered only where
 audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
-renders are request-hash deterministic. The old VRAM tier system is gone — per-platform
-workflow variants are the sizing mechanism now.
+renders are request-hash deterministic. The old VRAM tier system is gone — profiles plus
+the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (`workflows/variants/` is
+EMPTY; the per-machine JSONs were removed.)
 
 ### The video model reference — read these two before adding or changing an engine
 

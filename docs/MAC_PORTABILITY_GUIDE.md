@@ -268,6 +268,7 @@ different-looking stills, not reachable ones.
 | OOM / the machine freezes mid-render | 16 GB shared with macOS and everything else | close other apps; the writer peaks near 14 GB |
 | a video/image engine refuses with `EngineUnusable` | **NOT the `["cuda"]` row** -- that row is not a render-time gate and never refuses anything (see `docs/ADDING_IMAGE_AND_VIDEO_LANES.md`). The refusal is the engine's own `assert_usable`: a missing weight, a missing node class, or a missing NVML/vendor probe | read the message -- it names the artifact or class. A `["cuda"]` row is a claim about what has been PROVEN, not a lock |
 | a lane you did not pick starts a huge download at Queue | the image dropdowns still say `z_image_turbo` and the video lane you picked consumes a still | set ALL THREE image dropdowns to `sd15` **before** you queue. The validator provisions the selected image engine, so an unchanged `z_image_turbo` fetches ~20 GB of weights that cannot run here |
+| render dies at the scopes stage, `Unrecognized option 'vsync'` | this Mac ships **ffmpeg 9.0**, which REMOVED `-vsync` (deprecated since 5.1) -- it dies at argv parse before a frame is read | already handled: `scope_draw.cfr_flags()` probes the installed binary once and returns `-fps_mode` here (verified 2026-09-08 on this machine). If you see this, something bypassed the probe -- do not hardcode either spelling |
 | `ffprobe` still not found after `pip install -r requirements.txt` | `ffmpeg-downloader` ships the fetcher, not the binaries | run `ffdl install` once (or `brew install ffmpeg`). `imageio-ffmpeg` supplies ffmpeg only -- ffprobe has no equivalent bundled wheel |
 
 **Error messages that lie on a Mac** (cosmetic, being cleaned up):
@@ -590,12 +591,19 @@ these dropdowns.)
 
 ---
 
-## 10. The GGUF lanes: a PROVEN method, and it is HIGH FRICTION
+## 10. The GGUF lanes: the install is solved, and it is HIGH FRICTION
 
-**Operator's framing, and it is the right one:** GGUF works, we have a proven
-method, but the install is high friction. This section is for someone with
-decent coding skills, or an AI coder sitting beside them. If that is not you,
-stop here -- `sd15` + the `still_*` lanes and `ltx_8gb` need none of this.
+**Operator's framing, and it is the right one:** GGUF may well work, the install
+method is now known, and that install is high friction. This section is for
+someone with decent coding skills, or an AI coder sitting beside them. If that
+is not you, stop here -- `sd15` + the `still_*` lanes and `ltx_8gb` need none of
+this.
+
+**Be precise about what is proven here: the INSTALL, not a render.** As of
+2026-09-08 the ComfyUI-GGUF pack is verified registered on this machine (six
+loader classes, boot clean, one added wheel) and **no GGUF lane has completed a
+render on Apple Silicon in this repository.** Do not read this section as a
+qualification of any lane.
 
 **What GGUF buys you on a Mac.** Quantised weights are how the bigger lanes fit
 in unified memory at all. `flux2_klein` is 2.60 GB as a Q4 GGUF against 7.75 GB
@@ -605,6 +613,25 @@ not an optimisation, it is frequently the only version that can run.
 
 **What it costs you.** Everything below was hit in one sitting on 2026-09-08, in
 this order, on a machine that already had ComfyUI working.
+
+### 10.0 Before you spend the download: K_M quants may garble on Metal
+
+**Two independent sources say the same thing, and neither is settled.** Commit
+`5f1b94b4` passed over `flux2_klein` for Apple Silicon partly because
+*"K_M quants garble on MPS"*, and city96's ComfyUI-GGUF issue #177 reports GREEN
+OUTPUT from `Q*_K` Flux weights on Metal. A 2026 web sweep judged #177 to
+predate a PyTorch MPS integer-operation fix and to be contradicted by later
+successful Flux-family GGUF runs -- so it may well be stale. Nobody has settled
+it on this stack.
+
+Both engines below default to a K_M build: `flux-2-klein-4b-Q4_K_M.gguf` and
+`Wan2.2-TI2V-5B-Q5_K_M.gguf` with a `umt5-xxl-encoder-Q5_K_M.gguf` beside it.
+
+**So judge the PIXELS, not the exit code.** A garbled render exits zero. Open the
+first still or the first clip and look at it before you conclude a lane works.
+If it comes out green, smeared, or noise, try a non-K quant (`Q4_0`, `Q5_0`,
+`Q8_0`) before blaming memory or the adapter -- and record what you saw, because
+that is a finding worth a PBUG either way.
 
 ### 10.1 The repo ships the installer -- point it at the right tree
 
@@ -641,7 +668,15 @@ fatal: the remote end hung up unexpectedly
 macOS ships neither `git-lfs` nor Homebrew. `GIT_LFS_SKIP_SMUDGE=1` does **not**
 rescue it -- the checkout still fails. Install git-lfs first
 (`brew install git-lfs && git lfs install`, which means installing Homebrew
-first), or accept that the LTXVideo pack will not land.
+first).
+
+**There is no skip flag, and this matters if you rerun.** `install_node_packs`
+requires ComfyUI-LTXVideo unconditionally, so the provisioner will report
+INCOMPLETE every time until git-lfs exists -- and moving the broken clone aside
+does not settle it, because the next run re-clones and fails again the same way.
+What you get by moving it aside is a ComfyUI that boots cleanly in the meantime,
+not a finished provision. The GGUF pack DOES land before that failure, which is
+why Klein and the Wan lanes are reachable without it.
 
 **And clean up after the failure, because it does not.** A failed checkout
 leaves a directory full of files with NO COMMITS -- `git log` says *"your current
@@ -743,8 +778,8 @@ machine unless this repo carries a receipt for it.**
 | --- | --- | --- |
 | **LTX-Video 0.9.8 distilled** | strong -- plus our own published episodes | **KEEP.** Proven here; nothing further needed unless torch/ComfyUI move |
 | **FLUX.2 Klein 4B Q6** | strong -- an exact 16 GB completion exists | **Viable.** Preserve the known-good model/encoder combination |
-| **FLUX.2 Klein 4B Q4_K_M** | moderate -- no exact 16 GB report found | Plausible. This is the build `scripts/otr_provision.py` fetches and the one to try first on a Mac, but no receipt exists for it here or anywhere yet |
-| AnimateDiff-Evolved + SD1.5 v3 | moderate -- MPS completions exist, but from 2023 | Historically MPS-capable, never run on THIS stack. Use the PINNED commit, not `main` (see below) |
+| **FLUX.2 Klein 4B Q4_K_M** | moderate -- no exact 16 GB report found | Plausible, and the one to try first on a Mac. Note `scripts/otr_provision.py` does NOT fetch it -- `flux2_klein` sits in `MANUAL_TIERS`, so its three files are a manual download. See the K_M warning below |
+| **AnimateDiff-Evolved + SD1.5 v3** | moderate on Metal (2023 completions); STRONG on cost | **The cheapest lane in the pack, and the best untested candidate.** Measured 4.9 GB with SD1.5 FULLY RESIDENT and no offload on the 4060 -- it fits 16 GB unified with enormous headroom. It is `text_to_video`, so it needs NO scene still and sidesteps the image-engine question entirely. Use the PINNED commit, not `main` (see below) |
 | CogVideoX-2B | anecdote -- one Mac walkthrough, no hardware named | Unproven at this size |
 | Wan 2.1 Fun InP 1.3B | anecdote -- an exact M4/16 GB completion EXISTS | **Do not follow it as written:** it required `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0`, which REMOVES the MPS allocation ceiling. On a host where OOM kills the machine, that setting is the opposite of a mitigation |
 | LTX 2.x (`ltx25_*`) | strong NEGATIVE | **Avoid.** Open MPS BF16 attention NaNs produce all-black video |
