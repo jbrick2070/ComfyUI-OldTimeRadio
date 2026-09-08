@@ -551,10 +551,19 @@ class _CRTRenderer:
         # This guard is not a duplicate of that: a visual renderer should not be
         # able to CRASH on its input signal no matter which upstream engine
         # produced it, and a black-ish frame is a better answer than a lost
-        # episode. Cheap -- five floats per frame.
+        # episode.
+        #
+        # `freq` and `wave` are ARRAYS and need the same treatment as the three
+        # scalars: they feed `int()` and colour maths just as directly --
+        # `int(freq[i] * self.h * 0.18)`, `int(255 * (1.0 - freq[i] * 0.6))`,
+        # `int(3 + freq[p % len(freq)] * 8)`. An earlier version of this guard
+        # wrapped only the scalars and claimed in its own comment to cover
+        # "five floats", leaving two crash surfaces open. Caught by an external
+        # CLI review of that commit, 2026-09-07 -- exactly the class of miss a
+        # second reader is for.
         vol = _finite(self.volume[fi])
-        freq = self.freqs[fi]
-        wave = self.waves[fi]
+        freq = _finite_array(self.freqs[fi])
+        wave = _finite_array(self.waves[fi])
         signal = _finite(self._signal[fi])
         loss = _finite(self._loss[fi])
         t = fi / fps
@@ -1045,6 +1054,30 @@ def _check_nvenc(ffmpeg_path):
                  "NVIDIA h264_nvenc" if verdict else "CPU libx264")
     return verdict
 
+
+
+def _finite_array(seq, default: float = 0.0):
+    """``seq`` with any non-finite entry replaced by ``default``.
+
+    The array counterpart of :func:`_finite`. Returns the input OBJECT unchanged
+    when everything is already finite, so no caller sees a substituted array on
+    the healthy path.
+
+    It is not allocation-free, and an earlier version of this docstring wrongly
+    claimed it was: ``np.isfinite`` builds a bool mask every frame, and
+    ``asarray(..., dtype=float)`` COPIES when the input is float32, which is the
+    normal dtype coming from the audio side. That is a per-frame cost worth
+    knowing about if this ever shows up in a profile. Correction supplied by the
+    CLI review lane, 2026-09-07.
+    """
+    try:
+        import numpy as _np
+        arr = _np.asarray(seq, dtype=float)
+        if _np.all(_np.isfinite(arr)):
+            return seq
+        return _np.nan_to_num(arr, nan=default, posinf=default, neginf=default)
+    except Exception:  # noqa: BLE001 -- a frame must never die in its guard
+        return seq
 
 
 def _finite(value, default: float = 0.0) -> float:

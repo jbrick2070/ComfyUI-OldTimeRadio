@@ -72,6 +72,38 @@
     valid reviewer; do not wait on or multiply CLI/cloud lanes merely to increase the count.
     Save the real roster and result in the handoff receipt.
   * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
+- **ONE CLI REVIEW ON EVERY CODING CHANGE (operator directive 2026-09-07 -- hard).**
+  Operator: *"you can update claude.md so that we do 1 cli review as needed for all
+  coding."* Before pushing a code change, run it past ONE local CLI lane. Not an
+  arc, not a panel -- one reader, every time.
+  * **The lanes, all authenticated on the Mac:** `cursor-agent -p --force "<prompt>"`
+    (all-round, and the one that has actually caught things), `codex exec
+    --dangerously-bypass-approvals-and-sandbox "<prompt>"` (deep second opinion),
+    `agy -p='<prompt>' --dangerously-skip-permissions` (quick QA -- note the prompt
+    MUST be attached to `-p=` or the flag is consumed as the prompt).
+  * **WHY THIS RULE EXISTS, measured the day it was written.** Two defects shipped
+    that day, both from this window, and NEITHER was catchable by the checks the
+    author ran:
+    1. A helper inserted into `eng_viz_mandala.py` anchored on the first
+       `"\nclass "` token landed between `@register` and its class, so the
+       decorator bound to a FUNCTION and the engine vanished from every dropdown
+       ON EVERY PLATFORM -- a Mac message fix that deleted a working Windows
+       feature. `ast.parse` passed it happily: syntax valid, semantics destroyed.
+    2. A NaN guard in `video_engine.py` wrapped three scalars while its own
+       comment claimed "five floats", leaving `freq` and `wave` feeding `int()`
+       unguarded. Found by the cursor lane on the very next review.
+  * **The author cannot see these.** Both were caught by a reader with no memory
+    of having written the code. That is the whole mechanism; a self-review does
+    not substitute.
+  * **Still applies:** you write the code-grounded judgement FIRST and remain the
+    sole judge -- ground every claim against the real files before folding it in.
+    The cursor lane's own review that day correctly flagged one real defect, one
+    known-and-accepted behaviour change, and one item that needed the operator's
+    ruling rather than a fix. Verify before acting.
+  * **This does NOT replace the full four-round arc** where the 2026-08-17
+    amendment calls for one (a design choice with more than one defensible
+    answer). It is the floor, not the ceiling.
+
 - **`otr/obs/` IS THE SUCCESS SIGNAL. ALWAYS PUBLISH TO IT (operator directive 2026-08-17 --
   hard, and it OVERRIDES the tidiness instinct).** Operator, in his words: *"always publish to
   obs -- a test is not complete unless published to obs (or it's just testing one part). If I
