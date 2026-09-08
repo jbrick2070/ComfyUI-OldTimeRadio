@@ -244,10 +244,22 @@ def _resolve_title_timing(led, volume, fps, total_frames):
         return {}
 
     def _f(x):
+        """Parse a timing value, or ``None``.
+
+        NON-FINITE IS None, NOT NaN. These values reach ``round()`` and
+        ``int()`` downstream (:266, :276-277, :322-323), and both raise
+        ValueError on NaN/Inf -- so an announcer whose ``start_s`` arrived
+        non-finite killed the render before a single frame was drawn, in a
+        code path neither _finite nor _finite_array covers. Returning None
+        routes it through the same "value absent" handling the callers already
+        implement. Found and reproduced by the codex review lane, 2026-09-07,
+        after the cursor lane had corrected the audio-side guards.
+        """
         try:
-            return float(x)
-        except (TypeError, ValueError):
+            v = float(x)
+        except (TypeError, ValueError, OverflowError):
             return None
+        return v if math.isfinite(v) else None
 
     music_open = None
     first_dialogue_f = None
@@ -1089,7 +1101,10 @@ def _finite(value, default: float = 0.0) -> float:
     """
     try:
         out = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError is real, not theoretical: float(10**400) raises it, and
+        # a guard whose whole job is "never crash the frame" must not be the
+        # thing that crashes. Flagged by the codex review lane, 2026-09-07.
         return default
     return out if math.isfinite(out) else default
 
