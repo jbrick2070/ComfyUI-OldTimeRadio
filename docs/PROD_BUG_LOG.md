@@ -13087,3 +13087,69 @@ anyway, which is correct on a card that can offload and is how a unified-memory
 host dies. Whether `check_vram_fit` is even reading a meaningful number on Metal
 is unexamined; `free_vram_mb()`'s Metal branch (PBUG-20260908-02) reports the
 Metal working set, which cannot see a model parked on "cpu".
+
+
+---
+
+### PBUG-20260908-03 CORRECTION — the mechanism I filed was wrong; the fix is right for a different reason
+
+Filed the same day, hours later, after a Fable architecture review disputed the
+premise and a measurement settled it.
+
+**WHAT I CLAIMED:** that each writer reload allocated on top of the last, so the
+MPS pool ratcheted across an episode's 8-12 cycles until the OS killed the
+process.
+
+**WHY THAT IS WRONG:** `load_llm` calls `comfy.model_management.unload_all_models()`
+and `soft_empty_cache()` before every load (`_otr_model_loader.py:941`, the
+"Zero-Prime wash"), and `soft_empty_cache` DOES call `torch.mps.empty_cache()`
+(`comfy/model_management.py:2050`). The previous copy was therefore released
+before the next load. There was no ratchet of LLM weights across cycles.
+
+**WHAT IS ACTUALLY TRUE, measured on this machine:**
+
+```
+model resident on mps            MPS 2056.5 MiB
+after model.to("cpu")            MPS 2056.5 MiB   <- pool STILL held, and a CPU copy now exists
+after torch.mps.empty_cache()    MPS    0.5 MiB
+```
+
+Teardown step 1 moves the weights to a CPU copy and does NOT release the Metal
+pool. Before this fix nothing collapsed that doubled state until the NEXT
+`load_llm` washed it — so the model sat double-counted for the entire gap
+between stages, which is precisely the window in which the video models,
+Kokoro and StableAudio3 load. The fix does not stop a ratchet; it collapses a
+2x window that used to stay open across the most memory-hungry part of the run.
+
+**SO THE FIX STANDS AND THE REASONING IN ITS COMMIT DOES NOT.** Recorded here
+rather than quietly, because a wrong mechanism in the log is worse than no
+entry: the next person would have gone looking for a leak that is not there.
+
+#### What the review found that IS the larger cause, and is NOT fixed
+
+**1. A writer-tail ordering bug, wrong on every platform including CUDA.**
+`_otr_writer_vram.py:1-20` documents the invariant "the LAST phase is
+story_brief_reflection; after it the writer only assembles + saves". The unload
+sits at `_otr_writer_tail.py:1103`, BEFORE the reflection at `:1131`. A second
+unload at `:1252-1257` fires before `run_ledger_clean` at `:1391` needs the
+model again. Each later LLM phase appended to the tail landed after an unload,
+and the response was another unload rather than moving the first. That is
+4 loads/episode where 2 would do, and on CUDA it buys nothing at all — nothing
+between those points loads a different model, so it costs a full
+`from_pretrained` plus warmup for zero VRAM benefit. **Fixing it is the
+highest-value change and it touches SHARED code, so it needs the 5080
+before/after proof CLAUDE.md 0B requires.**
+
+**2. `vram_fit=WARN@4.3 GB` is the row's 8.68 GB halved.** The estimator assumes
+NF4 regardless of `quant_policy` (`_otr_model_catalog.py:181-186`, `:1903`). On
+the Mac profile `quant_policy` is `none`, so true residency is >= 8.68 GB plus
+KV — 87% of the 10 GB ceiling rather than 43%. It would still have been WARN, so
+it did not cause the kill, but every one of those 157 log lines is off by 2x.
+
+**3. A candidate answer to PBUG-20260908-02's open question.** ComfyUI's
+`free_memory` computes `memory_to_free = memory_required - get_free_memory(device)`
+(`model_management.py:882-887`), and `get_free_memory` on mps returns
+`psutil.virtual_memory().available` (`:1753-1755`). macOS counts purgeable and
+cached memory as available, so the arithmetic concludes nothing needs freeing
+and prints "0 models unloaded" — which is exactly the line observed before the
+fatal load. Offered as a pointer for a targeted test, NOT as a verified cause.
