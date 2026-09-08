@@ -13403,11 +13403,44 @@ The likeliest remaining explanation is the OTHER fix made the same morning:
 directly. If that is what fixed the audio, then the attention forcing is
 REDUNDANT and is costing ~14x on every diffusion lane for nothing.
 
-**The discriminating test is already running.** Arm B renders with
-`OTR_MPS_PYTORCH_ATTENTION=0`, so it produces both a video sampler rate under
-sub-quadratic AND an SA3 cue whose spectral flatness can be measured with the
-same metric that established the bug. Flatness near 0.156 means the forcing can
-go; near 0.432 means it stays and the slowness is the price.
+#### RESULT: the forcing STAYS. Arm B reproduced the noise exactly.
+
+Rendered with `OTR_MPS_PYTORCH_ATTENTION=0` (stock sub-quadratic), measured with
+the same spectral-flatness metric:
+
+```
+music_cue_opening.wav   flatness=0.454  zcr=0.174  peak=1.000   <- NOISE
+music_cue_closing.wav   flatness=0.420  zcr=0.149  peak=1.000   <- NOISE
+
+2026-09-07 baseline:    sub-quadratic 0.432 / 0.148   SDPA 0.156 / 0.054
+```
+
+0.454 and 0.420 against a 0.432 baseline, with `peak=1.000` on both -- the same
+clipping signature recorded originally. This is a clean reproduction.
+
+**Three conclusions, and the middle one corrects me twice over:**
+
+1. The attention forcing is CORRECT and LOAD-BEARING. Removing it brings the
+   noise straight back. It stays.
+2. The determinism fix does NOT cover this on its own.
+   `fill_uninitialized_memory = False` was active throughout arm B and the audio
+   is still noise, so my hypothesis an hour ago -- that the determinism fix was
+   the real one and the attention forcing redundant -- is disproved.
+3. **`attention_sub_quad` is numerically clean in isolation yet produces noise
+   inside the real SA3 graph.** Both facts are measured. So the defect is not the
+   bare op at any shape I tried; it is something about how Stable Audio 3
+   invokes it -- a mask, a chunking threshold, or the `attn_precision` path are
+   the candidates. That is the open question, and it is narrower and more useful
+   than where this entry started.
+
+#### So the 14x video penalty is a real cost of a real fix
+
+Not waste. Which promotes the scoped fix from nice-to-have to the actual
+valuable work: video attention wants sub-quadratic (13.8x faster, numerically
+identical), audio needs SDPA, and today one module-level global
+(`comfy/ldm/modules/attention.py:857`) serves both.
+`optimized_attention_for_device` (`:906`) is the seam. Until that exists, the
+cost figures in the Mac guide stand as measured.
 
 #### Consequence if it holds
 
