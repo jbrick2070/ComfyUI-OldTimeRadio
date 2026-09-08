@@ -12581,3 +12581,66 @@ canonical now renders on every platform the pack targets rather than on one.
 **Rule this suggests:** the shipped default must only select engines whose
 dependencies install unconditionally. An engine behind a platform marker is a
 legitimate opt-in, never a default.
+
+## PBUG-20260907-09b -- ROOT CAUSE of the SA3 NaN: our own determinism wrapper meets an MPS `baddbmm` bug
+
+**Supersedes the "still open" root-cause note in PBUG-20260907-09.** That entry
+recorded the symptom correctly and guessed the cause wrongly (fp16 overflow).
+The real chain was found by a Fable review lane and then reproduced on this box
+in four lines. **OTR manufactures the NaN itself.**
+
+```
+1. nodes/stable_audio_theme.py  wraps every SA3 forward in
+   deterministic_inference(engine_seed, warn_only=True)
+2. nodes/_otr_determinism.py    calls torch.use_deterministic_algorithms(True)
+3. that flag also sets torch.utils.deterministic.fill_uninitialized_memory=True
+   (default since torch 2.1), so EVERY torch.empty() is NaN-filled
+4. on MPS, ComfyUI selects sub-quadratic attention -- the boot log says so:
+   "Using sub quadratic optimization for attention" -- which calls
+       torch.baddbmm(<uninitialized empty buffer>, q, k, beta=0)
+5. beta=0 means "ignore the input buffer". CPU and CUDA honour that.
+   THE MPS KERNEL DOES NOT. The NaN enters at attention layer 0.
+```
+
+**Reproduced, model-free, on this machine (torch 2.12.1):**
+
+```
+BEFORE deterministic mode:  torch.empty(mps)=0    baddbmm(beta=0) NaNs    0/1024
+AFTER  deterministic mode:  torch.empty(mps)=nan  baddbmm(beta=0) NaNs 1024/1024
+same call on CPU, flag ON:                        baddbmm(beta=0) NaNs    0/1024
+```
+
+**Why every earlier hypothesis was wrong, recorded so nobody re-runs them.**
+
+* *fp16 overflow on Metal (the driver's own guess).* Falsified: fp16 matmul at
+  realistic activation magnitudes is clean on MPS (`0/262144` non-finite), and
+  the contrived overflow that "proved" it overflows **identically on CPU**
+  (`65536/65536` both) -- it was fp16's range limit, not a device fault.
+* *`dpmpp_3m_sde_gpu` generating SDE noise on-device (the Sonnet lane's read,
+  well-argued from ComfyUI's real `BatchedBrownianTree` source).* Falsified: a
+  seeded `torch.Generator("mps")`, `torch.randn` on mps, and the Brownian tree
+  itself all return finite noise, and the NaN is present in the model forward at
+  step 0 **before any SDE noise is added**.
+* *dtype mismatch / VAE decode.* The VAE is poisoned too, by the same
+  `baddbmm`, but it is not the origin -- the DiT is already NaN at layer 0.
+* *"first cue clean, second NaN".* An artifact of Python's once-per-location
+  `RuntimeWarning`, not intermittency. Both cues were always 100%.
+
+**This is why SA3 "works on a Mac" for everyone else.** It does. The engine
+declares `["cuda", "mps"]` and Comfy core owns its device layer, exactly as
+`registry.py` says. Nobody else wraps it in `use_deterministic_algorithms`.
+
+**Fix.** `_otr_determinism.py` now sets
+`torch.utils.deterministic.fill_uninitialized_memory = False` **on MPS only**,
+inside the same scope, restored in `finally`.
+
+Determinism is not weakened. `fill_uninitialized_memory` is a DEBUGGING aid that
+makes reads of uninitialized memory loud; it is not what makes results
+deterministic. A buffer that `beta=0` never reads cannot change a result
+whatever it is filled with. Guarded by `torch.backends.mps.is_available()`, which
+is False on the CUDA boxes, so the 5080/4060 golden determinism runs are
+byte-identical by construction rather than by argument.
+
+**The guards from PBUG-20260907-09 stay.** They are what turned a silent
+14-minute loss into a diagnosable one-line log, and they remain correct
+defence-in-depth against any other engine returning a bad sample.
