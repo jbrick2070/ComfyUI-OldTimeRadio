@@ -153,7 +153,7 @@ errors, but this is the ceiling rather than a comfortable setting.
 | `viz_mxc_cpu` / `viz_green` / `viz_camera` | video (procedural) | **PROVEN** (shipped canonical) |
 | `kokoro`, `stable_audio_3` | audio | **PROVEN** |
 | `musicgen`, `bark` | audio | **PROVEN on mps** (bark's row was wrong) |
-| `animatediff15_v3_*` | video diffusion | under test |
+| `animatediff15_v3_*` | video diffusion | **BLOCKED, not failed** -- needs the ComfyUI-AnimateDiff-Evolved node pack plus a domain-adapter LoRA; never reached its own code. Not a Mac issue |
 | `z_image_turbo` | image | **FAIL** -- too large at bf16, `aten::_int_mm` unimplemented at int8 |
 | `viz_mxc_mandala` | video | **BLOCKED** -- pycairo has no macOS wheel |
 

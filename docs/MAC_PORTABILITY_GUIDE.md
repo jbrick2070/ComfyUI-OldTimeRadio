@@ -301,3 +301,41 @@ LTXV loads fully on Metal: 3.67 GB + 9.08 GB (t5xxl) + 2.38 GB, every one
 -- no nvenc, nvml, triton, flash_attn, `torch.cuda` or `.cuda()` -- and pins its
 T5 encoder to CPU by design. The row was untested policy, not a measurement. See
 the 30-second grep test in `ADDING_IMAGE_AND_VIDEO_LANES.md`.
+
+
+## 8. `animatediff15_v3_*` -- needs a THIRD-PARTY NODE PACK, not just weights
+
+**Tested 2026-09-08, failed at the gate (not at render), and the cause is not
+Apple Silicon.** It would fail identically on Windows without the same pieces.
+
+```
+EngineUnusable: video engine 'animatediff15_v3_haunted_video' is not usable for
+role 'text_to_video': missing_model -- artifact(s) not found:
+  motion_module=v3_sd15_mm.ckpt (folder_paths category 'animatediff_models'),
+  domain_adapter=v3_sd15_adapter.ckpt
+```
+
+Three things are required and none auto-fetches:
+
+| requirement | where it goes | note |
+| --- | --- | --- |
+| **`ComfyUI-AnimateDiff-Evolved`** (custom node pack) | `custom_nodes/` | **This is the real dependency.** It registers the `animatediff_models` folder category and provides the nodes. Without it the motion module is invisible even when the file is on disk |
+| `v3_sd15_mm.ckpt` (1.56 GB) | `models/animatediff_models/` | `guoyww/animatediff` |
+| `v3_sd15_adapter.ckpt` (~95 MB+) | `models/loras/` | the v3 DOMAIN ADAPTER -- a LoRA on the image model, not the motion module |
+| `v1-5-pruned-emaonly-fp16.safetensors` (1.99 GB) | `models/checkpoints/` | shared with `sd15`; `Comfy-Org/stable-diffusion-v1-5-archive` |
+
+```bash
+python -c "
+from huggingface_hub import hf_hub_download
+print(hf_hub_download('guoyww/animatediff','v3_sd15_mm.ckpt'))
+print(hf_hub_download('guoyww/animatediff','v3_sd15_adapter.ckpt'))"
+```
+
+**Mac status: UNKNOWN, not FAILED.** The engine never ran, so nothing was learned
+about whether its code works on Metal. Its adapters contain zero NVIDIA-specific
+code, so the `["cuda"]` row is as likely to be untested policy as
+`ltx_8gb`'s was -- but that is a hypothesis, not a result.
+
+**Recommendation: use `ltx_8gb` instead on a Mac.** It is proven, both its
+weights auto-fetch, and it needs no third-party node pack. AnimateDiff is worth
+revisiting only if you specifically want its look.
