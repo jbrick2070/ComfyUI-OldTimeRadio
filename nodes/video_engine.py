@@ -1039,8 +1039,14 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     ffmpeg = _find_ffmpeg()
     if not ffmpeg:
         raise RuntimeError(
-            "ffmpeg not found. Install via: winget install ffmpeg  "
-            "(or add ffmpeg to PATH)"
+            "ffmpeg not found, and this build could not fall back to the "
+            "bundled one. `imageio-ffmpeg` is a declared dependency and ships "
+            "a working ffmpeg for Windows, Linux and macOS, so this normally "
+            "cannot happen -- reinstall the pack's requirements:\n"
+            "    pip install -r requirements.txt\n"
+            "Or point OTR_FFMPEG at an ffmpeg binary you already have. "
+            "(The old text here read `winget install ffmpeg`, which is a "
+            "Windows command that was also printed on macOS and Linux.)"
         )
 
     use_nvenc = _check_nvenc(ffmpeg)

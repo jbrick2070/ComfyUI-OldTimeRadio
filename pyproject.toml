@@ -90,6 +90,13 @@ dependencies = [
     "pycairo>=1.24; sys_platform == 'win32'",
     "pillow>=10.0",
     "aiohttp>=3.9",
+    # ffmpeg as a pip dependency (2026-09-07). Before this, a finished episode
+    # died at the mp4 encode with a `winget install ffmpeg` RuntimeError -- on
+    # macOS. imageio-ffmpeg ships prebuilt ffmpeg wheels for Windows, Linux and
+    # macOS (arm64 + x86_64), so `pip install` alone now yields a working
+    # encoder everywhere. Resolved LAST, after OTR_FFMPEG / PATH / real system
+    # installs, so boxes that already work are untouched.
+    "imageio-ffmpeg>=0.5",
 ]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},

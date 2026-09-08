@@ -185,3 +185,30 @@ pycairo>=1.24; sys_platform == 'win32'
 pillow>=10.0
 # aiohttp: imported by __init__.py itself, so it is on the pack's load path.
 aiohttp>=3.9
+
+# 2026-09-07: ffmpeg itself, as a pip dependency, and it closes the LAST gap
+# between "pip install finished" and "this box can produce an episode".
+#
+# MEASURED on a Mac mini M4: a full canonical run wrote its 108.8 s master WAV
+# -- writer, Kokoro voices and Stable Audio 3 all succeeded -- and then died at
+# the mp4 encode with `RuntimeError: ffmpeg not found. Install via: winget
+# install ffmpeg`. A Windows package-manager command, raised on macOS, at the
+# final step of a 13-minute render, on a box that had no Homebrew.
+#
+# ffmpeg was never a declared dependency at all: the pack asked PATH, then the
+# well-known Homebrew/MacPorts/Windows install directories, and gave up. That
+# works only for someone who already installed ffmpeg by hand -- and a
+# GUI-launched ComfyUI does not even inherit a login shell's PATH, so it fails
+# for some of the people who DID (see the note in _otr_shared/ffmpeg.py).
+#
+# imageio-ffmpeg publishes prebuilt ffmpeg binaries as ordinary wheels for
+# Windows, Linux and macOS (arm64 AND x86_64), and `get_ffmpeg_exe()` fetches
+# one if the wheel carries none. So this single line gives every platform a
+# working encoder at install time. The bundled macOS arm64 build is ffmpeg 7.1
+# with libx264, aac and h264_videotoolbox (Apple's hardware H.264 encoder).
+#
+# It is resolved LAST in `_otr_shared.ffmpeg.resolve_ffmpeg` -- after the
+# operator's OTR_FFMPEG pin, PATH, and real system installs -- so a box with
+# its own ffmpeg keeps using it and nothing changes on the boxes that work
+# today.
+imageio-ffmpeg>=0.5

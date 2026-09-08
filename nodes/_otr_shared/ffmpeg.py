@@ -91,6 +91,9 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
        for the same reason: a GUI-launched ComfyUI does not inherit the PATH a
        login shell would have given it, so an ffmpeg the user definitely
        installed is invisible to step 3.
+    5. the binary `imageio-ffmpeg` bundles. Last, so any real install above
+       wins, and present so that `pip install` alone is enough to encode on
+       Windows, Linux and macOS alike.
 
     NEVER RAISES. "This box has no ffmpeg" is a fact, and each caller has
     already decided what that fact costs it -- an empty string, its own
@@ -111,7 +114,48 @@ def resolve_ffmpeg(preferred=None) -> Optional[str]:
         candidate = os.path.expandvars(raw)
         if os.path.isfile(candidate):
             return candidate
-    return None
+    # Guarded AT THE CALL SITE as well as inside the helper. The helper has its
+    # own try/except, but this module's contract is that resolution NEVER
+    # raises, and a contract that depends on one particular callee staying
+    # well-behaved is not a contract. Caught by
+    # test_a_broken_imageio_ffmpeg_is_none_and_never_raises.
+    try:
+        return _imageio_ffmpeg()
+    except Exception:  # noqa: BLE001 -- resolution must never raise
+        return None
+
+
+def _imageio_ffmpeg() -> Optional[str]:
+    """The ffmpeg `imageio-ffmpeg` ships, or ``None``.
+
+    LAST resort on purpose: every step above is either the operator's choice or
+    a real system install, and both should win over a wheel-bundled copy. This
+    step exists so that a box which installed the pack and nothing else still
+    encodes.
+
+    `imageio-ffmpeg` publishes prebuilt binaries for Windows, Linux and macOS
+    (arm64 and x86_64) as ordinary wheels, so declaring it in requirements.txt
+    makes ffmpeg arrive with `pip install` on every platform this pack targets.
+    That is the whole point: before this step the macOS answer was "install
+    Homebrew first" and the Windows answer was a `winget` line printed from a
+    RuntimeError -- both of which ask a one-click-install user to open a
+    terminal, which is exactly the audience a registry install exists to spare.
+
+    2026-09-07, measured on a Mac mini M4: a full episode wrote its master WAV
+    and then died at the mp4 encode with "ffmpeg not found. Install via:
+    winget install ffmpeg" -- a Windows command, on macOS, at the last step of
+    a 13-minute run. The wheel-bundled binary was already sitting in the same
+    venv (ffmpeg 7.1, with libx264, aac and h264_videotoolbox); nothing had
+    ever asked it.
+
+    NEVER RAISES, per this module's contract. A missing or broken
+    imageio-ffmpeg is just "this box has no ffmpeg".
+    """
+    try:
+        import imageio_ffmpeg  # noqa: PLC0415 -- optional, resolved lazily
+        return _usable(imageio_ffmpeg.get_ffmpeg_exe())
+    except Exception:  # noqa: BLE001 -- resolution must never raise
+        return None
 
 
 #: Nodes that have already said their widget value is ignored. One line per

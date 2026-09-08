@@ -43,6 +43,17 @@ def box(tmp_path, monkeypatch):
     monkeypatch.setattr(shutil, "which", which_with_one_ffmpeg)
     monkeypatch.delenv("OTR_FFMPEG", raising=False)
     monkeypatch.setattr(ffm, "_WINDOWS_INSTALL_CANDIDATES", ())
+    # The macOS tuple needs the same treatment and never got it: on any dev box
+    # with Homebrew ffmpeg at /opt/homebrew/bin, the "nothing anywhere" cases
+    # below resolved to the REAL binary and the precedence they assert was
+    # never actually tested. Latent until this suite first ran on a Mac.
+    monkeypatch.setattr(ffm, "_MACOS_INSTALL_CANDIDATES", ())
+    # Step 5 (2026-09-07): imageio-ffmpeg is now a declared dependency and
+    # ships a working binary, so "this box has no ffmpeg" is not something the
+    # environment can produce any more -- it has to be stubbed, exactly like
+    # the install-location tuples above. Its own precedence (last, after every
+    # real install) is asserted separately below.
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: None)
     return SimpleNamespace(path=str(path_bin), env=str(env_bin),
                            explicit=str(explicit), tmp=tmp_path)
 
@@ -280,3 +291,41 @@ def test_a_pass_through_env_reader_is_not_needed_for_the_pin(box, monkeypatch):
     monkeypatch.setenv("OTR_FFMPEG", box.env)
     assert sd.find_ffmpeg(None) == box.env
     assert os.path.isfile(sd.find_ffmpeg(None))
+
+
+# --------------------------------------------------------------------------- #
+# Step 5 -- the bundled binary. Declared dependency (imageio-ffmpeg), so a box
+# that installed the pack and nothing else can still encode. It must be LAST:
+# the operator's pin, PATH and real system installs all outrank it.
+# --------------------------------------------------------------------------- #
+def test_the_bundled_binary_is_used_when_the_box_has_nothing_else(box, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: box.env)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.env
+
+
+def test_path_still_outranks_the_bundled_binary(box, monkeypatch):
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: box.env)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.path
+
+
+def test_the_operator_pin_still_outranks_the_bundled_binary(box, monkeypatch):
+    monkeypatch.setenv("OTR_FFMPEG", box.env)
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", lambda: box.explicit)
+    assert ffm.resolve_ffmpeg("ffmpeg") == box.env
+
+
+def test_a_broken_imageio_ffmpeg_is_none_and_never_raises(box, monkeypatch):
+    """The module contract: resolution NEVER raises. A missing or broken
+    imageio-ffmpeg is just 'this box has no ffmpeg'."""
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+
+    def _explode():
+        raise RuntimeError("no binary for this platform")
+
+    monkeypatch.setattr(ffm, "_imageio_ffmpeg", _explode)
+    try:
+        result = ffm.resolve_ffmpeg("ffmpeg")
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError(f"resolve_ffmpeg raised {exc!r}") from exc
+    assert result is None
