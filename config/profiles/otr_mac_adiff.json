@@ -1,0 +1,92 @@
+{
+  "id": "otr_mac_adiff",
+  "display_name": "Apple Silicon MPS -- AnimateDiff haunted lane (Mac-only, ADDITIVE). Same M4/16 GB substrate as otr_mac_mps: kokoro voices, stable_audio_3 music, Qwen3.5-4B writer on Metal at quant_policy none. The ONE difference is the three video roles, which run animatediff15_v3_haunted_video instead of the procgen visualizers -- SD1.5 + the v3 motion module + the v3 domain adapter, about 3.65 GB and the cheapest complete video lane in the pack (the 4060 measured 4.9 GB fully resident, no offload). It is text_to_video, so it mints NO still and the image roles are inert. NEEDS the pinned ComfyUI-AnimateDiff-Evolved pack AND an extra_model_paths entry for 'animatediff_models', which Comfy Desktop does not generate -- see docs/MAC_PORTABILITY_GUIDE.md section 8. Exists as its own profile so the 5080's haunted lane and otr_mac_mps are both untouched.",
+  "status": "draft",
+  "platform": "mac",
+  "device_backend": "mps",
+  "gpu_vendor": "apple",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "animatediff15_v3_haunted_video",
+    "music_visual": "animatediff15_v3_haunted_video",
+    "character_visual": "animatediff15_v3_haunted_video",
+    "announcer_image": "sd15",
+    "music_image": "sd15",
+    "character_image": "sd15"
+  },
+  "slot_overrides": {
+    "voice_bank": "kokoro_builtin",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "kokoro",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "animatediff15_v3_haunted_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "mps",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 10.0,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "mps",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "mps"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "v1-5-pruned-emaonly-fp16.safetensors",
+      "v3_sd15_mm.ckpt",
+      "v3_sd15_adapter.ckpt"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}
