@@ -12644,3 +12644,67 @@ byte-identical by construction rather than by argument.
 **The guards from PBUG-20260907-09 stay.** They are what turned a silent
 14-minute loss into a diagnosable one-line log, and they remain correct
 defence-in-depth against any other engine returning a bad sample.
+
+## PBUG-20260907-11 -- ComfyUI's sub-quadratic attention produces WRONG OUTPUT on MPS (and it is the default there)
+
+**This is the parent of PBUG-20260907-09b.** That entry fixed the NaN half. This
+is the whole bug, and the NaN was only its loudest symptom.
+
+**The operator caught it by ear, and every metric this driver had missed it.**
+Stable Audio 3 output that passed peak/RMS/noise-floor checks as "valid,
+non-silent audio" was described on listening as *"like a broken cassette tape
+going backwards"*. It was noise.
+
+**MEASURED, one 12 s SA3 cue, identical checkpoint + prompt + seed + steps + cfg
++ sampler + scheduler. The ONLY variable is the attention implementation:**
+
+| run | spectral flatness | zero-cross rate | sample range |
+| --- | --- | --- | --- |
+| CPU, any attention | **0.158** | 0.048 | [-0.974, 0.944] |
+| MPS, pytorch (SDPA) attention | **0.156** | 0.054 | [-0.961, 0.873] |
+| MPS, sub-quadratic (the default) | **0.432** | 0.148 | **[-1.000, 1.000]** |
+
+Spectral flatness ~1.0 is white noise and <0.1 is tonal; 0.43 is halfway to
+noise. The sub-quad run also clips at exactly full scale. **MPS with PyTorch
+attention is statistically indistinguishable from CPU** -- so Metal is fine and
+the attention kernel is not.
+
+**Why nobody caught it sooner: dBFS cannot see it.** Peak was identical to four
+decimal places across good and broken runs, and RMS differed by 1.4 dB -- well
+inside normal variation. Only spectral structure, or a human ear, separates
+them. **Any future audio/visual verification on this project must measure
+structure, not level.**
+
+**Root cause, upstream.** `comfy/model_management.py:459-470` auto-enables
+PyTorch attention for `nvidia`, `intel_xpu`, `ascend_npu`, `mlu` and `ixuca` --
+**and not for `mps`**, which therefore falls through to the sub-quadratic path.
+That path calls `torch.baddbmm(<uninitialized buffer>, q, k, beta=0)`; MPS
+ignores `beta=0` where CPU and CUDA honour it (the 09b NaN), and it evidently
+gets the attention arithmetic wrong in other ways too, since the output is
+garbage even with the NaN source removed.
+
+**Blast radius is far wider than OTR.** Sub-quadratic is ComfyUI's DEFAULT
+attention on Apple Silicon, and this is ComfyUI core, not a node pack. Every
+ComfyUI-native diffusion model on every Mac is affected -- image and video, not
+just audio. This is worth an upstream report.
+
+**Fix.** `prestartup_script.py` sets
+`comfy.cli_args.args.use_pytorch_cross_attention = True` when
+`torch.backends.mps.is_available()`, which is the last moment a node pack can
+influence the choice: custom-node prestartup runs BEFORE `model_management` is
+imported (confirmed in the boot log ordering). An explicit
+`--use-split-cross-attention` / `--use-quad-cross-attention` from the operator is
+respected, not overridden, and warned about. On CUDA and CPU the block is inert.
+
+**Verified with NO launch flag**, exactly as a user would start it:
+
+```
+[OldTimeRadio] mps detected: forcing PyTorch (SDPA) attention...
+Device: mps
+Using pytorch attention
+```
+
+**Consequence for the record:** the first published Apple Silicon episode
+(`magnetic_pulse_20260907_201810`, PBUG/GO_FORWARD 2026-09-07) was rendered
+BEFORE this fix. It proves the pipeline end to end, and its music bed is noise.
+It is a path receipt, not a good episode.

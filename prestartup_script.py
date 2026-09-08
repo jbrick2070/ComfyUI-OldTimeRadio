@@ -97,3 +97,64 @@ except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
     logging.getLogger("OTR").info(
         "OldTimeRadio: Kokoro voice prefetch unavailable (%s); Bark needs no "
         "voice files and is unaffected", _otr_exc)
+
+
+# ---------------------------------------------------------------------------
+# APPLE SILICON: force PyTorch (SDPA) attention before ComfyUI chooses.
+#
+# ComfyUI's sub-quadratic attention -- its DEFAULT on Mac -- produces WRONG
+# OUTPUT on MPS. Not slow, not an exception: structurally broken audio, and
+# under `torch.use_deterministic_algorithms(True)` outright NaN.
+#
+# MEASURED, Mac mini M4 / torch 2.12.1, one Stable Audio 3 cue, identical
+# checkpoint + prompt + seed + steps + cfg + sampler, ONLY the attention
+# implementation differing:
+#
+#   CPU / any attention        spectral flatness 0.158   zcr 0.048   <- music
+#   MPS / pytorch attention    spectral flatness 0.156   zcr 0.054   <- music
+#   MPS / sub-quadratic        spectral flatness 0.432   zcr 0.148   <- noise
+#
+# (flatness ~1.0 is white noise, <0.1 is tonal; the sub-quad run also clipped
+# at exactly +-1.000.) The operator's verdict on the sub-quad output was "like a
+# broken cassette tape going backwards", and dBFS/peak metrics could not tell it
+# from real music -- only spectral structure and ears could.
+#
+# The NaN half of the same bug: sub-quadratic attention calls
+# `torch.baddbmm(<uninitialized buffer>, q, k, beta=0)`, and `beta=0` means
+# "ignore that buffer". CPU and CUDA honour it; MPS does not. See
+# PBUG-20260907-09b.
+#
+# WHY THIS BELONGS HERE. comfy/model_management.py auto-enables PyTorch
+# attention for nvidia, intel_xpu, ascend_npu, mlu and ixuca -- and NOT for mps,
+# which therefore falls through to the broken path. That decision is made when
+# model_management is first imported, which is AFTER custom-node prestartup
+# scripts run, so this is the last moment a node pack can influence it.
+#
+# Scoped to MPS. On CUDA/CPU the block does nothing at all, so nothing about the
+# 5080's behaviour or its byte-identical goldens changes. An operator who passes
+# --use-split-cross-attention or --use-quad-cross-attention explicitly is
+# respected and not overridden.
+try:
+    import torch as _otr_torch
+
+    if _otr_torch.backends.mps.is_available():
+        from comfy.cli_args import args as _otr_comfy_args
+
+        _otr_explicit = (getattr(_otr_comfy_args, "use_split_cross_attention", False)
+                         or getattr(_otr_comfy_args, "use_quad_cross_attention", False))
+        if _otr_explicit:
+            logging.getLogger("OTR").info(
+                "[OldTimeRadio] mps: an explicit attention flag is set; leaving it "
+                "alone. NOTE: sub-quadratic attention is measurably WRONG on MPS "
+                "(see docs/MAC_LESSONS_LEARNED.md).")
+        elif not getattr(_otr_comfy_args, "use_pytorch_cross_attention", False):
+            _otr_comfy_args.use_pytorch_cross_attention = True
+            logging.getLogger("OTR").info(
+                "[OldTimeRadio] mps detected: forcing PyTorch (SDPA) attention. "
+                "ComfyUI's sub-quadratic default produces structurally wrong "
+                "output on Metal -- measured on Stable Audio 3, spectral flatness "
+                "0.43 (noise) vs 0.16 (music) with every other input identical.")
+except Exception as _otr_attn_exc:  # noqa: BLE001 -- never block boot
+    logging.getLogger("OTR").info(
+        "OldTimeRadio: could not set the MPS attention backend (%s); if this is "
+        "a Mac, pass --use-pytorch-cross-attention manually", _otr_attn_exc)
