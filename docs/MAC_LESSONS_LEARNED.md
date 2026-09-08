@@ -214,7 +214,33 @@ So the shipped Mac canonical (`viz_mxc_cpu` / `viz_mxc_mandala` / `viz_camera`,
 minting no stills, downloading no image weights) is not a conservative choice.
 It is the only local configuration Apple Silicon can run at all.
 
-**Practical:** do not spend a test run selecting `z_image_turbo`, any LTX, Wan or
-AnimateDiff on a Mac. They raise `EngineUnusable` from their declaration before
-any work happens; the failure carries no new information. Read
-`device_backends` first.
+**Practical:** a declaration is enforced before any work happens, so selecting
+one of the cuda-only rows on a Mac raises `EngineUnusable` immediately and the
+failure teaches nothing. Read `device_backends` first.
+
+### But at least one of those declarations looks untested rather than measured
+
+**`ltx_8gb` -- "LTX 0.9.8" -- deserves a real measurement before it is written
+off.** It is a different engine from `ltx_video`, and the distinction matters:
+
+| row | weights | plausible on Mac? |
+| --- | --- | --- |
+| `ltx_video` | `ltx-2.3-22b-dev-gguf` + `gemma-3-12b` encoder | no -- 22B, never a 16 GB model |
+| `ltx_8gb` | `ltxv-2b-0.9.8-distilled` | **maybe** -- 2B distilled, all-in-one |
+
+Grepping the 0.9.8 adapter (`eng_ltx_8gb.py`) for hard NVIDIA dependencies --
+`nvenc`, `nvml`, `triton`, `flash_attn`, `torch.cuda`, `.cuda()`, `sm_*`, `fp8`,
+`nvfp4` -- returns **nothing**. It drives stock ComfyUI nodes (`CLIPLoader`,
+`CLIPTextEncode`), pins its text encoder to CPU (`t5_device="cpu"`) and diffuses
+on whatever device ComfyUI resolved, which is `mps` here.
+
+So its `["cuda"]` row is very likely the same shape as the stale
+`bitsandbytes ... sys_platform != 'darwin'` marker: **a policy nobody has
+retested, not a hardware fact.** The honest blocker is more likely MEMORY than
+device -- the recipe's `t5xxl_fp16` encoder is roughly 9 GB by itself, on top of
+the 2B diffusion model, which is the same 16 GB wall as section 3.
+
+**This is unmeasured either way.** Flipping the declaration to test it is a real
+experiment worth running on Apple Silicon hardware; asserting it works, or that
+it cannot, would both be guesses. What IS established is that nothing in the
+adapter code forbids it.
