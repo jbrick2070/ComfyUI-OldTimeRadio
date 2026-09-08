@@ -12994,3 +12994,96 @@ luck about where the numbers fell rather than a validated model. Until this PBUG
 is understood, treat every artifact as concurrently resident when reasoning
 about an Apple Silicon budget — and note the empirical bracket the two receipts
 give: 16.1 GiB of concurrent weights survived (on swap), 21.2 GiB did not.
+
+---
+
+### PBUG-20260908-03 — the LLM teardown had no Metal branch, and an episode runs it 8-12 times
+
+**Verified on live production artifacts:** three OS kills on a Mac mini M4 /
+16 GB (macOS 26.6, torch 2.12.1) across
+`logs/ltx_sd15.log` (survived), `logs/klein_run.log` and `logs/klein_boot.log`
+(killed). No traceback in any of them -- on unified memory the OS kills the
+process rather than raising.
+
+#### The defect
+
+`nodes/_otr_model_loader.py::_teardown_gpu_for_entry` documents a canonical
+six-step sequence and implements all six **only for CUDA**:
+
+```
+1. model.to("cpu")            <- platform-neutral, always ran
+2. del cache_entry            <- platform-neutral, always ran
+3. gc.collect()               <- platform-neutral, always ran
+4. torch.cuda.empty_cache()   \
+5. torch.cuda.ipc_collect()    >  behind `if torch.cuda.is_available():`
+6. torch.cuda.synchronize()   /
+```
+
+There was no `torch.mps` counterpart anywhere in the loader. `torch.mps` appears
+in the whole `nodes/` tree only in `vram_context_test.py`, a diagnostic that is
+not on this path.
+
+#### Why steps 1-3 are not enough, measured
+
+```
+baseline driver-allocated:      0.5 MiB
+after a 2 GB allocation:     2048.5 MiB
+after del + gc.collect():    2048.5 MiB   <- where the old teardown ENDED
+after torch.mps.empty_cache():  0.5 MiB   <- what was missing
+```
+
+The Python object was always freed correctly. A full trace of the path found NO
+leaked reference: `_detach_and_invalidate_locked` clears `LLM_CACHE`, the model
+is moved to cpu, `del` + `gc.collect()` reap it, and the writer's slot closures
+re-call `request_slot` lazily rather than capturing the entry. The memory simply
+stayed in PyTorch's MPS caching allocator, because nothing ever asked for it
+back.
+
+#### Why it compounds into a kill rather than wasting a little
+
+This teardown runs BETWEEN independent stages that each free the LLM for
+whatever loads next -- `unload_writer_llm_after_script`
+(`_otr_writer_tail.py:1246`), bark's per-line eviction
+(`_otr_bark_lib.py:205`), the freeze cascade
+(`OTR_LedgerFreezeCascade.py:376`), ShotLock (`otr_shot_lock.py:1721`),
+`_otr_vram_levers.py:102`. So ONE EPISODE legitimately constructs and destroys
+the ~8.7 GB writer 8-12 times. That is a good trade on CUDA, where every cycle
+returns its blocks.
+
+On Metal the pool grew each cycle:
+
+| run | writer loads | outcome |
+| --- | --- | --- |
+| `ltx_sd15.log` | 8 | survived, published 2 episodes |
+| `klein_boot.log` | 12 | **killed**, materializing weights on the 12th |
+
+The kill lands on a `ledger_clean_act_summary` reload, immediately after the
+writer's own post-script unload had just torn the same model down.
+
+**The operator's observation is what located this.** The LTX lane carries
+16.1 GB of weights and published; the AnimateDiff lane carries 2.4 GB and could
+not finish. The video lane was never the variable -- the writer is common to
+both, and the heavier lane happened to survive because its episode made fewer
+writer cycles.
+
+#### The fix
+
+An `elif` for Metal beside the CUDA branch: `torch.mps.empty_cache()` plus a
+guarded `torch.mps.synchronize()`. CUDA takes the branch it always took and
+never evaluates the Metal test, so NVIDIA behaviour is unchanged.
+`model.to("cpu")` remains necessary rather than redundant on unified memory: it
+releases the allocator's device buffers so `empty_cache` has something to hand
+back.
+
+Pinned by `tests/test_llm_teardown_releases_on_metal.py`, including the
+measurement above -- if a future torch makes `gc` sufficient, that test fails
+and says so rather than silently blessing a redundant call.
+
+#### Still open
+
+`[Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB`
+appears 74-157 times per run. The Selector detects the fit is WARN and proceeds
+anyway, which is correct on a card that can offload and is how a unified-memory
+host dies. Whether `check_vram_fit` is even reading a meaningful number on Metal
+is unexamined; `free_vram_mb()`'s Metal branch (PBUG-20260908-02) reports the
+Metal working set, which cannot see a model parked on "cpu".

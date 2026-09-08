@@ -1566,6 +1566,13 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
                                         when the byte budget fits.
         6. torch.cuda.synchronize()  -- let in-flight ops finish.
 
+    ON APPLE SILICON steps 4-6 have a Metal counterpart (``torch.mps``) that
+    was missing until 2026-09-08. Steps 1-3 were always right there; without
+    4-6 the allocator simply never gave the memory back, and since this
+    teardown runs between stages that each free the LLM for the next model, an
+    episode's 8-12 legitimate load/unload cycles of a 8.7 GB writer grew the
+    pool until the OS killed the process. See PBUG-20260908-03.
+
     Never raises -- a teardown failure should NOT propagate as a node
     error.
     """
@@ -1604,6 +1611,33 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
                 torch.cuda.synchronize()
             except Exception as exc:  # noqa: BLE001
                 log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
+        elif getattr(torch, "mps", None) and torch.backends.mps.is_available():
+            # STEPS 4-6 HAD NO METAL COUNTERPART, AND THAT KILLED A MACHINE
+            # THREE TIMES (2026-09-08). Everything above this line is already
+            # correct on Apple Silicon: the entry is detached, `model.to("cpu")`
+            # runs, and gc.collect() reaps it -- a trace confirmed there is no
+            # leaked reference anywhere in this path. But dropping the Python
+            # object does NOT return the memory: PyTorch's MPS caching allocator
+            # keeps its reserved pool, and nothing here ever asked it not to.
+            #
+            # WHY IT COMPOUNDS INSTEAD OF JUST WASTING A LITTLE. This teardown
+            # runs BETWEEN independent stages that each decide to free the LLM
+            # for the next model -- the writer's post-script unload, bark's
+            # per-line eviction, the freeze cascade, ShotLock. One episode
+            # legitimately constructs and destroys this 8.7 GB model 8-12 times.
+            # On CUDA each cycle returns its blocks and the trade is sound. On
+            # Metal the pool grew every cycle: the surviving run managed 8
+            # cycles, the killed one died materializing weights on the 12th.
+            #
+            # `model.to("cpu")` above is NOT redundant with this on unified
+            # memory even though "cpu" is the same physical RAM -- it is what
+            # releases the allocator's device buffers so this call has something
+            # to hand back.
+            torch.mps.empty_cache()
+            try:
+                torch.mps.synchronize()
+            except Exception as exc:  # noqa: BLE001
+                log.debug("[OTR_ModelLoader] mps synchronize skipped: %s", exc)
     except ImportError:
         pass
 
