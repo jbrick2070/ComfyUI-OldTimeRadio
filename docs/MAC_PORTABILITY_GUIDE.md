@@ -236,3 +236,68 @@ has a different cause that is not yet diagnosed.
 
 Cosmetic on top of a working pipeline; a platform-scoped font fallback would fix
 the title clipping without altering a single pixel on Windows.
+
+
+---
+
+## 7. Local video diffusion on a Mac: LTX 0.9.8, step by step
+
+**PROVEN 2026-09-08** on a Mac mini M4 (16 GB): `ltx098_low_video` rendered all
+three beat classes and published a 108 s 1080p episode with zero errors.
+
+### What you need
+
+| item | size | how it arrives |
+| --- | --- | --- |
+| `ltxv-2b-0.9.8-distilled.safetensors` | 5.91 GB | **auto-fetched** -- already in the visual-asset manifest (`Lightricks/LTX-Video`) |
+| `t5xxl_fp16.safetensors` | 9.12 GB | **auto-fetched** (`comfyanonymous/flux_text_encoders`) |
+| an image engine for the still | 1.99 GB | **`sd15`, and this is the part people miss** |
+
+**Nothing here is gated and nothing needs a manual download.** The two LTX
+weights self-fetch on first use. Total on disk is about 17 GB.
+
+### The three steps
+
+1. **Install the pack and let it fetch.** Both LTX weights are in the manifest.
+2. **Select the lanes.** On `OTR_VideoDirector`, set the video model to
+   `ltx098_low_video (16:9)` for whichever roles you want, and set the matching
+   image model to `sd15`.
+3. **Make sure `sd15`'s checkpoint is present** (1.99 GB, ungated):
+
+```bash
+python -c "
+from huggingface_hub import hf_hub_download
+print(hf_hub_download('Comfy-Org/stable-diffusion-v1-5-archive',
+      'v1-5-pruned-emaonly-fp16.safetensors'))"
+```
+
+then copy it into `models/checkpoints/`.
+
+### THE STEP THAT IS NOT OBVIOUS
+
+**LTX 0.9.8 is image-to-video: it consumes a still, it does not invent one.** It
+had never run on a Mac before -- not because of anything in the engine, but
+because every LOCAL image engine on the platform was `["cuda"]`, so nothing could
+mint the still it needed. Its first Mac attempt failed at the image step, not the
+video step. `sd15` is what unblocked it.
+
+So **selecting LTX without also selecting a working image model gets you a
+failed render**, and the error names the image engine rather than LTX.
+
+### What it costs on 16 GB
+
+| configuration | wall clock | notes |
+| --- | --- | --- |
+| one lane (`still_motion`) | 22:22 | comfortable |
+| one lane LTX + 2 visualizers | 39:17 | comfortable |
+| **all three lanes on LTX** | **1:07:27** | swapped to ~14 GB, 27% free, zero errors -- the ceiling, not a comfortable setting |
+
+LTXV loads fully on Metal: 3.67 GB + 9.08 GB (t5xxl) + 2.38 GB, every one
+`full load: True`. No OOM, no unimplemented operator.
+
+### Why the registry said this was impossible
+
+`ltx_8gb` declared `["cuda"]`. Its adapter contains **zero** NVIDIA-specific code
+-- no nvenc, nvml, triton, flash_attn, `torch.cuda` or `.cuda()` -- and pins its
+T5 encoder to CPU by design. The row was untested policy, not a measurement. See
+the 30-second grep test in `ADDING_IMAGE_AND_VIDEO_LANES.md`.
