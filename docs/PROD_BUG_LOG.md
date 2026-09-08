@@ -12704,6 +12704,45 @@ Device: mps
 Using pytorch attention
 ```
 
+### The 3x3 matrix -- run because a single seed does not establish a root cause
+
+The first version of this entry rested on ONE seed and one comparison. That was
+fair to challenge, so the full matrix was run: 3 configurations x 3 seeds, one
+variable (the attention backend), everything else byte-identical.
+
+| config | flatness (mean +/- sd) | zcr | peak |
+| --- | --- | --- | --- |
+| MPS + pytorch attention | **0.182 +/- 0.014** | 0.06 | 0.77-1.00 (varies) |
+| **MPS + sub-quadratic** | **0.450 +/- 0.017** | 0.16 | **1.000 on all three** |
+| CPU + sub-quadratic | **0.165 +/- 0.020** | 0.06 | 0.80-0.98 (varies) |
+
+**The `cpu_subquad` cell is the one that matters, and it was missing from the
+first test.** Sub-quadratic attention on CPU is FINE (0.165). So the defect is
+not sub-quadratic generally -- it is **the MPS x sub-quadratic interaction**.
+2.7x separation, standard deviations under 0.021, no overlap, consistent across
+every seed. The broken config also clips at exactly 1.000 on all three seeds
+while both healthy configs vary naturally.
+
+**A falsifiability hatch ships with the fix:** `OTR_MPS_PYTORCH_ATTENTION=0`
+restores ComfyUI's stock Mac selection so anyone can re-run this comparison.
+
+### Scope of the claim -- what is and is NOT established
+
+**Established** on this machine (ComfyUI 0.34.6, torch 2.12.1, Mac mini M4,
+`stable_audio_3_small_music`): the attention backend is the sole cause, it is
+MPS-specific, and it reproduces on every seed tried. Mechanically corroborated by
+the separately measured `baddbmm(beta=0)` MPS fault, which lives in that same
+sub-quadratic path (PBUG-20260907-09b).
+
+**NOT established.** That it holds for every model -- Comfy-Org issue #15804
+reports sub-quadratic producing invalid values on Apple Silicon with LTX video,
+which corroborates the mechanism on different weights but does not prove it for
+all. That it holds across ComfyUI versions. And it does **not** explain
+Comfy-Org issue #16087, which reports SA3 noise on **CPU as well as MPS** with
+Stability's own package working on the same Mac -- on this box CPU is clean, so
+that report is either a different ComfyUI version, the `medium` checkpoint rather
+than `small_music`, or a second independent fault. Unresolved, and not claimed.
+
 **CONFIRMED BY EAR, 2026-09-07.** The operator listened to the MPS/PyTorch-attention
 cue and the CPU reference side by side: *"Both sound like music."* The same
 operator's verdict on the sub-quadratic cue was *"like a broken cassette tape

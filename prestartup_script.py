@@ -134,11 +134,25 @@ except Exception as _otr_exc:  # noqa: BLE001 -- a voice is never worth a boot
 # 5080's behaviour or its byte-identical goldens changes. An operator who passes
 # --use-split-cross-attention or --use-quad-cross-attention explicitly is
 # respected and not overridden.
+class _OTRAttentionOptOut(Exception):
+    """Internal: the operator opted out via OTR_MPS_PYTORCH_ATTENTION=0."""
+
 try:
     import torch as _otr_torch
 
     if _otr_torch.backends.mps.is_available():
         from comfy.cli_args import args as _otr_comfy_args
+
+        # Escape hatch, and it exists so this fix stays FALSIFIABLE: setting
+        # OTR_MPS_PYTORCH_ATTENTION=0 restores ComfyUI's stock Mac behaviour so
+        # the two backends can be A/B'd on identical inputs. Anyone re-testing
+        # the claim in PBUG-20260907-11 needs to be able to turn it off.
+        if os.environ.get("OTR_MPS_PYTORCH_ATTENTION", "1").strip() in ("0", "false", "no"):
+            logging.getLogger("OTR").info(
+                "[OldTimeRadio] mps: OTR_MPS_PYTORCH_ATTENTION=0 -- leaving ComfyUI's "
+                "stock attention selection alone (sub-quadratic). Measured WRONG on "
+                "Metal; set only for A/B testing.")
+            raise _OTRAttentionOptOut
 
         _otr_explicit = (getattr(_otr_comfy_args, "use_split_cross_attention", False)
                          or getattr(_otr_comfy_args, "use_quad_cross_attention", False))
@@ -154,6 +168,8 @@ try:
                 "ComfyUI's sub-quadratic default produces structurally wrong "
                 "output on Metal -- measured on Stable Audio 3, spectral flatness "
                 "0.43 (noise) vs 0.16 (music) with every other input identical.")
+except _OTRAttentionOptOut:
+    pass
 except Exception as _otr_attn_exc:  # noqa: BLE001 -- never block boot
     logging.getLogger("OTR").info(
         "OldTimeRadio: could not set the MPS attention backend (%s); if this is "
