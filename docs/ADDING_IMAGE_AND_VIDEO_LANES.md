@@ -180,15 +180,39 @@ no GGUF pack) is verified ungated.
 
 ## Declaring `device_backends` honestly
 
-`device_backends` is **enforced before any work runs**, so a `["cuda"]` row
-raises `EngineUnusable` on a Mac regardless of whether the code would have
-worked. The 2026-09-07 Apple Silicon session found several rows that were
-untested policy rather than measured fact:
+**Know what this row actually does.** An earlier draft of this section claimed
+`device_backends` is enforced before any work runs and that a `["cuda"]` row
+raises `EngineUnusable` on a Mac. That is **wrong**, and a codex review caught
+it. Grep it yourself -- outside the registries and the tests, exactly two things
+read the row:
+
+* `nodes/_otr_shared/capability_profiles.py` `_fit_reason()`, which decides
+  whether one engine fits one *profile* (`REASON_REQUIRES_CUDA` when the
+  profile's `device_backend` is not in the list). It feeds `availability()`,
+  `enabled_engines()` and `cross_validate_profile()` -- i.e. which engines a
+  profile admits into its enable set. The only live non-test caller is
+  `scripts/build_variants.py`, at variant-emit time; `scripts/otr_api.py`
+  dropped its enable-set cross-validation on 2026-08-31.
+* `scripts/otr_machine_matrix.py`, which prints the list -- but only in the
+  **voice-engines** table, off the *audio* registry. Video rows are not
+  rendered there at all, so a wrong video row prints nothing anywhere.
+
+The render path never consults it. So a hand-selected engine with a `["cuda"]`
+row will still be *attempted* on a Mac, and whatever the adapter's own
+`assert_usable` finds -- a missing checkpoint, a missing node class -- is the
+error you actually get. That makes an honest row more important, not less: for
+a video engine a wrong row is almost perfectly silent. It shifts which engines
+a profile admits at variant-emit time, and nothing on the render path, and
+nothing in the machine matrix, will ever contradict it.
+
+The 2026-09-07 Apple Silicon session found several rows that were untested
+policy rather than measured fact:
 
 * `bark` declared `["cuda", "cpu"]` and ran fine on `mps` once measured.
-* `z_image_turbo`, `ltx_8gb` and both `animatediff15_v3_*` adapters declare
-  `["cuda"]` and contain **zero** NVIDIA-specific code -- `z_image_turbo` was
-  then observed loading and executing on Metal, and failing on RAM alone.
+* `z_image_turbo`, `ltx_8gb` and both `animatediff15_v3_*` adapters all declared
+  `["cuda"]` and contain **zero** NVIDIA-specific code. `z_image_turbo` was then
+  observed loading and executing on Metal, failing on RAM alone; `ltx_8gb`
+  published a full episode and now correctly declares `["cuda", "mps"]`.
 
 **So: declare what you have MEASURED.** If you have not tried a backend, say so
 in a comment rather than excluding it silently -- an omitted backend is
@@ -211,7 +235,7 @@ That single check was right three times on 2026-09-08:
 | engine | grep | outcome |
 | --- | --- | --- |
 | `ltx_8gb` | 0 hits | **runs on Metal.** Published a full episode; the row was wrong |
-| `eng_ghost_signal*` (animatediff) | 0 hits | under test |
+| `eng_ghost_signal*` (animatediff) | 0 hits | **unresolved.** Blocked by a missing third-party node pack, not by Metal -- row left `["cuda"]` |
 | `bark` | had a literal `cuda if available else cpu` | **runs on mps** once given the chance |
 
 And the counter-example that keeps the rule honest -- `z_image_turbo` is

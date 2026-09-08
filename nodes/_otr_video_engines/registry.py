@@ -594,10 +594,18 @@ CAPABILITIES = {
     # dependency-lock.json.
     "animatediff15_v3_haunted_video": {
         "required_toolchain": None, "requires_sidecar": False,
-        # EXPERIMENT 2026-09-08, NOT a committed claim: mps added locally.
-        # Adapter has zero NVIDIA-specific code, same profile as ltx_8gb
-        # which proved out tonight. Reverted unless a render proves it.
-        "device_backends": ["cuda", "mps"], "requires_vendor": None,
+        # MPS NOT CLAIMED (2026-09-08). The adapter itself has zero
+        # NVIDIA-specific code -- the same NVIDIA-free adapter pattern as
+        # ltx_8gb, which DID prove out on Apple Silicon (not the same
+        # CAPABILITIES profile; different nodes and weights entirely).
+        # But this lane needs the third-party
+        # ComfyUI-AnimateDiff-Evolved node pack, which is not installed on the
+        # Mac test host, so no render has ever happened on mps (the pack is
+        # present on the CUDA proving machines). A device_backends row is a claim
+        # about proven execution, not about read-the-source plausibility
+        # (docs/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
+        # Add "mps" here only after a clip lands in otr/obs/.
+        "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
@@ -609,10 +617,18 @@ CAPABILITIES = {
     # cost row: admission-unenforced in the evidence manifest, like its parent.
     "animatediff15_v3_stillin_lab_video": {
         "required_toolchain": None, "requires_sidecar": False,
-        # EXPERIMENT 2026-09-08, NOT a committed claim: mps added locally.
-        # Adapter has zero NVIDIA-specific code, same profile as ltx_8gb
-        # which proved out tonight. Reverted unless a render proves it.
-        "device_backends": ["cuda", "mps"], "requires_vendor": None,
+        # MPS NOT CLAIMED (2026-09-08). The adapter itself has zero
+        # NVIDIA-specific code -- the same NVIDIA-free adapter pattern as
+        # ltx_8gb, which DID prove out on Apple Silicon (not the same
+        # CAPABILITIES profile; different nodes and weights entirely).
+        # But this lane needs the third-party
+        # ComfyUI-AnimateDiff-Evolved node pack, which is not installed on the
+        # Mac test host, so no render has ever happened on mps (the pack is
+        # present on the CUDA proving machines). A device_backends row is a claim
+        # about proven execution, not about read-the-source plausibility
+        # (docs/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
+        # Add "mps" here only after a clip lands in otr/obs/.
+        "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
