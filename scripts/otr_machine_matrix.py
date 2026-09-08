@@ -580,8 +580,12 @@ def render() -> str:
     A("* A `draft` row is not a promise. Most have never been run end to end.\n")
     A("* `install recipe` describes whether every selected artifact has one "
       "exact automatic or manual owner. It is not a hardware result.\n")
-    A("* Non-NVIDIA is largely unexplored. Profiles exist "
-      "(`otr_amd8_rocm`); none is proven.\n")
+    A("* AMD/ROCm is largely unexplored -- `otr_amd8_rocm` exists and is not "
+      "proven. **Apple Silicon is NOT in that bucket**: `otr_mac_mps` has "
+      "published episodes on a Mac mini M4 / 16 GB, and the engine-proof table "
+      "above carries its receipts (`viz_camera`, `sd15`, `ltx_8gb`, and all "
+      "four `still_*` lanes). This line used to say non-NVIDIA generally was "
+      "unproven, four lines below the rows disproving it.\n")
     A("* Where a lane needs weights, see "
       "[MODEL_ASSET_INDEX.md](MODEL_ASSET_INDEX.md) for the exact files and "
       "where to get them. That generated index is the cross-reference owner; "

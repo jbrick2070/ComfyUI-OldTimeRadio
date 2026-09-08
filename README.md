@@ -7,8 +7,9 @@ your output folder.
 
 **Pipeline:** story source → LLM script → character voices + announcer + music themes (a
 swappable 7-voice / 5-music engine roster; the shipped graph runs Kokoro on both voice
-slots, with MusicGen for music) → 48 kHz master mix → model-agnostic video
-(LTX 0.9.8 low by default; other engines remain selectable) → final MP4.
+slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic video
+(three procgen visualizer lanes by default -- zero weights; LTX, Wan, HuMo and the
+`still_*` family all remain selectable) → final MP4.
 
 **Alpha.24 qualification warning:** the mouse-only fresh-install path is not yet
 qualified. See [the physical 4060 report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
@@ -316,8 +317,8 @@ gated rows below.
 
 > **The LTX 2.5 gate bites late, and that is why it is listed here** (added 2026-08-29 after
 > it stopped a clean-machine install). Nothing in a default first run touches it — the
-> canonical workflow selects the older LTX 0.9.8 line — so you meet it only when you
-> select an `ltx25_*` row in `OTR_VideoDirector`. Its repo reports `"gated": "auto"`:
+> canonical workflow selects the three procgen visualizer lanes, which need no weights at
+> all — so you meet it only when you select an `ltx25_*` row in `OTR_VideoDirector`. Its repo reports `"gated": "auto"`:
 > approval is automatic, but the terms click and a token are both still required, and an
 > unauthenticated fetch returns **HTTP 401** rather than anything that reads like a licence
 > problem. If an `ltx25_*` lane fails to download its weights, this is why.
@@ -353,10 +354,18 @@ The per-machine rows in "Pick the graph" are dropdown changes to the one
 canonical graph, not separate saved JSONs. They are not substitutes for the
 exact canonical test reported here.
 
-The alpha.24 canonical JSON (`otr_canonical`) selects **LTX 0.9.8 low (16:9)**
-for all three video roles, **Z-Image-Turbo** for all three image roles,
-**Kokoro** for both voice slots, and **Stable Audio 3**. It does not select
-`still_flat`. The local writer is `Qwen/Qwen3.5-4B` in both writer slots.
+The canonical JSON (`otr_canonical`) selects the three **procgen visualizer
+lanes** -- `viz_mxc_cpu`, `viz_green`, `viz_camera` -- for the three video
+roles, **Z-Image-Turbo** for all three image roles, **Kokoro** for both voice
+slots, and **Stable Audio 3**. It does not select `still_flat`. The local
+writer is `Qwen/Qwen3.5-4B` in both writer slots.
+
+The video default is deliberate: the visualizer lanes need **no weights at
+all**, so the shipped graph renders on a clean install with nothing downloaded
+beyond the writer, the voices and the music. LTX 0.9.8 (`ltx098_low_video`) is
+a selectable upgrade that adds about 15 GB of weights, not the default. (This
+paragraph said LTX was the default for all three roles; node 87 of the
+canonical says otherwise, and so do the other two places that repeated it.)
 
 The music engine moved from MusicGen to Stable Audio 3 in `2.0.0-alpha.28`.
 MusicGen is **CC-BY-NC**, so every episode the shipped template produced carried
@@ -392,8 +401,11 @@ Wan, AnimateDiff, MiniMax H3 — are **optional alternatives** you dial in later
 before downloading any of them. If a model is missing, the engine fails **loudly** and stops —
 it never silently substitutes another model or quietly produces garbage. There is no automatic
 fallback: the procedural CRT path is a route you **select**, not a net that catches a
-failed engine. The canonical already requires LTX visual weights. Watch the console on the first run;
-it names any missing weight and where it expects it.
+failed engine. The shipped canonical requires **no video weights** -- its three visualizer
+lanes are procedural. Switch a video role to `ltx098_low_video (16:9)` and you add the
+LTX checkpoint and its T5 encoder (about 15 GB); switch an image role away from the
+default and you add that engine's weights. Watch the console on the first run; it names
+any missing weight and where it expects it.
 
 ### 5. Run it
 
@@ -405,7 +417,7 @@ it does not silently rewrite the graph currently open in ComfyUI.
 |---|---|---|
 | 8 GB card, ready for real video | `otr_canonical`, then set the three **OTR_VideoDirector** video roles to `animatediff15_v3_haunted_video (16:9)` and `llm_device` -> `cuda` in **OTR_LedgerScriptWriter** | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
-| GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, LTX 0.9.8 low (16:9) for every video role, Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
+| GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, the three procgen visualizer lanes (`viz_mxc_cpu` / `viz_green` / `viz_camera`) for the video roles -- NOT LTX, which is a selectable upgrade -- Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
 | AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical`, then set `llm_device` -> `cuda` (ROCm torch reports as cuda) and `device_policy` -> `cuda` | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
 | Apple Silicon Mac (VERIFIED; sessions 2026-09-07 and 2026-09-08) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon | fully local, zero API keys, **zero downloads on the press-Run path**: the three video roles are visualizer lanes (`viz_mxc_cpu`, `viz_green`, `viz_camera`) that mint no scene image, so nothing downloads a picture model. (`viz_mxc_mandala` was in this list and is NOT usable out of the box -- its `pycairo` dependency has no macOS wheel; `brew install cairo pkg-config` first, or use `viz_green`.) You are not stuck there: `sd15` (2.1 GB) mints stills locally and unlocks `still_flat` / `still_pan` / `still_word`, and `ltx_8gb` (6.3 GB + 9.8 GB text encoder) is real local video diffusion on Metal -- both measured on this machine, both in `docs/MAC_PORTABILITY_GUIDE.md` sections 5, 7 and 9. Qwen3.5-4B writer on `mps` at quant `none`, Kokoro voices on `mps`, Stable Audio 3 music, one act. **PROVEN on real hardware 2026-09-07: an episode published to `otr/obs/`** -- 135 s, 1080p25, h264+aac, fully local, no image weights and no API keys. Qwen3.5-4B writer on Metal (~6.5 tok/s) -> Kokoro voices -> Stable Audio 3 music -> visualizer video -> ffmpeg. Getting there needed five fixes, all shipped: the `tokenizers` pin that bricked the boot (alpha.29), a music lane whose `pycairo` dependency is Windows-only, ffmpeg AND ffprobe never being declared dependencies at all, and a 100%-NaN Stable Audio 3 caused by our own determinism wrapper meeting an MPS `baddbmm` bug. **Keep `llm_quant_policy` at `none`** -- NF4 runs at 0.3-0.5 tok/s on Metal (vs 14.47 on CUDA) and cannot clear the 40 s NewsCuration budget. 16 GB is thin: the writer peaks near 14 GB and has OOM-killed. ONE episode is not repeatability. **Running on a Mac? Start with `docs/MAC_PORTABILITY_GUIDE.md`** -- what works out of the box, what needs manual steps, and what cannot work locally. Measurements behind it: `docs/MAC_LESSONS_LEARNED.md` |
 
@@ -452,9 +464,9 @@ it does not silently rewrite the graph currently open in ComfyUI.
 - **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
   Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
   backend yet (bark replaces it with three dropdown changes).
-- **Other setups:** per-platform workflow variants + recipes ship in-repo (16 GB NVIDIA
-  canonical, cloud-lane variant, Mac, AMD). The Mac/AMD variants are drafts — not yet
-  verified on real hardware.
+- **Other setups:** one graph. `workflows/variants/` is currently EMPTY -- the
+  per-machine JSONs were removed, as this README says at the top. Use `otr_canonical`
+  and set the dropdowns per the "Pick the graph" table.
 - **RAM:** 32 GB of system memory is the comfortable floor for the video lanes; the 8 GB
   card streams model weights from host RAM. The measured host-RAM peaks so far are on the
   5080 (the H3 clamped run at 27.56 GiB, the HuMo 14B lane at 27.53 GiB); LTX 2.5 on the
@@ -599,7 +611,9 @@ redistribution. See [License & Credits](#license--credits) for the full list.
 The four `viz_*` lanes are pure numpy/PIL/ffmpeg with no model at all and no GPU
 requirement. The `still_*` lanes cost whatever your chosen IMAGE model costs,
 since the video side is a pan or a hold over a still. These are selectable
-alternatives; the alpha.24 canonical selects LTX 0.9.8 low for every video role.
+alternatives; the canonical selects the three procgen visualizer lanes
+(`viz_mxc_cpu` / `viz_green` / `viz_camera`), which cost no weights at all — so a
+`still_*` lane is an upgrade FROM the default, not a downgrade from LTX.
 
 ### Cloud lanes -- no local VRAM, but they are paid services
 
@@ -688,9 +702,14 @@ an explicit alternative, not the alpha.24 canonical default or a rescue lane.
 
 | Role | What it is | Canonical default |
 |------|------------|-------------------------------|
-| `announcer_visual` | the announcer bookends | `ltx098_low_video (16:9)` |
-| `music_visual` | opening/closing theme bookends | `ltx098_low_video (16:9)` |
-| `character_video` | character dialogue beats | `ltx098_low_video (16:9)` |
+| `announcer_visual` | the announcer bookends | `viz_mxc_cpu (16:9)` |
+| `music_visual` | opening/closing theme bookends | `viz_green (16:9)` |
+| `character_video` | character dialogue beats | `viz_camera (16:9)` |
+
+These are the **procgen** lanes: zero weights, so the shipped graph runs on a clean
+install. `ltx098_low_video (16:9)` is the local-video-diffusion upgrade (proven on both
+NVIDIA and Apple Silicon); the `still_*` family is the cheap middle ground and needs an
+image engine to feed it.
 
 (The former `sfx` speaker role and `scene_broll` / `background_abstract` video roles were
 removed in the 2026-07-01 cleanbreak — old ledgers using them fail loud by design.)
@@ -857,7 +876,12 @@ appear there as they render.
   model/dependency. The render stops there rather than substituting a different engine, so fix
   the named dependency (or select the procedural CRT path) and run it again.
 - **Out of VRAM on a local video tier** — preserve the failure before evaluating a
-  separately selected lighter route. The alpha.24 canonical is not a procedural floor.
+  separately selected lighter route. Note the shipped canonical IS the procedural floor
+  (three `viz_*` lanes, zero weights), so an out-of-VRAM failure means you selected a
+  heavier lane; the floor is what you fall back TO, not what failed.
+  **On Apple Silicon, do not treat out-of-memory as a recoverable render failure** — unified
+  memory has nowhere to offload, so it kills the machine rather than the render. See
+  `docs/MAC_PORTABILITY_GUIDE.md` section 1.
 - **No audio under the end credits** — known limitation: the credits scroll can outlast the
   master mix's closing theme. Tracked for a fix.
 - **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
@@ -1025,6 +1049,9 @@ their authors.
   (noncommercial).
 
 Do not treat the canonical defaults as a blanket commercial-use clearance.
-The canonical selects MusicGen, whose OTR engine metadata explicitly sets
-`commercial_clean = False`. Review the exact source, engine and weight licenses
-before commercial use; a successful render is not a license receipt.
+The canonical selects `stable_audio_3`, which IS commercially clean -- it replaced
+MusicGen in alpha.28 for exactly that reason. The residual exposure is elsewhere: the
+source bank you pick, and any engine you switch TO whose metadata sets
+`commercial_clean = False` (MusicGen among them, still selectable). Review the exact
+source, engine and weight licenses before commercial use; a successful render is not a
+license receipt.
