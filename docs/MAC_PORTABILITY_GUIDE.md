@@ -253,6 +253,24 @@ file belongs to the RETIRED lane in `eng_ghost_signal.py`
 in `eng_ghost_signal_official.py` and uses `MM_V3_NAME` = `v3_sd15_mm.ckpt`. Do
 not download it.
 
+### Then just set the dropdowns -- there is no profile for this
+
+Open `otr_canonical`, and on **OTR_VideoDirector** set whichever video roles you
+want to `animatediff15_v3_haunted_video (16:9)`. That is the whole selection
+step. The image dropdowns are inert for this lane -- it is `text_to_video` and
+mints no still -- so leave them.
+
+A Mac-specific profile for this briefly existed and was **deleted**. It encoded
+three dropdown settings, a canvas the engine overrules anyway, and a preflight
+list, which is a second place to keep in sync for no benefit; it was wrong twice
+in its first hour. The dropdowns are the path.
+
+**Do not expect a clip-length knob.** This lane declares `max_frames=0` -- one
+unsplittable timeline -- and sits deliberately outside `PLANNING_CAP_ENGINES`,
+so `video.max_render_frames` does not govern it and adding it there would split
+the beat into jump cuts at roughly twice the latent cost. Section 10.7 has the
+arithmetic.
+
 **Install the pack with the PINNED commit, not a fresh clone.** `main` is the
 version that issue #576 reports producing colored noise (section 11):
 
@@ -986,3 +1004,89 @@ untested on Metal, like everything else in the NEVER TESTED bucket.
 It means nobody has published a qualifying result, not that the thing fails.
 Every "none found" row above is an invitation, not a verdict -- and the cheap
 way to change one is to run it and record the peak, not to reason about it.
+
+---
+
+## 10.7 Why the AnimateDiff clip is 125 latents and cannot be capped
+
+**Because three different frame counts look alike in a log, and only one of them
+is the clip.** This cost three wrong attempts before a review panel settled it,
+so the arithmetic is written out rather than summarised.
+
+```
+[AnimateDiffEvo] Sliding context window sampling activated --
+latents passed in (125) greater than context_length 16.
+```
+
+125 is **not** the clip length.
+
+| quantity | value on a 10-second beat | where it comes from |
+| --- | --- | --- |
+| `target_frame_count` -- DELIVERED frames | 250 | ShotLock, from the beat's AUDIO budget |
+| `source_request` -- SAMPLED frames | 125 | `ceil(250 / hold)`, hold = 2 |
+| ADE sliding windows | ~8 | `source_request / 16` |
+
+`ghost_unique_source_count = ceil(T / hold)` (`eng_ghost_signal.py:323`), floored
+at 16 by `ghost_source_request` (`:341`), lands as `EmptyLatentImage`'s
+`batch_size` (`:1016`) and feeds the sampler (`:1028`). At delivery each decoded
+frame is held twice (`:354-360`), restoring all 250. **The picture is
+audio-locked; the model is only asked for half of it.**
+
+### The clip length is not yours to set, and that is deliberate
+
+`video.max_render_frames` is applied to the widget -- verified by dumping the
+submitted graph -- and does nothing here. The lane declares:
+
+```python
+frame_contract = FrameContract(min_frames=1, max_frames=0, quantum=1, ...)
+#: A beat is ONE timeline even when it spans several internal context windows
+#: -- the 16 is a context window, never an OTR clip duration -- so there is no
+#: ceiling to split on and continuity is explicitly NONE.
+```
+(`eng_ghost_signal.py:523-533`)
+
+`PLANNING_CAP_ENGINES` is `("ltx_8gb", "fastwan_8gb", "wan_ti2v")`
+(`frame_contract.py:319`), and `effective_frame_contract` returns the contract
+UNCHANGED for anything else.
+
+**Adding this lane to that tuple would make it WORSE, not shorter.** With
+`continuity=NONE` the planner joins segments with `join_mode="jump"`
+(`coverage_plan.py:195-197`), so a 17-frame cap would split a 250-frame beat into
+about fifteen segments, each still flooring at the 16-frame context window --
+roughly 240 sampled latents instead of 125, and fifteen jump cuts where there was
+one continuous beat.
+
+Capping at the beat level is out too: `validate_coverage_plan` refuses any plan
+whose visible frames differ from the audio-derived target
+(`coverage_plan.py:478-482`). Shorter picture means picture that no longer
+matches its sound.
+
+### The one real lever, and why it is not a speed knob
+
+`OTR_GHOST_HOLD_FACTOR` (`eng_ghost_signal.py:119`, range 1-5, unset = unchanged)
+is the only mechanism that reduces sampled latents without changing delivered
+duration. Its own documentation gives the arithmetic: hold 2 generates **12.5
+unique source positions per displayed second**, hold 3 gives **8.33**.
+
+Three things to know before reaching for it:
+
+* **It is a SHELL environment variable on the machine running the server.** A
+  profile cannot carry it -- the `video` section accepts only `device_policy`,
+  `dtype_policy` and optional `max_render_frames`
+  (`capability_profiles.py:135-153`), and an unknown key raises. `launch.env`
+  does not reach an already-booted server either.
+* **It changes how the show LOOKS.** Fewer fresh positions per second is slower
+  motion, not a free optimisation. Hold 2 is pinned as the golden contract by
+  `test_the_golden_lane_still_declares_hold_2`.
+* **Setting it on this machine breaks four tests** in
+  `tests/test_ghost_signal_cadence.py`. That is the golden contract doing its
+  job, not a bug.
+
+### So what IS the Mac's cost here
+
+About 132 s per sampler step, ~44 minutes for a 10-second beat, against the
+4060's 3-3.6 minutes for the same lane. Nothing is misconfigured: an M4 samples
+125 latents across eight sliding windows more slowly than an Ada card does.
+Treat that as the measured price of this lane on this hardware, and pick a
+cheaper lane if it matters -- the `still_*` family renders a whole episode in
+about 22 minutes (section 9).

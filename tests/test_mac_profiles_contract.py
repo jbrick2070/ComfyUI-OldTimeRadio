@@ -31,7 +31,7 @@ from nodes._otr_image_engines import registry as ireg  # noqa: E402
 from nodes._otr_shared import capability_profiles as cp  # noqa: E402
 from nodes._otr_video_engines import registry as vreg  # noqa: E402
 
-MAC_PROFILES = ("otr_mac_mps", "otr_mac_adiff")
+MAC_PROFILES = ("otr_mac_mps",)
 
 #: Engines a Mac profile must not SELECT BY DEFAULT, with the reason. Note the
 #: two reasons are different in kind, and neither is visible to
@@ -56,16 +56,6 @@ BANNED_ON_MAC = {
                         "until `brew install cairo pkg-config` -- not a "
                         "default a Mac reader should land on"),
     "z_image_turbo": "12.3 GB bf16 OOMs at 16 GB; int8 hits aten::_int_mm",
-}
-
-
-#: Engines a DRAFT Mac profile may name while their own registry row still says
-#: they do not run here. Each entry is a promise that somebody looked.
-DRAFT_KNOWN_INADMISSIBLE = {
-    "animatediff15_v3_haunted_video": (
-        "row is [\"cuda\"], reverted from [\"cuda\",\"mps\"] on 2026-09-08 "
-        "because no clip had landed. The registry comment says to add mps only "
-        "after one does; the profile and the row move together, on a receipt."),
 }
 
 
@@ -168,61 +158,6 @@ def test_a_profile_naming_a_weighted_engine_declares_something_to_fetch(name,
         % (name, sorted(set(weighted.values()))))
 
 
-def test_the_adiff_profile_differs_from_the_base_one_only_where_it_should():
-    """otr_mac_adiff exists to change the VIDEO lane and the frame budget, and
-    nothing else. If it drifts from otr_mac_mps on the substrate -- voices,
-    music, writer, device policy -- the two stop being comparable and a result
-    on one says nothing about the other."""
-    base, adiff = _profile("otr_mac_mps"), _profile("otr_mac_adiff")
-    assert base["slot_overrides"]["voice_bank"] == \
-        adiff["slot_overrides"]["voice_bank"]
-    assert base["slot_overrides"]["music_engine"] == \
-        adiff["slot_overrides"]["music_engine"]
-    assert base["llm"]["creative_model"] == adiff["llm"]["creative_model"]
-    assert base["llm"]["quant_policy"] == adiff["llm"]["quant_policy"]
-    assert base["audio"] == adiff["audio"]
-    assert base["video"]["dtype_policy"] == adiff["video"]["dtype_policy"]
-
-    for role in ("announcer_visual", "music_visual", "character_visual"):
-        assert adiff["role_overrides"][role] == "animatediff15_v3_haunted_video"
-        assert base["role_overrides"][role] != adiff["role_overrides"][role]
-
-
-def test_the_adiff_lane_is_not_given_a_render_cap_it_cannot_honour():
-    """THE INVERSE OF WHAT THIS TEST USED TO ASSERT, and the reason is measured.
-
-    An earlier version required otr_mac_adiff to carry `video.max_render_frames`,
-    on my belief that it capped the AnimateDiff clip length. It does not, and
-    setting it would BACKFIRE:
-
-    * `eng_ghost_signal.py:523-533` declares max_frames=0, quantum=1,
-      continuity=CONTINUITY_NONE -- "a beat is ONE timeline ... there is no
-      ceiling to split on". The lane is deliberately outside
-      `frame_contract.PLANNING_CAP_ENGINES` (`frame_contract.py:319`), so
-      `effective_frame_contract` returns its contract unchanged.
-    * With continuity=NONE the planner would assign join_mode="jump"
-      (`coverage_plan.py:195-197`), so a 17-frame cap splits a 250-frame beat
-      into ~15 jump-cut segments. Each still floors at the 16-frame context
-      window, so the render samples ~240 latents instead of 125 -- roughly TWICE
-      the cost, and fifteen cuts where there was one continuous beat.
-
-    The 125 latents in the log were never the clip length: they are
-    `ceil(target/hold)` source frames (`eng_ghost_signal.py:323`), restored to
-    250 delivered frames by the hold selector. The clip is audio-locked and
-    `validate_coverage_plan` refuses any plan that drifts from it
-    (`coverage_plan.py:478-482`).
-
-    Established by a kibitz round after two wrong guesses at this knob; the
-    reasoning is in kibitz-runs/2026-09-08-frame-cap/r1/final.md."""
-    video = _profile("otr_mac_adiff").get("video") or {}
-    assert "max_render_frames" not in video, (
-        "otr_mac_adiff carries a render cap. This lane declares itself "
-        "unsplittable (max_frames=0) and is outside PLANNING_CAP_ENGINES, so "
-        "the cap cannot govern it -- and if the lane were ever added to that "
-        "tuple, the cap would split the beat into jump cuts at ~2x the latent "
-        "cost. Remove it.")
-
-
 def test_the_ghost_lane_stays_out_of_the_planner_cap_list():
     """Guards the other half: if someone adds this lane to PLANNING_CAP_ENGINES
     to make the cap 'work', the profile's cap becomes live and the beat starts
@@ -234,49 +169,23 @@ def test_the_ghost_lane_stays_out_of_the_planner_cap_list():
         "beat sampled 125")
 
 
-def test_the_adiff_profile_stays_draft_until_a_clip_lands():
-    """`animatediff15_v3_haunted_video` declares ["cuda"]. That row was reverted
-    from ["cuda","mps"] on 2026-09-08 because nothing had proven otherwise, and
-    the registry comment says to add "mps" only after a clip lands in otr/obs/.
-
-    So this profile cannot be `shipping` while the row it depends on says the
-    lane does not run here. When the receipt exists, BOTH move together -- and
-    this test is what makes that a deliberate pair rather than a half-edit."""
-    row = vreg.CAPABILITIES["animatediff15_v3_haunted_video"]
-    claims_mps = "mps" in list(row["device_backends"])
-    status = _profile("otr_mac_adiff")["status"]
-    if not claims_mps:
-        assert status == "draft", (
-            "otr_mac_adiff is %r while its own video engine's row still says "
-            "cuda-only. Promote the row on a receipt first." % status)
-
-
 @pytest.mark.parametrize("name", MAC_PROFILES)
-def test_availability_is_computed_and_its_verdict_is_recorded(name, decls):
-    """Not an assertion that everything is OK -- an assertion that we KNOW.
+def test_availability_is_computed_and_every_role_is_admissible(name, decls):
+    """`availability()` is the only consumer of device_backends outside the
+    registries. `otr_mac_mps` is `shipping`, so every role it names must be
+    admissible -- a shipping profile whose own roles are inadmissible is
+    incoherent.
 
-    `availability()` is the only consumer of device_backends outside the
-    registries, and it is not a render gate. A role it reports as requires_cuda
-    is allowed here ONLY while the profile is a draft; a shipping profile whose
-    own roles are inadmissible is incoherent."""
+    This used to carry a `draft` branch for `otr_mac_adiff`, which a Sonnet
+    mutation audit caught asserting nothing at all. That profile is deleted --
+    it encoded three dropdown settings and a preflight list, and the operator's
+    point stands that the dropdowns ARE the path -- so the branch is gone with
+    it rather than left as dead code waiting to hide the next no-op."""
     p = _profile(name)
     verdicts = cp.availability(p, decls)
     bad = {role: (eng, verdicts.get(eng))
            for role, eng in p["role_overrides"].items()
            if verdicts.get(eng) != cp.REASON_OK}
-    if p["status"] == "shipping":
-        assert not bad, (
-            "%s is shipping but these roles are inadmissible: %r" % (name, bad))
-        return
-
-    # A DRAFT PROFILE STILL HAS TO KNOW WHAT IT IS CARRYING. An earlier version
-    # of this test asserted nothing at all on the draft branch, which a Sonnet
-    # mutation audit correctly called a no-op: otr_mac_adiff really does have
-    # three requires_cuda roles and the test sailed past them. "Draft" licenses
-    # a KNOWN inadmissible engine, not an unexamined one.
-    unexpected = {role: v for role, v in bad.items()
-                  if v[0] not in DRAFT_KNOWN_INADMISSIBLE}
-    assert not unexpected, (
-        "%s is a draft carrying inadmissible role(s) nobody has accounted for: "
-        "%r. Either the engine earned its backend row, or this dict should say "
-        "why it has not." % (name, unexpected))
+    assert not bad, (
+        "%s (%s) names inadmissible role(s): %r"
+        % (name, p["status"], bad))

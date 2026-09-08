@@ -95,13 +95,13 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 </details>
 
-## 10-15 GB  --  5 experimental profile(s), 1 shipping
+## 10-15 GB  --  4 experimental profile(s), 1 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `otr_mac_mps` | viz_camera | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
 
-<details><summary>4 draft profile(s) here -- not vouched for</summary>
+<details><summary>3 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_ti2v`
 
@@ -109,7 +109,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 |---|---|---|
 | `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | kokoro |
 | `otr_4060_viz_12b` | viz_camera | kokoro |
-| `otr_mac_adiff` | animatediff15_v3_haunted_video | kokoro |
 | `otr_nv40_12gb` | wan_ti2v | indextts2 |
 
 </details>
