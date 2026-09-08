@@ -460,7 +460,18 @@ CAPABILITIES = {
     # this lands WITH eng_ltx_8gb + its __init__ import).
     "ltx_8gb": {
         "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
+        # mps PROVEN 2026-09-08, not assumed. The ["cuda"] row here was untested
+        # policy: this adapter contains no NVIDIA-specific code (no nvenc, nvml,
+        # triton, flash_attn, torch.cuda or .cuda()), drives stock ComfyUI nodes
+        # and pins its T5 encoder to CPU. On a Mac mini M4 it loaded fully on
+        # Metal -- 3.67 GB + 9.08 GB (t5xxl) + 2.38 GB, all `full load: True`,
+        # no OOM and no unimplemented operator -- and published a real episode:
+        #   otr/obs/a_sharp_note_that_wont_fade_20260908_012201__vart__lx8g__...
+        #   h264 1920x1080 + aac, 85.6 s, 4 stills consumed, zero errors.
+        # It had never been reachable on a Mac before because it is
+        # image-to-video and no local image engine existed there; `sd15` (added
+        # the same night) supplies the still.
+        "device_backends": ["cuda", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["ltxv-2b-0.9.8-distilled"]},
