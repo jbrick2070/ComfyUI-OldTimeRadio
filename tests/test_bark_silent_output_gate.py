@@ -28,8 +28,15 @@ def bark_engine(monkeypatch):
     import nodes._otr_bark_lib as lib
 
     eng = BarkEngine()
+    # The stub must model the REAL signature, which has always been
+    # `_load_bark(model_id="suno/bark", device=None)`. It previously took only
+    # the repo id, so it silently locked the test to a call shape the adapter
+    # was not obliged to keep -- and broke the moment eng_bark started
+    # threading the CastLock ledger's device stamp through (2026-09-07
+    # portability sweep). `device=None` means "auto-detect", which is what an
+    # unset ledger should produce on every platform.
     monkeypatch.setattr(lib, "_load_bark",
-                        lambda _repo: (object(), object()))
+                        lambda _repo, device=None: (object(), object()))
     monkeypatch.setattr(lib, "_resolve_bark_speech_only", lambda: True)
     monkeypatch.setattr(lib, "_resolve_bark_inject_anchor", lambda: False)
     monkeypatch.setattr(

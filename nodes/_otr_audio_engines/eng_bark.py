@@ -69,8 +69,37 @@ class BarkEngine:
             return
         from .._otr_bark_lib import _load_bark
 
-        _load_bark("suno/bark")
+        # Thread the CastLock ledger's device stamp, exactly as
+        # eng_musicgen / eng_kokoro / eng_stable_audio already do
+        # (`getattr(self, "requested_device", None) or "cuda"`, the S4
+        # 2026-07-10 idiom stamped by _otr_voice_node_common.py).
+        #
+        # bark was the one adapter in this group that never joined that sweep:
+        # it passed NO device, so `_load_bark` fell through to its own
+        # auto-probe and the operator's `voice_device` selection was discarded
+        # before it could be honoured. Found by the 2026-09-07 portability
+        # sweep, and it is why bark ran on CPU on a Mac even after the probe
+        # itself learned about mps.
+        _load_bark("suno/bark", device=self._requested_device())
         self._loaded = True
+
+    def _requested_device(self):
+        """The device the ledger asked for, or ``None`` to let `_load_bark`
+        auto-detect.
+
+        DELIBERATELY NOT `or "cuda"`, which is what the sibling adapters
+        (eng_musicgen, eng_kokoro, eng_stable_audio) use. Those hand their
+        default straight to a `.to(device)`, so a literal "cuda" default is
+        merely the nv50 baseline for them. Bark is different: `_load_bark`
+        treats ``device=None`` as "auto-detect", and that probe is now
+        cuda -> mps -> cpu. Passing a hard "cuda" here would FORCE cuda on a
+        Mac and break the very platform this change exists to serve -- caught
+        by tests/test_bark_silent_output_gate.py when it was written that way.
+
+        So: an explicit ledger stamp is honoured on every platform, and the
+        absence of one falls through to the portable probe rather than to a
+        vendor guess."""
+        return getattr(self, "requested_device", None)
 
     def unload(self):
         self._loaded = False
@@ -151,7 +180,7 @@ class BarkEngine:
                 EngineUsabilityReason.MALFORMED_CONFIG,
                 f"bark requires a v2/* voice_preset; got {voice_preset!r}",
             )
-        model, processor = _load_bark("suno/bark")
+        model, processor = _load_bark("suno/bark", device=self._requested_device())
         self._loaded = True
         is_first = voice_preset not in self._presets_started
         self._presets_started.add(voice_preset)
