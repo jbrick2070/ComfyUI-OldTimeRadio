@@ -743,7 +743,11 @@ is minted by whichever image engine the operator selected for that role. The
 only exemption is the `viz_*` visualizer family, which is procedural and mints
 no still -- and each of those lanes declares that exemption out loud
 (`accepts_still = False`); staying silent is a test failure. Adding your own
-engine? Start at `docs/EXTENDING_OTR.md`, then run the matching preflight.
+engine? **[`docs/ADDING_IMAGE_AND_VIDEO_LANES.md`](docs/ADDING_IMAGE_AND_VIDEO_LANES.md)**
+walks all three levels: pointing an existing engine at a different checkpoint
+with an env var and NO code (how you run a smaller Z-Image on a low-RAM box),
+adding a custom image engine, and adding a custom video/still lane.
+`docs/EXTENDING_OTR.md` covers source banks; then run the matching preflight.
 
 ### Image models
 
