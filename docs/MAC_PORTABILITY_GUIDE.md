@@ -37,6 +37,19 @@ are needed**.
 * **Do not select `viz_mxc_mandala`.** It needs `pycairo`, which has no macOS
   wheel (see section 3).
 
+### Do not run the test suite while a render is running
+
+Twice on 2026-09-08 the known-fail guard reported NEW failures -- four HuMo
+beat-session tests once, five audition/citation tests another time -- that did
+not reproduce at all on an idle machine minutes later. Both runs happened while
+a render had the box 19 GB into swap.
+
+On a machine with separate VRAM the suite and a render coexist. Here they
+compete for the same physical memory, and a suite run under that pressure
+produces failures that are about the pressure, not about the code. **Take your
+before/after comparison on an idle box, or you will spend an hour chasing a
+regression you did not write.**
+
 ### An OOM here takes the MACHINE down, not the render
 
 **Read this before you select any engine.** On a discrete GPU, running out of
