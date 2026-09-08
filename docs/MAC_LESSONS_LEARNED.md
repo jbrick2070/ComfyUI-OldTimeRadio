@@ -219,3 +219,39 @@ none was "Apple Silicon can't do this":
   chasing it.
 * Every lane outside the canonical: no local image or video-diffusion engine
   exists on this platform at all (section 8).
+
+
+---
+
+## 9. WHY stable_audio_3 -- the selection criterion is licensing and auto-install, NOT quality
+
+**Operator, 2026-09-07:** *"the reason why we chose stable audio three was that
+it was ungated and it was auto installed. That's the main [thing]."*
+
+Record this before someone "improves" it away. The music engine was chosen on
+two hard requirements, and quality was never one of them:
+
+1. **Ungated** -- commercially clean, no licence acceptance, no HF token. This is
+   why `musicgen` was replaced: MusicGen is CC-BY-NC, and the shipped default was
+   silently producing non-commercially-licensed beds for anyone who never touched
+   the dropdown (PBUG-20260907-04).
+2. **Auto-installs** -- the weights fetch themselves at boot with no manual step
+   and no gated download. On a pack whose whole premise is *press Run*, an engine
+   that needs a human to go and accept a licence is not a candidate.
+
+**What this rules out, permanently, regardless of how good it sounds:**
+
+* Any **gated** model (a licence click, an HF token, a manual download).
+* Any **non-commercial** licence -- that is what `musicgen` failed on.
+* Any engine whose weights cannot be fetched by the boot prefetch.
+
+**And what it means for the SA3 sampling config.** The A/B (2026-09-07) showed
+Comfy-Org's own recipe for this checkpoint is 10.6x faster with no measurable
+quality difference, and the source comment claiming `cfg=7.0` is the "SA3 native
+default" is false. **None of that is a reason to switch engines** -- it is at
+most a reason to retune the one we have. The engine choice is settled on
+licensing and installability, and those have not changed.
+
+Operator on scope, the same day: *"we just need it to run and produce music and
+not fail the episode."* It does, once the attention backend is right (section 8
+/ PBUG-20260907-11).
