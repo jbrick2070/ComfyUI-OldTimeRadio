@@ -121,3 +121,43 @@ APIs, exactly as recorded in the 2026-09-07 portability sweep -- the reclaim
 itself ran fine (`unload_llm, _unload_bark, gc.collect, soft_empty_cache`), only
 its telemetry is blind. Harmless; the shared-resolver fix for it was
 deliberately deprioritised as tidiness rather than capability.
+
+
+---
+
+## 2026-09-08 -- ALL THREE BEAT CLASSES on local video diffusion
+
+```
+otr/obs/the_weight_of_the_dead_wifes_phantom_20260908_030426__sbke__lx8g__unk__koko__sspr__q354b__sa3_final.mp4
+  h264 1920x1080 + aac | 108.0 s | 81 MB | rendered in 1:07:27
+  ALL THREE video lanes = ltx098_low_video (announcer, music, character)
+  ALL THREE image models = sd15
+  12 stills minted (3 lanes x 4 beats) | ZERO errors
+```
+
+This is the heaviest configuration the pack has: every beat mints a still AND
+runs video diffusion, where the shipped canonical gives two of three roles to
+free procedural visualizers.
+
+**Cost on a 16 GB Mac:** it swapped to ~14 GB and held 27% free, and it took
+1:07:27 against 22:22 for the single-lane still_motion run. It completed with no
+errors, but this is the ceiling rather than a comfortable setting.
+
+### Apple Silicon engine status, consolidated
+
+| engine | kind | status |
+| --- | --- | --- |
+| `sd15` | image | **PROVEN** -- 12 stills across 3 lanes, no errors |
+| `ltx_8gb` (LTX 0.9.8) | video diffusion | **PROVEN** on all three beat classes |
+| `still_motion` | video (still-consuming) | **PROVEN** |
+| `viz_mxc_cpu` / `viz_green` / `viz_camera` | video (procedural) | **PROVEN** (shipped canonical) |
+| `kokoro`, `stable_audio_3` | audio | **PROVEN** |
+| `musicgen`, `bark` | audio | **PROVEN on mps** (bark's row was wrong) |
+| `animatediff15_v3_*` | video diffusion | under test |
+| `z_image_turbo` | image | **FAIL** -- too large at bf16, `aten::_int_mm` unimplemented at int8 |
+| `viz_mxc_mandala` | video | **BLOCKED** -- pycairo has no macOS wheel |
+
+**Yesterday this platform had procedural visualizers and nothing else.** It now
+has a local image engine and a local video-diffusion engine, and neither needed
+a code fix to the engines themselves -- only honest `device_backends` rows and,
+for LTX, a still it had never been able to obtain.
