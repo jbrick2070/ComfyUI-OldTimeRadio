@@ -73,7 +73,15 @@ edits.**
 
 1. **Copy the closest adapter** into `nodes/_otr_image_engines/<yourname>.py`.
    `z_image_turbo.py` for a local diffusion checkpoint; `eng_cloud_image.py`'s
-   `_CloudImageBase` for a partner API. Rename the class and its `name`, and
+   `_CloudImageBase` for a partner API.
+
+   > **WARNING, and it makes this guide bite itself:** `z_image_turbo.py` --
+   > the adapter this step tells you to copy -- declares `["cuda"]` in
+   > `registry.py:157`. Copy it verbatim and you inherit that, and **your engine
+   > will register fine and simply never be offered on a Mac.** The failure is
+   > silent. Set `device_backends` from what YOU measured (see the section at
+   > the end), not from whatever the template happened to carry. Flagged by the
+   > 5080 window, 2026-09-07. Rename the class and its `name`, and
    decorate with `@register`. **Registering IS joining the dropdown** -- there
    is no separate allow-list.
 
@@ -133,6 +141,42 @@ refused as "truncated" against a floor sized for a 1.82 GB one). **When you
 subclass, ask what ELSE was sized for the parent.**
 
 ---
+
+## An image engine is INERT until a video lane consumes its still
+
+**Register an image engine, download its weights, and it can still never be
+invoked.** The image dropdowns on `OTR_VideoDirector` are consumed per role by
+the VIDEO lane selected beside them, and a lane that declares
+`accepts_still = False` never asks for one.
+
+The shipped canonical currently selects three such lanes:
+
+```
+announcer   viz_mxc_cpu    accepts_still = False
+music       viz_green      accepts_still = False
+character   viz_camera     accepts_still = False
+```
+
+So testing a new image engine against the canonical AS SHIPPED proves nothing --
+the leg goes green having never called your code. **Flip a role to a still lane
+first** (`still_motion`, `still_flat` or `still_pan`, all of which already
+declare `["cuda","cpu","mps"]`). Raised by the 5080 window, 2026-09-07, and it
+would otherwise have cost a full render cycle to discover.
+
+## A resolution note if your model is 512-native
+
+SD 1.5 and its relatives are 512x512 native while the canonical canvas is
+832x480. **At 832 wide SD 1.5 duplicates subjects** -- two heads, mirrored
+torsos. That is confidently-wrong output rather than an error, so decide before
+your first render whether to mint at 512 and let the still lane handle framing.
+
+## Verify the repo is UNGATED before promising it in a dropdown
+
+`stabilityai/*` has historically required accepting terms on the Hub. A gated
+repo breaks the auto-install property the pack depends on -- see the engine
+selection criteria in `MAC_LESSONS_LEARNED.md` section 9.
+`Comfy-Org/stable-diffusion-v1-5-archive` (2.13 GB, ordinary checkpoint loader,
+no GGUF pack) is verified ungated.
 
 ## Declaring `device_backends` honestly
 
