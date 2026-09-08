@@ -247,6 +247,68 @@ print(hf_hub_download('guoyww/animatediff','v3_sd15_mm.ckpt'))
 print(hf_hub_download('guoyww/animatediff','v3_sd15_adapter.ckpt'))"
 ```
 
+**`mm-p_0.5.pth` is NOT one of these, whatever a summary tells you.** That 1.82 GB
+file belongs to the RETIRED lane in `eng_ghost_signal.py`
+(`GHOST_MOTION_MODULE_NAME`). The shipped `animatediff15_v3_haunted_video` lives
+in `eng_ghost_signal_official.py` and uses `MM_V3_NAME` = `v3_sd15_mm.ckpt`. Do
+not download it.
+
+**Install the pack with the PINNED commit, not a fresh clone.** `main` is the
+version that issue #576 reports producing colored noise (section 11):
+
+```bash
+OTR_COMFY_ROOT=/path/to/ComfyUI \
+  <ComfyUI Python> -c "
+import importlib.util as u
+s=u.spec_from_file_location('p','scripts/otr_provision.py')
+m=u.module_from_spec(s); s.loader.exec_module(m)
+m.ensure_animatediff_pack('/path/to/ComfyUI')"
+```
+
+Calling `ensure_animatediff_pack` directly gets you the pin without the
+`--packs-only` run failing on ComfyUI-LTXVideo's git-lfs requirement (10.2).
+This pack ships no `requirements.txt`, so it adds NOTHING to the venv -- the
+safest install in the whole document.
+
+### THE STEP THAT COSTS AN HOUR: Comfy Desktop does not map `animatediff_models`
+
+The pack will report, at boot:
+
+```
+[AnimateDiffEvo] - ERROR - No motion models found. Please download one and
+place in: ['.../custom_nodes/ComfyUI-AnimateDiff-Evolved/models']
+```
+
+**Your motion module is fine and it is in the right place.** The problem is the
+mapping: Comfy Desktop generates its `extra_model_paths` file with `checkpoints`,
+`loras`, `vae`, `text_encoders` and a dozen others -- but **no
+`animatediff_models` category**. So the adapter LoRA in `loras/` resolves and the
+motion module beside it does not, which is a confusing half-failure.
+
+That generated file says "do not edit manually" in its own header, and it means
+it. ComfyUI accepts the flag more than once, so add a SECOND file instead:
+
+```yaml
+# otr_mac_extra_paths.yaml
+otr_mac_addendum:
+  base_path: '/path/to/your/shared/models'
+  'animatediff_models': 'animatediff_models/'
+  'animatediff_motion_lora': 'loras/'
+```
+
+```bash
+python main.py --extra-model-paths-config "<the Desktop file>" \
+               --extra-model-paths-config otr_mac_extra_paths.yaml
+```
+
+Confirm it took by asking the API rather than by looking at the folder:
+
+```bash
+curl -s http://127.0.0.1:8188/object_info/ADE_LoadAnimateDiffModel \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)
+      ['ADE_LoadAnimateDiffModel']['input']['required']['model_name'][1]['options'])"
+```
+
 None of this is enough on its own -- see section 8 for the node pack, which is
 the dependency that actually blocks the lane.
 
