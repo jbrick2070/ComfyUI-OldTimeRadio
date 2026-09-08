@@ -160,3 +160,79 @@ the `still_*` video lanes that are otherwise unreachable.
 `[StoryOrchestrator] CUDA warmup complete` and
 `orphan worker still on GPU ... racing the orphan's CUDA kernels` both print on
 machines with no CUDA. Neither indicates a CUDA code path.
+
+
+---
+
+## 5. Local image generation on Apple Silicon -- what works and what does not
+
+**MEASURED 2026-09-08 on a Mac mini M4, 16 GB.**
+
+### Z-Image has NO viable Mac configuration
+
+| variant | size | result |
+| --- | --- | --- |
+| `z_image_turbo_bf16` | 12.31 GB | **MPS OOM.** Both models loaded (`full load: True`), died in the KSampler needing ~20.4 GiB of a 20.13 GiB ceiling |
+| `z_image_turbo_int8_convrot` | 5.78 GB | **`NotImplementedError: 'aten::_int_mm' is not implemented for MPS`.** There is no int8 matmul on Metal at all |
+| `z_image_turbo_nvfp4` | 4.51 GB | Blackwell-native fp4 -- NVIDIA only |
+
+Its own docstring recommends `nvfp4` for low VRAM, which is useless on a Mac.
+There is no fourth option: the model is either too large, or quantised in a
+format Metal cannot execute.
+
+### `sd15` is the Mac image engine
+
+Added 2026-09-08 for exactly this reason. **1.99 GB, ungated, one ordinary
+checkpoint** (MODEL + CLIP + VAE in a single file through
+`CheckpointLoaderSimple` -- no split loaders, no separate text encoder, no GGUF
+pack, no licence click).
+
+```bash
+python -c "
+from huggingface_hub import hf_hub_download
+print(hf_hub_download('Comfy-Org/stable-diffusion-v1-5-archive',
+      'v1-5-pruned-emaonly-fp16.safetensors'))"
+```
+
+then copy it into `models/checkpoints/`. Select `sd15` in any image-model
+dropdown on `OTR_VideoDirector`.
+
+**It fits every request down to 768 on the long side** (`OTR_SD15_MAX_SIDE`),
+preserving aspect and snapping to a multiple of 8 -- the canonical's 832x480
+mints as 768x440. That is not tidiness: SD 1.5 duplicates subjects past roughly
+768, producing two heads and mirrored torsos with **no error anywhere**.
+
+Knobs: `OTR_SD15_CKPT`, `OTR_SD15_MAX_SIDE`, `OTR_SD15_WIDTH` / `_HEIGHT`
+(no-request default only), `OTR_SD15_STEPS`, `OTR_SD15_CFG`, `OTR_SD15_SAMPLER`,
+`OTR_SD15_SCHEDULER`.
+
+### AN IMAGE ENGINE IS INERT UNTIL A VIDEO LANE CONSUMES ITS STILL
+
+The three roles in the shipped canonical all select lanes that mint no still
+(`viz_mxc_cpu`, `viz_green`, `viz_camera`, all `accepts_still=False`). **So
+selecting an image engine and changing nothing else proves nothing** -- the run
+goes green having never called it. Flip a role to `still_motion`, `still_flat`
+or `still_pan` first; all three already declare `["cuda","cpu","mps"]`.
+
+### Image-to-video is blocked one step removed
+
+`ltx_8gb` (LTX 0.9.8) PASSED its engine gate on `mps` once its `["cuda"]` row
+was patched -- its adapter contains no NVIDIA-specific code -- and then failed
+at the still it consumes, because the still came from `z_image_turbo`. With
+`sd15` supplying stills this becomes testable for the first time.
+
+## 6. Fonts: titles look wrong on macOS
+
+**Confirmed on this machine:** `Consolas` is **absent** from macOS, and
+`_otr_captions.py` names it for the `otr_crt` style. libass falls back to
+something proportional and wider, so the green title overruns its computed width
+and clips. The `sdh_standard` style beside it uses Arial, which macOS does have,
+and renders correctly -- which is why the white dialogue captions look fine while
+the green titles do not.
+
+`Monaco.ttf` IS present at `/System/Library/Fonts/Monaco.ttf` on macOS 26.6.2, so
+the credits-roll font search does resolve, and the overlapping-columns symptom
+has a different cause that is not yet diagnosed.
+
+Cosmetic on top of a working pipeline; a platform-scoped font fallback would fix
+the title clipping without altering a single pixel on Windows.
