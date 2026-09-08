@@ -47,8 +47,6 @@ except ImportError:  # pragma: no cover -- flat test imports
 _LOG = logging.getLogger("OTR.video.viz_mxc_mandala")
 
 
-@register
-
 def _pycairo_hint() -> str:
     """What a user on THIS platform must actually do to get pycairo.
 
@@ -79,6 +77,8 @@ def _pycairo_hint() -> str:
                 "viz_camera, which need no cairo.")
     return "viz_mxc_mandala needs pycairo (pip install pycairo)"
 
+
+@register
 class VizMxcMandalaEngine:
     """The pycairo Cosmic Radio Mandala engine (engine_id ``viz_mxc_mandala``)."""
 

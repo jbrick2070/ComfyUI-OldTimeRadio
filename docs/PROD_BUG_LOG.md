@@ -12798,3 +12798,57 @@ the registry, or do not update an install that already works. **Do not
 re-install from Manager** -- it will serve `.24` and brick the boot, and because
 Manager is itself a ComfyUI extension, a bricked boot cannot be repaired from
 the UI.
+
+## PBUG-20260907-13 -- viz_mxc_mandala stopped registering entirely, on EVERY platform, and it was my regression
+
+**Reported by the 5080 window as a pre-existing defect. It was not: I introduced
+it hours earlier in `b50ed143`, and the 5080 was seeing my commit.**
+
+OTR's own roster audit caught it and said so plainly at boot, on Windows and
+macOS alike:
+
+```
+[OTR video] ROSTER AUDIT: 1 declared engine(s) FAILED TO REGISTER:
+viz_mxc_mandala -- their adapter import raised and was swallowed by the guards
+above, so they are silently absent from every per-role dropdown. This is a real
+break, not a warning.
+```
+
+**Cause.** `b50ed143` added a `_pycairo_hint()` helper to
+`eng_viz_mandala.py` so Mac and Linux users would stop being told to run a
+`pip install pycairo` that cannot work for them. The insertion anchored on the
+first `\nclass ` in the file -- which sits directly BELOW the `@register`
+decorator. So the helper landed between them and `@register` decorated a
+FUNCTION instead of the engine class:
+
+```
+AttributeError: 'function' object has no attribute 'name'
+  engine_registry_base.py:149  self._registry[inst.name] = inst
+  eng_viz_mandala.py:50        @register
+```
+
+**Blast radius: worse than the bug it was fixing.** The engine was not merely
+unusable on macOS -- it vanished from every per-role dropdown on every platform,
+including the Windows boxes where pycairo installs correctly and mandala had
+always worked. A cosmetic message fix silently deleted a working Windows
+feature.
+
+**Fix.** The helper now sits ABOVE the decorator. Verified: the module imports,
+and the roster audit reports zero failed registrations.
+
+**Three things worth keeping from this.**
+
+1. **The roster audit is excellent and did its job.** It named the engine, said
+   the import raised and was swallowed, and stated flatly that this is a real
+   break rather than a warning. Nothing else in the boot output would have
+   revealed it. That check earned its keep.
+2. **Anchoring a code insertion on a generic token is unsafe.** `"\nclass "` is
+   not a landmark -- it matched a decorated class and split the decorator from
+   its target. Anchor on something unique, or insert relative to a construct
+   whose grammar you have actually checked.
+3. **The 5080 could see this and I could not.** It read my tree with fresh eyes
+   and no memory of having written it; I had "verified" the change with
+   `ast.parse`, which happily accepts a decorator applied to the wrong object.
+   Syntax valid, semantics destroyed. That is precisely the value of the second
+   window, and it is the mirror of the mandala-in-the-canonical defect that the
+   5080 structurally could not see about itself.
