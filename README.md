@@ -1025,8 +1025,9 @@ H3 (personal license only, see the licensing note above), `mesh_stage`, and the 
 floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are offered only where
 audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
 renders are request-hash deterministic. The old VRAM tier system is gone — profiles plus
-the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (`workflows/variants/` is
-EMPTY; the per-machine JSONs were removed.)
+the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (The per-machine JSONs
+were removed; `workflows/variants/` holds exactly one file, `otr_mac_lightning.json`,
+which is the graph that produced the Apple Silicon proof episode -- see "Other setups".)
 
 ### The video model reference — read these two before adding or changing an engine
 
