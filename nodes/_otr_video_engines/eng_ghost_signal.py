@@ -456,6 +456,28 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: inherited. Same defect class as the module name itself.
     motion_min_bytes = GHOST_MOTION_MIN_BYTES
 
+    #: THE SAMPLER RECIPE, PROMOTED TO CLASS ATTRIBUTES (2026-09-08) for the
+    #: same reason ``motion_module_name`` and ``motion_min_bytes`` above were.
+    #: They were module-level constants read from inside ``sampler_inputs_for``
+    #: and ``render_clip``, which is the exact shape this repo's own
+    #: docs/ADDING_IMAGE_AND_VIDEO_LANES.md calls out: "a method reading the
+    #: module constant loads the PARENT's weights while stamping its own
+    #: receipt: wrong pixels under a confident label."
+    #:
+    #: A DISTILLED SIBLING NEEDS ALL SIX. AnimateDiff-Lightning runs 8 steps at
+    #: cfg 1.0 with sgm_uniform and sqrt_linear; AnimateLCM needs the ``lcm``
+    #: beta schedule instead. Without this seam such a lane would sample on the
+    #: golden 20-step / cfg-8.0 recipe while stamping a Lightning receipt.
+    #:
+    #: The module constants remain the DEFAULTS and the frozen artifact, so this
+    #: lane is byte-identical and every other machine is untouched.
+    steps = GHOST_STEPS
+    cfg = GHOST_CFG
+    sampler_name = GHOST_SAMPLER_NAME
+    scheduler = GHOST_SCHEDULER
+    denoise = GHOST_DENOISE
+    beta_schedule = GHOST_BETA_SCHEDULE
+
     #: THE DOMAIN-ADAPTER SEAM. ``None`` on every clean lane, and that is
     #: precisely what keeps the golden lane the graph that rendered the
     #: published episode: with no name there is no loader node, no class to
@@ -567,9 +589,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "adapter": str(getattr(self, "lora_name", "") or ""),
             "adapter_strength": (float(self.lora_strength)
                                  if getattr(self, "lora_name", "") else None),
-            "steps": GHOST_STEPS, "cfg": GHOST_CFG,
-            "sampler": GHOST_SAMPLER_NAME, "scheduler": GHOST_SCHEDULER,
-            "denoise": GHOST_DENOISE, "beta_schedule": GHOST_BETA_SCHEDULE,
+            "steps": self.steps, "cfg": self.cfg,
+            "sampler": self.sampler_name, "scheduler": self.scheduler,
+            "denoise": self.denoise, "beta_schedule": self.beta_schedule,
             "canvas_w": GHOST_CANVAS_W, "canvas_h": GHOST_CANVAS_H,
             "context_length": GHOST_CONTEXT_LENGTH,
             "context_overlap": GHOST_CONTEXT_OVERLAP,
@@ -1006,7 +1028,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 "inputs": {
                     "model": _wb.Wire("base_model", 0),
                     "model_name": self.motion_module_name,
-                    "beta_schedule": GHOST_BETA_SCHEDULE,
+                    "beta_schedule": self.beta_schedule,
                     "context_options": _wb.Wire(NODE_CONTEXT, 0),
                 }},
             NODE_LATENT: {
@@ -1019,14 +1041,14 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 "inputs": {
                     "model": _wb.Wire(NODE_ADE, 0),
                     "seed": plan["seed"],
-                    "steps": GHOST_STEPS,
-                    "cfg": GHOST_CFG,
-                    "sampler_name": GHOST_SAMPLER_NAME,
-                    "scheduler": GHOST_SCHEDULER,
+                    "steps": self.steps,
+                    "cfg": self.cfg,
+                    "sampler_name": self.sampler_name,
+                    "scheduler": self.scheduler,
                     "positive": _wb.Wire("positive_cond", 0),
                     "negative": _wb.Wire("negative_cond", 0),
                     "latent_image": _wb.Wire(NODE_LATENT, 0),
-                    "denoise": GHOST_DENOISE,
+                    "denoise": self.denoise,
                 }},
         }
 
