@@ -650,16 +650,24 @@ CAPABILITIES = {
     # its siblings -- the operator declined the measurement campaign.
     "animatediff15_lightning_video": {
         "required_toolchain": None, "requires_sidecar": False,
-        # MPS NOT CLAIMED YET, AND THIS LANE IS THE ONE BUILT FOR IT. The
-        # AnimateDiff-Evolved pack IS installed on the Mac test host now and
-        # this graph has rendered correct pixels there on the golden recipe --
-        # but a device_backends row is a claim about PROVEN execution of THIS
-        # lane, and no Lightning clip has landed yet. The director dropdown does
-        # not read this key (nothing in otr_video_director.py references it), so
-        # cuda-only costs nothing operationally: the lane is selectable and
-        # renderable on the Mac today. Flip to ["mps", "cuda"] in the commit
-        # that carries the clip in otr/obs/ as its receipt, never before.
-        "device_backends": ["cuda"], "requires_vendor": None,
+        # MPS PROVEN 2026-09-09, and this row moved only when the receipt
+        # existed. The lane rendered a COMPLETE episode through the real OTR
+        # adapter path on an Apple M4 / 16 GB: 23 beats, 2,736 delivered frames,
+        # 02:32:34 wall clock, published to otr/obs/ as
+        # lightning_mac_proof_2_20260909_100958__arch__adlt__none__koko__news__q354b__sa3_final.mp4
+        # (157 MB, 2:16.24, 1920x1080 h264 + AAC). No OOM; the machine stayed up.
+        #
+        # `adlt` and `none` in that filename are the load-bearing parts: the
+        # first is this lane's shortcode, and the second is the image slot --
+        # proof that `accepts_still = False` held and no image engine was
+        # invoked for any video role.
+        #
+        # The earlier attempt is the reason the adaptive-hold guard exists: it
+        # rendered five beats and then asked for 160 latents on the sixth, which
+        # REBOOTED the machine (PBUG-20260909-01). This run's beats all fell
+        # under the ceiling, so the guard did not have to fire -- that path is
+        # unit-tested but still unproven under live fire, and is recorded as such.
+        "device_backends": ["mps", "cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         # THREE artifacts as of 2026-09-09, not two. The third is an EXTERNAL

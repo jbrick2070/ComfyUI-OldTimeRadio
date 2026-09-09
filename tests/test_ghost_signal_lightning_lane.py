@@ -275,13 +275,17 @@ def test_the_recipe_receipt_names_the_distillation(eng):
 
 
 def test_the_device_row_claims_only_what_has_been_proven():
-    """The lane was BUILT for Apple Silicon and the row still says cuda only.
-    That is the rule working, not a bug: a device_backends row is a claim about
-    PROVEN execution of THIS lane, and no Lightning clip has landed yet. Flip it
-    in the commit that carries the clip in otr/obs/, never before -- and this
-    test moves with it."""
+    """MPS EARNED 2026-09-09, and the row moved only when the receipt existed.
+
+    This test asserted `["cuda"]` from the lane's first commit until a complete
+    episode rendered through the real OTR adapter path on an M4/16 GB -- 23
+    beats, 2,736 delivered frames, 02:32:34, published to otr/obs/. The rule
+    that kept it cuda-only for three commits is the same rule that lets it say
+    mps now: a device row is a claim about PROVEN execution, and the proof is a
+    file on disk, not a plausible reading of the source."""
     row = vreg.CAPABILITIES[ENGINE_ID]
-    assert row["device_backends"] == ["cuda"]
+    assert row["device_backends"] == ["mps", "cuda"]
+    assert "cuda" in row["device_backends"], "removing cuda strands every NVIDIA profile"
     assert row["needs_fp8_te"] is False and row["needs_fp4_te"] is False, (
         "fp8/fp4 are the two things Metal cannot do; this stack needs neither, "
         "which is what makes the eventual mps claim plausible")
@@ -661,7 +665,12 @@ def test_the_lane_says_EXPERIMENTAL_out_loud(eng):
     doc = inspect.getdoc(type(eng)) or ""
     assert "EXPERIMENTAL" in inspect.getmodule(type(eng)).__doc__
     assert eng.default_roles == ()
-    assert vreg.CAPABILITIES[ENGINE_ID]["device_backends"] == ["cuda"]
+    # NOT a device-row assertion any more. The row earned "mps" on 2026-09-09
+    # with a published episode; experimental-ness is carried by the things that
+    # actually keep it out of production -- no default role, no qualified cost
+    # row, and the label itself.
+    assert ENGINE_ID not in _QUALIFIED_COST_ROWS(), (
+        "an experimental lane must make no VRAM-fit claim")
 
 
 # ---------------------------------------------------------------------------
@@ -935,3 +944,17 @@ def test_the_published_lanes_cache_key_never_raises(monkeypatch):
     for name in ("animatediff15_v3_haunted_video",
                  "animatediff15_v3_stillin_lab_video"):
         assert vreg.get_engine(name).shot_cache_identity(req)
+
+
+
+def _QUALIFIED_COST_ROWS():
+    """The lanes that carry a qualified cost row, or an empty set.
+
+    Read live rather than hardcoded: the point of the assertion above is that
+    THIS lane makes no VRAM-fit claim, and that has to stay true as the table
+    changes."""
+    try:
+        from nodes._otr_video_engines import frame_contract as fc
+        return set(getattr(fc, "QUALIFIED_COST_ROWS", ()) or ())
+    except Exception:  # noqa: BLE001
+        return set()

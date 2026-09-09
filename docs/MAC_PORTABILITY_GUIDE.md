@@ -1170,16 +1170,45 @@ comes from it instead of `ckpt_out[2]`. The recipe receipt id must REPOINT
 (`..._ftmse_...`) rather than be edited in place, because a proof clip will
 already exist under the current id.
 
-### What these numbers do NOT prove, and why the device row has not moved
+### CLOSED 2026-09-09: the lane published an episode, and the row moved
 
-`device_backends` is still `["cuda"]` and that is correct. These runs prove the
-RECIPE executes on Metal. They do not prove the LANE does -- they were hand-built
-graphs submitted to `/prompt`, not the OTR adapter path, so nothing exercised
-`prepare`/`render_clip`, the cadence receipts, `canonicalize`'s exact-canvas
-refusal, or the delivered-frame contract. Those are different claims and only the
-second one earns the row. **Flip it in the commit that carries a canonical clip
-in `otr/obs/`, together with
-`test_the_device_row_claims_only_what_has_been_proven`.**
+The section below is kept as written, because the distinction it draws is the
+reason this took three commits instead of one -- and then it was satisfied.
+
+**`device_backends` is now `["mps", "cuda"]`.** A COMPLETE episode rendered
+through the real OTR adapter path on the M4/16 GB:
+
+| | |
+|---|---|
+| beats | 23 |
+| delivered frames | 2,736 |
+| wall clock | 02:32:34 |
+| output | 157 MB, 2:16.24, 1920x1080 h264 + AAC stereo |
+| published | `otr/obs/lightning_mac_proof_2_20260909_100958__arch__adlt__none__koko__news__q354b__sa3_final.mp4` |
+
+Two tokens in that filename are the load-bearing ones. **`adlt`** is this lane's
+shortcode, so the file names the engine that made it. **`none`** is the IMAGE
+slot -- proof that `accepts_still = False` held and no image engine was invoked
+for any of the three video roles.
+
+No OOM. The machine stayed up (3h28m at the end of the run), which is the
+difference between this attempt and the one before it.
+
+WHAT IS STILL NOT PROVEN, and it is worth naming rather than letting the green
+tick cover it: every beat in this episode fell UNDER the 136-latent ceiling, so
+**the adaptive-hold guard never fired.** That path is unit-tested and has never
+run under live fire. The episode that forced it into existence had beats of
+239-267 delivered frames; this one had 91-250, because the writer produced a
+different script. A deliberately long beat is still owed.
+
+#### What the earlier numbers did NOT prove (kept for the distinction)
+
+`device_backends` was `["cuda"]` through three commits and that was correct. The
+isolated runs proved the RECIPE executes on Metal. They did not prove the LANE
+does -- they were hand-built graphs submitted to `/prompt`, not the OTR adapter
+path, so nothing exercised `prepare`/`render_clip`, the cadence receipts,
+`canonicalize`'s exact-canvas refusal, or the delivered-frame contract. Those are
+different claims and only the second earns the row.
 
 ### A STALE INSTALLED PACK MAKES TESTS LIE, and the failures look real
 
