@@ -4,10 +4,13 @@ DISTILLED module.
 AN EXPERIMENTAL LANE, and the operator named it one (2026-09-09: *"you may as
 well wire it in, if it fails it fails -- label it as an exp lane"*). It is not
 a production path and must not become one by accident: it has never rendered
-through the OTR adapter path, its ``device_backends`` row still says ``cuda``
-only, its ``default_roles`` is empty so it can only ever be chosen per beat
-from the director dropdown, and it carries no qualified cost row. Judge it by
-eye, keep it or drop it, but do not build anything on top of it yet.
+through the OTR adapter path -- that changed on 2026-09-09, when it published a
+complete 23-beat episode to ``otr/obs/`` and the row moved to
+``["mps", "cuda"]``. What still makes it EXPERIMENTAL is everything else: its
+``default_roles`` is empty so it can only ever be chosen per beat from the
+director dropdown, it carries no qualified cost row and makes no VRAM-fit claim,
+and its adaptive-hold guard has never fired under live fire. Judge it by eye,
+keep it or drop it, but do not build anything on top of it yet.
 
 THE SPEED LANE, AND IT EXISTS BECAUSE OF A MEASUREMENT. AnimateDiff renders
 CORRECTLY on Apple Silicon -- proven 2026-09-08 with clips faithful to the
@@ -225,10 +228,15 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     #: proposed, and its stated ground was UNIFORMITY: 12.5 is exactly half of
     #: 25, while a true 8 fps inside 25 needs runs of 3.125 and comes out
     #: ragged 3-3-3-4. That objection does not reach hold 3. Measured on the
-    #: real selector, a 250-frame beat is 106 runs of exactly 3 plus one
-    #: 2-frame tail -- uniform 8.33, not ragged 8, with the tail already
-    #: carried truthfully as ``cadence_tail_trim``. The training-rate argument
-    #: was never weighed in 2026-08-22 at all.
+    #: real selector, hold 3 emits runs of exactly 3 with one short tail of
+    #: ``T % 3``: a 250-frame beat is 83 runs of 3 plus a 1-frame tail, and a
+    #: 320-frame beat is 106 runs of 3 plus a 2-frame tail. (This comment gave
+    #: T=320's counts as if they were T=250's until 2026-09-09 -- the claim was
+    #: right, the numbers were on the wrong beat.
+    #: ``test_the_lane_runs_at_hold_3_by_operator_ruling`` now asserts both
+    #: cases and the general rule.) So it is uniform 8.33, not ragged 8, with
+    #: the tail already carried truthfully as ``cadence_tail_trim``. The
+    #: training-rate argument was never weighed in 2026-08-22 at all.
     #:
     #: ON THIS LANE ONLY. ``GHOST_DEFAULT_HOLD`` stays 2 and the two lanes with
     #: published episodes keep the cadence that made them.
