@@ -13433,14 +13433,44 @@ clipping signature recorded originally. This is a clean reproduction.
    the candidates. That is the open question, and it is narrower and more useful
    than where this entry started.
 
-#### So the 14x video penalty is a real cost of a real fix
+#### AND THE 14x WAS WRONG. Measured end to end, the penalty is ~1.15x.
 
-Not waste. Which promotes the scoped fix from nice-to-have to the actual
-valuable work: video attention wants sub-quadratic (13.8x faster, numerically
-identical), audio needs SDPA, and today one module-level global
-(`comfy/ldm/modules/attention.py:857`) serves both.
-`optimized_attention_for_device` (`:906`) is the seam. Until that exists, the
-cost figures in the Mac guide stand as measured.
+The same arm B run reached the video sampler:
+
+```
+Arm A (forced SDPA)      119.23 - 188.62 s/it   (n=55 samples, several runs)
+Arm B (sub-quadratic)    104.62 - 106.27 s/it
+                         -> about 1.15x faster, not 13.8x
+```
+
+**The microbenchmark over-predicted by roughly an order of magnitude, and its own
+arithmetic said so if I had checked it.** It projected ~64 minutes of attention
+across a 20-step render -- about 191 s per step -- inside a step that takes 120 s
+in total. A component cannot exceed the whole. Either the call count
+(8 windows x 16 layers x 20 steps) was too high, or timing the op in isolation
+does not reflect how it runs batched inside the UNet, or both. Attention is a
+fraction of the step; convolutions and the motion module dominate it.
+
+This is the ordinary microbenchmark trap and it was avoidable: an isolated op
+timing is not a render-time prediction, and the check that would have caught it
+was arithmetic on my own numbers rather than another experiment.
+
+#### What that means for the fix
+
+**The scoped per-model attention fix is NOT worth doing.** It would buy ~15% on
+diffusion lanes at the cost of splitting a global that currently guarantees
+correct audio -- a poor trade, and one that puts the SA3 noise back within reach
+of any future refactor that gets the scoping wrong.
+
+The forcing stays, the cost is real but small, and the Mac's slowness relative to
+a 4060 is hardware after all. The cost figures in the Mac guide stand as
+measured, and are NOT the upper bounds this entry earlier claimed they were.
+
+What remains genuinely open, and is now the only interesting part: `attention_sub_quad`
+is numerically clean in isolation at every shape tested, yet produces noise
+inside the real SA3 graph. That is a narrow, well-posed question about how
+Stable Audio 3 invokes attention -- masks, chunking thresholds, `attn_precision`
+-- and it is worth answering on its own terms, not as a route to speed.
 
 #### Consequence if it holds
 
