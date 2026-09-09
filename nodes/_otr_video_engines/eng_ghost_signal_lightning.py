@@ -208,7 +208,35 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     #: REPOINTED, never edited in place, because clips already exist on disk
     #: under the pre-decoder id and a receipt that changes meaning retroactively
     #: makes every older receipt uninterpretable.
-    recipe_receipt_id = "animatediff_sd15_lightning8_ftmse_static16_512x288_v1"
+    recipe_receipt_id = (
+        "animatediff_sd15_lightning8_ftmse_static16_hold3_512x288_v1")
+
+    #: HOLD 3 BY OPERATOR RULING, 2026-09-09, after an A/B he asked for and
+    #: judged: *"i like hold 3"*. Not a memory compromise -- the default.
+    #:
+    #: THE ARGUMENT THAT WON, and it is his: AnimateDiff is TRAINED AT 8 fps
+    #: (ByteDance's own workflow encodes at 8, and the 16-frame context is
+    #: 2.000 s at that rate). Hold 3 is 8.33 fps of fresh picture, so it asks
+    #: the motion module for movement at very nearly the rate it learned;
+    #: hold 2's 12.5 fps asks for motion outside that distribution.
+    #:
+    #: WHY THE 2026-08-22 RULING DOES NOT COVER THIS. That ruling chose
+    #: "12.5 fps native, uniform hold-2" over the 8 fps Fable and Codex
+    #: proposed, and its stated ground was UNIFORMITY: 12.5 is exactly half of
+    #: 25, while a true 8 fps inside 25 needs runs of 3.125 and comes out
+    #: ragged 3-3-3-4. That objection does not reach hold 3. Measured on the
+    #: real selector, a 250-frame beat is 106 runs of exactly 3 plus one
+    #: 2-frame tail -- uniform 8.33, not ragged 8, with the tail already
+    #: carried truthfully as ``cadence_tail_trim``. The training-rate argument
+    #: was never weighed in 2026-08-22 at all.
+    #:
+    #: ON THIS LANE ONLY. ``GHOST_DEFAULT_HOLD`` stays 2 and the two lanes with
+    #: published episodes keep the cadence that made them.
+    #:
+    #: The receipt id is REPOINTED rather than edited: the episode published to
+    #: otr/obs/ on 2026-09-09 ran at hold 2 under the old id, and silently
+    #: changing what that string means would make its receipt unreadable.
+    hold_factor = 3
 
     #: All six recipe cells, through the seam. Declaring fewer would sample on
     #: the golden 20-step / cfg-8.0 recipe while stamping a Lightning receipt --

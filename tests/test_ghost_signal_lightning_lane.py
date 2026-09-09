@@ -534,9 +534,11 @@ def test_the_stride_is_derived_not_a_fourth_literal():
 
 def test_this_lane_opts_in_and_asks_for_the_legal_count(eng):
     assert eng.align_source_to_context_window is True
-    assert eng._source_request_for(250) == 136, (
-        "a 250-frame hold-2 beat needs 125 unique sources; the legal count is "
-        "136 and costs the same eleven windows")
+    assert eng._source_request_for(250) == 88, (
+        "at the ruled hold 3 a 250-frame beat needs 84 unique sources, and 88 "
+        "is the next legal sliding-window count")
+    # The alignment itself is unchanged -- still 16 + 12k.
+    assert gs.ghost_legal_source_count(88) == 88
 
 
 def test_the_siblings_did_not_opt_in_and_are_byte_identical():
@@ -560,9 +562,12 @@ def test_the_surplus_is_reported_rather_than_hidden(eng):
     alignment becomes 11 frames of invisible work."""
     receipts = gs.ghost_cadence_receipts(250, eng._source_request_for(250),
                                          eng.hold_factor)
-    assert receipts["model_frame_count"] == 136
-    assert receipts["native_frame_count"] == 250
-    assert receipts["cadence_source_frame_count"] == 125
+    assert receipts["model_frame_count"] == 88, "what the model was asked for"
+    assert receipts["native_frame_count"] == 250, "delivered is UNCHANGED"
+    assert receipts["cadence_source_frame_count"] == 84, "unique sources kept"
+    # The surplus the alignment bought is visible, not hidden: 88 asked, 84 used.
+    assert (receipts["model_frame_count"]
+            - receipts["cadence_source_frame_count"]) == 4
 
 
 def test_the_alignment_is_NOT_expressed_as_a_frame_contract_quantum(eng):
@@ -677,6 +682,40 @@ def test_the_lane_says_EXPERIMENTAL_out_loud(eng):
 # ADAPTIVE HOLD -- PBUG-20260909-01, the beat that rebooted the machine
 # ---------------------------------------------------------------------------
 
+def test_the_lane_runs_at_hold_3_by_operator_ruling(eng):
+    """OPERATOR RULING 2026-09-09, after an A/B he asked for: *"i like hold 3"*.
+
+    The default, not a memory compromise. His argument, which the 2026-08-22
+    rate ruling never weighed: AnimateDiff is TRAINED at 8 fps, so hold 3's
+    8.33 fps of fresh picture asks the module for motion at the rate it learned.
+    That ruling rejected 8 fps on UNIFORMITY grounds -- a true 8 inside 25 needs
+    runs of 3.125 -- and hold 3 is not that: 106 runs of exactly 3 plus one
+    2-frame tail."""
+    assert eng.hold_factor == 3
+    assert gs.GHOST_DEFAULT_HOLD == 2, "the parent default is untouched"
+    assert "hold3" in eng.recipe_receipt_id, (
+        "cadence changed the picture, so the receipt id repoints rather than "
+        "silently meaning something new")
+    import itertools
+
+    def runs_of(T):
+        return [len(list(g)) for _, g in
+                itertools.groupby(gs.ghost_hold_selector(T, eng.hold_factor))]
+
+    # UNIFORM RUNS OF 3 PLUS ONE SHORT TAIL, for any T. The tail length is
+    # T % 3, which is arithmetic, not raggedness -- and it is already reported
+    # as `cadence_tail_trim`. (Stated with the right numbers this time: an
+    # earlier write-up of this attached T=320's counts to T=250.)
+    r250 = runs_of(250)          # 250 = 83*3 + 1
+    assert r250.count(3) == 83 and r250[-1] == 1 and len(r250) == 84
+    r320 = runs_of(320)          # 320 = 106*3 + 2
+    assert r320.count(3) == 106 and r320[-1] == 2
+    for T in (91, 116, 239, 250, 267, 320):
+        rs = runs_of(T)
+        assert set(rs[:-1]) == {3}, "every run before the tail is exactly 3"
+        assert rs[-1] == (T % 3 or 3)
+
+
 def test_the_beat_that_rebooted_the_machine_now_fits(eng):
     """THE PINNED INCIDENT. The first real episode rendered five beats at
     124-136 latents, then asked for 160 on a ~320-frame beat and took the whole
@@ -685,24 +724,31 @@ def test_the_beat_that_rebooted_the_machine_now_fits(eng):
     At hold 3 the same beat needs 112: the SAME 320 delivered frames, the same
     audio sync, no jump cuts, and no reboot."""
     hold = eng._beat_hold(320)
-    assert hold == 3, "hold 2 would ask for 160, which is the fatal count"
+    assert hold == 3, "hold 2 asked for 160, which is the fatal count"
     assert eng._source_request_for(320, hold) == 112
+    # Since the operator ruled hold 3 the DEFAULT, this beat no longer needs
+    # adapting at all -- it simply fits. The guard is now a backstop for far
+    # longer beats rather than the thing that saves this one.
+    assert hold == eng.hold_factor, "no escalation required any more"
     # and it is still a legal sliding-window count
     assert gs.ghost_legal_source_count(112) == 112
 
 
-@pytest.mark.parametrize("target,expect_hold,expect_latents", [
-    # The five beats that ACTUALLY RENDERED in that episode keep hold 2
-    # untouched -- adaptation must not disturb what already worked.
-    (250, 2, 136),   # shot_music_opening_001
-    (243, 2, 124),   # shot_b001
-    (267, 2, 136),   # shot_b002
-    (239, 2, 124),   # shot_b003 / b004
+@pytest.mark.parametrize("target,expect_latents", [
+    # The beats from the episode that rebooted the machine, now at the ruled
+    # cadence. Every one costs far less than it did at hold 2 (124-136).
+    (250, 88),   # shot_music_opening_001 -- was 136
+    (243, 88),   # shot_b001              -- was 124
+    (267, 100),  # shot_b002              -- was 136
+    (239, 88),   # shot_b003 / b004       -- was 124
 ])
-def test_the_beats_that_already_worked_are_untouched(eng, target,
-                                                     expect_hold, expect_latents):
-    assert eng._beat_hold(target) == expect_hold
-    assert eng._source_request_for(target, expect_hold) == expect_latents
+def test_the_ruled_cadence_costs_less_on_every_real_beat(eng, target,
+                                                         expect_latents):
+    """Hold 3 is cheaper AND preferred, which is the unusual part: the look
+    call and the memory call point the same way."""
+    assert eng._beat_hold(target) == 3, "no adaptation needed"
+    assert eng._source_request_for(target, 3) == expect_latents
+    assert expect_latents < eng._source_request_for(target, 2)
 
 
 def test_it_escalates_only_as_far_as_it_must(eng):
@@ -786,8 +832,8 @@ def test_hold_is_resolved_per_beat_and_not_stored_on_the_instance(eng):
     this from the existing `OTR_GHOST_HOLD_FACTOR` env knob would re-cadence
     every sibling that shares this base -- which is why it does not."""
     before = eng.hold_factor
-    assert eng._beat_hold(320) == 3
-    assert eng.hold_factor == before == 2, "the instance must not be mutated"
+    assert eng._beat_hold(500) == 4, "escalates past the ruled default"
+    assert eng.hold_factor == before == 3, "the instance must not be mutated"
     import inspect
     src = inspect.getsource(gs.GhostSignalEngine._beat_hold)
     # `GHOST_HOLD_FACTOR_MAX` is the legitimate loop bound and the docstring
@@ -912,9 +958,10 @@ def test_two_different_holds_really_do_produce_different_cache_keys(eng):
     base = {"shot_id": "same", "text_prompt": "x", "negative_prompt": "y",
             "seed_bundle": {"request_seed": 42}}
     short = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 250}))
-    long_ = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 320}))
-    assert any(p == "hold=2" for p in short)
-    assert any(p == "hold=3" for p in long_)
+    long_ = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 500}))
+    assert any(p == "hold=3" for p in short), "the ruled default"
+    assert any(p == "hold=4" for p in long_), "escalated for a 20-second beat"
+    assert short != long_
 
 
 def test_shot_cache_identity_raises_rather_than_returning_a_bogus_key(eng,

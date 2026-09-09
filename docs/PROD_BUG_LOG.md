@@ -13699,13 +13699,50 @@ grounds: 12.5 is exactly half of 25, so hold-2 is a clean 2-2-2-2, whereas a
 true 8 fps inside 25 needs runs of 3.125 and comes out ragged 3-3-3-4.
 
 That objection does not apply to hold 3. Measured on the real selector for a
-250-frame beat: hold 2 gives 160 runs of exactly 2; hold 3 gives 106 runs of
-exactly 3 plus a single 2-frame tail -- uniform, with the tail already carried
-truthfully as `cadence_tail_trim`. Hold 3 is **8.33 fps uniform**, not the 8 fps
-ragged that was rejected.
+250-frame beat: hold 2 gives 160 runs of exactly 2; hold 3 gives runs of exactly
+3 plus one short tail -- uniform, with the tail already carried truthfully as
+`cadence_tail_trim`. Hold 3 is **8.33 fps uniform**, not the 8 fps ragged that
+was rejected.
+
+> **Figure corrected (see the third addendum).** This paragraph originally said
+> "106 runs of exactly 3 plus a single 2-frame tail" for a 250-frame beat. Those
+> are T=320's counts. T=250 is 83 runs of 3 plus a 1-frame tail. The tail is
+> always `T % 3`. The uniformity claim was right; the numbers were attached to
+> the wrong beat.
 
 So the open question is a LOOK question and belongs to the operator's eye, not
 to argument: is uniform hold 3 the better default for this lane on every beat,
 rather than only on beats that would otherwise reboot the machine? It is one
 class attribute either way. Recorded here so the reasoning is not lost, and
 because the shipped ruling's stated grounds turn out not to cover this case.
+
+### PBUG-20260909-01, third addendum: hold 3 is the RULING, not the fallback
+
+Operator, 2026-09-09, after an A/B he asked for and judged himself: *"i like
+hold 3"*. So `animatediff15_lightning_video` now declares `hold_factor = 3` as
+its DEFAULT cadence. The adaptive guard remains, but it is now a backstop for
+beats past roughly T=500 rather than the thing that saves an ordinary one.
+
+Consequences, all measured:
+
+* The beat that rebooted the machine (T~320) needs **112 latents at the base
+  cadence** and no adaptation at all.
+* Every beat from that episode costs LESS than it did: 250 -> 88 (was 136),
+  243 -> 88 (was 124), 267 -> 100 (was 136), 239 -> 88 (was 124).
+* The look call and the memory call point the SAME way, which is unusual and
+  worth noting: the cadence the operator prefers is also the cheaper one.
+
+`recipe_receipt_id` is REPOINTED to `..._hold3_...` rather than edited, because
+the episode published to `otr/obs/` earlier the same day ran at hold 2 under the
+old string, and silently changing what it means would make that receipt
+unreadable.
+
+**A NUMBER I REPEATED WRONGLY, corrected here and in the guide.** The uniformity
+argument was stated as "a 250-frame beat is 106 runs of exactly 3 plus a 2-frame
+tail". Those are T=320's counts. T=250 is **83 runs of 3 plus a 1-frame tail**;
+T=320 is 106 runs of 3 plus a 2-frame tail. The claim itself holds -- runs of
+exactly 3 with one tail of `T % 3`, which is arithmetic rather than the ragged
+3-3-3-4 that a true 8 fps inside 25 forces -- but the figures were attached to
+the wrong beat length in the commit message, the guide and the comparison page.
+`test_the_lane_runs_at_hold_3_by_operator_ruling` now asserts both cases and the
+general rule, so the mistake cannot recur silently.
