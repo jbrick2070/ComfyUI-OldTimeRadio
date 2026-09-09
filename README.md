@@ -129,7 +129,7 @@ ComfyUI.
 | `flux2_klein` (image; **the 8 GB / 12 GB / AMD default**) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
 | `wan22_*` / `wan_ti2v` (Wan 2.2 video) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its shipped DiT and umt5 text encoder are GGUF files (`UnetLoaderGGUF`, `CLIPLoaderGGUF`) |
 | `ltx098_low_video` (`ltx_8gb`, LTX 0.9.8 distilled 2B -- the only 0.9.x lane) | **nothing extra** | every class it resolves (`CheckpointLoaderSimple`, `ModelSamplingLTXV`, `LTXVImgToVideo`, `LTXVConditioning`, `LTXVScheduler`, `SamplerCustom`, `VAEDecode`) is stock ComfyUI, and it published episodes on a Mac with ComfyUI-LTXVideo moved aside (`docs/MAC_PORTABILITY_GUIDE.md` 10.2). Its preflight message still says "install/update ComfyUI-LTXVideo" when a class is missing; on a stock install read that as "update ComfyUI". This row used to lump it with the two LTX 2.3 lanes below as "the LTX 0.9.x lanes", which was wrong on both counts |
-| `ltx23_high_video` / `ltx23_low_audio_in` (`ltx_video` / `ltx_audio_in`, the LTX 2.3 22B GGUF lanes) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) for `UnetLoaderGGUF`; their preflight message also names [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde` **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports), and `scripts/otr_provision.py` installs both at those pins | the 22B unet is a Q3_K_M GGUF; the `LTXAV*` / `LTXV*AVLatent` classes are the LTX 2.x audio-video graph. `ltx23_low_audio_in` also hard-requires NVML in its preflight, so it is NVIDIA-only by code, not merely by registry row |
+| `ltx23_high_video` / `ltx23_low_audio_in` (`ltx_video` / `ltx_audio_in`, the LTX 2.3 22B GGUF lanes) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) for `UnetLoaderGGUF`; their preflight message also names [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde` **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports), and `scripts/otr_provision.py` installs both at those pins | the 22B unet is a Q3_K_M GGUF, so `UnetLoaderGGUF` is the one non-core class. Every `LTXAV*` / `LTXV*AVLatent` class they resolve is stock ComfyUI 0.34+ (`comfy_extras/nodes_lt.py`, `nodes_lt_audio.py`; checked against 0.34.6 on 2026-09-09, where ComfyUI-LTXVideo registers none of them), so on that version the pack is a provisioner requirement, not a render requirement. `ltx23_low_audio_in` also hard-requires NVML in its preflight, so it is NVIDIA-only by code, not merely by registry row |
 | `humo_1.7B*`, `humo*`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
 
 `scripts/otr_provision.py` installs all three packs at their pinned commits for you
@@ -475,14 +475,14 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `still_flat` | nothing | -- | ? | ? | **proven** |
-| `still_motion` | nothing | -- | ? | ? | **proven** |
-| `still_pan` | nothing | -- | ? | ? | **proven** |
-| `still_word` | nothing | -- | ? | ? | **proven** |
-| `viz_camera` | nothing | -- | ? | ? | **proven** |
-| `viz_green` | nothing | -- | ? | ? | **proven** |
-| `viz_mxc_cpu` | nothing | -- | ? | ? | **proven** |
-| `viz_mxc_mandala` | nothing | -- | ? | ? | fits |
+| `still_flat` | nothing | -- | fits | fits | **proven** |
+| `still_motion` | nothing | -- | fits | fits | **proven** |
+| `still_pan` | nothing | -- | fits | fits | **proven** |
+| `still_word` | nothing | -- | fits | fits | **proven** |
+| `viz_camera` | nothing | -- | fits | fits | **proven** |
+| `viz_green` | nothing | -- | fits | fits | **proven** |
+| `viz_mxc_cpu` | nothing | -- | **proven** | fits | **proven** |
+| `viz_mxc_mandala` | nothing | -- | fits | fits | fits |
 
 **Video -- hosted, no weights but you supply the key**
 
@@ -501,35 +501,35 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `cloud_kling_avatar` | none, **but see below** | -- | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key |
 | `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key |
-| `animatediff15_lightning_video` | **auto** | 3.1 GiB | ? | ? | **proven** |
-| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | ? | not offered |
-| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | ? | ? | not offered |
-| `mesh_stage` | manual | 4.6 GiB | ? | ? | not offered |
-| `wan22_high_video` | **auto** | 9.4 GiB | ? | **proven** | not offered |
-| `wan22_high_fast` | manual | 10.0 GiB | ? | ? | not offered |
-| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | ? | ? | not offered |
-| `humo17_high_audio_in_wide` | manual | 12.6 GiB | ? | ? | not offered |
-| `ltx23_high_video` | manual | 14.8 GiB | ? | ? | not offered |
-| `ltx23_low_audio_in` | manual | 15.2 GiB | ? | ? | not offered |
-| `ltx098_low_video` | **auto** | 16.1 GiB | ? | **proven** | **proven** |
-| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | ? | ? | not offered |
-| `ltx25_high_mime` | GATED + manual | 22.2 GiB | ? | ? | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | ? | ? | not offered |
-| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | ? | **proven** | not offered |
-| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | ? | ? | not offered |
-| `h3_low_video` | manual | 41.9 GiB | ? | **proven** | not offered |
-| `h3_low_audio_in` | manual | 42.5 GiB | ? | ? | not offered |
+| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** |
+| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered |
+| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered |
+| `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered |
+| `wan22_high_video` | **auto** | 9.4 GiB | **no** | **proven** | not offered |
+| `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered |
+| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
+| `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
+| `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered |
+| `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered |
+| `ltx098_low_video` | **auto** | 16.1 GiB | fits | **proven** | **proven** |
+| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
+| `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
+| `ltx25_high_video` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
+| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered |
+| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered |
+| `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered |
+| `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered |
 
 **Image -- local**
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `sd15` | **auto** | 2.0 GiB | ? | ? | **proven** |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | ? | not offered |
-| `lumina_image` | manual | 10.4 GiB | ? | ? | not offered |
-| `flux_gen1` | manual | 13.0 GiB | ? | ? | not offered |
-| `ideogram4_local` | manual | 17.3 GiB | ? | ? | not offered |
-| `z_image_turbo` | **auto** | 19.3 GiB | ? | ? | not offered |
+| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** |
+| `flux2_klein` | manual | 10.2 GiB | **proven** | fits | not offered |
+| `lumina_image` | manual | 10.4 GiB | **OOM** | fits | not offered |
+| `flux_gen1` | manual | 13.0 GiB | **OOM** | fits | not offered |
+| `ideogram4_local` | manual | 17.3 GiB | **no** | **OOM** | not offered |
+| `z_image_turbo` | **auto** | 19.3 GiB | **OOM** | **proven** | not offered |
 
 **Image -- hosted**
 
@@ -547,14 +547,14 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `kokoro` | **auto** | 0.3 GiB | **proven** | ? | **proven** |
-| `musicgen` | **auto** | 2.2 GiB | **proven** | ? | **proven** |
-| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | ? | not offered |
-| `stable_audio_3` | **auto** | 3.5 GiB | ? | ? | **proven** |
-| `bark` | **auto** | 4.2 GiB | ? | ? | **proven** |
-| `stable_audio_music` | **auto** | 4.5 GiB | ? | ? | not offered |
-| `dia` | own installer (Windows) | 6.0 GiB | not offered | ? | not offered |
-| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | ? | not offered |
+| `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** |
+| `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | **proven** |
+| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered |
+| `stable_audio_3` | **auto** | 3.5 GiB | **proven** | fits | **proven** |
+| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **proven** |
+| `stable_audio_music` | **auto** | 4.5 GiB | fits | fits | not offered |
+| `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered |
+| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered |
 
 **Voice and music -- hosted**
 
@@ -569,8 +569,8 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `off` | nothing | -- | ? | ? | **proven** |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | ? | ? | fits |
+| `off` | nothing | -- | **proven** | **proven** | **proven** |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | fits | fits |
 **How you get the weights.** **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
@@ -719,7 +719,7 @@ Three things that cost a machine or an hour:
 | `tokenizers>=0.23.1,<0.24` | `pip install 'tokenizers>=0.23.1,<0.24'` with ComfyUI's own interpreter | only if you installed `2.0.0-alpha.24` through `.28`, which will not boot; `.29` or later is fine. Do not reinstall from Manager -- it serves the broken version |
 | the `sd15` checkpoint (1.99 GB) | the `hf_hub_download` line in guide section 5, then copy into `models/checkpoints/` | for any `still_*` lane and for `ltx098_low_video` |
 | `cairo` | `brew install cairo pkg-config && pip install pycairo` | only for `viz_mxc_mandala`; `viz_green` needs nothing |
-| `git-lfs` | `brew install git-lfs && git lfs install` | before `scripts/otr_provision.py --packs-only`, which otherwise fails on ComfyUI-LTXVideo's checkout and leaves an unpinned clone behind (guide 10.2) |
+| `git-lfs` | `brew install git-lfs && git lfs install` | before `scripts/otr_provision.py --packs-only`, which otherwise fails on ComfyUI-LTXVideo's checkout and leaves an unpinned clone behind (guide 10.2). The provisioner requires that pack unconditionally; on ComfyUI 0.34.6 no LTX lane resolves a class from it |
 | ComfyUI-AnimateDiff-Evolved plus its weights | `OTR_COMFY_ROOT=<ComfyUI> <ComfyUI Python> scripts/otr_provision.py --packs-only`, the weights by hand (guide sections 3 and 8), and `config/otr_mac_extra_model_paths.yaml` passed as a second `--extra-model-paths-config`, because Comfy Desktop's generated mapping has no `animatediff_models` category | only for the AnimateDiff lanes |
 
 Running headless (`python main.py` rather than the Desktop app)? Pass the Desktop

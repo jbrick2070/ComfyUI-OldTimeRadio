@@ -20,14 +20,14 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `still_flat` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `still_motion` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `still_pan` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `still_word` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `viz_camera` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `viz_green` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `viz_mxc_cpu` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `viz_mxc_mandala` | nothing | -- | ? | ? | fits | ? | ? |
+| `still_flat` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `still_motion` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `still_pan` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `still_word` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `viz_camera` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `viz_green` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `viz_mxc_cpu` | nothing | -- | **proven** | fits | **proven** | ? | ? |
+| `viz_mxc_mandala` | nothing | -- | fits | fits | fits | ? | ? |
 
 **Video -- hosted, no weights but you supply the key**
 
@@ -46,35 +46,35 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key | key | key |
-| `animatediff15_lightning_video` | **auto** | 3.1 GiB | ? | ? | **proven** | ? | not offered |
-| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | ? | not offered | ? | not offered |
-| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | ? | ? | not offered | ? | not offered |
-| `mesh_stage` | manual | 4.6 GiB | ? | ? | not offered | ? | not offered |
-| `wan22_high_video` | **auto** | 9.4 GiB | ? | **proven** | not offered | ? | not offered |
-| `wan22_high_fast` | manual | 10.0 GiB | ? | ? | not offered | ? | not offered |
-| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | ? | ? | not offered | ? | not offered |
-| `humo17_high_audio_in_wide` | manual | 12.6 GiB | ? | ? | not offered | ? | not offered |
-| `ltx23_high_video` | manual | 14.8 GiB | ? | ? | not offered | ? | not offered |
-| `ltx23_low_audio_in` | manual | 15.2 GiB | ? | ? | not offered | not offered | not offered |
-| `ltx098_low_video` | **auto** | 16.1 GiB | ? | **proven** | **proven** | ? | not offered |
-| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_high_mime` | GATED + manual | 22.2 GiB | ? | ? | not offered | ? | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | ? | ? | not offered | ? | not offered |
-| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | ? | **proven** | not offered | ? | not offered |
-| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | ? | ? | not offered | ? | not offered |
-| `h3_low_video` | manual | 41.9 GiB | ? | **proven** | not offered | ? | not offered |
-| `h3_low_audio_in` | manual | 42.5 GiB | ? | ? | not offered | ? | not offered |
+| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** | ? | not offered |
+| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
+| `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
+| `wan22_high_video` | **auto** | 9.4 GiB | **no** | **proven** | not offered | ? | not offered |
+| `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered | ? | not offered |
+| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered | ? | not offered |
+| `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
+| `ltx098_low_video` | **auto** | 16.1 GiB | fits | **proven** | **proven** | ? | not offered |
+| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
+| `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
+| `ltx25_high_video` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
 
 **Image -- local**
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `sd15` | **auto** | 2.0 GiB | ? | ? | **proven** | ? | too slow |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | ? | not offered | ? | not offered |
-| `lumina_image` | manual | 10.4 GiB | ? | ? | not offered | ? | not offered |
-| `flux_gen1` | manual | 13.0 GiB | ? | ? | not offered | ? | not offered |
-| `ideogram4_local` | manual | 17.3 GiB | ? | ? | not offered | not offered | not offered |
-| `z_image_turbo` | **auto** | 19.3 GiB | ? | ? | not offered | ? | not offered |
+| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** | ? | too slow |
+| `flux2_klein` | manual | 10.2 GiB | **proven** | fits | not offered | ? | not offered |
+| `lumina_image` | manual | 10.4 GiB | **OOM** | fits | not offered | ? | not offered |
+| `flux_gen1` | manual | 13.0 GiB | **OOM** | fits | not offered | ? | not offered |
+| `ideogram4_local` | manual | 17.3 GiB | **no** | **OOM** | not offered | not offered | not offered |
+| `z_image_turbo` | **auto** | 19.3 GiB | **OOM** | **proven** | not offered | ? | not offered |
 
 **Image -- hosted**
 
@@ -92,14 +92,14 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `kokoro` | **auto** | 0.3 GiB | **proven** | ? | **proven** | ? | ? |
-| `musicgen` | **auto** | 2.2 GiB | **proven** | ? | **proven** | ? | ? |
-| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | ? | not offered | not offered | not offered |
-| `stable_audio_3` | **auto** | 3.5 GiB | ? | ? | **proven** | ? | not offered |
-| `bark` | **auto** | 4.2 GiB | ? | ? | **proven** | ? | too slow |
-| `stable_audio_music` | **auto** | 4.5 GiB | ? | ? | not offered | ? | not offered |
-| `dia` | own installer (Windows) | 6.0 GiB | not offered | ? | not offered | not offered | not offered |
-| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | ? | not offered | not offered | not offered |
+| `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** | ? | ? |
+| `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | **proven** | ? | ? |
+| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered | not offered | not offered |
+| `stable_audio_3` | **auto** | 3.5 GiB | **proven** | fits | **proven** | ? | not offered |
+| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **proven** | ? | too slow |
+| `stable_audio_music` | **auto** | 4.5 GiB | fits | fits | not offered | ? | not offered |
+| `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered | not offered | not offered |
+| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered | not offered | not offered |
 
 **Voice and music -- hosted**
 
@@ -114,8 +114,8 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `off` | nothing | -- | ? | ? | **proven** | ? | ? |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | ? | ? | fits | ? | ? |
+| `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | fits | fits | ? | ? |
 
 **How you get the weights.** **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
