@@ -1056,6 +1056,12 @@ about fifteen segments, each still flooring at the 16-frame context window --
 roughly 240 sampled latents instead of 125, and fifteen jump cuts where there was
 one continuous beat.
 
+(That fifteen is specific to a SEVENTEEN-frame cap, not to capping in general --
+a cap near 248 would split the same beat only once. The conclusion survives the
+correction: on a `continuity=NONE` lane any cap introduces a jump and extra
+floor/alignment work, so the lane stays out of `PLANNING_CAP_ENGINES`. But the
+number was doing more argumentative work than it had earned.)
+
 Capping at the beat level is out too: `validate_coverage_plan` refuses any plan
 whose visible frames differ from the audio-derived target
 (`coverage_plan.py:478-482`). Shorter picture means picture that no longer
@@ -1137,12 +1143,17 @@ MIT is worth noting: it is **more permissive than anything else this lane
 loads** -- the SD1.5 checkpoint and the Lightning module are both CreativeML
 Open RAIL-M. Adopting it would not weaken the lane's licence position.
 
-**THE LANE STILL DECODES WITH THE CHECKPOINT'S BAKED VAE.** `eng_ghost_signal.py`
-takes `prepared["vae"] = (ckpt_out[2],)`, and that is unchanged. Three
-independent judges were asked whether to adopt ft-mse now; two answered and
-agreed on the sequencing even though they used opposite verdict words -- adopt
-only AFTER a Lightning clip lands in `otr/obs/` through the real OTR adapter
-path. The reasoning is the same in both: tonight's proof was hand-built graphs
+**SUPERSEDED THE SAME DAY -- THE LANE NOW DECODES WITH ft-mse.** This section
+first said the decoder was deliberately NOT wired, because three judges were
+asked and the two that answered agreed on sequencing (adopt only AFTER a clip
+lands in `otr/obs/`), even though they used opposite verdict words. The operator
+then overrode that -- *"you may as well wire it in, if it fails it fails -- label
+it as an exp lane"* -- which was the documented flip condition one judge had
+named. So as of `c3212e1c` the lane declares
+`vae_name = VAE_FT_MSE_NAME` and `prepare` rebinds `prepared["vae"]` from its own
+`VAELoader`; only lanes that declare no `vae_name` still take `ckpt_out[2]`, which
+is both published siblings. The sequencing argument is kept here because it is
+still the right reasoning The reasoning is the same in both: tonight's proof was hand-built graphs
 that never touched `prepare` / `render_clip` / `canonicalize` / the cadence
 receipts, and adding a third artifact before that first real leg gives a failure
 two suspects instead of one. A decoder swap is also the one change that can be
@@ -1169,6 +1180,33 @@ refusal, or the delivered-frame contract. Those are different claims and only th
 second one earns the row. **Flip it in the commit that carries a canonical clip
 in `otr/obs/`, together with
 `test_the_device_row_claims_only_what_has_been_proven`.**
+
+### A STALE INSTALLED PACK MAKES TESTS LIE, and the failures look real
+
+`custom_nodes/comfyui-old-time-radio` is a SEPARATE COPY of this repo, not a
+symlink to it. ComfyUI needs it there; the tests import from the repo. When the
+two drift, a FULL-SUITE run can resolve `nodes.*` to the INSTALLED copy while a
+single-file run resolves it to the repo -- so tests pass alone and fail together.
+
+It bit on 2026-09-09 and cost real time, because the failures are perfectly
+plausible: four tests that assert on `inspect.getsource` reported that code
+present in the repo was missing. It was missing -- from the stale copy they had
+actually imported.
+
+**Symptom:** a test passes when you run its file and fails in the full suite,
+and the assertion is about source text or a newly added attribute.
+
+**Check:**
+
+```bash
+diff -rq --exclude=__pycache__ \
+  ~/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/nodes \
+  <repo>/nodes
+```
+
+**Fix:** copy the changed files over and drop `__pycache__`, then re-run. Do this
+after EVERY edit you intend to render with, or the render exercises different
+code from the one the tests just proved.
 
 ### The Mac setup that made it run at all
 

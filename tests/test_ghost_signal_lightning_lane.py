@@ -662,3 +662,166 @@ def test_the_lane_says_EXPERIMENTAL_out_loud(eng):
     assert "EXPERIMENTAL" in inspect.getmodule(type(eng)).__doc__
     assert eng.default_roles == ()
     assert vreg.CAPABILITIES[ENGINE_ID]["device_backends"] == ["cuda"]
+
+
+# ---------------------------------------------------------------------------
+# ADAPTIVE HOLD -- PBUG-20260909-01, the beat that rebooted the machine
+# ---------------------------------------------------------------------------
+
+def test_the_beat_that_rebooted_the_machine_now_fits(eng):
+    """THE PINNED INCIDENT. The first real episode rendered five beats at
+    124-136 latents, then asked for 160 on a ~320-frame beat and took the whole
+    Mac down -- unified memory, so an OOM is a reboot and not a process kill.
+
+    At hold 3 the same beat needs 112: the SAME 320 delivered frames, the same
+    audio sync, no jump cuts, and no reboot."""
+    hold = eng._beat_hold(320)
+    assert hold == 3, "hold 2 would ask for 160, which is the fatal count"
+    assert eng._source_request_for(320, hold) == 112
+    # and it is still a legal sliding-window count
+    assert gs.ghost_legal_source_count(112) == 112
+
+
+@pytest.mark.parametrize("target,expect_hold,expect_latents", [
+    # The five beats that ACTUALLY RENDERED in that episode keep hold 2
+    # untouched -- adaptation must not disturb what already worked.
+    (250, 2, 136),   # shot_music_opening_001
+    (243, 2, 124),   # shot_b001
+    (267, 2, 136),   # shot_b002
+    (239, 2, 124),   # shot_b003 / b004
+])
+def test_the_beats_that_already_worked_are_untouched(eng, target,
+                                                     expect_hold, expect_latents):
+    assert eng._beat_hold(target) == expect_hold
+    assert eng._source_request_for(target, expect_hold) == expect_latents
+
+
+def test_it_escalates_only_as_far_as_it_must(eng):
+    """Hold rises one step at a time to the FIRST value that fits, never
+    straight to the maximum -- every extra step costs unique frames per second
+    (12.5 at hold 2, 8.3 at 3, 6.25 at 4, 5.0 at 5)."""
+    assert eng._beat_hold(400) == 3
+    assert eng._beat_hold(600) == 5
+
+
+def test_an_impossible_beat_is_REFUSED_BY_NAME_not_attempted(eng):
+    """The whole point. A named refusal is recoverable; a reboot is not."""
+    with pytest.raises(vreg.EngineUnusable) as exc:
+        eng._beat_hold(4000)
+    msg = str(exc.value)
+    assert "PBUG-20260909-01" in msg
+    assert "rebooted the machine" in msg
+
+
+def test_an_unreadable_host_refuses_rather_than_guessing(eng, monkeypatch):
+    """On a platform where the failure mode is a reboot, "I could not measure
+    the memory" must never resolve to "go ahead"."""
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    with pytest.raises(vreg.EngineUnusable):
+        eng._beat_hold(250)
+
+
+def test_the_ceiling_is_derived_from_the_host_not_hardcoded():
+    """A 32 GB Mac or a discrete card must NOT inherit a 16 GB limit."""
+    from nodes._otr_video_engines import motion_common as mc
+    at16 = mc.latent_ceiling_for_host(512, 288, 16 * 1024)
+    at32 = mc.latent_ceiling_for_host(512, 288, 32 * 1024)
+    assert at16 == 136, "the largest count measured to SURVIVE, not to fail"
+    assert at32 == 2 * at16, "twice the RAM, twice the allowance"
+    # A bigger canvas costs batch, so the ceiling falls.
+    assert mc.latent_ceiling_for_host(512, 512, 16 * 1024) < at16
+
+
+def test_the_ceiling_anchors_on_survival_not_on_failure():
+    """136 rendered; 160 rebooted the machine. The untested gap between them is
+    treated as UNSAFE, which is the only defensible direction when being wrong
+    costs a reboot."""
+    from nodes._otr_video_engines import motion_common as mc
+    assert mc.GHOST_ANCHOR_SAFE_LATENTS == 136
+    assert mc.latent_ceiling_for_host(512, 288, 16 * 1024) < 160
+
+
+def test_one_hold_governs_the_plan_the_selector_and_the_receipts(eng):
+    """A receipt that named a cadence the render did not use would be worse than
+    no receipt. The hold is resolved ONCE and carried on the plan."""
+    import inspect
+    plan_src = inspect.getsource(gs.GhostSignalEngine._build_render_request)
+    assert 'hold = self._beat_hold(target)' in plan_src
+    assert '"hold": int(hold)' in plan_src
+    clip_src = inspect.getsource(gs.GhostSignalEngine.render_clip)
+    assert 'plan.get("hold"' in clip_src, "the selector must use the beat's hold"
+    rec_src = inspect.getsource(gs._ghost_cadence_receipts_for)
+    assert "hold=None" in rec_src
+
+
+def test_the_receipt_names_the_cadence_that_actually_ran(eng):
+    """cadence_mode must say hold_3 on a beat that adapted."""
+    hold = eng._beat_hold(320)
+    receipts = gs.ghost_cadence_receipts(320, eng._source_request_for(320, hold),
+                                         hold)
+    assert receipts["cadence_mode"] == "hold_3"
+    assert receipts["model_frame_count"] == 112
+    assert receipts["native_frame_count"] == 320, "delivered count is UNCHANGED"
+
+
+def test_hold_is_resolved_per_beat_and_not_stored_on_the_instance(eng):
+    """The registry keeps ONE shared instance per engine for the whole process,
+    so a hold cached on `self` would leak from one beat to the next. And driving
+    this from the existing `OTR_GHOST_HOLD_FACTOR` env knob would re-cadence
+    every sibling that shares this base -- which is why it does not."""
+    before = eng.hold_factor
+    assert eng._beat_hold(320) == 3
+    assert eng.hold_factor == before == 2, "the instance must not be mutated"
+    import inspect
+    src = inspect.getsource(gs.GhostSignalEngine._beat_hold)
+    # `GHOST_HOLD_FACTOR_MAX` is the legitimate loop bound and the docstring
+    # names the env var on purpose, so match the ENV READ rather than the
+    # substring: the knob must never be the mechanism here.
+    assert "_resolve_hold_factor" not in src
+    assert "GHOST_HOLD_FACTOR_ENV" not in src, (
+        "the env knob is process-wide and would re-cadence the published lanes")
+    assert "otr_env" not in src
+
+
+def test_the_published_lanes_never_adapt():
+    """CLAUDE.md 0B. Their cadence is frozen at whatever made their episodes."""
+    assert gs.GhostSignalEngine.adaptive_hold_for_memory is False
+    for name in ("animatediff15_v3_haunted_video",
+                 "animatediff15_v3_stillin_lab_video"):
+        peer = vreg.get_engine(name)
+        assert peer.adaptive_hold_for_memory is False
+        # the fatal beat still resolves to their frozen hold, unchanged
+        assert peer._beat_hold(320) == peer.hold_factor == 2
+        assert peer._source_request_for(320) == gs.ghost_source_request(320, 2)
+
+
+def test_the_sampler_receipt_cannot_contradict_itself(eng):
+    """CAUGHT IN REVIEW, and it was mine. `sampler_inputs_for` read
+    `self.hold_factor` while `source_request` came from the beat's resolved
+    hold -- so an adapted beat would have stamped `hold_factor: 2` beside a
+    `source_request` of 112, which is impossible at hold 2 for a 320-frame
+    beat. The receipt would have contradicted itself in the same dict."""
+    class _Req(dict):
+        pass
+    req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
+           "timing": {"target_frame_count": 320},
+           "seed_bundle": {"request_seed": 42}}
+    got = eng.sampler_inputs_for(req)
+    assert got["hold_factor"] == 3, "the hold that actually ran"
+    assert got["source_request"] == 112
+    assert got["unique_source_count"] == 107
+    # internally consistent: ceil(T / hold) == unique
+    import math
+    assert math.ceil(320 / got["hold_factor"]) == got["unique_source_count"]
+
+
+def test_a_non_adapting_lane_reports_exactly_what_it_always_did():
+    """The fix must be invisible to the published lanes."""
+    peer = vreg.get_engine("animatediff15_v3_haunted_video")
+    req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
+           "timing": {"target_frame_count": 320},
+           "seed_bundle": {"request_seed": 42}}
+    got = peer.sampler_inputs_for(req)
+    assert got["hold_factor"] == peer.hold_factor == 2
+    assert got["source_fps"] == 12, "unchanged, including its truncation"

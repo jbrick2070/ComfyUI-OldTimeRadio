@@ -243,6 +243,17 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     #: has never rendered, so it can start correct instead of being corrected.
     align_source_to_context_window = True
 
+    #: ADAPTIVE HOLD (PBUG-20260909-01). This lane's first real episode rendered
+    #: five beats and then asked for 160 latents on the sixth, which REBOOTED the
+    #: machine -- unified memory, so an OOM is not a process kill. With this on,
+    #: that beat runs at hold 3 instead: 112 latents, the same 320 delivered
+    #: frames, the same audio sync, no jump cuts, and 8.3 unique sources per
+    #: second instead of 12.5. Beats that already fit keep hold 2 untouched.
+    #:
+    #: On this lane and not its siblings for the usual reason: they have
+    #: published episodes and a cadence change changes their pictures.
+    adaptive_hold_for_memory = True
+
     #: DECLARED EXPLICITLY (G3.6) rather than inherited. This lane consumes no
     #: still of any kind, and restating it here is what keeps the portrait-free
     #: role set correct if a future parent ever changes its mind.
@@ -335,9 +346,15 @@ class GhostSignalLightningEngine(GhostSignalEngine):
         whether a clip may be reused must assert it too.
         """
         cfg = float(self.cfg)
+        plan = self._build_render_request(request)
         return super().shot_cache_identity(request) + (
             "cfg=%s" % cfg.hex(),
             "negative_effective=%s" % negative_is_live(cfg),
+            # THE CADENCE THAT WILL RUN. The parent's identity carries
+            # `unique_source_count`, which usually differs when the hold does --
+            # but "usually" is not "always", and a clip rendered at hold 3 must
+            # never be served to a beat that resolved to hold 2.
+            "hold=%d" % int(plan.get("hold", self.hold_factor)),
         )
 
 

@@ -453,11 +453,15 @@ def ghost_hold2_selector(target_frame_count) -> list:
 
 
 def _ghost_cadence_receipts_for(engine, target_frame_count,
-                                source_request=None) -> dict:
-    """``ghost_cadence_receipts`` bound to a lane's own hold factor."""
-    return ghost_cadence_receipts(target_frame_count, source_request,
-                                  getattr(engine, "hold_factor",
-                                          GHOST_DEFAULT_HOLD))
+                                source_request=None, hold=None) -> dict:
+    """``ghost_cadence_receipts`` bound to the hold that ACTUALLY RAN.
+
+    ``hold`` is optional so every existing caller keeps the lane's frozen
+    cadence; an adaptive lane passes the beat's resolved hold, or
+    ``cadence_mode`` would name a cadence that did not happen."""
+    if hold is None:
+        hold = getattr(engine, "hold_factor", GHOST_DEFAULT_HOLD)
+    return ghost_cadence_receipts(target_frame_count, source_request, hold)
 
 
 def ghost_cadence_receipts(target_frame_count, source_request=None,
@@ -589,6 +593,26 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: default keeps every existing lane byte-identical and the new lane opts in.
     align_source_to_context_window = False
 
+    #: THE ADAPTIVE-HOLD SEAM (2026-09-09, PBUG-20260909-01). When True, a beat
+    #: whose source request would exceed what this HOST can survive raises its
+    #: hold instead -- same delivered frames, same audio contract, no jump cuts,
+    #: fewer unique sources per second on that beat only. When no hold up to
+    #: ``GHOST_HOLD_FACTOR_MAX`` fits, the beat is REFUSED by name.
+    #:
+    #: DEFAULT FALSE, and on this seam that is not caution but necessity: the
+    #: registry keeps ONE SHARED INSTANCE per engine and the two lanes below
+    #: have PUBLISHED EPISODES, so any change to their cadence changes their
+    #: pictures. They keep the frozen hold they always had.
+    #:
+    #: WHY HOLD AND NOT A CAP. ``U = ceil(T / hold)``, so hold is the only dial
+    #: that reduces the LATENT count without touching the DELIVERED count.
+    #: Capping delivered frames is refused outright by
+    #: ``coverage_plan.validate_coverage_plan`` (picture must match sound), and
+    #: adding this lane to ``PLANNING_CAP_ENGINES`` is worse still: with
+    #: ``continuity=NONE`` the planner joins segments with ``join_mode="jump"``,
+    #: producing jump cuts AND more total latents.
+    adaptive_hold_for_memory = False
+
     #: THE CADENCE SEAM. How many delivered frames each generated frame fills.
     #: A peer overrides this alone; the render path reads it through ``self`` so
     #: a declared value cannot be ignored while its receipt claims otherwise.
@@ -707,9 +731,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             # `motion_module_name`. Dormant while every registered lane is
             # hold-2; wrong the instant one is not, which is the whole point of
             # a cadence peer.
-            "source_fps": int(self.target_fps / max(int(self.hold_factor), 1)),
+            # FROM THE PLAN, NOT THE INSTANCE (2026-09-09). `source_request`
+            # and `unique_source_count` below already come from the beat's
+            # resolved hold; reading `self.hold_factor` here meant an adapted
+            # beat would stamp `hold_factor: 2` beside a `source_request` that
+            # is arithmetically impossible at hold 2 -- a receipt contradicting
+            # itself, which is precisely the defect the note above describes.
+            # Identical for every lane that does not adapt, because there
+            # `plan["hold"]` IS `self.hold_factor`.
+            "source_fps": int(self.target_fps
+                              / max(int(plan.get("hold", self.hold_factor)), 1)),
             "target_fps": int(self.target_fps),
-            "hold_factor": int(self.hold_factor),
+            "hold_factor": int(plan.get("hold", self.hold_factor)),
             "source_request": plan["source_request"],
             "unique_source_count": plan["unique_source_count"],
             "latent": "EmptyLatentImage", "init_image": None,
@@ -1087,7 +1120,11 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         target = int(t_get("target_frame_count", 0) or 0)
         text_prompt = str(get("text_prompt") or "").strip()
         negative_prompt = str(get("negative_prompt") or "").strip()
-        unique = ghost_unique_source_count(target, self.hold_factor)
+        # ONE hold for the whole beat, resolved once and carried on the plan,
+        # so the source count, the selector and the receipts cannot disagree
+        # about which cadence ran.
+        hold = self._beat_hold(target)
+        unique = ghost_unique_source_count(target, hold)
         return {
             "shot_id": str(get("shot_id") or get("request_id") or ""),
             "text_prompt": text_prompt,
@@ -1095,17 +1132,65 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "seed": int(s_get("request_seed", 0) or 0),
             "target_frame_count": target,
             "unique_source_count": unique,
-            "source_request": self._source_request_for(target),
+            "source_request": self._source_request_for(target, hold),
+            "hold": int(hold),
             "fps": int(self.target_fps),
         }
 
-    def _source_request_for(self, target) -> int:
+    def _source_request_for(self, target, hold=None) -> int:
         """Source frames to ask for: the structural floor, then -- only on a
-        lane that opts in -- the context-window quantum on top of it."""
-        requested = ghost_source_request(target, self.hold_factor)
+        lane that opts in -- the context-window quantum on top of it.
+
+        ``hold`` defaults to the lane's frozen cadence, so every call that
+        predates the adaptive seam behaves exactly as it did."""
+        hold = self.hold_factor if hold is None else hold
+        requested = ghost_source_request(target, hold)
         if self.align_source_to_context_window:
             requested = ghost_legal_source_count(requested)
         return int(requested)
+
+    def _beat_hold(self, target) -> int:
+        """The cadence THIS beat will actually run at.
+
+        Returns the frozen ``hold_factor`` unchanged unless the lane opts into
+        ``adaptive_hold_for_memory``, so the published lanes are untouched.
+
+        RESOLVED PER BEAT, NOT IN ``__init__``. The registry instantiates each
+        engine once and keeps that single instance for the whole process
+        (``engine_registry_base.py``), so a hold stored on the instance would
+        leak from one beat to the next -- and, if it were driven by the existing
+        ``OTR_GHOST_HOLD_FACTOR`` env knob instead, would re-cadence every
+        sibling that shares this base. Both would break the additive contract.
+        """
+        base = int(self.hold_factor)
+        if not self.adaptive_hold_for_memory:
+            return base
+        ceiling = _MC.latent_ceiling_for_host(*self.render_canvas)
+        if not ceiling:
+            # Unreadable memory on a host whose OOM is a REBOOT is not a green
+            # light. Refuse rather than fly blind.
+            raise EngineUnusable(
+                self.name, self.family,
+                EngineUsabilityReason.MALFORMED_CONFIG,
+                "%s cannot read this host's memory, and on unified memory an "
+                "over-large batch reboots the machine rather than failing the "
+                "render. Refusing instead of guessing." % self.name,
+                kind="video")
+        for hold in range(base, GHOST_HOLD_FACTOR_MAX + 1):
+            if self._source_request_for(target, hold) <= ceiling:
+                return hold
+        raise EngineUnusable(
+            self.name, self.family,
+            EngineUsabilityReason.MALFORMED_CONFIG,
+            "%s: a %d-frame beat needs %d source latents even at the maximum "
+            "hold of %d, and this host was measured safe only to %d at %dx%d "
+            "(PBUG-20260909-01: exceeding it rebooted the machine). Shorten the "
+            "beat or render it elsewhere."
+            % (self.name, int(target),
+               self._source_request_for(target, GHOST_HOLD_FACTOR_MAX),
+               GHOST_HOLD_FACTOR_MAX, ceiling,
+               self.render_canvas[0], self.render_canvas[1]),
+            kind="video")
 
     def _assert_required_inputs(self, plan):
         if not plan["text_prompt"]:
@@ -1301,7 +1386,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         # Retain the first U source frames in order; the rest is the structural
         # surplus and is discarded BEFORE conversion, never delivered.
         selector = ghost_hold_selector(plan["target_frame_count"],
-                                       self.hold_factor)
+                                       plan.get("hold", self.hold_factor))
         unique = plan["unique_source_count"]
         delivered = frames[[min(i, unique - 1) for i in selector]]
 
@@ -1330,8 +1415,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "render_canvas": "%dx%d" % (GHOST_CANVAS_W, GHOST_CANVAS_H),
             "vram_peak_mb": None,        # no measurement campaign was authorized
         }
-        raw.update(_ghost_cadence_receipts_for(self,
-            plan["target_frame_count"], plan["source_request"]))
+        raw.update(_ghost_cadence_receipts_for(
+            self, plan["target_frame_count"], plan["source_request"],
+            plan.get("hold")))
         _LOG.info(
             "[OTR video] %s beat %s: T=%d U=%d requested=%d decoded=%d "
             "tail_trim=%d @ %dx%d -> %dx%d %s",

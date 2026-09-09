@@ -13573,3 +13573,139 @@ in the same generated file and deserves its own review -- and because
 `model_requirements` holds S5 WIZARD ASSET IDS for some lanes, not filenames
 (`wan_ti2v` declares `wan2.2-ti2v-5b` for `Wan2.2-TI2V-5B-Q5_K_M.gguf`), so the
 mapping is not the one-liner it looks like.
+
+---
+
+## PBUG-20260909-01 -- A long beat REBOOTS a 16 GB Mac, and nothing stops it
+
+**Found:** 2026-09-09, first real OTR-adapter-path episode on
+`animatediff15_lightning_video` (Apple M4, 16 GB).
+**Severity:** HIGH on Apple Silicon. Not a failed render -- a **hard machine
+reboot**. Unrelated to any other platform.
+**Status:** OPEN. Solution options being reviewed; finding recorded first.
+
+### What happened
+
+Five beats rendered correctly through the real adapter, then the sixth took the
+whole machine down.
+
+| beat | T delivered | U unique | latents requested | result |
+|---|---|---|---|---|
+| `shot_music_opening_001` | 250 | 125 | 136 | OK |
+| `shot_b001` | 243 | 122 | 124 | OK |
+| `shot_b002` | 267 | 134 | 136 | OK |
+| `shot_b003` | 239 | 120 | 124 | OK |
+| `shot_b004` | 239 | 120 | 124 | OK |
+| next beat | ~320 | ~160 | **160** | **HARD REBOOT** (`uptime` = 1 min) |
+
+So the ceiling on this box sits **between 136 and 160 latents at 512x288**.
+
+### Why it is severe rather than annoying
+
+Unified memory means an OOM is not a process kill. It took the Mac down, exactly
+as the operator warned in this project's first hour: *"an OOM on a Mac is a total
+unified crash."* Everything unsaved in the run is lost, and the episode cannot
+resume.
+
+### Why it will recur
+
+Beat length follows the AUDIO. `U = ceil(T / hold)` and `T` comes from the
+audio-derived target, so the writer can emit a ~13 s beat at any time and the
+lane will ask for ~160 latents without anything noticing. There is no guard:
+
+* `ghost_source_request` floors at 16 and has no ceiling.
+* `_source_request_for` rounds UP to the next legal `16 + 12k` window count --
+  correct for window tiling, but it can only ever INCREASE the request.
+* `frame_contract` declares `max_frames=0` (unbounded) and the lane is
+  deliberately out of `PLANNING_CAP_ENGINES` -- and belongs out of it, because
+  with `continuity=NONE` a planner cap produces jump cuts and MORE latents.
+* `coverage_plan.validate_coverage_plan` refuses any plan whose visible frames
+  differ from the audio target, so simply shortening the picture is not legal.
+
+### What is NOT the cause
+
+Not the context alignment. Every request in the run landed on a legal
+`16 + 12k` count (124, 136, and the fatal 160 = 16 + 12x12), so the seam added
+on 2026-09-09 behaved exactly as designed. 160 is a legal window count that is
+simply too large for this machine's memory.
+
+Not the external decoder either: the VAE runs after sampling, and the crash came
+2-3 sampler steps in.
+
+### The shape of a fix
+
+The ceiling is MACHINE-SPECIFIC -- a 5080 or a 32 GB Mac must not inherit a
+16 GB cap -- so any guard has to derive from available memory
+(`unified_memory_budget_mb()`, `torch.mps.recommended_max_memory()` reports
+12124 MB here), never a hardcoded constant. And it must fail SAFE: a named
+refusal is recoverable, a reboot is not.
+
+One candidate under review, noted because the machinery already exists: `hold`
+divides the latent count for the same delivered `T`, and `hold_factor` is
+already a seam with an env override. T=320 needs U=160 at hold 2 but U=107
+(aligning to 112) at hold 3 -- same delivered frames, same audio contract, no
+jump cuts, at the cost of fewer unique frames per second on long beats only.
+
+### PBUG-20260909-01, addendum: three corrections from review
+
+Folded in after the adaptive-hold fix, all three verified against the code:
+
+1. **`sampler_inputs_for` would have contradicted itself.** It read
+   `self.hold_factor` for `hold_factor` / `source_fps` while `source_request`
+   and `unique_source_count` came from the beat's resolved hold -- so an adapted
+   beat would have stamped `hold_factor: 2` beside a `source_request` of 112,
+   which is impossible at hold 2 for a 320-frame beat. Defect introduced by the
+   fix itself and caught in review; now reads the plan. Pinned by
+   `test_the_sampler_receipt_cannot_contradict_itself`.
+
+2. **`source_fps` truncates, and always has.** It is
+   `int(target_fps / hold)`, so a hold-2 lane records **12** where the real
+   figure is 12.5, and an adapted hold-3 beat records 8 where the real figure is
+   8.33. PRE-EXISTING and NOT fixed here: `sampler_inputs_for`'s dict is hashed
+   into the render receipt, so changing the value -- or adding an exact field
+   beside it -- changes that hash for EVERY Ghost lane including the two with
+   published episodes, breaking A/A comparison against receipts already on disk.
+   That is a deliberate decision with its own blast radius and belongs in its own
+   commit. The truncation is recorded here so nobody reads 12 as exact.
+
+3. **Two statements in the earlier write-up were loose.**
+   `unified_memory_budget_mb()` does NOT use `torch.mps.recommended_max_memory()`
+   -- it uses physical RAM x 1.15; the 12,124 MB Metal working-set figure comes
+   from `free_vram_mb()`. And "a planning cap produces ~15 jump cuts" is
+   specifically the result for a **17-delivered-frame** cap, not for any cap: a
+   cap near 248 would split a 320-frame beat only once. The conclusion is
+   unchanged -- a cap still introduces a jump and extra floor/alignment work on a
+   `continuity=NONE` lane -- but the number was doing more work than it earned.
+
+### PBUG-20260909-01, second addendum: the cadence cost may not be a cost
+
+The adaptive fallback was written up as a TRADE -- 12.5 unique fps down to 8.33
+on long beats. The operator's response (2026-09-09) reframes it:
+
+> *"closer we get to native the better it looks I think, but who knows, it's
+> experimental."*
+
+**AnimateDiff is trained at 8 fps.** ByteDance's own ComfyUI workflow encodes at
+`frame_rate: 8`, and the module's 16-frame context is 2.000 s at that rate. So
+12.5 fps of unique picture asks the motion module to produce movement at a rate
+OUTSIDE its training distribution, while hold 3's 8.33 fps sits almost exactly
+on it. On that reading the fallback is not a degradation at all -- it is a move
+toward the module's native cadence, and the memory saving is incidental.
+
+**This argument was never made when the rate was ruled on.** The 2026-08-22
+ruling (`docs/2026-08-22-lofi-video-lane-PLAN.md:244`) chose 12.5 fps hold-2
+over the 8 fps that Fable and Codex proposed, and it did so on UNIFORMITY
+grounds: 12.5 is exactly half of 25, so hold-2 is a clean 2-2-2-2, whereas a
+true 8 fps inside 25 needs runs of 3.125 and comes out ragged 3-3-3-4.
+
+That objection does not apply to hold 3. Measured on the real selector for a
+250-frame beat: hold 2 gives 160 runs of exactly 2; hold 3 gives 106 runs of
+exactly 3 plus a single 2-frame tail -- uniform, with the tail already carried
+truthfully as `cadence_tail_trim`. Hold 3 is **8.33 fps uniform**, not the 8 fps
+ragged that was rejected.
+
+So the open question is a LOOK question and belongs to the operator's eye, not
+to argument: is uniform hold 3 the better default for this lane on every beat,
+rather than only on beats that would otherwise reboot the machine? It is one
+class attribute either way. Recorded here so the reasoning is not lost, and
+because the shipped ruling's stated grounds turn out not to cover this case.

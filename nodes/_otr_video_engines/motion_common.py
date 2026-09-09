@@ -445,6 +445,59 @@ def free_vram_mb():
 _UNIFIED_HEADROOM_MB = 1536.0
 
 
+#: THE ONE MEASURED BRACKET, and it is a bracket rather than a model.
+#: 2026-09-09 on an Apple M4 / 16 GB, `animatediff15_lightning_video` at
+#: 512x288: 124 and 136 latents rendered; the next beat asked for 160 and took
+#: the WHOLE MACHINE DOWN (unified memory, so an OOM is a reboot, not a process
+#: kill). PBUG-20260909-01. So the true ceiling lies somewhere in (136, 160] and
+#: 136 is the largest count anything has survived.
+GHOST_ANCHOR_SAFE_LATENTS = 136
+GHOST_ANCHOR_PIXELS = 512 * 288
+#: Physical RAM of the box that produced the bracket. The ceiling scales off
+#: THIS, never off a hardcoded 16 GB assumption, so a 32 GB Mac or a discrete
+#: card gets a proportionally larger allowance instead of inheriting a limit it
+#: does not have.
+GHOST_ANCHOR_RAM_MB = 16 * 1024
+
+
+def latent_ceiling_for_host(canvas_w, canvas_h, ram_mb=None):
+    """Largest source-latent batch this host should be asked for, or ``None``.
+
+    ``None`` means "no opinion" -- a host with plenty of memory, or one whose
+    memory cannot be read, and the caller decides what to do with that. On
+    unified memory the caller must treat an unreadable budget as a REFUSAL
+    rather than a green light, because the failure mode there is a reboot.
+
+    SINGLE-POINT CALIBRATION, SAID OUT LOUD. This scales one measured bracket
+    linearly by physical RAM and inversely by canvas pixels. It is not a memory
+    model of the sampler -- the memory that actually killed the machine is
+    attention activation across the sliding windows, not the latents themselves,
+    and nobody has measured that curve. It is deliberately conservative: it
+    returns the largest count OBSERVED TO SURVIVE, not the smallest observed to
+    fail, so the untested gap between them is treated as unsafe.
+    """
+    pixels = max(1, int(canvas_w) * int(canvas_h))
+    if ram_mb is None:
+        ram_mb = _physical_ram_mb()
+    if not ram_mb:
+        return None
+    scaled = (GHOST_ANCHOR_SAFE_LATENTS
+              * (float(ram_mb) / GHOST_ANCHOR_RAM_MB)
+              * (float(GHOST_ANCHOR_PIXELS) / pixels))
+    return max(1, int(scaled))
+
+
+def _physical_ram_mb():
+    """Physical RAM in MB, or ``None``. Physical, not Metal working set: see
+    ``unified_memory_budget_mb`` for why that distinction is load-bearing."""
+    try:
+        import os
+        return int(os.sysconf("SC_PAGE_SIZE")
+                   * os.sysconf("SC_PHYS_PAGES") / (1024 * 1024))
+    except (ValueError, OSError, AttributeError):
+        return None
+
+
 def unified_memory_budget_mb():
     """The budget a Metal host actually has for weights, or ``None``.
 
