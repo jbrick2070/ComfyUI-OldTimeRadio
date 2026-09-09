@@ -74,7 +74,7 @@ class UpscaleEngine(Protocol):
     requires_flag: Optional[str]    # ALWAYS None (registry IS the menu)
 
     # --- upscale-namespace identity ---
-    device_backends: tuple          # subset of ("cuda", "cpu"); NO "mps" until proven
+    device_backends: tuple          # subset of ("cuda", "cpu", "mps")
     requires_vendor: Optional[str]  # None | "nvidia" | "amd" | "apple"
     intrinsic_scale: int            # off=1; a 2x model=2; 4x=4
     device: Optional["torch.device"]  # SET BY load(); None until loaded
@@ -137,15 +137,32 @@ assert_usable = _UPSCALE_REGISTRY.assert_usable
 # nodes/_otr_shared/capability_profiles.py cross-validation. A new engine
 # ships its own row here; zero per-profile edits.
 #
-# MPS is deliberately NOT in device_backends for either engine in the first
-# ship: this Windows/NVIDIA box cannot produce a live MPS receipt, and the
-# operator's HONEST-SWITCH LAW forbids advertising a capability without
-# proof. Add "mps" when a Mac user provides an integration receipt.
+# MPS ADDED 2026-09-09, on the receipt the first ship asked for. The original
+# note said: "this Windows/NVIDIA box cannot produce a live MPS receipt, and the
+# operator's HONEST-SWITCH LAW forbids advertising a capability without proof.
+# Add \"mps\" when a Mac user provides an integration receipt." That receipt now
+# exists, taken on an Apple M4 / 16 GB:
+#
+#   RealESRGAN_x2plus.pth via spandrel 0.4.2, arch ESRGAN, scale 2
+#   128x128 -> 256x256 on torch.device("mps") in 0.51 s, all outputs finite
+#   max |mps - cpu| = 0.00000  -- BIT-EXACT against the CPU path
+#
+# The parity check is the load-bearing half: a forward that merely RETURNS on
+# Metal proves nothing, because a wrong kernel returns too. Weights auto-fetch
+# ungated from the Real-ESRGAN releases with a SHA check
+# (scripts/ensure_upscale_models.py), so this costs a Mac reader nothing.
+#
+# This unblocks the upscale namespace on Apple Silicon. The string comparison in
+# _resolve.py was the GATE, but not the whole surface: _pipeline._fit_and_pad_bhwc
+# runs its bicubic resize and pad ON THE TENSOR'S DEVICE after upscale_frames
+# returns, so the composite's full path exercises a little more Metal than the
+# ESRGAN forward does. The engine half is measured; that resize is covered by
+# torch's own operators and is not separately receipted here.
 # ---------------------------------------------------------------------------
 CAPABILITIES = {
     "off": {
         "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu"], "requires_vendor": None,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
@@ -168,7 +185,7 @@ CAPABILITIES = {
     # exists to disarm; it was flagged in QA on 2026-08-23 before it bit.
     "spandrel_esrgan": {
         "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu"], "requires_vendor": None,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": ["real-esrgan-x2plus"]},

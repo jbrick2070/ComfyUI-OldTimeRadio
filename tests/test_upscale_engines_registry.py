@@ -82,9 +82,12 @@ def test_spandrel_engine_shape():
     assert sp.default_roles == ()
     assert sp.commercial_clean is True    # Real-ESRGAN x2plus BSD-3-Clause
     assert sp.requires_flag is None
-    # First ship: NO MPS -- documented deferral until a Mac receipt.
-    assert set(sp.device_backends) == {"cuda", "cpu"}
-    assert "mps" not in sp.device_backends
+    # MPS ADDED 2026-09-09 on the receipt the first ship's deferral asked for:
+    # the stage ran on an M4/16 GB (load -> upscale_frames -> unload) at
+    # 2x 288x512 -> 576x1024 in 1.06 s against 8.37 s on cpu, agreeing with the
+    # CPU path to 3e-6. See tests/test_upscale_mps_receipt.py.
+    assert set(sp.device_backends) == {"cuda", "cpu", "mps"}
+    assert "cuda" in sp.device_backends, "Metal must not cost NVIDIA its row"
     assert sp.requires_vendor is None
     assert sp.intrinsic_scale == 2
 

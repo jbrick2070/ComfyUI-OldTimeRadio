@@ -28,7 +28,7 @@ class OffUpscale:
     requires_flag = None
 
     # Upscale-namespace identity
-    device_backends = ("cuda", "cpu")
+    device_backends = ("cuda", "cpu", "mps")
     requires_vendor = None
     intrinsic_scale = 1
 

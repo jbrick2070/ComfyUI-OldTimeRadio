@@ -76,7 +76,13 @@ class SpandrelEsrgan:
     requires_flag = None
 
     # Upscale-namespace identity
-    device_backends = ("cuda", "cpu")   # MPS deferred until Mac receipt
+    # MPS added 2026-09-09 on the receipt the deferral asked for: RealESRGAN
+    # x2plus via spandrel 0.4.2, 128x128 -> 256x256 on torch.device("mps"),
+    # every output finite, and BIT-EXACT against the CPU path on the same
+    # weights and input (max |mps - cpu| = 0.00000). The parity is the evidence;
+    # a forward that merely returns proves nothing, because a wrong kernel
+    # returns too.
+    device_backends = ("cuda", "cpu", "mps")
     requires_vendor = None
     intrinsic_scale = 2
 
