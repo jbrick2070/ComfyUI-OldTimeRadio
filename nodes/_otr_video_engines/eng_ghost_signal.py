@@ -351,6 +351,74 @@ def ghost_source_request(target_frame_count,
                GHOST_SOURCE_FLOOR)
 
 
+#: How far the sliding window ADVANCES per step: ``length - overlap`` = 12.
+#: Derived, never a fourth literal -- the three it comes from are already pinned
+#: above and a hand-written 12 would silently survive a change to either.
+GHOST_CONTEXT_STRIDE = GHOST_CONTEXT_LENGTH - GHOST_CONTEXT_OVERLAP
+
+
+def ghost_legal_source_count(n,
+                             length=GHOST_CONTEXT_LENGTH,
+                             stride=GHOST_CONTEXT_STRIDE) -> int:
+    """The smallest count >= ``n`` that the sliding window tiles EVENLY.
+
+    THE FRAME MATH EVERY OTHER LANE ALREADY DOES, expressed for a lane whose
+    constraint is a context window rather than a VRAM ceiling. Legal counts are
+    ``length + k * stride`` -- exactly the shape ``FrameContract.quantum``
+    describes ("legal lengths are ``min_frames + k * quantum``"), which is why
+    this reads as ``min_frames=16, quantum=12``.
+
+    WHAT IS ILLEGAL AND WHY IT IS NOT A CRASH. Read off
+    ``create_windows_static_standard`` in the pinned AnimateDiff-Evolved: windows
+    start at 0, 12, 24 ... and when one would run past the end the scheduler
+    BACKS THE FINAL WINDOW UP so it still spans a full ``length``. That is a
+    deliberate upstream clamp -- every window stays full-length, which is what
+    the motion module wants -- and it has never been observed to fail. Its cost
+    is that the final overlap is whatever is left over. At the beat this lane
+    actually renders, 125 source frames, the last window overlaps the previous
+    by **15 of 16 frames** instead of the declared 4: it re-denoises almost
+    entirely covered ground, and the pyramid fuse weights the tail unevenly.
+
+    WHY ROUNDING UP IS FREE, WHICH IS THE WHOLE ARGUMENT FOR DOING IT.
+    ``sampling.py`` invokes the model ONCE PER WINDOW on that window's slice, so
+    cost tracks the WINDOW COUNT, not the latent count. For ``n > length`` that
+    count is ``ceil((n - length) / stride) + 1`` -- and the rounded-up value has
+    the identical count by construction, because rounding up is exactly taking
+    that ceiling. 125 and 136 are both ELEVEN windows. So this buys a uniform
+    overlap for **zero additional sampler work**; the only real cost is decoding
+    the surplus frames, which the lane already discards and already reports.
+
+    The surplus is not new machinery: ``ghost_source_request``'s ``max(U, 16)``
+    is the same idea (pad up, discard, report separately) applied to the FLOOR.
+    This applies it to the STRIDE. ``model_frame_count`` keeps naming what the
+    model really did.
+    """
+    n = int(n)
+    length = int(length)
+    stride = max(1, int(stride))
+    if n <= length:
+        return length
+    steps = -((length - n) // stride)      # ceil((n - length) / stride)
+    return length + steps * stride
+
+
+def ghost_context_window_count(n,
+                               length=GHOST_CONTEXT_LENGTH,
+                               stride=GHOST_CONTEXT_STRIDE) -> int:
+    """How many windows ``create_windows_static_standard`` emits for ``n``.
+
+    Kept beside the aligner because the claim "rounding up is free" is only
+    true if these two agree, and a test asserts they do across a wide sweep
+    against the REAL upstream function rather than against this arithmetic.
+    """
+    n = int(n)
+    length = int(length)
+    stride = max(1, int(stride))
+    if n <= length:
+        return 1
+    return -((length - n) // stride) + 1
+
+
 def ghost_hold_selector(target_frame_count, hold=GHOST_DEFAULT_HOLD) -> list:
     """The delivered-index -> source-index map: ``[0]*hold + [1]*hold ...[:T]``.
 
@@ -488,6 +556,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     lora_name = None
     lora_strength = 0.0
     lora_min_bytes = 0
+
+    #: THE CONTEXT-ALIGNMENT SEAM (2026-09-08). When True the source request is
+    #: rounded UP to a count the sliding window tiles evenly
+    #: (``ghost_legal_source_count``); the surplus is discarded and reported
+    #: exactly like the existing structural-floor surplus.
+    #:
+    #: DEFAULT FALSE, AND THAT IS NOT TIMIDITY. Turning it on changes the number
+    #: of latents a beat asks for, which changes the picture -- and the lanes
+    #: below this line have PUBLISHED EPISODES. Flipping it for them is an
+    #: operator decision backed by a 5080 comparison, not a driver one, so the
+    #: default keeps every existing lane byte-identical and the new lane opts in.
+    align_source_to_context_window = False
 
     #: THE CADENCE SEAM. How many delivered frames each generated frame fills.
     #: A peer overrides this alone; the render path reads it through ``self`` so
@@ -943,10 +1023,17 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             "seed": int(s_get("request_seed", 0) or 0),
             "target_frame_count": target,
             "unique_source_count": unique,
-            "source_request": ghost_source_request(target,
-                                                   self.hold_factor),
+            "source_request": self._source_request_for(target),
             "fps": int(self.target_fps),
         }
+
+    def _source_request_for(self, target) -> int:
+        """Source frames to ask for: the structural floor, then -- only on a
+        lane that opts in -- the context-window quantum on top of it."""
+        requested = ghost_source_request(target, self.hold_factor)
+        if self.align_source_to_context_window:
+            requested = ghost_legal_source_count(requested)
+        return int(requested)
 
     def _assert_required_inputs(self, plan):
         if not plan["text_prompt"]:

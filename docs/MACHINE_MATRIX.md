@@ -113,7 +113,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  92 experimental profile(s), 41 shipping
+## 16 GB+  --  93 experimental profile(s), 42 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -132,6 +132,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_ltx25_high_mime` | ltx25_high_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_ltx25_high_video` | ltx25_high_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_w45_animatediff15_lightning_video` | animatediff15_lightning_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |

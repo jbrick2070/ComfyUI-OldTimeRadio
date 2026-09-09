@@ -13478,3 +13478,98 @@ Every cost figure in `docs/MAC_PORTABILITY_GUIDE.md` was measured under the slow
 backend: the ~22 min still-lane episode, `ltx_8gb`'s 39-67 min, `flux2_klein`'s
 ~8 min per still, AnimateDiff's ~44 min per beat. They are upper bounds, not the
 platform's capability.
+
+---
+
+## PBUG-20260908-06 -- The video evidence manifest has TWO contradicting authorities, and the generator is stale
+
+**Found:** 2026-09-08, registering `animatediff15_lightning_video`.
+**Severity:** documentation / process. No runtime effect today.
+**Status:** OPEN, deliberately not fixed in the Lightning commit.
+
+### The contradiction
+
+Two docs give opposite instructions for the same file:
+
+* `docs/evidence/README.md:3-5` -- *"`video_evidence_manifest.json` is GENERATED
+  by `scripts/build_video_evidence_manifest.py`. Edit the script's `ROWS` table
+  and regenerate; never hand-edit the JSON."*
+* `docs/VIDEO_LANE_PREFLIGHT.md` (Registration surface) -- *"append the lane's
+  `admission_unenforced` sentence BY HAND (G4). The generator emits
+  `manifest_version: 1` against the live version 7 and refuses to overwrite; do
+  not run it."*
+
+### Which one is right
+
+The preflight is. Evidence, read off the script rather than either doc:
+
+1. `scripts/build_video_evidence_manifest.py` still carries
+   `"animatediff15_v3_video"` in its `admission_unenforced` table. **That id was
+   RETIRED on 2026-08-23** and is tombstoned in `RETIRED_ENGINE_IDS`. The
+   script's own comment says gate G4 asserts every key in that table is a LIVE
+   registered lane -- so regenerating would emit a manifest that fails G4 on its
+   own first row.
+2. It carries no entry for `animatediff15_v3_stillin_lab_video` either, which
+   registered 2026-09-02. So the JSON has already been hand-extended past the
+   script at least once, and this lane is the second time.
+3. `manifest_version` in the script is 1; the live JSON is 7 and the doctrine
+   block says the file is APPEND-ONLY.
+
+So the generator cannot reproduce the file it supposedly generates, and has not
+been able to for at least a week. The JSON is the real artifact; the script is a
+stale ancestor of it.
+
+### Why it was not fixed here
+
+Reconciling them is a real change with its own blast radius -- it either
+rewrites the script to match seven versions of hand-appended history, or demotes
+the script and rewrites `docs/evidence/README.md`. Either is a reviewable change
+of its own, and folding it into a lane registration would hide it. The Lightning
+entry was appended by hand, matching how the stillin-lab lane was added and what
+the preflight says.
+
+### The fix when someone takes it
+
+Decide which artifact is authoritative and make the other say so. If the JSON
+wins: delete the generator or reduce it to a validator, and correct
+`docs/evidence/README.md`. If the script wins: port all seven versions of
+appended rows into `ROWS`, drop the retired id, add the two missing lanes, and
+bump its `manifest_version` to match.
+
+---
+
+## PBUG-20260908-07 -- The asset index tells a reader to download a file the lane never loads
+
+**Found:** 2026-09-08, same registration.
+**Severity:** low, but it is a wrong install instruction and the doc's header
+says install instructions are exactly what it is.
+**Status:** OPEN, pre-existing, not caused by the Lightning lane.
+
+`docs/MODEL_ASSET_INDEX.md` opens with *"what to download for each mode ...
+Every requirement below is read out of the engine module named in its row"* and
+*"if I want to use engine X, what has to be on disk first?"*.
+
+`scripts/otr_asset_index.py` answers that by following local imports and
+regex-scanning string literals out of the module. For a SUBCLASS lane that is
+wrong in a specific direction -- it inherits every filename literal reachable
+through the parent module, whether or not the lane loads it:
+
+| row | says | actually loads |
+|---|---|---|
+| `ghost_signal_lightning` | 3 files, incl. `mm-p_0.5.pth` | 2 (checkpoint + `animatediff_lightning_8step_comfyui.safetensors`) |
+| `ghost_signal_official` | 5 files | 3 |
+| `ghost_signal_stillin_lab` | 3 files | 3 (correct by coincidence) |
+
+So the index tells a Mac reader to fetch 1.8 GB of a motion module belonging to
+a RETIRED lane. The registry rows are correct in every case
+(`CAPABILITIES[...]["model_requirements"]`); only the generated doc is not.
+
+### The fix
+
+Have `otr_asset_index.py` prefer `CAPABILITIES[engine]["model_requirements"]`
+for any REGISTERED engine, falling back to the literal scan only for modules
+that register nothing. Not done here because it changes three other lanes' rows
+in the same generated file and deserves its own review -- and because
+`model_requirements` holds S5 WIZARD ASSET IDS for some lanes, not filenames
+(`wan_ti2v` declares `wan2.2-ti2v-5b` for `Wan2.2-TI2V-5B-Q5_K_M.gguf`), so the
+mapping is not the one-liner it looks like.

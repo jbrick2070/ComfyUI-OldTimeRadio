@@ -1548,6 +1548,15 @@ _NO_WEIGHT_VIDEO_ENGINES = {
 # Still/pan/motion routes remain image consumers despite owning no video
 # weights.
 _NO_STILL_VIDEO_ENGINES = _ANIMATEDIFF_ENGINES | {
+    # NAMED SEPARATELY, and the duplication is the point. This set is DERIVED
+    # from _ANIMATEDIFF_ENGINES, and animatediff15_lightning_video is
+    # deliberately NOT in that set -- membership there routes an engine to the
+    # "haunted" fetch bundle, which installs the v3 module and adapter this lane
+    # never loads. Keeping it out of the fetch route silently kept it out of the
+    # no-still route too, so a Lightning profile would plan a ~13-19 GB image
+    # download for stills the engine declares it does not consume
+    # (accepts_still = False). Two different questions, two memberships.
+    "animatediff15_lightning_video",
     "viz_camera",
     "viz_green",
     "viz_mxc_cpu",
@@ -1660,6 +1669,13 @@ def profile_lanes(profile) -> dict:
             automatic.append("wan_ti2v_gguf")
         elif video == "ltx_8gb":
             automatic.append("ltx_8gb")
+        elif video == "animatediff15_lightning_video":
+            # BEFORE the _ANIMATEDIFF_ENGINES branch and deliberately NOT in
+            # that set: every id in it routes to "haunted", which fetches the
+            # v3 module + v3 adapter. This lane loads neither. Adding it to the
+            # set instead of here would provision 1.77 GB of wrong weights and
+            # leave the one file the lane opens un-fetched.
+            automatic.append("lightning")
         elif video in _ANIMATEDIFF_ENGINES:
             automatic.append("haunted")
         elif video in (_NO_WEIGHT_VIDEO_ENGINES |

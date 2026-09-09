@@ -108,6 +108,12 @@ LEG_ORDER = (
     "mesh_stage", "ltx_8gb", "fastwan_8gb", "ltx_video", "ltx_audio_in",
     "humo_1.7B", "humo_1.7B_169", "humo", "humo_14B_169",
     "wan_ti2v",
+    # The AnimateDiff lanes are named rather than left to the sorted append, so
+    # the cheapest-and-least-proven-first rule survives. Lightning runs BEFORE
+    # its siblings: 8 sampler steps at cfg 1.0 is 8 UNet passes a beat where
+    # they take 40, so it is by some distance the cheapest of the three.
+    "animatediff15_lightning_video",
+    "animatediff15_v3_haunted_video",
     # THE TWO H3 LANES RUN LAST, AND THEY NEED A DIFFERENT BOOT (lanes 19/20,
     # 2026-08-12). Last because they are by far the slowest -- ~240 s for a
     # single 5 s beat, against ~22 s for ltx_8gb -- so on the

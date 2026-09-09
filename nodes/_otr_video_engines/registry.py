@@ -634,6 +634,37 @@ CAPABILITIES = {
         "model_requirements": ["v1-5-pruned-emaonly-fp16.safetensors",
                                "v3_sd15_mm.ckpt",
                                "v3_sd15_adapter.ckpt"]},
+    # THE LIGHTNING SPEED PEER (2026-09-08). The same Ghost graph on ByteDance's
+    # DISTILLED 8-step motion module: 8 steps at cfg 1.0 where the golden lane
+    # runs 20 at cfg 8.0, which is 8 UNet passes against 40 because ComfyUI
+    # batches cond+uncond whenever cfg > 1. It exists because AnimateDiff was
+    # measured at 122-134 s/it on an M4 -- correct pixels, ~45 minutes a beat --
+    # and that, not any defect, is why no AnimateDiff clip has ever reached
+    # otr/obs/ from a Mac.
+    #
+    # TWO artifacts, not three: upstream's own workflow JSON has NO domain
+    # adapter node, and the v3 adapter is v3-PAIRED, so listing it would make
+    # the S5 wizard ask for a 97 MB file this lane never loads.
+    #
+    # No cost row, admission-unenforced in the evidence manifest, exactly like
+    # its siblings -- the operator declined the measurement campaign.
+    "animatediff15_lightning_video": {
+        "required_toolchain": None, "requires_sidecar": False,
+        # MPS NOT CLAIMED YET, AND THIS LANE IS THE ONE BUILT FOR IT. The
+        # AnimateDiff-Evolved pack IS installed on the Mac test host now and
+        # this graph has rendered correct pixels there on the golden recipe --
+        # but a device_backends row is a claim about PROVEN execution of THIS
+        # lane, and no Lightning clip has landed yet. The director dropdown does
+        # not read this key (nothing in otr_video_director.py references it), so
+        # cuda-only costs nothing operationally: the lane is selectable and
+        # renderable on the Mac today. Flip to ["mps", "cuda"] in the commit
+        # that carries the clip in otr/obs/ as its receipt, never before.
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": [
+            "v1-5-pruned-emaonly-fp16.safetensors",
+            "animatediff_lightning_8step_comfyui.safetensors"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

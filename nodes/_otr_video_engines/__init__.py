@@ -342,6 +342,15 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# The LIGHTNING SPEED PEER (2026-09-08) subclasses the GOLDEN base rather than
+# either v3 lane -- ByteDance's own ComfyUI workflow carries no domain adapter,
+# so composing the v3-paired adapter with a non-v3 distilled module would be an
+# unproven graph. It still imports after the others because every sibling does.
+try:  # pragma: no cover - trivial guard
+    from . import eng_ghost_signal_lightning as _eng_ghost_signal_lightning  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 
 # ---------------------------------------------------------------------------
 # ROSTER AUDIT -- runs LAST, after every guarded adapter import above.

@@ -37,6 +37,7 @@
   }
  ],
  "engines": [
+  "animatediff15_lightning_video",
   "animatediff15_v3_haunted_video",
   "animatediff15_v3_stillin_lab_video",
   "cloud_kling_avatar",
@@ -15613,6 +15614,7 @@
   }
  },
  "required_scene_targets_by_engine": {
+  "animatediff15_lightning_video": [],
   "animatediff15_v3_haunted_video": [],
   "animatediff15_v3_stillin_lab_video": [],
   "cloud_kling_avatar": [

@@ -341,6 +341,7 @@ _ORDER = ["8 GB", "10-15 GB", "16 GB+", "unstated"]
 _EXTRA_INSTALL = {
     "animatediff15_v3_haunted_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_v3_stillin_lab_video": "ComfyUI-AnimateDiff-Evolved",
+    "animatediff15_lightning_video": "ComfyUI-AnimateDiff-Evolved",
     "ltx25_high_video": "ComfyUI-GGUF + gated weights",
     "ltx25_high_foley_plus": "ComfyUI-GGUF + gated weights",
     "ltx25_high_mime": "ComfyUI-GGUF + gated weights",

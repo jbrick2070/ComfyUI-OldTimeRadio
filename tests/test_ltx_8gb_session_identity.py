@@ -164,6 +164,10 @@ _ENGINES_WITH_A_SESSION = {
     # the still-in LAB PEER (2026-09-02) inherits the haunted lane's session
     # identity (engine, recipe, artifact receipts, adapter strength) unchanged
     "animatediff15_v3_stillin_lab_video",
+    # the LIGHTNING SPEED PEER (2026-09-08) inherits the golden lane's session
+    # identity, which already carries the motion module by name and file
+    # receipt -- so a Lightning session can never reuse a golden-module handle
+    "animatediff15_lightning_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

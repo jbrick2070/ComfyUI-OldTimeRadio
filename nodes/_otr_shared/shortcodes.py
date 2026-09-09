@@ -102,6 +102,7 @@ VISUAL_STYLE = {
 VIDEO_LANE = {
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
+    "animatediff15_lightning_video": "adlt",
     "cloud_kling_avatar": "ckla",
     "cloud_seedance_2": "csd2",
     "cloud_vidu_q2_pro_fast_720p": "cvdu",

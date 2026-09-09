@@ -224,6 +224,14 @@ BOOKEND_SCENE_PROMPT_BOUNDED = frozenset({
 BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
     "animatediff15_v3_haunted_video",
     "animatediff15_v3_stillin_lab_video",
+    # The LIGHTNING peer (2026-09-08) composes its prompts through the SAME
+    # ghost_signal_prompt authorities as its siblings -- distillation changed
+    # the sampler cells, not where the words come from -- so it belongs here for
+    # their reason exactly. Worth noting it is here DESPITE running at cfg 1.0,
+    # where ComfyUI skips the unconditional pass and the negative is inert: the
+    # negative is still COMPOSED and still stamped, so handing this lane a scene
+    # prompt would still overwrite its positive.
+    "animatediff15_lightning_video",
 })
 
 #: Engines whose motion is not text-driven at all, so a scene prompt would be

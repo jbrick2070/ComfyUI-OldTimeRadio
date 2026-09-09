@@ -54,6 +54,7 @@ Anything not listed there is a manual install -- see its row below.
 | `cloud_video` | nothing on disk | - | - |
 | `fastwan_8gb` | 1 weight file(s) | manual download | 3 profile(s) |
 | `ghost_signal` | 2 weight file(s) | manual download | - |
+| `ghost_signal_lightning` | 3 weight file(s) | manual download | - |
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
 | `ghost_signal_stillin_lab` | 3 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | 2 profile(s) |
@@ -143,6 +144,12 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 
 **`ghost_signal`** -- `nodes/_otr_video_engines/eng_ghost_signal.py`
 
+- `mm-p_0.5.pth`
+- `v1-5-pruned-emaonly-fp16.safetensors`
+
+**`ghost_signal_lightning`** -- `nodes/_otr_video_engines/eng_ghost_signal_lightning.py`
+
+- `animatediff_lightning_8step_comfyui.safetensors`
 - `mm-p_0.5.pth`
 - `v1-5-pruned-emaonly-fp16.safetensors`
 

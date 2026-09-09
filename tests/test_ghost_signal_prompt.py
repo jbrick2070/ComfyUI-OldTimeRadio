@@ -598,6 +598,13 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     assert "animatediff15_v3_haunted_video" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
     assert ("animatediff15_v3_haunted_video"
             in rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED)
+    # EVERY lane in the family, not just the one that happened to be shipping
+    # when this was written -- membership is the claim, so a new sibling that
+    # composes its own prompts has to say so here too.
+    assert ("animatediff15_lightning_video"
+            in rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED)
+    assert ("animatediff15_lightning_video"
+            not in rd.BOOKEND_SCENE_PROMPT_ENGINES)
 
     # THE TWO JOINT-AV LANES ARE ON THE ALLOWLIST ON PURPOSE (2026-08-26).
     # They render the LTX 2.5 picture graph, so they compose scene prompts the

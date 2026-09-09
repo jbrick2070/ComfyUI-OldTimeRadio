@@ -1061,6 +1061,74 @@ whose visible frames differ from the audio-derived target
 (`coverage_plan.py:478-482`). Shorter picture means picture that no longer
 matches its sound.
 
+### The math the lane never did -- and 125 is not a legal count
+
+Everything above is about the clip LENGTH, which is audio-derived and not yours
+to set. There is a separate question the lane went years without asking, and the
+operator raised it on 2026-09-08: *"like all other video lanes we need to do the
+math -- maybe we pad to the min or somehow calculate the beat into a legal
+segmentation."* Every other video lane resolves a beat into lengths its model
+actually accepts. This family never did, because its constraint is a CONTEXT
+WINDOW rather than a VRAM ceiling, and the window scheduler absorbs an illegal
+count in silence.
+
+**The rule**, read off `create_windows_static_standard` in the pinned
+AnimateDiff-Evolved (not off its docs): windows start at 0, 12, 24 ... where the
+stride is `context_length - context_overlap = 16 - 4 = 12`. When a window would
+run past the end, the scheduler BACKS THE FINAL WINDOW UP so it still spans a
+full 16. Legal counts are therefore:
+
+```
+N = 16 + 12k          # 16, 28, 40, 52 ... 124, 136 ...
+```
+
+which is exactly the shape `FrameContract.quantum` already describes -- *"legal
+lengths are `min_frames + k * quantum`"* -- i.e. `min_frames=16, quantum=12`.
+
+**125 is one past a legal count**, and 125 is what a 250-frame hold-2 beat asks
+for. Its final window overlaps the previous by **15 of 16 frames** instead of 4:
+
+| N | windows | overlaps |
+|---|---|---|
+| 124 | 10 | {4} |
+| **125** | 11 | **{4, 15}** |
+| 136 | 11 | {4} |
+| **250** | 21 | **{4, 10}** |
+
+So the tail re-denoises almost entirely covered ground and the pyramid fuse
+weights it unevenly. **This is NOT a crash and never has been.** The back-up is
+upstream's deliberate clamp -- it keeps every window full-length, which is what
+the motion module wants -- and the operator reports never having seen it fail,
+with the procgen background layer covering any small gap. It is simply not the
+arithmetic the rest of the pack does.
+
+**Rounding up is FREE, which is why it is worth doing at all.**
+`sampling.py:843-844` invokes the model ONCE PER WINDOW on that window's slice,
+so cost tracks the window COUNT, not the latent count. That count is
+`ceil((n-16)/12) + 1`, and the rounded-up value has the identical count by
+construction -- rounding up IS taking that ceiling. **125 and 136 are both
+eleven windows.** The only real cost is decoding the surplus frames, which the
+lane already discards and already reports as
+`model_frame_count - cadence_source_frame_count`.
+
+That surplus machinery is not new either: `ghost_source_request`'s `max(U, 16)`
+is the same pad-up-discard-report idea applied to the FLOOR. Alignment applies
+it to the STRIDE. The operator's "pad to the min" was already half-built.
+
+**Where it is switched on.** `align_source_to_context_window` defaults to
+**False** on `GhostSignalEngine`, so `animatediff15_v3_haunted_video` and the
+still-in lab peer are untouched -- swept across all 1199 beat lengths, both
+return source counts byte-identical to the pre-seam function. Only
+`animatediff15_lightning_video` opts in, because it has never rendered and can
+start correct rather than be corrected. **Turning it on for a lane with
+published episodes changes its latent count and therefore its picture**, so that
+is an operator decision backed by a 5080 comparison, not a driver one.
+
+Verified rather than argued: swept `n = 1..599` against the REAL upstream
+scheduler -- the window-count formula is exact in every case, rounding up never
+adds a window in any case, and every aligned count tiles with a uniform overlap
+of 4.
+
 ### The one real lever, and why it is not a speed knob
 
 `OTR_GHOST_HOLD_FACTOR` (`eng_ghost_signal.py:119`, range 1-5, unset = unchanged)

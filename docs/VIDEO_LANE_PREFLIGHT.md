@@ -265,6 +265,31 @@ registration commit:
   `canonicalize` (which also satisfies G5.1's module-that-defines rule).
 - A `render_canvas` declaration needs a test naming the engine id AND the literal canvas (G2.2);
   a profile `status` is `shipping` or `draft` only, and `status` is not a CAPABILITIES key.
+- `nodes/_otr_shared/shortcodes.py` -- `VIDEO_LANE` needs a code for the id.
+  `tests/test_shortcodes.py::test_every_video_engine_id_has_a_code` reads the REGISTRY,
+  so an id with no code fails the moment it registers. (Found 2026-09-08 registering
+  `animatediff15_lightning_video`; it was not on this list and cost a red suite.)
+- `nodes/_otr_video_engines/render_driver.py` -- the new id must appear in ONE of the
+  bookend rosters (`BOOKEND_SCENE_PROMPT_ENGINES`, `..._SELF_COMPOSED`,
+  `..._NOT_TEXT_DRIVEN`). `tests/test_bookend_scene_prompt_roster.py::test_no_live_engine_falls_through_silently`
+  accounts for EVERY registered engine. Same lane, same day, same cost.
+- `nodes/_otr_video_engines/__init__.py` -- the guarded package import, ABOVE the roster
+  audit at the bottom of that module. Not a test fixture, but adapters self-register only
+  when imported, so without it the lane is declared and absent.
+- If the lane lands a PROFILE of any kind (including a `otr_w45_*` campaign row, which
+  `scripts/otr_w45_campaign.py::build_legs` REFUSES to run without), then
+  `docs/MACHINE_MATRIX.md` + the README block go stale immediately --
+  `scripts/otr_machine_matrix.py`, enforced by `tests/test_machine_matrix_drift.py`.
+  Profiles also reject unknown top-level keys outright, so a `_note` field is not a place
+  to explain the profile; use `display_name`.
+- Provisioning is TWO independent questions and answering one does not answer the other:
+  which fetch bundle the lane routes to (`scripts/otr_provision.py`'s per-family sets ->
+  `scripts/otr_fetch_lane_weights.py::LANES`, plus a `LANE_INFO` row or `--list` prints a
+  blank), and whether it consumes stills (`_NO_STILL_VIDEO_ENGINES`). On a SUBCLASS lane
+  these pull in opposite directions: keeping the new id out of the family set so it does
+  not inherit the parent's weights ALSO drops it out of the no-still set derived from that
+  same family set, which silently plans a 13-19 GB image download for a lane that declares
+  `accepts_still = False`. Name it explicitly in both.
 
 ## The family (create each sibling when its subsystem is next touched,
 never as an empty paper checklist)

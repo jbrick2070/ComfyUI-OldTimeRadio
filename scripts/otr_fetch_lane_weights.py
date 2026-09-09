@@ -58,6 +58,15 @@ class WeightSpec(NamedTuple):
 LANE_INFO = {
     "haunted": (3.65, "AnimateDiff video -- SD1.5 + motion module. The cheapest "
                       "complete video lane."),
+    "lightning": (2.84, "AnimateDiff DISTILLED -- SD1.5 + the ByteDance 8-step "
+                        "module. Same graph as `haunted` minus the adapter, at "
+                        "8 sampler steps and cfg 1.0 instead of 20 and 8.0, so "
+                        "8 UNet passes a beat where the golden recipe takes 40. "
+                        "The smallest complete video lane in the pack, and the "
+                        "reason it exists is Apple Silicon: AnimateDiff renders "
+                        "correctly there but was measured at 122-134 s/it. NOTE "
+                        "cfg 1.0 means ComfyUI skips the unconditional pass "
+                        "entirely, so the negative prompt is inert."),
     "z_image_blackwell": (12.00, "IMAGE model, nvfp4. Blackwell (sm_120) only."),
     "z_image_int8": (13.58, "IMAGE model, int8. Smallest universal precision."),
     "z_image": (19.26, "IMAGE model, bf16. Any NVIDIA; largest download."),
@@ -112,6 +121,47 @@ LANES = {
          "v3_sd15_mm.ckpt", "animatediff_models"),                      # 1.67 GB
         ("guoyww/animatediff",
          "v3_sd15_adapter.ckpt", "loras"),                              # 0.10 GB
+    ],
+    # THE LIGHTNING LANE'S OWN BUNDLE, AND IT IS A SEPARATE KEY ON PURPOSE.
+    # `animatediff15_lightning_video` shares only the SD1.5 checkpoint with the
+    # haunted bundle above; routing it to "haunted" -- the obvious shortcut,
+    # since both are AnimateDiff -- would install the v3 module and the v3
+    # adapter and NONE of the artifact this lane actually loads. The lane would
+    # then fail its byte-floor check against a file that was never fetched,
+    # while 1.77 GB of the wrong weights sat on disk looking like success.
+    #
+    # TWO artifacts, not three. There is no adapter here: ByteDance's own
+    # ComfyUI workflow has no LoRA node, and the v3 adapter is v3-PAIRED --
+    # see the lane's docstring. Fetching it would be 0.10 GB nobody loads.
+    #
+    # ByteDance/AnimateDiff-Lightning is CreativeML Open RAIL-M and UNGATED, so
+    # the module downloads with no token and no licence click, exactly like the
+    # guoyww artifacts above.
+    # FULLY PINNED, and on THIS lane the SHA is not belt-and-braces -- it is the
+    # only thing that can catch the wrong artifact at all. Upstream publishes
+    # 1-step, 2-step, 4-step and 8-step ComfyUI checkpoints that are ALL EXACTLY
+    # 908,929,664 bytes, so a byte check cannot distinguish them and the wrong
+    # one loads silently, sampling a schedule those weights were not distilled
+    # for. Revision + bytes + SHA-256 are what make this bundle reproducible;
+    # WeightSpec's own docstring requires all three of a new lane.
+    "lightning": [
+        WeightSpec(
+            "Comfy-Org/stable-diffusion-v1-5-archive",
+            "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints",
+            revision="9cfd069101959ca3828bf9c04a4419870832b74f",
+            expected_bytes=2132696762,
+            expected_sha256=(
+                "e9476a13728cd75d8279f6ec8bad753a66a1957ca375a1464dc63b37"
+                "db6e3916")),                                          # 1.99 GB
+        WeightSpec(
+            "ByteDance/AnimateDiff-Lightning",
+            "animatediff_lightning_8step_comfyui.safetensors",
+            "animatediff_models",
+            revision="027c893eec01df7330f5d4b733bc9485ee02e8b2",
+            expected_bytes=908929664,
+            expected_sha256=(
+                "5173ea8209053dd5de9b973baefac1801fbe7a433d07fa012266412"
+                "1751885cf")),                                         # 0.85 GB
     ],
     # 26.74 GiB. COMPLETE 14B HuMo recipe: every destination is read from
     # HuMoEngine._loader_names(), and the primary UNET is exactly
