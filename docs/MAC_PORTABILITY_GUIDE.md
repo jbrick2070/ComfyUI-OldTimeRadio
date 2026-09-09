@@ -1073,6 +1073,10 @@ back to back:
 |---|---|
 | golden v3, 20 steps, cfg 8.0, `autoselect` | **230.3 s** |
 | **Lightning 8-step, 8 steps, cfg 1.0, `sgm_uniform` / `sqrt_linear`** | **60.1 s** |
+
+(The 55.1 s quoted further down is the SAME recipe on a DIFFERENT prompt --
+the safari scene rather than `recur_frac`. Two prompts, not two measurements
+of one arm. Cold checkpoint load is in both.)
 | Lightning 8-step, 8 steps, **cfg 2.0** (negative LIVE) | 100.1 s |
 
 **3.83x, not the 5x the pass count predicts.** The gap is real and was called in
@@ -1100,6 +1104,60 @@ sweep knob rather than a fix waiting to be applied.
 **What this evidence is NOT.** Two images, one seed each, 16 frames at 512x288.
 Not a sweep. If lettering ever appears it will be on a beat whose prompt names a
 sign or a dial, and the env knob is already there.
+
+### The DECODER A/B: `vae-ft-mse-840000` is better, and is NOT in the lane
+
+Run at the operator's request after he judged the cfg-1.0 render "most
+realistic". Identical prompt, seed 42, cfg 1.0, 8 steps, 512x288, 16 frames --
+**only the decoder changed**:
+
+| arm | wall clock | picture |
+|---|---|---|
+| A, the SD1.5 checkpoint's baked VAE | 55.1 s (cold) | more milky haze |
+| **B, `vae-ft-mse-840000-ema-pruned`** | 28.8 s (WARM) | cleaner glass on the bottles, better foliage separation |
+
+**B's 28.8 s is a WARM-CACHE ARTIFACT, not the VAE being faster.** The
+checkpoint was already resident from arm A. Decode cost is essentially
+identical; treat ~55 s as the cold figure for both. The win here is quality
+only.
+
+Pin data, verified against the file on disk and the Hub API rather than taken
+from an agent's summary:
+
+```
+stabilityai/sd-vae-ft-mse-original
+  revision 629b3ad3030ce36e15e70c5db7d91df0d60c627f
+  vae-ft-mse-840000-ema-pruned.safetensors
+  334,641,190 bytes
+  sha256 735e4c3a447a3255760d7f86845f09f937809baa529c17370d83e4c3758f3c75
+  licence MIT
+```
+
+MIT is worth noting: it is **more permissive than anything else this lane
+loads** -- the SD1.5 checkpoint and the Lightning module are both CreativeML
+Open RAIL-M. Adopting it would not weaken the lane's licence position.
+
+**THE LANE STILL DECODES WITH THE CHECKPOINT'S BAKED VAE.** `eng_ghost_signal.py`
+takes `prepared["vae"] = (ckpt_out[2],)`, and that is unchanged. Three
+independent judges were asked whether to adopt ft-mse now; two answered and
+agreed on the sequencing even though they used opposite verdict words -- adopt
+only AFTER a Lightning clip lands in `otr/obs/` through the real OTR adapter
+path. The reasoning is the same in both: tonight's proof was hand-built graphs
+that never touched `prepare` / `render_clip` / `canonicalize` / the cadence
+receipts, and adding a third artifact before that first real leg gives a failure
+two suspects instead of one. A decoder swap is also the one change that can be
+A/B'd after the fact, because it re-decodes the same latents -- unlike
+`align_source_to_context_window`, which altered what was sampled and therefore
+had to land first.
+
+So this is recorded as a MEASURED, PINNED, READY option and deliberately not
+wired. When the adapter-path proof lands, the seam is a `vae_name` /
+`vae_min_bytes` pair on the parent defaulting to `None` (mirroring `lora_name`
+cell for cell so the two published siblings stay byte-identical), the only graph
+change being a second one-node `VAELoader` in `prepare` so `prepared["vae"]`
+comes from it instead of `ckpt_out[2]`. The recipe receipt id must REPOINT
+(`..._ftmse_...`) rather than be edited in place, because a proof clip will
+already exist under the current id.
 
 ### What these numbers do NOT prove, and why the device row has not moved
 

@@ -58,7 +58,7 @@ class WeightSpec(NamedTuple):
 LANE_INFO = {
     "haunted": (3.65, "AnimateDiff video -- SD1.5 + motion module. The cheapest "
                       "complete video lane."),
-    "lightning": (2.84, "AnimateDiff DISTILLED -- SD1.5 + the ByteDance 8-step "
+    "lightning": (3.17, "AnimateDiff DISTILLED -- SD1.5 + the ByteDance 8-step "
                         "module. Same graph as `haunted` minus the adapter, at "
                         "8 sampler steps and cfg 1.0 instead of 20 and 8.0, so "
                         "8 UNet passes a beat where the golden recipe takes 40. "
@@ -162,6 +162,17 @@ LANES = {
             expected_sha256=(
                 "5173ea8209053dd5de9b973baefac1801fbe7a433d07fa012266412"
                 "1751885cf")),                                         # 0.85 GB
+        # THE EXTERNAL DECODER. MIT-licensed and ungated, and pinned to the same
+        # three fields as the rest of this bundle. Verified against the file on
+        # disk and the Hub API, not copied from a summary.
+        WeightSpec(
+            "stabilityai/sd-vae-ft-mse-original",
+            "vae-ft-mse-840000-ema-pruned.safetensors", "vae",
+            revision="629b3ad3030ce36e15e70c5db7d91df0d60c627f",
+            expected_bytes=334641190,
+            expected_sha256=(
+                "735e4c3a447a3255760d7f86845f09f937809baa529c17370d83e4c"
+                "3758f3c75")),                                         # 0.31 GB
     ],
     # 26.74 GiB. COMPLETE 14B HuMo recipe: every destination is read from
     # HuMoEngine._loader_names(), and the primary UNET is exactly

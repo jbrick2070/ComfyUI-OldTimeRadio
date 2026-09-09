@@ -662,9 +662,15 @@ CAPABILITIES = {
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
+        # THREE artifacts as of 2026-09-09, not two. The third is an EXTERNAL
+        # DECODER, not an adapter: `vae-ft-mse-840000-ema-pruned` replaces the
+        # VAE the checkpoint returns. A/B'd on the M4 with only the decoder
+        # changed -- cleaner glass and foliage, less milky haze, judged by the
+        # operator -- and it is MIT, more permissive than the other two.
         "model_requirements": [
             "v1-5-pruned-emaonly-fp16.safetensors",
-            "animatediff_lightning_8step_comfyui.safetensors"]},
+            "animatediff_lightning_8step_comfyui.safetensors",
+            "vae-ft-mse-840000-ema-pruned.safetensors"]},
     "minimax_h3_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,

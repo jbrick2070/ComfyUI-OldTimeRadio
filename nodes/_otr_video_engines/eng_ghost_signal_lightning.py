@@ -1,4 +1,13 @@
-"""``animatediff15_lightning_video`` -- the Ghost graph on a DISTILLED module.
+"""``animatediff15_lightning_video`` -- EXPERIMENTAL. The Ghost graph on a
+DISTILLED module.
+
+AN EXPERIMENTAL LANE, and the operator named it one (2026-09-09: *"you may as
+well wire it in, if it fails it fails -- label it as an exp lane"*). It is not
+a production path and must not become one by accident: it has never rendered
+through the OTR adapter path, its ``device_backends`` row still says ``cuda``
+only, its ``default_roles`` is empty so it can only ever be chosen per beat
+from the director dropdown, and it carries no qualified cost row. Judge it by
+eye, keep it or drop it, but do not build anything on top of it yet.
 
 THE SPEED LANE, AND IT EXISTS BECAUSE OF A MEASUREMENT. AnimateDiff renders
 CORRECTLY on Apple Silicon -- proven 2026-09-08 with clips faithful to the
@@ -145,6 +154,26 @@ LIGHTNING_DENOISE = 1.0
 #: another schedule.
 LIGHTNING_BETA_SCHEDULE = "sqrt_linear (AnimateDiff)"
 
+#: THE EXTERNAL DECODER. SD1.5's baked VAE is soft; this is the standard
+#: AnimateDiff decoder upgrade and it was A/B'd on this machine on 2026-09-09 --
+#: identical prompt, seed 42, cfg 1.0, 8 steps, 512x288, ONLY the decoder
+#: changed. Cleaner glass, better foliage separation, less milky haze, and the
+#: operator judged it directly. Decode cost is unchanged (the 28.8 s in that run
+#: was a warm checkpoint, not a faster VAE).
+#:
+#: LICENCE NOTE, AND IT IS THE GOOD DIRECTION: MIT. That is MORE permissive than
+#: anything else this lane loads -- the SD1.5 checkpoint and the Lightning
+#: module are both CreativeML Open RAIL-M -- so adopting it cannot weaken the
+#: lane's licence position. ``commercial_clean`` is unchanged for the reasons
+#: that already applied to the other two artifacts.
+VAE_FT_MSE_NAME = "vae-ft-mse-840000-ema-pruned.safetensors"
+
+#: 334,641,190 bytes on disk, verified against the Hub API rather than taken
+#: from a summary (sha256 735e4c3a...f3c75, revision 629b3ad3...). The floor
+#: sits under its own artifact and within the family's 15% margin, so a
+#: truncated fetch is still NAMED.
+VAE_FT_MSE_MIN_BYTES = 320_000_000
+
 #: The cfg sweep knob. Distilled at 1.0; the operator may want the live negative
 #: back at the cost of doubling the UNet passes, and that must not be an edit.
 LIGHTNING_CFG_ENV = "OTR_LIGHTNING_CFG"
@@ -176,7 +205,10 @@ class GhostSignalLightningEngine(GhostSignalEngine):
 
     motion_module_name = MM_LIGHTNING_NAME
     motion_min_bytes = MM_LIGHTNING_MIN_BYTES
-    recipe_receipt_id = "animatediff_sd15_lightning8_static16_512x288_v1"
+    #: REPOINTED, never edited in place, because clips already exist on disk
+    #: under the pre-decoder id and a receipt that changes meaning retroactively
+    #: makes every older receipt uninterpretable.
+    recipe_receipt_id = "animatediff_sd15_lightning8_ftmse_static16_512x288_v1"
 
     #: All six recipe cells, through the seam. Declaring fewer would sample on
     #: the golden 20-step / cfg-8.0 recipe while stamping a Lightning receipt --
@@ -187,6 +219,11 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     scheduler = LIGHTNING_SCHEDULER
     denoise = LIGHTNING_DENOISE
     beta_schedule = LIGHTNING_BETA_SCHEDULE
+
+    #: THE EXTERNAL DECODER, declared here and nowhere else so the two lanes
+    #: with published episodes keep decoding exactly as they always have.
+    vae_name = VAE_FT_MSE_NAME
+    vae_min_bytes = VAE_FT_MSE_MIN_BYTES
 
     #: THE FRAME MATH, AND THIS LANE IS WHERE IT LANDS FIRST. Every other video
     #: lane resolves a beat into lengths its model actually accepts; this family
@@ -305,6 +342,7 @@ class GhostSignalLightningEngine(GhostSignalEngine):
 
 
 __all__ = ["GhostSignalLightningEngine",
+           "VAE_FT_MSE_NAME", "VAE_FT_MSE_MIN_BYTES",
            "MM_LIGHTNING_NAME", "MM_LIGHTNING_MIN_BYTES",
            "LIGHTNING_STEPS", "LIGHTNING_CFG", "LIGHTNING_SAMPLER_NAME",
            "LIGHTNING_SCHEDULER", "LIGHTNING_DENOISE",

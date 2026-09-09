@@ -153,14 +153,17 @@ def test_it_carries_no_domain_adapter(eng):
         "subclassing the haunted lane would drag in the v3-paired adapter")
 
 
-def test_the_registry_row_asks_for_two_artifacts_not_three():
-    """Listing the 97 MB adapter would make the S5 wizard demand a file this
-    lane never loads."""
+def test_the_registry_row_asks_for_the_three_it_loads_and_no_adapter():
+    """THREE artifacts since 2026-09-09 -- checkpoint, motion module, external
+    decoder. Still NOT the v3 domain adapter: that is v3-paired and this lane
+    never loads it, so listing it would make the S5 wizard demand 97 MB for
+    nothing. "Three artifacts" and "the haunted three" are different sets."""
     req = vreg.CAPABILITIES[ENGINE_ID]["model_requirements"]
     assert L.MM_LIGHTNING_NAME in req
     assert "v1-5-pruned-emaonly-fp16.safetensors" in req
+    assert L.VAE_FT_MSE_NAME in req
     assert "v3_sd15_adapter.ckpt" not in req
-    assert len(req) == 2
+    assert len(req) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +418,7 @@ def test_the_fetch_bundle_is_fully_pinned():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     rows = mod.LANES["lightning"]
-    assert len(rows) == 2, "checkpoint + motion module, no adapter"
+    assert len(rows) == 3, "checkpoint + motion module + decoder, no adapter"
     for row in rows:
         assert row.revision and row.revision != "main", row
         assert row.expected_bytes, row
@@ -589,3 +592,73 @@ def test_the_alignment_is_NOT_expressed_as_a_frame_contract_quantum(eng):
         "capping this lane produces jump cuts and MORE latents, not fewer")
     # And the source request is where it actually happens.
     assert eng._source_request_for(250) != gs.ghost_source_request(250, 2)
+
+
+# ---------------------------------------------------------------------------
+# THE EXTERNAL DECODER (2026-09-09) -- adopted on operator override
+# ---------------------------------------------------------------------------
+
+def test_it_decodes_with_ft_mse_and_not_the_checkpoint_vae(eng):
+    """The A/B the operator asked for and then ruled on. Only the decoder
+    changed between the two renders; latents were identical, which is exactly
+    why this was the one recipe change safe to land after the fact."""
+    assert eng.vae_name == "vae-ft-mse-840000-ema-pruned.safetensors"
+    assert eng.vae_min_bytes < 334_641_190, "would refuse the real artifact"
+    assert eng.vae_min_bytes >= 334_641_190 * 0.85, "too loose to catch a truncation"
+
+
+def test_the_siblings_still_decode_with_the_checkpoints_own_vae():
+    """CLAUDE.md 0B again. `vae_name` defaults to None on the parent, so the two
+    lanes with PUBLISHED EPISODES load no decoder, require no third file and
+    bind `ckpt_out[2]` exactly as they always did."""
+    assert gs.GhostSignalEngine.vae_name is None
+    assert gs.GhostSignalEngine.vae_min_bytes == 0
+    for name in ("animatediff15_v3_haunted_video",
+                 "animatediff15_v3_stillin_lab_video"):
+        peer = vreg.get_engine(name)
+        assert peer.vae_name is None
+        assert peer._vae_path() is None, "a lane with no name is never asked"
+        assert "vae_loader" not in peer._node_candidates(), (
+            "no name means no loader node enters the graph at all")
+
+
+def test_the_decoder_lane_gets_a_loader_node_and_the_others_do_not(eng):
+    assert eng._node_candidates()["vae_loader"] == ("VAELoader",)
+
+
+def test_prepare_rebinds_the_vae_only_when_a_name_is_declared():
+    """The ONLY graph change this seam makes. `render_clip`'s decode node
+    already consumes `owners["vae"]` as a one-slot tuple and does not care where
+    it came from, so the rebinding is the whole wiring -- and the checkpoint's
+    own VAE is simply never bound, rather than held resident alongside."""
+    import inspect
+    src = inspect.getsource(gs.GhostSignalEngine.prepare)
+    assert 'prepared["vae"] = (ckpt_out[2],)' in src, "the default path stays"
+    assert "if self.vae_name:" in src
+    assert 'prepared["vae"] = (vae_out[0],)' in src
+
+
+def test_the_decoder_is_in_the_identity_so_a_swap_opens_a_new_session(eng):
+    """Two decoders are two sessions. Without this a cached handle from a
+    baked-VAE run could be reused for an ft-mse render."""
+    import inspect
+    src = inspect.getsource(gs.GhostSignalEngine.session_identity)
+    assert "self.vae_name" in src
+    assert "_vae_path" in src
+
+
+def test_the_receipt_id_was_REPOINTED_not_edited(eng):
+    """Clips already exist on disk under the pre-decoder id. Editing that string
+    in place would retroactively change what every older receipt means."""
+    assert "ftmse" in eng.recipe_receipt_id
+    assert eng.recipe_receipt_id != "animatediff_sd15_lightning8_static16_512x288_v1"
+
+
+def test_the_lane_says_EXPERIMENTAL_out_loud(eng):
+    """The operator named it one. It must not become a production path by
+    accident: no default role, no proven device row, no qualified cost row."""
+    import inspect
+    doc = inspect.getdoc(type(eng)) or ""
+    assert "EXPERIMENTAL" in inspect.getmodule(type(eng)).__doc__
+    assert eng.default_roles == ()
+    assert vreg.CAPABILITIES[ENGINE_ID]["device_backends"] == ["cuda"]

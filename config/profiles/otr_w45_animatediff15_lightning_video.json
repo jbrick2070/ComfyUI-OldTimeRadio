@@ -79,7 +79,8 @@
   "preflight": {
     "required_models": [
       "v1-5-pruned-emaonly-fp16.safetensors",
-      "animatediff_lightning_8step_comfyui.safetensors"
+      "animatediff_lightning_8step_comfyui.safetensors",
+      "vae-ft-mse-840000-ema-pruned.safetensors"
     ],
     "required_keys": []
   },

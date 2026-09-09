@@ -76,6 +76,11 @@ GHOST_MOTION_CATEGORY = "animatediff_models"
 #: with them. Only a lane that declares ``lora_name`` ever looks here.
 GHOST_LORA_CATEGORY = "loras"
 
+#: An EXTERNAL decoder lives here. Only a lane that declares ``vae_name`` ever
+#: looks -- every other lane keeps taking the VAE the checkpoint already
+#: returned, which is why this is additive rather than a swap.
+GHOST_VAE_CATEGORY = "vae"
+
 #: Byte floors, so a truncated fetch is NAMED rather than traced through a
 #: loader stack. These are the exact sizes in the dependency lock, minus a
 #: small margin -- a file materially under them is not the pinned artifact.
@@ -282,6 +287,9 @@ NODE_ADE = "ade"
 NODE_LATENT = "latent"
 NODE_SAMPLER = "sampler"
 NODE_DECODE = "decode"
+#: The external-decoder loader instance. A new INSTANCE on an existing stock
+#: class; no new candidate name enters the graph vocabulary.
+NODE_VAE_LOADER = "vae_loader"
 #: Built ONLY on a lane that declares ``lora_name`` -- see the seam below.
 NODE_LORA = "lora"
 
@@ -557,6 +565,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     lora_strength = 0.0
     lora_min_bytes = 0
 
+    #: THE EXTERNAL-DECODER SEAM (2026-09-09), mirroring ``lora_name`` cell for
+    #: cell. ``None`` means "decode with the VAE the checkpoint returned", which
+    #: is what every lane did before this existed and what the two lanes with
+    #: PUBLISHED EPISODES still do -- with no name there is no loader node, no
+    #: artifact required and no extra resident weight.
+    #:
+    #: A lane that sets it gets its OWN decoder and never binds ``ckpt_out[2]``.
+    #: Latents are untouched: this changes only how they are turned into pixels,
+    #: which is why it is the one recipe change that can be A/B'd after the fact.
+    vae_name = None
+    vae_min_bytes = 0
+
     #: THE CONTEXT-ALIGNMENT SEAM (2026-09-08). When True the source request is
     #: rounded UP to a count the sliding window tiles evenly
     #: (``ghost_legal_source_count``); the surplus is discarded and reported
@@ -703,6 +723,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         lora = getattr(self, "lora_name", "")
         if lora:
             out.append(("adapter", self._lora_path() or ""))
+        if getattr(self, "vae_name", ""):
+            out.append(("decoder", self._vae_path() or ""))
         return out
 
     @staticmethod
@@ -740,6 +762,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             parts.append(self.lora_name)
             parts.append(repr(self._file_receipt(self._lora_path() or "")))
             parts.append("strength=%.4f" % float(self.lora_strength))
+        # The decoder is a HANDLE too: two decoders are two sessions, and a
+        # swapped or resized file must open a new one. Absent on every lane
+        # that declares none, so their identity is byte-identical.
+        if self.vae_name:
+            parts.append(self.vae_name)
+            parts.append(repr(self._file_receipt(self._vae_path() or "")))
         return tuple(parts)
 
     def shot_cache_identity(self, request):
@@ -817,6 +845,18 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         return self._resolve_model_file_by_token(
             (GHOST_LORA_CATEGORY,), self.lora_name)
 
+    def _vae_path(self):
+        """The optional external decoder, or ``None`` on a lane without one.
+
+        Same two-state contract as ``_lora_path``: "no name" and "not found"
+        are different, so a lane that declares nothing is never asked for a
+        file and a lane that declares one never silently decodes with the
+        checkpoint's."""
+        if not self.vae_name:
+            return None
+        return self._resolve_model_file_by_token(
+            (GHOST_VAE_CATEGORY,), self.vae_name)
+
     def _installed(self):
         """A PREDICATE -- it answers, it never raises."""
         try:
@@ -828,6 +868,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         candidates = dict(GHOST_NODE_CANDIDATES)
         if self.lora_name:
             candidates["lora"] = ("LoraLoaderModelOnly",)
+        if self.vae_name:
+            candidates["vae_loader"] = ("VAELoader",)
         return candidates
 
     # ---- preflight ------------------------------------------------------ #
@@ -858,6 +900,12 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             rows.append(("domain_adapter", self.lora_name,
                          GHOST_LORA_CATEGORY, self._lora_path(),
                          self.lora_min_bytes))
+        # Same fail-closed rule: a lane that declares a decoder and cannot find
+        # it must REFUSE, not quietly decode with the checkpoint's and stamp a
+        # receipt naming the one it did not use.
+        if self.vae_name:
+            rows.append(("decoder", self.vae_name, GHOST_VAE_CATEGORY,
+                         self._vae_path(), self.vae_min_bytes))
         rows = tuple(rows)
         missing = ["%s=%s (folder_paths category %r)" % (label, token, category)
                    for label, token, category, path, _floor in rows if not path]
@@ -927,6 +975,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             self._artifacts["domain_adapter"] = self.lora_name
             self._artifacts["domain_adapter_strength"] = float(
                 self.lora_strength)
+        if self.vae_name:
+            self._artifacts["decoder"] = self.vae_name
         self._loaded = True
 
     def unload(self):
@@ -991,6 +1041,28 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         prepared["vae"] = (ckpt_out[2],)
         prepared["recipe"] = self._recipe_receipt()
         del ckpt_out
+
+        # AN EXTERNAL DECODER, on a lane that declares one. THE ONLY GRAPH
+        # CHANGE this seam makes: `render_clip`'s decode node already consumes
+        # `owners["vae"]` as a one-slot tuple and does not care where it came
+        # from, so rebinding it here is the whole wiring.
+        #
+        # The checkpoint's own VAE is simply never bound. It was returned by
+        # CheckpointLoaderSimple regardless -- that cost is the checkpoint's,
+        # not this seam's -- and dropping the reference here lets it go rather
+        # than holding two decoders resident on a 16 GB machine.
+        if self.vae_name:
+            vae_out = _wb.run_graph(
+                {NODE_VAE_LOADER: {"class": classes["vae_loader"],
+                                   "inputs": {"vae_name": self.vae_name}}},
+                terminal=NODE_VAE_LOADER)
+            if not vae_out:
+                raise RuntimeError(
+                    "%s: VAELoader returned no VAE for %r -- the artifact gate "
+                    "passed, so this is a graph fault, not a missing file"
+                    % (self.name, self.vae_name))
+            prepared["vae"] = (vae_out[0],)
+            del vae_out
         return prepared
 
     # ---- request -------------------------------------------------------- #
@@ -1438,7 +1510,7 @@ __all__ = [
     "GHOST_NODE_CANDIDATES", "GHOST_ADE_OMITTED_SOCKETS",
     "GHOST_CONTEXT_OMITTED_SOCKETS",
     "NODE_CKPT", "NODE_POSITIVE", "NODE_NEGATIVE", "NODE_CONTEXT", "NODE_ADE",
-    "NODE_LATENT", "NODE_SAMPLER", "NODE_DECODE",
+    "NODE_LATENT", "NODE_SAMPLER", "NODE_DECODE", "NODE_VAE_LOADER",
     "ghost_unique_source_count", "ghost_source_request",
     "ghost_hold2_selector", "ghost_hold_selector", "ghost_cadence_receipts",
     "GHOST_DEFAULT_HOLD",
