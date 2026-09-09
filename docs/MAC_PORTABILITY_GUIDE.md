@@ -1061,6 +1061,78 @@ whose visible frames differ from the audio-derived target
 (`coverage_plan.py:478-482`). Shorter picture means picture that no longer
 matches its sound.
 
+### MEASURED 2026-09-09: AnimateDiff-Lightning is 3.83x on this M4
+
+The first numbers for `animatediff15_lightning_video`, taken with ISOLATED
+ComfyUI graphs -- checkpoint -> `ADE_AnimateDiffLoaderGen1` -> KSampler ->
+VAEDecode, no OTR pipeline, no writer, no TTS -- so each number is the lane's
+sampler cost and nothing else's. Same machine, same canvas, same frame count,
+back to back:
+
+| arm (512x288, 16 frames, one window) | wall clock |
+|---|---|
+| golden v3, 20 steps, cfg 8.0, `autoselect` | **230.3 s** |
+| **Lightning 8-step, 8 steps, cfg 1.0, `sgm_uniform` / `sqrt_linear`** | **60.1 s** |
+| Lightning 8-step, 8 steps, **cfg 2.0** (negative LIVE) | 100.1 s |
+
+**3.83x, not the 5x the pass count predicts.** The gap is real and was called in
+review before the run: VAE decode and checkpoint load do not shrink with the
+step count, so they become a larger fraction of a shorter render. Treat pass-count
+arithmetic as a floor, never as the estimate.
+
+### cfg 1.0 WINS on this lane, on both axes -- and the lettering fear did not land
+
+This was the lane's one genuinely open question, because cfg 1.0 does not weaken
+the negative prompt, it DELETES the pass (`comfy/samplers.py:610`), and this repo
+had already refused AnimateLCM for exactly that. The test was built to be the
+worst case for it: a bar counter with rows of bottles, which is precisely what
+SD1.5 volunteers labels and signage onto.
+
+* **No lettering at cfg 1.0.** None on the bottles, none anywhere.
+* **cfg 2.0 looked WORSE**, not better: magenta/green chromatic fringing, halos
+  around the figures, oversaturation. Lightning is distilled FOR cfg 1.0, so
+  raising guidance fights the distillation instead of helping it. It also cost
+  1.8x the time (100.1 s against 55.1 s).
+
+So the AnimateLCM precedent does NOT transfer, and `OTR_LIGHTNING_CFG` stays a
+sweep knob rather than a fix waiting to be applied.
+
+**What this evidence is NOT.** Two images, one seed each, 16 frames at 512x288.
+Not a sweep. If lettering ever appears it will be on a beat whose prompt names a
+sign or a dial, and the env knob is already there.
+
+### What these numbers do NOT prove, and why the device row has not moved
+
+`device_backends` is still `["cuda"]` and that is correct. These runs prove the
+RECIPE executes on Metal. They do not prove the LANE does -- they were hand-built
+graphs submitted to `/prompt`, not the OTR adapter path, so nothing exercised
+`prepare`/`render_clip`, the cadence receipts, `canonicalize`'s exact-canvas
+refusal, or the delivered-frame contract. Those are different claims and only the
+second one earns the row. **Flip it in the commit that carries a canonical clip
+in `otr/obs/`, together with
+`test_the_device_row_claims_only_what_has_been_proven`.**
+
+### The Mac setup that made it run at all
+
+Two things, both of which cost time to find:
+
+1. **`animatediff_models` is not in Comfy Desktop's generated mapping.** It is a
+   category AnimateDiff-Evolved registers itself
+   (`utils_model.py:343-344`), pointing at BOTH its own pack directory and
+   `<comfy>/models/animatediff_models`. A motion module in the shared models
+   root is therefore invisible. Either hardlink the module into
+   `<comfy>/models/animatediff_models/` (no extra disk, same volume), or pass
+   `config/otr_mac_extra_model_paths.yaml` ALONGSIDE the Desktop file.
+2. **A bare `python main.py` has NO checkpoints.** The Desktop app's mapping
+   lives at `~/Library/Application Support/Comfy Desktop/instance-model-paths/inst-*.yaml`
+   and must be passed explicitly, or `ckpt_name` validates against an empty
+   list and every prompt is rejected:
+
+```bash
+python main.py --extra-model-paths-config \
+  "$HOME/Library/Application Support/Comfy Desktop/instance-model-paths/inst-<id>.yaml"
+```
+
 ### The math the lane never did -- and 125 is not a legal count
 
 Everything above is about the clip LENGTH, which is audio-derived and not yours
