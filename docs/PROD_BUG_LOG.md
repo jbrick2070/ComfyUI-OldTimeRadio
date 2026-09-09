@@ -13746,3 +13746,47 @@ exactly 3 with one tail of `T % 3`, which is arithmetic rather than the ragged
 the wrong beat length in the commit message, the guide and the comparison page.
 `test_the_lane_runs_at_hold_3_by_operator_ruling` now asserts both cases and the
 general rule, so the mistake cannot recur silently.
+
+### PBUG-20260909-01, CLOSED with a stated gap: the guard stays unit-tested
+
+Operator ruling 2026-09-09: accept the decomposed proof and stop. Recorded so
+the gap is visible rather than implied by a green suite.
+
+**What IS proven.** The escalation logic is unit-tested against the real
+selector: `_beat_hold(500)` resolves 3 -> 4 and asks for 136 latents rather than
+the 172 hold 3 would want. And rendering 136 latents at 512x288 is proven
+repeatedly on this host in real renders the same day.
+
+**What is NOT.** Those two composed -- a single beat escalating AND rendering
+through `prepare` / `render_clip` / `canonicalize` -- has never run. The guard
+now fires only past roughly T=480, so an ordinary episode will not reach it.
+
+**Why it was not forced, and this is the interesting part.** A harness was built
+from the canonical per the operator's rule -- the canonical workflow's own
+`OTR_VideoRenderBatch` node (92), its own input names, the real ledger captured
+by the last canonical run, with exactly one number changed. It submitted
+correctly and the node executed. It was REFUSED, correctly:
+
+    COVERAGE PLAN: shot shot_music_opening_001 carries a plan for 250
+      coverage_plan.target_visible_frames: 250
+      target_frame_count (forced):         500
+
+`validate_coverage_plan` exists to catch picture that does not match sound.
+Patching `coverage_plan` to agree would then put both out of step with the
+AUDIO, which is the same lie one layer down. **Every route to a synthetic long
+beat requires defeating the validator that makes the result meaningful.** So the
+harness did not fail -- it proved the system will not let this be faked, which is
+the system working.
+
+The only honest live-fire path left is a real episode whose AUDIO produces a
+~20-second beat, since beat length follows audio and the writer decides it. That
+is available whenever an episode happens to produce one; it is not worth
+manufacturing.
+
+**A SIDE EFFECT WORTH RECORDING.** Running that harness overwrote
+`output/otr/episodes/_shared/state/node_episode_input.json` -- node 92 captures
+its input there, so the synthetic single-shot ledger replaced the real 23-shot
+one. The published episode's own ledger was untouched and the capture was
+restored from it. This is exactly the "stale harnesses make weird episode-title
+stuff happen" failure the operator warned about twice the same hour: a scratch
+file that later runs read, silently holding one shot at T=500.
