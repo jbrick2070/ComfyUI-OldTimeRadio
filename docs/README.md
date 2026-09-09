@@ -14,6 +14,24 @@ design rows; finished campaigns live in git history and `HANDOFF_LOG.md`.
 - `comfy-credits-setup.md` - optional Comfy Credits / Partner API setup.
 - `gemma4-gguf-native-setup.md` and `gemma4/` - local Gemma GGUF notes.
 
+## Apple Silicon
+
+A rented Mac mini M4 (16 GB) was used to port this pack to Metal. Start with the
+compliance matrix if you want the answer for one engine; start with the guide if
+you are setting a Mac up.
+
+- `MAC_COMPLIANCE_MATRIX.md` - **every engine, classified**: PROVEN / LIKELY /
+  OOM RISK @16GB / WILL NOT RUN, with weights (auto-ungated, gated, manual) and
+  size. Read the legend first: a missing `mps` in a registry row means NOBODY HAS
+  RUN IT, not that it cannot run, and gated weights are friction rather than
+  failure.
+- `MAC_PORTABILITY_GUIDE.md` - the long-form guide: setup, the traps that cost
+  real time, measured costs, and a dated corrections ledger. **An OOM on unified
+  memory is a machine REBOOT, not a failed render** -- section 2 is only about
+  that.
+- `MAC_PUNCH_LIST.md` - what closed, what is still open, and what needs the
+  other machine.
+
 ## The video model reference (read both before adding or changing an engine)
 
 - `ENGINE_MATRIX.md` - **every per-model number**: clip window, frame ladder,
