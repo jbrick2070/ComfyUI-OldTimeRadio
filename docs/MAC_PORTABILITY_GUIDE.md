@@ -1210,6 +1210,46 @@ path, so nothing exercised `prepare`/`render_clip`, the cadence receipts,
 `canonicalize`'s exact-canvas refusal, or the delivered-frame contract. Those are
 different claims and only the second earns the row.
 
+### STALE HARNESSES, and why the operator's rule is "build it from the canonical"
+
+Operator, 2026-09-09, twice in one hour: *"be careful of stale harnesses"* and
+*"i would always build a harness from scratch using the canonical"*. Both
+warnings landed on live mistakes, so this is the record.
+
+`scripts/otr_visual_smoke.py` looked like exactly the right instrument for a
+live-fire test of the adaptive-hold guard: it bakes a rendered episode's planned
+ledger into a bundle and replays ONLY the render tail, skipping the ~30-minute
+writer and TTS stages. Three things were wrong with reaching for it:
+
+1. **It submits to the SERVER**, so the code under test is whatever the running
+   ComfyUI loaded at startup -- not what is in the repo. The pack was three files
+   stale at that moment, which meant the "guard" being exercised was the previous
+   commit's.
+2. **Its own defaults have rotted.** It targets port 8000; this host runs 8188.
+   The replay died on a connection error before doing anything.
+3. **Making it work required faking state.** Its bake refused because a
+   `pending_<ts>` directory had been renamed to the final episode name on
+   publication, so the master wav's recorded path no longer resolved. The fix
+   was a symlink from the old pending name to the published episode -- which is
+   exactly the kind of thing that later makes "weird episode title stuff happen",
+   because a directory that says `pending_` now points at a finished episode.
+   It was removed as soon as the harness was abandoned.
+
+**The rule.** Build the harness from the canonical workflow and the canonical
+runner, the way a real episode runs, rather than restoring an older accelerator.
+A stale accelerator does not fail loudly -- it produces a plausible result from
+the wrong code, and the operator's episode titles are where that surfaces.
+
+**And sync before every render, not just before every test.** The pack under
+`custom_nodes/` is a COPY. Restarting the server does not sync it; only copying
+does. The check is one command and it is cheaper than any result it invalidates:
+
+```bash
+diff -rq --exclude=__pycache__ \
+  ~/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/nodes \
+  <repo>/nodes
+```
+
 ### A STALE INSTALLED PACK MAKES TESTS LIE, and the failures look real
 
 `custom_nodes/comfyui-old-time-radio` is a SEPARATE COPY of this repo, not a
