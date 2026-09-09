@@ -728,7 +728,13 @@ def test_the_ceiling_is_derived_from_the_host_not_hardcoded():
     at16 = mc.latent_ceiling_for_host(512, 288, 16 * 1024)
     at32 = mc.latent_ceiling_for_host(512, 288, 32 * 1024)
     assert at16 == 136, "the largest count measured to SURVIVE, not to fail"
-    assert at32 == 2 * at16, "twice the RAM, twice the allowance"
+    # NOT `2 * at16`. This test asserted exactly that until 2026-09-09, which
+    # encoded the linear scaling that was the defect: only the VARIABLE pool
+    # doubles, because ~4.6 GB of weights and baseline is fixed. So twice the
+    # RAM buys MORE than twice the latents, and half the RAM buys LESS than
+    # half. A test that pins the arithmetic must pin the corrected arithmetic.
+    assert at32 > 2 * at16, "the fixed cost amortises on a bigger machine"
+    assert mc.latent_ceiling_for_host(512, 288, 8 * 1024) < at16 / 2
     # A bigger canvas costs batch, so the ceiling falls.
     assert mc.latent_ceiling_for_host(512, 512, 16 * 1024) < at16
 
@@ -825,3 +831,107 @@ def test_a_non_adapting_lane_reports_exactly_what_it_always_did():
     got = peer.sampler_inputs_for(req)
     assert got["hold_factor"] == peer.hold_factor == 2
     assert got["source_fps"] == 12, "unchanged, including its truncation"
+
+
+# ---------------------------------------------------------------------------
+# EXECUTION tests for what was previously only string-matched. Review's point:
+# an `inspect.getsource` assertion passes whether or not the code WORKS.
+# ---------------------------------------------------------------------------
+
+def test_the_ceiling_subtracts_the_fixed_resident_cost(eng):
+    """CAUGHT IN REVIEW, and it was the dangerous direction. The first version
+    scaled the 136-latent anchor LINEARLY by total RAM, which assumes the
+    weights shrink with the machine. They do not: ~4.6 GB of checkpoint, motion
+    module, decoder and OS baseline is fixed. On an 8 GB Mac that returned 68
+    where the corrected figure is 40 -- a 1.7x overestimate on exactly the
+    hardware the guard protects, in the direction that reboots it."""
+    from nodes._otr_video_engines import motion_common as mc
+    assert mc.latent_ceiling_for_host(512, 288, 16 * 1024) == 136, "anchor holds"
+    at8 = mc.latent_ceiling_for_host(512, 288, 8 * 1024)
+    assert at8 == 40, "linear scaling would have said 68"
+    assert at8 < 68
+    # Half the RAM must give LESS than half the latents, because the fixed cost
+    # does not halve with it.
+    assert at8 < 136 / 2
+
+
+def test_a_machine_too_small_for_the_weights_gets_no_ceiling_at_all(eng):
+    """Not a small number -- None. There is no safe batch size when the weights
+    alone do not fit, and `_beat_hold` turns None into a named refusal."""
+    from nodes._otr_video_engines import motion_common as mc
+    assert mc.latent_ceiling_for_host(512, 288, 4 * 1024) is None
+    assert mc.latent_ceiling_for_host(512, 288, 1) is None
+
+
+def test_the_ceiling_does_not_collapse_while_a_render_is_resident():
+    """WHY THE LIVE-MEMORY SIGNAL WAS REJECTED, pinned so it is not re-added.
+    Review asked for live availability instead of total RAM. Implemented and
+    measured, this host reported 1344 MB available mid-episode -- because the
+    lane's own ~4.6 GB was already resident. Subtracting the fixed cost from a
+    figure that has already paid it double-counts, and every beat after the
+    first would be refused."""
+    from nodes._otr_video_engines import motion_common as mc
+    import inspect
+    src = inspect.getsource(mc.latent_ceiling_for_host)
+    assert "_available_ram_mb()" not in src.split("def _available_ram_mb")[0]
+    # And the value must not move just because the machine is busy.
+    assert (mc.latent_ceiling_for_host(512, 288)
+            == mc.latent_ceiling_for_host(512, 288)), "must be reproducible"
+
+
+def test_two_different_cfgs_really_do_produce_different_cache_keys(eng,
+                                                                   monkeypatch):
+    """EXECUTED, not string-matched. The previous test asserted `.hex()` appears
+    in the source, which would pass even if the value were computed from the
+    wrong object."""
+    req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
+           "timing": {"target_frame_count": 250},
+           "seed_bundle": {"request_seed": 42}}
+    monkeypatch.delenv(L.LIGHTNING_CFG_ENV, raising=False)
+    a = eng.shot_cache_identity(req)
+    monkeypatch.setenv(L.LIGHTNING_CFG_ENV, "2.0")
+    b = eng.shot_cache_identity(req)
+    assert a != b, "a cfg sweep must not be served the other arm's clip"
+    assert any("negative_effective=False" in str(p) for p in a)
+    assert any("negative_effective=True" in str(p) for p in b)
+
+
+def test_two_different_holds_really_do_produce_different_cache_keys(eng):
+    """Same point for the hold. A 320-frame beat resolves to hold 3 and a
+    250-frame beat to hold 2, and their keys must differ by more than the shot
+    id -- the hold token has to actually be in there."""
+    base = {"shot_id": "same", "text_prompt": "x", "negative_prompt": "y",
+            "seed_bundle": {"request_seed": 42}}
+    short = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 250}))
+    long_ = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 320}))
+    assert any(p == "hold=2" for p in short)
+    assert any(p == "hold=3" for p in long_)
+
+
+def test_shot_cache_identity_raises_rather_than_returning_a_bogus_key(eng,
+                                                                      monkeypatch):
+    """REVIEW'S LANDMINE, pinned. `shot_cache_identity` now calls
+    `_build_render_request`, which can raise `EngineUnusable` through
+    `_beat_hold`. That is the CORRECT behaviour -- a key for a beat that cannot
+    be rendered would be worse -- but it is a new exception on a method whose
+    docstring calls it a description of handles, so it gets a test."""
+    req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
+           "timing": {"target_frame_count": 250},
+           "seed_bundle": {"request_seed": 42}}
+    assert eng.shot_cache_identity(req)          # fine normally
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    with pytest.raises(vreg.EngineUnusable):
+        eng.shot_cache_identity(req)
+
+
+def test_the_published_lanes_cache_key_never_raises(monkeypatch):
+    """The same unreadable host must NOT break the lanes that do not adapt."""
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    req = {"shot_id": "s1", "text_prompt": "x", "negative_prompt": "y",
+           "timing": {"target_frame_count": 320},
+           "seed_bundle": {"request_seed": 42}}
+    for name in ("animatediff15_v3_haunted_video",
+                 "animatediff15_v3_stillin_lab_video"):
+        assert vreg.get_engine(name).shot_cache_identity(req)

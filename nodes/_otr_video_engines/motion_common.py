@@ -459,6 +459,22 @@ GHOST_ANCHOR_PIXELS = 512 * 288
 #: does not have.
 GHOST_ANCHOR_RAM_MB = 16 * 1024
 
+#: WHAT IS RESIDENT BEFORE A SINGLE LATENT EXISTS, and it does NOT scale with
+#: RAM -- which is the correction that matters. Roughly:
+#:
+#:   SD1.5 checkpoint          ~1.9 GB
+#:   Lightning motion module   ~0.87 GB
+#:   ft-mse external decoder   ~0.32 GB
+#:   OS + ComfyUI baseline     ~1.5 GB   (the figure `_UNIFIED_HEADROOM_MB`
+#:                                        already assumes for the same purpose)
+#:
+#: The first version of this scaled the 136-latent anchor LINEARLY by total RAM,
+#: which silently assumed the fixed cost shrank with the machine. It does not.
+#: On an 8 GB Mac that returned 68 where the corrected figure is 40 -- a 1.7x
+#: OVERESTIMATE on the exact hardware this guard exists to protect, and in the
+#: direction that reboots it. Caught in review before it shipped anywhere.
+GHOST_FIXED_RESIDENT_MB = 4700
+
 
 def latent_ceiling_for_host(canvas_w, canvas_h, ram_mb=None):
     """Largest source-latent batch this host should be asked for, or ``None``.
@@ -478,13 +494,71 @@ def latent_ceiling_for_host(canvas_w, canvas_h, ram_mb=None):
     """
     pixels = max(1, int(canvas_w) * int(canvas_h))
     if ram_mb is None:
+        # TOTAL physical RAM, deliberately, NOT live availability.
+        #
+        # Review asked for a live signal, on the sound reasoning that a browser
+        # or a leaked render holding several GB is invisible to total RAM. It
+        # was implemented and MEASURED, and it is wrong here: during an active
+        # episode this host reported 1344 MB available, because the lane's own
+        # ~4.6 GB of weights were already resident. Subtracting the fixed cost
+        # from a figure that has ALREADY paid it double-counts, and the guard
+        # then refuses every beat from the second one onward.
+        #
+        # Total RAM is also what makes the ceiling reproducible: two runs of the
+        # same beat must resolve the same hold, or the receipt stops describing
+        # a repeatable render. The live-pressure case is real but needs a
+        # measurement of resident-vs-available that nobody has taken yet; it is
+        # recorded in PBUG-20260909-01 rather than guessed at here.
         ram_mb = _physical_ram_mb()
     if not ram_mb:
         return None
+    # Only the VARIABLE pool scales. Subtract the fixed resident cost from both
+    # the anchor and this host, or a smaller machine inherits an allowance that
+    # assumes its weights got smaller too.
+    anchor_variable = GHOST_ANCHOR_RAM_MB - GHOST_FIXED_RESIDENT_MB
+    host_variable = float(ram_mb) - GHOST_FIXED_RESIDENT_MB
+    if host_variable <= 0 or anchor_variable <= 0:
+        # The weights alone do not fit. There is no safe batch size.
+        return None
     scaled = (GHOST_ANCHOR_SAFE_LATENTS
-              * (float(ram_mb) / GHOST_ANCHOR_RAM_MB)
+              * (host_variable / anchor_variable)
               * (float(GHOST_ANCHOR_PIXELS) / pixels))
     return max(1, int(scaled))
+
+
+def _available_ram_mb():
+    """Physically FREE + inactive RAM in MB, or ``None``.
+
+    NOT used by ``latent_ceiling_for_host`` -- see the note there for the
+    measurement that ruled it out. Kept because the live-pressure problem is
+    real and whoever takes it will need this.
+
+    ``vm_stat`` is parsed rather than trusted wholesale: free pages alone
+    understate what is reclaimable, so inactive and speculative pages count
+    too. Returns ``None`` on anything unexpected, and the caller then falls back
+    to total RAM -- never to "unlimited".
+    """
+    import re
+    import subprocess
+    try:
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True,
+                             timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0 or not out.stdout:
+        return None
+    page = 4096
+    m = re.search(r"page size of (\d+) bytes", out.stdout)
+    if m:
+        page = int(m.group(1))
+    pages = 0
+    for label in ("Pages free", "Pages inactive", "Pages speculative"):
+        m = re.search(re.escape(label) + r":\s+(\d+)", out.stdout)
+        if m:
+            pages += int(m.group(1))
+    if not pages:
+        return None
+    return int(pages * page / (1024 * 1024))
 
 
 def _physical_ram_mb():
