@@ -563,12 +563,42 @@ def _available_ram_mb():
 
 def _physical_ram_mb():
     """Physical RAM in MB, or ``None``. Physical, not Metal working set: see
-    ``unified_memory_budget_mb`` for why that distinction is load-bearing."""
+    ``unified_memory_budget_mb`` for why that distinction is load-bearing.
+
+    TWO PROBES, BECAUSE ``os.sysconf`` DOES NOT EXIST ON WINDOWS. It was the
+    only probe here until 2026-09-09, which made this function return ``None``
+    on every Windows host -- and the one caller that treats ``None`` as a
+    refusal then refused every beat of the lightning lane on both of the
+    operator's Windows boxes. The POSIX probe stays first (it is what the Mac
+    measurement was calibrated against); the ctypes probe is the Windows twin,
+    reading the same quantity from ``GlobalMemoryStatusEx``.
+    """
+    import os
     try:
-        import os
         return int(os.sysconf("SC_PAGE_SIZE")
                    * os.sysconf("SC_PHYS_PAGES") / (1024 * 1024))
     except (ValueError, OSError, AttributeError):
+        pass
+    try:
+        import ctypes
+
+        class _MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        status = _MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(_MEMORYSTATUSEX)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None
+        return int(status.ullTotalPhys / (1024 * 1024))
+    except Exception:  # noqa: BLE001 -- not Windows, or the call failed
         return None
 
 

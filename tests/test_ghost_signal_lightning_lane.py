@@ -362,13 +362,17 @@ def test_it_is_not_routed_through_the_haunted_fetch_bundle():
     assert ENGINE_ID not in m._ANIMATEDIFF_ENGINES, (
         "membership there routes this lane to the v3 weights it never loads")
     # And prove the route it DOES take, so "not haunted" cannot quietly become
-    # "not provisioned at all".
-    import inspect
-    src = inspect.getsource(m.profile_lanes)
-    assert 'automatic.append("lightning")' in src
-    assert src.index('== "%s"' % ENGINE_ID) < src.index("_ANIMATEDIFF_ENGINES"), (
-        "the lightning branch must be evaluated BEFORE the _ANIMATEDIFF_ENGINES "
-        "catch-all, or the catch-all wins and fetches the wrong weights")
+    # "not provisioned at all". ASKED, not grepped: this used to read the
+    # source of profile_lanes, which meant moving the router (2026-09-09, into
+    # the shared lane_for_engine) failed the test while the invariant it
+    # guards was perfectly intact. Calling the router asserts the behaviour
+    # itself and survives the next move.
+    assert m.lane_for_engine(ENGINE_ID, "video") == m.Lane("lightning", False)
+    # The ordering that makes that true: every id in the catch-all set must
+    # still route to "haunted", so a lane reaching the catch-all is provably
+    # getting the v3 weights and this one provably is not.
+    for sibling in sorted(m._ANIMATEDIFF_ENGINES):
+        assert m.lane_for_engine(sibling, "video") == m.Lane("haunted", False)
 
 
 def test_but_it_IS_in_the_no_still_set():
@@ -768,13 +772,56 @@ def test_an_impossible_beat_is_REFUSED_BY_NAME_not_attempted(eng):
     assert "rebooted the machine" in msg
 
 
-def test_an_unreadable_host_refuses_rather_than_guessing(eng, monkeypatch):
+def test_an_unreadable_UNIFIED_host_refuses_rather_than_guessing(eng, monkeypatch):
     """On a platform where the failure mode is a reboot, "I could not measure
     the memory" must never resolve to "go ahead"."""
     from nodes._otr_video_engines import motion_common as mc
     monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    monkeypatch.setattr(mc, "_unified_memory_backend", lambda: True)
     with pytest.raises(vreg.EngineUnusable):
         eng._beat_hold(250)
+
+
+def test_an_unreadable_DISCRETE_host_runs_the_frozen_cadence(eng, monkeypatch):
+    """The same unreadable memory must NOT refuse on a discrete card.
+
+    THIS PINS A SHIPPED REGRESSION, and the test above is the one that let it
+    through by asserting the refusal unconditionally. ``_physical_ram_mb`` was
+    POSIX-only, so on Windows it returned None, the ceiling came back None, and
+    this lane raised EngineUnusable on the FIRST BEAT OF EVERY RENDER on both
+    of the operator's Windows boxes -- an Apple-Silicon guard that deleted a
+    working Windows lane.
+
+    The refusal's own message says why it exists: exhausting UNIFIED memory
+    reboots the machine. A discrete card has somewhere to offload to and its
+    overrun is a re-runnable process kill, so the correct behaviour there is
+    the frozen cadence -- exactly what every non-adaptive sibling does.
+    """
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    monkeypatch.setattr(mc, "_unified_memory_backend", lambda: False)
+    assert eng._beat_hold(250) == eng.hold_factor
+
+
+def test_physical_ram_is_readable_on_windows_too(monkeypatch):
+    """The POSIX probe is not the only probe.
+
+    ``os.sysconf`` does not exist on Windows. Deleting it here is exactly what
+    a Windows interpreter looks like to this function, and the fallback must be
+    reached rather than the whole thing returning None -- which is the state
+    that produced the regression pinned above.
+    """
+    import inspect
+    from nodes._otr_video_engines import motion_common as mc
+    src = inspect.getsource(mc._physical_ram_mb)
+    assert "GlobalMemoryStatusEx" in src, (
+        "the Windows probe is gone; _physical_ram_mb is POSIX-only again and "
+        "every Windows host will read as unmeasurable")
+    # The POSIX branch must still be FIRST -- the Mac ceiling was calibrated
+    # against it, and a reordering would silently re-anchor the measurement.
+    assert src.index("sysconf") < src.index("GlobalMemoryStatusEx")
+    monkeypatch.delattr(os, "sysconf", raising=False)
+    mc._physical_ram_mb()          # must not raise on a non-POSIX host
 
 
 def test_the_ceiling_is_derived_from_the_host_not_hardcoded():
@@ -977,6 +1024,11 @@ def test_shot_cache_identity_raises_rather_than_returning_a_bogus_key(eng,
     assert eng.shot_cache_identity(req)          # fine normally
     from nodes._otr_video_engines import motion_common as mc
     monkeypatch.setattr(mc, "latent_ceiling_for_host", lambda *a, **k: None)
+    # UNIFIED IS STATED, NOT INHERITED FROM WHATEVER TORCH THIS BOX HAS. The
+    # refusal is scoped to unified memory (see _beat_hold), so a test that
+    # leaves the backend ambient asserts different things on different
+    # machines -- and on a discrete box asserts the opposite of the truth.
+    monkeypatch.setattr(mc, "_unified_memory_backend", lambda: True)
     with pytest.raises(vreg.EngineUnusable):
         eng.shot_cache_identity(req)
 

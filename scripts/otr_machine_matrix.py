@@ -364,6 +364,10 @@ def extra_install_for(cells) -> str:
 
 
 def render() -> str:
+    # Cleared per render: the flag is module-global, so a second call in the
+    # same process would otherwise inherit the first one's verdict.
+    global _DEGRADED
+    _DEGRADED = ""
     profs = load_profiles()
     L = []
     A = L.append
@@ -655,6 +659,19 @@ _VOICE_SHIP_NOTES = {
 }
 
 
+#: Set when the VOICE-ENGINE section could not read the live audio registry --
+#: and ONLY that section, which is narrower than it sounds and is said out loud
+#: here because a reader who assumed "any degraded section" would trust this
+#: flag further than it deserves. Two other soft failures do NOT set it: a
+#: known-limits load that falls back to an empty section, and a corrupt profile
+#: JSON that load_profiles skips. Widening it means setting it there too.
+#:
+#: A degraded render is fine to LOOK at and fatal to SAVE, so it gates writing
+#: and --check, not rendering. --stdout deliberately still prints: nothing is
+#: overwritten and a human reading the output can see the placeholder.
+_DEGRADED = ""
+
+
 def _voice_engines_table(A) -> None:
     """Every registered voice engine, from `nodes/_otr_audio_engines/registry.py`."""
     try:
@@ -666,6 +683,14 @@ def _voice_engines_table(A) -> None:
             _sys.path.insert(0, _root)
         from nodes._otr_audio_engines.registry import CAPABILITIES, _REGISTRY
     except Exception as exc:  # noqa: BLE001 -- the matrix must still generate
+        # ...but it must NEVER be WRITTEN in this state. Proven 2026-09-09 by
+        # doing exactly that: run under a torch-less interpreter, this branch
+        # replaced the whole voice table in the shipped doc with one
+        # parenthetical, and the write reported success. `render()` may still
+        # degrade -- callers that only want the class table depend on it -- so
+        # the flag is what main() refuses on.
+        global _DEGRADED
+        _DEGRADED = "voice-engine table (%s)" % exc
         A("## Voice engines\n")
         A("(registry unavailable in this interpreter: %s)\n" % exc)
         return
@@ -704,6 +729,21 @@ def main(argv=None) -> int:
     if args.stdout:
         sys.stdout.write(text)
         return 0
+
+    if _DEGRADED:
+        # Refusing is the whole point: this generator OVERWRITES a shipped doc,
+        # and a run that cannot read the registry produces a doc that is worse
+        # than the one already on disk. Run it under the ComfyUI interpreter.
+        # --check gets the same refusal, and for the same reason: a degraded
+        # render differs from the good doc on disk, so checking it would report
+        # DRIFT that does not exist and send somebody to "fix" a correct file.
+        print("CANNOT %s: this interpreter could not read the %s, so the "
+              "render is incomplete. It would %s. Re-run under the ComfyUI "
+              "venv (the one with torch)."
+              % ("CHECK" if args.check else "WRITE", _DEGRADED,
+                 "report drift against a correct doc" if args.check
+                 else "overwrite a good doc with a placeholder"))
+        return 3
 
     if args.check:
         try:

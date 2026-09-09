@@ -29,6 +29,12 @@ def test_matrix_and_readme_are_in_sync_with_the_profiles():
     """`--check` writes nothing and fails if either surface is stale."""
     r = subprocess.run([sys.executable, _SCRIPT, "--check"],
                        capture_output=True, text=True, cwd=_REPO)
+    if r.returncode == 3:
+        # The generator reads the live audio registry, so an interpreter
+        # without torch renders an incomplete doc. That is not drift and must
+        # not be reported as drift -- the generator refuses rather than
+        # comparing, and there is nothing this test can prove here.
+        pytest.skip(r.stdout.strip() or "registry unavailable in this interpreter")
     assert r.returncode == 0, (
         "docs/MACHINE_MATRIX.md or README's generated block no longer matches "
         "config/profiles/. Regenerate with:\n"

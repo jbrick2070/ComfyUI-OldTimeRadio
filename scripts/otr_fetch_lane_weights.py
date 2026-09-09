@@ -58,7 +58,7 @@ class WeightSpec(NamedTuple):
 LANE_INFO = {
     "haunted": (3.65, "AnimateDiff video -- SD1.5 + motion module. The cheapest "
                       "complete video lane."),
-    "lightning": (3.17, "AnimateDiff DISTILLED -- SD1.5 + the ByteDance 8-step "
+    "lightning": (3.14, "AnimateDiff DISTILLED -- SD1.5 + the ByteDance 8-step "
                         "module. Same graph as `haunted` minus the adapter, at "
                         "8 sampler steps and cfg 1.0 instead of 20 and 8.0, so "
                         "8 UNet passes a beat where the golden recipe takes 40. "

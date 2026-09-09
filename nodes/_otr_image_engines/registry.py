@@ -119,6 +119,14 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["flux.1-dev"]},
+    # mps is WITHHELD ON PURPOSE, and this comment exists so the next reader does
+    # not "fix" it. Klein HAS rendered on a 16 GB M4 -- klein_run.log, a clean
+    # 1472x832 still -- so the absence of `mps` here is NOT the usual "nobody has
+    # run it". It peaked at 22 GB on a 16 GB machine and only survived on swap,
+    # at ~8 min a still. On unified memory an overrun is a HARD MACHINE REBOOT,
+    # so a lane that clears 16 GB by swapping is not one to put in a Mac user's
+    # dropdown; `sd15` is the practical Mac image engine and declares mps.
+    # Declaring mps here would make Klein selectable on every Mac profile.
     "flux2_klein": {"required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,

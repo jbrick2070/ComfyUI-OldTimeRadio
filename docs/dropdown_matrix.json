@@ -1,0 +1,494 @@
+{
+ "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (an episode rendered, receipt in docs/MACHINE_MATRIX.md) | fits | oom | no | unknown. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row.",
+ "engines": {
+  "animatediff15_lightning_video": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 3.1
+  },
+  "animatediff15_v3_haunted_video": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "proven"
+   },
+   "size_gb": 3.8
+  },
+  "animatediff15_v3_stillin_lab_video": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 3.8
+  },
+  "bark": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 4.2
+  },
+  "chatterbox": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 3.0
+  },
+  "cloud_flux_pro": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_kling_avatar": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_krea_2_turbo": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_luma_photon_flash": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_nano_banana_2": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_seedance_2": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_seedream_2": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_vidu_q2_pro_fast_720p": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_wan_i2v": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "cloud_wan_i2v_audio": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "dia": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 6.0
+  },
+  "elevenlabs": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "fastwan_8gb": {
+   "memory": {
+    "mac16": "no",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 10.0
+  },
+  "flux2_klein": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "proven"
+   },
+   "note": "Rendered a clean 1472x832 still on a 16 GB M4 (klein_run.log) but peaked at 22 GB and survived only on swap, at ~8 min a still, so mps is withheld from its declaration on purpose. sd15 is the practical Mac image engine.",
+   "size_gb": 11.0
+  },
+  "flux_gen1": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 13.0
+  },
+  "google_image": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "google_lyria": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "google_omni_video": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "google_tts": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "google_veo_video": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "humo": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "proven",
+    "nv8": "unknown"
+   },
+   "size_gb": 26.7
+  },
+  "humo_1.7B": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 12.6
+  },
+  "humo_1.7B_169": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 12.6
+  },
+  "humo_14B_169": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 26.7
+  },
+  "ideo": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "ideogram4_local": {
+   "memory": {
+    "mac16": "no",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 17.3
+  },
+  "indextts2": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 11.1
+  },
+  "kokoro": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "proven"
+   },
+   "size_gb": 0.3
+  },
+  "ltx25_foley_plus": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 19.6
+  },
+  "ltx25_mime": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 19.6
+  },
+  "ltx25_video": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 19.6
+  },
+  "ltx_8gb": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "proven",
+    "nv8": "unknown"
+   },
+   "size_gb": 9.1
+  },
+  "ltx_audio_in": {
+   "memory": {
+    "mac16": "no",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 15.2
+  },
+  "ltx_video": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 14.8
+  },
+  "lumina_image": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 10.4
+  },
+  "mesh_stage": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 4.6
+  },
+  "minimax_h3_audio_in": {
+   "memory": {
+    "mac16": "no",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 42.5
+  },
+  "minimax_h3_video": {
+   "memory": {
+    "mac16": "no",
+    "nv16": "proven",
+    "nv8": "unknown"
+   },
+   "size_gb": 41.9
+  },
+  "musicgen": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "proven"
+   },
+   "size_gb": 2.2
+  },
+  "off": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "sd15": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 2.0
+  },
+  "sonilo": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "spandrel_esrgan": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 0.1
+  },
+  "stable_audio_3": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 3.5
+  },
+  "stable_audio_music": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 4.5
+  },
+  "still_flat": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "still_motion": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "still_pan": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "still_word": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "viz_camera": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "viz_green": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "viz_mxc_cpu": {
+   "memory": {
+    "mac16": "proven",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "viz_mxc_mandala": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "wan_ti2v": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "proven",
+    "nv8": "unknown"
+   },
+   "size_gb": 10.6
+  },
+  "word_razzle": {
+   "memory": {
+    "mac16": "fits",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": null
+  },
+  "z_image_turbo": {
+   "memory": {
+    "mac16": "oom",
+    "nv16": "unknown",
+    "nv8": "unknown"
+   },
+   "size_gb": 19.3
+  }
+ }
+}

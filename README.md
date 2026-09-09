@@ -457,6 +457,188 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 ---
 
+## What each dropdown costs you to download, and what will run it
+
+**You never need all the weights in this workflow.** One graph ships; the
+dropdowns decide what it loads, and therefore what you have to fetch. The table
+below is per DROPDOWN CHOICE, so you can price a feature -- and check your
+machine against it -- before you pick it.
+
+The whole table is generated from the code (`scripts/otr_dropdown_matrix.py`):
+whether a machine is offered an engine comes from that engine's own capability
+row, and the sizes come from the real fetch manifests. `docs/DROPDOWN_MATRIX.md`
+is the same table with two more machine columns (AMD ROCm and CPU-only).
+
+<!-- BEGIN GENERATED: dropdown-matrix -->
+
+**Video -- procedural, nothing to download**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `still_flat` | nothing | -- | ? | ? | **proven** |
+| `still_motion` | nothing | -- | ? | ? | **proven** |
+| `still_pan` | nothing | -- | ? | ? | **proven** |
+| `still_word` | nothing | -- | ? | ? | **proven** |
+| `viz_camera` | nothing | -- | ? | ? | **proven** |
+| `viz_green` | nothing | -- | ? | ? | **proven** |
+| `viz_mxc_cpu` | nothing | -- | ? | ? | **proven** |
+| `viz_mxc_mandala` | nothing | -- | ? | ? | fits |
+
+**Video -- hosted, no weights but you supply the key**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `cloud_wan_i2v` | none | -- | key | key | key |
+| `cloud_wan_i2v_audio` | none | -- | key | key | key |
+| `google_omni_video` | none | -- | key | key | key |
+| `google_veo_video` | none | -- | key | key | key |
+| `word_razzle` | none | -- | key | key | key |
+
+**Video -- local diffusion**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key |
+| `cloud_seedance_2` | none, **but see below** | -- | key | key | key |
+| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key |
+| `animatediff15_lightning_video` | **auto** | 3.1 GiB | ? | ? | **proven** |
+| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | ? | not offered |
+| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | ? | ? | not offered |
+| `mesh_stage` | manual | 4.6 GiB | ? | ? | not offered |
+| `wan22_high_video` | **auto** | 9.4 GiB | ? | **proven** | not offered |
+| `wan22_high_fast` | manual | 10.0 GiB | ? | ? | not offered |
+| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | ? | ? | not offered |
+| `humo17_high_audio_in_wide` | manual | 12.6 GiB | ? | ? | not offered |
+| `ltx23_high_video` | manual | 14.8 GiB | ? | ? | not offered |
+| `ltx23_low_audio_in` | manual | 15.2 GiB | ? | ? | not offered |
+| `ltx098_low_video` | **auto** | 16.1 GiB | ? | **proven** | **proven** |
+| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | ? | ? | not offered |
+| `ltx25_high_mime` | GATED + manual | 22.2 GiB | ? | ? | not offered |
+| `ltx25_high_video` | GATED + manual | 22.2 GiB | ? | ? | not offered |
+| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | ? | **proven** | not offered |
+| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | ? | ? | not offered |
+| `h3_low_video` | manual | 41.9 GiB | ? | **proven** | not offered |
+| `h3_low_audio_in` | manual | 42.5 GiB | ? | ? | not offered |
+
+**Image -- local**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `sd15` | **auto** | 2.0 GiB | ? | ? | **proven** |
+| `flux2_klein` | manual | 10.2 GiB | **proven** | ? | not offered |
+| `lumina_image` | manual | 10.4 GiB | ? | ? | not offered |
+| `flux_gen1` | manual | 13.0 GiB | ? | ? | not offered |
+| `ideogram4_local` | manual | 17.3 GiB | ? | ? | not offered |
+| `z_image_turbo` | **auto** | 19.3 GiB | ? | ? | not offered |
+
+**Image -- hosted**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `cloud_flux_pro` | none | -- | key | key | key |
+| `cloud_krea_2_turbo` | none | -- | key | key | key |
+| `cloud_luma_photon_flash` | none | -- | key | key | key |
+| `cloud_nano_banana_2` | none | -- | key | key | key |
+| `cloud_seedream_2` | none | -- | key | key | key |
+| `google_image` | none | -- | key | key | key |
+| `ideo` | none | -- | key | key | key |
+
+**Voice and music -- local**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `kokoro` | **auto** | 0.3 GiB | **proven** | ? | **proven** |
+| `musicgen` | **auto** | 2.2 GiB | **proven** | ? | **proven** |
+| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | ? | not offered |
+| `stable_audio_3` | **auto** | 3.5 GiB | ? | ? | **proven** |
+| `bark` | **auto** | 4.2 GiB | ? | ? | **proven** |
+| `stable_audio_music` | **auto** | 4.5 GiB | ? | ? | not offered |
+| `dia` | own installer (Windows) | 6.0 GiB | not offered | ? | not offered |
+| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | ? | not offered |
+
+**Voice and music -- hosted**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `elevenlabs` | none | -- | key | key | key |
+| `google_lyria` | none | -- | key | key | key |
+| `google_tts` | none | -- | key | key | key |
+| `sonilo` | none | -- | key | key | key |
+
+**Upscale**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
+|---|---|---|---|---|---|
+| `off` | nothing | -- | ? | ? | **proven** |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | ? | ? | fits |
+**How you get the weights.** **auto** -- fetched on first use, no account and no
+token; just pick it and run. **GATED** -- fetches itself, but only after you
+accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
+it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
+**none** -- no weights at all. *no lane* -- the engine is registered but no
+provisioning lane is declared for it, so nothing will fetch it for you.
+
+**own installer** -- installs through its own script rather than the model
+provisioner; **(Windows)** marks the three whose installer is PowerShell with no
+`.sh` twin, so on Linux and macOS there is no install path today. That is
+packaging, not hardware -- writing the shell installer is what clears it. **nothing** -- pure code; there is nothing to obtain.
+
+Sizes are GiB, summed from the real artifact bytes in the fetch manifests where
+a lane carries them, otherwise the figure the fetcher's own pick list states.
+
+**What a machine cell means, and read this before you read one.** Each cell
+answers TWO questions in order.
+
+* **not offered** -- OTR will not put this engine in your dropdown on that
+  machine, because its declaration does not list that backend. This is a
+  statement about the code, **not about your hardware**: several of these have
+  run on that hardware, and the declaration is a record of what has been
+  PROVEN, not of what is possible. Making one available is a code change plus a
+  receipt, not a purchase.
+* **too slow** -- offered on a CPU-only box in principle, kept off it because it
+  is not practical there.
+* Otherwise the engine IS offered, and the word is the memory verdict:
+  **proven** (an episode actually rendered, receipt in `docs/MACHINE_MATRIX.md`),
+  fits (nothing blocks it and it fits, nobody has run it), **OOM** (expect to
+  exhaust memory), **?** (offered, and nobody has measured it).
+
+**The AMD column is the weakest one here, and it is weak by construction.** The
+ROCm profiles declare `device_backend: "cuda"`, because that is how ROCm
+presents itself to torch -- so every CUDA lane reads as offered there, and the
+column is really answering "is this vendor-locked or sidecar-locked?" rather
+than "has this been run on AMD?". Nothing in this repo has an AMD receipt. Treat
+an AMD cell as the absence of a hard blocker, nothing more.
+
+**On a Mac, OOM is a HARD MACHINE REBOOT, not a failed render** -- unified
+memory has no separate pool to exhaust. That is why the Mac column is worth
+reading before you pick, and why an unmeasured **?** there deserves more caution
+than the same mark on a discrete card.
+<!-- END GENERATED: dropdown-matrix -->
+
+### The cheapest complete setups
+
+Every engine in these three is **auto-download, ungated** -- no token, no manual
+fetch, nothing to accept:
+
+| | dropdowns | total download |
+|---|---|---|
+| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~3.8 GB** |
+| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** |
+| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** |
+
+The `viz_*` lanes are audio-reactive and declare `accepts_still = False`, so they
+mint no still and never invoke an image engine -- which is why the smallest setup
+needs no image weights at all.
+
+### One trap worth knowing before you change a dropdown
+
+The image dropdowns ship defaulted to `z_image_turbo` (19.3 GB). With the default
+`viz_*` video lanes that engine is never invoked, so it costs nothing. **Pick a
+`still_*` or `ltx098_low_video` video lane and it becomes live**, because those
+declare `accepts_still = True` -- one dropdown change silently pulls 19.3 GB, and
+on a 16 GB machine it then dies in the KSampler needing ~20.4 GiB. Set the three
+image dropdowns to `sd15` (2.0 GB, same job) at the same time.
+
 ## Running on a Mac (Apple Silicon)
 
 **The shipped canonical renders end to end on Apple Silicon and publishes to

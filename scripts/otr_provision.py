@@ -39,6 +39,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import NamedTuple
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
@@ -1621,6 +1622,151 @@ def load_machine_profile(machine_key: str) -> dict:
         raise ProvisionFailure(str(exc))
 
 
+class _Unrouted:
+    """No provisioning lane is DECLARED for this engine.
+
+    Distinct from ``None``, which means "declared, and it needs nothing" (the
+    procedural visualizers, the still lanes, every cloud lane). The difference
+    is the whole point: ``None`` is an answer, ``UNROUTED`` is a gap, and a
+    caller that cannot tell them apart either provisions nothing for a lane
+    that needs weights, or reports a gap where there is none.
+    """
+    __slots__ = ()
+
+    def __repr__(self) -> str:      # pragma: no cover - debugging aid
+        return "UNROUTED"
+
+
+UNROUTED = _Unrouted()
+
+
+class Lane(NamedTuple):
+    """One provisioning lane: its fetcher/tier name and how it is obtained."""
+    lane: str
+    manual: bool
+
+
+#: Why a registered engine has NO provisioning lane. An engine absent from
+#: this table AND unrouted is a genuine gap -- nothing will fetch its weights
+#: and a profile selecting it fails to provision -- which is why the reasons
+#: are declared here in code, next to the router, rather than described in a
+#: document that cannot be tested.
+#:
+#:   "hf_cache" -- auto-downloads on first use through the Hugging Face cache.
+#:                 No lane is needed and none should be added; the engine's own
+#:                 loader fetches it. Still a download, so it still has a size.
+#:   "sidecar"  -- installs through its own installer script, not the model
+#:                 provisioner. Friction lives in that installer.
+#:   "remote"   -- a hosted API. No local weights at all, only a credential.
+#:   "remote_unprovisioned"
+#:              -- a hosted API that NO SHIPPING PROFILE SELECTS. It is
+#:                 deliberately absent from _REMOTE_NO_WEIGHT_VIDEO_ENGINES,
+#:                 whose comment restricts that set to routes a shipping
+#:                 profile exercises -- so profile_lanes still RAISES on it.
+#:                 The engine works; provisioning a profile that names it does
+#:                 not, and a matrix that painted it like its provisioned
+#:                 siblings would be telling a stranger it is ready.
+#:   "builtin"  -- pure code. No weights and no service; nothing to obtain.
+NO_LANE_REASON = {
+    # Voice and music that arrive through the HF cache on first use.
+    "kokoro": "hf_cache",
+    "bark": "hf_cache",
+    "musicgen": "hf_cache",
+    "stable_audio_music": "hf_cache",
+    # Voice engines with their own installers (scripts/_otr_*_install.ps1).
+    "chatterbox": "sidecar",
+    "dia": "sidecar",
+    "indextts2": "sidecar",
+    # Hosted voice/music.
+    "elevenlabs": "remote",
+    "google_tts": "remote",
+    "google_lyria": "remote",
+    "sonilo": "remote",
+    # Image models fetched by their own loaders / documented manual tiers.
+    "sd15": "hf_cache",
+    "lumina_image": "manual_doc",
+    "flux_gen1": "manual_doc",
+    "ideogram4_local": "manual_doc",
+    # Hosted video lanes registered after the remote sets below were written,
+    # and never added to them because no shipping profile selects one. Naming
+    # them here records the gap instead of hiding it.
+    "cloud_kling_avatar": "remote_unprovisioned",
+    "cloud_seedance_2": "remote_unprovisioned",
+    "cloud_vidu_q2_pro_fast_720p": "remote_unprovisioned",
+    # Upscale ships one model, pulled on first use. "off" does nothing at all,
+    # which is neither a download nor a service.
+    "off": "builtin",
+    "spandrel_esrgan": "hf_cache",
+    # Local video lanes whose weights are documented but have no fetcher lane.
+    "mesh_stage": "manual_doc",
+    "fastwan_8gb": "manual_doc",
+    "ltx_video": "manual_doc",
+    "ltx_audio_in": "manual_doc",
+}
+
+
+def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
+    """Route ONE engine id to its provisioning lane. The single router.
+
+    ``profile_lanes`` walks a profile's selections through this; the dropdown
+    matrix generator walks every registered engine through it. They must not
+    disagree, so there is exactly one copy of the table and it lives here.
+
+    Returns a :class:`Lane`, ``None`` (needs no weights), or ``UNROUTED`` (no
+    lane declared -- the caller decides whether that is fatal).
+    """
+    engine = _PUBLIC_VIDEO_IDS.get(engine, engine) if kind == "video" else engine
+    if kind == "video":
+        if engine in _H3_ENGINES:
+            return Lane("h3_operator_only", True)
+        if engine in _LTX25_ENGINES:
+            return Lane("ltx25", True)
+        if engine in _HUMO14_ENGINES:
+            return Lane("humo", False)
+        if engine in _HUMO17_ENGINES:
+            return Lane("humo_1_7b", True)
+        if engine == "wan_ti2v":
+            return Lane("wan_ti2v_gguf", False)
+        if engine == "ltx_8gb":
+            return Lane("ltx_8gb", False)
+        if engine == "animatediff15_lightning_video":
+            # BEFORE the _ANIMATEDIFF_ENGINES branch and deliberately NOT in
+            # that set: every id in it routes to "haunted", which fetches the
+            # v3 module + v3 adapter. This lane loads neither. Adding it to the
+            # set instead of here would provision 1.77 GB of wrong weights and
+            # leave the one file the lane opens un-fetched.
+            return Lane("lightning", False)
+        if engine in _ANIMATEDIFF_ENGINES:
+            return Lane("haunted", False)
+        if engine in (_NO_WEIGHT_VIDEO_ENGINES |
+                      _REMOTE_NO_WEIGHT_VIDEO_ENGINES):
+            return None
+        return UNROUTED
+    if kind == "image":
+        if engine == "flux2_klein":
+            return Lane("flux2_klein", True)
+        if engine == "z_image_turbo":
+            return Lane("z_image_int8" if low_vram else "z_image", False)
+        if engine in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
+            return None
+        return UNROUTED
+    if kind == "audio":
+        # stable_audio_3 is the ONLY audio engine with a fetcher lane. Every
+        # other voice/music engine either auto-downloads through the HF cache
+        # on first use or installs through its own sidecar, and neither is a
+        # provisioning lane. Returning a lane for any of them here would make
+        # profile_lanes emit a name `_fetcher_lane_names()` does not know and
+        # fail every profile that selects it -- so they fall through to
+        # UNROUTED, which every caller either ignores or explains through
+        # NO_LANE_REASON.
+        if engine == "stable_audio_3":
+            return Lane("stable_audio_3", False)
+        return UNROUTED
+    if kind == "upscale":
+        return UNROUTED
+    return UNROUTED
+
+
 def profile_lanes(profile) -> dict:
     """Resolve one exact profile dict into automatic lanes and manual tiers."""
     if isinstance(profile, str):
@@ -1657,34 +1803,13 @@ def profile_lanes(profile) -> dict:
     automatic = []
     manual = []
     for video in sorted(selected_videos):
-        if video in _H3_ENGINES:
-            manual.append("h3_operator_only")
-        elif video in _LTX25_ENGINES:
-            manual.append("ltx25")
-        elif video in _HUMO14_ENGINES:
-            automatic.append("humo")
-        elif video in _HUMO17_ENGINES:
-            manual.append("humo_1_7b")
-        elif video == "wan_ti2v":
-            automatic.append("wan_ti2v_gguf")
-        elif video == "ltx_8gb":
-            automatic.append("ltx_8gb")
-        elif video == "animatediff15_lightning_video":
-            # BEFORE the _ANIMATEDIFF_ENGINES branch and deliberately NOT in
-            # that set: every id in it routes to "haunted", which fetches the
-            # v3 module + v3 adapter. This lane loads neither. Adding it to the
-            # set instead of here would provision 1.77 GB of wrong weights and
-            # leave the one file the lane opens un-fetched.
-            automatic.append("lightning")
-        elif video in _ANIMATEDIFF_ENGINES:
-            automatic.append("haunted")
-        elif video in (_NO_WEIGHT_VIDEO_ENGINES |
-                       _REMOTE_NO_WEIGHT_VIDEO_ENGINES):
-            pass
-        else:
+        lane = lane_for_engine(video, "video")
+        if lane is UNROUTED:
             raise ProvisionFailure(
                 "profile %r selects unrecognized video engine %r; "
                 "no fallback was chosen" % (pid, video))
+        if lane is not None:
+            (manual if lane.manual else automatic).append(lane.lane)
 
     try:
         low_vram = float(
@@ -1692,19 +1817,18 @@ def profile_lanes(profile) -> dict:
     except (TypeError, ValueError):
         low_vram = False
     for image in sorted(images):
-        if image == "flux2_klein":
-            manual.append("flux2_klein")
-        elif image == "z_image_turbo":
-            automatic.append("z_image_int8" if low_vram else "z_image")
-        elif image in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:
-            pass
-        else:
+        lane = lane_for_engine(image, "image", low_vram=low_vram)
+        if lane is UNROUTED:
             raise ProvisionFailure(
                 "profile %r selects unrecognized image engine %r; "
                 "no fallback was chosen" % (pid, image))
+        if lane is not None:
+            (manual if lane.manual else automatic).append(lane.lane)
 
-    if music == "stable_audio_3":
-        automatic.append("stable_audio_3")
+    if music:
+        lane = lane_for_engine(music, "audio")
+        if lane is not None and lane is not UNROUTED:
+            (manual if lane.manual else automatic).append(lane.lane)
 
     def dedupe(values):
         return list(dict.fromkeys(values))

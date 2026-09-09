@@ -1167,15 +1167,34 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             return base
         ceiling = _MC.latent_ceiling_for_host(*self.render_canvas)
         if not ceiling:
-            # Unreadable memory on a host whose OOM is a REBOOT is not a green
-            # light. Refuse rather than fly blind.
-            raise EngineUnusable(
-                self.name, self.family,
-                EngineUsabilityReason.MALFORMED_CONFIG,
-                "%s cannot read this host's memory, and on unified memory an "
-                "over-large batch reboots the machine rather than failing the "
-                "render. Refusing instead of guessing." % self.name,
-                kind="video")
+            # THE REFUSAL IS SCOPED TO UNIFIED MEMORY, and the scope is the
+            # whole justification -- read the message it raises. Exhausting
+            # unified memory REBOOTS THE MACHINE, so flying blind there can
+            # cost the operator the box; on a discrete card the same overrun
+            # kills the render process and is re-runnable, which is an
+            # annoyance and not a reason to refuse work.
+            #
+            # WRITTEN AFTER SHIPPING IT THE OTHER WAY (2026-09-09). This branch
+            # refused unconditionally, and `_physical_ram_mb` was POSIX-only,
+            # so on BOTH of the operator's Windows boxes the lane raised on the
+            # first beat of every render -- a Mac guard that deleted a working
+            # Windows lane, which is the exact failure CLAUDE.md section 0B
+            # exists to prevent. The probe now covers Windows too, so this
+            # branch should be unreachable there; it stays scoped anyway,
+            # because a guard whose rationale names one platform must not fire
+            # on the platform it does not describe.
+            if _MC._unified_memory_backend():
+                raise EngineUnusable(
+                    self.name, self.family,
+                    EngineUsabilityReason.MALFORMED_CONFIG,
+                    "%s cannot read this host's memory, and on unified memory "
+                    "an over-large batch reboots the machine rather than "
+                    "failing the render. Refusing instead of guessing."
+                    % self.name,
+                    kind="video")
+            # Discrete VRAM, memory unreadable: no opinion. Run the frozen
+            # cadence, exactly as every non-adaptive sibling does.
+            return base
         for hold in range(base, GHOST_HOLD_FACTOR_MAX + 1):
             if self._source_request_for(target, hold) <= ceiling:
                 return hold
