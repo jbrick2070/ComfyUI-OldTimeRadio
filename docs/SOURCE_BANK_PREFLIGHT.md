@@ -45,9 +45,7 @@ and hashes.
 - [ ] **Hard:** The design names its orientation and closure mechanism, and a
   test or receipt identifies the resulting artifact or line IDs. Whether the
   result works artistically remains taste, not a fatal gate.
-- [ ] **Hard:** The creative contract forbids guns, blood, violence, and
-  swearing without using deterministic prose censorship as a substitute for a
-  model repair.
+- [ ] **Hard:** The creative contract carries no blanket content restriction. Generated episodes are not filtered for violence or profanity (operator directive 2026-08-03): an adaptation lane carries the author's own language and events as written, and an invention lane writes what the story needs. No prompt, seam, or test reintroduces a "no guns, blood, violence, or swearing" clause, and deterministic prose censorship is never used as a substitute for a model repair.
 
 Creative quality remains a taste decision, not a runtime validator.
 
@@ -165,8 +163,7 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** Base, structural-retry, and typed-repair prompts fit the
   resolved context cap of their actual slot/model. Provenance-sensitive calls
   fail loudly rather than truncate.
-- [ ] **Hard:** Output reservations scale from the artifact's real size driver
-  such as line count or evidence count, not only `target_words`.
+- [ ] **Hard:** Output reservations scale from the artifact's real size driver such as line count, evidence count, or the requested `act_count` (the only size-shaped input; there is no word target -- `target_words` was removed 2026-08-14).
   **Reserving the whole remaining context window does not satisfy this.** A call
   that requests `context_cap - prompt_tokens` has not scaled from a size driver;
   it has declined to size at all, and it hands a degenerate decode the entire
@@ -199,8 +196,7 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** Creative randomness uses OS entropy. Reproducibility comes
   only from the existing explicit seed overrides; the bank does not plant a
   fixed seed.
-- [ ] **Hard:** `target_words` is advisory and recorded. It does not trigger
-  deterministic trim, padding, culling, rewriting, or a fatal quota gate.
+- [ ] **Hard:** There is no word target. `target_words` was removed 2026-08-14; the only size-shaped input is the explicit `act_count` combo ("1".."6", `_otr_writer_inputs._ACT_COUNT_CHOICES`, derived from `_otr_episode_budget.MIN_ACT_COUNT` / `MAX_ACT_COUNT`), and an out-of-range value falls back to the default rather than refusing. Measured word counts are stamped as telemetry only (`production_ledger.stamp_word_counts` -> `meta.character_word_count`, `meta.announcer_word_count`, `meta.total_word_count`) and never trigger deterministic trim, padding, culling, rewriting, a refusal, or a fatal quota gate (operator directive 2026-08-03: never chase word count).
 
 ## Gate 4 -- Ledger closure and delivery
 
@@ -241,9 +237,7 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** Evidence maps and authorship receipts live in typed artifacts
   or namespaced `meta`; the fixed line schema contains no ad hoc provenance
   fields.
-- [ ] **Hard:** The pack deliberately selects its live freeze policy: non-empty
-  `line_composer_system` means `legacy_full`; absence means
-  `content_owned_readonly`. A test proves the expected policy.
+- [ ] **Hard:** The pack deliberately selects its live freeze policy (`_otr_freeze_cascade.resolve_freeze_policy`, keyed on `meta.source_bank`): a non-empty `line_composer_system` seam resolves to `inline_safety_cleanup` (the shared atomic safety patch plus deterministic role normalization); no such seam resolves to `content_owned_readonly` (read-only verification of the lane's sealed authorship and structure); a tagged bank that cannot resolve returns `policy_resolution_failed` as a terminal error and never fails open. A test proves the expected policy name for the new bank.
 - [ ] **Hard:** A content-owned runner assigns valid character `tts_model`
   and `voice_preset` values that satisfy the declared reuse policy
   (unique when reuse is disabled). Its proof survives while the shared writer
@@ -263,11 +257,7 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** The pack is duplicate-key-safe JSON at
   `nodes/story_packs/<source_bank_id>/<story_model_id>.json`, uses the live
   schema version, and its header coordinates match its path.
-- [ ] **Hard:** Every new or edited JSON -- the bank and pipeline rows, the pack
-  `<story_model_id>.json`, and `story_rules/<source_bank_id>.json` -- is UTF-8 with
-  NO byte-order mark. A leading BOM survives the duplicate-key, round-trip, and
-  validator checks but breaks downstream string matching, so a `head -c3` no-BOM
-  check is explicit (matches the Teardown gate).
+- [ ] **Hard:** Every new or edited JSON -- the bank and pipeline rows, the pack `<story_model_id>.json`, and any pack sidecar in the same directory (a deck or seed file) -- is UTF-8 with NO byte-order mark. A leading BOM survives the duplicate-key, round-trip, and validator checks but breaks downstream string matching, so a `head -c3` no-BOM check is explicit (matches the Teardown gate).
 - [ ] **Hard:** The exact bank row and pipeline row schemas validate. Defaults,
   declared seams, required seams, pass slots, and cross-references resolve.
 - [ ] **Hard:** Custom seams live in pipeline `declared_seams` and pass rows
@@ -276,21 +266,14 @@ Creative quality remains a taste decision, not a runtime validator.
 - [ ] **Hard:** Every required fetcher and interpreter ID is registered.
   **N/A** only for a valid no-source or independent-runner contract that
   deliberately declares neither.
-- [ ] **Hard:** The execution runner exists and is registered explicitly in
-  `_otr_lane_specs.LANE_SPECS` (by MODULE + ATTRIBUTE NAME, resolved lazily),
-  with that lane's request-compatibility policy DECLARED -- `compat_attr=""`
-  means "accepts any request", stated on purpose, never left blank by
-  omission. No plugin-style discovery or fallback is assumed.
+- [ ] **Hard:** The execution lane exists and is registered explicitly: a dispatched lane has a `LANE_SPECS` entry in `nodes/_otr_lane_specs.py` (by MODULE + ATTRIBUTE NAME, resolved lazily; `LaneSpec` carries only `module` and `runner_attr`), and an inline lane's pipeline id is listed in `INLINE_PIPELINES` because the writer's own body runs it. There is no request-compatibility hook -- `compat_attr`, `compat_error_attrs`, `RollRequest`, `assert_supported` and `is_roll_compatible` were removed 2026-08-14 with the word authority -- so a lane never refuses a request on size. No plugin-style discovery or fallback is assumed; a pipeline absent from both tables raises `UnknownLanePipelineError`.
 - [ ] **Hard:** `runnable=true` lands only with the runnable lane. A custom
   non-source-contract pipeline has `executable=true` in the same change.
 - [ ] **Hard:** `resolve_story_pack` and `require_runnable_bank` succeed
   for the new coordinates, and an unknown or disabled coordinate fails loud.
 - [ ] **Hard:** The existing canonical `source_bank` selector reaches the
   new bank. There is no copied, generated, or parallel workflow.
-- [ ] **Hard:** If no node, widget, input, link, or default changed, tests
-  prove registry-driven selection and the canonical workflow remains
-  unchanged, including the shipped `science_news` default. If any did
-  change, `workflows/otr_canonical.json` changed in the same commit.
+- [ ] **Hard:** If no node, widget, input, link, or default changed, tests prove registry-driven selection and the canonical workflow remains unchanged, including the saved default source selection `roll (any eligible bank)` (writer node 1 `widgets_values[21]`) and the saved style default `roll (any style)` (`widgets_values[22]`); the roll pool is every bank with `runnable=true`, so a new runnable bank enters it with no workflow edit. If any did change, `workflows/otr_canonical.json` changed in the same commit.
 - [ ] **Hard:** Any canonical JSON change passes
   `OTR_WorkflowValidator`, JSON round-trip, link referential integrity,
   wired-input-name, and live `INPUT_TYPES`/widget-count audits. Optional
@@ -304,10 +287,15 @@ Creative quality remains a taste decision, not a runtime validator.
   - **Faithful adaptation** (the bank retells someone else's work: Shakespeare,
     public-domain fiction, any lane whose contract is fidelity to a source):
     add the `source_bank_id` to `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` in
-    `nodes/_otr_casting.py` in the SAME change. The exclusion overrides BOTH the
-    entropy roll AND the operator's `always include` setting, and it stamps
-    `lemmy_policy = "source_fidelity_exclusion"` so the ledger says WHY he is
-    absent rather than leaving it to look like a lost roll.
+    `nodes/_otr_casting.py` in the SAME change, and to its deliberate copy
+    `_BANANA_EXCLUDED_SOURCE_BANK_IDS` in `nodes/_otr_banana_route.py` (fidelity
+    lanes also skip the banana visual transform;
+    `tests/test_banana_route.py::test_exclusion_frozenset_parity_with_casting`
+    asserts the two frozensets EQUAL, so editing only one fails the suite). The
+    Lemmy exclusion overrides BOTH the entropy roll AND the operator's `always
+    include` setting, and it stamps `lemmy_policy = "source_fidelity_exclusion"`
+    so the ledger says WHY he is absent rather than leaving it to look like a
+    lost roll.
   - **Invention or archive lane** (the bank writes its own story): no exclusion
     entry. The cameo behaves normally.
 
@@ -353,16 +341,9 @@ Creative quality remains a taste decision, not a runtime validator.
   pass against the live node definitions.
 - [ ] **Hard:** Before the live run, the machine is reset using the selective
   process and port procedure in `AGENTS.md`; no blanket Python kill is used.
-- [ ] **Hard:** A live 30-word run loads
-  `workflows/otr_canonical.json`, selects the new bank, exercises its real
-  source policy and real two-slot path, and reaches the shared writer tail.
-- [ ] **Hard:** Before long-form qualification, 30-word canonical smokes pass
-  with at least two materially different local LLM families and one configured
-  frontier/cloud creative lane, while the technical slot remains independently
-  exercised. Record each concrete model label and prompt ID.
-- [ ] **Hard:** After those 30-word smokes pass, repeat the same model pairings
-  at 120 words and save the ledger and published-asset receipt for each. Do not
-  begin a 720-word qualification or bakeoff until every 120-word leg is green.
+- [ ] **Hard:** A live `act_count="1"` run (the saved canonical value; harness flag `--act-count 1`) loads `workflows/otr_canonical.json`, selects the new bank, exercises its real source policy and real two-slot path, and reaches the shared writer tail. Word count is observed and recorded, never requested.
+- [ ] **Hard:** Before long-form qualification, `act_count="1"` canonical smokes pass with at least two materially different local LLM families and one configured frontier/cloud creative lane, while the technical slot remains independently exercised. Record each concrete model label and prompt ID.
+- [ ] **Hard:** After those smokes pass, repeat the same model pairings at a mid-length shape (`act_count="3"`, the writer's fallback default) and save the ledger and published-asset receipt for each. Do not begin full-length qualification (`act_count="6"`, `MAX_ACT_COUNT`) until every mid-length leg is green. No stage sets, measures against, or refuses on a word target (operator directive 2026-08-03).
 - [ ] **Hard:** The saved ledger passes the lane-owned closure proof and shared
   freeze path with no hard errors. Its source, rights, slot-call, authorship,
   and word-count receipts are present.
@@ -425,11 +406,12 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 
 **Step 0 -- decide the removal DEPTH (this drives everything below):**
 - **Variant removal** (a base or sibling version of the same lane SURVIVES, e.g. the 2026-07-19 rip
-  of a base bank while its shared runner and a renamed sibling stayed): remove only the bank's OWN row/pack/rules + its
-  DEDICATED pipeline. KEEP the shared lane runner module and any shared pipeline.
+  of a base bank while its shared runner and a renamed sibling stayed): remove only the bank's OWN row and
+  pack dir (sidecars included) + its DEDICATED pipeline. KEEP the shared lane runner module and any shared pipeline.
 - **Full-family removal** (NO surviving sibling of that lane, e.g. `scifi_sonnet_v3` is the only sonnet
-  bank): ALSO delete the lane runner module + its interpreter/source-kind registration + the dedicated
-  lane test. "Only version of its family" is the tell that a rip goes deep.
+  bank): ALSO delete the lane runner module + the bank's rows in the `_FETCHERS` / `_INTERPRETERS` tables in
+  `nodes/_otr_source_payload.py` (and the `_fetch_*` / `_interpret_*` wrappers those rows point at) + the
+  dedicated lane test. "Only version of its family" is the tell that a rip goes deep.
   **THE TELL IS THE RUNNER, NOT THE NAME (2026-08-16).** `scifi_news` and
   `scifi_news_pro` read as siblings and are not: they are separate lanes on
   separate runners, so ripping `scifi_news` was FULL-FAMILY even though a
@@ -439,29 +421,27 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 
 **Surfaces to clean (each: PASS + a file:line / test / grep evidence):**
 - [ ] **Hard:** Bank row deleted from `nodes/story_packs/banks.json`.
-- [ ] **Hard:** Pack dir `nodes/story_packs/<id>/` and `nodes/story_rules/<id>.json` deleted.
-- [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- `LANE_SPECS` in
-  `nodes/_otr_lane_specs.py` AND the JSON catalog `nodes/story_packs/pipelines.json`
+- [ ] **Hard:** Pack dir `nodes/story_packs/<id>/` deleted, sidecars included (a deck or seed file). There is no separate `story_rules` surface; the pack dir is the bank's whole per-bank file footprint.
+- [ ] **Hard:** Pipeline removed from BOTH registries when dedicated -- the code table in
+  `nodes/_otr_lane_specs.py` (`LANE_SPECS` for a dispatched lane, `INLINE_PIPELINES` for a pipeline the
+  writer's own body runs) AND the JSON catalog `nodes/story_packs/pipelines.json`
   (**the easy-to-miss one** -- a retired pipeline left in the JSON is a semantic registry failure even
   with no bank pointing at it). KEEP any pipeline a surviving bank still uses (e.g. `legacy_many_pass_adapt`).
-- [ ] **Hard:** Runner + routes -- delete the bank's `LANE_SPECS` entry and any
-  `if base == "<family>":` route. **Full-family only:** delete the lane module `nodes/_otr_<family>.py`
-  and its `validate_source_payload("<family>")` / interpreter registration; grep the family id across
-  `nodes/` and clean every orphaned import.
-- [ ] **Hard:** Registry consistency -- no retired `story_pipeline_id` remains in
-  `_otr_story_routing._ensure_loaded().pipelines`; `runnable`(bank) and `executable`(pipeline) stay in
-  sync or `_otr_story_routing` raises `RegistryValidationError`.
+- [ ] **Hard:** Runner + routes -- delete the bank's `LANE_SPECS` entry (dispatched lane); an inline pipeline id leaves `INLINE_PIPELINES` only when no surviving bank still routes to it. **Full-family only:** delete the lane module `nodes/_otr_<family>.py`, the bank's rows in the `_FETCHERS` and `_INTERPRETERS` tables in `nodes/_otr_source_payload.py`, and the `_fetch_*` / `_interpret_*` wrapper functions those rows point at; grep the family id across `nodes/` and clean every orphaned import.
+- [ ] **Hard:** Registry consistency -- no retired `story_pipeline_id` remains in `_otr_story_routing._ensure_loaded().pipelines`, and the load still passes `_crossref_bank`: a runnable bank on a source-contract pipeline declares both `fetcher` and `interpreter`, and a runnable bank on a non-source-contract pipeline points at a pipeline with `executable=true`; otherwise `_otr_story_routing` raises `RegistryValidationError`. `executable` is validation-time metadata only -- `bank.runnable` is the sole run gate, and the shipped `legacy_many_pass` / `legacy_many_pass_adapt` rows are `executable:false` while their banks are runnable.
 - [ ] **Hard:** LEMMY cameo policy removed with the bank. Delete the id from
-  `BANK_CAMEO_POLICY` in `tests/test_cast_lock_policy_repin.py`, and from
-  `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` in `nodes/_otr_casting.py` if it was a
-  faithful adaptation. That map is asserted EQUAL to the shipped registry in
+  `BANK_CAMEO_POLICY` in `tests/test_cast_lock_policy_repin.py`, and -- if it was a
+  faithful adaptation -- from BOTH `_LEMMY_EXCLUDED_SOURCE_BANK_IDS` in
+  `nodes/_otr_casting.py` and its test-pinned copy `_BANANA_EXCLUDED_SOURCE_BANK_IDS`
+  in `nodes/_otr_banana_route.py` (`tests/test_banana_route.py` asserts them EQUAL).
+  That map is asserted EQUAL to the shipped registry in
   BOTH directions, so a leftover entry fails the suite as loudly as a missing one
   -- which is the CLEAN RIP law above applied to the cameo surface: a ripped bank
   leaves no entry claiming a rule about a bank nobody ships.
 - [ ] **Hard:** Tests UPDATED, not just deleted -- the roster/bijection test (`tests/test_bank_variants.py`
   counts + id lists) reflects the new runnable roster; guard tests that enumerate banks via `_CURRENT_BANKS`/
-  inline lists (`test_placeholder_guard_v4`, `test_scene_guard_v4`, `test_provenance_v4`,
-  `test_genre_guard_spoken_v4`, `test_outro_guard_v4`, `test_source_snapshot`, ...) regenerate their lists
+  inline lists (`tests/test_scene_guard_v4.py`, `tests/test_provenance_v4.py`, `tests/test_source_snapshot.py`,
+  the `BANK_CAMEO_POLICY` map in `tests/test_cast_lock_policy_repin.py`, ...) regenerate their lists
   from the surviving roster or pin the exact ids. Do NOT trust a hand list -- `grep _CURRENT_BANKS` (+ the
   ripped ids) across `tests/` to find EVERY such list (2026-07-18: two guard tests were missed on the first
   hand-enumeration). Advisory/positive tests that DRIVE a ripped lane string: DELETE if the subject is the
@@ -481,10 +461,12 @@ ripped id across `nodes`/`tests`/`workflows` returns nothing -- test bodies incl
 
 **Gate (identical to adding + the 2026-07-18 QA hardening):**
 - [ ] **Import-smoke (Bible 03.01/03.02):** on a full-family removal, after deleting the lane module,
-  LOAD the node registry clean ("All N nodes loaded, 0 skips") and grep the REPO-ROOT `__init__.py` for a
-  leftover key -- that is the real loader surface (`NODE_CLASS_MAPPINGS` lives at `__init__.py:116` +
-  `:351-363`), NOT `nodes/__init__.py` (corrected 2026-07-18). A string grep proves the ids are gone, NOT
-  that the pack still imports.
+  LOAD the node registry clean (the boot line reads `[OldTimeRadio] OK - All <N> nodes loaded successfully`;
+  a `Loaded <x>/<N> nodes (<k> failed)` line is a FAIL) and grep the REPO-ROOT `__init__.py` for a
+  leftover key -- that is the real loader surface (`NODE_CLASS_MAPPINGS` is declared and filled in the
+  repo-root `__init__.py` -- grep the symbol for the declaration and the per-node registration loop rather
+  than trusting a line number), NOT `nodes/__init__.py` (corrected 2026-07-18). A string grep proves the ids
+  are gone, NOT that the pack still imports.
 - [ ] **Ledger-ownership (CLAUDE.md "no hole in the ledger"; PBUG-20260712-05):** enumerate every ledger
   field each removed bank stamped -- including COMPUTED keys (`f"{source_bank_id}_..."`) a literal grep
   misses -- and confirm zero surviving readers in the shared writer tail. A green suite does not prove
@@ -554,7 +536,8 @@ judgement should not cost a rebuild if the operator wants it back in March.
 
 **THE RIP MUST BE ONE ATOMIC COMMIT. This is a constraint ON the teardown,
 not advice for later.** Every surface in the checklist above -- registry
-rows, pipeline entries, pack dir, story rules, lane module, tests, docs --
+rows, pipeline entries, pack dir with its sidecars, lane module, `_FETCHERS` /
+`_INTERPRETERS` rows, `LANE_SPECS` entry, cameo-policy row, tests, docs --
 lands in a SINGLE commit whose message names the ripped id in its subject.
 That commit IS the restoration recipe, and `git revert <sha>` is the first
 move of any reversal. A rip smeared across three commits cannot be reverted
@@ -567,10 +550,7 @@ rip). The tag is the known-good tree the restored lane must be diffed
 against; without it, "what did this lane look like when it worked" is an
 archaeology exercise.
 
-**What a revert DOES restore, cleanly:** the bank row, the pipeline entries
-in both registries, the pack dir + story rules, the lane runner module, the
-`LANE_SPECS` entry, the deleted tests, and the cameo-policy row. These are
-all tracked text; git owns them completely.
+**What a revert DOES restore, cleanly:** the bank row, the pipeline entries in both registries, the pack dir and its sidecars, the lane runner module, the `_FETCHERS` / `_INTERPRETERS` rows, the `LANE_SPECS` entry, the deleted tests, and the cameo-policy row. These are all tracked text; git owns them completely.
 
 **What a revert does NOT restore, and must be re-checked by hand:**
 

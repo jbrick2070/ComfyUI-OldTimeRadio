@@ -51,7 +51,18 @@ throughout. Cite the generated matrix; do not copy it.
 ## Current Project Docs
 
 - `GO_FORWARD_PLAN.md` - current sprint and next sprint only.
-- `multimodal-story-schema/` - active source-pack and story-schema work.
+- `multimodal-story-schema/` - the 2026-07 source-pack and story-schema plans
+  plus the `schema-examples/` fixtures. Historical plan of record, last
+  changed 2026-07-24: `nodes/_otr_source_payload.py`,
+  `tests/test_source_payload_chunk3.py` and
+  `tests/test_cast_lock_policy_repin.py` still cite it for the source-payload
+  contract and the schema examples, but its stage plans also describe a
+  per-bank `story_rules` loader that never shipped (there is no
+  `nodes/story_rules/` and no `_otr_story_rules.py`) -- read them as history,
+  not as the live design. The five runnable banks live in
+  `nodes/story_packs/banks.json`; the current source-bank work is the PROPOSED
+  My Story bank, scoped in `2026-09-10-my-story-app-scope.md` and tracked as
+  sprints 3-4 in `GO_FORWARD_PLAN.md`.
 - `model-license-*.md` plus `model-license-audit-targets.txt` - model license
   audit records used by tests.
 - `conventions.md` - naming and module-shape rules enforced by tests.

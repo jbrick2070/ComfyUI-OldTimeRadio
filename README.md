@@ -1053,7 +1053,8 @@ The writer's `source_bank` dropdown selects where each episode's story comes fro
 shipped canonical workflow rolls randomly across every eligible bank each run
 (`scifi_news_pro` is only the code-level fallback for a freshly-dropped, unconfigured node —
 pin the dropdown to one bank if you want a fixed lane). Every lane is an INDEPENDENT bank (its
-own story pack + story_rules) with no dependency on any other lane.
+own story pack under nodes/story_packs/<bank_id>/ plus its bank row in
+nodes/story_packs/banks.json) with no dependency on any other lane.
 
 | Bank | What it does |
 |------|--------------|
@@ -1063,8 +1064,13 @@ own story pack + story_rules) with no dependency on any other lane.
 | `shakespeare` | Folger scene adaptation. **The Folger Digital Texts are CC BY-NC 3.0 (noncommercial)** — episodes from this bank inherit that restriction on the source text. |
 | `original` | no-source original fiction seeded from an entropy spark draw |
 
-A typed `custom_premise` rides along as an operator hint on the original lanes and as a
-source override on the article lanes. Every lane is fail-closed: a bad source, context
+A typed `custom_premise` is handled by lane shape. On `original` it rides along as an
+operator hint beside the random spark draw. On every other bank -- `scifi_news_pro`,
+`media_archive`, `public_domain` and `shakespeare` -- it replaces the fetch outright: your
+text becomes the whole source payload and no feed item, archive item, or source text is
+pulled for that run. (A dedicated My Story bank that takes a pasted text as its own lane is
+PROPOSED, not shipped; today the premise field is the only paste-your-own-text path.)
+Every lane is fail-closed: a bad source, context
 overflow, or contract violation stops loudly instead of shipping a degraded story, and
 the LLM writes all story text — Python validates, it never rewrites prose.
 
@@ -1342,9 +1348,11 @@ every leg, so killing a run mid-flight still leaves a complete record.
 - [`scripts/otr_llm_image_upscale_sweep.py`](scripts/otr_llm_image_upscale_sweep.py) —
   every curated local LLM in both writer slots, across image engines, stills, and upscalers.
 - [`scripts/otr_bank_engine_sweep.py`](scripts/otr_bank_engine_sweep.py) — the smallest local
-  model (`gemma-4-E2B-it`, 3.0 GB) in **both** writer slots across every runnable source bank
-  and all five local image engines. A 2B model is the worst case for structured extraction,
-  so a bank that survives it survives everything above it.
+  model (`gemma-4-E2B-it`, 3.0 GB) in **both** writer slots across four of the five runnable
+  source banks (`media_archive`, `original`, `public_domain`, `shakespeare` --
+  `scifi_news_pro` is deliberately absent, having qualified live on 2026-08-26) and, between
+  its two engine profiles, all five local image engines. A 2B model is the worst case for
+  structured extraction, so a bank that survives it survives everything above it.
 
 ```
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_bank_engine_sweep.py
@@ -1420,9 +1428,10 @@ project's generations. Born of the machine, still raising hell on the airwaves. 
 ## Changelog
 
 The current line is **v2.0-alpha** (Open Video Model Platform; per-role video AND image
-engines; five independent story source banks; per-platform workflow variants; frozen 48 kHz
-audio master, byte-identical in the archival copy). Full per-version history is in the git log
-and the GitHub Releases page.
+engines; five independent story source banks; one canonical workflow whose dropdowns you set
+per machine -- the per-platform variants were removed and will be regenerated from the
+canonical once it is final; frozen 48 kHz audio master, byte-identical in the archival copy).
+Full per-version history is in the git log and the GitHub Releases page.
 
 ## License & Credits
 

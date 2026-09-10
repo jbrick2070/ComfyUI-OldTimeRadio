@@ -10,7 +10,7 @@ dropdown at all) -- this doc is about *driving* a leg once it does.
 ## 0. The one rule everything else follows
 
 **The video/image engine widgets are MANAGED. A headless `--set` cannot touch
-them.** `patch_creative` (`nodes/_otr_workflow_apply.py:731`) explicitly
+them.** `patch_creative` (`nodes/_otr_workflow_apply.py:741`) explicitly
 refuses anything outside `CREATIVE_WHITELIST` -- this is deliberate (the
 BUG-08.06 stranded-COMBO class: a raw widget poke can save a value no live
 menu recognizes). The **only** sanctioned lever for an engine pick is a
@@ -26,7 +26,7 @@ JSON per leg (or per axis) rather than reaching for `--set`.**
 
 ## 1. What CAN go on the CLI directly (`CREATIVE_WHITELIST`)
 
-`nodes/_otr_workflow_apply.py:681`. These are content/model-selection dials,
+`nodes/_otr_workflow_apply.py:693`. These are content/model-selection dials,
 not managed engine widgets, and the runner (`scripts/otr_canonical_api_run.py`)
 already has dedicated flags for the most-used ones:
 
@@ -36,7 +36,7 @@ already has dedicated flags for the most-used ones:
 | `--visual-style` | `visual_style` | |
 | `--creative-model` / `--technical-model` | `creative_writing_model` / `technical_model` | **applied AFTER the profile** -- see §2 |
 | `--num-characters` | `num_characters` | |
-| `--act-count` | `act_count` | `'1'` = exactly 3 voiced beats, see §5 |
+| `--act-count` | `act_count` | explicit `'1'`..`'6'`, no auto; `'1'` = 4 voiced character beats + 2 announcer beats, no music interstitial -- see §5 |
 | `--title` / `--premise` | `episode_title` / `custom_premise` | **never use `--title` for a soak leg label** -- PBUG-20260817-05: it becomes the on-screen title card and the published filename. Label your own leg in your own harness's console/receipt, not the widget. |
 
 Anything else goes through `--set NODE.widget=value`, still gated by the same
@@ -75,46 +75,81 @@ video AND image per-role pickers live on THIS node, not on `OTR_ImageDirector`:
 `announcer_image_model`(3) `music_image_model`(4) `character_image_model`(5)
 ... `device_policy`(12) `dtype_policy`(13) `max_render_frames`(14)
 
-Value FORM differs by widget: the three `*_video_model` widgets store the
-live menu label **with its suffix**, e.g. `'still_flat (16:9)'`; the three
-`*_image_model` widgets store the **bare engine id**, e.g. `'z_image_turbo'`
-(no suffix at all). A profile's `role_overrides` writes the bare internal id
-either way -- `_director_option_value` in `_otr_workflow_apply.py` resolves it
-to the exact live label for the video widgets automatically. You only need to
-know the bare ids to author a profile; you only need the suffixed form if you
-are hand-editing `widgets_values` directly instead (not recommended -- use a
-profile).
+Value FORM differs by widget: when saved from the canvas, the three
+`*_video_model` widgets store the live menu label **with its suffix**, e.g.
+`'still_flat (16:9)'`; the three `*_image_model` widgets store the **bare
+engine id**, e.g. `'z_image_turbo'`. A profile's `role_overrides` writes the
+bare internal id, and `apply_profile` (`nodes/_otr_workflow_apply.py:644`)
+keeps it bare for every engine except the public-aliased engines listed in
+`_INTERNAL_TO_PUBLIC` (`nodes/_otr_shared/public_engines.py:246`; 15 entries
+at HEAD 75bb405b, although the docstring of `_director_option_value` (`:573`)
+still says "four"), which that function rewrites to their exact live label.
+No `still_*` or `viz_*` engine is in that map, so a soak profile selecting
+`still_flat` lands `'still_flat'` in node 87, not `'still_flat (16:9)'`; the
+bare id is admissible at runtime through the director's resolver, and the
+function's own comment tracks the canvas-display mismatch as a known,
+deliberately unwidened gap. You only need the bare ids to author a profile;
+you only need the suffixed form if you are hand-editing `widgets_values`
+directly instead (not recommended -- use a profile).
 
-**Node 88, `OTR_ImageDirector`**: granularity/seed/dtype only. **No engine
-picker lives here** -- do not go looking for `announcer_image_model` on this
-node, it is a mirror consumer (`otr_meta_brief_image_prompt.py`), not the
-authority.
+**Node 88, `OTR_ImageDirector`** (`nodes/otr_image_director.py`, class
+`OTRImageDirector` at `:150`, registered in `__init__.py:319`): eight widgets
+-- `announcer_granularity`(0) `music_granularity`(1)
+`character_granularity`(2) `fresh_cap`(3) `seed_mode`(4) `request_seed`(5)
+`custom_models_json`(6) `dtype_policy`(7). **No engine picker lives here**
+-- do not go looking for `announcer_image_model` on this node. It reads the
+three `*_image_model` picks out of the `video_policy_json` it receives from
+`OTR_VideoDirector` (`IMAGE_SLOT_ROLES` at `:59`, the pick loop at `:279`),
+so it is a consumer of node 87's choice, not the authority.
 
 **Node 84, `OTR_SilentComposite`** (upscale -- PROFILE ONLY, via
 `upscale_stage`): `upscale_engine`(5), choices are **exactly two**:
 `'off'`, `'spandrel_esrgan'` -- there is no third upscale engine to rotate in.
 `upscale_device`(6) is a free-form STRING; `'cuda'` or `'cpu'`.
 
-## 4. Which source bank actually reaches BOTH LLM slots
+## 4. Every runnable bank reaches BOTH LLM slots -- pin `scifi_news_pro` only to cover the dispatched lane
 
-Found by the 2026-08-25 sweep-design fan-out, worth restating here because it
-is easy to get backwards: an unpinned `source_bank='roll (any eligible bank)'`
-can land on a lane that never calls `technical_model` at all, which silently
-proves nothing about that slot. **`scifi_news_pro` is the only bank verified to
-drive both the creative and technical writer closures** (creative: pitch/
-treatment/script at `_otr_scifi_news_pro.py:4409/4416/4456`; technical: P0
-dossier/cast_aliases/news_read/safety cleanup/`_pass_casting` at `:4342/4434/
-4441/4474/4533`). **Pin it explicitly for any leg meant to exercise both
-slots.**
+Every runnable bank drives BOTH LLM slots. The shared writer tail runs
+`run_story_brief_reflection` and `run_produced_story_summary` on the
+technical closure for every lane (`nodes/_otr_writer_tail.py:703`,
+`:1130-1136`, `:1243-1249`), and the source-contract banks call
+`technical_fn` again in their interpreters
+(`nodes/OTR_LedgerScriptWriter.py:3527-3542`). An unpinned
+`source_bank='roll (any eligible bank)'` therefore still exercises
+`technical_model` on whichever of the five runnable banks it lands on. Pin
+`scifi_news_pro` when the leg must ALSO cover the dispatched multipass lane
+(the only entry in `LANE_SPECS`, `nodes/_otr_lane_specs.py:75`), which is the
+one lane a roll can miss.
+
+On `scifi_news_pro` the creative slot carries pitch/treatment/script
+(`_otr_scifi_news_pro.py:4707/4720/4761`) and the technical slot carries the
+P0 dossier, cast_aliases, news_read and `_pass_casting`
+(`:4648/4733/4741/4832`). The former same-story safety cleanup no longer calls
+a model: `_apply_fable_safety_cleanup` (`:4472`) returns the script unchanged
+and deletes its `technical_fn` argument, retired 2026-08-05 under the
+operator's no-content-guardrails directive. Do not count it as technical-slot
+coverage, and do not reintroduce it. Line numbers drift; re-grep
+`receipt("` before citing them.
+
+**Pin `scifi_news_pro` explicitly only when the leg must also cover the
+dispatched `scifi_news_pro_multipass` runner; the technical slot is exercised
+on every runnable bank whether or not you pin.**
 
 ## 5. `act_count='1'` is the fast, high-coverage shape
 
-At `act_count=1` there are **exactly 3 voiced beats** -- one each for
-announcer, music and character. That 1:1 mapping onto the three per-role
-engine widgets means a SINGLE one-act leg can already exercise three DIFFERENT
-still engines and three DIFFERENT image engines in one render (one per role),
-without needing three separate legs. This is the mechanism behind "one act,
-lots of variety" -- use it before reaching for more legs.
+At `act_count=1` the outline is 6 beats: 4 voiced character beats
+(`BEATS_PER_ACT`), 2 announcer beats (open + close) and NO `music_inter` beat
+(`nodes/_otr_episode_budget.py:85-87`, `:129`; `voiced_beat_count(1) == 4`).
+Beats reach the three engine roles through `speaker_role`
+(`SPEAKER_TO_VIDEO_ROLE`, `nodes/otr_shot_lock.py:61`): character beats drive
+the `character_*` widgets, announcer beats the `announcer_*` widgets, and the
+`music_*` widgets are exercised only by the mirrored opening/closing theme cue
+(`b000_music_open`, `nodes/otr_shot_lock.py:818`), never by a voiced beat. A
+SINGLE one-act leg still renders through all three roles, so it can exercise
+three DIFFERENT still engines and three DIFFERENT image engines in one render
+-- but the per-role counts are 2 announcer / 4 character / theme-cue-only
+music, not 1:1. This is the mechanism behind "one act, lots of variety" --
+use it before reaching for more legs.
 
 ## 6. The genuinely LOCAL engine pools (verified on disk 2026-08-25)
 

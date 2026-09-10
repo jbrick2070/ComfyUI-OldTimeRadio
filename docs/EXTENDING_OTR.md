@@ -9,18 +9,27 @@ build time.
 **Extending OTR in other ways.** This doc covers source banks (the heavy
 bundle+activation pattern). For adapter-style extensions -- adding your own
 AUDIO / VIDEO / IMAGE / UPSCALE engine -- the pattern is a lighter code drop:
-create `nodes/_otr_<kind>_engines/eng_<yourname>.py`, decorate the class with
-`@register` from the namespace's `registry.py`, add a `CAPABILITIES` row, and
-the dropdown auto-populates on next boot. The per-namespace `__init__.py` files
-carry a short "HOW TO ADD YOUR OWN ..." docstring for each; the upscale
-namespace's guide is at `nodes/_otr_upscale_engines/__init__.py` and mirrors
-the shipped audio/video/image conventions.
+create `nodes/_otr_<kind>_engines/eng_<yourname>.py` (the image namespace names
+its local adapters `<yourname>.py`; the `eng_` prefix is the audio/video/upscale
+convention), decorate the class with `@register` from the namespace's
+`registry.py`, add a `CAPABILITIES` row, and add a guarded
+`from . import <yourmodule>` line to that namespace's `__init__.py` -- adapters
+are imported explicitly, never discovered by scanning, so without the import
+line the engine never registers and the boot roster audit only logs it as
+missing. With all four in place the dropdown auto-populates on the next boot.
+The image, video and upscale namespaces carry a 'HOW TO ADD YOUR OWN ...'
+docstring in `__init__.py` (the upscale one at
+`nodes/_otr_upscale_engines/__init__.py` is the fullest and mirrors the shipped
+audio/video/image conventions); the audio namespace documents the same shape in
+its module docstring only.
 
-OTR ships six source banks. Every bank is INDEPENDENT and EQUAL -- its own
-definition, its own fetch/interpret strategy, its own story pack. Adding your
-own bank means adding a seventh peer, not plugging into a special "user" tier.
-Your bank runs through the same trusted shared writer and the same production
-tail as the shipped six.
+OTR ships five runnable source banks (`media_archive`, `original`,
+`scifi_news_pro`, `public_domain`, `shakespeare`) plus one non-runnable
+signpost row, `custom_source_bank` (`+ Add Your Own`). Every runnable bank is
+INDEPENDENT and EQUAL -- its own definition, its own fetch/interpret strategy,
+its own story pack. Adding your own bank means adding a sixth peer, not
+plugging into a special "user" tier. Your bank runs through the same trusted
+shared writer and the same production tail as the shipped five.
 
 This is not foolproof and is not meant to be. You own your bank. OTR gives you
 one honest contract, loud failures that name the broken field, and a cleanup
@@ -68,10 +77,13 @@ the speaker label comes from the cast row's `name`. A missing `start_s`/`dur_s`
 means zero-width cues; a missing cast row means unlabeled dialogue.
 
 **Credits roll (NO-FALLBACK -- raises on any missing receipt):**
-`meta.episode_title`, `meta.style` (or the explicit no-scaffold receipts),
-`meta.render_engines`, `meta.image_engines`, `meta.music_engine`,
-`meta.cast_contract.cast_seed` OR `meta.episode_seed` (one of the two is
-REQUIRED), `meta.gen_params_initial.seed_source`.
+`meta.episode_title`, `meta.visual_style` (the look that governs image work;
+`meta.style` stays in the ledger as provenance and is not read here --
+operator ruling 2026-08-03), `meta.render_engines`, `meta.image_engines`,
+`meta.music_engine`, and `meta.cast_contract.cast_seed` OR
+`meta.episode_seed` (one of the two is REQUIRED).
+`meta.gen_params_initial.seed_source` is printed beside the seed when present
+and is not required.
 
 **Final assembly / publish:** the clips manifest (`clips`, per-row `shot_id`,
 `beat_id`, `start_s`, `target_frame_count` > 0, manifest `fps` > 0); the mux
@@ -92,11 +104,16 @@ table plus the consumer list above IS the complete-ledger contract.
 ```
 user_packs/source_banks/<bank_id>/
   bank.json          # {"schema_version": "v2.0", "bank": { ...the row... }}
-                     #   the row is EXACTLY a shipped banks.json row: id,
-                     #   label, source_kind, fetcher/interpreter entry points,
+                     #   the row is EXACTLY a shipped banks.json row:
+                     #   source_bank_id (must equal the folder name), label,
+                     #   source_kind, fetcher/interpreter entry points,
                      #   default_story_pipeline, default_story_model,
                      #   defaults, required_seams, runnable, guide_ref.
-                     #   Every key is required; unknown keys are rejected.
+                     #   Every key except `defaults` is required (`defaults`
+                     #   may be omitted and reads as {}); interpreter, fetcher
+                     #   and guide_ref may be empty strings; runnable must be
+                     #   a JSON boolean; required_seams is a list of non-empty
+                     #   production seam names; unknown keys are rejected.
   <bank_id>.py       # single file: fetch_source + interpret_source
                      #   (keyword-only; check_compatibility is a RESERVED
                      #   name with no consumer yet -- see section 2)
@@ -109,11 +126,12 @@ user_packs/source_banks/<bank_id>/
 
 - `<bank_id>` is the folder name, the row's `source_bank_id`, and the dropdown
   value -- all three must match. Use lowercase letters, digits and underscores,
-  starting with a letter. The six shipped ids (and `custom_source_bank`) are
-  protected: a bundle that tries to shadow one is quarantined, and the shipped
-  bank is untouched.
-- Your bank row is parsed by the SAME parser that validates the shipped six and
-  held to the same cross-reference contracts: the default pipeline must be
+  starting with a letter. All six ids in `banks.json` -- the five shipped banks
+  and `custom_source_bank` -- are protected: a bundle that tries to shadow one
+  is quarantined (`protected_id`), and the shipped row is untouched.
+- Your bank row is parsed by the SAME parser that validates the shipped rows
+  (`_parse_bank`, the one bank-row parser in the tree) and held to the same
+  cross-reference contracts: the default pipeline must be
   registered, the default pack must exist under your own `story_packs/` and
   declare that pipeline, every `required_seams` entry must be present in it,
   and a `runnable` bank must have a real execution lane.
@@ -145,15 +163,20 @@ user_packs/source_banks/<bank_id>/
   (with `news_close_brief` in the dump). The same
   `validate_interpreter_result` that judges the shipped interpreters judges
   yours, and the writer -- not you -- writes the result into the ledger.
-  If your interpreter exhausts its own structured-output repair ladder and
-  raises `SourceInterpretError`, the writer does NOT abort: it derives a
+  If your `interpret_source` exhausts its own structured-output repair
+  ladder, raise `SourceInterpretError` CHAINED
+  (`raise SourceInterpretError(...) from cause`) from an exception whose
+  `.attempts` is the integer number of model calls consumed (or whose message
+  reads "N attempts failed"). Only then does the writer derive a
   deterministic same-source brief from your bank's label and the validated
-  payload, exactly as it does for the shipped four, and stamps
+  payload -- the same treatment the four registered interpreter families get
+  -- and stamp
   `meta.source_interpreter.status = "deterministic_same_source_fallback"`.
-  That brief carries your source forward verbatim and invents no genre --
-  it keeps the episode alive, it is not a substitute for a working
-  interpreter. Any other failure (bad config, backend down, a contract
-  violation in your return value) still propagates loudly.
+  That brief carries your source forward verbatim and invents no genre; it
+  keeps the episode alive, it is not a substitute for a working interpreter.
+  A bare `SourceInterpretError` with no exhaustion count, and any other
+  failure (bad config, backend down, a contract violation in your return
+  value), propagates loudly and ends the run.
 - **`check_compatibility`** is a RESERVED NAME with no contract. Nothing calls
   it, and `otr_check bank --activate` deliberately does not inspect it -- not
   even for callability. There is no request type, no decision type, and no
@@ -209,22 +232,42 @@ user_packs/source_banks/<bank_id>/
 
 ## 3. What OTR provides (so you cannot break the pipeline)
 
-- **The shared writer builds the ledger.** Your bank supplies source material
-  and prompts; the trusted writer authors the script, owns every ledger write,
-  and runs the shared tail. Your code never touches the canonical ledger, so a
-  buggy bank cannot corrupt an episode's durable state.
-- **Validation + quarantine.** `otr_check bank <path> --activate` validates
-  your JSON, your bank row, your story packs and every cross-reference boot
-  enforces; imports your Python in a child process bounded by wall time and
-  killed as a process tree; binds your lanes' signatures; and validates each
-  `fixtures/*.json` as a recorded fetch payload through the very
-  `normalize_fetch_result` your live `fetch_source` output will meet. (It does
-  not CALL your functions -- fixtures are checked as data, not replayed as
-  cases.) A broken bundle is QUARANTINED with a named, actionable issue -- it
-  never appears in the dropdown and never breaks ComfyUI boot.
+- **The shared writer builds the ledger on the source-contract pipelines.** A
+  client row on `legacy_many_pass` or `legacy_many_pass_adapt` supplies source
+  material and briefs (its own `fetch_source` / `interpret_source`, or a
+  shipped entry-point id it names); the writer's own body authors the script,
+  owns every ledger write, and runs the shared tail, so your code never
+  touches the canonical ledger and a buggy bank cannot corrupt an episode's
+  durable state. Two neighbouring routes are NOT this one. The registry also
+  lets a client row name the dispatched `scifi_news_pro_multipass` pipeline
+  (its pack must then declare exactly that lane's six seams); that lane is a
+  FIRST-PARTY runner (`nodes/_otr_scifi_news_pro.py`, dispatched by pipeline
+  id from `_otr_lane_specs.LANE_SPECS`) which builds its own ledger rows from
+  the fetched payload and hands tail parts to the writer -- use it only if you
+  are reproducing that lane's whole seam set. And an end user typing an idea
+  into node 1's `custom_premise` is not extending OTR at all: on any bank with
+  a source contract the text becomes a "User Seed" payload that replaces the
+  fetch, and on the original lane it rides as an operator hint beside the
+  spark draw. (A dedicated user-facing "My Story" bank for that path is
+  PROPOSED, not shipped.)
+- **Validation + quarantine.** `otr_check bank <path> --activate` -- the
+  checker is `scripts/otr_check.py`; on Windows run it as
+  `scripts\otr_check.bat bank <path> --activate` from the repo root (the
+  wrapper picks the ComfyUI venv python, or `OTR_PYTHON` if you set it, and
+  forces UTF-8), on any platform
+  `python scripts/otr_check.py bank <path> --activate` with the same
+  interpreter ComfyUI uses -- validates your JSON, your bank row, your story
+  packs and every cross-reference boot enforces; imports your Python in a
+  child process bounded by wall time (60 s by default, `--timeout S` to change
+  it) and killed as a process tree; binds your lanes' signatures; and
+  validates each `fixtures/*.json` as a recorded fetch payload through the
+  very `normalize_fetch_result` your live `fetch_source` output will meet. (It
+  does not CALL your functions -- fixtures are checked as data, not replayed
+  as cases.) A broken bundle is QUARANTINED with a named, actionable issue --
+  it never appears in the dropdown and never breaks ComfyUI boot.
   Run `otr_check bank <path>` with no `--activate` for the same report without
   executing a single line of your code, and `otr_check bank --all` for every
-  client bank at once.
+  client bank at once (`--all` never activates; consent is per bundle).
   Activation writes a content-addressed snapshot plus `.otr_receipt.json`; boot
   admits your bank only when the bundle's authoring bytes still hash to that
   receipt AND the snapshot is present. Edit anything and the bank goes STALE
@@ -243,23 +286,35 @@ user_packs/source_banks/<bank_id>/
 
 ## 4. The ledger-cleanup pass (your safety net, not your license)
 
-After your fetch/interpret and the writer's passes, the shared tail runs
-`nodes/_otr_ledger_cleanup.run_ledger_cleanup` -- deterministic completion,
-then safety repair, then a bounded LLM fill -- and stamps its receipt at
-`meta.ledger_cleanup`. It is the last thing that touches canonical line text.
+After your fetch/interpret and the writer's passes, the shared tail runs two
+passes back to back inside one reconciled window:
+`nodes/_otr_ledger_clean.run_ledger_clean` (a model judges each spoken row for
+words that are not dialogue -- stage business, labels, wrappers -- and a model
+repairs what it named; bounded, and an imperfect row ships rather than failing
+the episode), then `nodes/_otr_ledger_cleanup.run_ledger_cleanup` --
+deterministic completion, then a bounded LLM fill of `meta.episode_title` --
+which stamps its receipt at `meta.ledger_cleanup`. The receipt's `safety` key
+survives with `status: "retired"`; nothing in this tail rewrites a delivered
+spoken row for its language. On a bank whose story pack declares the
+`line_composer_system` seam (every source-contract pipeline requires it; a
+content-owned lane such as `scifi_news_pro` is skipped) the writer tail's
+cast-coverage repair runs after both and is the last point that touches
+canonical `text` before the freeze cascade.
 
 - **It fills what it can derive.** A row with no `line_id` gets one minted; a
   duplicate id is renamed, not dropped; a blank `speaker_role` is resolved
   from a `char_id` that names a real cast row; a row with nothing sayable
   becomes an EXPLICIT skip carrying its reason instead of a silent hole; stale
   word/char counts are re-derived. Nothing here authors prose.
-- **Content is repaired, never fatal.** Profanity and explicit weapon or
-  sexual language in a delivered spoken row is rewritten in place by the
-  shared same-story cleanup. If repair itself fails, the residual hits are
-  reported and the freeze gate's G9 check remains the last-resort backstop --
-  the cleanup pass never adds a second terminal content policy. Length, style,
-  vocabulary and quality NEVER fail a story (the standing law: an audit may
-  improve a story, never fail one).
+- **Content is never repaired and never fatal (operator directive
+  2026-08-03/05).** There is no profanity, weapon or sexual-language rewrite in
+  the tail and no terminal content gate in the freeze cascade: the
+  safety-repair step and the G9 freeze check were both deleted 2026-08-05, and
+  on an adaptation lane the author's own language is carried as written. The
+  `meta.ledger_cleanup.safety` receipt key survives with `status: "retired"` so
+  no downstream reader loses a field. Do not add a content policy to your pack
+  or your interpreter. Length, style, vocabulary and quality NEVER fail a story
+  (the standing law: an audit may improve a story, never fail one).
 - **One prose field is filled for you.** A blank `meta.episode_title` gets one
   bounded same-story LLM title, then a title derived from your source
   headline. `otr_credits_roll` raises on a missing title, so a hole here would
@@ -306,8 +361,8 @@ arrives on, and adding a bank changes no node, no widget and no link.
   Writer (`OTR_LedgerScriptWriter`). That dropdown is not a stored list: its
   choices are read LIVE from the routing registry every time ComfyUI asks the
   node for its inputs, and activated client banks are folded into that registry
-  beside the shipped six. Activate, restart ComfyUI, and your `<bank_id>` is
-  simply there.
+  beside the five shipped banks and the `+ Add Your Own` signpost. Activate,
+  restart ComfyUI, and your `<bank_id>` is simply there.
 - **Restart is the refresh.** The registry is built once per process and cached,
   so a bank activated while ComfyUI is running does not appear until you restart
   it. The same is true in reverse: edit your bundle without re-activating and

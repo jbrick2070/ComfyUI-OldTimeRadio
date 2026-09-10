@@ -88,10 +88,12 @@ content, or fall back to a canned artifact.
 
 ## 5. Size context from the real artifact
 
-Do not derive output or context budgets from `target_words` alone. Include the
-actual size drivers: accepted line count, evidence rows, graph width, schema
-overhead, prior artifact size, and repair envelope size. The repair prompt is
-often the largest call.
+There is no requested word count to size from (`target_words` left with the
+word authority on 2026-08-14; `act_count` sets the act topology and length is
+an observation). Derive output and context budgets from the actual size
+drivers: accepted line count, evidence rows, graph width, schema overhead,
+prior artifact size, and repair envelope size. The repair prompt is often the
+largest call.
 
 Resolve the true context cap for the selected model and fail loudly when a
 provenance-sensitive prompt cannot fit. A model's native context and the
@@ -106,10 +108,15 @@ wrong nesting, copied request envelopes, enum synonyms, or over-wide output.
 Qualification ladder for model-sensitive work:
 
 1. unit fixtures and full regression gates;
-2. canonical 30-word end-to-end smoke on at least two different local model
-   families and one configured cloud/frontier creative lane;
-3. the same pairings at 120 words;
-4. only then, 720-word qualification or bakeoff.
+2. a canonical end-to-end smoke at `act_count` 1 (the cheapest full-path leg)
+   on at least two different local model families -- add a cloud lane only if
+   one is configured; local is the default (operator ruling 2026-08-04);
+3. the same pairings at the act count the episode will ship with;
+4. only then, a full-length canonical leg published to `otr/obs/`.
+
+(Supersession note: the 30/120/720-word ladder is history -- word targets left
+with the word authority on 2026-08-14 and bake-offs were retired 2026-08-23.
+Word counts appear in a receipt only as the telemetry the ledger stamped.)
 
 Record concrete model labels, slot assignments, prompt IDs, repair counts,
 ledger paths, and final asset paths for every leg.
@@ -365,11 +372,17 @@ wired, not the decision. Runbook: the Teardown protocol in `SOURCE_BANK_PREFLIGH
 `499386aa` roster trim and `docs/2026-07-18-rip-4-banks-plan.md`. 2026-07-31: the runner table left
 the writer for `nodes/_otr_lane_specs.py` -- same surface, new address.)
 
-A source bank is not just its `banks.json` row -- it is wired across ~10 surfaces: the row, the pack
-dir, the `story_rules` file, the runner entry in `_otr_lane_specs.LANE_SPECS`, the pipeline object in
-`pipelines.json` (a SECOND registry -- the one hand-removal always forgets), the lane runner module, a
-possible `if base == "<family>"` route, the runnable<->executable registry law in `_otr_story_routing`,
-the roster/bijection + bank-enumerating guard tests, and any PBUG the bank's live failures earned. Two
+A source bank is not just its `banks.json` row -- it is wired across ~10 surfaces: the row (a
+`runnable:false` row such as `custom_source_bank` is a signpost, not a lane), the pack dir under
+`nodes/story_packs/<id>/`, the lane registration in `_otr_lane_specs` (a `LANE_SPECS` entry for a
+dispatched lane, or membership in `INLINE_PIPELINES` for one the writer's own body runs), the pipeline
+object in `pipelines.json` (a SECOND registry -- the one hand-removal always forgets), the lane runner
+module, any family-keyed behaviour resolved through `_otr_bank_variants.base_source_bank_id`, the
+runnable<->executable registry law in `_otr_story_routing`, the roster/bijection + bank-enumerating
+guard tests, and any PBUG the bank's live failures earned. (The `story_rules` file this list once
+named no longer exists anywhere in `nodes/` -- there is no such file, loader or runner argument -- so
+drop it from any checklist.) A PROPOSED my_story bank would be added through exactly these surfaces
+in reverse. Two
 rules that end the re-derivation: (1) removal DEPTH is set by whether a sibling version survives -- a
 variant rip keeps the shared lane module, a full-family rip (the only version of its lane) deletes it;
 (2) retiring a bank that carried a live failure is a legitimate fix, but RECORD the PBUG -- ripping the
@@ -563,12 +576,33 @@ body drift to a valid credits declaration.
 
 ## 34. Explicit delivery length is a producer contract, not a quality opinion
 
+Supersession note (2026-08-14, commit c0cec79b): the word-band contract that
+follows is HISTORY. There is no requested word count, no tolerance band, and no
+length gate anywhere in the pipeline (operator directive 2026-08-03: never
+chase word count; no gates, caps or refusals). What survives of this lesson:
+every producer family stamps the same observation receipt -- owner, canonical
+actual counts and exact text hashes via `_otr_word_delivery.stamp_contract` and
+`stamp_actual` -- and the freeze cascade attributes those counts to the lane as
+`meta.word_delivery_telemetry` with `status: telemetry_only`. Episode shape is
+`act_count` (1..6); a story is as long as it turns out to be.
+
 A requested word count can allow an inclusive tolerance without becoming
 optional. Express the tolerance once as integer bounds, persist the target,
 bounds, owner, canonical count, and exact character-text hash, and require every
 producer family to finish inside that same contract before its final artifact is
 sealed. A 180-word request accepts 163..200 words; the same law accepts 289..356
 for 320. Floating ratios are planning aids, not the final delivery authority.
+
+Supersession note: the paragraph below described the length-repair ladder
+retired 2026-08-14. Rewriting, rerolling or refusing a spoken row for its word
+count is forbidden (writer law 2026-07-22; operator directive 2026-08-03). The
+parts still in force for the repairs that ARE permitted (a silent locked cast
+member, filled by `_otr_cast_coverage_repair` inside the writer tail;
+structural JSON repair in `_otr_structured_call`; mechanical hygiene): target
+one owned row at a time, validate the complete candidate, and never let one
+malformed call, one unchanged valid response, or one bad sibling row discard
+prior accepted progress. Subjective taste remains fail-open; a genuine capacity
+failure raises the typed error described in the A-4 amendment below.
 
 Length repair must be small, fresh, and progressive. Target one owned spoken row
 at a time, alternate creative and technical writer slots, validate the complete
@@ -587,16 +621,40 @@ loud on the spot; a call that RAN and used its whole output allowance without
 stopping is stochastic and advances the ladder instead. The typed error is what
 the ladder raises when it has actually spent its attempts.
 
+Supersession note (2026-08-14): the per-lane length-fit adapters and the fit /
+re-scour steps described in the next sentence left with the word authority;
+there is no fitting stage at any authoring boundary. What survives:
+content-owned lanes still build their own proofs and hashes before assembly,
+shared inline lanes still stamp the actual receipt from the exact final rows
+(`_otr_word_delivery.stamp_actual`) and build reflections from those rows, and
+older pass receipts are preserved as history instead of relabeling a later
+repair as an earlier pass.
+
 Place each adapter at its last safe authoring boundary. Content-owned lanes fit
 and rebuild their own proofs and hashes before assembly. Shared inline lanes fit
 after story QA and spoken hygiene, re-scour the accepted rows, then stamp the
 actual receipt and build reflections from those exact final rows. Preserve older
 pass receipts as history instead of relabeling a later repair as an earlier pass.
-After the final readiness normalization, freeze performs a read-only hash-bound
-recount before video readiness. A miss becomes `needs_full_rerun`; freeze never
-authors prose or mutates a content-owned seal.
+After the final readiness normalization, freeze stamps a read-only word
+observation (`meta.word_delivery_telemetry`, `status: telemetry_only`,
+attributed to the declared owner) before video readiness; a count can never
+fail the episode. `needs_full_rerun` is reserved for a structural_error -- a
+genuinely unrenderable gap such as missing voiced text or broken structure.
+Freeze never authors prose or mutates a content-owned seal.
 
 ## 35. Candidate exhaustion is not episode exhaustion
+
+Supersession note (2026-08-14): the distance-to-band candidate ladder, the
+producer reroll alternation and the prompt-nonce freshness rule described in
+this section were retired with the word authority; there is no word distance to
+make progress toward. What is current: each structured LLM call runs the shared
+bounded ladder in `_otr_structured_call` (base call -> lower-temperature
+structural retry -> typed repair, three attempts by default; an alternate-owner
+handoff is a single opt-in branch, off by default). A capacity failure carries a
+phase (see the A-4 amendment above): `output_limit` may re-roll,
+`prompt_no_room` never does. The principle is unchanged: a bounded call is
+healthy, and neither a retired attempt nor an LLM verdict can make the requested
+episode impossible.
 
 A bounded model call is healthy; a bounded episode-wide output ladder is not.
 Keep each repair attempt and each producer candidate finite, but separate that
@@ -616,9 +674,11 @@ readiness, or subjective score become authoritative. There is no fixed outer
 model-output ceiling. Temporary provider failure stays pending, retryable, and
 non-ready until a legal candidate arrives or the operator cancels.
 
-Only deterministic impossibility may fail loud: invalid configuration, a graph
-whose declared capacity cannot reach the band, corrupt schema ownership, or a
-mechanical safety violation.
+Only deterministic impossibility may fail loud: invalid configuration, a prompt
+that leaves no room for the artifact in the model context (`prompt_no_room`),
+corrupt schema ownership, or a structural ledger fault. (There is no word band,
+and a content-policy hit is not a failure class -- see the 2026-08-05 note in
+Lesson 36.)
 
 **Amended 2026-07-30 (A-4): this doctrine was right and the code did not
 implement it.** The rule "only deterministic impossibility may fail loud" now
@@ -635,11 +695,12 @@ about one failure; and being CATCHABLE is not being RETRYABLE -- both phases
 are caught at the attempt boundary and the deterministic one is re-raised
 untouched.
 
-The final in-band ledger recount and text hash are
-the acceptance judge. Subjective quality remains fail-open, and audio, video,
-captions, credits, mux, and publication stay downstream of the hard final stamp.
-Never manufacture prose, facts, products, advertisements, or numeric claims to
-satisfy the counter.
+The final structural freeze gates and the accepted text hash are the acceptance
+judge; the word recount is telemetry only. Subjective quality remains
+fail-open, and audio, video, captions, credits, mux, and publication stay
+downstream of the hard final stamp. Never manufacture prose, facts, products,
+advertisements, or numeric claims -- there is no counter to satisfy (operator
+directive 2026-08-03).
 
 ## 36. A rejected fiction candidate is not a damaged episode ledger
 
@@ -650,6 +711,16 @@ complete model-authored candidate, with cancellation as the operator-controlled
 stop. There is no fixed outer model-output ceiling and no deterministic canned,
 summary, drop, or patch-in-place story floor. This is the controlling amendment
 to conflicting readings of Lessons 3, 11, 26, 34, and 35.
+
+Supersession note (2026-08-05, commits aeb6c227 / 952c59b4): the "safety"
+defect class named in this ruling no longer exists. Operator directive
+2026-08-03 removed every content guardrail from generated episodes; the sci-fi
+lane's same-story safety cleanup now returns the script unchanged with a
+`retired_no_content_policy` receipt and its terminal safety scan is deleted.
+The remaining recoverable classes -- JSON, schema, content-validation
+(structure and provenance, never language), and `output_limit` -- retire only
+the bounded `_otr_structured_call` ladder, exactly as the ruling says. Do not
+reintroduce a safety class to satisfy this wording.
 
 The source article is evidence and inspiration, not a fictional continuity
 contract. Accepted characters, events, dialogue, and plot may diverge completely
@@ -665,12 +736,14 @@ complete normalized source, validate locally, rebase exact offsets, merge
 deterministically, and validate again against the complete A0.
 
 Assemble and stamp the production ledger once, from the accepted canonical
-artifact. The final line identity, graph, safety, recount, authorship, freeze, and
-hash checks remain strict corruption and downstream-consumer guards; they do not
-prove fidelity to an abandoned work of fiction. Cancellation and deterministic
-configuration, source/security, provider, I/O, compiler, ownership, graph,
-freeze, and proof failures remain loud. A raw unsafe candidate is retryable;
-unsafe text that somehow remains after acceptance is an invariant failure.
+artifact. The final line identity (G8 is the sole owner of duplicate line_id
+diagnostics), graph, authorship, provenance, freeze, and hash checks remain
+strict corruption and downstream-consumer guards; they do not prove fidelity to
+an abandoned work of fiction. Cancellation and deterministic configuration,
+source/security, provider, I/O, compiler, ownership, graph, freeze, and proof
+failures remain loud. There is no content-safety check at any stage (operator
+directive 2026-08-03; G9 and the same-story cleanup were removed 2026-08-05):
+the author's own language ships as written, and a word is never a defect.
 
 
 ## 37. Prove the control reaches the code path before blaming the control
@@ -826,9 +899,11 @@ focused_tests:
 full_suite:
 bug_bible:
 model_pairings:
-30_word_receipts:
-120_word_receipts:
-720_word_receipts:
+act_count_1_receipts:
+full_length_act_count_receipts:
+# one line per canonical leg naming the act_count, bank, model pairing, ledger
+# path and the otr/obs/ asset; word counts appear only as the
+# word_delivery_telemetry the ledger stamped
 live_ledgers:
 published_assets:
 prod_bug_entries:

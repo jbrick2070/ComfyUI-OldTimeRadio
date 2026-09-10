@@ -27,10 +27,10 @@ Originality is a design requirement, not a runtime score. Do not build an
 Ground compatibility against these live surfaces without using existing bank
 implementations as templates:
 
-- `nodes/production_ledger.py` and `nodes/_otr_ledger_freeze.py`
+- `nodes/production_ledger.py`, `nodes/_otr_ledger_freeze.py` (Phase 0 / Phase 10 audits, `ALLOWED_SPEAKER_ROLES`), and `nodes/_otr_freeze_cascade.py` (`resolve_freeze_policy`, the cascade orchestrator)
 - `nodes/_otr_story_routing.py` and `nodes/_otr_story_pack.py`
 - `nodes/_otr_source_payload.py`
-- the runner dispatch and shared tail in `nodes/OTR_LedgerScriptWriter.py`
+- the runner dispatch in `nodes/OTR_LedgerScriptWriter.py` (the `_LANES.runner_for` branch) and the shared writer tail in `nodes/_otr_writer_tail.py` (`WriterTailMixin._run_writer_tail`, `WriterTailContext`, `TailFinalizer`)
 - `nodes/story_packs/banks.json` and `nodes/story_packs/pipelines.json`
 - `workflows/otr_canonical.json`
 
@@ -42,19 +42,15 @@ method. It may use a source or invent from no source. It may use one model pass
 or many. It does not need an announcer. A music-free form must satisfy the
 live output behavior described under the ledger contract.
 
-A no-source bank still needs its own truthful initialization path. Do not use
-empty `fetcher` plus empty `interpreter` as a generic no-source marker: the
-current writer reserves that shape for the `original_radio` architecture.
-Add explicit bank/pipeline handling or a registered bank-specific local seed
-path instead of inheriting that design accidentally.
+A no-source bank still needs its own truthful initialization path.
+Do not use empty `fetcher` plus empty `interpreter` as a generic no-source marker: the current writer reserves that shape (runnable, no fetcher, no interpreter -- `nodes/_otr_writer_inputs.py::_bank_has_no_source_contract`) for the `original` bank, whose creative front lives in `nodes/_otr_original_radio.py`. Add explicit bank/pipeline handling or a registered bank-specific local seed path instead of inheriting that design accidentally.
 
 The result must still work as audio. Some voice must orient the listener and
 provide closure, but the device and placement are yours. If the canonical
 announcer role is used, it frames the program rather than joining character
 dialogue.
 
-Keep the content SFW: no guns, blood, violence, or swearing. Treat that as a
-creative constraint, not a post-generation censor.
+Generated episode content is not filtered (operator directive 2026-08-03). Do not add profanity, weapon, or violence constraints to prompts, packs, validators, or tests, and do not add a post-generation censor. A source-adaptation lane carries the author's own language as written. The two former same-story safety cleanups (`nodes/_otr_scifi_news_pro.py::_apply_fable_safety_cleanup`, `nodes/_otr_freeze_cascade.py::_run_inline_safety_cleanup`) are retired stubs that stamp a `retired_no_content_policy` receipt and change no text; a new lane must not reintroduce that scan.
 
 ## 3. Keep the three routing coordinates distinct
 
@@ -86,12 +82,13 @@ def run_<bank>_episode(
     technical_fn,
     slot_scheduler,
     source_bank_row,
-    story_rules,
     episode_root,
     episode_id,
 ) -> MyBankTailParts:
     ...
 ```
+
+These eleven keyword arguments are exactly what `OTR_LedgerScriptWriter` passes at the dispatch call (`nodes/OTR_LedgerScriptWriter.py`, the `_LANES.runner_for` branch) and exactly what `nodes/_otr_scifi_news_pro.py::run_scifi_news_pro_episode` declares. There is no `story_rules` artifact or argument; bank defaults travel on `source_bank_row.defaults` and prompts on `pack.prompt_stages`.
 
 The live writer dispatch is the source of truth for the exact signature.
 `MyBankTailParts` is lane-defined; there is no shared `TailParts` class.
@@ -190,21 +187,14 @@ Apply the same ownership rule to titles, premises, character descriptions,
 visual prompts, and music prompts unless a live shared component explicitly
 owns that field.
 
-Invalid creative output goes back through a finite model repair ladder. On a
-designated liveness route such as canonical Sci-Fi, exhausting that ladder
-retires the candidate, not the episode: request a fresh complete model-authored
-candidate until one is accepted or the operator cancels. Do not impose a fixed
-outer model-output ceiling. Deterministic configuration, source/security,
-provider, I/O, compiler, ownership, graph, freeze, and proof failures remain
-loud. Never ship canned story text or fall back to another bank or pipeline.
+Invalid creative output goes back through a finite model repair ladder, and exhausting it fails the episode loud. Canonical Sci-Fi's P3 markup ladder (`nodes/_otr_scifi_news_pro.py::_run_markup_ladder`) is four fixed temperature rungs that never rise, followed by one deterministic salvage re-read of the best rejected draft; if salvage also refuses, it raises `NewsProScriptError` and the runner, which calls `_pass_script` exactly once, does not request another candidate. There is no open-ended candidate-retirement route and no 'until the operator cancels' loop anywhere in `nodes/`. A new lane chooses its own finite ladder depth and fails loud on exhaustion. Deterministic configuration, source/security, provider, I/O, compiler, ownership, graph, freeze, and proof failures remain loud. Never ship canned story text or fall back to another bank or pipeline.
 
 An accepted fictional story may replace an abandoned draft, including its
 characters, events, dialogue, and plot. This latitude does not weaken evidence:
 claims presented as factual and the factual coda still trace to the admitted
 source.
 
-`target_words` is an advisory scale request and a receipt. It must not cause
-deterministic trimming, padding, line deletion, or a production gate.
+There is no `target_words` input. Episode shape is `act_count`, an explicit combo choice "1" through "6" (`nodes/_otr_writer_inputs.py::_ACT_COUNT_CHOICES`, derived from `MIN_ACT_COUNT`/`MAX_ACT_COUNT` in `nodes/_otr_episode_budget.py`); there is no 'auto'. Every bank's topology accepts every act count. Word counts are telemetry only (operator directive 2026-08-03: never chase word count): no word gate, cap, refusal, trimming, padding, or line deletion may derive from a measured word total, and a runner must not add a word band of its own.
 
 ## 7. Fill the one production ledger
 
@@ -213,9 +203,8 @@ lists the minimum authored inputs, not the full normalized row schemas:
 
 Assemble the production ledger once from accepted artifacts. Its canonical
 spoken rows are the audible downstream authority; rejected candidate prose and
-candidate-local hashes, seals, or readiness state never enter it. Final graph,
-safety, recount, authorship, freeze, and hash checks prove the accepted ledger's
-integrity, not semantic fidelity to an earlier fictional draft.
+candidate-local hashes, seals, or readiness state never enter it.
+Final graph, recount, authorship, freeze, and hash checks prove the accepted ledger's integrity, not semantic fidelity to an earlier fictional draft. There is no content-safety check in that proof: both former same-story safety cleanups are retired stubs that stamp a receipt and change no text (operator directive 2026-08-03).
 
 | table | minimum authored inputs |
 |---|---|
@@ -250,17 +239,12 @@ Allowed `speaker_role` values are `character`, `announcer`,
 contract assigns another non-empty ID. A non-skipped voiced row needs
 non-empty canonical `text`. A music sentinel may carry empty text without
 being skipped; any row explicitly marked `skip=True` needs empty text and a
-`tts_skip_reason`. A voiced line's `boundary` is `shot_start`,
-`beat_start`, or `continue`, consistent with its transition. Spoken text
+`tts_skip_reason`.
+A voiced line's `boundary` is `shot_start` or `beat_start`, consistent with its transition. The sci-fi runner is the only emitter (`nodes/_otr_scifi_news_pro.py`); the legacy inline lanes leave it unset, which `nodes/production_ledger.py` stores as None and whose module docstring defines as equivalent to `shot_start`. No consumer in `nodes/` currently reads the field, and no third value is emitted or validated anywhere in `nodes/`; do not invent one.
+Spoken text
 contains no speaker label, stage direction, or whole-line quotation wrapper.
 
-Freeze policy is selected from the pack: a non-empty
-`line_composer_system` seam selects `legacy_full`; its absence selects
-`content_owned_readonly`. Choose and test that seam deliberately. A
-content-owned runner assigns real character voice metadata and proof receipts;
-the shared writer tail must then stamp fresh `text_for_tts` and its
-canonical-text source hash after final text mutations. A legacy lane uses the
-shared CastLock and readiness path.
+Freeze policy is resolved from the pack by `nodes/_otr_freeze_cascade.py::resolve_freeze_policy`: a non-empty `line_composer_system` seam in `pack.prompt_stages` selects `inline_safety_cleanup`; its absence selects `content_owned_readonly`; a tagged bank that fails to resolve returns `policy_resolution_failed` as a terminal error rather than failing open. Choose and test that seam deliberately. Neither policy rewrites accepted spoken text: the inline policy's former content patch is a retired stub (operator directive 2026-08-03) and its only remaining mutation is deterministic role normalization, while `content_owned_readonly` verifies the producer's sealed authorship and structure read-only. A content-owned runner assigns real character voice metadata and proof receipts; the shared writer tail then stamps fresh `text_for_tts` and its canonical-text source hash after the last text mutation. A legacy lane uses the shared CastLock and readiness path.
 
 Keep evidence maps, authorship hashes, and lane receipts in typed artifacts or
 namespaced `meta`, not in fixed line rows. Use the Ledger setters and shared
@@ -311,29 +295,21 @@ are recorded without becoming hidden fatal gates.
 
 ## 9. Integrate into the canonical workflow
 
-A runnable custom lane needs a validated pack, bank registry row, pipeline
-registry row, execution runner, an explicit `_otr_lane_specs.LANE_SPECS`
-entry (module + runner attribute by NAME, plus that lane's declared
-request-compatibility policy), and tests in the same change. Register every required fetcher and interpreter.
+A runnable custom lane needs a validated pack, bank registry row, pipeline registry row, execution runner, an explicit `_otr_lane_specs.LANE_SPECS` entry (`LaneSpec(module=..., runner_attr=...)` -- names only, never imported objects), and tests in the same change. There is no per-lane request-compatibility policy: a lane that cannot build a requested shape fails loudly when it tries. Register every required fetcher and interpreter.
 Set `runnable=true` only when the lane exists. A custom non-source-contract
 pipeline must also set `executable=true` when its runner lands.
 
 There is one outer workflow: `workflows/otr_canonical.json`. Do not create a
-copy, generated substitute, or parallel ComfyUI graph. A registry-only bank
-normally appears through the existing `source_bank` selector and may require
-no workflow JSON edit; prove that path, and do not change the shipped
-`science_news` default merely to expose the new choice. If a node, widget,
+copy, generated substitute, or parallel ComfyUI graph.
+A registry-only bank normally appears through the existing `source_bank` selector and may require no workflow JSON edit; prove that path. The shipped canonical default for `source_bank` is the roll sentinel `"roll (any eligible bank)"` (`workflows/otr_canonical.json` writer node, `nodes/_otr_rolls.py`), whose pool is every bank with `runnable=true`; a new runnable row joins that pool automatically. Do not change the saved default merely to expose the new choice. (A PROPOSED `my_story` bank, user-facing label "My Story", would enter the same pool once its row is runnable; it does not exist at HEAD.)
+If a node, widget,
 input, link, or default changes, update the canonical JSON in the same change
 and run the workflow, link, input-name, and positional-widget audits. Append
 new optional widgets at the end.
 
 ## 10. Finish with evidence
 
-After design, build, and wiring are complete, execute
-`docs/SOURCE_BANK_PREFLIGHT.md`. It includes the full Windows regression
-suite, Bug Bible regression, canonical validation, and a live 30-word run. The
-live run must save a valid ledger, pass the freeze path, publish to `otr/obs`,
-and leave a real asset that is verified on disk.
+After design, build, and wiring are complete, execute `docs/SOURCE_BANK_PREFLIGHT.md`. It includes the full Windows regression suite, Bug Bible regression, canonical validation, and a live `--act-count 1` canonical run (`scripts/otr_canonical_api_run.py`; there is no word-sized run). The live run must save a valid ledger, pass the freeze path, publish to `otr/obs`, and leave a real asset that is verified on disk.
 
 A bank is complete only when its original design, source provenance, two-slot
 execution, ledger graph, runner/tail handoff, canonical integration, tests,
@@ -343,8 +319,7 @@ and live asset all have evidence.
 The implementation plan should include these details explicitly, rather than
 leaving them for live integration:
 
-1. Provide the exact repository-valid JSON schema for the story pack, story
-   rules, bank row, pipeline row, and every sidecar.
+1. Provide the exact repository-valid JSON schema for the story pack, bank row, pipeline row, and every sidecar. Bank defaults live in the bank row's `defaults` object and prompts in the pack's `prompt_stages`; there is no separate story-rules file.
 2. Define every Pydantic model field, enum, bound, and nested item type, plus one
    known-valid JSON example for every model-authored artifact.
 3. Put every cross-artifact invariant inside the originating
@@ -362,11 +337,8 @@ leaving them for live integration:
    largest typed repair for every pass.
 6. Name the concrete live voice-selection function and returned row contract;
    "use the voice registry" is not sufficiently implementable.
-7. Pin registry ordering tests and all repo-specific static annotations, such as
-   the literal `# LLM slot: per-sub-pass` audit tag.
-8. Define `custom_premise` precedence in the shared input resolver. For a local
-   synthetic fetcher it must remain an operator hint and must not bypass the
-   immutable draw.
+7. Pin registry ordering tests and any repo-specific static annotation the lane itself introduces, named literally in the plan. (The former `# LLM slot: per-sub-pass` audit tag left the tree with the retired codex lane, commit dae1fb3c; there is no shipped tag to copy.)
+8. State `custom_premise` precedence as the shared resolver implements it (`nodes/_otr_writer_inputs.py::_resolve_inputs`): a source-snapshot replay wins first; on a runnable bank with neither fetcher nor interpreter (the original lane) `custom_premise` rides as `source_meta["operator_hint"]` beside the spark draw and never replaces the payload; on every bank that declares a fetcher a non-blank `custom_premise` becomes a verbatim `"User Seed"` payload that replaces the fetch. A new bank that wants hint semantics while declaring a local synthetic fetcher must add an explicit bank- or pipeline-keyed branch to `_resolve_inputs` in the same change, with a test, rather than assuming the shared order protects its draw.
 9. Identify the exact final writer mutation boundary and the point after the
    last shared LLM call where telemetry is truthfully stamped.
 10. Say which lane-local provenance may remain after a shared generic receipt
@@ -403,16 +375,8 @@ leaving them for live integration:
     `shot_end`, and `resolution` carry no conflicting authored meaning when the
     canonical downstream values are `character`, `continue`, and `closing`;
     unknown values must still fail loudly.
-18. Put the final script's graph, roster, and text-safety checks inside the P6
-    (and retake) `post_validator`, not only after generation. Forbidden terms,
-    speaker-label leakage, and line-coverage drift are authored defects that a
-    bounded typed repair can fix; keep a deterministic assertion after the call
-    as defense in depth.
-19. Apply safety rules at the earliest creative artifact that authors a detail,
-    before later passes treat it as immutable. A forbidden title or clue first
-    invented in a slate must repair in the slate/truth/score ladder; waiting
-    until P6 can create an impossible repair where the script is required to
-    preserve the same now-locked detail.
+18. Put the final script's graph, roster, and structural text checks inside the P6 (and retake) `post_validator`, not only after generation. Speaker-label leakage, whole-line quotation wrappers, stage directions in spoken text, and line-coverage drift are authored defects that a bounded typed repair can fix; keep a deterministic assertion after the call as defense in depth. Do not add a forbidden-term or content-safety scan: generated episode content is not filtered (operator directive 2026-08-03).
+19. Apply structural constraints (roster identity, landmark IDs, enum vocabulary, required ending) at the earliest creative artifact that authors the detail, before later passes treat it as immutable. A defect first invented in a slate must repair in the slate/truth/score ladder; waiting until P6 can create an impossible repair where the script is required to preserve the same now-locked detail.
 20. Include standard dramatic-taxonomy aliases and semantic marker values in
     manifest normalization. `exposition`, `rising_action`, and `climax` map to
     the canonical arc; a marker such as `closure: "final"` means true. Reject

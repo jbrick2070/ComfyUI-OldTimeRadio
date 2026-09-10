@@ -20,10 +20,14 @@ for measured state. The archive holds receipts, not instructions to execute.
 **PRIORITY #1 (operator, 2026-09-10): finish the Opus cleanup, then deliver the
 My Story creator flow.** The cleanup half LANDED 2026-09-10 (sprints 1-2, commits
 `cc09b54a` / `7aa46655` / `e562e146`; receipt in
-`docs/2026-09-10-cleanup-opus/HANDOFF.md`). Follow the five dependent sprints under **WHERE TO
-PICK UP**; sprint 3 is next. This latest instruction takes precedence over older next-step
-directions in this file. The remaining queue resumes afterward; stable row
-identities and earlier scope cuts remain intact.
+`docs/2026-09-10-cleanup-opus/HANDOFF.md`). Sprint 3 LANDED the same day:
+documentation currentization ([D0 receipt](2026-09-10-my-story-d0-receipt.md))
+and the reviewed independent bank design
+([**D1 -- the coding plan**](2026-09-10-my-story-d1-design.md)). **Sprint 4 is
+next and needs no further design: code from D1.** Follow the five dependent
+sprints under **WHERE TO PICK UP**. This latest instruction takes precedence over
+older next-step directions in this file. The remaining queue resumes afterward;
+stable row identities and earlier scope cuts remain intact.
 
 **Dependency rationale for the remaining queue (operator, 2026-09-04, late):** *"I really
 want to get the registry thing fixed, but no sense in fixing it if bug fixes will break it --
@@ -111,19 +115,33 @@ canonical workflow for checks, never an old harness graph.
 |---|---|---|
 | **1. Clean audio** -- DONE 2026-09-10 | Opus P1 landed as `cc09b54a`: automatic roomtone bed and tape hiss retired, clean code + canonical enhancement defaults (node 4 all effects off), seven unused SceneSequencer assignments removed. | Fresh three-case canonical CPU check passed (1.50 s / 0.00 s offsets unchanged, silence stays zero); full suite same 54 baseline failures, zero new; reviewed, pushed. |
 | **2. Finish bounded cleanup** -- DONE 2026-09-10 | Opus P2 landed as `7aa46655` (G8 sole owner of duplicate line_id diagnostics). Opus P3 landed as `e562e146` (freeze no longer acquires a model; validation, unload and recovery contracts preserved; fresh-process no-acquisition proof on both banks). | Separate qualified, reviewed, committed and pushed chunks. Codex picks up sprint 3 from HEAD `e562e146`; evidence in `docs/2026-09-10-cleanup-opus/implementation_receipt.json`. |
-| **3. Current docs + independent design** | My Story D0: currentize README, source-bank preflight and linked operational guides against the cleaned-up code. Then D1: specify and review the independent bank's pass graph, schemas, prompts, cast and integration contracts. | Exact D1 design is required before code. Scope convergence is not a bank preflight PASS. |
-| **4. Complete creator path** | Build My Story field admission, LLM expansion into a full ledger, persistent input drafts, source selection and required published-episode delivery. Retain act count and character-count request. Ship all functional canonical widget/link changes with their code, before the bank is runnable. | Normal graph use completes the whole path. A saved draft or archive alone is not successful My Story delivery. Qualify, review, commit and push per the linked plan. |
+| **3. Current docs + independent design** -- DONE 2026-09-10 | D0 currentized seven documents against the cleaned-up code (79 verified edits; receipt: [D0 receipt](2026-09-10-my-story-d0-receipt.md)). D1 specified the independent bank and was reviewed r1-r3, six readers, 19 findings folded: [**D1 design**](2026-09-10-my-story-d1-design.md). | **The D1 design IS the coding plan for sprint 4 -- build from it, do not re-derive it.** Its section 12a lists every folded review finding. Scope convergence is still not a bank preflight PASS. |
+| **4. Complete creator path** -- NEXT, CODE-READY | Build exactly what [D1](2026-09-10-my-story-d1-design.md) specifies: sections 1 (registry rows), 2 (widgets, input helper, two writer check sites, validator admission, drafts), 3 (the five-pass graph), 5-6 (cast count, attribution), 7 (delivery intent, mux wire, canonical wiring), 10 (tests). Ship all functional canonical widget/link changes with their code, before the bank is runnable. | Normal graph use completes the whole path. A saved draft or archive alone is not successful My Story delivery. Qualify, review, commit and push per the linked plan. |
 | **5. Optional App view + qualification** | Add the native App form and final player/report presentation. Prove graph-only use, App/Graph switching, saved parameters, playback/history, cancellation and errors; complete model/canonical qualification and final user documentation. | App Mode/sidebar use remains optional, with graph as the default. Report actual preflight evidence and limits; no release/tag/promotion is implied. |
 
-**Sprints 1-2 are DONE (2026-09-10). Start now with sprint 3: Codex My Story D0
-from HEAD `e562e146`.** The
-[Opus starter prompt](2026-09-10-my-story-app-review/OPUS_START.md) contains
-the bounded assignment and handoff to Codex. One
-coder owns shared files at a time; do not interleave My Story writer/validator
-work with Opus's qualification baseline. Use the linked cleanup plan's measured
-failure comparison, not a claim that its full suite is green. No stale soak,
-server/GPU run, cache/episode deletion, release change or extra cleanup belongs
-to sprints 1-2. Later My Story qualification follows its own canonical-run gates.
+**Sprints 1-3 are DONE (2026-09-10). Start now with SPRINT 4, and it is
+code-ready: build from [the D1 design](2026-09-10-my-story-d1-design.md).**
+That document is the coding plan -- exact registry rows, widget appends, the
+pure input helper and its refusals, the draft coordinator, the five-pass graph
+with every schema and post-validator, the delivery-intent wire, the canonical
+JSON arithmetic (33 -> 37 widgets on node 1; new link 291 into mux node 85
+input 10; `last_link_id` 290 -> 291) and the full test inventory. Its section
+12a records the 19 review findings already folded in, so do not re-litigate
+them. Do not re-run the R1-R4 scope campaign
+([receipt](2026-09-10-my-story-app-review/README.md)) or the D1 review; the
+open obligation is the ONE finished-diff review of the code you write.
+
+One coder owns shared files at a time. Use the cleanup plan's measured failure
+comparison, not a claim that its full suite is green. No stale soak,
+server/GPU run, cache/episode deletion or release change belongs to this work.
+Later My Story qualification follows its own canonical-run gates.
+
+**Attribution is part of the creator path (operator, 2026-09-10):** a listener
+may name who the story is by, and the announcer and credits use that name when
+given and a neutral phrase when not. **The operator's own name is never a
+default anywhere in an episode.** D1 section 6 carries the contract; the
+`story_author` widget is the fourth appended field, which is why the writer
+vector goes to 37 and not 36.
 
 **Separate optional follow-on: speaker placement.** The preferred listening-test
 starting point is gentle, balanced positions assigned once per episode to stable
