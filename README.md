@@ -796,6 +796,22 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
   | `OTR_VideoDirector` | music video | `animatediff15_lightning_video (16:9)` |
   | `OTR_VideoDirector` | character video | `animatediff15_lightning_video (16:9)` |
 
+  **The device widgets: only TWO of the three do anything.** Traced through the
+  render path, because a JSON that sets the wrong one looks configured and is
+  not:
+
+  | widget | node | what it actually does |
+  |---|---|---|
+  | `voice_device` | `OTR_CastLock` | **load-bearing, and it drives TWO stages.** Refuses anything but `cuda`/`cpu`/`mps` outright, then travels as `meta.voice_device` and becomes `requested_device` for the voice adapters AND the music adapter. Set this per device. |
+  | `upscale_device` | `OTR_SilentComposite` | **load-bearing.** `cuda` on a Mac is a named refusal at the upscale stage. |
+  | `device_policy` | `OTR_VideoDirector` | **decorative -- nothing reads it.** It is built into the render policy and never consumed by any video or image adapter. Setting it to `mps` buys you nothing; the video lanes pick their own device. |
+
+  `dtype_policy` is unread the same way, and so is the whole `host_caps` object
+  every adapter accepts and ignores. That is not a bug to fix here -- it is what
+  makes the shipping model work. `scripts/otr_api.py` puts it plainly, after the
+  capability cross-check was deleted on 2026-08-31: *"the dropdown decides, the
+  workflow runs it -- the matrix is the RECORD, never the controller."*
+
   The writer matters as much as the video lane, and the reason is worth
   understanding rather than memorising. `Qwen/Qwen3.5-4B` is the shipped default
   BECAUSE it is the low-friction one -- ungated, Apache-2.0, 8.68 GB to
