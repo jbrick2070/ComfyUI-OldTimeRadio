@@ -1,101 +1,104 @@
 ## 2026-09-09 (evening) -- HEAD 439913e6 +handoff (v2.0-alpha) -- MAC (rented M4) -- the matrix became receipt-backed, and five of my own claims were wrong
 
-**READ THIS FIRST IF YOU ARE THE NEXT WINDOW.** The Mac goes away in a few days.
-Everything below is pushed; HEAD was `439913e6` + the plan/bug-log updates in
-this commit. One render is still in flight -- see "IN FLIGHT" at the bottom.
+**THE SHA ABOVE IS THE LAST CODE HEAD. This handoff took TWO commits** (the log
+entry, then this reformat), so walk back two from the branch tip to reach it.
+The authoritative post-handoff sha is the one in the kickoff line, read after
+the push.
 
-### The through-line: arithmetic kept contradicting receipts that were already in the repo
+**PRE-FLIGHT, stated plainly because one of them is not clean:**
+1. **A BACKGROUND RENDER IS STILL RUNNING.** `lightning_mac_proof_3`, submitted
+   ~19:0x, ~25 min in of an expected ~2.5 h. The operator asked for the handoff
+   with it deliberately left running. It is NOT killed; see IN FLIGHT below.
+2. **Suite: 151 failing of 14,137 in a full run; all 151 PASS when run
+   individually.** Order dependence, and it reproduces byte-identically ten
+   commits back -- pre-existing, not this session. **Bible: NOT RUN** -- the
+   survival-guide repo is not checked out on this rented Mac.
+3. **Box: ComfyUI server RESIDENT on :8188** (pid 39606), memory ~20% free while
+   the writer loads. The next window inherits a busy box.
 
-Five times today a number I derived disagreed with a measurement already sitting
-in this tree, and the measurement was right every time. That is the lesson worth
-carrying more than any single fix:
+Did: Turned `docs/DROPDOWN_MATRIX.md` from reasoning into receipts and closed
+every open Mac gap by measurement. Reconciled the Mac column against all seven
+published episodes; harvested 46 NVIDIA receipts from `4060_DRILL_LOG` /
+`ship-audit-2026-09-01` / `MACHINE_MATRIX` (**nv8 18/68, nv16 29/68, mac16
+16/68, AMD 0/68** -- AMD is zero because nothing has ever run there). Added the
+**WRITER dimension**, which the matrix lacked entirely while every published
+episode turned on one. Split `proven` (a published episode used it) from
+`measured` (ran in a lab, nothing shipped) -- that split IS the test plan.
+Closed both Mac `measured` gaps by direct measurement: `bark` -> **OOM**
+(11.7x realtime, 18.0 GB footprint, strands 10.85 GB), `musicgen` stays measured
+(2.1x realtime, ratchets to 15.88 GB but fully recovers). Closed the largest
+untested Mac gap -- the upscale stage runs **FLAT at 1.13 GB across 96 frames**,
+~24 min projected per episode. Shipped ONE GRAPH: `otr_mac_lightning.json`
+deleted after measuring it at zero nodes, zero links and five widget values from
+the canonical. Fixed `_unload_bark`'s bare CUDA `empty_cache()` (a silent no-op
+on Metal; `del`+`gc` measured returning NOTHING). Made
+`otr_machine_matrix.py` REFUSE to write when it cannot read the registry -- it
+was overwriting a shipped doc with a placeholder and reporting success. Extracted
+`lane_for_engine()` (118 profiles route byte-identically). Filed
+PBUG-20260909-02 (the host reboot) and -03 (the allocator rule).
 
-1. **`flux2_klein` "proven" on Mac** -- it HAD rendered on the M4, and its
-   declaration is `["cuda"]`, so the code refuses it on every Mac profile. Both
-   halves true; the single word wrong. The generator now FAILS when a curated
-   receipt lands on a cell the code refuses.
-2. **The writer badge said `(4.3 GB)`** for a row that measures 14 GB on Metal --
-   `_estimate_resident_gb` halves on an assumption of NF4 loading that macOS
-   cannot reach. A reader trusted it and the machine rebooted.
-3. **I recommended `gemma-4-E2B-it` as the safer Mac writer.** It measures ~10 GB
-   at bf16 against Qwen's ~9 -- LARGER, despite a smaller download.
-   `docs/MAC_LESSONS_LEARNED.md` already said so.
-4. **I told the operator no image engine had ever published on this Mac.**
-   `sd15` had, four times; the `unk` in those filenames is a shortcode miss, not
-   an absent engine.
-5. **An A/B harness I wrote printed "Metal is degrading the output"** while its
-   own numbers refuted it (mps 0.323 vs cpu 0.427). It tested the SIZE of the
-   gap and never its direction.
+**Five claims of mine that measurement refuted, recorded because the pattern is
+the lesson:** `flux2_klein` "proven" on a Mac the code refuses it on; a writer
+badge reading 4.3 GB for a row that measures 14; recommending `gemma-4-E2B-it`
+as the safer Mac writer when it measures LARGER than Qwen; telling the operator
+no image engine had ever published here when `sd15` had, four times; and an A/B
+harness that printed "Metal is degrading the output" while its own numbers
+refuted it (it tested the size of the gap, never its direction).
 
-### What is now true, with receipts
+Current step: Mac campaign complete except repeatability. The matrix is
+receipt-backed on all three real machines. AMD is entirely unproven and the
+operator is sourcing hardware (RunPod likely).
 
-* `docs/DROPDOWN_MATRIX.md` is generated and receipt-backed: **nv8 18/68,
-  nv16 29/68, mac16 16/68, AMD 0/68**. AMD is zero because nothing has ever run
-  there -- an absence, not an omission.
-* The matrix gained the **WRITER dimension**, which it lacked entirely while
-  every published episode turned on one.
-* `proven` now means A PUBLISHED EPISODE USED IT; `measured` means it ran in a
-  lab and nothing shipped with it. That split IS the test plan.
-* **Both Mac `measured` gaps closed by measurement:** `bark` -> OOM (11.7x
-  realtime, 18 GB footprint, strands 10.85 GB); `musicgen` -> stays measured
-  (2.1x realtime, ratchets to 15.88 GB but fully recovers).
-* **The largest untested Mac gap turned out safe:** the upscale stage runs FLAT
-  at 1.13 GB across 96 frames, ~24 min projected for a full episode.
-* See PBUG-20260909-02 and -03 for the reboot and the allocator rule.
+Next: **Test bitsandbytes on ROCm BEFORE rendering anything** -- it forks every
+downstream memory decision (works -> ~3 GB NF4 writer; does not -> ~9 GB bf16).
+Then `GO_FORWARD_PLAN` section E rungs 0-5, cheapest first. Blocked on: AMD
+hardware existing. Also owed: revert the canonical's three video widgets once
+the in-flight render lands.
 
-### Code that changed
+Models: no kibitz arc -- the 2026-08-17 amendment applies (documentation and
+measurement, not a design with two defensible answers). Reviews actually run:
+one `cursor-agent` pass on the writer-guard diff (it found the guard was DEAD
+CODE -- it skipped on `policy.gguf_quant`, which every real policy sets), two
+`agy` passes (badge blast radius; episodes-vs-matrix audit), and four Workflow
+fan-outs (61-engine AMD/ROCm, 28-agent widget/IO contract, 38-agent plain-JSON
+gate trace, 12-agent per-device combinations). Reported as what it was: a
+scoped set of reviews, NOT a full arc.
 
-* `_otr_bark_lib._unload_bark` -- had a BARE `torch.cuda.empty_cache()`, a silent
-  no-op on Metal. Now guarded + an `mps` elif. CUDA byte-identical in effect.
-* `_otr_model_catalog` -- the writer badge states the DOWNLOAD size plus derived
-  fit tags (`mac16`, `mac16-tight`, `nv8`, `gated`); `MEASURED_METAL_BF16_GB`
-  lets a measurement override the projection.
-* `eng_stable_audio` gained an `assert_usable`; `audio_enhance` routes its two
-  bare `import torchaudio` through a named refusal.
-* `otr_provision` -- the engine->lane router extracted to `lane_for_engine()`
-  (118 profiles route byte-identically), plus `NO_LANE_REASON`.
-* `otr_machine_matrix.py` refuses to WRITE when it cannot read the registry --
-  it was overwriting the shipped doc with a placeholder and reporting success.
-* **ONE GRAPH.** `otr_mac_lightning.json` deleted: it differed from the canonical
-  by zero nodes, zero links and FIVE widget values. Those five are a table in
-  README's "Other setups".
+Commits: `5240c581`, `4f8ac164`, `7e8aee60`, `9abdebf0`, `d5ba6e2f`, `94cac4e4`,
+`d10b531a`, `7e49a577`, `439913e6`, `075a6ebf`. The handoff commits land on top
+-- see the kickoff line for the real head.
 
 ### Rulings the operator gave today, and they are load-bearing
 
-* **No gated profiles, no capability matrix, in code.** The matrix is a GUIDE.
-  A writer memory-guard was written and REVERTED on this ruling. (A CLI review
-  later found that guard was dead code anyway -- it skipped on
-  `policy.gguf_quant`, which every real policy sets.)
-* **One JSON.** Not profiles, not variants, not templates.
-* **No backward compatibility** for anything unreleased -- labels were rewritten
-  in place, all six of them.
-* Metal-only LLM lanes are acceptable if the DOCUMENTATION states them.
+* **No gated profiles and no capability matrix IN CODE.** The matrix is a GUIDE.
+  A writer memory-guard was written and REVERTED on this ruling -- and a CLI
+  review then found it was dead code anyway.
+* **ONE JSON.** Not profiles, not variants, not templates. `config/profiles/` is
+  docs/build input, not shipping surface.
+* **No backward compatibility** for anything unreleased.
+* Metal-only LLM lanes are fine **if the documentation states them**.
 
 ### For the next window
 
-* `docs/GO_FORWARD_PLAN.md` section E is now an **AMD test ladder** -- rungs 0-5,
-  cheapest first, with what to skip and why. **Test bitsandbytes on ROCm before
-  rendering anything**; it forks every memory decision downstream.
-* `docs/SHIPPING_JSON_RECIPES.md` holds four per-device recipes, **NOT APPLIED**.
-  Three were corrected on adversarial verification -- notably 8 GB NVIDIA needs
-  `bnb_nf4`, not `none`.
-* **151 of 14,137 tests fail in a full-suite run** and pass individually. Order
-  dependence, reproduces identically ten commits back -- pre-existing, not from
-  this session. Real repo health; not today's work.
-* The Bible repo is not on this Mac. **Five portable candidates are recorded at
-  the end of `docs/PROD_BUG_LOG.md`** for promotion from the Windows box.
+* `docs/GO_FORWARD_PLAN.md` section E is now an executable **AMD ladder**.
+* `docs/SHIPPING_JSON_RECIPES.md` holds four per-device recipes, **NOT APPLIED**;
+  three were corrected on adversarial verification (8 GB NVIDIA needs `bnb_nf4`,
+  not `none`).
+* **Five Bible candidates** are at the end of `docs/PROD_BUG_LOG.md` for
+  promotion from the Windows box.
 
-### IN FLIGHT at handoff
+### IN FLIGHT -- read this before touching the tree
 
-`lightning_mac_proof_3` was submitted at ~19:0x against the canonical with its
-three video roles temporarily set to `animatediff15_lightning_video (16:9)`.
-**`workflows/otr_canonical.json` IS MODIFIED IN THE WORKING TREE for that run** --
-the pristine copy is at
-`scratchpad/canonical.PRISTINE.json`, and the three widgets must be reverted to
-`viz_mxc_cpu` / `viz_green` / `viz_camera` once the render lands. It exists to
-close the one Mac gap left: the `_beat_hold` change is proven by unit tests, a
-118-profile router diff and an unchanged 136-latent ceiling, but NOT by a live
-episode -- the render that would have proven it is the one that rebooted the box.
+`lightning_mac_proof_3` is rendering against `workflows/otr_canonical.json` with
+its three video roles TEMPORARILY set to `animatediff15_lightning_video (16:9)`.
+**That file is MODIFIED IN THE WORKING TREE AND DELIBERATELY UNCOMMITTED.**
+Pristine copy: `scratchpad/canonical.PRISTINE.json`. Revert the three widgets to
+`viz_mxc_cpu` / `viz_green` / `viz_camera` once the render lands.
+
+It exists to close the one Mac gap left: the `_beat_hold` change is proven by
+unit tests, a 118-profile router diff and an unchanged 136-latent ceiling, but
+NOT by a live episode -- the render that would have proven it is the one that
+rebooted the box (PBUG-20260909-02).
 
 ## 2026-09-04 (evening) -- v2.0-alpha -- CODER (the scan collapse SHIPPED end to end: batches a-d, 103 env files -> 2)
 
