@@ -72,11 +72,24 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-05 evening):** `v2.0-alpha`, HEAD == origin. Suite **13470 passed /
-126 skipped / 1 xfailed, RC=0**; Bug Bible 22 passed. No resident server; VRAM at the
-desktop baseline. GPT-6 Astra is available at `ultra` reasoning -- the older "Codex
-credits out until 09-07" note is dead. **Read section 0 (THE ATTACK ORDER) before
-picking a row.**
+**State (2026-09-09 evening, rented Mac M4):** `v2.0-alpha`, HEAD == origin.
+Suite **151 failing of 14,137 in a FULL run, and all 151 PASS individually** --
+order dependence, reproduces identically ten commits back, so it is pre-existing
+and not any recent session's doing. **Bug Bible NOT RUN** (the survival-guide
+repo is not checked out on this Mac). Box: a ComfyUI server was left RESIDENT on
+:8188 with a render in flight -- see the newest `docs/HANDOFF_LOG.md` entry.
+**Read section 0 (THE ATTACK ORDER) before picking a row.**
+
+> **The registry paragraphs immediately below are STALE and were not rewritten
+> from this Mac.** They reason about `2.0.0-alpha.19/.20/.21` as the frontier
+> while `pyproject.toml` is at **2.0.0-alpha.29**, and the Flagged/Active churn since is
+> recorded further down this file and in `docs/HANDOFF_LOG.md`. The DEFECT LIST
+> and the DO-NOT rulings in them are still valid and load-bearing -- only the
+> version numbers moved. **Re-read the live registry before acting on any
+> version claim here**; this window had no registry credentials and refused to
+> guess the current state.
+
+
 
 **THE ONE OPEN REGISTRY ITEM.** Every published version through `2.0.0-alpha.21` is
 Flagged (alpha.13/.14 Banned), so `latest_version` resolves to `null` and **no user can
@@ -252,6 +265,211 @@ receipt in `docs/HANDOFF_LOG.md`. Completed narrative goes to
 
 ---
 
+
+## STANDING RULINGS LIFTED FROM ARCHIVED SECTIONS (2026-09-09)
+
+**These are verbatim from sections moved to `docs/GO_FORWARD_ARCHIVE.md`.**
+They are here because the archive rule says a ruling must survive the move,
+and because the rule's own suggested grep MISSES most of them -- it found
+zero hits in 770 lines that in fact carried 29. Do not re-litigate any of
+these without the operator; the archive holds the full context.
+
+| the pending sweep deleting what it could not READ (Fable finding 2) | `31dc6861` |
+| replay import trusting a ledger the manifest never verified (Fable finding 3) | `14c6a6db` |
+
+---
+
+
+**THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
+prior session optimised a number that was never the blocker.
+
+---
+
+  ripping one symbol from it DEMOTED the Lemmy voice route and had to be reverted)
+  and `nodes/_otr_source_grounding.py` (its siblings are ruling-protected).
+
+---
+
+field annotations, and overrides of a base in ANOTHER installed pack are all invisible
+to it. Grep for the PATTERN, never the name.
+
+---
+
+
+Operator: Mac and AMD ship images only (ruling 2026-09-01), and he is "not hopeful".
+Landed: the credits font, the llama-cpp hint and four platform guards. Owed, in order:
+
+---
+
+**HARD CONSTRAINT, carried from today.** A dropdown entry is a promise the
+model will load. Do NOT widen any `device_backends` on reasoning alone -- the
+z_image and ltx widenings in step 1 are EXPERIMENTS to be measured on Apple
+
+---
+
+   finds NO caller that passes one -- the adapter is dead code. A first run
+   therefore fetches ~20 GB behind a node that never moves. Before the
+   nuke-and-reinstall test this is not cosmetic: without it we cannot tell
+
+---
+
+
+### B. The publish -- operator's call, and it gates everything user-facing
+
+---
+
+   `pyproject.toml` AUTO-FIRES the publish, and `(node_id, version)` is uniquely
+   indexed -- a burned version string never returns.
+5. **Bundle `static-ffmpeg` into that same bump.** It is the only zero-friction
+
+---
+
+   template -> press Run -> touch nothing but the mouse.
+   **Never delete:** `D:\otr-4060-testing` (the checkout), the private evidence
+   tree, or `ComfyUI-Shared\models` unless explicitly cleared.
+
+---
+
+   the paragraph below that said neither existed is superseded.
+8. ~~SDXL adapter only if item 7 fails.~~ Item 7 did not fail. **Do not build it.**
+9. Still the rule, and it held: a dropdown entry is a promise. Every widening
+
+---
+
+   script on any cold cache. This is the single highest-value action in this file.
+   Operator's call (a `pyproject.toml` edit auto-fires the publish).
+2. **The size badge understates every row by about half, and it is now measured
+
+---
+
+offer it. Installing alpha.25 in the clean-install drill required opening the
+version chip and picking the exact string by hand -- the operator's own
+guidance, "you can still install flagged you just need to click to see the
+
+---
+
+**THE LEAD THAT FOLLOWS FROM IT, and it is a good one.** The LLM lane downloads
+just as much and has never been the differing file, because it goes through
+`huggingface_hub.snapshot_download` -- a declared dependency, present in every
+
+---
+
+retry on a 36.8 GB first fetch that previously restarted a 12 GB file from zero
+and was measured stalling for 50 seconds; the operator's token on transfers; and
+the library's redirect handling instead of ours. Those were separately-recorded
+
+---
+
+tried first; this is the documented async fallback, not a request to relay
+through the operator.
+
+---
+
+
+Operator, 2026-09-07: *"do not save the 3 jsons just note them, they will be
+saved later"* / *"I'm not saving a duplicate json until all testing is done with
+all machines."* No profile JSON was added. Do not add them; do not promote them.
+
+---
+
+the current writer default and the licence-clean music bed, so `still_pan` has
+never run with `q354b` + `sa3`. It must not be promoted until one episode does.
+That run is the cheapest missing evidence in the set and the 4060 keeps it.
+
+---
+
+
+**Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
+*"I'm not sure we need to regression test every combo at this stage."* Three
+
+---
+
+
+## 2. ONE JSON OR TWO -- the operator's question, answered
+
+Operator, 2026-09-07: *"my goal is I run it on cuda, mac, it works everywhere --
+not all dropdowns -- but want ONE json to work. If that's impossible we need two
+
+---
+
+
+**Recommended shape, in the operator's own words** (*"if cuda is available use
+it, if not ... it automatically finds it"*):
+
+---
+
+only selectable policy on Apple Silicon -- and `none` is what does not fit.
+A Mac operator has no in-UI move.
+
+**Three real options, operator's call:**
+
+---
+
+
+**No episode reached `otr/obs/`, so by the operator's own standard this leg did
+not pass.** Two runs were started; the first died when its host session
+
+---
+
+   GitHub credentials (no `gh`, no keychain entry, no SSH key). The commit is
+   `a7ab7011`; a `git format-patch` of it was handed to the operator directly.
+   It is the tokenizers install-brick fix, PBUG-20260907-05 -- the highest
+
+---
+
+   ComfyUI install**, `.28` included.
+2. **Do not re-install this pack from the registry onto a working box** until
+   `.29` (or later) is the served version. It will brick the boot, and because
+
+---
+
+   `pycairo` dependency installs on Windows only -- so the shipped default could
+   never render on macOS **or Linux**. Now `viz_green`.
+3. **ffmpeg was never a declared dependency.** The run died at the mp4 encode
+   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
+
+---
+
+
+Both valid, non-silent, unclipped. **The numbers do not separate them on
+quality**, and at 2 cues an episode the saving is ~40 s of a ~24 min run -- ~3%,
+
+---
+
+native default", and Comfy-Org's own default for the checkpoint this pack loads
+is `cfg=1`. Operator, 2026-09-07: *"we just need it to run and produce music and
+not fail the episode."* It does.
+
+---
+
+1. **`2.0.0-alpha.29` and everything after it are committed but NOT pushed** --
+   this rented Mac has no GitHub credentials. Patches were handed to the operator
+   directly. The tokenizers fix is the urgent one: **every currently published
+
+---
+
+## OPEN AND AWAITING THE OPERATOR: the four per-device shipping JSONs
+
+`docs/SHIPPING_JSON_RECIPES.md` (2026-09-09) carries four no-friction dropdown
+combinations -- 8 GB NVIDIA, 16 GB+ NVIDIA, Apple Silicon, AMD ROCm -- each
+adversarially verified, **three of them corrected on that verification**.
+**NOTHING HAS BEEN APPLIED**; `workflows/otr_canonical.json` is untouched.
+
+It is listed here because it had no home in the forward file at all -- it
+existed only as a bullet in one HANDOFF_LOG entry, which is how an
+awaiting-approval item quietly disappears.
+
+* **Blocked on:** the operator reading the recipes and saying which to stamp.
+* **The correction that matters most:** 8 GB NVIDIA needs `llm_quant_policy`
+  = `bnb_nf4`, NOT `none` -- the 2.99 GiB / 14.47 tok/s figure that card is
+  known for IS an NF4 receipt.
+* **The prerequisite no engine choice avoids:** ffmpeg AND **ffprobe**.
+  `pip install -r requirements.txt` brings `imageio-ffmpeg`, which ships ffmpeg
+  and not ffprobe, and the still lanes fail loud without it.
+* AMD's recipe is a starting point with **zero AMD receipts behind any cell**.
+
+---
+
 ## 0. THE ATTACK ORDER (Fable ruling, 2026-09-05) -- READ THIS BEFORE PICKING A ROW
 
 The operator asked Fable to decide the plan of attack across the open rows and to say
@@ -312,51 +530,6 @@ exactly those arguments. So: return `final` alongside `(ok, reason)`, move the
 seed `already_used` with recomposed prompts.
 
 ---
-
-## 1A. THE SECURITY WORK -- SIX SURFACES CLOSED, NONE OPEN
-
-**Receipts in `docs/HANDOFF_LOG.md`; the narrative is in GO_FORWARD_ARCHIVE.md.**
-Reading the registry's own `status_reason` -- not the finding counts -- showed
-alpha.13/.14 were BANNED by a human for *"RCE (code execution) -- attacker-reachable
-via unauthenticated /prompt (node widget) or no-auth route"*. Both clauses were real.
-
-**CLOSED:**
-| surface | commit |
-|---|---|
-| the `ffmpeg` widget reaching `argv[0]` on five nodes | `a9e0383e` |
-| UNC/SMB coercion via `replay_from`, `workflow_json_path`, media paths | `a9e0383e` / `843b79d4` |
-| the same coercion through `IS_CHANGED`, which runs BEFORE the execute guard | `79dc9828` |
-| forged image-cache entries -> arbitrary local FILE READ, served by `/view` | `9d3f56a7` |
-| the no-auth route half (`POST /otr/video_render_*`, unconditional in alpha.13) | `b198026a`, 09-03 |
-| the pending sweep deleting what it could not READ (Fable finding 2) | `31dc6861` |
-| replay import trusting a ledger the manifest never verified (Fable finding 3) | `14c6a6db` |
-
-**Nothing from the security reviews remains open.**
-
-**THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
-prior session optimised a number that was never the blocker.
-
-## 1. THE SCAN COLLAPSE AND THE DEAD-CODE RIP -- DONE
-
-**Nothing owed. Receipts in `docs/HANDOFF_LOG.md`.** The env/proc single-owner
-migration, the acceptance leg (`obs_publish OK`, 00:10:17, asset verified on disk),
-and two rounds of dead-code rip all shipped:
-
-* **37 top-level symbols** ripped (`47bf95d6`) -- `-859` lines from `nodes/`, 220
-  tests removed. Verified by Astra + Gemini 3.8 + Sonnet, unanimous, against a brief
-  that ruled **"it has tests" an INVALID objection** -- that circular justification
-  is what had kept them alive, because `dead_code_closure.py` treats `tests/` as ROOTS.
-* **11 more** (`e5a9fd0f`) that the first rip orphaned -- the chain terminates at
-  round 3.
-* **Two files are now UNTOUCHABLE alongside `eng_indextts2.py`:**
-  `nodes/_otr_resolved_request.py` (byte-hashed by `RUNTIME_FINGERPRINT_SOURCES`;
-  ripping one symbol from it DEMOTED the Lemmy voice route and had to be reverted)
-  and `nodes/_otr_source_grounding.py` (its siblings are ruling-protected).
-
-**THE LESSON, because it cost three false-positive rounds:** an AST scan sees CALLS,
-not registrations or type positions. Aliased imports, `@register` decorators, pydantic
-field annotations, and overrides of a base in ANOTHER installed pack are all invisible
-to it. Grep for the PATTERN, never the name.
 
 ## 2. THE EASY CODE -- closed specs, no arc; lands BEFORE the version that gets reviewed
 
@@ -1001,17 +1174,6 @@ is the reason it must not be quietly re-opened.
 
 ### The parked rows
 
-### MAC / AMD -- images only, later (deferred; needs its own design row when picked up)
-
-Operator: Mac and AMD ship images only (ruling 2026-09-01), and he is "not hopeful".
-Landed: the credits font, the llama-cpp hint and four platform guards. Owed, in order:
-(1) one measured Klein render on Apple Silicon -> `nodes/_otr_image_engines/registry.py`
-gains `mps` on the `flux2_klein` row (cuda-only today) -> `otr_mac_mps` flips off
-`google_image` (README's Mac row says so); (2) the upscale stage accepting `mps`
-(`_otr_upscale_engines/__init__.py`, deliberately deferred); (3) a measured ROCm boot for
-`otr_amd8_rocm` / `otr_amd16_rocm`. ROCm already qualifies for Klein (presents as cuda).
-Needs hardware neither NVIDIA box has.
-
 ### PARKED (operator ruling 2026-08-12): wire character casting to the VOICE REFERENCE BANK
 
 **Status: PARKED, not rejected** (operator: *"park it on go forward"*).
@@ -1133,151 +1295,6 @@ which workflow to load and which models are required.
 
 ---
 
-## SDXL image lane for Apple Silicon (queued 2026-09-06)
-
-**WHY.** OTR has NO local image engine that can run on a Mac. Every entry in
-`nodes/_otr_image_engines/registry.py` declares `device_backends: ["cuda"]` --
-`flux_gen1`, `flux2_klein`, `lumina_image`, `ideogram4_local`, `z_image_turbo` --
-and the only one offering `cpu`/`mps` is `cloud_flux_pro`, a paid cloud lane.
-So `otr_mac_mps` ships `google_image`, a paid Google API needing
-`OTR_GOOGLE_API_KEY`. Attempting to swap Z-Image in is refused by the validator
-itself: *"engine excluded from profile 'otr_mac_mps' enable-set
-(requires_cuda)"*.
-
-This is the last thing standing between a Mac and a stills tier. It is NOT
-about the writer (Qwen3.5-4B at 8.06 GiB bf16 is comfortable in 16 GB unified),
-NOT about voices (kokoro declares `["cuda","cpu","mps"]` and self-installs),
-NOT about music (stable_audio_3 declares `["cuda","mps"]` and now
-auto-downloads, 222227b), and NOT about ffmpeg (macOS paths landed in 0c85e09,
-capability probe in cbb38d4).
-
-**WHY SDXL AND NOT THE ALTERNATIVES.**
-* **SDXL community fine-tune** (Juggernaut XL, DreamShaper XL, RealVisXL) --
-  ungated `.safetensors`, ~6.5-8 GB, loads through the stock
-  `CheckpointLoaderSimple` that `z_image_turbo` and `ltx_8gb` already use, so
-  the adapter sits close to code that exists. Native MPS with no custom CUDA
-  kernels. RAIL++-M permits commercial use. **The pick.**
-* **SD 1.5 fine-tune** -- <4 GB, bulletproof on every platform. The floor
-  option if SDXL is tight; worth shipping alongside rather than instead.
-* `flux2_klein` -- OTR already has the adapter, but it loads
-  `flux-2-klein-4b-Q4_K_M.gguf` through **ComfyUI-GGUF's `UnetLoaderGGUF`**, a
-  third-party pack, and `K_M` quants are reported to garble on MPS. Viable only
-  with a non-K quant or an MLX/mflux backend -- both larger than this item.
-* `z_image_turbo` -- its `["cuda"]` is very likely a record of where it was
-  TESTED, not a requirement: the registry says `needs_fp8_te: False`, the
-  adapter ranks `nvfp4 > fp8 > bf16` with a **bf16 fallback**, and the bf16
-  weights are what the 4060 actually used on 2026-09-06. BUT reported peak is
-  ~15 GB on an M3 Air, which is uncomfortable against 16 GB shared with the OS.
-  Plausibly a 24 GB+ Mac option, not a 16 GB default.
-* PixArt-Sigma -- **AGPL-3.0.** Riskier to ship than MusicGen's CC-BY-NC, which
-  was already rejected as a default. Not a candidate.
-
-**ORDER OF WORK.** Cheapest experiment first; it may make the adapter optional.
-
-1. **One Mac render, two one-line experiments, before any adapter is written.**
-   Widen `z_image_turbo` to `["cuda","cpu","mps"]` and render one act; measure
-   PEAK unified memory, not just success. Same session, widen `ltx_8gb` the
-   same way -- if AI video also runs on MPS, Mac gains tier 1 and the whole
-   ladder, which no amount of image work would give it.
-2. If Z-Image peaks too high (or fails), write the SDXL adapter: capability
-   entry with `device_backends: ["cuda","cpu","mps"]`,
-   `practical_without_gpu: True`, `model_requirements`, plus a
-   `nodes/_otr_visual_assets.py` MANIFEST entry so it auto-downloads on Run
-   like Z-Image and LTX do.
-3. Verify the ungated repo BEFORE wiring: read gating from repo metadata, not
-   from the licence name. `meta-llama` vs the `unsloth` mirror is the worked
-   example of why (see `docs/model-license-unsloth--llama-3.2-3b-instruct.md`).
-4. Ship the Mac JSON only once a real Mac has rendered one act end to end.
-
-**HARD CONSTRAINT, carried from today.** A dropdown entry is a promise the
-model will load. Do NOT widen any `device_backends` on reasoning alone -- the
-z_image and ltx widenings in step 1 are EXPERIMENTS to be measured on Apple
-hardware, and stay unmerged until one does. No Mac exists in this campaign.
-
-**ALSO OWED ON MAC, independent of the image lane:** three shipped configs
-pre-select `viz_mxc_mandala`, whose pycairo dependency is pinned
-`sys_platform == 'win32'` because pycairo publishes zero Linux wheels --
-`otr_mac_mps`, `otr_amd8_rocm` and `otr_amd16_rocm`. `viz_mxc_cpu` is the
-sibling that installs everywhere. The engine itself stays; only the selected
-value changes.
-
----
-
-## Zero-friction install campaign -- open items as of 2026-09-06 evening
-
-Written after the first four complete episodes ever produced on the 8 GB
-RTX 4060. Everything below is either UNDONE or UNPROVEN; the finished work is in
-`4060_DRILL_LOG.md` Steps 100-110 and the commits they name.
-
-### A. Before the clean-install test -- cheap, and the test is worse without them
-
-1. **Wire the download progress bar.** `auto_download_if_missing` accepts a
-   `progress_pbar` and forwards it into `snapshot_download`, but a pack-wide grep
-   finds NO caller that passes one -- the adapter is dead code. A first run
-   therefore fetches ~20 GB behind a node that never moves. Before the
-   nuke-and-reinstall test this is not cosmetic: without it we cannot tell
-   "downloading normally" from "hung", and that ambiguity would waste the one shot
-   the test gives us.
-2. **Wire `caption_support_gap()`.** `cbb38d4` added the probe and its tests;
-   NOTHING CALLS IT. Until it is invoked from the same validator hook that fires
-   the visual-asset check on Run, a minimal ffmpeg still renders the whole episode
-   and dies at the caption burn. The point is failing at minute 0 instead of
-   minute 20; wiring it into the caption node would deliver almost none of that.
-3. **Three `viz_mxc_mandala` selections.** `otr_mac_mps`, `otr_amd8_rocm` and
-   `otr_amd16_rocm` pre-select an engine whose pycairo dependency is pinned
-   `sys_platform == 'win32'` (pycairo publishes zero Linux wheels). `viz_mxc_cpu`
-   is the sibling that installs everywhere. The ENGINE STAYS -- Windows users keep
-   it in the dropdown; only the selected value changes. This is a live bug on AMD,
-   not only Mac.
-
-### B. The publish -- operator's call, and it gates everything user-facing
-
-4. **alpha.25.** `pyproject.toml` still reads `2.0.0-alpha.24`, stamped
-   2026-09-05. `nodes/_otr_visual_assets.py` -- the ONLY thing that makes Z-Image
-   and LTX auto-download -- landed 2026-09-06 and is therefore NOT in the
-   published package, along with the native text decoder, the cap removal, the
-   credits fix, the six clean writer rows and the Qwen default. A registry user
-   today gets the alpha.24 that failed on this card in the morning. Editing
-   `pyproject.toml` AUTO-FIRES the publish, and `(node_id, version)` is uniquely
-   indexed -- a burned version string never returns.
-5. **Bundle `static-ffmpeg` into that same bump.** It is the only zero-friction
-   answer for a Mac with no ffmpeg: `imageio-ffmpeg`'s bundled binary is stripped
-   and typically lacks `libass`, so captions break after a full render. An
-   `install.py` downloader is CLOSED -- that subprocess-spawning shape is what got
-   alpha.9/.10/.11 Flagged. Since a dependency edit fires a publish anyway,
-   alpha.25 is the one moment it costs nothing extra. The `caption_support_gap()`
-   probe from item 2 then VERIFIES whatever binary it fetches rather than trusting
-   it.
-
-### C. The clean-install test -- the only real proof
-
-6. Sequence, in order, none of it optional: publish -> **wait for Active, not
-   Pending** (a new version lands Pending and Comfy-Org's cron only considers
-   versions older than 30 minutes; while Pending `latest_version` is null and
-   Manager says "not a CNR node", which looks like our bug and is not) -> inventory
-   exactly what is about to be deleted and get sign-off -> wipe the INSTALLED pack
-   and its HF model cache -> install from Manager by EXACT version -> open a
-   template -> press Run -> touch nothing but the mouse.
-   **Never delete:** `D:\otr-4060-testing` (the checkout), the private evidence
-   tree, or `ComfyUI-Shared\models` unless explicitly cleared.
-   **Record every hand step.** Zero is the pass. A non-zero list IS the remaining
-   work.
-
-### D. Mac -- ANSWERED 2026-09-09. Seven published episodes; see HANDOFF_LOG.
-
-7. ~~Widen `z_image_turbo` AND `ltx_8gb`, run one act on a real Mac.~~ **DONE, and
-   the answer was yes.** `ltx_8gb` now declares `["cuda","mps"]` and has TWO
-   published Mac episodes; `sd15` declares `["cuda","cpu","mps"]` and minted the
-   stills in FOUR. So AI video and a local image engine both run on Metal, and
-   the paragraph below that said neither existed is superseded.
-8. ~~SDXL adapter only if item 7 fails.~~ Item 7 did not fail. **Do not build it.**
-9. Still the rule, and it held: a dropdown entry is a promise. Every widening
-   above is backed by a published episode, not by reasoning.
-
-**What Mac testing still owes, and it is short:** repeatability past one episode
-per lane, and nothing else. `docs/DROPDOWN_MATRIX.md` carries the per-engine
-verdicts with the receipt behind each.
-
 ### E. AMD -- still entirely unproven, but now with an ORDER to test in
 
 10. No AMD hardware exists in this campaign; the operator is sourcing one
@@ -1377,572 +1394,3 @@ verdicts with the receipt behind each.
 
 ---
 
-## Zero-friction install campaign -- UPDATE after the first real attempt, 2026-09-06 ~23:40
-
-This supersedes the status (not the reasoning) of sections A-H above. alpha.25 was
-published, the 4060 was wiped to 106 GB of nothing, and the challenge was actually
-run: Manager install -> restart -> Browse Templates -> Run, touching only the mouse.
-Full narrative in `4060_DRILL_LOG.md` Step 111; bugs in `PROD_BUG_LOG.md`
-PBUG-20260906-08 / -09; portable rules promoted as Bug Bible 12.157 / 12.158.
-
-### CLOSED by this attempt
-
-* **A.1 (wire the progress bar) -- done, and it was the blocker.** Wiring it is what
-  broke every LLM download: the adapter was a hand-rolled tqdm look-alike and
-  `snapshot_download` writes `.total` back onto the bar and calls `.refresh()`.
-  Fixed at the root by subclassing `tqdm.std.tqdm` (commit 730ecd1). The lesson is
-  now portable as Bible 12.157: `tqdm_class` is the tqdm PROTOCOL, not a callback.
-* **B.4 (publish alpha.25) -- done.** And it taught something section 7A did not
-  say: **Pending does NOT block an explicit install.** `Latest` still resolved to
-  alpha.24, but alpha.25 was listed and installable by name from the version chip,
-  with Status shown as `Unknown`. A publisher can test a Pending version instead of
-  waiting on Comfy-Org's 30-minute cron.
-* **C.6 (run the test) -- run, and it FAILED at the writer.** Everything up to the
-  script writer passed: 25/25 nodes, template loads, Run accepted with zero
-  configuration, 36.8 GB of visual assets auto-downloaded with pinned revisions and
-  sha256, filed into the correct model directories. Then the writer died. Hand steps
-  to a loaded runnable template were SIX, five of them Manager's own; a stranger's
-  path is four.
-* **G.14 (this box cannot run pytest) -- UNBLOCKED, and the workaround is cheap.**
-  `pip install --target <scratch> pytest pytest-asyncio` plus `PYTHONPATH=<scratch>`
-  runs pytest on the ComfyUI interpreter WITHOUT adding anything to the venv (proved:
-  `find_spec('pytest')` is still None in the venv afterwards). That keeps the
-  clean-install environment honest while making the 576 blocked tests runnable. It
-  immediately earned its keep on the Bible repo, catching a Three-File Contract
-  violation the YAML parse could not see. **The 576 OTR tests still need running --
-  the technique exists now, the run does not.**
-
-### NEW -- found by actually running it, in priority order
-
-1. **Publish alpha.26 and re-run the challenge.** 730ecd1 fixes both blockers but is
-   NOT published; a registry user today still gets alpha.25, which cannot write a
-   script on any cold cache. This is the single highest-value action in this file.
-   Operator's call (a `pyproject.toml` edit auto-fires the publish).
-2. **The size badge understates every row by about half, and it is now measured
-   twice, not argued.** gemma-4-12b badged 11.9 GB downloaded **23.9 GB**; Qwen
-   badged 4.3 GB downloaded **8.7 GB**. This is F.12/F.13's `/2` rule reaching the
-   user-facing label. An 8 GB owner reads the badge to decide what they can afford,
-   so it is not cosmetic.
-3. **`no resume/retry` on a 36.8 GB first fetch.** The planner prints it itself. A
-   dropped connection 11 GB into a 12 GB file restarts that file at zero. The run
-   also showed a real ~50-second stall (57 MB/s -> 0.6 MB/s -> recovered), so the
-   condition is not hypothetical.
-4. **A token was present and unused.** Startup logged
-   `[hf_token] HF_TOKEN resolved from os.environ (len=37)` and the asset downloader
-   still warned "sending unauthenticated requests". Unauthenticated MUST keep
-   working (a stranger has no token) but a resolved token should be used when it
-   exists -- higher rate limits, fewer stalls.
-5. **kokoro's numpy pin is unsatisfiable against ComfyUI's numpy.** pip reported
-   `kokoro 0.7.16 requires numpy==1.26.4, but you have numpy 2.5.1` and
-   `requires misaki[en]>=0.7.16, but you have misaki 0.7.4`. kokoro is the DEFAULT
-   announcer voice, so this sits directly on the first-run path. Not yet observed
-   failing at runtime; must be watched on the next full render.
-6. **54 of 97 shipped graphs still select `mistralai/Mistral-Nemo-Instruct-2407`**
-   and 23 select gemma-4-12b. Only the two SHIPPED TEMPLATES were fixed in 730ecd1.
-   The rest take their writer from `config/profiles/*.json`, which is the 5080's
-   surface and a much larger blast radius -- do it as its own change, with the
-   before/after measurement §0B requires.
-7. **Music default is still `musicgen` (CC-BY-NC), not `stable_audio_3`.** Confirmed
-   in the shipped canonical template during this drill. Every published episode
-   therefore still carries a non-commercial bed. This is H.16 unchanged, and it is a
-   licensing exposure rather than a defect.
-8. **Manager keeps a database record for a pack whose files were deleted by hand.**
-   It offered Uninstall (version `49c3a57`) for a directory that no longer existed,
-   and Install only appeared after clicking Uninstall. Not our bug, but it is a real
-   step for anyone who removes a pack manually, and it cost time in this drill.
-9. **Two cosmetic template-gallery findings.** The gallery SEARCH does not reach
-   extension templates (searching "radio" returned 2 of 540 core templates, neither
-   ours -- ours are only reachable by expanding EXTENSIONS), and both OTR entries
-   render as blank gradient thumbnails because no cover art ships.
-
-### UNCHANGED and still owed
-
-A.2 (wire `caption_support_gap()` -- the probe still has no caller), A.3 (three
-`viz_mxc_mandala` selections -> `viz_mxc_cpu`), B.5 (bundle `static-ffmpeg`),
-D.7/D.8/D.9 (Mac: widen `z_image_turbo` and `ltx_8gb`, run one act, read `otr/obs/`),
-E.10/E.11 (AMD entirely unproven; `torch.version.hip` is the discriminator),
-F.12 (`_assert_policy_admits_vram` still uses the discredited `/2` heuristic),
-H.17 (restore GGUF rows as a documented opt-in lane), H.18 (cloud deferred).
-
-### The standing rule this drill confirms
-
-The test is worth running BEFORE it can pass. Two blockers, one of them a total
-cold-cache failure of the shipped package, were invisible to a green test suite, to
-270 passing unit tests, and to five successful episodes rendered on a warm box. They
-appeared within fourteen minutes of a stranger's path being walked literally.
-
----
-
-## THE BIGGEST REMAINING FRICTION IS NOT OUR CODE -- 9 OF 14 RELEASES ARE FLAGGED (2026-09-07 ~02:00)
-
-Recorded the moment alpha.26 was published, from
-`https://api.comfy.org/nodes/comfyui-old-time-radio/versions`:
-
-    NodeVersionStatusFlagged    9
-    NodeVersionStatusActive     2
-    NodeVersionStatusBanned     2
-    NodeVersionStatusPending    1   (alpha.26, 2026-09-07T08:50:55Z)
-
-    alpha.26  Pending
-    alpha.25  FLAGGED
-    alpha.24  Active
-    alpha.23  Active
-    alpha.22  FLAGGED
-    alpha.21  FLAGGED
-    alpha.20  FLAGGED
-    alpha.19  FLAGGED
-
-**WHY THIS MATTERS MORE THAN ANY BUG FIXED TONIGHT.** A Flagged version does not
-resolve as `latest_version`, so ComfyUI Manager's default install path does not
-offer it. Installing alpha.25 in the clean-install drill required opening the
-version chip and picking the exact string by hand -- the operator's own
-guidance, "you can still install flagged you just need to click to see the
-options", is exactly right and is exactly the friction the whole campaign exists
-to remove. We can make the package perfect and a stranger still cannot install
-it by pressing the obvious button.
-
-**WHAT IS AND IS NOT KNOWN.** Section 7A already records that promotion is
-Comfy-Org's private security scanner and that there is NO publisher self-service
-path to Active. What is NOT known is WHY the majority of our versions fail it
-while alpha.23 and alpha.24 passed. Two Banned versions (alpha.13, alpha.14) sit
-below them, and alpha.9/.10/.11 were Flagged for a documented reason -- an
-`install.py` that spawned a subprocess -- which is why that shape is closed. The
-current flags have no such known cause.
-
-**THE OBVIOUS SUSPECTS, none verified.** `.comfyignore` strips the exec()-using
-probe/smoke scripts, but that list has not been re-audited since the pack grew;
-the pack now ships `prestartup_script.py`, `patches/`, and node modules that
-spawn ffmpeg via `subprocess`, any of which a scanner may read as executable
-behaviour. The one thing that would settle it is comparing what actually SHIPS
-in a Flagged zip against an Active one -- alpha.24 (Active) and alpha.25
-(Flagged) are one day apart and diffable.
-
-**NEXT ACTIONS, in order:**
-1. Download the alpha.24 and alpha.25 zips from the registry and diff their file
-   lists. Two adjacent versions, one Active and one Flagged, is the cleanest
-   natural experiment available and costs nothing.
-2. Re-audit `.comfyignore` against what the scanner plausibly objects to, and
-   verify by downloading the published zip rather than by assuming -- section 7A
-   already insists on that and it has not been done since alpha.16.
-3. Ask Comfy-Org. Section 7A says waiting or asking are the only moves, and
-   nine flags across one pack is worth a question rather than another guess.
-4. Until it is resolved, the README install instructions must say plainly that
-   the version may need selecting by hand, because a stranger hitting the
-   default button today gets alpha.24 -- the build that cannot write a script on
-   a cold cache.
-
-**This supersedes nothing above; it outranks it.** Every item in the earlier
-sections assumes the pack can be installed.
-
-### The natural experiment ran, and the correlation is strong: SHIPPED DOWNLOADER CODE IS WHAT GETS US FLAGGED
-
-Ran immediately after the note above, on the four published zips from the two
-adjacent pairs with opposite outcomes. This costs nothing and should have been
-done months ago.
-
-**PAIR 1 -- alpha.24 (Active) vs alpha.25 (Flagged), one day apart.** alpha.25
-adds exactly THREE files and removes none:
-
-    + nodes/_otr_code_provenance.py
-    + nodes/_otr_visual_asset_download.py
-    + nodes/_otr_visual_assets.py
-
-**PAIR 2 -- alpha.22 (Flagged) vs alpha.23 (Active).** alpha.23 REMOVES exactly
-four files and adds none:
-
-    - nodes/_otr_audio_engines/eng_indextts2.py
-    - scripts/_otr_idx_download_weights.py
-    - scripts/_otr_indextts2_install.ps1
-    - scripts/_otr_indextts2_worker.py
-
-**THE PATTERN IS THE SAME IN BOTH DIRECTIONS.** The Flagged build is the one
-carrying a bespoke DOWNLOADER or INSTALLER; the Active build is the one where it
-is absent. `_otr_idx_download_weights.py` fetches weights and
-`_otr_indextts2_install.ps1` is a PowerShell installer; `_otr_visual_assets.py`
-streams weights over raw `urllib` (`build_opener` / `Request`, the only raw-net
-addition in the whole diff).
-
-**AND IT IS A DEFECT CLASS THIS REPO HAS ALREADY BEEN BURNED BY.** Section B.5
-of this plan records that an `install.py` downloader is CLOSED because "that
-subprocess-spawning shape is what got alpha.9/.10/.11 Flagged". Nine flags now,
-same shape, three separate times.
-
-**WHAT THIS DOES NOT PROVE.** The scanner is private; this is correlation across
-two pairs, not a stated reason, and the static-pattern census is explicitly
-AGAINST a naive reading: alpha.22 (Flagged) and alpha.23 (Active) have
-IDENTICAL counts -- 23 subprocess sites, 2 raw-net sites, 4 exec/eval sites, in
-the same files. So it is not "any subprocess" or "any network call"; those live
-happily in Active builds. What differs is a module whose PURPOSE is fetching or
-installing.
-
-**THE LEAD THAT FOLLOWS FROM IT, and it is a good one.** The LLM lane downloads
-just as much and has never been the differing file, because it goes through
-`huggingface_hub.snapshot_download` -- a declared dependency, present in every
-Active build. The visual lane does NOT: it hand-rolls the transfer over urllib
-(confirmed while chasing the unused-token question -- `_otr_visual_assets.py`
-pins metadata with `hf_hub_url`/`get_hf_file_metadata` at :294-301 and then
-streams bytes itself, passing `token=False` at :221 and :227).
-
-**Routing the visual assets through `hf_hub_download` would close four open
-items at once:** the flag hypothesis, the `no resume/retry` the planner prints
-itself, the resolved-but-unused HF_TOKEN, and the 50-second stall observed on
-the 36.8 GB fetch -- huggingface_hub retries and resumes by default. It is the
-same library, already shipped, already used by the writer lane.
-
-**NEXT, in order:** (1) port the visual-asset transfer to `hf_hub_download` and
-delete the bespoke downloader module; (2) publish and observe whether the next
-version goes Active -- that IS the experiment, and it is one publish; (3) if it
-still flags, ask Comfy-Org with these four zips as evidence rather than guessing
-a fourth time.
-
-### REFUTED: removing the bespoke downloader did NOT unflag the package (2026-09-07 12:05)
-
-alpha.27 shipped the huggingface_hub port -- no `from urllib.request import`, no
-`build_opener`, no hand-written redirect handler -- and came back
-**NodeVersionStatusFlagged** at 12:05:30, same as .25 and .26.
-
-**THE HYPOTHESIS IS DEAD AND SHOULD NOT BE RE-RUN.** The correlation across four
-zips was real -- Flagged builds carried a fetcher, Active builds did not -- but
-it is not causal, or not sufficient. One version string bought that answer,
-which was the stated price.
-
-**What the port is still worth keeping for**, independent of the flag: resume and
-retry on a 36.8 GB first fetch that previously restarted a 12 GB file from zero
-and was measured stalling for 50 seconds; the operator's token on transfers; and
-the library's redirect handling instead of ours. Those were separately-recorded
-open items and they are closed. The port was not wasted, it just did not do the
-one thing it was published to test.
-
-**THE REMAINING CORRELATE, recorded as a CANDIDATE and nothing more.** alpha.25
-added three files to the Active alpha.24: `_otr_visual_asset_download.py`,
-`_otr_visual_assets.py` and `_otr_code_provenance.py`. The first two are now
-library-backed and still Flagged. `_otr_code_provenance.py` is present in .25,
-.26 and .27 (all Flagged) and absent from .24 (Active). It reads `.git/HEAD`
-and SHA-256-hashes `nodes/**/*.py` to fingerprint the package's own code -- a
-shape a scanner could read as tamper-detection. That is a guess, and it is the
-THIRD guess in a row about a scanner whose rules are private.
-
-**STOP GUESSING. ASK.** Section 7A already says it: promotion is Comfy-Org's
-private scanner, there is no publisher self-service path to Active, and waiting
-or asking are the only moves. We now have unusually good evidence to ask WITH --
-four published zips, two adjacent pairs whose outcomes flip, a documented
-intervention that failed, and nine flags across fourteen versions. That is a
-concrete question, not a complaint.
-
-**AND SAY IT IN THE README UNTIL IT IS RESOLVED.** A stranger pressing the
-default install button today gets alpha.24, which cannot write a script on a
-cold cache (PBUG-20260906-08). The install instructions must say the version may
-need choosing by hand. That is friction we cannot remove, but hiding it is worse
-than naming it.
-
----
-
-# HANDOFF: 4060 -> 5080, 2026-09-07
-
-**Posted here because no 5080 window was live** (`ListAgents`: every OTR peer
-offline). The direct window-to-window channel is the preferred route and was
-tried first; this is the documented async fallback, not a request to relay
-through the operator.
-
-**THE FULL BRIEF IS `docs/4060_PORTABILITY_ANSWER.md`.** It supersedes the
-2026-08-29 "FRICTIONLESS-INSTALL ANSWER" in the drill log, which is now
-banner-marked as stale. Summary of what the 5080 needs:
-
-## 1. PULL BEFORE YOU EDIT -- today's 4060 work lands in YOUR files
-
-| commit | file | effect on the 16 GB box |
-|---|---|---|
-| `f6fbb59` | `nodes/_otr_visual_assets.py` | image weights are no longer fetched when the role's video lane declares `accepts_still=False`. **Measured across 116 profiles: 19 drop image weights, six `shipping`, including the 16 GB `16gb_full`.** No profile gains a download or loses one it can use. |
-| `e4b5dfe` | `nodes/_otr_visual_assets.py` | `+ Add Custom Model` resolves through `custom_models_json` in the preflight instead of being hard-refused |
-
-`nodes/` is the 5080's surface under CLAUDE.md 0B. These were made here because
-the defect was found here, on a live 8 GB run; the blast radius is stated in
-both commit messages and was measured, not asserted.
-
-## 2. THE THREE CONFIGURATIONS ARE NOTED, NOT SAVED -- KEEP IT THAT WAY
-
-Operator, 2026-09-07: *"do not save the 3 jsons just note them, they will be
-saved later"* / *"I'm not saving a duplicate json until all testing is done with
-all machines."* No profile JSON was added. Do not add them; do not promote them.
-
-They share one zero-friction core -- `Qwen/Qwen3.5-4B` + `kokoro` +
-`stable_audio_3`, with no token, key, node pack or hand step -- and differ only
-in the video lane:
-
-    FLOOR   viz_mxc_cpu  ~12.2 GB  16:16      PROVEN as a complete combination
-    STILLS  still_pan    ~31.5 GB             LANE proven, COMBINATION NOT
-    MOTION  ltx_8gb      ~46.5 GB  27-42 min  PROVEN as a complete combination
-
-**Tier 2's gap is real and named:** its four published episodes all predate both
-the current writer default and the licence-clean music bed, so `still_pan` has
-never run with `q354b` + `sa3`. It must not be promoted until one episode does.
-That run is the cheapest missing evidence in the set and the 4060 keeps it.
-
-## 3. WHAT THE 5080 IS ASKED TO DO
-
-1. **Re-measure the three on 16 GB** and record the deltas. One card's numbers
-   are not a portability claim -- that is the entire reason the 4060 exists.
-2. **Status promotion stays yours.** Nothing here is promoted.
-3. **Ask Comfy-Org about the Flagged status.** The section immediately above
-   this one already reached that conclusion and named the third guess as a guess.
-   Two hypotheses are spent; the evidence to ask with is unusually good.
-4. **The ~38 stale tests** pinning superseded decisions: a discrete single-pass
-   task, zero user-facing defects.
-
-## 4. WHAT IS STILL UNPROVEN BY ANYONE
-
-**Mac and AMD -- no hardware, on either box.** One piece of real evidence does
-exist: `viz_mxc_cpu` declares `cuda` alongside `cpu`/`mps`, so FLOOR's engine is
-the same engine the Mac and AMD profiles select, and it published here in 16:16
-with zero model weights. That is the only Mac/AMD video evidence obtainable
-without Mac/AMD hardware. It is not a substitute for running it there.
-
-**Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
-*"I'm not sure we need to regression test every combo at this stage."* Three
-configurations that install clean beat 33 lanes with thin evidence.
-
----
-
-# 2026-09-07 -- FIRST MAC HARDWARE RUN (Mac mini M4, 16 GB, macOS 26.6.2)
-
-Section 4 above says *"Mac and AMD -- no hardware, on either box."* That is no
-longer true for Mac. This section replaces the guesses with measurements.
-
-Box: Mac mini M4, 10-core, **16 GB unified**, macOS 26.6.2, ComfyUI Desktop
-0.34.6 standalone `mac-mps`, Python 3.13.12, torch 2.12.1. `Device: mps`, all 25
-OTR nodes loaded, zero import failures. Canonical as retargeted at `a62f3567`.
-
-## 1. THE MPS QUESTION, ANSWERED
-
-The standing hypothesis was that `nodes/` carries ~40 `torch.cuda.is_available()`
-checks and zero `torch.backends.mps.is_available()` checks, so selecting `mps`
-silently routes to CPU. **Counted: 40 cuda call sites, and exactly one
-`torch.backends.mps` occurrence -- which is a docstring, not a check.** The
-hypothesis was right about the code shape and **wrong about the writer.**
-
-**The writer genuinely runs on the GPU.** `llm_device` flows
-`OTR_LedgerScriptWriter` -> `_policy.device` -> `_otr_model_loader.py:1459`:
-
-```python
-if quant_config is None and max_memory is None:
-    model = model.to(device)          # device == "mps"
-```
-
-The canonical runs quant `none` with `max_memory=None`, so that branch is taken
-and `.to("mps")` executes verbatim. Confirmed on the live process, not inferred:
-`footprint -p <pid>` reported **14 GB phys_footprint** while
-`AGXMetalG16G_B0.bundle` -- the Apple GPU Metal driver -- was mapped into the
-address space, with `IOAccelerator` regions resident. That is Metal executing.
-
-**`[StoryOrchestrator] CUDA warmup complete` prints on this Mac and means
-nothing.** It is a hardcoded string in the warmup block; the warmup runs on
-whatever device the model is on. Cosmetic, and actively misleading to anyone
-diagnosing a Mac run. Worth renaming; not a routing fault.
-
-**Where an mps selection IS disregarded -- confirmed by reading the code:**
-
-* **Kokoro TTS, and it reaches every Python 3.13 install.** `voice_device="mps"`
-  is accepted by the widget and ignored by the engine: on 3.13 the backend is
-  `kokoro-onnx`, whose session is built from an explicit provider list, CPU by
-  default. The code says so itself (`_kokoro_backends.py:19`). See
-  PBUG-20260907-08.
-* **Upscale lane, deliberately.** `_otr_upscale_engines/_resolve.py:20` is the
-  repo's only device resolver and its docstring reads *"Rejects: `mps` (until a
-  Mac integration receipt lands)"*. It raises rather than degrading -- the
-  correct failure shape, just not yet lifted.
-* **The VRAM budgeter is blind, not wrong.** `total_vram` comes from
-  `torch.cuda.get_device_properties(0)` behind `torch.cuda.is_available()`, so it
-  is `0` here and the 10.0 GB ceiling widget enforces nothing on Mac. Harmless
-  today only because `_plan_max_memory` returns `None` for every row.
-* **`bark` declares `["cuda", "cpu"]` and omits `mps` on purpose**
-  (`registry.py:206`) -- correctly declared, unlike Kokoro's.
-
-**The one line in the writer path that is already device-aware** is the GGUF
-backend, `_otr_gguf_backend.py:643`:
-`default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0`.
-This is the pattern the rest of the tree should converge on.
-
-## 2. ONE JSON OR TWO -- the operator's question, answered
-
-Operator, 2026-09-07: *"my goal is I run it on cuda, mac, it works everywhere --
-not all dropdowns -- but want ONE json to work. If that's impossible we need two
-jsons."*
-
-**One JSON is achievable, and a second JSON would not fix the real problem
-anyway.** The blocker is not the graph. It is that device selection is expressed
-as a literal string in the saved widget (`"mps"` in three nodes: writer,
-`OTR_CastLock`, `OTR_VideoDirector`), so the graph names a device that only one
-class of machine has.
-
-**Recommended shape, in the operator's own words** (*"if cuda is available use
-it, if not ... it automatically finds it"*):
-
-1. Add ONE shared resolver -- `cuda -> mps -> cpu` -- and route every device
-   decision through it. `_otr_gguf_backend.py:643` already shows the idiom;
-   `_otr_upscale_engines/_resolve.py` is the natural home for the general form.
-2. Add `"auto"` to the three device dropdowns and make it the canonical's saved
-   value. `auto` resolves per host, so the SAME json runs on the 5080 and here.
-   `cuda` / `mps` / `cpu` stay selectable for anyone pinning deliberately.
-3. Where a lane genuinely cannot honour a device, **say so at selection time**
-   rather than in a log line -- Kokoro's `voice_device` is the live example.
-
-That is a code change, not a workflow change, and it is the only version of
-"one json" that survives contact with a third platform.
-
-## 3. THE HARD CONSTRAINT: 16 GB IS NOT ENOUGH FOR THE SHIPPED CANONICAL
-
-Full numbers in PBUG-20260907-06. The short form:
-
-* writer `phys_footprint` **14 GB** on a **16 GB** machine
-* swap 0.00 M -> **5.6 GB**, free memory to **1 %**
-* **ComfyUI OOM-killed by macOS mid-render, twice**
-* throughput while it lasted: **3.7 -> 6.4 tok/s**
-
-**And the quant dropdown cannot rescue it.** Both bnb lanes are off on darwin by
-declared intent (`bitsandbytes ... sys_platform != 'darwin'`), so `none` is the
-only selectable policy on Apple Silicon -- and `none` is what does not fit.
-A Mac operator has no in-UI move.
-
-**Three real options, operator's call:**
-
-1. **Ship the GGUF lane on Mac.** `Q4_K_M` on the 4B writer is ~2.5 GB and the
-   backend is already MPS-correct. Blocked only by PBUG-20260907-07:
-   `llama-cpp-python` is declared nowhere. This is the cheapest path to a Mac
-   episode and it needs a platform-wheel decision, not a Mac tester.
-2. **A smaller writer for the 16 GB tier**, selected by the machine class rather
-   than by hand.
-3. **Declare 16 GB unified out of scope** for the transformers lane and say so in
-   the README, which is more honest than a canonical that OOMs.
-
-## 4. WHAT THIS SESSION DID NOT PROVE
-
-**No episode reached `otr/obs/`, so by the operator's own standard this leg did
-not pass.** Two runs were started; the first died when its host session
-restarted (the ComfyUI server was a child of that session -- a harness fault,
-not an OTR one), the second was OOM-killed. Both got as far as correct
-structured writer output -- outline beats, character descriptions, schema-valid
-JSON -- and neither reached TTS, music, video or publish. **Everything downstream
-of the writer is still unproven on Apple Silicon.**
-
-What IS proven on Mac: the pack installs, boots, registers all 25 nodes, passes
-the visual-asset preflight (`READY engines=stable_audio_3`, with all three
-`z_image_turbo` slots correctly refused as provably unused), fetches
-`stable_audio_3` weights, and drives the writer on Metal.
-
-## 5. FOR WHOEVER PICKS THIS UP
-
-1. **`2.0.0-alpha.29` is committed but NOT pushed.** This rented Mac has no
-   GitHub credentials (no `gh`, no keychain entry, no SSH key). The commit is
-   `a7ab7011`; a `git format-patch` of it was handed to the operator directly.
-   It is the tokenizers install-brick fix, PBUG-20260907-05 -- the highest
-   priority item here, because **every currently published version bricks a
-   ComfyUI install**, `.28` included.
-2. **Do not re-install this pack from the registry onto a working box** until
-   `.29` (or later) is the served version. It will brick the boot, and because
-   Manager is itself a ComfyUI extension you will not be able to use the UI to
-   undo it.
-3. The 40-site cuda/mps audit is classified above by lane, but only the sites on
-   the canonical's path were read line by line. The remaining lanes -- video,
-   post, upscale beyond `_resolve.py`, the vram-log helpers -- are unaudited.
-
----
-
-# 2026-09-07, 20:21 -- APPLE SILICON PASSES: an episode reached `otr/obs/`
-
-Supersedes section 4 of the earlier entry ("no episode has reached `otr/obs/` on
-Apple Silicon"). It has.
-
-```
-otr/obs/magnetic_pulse_20260907_201810__rfrc__vcam__none__koko__news__q354b__sa3_final.mp4
-  135.1 s | h264 1920x1080 @ 25 fps, 3378 frames | aac 48 kHz stereo | 216 MB
-  RMS -53 -> -37 dBFS across the timeline (real content, not the silent fallback)
-  Stable Audio 3: ZERO non-finite warnings
-```
-
-Fully local: Qwen3.5-4B writer on Metal -> Kokoro voices -> Stable Audio 3 music
--> visualizer video -> ffmpeg encode -> published. No image weights, no API keys.
-
-## What actually blocked it -- five defects, none of them "Mac can't"
-
-1. **PBUG-20260907-05** `tokenizers>=0.22,<=0.23` excluded 0.23.1 and stopped
-   ComfyUI booting at all. Every published version `.24`-`.28` carries it.
-   Fixed in `2.0.0-alpha.29`.
-2. **PBUG-20260907-10** the canonical selected `viz_mxc_mandala` for music, whose
-   `pycairo` dependency installs on Windows only -- so the shipped default could
-   never render on macOS **or Linux**. Now `viz_green`.
-3. **ffmpeg was never a declared dependency.** The run died at the mp4 encode
-   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
-4. **ffprobe was the other half.** imageio ships ffmpeg alone and the visualizer
-   probes back every clip it encodes. Now `ffmpeg-downloader` (matched pair).
-5. **PBUG-20260907-09b** Stable Audio 3 returned 100% NaN -- caused by OTR's own
-   determinism wrapper (`fill_uninitialized_memory`) meeting an MPS `baddbmm`
-   bug that ignores `beta=0`. Not the model, not the dtype, not the sampler.
-
-**Three of those five are cross-platform defects that Mac merely exposed first**
-(2, 3 and 4 all affect Linux; 1 affects any host with transformers >= 5.11).
-
-## The SA3 config question, measured and DEFERRED
-
-Comfy-Org ships checkpoints in matched base/non-base pairs with different
-recipes -- verified locally against both shipped templates:
-
-```
-audio_stable_audio_3_medium.json       steps=8  cfg=1 lcm simple   (non-base)
-audio_stable_audio_3_medium_base.json  steps=50 cfg=7 lcm simple   (base)
-```
-
-OTR loads `stable_audio_3_small_music` -- the **non-base** member -- at
-`steps=100, cfg=7.0, dpmpp_3m_sde_gpu`. That is the base recipe plus double the
-steps, on a distilled checkpoint.
-
-**A/B measured on this Mac** (same checkpoint, seed, prompt; one 12 s cue):
-
-| | OTR recipe | Comfy recipe |
-| --- | --- | --- |
-| wall clock | 22.3 s | **2.1 s** (10.6x) |
-| peak | 0.0003 dBFS | 0.0003 dBFS |
-| RMS | -14.76 dBFS | -16.17 dBFS |
-| noise floor | -37.4 dB | -32.8 dB |
-| flat factor | 33.5 | 42.2 |
-
-Both valid, non-silent, unclipped. **The numbers do not separate them on
-quality**, and at 2 cues an episode the saving is ~40 s of a ~24 min run -- ~3%,
-because the writer dominates, not the music. Changing the default would also
-force a CUDA golden re-baseline.
-
-**Decision: values LEFT AS THEY ARE**, pending a listening test. Only the false
-provenance comment was corrected -- the source claimed `cfg=7.0` is the "SA3
-native default", and Comfy-Org's own default for the checkpoint this pack loads
-is `cfg=1`. Operator, 2026-09-07: *"we just need it to run and produce music and
-not fail the episode."* It does.
-
-## What is STILL unproven on Apple Silicon
-
-* **Repeatability.** ONE episode. Nothing proves the second lands.
-* **Memory margin.** It finished at ~44% free, but earlier runs OOM-killed at
-  quant `none`; the headroom is thin and uncharacterised.
-* **Wall clock vs CUDA.** ~24 min end to end here; no clean comparison made.
-* ~~**Everything outside the canonical.** There is no local image engine and no
-  local video-diffusion engine on this platform.~~ **FALSE as of 2026-09-09, and
-  it was already false when written.** `sd15` declares `["cuda","cpu","mps"]`
-  and minted the stills in FOUR published Mac episodes; `ltx_8gb` declares
-  `["cuda","mps"]` and published TWO; `animatediff15_lightning_video` declares
-  `["mps","cuda"]` and published one 23-beat episode. The visualizer lanes are
-  not the only local video path -- they are the cheapest one.
-  Still true of the REST: `flux_gen1`, `flux2_klein`, `lumina_image`,
-  `z_image_turbo` and every Wan/LTX-2.x row declare `["cuda"]`, and `flux2_klein`
-  withholds `mps` ON PURPOSE (it rendered on an M4 at 22 GB peak, surviving only
-  on swap).
-* ~~**`ltx_8gb` may be mis-declared.**~~ **Resolved:** it carries `mps` and has
-  the receipts. The suspicion was right and is now measured.
-
-## For the 5080
-
-1. **`2.0.0-alpha.29` and everything after it are committed but NOT pushed** --
-   this rented Mac has no GitHub credentials. Patches were handed to the operator
-   directly. The tokenizers fix is the urgent one: **every currently published
-   version bricks a ComfyUI install.**
-2. Re-run the CUDA goldens against these commits. Nothing here should move CUDA
-   output -- the determinism change is guarded on `torch.backends.mps.is_available()`
-   and the ffmpeg/ffprobe steps resolve last -- but that is an argument, and the
-   goldens are the measurement.

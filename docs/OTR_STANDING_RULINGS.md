@@ -2273,6 +2273,21 @@ the 16 GB default "work, be less friction and fit VRAM for our 8 GB and 16 GB de
 
 ## MAC AND AMD SHIP IMAGES ONLY (operator ruling 2026-09-01)
 
+> **SUPERSEDED FOR MAC, 2026-09-09 -- BY ITS OWN STATED EXPIRY CONDITION.** This
+> ruling said it "stands until a video engine publishes an episode on one of
+> those machines". Three now have, on the M4: `animatediff15_lightning_video`
+> (one 23-beat episode), `ltx_8gb` (two), and the four `still_*` lanes. The
+> registry rows carry `mps` accordingly. The second clause -- "it stays on
+> `google_image` until a local image engine declares `mps`" -- is also spent:
+> `sd15` declares `["cuda","cpu","mps"]` and minted the stills in FOUR published
+> Mac episodes, and `config/profiles/otr_mac_mps.json` has used it throughout.
+>
+> **STILL STANDING FOR AMD**, and untouched: nothing in this repo has ever run
+> on AMD hardware, and `docs/DROPDOWN_MATRIX.md` records AMD at 0 of 68 cells.
+> The ruling's logic is intact there -- only the Mac half expired, exactly as it
+> said it would.
+
+
 Operator: *"I know most video models we have won't work at all on Mac and AMD, so I am
 fine only giving them images if that's the case."*
 
