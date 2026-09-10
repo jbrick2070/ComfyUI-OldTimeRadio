@@ -1,0 +1,13 @@
+{
+  "scope": "Existing AST slot-sweep accounting only, not a repository cleanup audit",
+  "current_sites": 43,
+  "freeze_sites": [
+    [
+      "nodes\\OTR_LedgerFreezeCascade.py",
+      281,
+      "request_slot"
+    ]
+  ],
+  "after_planned_freeze_request_removal": 42,
+  "test_floor": 12
+}

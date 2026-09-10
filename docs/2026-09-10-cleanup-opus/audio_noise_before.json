@@ -1,0 +1,145 @@
+{
+  "scope": "Pre-change CPU diagnostic: actual canonical node 3/4 with zero voice boundaries; direct AudioEnhance off/subtle isolation; no master/render/publish",
+  "canonical_sha256": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2",
+  "calls": [
+    {
+      "type": "OTR_SceneSequencer",
+      "node_id": 3,
+      "function": "sequence",
+      "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+      "widgets_values": [
+        "[]",
+        0,
+        999,
+        "",
+        0
+      ]
+    },
+    {
+      "type": "OTR_AudioEnhance",
+      "node_id": 4,
+      "function": "enhance",
+      "source_sha256": "046f1790b962af09ac9360c58317756c03fea46af1bb573bca0f8bb1ceee48b7",
+      "widgets_values": [
+        48000,
+        0.3,
+        0.8,
+        0.15,
+        16000,
+        "subtle"
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "input": "OTR_SceneSequencer.script_json",
+      "link": [
+        277,
+        80,
+        0,
+        3,
+        2,
+        "STRING"
+      ],
+      "source_type": "OTR_CastLock",
+      "supplied": {
+        "value": "{\"schema_version\": \"l4-2026-08-07\", \"episode_id\": \"noise_source_probe\", \"commit\": \"1f27e412\", \"total_episode_dur_s\": null, \"total_char_count\": 19, \"total_word_count\": 2, \"total_dialogue_lines\": 2, \"total_beats\": 0, \"cast\": [{\"char_id\": \"c01\", \"name\": \"Mira\", \"line_count\": 1, \"word_count\": 1}], \"scenes\": [], \"shots\": [], \"beats\": [], \"lines\": [{\"line_id\": \"l001\", \"speaker_role\": \"announcer\", \"text\": \"Announcement.\", \"char_count\": 13, \"word_count\": 1}, {\"line_id\": \"l002\", \"speaker_role\": \"character\", \"char_id\": \"c01\", \"text\": \"Reply.\", \"char_count\": 6, \"word_count\": 1}], \"music\": [], \"clips\": [], \"audio\": {}, \"final_audio_path\": null, \"final_video_path\": null, \"meta\": {\"character_word_count\": 1, \"announcer_word_count\": 1, \"total_word_count\": 2, \"paths\": {\"ledger_path\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\audio\\\\noise_source_probe_ledger.json\", \"episode_root\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\", \"audio_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\audio\", \"stills_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\stills\", \"portraits_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\portraits\", \"videos_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\videos\", \"composited_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\episodes\\\\noise_source_probe\\\\composited\", \"obs_final\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\obs\\\\noise_source_probe.mp4\", \"obs_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\otr-audio-noise-probe-bgr7k9yx\\\\otr\\\\obs\", \"layout\": \"per-episode-workspace\"}, \"schema_version\": \"l4-2026-08-07\"}}"
+      }
+    },
+    {
+      "input": "OTR_SceneSequencer.tts_audio_clips",
+      "link": [
+        239,
+        81,
+        0,
+        3,
+        0,
+        "AUDIO"
+      ],
+      "source_type": "OTR_BatchCharacterVoices",
+      "supplied": {
+        "sample_rate": 48000,
+        "shape": [
+          1,
+          1,
+          48000
+        ]
+      }
+    },
+    {
+      "input": "OTR_SceneSequencer.announcer_audio_clips",
+      "link": [
+        240,
+        82,
+        0,
+        3,
+        1,
+        "AUDIO"
+      ],
+      "source_type": "OTR_AnnouncerVoice",
+      "supplied": {
+        "sample_rate": 48000,
+        "shape": [
+          1,
+          1,
+          48000
+        ]
+      }
+    }
+  ],
+  "zero_input": {
+    "shape": [
+      1,
+      1,
+      48000
+    ],
+    "rate": 48000,
+    "nonzero_samples": 0,
+    "peak": 0.0,
+    "rms": 0.0
+  },
+  "scene": {
+    "shape": [
+      1,
+      1,
+      200
+    ],
+    "rate": 48000,
+    "nonzero_samples": 200,
+    "peak": 0.005628523882478476,
+    "rms": 0.0018903516914828785
+  },
+  "canonical_enhance": {
+    "shape": [
+      1,
+      2,
+      200
+    ],
+    "rate": 48000,
+    "nonzero_samples": 400,
+    "peak": 0.010807646438479424,
+    "rms": 0.003391399998608923
+  },
+  "isolated_clean_enhance": {
+    "shape": [
+      1,
+      2,
+      48000
+    ],
+    "rate": 48000,
+    "nonzero_samples": 0,
+    "peak": 0.0,
+    "rms": 0.0
+  },
+  "isolated_tape_subtle": {
+    "shape": [
+      1,
+      2,
+      48000
+    ],
+    "rate": 48000,
+    "nonzero_samples": 95998,
+    "peak": 0.003716342383995652,
+    "rms": 0.000828914681646259
+  }
+}

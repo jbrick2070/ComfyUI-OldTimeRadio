@@ -1,0 +1,31 @@
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registration skipped: No module named 'server'
+[
+  {
+    "bank": "original",
+    "verdict": "frozen_with_warns",
+    "errors": [],
+    "cleanup": {
+      "status": "retired_no_content_policy",
+      "reason": "content_guardrails_removed_by_operator_directive",
+      "patch_count": 0
+    },
+    "text": "The signal is clear.",
+    "ledger": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-cleanup-freeze-fixture-fb8cujse\\otr\\episodes\\freeze_fixture_original\\audio\\freeze_fixture_original_ledger.json"
+  },
+  {
+    "bank": "scifi_news_pro",
+    "verdict": "frozen_with_warns",
+[OTR.assets] legacy call without live prompt context
+    "errors": [],
+    "cleanup": {
+      "status": "not_applicable_content_owned",
+      "reason": "producer_cleanup_precedes_authorship_seal",
+      "patch_count": 0
+    },
+    "text": "The signal is clear.",
+    "ledger": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-cleanup-freeze-fixture-fb8cujse\\otr\\episodes\\freeze_fixture_scifi_news_pro\\audio\\freeze_fixture_scifi_news_pro_ledger.json"
+  }
+]
+("OTR_WorkflowValidator: OK -- 23 nodes, 62 links, strict_unknown_types=True, path='C:\\\\Users\\\\jeffr\\\\Documents\\\\ComfyUI\\\\custom_nodes\\\\ComfyUI-OldTimeRadio\\\\workflows\\\\otr_canonical.json', widget_vector_drift=0",)

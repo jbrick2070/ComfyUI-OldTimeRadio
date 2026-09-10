@@ -80,6 +80,17 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
+**Pending Opus cleanup handoff (operator, 2026-09-10):** use
+`docs/2026-09-10-cleanup-opus/HANDOFF.md` and its final `PLAN.md` after verifying
+the campaign receipt records convergence. One coder owns the listed files.
+Implement clean audio first (retire automatic roomtone/tape hiss and set clean
+canonical enhancement defaults, with the seven unused SceneSequencer stores),
+then the G8 collision-owner cleanup, then removal of unused freeze model
+acquisition. Revalidate at current Windows HEAD; use the fresh canonical CPU
+check and the per-chunk qualification/commit/push instructions. No stale soak,
+server/GPU run, cache/episode deletion, release change or extra cleanup scope
+belongs to this handoff. Other hardware/transfer work below remains separate.
+
 Continue on the 5080 with the **five-act forced-Ghost canonical publication
 proof in row 2.2**, then follow section 0. Read the newest entry in
 `docs/HANDOFF_LOG.md` and `docs/2026-09-10-mac-final/README.md` before starting.

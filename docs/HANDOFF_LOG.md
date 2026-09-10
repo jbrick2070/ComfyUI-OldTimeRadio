@@ -1,3 +1,53 @@
+## 2026-09-10 19:25 UTC -- Clean-audio cleanup plan converged; fresh canonical check qualified
+
+**Preparation base: b9d7be0863788e2507de5e68f9273e61c27268ba, v2.0-alpha.**
+The runtime/test qualification was taken at 1f27e412; only the separate My Story
+scope document changed before this preparation commit. No production audio,
+freeze implementation, canonical JSON, release metadata or engine lane changed
+in this task. Noise removal and the other cleanup changes are pending Opus.
+
+The operator requested a fully mapped R1-R4 handoff and then clean audio. Two
+fixed local reviewers (AgY Gemini 3.7 Flash High and Cursor Grok 4.6 High) reviewed
+original C1-C3 R1-R3, the late C4 addition R1-R3 and one shared integrated R4:
+14 actual CLI review calls, no extra workers/model upgrades/paid panel. Astra
+grounded and judged every candidate. The stale P0 prohibition on canonical edits
+was corrected: only P1 changes the specified AudioEnhance widgets/description.
+The broad claim that all changes have no live consumers was rejected; C4 retires
+audible behavior by operator choice, C2 changes diagnostics, and C3 removes
+unused acquisition with real admission/failure consequences.
+
+Qualified preparation replaces the 228-line copied-loop offset test with a
+277-line fresh canonical CPU script and 54-line subprocess launcher. It invokes
+the actual registered SceneSequencer -> AudioEnhance -> EpisodeAssembler route,
+real saved widgets/links, ledger persistence and written WAVs. Focused: 1 passed
+in 12.11 s, including two independently launched seeded checks. Full suite:
+14177 before and 14166 after collection, the exact same 54 unexpected failures,
+zero new failing IDs; exit 2 is disclosed, not a green suite. Bug Bible: 22 passed,
+27 skipped, 3 xfailed. Direct canonical validator: 23 nodes, 62 links, no widget
+drift. Variants --check soft-skips because no variants are committed. AgY also
+performed the one assigned finished-preparation code review; no concrete ship
+blocker remained. No server, GPU or published-episode qualification was run.
+
+Fresh zero-input CPU evidence confirms automatic scene roomtone and subtle tape
+hiss produce nonzero samples; clean all-off enhancement preserves zeros. This
+does not establish the cause of every prior noisy recording. Existing masters
+and replay WAVs retain their old sound. The plan requires clean/dry defaults in
+the real canonical graph, preserving level/rate/channel/timing work, and fresh
+unseeded silence/stereo/tape-mode proof after implementation. Per-speaker spatial
+placement for any cast size remains an optional later design/listening topic.
+
+Start at docs/2026-09-10-cleanup-opus/HANDOFF.md and PLAN.md. P1=C4+C1 clean
+audio/stores; P2=C2 G8 diagnostic ownership; P3=C3 unused freeze acquisition.
+Approximately 158 gross runtime lines are eligible, not a net deletion promise
+or repository-wide estimate. Every candidate has exact file/symbol ownership,
+consumer chains, compatibility risks, edit/test recipes and stopping conditions.
+campaign_receipt.json records review artifacts/hashes; qualification.json and
+the compact audio/freeze/slot receipts record the actual preparation evidence.
+The preparation and receipts ship together as "test: qualify fresh canonical
+audio check and cleanup handoff"; verify that commit on origin before P1.
+
+---
+
 ## 2026-09-10 16:52 UTC -- DeskIn disconnected; archive copy incomplete; follow-up paused
 
 Mac testing remains closed and all source/evidence is pushed. DeskIn displayed

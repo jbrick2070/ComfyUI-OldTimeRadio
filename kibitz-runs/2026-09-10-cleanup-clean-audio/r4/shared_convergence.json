@@ -1,0 +1,31 @@
+{
+  "status": "closed by the shared integrated cleanup R4",
+  "additional_review_calls": 0,
+  "shared_input": {
+    "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/input.md",
+    "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+    "bytes": 53854
+  },
+  "reviews": [
+    {
+      "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/antigravity.md",
+      "sha256": "0a5b4878afcf063be1e7d2ff12da7f7caff904cf968d1e831b04f1e646518c65",
+      "bytes": 2592
+    },
+    {
+      "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor.md",
+      "sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+      "bytes": 5622
+    }
+  ],
+  "judgment": {
+    "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/judgment.md",
+    "sha256": "6c466f655b3b1335844cb600252039e6d8e41374c08b0d8823ba833ee95a2ef0",
+    "bytes": 5483
+  },
+  "final": {
+    "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/final.md",
+    "sha256": "c23b28b5b54da3898f30041d0a81fdf0944c04e2aadcc450f3b0d7225a7e2495",
+    "bytes": 56934
+  }
+}

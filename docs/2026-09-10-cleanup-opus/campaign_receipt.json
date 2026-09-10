@@ -1,0 +1,902 @@
+{
+  "driver": "Astra / Codex, code-grounded sole judge",
+  "source_head": "b9d7be0863788e2507de5e68f9273e61c27268ba",
+  "branch": "v2.0-alpha",
+  "status": "converged implementation plan; runtime cleanup not applied",
+  "lanes": {
+    "antigravity": "Gemini 3.7 Flash (High)",
+    "cursor": "cursor-grok-4.6-high"
+  },
+  "kibitz_review_calls": 14,
+  "shape": "C1-C3 R1-R3 plus clean-audio C4 R1-R3; shared integrated R4. Same two lanes; no nested delegation or model upgrades.",
+  "failed_transport_attempts": [
+    {
+      "stage": "initial cleanup R1",
+      "error": "WinError 206 before reviewer process start",
+      "review_calls": 0,
+      "resolution": "Retry through bundled script with --no-profiles; invariants in read-only brief."
+    }
+  ],
+  "cost": "No cost/usage numbers exposed by these CLI receipts; none invented. No paid panel used.",
+  "scope_limit": "Each bounded reviewer brief allows at most 15 primary files plus targeted consumer searches; no repository-wide audit claimed.",
+  "rounds": [
+    {
+      "scope": "cleanup",
+      "round": "r1",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/input.md",
+          "sha256": "f38776df941be26a1029a2011f0b6025fc33699b5f4f0bc991ae7cfa0ecfcac4",
+          "bytes": 18989
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/driver_anchor.md",
+          "sha256": "ae0199afcfb6a9b49649d546337c1f34ac0bf8d357d8779e3bf96cd0901fc67d",
+          "bytes": 1767
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/antigravity.md",
+          "sha256": "023f8e27be50863e6d99375c2b3271dce4c875cf3ce94f589baa600977e1f2a2",
+          "bytes": 4539
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/cursor.md",
+          "sha256": "201b52510e1c5e06d1c83a3a9e12654fc4c211a48fcbfacb81437f04b6774560",
+          "bytes": 5859
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/judgment.md",
+          "sha256": "f3861f9f993353d0eb4a5a43a7045be92811d591b86e884ef54a83889d41a694",
+          "bytes": 4359
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/final.md",
+          "sha256": "ec222331f0ea4d2ea7ab0bfa21f81a00992c53778ce20d68a5a0e9ab55458d14",
+          "bytes": 28112
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "cleanup",
+      "round": "r2",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/input.md",
+          "sha256": "ec222331f0ea4d2ea7ab0bfa21f81a00992c53778ce20d68a5a0e9ab55458d14",
+          "bytes": 28112
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/driver_anchor.md",
+          "sha256": "b48b57841744fcd5fc00b808d52fa4152cc0d8779487eb46aa1c3f574290e14d",
+          "bytes": 1484
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/antigravity.md",
+          "sha256": "5343a5835ce1928456190859ddf49c7e03d4b94fa1b4d69a03ea435ddac3fdaf",
+          "bytes": 6135
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/cursor.md",
+          "sha256": "fa854ea74b693bdb6d5cf534a6585b1c14fc2025064c8eb89decdc2b7466eb1b",
+          "bytes": 6840
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/judgment.md",
+          "sha256": "bd0f6a9c926f65f86aa8cbce835166b1000977d39be72e246c44f160fd0531b8",
+          "bytes": 4788
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/final.md",
+          "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+          "bytes": 34672
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "cleanup",
+      "round": "r3",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/input.md",
+          "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+          "bytes": 34672
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/driver_anchor.md",
+          "sha256": "6efab4b1c6d3a7f2343bd5bc8af7a3c2d34482cb2e4c3746841a0f11f364e914",
+          "bytes": 1637
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/antigravity.md",
+          "sha256": "9894077d8333644927ac23fb75381918c62e0d8851ac307b554d2b91beb840bb",
+          "bytes": 2207
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor.md",
+          "sha256": "893fbc20bdb9182cb922262cc866896caf269aad56c202d50b871a5b99c9071b",
+          "bytes": 6954
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/judgment.md",
+          "sha256": "7df94144c16ca5779640f83acb2718aecf0252c90c5c492c34d03fbda36b05fd",
+          "bytes": 3184
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/final.md",
+          "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+          "bytes": 53854
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "cleanup",
+      "round": "r4",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/input.md",
+          "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+          "bytes": 53854
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/driver_anchor.md",
+          "sha256": "b9de96dc5f8a250bc0c35e1f5bd7e61fe4714f18a6809b5f2979f9f9e5b09d10",
+          "bytes": 1686
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/antigravity.md",
+          "sha256": "0a5b4878afcf063be1e7d2ff12da7f7caff904cf968d1e831b04f1e646518c65",
+          "bytes": 2592
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor.md",
+          "sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+          "bytes": 5622
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/judgment.md",
+          "sha256": "6c466f655b3b1335844cb600252039e6d8e41374c08b0d8823ba833ee95a2ef0",
+          "bytes": 5483
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/final.md",
+          "sha256": "c23b28b5b54da3898f30041d0a81fdf0944c04e2aadcc450f3b0d7225a7e2495",
+          "bytes": 56934
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "clean_audio_addition",
+      "round": "r1",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/input.md",
+          "sha256": "6d2ceb9c97cf5fa9e6c3308bc9674eabe3d07e839d351049bfb2f106abcfd838",
+          "bytes": 11058
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/driver_anchor.md",
+          "sha256": "5046026da4165a4249e7d9ca74799e8b1d139579a27b49d45382c63abe9df464",
+          "bytes": 1441
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/antigravity.md",
+          "sha256": "e08dd6a9fa0b0ba6eaf258b38ad88d797f4edab8cab7df7ce52ffd49c573115e",
+          "bytes": 4182
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor.md",
+          "sha256": "adec54736b371e060d3b7d16f642ec04391740e5c1e907708bddd8311bce95f3",
+          "bytes": 6759
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/judgment.md",
+          "sha256": "719fa08905d449435586658a0196c985f9cc0f2ba92289ec1bfc7d81be916e48",
+          "bytes": 3523
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/final.md",
+          "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+          "bytes": 15168
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "clean_audio_addition",
+      "round": "r2",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/input.md",
+          "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+          "bytes": 15168
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/driver_anchor.md",
+          "sha256": "be2b3e2bc872525c8cab2670652bbf468408431ec39aca7cbb33ca6e8a3a9c63",
+          "bytes": 1189
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/antigravity.md",
+          "sha256": "76eb83fd0bf1d31cf7c81195fca25860cdb1abbeea43b9115b33b185977da399",
+          "bytes": 4113
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor.md",
+          "sha256": "fff0d98e84fbea2854b35b362ca8702af98aaa4aa06572b74f9f59bd5368360d",
+          "bytes": 6042
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/judgment.md",
+          "sha256": "97e9f14e21a3db2392fbd378ab7ae33e15a4ea776a810d29727a3682934ceeb0",
+          "bytes": 2508
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/final.md",
+          "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+          "bytes": 17603
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    },
+    {
+      "scope": "clean_audio_addition",
+      "round": "r3",
+      "artifacts": [
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/input.md",
+          "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+          "bytes": 17603
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/driver_anchor.md",
+          "sha256": "ce1c084707dd7ba8004c1fdd363762e4aee6ea448cdfe6a06f14027690dab4f0",
+          "bytes": 947
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/antigravity.md",
+          "sha256": "3ceb36a3d8323d0c8af757a7d122efcf458dc8523ed6798c68cedcb1af63ffea",
+          "bytes": 6226
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor.md",
+          "sha256": "a3823bd8a46fcaa1cab454e23a303704e7db09a2724b47c4e785a3183bc98f68",
+          "bytes": 6996
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/judgment.md",
+          "sha256": "2f4c7b5c0375162ba6ec0454c49e3f3776794ff12ff8ffccf4e21f6e136a4184",
+          "bytes": 3062
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/final.md",
+          "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+          "bytes": 53854
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/agy_model_selected.txt",
+          "sha256": "36005544586074e7ca19f5f590af5ce7b239b3266bcac6f628288782e54bde18",
+          "bytes": 23
+        },
+        {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      ]
+    }
+  ],
+  "verified_byte_identical_edges": [
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r1/final.md",
+        "sha256": "ec222331f0ea4d2ea7ab0bfa21f81a00992c53778ce20d68a5a0e9ab55458d14",
+        "bytes": 28112
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/input.md",
+        "sha256": "ec222331f0ea4d2ea7ab0bfa21f81a00992c53778ce20d68a5a0e9ab55458d14",
+        "bytes": 28112
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r2/final.md",
+        "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+        "bytes": 34672
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/input.md",
+        "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+        "bytes": 34672
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/final.md",
+        "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+        "bytes": 53854
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/input.md",
+        "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+        "bytes": 53854
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/final.md",
+        "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+        "bytes": 15168
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/input.md",
+        "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+        "bytes": 15168
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/final.md",
+        "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+        "bytes": 17603
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/input.md",
+        "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+        "bytes": 17603
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/final.md",
+        "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+        "bytes": 53854
+      },
+      "to": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/input.md",
+        "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+        "bytes": 53854
+      }
+    },
+    {
+      "from": {
+        "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/final.md",
+        "sha256": "c23b28b5b54da3898f30041d0a81fdf0944c04e2aadcc450f3b0d7225a7e2495",
+        "bytes": 56934
+      },
+      "to": {
+        "path": "docs/2026-09-10-cleanup-opus/PLAN.md",
+        "sha256": "c23b28b5b54da3898f30041d0a81fdf0944c04e2aadcc450f3b0d7225a7e2495",
+        "bytes": 56934
+      }
+    }
+  ],
+  "parallel_cursor_output_provenance": [
+    {
+      "input_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r3/input.md",
+          "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+          "bytes": 34672
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/input.md",
+          "sha256": "57b69e304409ad5e069cef2d28d5f8b122b0e38d8286b7e20ed844e93e846616",
+          "bytes": 34672
+        }
+      },
+      "review_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r3/cursor.md",
+          "sha256": "893fbc20bdb9182cb922262cc866896caf269aad56c202d50b871a5b99c9071b",
+          "bytes": 6954
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor.md",
+          "sha256": "893fbc20bdb9182cb922262cc866896caf269aad56c202d50b871a5b99c9071b",
+          "bytes": 6954
+        }
+      },
+      "model_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      }
+    },
+    {
+      "input_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r4/input.md",
+          "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+          "bytes": 53854
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/input.md",
+          "sha256": "e980061dce330468bd75a20f9ca226af51845f8adb9d0ca5a51a88c54cefb5fc",
+          "bytes": 53854
+        }
+      },
+      "review_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r4/cursor.md",
+          "sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+          "bytes": 5622
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor.md",
+          "sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+          "bytes": 5622
+        }
+      },
+      "model_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r4/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      }
+    },
+    {
+      "input_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/input.md",
+          "sha256": "6d2ceb9c97cf5fa9e6c3308bc9674eabe3d07e839d351049bfb2f106abcfd838",
+          "bytes": 11058
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/input.md",
+          "sha256": "6d2ceb9c97cf5fa9e6c3308bc9674eabe3d07e839d351049bfb2f106abcfd838",
+          "bytes": 11058
+        }
+      },
+      "review_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/cursor.md",
+          "sha256": "adec54736b371e060d3b7d16f642ec04391740e5c1e907708bddd8311bce95f3",
+          "bytes": 6759
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor.md",
+          "sha256": "adec54736b371e060d3b7d16f642ec04391740e5c1e907708bddd8311bce95f3",
+          "bytes": 6759
+        }
+      },
+      "model_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      }
+    },
+    {
+      "input_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r2/input.md",
+          "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+          "bytes": 15168
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/input.md",
+          "sha256": "52ceaf374e64b59e0c4eff18c70c097214c31399fcf99eab6d839f63cd55b273",
+          "bytes": 15168
+        }
+      },
+      "review_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r2/cursor.md",
+          "sha256": "fff0d98e84fbea2854b35b362ca8702af98aaa4aa06572b74f9f59bd5368360d",
+          "bytes": 6042
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor.md",
+          "sha256": "fff0d98e84fbea2854b35b362ca8702af98aaa4aa06572b74f9f59bd5368360d",
+          "bytes": 6042
+        }
+      },
+      "model_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r2/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      }
+    },
+    {
+      "input_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r3/input.md",
+          "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+          "bytes": 17603
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/input.md",
+          "sha256": "4f0bedf72e9ebc659da95841376bd69de108bce2b7ceae916c2c55ae17b0b790",
+          "bytes": 17603
+        }
+      },
+      "review_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r3/cursor.md",
+          "sha256": "a3823bd8a46fcaa1cab454e23a303704e7db09a2724b47c4e785a3183bc98f68",
+          "bytes": 6996
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor.md",
+          "sha256": "a3823bd8a46fcaa1cab454e23a303704e7db09a2724b47c4e785a3183bc98f68",
+          "bytes": 6996
+        }
+      },
+      "model_pair": {
+        "from": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        },
+        "to": {
+          "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor_model_selected.txt",
+          "sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+          "bytes": 115
+        }
+      }
+    }
+  ],
+  "clean_audio_scoped_r3": {
+    "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/scoped_final.md",
+    "sha256": "12e21c9e67515378a149413fdceadb918b3d8784a6e3c268bd4c760caf09a4af",
+    "bytes": 20131
+  },
+  "shared_clean_audio_r4": {
+    "path": "kibitz-runs/2026-09-10-cleanup-clean-audio/r4/shared_convergence.json",
+    "sha256": "7eaade4ea72b245d7f07bd7580c4a5660f29b5f5667ed902f214d8cd8cb5b465",
+    "bytes": 1041
+  },
+  "qualified_preparation": {
+    "path": "docs/2026-09-10-cleanup-opus/qualification.json",
+    "sha256": "b0acd7fc1e4035c81830101ed7522e07fae0a1cb8c05609b52f53998705ae592",
+    "bytes": 8508
+  },
+  "review_encoding_normalization": [
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r3/antigravity.md",
+      "original_sha256": "3242211f6f4d45ef86391175ef8c5951d73c5b808835609571b1dcf5a310067a",
+      "normalized_sha256": "63134fec3a2c0ea45f3091b8cff448133a9210b142d9b0ff103cb32b60a87c3c",
+      "change": "Removed only the provider-written three-byte UTF-8 BOM for repository delivery; review text and all other bytes unchanged."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/antigravity.md",
+      "original_sha256": "696bbb8caac49c514b2117dc9cc59cfc5a6c202338014dea3739cc8dd3cb88c3",
+      "normalized_sha256": "33c2e975ad874bba30d0d3439de3df12e3c400648e0f6bbbf710206816a876a5",
+      "change": "Removed only the provider-written three-byte UTF-8 BOM for repository delivery; review text and all other bytes unchanged."
+    }
+  ],
+  "artifact_hash_representation": "Delivered UTF-8 without BOM, LF repository bytes. Original captured hashes are preserved below for encoding-only normalization. qualification.json source/log hashes remain the actual qualified Windows bytes.",
+  "delivery_line_endings": [
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/audio_noise_before.json",
+      "captured_sha256": "eb53dac92e9cd4e7f92a961069a3d50260f06cd73a8421199d421d44d89a3f50",
+      "delivered_sha256": "8584b6178681c59ab1868556645c5e2a1909087cb897d37b31dfc574ac5e1a92",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/canonical_audio_receipt.json",
+      "captured_sha256": "b4bb4ea714ea46588d9bc79c19826fc2a3e3b03ab1adc56051bf8cc729877724",
+      "delivered_sha256": "a093979a203d63661a8b8db31a5a6f977e5fe76178adc71619a418cac8a5e2a2",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/canonical_audio_receipt_pre_seed.json",
+      "captured_sha256": "fec2ad9320982530d96dd1cb208c0372736c99ebe2b3df033fcb55fcdb9ba73b",
+      "delivered_sha256": "578cc71bb8eeff64aa32d35c39731ce87801df213aa632afd8313369b1bffe31",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/freeze_fixture_receipt.txt",
+      "captured_sha256": "a13fdbb974a82307f3c8de3eaaa689b73163304468a7139c95b34e5417f875e7",
+      "delivered_sha256": "3a24baa6341f4b4e8e290a18ac8982f0eda7358ea446f31d0c1687cb1deda87d",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/qualification.json",
+      "captured_sha256": "b57026dbe70a49413557e200275e71917ec5928c3ced321283d7bd47b202f632",
+      "delivered_sha256": "b0acd7fc1e4035c81830101ed7522e07fae0a1cb8c05609b52f53998705ae592",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/qualification_pre_seed.json",
+      "captured_sha256": "b6fa1b1ede4396f16e7bfdcd50e48e37d01227110c96709181e423858ad2fa54",
+      "delivered_sha256": "dedfde1d8cea7f0ea5ba842cd065b45f6e0775d31a602eac6112b21987fa39aa",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "docs/2026-09-10-cleanup-opus/slot_sweep_accounting.json",
+      "captured_sha256": "769f7dde51f9cf4c694e773fb539d58e835f6466867d4873f60075f0d1db845a",
+      "delivered_sha256": "c3ce85b823a4859a5ace49db181e89a744516c29108c25eff6626da7c4728198",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/cursor.md",
+      "captured_sha256": "c955e88f38125bf48819f87fb5d341ab7cbde00977b3751ffc2f8c2296cc73a8",
+      "delivered_sha256": "adec54736b371e060d3b7d16f642ec04391740e5c1e907708bddd8311bce95f3",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r1/input.md",
+      "captured_sha256": "530a590681084e08d303e339d95e4113620eca945abaf80ef53626787053a409",
+      "delivered_sha256": "6d2ceb9c97cf5fa9e6c3308bc9674eabe3d07e839d351049bfb2f106abcfd838",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r2/cursor.md",
+      "captured_sha256": "b3a1ed29a313ada4004730509e5ede840ff69d19afb90f25f036783bddf123e9",
+      "delivered_sha256": "fff0d98e84fbea2854b35b362ca8702af98aaa4aa06572b74f9f59bd5368360d",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r2/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r3/cursor.md",
+      "captured_sha256": "e9794cf2d2ae8feaad73d24f4535076fa3a67a56198edd546e404185d7f40f5e",
+      "delivered_sha256": "a3823bd8a46fcaa1cab454e23a303704e7db09a2724b47c4e785a3183bc98f68",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio-cursor/r3/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/antigravity.md",
+      "captured_sha256": "c77367b5166778fdc83b1bd29aeff13ef8c3f54389c7b5f7a415df8a09bd71da",
+      "delivered_sha256": "e08dd6a9fa0b0ba6eaf258b38ad88d797f4edab8cab7df7ce52ffd49c573115e",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor.md",
+      "captured_sha256": "c955e88f38125bf48819f87fb5d341ab7cbde00977b3751ffc2f8c2296cc73a8",
+      "delivered_sha256": "adec54736b371e060d3b7d16f642ec04391740e5c1e907708bddd8311bce95f3",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r1/input.md",
+      "captured_sha256": "530a590681084e08d303e339d95e4113620eca945abaf80ef53626787053a409",
+      "delivered_sha256": "6d2ceb9c97cf5fa9e6c3308bc9674eabe3d07e839d351049bfb2f106abcfd838",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/antigravity.md",
+      "captured_sha256": "33c2e975ad874bba30d0d3439de3df12e3c400648e0f6bbbf710206816a876a5",
+      "delivered_sha256": "76eb83fd0bf1d31cf7c81195fca25860cdb1abbeea43b9115b33b185977da399",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor.md",
+      "captured_sha256": "b3a1ed29a313ada4004730509e5ede840ff69d19afb90f25f036783bddf123e9",
+      "delivered_sha256": "fff0d98e84fbea2854b35b362ca8702af98aaa4aa06572b74f9f59bd5368360d",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r2/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/antigravity.md",
+      "captured_sha256": "87a68e734929a3c1b4a96148c957d7208eb7a537a72473a780340620b13972a6",
+      "delivered_sha256": "3ceb36a3d8323d0c8af757a7d122efcf458dc8523ed6798c68cedcb1af63ffea",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor.md",
+      "captured_sha256": "e9794cf2d2ae8feaad73d24f4535076fa3a67a56198edd546e404185d7f40f5e",
+      "delivered_sha256": "a3823bd8a46fcaa1cab454e23a303704e7db09a2724b47c4e785a3183bc98f68",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r3/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-clean-audio/r4/shared_convergence.json",
+      "captured_sha256": "23599f412a1420bfb2c8f5eb44694d603fdc26d26d9c0f07b69fbd9ec6b60251",
+      "delivered_sha256": "8bff6764ac7c740db4a1b2f1dedff88c8578920fe6862cd0531178ec4c5f7d87",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r3/cursor.md",
+      "captured_sha256": "ee073a1fd5fcc7b75341f99515b280167c4d2fc940174a535c168dc8499b26f5",
+      "delivered_sha256": "893fbc20bdb9182cb922262cc866896caf269aad56c202d50b871a5b99c9071b",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r3/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r4/cursor.md",
+      "captured_sha256": "a28f02fbbf69b4464c39b60e8354482bd450434a62c0f115eb88906f0d41f728",
+      "delivered_sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus-cursor/r4/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r1/antigravity.md",
+      "captured_sha256": "e6f9342cde9b33f08169b98dca7ea0e88f2f612d015e23d9e7212b2a15c0b91f",
+      "delivered_sha256": "023f8e27be50863e6d99375c2b3271dce4c875cf3ce94f589baa600977e1f2a2",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r1/cursor.md",
+      "captured_sha256": "6b9bee99169c67bfe2cbc6457da581a906a4f2d437820b7790c921d0f79467b6",
+      "delivered_sha256": "201b52510e1c5e06d1c83a3a9e12654fc4c211a48fcbfacb81437f04b6774560",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r1/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r2/antigravity.md",
+      "captured_sha256": "9481d8d58d841e58ca6a2353ca5b89acbc5d876292e6d8d6c3aa17e474056a81",
+      "delivered_sha256": "5343a5835ce1928456190859ddf49c7e03d4b94fa1b4d69a03ea435ddac3fdaf",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r2/cursor.md",
+      "captured_sha256": "2656675ebf3bac9276668d774ac5715525f8b8d6ad3bdd1e82e6e0e46632277a",
+      "delivered_sha256": "fa854ea74b693bdb6d5cf534a6585b1c14fc2025064c8eb89decdc2b7466eb1b",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r2/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r3/antigravity.md",
+      "captured_sha256": "63134fec3a2c0ea45f3091b8cff448133a9210b142d9b0ff103cb32b60a87c3c",
+      "delivered_sha256": "9894077d8333644927ac23fb75381918c62e0d8851ac307b554d2b91beb840bb",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor.md",
+      "captured_sha256": "ee073a1fd5fcc7b75341f99515b280167c4d2fc940174a535c168dc8499b26f5",
+      "delivered_sha256": "893fbc20bdb9182cb922262cc866896caf269aad56c202d50b871a5b99c9071b",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r3/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r4/antigravity.md",
+      "captured_sha256": "79466710c4cd4f950a42f5aab68237152d5352385095df3cf14c0d4ec7919494",
+      "delivered_sha256": "0a5b4878afcf063be1e7d2ff12da7f7caff904cf968d1e831b04f1e646518c65",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor.md",
+      "captured_sha256": "a28f02fbbf69b4464c39b60e8354482bd450434a62c0f115eb88906f0d41f728",
+      "delivered_sha256": "ef6ca5667fbca3a3b207983d8c7e692e4d426a08028d79fc5bcf97f6a1615324",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    },
+    {
+      "artifact": "kibitz-runs/2026-09-10-cleanup-opus/r4/cursor_model_selected.txt",
+      "captured_sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "delivered_sha256": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+      "change": "CRLF to repository LF; only the two C4 R1 input copies also lose one empty EOF line. No review/instruction text changed."
+    }
+  ]
+}

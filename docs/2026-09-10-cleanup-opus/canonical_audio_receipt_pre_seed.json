@@ -1,0 +1,373 @@
+{
+  "scope": "canonical non-foley CPU audio segment; synthetic upstream assets; no model/server/publish",
+  "head": "1f27e4123a9567400ab39ef698d2a8a394601284",
+  "canonical": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json",
+  "cases": [
+    {
+      "episode": "canonical_audio_opening",
+      "canonical_sha256": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2",
+      "calls": [
+        {
+          "type": "OTR_SceneSequencer",
+          "node_id": 3,
+          "function": "sequence",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "[]",
+            0,
+            999,
+            "",
+            0
+          ]
+        },
+        {
+          "type": "OTR_AudioEnhance",
+          "node_id": 4,
+          "function": "enhance",
+          "source_sha256": "046f1790b962af09ac9360c58317756c03fea46af1bb573bca0f8bb1ceee48b7",
+          "widgets_values": [
+            48000,
+            0.3,
+            0.8,
+            0.15,
+            16000,
+            "subtle"
+          ]
+        },
+        {
+          "type": "OTR_EpisodeAssembler",
+          "node_id": 7,
+          "function": "assemble",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "",
+            10,
+            8,
+            500
+          ]
+        },
+        {
+          "type": "OTR_EpisodeAssembler",
+          "node_id": 7,
+          "function": "assemble",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "",
+            10,
+            8,
+            500
+          ]
+        }
+      ],
+      "supplied_boundaries": [
+        {
+          "input": "OTR_SceneSequencer.script_json",
+          "link": [
+            277,
+            80,
+            0,
+            3,
+            2,
+            "STRING"
+          ],
+          "source_type": "OTR_CastLock",
+          "supplied": {
+            "value": "{\"schema_version\": \"l4-2026-08-07\", \"episode_id\": \"canonical_audio_opening\", \"commit\": \"1f27e412\", \"total_episode_dur_s\": null, \"total_char_count\": 29, \"total_word_count\": 4, \"total_dialogue_lines\": 2, \"total_beats\": 0, \"cast\": [{\"char_id\": \"c01\", \"name\": \"Mira\", \"voice_preset\": \"af_heart\", \"line_count\": 1, \"word_count\": 2}], \"scenes\": [], \"shots\": [], \"beats\": [], \"lines\": [{\"line_id\": \"l001\", \"speaker_role\": \"announcer\", \"text\": \"Opening announcement.\", \"char_count\": 21, \"word_count\": 2}, {\"line_id\": \"l002\", \"speaker_role\": \"character\", \"char_id\": \"c01\", \"text\": \"A reply.\", \"char_count\": 8, \"word_count\": 2}], \"music\": [], \"clips\": [], \"audio\": {}, \"final_audio_path\": null, \"final_video_path\": null, \"meta\": {\"title\": \"Canonical audio check\", \"character_word_count\": 2, \"announcer_word_count\": 2, \"total_word_count\": 4, \"paths\": {\"ledger_path\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\audio\\\\canonical_audio_opening_ledger.json\", \"episode_root\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\", \"audio_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\audio\", \"stills_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\stills\", \"portraits_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\portraits\", \"videos_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\videos\", \"composited_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_opening\\\\composited\", \"obs_final\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\obs\\\\canonical_audio_opening.mp4\", \"obs_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\obs\", \"layout\": \"per-episode-workspace\"}, \"schema_version\": \"l4-2026-08-07\"}}"
+          }
+        },
+        {
+          "input": "OTR_SceneSequencer.tts_audio_clips",
+          "link": [
+            239,
+            81,
+            0,
+            3,
+            0,
+            "AUDIO"
+          ],
+          "source_type": "OTR_BatchCharacterVoices",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              48000
+            ]
+          }
+        },
+        {
+          "input": "OTR_SceneSequencer.announcer_audio_clips",
+          "link": [
+            240,
+            82,
+            0,
+            3,
+            1,
+            "AUDIO"
+          ],
+          "source_type": "OTR_AnnouncerVoice",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              48000
+            ]
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.music_cue_audio",
+          "link": [
+            282,
+            83,
+            0,
+            7,
+            7,
+            "AUDIO"
+          ],
+          "source_type": "OTR_StableAudioTheme",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              96000
+            ]
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.music_cue_manifest_json",
+          "link": [
+            283,
+            83,
+            1,
+            7,
+            8,
+            "STRING"
+          ],
+          "source_type": "OTR_StableAudioTheme",
+          "supplied": {
+            "value": "{\"cues\":[{\"actual_duration_s\":2.0,\"anchor_line_id\":null,\"batch_index\":0,\"cue_id\":\"opening\",\"cue_spec_sha256\":null,\"output_path\":\"\",\"placement\":\"opening\",\"prompt\":\"Instrumental tone.\",\"prompt_sha256\":\"1671c79a976496c5034d4de4dc069a6116c1d3deb7c4ff35caf570ab71c04cd0\",\"requested_duration_s\":2.0,\"sample_count\":96000,\"sample_rate\":48000,\"seed\":1}],\"manifest_version\":1,\"sample_rate\":48000}"
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.video_policy_json",
+          "link": [
+            286,
+            87,
+            0,
+            7,
+            9,
+            "STRING"
+          ],
+          "source_type": "OTR_VideoDirector",
+          "supplied": {
+            "value": ""
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.replay_descriptor",
+          "link": [
+            289,
+            62,
+            6,
+            7,
+            10,
+            "STRING"
+          ],
+          "source_type": "OTR_LedgerFreezeCascade",
+          "supplied": {
+            "value": ""
+          }
+        }
+      ],
+      "measured_scene_offset_s": 1.5,
+      "ledger": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\pytest-of-jeffr\\pytest-9221\\test_current_canonical_audio_r0\\fresh_canonical_audio\\otr\\episodes\\canonical_audio_opening\\audio\\canonical_audio_opening_ledger.json",
+      "master": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\pytest-of-jeffr\\pytest-9221\\test_current_canonical_audio_r0\\fresh_canonical_audio\\otr\\episodes\\canonical_audio_opening\\audio\\canonical_audio_opening_master.wav",
+      "master_sha256": "daf7d16df000151e24640a9c5014787aa2ba525f031a664c59d78511d2270dba"
+    },
+    {
+      "episode": "canonical_audio_no_opening",
+      "canonical_sha256": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2",
+      "calls": [
+        {
+          "type": "OTR_SceneSequencer",
+          "node_id": 3,
+          "function": "sequence",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "[]",
+            0,
+            999,
+            "",
+            0
+          ]
+        },
+        {
+          "type": "OTR_AudioEnhance",
+          "node_id": 4,
+          "function": "enhance",
+          "source_sha256": "046f1790b962af09ac9360c58317756c03fea46af1bb573bca0f8bb1ceee48b7",
+          "widgets_values": [
+            48000,
+            0.3,
+            0.8,
+            0.15,
+            16000,
+            "subtle"
+          ]
+        },
+        {
+          "type": "OTR_EpisodeAssembler",
+          "node_id": 7,
+          "function": "assemble",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "",
+            10,
+            8,
+            500
+          ]
+        },
+        {
+          "type": "OTR_EpisodeAssembler",
+          "node_id": 7,
+          "function": "assemble",
+          "source_sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7",
+          "widgets_values": [
+            "",
+            10,
+            8,
+            500
+          ]
+        }
+      ],
+      "supplied_boundaries": [
+        {
+          "input": "OTR_SceneSequencer.script_json",
+          "link": [
+            277,
+            80,
+            0,
+            3,
+            2,
+            "STRING"
+          ],
+          "source_type": "OTR_CastLock",
+          "supplied": {
+            "value": "{\"schema_version\": \"l4-2026-08-07\", \"episode_id\": \"canonical_audio_no_opening\", \"commit\": \"1f27e412\", \"total_episode_dur_s\": null, \"total_char_count\": 29, \"total_word_count\": 4, \"total_dialogue_lines\": 2, \"total_beats\": 0, \"cast\": [{\"char_id\": \"c01\", \"name\": \"Mira\", \"voice_preset\": \"af_heart\", \"line_count\": 1, \"word_count\": 2}], \"scenes\": [], \"shots\": [], \"beats\": [], \"lines\": [{\"line_id\": \"l001\", \"speaker_role\": \"announcer\", \"text\": \"Opening announcement.\", \"char_count\": 21, \"word_count\": 2}, {\"line_id\": \"l002\", \"speaker_role\": \"character\", \"char_id\": \"c01\", \"text\": \"A reply.\", \"char_count\": 8, \"word_count\": 2}], \"music\": [], \"clips\": [], \"audio\": {}, \"final_audio_path\": null, \"final_video_path\": null, \"meta\": {\"title\": \"Canonical audio check\", \"character_word_count\": 2, \"announcer_word_count\": 2, \"total_word_count\": 4, \"paths\": {\"ledger_path\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\audio\\\\canonical_audio_no_opening_ledger.json\", \"episode_root\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\", \"audio_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\audio\", \"stills_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\stills\", \"portraits_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\portraits\", \"videos_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\videos\", \"composited_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\episodes\\\\canonical_audio_no_opening\\\\composited\", \"obs_final\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\obs\\\\canonical_audio_no_opening.mp4\", \"obs_dir\": \"C:\\\\Users\\\\jeffr\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-jeffr\\\\pytest-9221\\\\test_current_canonical_audio_r0\\\\fresh_canonical_audio\\\\otr\\\\obs\", \"layout\": \"per-episode-workspace\"}, \"schema_version\": \"l4-2026-08-07\"}}"
+          }
+        },
+        {
+          "input": "OTR_SceneSequencer.tts_audio_clips",
+          "link": [
+            239,
+            81,
+            0,
+            3,
+            0,
+            "AUDIO"
+          ],
+          "source_type": "OTR_BatchCharacterVoices",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              48000
+            ]
+          }
+        },
+        {
+          "input": "OTR_SceneSequencer.announcer_audio_clips",
+          "link": [
+            240,
+            82,
+            0,
+            3,
+            1,
+            "AUDIO"
+          ],
+          "source_type": "OTR_AnnouncerVoice",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              48000
+            ]
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.music_cue_audio",
+          "link": [
+            282,
+            83,
+            0,
+            7,
+            7,
+            "AUDIO"
+          ],
+          "source_type": "OTR_StableAudioTheme",
+          "supplied": {
+            "sample_rate": 48000,
+            "shape": [
+              1,
+              1,
+              48000
+            ]
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.music_cue_manifest_json",
+          "link": [
+            283,
+            83,
+            1,
+            7,
+            8,
+            "STRING"
+          ],
+          "source_type": "OTR_StableAudioTheme",
+          "supplied": {
+            "value": "{\"cues\":[{\"actual_duration_s\":1.0,\"anchor_line_id\":null,\"batch_index\":0,\"cue_id\":\"closing\",\"cue_spec_sha256\":null,\"output_path\":\"\",\"placement\":\"closing\",\"prompt\":\"Instrumental tone.\",\"prompt_sha256\":\"1671c79a976496c5034d4de4dc069a6116c1d3deb7c4ff35caf570ab71c04cd0\",\"requested_duration_s\":1.0,\"sample_count\":48000,\"sample_rate\":48000,\"seed\":1}],\"manifest_version\":1,\"sample_rate\":48000}"
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.video_policy_json",
+          "link": [
+            286,
+            87,
+            0,
+            7,
+            9,
+            "STRING"
+          ],
+          "source_type": "OTR_VideoDirector",
+          "supplied": {
+            "value": ""
+          }
+        },
+        {
+          "input": "OTR_EpisodeAssembler.replay_descriptor",
+          "link": [
+            289,
+            62,
+            6,
+            7,
+            10,
+            "STRING"
+          ],
+          "source_type": "OTR_LedgerFreezeCascade",
+          "supplied": {
+            "value": ""
+          }
+        }
+      ],
+      "measured_scene_offset_s": 0.0,
+      "ledger": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\pytest-of-jeffr\\pytest-9221\\test_current_canonical_audio_r0\\fresh_canonical_audio\\otr\\episodes\\canonical_audio_no_opening\\audio\\canonical_audio_no_opening_ledger.json",
+      "master": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\pytest-of-jeffr\\pytest-9221\\test_current_canonical_audio_r0\\fresh_canonical_audio\\otr\\episodes\\canonical_audio_no_opening\\audio\\canonical_audio_no_opening_master.wav",
+      "master_sha256": "ebf68ec9e91ea7612131de046e546ead85c430956af00307334b42e1aa9ac6a9"
+    }
+  ]
+}

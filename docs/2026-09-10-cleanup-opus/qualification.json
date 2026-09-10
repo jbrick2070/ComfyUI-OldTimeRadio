@@ -1,0 +1,130 @@
+{
+  "base_head": "1f27e4123a9567400ab39ef698d2a8a394601284",
+  "scope": "Fresh canonical CPU audio check and preparation for bounded cleanup; no runtime cleanup implemented",
+  "focused": "1 passed in 12.11 seconds; two independent seeded fresh processes; exit 0",
+  "full_before_exit": 2,
+  "full_after_exit": 2,
+  "before_failure_count": 54,
+  "after_failure_count": 54,
+  "new_failure_nodeids": [],
+  "same_failing_nodeids": [
+    "tests/test_canonical_replay.py::test_replay_from_is_whitelisted_in_both_copies_and_the_canonical_carries_the_wiring",
+    "tests/test_canonical_widget_input_parity.py::test_the_wan_8gb_variant_still_carries_a_REAL_frame_ceiling",
+    "tests/test_capability_profiles.py::test_no_generated_variant_bakes_in_an_unpinned_quant",
+    "tests/test_full_workflow_v2_audio_wiring.py::test_widget_vectors_exact",
+    "tests/test_gate_prices_the_policy_context.py::test_a_policy_that_really_asks_for_8192_is_still_priced_at_8192",
+    "tests/test_gate_prices_the_policy_context.py::test_the_oversize_guard_still_bites",
+    "tests/test_gate_prices_the_policy_context.py::test_the_row_max_context_does_not_override_the_policy",
+    "tests/test_gguf_catalog_rows.py::test_dropdown_gguf_row_is_bare_and_validates",
+    "tests/test_gguf_catalog_rows.py::test_dropdown_orders_row_as_gemma_peer",
+    "tests/test_gguf_catalog_rows.py::test_row_present_by_default",
+    "tests/test_gguf_catalog_rows.py::test_virtual_row_schema",
+    "tests/test_gguf_fit_prices_requested_quant.py::test_a_small_quant_is_not_priced_as_the_big_one",
+    "tests/test_gguf_fit_prices_requested_quant.py::test_an_unknown_quant_falls_back_rather_than_crashing",
+    "tests/test_gguf_fit_prices_requested_quant.py::test_kv_scales_with_the_requested_context_not_the_row_maximum",
+    "tests/test_ghost_signal_lightning_lane.py::test_hold_is_resolved_per_beat_and_not_stored_on_the_instance",
+    "tests/test_ghost_signal_lightning_lane.py::test_it_escalates_only_as_far_as_it_must",
+    "tests/test_ghost_signal_lightning_lane.py::test_two_different_holds_really_do_produce_different_cache_keys",
+    "tests/test_google_video_sfx_workflow.py::test_canonical_workflow_wires_clip_manifest_to_master_audio_mux",
+    "tests/test_hf_env_offline.py::test_request_slot_uses_complete_canonical_cache_without_download",
+    "tests/test_llm_runtime_policy.py::test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling",
+    "tests/test_llm_runtime_policy.py::test_gguf_ceiling_zero_disables_the_gate",
+    "tests/test_llm_runtime_policy.py::test_gguf_fresh_load_consults_the_policy_ceiling",
+    "tests/test_llm_runtime_policy.py::test_pinned_quant_still_catches_a_short_file",
+    "tests/test_llm_runtime_policy.py::test_registry_row_carries_the_table_shas_not_a_none_slot",
+    "tests/test_llm_runtime_policy.py::test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier",
+    "tests/test_llm_runtime_policy.py::test_unpinned_artifact_is_refused_not_loaded_unchecked",
+    "tests/test_llm_slot_sweep.py::test_every_llm_call_site_has_slot_tag",
+    "tests/test_loader_slot_primitives.py::test_check_vram_fit_curated_pass_returns_pass_tier",
+    "tests/test_loader_slot_primitives.py::test_check_vram_fit_custom_ceiling",
+    "tests/test_loader_slot_primitives.py::test_every_curated_local_row_is_pass_tier",
+    "tests/test_ltx_8gb_canonical_canvas.py::test_the_8gb_variant_workflow_agrees_with_the_declaration",
+    "tests/test_model_asset_index_drift.py::test_committed_asset_index_has_no_generator_drift",
+    "tests/test_model_catalog_download.py::test_auto_download_disk_space_precheck",
+    "tests/test_model_catalog_download.py::test_estimate_curated_returns_catalog_value",
+    "tests/test_model_catalog_scan.py::test_default_llm_is_pass_tier_for_c7_baseline",
+    "tests/test_model_catalog_scan.py::test_dropdown_with_mistral_nemo_sets_on_disk_flag",
+    "tests/test_model_catalog_scan.py::test_resolve_context_cap_pass_for_curated_override",
+    "tests/test_model_catalog_scan.py::test_resolve_context_cap_pass_override_exceeds_hard_limit",
+    "tests/test_model_catalog_scan.py::test_scan_skips_non_models_dirs",
+    "tests/test_model_catalog_scan.py::test_scan_with_mistral_nemo_returns_one_result",
+    "tests/test_model_catalog_scan.py::test_validator_recovery_hint_lists_top_installed",
+    "tests/test_model_slot_audit.py::test_canonical_kept_local_slots_are_registered_or_cataloged",
+    "tests/test_no_ollama_backend.py::test_hf_and_gguf_gemma_12b_rows_are_explicit_peers",
+    "tests/test_otr_provision_profile_routes.py::test_amd_profiles_plan_their_exact_image_and_music_dependencies",
+    "tests/test_platform_s0_guards.py::test_plan_max_memory_cuda_branches_unchanged",
+    "tests/test_process_single_owner.py::test_no_second_spawner_under_nodes",
+    "tests/test_remaining_video_contracts.py::test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned",
+    "tests/test_remaining_video_contracts.py::test_otr_8gb_wan_profile_pins_low_vram_contract",
+    "tests/test_unified_memory_weight_floor.py::test_the_impure_half_actually_raises_on_an_oversized_engine",
+    "tests/test_vram_badge_prices_the_default_context.py::test_it_prices_the_policy_default_not_a_hardcoded_guess",
+    "tests/test_vram_badge_prices_the_default_context.py::test_the_2507_badge_is_not_the_max_context_number",
+    "tests/test_vram_badge_prices_the_default_context.py::test_the_badge_names_the_context_it_assumed",
+    "tests/test_widget_cannot_name_the_binary.py::test_the_blend_answers_empty_rather_than_echoing",
+    "tests/test_workflow_json_guardrails.py::TestWriterB2aSurface::test_writer_widget_migration_preserves_values"
+  ],
+  "bug_bible": "22 passed, 27 skipped, 3 xfailed; exit 0",
+  "variants": "check: no committed variants yet (nothing to diff); soft-skip guard OK; exit 0",
+  "files": [
+    {
+      "path": "workflows/otr_canonical.json",
+      "sha256": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2"
+    },
+    {
+      "path": "nodes/scene_sequencer.py",
+      "sha256": "db6f1f93b748383014cdf308505707c20ad9b342a9de1f67cf8ff8e78c2198e7"
+    },
+    {
+      "path": "nodes/audio_enhance.py",
+      "sha256": "046f1790b962af09ac9360c58317756c03fea46af1bb573bca0f8bb1ceee48b7"
+    },
+    {
+      "path": "nodes/_otr_ledger_freeze.py",
+      "sha256": "2e9ec00972b6af2b09a75be466c5a298417ed3631609155a75d3d5c1d7f04371"
+    },
+    {
+      "path": "nodes/_otr_freeze_cascade.py",
+      "sha256": "acf7b8375da0db411961eff6869aceecb789ec0dd73c4ad455294739da485114"
+    },
+    {
+      "path": "nodes/OTR_LedgerFreezeCascade.py",
+      "sha256": "a139e4535c295758c841f1728951178393af3c8a506517676efacd3d8e3a8259"
+    },
+    {
+      "path": "scripts/otr_canonical_audio_check.py",
+      "sha256": "54635294d4ee0153847fb047d44b12bc5c97bff389eef7875f620c8f7a3566b4"
+    },
+    {
+      "path": "tests/test_canonical_audio_check.py",
+      "sha256": "697e9c9166b9c0c8512f36c7bd01b7630cf02dca49fa9264dc39ab7adf4a18c8"
+    }
+  ],
+  "before_collected": 14177,
+  "after_collected": 14166,
+  "collection_delta": "12 copied-loop tests retired; 1 fresh-process canonical test added",
+  "direct_canonical_validator": "23 nodes, 62 links, strict_unknown_types=True, widget_vector_drift=0; exit 0",
+  "comparison": "Baseline, first replacement and final seeded replacement have the exact same 54 unexpected failing node IDs; no new failures. Suite is not green.",
+  "stage": "Pre-clean-audio preparation: real production audio still adds roomtone and canonical tape hiss; clean-audio implementation is planned, not applied.",
+  "logs": [
+    {
+      "path": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-canonical-harness-baseline.log",
+      "sha256": "e0a5ca1ddef40c5b2bf4dfc839b77714a13d2a65a0b7599e7adb8b6f9994ce4a"
+    },
+    {
+      "path": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-canonical-harness-after.log",
+      "sha256": "59ccb2506439e0992ab3857c303d01e70afcfae6d933ede3e574d0c076ecca82"
+    },
+    {
+      "path": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-canonical-harness-seeded-focused.log",
+      "sha256": "746099a85e29d095699a01fbb4b3ad91bd9dcb9af56cde99076bc019870f9377"
+    },
+    {
+      "path": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-canonical-harness-seeded-full.log",
+      "sha256": "a883d7bbe3994ba8054ac7706103ec59ef47afbd81c0c0d6ac8555a716efe87f"
+    },
+    {
+      "path": "C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr-canonical-harness-seeded-bible.log",
+      "sha256": "16b4d852002108d7218a9f6b3460c1f1dc1aea9afd3dac7894e006eb04196e19"
+    }
+  ]
+}
