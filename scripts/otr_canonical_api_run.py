@@ -156,6 +156,12 @@ def build_api_prompt(args) -> tuple[dict, list[str]]:
         if not wf_path.is_file():
             raise SystemExit(f"canonical workflow missing: {wf_path}")
         print(f"[canonical-api] workflow={wf_path}", flush=True)
+    # The run label is NOT a graph value -- it never reaches a widget. It is
+    # echoed here so a proof or soak run is identifiable in the console and the
+    # receipt without renaming the operator's episode.
+    if getattr(args, "run_label", None):
+        print("[canonical-api] run_label=%s (label only -- the writer names the "
+              "episode)" % args.run_label, flush=True)
     schemas = _schemas(args.offline_schemas)
     workflow = load_workflow(str(wf_path))
 
@@ -369,7 +375,17 @@ def main(argv: list[str] | None = None) -> int:
              "(8gb, 12gb, 16gb, amd). Expands to settings IN MEMORY -- "
              "there is no per-machine profile file.",
     )
-    parser.add_argument("--title", default=None)
+    parser.add_argument("--title", default=None,
+                        help="NAME THE EPISODE. This fills the episode_title "
+                             "widget, so the writer generates no title of its "
+                             "own and the TITLE CARD shows exactly this. For "
+                             "labelling a proof or soak run, use --run-label.")
+    parser.add_argument("--run-label", default=None, dest="run_label",
+                        help="a name for THIS RUN, for the console and the "
+                             "receipt. Deliberately does NOT touch "
+                             "episode_title, so the writer still names the "
+                             "episode and the title card shows the story's "
+                             "name rather than your harness label.")
     parser.add_argument("--replay-from", default=None, dest="replay_from",
                         help="CANONICAL REPLAY: a frozen replay bundle directory "
                              "(scripts/otr_freeze_replay_bundle.py). The writer, "
