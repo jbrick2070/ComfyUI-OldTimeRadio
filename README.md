@@ -755,11 +755,49 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
 - **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
   Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
   backend yet (bark replaces it with three dropdown changes).
-- **Other setups:** one graph. `workflows/variants/` holds exactly one file --
-  `otr_mac_lightning.json`, the graph that produced the Apple Silicon proof episode
-  (`otr_canonical` with the three video roles set to `animatediff15_lightning_video`).
-  The old per-machine JSONs were removed, as this README says at the top. Use
-  `otr_canonical` and set the dropdowns per the "Pick the graph" table.
+- **Other setups:** ONE graph, and only one. `workflows/otr_canonical.json` is
+  the whole shipping surface -- there are no per-machine JSONs, and
+  `workflows/variants/` is generated-only (every file there must come from a
+  profile of the same name; a hand-authored one crashes
+  `python scripts/build_variants.py --check`). A second graph for Apple Silicon
+  existed briefly and was deleted once it was measured: it differed from the
+  canonical by **zero** nodes, **zero** links and exactly **five widget
+  values**. Five dropdown settings are not a reason for a second file to keep in
+  step. Load `otr_canonical` and set the dropdowns for your machine.
+
+  **The five settings that made it an Apple Silicon graph**, so you can
+  reproduce it in the canonical:
+
+  | node | widget | set it to |
+  |---|---|---|
+  | `OTR_LedgerScriptWriter` | creative model | `google/gemma-4-E2B-it` |
+  | `OTR_LedgerScriptWriter` | technical model | `google/gemma-4-E2B-it` |
+  | `OTR_VideoDirector` | announcer video | `animatediff15_lightning_video (16:9)` |
+  | `OTR_VideoDirector` | music video | `animatediff15_lightning_video (16:9)` |
+  | `OTR_VideoDirector` | character video | `animatediff15_lightning_video (16:9)` |
+
+  The writer matters as much as the video lane, and the reason is worth
+  understanding rather than memorising. `Qwen/Qwen3.5-4B` is the shipped default
+  BECAUSE it is the low-friction one -- ungated, Apache-2.0, 8.68 GB to
+  download, and measured at **2.99 GiB resident, 14.47 tok/s** on a physical
+  8 GB RTX 4060, the fastest and smallest row in the catalog. It is the right
+  answer on NVIDIA and nothing here changes that.
+
+  That 2.99 GiB is **under NF4**. `bitsandbytes` is excluded on macOS by
+  declared intent, so on Apple Silicon the same row loads full bf16 and measures
+  **~14 GB** -- 4.7x the memory for the identical download, purely because of
+  the platform. Its entry is therefore tagged `mac16-tight`.
+
+  **`tight` is not `avoid`, and the receipts say so.** All SEVEN episodes ever
+  published on the 16 GB M4 used this writer -- five different video lanes, four
+  source banks, five visual styles. It is the only writer with a Mac receipt at
+  all. Against that: one hard reboot, at the writer-to-video handover, with a
+  test suite competing for RAM at the time. So `tight` means what it says --
+  it works, and it has no margin for anything else running. Close other
+  applications rather than changing writer. `google/gemma-4-E2B-it` is the
+  smaller alternative if you need headroom (6.0 GB, plain `mac16`, equally
+  ungated), but be clear that it is arithmetic: nothing has been rendered with
+  it on a Mac.
 - **RAM:** 32 GB of system memory is the comfortable floor for the video lanes; the 8 GB
   card streams model weights from host RAM. The measured host-RAM peaks so far are on the
   5080 (the H3 clamped run at 27.56 GiB, the HuMo 14B lane at 27.53 GiB); LTX 2.5 on the
@@ -1026,8 +1064,9 @@ floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are off
 audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
 renders are request-hash deterministic. The old VRAM tier system is gone — profiles plus
 the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (The per-machine JSONs
-were removed; `workflows/variants/` holds exactly one file, `otr_mac_lightning.json`,
-which is the graph that produced the Apple Silicon proof episode -- see "Other setups".)
+were removed, and `workflows/variants/` is generated-only and currently empty.
+There is exactly ONE graph -- see "Other setups" for the per-machine dropdown
+settings.)
 
 ### The video model reference — read these two before adding or changing an engine
 

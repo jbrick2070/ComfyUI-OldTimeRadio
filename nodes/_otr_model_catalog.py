@@ -1468,6 +1468,87 @@ def _strip_label_suffix(model_id: str) -> str:
     return s
 
 
+#: Resident memory as a multiple of the bf16 download size on APPLE SILICON,
+#: where nothing is quantized. MEASURED: PBUG-20260907-06 recorded
+#: `Qwen/Qwen3.5-4B` (8.68 GB of safetensors) reaching a 14 GB phys_footprint
+#: while generating -- 14 / 8.68 = 1.61. One data point, not a curve, and it is
+#: deliberately NOT the /2.0 that `_estimate_resident_gb` applies: that divisor
+#: assumes 8-bit/NF4, and `bitsandbytes>=0.42.0; sys_platform != 'darwin'` in
+#: requirements.txt means bitsandbytes is never installed on macOS, so
+#: `llm_quant_policy` can only be `none` there and nothing is halved.
+_METAL_BF16_RESIDENT_FACTOR = 14.0 / 8.68
+
+#: The whole machine. Between the comfortable budget and this figure a row is
+#: MARGINAL -- proven to run with nothing else resident, and proven to take the
+#: host down when something else is. Above it, it cannot fit at all.
+_MAC16_PHYSICAL_GB = 16.0
+
+#: What each machine class can actually give a writer, in GB. The NVIDIA rows
+#: are the card minus what the rest of the pipeline needs; 14.5 for the 16 GB
+#: class is this repo's own DEFAULT_VRAM_CEILING_GB. The Mac row is a
+#: JUDGEMENT, not a measurement: 16 GB shared with macOS, and the measured
+#: 14.0 GB writer took the machine down twice, so 12.0 is the last figure with
+#: any margin left for the video stack that loads after it.
+def _fit_budgets():
+    """Resolved at CALL time -- ``DEFAULT_VRAM_CEILING_GB`` is defined further
+    down this module, and importing it eagerly here is a NameError at import,
+    which empties the writer dropdown rather than failing one badge."""
+    return (
+        ("mac16", 12.0),
+        ("nv8", 7.0),
+        ("nv16", DEFAULT_VRAM_CEILING_GB),
+        ("nv24", 22.0),
+    )
+
+
+def fit_tags_for(repo_id: str) -> tuple:
+    """Machine classes this writer FITS, smallest first. Derived, never typed.
+
+    WHY THE PICKER NEEDS THIS AND A SIZE IS NOT ENOUGH. The operator's rule
+    (2026-08-01) is that a dropdown states "how much VRAM it needs so users
+    select only the one they can use". One number cannot do that across these
+    machines, because the same row costs DIFFERENT amounts depending on whether
+    bitsandbytes exists: `Qwen/Qwen3.5-4B` is ~4.3 GB resident quantized on an
+    NVIDIA card and a measured 14 GB unquantized on Apple Silicon. A single
+    figure has to be wrong on one of them, and it was wrong on the platform
+    where being wrong REBOOTS THE MACHINE.
+
+    So the badge states the download size -- a platform-independent fact -- and
+    these tags carry the fit. A missing `mac16` means "do not pick this on a
+    16 GB Mac"; it gates nothing, and the row stays selectable everywhere.
+    """
+    curated = _by_repo_id().get(repo_id)
+    if curated is None or getattr(curated, "provider", "local") != "local":
+        return ()
+    download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
+    if download_gb <= 0.0:
+        return ()
+    tags = []
+    for name, budget_gb in _fit_budgets():
+        # Apple Silicon pays the unquantized price; NVIDIA gets bitsandbytes.
+        resident = (download_gb * _METAL_BF16_RESIDENT_FACTOR
+                    if name == "mac16" else download_gb / 2.0)
+        if resident <= budget_gb:
+            tags.append(name)
+        elif name == "mac16" and resident <= _MAC16_PHYSICAL_GB:
+            # MARGINAL, AND THE BINARY VERSION OF THIS WAS WRONG. A first cut
+            # tagged only <= 12.0 and dropped `mac16` from `Qwen/Qwen3.5-4B`
+            # (14.0 GB projected) -- for a writer that had ALREADY PUBLISHED a
+            # complete 23-beat episode on the 16 GB M4 that same day
+            # (`lightning_mac_proof_2_..._q354b_...mp4`; `q354b` is this row).
+            # Telling an operator a model cannot run when a receipt says it did
+            # is the same defect the flux2_klein cell was, pointing the other
+            # way.
+            #
+            # It is also not simply fine: the same combination hard-rebooted the
+            # machine hours later, at the writer -> video handover, with a test
+            # suite competing for RAM. Both facts are true, so the tag says so
+            # rather than picking one -- it fits when nothing else is resident,
+            # and there is no margin for anything that is.
+            tags.append(name + "-tight")
+    return tuple(tags)
+
+
 def vram_badge_for(repo_id: str) -> str:
     """``' (11.9 GB)'`` for a model whose resident cost is known, else ``''``.
 
@@ -1524,6 +1605,29 @@ def vram_badge_for(repo_id: str) -> str:
         return ""
     if not est or est <= 0:
         return ""
+
+    # STATE THE DOWNLOAD, THEN WHERE IT FITS. The resident estimate stays the
+    # gate's number and is no longer what the label leads with, because it is
+    # platform-blind: it halves every row on the stated assumption of 8-bit/NF4
+    # loading, which does not exist on Apple Silicon. The shipped Mac default
+    # read "(4.3 GB)" for a model that measured 14 GB there, and a reader who
+    # trusted that badge lost the machine. The download size is true
+    # everywhere; the tags carry what changes.
+    curated = _by_repo_id().get(repo_id)
+    download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
+    tags = list(fit_tags_for(repo_id))
+    # FRICTION IS PART OF "CAN I USE THIS", not a separate question. A row that
+    # fits the machine but needs a licence click and an HF_TOKEN is not the
+    # same offer as one that just downloads, and the whole point of the shipped
+    # graphs is that a dropdown choice costs nothing but bandwidth. Derived
+    # from the row's own flag, never typed.
+    if repo_id in GATED_CURATED_MODELS or getattr(curated, "requires_auth", False):
+        tags.insert(0, "gated")
+    if download_gb > 0 and tags:
+        return " (%.1f GB, %s)" % (download_gb, " ".join(tags))
+    if download_gb > 0:
+        # Fits nothing in the table -- say the size and say nothing false.
+        return " (%.1f GB)" % download_gb
     return " (%.1f GB%s)" % (float(est), suffix)
 
 

@@ -100,11 +100,26 @@ are what you get with zero downloads. `sd15` plus the `still_*` lanes cost one
 
 ### Memory: 16 GB is the floor, and it is tight
 
-The writer alone peaks near 14 GB inside ComfyUI on a 16 GB machine. It works,
-but close other applications first -- a remote-desktop session competing for
-RAM is enough to trigger an OOM kill. Note `ps` under-reports badly on Apple
-Silicon (0.33 GB for a 14 GB process); use `footprint -p <pid>` and read
-`phys_footprint`.
+The writer alone peaks near 14 GB inside ComfyUI on a 16 GB machine. **"It
+works" was too generous and is corrected here: it works SOMETIMES, and the
+difference is whatever else happens to be resident.** The same combination
+published a full 23-beat episode at 10:09 on 2026-09-09 and hard-rebooted the
+machine at 16:23 the same day, ~19 minutes in, at the writer -> video
+transition. 14 GB of a 16 GB machine has no margin for a second thing, and the
+second thing does not have to be large. Close other applications first -- a
+remote-desktop session, or a test suite that imports torch, is enough.
+
+Note `ps` under-reports badly on Apple Silicon (0.33 GB for a 14 GB process);
+use `footprint -p <pid>` and read `phys_footprint`.
+
+**THE WRITER DROPDOWN UNDER-STATES THIS BY 3x, and that is the trap.** The
+picker shows `Qwen/Qwen3.5-4B (4.3 GB)`. That badge reports
+`_estimate_resident_gb`, which halves a row's download size on the stated
+assumption that OTR loads at 8-bit/NF4 -- true on NVIDIA, false here, because
+bitsandbytes is excluded on darwin by declared intent. The honest Apple Silicon
+number for that row is the measured **14 GB**. Read the badge as an NVIDIA
+figure until the picker carries per-device rows. Nothing refuses the load: the
+menu offers it, and the machine pays.
 
 The writer is also what took the machine down three times on 2026-09-08 -- it
 was being loaded four times per episode, and on unified memory the second copy
@@ -729,8 +744,26 @@ curl -s http://127.0.0.1:8188/object_info/ADE_LoadAnimateDiffModel \
 `otr_canonical`, and on **OTR_VideoDirector** set whichever video roles you want
 to `animatediff15_lightning_video (16:9)` (or the haunted lane). The image
 dropdowns are inert for these lanes -- they are `text_to_video` and mint no
-still -- so leave them. `workflows/variants/otr_mac_lightning.json` is the graph
-the proof episode ran from, with all three roles on Lightning.
+still -- so leave them. Also consider the WRITER. `Qwen/Qwen3.5-4B` is the
+shipped default for good reason -- ungated, Apache-2.0, and measured at 2.99 GiB
+resident / 14.47 tok/s on an 8 GB NVIDIA card, the smallest and fastest row
+there is. But that figure is **under NF4**, and bitsandbytes is not installed on
+macOS, so here the same row loads full bf16 at ~14 GB. Its entry is tagged
+`mac16-tight` -- and `tight` is not `avoid`. Every one of the SEVEN episodes
+ever published on this machine used this writer, across five video lanes and
+four source banks; it is the only writer with a Mac receipt at all. The one
+reboot came at the writer-to-video handover with a test suite competing for RAM.
+Close other applications before changing writer. `google/gemma-4-E2B-it` (6.0 GB,
+plain `mac16`, equally ungated) is the headroom option, but nothing has been
+rendered with it here -- that tag is arithmetic, not a receipt.
+
+A separate `otr_mac_lightning.json` held exactly this arrangement and was
+**deleted on 2026-09-09**, for the same reason the profile below was: measured
+against the canonical it differed by zero nodes, zero links and five widget
+values. Five dropdown settings do not justify a second graph to keep in step --
+and while it existed it sat in `workflows/variants/`, which is generated-only,
+so it crashed `build_variants.py --check` outright. The five settings are in
+README's "Other setups".
 
 A Mac-specific profile for this briefly existed and was **deleted**: it encoded
 three dropdown settings, a canvas the engine overrules anyway, and a preflight
@@ -1284,6 +1317,46 @@ Every kill looked like a video-lane problem because a video lane was on screen
 when it happened. The thing to measure on this platform is not the lane you
 selected -- it is **how many times the biggest model in the pipeline is loaded**,
 and whether anything still holds a reference when it is.
+
+---
+
+### The Metal writer lane: use GGUF, not bf16
+
+**On Apple Silicon the transformers lane at `llm_quant_policy: none` is the one
+combination that cannot be made to fit, and no dropdown fixes it.** That is
+worth stating plainly because the obvious lever looks like it should work and
+does not:
+
+* `llm_quant_policy` offers `bnb_nf4`, `bnb_8bit` and `none`. Both bnb lanes
+  need bitsandbytes, and `requirements.txt` carries
+  `bitsandbytes>=0.42.0; sys_platform != 'darwin'` -- it is deliberately not
+  installed on macOS. Installed by hand it *runs*, at 0.3-0.5 tok/s against
+  14.47 on CUDA, because there is no Metal NF4 kernel. So `none` is the only
+  reachable quant, and `none` is exactly the setting that peaks at 14 GB.
+
+**What fits: the GGUF writer row at `gguf_quant: Q4_K_M`** -- roughly 2.5 GB for
+a 4B writer, against 8.7 GB of bf16 safetensors. `nodes/_otr_gguf_backend.py`
+is genuinely device-aware here (`default_layers = DEFAULT_N_GPU_LAYERS if
+policy.device in ("cuda", "mps") else 0`), so llama.cpp's Metal backend takes
+`n_gpu_layers` exactly as CUDA does rather than silently falling back to CPU.
+Section 11 covers the install, which is high-friction but solved.
+
+So Apple Silicon wants its own writer lane. **This is stated here and enforced
+nowhere** -- operator directive, 2026-09-09: no gated dropdowns and no
+capability matrix in code, only documentation. A guard that refused the bf16
+lane on Metal was written and then removed for exactly that reason.
+
+**NOT YET SELECTABLE, and this is the honest status.** `GGUF_ROWS` in
+`nodes/_otr_gguf_backend.py` is currently EMPTY, so no GGUF writer appears in
+the picker at all -- there is nothing to point a Metal-named row at until a
+pinned artifact is added. The backend is ready and device-aware; the row is
+missing.
+
+**The arithmetic, so you can size it yourself.** Resident runs about **1.61x**
+the bf16 download size -- `14 / 8.68`, the one measurement this repo has
+(PBUG-20260907-06). On a 16 GB machine, minus what macOS and the video stack
+need, a bf16 writer above roughly 7 GB of safetensors has no margin. Q4_K_M on
+a 4B writer is roughly 2.5 GB and is not close to the edge.
 
 ---
 

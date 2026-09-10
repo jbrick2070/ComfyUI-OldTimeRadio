@@ -38,11 +38,28 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
 _CANONICAL = _REPO / "workflows" / "otr_canonical.json"
+_WORKFLOWS = _REPO / "workflows"
 _VARIANTS = _REPO / "workflows" / "variants"
 
 
 def _workflows():
+    """EVERY shipped graph, not just the canonical and the generated variants.
+
+    This used to be `canonical + variants/*.json`, which quietly assumed that
+    the only hand-authored graph lives in `variants/`. It does not:
+    `workflows/otr_mac_lightning.json` is the graph that produced the Apple
+    Silicon proof episode, and it was moved OUT of `variants/` on 2026-09-09
+    because that directory is contractually generated-only -- an orphan file
+    there with no matching profile crashes `build_variants.py --check`.
+
+    The moment it moved, this guard stopped seeing it. That is the worse
+    failure: a widget migration could re-index the canonical and leave the Mac
+    graph behind, and the positional-widget contract (CLAUDE.md section 0)
+    would be broken in a shipped file with nothing to catch it. Any graph under
+    `workflows/` is a graph this guard must cover.
+    """
     out = [_CANONICAL]
+    out.extend(sorted(p for p in _WORKFLOWS.glob("*.json") if p != _CANONICAL))
     out.extend(sorted(_VARIANTS.glob("*.json")))
     return [p for p in out if p.is_file()]
 
