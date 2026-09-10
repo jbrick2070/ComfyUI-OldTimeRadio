@@ -72,12 +72,17 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-09 evening, rented Mac M4):** `v2.0-alpha`, HEAD == origin.
+**State (2026-09-09 late evening, rented Mac M4):** `v2.0-alpha`, HEAD == origin.
 Suite **151 failing of 14,137 in a FULL run, and all 151 PASS individually** --
 order dependence, reproduces identically ten commits back, so it is pre-existing
-and not any recent session's doing. **Bug Bible NOT RUN** (the survival-guide
-repo is not checked out on this Mac). Box: a ComfyUI server was left RESIDENT on
-:8188 with a render in flight -- see the newest `docs/HANDOFF_LOG.md` entry.
+and not any recent session's doing. **Bug Bible NOW RUNS ON THIS MAC** -- the
+survival-guide repo is checked out at
+`~/Documents/comfyui-custom-node-survival-guide` (operator supplied the URL
+2026-09-09; remote switched to SSH, which is what the OTR repo already uses).
+Baseline standalone: **23 passed, 27 skipped, 3 xfailed, 338 entries.** Against
+`--pack-dir` this repo: **10 failed, 29 passed** -- those 10 are PRE-EXISTING on
+a Mac checkout and were 12 before this session; measure against 10, not 0.
+**Box: CLEAN.** Port 8188 clear, no ComfyUI process, no background task running.
 **Read section 0 (THE ATTACK ORDER) before picking a row.**
 
 > **The registry paragraphs immediately below are STALE and were not rewritten
@@ -725,6 +730,41 @@ The guards from item 1 keep every one of these from moving the findings.
 
 `has_local_resident_llm()` (`nodes/_otr_model_loader.py`) reports "nothing resident" the moment a timeout clears the cache dict, even while the orphan worker still runs CUDA kernels; `nodes/otr_shot_lock.py` and `nodes/otr_video_render_batch.py` both trust that signal before visual or video work. Shape: process-global lock-protected registry of in-flight generations, registered before invalidation, cleared via `Future.add_done_callback`, fail-fast admission on `request_slot`, the two visual-entry guards reading real occupancy. Deferred three times as correctly out of scope for the cache-bookkeeping fixes (PBUG-20260825-04), and each cut of that fix found a new race, so this is a genuine design choice: full arc first.
 
+### 3.8 ONE SHARED, TORCH-FREE FONT RESOLVER -- design row, arc BEFORE code (opened 2026-09-09)
+
+**The defect class is closed by detection, not by construction, and that is the
+open part.** `video_engine` resolves a font by FILE PATH (PIL opens files);
+`_otr_captions` names a FAMILY to libass (fontconfig resolves it). Only
+arithmetic joins them -- `_otr_title_card` centres with
+`x = centre - tw // 2` from the measured width and libass draws from that x
+under Alignment 7. When the two disagree the title is mis-placed, which is
+exactly PBUG-20260909-04 and Bible 12.159.
+
+Four commits closed the symptom (`f0aa8e6a`, `f0590fd5`, `719edac0`,
+`35421bf5`) and a test now FAILS when the families disagree. The two tables are
+still two tables.
+
+**WHY IT IS AN ARC AND NOT A GREP.** `_otr_captions` deliberately imports
+nothing from `video_engine` -- it must stay torch-free -- so "just import the
+resolver" is not available, and there are at least three defensible shapes:
+(a) a shared torch-free resolver under `nodes/_otr_shared/` that both consume;
+(b) the caption emitter taking the family as a parameter from a caller that
+already holds both; (c) leaving two tables and keeping the agreement test as
+the contract. Per CLAUDE.md's 2026-08-17 amendment that is a design choice with
+more than one defensible answer.
+
+**THERE ARE NOW THREE CALLERS ARGUING FOR (a)**, which is new information since
+the row was first considered: `video_engine._load_font`,
+`otr_credits_roll._load_font` (its own list, its own override
+`OTR_CREDITS_FONT`, and it RAISES rather than falling back), and
+`_otr_shared/scope_draw._small_font` (found by the Bible rule on its first run,
+trying only a Linux font on two platforms that do not ship it).
+
+**DONE WHEN:** the family libass draws is derived from the face actually
+resolved, or the operator rules that the detector test is the contract and this
+row closes. **NOT BLOCKED on hardware** -- it is pure code and reviewable on any
+box. **Blocked on:** nothing but the arc.
+
 ### 3.4 ONE MANIFEST, PREFLIGHT AUTO-DOWNLOAD (queue item 8; design row; operator asked "and auto download for all?" 2026-09-01 -- confirm to schedule)
 
 RULING: Keep the rule that nothing downloads DURING a render.
@@ -1248,6 +1288,7 @@ Operator: *"once we ship v2 we ship an OTR-Lite, similar architecture but only t
 | Seedance softener mangles authored prompts (2026-08-17) | CANDIDATE only. Detail: `docs/GO_FORWARD_ARCHIVE.md` | a cloud leg produces the artifact | a cloud render this repo cannot observe |
 | `PBUG-20260904-05` (draft 8 GB profiles: 2048 ctx holds `media_archive`, refuses the other two banks) | CANDIDATE: a live refusal | verify condition is automatable | a profile-design call not yet made |
 | `PBUG-20260901-04` (kokoro on Python 3.13) | Bible CANDIDATE (a Requires-Python marker rule) | promoted at the fan-out | fan-out (Section 3, question F) |
+| `PBUG-20260909-04` (title cards off-frame on macOS; two font resolvers) | **DONE 2026-09-09 -- promoted as Bible `12.159`** with an AST regression test, index row, and `bible_entries` 337 -> 338 (Bible `73ae3dc`) | closed | -- |
 
 Rulings -- do not re-open:
 - historical `PBUG-20260711-18`: Keep as a standing context/cap engineering risk; never eligible from static evidence.

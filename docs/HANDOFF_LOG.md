@@ -1,3 +1,125 @@
+## 2026-09-09 (late evening) -- HEAD 765b9e9a +handoff (v2.0-alpha) -- MAC (rented M4) -- title cards had been publishing off-frame on macOS, and the tests could not see it
+
+**THE SHA ABOVE IS THE LAST CODE HEAD.** This handoff is a SINGLE commit, so it
+is the second-to-last sha on the branch once this entry lands; the last is this
+handoff commit. The authoritative post-handoff sha is the one in the kickoff
+line, read after the push.
+
+**PRE-FLIGHT, all three:**
+1. **No background tasks running.** The full suite finished; the audit workflow
+   was explicitly STOPPED (see the warning below); no render, no server.
+2. **Suite: 148 failing of 14,137 in a full run** (the inherited baseline said
+   151). **AND THE INHERITED READING OF THAT NUMBER IS WRONG -- do not carry it
+   forward.** The previous entry said "all 151 PASS individually -- order
+   dependence". Spot-checked three of the failing files this session:
+   `test_widget_cannot_name_the_binary.py` fails **5 tests when run entirely
+   alone**. The cause is environmental, not ordering -- **this Mac has neither
+   `ffmpeg` nor `ffprobe` on PATH** (`which` finds neither), which is the exact
+   prerequisite `docs/SHIPPING_JSON_RECIPES.md` names for every device. Treat
+   148 as a Mac-environment baseline and RE-DERIVE it on a box with ffmpeg
+   before reading anything into the number.
+3. **Bible: RUN, and it now runs on this Mac for the first time.** Standalone
+   **23 passed, 27 skipped, 3 xfailed, 338 entries**. Against `--pack-dir` this
+   repo: **10 failed, 29 passed** -- it was 12 before this session and two of
+   those were fixed here; the remaining 10 are pre-existing on a Mac checkout.
+4. **Box: CLEAN.** Port 8188 clear, no ComfyUI process, nothing resident.
+
+**A WARNING THE NEXT WINDOW NEEDS, because it cost real time here.** An agent
+inside a fan-out audit **EDITED THE REPO** -- it left a debug `PROBE` line in
+`nodes/video_engine.py` and had deleted two font candidates as a mutation
+experiment, in the working tree, while I was mid-edit. Caught by reading the
+file, restored to the pushed head, installed pack verified clean, workflow
+killed. Nothing contaminated reached a commit. If you fan agents out over this
+repo, tell them to copy to `/tmp` and CHECK `git status` afterwards.
+
+Did: Root-caused and fixed a defect that had shipped on **all eight episodes
+published from this Mac** -- hero title cards rendered off the right edge of the
+frame. Operator's report was "the totles you stee still flush righ not cneter",
+and it had read as cosmetic for weeks. Nothing in the title path passes a
+"centre" flag: `_otr_title_card` centres with `x = cx_centre - tw // 2` from a
+PIL-measured width and `_otr_captions` emits that x as an ASS `\pos()` under
+Alignment 7 (top-LEFT), so libass plants the left edge exactly where the
+measurement said. `video_engine._load_font` had **no macOS candidate at all** --
+its non-Windows list was two Debian/Ubuntu paths -- so every size fell to
+`ImageFont.load_default()`, a ~10px bitmap face that IGNORES the size argument.
+A 21-character title measured **131px instead of 1218px** at size 96, giving
+x=895 and glyphs spanning 895..2113 on a 1920 frame. **The proof is on the same
+frame:** that episode's SDH captions are perfectly centred, because they use
+Alignment 2 and let libass do the centring -- one file, two text layers, only
+the one centred by our own arithmetic wrong. Windows was correct throughout
+(`consola.ttf` really is in `C:\Windows\Fonts`), which is why it looked
+cosmetic. Filed **PBUG-20260909-04**, promoted to Bug Bible **12.159**.
+Four commits: macOS candidates; then real Fedora/Arch/openSUSE layouts plus a
+bare-name tier (PIL walks the font dirs, which `otr_credits_roll` has always
+relied on); then family grouping; then FAMILY-MAJOR search plus config-keyed
+caches. **Three of those four were corrections to my own previous commit**, each
+found by review -- distro grouping put Arch's Liberation ahead of Arch's DejaVu;
+grouping the absolute list still leaked preference across search stages; and the
+caches outlived the `OTR_VIDEO_FONT` that built them, which matters because
+ComfyUI runs prompts back to back in one process. Also fixed a cold-start race
+(the cache key was published BEFORE the value). Separately fixed
+`scope_draw._small_font`, which tried only `DejaVuSans.ttf` -- a Linux font on
+neither Windows nor macOS -- and had been drawing scope chrome at bitmap size on
+BOTH rendering platforms since it was written; **found by Bible 12.159's own
+test on its first run**, in a file the four font commits never touched.
+Corrected the `--run-label` help text, which claimed a receipt that script never
+writes.
+
+**The test story is the transferable part.** A QA mutation pass ran twelve source
+mutants against the guarding tests and **all twelve survived** -- the entire
+bare-name tier could be deleted, the path cache bypassed, or the original macOS
+bug restored, with everything still green. Two causes, both fixed: `_FONT_PATH`
+is a MODULE GLOBAL that outlives a test, so whichever test ran first warmed it
+and every later test was served the cache without executing discovery at all;
+and two successive guarding tests were toothless -- the first asserted
+`x + tw <= 1920`, a **tautology** for any `tw <= 1920` that passed against the
+live bug, and its replacement re-implemented the comparison instead of calling
+the resolver and sat green while the Arch ordering bug shipped. Five mutants now
+die, each to the test that owns it.
+
+Current step: Font work is CLOSED as a symptom and pinned by tests. GO_FORWARD
+gained **row 3.8 -- one shared, torch-free font resolver**, the only forward
+item this session created: `video_engine` resolves by FILE PATH while
+`_otr_captions` names a FAMILY to libass, and only arithmetic joins them. Three
+callers now argue for a shared resolver under `nodes/_otr_shared/`
+(`video_engine`, `otr_credits_roll`, `scope_draw`), but `_otr_captions` must
+stay torch-free so "just import it" is unavailable -- a design choice with more
+than one defensible answer, so it wants an arc, not a solo swing.
+
+Next: Read GO_FORWARD section 0 (THE ATTACK ORDER) and take the topmost item not
+blocked on the operator. Row 3.8 is NOT blocked on hardware and is reviewable on
+any box. **Blocked on the operator and untouched here:** the four per-device
+shipping JSONs in `docs/SHIPPING_JSON_RECIPES.md` (still NOT applied), the
+registry evidence packet, and AMD -- no AMD hardware exists yet; the operator was
+last seen pricing AMD desktops. **Also still open:** copying the 8 published
+episodes (867 MB) off this Mac -- no route has been agreed, and the Mac expires
+in days.
+
+Models: Opus 5 drove. Review routing per CLAUDE.md's 2026-09-07 ONE-CLI-REVIEW
+directive -- one reader on every coding change, not an arc, since every item here
+was a verifiable-right-answer fix rather than a design fork. **The roster is not
+the usual one and is stated exactly:** the `cursor-agent` lane returned 0 bytes
+twice, `agy` hit its 5-minute print timeout (`KIBITZ_AGY_PRINT_TIMEOUT` only
+reaches agy through `kibitz.py`, not a direct invocation), and `codex exec` was
+hijacked by its own interactive review-type template and later run by the
+operator against the WINDOWS checkout, where the uncommitted Mac diff did not
+exist. Substituted per the missing-reviewer directive: **agy (one successful
+pass), two Sonnet subagents, and codex via the operator on Windows once the work
+was pushed.** Codex's Windows pass produced the sharpest findings of the session
+(the Arch ordering bug, the stale-override caches, and the twelve surviving
+mutants) and every one was confirmed against the code before folding in. **NOT a
+full four-round arc and never described as one.**
+
+Commits: `525fad69` (--run-label), `f0aa8e6a`, `f0590fd5`, `719edac0`,
+`35421bf5` (the font chain), `765b9e9a` (scope chrome). Bible repo
+`jbrick2070/comfyui-custom-node-survival-guide` at **`e39f487`** (12.159, its AST
+regression test, index row 450->451, entries 337->338, README count in all three
+places; remote switched to SSH because the HTTPS clone could not authenticate).
+The handoff commit lands ON TOP of these -- see the kickoff line for the real
+head.
+
+---
+
 ## 2026-09-09 (evening) -- HEAD 439913e6 +handoff (v2.0-alpha) -- MAC (rented M4) -- the matrix became receipt-backed, and five of my own claims were wrong
 
 **THE SHA ABOVE IS THE LAST CODE HEAD. This handoff took TWO commits** (the log

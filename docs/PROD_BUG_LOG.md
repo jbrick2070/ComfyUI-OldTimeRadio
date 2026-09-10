@@ -13576,6 +13576,120 @@ mapping is not the one-liner it looks like.
 
 ---
 
+## PBUG-20260909-04 -- Hero title cards published OFF THE RIGHT EDGE on macOS, because measurement and drawing use different fonts
+
+**Found:** 2026-09-09, operator eyeball on the published episode
+`lightning_mac_proof_3_20260909_201719__anim__adlt__none__koko__orig__q354b__sa3_final.mp4`
+(Apple M4, 16 GB). Operator's words: *"the totles you stee still flush righ not
+cneter"*.
+**Severity:** HIGH on macOS, and it had shipped -- all eight episodes published
+from this Mac carry it. **Windows was correct throughout**, which is exactly why
+it read as a cosmetic layout complaint for weeks rather than a platform gap.
+**Status:** FIXED (f0aa8e6a, f0590fd5, 719edac0, 35421bf5). Promoted to the Bug
+Bible as **12.159**; index row appended, `bible_entries` 337 -> 338.
+
+### What happened
+
+Nothing in the title path passes a "centre" flag to anything. `_otr_title_card`
+centres the hero ITSELF with `x = cx_centre - tw // 2` using a width PIL
+measured, and `_otr_captions` emits that x as an ASS `\pos()` under the TITLE
+style's **Alignment 7 (top-LEFT)** -- so libass plants the glyphs' left edge
+exactly where the measurement said and draws them in ITS font at the real size.
+
+`video_engine._load_font` listed three real Windows fonts and, for everything
+else, two **Debian/Ubuntu** paths. Neither exists on macOS, so every requested
+size fell through to `ImageFont.load_default()` -- a ~10px bitmap face that
+IGNORES the size argument.
+
+| | measured `tw` | computed `x` | span on a 1920 frame |
+|---|---|---|---|
+| macOS, as shipped | 131 | 895 | 895 -> **2113** (off-frame, clipped) |
+| macOS, fixed | 1218 | 351 | 351 -> 1569 (351px both margins) |
+| Windows | ~1218 | ~351 | correct all along |
+
+**The proof is on the same frame.** The SDH captions in that episode are
+perfectly centred, because they use ASS Alignment 2 and let *libass* do the
+centring -- one file, two text layers, and only the one centred by our own
+arithmetic is wrong.
+
+### Root cause
+
+TWO INDEPENDENT FONT RESOLVERS joined only by arithmetic. `_otr_captions`
+already carried a per-platform FAMILY map (`darwin -> Menlo`) for DRAWING; the
+MEASURING side never got a darwin entry. `otr_credits_roll` had already learned
+this lesson on 2026-09-01 -- it carries macOS candidates and refuses to fall
+back at all -- and the lesson was never propagated.
+
+### The fix, and the two wrong turns on the way
+
+1. macOS candidates resolving to Menlo, the family the ASS style already names.
+2. Linux layouts for Fedora/Arch/openSUSE, each checked against the
+   distribution's own package file list. **Three separate reviews corrected this
+   list**; two paths were wrong on the `-fonts` suffix and on `TTF/` vs
+   `liberation/`.
+3. **Grouping by distro was WRONG and shipped for one commit** -- it put Arch's
+   Liberation path ahead of Arch's DejaVu path, so an ordinary Arch box with
+   both packages measured the wrong family.
+4. **Grouping the absolute list by family was ALSO not enough.** Preference
+   still leaked across search stages: an exact-path Liberation hit returned
+   before the bare-name search for DejaVu ever ran. The search is now
+   FAMILY-MAJOR -- a family's exact paths AND PIL's own lookup complete before
+   the next family is considered.
+5. The caches now key on `OTR_VIDEO_FONT` and drop TOGETHER. ComfyUI runs
+   prompts back to back in one process, so an override set by one render used to
+   poison every later render for the life of the server -- and `_FONT_CACHE`,
+   keyed only by size, kept serving font OBJECTS built from the old face.
+6. The bitmap fallback now says so, once per process. That silence is what let
+   this reach a published artifact.
+
+### Why the tests did not catch it, which is the transferable part
+
+A QA mutation pass ran twelve source mutants and **all twelve survived** -- the
+entire bare-name tier could be deleted, the path cache bypassed, or the original
+macOS bug restored, with every test still green. Two causes:
+
+* **`_FONT_PATH` is a MODULE GLOBAL that outlives a test.** Whichever test ran
+  first warmed it, and every later test was served the cached answer without
+  executing the discovery code at all. An autouse fixture now starts each test
+  cold.
+* **Two successive guarding tests were toothless.** The first asserted
+  `x + tw <= 1920`, which is a TAUTOLOGY for any `tw <= 1920` and passed against
+  the live bug. Its replacement re-implemented the comparison in the test
+  instead of calling the resolver, and sat green while the Arch ordering bug
+  shipped. A test that re-implements the logic tests the re-implementation.
+
+Five mutants are now killed, each by the test that should own it (M1 bare-name
+tier, M2 path cache, M3 bitmap default, M4 flat tiers, M5 cache invalidation).
+
+### A SECOND SITE, found by the Bible rule on its first run
+
+`nodes/_otr_shared/scope_draw.py::_small_font` tried only `DejaVuSans.ttf` -- a
+Linux font present on **neither Windows nor macOS** -- and swallowed every
+failure. Scope chrome has therefore been drawing at bitmap size instead of
+`h // 72` on both rendering platforms since it was written. Milder than the
+above (nothing measures it, so text is too SMALL rather than mis-placed) and
+fixed in the same pass. It is the argument for writing the portable rule rather
+than only fixing the site that hurt.
+
+### Still open, and it is a DESIGN item
+
+The root shape is that `video_engine` resolves a font by FILE PATH while
+`_otr_captions` names a FAMILY to libass, and only arithmetic joins them. Making
+the drawn family derive from the face actually resolved crosses a module
+boundary `_otr_captions` deliberately keeps thin (it must not import torch). Per
+CLAUDE.md that is a design choice with more than one defensible answer and wants
+an arc, not a solo swing. A shared torch-free resolver under
+`nodes/_otr_shared/` is the obvious candidate and now has THREE callers arguing
+for it. Detector-tested in the meantime.
+
+### Verify
+
+`tests/test_load_font_measures_with_a_real_face.py` (15 tests) and Bible
+`12.159`'s own AST-based rule, which flags any `ImageFont.load_default()` call
+with no warning nearby.
+
+---
+
 ## PBUG-20260909-01 -- A long beat REBOOTS a 16 GB Mac, and nothing stops it
 
 **Found:** 2026-09-09, first real OTR-adapter-path episode on
