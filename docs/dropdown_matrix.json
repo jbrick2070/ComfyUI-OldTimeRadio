@@ -8,6 +8,7 @@
     "nv16": "fits",
     "nv8": "fits"
    },
+   "note": "TWO published Mac episodes now: lightning_mac_proof_2 (2026-09-09, 23 beats, 02:32:34) and lightning_mac_proof_3 (2026-09-09, 8 clips, 01:17:46, RESULT SUCCESS). The second was rendered specifically to prove the scoped-refusal change to _beat_hold on a live episode -- it had unit tests and a measured ceiling behind it but no render, because the render that would have proven it rebooted the host (PBUG-20260909-02). Rendered clean with nothing else competing for RAM, it published and the machine survived.",
    "size_gb": 3.1
   },
   "animatediff15_v3_haunted_video": {

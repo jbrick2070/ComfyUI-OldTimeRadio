@@ -87,18 +87,33 @@ Commits: `5240c581`, `4f8ac164`, `7e8aee60`, `9abdebf0`, `d5ba6e2f`, `94cac4e4`,
 * **Five Bible candidates** are at the end of `docs/PROD_BUG_LOG.md` for
   promotion from the Windows box.
 
-### IN FLIGHT -- read this before touching the tree
+### THE IN-FLIGHT RENDER LANDED -- the last Mac gap is closed
 
-`lightning_mac_proof_3` is rendering against `workflows/otr_canonical.json` with
-its three video roles TEMPORARILY set to `animatediff15_lightning_video (16:9)`.
-**That file is MODIFIED IN THE WORKING TREE AND DELIBERATELY UNCOMMITTED.**
-Pristine copy: `scratchpad/canonical.PRISTINE.json`. Revert the three widgets to
-`viz_mxc_cpu` / `viz_green` / `viz_camera` once the render lands.
+`lightning_mac_proof_3` **PUBLISHED**, and it is the receipt the `_beat_hold`
+change was missing:
 
-It exists to close the one Mac gap left: the `_beat_hold` change is proven by
-unit tests, a 118-profile router diff and an unchanged 136-latent ceiling, but
-NOT by a live episode -- the render that would have proven it is the one that
-rebooted the box (PBUG-20260909-02).
+```
+RESULT SUCCESS   prompt d62eef79   Prompt executed in 01:17:46
+obs_publish OK -> lightning_mac_proof_3_20260909_201719__anim__adlt__none__koko__orig__q354b__sa3_final.mp4
+66 MB, 8 clips.  Host survived -- up 4:38, no reboot.
+```
+
+The filename carries the proof: **`adlt`** is the lightning lane, **`none`** is
+the image slot (so `accepts_still = False` held and no image engine was
+invoked), **`koko`** + **`sa3`** + **`q354b`** are the proven Mac spine.
+
+**Why it mattered:** the scoped-refusal change to `_beat_hold` had unit tests, a
+118-profile router diff and an unchanged 136-latent ceiling behind it, but no
+live episode -- the render that would have proven it is the one that rebooted
+the box (PBUG-20260909-02). It now has one, rendered clean with nothing else
+competing for RAM.
+
+**It also gives the lightning lane its SECOND Mac episode**, which is the start
+of the repeatability that "What Mac testing still owes" asks for.
+
+`workflows/otr_canonical.json` has been REVERTED and is byte-identical to the
+pristine copy taken before the run -- its three video roles are back to
+`viz_mxc_cpu` / `viz_green` / `viz_camera`. Working tree clean.
 
 ## 2026-09-04 (evening) -- v2.0-alpha -- CODER (the scan collapse SHIPPED end to end: batches a-d, 103 env files -> 2)
 
