@@ -124,6 +124,11 @@ observed speed varies from about 30 to 180 KB/s. Do not retire the rental
 based on a queued transfer or this Git commit. The media files themselves are
 not stored in Git history.
 
+An hourly follow-up, **Finish OTR Mac file transfer**, is active in the
+current Codex task. It checks the existing copy, stays quiet during normal
+progress, and is to pause after verified completion or an unresolved access
+blocker. Keep the Mac and Codex running until the off-machine copy is verified.
+
 A complete local ZIP backup is ready at
 `/Users/rentamac/Documents/otr-mac/transfer/otr-mac-episodes-20260910.zip`.
 It has 273 members (the 272 media/episode files plus the manifest), is

@@ -47,6 +47,12 @@ copy. Do not retire the Mac until the transfer is verified. Do not overwrite
 Windows `_shared` state with Mac runtime state. A private Google Drive backup
 was offered, not uploaded without an answer.
 
+**Overnight continuation:** the current task has an active hourly follow-up,
+**Finish OTR Mac file transfer**, to verify the existing copy, record its
+completion, and pause itself. It stays quiet during ordinary progress and
+reports completion, failure, or required input. Keep the Mac and Codex running
+until the off-machine copy is verified.
+
 **Evidence and recovery inventory:** `docs/2026-09-10-mac-final/README.md`,
 raw success/failure logs, submitted prompts, history, font-source hashes,
 ffprobe output, the exact published-file SHA-256, before/after title frames,
