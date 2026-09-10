@@ -508,8 +508,8 @@
       "widgets_values": [
         "",
         2,
-        "Qwen/Qwen3.5-4B (8.7 GB, nv8 nv16 nv24)",
-        "Qwen/Qwen3.5-4B (8.7 GB, nv8 nv16 nv24)",
+        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
         "",
         true,
         "1",

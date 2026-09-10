@@ -1,5 +1,5 @@
 {
- "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (an episode rendered, receipt in docs/MACHINE_MATRIX.md) | fits | oom | no | unknown. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row.",
+ "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row.",
  "_nvidia_provenance": "The nv8 and nv16 verdicts came from a 46-agent audit of all 61 engines on 2026-09-09 (8 GB Ada / 16 GB Blackwell), each grounded in the registries and adapters, with 42 load-bearing verdicts adversarially re-checked and 7 overturned. Unlike the Mac column these are mostly REASONED, not run: 'proven' still means a receipt in docs/MACHINE_MATRIX.md and nothing else.",
  "engines": {
   "animatediff15_lightning_video": {
@@ -28,10 +28,11 @@
   },
   "bark": {
    "memory": {
-    "mac16": "proven",
+    "mac16": "measured",
     "nv16": "proven",
     "nv8": "proven"
    },
+   "note": "Measured on this M4 2026-09-07 -- 40.8 s for 4.6 s of structured speech, flatness 0.070, finite; the row earned its mps backend on that run. But NO published episode has used it: all seven Mac episodes to date used kokoro.",
    "size_gb": 4.2
   },
   "chatterbox": {
@@ -349,10 +350,11 @@
   },
   "musicgen": {
    "memory": {
-    "mac16": "proven",
+    "mac16": "measured",
     "nv16": "proven",
     "nv8": "proven"
    },
+   "note": "Measured on this M4 2026-09-07 -- mps 14.1 s vs cpu 14.7 s for 256 tokens, flatness 0.134/0.103, finite. No published episode has used it: all seven Mac episodes used stable_audio_3. Its CC-BY-NC licence is why it is not the default.",
    "size_gb": 2.2
   },
   "off": {

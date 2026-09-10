@@ -111,7 +111,14 @@ def test_the_two_questions_stay_separate():
             "curated -- everything else is derived from the code."
             % (engine, sorted(extra), sorted(allowed)))
         verdicts = set(row.get("memory", {}).values())
-        assert verdicts <= {"proven", "fits", "oom", "no", "unknown"}, (
+        # "measured" is a DISTINCT state from "proven" and the split is the
+        # whole go-forward test plan: proven = a published episode used it;
+        # measured = it ran on that hardware in a lab test and nothing has
+        # shipped with it. Collapsing them once put bark and musicgen -- which
+        # have Metal timings and zero episodes -- in the same column as engines
+        # that had carried a whole episode.
+        assert verdicts <= {"proven", "measured", "fits", "oom", "no",
+                            "unknown"}, (
             "%s uses an unknown memory verdict: %s" % (engine, sorted(verdicts)))
 
 

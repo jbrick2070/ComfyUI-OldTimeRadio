@@ -39,7 +39,11 @@ os.environ.setdefault("OTR_TEST_MODE", "1")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Hand-maintained graphs. Generated variants are deliberately excluded.
-HAND_MAINTAINED = ("otr_canonical.json", "otr_story_only.json")
+# `otr_story_only.json` was DELETED at a62f3567 ("The pack ships ONE
+# workflow JSON"), and this tuple kept naming it -- so the guard spent
+# two commits failing on a missing file instead of checking the one
+# graph that ships. One graph, one entry.
+HAND_MAINTAINED = ("otr_canonical.json",)
 
 #: Writer widgets whose value must be a member of a live COMBO choice list.
 MODEL_WIDGETS = ("creative_writing_model", "technical_model")

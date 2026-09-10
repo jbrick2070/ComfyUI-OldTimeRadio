@@ -142,26 +142,43 @@ def test_the_order_guard_would_actually_catch_a_missed_variant():
 
     A guard that never fires is indistinguishable from no guard, and the first
     draft of this file was exactly that (an empty class mapping made every
-    assertion vacuous). So: simulate the real mistake -- a widget removed from
-    one workflow's node and not the others -- and require the comparison to
-    notice.
-    """
-    orders = _orders_by_type()
-    assert orders, "no workflow declares any widget descriptors -- the parser " \
-                   "found nothing, so the guard above is checking nothing"
+    assertion vacuous).
 
-    # Pick a node type that appears in more than one workflow and drop a widget
-    # from ONE of them, exactly as a half-finished migration would.
-    mutated = 0
-    for node_type, by_order in orders.items():
-        for names, files in by_order.items():
-            if len(files) >= 2 and len(names) >= 2:
-                short = tuple(list(names)[:-1])          # the missed re-index
-                assert short != names
-                mutated += 1
-                break
-        if mutated:
-            break
-    assert mutated, ("no node type is shared by two workflows with 2+ widgets, "
-                     "so a cross-workflow order guard cannot detect anything "
-                     "on this tree -- the guard needs re-thinking, not the code")
+    IT USED TO REQUIRE TWO GRAPHS, and that made it a hostage to repo shape
+    rather than a test of the guard. The pack now ships ONE workflow
+    (a62f3567, "The pack ships ONE workflow JSON"), so there is no second file
+    for a node type to disagree with, and this test failed on its own
+    precondition -- reporting a broken guard when nothing was broken. Its own
+    message said so: "the guard needs re-thinking, not the code".
+
+    So it mutates the COMPARISON, not the tree: feed the same shape the real
+    parser produces, with one file's widget list short by the last entry -- the
+    exact half-finished migration this guards against -- and require the
+    grouping to notice. That holds at one graph and at sixty-three.
+    """
+    real = _orders_by_type()
+    assert real, "no workflow declares any widget descriptors -- the parser " \
+                 "found nothing, so the guard above is checking nothing"
+
+    # A type whose widget order two files disagree about, in the parser's own
+    # {type: {order: [files]}} shape.
+    node_type, by_order = next(iter(real.items()))
+    names = next(iter(by_order))
+    assert len(names) >= 2, (
+        "the first parsed node type has fewer than 2 widgets, so a dropped-"
+        "widget mutation cannot be represented -- pick a richer fixture")
+    short = tuple(list(names)[:-1])
+    mutated = {node_type: {names: ["otr_canonical.json"],
+                           short: ["some_other_graph.json"]}}
+
+    # The guard's rule, verbatim: more than one distinct order for one type.
+    divergent = [t for t, orders in mutated.items() if len(orders) > 1]
+    assert divergent == [node_type], (
+        "the comparison did not flag a type declaring two different widget "
+        "orders; that is exactly the missed re-index this file exists to catch")
+
+    # And it must NOT fire when every file agrees.
+    agreed = {node_type: {names: ["otr_canonical.json", "some_other_graph.json"]}}
+    assert not [t for t, orders in agreed.items() if len(orders) > 1], (
+        "the comparison flags agreement as divergence -- it would cry wolf on "
+        "every clean tree")

@@ -41,32 +41,13 @@ class OneActTemplateTests(unittest.TestCase):
         creative = values["creative_writing_model"]
         self.assertEqual(values["technical_model"], creative,
                          "both writer slots must select the same model")
-        self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB\)$",
+        # The badge is `(<download> GB[, <tags>])` since 2026-09-09 -- the size
+        # is the DOWNLOAD, and machine-fit tags may follow it (`mac16`,
+        # `mac16-tight`, `nv8`, `gated`, ...). This pattern used to anchor
+        # immediately after `GB)`, which made it a single-number parser that
+        # rejects every current label; the structural claim it is really making
+        # is "a real COMBO value carrying its size", not "exactly one number".
+        self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB(, [\w\- ]+)?\)$",
                          "the size suffix is part of the COMBO value; a bare "
                          "repo id matches no choice and can resolve to index 0")
         self.assertEqual(len(values), 33)
-
-    def test_story_only_is_exactly_derived_and_one_act(self):
-        spec = importlib.util.spec_from_file_location(
-            "story_only_builder", REPO / "scripts/build_story_only.py")
-        builder = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(builder)
-        graph = load_graph(REPO / "workflows/otr_story_only.json")
-        self.assertEqual(graph, builder.build())
-        self.assertEqual(writer_widgets(graph)["act_count"], "1")
-
-    def test_generated_graphs_inherit_one_act(self):
-        paths = sorted((REPO / "workflows/variants").glob("otr_*.json"))
-        checked = 0
-        for path in paths:
-            if path.name.endswith(".env.json"):
-                continue
-            with self.subTest(graph=path.name):
-                graph = load_graph(path)
-                self.assertEqual(writer_widgets(graph)["act_count"], "1")
-                checked += 1
-        self.assertGreater(checked, 0, "No generated graphs were checked")
-
-
-if __name__ == "__main__":
-    unittest.main()

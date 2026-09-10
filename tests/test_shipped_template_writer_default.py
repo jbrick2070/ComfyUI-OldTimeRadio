@@ -35,7 +35,11 @@ sys.path.insert(0, str(ROOT / "nodes"))
 
 WRITER_NODE = "OTR_LedgerScriptWriter"
 MODEL_SLOTS = ("creative_writing_model", "technical_model")
-SHIPPED = ("otr_canonical.json", "otr_story_only.json")
+# `otr_story_only.json` was DELETED at a62f3567 ("The pack ships ONE
+# workflow JSON"), and this tuple kept naming it -- so the guard spent
+# two commits failing on a missing file instead of checking the one
+# graph that ships. One graph, one entry.
+SHIPPED = ("otr_canonical.json",)
 
 
 def _load(name):

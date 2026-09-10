@@ -339,8 +339,8 @@ def _cell(row: dict, key: str) -> str:
         # not being asked here.
         return "key"
     verdict = row["memory"].get(key, "unknown")
-    return {"proven": "**proven**", "fits": "fits", "oom": "**OOM**",
-            "no": "**no**", "unknown": "?"}.get(verdict, verdict)
+    return {"proven": "**proven**", "measured": "measured", "fits": "fits",
+            "oom": "**OOM**", "no": "**no**", "unknown": "?"}.get(verdict, verdict)
 
 
 def _size(row: dict) -> str:
@@ -424,9 +424,17 @@ answers TWO questions in order.
 * **too slow** -- offered on a CPU-only box in principle, kept off it because it
   is not practical there.
 * Otherwise the engine IS offered, and the word is the memory verdict:
-  **proven** (an episode actually rendered, receipt in `docs/MACHINE_MATRIX.md`),
-  fits (nothing blocks it and it fits, nobody has run it), **OOM** (expect to
-  exhaust memory), **?** (offered, and nobody has measured it).
+  **proven** (a PUBLISHED EPISODE used it), measured (it ran on that hardware
+  in a lab test and worked, but no episode has ever used it), fits (nothing
+  blocks it and the arithmetic says it fits -- nobody has run it at all),
+  **OOM** (expect to exhaust memory), **?** (offered, nobody has measured it).
+
+**The proven/measured split IS the test plan.** "measured" is precisely the list
+of engines to close next, and the distinction was earned: a first pass called
+both states "proven", which put engines in the same column as ones that had
+carried a whole episode. Note also that an episode's FILENAME records only its
+dominant video lane, so counting receipts from filenames under-reports -- one
+published episode here ran viz_camera, viz_mxc_cpu and viz_green together.
 
 **The AMD column is the weakest one here, and it is weak by construction.** The
 ROCm profiles declare `device_backend: "cuda"`, because that is how ROCm

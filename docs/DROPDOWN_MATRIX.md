@@ -93,10 +93,10 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** | ? | ? |
-| `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | **proven** | ? | ? |
+| `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | measured | ? | ? |
 | `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `stable_audio_3` | **auto** | 3.5 GiB | **proven** | fits | **proven** | ? | not offered |
-| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **proven** | ? | too slow |
+| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | measured | ? | too slow |
 | `stable_audio_music` | GATED | 4.5 GiB | fits | fits | not offered | ? | not offered |
 | `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered | not offered | not offered |
@@ -144,9 +144,17 @@ answers TWO questions in order.
 * **too slow** -- offered on a CPU-only box in principle, kept off it because it
   is not practical there.
 * Otherwise the engine IS offered, and the word is the memory verdict:
-  **proven** (an episode actually rendered, receipt in `docs/MACHINE_MATRIX.md`),
-  fits (nothing blocks it and it fits, nobody has run it), **OOM** (expect to
-  exhaust memory), **?** (offered, and nobody has measured it).
+  **proven** (a PUBLISHED EPISODE used it), measured (it ran on that hardware
+  in a lab test and worked, but no episode has ever used it), fits (nothing
+  blocks it and the arithmetic says it fits -- nobody has run it at all),
+  **OOM** (expect to exhaust memory), **?** (offered, nobody has measured it).
+
+**The proven/measured split IS the test plan.** "measured" is precisely the list
+of engines to close next, and the distinction was earned: a first pass called
+both states "proven", which put engines in the same column as ones that had
+carried a whole episode. Note also that an episode's FILENAME records only its
+dominant video lane, so counting receipts from filenames under-reports -- one
+published episode here ran viz_camera, viz_mxc_cpu and viz_green together.
 
 **The AMD column is the weakest one here, and it is weak by construction.** The
 ROCm profiles declare `device_backend: "cuda"`, because that is how ROCm
