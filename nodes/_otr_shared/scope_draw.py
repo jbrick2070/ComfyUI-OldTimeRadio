@@ -28,7 +28,9 @@ this one. There is ONE streaming clip encoder now, not three. UTF-8, no BOM.
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
+import sys
 import tempfile
 
 import numpy as np
@@ -137,12 +139,54 @@ def build_vignette(w, h):
     return np.clip(1.0 - dist * 0.35, 0.45, 1.0).astype(np.float32)
 
 
+#: Announced once per process, not once per call -- this is reached from the
+#: per-frame draw path.
+_WARNED_SCOPE_BITMAP = False
+
+#: Faces that ship with the OS, most preferred first per platform. This is
+#: CHROME text and nothing measures it for placement, so a proportional face is
+#: fine -- what matters is only that the requested SIZE is honoured.
+_SCOPE_FACES = {
+    "win32": ["arial.ttf", "segoeui.ttf", "tahoma.ttf"],
+    "darwin": ["Helvetica.ttc", "Arial.ttf", "Geneva.ttf"],
+}
+_SCOPE_FACES_DEFAULT = ["DejaVuSans.ttf", "LiberationSans-Regular.ttf"]
+
+
 def _small_font(h):
-    """A small chrome font; truetype if available, else PIL's default."""
-    try:
-        return ImageFont.truetype("DejaVuSans.ttf", max(9, h // 72))
-    except Exception:  # noqa: BLE001 -- headless / no truetype -> bitmap default
-        return ImageFont.load_default()
+    """A small chrome font at the REQUESTED SIZE, or PIL's default with a warning.
+
+    WHY THIS IS NOT JUST `DejaVuSans.ttf` ANY MORE. It used to try that one
+    bare name and silently swallow every failure. DejaVu is a Linux font: it
+    ships with neither Windows nor macOS, so on BOTH of the platforms that
+    actually render episodes this always fell through to
+    `ImageFont.load_default()` -- a ~10px bitmap face that IGNORES the size
+    argument. Scope chrome has therefore been drawing at bitmap size instead of
+    `h // 72` everywhere except Linux, quietly, since it was written.
+
+    Found by BUG-12.159's own regression test the day that rule was added, in a
+    file the original fix had not touched -- which is the whole argument for
+    writing the portable rule rather than only fixing the site that hurt.
+
+    Milder than the `video_engine` case that produced that rule: nothing here
+    MEASURES this font to position anything (no `textbbox`/`textlength` call in
+    this module), so the failure is text that is too small rather than text
+    that is off-frame. It is still wrong, and it was still silent.
+    """
+    global _WARNED_SCOPE_BITMAP
+    size = max(9, h // 72)
+    for name in _SCOPE_FACES.get(sys.platform, _SCOPE_FACES_DEFAULT):
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:  # noqa: BLE001 -- absent face; try the next one
+            pass
+    if not _WARNED_SCOPE_BITMAP:
+        _WARNED_SCOPE_BITMAP = True
+        logging.getLogger("OTR").warning(
+            "OTR: no chrome font found on platform %s -- scope labels fall "
+            "back to PIL's bitmap default, which ignores the requested size "
+            "(%dpx) and will draw them small.", sys.platform, size)
+    return ImageFont.load_default()
 
 
 # --------------------------------------------------------------------------- #
