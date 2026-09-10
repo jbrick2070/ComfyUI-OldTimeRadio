@@ -133,44 +133,126 @@ def test_this_platform_measures_in_the_family_libass_draws():
         "the matching TTF path." % (mono_font(), sys.platform, path))
 
 
-def test_the_family_check_catches_a_liberation_only_linux_host():
-    """The scenario the platform test above CANNOT reach on this machine.
+def _resolve_on(monkeypatch, platform, present):
+    """Run the REAL resolver against a simulated host carrying `present`.
 
-    `_load_font`'s Linux candidates include Liberation Mono, but
-    `_otr_captions._MONO_FALLBACK` names "DejaVu Sans Mono" for every non-Mac,
-    non-Windows host. So a box carrying Liberation and not DejaVu measures in
-    one family while libass is told to draw the other -- the same two-resolver
-    disagreement this whole file exists for, and MORE dangerous than the bug it
-    replaced, because a bitmap fallback at least warns while this one succeeds
-    quietly.
-
-    The live test above cannot see it: it resolves through whatever the real
-    host has, so it passes on macOS (Menlo) and on any Linux box that happens
-    to have DejaVu installed -- which is most of them. That is precisely the
-    gap a reviewer flagged. This test forces the arrangement instead of waiting
-    for a machine that exhibits it, so the check is proven to have teeth before
-    the first AMD/ROCm host ever runs.
-
-    It asserts the DETECTOR works, not that the arrangement is acceptable. The
-    real fix is for the drawing family to be derived from the face that was
-    actually resolved rather than from a parallel hand-maintained map; that
-    crosses a module boundary `_otr_captions` deliberately keeps thin, so it is
-    recorded here rather than smuggled in.
+    Deliberately drives `_find_mono_font_path` itself rather than re-deriving
+    what it ought to pick. An earlier version of this file compared hardcoded
+    strings through a helper of its own and passed green while the shipped
+    candidate list had Arch's Liberation path ahead of Arch's DejaVu path --
+    a reviewer found the defect the test was nominally guarding. A test that
+    re-implements the logic tests the re-implementation.
     """
-    def agrees(family, path):
-        def norm(v):
-            return "".join(ch for ch in v.lower() if ch.isalnum())
-        stem = norm(os.path.splitext(os.path.basename(path))[0])
-        fam = norm(family)
-        return fam.startswith(stem) or stem.startswith(fam)
+    from PIL import ImageFont
 
-    dejavu = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-    liberation = "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
+    import nodes.video_engine as ve
 
-    assert agrees("DejaVu Sans Mono", dejavu), (
-        "the detector must ACCEPT the matched Linux pairing, or it is just a "
-        "test that always fails and proves nothing")
-    assert not agrees("DejaVu Sans Mono", liberation), (
-        "the detector must REJECT a host that measures Liberation Mono while "
-        "the ASS style names DejaVu Sans Mono -- if this ever starts passing, "
-        "the platform test above has gone blind to the mismatch it exists for")
+    have = set(present)
+    monkeypatch.setattr(ve.sys, "platform", platform, raising=False)
+    monkeypatch.setattr(ve.os.path, "isfile", lambda q: q in have)
+
+    class Stub:
+        def __init__(self, path):
+            self.path = path
+
+    def fake_truetype(name, size=10, *a, **k):
+        if name in have:
+            return Stub(name)
+        raise OSError("absent on this simulated host: %r" % (name,))
+
+    monkeypatch.setattr(ImageFont, "truetype", fake_truetype)
+    monkeypatch.setattr(ve, "_FONT_PATH", None, raising=False)
+    monkeypatch.setattr(ve, "_FONT_PATH_RESOLVED", False, raising=False)
+    return ve._find_mono_font_path(96)
+
+
+#: Real package layouts, each taken from the distribution's own file list.
+_DEJAVU = {
+    "debian": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "opensuse": "/usr/share/fonts/truetype/DejaVuSansMono.ttf",
+    "fedora": "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",
+    "arch": "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+}
+_LIBERATION = {
+    "debian": "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+    "fedora": "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
+    "arch": "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
+}
+
+
+@pytest.mark.parametrize("distro", sorted(_LIBERATION))
+def test_dejavu_beats_liberation_when_a_linux_host_has_both(monkeypatch, distro):
+    """THE regression, and it shipped for one commit.
+
+    `_otr_captions._MONO_FALLBACK` names "DejaVu Sans Mono" as the family
+    libass DRAWS with on every non-Mac, non-Windows host. So whenever DejaVu is
+    on the box, the measuring side must resolve DejaVu -- otherwise metrics
+    come from one family and glyphs from another, which is the whole defect
+    class this file exists for.
+
+    Ordering the candidates by DISTRO put Arch's Liberation path ahead of
+    Arch's DejaVu path, so an ordinary Arch box carrying both packages -- not
+    the documented Liberation-only edge case -- measured the wrong family. The
+    list is now grouped by FAMILY, which makes the class unreachable instead of
+    fixing the one pair that happened to be wrong.
+    """
+    picked = _resolve_on(monkeypatch, "linux",
+                         [_DEJAVU[distro], _LIBERATION[distro]])
+    assert picked == _DEJAVU[distro], (
+        "on a %s host carrying BOTH families the resolver chose %r; it must "
+        "choose DejaVu (%r), because that is the family the ASS style names "
+        "and libass will actually draw."
+        % (distro, picked, _DEJAVU[distro]))
+
+
+@pytest.mark.parametrize("distro", sorted(_LIBERATION))
+def test_liberation_is_still_reached_when_it_is_all_the_host_has(monkeypatch,
+                                                                distro):
+    """Grouping by family must not strand a Liberation-only box.
+
+    It is the wrong family and it is still enormously better than the bitmap
+    fallback: Liberation Mono is metric-compatible with DejaVu Sans Mono, while
+    the fallback is off by roughly a factor of ten. Preferring DejaVu must not
+    turn a working host into a broken one.
+    """
+    picked = _resolve_on(monkeypatch, "linux", [_LIBERATION[distro]])
+    assert picked == _LIBERATION[distro], (
+        "a %s host with only Liberation resolved %r instead of falling back to "
+        "it; regrouping the candidates must not strand these hosts on the "
+        "bitmap default." % (distro, picked))
+
+
+def test_debian_ubuntu_resolution_is_unchanged_by_the_regrouping(monkeypatch):
+    """The boxes that already worked must keep working, byte for byte.
+
+    Debian/Ubuntu is the layout the original two-entry list was written for, so
+    it is the one that must be shown unaffected rather than assumed to be.
+    """
+    both = _resolve_on(monkeypatch, "linux",
+                       [_DEJAVU["debian"], _LIBERATION["debian"]])
+    assert both == _DEJAVU["debian"], "DejaVu must still win when both present"
+
+    only_lib = _resolve_on(monkeypatch, "linux", [_LIBERATION["debian"]])
+    assert only_lib == _LIBERATION["debian"], (
+        "a Debian box with only Liberation must still resolve it")
+
+
+def test_windows_and_macos_are_untouched_by_the_linux_regrouping(monkeypatch):
+    """Neither branch shares the Linux list, and that is worth pinning.
+
+    The Windows path is BUILT with `os.path.join`, exactly as the resolver
+    builds it, rather than written out with backslashes. The first draft of
+    this test hardcoded the separator and failed on this Mac, where join emits
+    `C:\\Windows/Fonts/consola.ttf` -- the same "re-implement instead of
+    invoke" mistake this file was just rewritten to stop making.
+    """
+    windir = os.environ.get("WINDIR", r"C:\Windows")
+    win = os.path.join(os.path.join(windir, "Fonts"), "consola.ttf")
+    assert _resolve_on(monkeypatch, "win32", [win]) == win, (
+        "the win32 branch must still resolve consola.ttf; the Linux "
+        "regrouping shares no list with it")
+
+    mac = "/System/Library/Fonts/Menlo.ttc"
+    assert _resolve_on(monkeypatch, "darwin", [mac]) == mac, (
+        "the darwin branch must still resolve Menlo, the family the ASS style "
+        "names for macOS")

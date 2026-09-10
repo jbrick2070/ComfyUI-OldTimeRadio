@@ -144,31 +144,43 @@ def _find_mono_font_path(size):
             "/System/Library/Fonts/Supplemental/Andale Mono.ttf",
         ]
     else:
-        # Debian/Ubuntu FIRST, so a box that already resolved keeps resolving
-        # in exactly the same order -- the rest are appended, never inserted.
-        # They are the same two families under the layouts other distributions
-        # actually use: Fedora, Arch and openSUSE have no `truetype/` level, so
-        # on those hosts this list matched nothing and fell through to the
-        # bitmap default -- the macOS defect documented above, one lane over.
-        # That matters for ROCm/Linux specifically: nothing here has ever run
-        # on it, so the first AMD host would have found it on a published frame.
+        # GROUPED BY FAMILY, DejaVu first -- and the grouping is the point,
+        # not the tidiness. `_otr_captions._MONO_FALLBACK` names
+        # "DejaVu Sans Mono" as the family libass DRAWS with on every non-Mac,
+        # non-Windows host, so whenever DejaVu is present this side must
+        # measure it. Ordering these by DISTRO instead put Arch's Liberation
+        # path ahead of Arch's DejaVu path, and a box carrying BOTH -- an
+        # entirely ordinary Arch install -- then measured Liberation while
+        # libass drew DejaVu. A review caught it; the grouping makes the class
+        # unreachable rather than merely fixing the one pair that was wrong.
         #
-        # Each path below was checked against the distribution's own package
-        # file list rather than recalled: Fedora ships
-        # `dejavu-sans-mono-fonts/` and `liberation-mono-fonts/` (both with the
-        # `-fonts` suffix), Arch's ttf-dejavu ships `TTF/` while its
-        # ttf-liberation ships `liberation/` -- NOT `TTF/`. Two entries here
-        # were wrong on exactly those details and a review caught them; the
-        # bare-name tier would have covered for them, which is precisely why a
-        # wrong path is misinformation rather than a runtime bug.
+        # Debian/Ubuntu behaviour is UNCHANGED by the regrouping. Its DejaVu
+        # path is still tried first, and its Liberation path still wins on a
+        # box that has only Liberation -- it is simply reached later, after
+        # DejaVu layouts that such a box does not have.
+        #
+        # Every path was checked against the distribution's own package file
+        # list rather than recalled, and three separate reviews corrected this
+        # list on exactly that point: Fedora ships `dejavu-sans-mono-fonts/`
+        # and `liberation-mono-fonts/` (both carrying the `-fonts` suffix),
+        # Arch's ttf-dejavu ships `TTF/` while its ttf-liberation ships
+        # `liberation/` -- NOT `TTF/` -- and openSUSE DOES use a `truetype/`
+        # level, contrary to what this comment claimed for one commit.
         candidates = [
+            # DejaVu Sans Mono -- the family the ASS side names. It wins
+            # wherever it exists, on every layout, before any Liberation.
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/truetype/DejaVuSansMono.ttf",
             "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",
             "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+            # Liberation Mono -- metric-compatible, but NOT the family the ASS
+            # side names, so it is the last resort before the bitmap fallback.
+            # Reaching one of these means measure and draw disagree; see the
+            # note in docs/SHIPPING_JSON_RECIPES.md.
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
             "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
             "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
         ]
 
     explicit = (otr_env.get("OTR_VIDEO_FONT") or "").strip()
@@ -200,8 +212,8 @@ def _find_mono_font_path(size):
     # a DejaVu Sans Mono file (no proportional-font risk), and it is what finds
     # `.ttc`/`.otf` variants the `.ttf` spelling misses -- measured here,
     # "Menlo" -> Menlo.ttc and "Courier" -> Courier.ttc.
-    for name in ("DejaVuSansMono.ttf", "LiberationMono-Regular.ttf",
-                 "DejaVuSansMono", "Menlo.ttc", "consola.ttf"):
+    for name in ("DejaVuSansMono.ttf", "DejaVuSansMono",
+                 "LiberationMono-Regular.ttf", "Menlo.ttc", "consola.ttf"):
         try:
             return ImageFont.truetype(name, size).path
         except OSError:
@@ -216,11 +228,12 @@ def _mono_font_path():
     Split out from :func:`_load_font` because that cache is keyed by SIZE and
     the title dock re-measures at every integer size as it shrinks. Resolution
     is size-independent, so doing it per size meant a font-less Linux host paid
-    up to five RECURSIVE `os.walk`s of /usr/share/fonts for each of ~30-60
-    distinct sizes -- hundreds of full directory walks per render, to reach a
-    bitmap fallback it was always going to reach. Finding the FILE once and
-    re-opening it at each size costs one walk, worst case, for the life of the
-    process.
+    up to five RECURSIVE searches for each of ~30-60 distinct sizes -- and each
+    search walks EVERY XDG font root, so on a stock Linux box that is five
+    names x three roots = 15 root walks, repeated per size, to reach a bitmap
+    fallback it was always going to reach. Resolving the FILE once caps the
+    whole process at that single worst-case sweep instead of repeating it:
+    MEASURED over 40 distinct sizes, 200 resolution attempts before, 5 after.
     """
     global _FONT_PATH_RESOLVED, _FONT_PATH
     if not _FONT_PATH_RESOLVED:

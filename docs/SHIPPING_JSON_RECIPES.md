@@ -53,9 +53,14 @@ carrying DejaVu or Liberation now resolves whatever layout it uses.
   container image may carry no fonts at all. Install `dejavu-sans-mono` (or
   `liberation-mono`) if the render logs `no monospace TTF found`, or point
   `OTR_VIDEO_FONT` at a TTF path directly.
-* **If you set `OTR_CAPTION_MONO_FONT`, set `OTR_VIDEO_FONT` to the matching
-  file.** The first changes what libass draws; only the second changes what PIL
-  measures. Setting one alone re-opens exactly the defect above.
+* **The two override variables take DIFFERENT KINDS OF VALUE, and mixing
+  them up silently does nothing.** `OTR_CAPTION_MONO_FONT` takes a FAMILY NAME
+  (`Liberation Mono`), because that is what an ASS `Style:` line carries and
+  libass resolves through fontconfig. `OTR_VIDEO_FONT` takes an absolute FILE
+  PATH (`/usr/share/fonts/.../LiberationMono-Regular.ttf`), because PIL opens
+  files and does not resolve bare family names reliably. Set one and not the
+  other and measure/draw disagree again -- set both, each in its own form, or
+  neither.
 * **Prefer DejaVu over Liberation on Linux, and it is not a style preference.**
   The ASS side names `DejaVu Sans Mono` for every non-Mac, non-Windows host,
   while the measuring side will accept Liberation Mono if that is what it
@@ -63,7 +68,9 @@ carrying DejaVu or Liberation now resolves whatever layout it uses.
   -- quietly, with no warning, because both halves individually succeed. The
   standing fix is for the drawn family to be derived from the face actually
   resolved instead of a parallel hand-kept map; until that lands, install
-  DejaVu or set both env vars to the same file.
+  DejaVu (the candidate list now prefers it over Liberation on every layout),
+  or set both variables at once -- the family name in `OTR_CAPTION_MONO_FONT`
+  and the matching file path in `OTR_VIDEO_FONT`.
 
 **AMD/Linux is the lane most exposed to this**, for the same reason its whole
 column is 0-of-68: no one has ever run it, so nothing has forced the question.
