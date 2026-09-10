@@ -6,15 +6,16 @@ The authoritative post-handoff sha is the one in the kickoff line, read after
 the push.
 
 **PRE-FLIGHT, stated plainly because one of them is not clean:**
-1. **A BACKGROUND RENDER IS STILL RUNNING.** `lightning_mac_proof_3`, submitted
-   ~19:0x, ~25 min in of an expected ~2.5 h. The operator asked for the handoff
-   with it deliberately left running. It is NOT killed; see IN FLIGHT below.
+1. **No background tasks running.** `lightning_mac_proof_3` was in flight when
+   this entry was first written and has since LANDED -- RESULT SUCCESS,
+   obs_publish OK. See the section below for the receipt.
 2. **Suite: 151 failing of 14,137 in a full run; all 151 PASS when run
    individually.** Order dependence, and it reproduces byte-identically ten
    commits back -- pre-existing, not this session. **Bible: NOT RUN** -- the
    survival-guide repo is not checked out on this rented Mac.
-3. **Box: ComfyUI server RESIDENT on :8188** (pid 39606), memory ~20% free while
-   the writer loads. The next window inherits a busy box.
+3. **Box: CLEAN at handoff.** The render finished (see below), the ComfyUI
+   server on :8188 was stopped, and nothing is resident. The next window
+   inherits an idle machine and must boot its own server.
 
 Did: Turned `docs/DROPDOWN_MATRIX.md` from reasoning into receipts and closed
 every open Mac gap by measurement. Reconciled the Mac column against all seven
