@@ -1,3 +1,75 @@
+## 2026-09-09 (late night; UTC 2026-09-10) -- base 7eb90476 -> row 2.2 allocation built; CUDA publication proof still open
+
+**CODER window.** GPT-6 Astra drove in the model ladder's rung 5 coder/sole-judge
+role; the historical table names Opus, so this is an explicit role mapping.
+One rung 2 local CLI review: `agy`, exit 0, **NO BLOCKERS**; the lane
+self-reported Gemini 3.8 Flash (High). No arc (section 0 explicitly rules
+row 2.2 NO ARC), no second reviewer. Driver grounding and raw review are in
+`docs/2026-09-10-ghost-pool/`.
+
+**What changed.** The finalized-prompt duplicate key already shipped in
+`a8e4d5a6` / `27123086`; this window did not rebuild it from the stale queue
+instructions. The remaining fallback still died after all 18 clauses were
+spent. A 40-beat same-mode reproducer failed before and now completes with
+22 explicit reuse receipts. Allocation keeps the seed/beat probe order while
+prompts are unused, then selects the least-recent eligible signature. Replay
+contributes at its original ordinal, and both immediate replay neighbors are
+excluded. Each fresh fallback beat appends its allocation disposition to its
+original model-failure reason. No stored field or hash version changed.
+
+**Measured limits.** The key is the v2 ADMISSION prompt; v3 intentionally
+composes different text. This change prevents allocation exhaustion and does
+not establish different rendered pixels. Three short seeded allocations and
+the non-Ghost ShotLock plan compare byte-identically before/after (raw JSON
+snapshots retained). The canonical workflow is byte-identical, SHA256
+`9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2`.
+No physical Windows/5080 render was run, no profile or recipe changed, and the
+5080 daily loop and stopped pod were untouched.
+
+**Verification.** Focused: **162 passed, 1 skipped**. Final whole-suite walk in
+the controlled Mac envelope: **13,661 passed, 142 failed, 358 skipped,
+1 xfailed; 3 explicitly deselected** (JUnit includes the collection skip).
+The baseline was 13,648 passed / 143 failed with the same skip envelope.
+**Zero new failing nodeids.** The only baseline failure absent afterward is
+`test_bars_layer_paints_green_in_bottom_strip`, whose generated pink-noise
+input is unseeded; none of its code changed, so this is not claimed as a fix.
+The suite exits 2 under the existing known-fail guard and is NOT described
+as green. Bug Bible standalone: **23 passed / 27 skipped / 3 xfailed**.
+Against OTR: **10 failed / 29 passed / 11 skipped / 3 xfailed**, the exact same
+10 failures before and after. No new live production bug was admitted and no
+new Bible entry was invented from the synthetic exhaustion fixture.
+
+**The Mac suite must be isolated from its real model cache.** The first
+baseline launched a real Bark audition from a test expecting unavailable
+Windows evidence; its child and the suite were stopped. An offline-only
+restart reached about 11.4 GB RSS near the cameo resolver tests and was also
+stopped. The completed baseline and final run use empty model/cache roots,
+model-network access disabled, and three deselections from
+`test_audition_overwrite_guards.py`. Exact env, deselections, raw-log hashes,
+and failure sets are in `test_comparison.json`. Do not repeat a plain full
+suite against the Mac's populated model cache. Production configuration was
+not changed. The installed pack is a SEPARATE COPY: both touched production
+files were verified against their old HEAD, copied across, and their bytecode
+removed. The final suite ran only after this sync; its installed-pack guard
+passes.
+
+**Next, in the stated order:** the row 2.2 **five-act canonical forced-Ghost
+CUDA leg**, requiring `RESULT SUCCESS`, `obs_publish OK`, and the actual file
+in `otr/obs/`. The real `otr_mac_mps` profile returns **requires_cuda** for
+both ghost-authoring lanes; receipt is `live_gate.json`. No live leg was run,
+no new episode is claimed, and the row is not closed. This window has no
+connected CUDA host. Do not skip to a later design row or expand the Mac's
+admitted lanes as a workaround. The registry and device promotions stay
+untouched. GO_FORWARD now has a working HOW TO READ THIS FILE pointer;
+finished build directions are archived verbatim, and related open diagnostics
+remain in the plan.
+
+**Box at handoff:** suite and reviewer complete; no ComfyUI server or render
+resident. This entry and the coding change ship together; the final response
+cites the resulting commit after push and verifies HEAD == origin/v2.0-alpha.
+
+---
+
 ## 2026-09-09 (late evening) -- HEAD 765b9e9a +handoff (v2.0-alpha) -- MAC (rented M4) -- title cards had been publishing off-frame on macOS, and the tests could not see it
 
 **THE SHA ABOVE IS THE LAST CODE HEAD.** This handoff is a SINGLE commit, so it

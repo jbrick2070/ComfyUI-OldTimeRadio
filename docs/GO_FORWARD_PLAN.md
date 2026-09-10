@@ -9,6 +9,14 @@ only reports something already shipped, move it to the archive -- do not delete 
 roughly a third of these paragraphs carry an operator RULING and losing one costs far more
 than the length does.
 
+## HOW TO READ THIS FILE
+
+Read `CLAUDE.md` (especially the 2026-09-07 one-CLI-review rule), then
+`docs/OTR_STANDING_RULINGS.md` for the MODEL & CREDIT BUDGET ladder and window
+packing. **THE QUEUE is section 0, THE ATTACK ORDER**; stable row numbers are
+identities, not a second ordering. Read the newest `docs/HANDOFF_LOG.md` entry
+for measured state. The archive holds receipts, not instructions to execute.
+
 **THE ORDER BELOW IS BY DEPENDENCY, and it is the operator's (2026-09-04, late):** *"I really
 want to get the registry thing fixed, but no sense in fixing it if bug fixes will break it --
 get all the easy code items done first, then the registry, then testing"* -- and, on second
@@ -72,18 +80,22 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-09 late evening, rented Mac M4):** `v2.0-alpha`, HEAD == origin.
-Suite **151 failing of 14,137 in a FULL run, and all 151 PASS individually** --
-order dependence, reproduces identically ten commits back, so it is pre-existing
-and not any recent session's doing. **Bug Bible NOW RUNS ON THIS MAC** -- the
-survival-guide repo is checked out at
-`~/Documents/comfyui-custom-node-survival-guide` (operator supplied the URL
-2026-09-09; remote switched to SSH, which is what the OTR repo already uses).
-Baseline standalone: **23 passed, 27 skipped, 3 xfailed, 338 entries.** Against
-`--pack-dir` this repo: **10 failed, 29 passed** -- those 10 are PRE-EXISTING on
-a Mac checkout and were 12 before this session; measure against 10, not 0.
-**Box: CLEAN.** Port 8188 clear, no ComfyUI process, no background task running.
-**Read section 0 (THE ATTACK ORDER) before picking a row.**
+**State (2026-09-09 late night, rented Mac M4; UTC 2026-09-10):**
+`v2.0-alpha`; latest receipts are at the top of `docs/HANDOFF_LOG.md`.
+The required five-act forced-Ghost proof needs a CUDA host; row 2.2 remains
+first. **Use the measured test envelope, not the old "151 all pass alone"
+claim:** the controlled Mac baseline has 143 failures, the final run 142,
+with no new failing nodeids. Empty model/cache roots, offline model access,
+and three explicitly deselected audition tests are required on this host to
+avoid loading real models from a nominal unit run. Exact settings and failure
+sets: `docs/2026-09-10-ghost-pool/test_comparison.json`.
+Bug Bible is available at `~/Documents/comfyui-custom-node-survival-guide`:
+standalone 23 passed / 27 skipped / 3 xfailed; against OTR 10 failed /
+29 passed / 11 skipped / 3 xfailed, identical failing nodeids before and after.
+**Box clean:** no renderer or server is resident. Read section 0 before
+picking a row; no registry publish or device promotion is authorized by this
+handoff.
+
 
 > **The registry paragraphs immediately below are STALE and were not rewritten
 > from this Mac.** They reason about `2.0.0-alpha.19/.20/.21` as the frontier
@@ -483,7 +495,7 @@ their stable row ids; this is the ORDER through them, and two rows are struck ou
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **2.2 GHOST POOL** | The only open row that changes what lands in `otr/obs/` tomorrow, and the defect is CONFIRMED LIVE: a canonical leg with the ghost lane forced on rejected the batch on both attempts and cost that episode all 18 authored prompts. It owes a five-act GPU leg -- start the leg first, not last. |
+| **1st** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
 * **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
@@ -524,15 +536,9 @@ accepted ledger malformed and fails closed. The stored object already carries `m
 makes "applied identically to writer output, replay and the deterministic path"
 achievable in one commit.
 
-**AND THE FIRST CONCRETE STEP OF 2.2 IS RESTRUCTURING, NOT PLUMBING.** The gate is
-`_ghost_validate_batch` in `nodes/otr_shot_lock.py`; it keys `seen` on `leaf.casefold()`
-and seeds `already_used` from `drawable_beat` values -- leaves, not prompts, which is half
-the defect. The finalized prompt is ALREADY computed and thrown away: `candidate_fits`
-(`ghost_signal_author.py`) calls `finalize_ghost_prompt_v2` and discards `final` except
-for its token count, and `_ghost_validate_batch` already calls `candidate_fits` with
-exactly those arguments. So: return `final` alongside `(ok, reason)`, move the
-`candidate_fits` call above the uniqueness check, key `seen` on the finalized prompt, and
-seed `already_used` with recomposed prompts.
+**The next concrete step is the five-act CUDA proof in row 2.2.**
+The build specification and superseded plumbing directions are archived;
+do not add a new field or redirect the v3 renderer to the v2 admission key.
 
 ---
 
@@ -543,20 +549,31 @@ an env read or a spawn fails the suite, so this is exactly the work that must la
 the publish and cannot move the findings once it does. Story quality is DONE and is not
 reopened (operator 2026-08-04); these are CORRECTNESS defects.
 
-### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
+### 2.2 GHOST POOL -- five-act CUDA publication proof still owed
 
-**THE DEFECT IS CONFIRMED LIVE.** A canonical three-act leg with the ghost lane
-forced on (`OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`) was rejected on
-BOTH attempts for repeated leaves and lost all 18 authored prompts to deterministic
-clauses. Receipt in `docs/HANDOFF_LOG.md`.
+**Next action:** run the five-act topology from `workflows/otr_canonical.json`
+on a CUDA proving host with
+`OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`. Inspect the route-freeze
+receipt to confirm the forced lane actually ran. A plain canonical `still_flat`
+leg authors zero ghost beats and cannot prove this row.
 
-**WHY NOTHING ELSE WAS COVERING IT, and this decides how to test the fix:** only two
-of the 33 registered engines author ghost prompts -- `animatediff15_v3_haunted_video`
-and `animatediff15_v3_stillin_lab_video`, selected by
-`prompt_profile == "ghost_signal_v1"` -- and the daily rotation loop deliberately
-skips AnimateDiff. The shipped canonical graph runs `still_flat` on every video role
-and authors ZERO ghost beats. **A plain canonical leg cannot prove this row. Force
-the lane.**
+**DONE WHEN:** `RESULT SUCCESS`, `obs_publish OK`, and the final file exists in
+`otr/obs/`; inspect every stored `ghost_prompt`, its per-beat fallback reason,
+and the admission-signature sequence, including any reuse after exhaustion.
+Keep the original model-failure reason when checking the allocation disposition.
+
+**Hardware gate:** the real `otr_mac_mps` profile returns `requires_cuda` for
+both ghost-authoring lanes (`animatediff15_v3_haunted_video` and
+`animatediff15_v3_stillin_lab_video`). The rented Mac cannot close this gate
+through an admitted profile. The 5080 daily loop stays untouched and the pod
+stays stopped. Continue here when a CUDA proving host is accessible.
+
+**Constraints for the proof:** no new stored fields, no motif rewriting,
+no act-scoped uniqueness, no combinatorial generator, no content-validator
+changes. Frozen replay rows keep their original objects and reasons. The key
+is the finalized v2 ADMISSION prompt; v3 intentionally composes other text,
+so admission uniqueness does not establish pixel variety. The viewer threshold
+question remains a frame inspection, not another reasoning pass.
 
 **THREE OTHER CAUSES KILL MORE ARCHIVED BEATS THAN THIS ONE, and they are not this
 row.** Measured over the 27 ledgers carrying `ghost_prompt` objects, 127 of 263 beats
@@ -569,21 +586,9 @@ real bug; do not fix it on a hunch.** Truncation is the tempting theory and the
 evidence argues against it: the budget is `64 + 48 * shots` and `Expecting ','
 delimiter` is a structural break, not a cut-off.
 
-**Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
-
-- **Build:** key uniqueness on the FINALIZED POSITIVE PROMPT, applied identically to writer output, replay and the deterministic path (capacity becomes clauses x motifs).
-- **Build:** a bounded progression, total by construction -- unused finalized prompt -> reuse a leaf where a different motif keeps the prompt new -> reuse the least-recent signature, deterministic on `episode_seed + beat_id`, never adjacent.
-- **Build:** the allocator appends a PER-BEAT reuse disposition to that beat's existing `fallback_reason`. ShotLock stamps one batch-wide reason today, which would erase the original model-failure reason.
-- **Build:** only pool exhaustion becomes recoverable. The ten `GhostAuthorError` raise sites (unknown mode, missing bookend motif, invalid role, empty `motif_cue`) are structural corruption and stay loud.
-- **Shared code:** measure both boxes before pushing (CLAUDE.md 0B).
-
-**CUT, so nobody rebuilds them:** the combinatorial generator, act-scoped uniqueness (no authoritative act field exists), and "loud handover" (controlled reuse under a second name).
-
-**DONE WHEN:** >18 same-mode beats complete; mixed replay plus fresh authoring completes; all three paths share the invariant; adjacent finalized prompts never repeat; same seed gives identical output AND receipts; every beat keeps a valid `ghost_prompt`; then the failing five-act topology through `workflows/otr_canonical.json` with `obs_publish OK` and the file on disk.
-
-The tests that encode the obsolete absolute-leaf rule (`test_ghost_prompt_v2_lane.py:399-405, 437-451`; `test_ghost_signal_author.py:925-931`) are REPLACED with the new invariant, not deleted.
-
-**Open question:** whether "no adjacent repeat" is the right viewer threshold -- check it against frames rather than more reasoning.
+Build/review/test receipts and the original specification are in
+`docs/2026-09-10-ghost-pool/` and `docs/GO_FORWARD_ARCHIVE.md`; do not rebuild
+from the superseded leaf-key plumbing directions in the archive.
 
 ### 2.4 OPEN DEFECTS THAT ARE CODING WORK (queue item 3c; a leg may prove some later, none needs a leg to FIX)
 

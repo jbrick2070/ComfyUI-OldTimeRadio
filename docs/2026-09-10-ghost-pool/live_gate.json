@@ -1,0 +1,8 @@
+{
+  "profile": "otr_mac_mps",
+  "backend": "mps",
+  "lanes": {
+    "animatediff15_v3_haunted_video": "requires_cuda",
+    "animatediff15_v3_stillin_lab_video": "requires_cuda"
+  }
+}

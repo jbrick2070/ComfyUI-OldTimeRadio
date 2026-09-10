@@ -6097,3 +6097,61 @@ not fail the episode."* It does.
    output -- the determinism change is guarded on `torch.backends.mps.is_available()`
    and the ffmpeg/ffprobe steps resolve last -- but that is an argument, and the
    goldens are the measurement.
+
+
+## Archived 2026-09-10 -- row 2.2 build specification and superseded plumbing directions
+
+Verbatim source below. Build receipts: `docs/2026-09-10-ghost-pool/`. The live five-act CUDA publication gate remains open in GO_FORWARD.
+
+**AND THE FIRST CONCRETE STEP OF 2.2 IS RESTRUCTURING, NOT PLUMBING.** The gate is
+`_ghost_validate_batch` in `nodes/otr_shot_lock.py`; it keys `seen` on `leaf.casefold()`
+and seeds `already_used` from `drawable_beat` values -- leaves, not prompts, which is half
+the defect. The finalized prompt is ALREADY computed and thrown away: `candidate_fits`
+(`ghost_signal_author.py`) calls `finalize_ghost_prompt_v2` and discards `final` except
+for its token count, and `_ghost_validate_batch` already calls `candidate_fits` with
+exactly those arguments. So: return `final` alongside `(ok, reason)`, move the
+`candidate_fits` call above the uniqueness check, key `seen` on the finalized prompt, and
+seed `already_used` with recomposed prompts.
+
+
+### 2.2 GHOST POOL -- uniqueness on the finalized prompt (queue item 3b; r1 is in, build)
+
+**THE DEFECT IS CONFIRMED LIVE.** A canonical three-act leg with the ghost lane
+forced on (`OTR_FORCE_ENGINE_MAP=*=animatediff15_v3_haunted_video`) was rejected on
+BOTH attempts for repeated leaves and lost all 18 authored prompts to deterministic
+clauses. Receipt in `docs/HANDOFF_LOG.md`.
+
+**WHY NOTHING ELSE WAS COVERING IT, and this decides how to test the fix:** only two
+of the 33 registered engines author ghost prompts -- `animatediff15_v3_haunted_video`
+and `animatediff15_v3_stillin_lab_video`, selected by
+`prompt_profile == "ghost_signal_v1"` -- and the daily rotation loop deliberately
+skips AnimateDiff. The shipped canonical graph runs `still_flat` on every video role
+and authors ZERO ghost beats. **A plain canonical leg cannot prove this row. Force
+the lane.**
+
+**THREE OTHER CAUSES KILL MORE ARCHIVED BEATS THAN THIS ONE, and they are not this
+row.** Measured over the 27 ledgers carrying `ghost_prompt` objects, 127 of 263 beats
+fell to `deterministic_fallback`: 29 on "requests a person in object mode", 28 on
+"names a texture instead of a thing", 21 on a JSON parse failure. The two content
+validators want their own row and their own arc. **The JSON one is now DIAGNOSABLE
+rather than fixed, deliberately -- `_decode_excerpt` puts the text around the failure
+into that beat's `fallback_reason`. Read the next occurrence off a ledger and fix the
+real bug; do not fix it on a hunch.** Truncation is the tempting theory and the
+evidence argues against it: the budget is `64 + 48 * shots` and `Expecting ','
+delimiter` is a structural break, not a cut-off.
+
+**Root cause (why this matters):** the pool is not too small, the duplicate check is. Four slots (`GHOST_V2_SLOTS`) make the picture; the check reads one leaf (`key = leaf.casefold()` in `nodes/otr_shot_lock.py`), so two beats with the same leaf and different characters are rejected although they render different pictures. Growing the pool cannot fix this.
+
+- **Build:** key uniqueness on the FINALIZED POSITIVE PROMPT, applied identically to writer output, replay and the deterministic path (capacity becomes clauses x motifs).
+- **Build:** a bounded progression, total by construction -- unused finalized prompt -> reuse a leaf where a different motif keeps the prompt new -> reuse the least-recent signature, deterministic on `episode_seed + beat_id`, never adjacent.
+- **Build:** the allocator appends a PER-BEAT reuse disposition to that beat's existing `fallback_reason`. ShotLock stamps one batch-wide reason today, which would erase the original model-failure reason.
+- **Build:** only pool exhaustion becomes recoverable. The ten `GhostAuthorError` raise sites (unknown mode, missing bookend motif, invalid role, empty `motif_cue`) are structural corruption and stay loud.
+- **Shared code:** measure both boxes before pushing (CLAUDE.md 0B).
+
+**CUT, so nobody rebuilds them:** the combinatorial generator, act-scoped uniqueness (no authoritative act field exists), and "loud handover" (controlled reuse under a second name).
+
+**DONE WHEN:** >18 same-mode beats complete; mixed replay plus fresh authoring completes; all three paths share the invariant; adjacent finalized prompts never repeat; same seed gives identical output AND receipts; every beat keeps a valid `ghost_prompt`; then the failing five-act topology through `workflows/otr_canonical.json` with `obs_publish OK` and the file on disk.
+
+The tests that encode the obsolete absolute-leaf rule (`test_ghost_prompt_v2_lane.py:399-405, 437-451`; `test_ghost_signal_author.py:925-931`) are REPLACED with the new invariant, not deleted.
+
+**Open question:** whether "no adjacent repeat" is the right viewer threshold -- check it against frames rather than more reasoning.

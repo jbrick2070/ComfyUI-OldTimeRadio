@@ -1,0 +1,33 @@
+{
+  "7": {
+    "g000": "a warm light finds it in the dark studio",
+    "g001": "it lights from cold to warm on the studio desk",
+    "g002": "it tilts on the table as a shadow crosses it",
+    "g003": "a figure steps back until the dark takes the edges",
+    "g004": "light pulses over it once and holds steady",
+    "g005": "a figure steps forward across a bare wooden floor",
+    "g006": "the light slides off it and the studio goes dark",
+    "g007": "it dims slowly and the highlight leaves its edge"
+  },
+  "999999": {
+    "g000": "a warm light finds it in the dark studio",
+    "g001": "it lights from cold to warm on the studio desk",
+    "g002": "a figure draws a coat closed and stands very still",
+    "g003": "it tilts on the table as a shadow crosses it",
+    "g004": "a figure lowers a hand to the table and leaves it there",
+    "g005": "a pale wash finds it and spreads to the wall",
+    "g006": "the light slides off it and the studio goes dark",
+    "g007": "it dims slowly and the highlight leaves its edge"
+  },
+  "1013426535": {
+    "g000": "it lights from cold to warm on the studio desk",
+    "g001": "a warm light finds it in the dark studio",
+    "g002": "a figure leans over a table and goes still",
+    "g003": "it lies on its side while the light narrows",
+    "g004": "a figure turns away and walks into the dark",
+    "g005": "a hard edge of light cuts across it",
+    "g006": "it dims slowly and the highlight leaves its edge",
+    "g007": "the light slides off it and the studio goes dark"
+  },
+  "non_ghost": "9b8fe522884c33abc536db0eb029bf63c1550c36950e4f6705cadd116c022e44"
+}

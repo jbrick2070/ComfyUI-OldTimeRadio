@@ -951,15 +951,8 @@ def test_the_validator_contract_rides_the_template_hash():
     assert gsa._template_identity() == before
 
 
-def test_an_exhausted_fallback_pool_raises_instead_of_duplicating():
-    """The authored path forbids duplicate pictures; the deterministic path used
-    to ship one silently once its six-clause pool ran out.
-
-    Exhaustion is now measured in SIGNATURE space: the pool is spent only when
-    every clause finalizes to a prompt this beat has already used. Feeding the
-    raw leaves would no longer exhaust anything, which is the whole point of the
-    change -- so the test spends the pool the way the allocator really does.
-    """
+def test_an_exhausted_fallback_pool_reuses_the_least_recent_prompt():
+    """Exhaustion changes the allocation disposition, never kills a beat."""
     spec = _spec(mode="object")
     pool = gsa.GHOST_FALLBACK_CLAUSES["object"]
     spent = [gsa.ghost_prompt_signature(
@@ -967,9 +960,17 @@ def test_an_exhausted_fallback_pool_raises_instead_of_duplicating():
         motif_cue=spec["motif_cue"], drawable_beat=leaf,
         ledger_meta=_DET_META) for leaf in pool]
     assert all(spent), "a clause that cannot finalize would not spend the pool"
-    with pytest.raises(gsa.GhostAuthorError, match="exhausted"):
-        gsa.deterministic_leaf(spec, episode_seed=7, style=STYLE,
-                               ledger_meta=_DET_META, used=spent, total=1)
+    receipt = {}
+    leaf = gsa.deterministic_leaf(
+        spec, episode_seed=7, style=STYLE, ledger_meta=_DET_META,
+        used=spent, total=1, reuse_dispositions=receipt)
+    assert leaf == pool[0]
+    assert "reused least-recent" in receipt[spec["id"]]
+    # Repeating the oldest signature makes it newest, not oldest.
+    leaf = gsa.deterministic_leaf(
+        spec, episode_seed=7, style=STYLE, ledger_meta=_DET_META,
+        used=spent + [spent[0]], total=1)
+    assert leaf == pool[1]
 
 
 def test_a_collision_reason_never_claims_the_leaves_are_the_same():
@@ -1049,3 +1050,78 @@ def test_the_motif_article_agrees_with_a_vowel_silhouette():
     comp = dict(comp, silhouette="angular restless")
     motif = gsa.motif_for_character(comp, "figure", seed_int=comp["seed_int"])
     assert motif.startswith("an angular"), motif
+
+
+def _long_specs(mode, count=60, motifs=None):
+    motifs = motifs or ["a lean figure" if mode == "figure" else "a brass key"]
+    return gsa.build_ghost_author_specs([
+        {"beat_id": "b%03d" % i, "role": "character_video", "mode": mode,
+         "motif_cue": motifs[i % len(motifs)]}
+        for i in range(count)
+    ], model_id="m/x")
+
+
+@pytest.mark.parametrize("mode", gsa.GHOST_MODES)
+@pytest.mark.parametrize("seed", [7, 1013426535])
+def test_sixty_same_mode_beats_cycle_without_adjacent_repeats(mode, seed):
+    specs = _long_specs(mode)
+    dispositions = {}
+    batch = gsa.deterministic_batch(
+        specs, episode_seed=seed, style=STYLE, ledger_meta=_DET_META,
+        reuse_dispositions=dispositions)
+    sigs = _signatures(specs, batch)
+    capacity = len(gsa.GHOST_FALLBACK_CLAUSES[mode])
+    assert len(batch) == len(specs) == 60
+    assert len(set(sigs[:capacity])) == capacity
+    assert all(a != b for a, b in zip(sigs, sigs[1:]))
+    # Once spent, each prompt is reused in true least-recent order.
+    assert sigs[capacity:] == sigs[:-capacity]
+    assert sum("reused least-recent" in r for r in dispositions.values()) == 60 - capacity
+    for spec in specs:
+        obj = gsa.build_ghost_prompt_object(
+            spec, batch[spec["id"]], source="deterministic_fallback",
+            fallback_reason="model failure; " + dispositions[spec["id"]])
+        assert set(obj) == set(gsa.GHOST_PROMPT_FIELDS)
+        gsa.validate_ghost_prompt_object(obj)
+    again = {}
+    assert gsa.deterministic_batch(
+        specs, episode_seed=seed, style=STYLE, ledger_meta=_DET_META,
+        reuse_dispositions=again) == batch
+    assert again == dispositions
+
+
+def test_reusing_a_leaf_under_another_motif_keeps_the_prompt_unused():
+    specs = _long_specs("object", 36, ["a brass key", "a porcelain cup"])
+    dispositions = {}
+    batch = gsa.deterministic_batch(
+        specs, episode_seed=7, style=STYLE, ledger_meta=_DET_META,
+        reuse_dispositions=dispositions)
+    assert len(set(batch.values())) == 18
+    assert len(set(_signatures(specs, batch))) == 36
+    assert set(dispositions.values()) == {"pool: unused finalized prompt"}
+
+
+def test_exhausted_pool_excludes_the_next_frozen_replay_prompt():
+    specs = _long_specs("object", 40)
+    whole = _det_batch(specs, 7)
+    sigs = _signatures(specs, whole)
+    # Every signature has been used. Ordinal 18 would reuse signature 0, but
+    # freeze that signature at 19: allocation must also exclude the NEXT row.
+    fixed = {i: sig for i, sig in enumerate(sigs) if i != 18}
+    fixed[19] = sigs[0]
+    batch = gsa.deterministic_batch(
+        [specs[18]], episode_seed=7, style=STYLE, ledger_meta=_DET_META,
+        replayed_signatures=fixed)
+    chosen = _signatures([specs[18]], batch)[0]
+    assert chosen == sigs[1]  # true LRU, excluding both neighboring rows
+    assert chosen not in (fixed[17], fixed[19])
+
+
+def test_a_broken_pool_cannot_hide_an_impossible_adjacency(monkeypatch):
+    spec = _spec()
+    leaf = gsa.GHOST_FALLBACK_CLAUSES["object"][0]
+    sig = _signatures([spec], {spec["id"]: leaf})[0]
+    monkeypatch.setitem(gsa.GHOST_FALLBACK_CLAUSES, "object", (leaf,))
+    with pytest.raises(gsa.GhostAuthorError, match="no nonadjacent"):
+        gsa.deterministic_leaf(spec, episode_seed=7, style=STYLE,
+                               ledger_meta=_DET_META, used=[sig])

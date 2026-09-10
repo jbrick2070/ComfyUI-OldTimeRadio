@@ -1135,25 +1135,30 @@ def _bookend_phase(beat_id, ordinal, total) -> str:
 
 
 def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
-                       used=(), total=0) -> str:
-    """One complete checked-in clause for a spec, unique within the batch.
+                       used=(), total=0, reserved=(), avoid=(),
+                       reuse_dispositions=None) -> str:
+    """Prefer an unused admission prompt, then reuse the least-recent one.
 
-    Deterministic collision PROBING rather than modulo-and-hope: two beats in
-    the same mode would otherwise land on the same clause about one time in
-    six, and an episode that says the same sentence twice is exactly the
-    repetition this sprint exists to remove.
+    ``used`` is chronological signature history, not a set or a list of leaves.
+    A different motif can make a reused leaf a NEW prompt. ``reserved`` holds
+    frozen replay signatures, including future rows; they have priority over
+    fresh allocation but do not count as past uses. ``avoid`` names adjacent
+    frozen rows; the last history entry is also always excluded.
 
-    ``used`` CARRIES SIGNATURES, NOT LEAVES (2026-09-05). Two beats may share a
-    leaf when their motifs differ, because the picture is made of four slots and
-    the leaf is one of them -- see `ghost_prompt_signature`. Deduping on the
-    leaf rejected beats that render differently and cost a whole leg its
-    authored prompts. ``style`` and ``ledger_meta`` are required because a
-    signature cannot be computed without them.
+    The existing episode-seed/beat-id probe order breaks ties. Dispositions are
+    returned separately for ShotLock to append to fallback_reason, never as a
+    new field on the exact-schema ghost object. Only exhaustion is recoverable;
+    an invalid spec or a pool with no nonadjacent choice still fails loudly.
     """
     mode = str(spec.get("mode") or "")
     role = normalize_role(spec.get("role"))
     ordinal = int(spec.get("ordinal") or 0)
-    spent = {str(u) for u in used if str(u)}
+    history = [str(u) for u in used if str(u)]
+    spent = set(history) | {str(u) for u in reserved if str(u)}
+    forbidden = {str(u) for u in avoid if str(u)}
+    if history:
+        forbidden.add(history[-1])
+    candidates = []
 
     def _signature(candidate):
         return ghost_prompt_signature(
@@ -1162,17 +1167,24 @@ def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
             ledger_meta=ledger_meta)
 
     def _free(candidate):
-        # An uncomputable signature has no opinion -- the candidate is taken as
-        # unique and the fit check reports the real error. Silently skipping it
-        # here would spend the pool on a composer defect.
         sig = _signature(candidate)
-        return (not sig) or sig not in spent
+        if not sig:
+            raise GhostAuthorError(
+                "deterministic Ghost clause cannot compose for %s"
+                % spec.get("beat_id"))
+        candidates.append((candidate, sig))
+        return sig not in spent and sig not in forbidden
+
+    def _record(candidate, disposition):
+        if reuse_dispositions is not None:
+            reuse_dispositions[spec["id"]] = disposition
+        return candidate
 
     if role != "character_video":
         phase = _bookend_phase(spec.get("beat_id"), ordinal, total)
         candidate = GHOST_FALLBACK_BOOKENDS.get((phase, mode), "")
         if candidate and _free(candidate):
-            return candidate
+            return _record(candidate, "pool: unused finalized prompt")
     pool = GHOST_FALLBACK_CLAUSES.get(mode) or ()
     if not pool:
         raise GhostAuthorError(
@@ -1182,31 +1194,42 @@ def deterministic_leaf(spec, *, episode_seed, style, ledger_meta,
     for step in range(len(pool)):
         candidate = pool[(start + step) % len(pool)]
         if _free(candidate):
-            return candidate
-    raise GhostAuthorError(
-        "the %s fallback pool is exhausted: %d clauses, every one of which "
-        "finalizes to a prompt already used in this episode. The authored path "
-        "forbids duplicate prompts, so the deterministic path may not quietly "
-        "ship one -- widen the pool." % (mode, len(pool)))
+            return _record(candidate, "pool: unused finalized prompt")
+    eligible = [(leaf, sig) for leaf, sig in candidates if sig not in forbidden]
+    if not eligible:
+        raise GhostAuthorError(
+            "the %s Ghost clause pool has no nonadjacent finalized prompt; "
+            "check the pool and composer constants" % mode)
+    last_used = {sig: i for i, sig in enumerate(history)}
+    leaf, _sig = min(eligible, key=lambda item: last_used.get(item[1], -1))
+    return _record(leaf, "pool: reused least-recent finalized prompt; "
+                         "adjacent prompts excluded")
 
 
 def deterministic_batch(specs, *, episode_seed, style, ledger_meta,
-                        already_used=()) -> dict:
+                        already_used=(), replayed_signatures=None,
+                        reuse_dispositions=None) -> dict:
     """``{opaque_id: leaf}`` -- a complete batch, never a partial salvage.
 
-    ``already_used`` carries SIGNATURES decided elsewhere in the SAME episode --
-    replayed rows, typically. Without it a mixed episode could hand two beats
-    the same picture, because each call would probe for collisions only against
-    its own subset, and an episode that shows the same frame twice is the
-    repetition this sprint exists to remove.
+    ``already_used`` is a chronological prefix. Interleaved replay belongs in
+    ``replayed_signatures`` (original ordinal -> signature), so both neighbors
+    of a fresh row are protected and least-recent means episode order.
     """
     out = {}
     used = [str(sig) for sig in (already_used or ()) if str(sig)]
-    total = len(specs or ())
-    for spec in specs or ():
+    fixed = dict(replayed_signatures or {})
+    pending = {spec["ordinal"]: spec for spec in (specs or ())}
+    total = max((*pending, *fixed), default=-1) + 1
+    for ordinal in sorted(set(pending) | set(fixed)):
+        if ordinal in fixed:
+            used.append(fixed[ordinal])
+            continue
+        spec = pending[ordinal]
         leaf = deterministic_leaf(spec, episode_seed=episode_seed, style=style,
                                   ledger_meta=ledger_meta, used=used,
-                                  total=total)
+                                  total=total, reserved=fixed.values(),
+                                  avoid=(fixed.get(ordinal + 1, ""),),
+                                  reuse_dispositions=reuse_dispositions)
         sig = ghost_prompt_signature(
             role=spec.get("role"), style=style, mode=spec.get("mode"),
             motif_cue=spec.get("motif_cue"), drawable_beat=leaf,

@@ -2620,7 +2620,7 @@ def _ghost_unload_writer(warnings):
 
 
 def _ghost_replayed_signatures(replayed, specs, *, style, meta):
-    """The finalized prompts of the rows replay already decided.
+    """Original ordinal -> finalized prompt for the rows replay already decided.
 
     Every beat replay settled is a picture the viewer will see, so a freshly
     authored beat may not land on it. The stored object carries `mode`,
@@ -2632,15 +2632,16 @@ def _ghost_replayed_signatures(replayed, specs, *, style, meta):
     reject.
     """
     _gsa, _gsp = _ghost_modules()
-    role_for = {spec["beat_id"]: spec.get("role") for spec in (specs or ())}
-    out = []
+    spec_for = {spec["beat_id"]: spec for spec in (specs or ())}
+    out = {}
     for beat_id, obj in (replayed or {}).items():
+        spec = spec_for[beat_id]
         sig = _gsa.ghost_prompt_signature(
-            role=role_for.get(beat_id), style=style, mode=obj.get("mode"),
+            role=spec.get("role"), style=style, mode=obj.get("mode"),
             motif_cue=obj.get("motif_cue"),
             drawable_beat=obj.get("drawable_beat"), ledger_meta=meta)
         if sig:
-            out.append(sig)
+            out[spec["ordinal"]] = sig
     return out
 
 
@@ -2706,7 +2707,8 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
 
 
 def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
-                          warnings, already_used=()):
+                          warnings, already_used=(), replayed_signatures=None,
+                          reuse_dispositions=None):
     """``(leaves, source, fallback_reason)`` for one whole batch.
 
     One call for a normal episode. An invalid batch gets ONE fresh whole-batch
@@ -2715,10 +2717,13 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
     in the ledger rather than inferred from prose in a log.
     """
     _gsa, _gsp = _ghost_modules()
+    replayed_signatures = dict(replayed_signatures or {})
     if gen is None:
         return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
                                          style=style, ledger_meta=meta,
-                                         already_used=already_used),
+                                         already_used=already_used,
+                                         replayed_signatures=replayed_signatures,
+                                         reuse_dispositions=reuse_dispositions),
                 "deterministic_fallback", "no writer model configured")
 
     prompt = _gsa.build_batch_prompt(specs)
@@ -2754,7 +2759,8 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
         try:
             leaves = _gsa.parse_batch_response(raw, ids)
             _ghost_validate_batch(leaves, specs, style, meta, names,
-                                  already_used=already_used)
+                                  already_used=tuple(already_used) +
+                                  tuple(replayed_signatures.values()))
         except _gsa.GhostAuthorError as exc:
             reason = "attempt %d rejected: %s" % (attempt, exc)
             warnings.append("Ghost author %s" % reason)
@@ -2766,7 +2772,9 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
         return leaves, "writer_llm", ""
     return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
                                      style=style, ledger_meta=meta,
-                                     already_used=already_used),
+                                     already_used=already_used,
+                                     replayed_signatures=replayed_signatures,
+                                     reuse_dispositions=reuse_dispositions),
             "deterministic_fallback", reason)
 
 
@@ -2906,6 +2914,7 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
 
     if needs:
         gen = None
+        reuse_dispositions = {}
         try:
             if model_id != _gsa.GHOST_DETERMINISTIC_MODEL_ID:
                 gen, loaded_model_id = _resolve_writer_llm_binding(
@@ -2923,15 +2932,17 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
                 # EVERY leaf already decided by replay, so a fallback cannot
                 # collide with one. Uniqueness is a property of the EPISODE the
                 # viewer watches, not of whichever subset this call authored.
-                already_used=_ghost_replayed_signatures(
-                    out, specs, style=style, meta=meta))
+                replayed_signatures=_ghost_replayed_signatures(
+                    out, specs, style=style, meta=meta),
+                reuse_dispositions=reuse_dispositions)
         finally:
             _ghost_unload_writer(warnings)
         for spec in needs:
             out[spec["beat_id"]] = _gsa.build_ghost_prompt_object(
                 spec, leaves[spec["id"]], source=source,
-                fallback_reason=(reason if source == "deterministic_fallback"
-                                 else ""))
+                fallback_reason=("; ".join(filter(None, (
+                    reason, reuse_dispositions.get(spec["id"], ""))))
+                    if source == "deterministic_fallback" else ""))
 
     dispositions = {}
     for obj in out.values():

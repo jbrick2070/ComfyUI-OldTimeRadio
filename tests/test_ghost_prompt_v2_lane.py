@@ -515,3 +515,94 @@ def test_a_deterministic_leaf_never_collides_with_a_replayed_one():
     assert len(set(rest_sigs)) == len(rest_sigs)
 
 
+
+
+def _long_ghost_ledger():
+    led = _ledger()
+    template = next(row for row in led['lines'] if row['line_id'] == 'b002')
+    led['lines'] = [dict(template, line_id='long%03d' % i, start_s=3.0 * i)
+                    for i in range(60)]
+    return led
+
+
+def test_shotlock_preserves_per_beat_reuse_reasons_and_mixed_replay(monkeypatch):
+    monkeypatch.setattr(gsa, 'schedule_ghost_modes',
+                        lambda entries, seed: {bid: 'object' for bid, _ in entries})
+    led, shots = _plan(ledger=_long_ghost_ledger())
+    assert len(shots) >= 60
+    assert any('reused least-recent' in s['ghost_prompt']['fallback_reason']
+               for s in shots)
+    for shot in shots:
+        reason = shot['ghost_prompt']['fallback_reason']
+        assert reason.startswith('no writer model configured; pool: ')
+        gsa.validate_ghost_prompt_object(shot['ghost_prompt'])
+
+    frozen = {s['shot_id']: copy.deepcopy(s['ghost_prompt']) for s in shots}
+    mixed = copy.deepcopy(led)
+    changed = {'long018', 'long035', 'long036'}
+    for line in mixed['lines']:
+        if line['line_id'] in changed:
+            line['traits'] = 'furious'
+    again_led, again = _plan(ledger=mixed)
+    from nodes import _otr_visual_styles as vs
+    style = vs.get_visual_style(again_led['meta'])
+    sigs = []
+    for shot in again:
+        obj = shot['ghost_prompt']
+        bid = shot['shot_id'][len('shot_'):]
+        if bid not in changed:
+            assert obj == frozen[shot['shot_id']]
+        else:
+            assert obj['request_sha256'] != frozen[shot['shot_id']]['request_sha256']
+            assert obj['fallback_reason'].count('pool: ') == 1
+        gsa.validate_ghost_prompt_object(obj)
+        sigs.append(gsa.ghost_prompt_signature(
+            role=shot['role'], style=style, mode=obj['mode'],
+            motif_cue=obj['motif_cue'], drawable_beat=obj['drawable_beat'],
+            ledger_meta=again_led['meta']))
+    assert all(a != b for a, b in zip(sigs, sigs[1:]))
+    # The same input must replay both the decisions and their reasons unchanged.
+    assert _plan(ledger=copy.deepcopy(again_led))[1] == again
+
+
+def test_failed_writer_reason_survives_each_allocation_disposition():
+    from tests.test_ghost_signal_author import _long_specs, STYLE, _DET_META
+    specs = _long_specs('object')
+    calls = []
+    def gen(messages, **kwargs):
+        calls.append(messages)
+        return 'invalid-json-from-writer'
+    dispositions = {}
+    leaves, source, reason = sl._ghost_generate_batch(
+        gen, specs, style=STYLE, meta=_DET_META, episode_seed=7,
+        names=(), warnings=[], reuse_dispositions=dispositions)
+    assert len(calls) == 2
+    assert source == 'deterministic_fallback'
+    assert 'attempt 2 rejected' in reason and 'not JSON' in reason
+    assert len(leaves) == len(dispositions) == 60
+    assert any('reused least-recent' in r for r in dispositions.values())
+
+
+def test_writer_mixed_with_replay_uses_the_same_admission_signatures():
+    import json
+    from tests.test_ghost_signal_author import _long_specs, STYLE, _DET_META, _signatures
+    specs = _long_specs('object', 3)
+    pool = gsa.GHOST_FALLBACK_CLAUSES['object']
+    replay = {0: _signatures([specs[0]], {specs[0]['id']: pool[0]})[0],
+              2: _signatures([specs[2]], {specs[2]['id']: pool[2]})[0]}
+    def gen(messages, **kwargs):
+        return json.dumps({'shots': [{'id': specs[1]['id'], 'drawable_beat': pool[1]}]})
+    result = sl._ghost_generate_batch(
+        gen, specs[1:2], style=STYLE, meta=_DET_META, episode_seed=7,
+        names=(), warnings=[], replayed_signatures=replay)
+    assert result == ({specs[1]['id']: pool[1]}, 'writer_llm', '')
+    # A collision with either frozen neighbor rejects the writer batch and
+    # reaches deterministic allocation, still excluding both neighbors.
+    def colliding_gen(messages, **kwargs):
+        return json.dumps({'shots': [{'id': specs[1]['id'], 'drawable_beat': pool[2]}]})
+    leaves, source, reason = sl._ghost_generate_batch(
+        colliding_gen, specs[1:2], style=STYLE, meta=_DET_META, episode_seed=7,
+        names=(), warnings=[], replayed_signatures=replay)
+    assert source == 'deterministic_fallback'
+    assert 'same prompt' in reason
+    assert _signatures(specs[1:2], leaves)[0] not in replay.values()
