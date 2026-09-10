@@ -1,0 +1,331 @@
+{
+  "status": "R1-R4 scope convergence; implementation and bank preflight remain pending",
+  "captured_at_utc": "2026-09-10T20:00:02.647557+00:00",
+  "driver": "Codex; grounded panelist and sole judge; no duplicate Codex CLI",
+  "source_scope_commit": "b9d7be0863788e2507de5e68f9273e61c27268ba",
+  "initial_code_baseline": "1f27e4123a9567400ab39ef698d2a8a394601284",
+  "cleanup_preparation_head": "a3551ff5fb9ea451e9dc9a9bba6e9f70c0845915",
+  "successful_external_reviews": 8,
+  "failed_external_attempts": 1,
+  "total_external_review_attempts": 9,
+  "failure": "R1 Claude Code sonnet/high: OAuth session expired and could not be refreshed; Cursor replaced the seat",
+  "reviewer_models": [
+    "Gemini 3.8 Flash (High)",
+    "cursor-grok-4.6-high"
+  ],
+  "internal_helpers": 2,
+  "internal_helpers_are_external_panel_seats": false,
+  "cost": null,
+  "cost_note": "CLI reviewers supplied no usage/cost receipt; no spend total claimed",
+  "profiles": "none; stale local overlay read but excluded; real Windows/canonical constraints applied through anchors",
+  "rounds": [
+    {
+      "round": "r1",
+      "input_sha256": "19a0a6a190f881a9aed8ac0a0769a9af56f6083a17c4f265ff00760e3b6c2854",
+      "final_sha256": "ce42a986560777c4ff2c1780d1ed6d3ac1a7406d9d9061ddcba282d5aa65c3d8",
+      "successful_reviewers": [
+        "antigravity",
+        "cursor"
+      ]
+    },
+    {
+      "round": "r2",
+      "input_sha256": "ce42a986560777c4ff2c1780d1ed6d3ac1a7406d9d9061ddcba282d5aa65c3d8",
+      "final_sha256": "1cdb2747d50a7422e48796e5998e92ce30784d31fc407a6258895ec21fe89137",
+      "successful_reviewers": [
+        "antigravity",
+        "cursor"
+      ]
+    },
+    {
+      "round": "r3",
+      "input_sha256": "1cdb2747d50a7422e48796e5998e92ce30784d31fc407a6258895ec21fe89137",
+      "final_sha256": "a9c6a99042920e397fad38c79322b6194ce1f34d776e4f466d96047aff70311a",
+      "successful_reviewers": [
+        "antigravity",
+        "cursor"
+      ]
+    },
+    {
+      "round": "r4",
+      "input_sha256": "a9c6a99042920e397fad38c79322b6194ce1f34d776e4f466d96047aff70311a",
+      "final_sha256": "dddeb4754fa4909511c94c7c267568a1e3e0bd928c56591b850f0f4f3bf7bef2",
+      "successful_reviewers": [
+        "antigravity",
+        "cursor"
+      ]
+    }
+  ],
+  "byte_chain_verified": true,
+  "archive": {
+    "path": "review-evidence.zip",
+    "sha256": "b2e6d481d1ad19880528ba8559d39e4e886e9d3e36895fe23e2432c4659def3b",
+    "format_note": "ZIP preserves exact captured UTF-8 bytes, including original line endings and whitespace. Readable judgment copies normalize only line endings/trailing whitespace."
+  },
+  "members": {
+    "campaign.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/campaign.md",
+      "sha256": "f1cc8602de56613d790271485031ccc6848af7655ad1acf11ac3e2090e90b366",
+      "bytes": 3689,
+      "captured_utf8_bom": false
+    },
+    "r1/agy_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/agy_model_selected.txt",
+      "sha256": "2f864ce7fd5a58362b08b4b32505753239d1e06282ba2a20441cd6ec287e79e8",
+      "bytes": 23,
+      "captured_utf8_bom": false
+    },
+    "r1/antigravity.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/antigravity.md",
+      "sha256": "679c983dec72e54d5ba147cb8661f8777bf09c8d790fd46648739378881f1ddf",
+      "bytes": 11744,
+      "captured_utf8_bom": false
+    },
+    "r1/claude_auth_failure.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/claude.md",
+      "sha256": "295d3e16ab402e7a34a5333f79740158432a9b15bdaeb34b56e397352fe0b1ad",
+      "bytes": 74,
+      "captured_utf8_bom": false
+    },
+    "r1/cursor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/cursor.md",
+      "sha256": "3577d702cd98731081630457cb17fd24b22a2e362d287d368efc97a8a21a7169",
+      "bytes": 9481,
+      "captured_utf8_bom": false
+    },
+    "r1/cursor_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/cursor_model_selected.txt",
+      "sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "bytes": 119,
+      "captured_utf8_bom": false
+    },
+    "r1/driver_anchor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/driver_anchor.md",
+      "sha256": "91196afeb98ce6b3246f42ec7b605346aa8985cc5f3833e6d08c13655b378052",
+      "bytes": 2499,
+      "captured_utf8_bom": false
+    },
+    "r1/final.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/final.md",
+      "sha256": "ce42a986560777c4ff2c1780d1ed6d3ac1a7406d9d9061ddcba282d5aa65c3d8",
+      "bytes": 29749,
+      "captured_utf8_bom": false
+    },
+    "r1/input.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/input.md",
+      "sha256": "19a0a6a190f881a9aed8ac0a0769a9af56f6083a17c4f265ff00760e3b6c2854",
+      "bytes": 21250,
+      "captured_utf8_bom": false
+    },
+    "r1/judgment.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/judgment.md",
+      "sha256": "60e4c576bd9bb32afaf462bfbbe83247da7fab2d31d9638bc8ae82a36173fef4",
+      "bytes": 7213,
+      "captured_utf8_bom": false
+    },
+    "r1/profiles_used.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r1/profiles_used.txt",
+      "sha256": "a9a11813438ba2fc0c6efd97f13b88bf41af82044d04182d865bdd38eaa32423",
+      "bytes": 8,
+      "captured_utf8_bom": false
+    },
+    "r2/agy_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/agy_model_selected.txt",
+      "sha256": "2f864ce7fd5a58362b08b4b32505753239d1e06282ba2a20441cd6ec287e79e8",
+      "bytes": 23,
+      "captured_utf8_bom": false
+    },
+    "r2/antigravity.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/antigravity.md",
+      "sha256": "754c3980bc9e46cd9012ec989d76ad5511937163cd654867e37367cb499eb65a",
+      "bytes": 10907,
+      "captured_utf8_bom": true
+    },
+    "r2/cursor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/cursor.md",
+      "sha256": "ac28a745ac863a9e2dd2765b800923bfa03859e46dbbc3c4dc3ca590086ee603",
+      "bytes": 12426,
+      "captured_utf8_bom": false
+    },
+    "r2/cursor_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app-cursor/r2/cursor_model_selected.txt",
+      "sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "bytes": 119,
+      "captured_utf8_bom": false
+    },
+    "r2/driver_anchor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/driver_anchor.md",
+      "sha256": "def228f2f42eabda766dfcd0e2d0e4bae1fa530cc76a88deff57044abba4d89e",
+      "bytes": 1700,
+      "captured_utf8_bom": false
+    },
+    "r2/final.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/final.md",
+      "sha256": "1cdb2747d50a7422e48796e5998e92ce30784d31fc407a6258895ec21fe89137",
+      "bytes": 40630,
+      "captured_utf8_bom": false
+    },
+    "r2/grounding.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/grounding.md",
+      "sha256": "72d71348eca4cc1a33d808c70043304dac620af6426dc6a132b6dad7fa05731b",
+      "bytes": 4897,
+      "captured_utf8_bom": false
+    },
+    "r2/input.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/input.md",
+      "sha256": "ce42a986560777c4ff2c1780d1ed6d3ac1a7406d9d9061ddcba282d5aa65c3d8",
+      "bytes": 29749,
+      "captured_utf8_bom": false
+    },
+    "r2/judgment.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/judgment.md",
+      "sha256": "ceb40f2d666c66bd713deda57ba5db2921301c23b3da730b7bcf19ca8e92f27b",
+      "bytes": 6622,
+      "captured_utf8_bom": false
+    },
+    "r2/profiles_used.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r2/profiles_used.txt",
+      "sha256": "a9a11813438ba2fc0c6efd97f13b88bf41af82044d04182d865bdd38eaa32423",
+      "bytes": 8,
+      "captured_utf8_bom": false
+    },
+    "r3/agy_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/agy_model_selected.txt",
+      "sha256": "2f864ce7fd5a58362b08b4b32505753239d1e06282ba2a20441cd6ec287e79e8",
+      "bytes": 23,
+      "captured_utf8_bom": false
+    },
+    "r3/antigravity.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/antigravity.md",
+      "sha256": "497c9822b99ab21ef38c536077a70bb4da1f690115d04be28c413386b9311304",
+      "bytes": 12006,
+      "captured_utf8_bom": false
+    },
+    "r3/cursor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/cursor.md",
+      "sha256": "e8d4f32c2bbbab61a4349e5c22c075a090cde581036c0223b089f836b15453eb",
+      "bytes": 8899,
+      "captured_utf8_bom": false
+    },
+    "r3/cursor_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app-cursor/r3/cursor_model_selected.txt",
+      "sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "bytes": 119,
+      "captured_utf8_bom": false
+    },
+    "r3/driver_anchor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/driver_anchor.md",
+      "sha256": "42f0fcd32341615a769fcbfb2ef34158f152824541651dd8fb1d4ac54caeff2f",
+      "bytes": 1970,
+      "captured_utf8_bom": false
+    },
+    "r3/final.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/final.md",
+      "sha256": "a9c6a99042920e397fad38c79322b6194ce1f34d776e4f466d96047aff70311a",
+      "bytes": 50846,
+      "captured_utf8_bom": false
+    },
+    "r3/input.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/input.md",
+      "sha256": "1cdb2747d50a7422e48796e5998e92ce30784d31fc407a6258895ec21fe89137",
+      "bytes": 40630,
+      "captured_utf8_bom": false
+    },
+    "r3/judgment.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/judgment.md",
+      "sha256": "6948442889e856ae771e4253d814d81ce2b3971b5e65e5578fee1074a7ea82de",
+      "bytes": 8147,
+      "captured_utf8_bom": false
+    },
+    "r3/profiles_used.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r3/profiles_used.txt",
+      "sha256": "a9a11813438ba2fc0c6efd97f13b88bf41af82044d04182d865bdd38eaa32423",
+      "bytes": 8,
+      "captured_utf8_bom": false
+    },
+    "r4/GO_FORWARD_PLAN_reviewed.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/GO_FORWARD_PLAN_reviewed.md",
+      "sha256": "b67ca6592891d8ed4261431575a85aef366e347a1f042adbe0246ab3ad3ca6cb",
+      "bytes": 122372,
+      "captured_utf8_bom": false
+    },
+    "r4/agy_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/agy_model_selected.txt",
+      "sha256": "2f864ce7fd5a58362b08b4b32505753239d1e06282ba2a20441cd6ec287e79e8",
+      "bytes": 23,
+      "captured_utf8_bom": false
+    },
+    "r4/antigravity.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/antigravity.md",
+      "sha256": "187d4a59ba8e64517ffa079d805942af4a38fe70f1f8fe0aae75d34a94586636",
+      "bytes": 10561,
+      "captured_utf8_bom": false
+    },
+    "r4/cursor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/cursor.md",
+      "sha256": "da2bd52bd987d0c8ee839db8e4aab13dbf02149f06efbc2f77a064ed74c97ef8",
+      "bytes": 12265,
+      "captured_utf8_bom": false
+    },
+    "r4/cursor_model_selected.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app-cursor/r4/cursor_model_selected.txt",
+      "sha256": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+      "bytes": 119,
+      "captured_utf8_bom": false
+    },
+    "r4/driver_anchor.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/driver_anchor.md",
+      "sha256": "e00893248867ed85636769a2a159592ba81975582115156de79941f1fc7410df",
+      "bytes": 2911,
+      "captured_utf8_bom": false
+    },
+    "r4/final.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/final.md",
+      "sha256": "dddeb4754fa4909511c94c7c267568a1e3e0bd928c56591b850f0f4f3bf7bef2",
+      "bytes": 52119,
+      "captured_utf8_bom": false
+    },
+    "r4/input.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/input.md",
+      "sha256": "a9c6a99042920e397fad38c79322b6194ce1f34d776e4f466d96047aff70311a",
+      "bytes": 50846,
+      "captured_utf8_bom": false
+    },
+    "r4/judgment.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/judgment.md",
+      "sha256": "e54f70767000379f09888023135f9f5dbe45a66c868f6ffbe0b8e1e06eef9edc",
+      "bytes": 7949,
+      "captured_utf8_bom": false
+    },
+    "r4/profiles_used.txt": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/r4/profiles_used.txt",
+      "sha256": "a9a11813438ba2fc0c6efd97f13b88bf41af82044d04182d865bdd38eaa32423",
+      "bytes": 8,
+      "captured_utf8_bom": false
+    },
+    "user_steering.md": {
+      "source_path": "kibitz-runs/2026-09-10-my-story-app/user_steering.md",
+      "sha256": "ccd0a38ba9a091b2ed27d7f9ed2d3470c931b7e2efcfeb3f44fd5c4f54aae67a",
+      "bytes": 5239,
+      "captured_utf8_bom": false
+    }
+  },
+  "delivered_documents": {
+    "docs/2026-09-10-my-story-app-scope.md": "dddeb4754fa4909511c94c7c267568a1e3e0bd928c56591b850f0f4f3bf7bef2",
+    "docs/GO_FORWARD_PLAN.md": "7887d1eeadda030ccf7ce960f102563f28a27d4cb24a257888241c938a3e01e4"
+  },
+  "canonical_sha256_unchanged": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2",
+  "cleanup_references": {
+    "docs/2026-09-10-cleanup-opus/HANDOFF.md": "f6c32c9cbba7cf7466ec72b4e5817275ecf0e930643658eaa67e13a16227138c",
+    "docs/2026-09-10-cleanup-opus/PLAN.md": "c23b28b5b54da3898f30041d0a81fdf0944c04e2aadcc450f3b0d7225a7e2495",
+    "docs/2026-09-10-cleanup-opus/campaign_receipt.json": "c8c6648d6dc3b5136c177afa7b523e0b37108126b25de448001d344c0c5f6c75"
+  },
+  "coverage_limits": [
+    "Documentation/scope only; no runtime, workflow, registry or test changes",
+    "No tests, render, model acquisition, browser acceptance or production qualification run by this campaign",
+    "Cleanup retains its separate completed review campaign; this campaign R4 reviews only the combined sequence",
+    "Exact independent bank design is still D1 work; no bank preflight PASS claimed",
+    "Final operator cut removes My Story replay-system work, source-snapshot restoration and old-bundle compatibility",
+    "Speaker placement remains a separate optional design/listening follow-on"
+  ]
+}

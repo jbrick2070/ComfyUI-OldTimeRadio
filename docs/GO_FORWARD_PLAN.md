@@ -17,7 +17,13 @@ packing. **THE QUEUE is section 0, THE ATTACK ORDER**; stable row numbers are
 identities, not a second ordering. Read the newest `docs/HANDOFF_LOG.md` entry
 for measured state. The archive holds receipts, not instructions to execute.
 
-**THE ORDER BELOW IS BY DEPENDENCY, and it is the operator's (2026-09-04, late):** *"I really
+**PRIORITY #1 (operator, 2026-09-10): finish the Opus cleanup, then deliver the
+My Story creator flow.** Follow the five dependent sprints under **WHERE TO
+PICK UP**. This latest instruction takes precedence over older next-step
+directions in this file. The remaining queue resumes afterward; stable row
+identities and earlier scope cuts remain intact.
+
+**Dependency rationale for the remaining queue (operator, 2026-09-04, late):** *"I really
 want to get the registry thing fixed, but no sense in fixing it if bug fixes will break it --
 get all the easy code items done first, then the registry, then testing"* -- and, on second
 look, *"shouldn't we move [the design rows] before the registry?"* Yes: a design row is a code
@@ -80,18 +86,49 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Pending Opus cleanup handoff (operator, 2026-09-10):** use
-`docs/2026-09-10-cleanup-opus/HANDOFF.md` and its final `PLAN.md` after verifying
-the campaign receipt records convergence. One coder owns the listed files.
-Implement clean audio first (retire automatic roomtone/tape hiss and set clean
-canonical enhancement defaults, with the seven unused SceneSequencer stores),
-then the G8 collision-owner cleanup, then removal of unused freeze model
-acquisition. Revalidate at current Windows HEAD; use the fresh canonical CPU
-check and the per-chunk qualification/commit/push instructions. No stale soak,
-server/GPU run, cache/episode deletion, release change or extra cleanup scope
-belongs to this handoff. Other hardware/transfer work below remains separate.
+**PRIORITY #1: Opus cleanup -> My Story.** Read the
+[Opus handoff](2026-09-10-cleanup-opus/HANDOFF.md), its
+[implementation plan](2026-09-10-cleanup-opus/PLAN.md), and the
+[My Story scope](2026-09-10-my-story-app-scope.md). Verify their review receipts
+and the current Windows HEAD before implementation. These are pending delivery
+plans, not evidence that production cleanup or My Story already exists.
 
-Continue on the 5080 with the **five-act forced-Ghost canonical publication
+**Coding owners (operator confirmed, 2026-09-10): Opus owns sprints 1-2;
+Codex owns sprints 3-5.** Codex starts its dependent work only after verifying
+Opus's three qualified chunks are committed and pushed. A different reviewer
+checks each finished code change under the standing review rule. The split
+preserves handoff context; it does not authorize concurrent shared-file edits.
+
+**Scope cut (operator, 2026-09-10): no replay-system work.** My Story takes
+user input, saves it, and generates a new published episode. Reusing saved
+input means a fresh generation. Do not add saved-episode rerendering, old-bundle
+compatibility, migration or metadata reconstruction. Use the real current
+canonical workflow for checks, never an old harness graph.
+
+| Sprint | Pending work, in dependency order | Exit / next owner |
+|---|---|---|
+| **1. Clean audio** | Opus P1: remove automatic roomtone/tape hiss, set clean code and canonical enhancement defaults together, and remove the seven unused SceneSequencer assignments (C4 + C1). | Follow P1's focused/full/Bible and fresh canonical CPU checks; review, commit and push this chunk. |
+| **2. Finish bounded cleanup** | Opus P2: give G8 one duplicate-ID diagnostic owner (C2). Then Opus P3: remove unused freeze model acquisition while preserving validation, unloading and recovery contracts (C3). | P2 and P3 remain separate qualified, reviewed, committed and pushed chunks. Hand off the resulting HEAD before My Story edits shared files. |
+| **3. Current docs + independent design** | My Story D0: currentize README, source-bank preflight and linked operational guides against the cleaned-up code. Then D1: specify and review the independent bank's pass graph, schemas, prompts, cast and integration contracts. | Exact D1 design is required before code. Scope convergence is not a bank preflight PASS. |
+| **4. Complete creator path** | Build My Story field admission, LLM expansion into a full ledger, persistent input drafts, source selection and required published-episode delivery. Retain act count and character-count request. Ship all functional canonical widget/link changes with their code, before the bank is runnable. | Normal graph use completes the whole path. A saved draft or archive alone is not successful My Story delivery. Qualify, review, commit and push per the linked plan. |
+| **5. Optional App view + qualification** | Add the native App form and final player/report presentation. Prove graph-only use, App/Graph switching, saved parameters, playback/history, cancellation and errors; complete model/canonical qualification and final user documentation. | App Mode/sidebar use remains optional, with graph as the default. Report actual preflight evidence and limits; no release/tag/promotion is implied. |
+
+**Start now with sprint 1's current-HEAD checks and P1 implementation.** The
+[Opus starter prompt](2026-09-10-my-story-app-review/OPUS_START.md) contains
+the bounded assignment and handoff to Codex. One
+coder owns shared files at a time; do not interleave My Story writer/validator
+work with Opus's qualification baseline. Use the linked cleanup plan's measured
+failure comparison, not a claim that its full suite is green. No stale soak,
+server/GPU run, cache/episode deletion, release change or extra cleanup belongs
+to sprints 1-2. Later My Story qualification follows its own canonical-run gates.
+
+**Separate optional follow-on: speaker placement.** The preferred listening-test
+starting point is gentle, balanced positions assigned once per episode to stable
+speaker identities, narration centered, and support for every supported cast
+size. Preserve positions between lines. See the My Story scope for design/proof
+requirements; this is not part of clean-audio P1 and does not block priority #1.
+
+After priority #1, resume the **five-act forced-Ghost canonical publication
 proof in row 2.2**, then follow section 0. Read the newest entry in
 `docs/HANDOFF_LOG.md` and `docs/2026-09-10-mac-final/README.md` before starting.
 The Mac font check is not a pending gate. Preserve the accepted title and
@@ -499,15 +536,16 @@ awaiting-approval item quietly disappears.
 
 ---
 
-## 0. THE ATTACK ORDER (Fable ruling, 2026-09-05) -- READ THIS BEFORE PICKING A ROW
+## 0. THE ATTACK ORDER (operator priority, 2026-09-10) -- READ THIS BEFORE PICKING A ROW
 
-The operator asked Fable to decide the plan of attack across the open rows and to say
-plainly what to CUT. It ran grounded on the real Windows files. The sections below keep
-their stable row ids; this is the ORDER through them, and two rows are struck outright.
+The September 10 operator instruction places the combined cleanup/My Story
+programme first. The earlier Fable scope cuts and stable row identities below
+remain in force for the remaining queue.
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
+| **1st** | **Opus cleanup -> My Story (sprints 1-5 above)** | Clean the shared code first, currentize the source-bank docs, complete the independent design, build a full graph creator path, then add optional App presentation and finish qualification. Both linked plans are priority #1. |
+| **2nd** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
 * **2.2 -- NO ARC.** Sonnet QA on the diff, then the leg. r1 already ran and the row names
@@ -548,8 +586,9 @@ accepted ledger malformed and fails closed. The stored object already carries `m
 makes "applied identically to writer output, replay and the deterministic path"
 achievable in one commit.
 
-**The next concrete step is the five-act CUDA proof in row 2.2.**
-The build specification and superseded plumbing directions are archived;
+**The next concrete step is sprint 1: Opus P1 at the current Windows HEAD.**
+Row 2.2 resumes after the combined priority #1 programme. Its build
+specification and superseded plumbing directions are archived;
 do not add a new field or redirect the v3 renderer to the v2 admission key.
 
 ---
