@@ -320,8 +320,37 @@ def _unload_bark():
         del _BARK_CACHE["processor"]
         _BARK_CACHE = {"model": None, "processor": None, "device": None}
         gc.collect()
-        torch.cuda.empty_cache()
-        log.info("Bark unloaded, VRAM freed (gc.collect + empty_cache)")
+        # THE CUDA CALL WAS BARE, so adding the guard is not an add-only diff
+        # and is called out here rather than buried: on CUDA the condition is
+        # True and the call still runs, byte-identical behaviour; off CUDA it
+        # was already a documented silent no-op. Nothing changes on the 5080.
+        if getattr(torch, "cuda", None) and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            log.info("Bark unloaded, VRAM freed (gc.collect + empty_cache)")
+        # METAL. `del` + gc drop the Python object; PyTorch's MPS caching
+        # allocator keeps the ~4.2 GB reserved until something asks for it
+        # back, and the line above never asked on this platform.
+        #
+        # WHY THIS SITE AND NOT THE OTHER TWENTY-FOUR. Most `empty_cache` calls
+        # in this pack are followed by a `soft_empty_cache`, which DOES release
+        # MPS (comfy/model_management.py), so their window closes on its own --
+        # see PBUG-20260908-03's own correction, which retracts the "the pool
+        # ratchets every cycle" reading in favour of a bounded 2x window. This
+        # one is different because of ORDERING: `load_llm` performs its wash
+        # FIRST and calls `_unload_bark()` AFTER it, so on the bark path the
+        # writer's weights materialize on top of a dead-but-reserved Bark pool
+        # with no wash in between. On a 16 GB unified machine that is the sum
+        # of both models at once, and an overrun there REBOOTS THE HOST rather
+        # than failing the render.
+        #
+        # Deliberately NOT paired with `model.to("cpu")`: that would be a real
+        # device->host copy on every CUDA teardown -- a silent regression on
+        # the box this fix is not for -- and on unified memory the copy is the
+        # same physical RAM anyway.
+        elif getattr(torch, "mps", None) and torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+            log.info("Bark unloaded, unified memory returned "
+                     "(gc.collect + torch.mps.empty_cache)")
 
 
 # -----------------------------------------------------------------------------

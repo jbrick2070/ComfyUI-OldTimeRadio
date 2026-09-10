@@ -552,7 +552,7 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered |
 | `stable_audio_3` | **auto** | 3.5 GiB | **proven** | fits | **proven** |
 | `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **proven** |
-| `stable_audio_music` | **auto** | 4.5 GiB | fits | fits | not offered |
+| `stable_audio_music` | GATED | 4.5 GiB | fits | fits | not offered |
 | `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered |
 | `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered |
 

@@ -207,6 +207,35 @@ def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
     return (word, fact.get("gb"), lane.lane)
 
 
+def hf_token_engines() -> frozenset:
+    """Engines whose weights are HF-GATED, read from the audio profiles.
+
+    `config/audio_engine_profiles.yaml` declares `requires_hf_token` per
+    profile, and it is the only structured statement of that fact in the repo.
+    Before this was read, the matrix derived `stable_audio_music` as **auto**
+    -- whose legend promises "no account and no token; just pick it and run" --
+    for a lane whose weights are gated behind a licence click. That is the
+    single worst thing this table can say, because a reader picks a music
+    engine on exactly that promise.
+
+    Parsed with a regex rather than a YAML library on purpose: this generator
+    runs in a docs check with no third-party imports, and the block is a flat
+    list of `engine:` / `requires_hf_token:` pairs.
+    """
+    path = os.path.join(_REPO, "config", "audio_engine_profiles.yaml")
+    if not os.path.exists(path):
+        return frozenset()
+    gated, engine = set(), None
+    for line in io.open(path, encoding="utf-8"):
+        stripped = line.strip()
+        if stripped.startswith("engine:"):
+            engine = stripped.split(":", 1)[1].strip()
+        elif stripped.startswith("requires_hf_token:") and engine:
+            if stripped.split(":", 1)[1].split("#")[0].strip() == "true":
+                gated.add(engine)
+    return frozenset(gated)
+
+
 def os_friction() -> dict:
     """``{engine: "windows-only installer"}`` -- derived from what is on disk.
 
@@ -246,10 +275,16 @@ def build_rows() -> list:
     facts = download_facts()
     curated = load_curated().get("engines", {})
     os_only = os_friction()
+    gated = hf_token_engines()
     rows = []
     for namespace, table in caps.items():
         for engine in sorted(table):
             word, gb, lane = friction_for(engine, namespace, facts)
+            # A declared HF gate outranks a derived "auto": the weights may
+            # well fetch themselves, but only after a licence click and a
+            # token, and that is the thing the reader needs to know first.
+            if engine in gated and word in ("auto", "manual"):
+                word = "GATED" if word == "auto" else "GATED+manual"
             remote = word in ("none", "none*")
             hand = curated.get(engine, {})
             rows.append({

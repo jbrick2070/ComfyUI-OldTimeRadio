@@ -1620,14 +1620,29 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
             # object does NOT return the memory: PyTorch's MPS caching allocator
             # keeps its reserved pool, and nothing here ever asked it not to.
             #
-            # WHY IT COMPOUNDS INSTEAD OF JUST WASTING A LITTLE. This teardown
-            # runs BETWEEN independent stages that each decide to free the LLM
-            # for the next model -- the writer's post-script unload, bark's
-            # per-line eviction, the freeze cascade, ShotLock. One episode
-            # legitimately constructs and destroys this 8.7 GB model 8-12 times.
-            # On CUDA each cycle returns its blocks and the trade is sound. On
-            # Metal the pool grew every cycle: the surviving run managed 8
-            # cycles, the killed one died materializing weights on the 12th.
+            # WHAT IT ACTUALLY COSTS -- and this paragraph was WRONG for a day,
+            # so read the correction rather than the original story. It said the
+            # pool RATCHETED across an episode's 8-12 writer reloads until the
+            # OS killed the process. It does not: `load_llm` runs a Zero-Prime
+            # wash before every load (:941), and `soft_empty_cache` DOES call
+            # `torch.mps.empty_cache()` on Metal, so the previous copy was
+            # already released before the next load.
+            #
+            # The measured truth is a 2x WINDOW, not a ratchet
+            # (PBUG-20260908-03 CORRECTION):
+            #
+            #     model resident on mps          MPS 2056.5 MiB
+            #     after model.to("cpu")          MPS 2056.5 MiB  <- still held,
+            #                                                      and a CPU
+            #                                                      copy now
+            #                                                      exists too
+            #     after torch.mps.empty_cache()  MPS    0.5 MiB
+            #
+            # Step 1 makes a CPU copy and releases nothing, so the model sat
+            # DOUBLE-COUNTED for the whole gap between stages -- which is
+            # exactly the window the video models, Kokoro and StableAudio3 load
+            # into. This call collapses that window. The fix is right; the
+            # reasoning its commit gave was not.
             #
             # `model.to("cpu")` above is NOT redundant with this on unified
             # memory even though "cpu" is the same physical RAM -- it is what

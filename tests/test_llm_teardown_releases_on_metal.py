@@ -7,14 +7,22 @@ are platform-neutral and always ran; steps 4-6 sat behind
 Python object was correctly freed and PyTorch's MPS caching allocator kept its
 reserved pool forever.
 
-WHY THAT ESCALATED FROM WASTE TO A MACHINE KILL. This teardown is not called
-once. It runs between independent stages that each free the LLM for whatever
-loads next -- the writer's post-script unload, bark's per-line eviction, the
-freeze cascade, ShotLock -- so one episode legitimately constructs and destroys
-the ~8.7 GB writer 8-12 times. On CUDA every cycle hands its blocks back and the
-trade is sound. On Metal the pool grew each time: a run that survived managed 8
-cycles; the one that died was materializing weights on its 12th, and the process
-was killed with no traceback because unified memory has nowhere to spill.
+WHAT IT ACTUALLY COSTS, and the first answer here was WRONG. This file
+originally said the Metal pool RATCHETED across an episode's 8-12 writer
+reloads until the OS killed the process. `load_llm` washes with
+`soft_empty_cache` before every load and that DOES release MPS, so the previous
+copy was gone before the next one arrived -- there is no ratchet.
+
+The measured mechanism (PBUG-20260908-03 CORRECTION) is a 2x WINDOW:
+
+    model resident on mps          MPS 2056.5 MiB
+    after model.to("cpu")          MPS 2056.5 MiB   <- pool still held, and a
+                                                      CPU copy now exists
+    after torch.mps.empty_cache()  MPS    0.5 MiB
+
+Step 1 copies to CPU and releases nothing, so the writer sat double-counted for
+the entire gap between stages -- the window the video models, Kokoro and
+StableAudio3 load into on a 16 GB machine. This teardown collapses it.
 
 A trace confirmed there is NO leaked reference in this path -- the entry is
 detached, LLM_CACHE cleared, the model moved to cpu and reaped. That is what

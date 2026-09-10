@@ -35,6 +35,34 @@ log = logging.getLogger("OTR.AudioEnhance")
 
 # -- DSP building blocks (all vectorized) -------------------------------------
 
+def _require_torchaudio(what: str):
+    """Import torchaudio, or refuse by NAME instead of by ModuleNotFoundError.
+
+    `torchaudio` is imported lazily at two points in this module and is declared
+    in NEITHER `requirements.txt` NOR `pyproject.toml`'s static
+    `[project] dependencies`. It normally arrives with ComfyUI's own torch
+    install, which is why this has never bitten here -- but `OTR_AudioEnhance`
+    is a REGISTERED node, so on a machine without it the operator got a bare
+    `ModuleNotFoundError: No module named 'torchaudio'` from inside a render,
+    with no sentence saying what to install.
+
+    Every other optional dependency in this pack refuses by name; this one did
+    not. The pack's convention is that the error message IS the install
+    instruction.
+    """
+    try:
+        import torchaudio  # noqa: F401
+        return torchaudio
+    except ImportError as exc:
+        raise RuntimeError(
+            "OTR_AudioEnhance needs torchaudio for %s, and it is not "
+            "installed. Install it into the ComfyUI environment with a build "
+            "matching your torch: `pip install torchaudio`. It normally "
+            "arrives alongside torch, so a missing torchaudio usually means "
+            "torch was installed without it." % what
+        ) from exc
+
+
 def _resample(waveform: torch.Tensor, orig_sr: int, target_sr: int) -> torch.Tensor:
     """Resample waveform using sinc interpolation (torchaudio.transforms.Resample).
 
@@ -47,7 +75,7 @@ def _resample(waveform: torch.Tensor, orig_sr: int, target_sr: int) -> torch.Ten
     if orig_sr == target_sr:
         return waveform
 
-    import torchaudio
+    torchaudio = _require_torchaudio("sample-rate conversion")
 
     # torchaudio.transforms.Resample uses a polyphase sinc filter internally.
     # We move the resampler to the waveform's device for GPU acceleration.
@@ -139,7 +167,7 @@ def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
     if warmth <= 0.0:
         return waveform
 
-    import torchaudio
+    torchaudio = _require_torchaudio("the warmth filter")
 
     gain_db = warmth * 30.0
     orig_device = waveform.device

@@ -13,7 +13,7 @@ inference call is wired and verified in the GPU pilot.
 """
 from __future__ import annotations
 
-from .registry import register
+from .registry import EngineUnusable, EngineUsabilityReason, register
 
 try:
     from .._otr_shared import env as otr_env
@@ -33,15 +33,62 @@ class StableAudioMusicEngine:
     def __init__(self):
         self._model = None
 
+    @staticmethod
+    def _missing_dependency_detail() -> str:
+        """The whole install, in one sentence, because the render already paid.
+
+        By the time ``load`` runs, the script, the cast and every voice line
+        have been generated. An error that names a package and stops is a
+        30-minute round trip to find out there is a SECOND step (the weights
+        are HF-gated, `config/audio_engine_profiles.yaml`
+        `requires_hf_token: true`). Both steps go in the message.
+
+        The platform sentence is deliberate: this lane declares
+        `device_backends: ["cuda"]` and has never run on Metal or ROCm, so the
+        pip line is not promised to work there.
+        """
+        return (
+            "stable-audio-tools is not installed. TWO steps are needed and "
+            "the second is easy to miss: (1) `pip install stable-audio-tools` "
+            "into the ComfyUI environment -- it is deliberately NOT in this "
+            "pack's requirements, because it is a heavy dependency for an "
+            "opt-in engine no shipped profile selects; (2) the "
+            "stable-audio-open-1.0 weights are HF-GATED, so accept the licence "
+            "on its Hugging Face model page and set HF_TOKEN, or the download "
+            "will 401 after the install succeeds. Verified on NVIDIA only -- "
+            "this lane declares cuda and has not been run on Apple Silicon or "
+            "ROCm. `musicgen` and `stable_audio_3` need neither step."
+        )
+
+    def assert_usable(self, role: str = "music") -> None:
+        """The SECOND gate, and its absence was the actual defect.
+
+        `eng_viz_mandala` is the precedent and it guards BOTH places -- here
+        and in `load` -- so a missing library is reported when the engine is
+        SELECTED rather than when it is finally called. Guarding only `load`
+        means the refusal arrives after the writer and the whole voice pass
+        have already been spent.
+
+        Registry-level `assert_usable` does no IO by contract; an import
+        probe is not IO, and it is the only way to answer this question.
+        """
+        try:
+            import stable_audio_tools  # noqa: F401
+        except ImportError as exc:
+            raise EngineUnusable(
+                self.name, role, EngineUsabilityReason.MISSING_MODEL,
+                self._missing_dependency_detail(),
+            ) from exc
+
     def load(self):
         if self._model is not None:
             return
         try:
             from stable_audio_tools import get_pretrained_model
         except ImportError as exc:
-            raise RuntimeError(
-                "stable-audio-tools is not installed -- install Stable Audio "
-                "before rendering with stable_audio_music"
+            raise EngineUnusable(
+                self.name, "music", EngineUsabilityReason.MISSING_MODEL,
+                self._missing_dependency_detail(),
             ) from exc
 
         # GPU-VALIDATE (F): the plan's target is the ComfyUI-native SA3 loader;
