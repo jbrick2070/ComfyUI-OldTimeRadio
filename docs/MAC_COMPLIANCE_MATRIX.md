@@ -26,8 +26,8 @@ The sections below run in that order -- the two that can cost you a machine firs
 | verdict | count |
 |---|---|
 | WILL NOT RUN | **5** |
-| OOM RISK @16GB | **13** |
-| PROVEN | **16** |
+| OOM RISK @16GB | **14** |
+| PROVEN | **15** |
 | LIKELY | **27** |
 | | **61 total** |
 
@@ -49,7 +49,7 @@ The sections below run in that order -- the two that can cost you a machine firs
 * `minimax_h3_video` -- NVFP4-AWQ text encoder (needs_fp4_te True) plus an int8-convrot DiT; MPS has no fp4 path and no aten::_int_mm.
 * `fastwan_8gb` -- not verbatim: moved here by the adversarial pass. See its row above and the overturned list; the repo-recorded blocker is the Wan MPS temporal-corruption defect in `docs/MAC_PORTABILITY_GUIDE.md` section 11.
 
-## OOM RISK @16GB (13)
+## OOM RISK @16GB (14)
 
 | engine | ns | weights | ~GB | why |
 |---|---|---|---|---|
@@ -66,12 +66,12 @@ The sections below run in that order -- the two that can cost you a machine firs
 | `ltx25_video` | video | manual | 19.6 | A 10.73 GB LTX 2.5 DiT plus an 8.86 GB Gemma-4 12B encoder is ~19.6 GB, and the adapter's CPU-pinning of that encoder buys nothing on unified memory where 'cpu' is the same physical RAM; on top of that, MPS BF16 attention NaNs are reported to produce all-black LTX 2.5 output on this platform (`docs/MAC_PORTABILITY_GUIDE.md` section 11). |
 | `ltx_video` | video | manual | 14.8 | The LTX-2.3 22B stack: a 10.03 GB Q3_K_M GGUF plus an 8.80 GB Gemma-3 encoder, a 42.98 GB projection checkpoint and a 7.08 GB LoRA, with a measured per-clip peak of ~14.8 GB on a 16 GB CUDA card -- past the ~11.8 GiB Metal working-set ceiling. |
 | `wan_ti2v` | video | manual | 10.6 | It is the one lane MEASURED fatal here: it loaded fully on Metal ('WAN22 ... loaded completely; 9536.40 MB, full load: True') and then took the whole machine down, and the pack's unified-memory guard now refuses it at 10.6 GiB of weights against a 10.3 GiB accelerator budget. The Wan MPS temporal-corruption defect (`docs/MAC_PORTABILITY_GUIDE.md` section 11) applies to this lane as well. |
+| `bark` | audio | auto, ungated | 4.2 | **SUPERSEDED 2026-09-09 -- MOVED TO OOM RISK.** The earlier reading (40.8 s for 4.6 s, flatness 0.070) is real and was too short to find the problem. Run end to end it drives the process to an **18.0 GB phys_footprint on a 16 GB machine** at **11.7x realtime**, and strands **10.85 GB** that a second explicit torch.mps.empty_cache() will not return. Its live tensors never exceed 4.18 GB -- the cost is the MPS allocator ratcheting across an autoregressive loop (PBUG-20260909-03). |
 
-## PROVEN (16)
+## PROVEN (15)
 
 | engine | ns | weights | ~GB | why |
 |---|---|---|---|---|
-| `bark` | audio | auto, ungated | 4.2 | Ran on Metal on this exact host: 40.8 s for 4.6 s of structured speech (flatness 0.070, finite); the row gained "mps" on that measurement and _otr_bark_lib now probes cuda->mps->cpu instead of the old hardcoded cuda-if-available choice. |
 | `kokoro` | audio | auto, ungated | 0.3 | Shipped voice engine of the otr_mac_mps profile and part of six published M4 episodes; on Python 3.13 it runs kokoro-onnx on CPU by design, so the mps voice_device stamp is accepted-and-unused rather than a failure. |
 | `musicgen` | audio | auto, ungated | 2.2 | Measured on the M4 2026-09-07 at mps 14.1 s vs cpu 14.7 s for 256 tokens, flatness 0.134/0.103, finite; it is a transformers model so the ComfyUI MPS attention fault does not touch it. Licence (CC-BY-NC) is why it is not the default. |
 | `stable_audio_3` | audio | auto, ungated | 3.5 | Declares mps, is the mac profile's music engine, and published on the M4 - but only because the pack's prestartup forces PyTorch/SDPA attention on MPS (sub-quadratic gives noise) and _otr_determinism disables fill_uninitialized_memory on MPS (PBUG-20260907-09b). |

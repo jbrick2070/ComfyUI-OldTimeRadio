@@ -151,7 +151,11 @@ release 1.6.0); on Windows, install the row you need by hand as above.
 > `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` (bark installs
 > everywhere and downloads its own weights). A missing backend fails at the first
 > voice line with the exact pip line to run. Python 3.14 has no Kokoro backend
-> packaged yet; use bark there. On Python 3.12 nothing changes. Every voice engine and what it needs, generated from the code:
+> packaged yet; use bark there -- **except on a 16 GB Apple Silicon machine,
+> where bark is not a fallback at all.** Measured 2026-09-09: it drives the
+> process to an 18.0 GB phys_footprint on a 16 GB box and runs at 11.7x
+> realtime. On that machine stay on Python 3.12/3.13 and keep Kokoro. On
+> Python 3.12 nothing changes. Every voice engine and what it needs, generated from the code:
 > `docs/MACHINE_MATRIX.md`, section "Voice engines".
 
 **You do not have to memorise this.** If a pack is missing, the render stops

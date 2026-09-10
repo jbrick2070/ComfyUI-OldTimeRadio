@@ -45,7 +45,8 @@ actually rendered (`nodes/_otr_shared/shortcodes.py`).
 | writer | `Qwen/Qwen3.5-4B` on `mps`, `llm_quant_policy` = `none` | PROVEN, every episode | ~6.5 tok/s; peaks near 14 GB | 1, 12 |
 | voices | `kokoro` | PROVEN, every episode | kokoro-onnx on CPU under Python 3.13, by design | 1 |
 | music | `stable_audio_3` | PROVEN, every episode | -- | 1 |
-| voices / music, alternatives | `bark`, `musicgen` | PROVEN on `mps` (measured runs, not episodes) | see the matrix | 3 |
+| music, alternative | `musicgen` | measured on `mps` (2.1x realtime), no episode | see the matrix | 3 |
+| voices, NOT an option here | `bark` | **OOM on this machine** -- 18.0 GB footprint, 11.7x realtime, strands 10.85 GB (2026-09-09) | see the matrix | 3 |
 | video, zero downloads | `viz_mxc_cpu`, `viz_green`, `viz_camera` | PROVEN (`vcam`), 2 episodes | ~24 min end to end | 1 |
 | stills, local | `sd15` | PROVEN (`sd15`), 3 episodes | 1.99 GB, ungated | 4 |
 | video from a still | `still_motion`, `still_pan`, `still_flat`, `still_word` | PROVEN (`stmo`, `stwo`), 2 episodes | 22:22 -- 22:38 per episode | 6 |
