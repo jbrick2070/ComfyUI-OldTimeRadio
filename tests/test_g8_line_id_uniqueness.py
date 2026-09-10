@@ -8,6 +8,10 @@ catches the duplication at freeze time -- before any render fires.
 Phase 0 collects (warn-mode), Phase 10 raises FreezeAssertionError.
 The check is wired into ``run_gap_audit`` alongside the G1-G6 gates
 (G7 was deleted 2026-07-01 with the sfx subsystem, rip-sfx-broll).
+
+G8 is the SOLE owner of the collision diagnostic (2026-09-10): the
+per-line invariants validate that each line_id is a non-empty string
+and no longer echo a second "is duplicated" error per repeated row.
 """
 from __future__ import annotations
 
@@ -81,6 +85,66 @@ def test_g8_phase_0_collects_does_not_raise():
     )
 
 
+def _collision_errors(errors):
+    """Every diagnostic that speaks about a repeated line_id, any owner."""
+    return [e for e in errors if "duplicate" in e.lower()]
+
+
+def test_two_equal_ids_yield_exactly_one_collision_diagnostic_at_phase_0():
+    """Phase 0 collects ONE collision diagnostic for a pair of equal ids,
+    and it is the G8 summary. Other minimal-fixture errors may coexist;
+    none of them may be a second report of the same collision."""
+    led = _mk_minimal_ledger([
+        {"line_id": "ln_pair", "char_id": "c01",
+         "speaker_role": "character", "text": "first", "traits": "calm"},
+        {"line_id": "ln_pair", "char_id": "c02",
+         "speaker_role": "character", "text": "second", "traits": "calm"},
+    ])
+    report = _LFC.phase_0_gap_audit_pre(led)
+    collisions = _collision_errors(report.errors)
+    assert len(collisions) == 1, report.errors
+    assert collisions[0].startswith("G8:")
+    assert "ln_pair" in collisions[0]
+    assert "1 duplicate line_id(s)" in collisions[0]
+
+
+def test_two_equal_ids_still_refuse_at_phase_10_with_the_g8_summary():
+    """Phase 10 refuses the freeze and carries the single G8 summary in
+    the structured ``.errors``; the per-line invariants add no echo."""
+    led = _mk_minimal_ledger([
+        {"line_id": "ln_pair", "char_id": "c01",
+         "speaker_role": "character", "text": "first", "traits": "calm"},
+        {"line_id": "ln_pair", "char_id": "c02",
+         "speaker_role": "character", "text": "second", "traits": "calm"},
+    ])
+    with pytest.raises(_LFC.FreezeAssertionError) as excinfo:
+        _LFC.phase_10_gap_audit_post_and_freeze(led)
+    collisions = _collision_errors(excinfo.value.errors)
+    assert len(collisions) == 1, excinfo.value.errors
+    assert collisions[0].startswith("G8:")
+    assert "ln_pair" in collisions[0]
+    assert led["meta"]["freeze_verdict"] == "needs_full_rerun"
+
+
+@pytest.mark.parametrize("bad_id", [None, "", 7])
+def test_invalid_line_ids_are_per_line_errors_not_collisions(bad_id):
+    """Missing, empty and non-string ids stay per-line invalid-id errors
+    (one per offending row) and never become a G8 collision."""
+    rows = [
+        {"char_id": "c01", "speaker_role": "character",
+         "text": "no id", "traits": "calm"},
+        {"line_id": bad_id, "char_id": "c02", "speaker_role": "character",
+         "text": "bad id", "traits": "calm"},
+        {"line_id": bad_id, "char_id": "c03", "speaker_role": "character",
+         "text": "bad id again", "traits": "calm"},
+    ]
+    report = _LFC.run_gap_audit(_mk_minimal_ledger(rows), label="test")
+    invalid = [e for e in report.errors if "empty/missing line_id" in e]
+    assert len(invalid) == 3, report.errors
+    assert not _collision_errors(report.errors), report.errors
+    assert not [e for e in report.errors if "G8" in e]
+
+
 def test_g8_three_or_more_duplicates_reported_with_more_suffix():
     """When >5 duplicates exist, the diagnostic shows the first 5 + a
     ``(+N more)`` suffix so the operator sees severity but the message
@@ -104,6 +168,9 @@ def test_g8_three_or_more_duplicates_reported_with_more_suffix():
     assert "+2 more" in msg, (
         f"G8 diagnostic should cap displayed dups at 5 + suffix; got: {msg}"
     )
+    # Eight occurrences of one id -> exactly one collision diagnostic in
+    # the whole error list; the per-line invariants do not echo seven more.
+    assert _collision_errors(report.errors) == g8_errors, report.errors
 
 
 def test_g8_skips_lines_without_line_id():
@@ -162,3 +229,4 @@ def test_g8_runs_alongside_role_invariant_independently():
         f"Expected both role + G8 errors. role: {role_errors}, "
         f"G8: {g8_errors}"
     )
+    assert _collision_errors(report.errors) == g8_errors, report.errors

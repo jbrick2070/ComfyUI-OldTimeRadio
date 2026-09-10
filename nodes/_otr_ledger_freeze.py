@@ -267,11 +267,13 @@ def _check_per_line_invariants(
 ) -> None:
     """ADR §7 per-line invariants.
 
-    line_id unique; char_id non-empty for voiced beats; speaker_role
-    in the allowed enum; (text non-empty) OR (skip=True with reason);
-    beat_id references an existing beat in meta.outline.beats (or
-    top-level beats[]); word_count / char_count match text; no
-    inconsistent text!="" AND skip=True combo.
+    line_id present, a string and non-empty (uniqueness across lines[]
+    is owned by G8, `_check_g8_line_id_uniqueness`, which reports one
+    capped summary per audit); char_id non-empty for voiced beats;
+    speaker_role in the allowed enum; (text non-empty) OR (skip=True
+    with reason); beat_id references an existing beat in top-level
+    beats[]; word_count / char_count match text; no inconsistent
+    text!="" AND skip=True combo.
     """
     lines = ledger_data.get("lines")
     if not isinstance(lines, list):
@@ -296,7 +298,6 @@ def _check_per_line_invariants(
                 if isinstance(bid, str) and bid:
                     valid_beat_ids.add(bid)
 
-    seen_line_ids: set[str] = set()
     voiced = 0
     for idx, ln in enumerate(lines):
         if not isinstance(ln, dict):
@@ -307,10 +308,6 @@ def _check_per_line_invariants(
         line_id = ln.get("line_id")
         if not isinstance(line_id, str) or not line_id:
             errors.append(f"lines[{idx}] has empty/missing line_id")
-        elif line_id in seen_line_ids:
-            errors.append(f"lines[{idx}] line_id={line_id!r} is duplicated")
-        else:
-            seen_line_ids.add(line_id)
 
         speaker_role = ln.get("speaker_role")
         if not isinstance(speaker_role, str) or not speaker_role:

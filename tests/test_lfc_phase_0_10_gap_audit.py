@@ -241,10 +241,19 @@ class TestPhase10HardFail:
 
     def test_duplicate_line_id_raises(self):
         data = _clean_ledger_data()
-        data["lines"][1]["line_id"] = data["lines"][0]["line_id"]
+        duplicated_id = data["lines"][0]["line_id"]
+        data["lines"][1]["line_id"] = duplicated_id
         with pytest.raises(_LFC.FreezeAssertionError) as ei:
             _LFC.phase_10_gap_audit_post_and_freeze(data)
-        assert any("duplicated" in e for e in ei.value.errors)
+        # G8 is the sole owner of the collision diagnostic: exactly one
+        # summary naming the duplicated id, and no per-line echo of it.
+        g8_errors = [e for e in ei.value.errors if e.startswith("G8:")]
+        assert len(g8_errors) == 1, ei.value.errors
+        assert duplicated_id in g8_errors[0]
+        assert "duplicate line_id(s)" in g8_errors[0]
+        assert not any(
+            "duplicated" in e for e in ei.value.errors
+        ), ei.value.errors
 
     def test_bad_speaker_role_raises(self):
         data = _clean_ledger_data()
