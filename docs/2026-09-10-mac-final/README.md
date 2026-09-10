@@ -117,17 +117,24 @@ The requested Windows destination is:
 C:\Users\jeffr\Documents\ComfyUI\output\otr
 ```
 
-**Transfer is in progress, not yet verified complete.** DeskIn has all nine
-videos queued to `obs` and all nine episode folders queued to `episodes`.
-At this receipt, one video is reported complete and the next is transferring;
-observed speed varies from about 30 to 180 KB/s. Do not retire the rental
-based on a queued transfer or this Git commit. The media files themselves are
-not stored in Git history.
+**Transfer interrupted, 2026-09-10 16:52 UTC.** DeskIn displayed
+"File transfer terminated due to disconnection" at **11/18 complete**: all
+nine videos and two episode folders were reported finished. The completed
+folders displayed as the Tick episode (487.7 MiB) and a Lantern episode
+(899.5 MiB). The active Magnetic Pulse folder was at 322.2 MiB of the displayed
+1.23 GB (25%) when the connection ended. Seven episode folders are not yet
+verified complete. Full destination inventory and hashes have not been checked.
+Do not retire the rental on this partial receipt. See `transfer_status.json`.
 
-An hourly follow-up, **Finish OTR Mac file transfer**, is active in the
-current Codex task. It checks the existing copy, stays quiet during normal
-progress, and is to pause after verified completion or an unresolved access
-blocker. Keep the Mac and Codex running until the off-machine copy is verified.
+After dismissing the disconnection notice, the reconnect window was visible,
+but repeated Connect clicks failed with the CUA error `noWindowsAvailable`,
+including after a CUA session reset and raising the window. Keyboard Return
+and Tab did not reconnect. The **Finish OTR Mac file transfer** hourly
+follow-up is now **paused** pending restored access. The user needs to reconnect
+DeskIn to IDREAM in File Transfer mode and leave that window open. Then compare
+the remote files with the existing manifest and resume only missing or partial
+files; do not resend completed batches. The Mac originals and local ZIP remain
+available, and no completed destination file was removed.
 
 A complete local ZIP backup is ready at
 `/Users/rentamac/Documents/otr-mac/transfer/otr-mac-episodes-20260910.zip`.

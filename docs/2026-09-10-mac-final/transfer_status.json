@@ -1,0 +1,16 @@
+{
+  "checked_at_utc": "2026-09-10T16:55:41.888695+00:00",
+  "status": "disconnected; reconnect needs user action",
+  "completed_top_level_items": 11,
+  "queued_top_level_items": 18,
+  "active_folder_prefix": "signal_lost_magnetic_pulse",
+  "active_transferred_mib": 322.2,
+  "displayed_speed_kib_s": 0,
+  "displayed_percent": 25,
+  "verification": "DeskIn reported transfer terminated due to disconnection. Nine videos and two folders reported complete; full destination inventory and hashes not verified.",
+  "consecutive_access_failures": 1,
+  "ui_recovery": "Finder Applications already selected DeskIn; Finder Command+O, then cua.getApp(DeskIn), then Command+grave revealed IDREAM. Opening by full app path kept selecting the helper popup.",
+  "active_total_display": "1.23 GB",
+  "reconnect_failure": "Repeated Connect clicks fail with noWindowsAvailable, including after a CUA reset and window raise; keyboard Return/Tab did not reconnect.",
+  "resume_rule": "After reconnection inspect remote files against the existing manifest. Resume only missing/incomplete files; do not resend completed batches."
+}

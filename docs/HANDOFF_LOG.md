@@ -1,3 +1,24 @@
+## 2026-09-10 16:52 UTC -- DeskIn disconnected; archive copy incomplete; follow-up paused
+
+Mac testing remains closed and all source/evidence is pushed. DeskIn displayed
+**File transfer terminated due to disconnection** at **11/18 items complete**:
+nine finished videos and two episode folders were reported complete. The
+Magnetic Pulse archive was at 322.2 MiB of the displayed 1.23 GB (25%); seven
+folders remain unverified. The full destination inventory and hashes are not
+yet checked, so this is not permission to retire the rental.
+
+The main reconnect window appeared after dismissal, but repeated CUA clicks
+on Connect returned `noWindowsAvailable`, including after reset and window
+raise; keyboard navigation did not reconnect. No copy batch was resent. The
+hourly follow-up is **PAUSED** to avoid repeating the alert. Ask the operator
+to reconnect IDREAM in DeskIn File Transfer mode and leave the window open,
+then inspect the actual remote files against the manifest and resume only
+missing or partial files. Do not replace Windows `_shared` state. The local
+media, hardlink staging and full ZIP are still intact. Current receipt:
+`docs/2026-09-10-mac-final/transfer_status.json`. No runtime code changed.
+
+---
+
 ## 2026-09-10 -- Mac font signoff accepted; 5080 handoff; media transfer in progress
 
 **Base code HEAD: `6f9a5586cff084489fbb0aea257eb1f6761af615`, v2.0-alpha.**
