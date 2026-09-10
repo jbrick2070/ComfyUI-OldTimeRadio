@@ -20,10 +20,10 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `still_flat` | nothing | -- | fits | fits | **proven** | ? | ? |
-| `still_motion` | nothing | -- | fits | fits | **proven** | ? | ? |
-| `still_pan` | nothing | -- | fits | fits | **proven** | ? | ? |
-| `still_word` | nothing | -- | fits | fits | **proven** | ? | ? |
+| `still_flat` | nothing | -- | fits | **proven** | **proven** | ? | ? |
+| `still_motion` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
+| `still_pan` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
+| `still_word` | nothing | -- | fits | measured | **proven** | ? | ? |
 | `viz_camera` | nothing | -- | fits | fits | **proven** | ? | ? |
 | `viz_green` | nothing | -- | fits | fits | **proven** | ? | ? |
 | `viz_mxc_cpu` | nothing | -- | **proven** | fits | **proven** | ? | ? |
@@ -56,10 +56,10 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered | ? | not offered |
 | `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
-| `ltx098_low_video` | **auto** | 16.1 GiB | fits | **proven** | **proven** | ? | not offered |
+| `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
 | `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
+| `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
@@ -70,11 +70,11 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** | ? | too slow |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | fits | not offered | ? | not offered |
-| `lumina_image` | manual | 10.4 GiB | **OOM** | fits | not offered | ? | not offered |
-| `flux_gen1` | manual | 13.0 GiB | **OOM** | fits | not offered | ? | not offered |
-| `ideogram4_local` | manual | 17.3 GiB | **no** | **OOM** | not offered | not offered | not offered |
-| `z_image_turbo` | **auto** | 19.3 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
+| `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | ? | not offered |
 
 **Image -- hosted**
 
@@ -115,19 +115,19 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | fits | measured | ? | ? |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
 
 **Writer (the LLM that writes the script)**
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `google/gemma-2-2b-it` | GATED | 5.2 GiB | fits | fits | fits | ? | ? |
-| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | **OOM** | ? | ? |
+| `google/gemma-2-2b-it` | GATED | 5.2 GiB | **proven** | fits | fits | ? | ? |
+| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | fits | **proven** | ? | ? |
-| `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | fits | fits | **tight** | ? | ? |
-| `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **no** | fits | **no** | ? | ? |
-| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | fits | **no** | ? | ? |
+| `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | fits | **tight** | ? | ? |
+| `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **proven** | measured | **no** | ? | ? |
+| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
 
 **How you get the weights.** **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you

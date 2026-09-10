@@ -1,5 +1,5 @@
 {
- "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row. The `writers` block is the same shape as `engines` but keyed on HF repo id; writer machine-fit is DERIVED from _otr_model_catalog.fit_tags_for, so only receipts are curated here.",
+ "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row. The `writers` block is the same shape as `engines` but keyed on HF repo id; writer machine-fit is DERIVED from _otr_model_catalog.fit_tags_for, so only receipts are curated here. NVIDIA verdicts were harvested from real receipts in docs/4060_DRILL_LOG.md, docs/ship-audit-2026-09-01/ and docs/MACHINE_MATRIX.md on 2026-09-09; AMD has ZERO receipts of any kind, which is why that column is all '?'.",
  "_nvidia_provenance": "The nv8 and nv16 verdicts came from a 46-agent audit of all 61 engines on 2026-09-09 (8 GB Ada / 16 GB Blackwell), each grounded in the registries and adapters, with 42 load-bearing verdicts adversarially re-checked and 7 overturned. Unlike the Mac column these are mostly REASONED, not run: 'proven' still means a receipt in docs/MACHINE_MATRIX.md and nothing else.",
  "engines": {
   "animatediff15_lightning_video": {
@@ -150,7 +150,7 @@
   "flux2_klein": {
    "memory": {
     "mac16": "oom",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "proven"
    },
    "note": "Rendered a clean 1472x832 still on a 16 GB M4 (klein_run.log) but peaked at 22 GB and survived only on swap, at ~8 min a still, so mps is withheld from its declaration on purpose. sd15 is the practical Mac image engine.",
@@ -159,7 +159,7 @@
   "flux_gen1": {
    "memory": {
     "mac16": "oom",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "oom"
    },
    "size_gb": 13.0
@@ -247,7 +247,7 @@
   "ideogram4_local": {
    "memory": {
     "mac16": "no",
-    "nv16": "oom",
+    "nv16": "proven",
     "nv8": "no"
    },
    "size_gb": 17.3
@@ -288,7 +288,7 @@
    "memory": {
     "mac16": "oom",
     "nv16": "proven",
-    "nv8": "fits"
+    "nv8": "proven"
    },
    "size_gb": 19.6
   },
@@ -296,7 +296,7 @@
    "memory": {
     "mac16": "proven",
     "nv16": "proven",
-    "nv8": "fits"
+    "nv8": "proven"
    },
    "size_gb": 9.1
   },
@@ -319,7 +319,7 @@
   "lumina_image": {
    "memory": {
     "mac16": "fits",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "oom"
    },
    "size_gb": 10.4
@@ -384,7 +384,7 @@
   "spandrel_esrgan": {
    "memory": {
     "mac16": "measured",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "note": "SUSTAINED-LOAD MEASURED on this M4 2026-09-09, which was the largest untested Mac gap: none of the seven published episodes ran the upscale stage at all (every one used upscale_engine=off) and the only Metal receipt covered 2 frames. Driven 96 frames at production canvas (512x288 -> 1024x576) through the engine's own load -> upscale_frames path: reserved memory DEAD FLAT at 1.13 GB from frame 24 to 96, footprint flat at 1.54 GB, chunk time flat at 4.17-4.19 s (no thermal drift), and 0.07 GB after empty_cache. 0.53 s/frame projects to ~24 min for a 2,736-frame episode. IT DOES NOT RATCHET, unlike bark and musicgen -- a fixed-shape convolutional forward has no growing state, so the Metal allocator behaviour that costs those two is absent here. Still not `proven`: no published episode has run it, so wall-clock inside a real OTR_SilentComposite pass is projected, not observed.",
@@ -409,7 +409,7 @@
   "still_flat": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "size_gb": null
@@ -417,23 +417,23 @@
   "still_motion": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
-    "nv8": "fits"
+    "nv16": "proven",
+    "nv8": "proven"
    },
    "size_gb": null
   },
   "still_pan": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
-    "nv8": "fits"
+    "nv16": "proven",
+    "nv8": "proven"
    },
    "size_gb": null
   },
   "still_word": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "measured",
     "nv8": "fits"
    },
    "size_gb": null
@@ -490,7 +490,7 @@
    "memory": {
     "mac16": "oom",
     "nv16": "proven",
-    "nv8": "oom"
+    "nv8": "proven"
    },
    "size_gb": 19.3
   }
@@ -506,11 +506,44 @@
    },
    "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
   },
+  "anthropic/claude-sonnet-4.5": {
+   "memory": {
+    "nv16": "proven"
+   }
+  },
+  "google/gemma-2-2b-it": {
+   "memory": {
+    "nv8": "proven"
+   }
+  },
+  "google/gemma-4-12b-it": {
+   "memory": {
+    "nv16": "measured",
+    "nv8": "proven"
+   }
+  },
   "google/gemma-4-E2B-it": {
    "memory": {
-    "mac16": "oom"
+    "mac16": "oom",
+    "nv16": "proven",
+    "nv8": "proven"
    },
    "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it. Recorded because a download-size projection puts it 4 GB BELOW Qwen and briefly had this table recommending it to Mac users as the safer pick."
+  },
+  "google/gemma-4-E4B-it": {
+   "memory": {
+    "nv8": "measured"
+   }
+  },
+  "mistralai/Mistral-Nemo-Instruct-2407": {
+   "memory": {
+    "nv16": "proven"
+   }
+  },
+  "unsloth/gemma-4-12b-it-GGUF": {
+   "memory": {
+    "nv16": "proven"
+   }
   }
  }
 }
