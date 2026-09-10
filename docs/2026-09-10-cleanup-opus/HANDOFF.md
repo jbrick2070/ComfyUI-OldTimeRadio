@@ -1,10 +1,24 @@
 # Opus handoff: clean audio and bounded cleanup
 
-Status: R1-R4 converged; ready for the three bounded Opus implementation chunks. Runtime cleanup has not been applied. The preparation and this handoff ship together in the commit named "test: qualify fresh canonical audio check and cleanup handoff"; verify that commit is present on origin/v2.0-alpha before P1.
+Status: DONE 2026-09-10. All three chunks are implemented, reviewed, committed and pushed to origin/v2.0-alpha: P1 `cc09b54a`, P2 `7aa46655`, P3 `e562e146`. Codex owns sprints 3-5 from HEAD `e562e146`. The result section below is the closing receipt; the sections after it are the pre-implementation contract kept for the record. The preparation shipped in "test: qualify fresh canonical audio check and cleanup handoff" (a3551ff5).
 
 Qualified Windows base: `1f27e4123a9567400ab39ef698d2a8a394601284`; closing pre-commit HEAD `b9d7be0863788e2507de5e68f9273e61c27268ba` adds only an unrelated My Story scope document. Branch `v2.0-alpha`. Recheck HEAD and ownership before editing. This is a bounded sample, not a complete repository audit.
 
-## Pending implementation, in order
+## Implementation result (2026-09-10)
+
+| Chunk | Commit | Runtime lines (nodes/) | Evidence |
+|---|---|---|---|
+| P1 / C4+C1 clean audio | `cc09b54a` | +73/-199 | Three-case fresh canonical CPU check passed: chirp opening 1.50 s, chirp no-opening 0.00 s (both unchanged from pre-edit evidence), silence 0/0/0 nonzero samples at scene/enhanced/master; clean enhancement equals the mono scene duplicated; asymmetric stereo through function defaults is bit-identical; all four tape modes leave silence at zero (subtle alone produced 95,998 nonzero samples before). Canonical sha 9ab0abe6 -> b24221b6, only node 4 widgets and one description word; validator 23 nodes / 62 links / drift 0. |
+| P2 / C2 G8 ownership | `7aa46655` | +7/-10 | 115 focused tests passed; two equal ids yield exactly one G8 summary at Phase 0 and Phase 10 (freeze still refused); None/""/7 ids stay per-line errors; eight occurrences yield one "+2 more" summary. Canonical bytes unchanged. |
+| P3 / C3 freeze no-acquisition | `e562e146` | +65/-67 | Fresh-process test on both banks runs the real registered node against canonical node 62 (link 115, widgets True/True) with the package-qualified loader poisoned: zero acquisition calls, frozen_with_warns, freeze_unload_ok true, cleanup status retired_no_content_policy / not_applicable_content_owned, real run_freeze_cascade with a poisoned callback never invokes it. Negative control: the same child against the pre-P3 commit aborts with "freeze must not call request_slot". Slot sweep 43 -> 42 sites, floor 12. |
+
+Runtime total across the three chunks: +145/-276 (net -131) lines in `nodes/`; test/check lines are reported separately in `implementation_receipt.json`. Full suite: a fresh same-HEAD baseline (14166 collected, exit 2, 54 unexpected failing node ids) and every post-chunk run (14166 / 14171 / 14180 collected) carry zero new failures (P1 and P2 the identical 54 ids; the P3 run had one order-dependent baseline failure, the catalog disk-space precheck, pass -- it passes in isolation and no catalog file was touched); the suite is not green and nothing was quarantined. Bug Bible after each chunk: 22 passed, 27 skipped, 3 xfailed. `scripts/build_variants.py --check`: no committed variants.
+
+Reviews (one finished-diff reader per chunk, CLAUDE.md 2026-09-07): P1 cursor-agent, no ship blocker (two stale-prose findings folded in); P2 cursor-agent, no ship blocker; P3 internal Claude reviewer subagent grounded on the real files (substitute: the cursor-agent lane returned a one-line preamble with exit 0 on its first run) plus a cursor-agent retry, both no ship blocker; their module-identity hardening, stale docstring, comment wording and peek-None findings were folded in before commit.
+
+Remaining production listening limitation: only the CPU synthetic-boundary segment was executed. No ComfyUI server, GPU, model generation, foley mux, video render, published episode or production listening happened in this wave. Existing masters, cached node outputs and replay bundles keep their original sound; the first normal fresh non-replay assembly is where the clean path is heard. The next bounded review named below is unchanged.
+
+## Implementation chunks as planned (completed; kept for the record)
 
 | Chunk | Confirmed eligible work | Intended result |
 |---|---|---|
@@ -25,7 +39,7 @@ The main audible change is confirmed in source and a fresh CPU diagnostic: exact
 - `qualification.json`, `canonical_audio_receipt.json`, `audio_noise_before.json`, `freeze_fixture_receipt.txt` and `slot_sweep_accounting.json` hold the compact evidence. Clean-audio and no-acquisition node regression tests in PLAN.md are planned work, not already-passed results.
 - `campaign_receipt.json` records the complete arc: C1-C3 R1-R3, late clean-audio C4 R1-R3 and shared integrated R4. Two fixed local lanes, 14 actual review calls, no additional workers/model upgrades/paid panel. Astra verified claims, corrected the stale canonical prohibition and rejected misreads. The final preparation also received its one finished-code CLI review. Reviewers expose no usage/cost receipt, so no spend number is claimed.
 
-## Copyable Opus instruction
+## Copyable Opus instruction (executed 2026-09-10)
 
 Read AGENTS.md, CLAUDE.md, the current GO_FORWARD ownership/queue, and docs/2026-09-10-cleanup-opus/PLAN.md plus qualification.json. Implement P1, P2 and P3 as the three scoped chunks specified there. Begin by verifying the preparatory commit is pushed and revalidate candidate preconditions at current Windows HEAD. The operator wants clean audio: remove the automatic noise sources and make the real canonical enhancement defaults dry; preserve useful rate/channel conversion, levels, timing, public node contracts and independent engine lanes. Extend the fresh canonical check in place; do not preserve obsolete runtime work to satisfy stale diagnostics. Run the declared focused/full/Bug Bible/structural checks and compare unexpected failures with a fresh same-HEAD baseline; do not quarantine new failures. Obtain one grounded finished-diff CLI review per code chunk, commit and push each qualified chunk to v2.0-alpha, and verify HEAD equals origin. Preserve unrelated files. No model upgrades, nested workers, paid panels, GPU/server runs, release changes or artifact/cache deletion. Stop after these chunks and their receipts; do not expand the hunt. Report exact runtime/test line deltas, evidence, and any remaining production listening limitation.
 

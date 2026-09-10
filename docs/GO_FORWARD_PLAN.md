@@ -18,8 +18,10 @@ identities, not a second ordering. Read the newest `docs/HANDOFF_LOG.md` entry
 for measured state. The archive holds receipts, not instructions to execute.
 
 **PRIORITY #1 (operator, 2026-09-10): finish the Opus cleanup, then deliver the
-My Story creator flow.** Follow the five dependent sprints under **WHERE TO
-PICK UP**. This latest instruction takes precedence over older next-step
+My Story creator flow.** The cleanup half LANDED 2026-09-10 (sprints 1-2, commits
+`cc09b54a` / `7aa46655` / `e562e146`; receipt in
+`docs/2026-09-10-cleanup-opus/HANDOFF.md`). Follow the five dependent sprints under **WHERE TO
+PICK UP**; sprint 3 is next. This latest instruction takes precedence over older next-step
 directions in this file. The remaining queue resumes afterward; stable row
 identities and earlier scope cuts remain intact.
 
@@ -107,13 +109,14 @@ canonical workflow for checks, never an old harness graph.
 
 | Sprint | Pending work, in dependency order | Exit / next owner |
 |---|---|---|
-| **1. Clean audio** | Opus P1: remove automatic roomtone/tape hiss, set clean code and canonical enhancement defaults together, and remove the seven unused SceneSequencer assignments (C4 + C1). | Follow P1's focused/full/Bible and fresh canonical CPU checks; review, commit and push this chunk. |
-| **2. Finish bounded cleanup** | Opus P2: give G8 one duplicate-ID diagnostic owner (C2). Then Opus P3: remove unused freeze model acquisition while preserving validation, unloading and recovery contracts (C3). | P2 and P3 remain separate qualified, reviewed, committed and pushed chunks. Hand off the resulting HEAD before My Story edits shared files. |
+| **1. Clean audio** -- DONE 2026-09-10 | Opus P1 landed as `cc09b54a`: automatic roomtone bed and tape hiss retired, clean code + canonical enhancement defaults (node 4 all effects off), seven unused SceneSequencer assignments removed. | Fresh three-case canonical CPU check passed (1.50 s / 0.00 s offsets unchanged, silence stays zero); full suite same 54 baseline failures, zero new; reviewed, pushed. |
+| **2. Finish bounded cleanup** -- DONE 2026-09-10 | Opus P2 landed as `7aa46655` (G8 sole owner of duplicate line_id diagnostics). Opus P3 landed as `e562e146` (freeze no longer acquires a model; validation, unload and recovery contracts preserved; fresh-process no-acquisition proof on both banks). | Separate qualified, reviewed, committed and pushed chunks. Codex picks up sprint 3 from HEAD `e562e146`; evidence in `docs/2026-09-10-cleanup-opus/implementation_receipt.json`. |
 | **3. Current docs + independent design** | My Story D0: currentize README, source-bank preflight and linked operational guides against the cleaned-up code. Then D1: specify and review the independent bank's pass graph, schemas, prompts, cast and integration contracts. | Exact D1 design is required before code. Scope convergence is not a bank preflight PASS. |
 | **4. Complete creator path** | Build My Story field admission, LLM expansion into a full ledger, persistent input drafts, source selection and required published-episode delivery. Retain act count and character-count request. Ship all functional canonical widget/link changes with their code, before the bank is runnable. | Normal graph use completes the whole path. A saved draft or archive alone is not successful My Story delivery. Qualify, review, commit and push per the linked plan. |
 | **5. Optional App view + qualification** | Add the native App form and final player/report presentation. Prove graph-only use, App/Graph switching, saved parameters, playback/history, cancellation and errors; complete model/canonical qualification and final user documentation. | App Mode/sidebar use remains optional, with graph as the default. Report actual preflight evidence and limits; no release/tag/promotion is implied. |
 
-**Start now with sprint 1's current-HEAD checks and P1 implementation.** The
+**Sprints 1-2 are DONE (2026-09-10). Start now with sprint 3: Codex My Story D0
+from HEAD `e562e146`.** The
 [Opus starter prompt](2026-09-10-my-story-app-review/OPUS_START.md) contains
 the bounded assignment and handoff to Codex. One
 coder owns shared files at a time; do not interleave My Story writer/validator
@@ -544,7 +547,7 @@ remain in force for the remaining queue.
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **Opus cleanup -> My Story (sprints 1-5 above)** | Clean the shared code first, currentize the source-bank docs, complete the independent design, build a full graph creator path, then add optional App presentation and finish qualification. Both linked plans are priority #1. |
+| **1st** | **Opus cleanup (DONE `e562e146`) -> My Story (sprints 3-5 above)** | The shared code is clean as of 2026-09-10; now currentize the source-bank docs, complete the independent design, build a full graph creator path, then add optional App presentation and finish qualification. Both linked plans are priority #1. |
 | **2nd** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
@@ -586,7 +589,8 @@ accepted ledger malformed and fails closed. The stored object already carries `m
 makes "applied identically to writer output, replay and the deterministic path"
 achievable in one commit.
 
-**The next concrete step is sprint 1: Opus P1 at the current Windows HEAD.**
+**The next concrete step is sprint 3: Codex My Story D0 from HEAD `e562e146`
+(sprints 1-2 landed 2026-09-10).**
 Row 2.2 resumes after the combined priority #1 programme. Its build
 specification and superseded plumbing directions are archived;
 do not add a new field or redirect the v3 renderer to the v2 admission key.
