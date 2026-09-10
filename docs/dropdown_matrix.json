@@ -1,5 +1,5 @@
 {
- "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row.",
+ "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row. The `writers` block is the same shape as `engines` but keyed on HF repo id; writer machine-fit is DERIVED from _otr_model_catalog.fit_tags_for, so only receipts are curated here.",
  "_nvidia_provenance": "The nv8 and nv16 verdicts came from a 46-agent audit of all 61 engines on 2026-09-09 (8 GB Ada / 16 GB Blackwell), each grounded in the registries and adapters, with 42 load-bearing verdicts adversarially re-checked and 7 overturned. Unlike the Mac column these are mostly REASONED, not run: 'proven' still means a receipt in docs/MACHINE_MATRIX.md and nothing else.",
  "engines": {
   "animatediff15_lightning_video": {
@@ -28,11 +28,11 @@
   },
   "bark": {
    "memory": {
-    "mac16": "measured",
+    "mac16": "oom",
     "nv16": "proven",
     "nv8": "proven"
    },
-   "note": "Measured on this M4 2026-09-07 -- 40.8 s for 4.6 s of structured speech, flatness 0.070, finite; the row earned its mps backend on that run. But NO published episode has used it: all seven Mac episodes to date used kokoro.",
+   "note": "MEASURED END TO END ON THIS M4, 2026-09-09, and the verdict moved from 'measured' to OOM on the numbers. It produces good audio -- 11.5 s of speech, finite, spectral flatness 0.031 -- but: (1) 11.7x SLOWER THAN REALTIME (134.6 s for 11.5 s), so an episode's minutes of dialogue is hours in the voice stage alone; (2) generation drove the process to an 18.0 GB phys_footprint on a 16 GB machine, which is swap. The cause is not the weights: LIVE tensors never left 4.18 GB. The MPS caching allocator's RESERVED pool grew 5.10 -> 16.63 GB across the autoregressive loop and never gave it back -- after a full teardown, with ZERO live tensors, 10.85 GB stayed reserved and a second explicit torch.mps.empty_cache() returned none of it. kokoro is why all seven published episodes used kokoro.",
    "size_gb": 4.2
   },
   "chatterbox": {
@@ -383,10 +383,11 @@
   },
   "spandrel_esrgan": {
    "memory": {
-    "mac16": "fits",
+    "mac16": "measured",
     "nv16": "fits",
     "nv8": "fits"
    },
+   "note": "Measured on this M4 2026-09-09 (tests/test_upscale_mps_receipt.py): RealESRGAN_x2plus forward passes on mps in 0.51 s, bit-exact against CPU on the raw forward, and the engine's load -> upscale_frames loop ran 1.06 s on MPS vs 8.37 s on CPU. But those were 64x64 and 288x512 micro-clips: NONE of the seven published Mac episodes ran the upscale stage at all -- every one published with upscale_engine=off. Sustaining ESRGAN over 2,000+ frames in OTR_SilentComposite is unproven here, and on NVIDIA that stage has taken over 105 minutes (docs/SOAK_LEG_GUIDE.md).",
    "size_gb": 0.1
   },
   "stable_audio_3": {
@@ -492,6 +493,18 @@
     "nv8": "oom"
    },
    "size_gb": 19.3
+  }
+ },
+ "writers": {
+  "Qwen/Qwen3.5-4B": {
+   "memory": {
+    "amd": "unknown",
+    "cpu": "unknown",
+    "mac16": "proven",
+    "nv16": "fits",
+    "nv8": "proven"
+   },
+   "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
   }
  }
 }

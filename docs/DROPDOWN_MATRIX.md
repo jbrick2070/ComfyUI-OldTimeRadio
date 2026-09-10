@@ -96,7 +96,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | measured | ? | ? |
 | `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `stable_audio_3` | **auto** | 3.5 GiB | **proven** | fits | **proven** | ? | not offered |
-| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | measured | ? | too slow |
+| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **OOM** | ? | too slow |
 | `stable_audio_music` | GATED | 4.5 GiB | fits | fits | not offered | ? | not offered |
 | `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered | not offered | not offered |
@@ -115,7 +115,19 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | fits | fits | ? | ? |
+| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | fits | measured | ? | ? |
+
+**Writer (the LLM that writes the script)**
+
+| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
+|---|---|---|---|---|---|---|---|
+| `google/gemma-2-2b-it` | GATED | 5.2 GiB | fits | fits | fits | ? | ? |
+| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | fits | ? | ? |
+| `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
+| `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | fits | **proven** | ? | ? |
+| `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | fits | fits | **tight** | ? | ? |
+| `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **no** | fits | **no** | ? | ? |
+| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | fits | **no** | ? | ? |
 
 **How you get the weights.** **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you

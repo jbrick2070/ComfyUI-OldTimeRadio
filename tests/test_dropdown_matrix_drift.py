@@ -46,13 +46,38 @@ def test_the_doc_and_readme_match_the_live_code():
 
 
 def test_every_registered_engine_has_a_row():
-    """A new engine cannot ship without appearing in the matrix."""
+    """A new engine cannot ship without appearing in the matrix.
+
+    Compared as a SUBSET, not equality: the table also carries the WRITER
+    dimension, which does not live in any engine registry (writers come from
+    `_otr_model_catalog`'s curated list). Equality here asserted that the only
+    thing worth charting is a registry engine -- which is exactly the
+    assumption that let the matrix ship with no writers at all while every
+    published episode turned on one.
+    """
     M = _generator()
     caps = M.registry_capabilities()
     declared = {e for table in caps.values() for e in table}
     charted = {row["engine"] for row in M.build_rows()}
-    assert declared == charted, (
+    assert declared <= charted, (
         "engines missing from the matrix: %s" % sorted(declared - charted))
+
+
+def test_every_curated_writer_has_a_row():
+    """The writer dimension, pinned the same way.
+
+    Added after an audit of the published episodes found the matrix silent on
+    writers -- while all seven Mac episodes used the same one, and it is the
+    largest single download in the graph.
+    """
+    M = _generator()
+    charted = {row["engine"] for row in M.build_rows()
+               if row["namespace"] == "writer"}
+    cat = M._load("nodes/_otr_model_catalog.py", "_odm_catalog_test")
+    declared = {m.repo_id for m in cat._active_curated_models()
+                if getattr(m, "provider", "local") == "local"}
+    assert declared == charted, (
+        "writers missing from the matrix: %s" % sorted(declared - charted))
 
 
 def test_no_curated_receipt_sits_on_a_cell_the_code_refuses():

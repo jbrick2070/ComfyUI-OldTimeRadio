@@ -1,0 +1,1 @@
+{"decl": ["video_path", "burn_captions", "caption_style", "fps", "ffmpeg", "ledger_path", "output_path", "gate_in", "title_card_plan_json"], "widgets": ["burn_captions", "caption_style", "fps", "ffmpeg", "ledger_path", "output_path"]}

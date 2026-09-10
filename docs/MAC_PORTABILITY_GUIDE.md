@@ -1320,6 +1320,42 @@ and whether anything still holds a reference when it is.
 
 ---
 
+### The `llm_vram_ceiling_gb` widget does NOTHING on Apple Silicon
+
+**Set it to whatever you like; on `mps` it cannot refuse any writer in the
+catalog.** This is worth knowing before you build a device JSON, because the
+widget looks exactly like the protection it is not.
+
+The shipped canonical saves `llm_device='mps'`, `llm_quant_policy='none'`,
+`llm_vram_ceiling_gb=10.0`. Traced through `check_vram_fit` on this machine:
+
+```
+    estimate  =  4.34 GB   <- _estimate_resident_gb halves the 8.68 GB row,
+                              on the assumption of 8-bit/NF4 loading
+    ceiling   = 10.00 GB   <- what the widget says
+    FAIL at   = 15.00 GB   <- ceiling x _FAIL_RATIO (1.5)
+    verdict   = WARN       <- so the load proceeds
+```
+
+Three things have to line up wrong for that, and they all do here. The estimate
+is HALVED for a quantization that does not exist on macOS. The gate only FAILS
+at 1.5x the ceiling, not at it. And the measured Metal cost -- **14.0 GB** --
+is still under that 15.0 GB trip point. Even un-halved, the largest row you
+could pick is 24 GB and only Mistral-Nemo and gemma-4-12b would ever trip it.
+
+Nothing enforces a Mac memory limit anywhere else either: the loader's
+`total_vram` comes from `torch.cuda.get_device_properties(0)` behind a
+`torch.cuda.is_available()` guard, which is False here, so the budgeter reads 0.
+And `refuse_if_weights_exceed_unified_memory` is a VIDEO guard -- it takes an
+engine name and never sees an LLM.
+
+**So the writer is unguarded on this platform, by design and by operator
+ruling** (no gated dropdowns, no capability matrix in code -- documentation
+only). Read the dropdown's own fit tags instead: a row without `mac16` is the
+warning, and `mac16-tight` means it fits with nothing else running.
+
+---
+
 ### The Metal writer lane: use GGUF, not bf16
 
 **On Apple Silicon the transformers lane at `llm_quant_policy: none` is the one

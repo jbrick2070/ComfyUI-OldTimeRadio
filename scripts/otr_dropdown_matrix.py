@@ -79,6 +79,10 @@ _REGISTRIES = (
 #: Why the code refuses an engine on a machine -> what to say in a cell. The
 #: wording matters: none of these mean "your hardware cannot do this", and a
 #: table that implies they do sends people to buy a machine they already own.
+#: The machine classes `_otr_model_catalog.fit_tags_for` actually evaluates.
+#: Anything outside this set gets no derived verdict, only "?".
+_WRITER_FIT_KEYS = frozenset({"mac16", "nv8", "nv16", "nv24"})
+
 _REFUSAL = {
     "requires_cuda": "not offered",
     "requires_vendor": "not offered",
@@ -258,6 +262,51 @@ def os_friction() -> dict:
             for engine, kinds in out.items() if kinds == {".ps1"}}
 
 
+def writer_rows() -> list:
+    """The WRITER dimension, which this table was silent about entirely.
+
+    THE GAP THIS CLOSES. Every shipped graph needs a writer LLM, and every one
+    of the seven episodes published on the M4 used the same one -- yet neither
+    this document nor its curated file mentioned writers at all. A per-dropdown
+    matrix that omits the dimension carrying the largest single download, and
+    the one measured at 14 GB resident on a 16 GB machine, is not a per-dropdown
+    matrix. Found by an audit of the published episodes against the table.
+
+    Writers do not live in an engine registry, so they cannot come through
+    `registry_capabilities`: they come from the catalog's curated list, and
+    their machine fit is the same `fit_tags_for` the dropdown badge uses -- one
+    derivation, so the table and the picker cannot disagree.
+    """
+    cat = _load("nodes/_otr_model_catalog.py", "_odm_catalog")
+    curated = load_curated().get("writers", {})
+    rows = []
+    for m in cat._active_curated_models():
+        if getattr(m, "provider", "local") != "local":
+            continue          # hosted lanes: a credential, not a download
+        repo = m.repo_id
+        tags = cat.fit_tags_for(repo)
+        gated = (repo in cat.GATED_CURATED_MODELS
+                 or bool(getattr(m, "requires_auth", False)))
+        hand = curated.get(repo, {})
+        rows.append({
+            "engine": repo,
+            "public": repo,
+            "namespace": "writer",
+            "friction": "GATED" if gated else "auto",
+            "lane": None,
+            "size_gb": float(getattr(m, "approx_safetensors_gb", 0.0) or 0.0),
+            "size_measured": True,
+            # Fit is DERIVED; only the receipts are curated.
+            "availability": {mch["key"]: "ok" for mch in MACHINES},
+            "memory": hand.get("memory", {}),
+            "note": hand.get("note", ""),
+            "remote": False,
+            "os_note": "",
+            "fit_tags": tags,
+        })
+    return rows
+
+
 def load_curated() -> dict:
     return json.load(io.open(_CURATED, encoding="utf-8"))
 
@@ -303,6 +352,7 @@ def build_rows() -> list:
                 "memory": hand.get("memory", {}),
                 "note": hand.get("note", ""),
             })
+    rows.extend(writer_rows())
     return rows
 
 
@@ -338,6 +388,25 @@ def _cell(row: dict, key: str) -> str:
         # unmeasured question marks would imply a hardware question that is
         # not being asked here.
         return "key"
+    if row.get("fit_tags") is not None and not row["memory"].get(key):
+        # WRITERS: the arithmetic half is derived, so an uncurated cell is not
+        # unknown -- it is "the size says yes/no and nobody has run it". Only
+        # a receipt is curated, and a receipt always wins over this.
+        #
+        # ONLY FOR MACHINES fit_tags_for ACTUALLY EVALUATES. It computes
+        # mac16/nv8/nv16/nv24 and says nothing about AMD or CPU, so treating a
+        # missing tag as "no" there announced that a 5.2 GB writer cannot run
+        # on an AMD card -- inventing a verdict out of a column that was never
+        # calculated. Absence of a tag is only evidence where a tag was on
+        # offer.
+        if key in _WRITER_FIT_KEYS:
+            tags = row["fit_tags"]
+            if key in tags:
+                return "fits"
+            if key + "-tight" in tags:
+                return "**tight**"
+            return "**no**"
+        return "?"
     verdict = row["memory"].get(key, "unknown")
     return {"proven": "**proven**", "measured": "measured", "fits": "fits",
             "oom": "**OOM**", "no": "**no**", "unknown": "?"}.get(verdict, verdict)
@@ -370,6 +439,8 @@ _GROUPS = (
     ("Voice and music -- hosted",
      lambda r: r["namespace"] == "audio" and r["friction"] == "none"),
     ("Upscale", lambda r: r["namespace"] == "upscale"),
+    ("Writer (the LLM that writes the script)",
+     lambda r: r["namespace"] == "writer"),
 )
 
 
