@@ -1263,29 +1263,73 @@ RTX 4060. Everything below is either UNDONE or UNPROVEN; the finished work is in
    **Record every hand step.** Zero is the pass. A non-zero list IS the remaining
    work.
 
-### D. Mac -- one unknown, answered by running, not by estimating
+### D. Mac -- ANSWERED 2026-09-09. Seven published episodes; see HANDOFF_LOG.
 
-7. **Widen `z_image_turbo` AND `ltx_8gb` to `["cuda","cpu","mps"]`, run one act on
-   a real Mac, read `otr/obs/`.** Binary: it published or it did not. Operator
-   ruling 2026-09-06, and it is the right one -- every advance today came from
-   running something, and the arithmetic that said Qwen "misses 8 GB by 0.07 GiB"
-   was true and useless. Peak-memory readings are DIAGNOSTICS ON FAILURE (a near
-   miss worth a second try, or the wrong model), never a precondition for trying.
-   `ltx_8gb` is the higher-value half: if AI video runs on Metal, Mac gets the
-   whole ladder instead of one rung.
-8. SDXL adapter only if item 7 fails -- specced in the section above.
-9. Neither widening merges on reasoning alone. A dropdown entry is a promise.
+7. ~~Widen `z_image_turbo` AND `ltx_8gb`, run one act on a real Mac.~~ **DONE, and
+   the answer was yes.** `ltx_8gb` now declares `["cuda","mps"]` and has TWO
+   published Mac episodes; `sd15` declares `["cuda","cpu","mps"]` and minted the
+   stills in FOUR. So AI video and a local image engine both run on Metal, and
+   the paragraph below that said neither existed is superseded.
+8. ~~SDXL adapter only if item 7 fails.~~ Item 7 did not fail. **Do not build it.**
+9. Still the rule, and it held: a dropdown entry is a promise. Every widening
+   above is backed by a published episode, not by reasoning.
 
-### E. AMD -- entirely unproven
+**What Mac testing still owes, and it is short:** repeatability past one episode
+per lane, and nothing else. `docs/DROPDOWN_MATRIX.md` carries the per-engine
+verdicts with the receipt behind each.
 
-10. No AMD hardware exists in this campaign. Everything about AMD is inference
-    from ROCm reusing the `torch.cuda` namespace, which is why the AMD tiers
-    declare `device_backend: "cuda"` and why cuda-only engines are admissible
-    there. Plausible is not measured.
-11. **`torch.version.hip` vs `torch.version.cuda` is the clean discriminator**
-    between a real NVIDIA box and a ROCm one; `torch.cuda.is_available()` alone
-    cannot tell them apart. Worth using wherever the distinction actually matters
-    -- bitsandbytes availability above all.
+### E. AMD -- still entirely unproven, but now with an ORDER to test in
+
+10. No AMD hardware exists in this campaign; the operator is sourcing one
+    (RunPod is the likely first box). `docs/DROPDOWN_MATRIX.md` records AMD as
+    **0 of 68 cells** -- not an omission, an absence of receipts. Everything
+    about AMD is inference from ROCm reusing the `torch.cuda` namespace.
+11. **`torch.version.hip` vs `torch.version.cuda` is the clean discriminator.**
+    `torch.cuda.is_available()` alone cannot tell an NVIDIA box from a ROCm one.
+    Already used at `host_caps.py:38` and `_otr_workflow_validator.py:357`.
+
+12. **TEST bitsandbytes FIRST, before any render.** It is a two-minute question
+    with the largest downstream consequence on the box. `requirements.txt:47`
+    installs `bitsandbytes>=0.42.0` on every non-darwin platform, but the PyPI
+    wheel is CUDA-only and ROCm needs its own build. The answer forks everything:
+      * works    -> writer is ~3 GB NF4, the 8 GB AMD case is viable
+      * does not -> `quant_policy` must be `none`, writer is ~9 GB bf16, and AMD
+                    inherits the Mac's memory problem on a card that at least
+                    fails gracefully.
+    Do not render anything until this is known.
+
+13. **Then climb in rungs, cheapest first.** Each rung rules out a whole class:
+
+    | rung | test | cost | rules out |
+    | --- | --- | --- | --- |
+    | 0 | `torch.version.hip` set; all 25 nodes load; **ffprobe on PATH** | 2 min | platform / install |
+    | 1 | zero-download episode, `viz_*` lanes only | ~15 min | graph, ffmpeg, ledger, publish |
+    | 2 | writer alone (item 12) | 5 min | the memory model |
+    | 3 | `kokoro` + `stable_audio_3` (~3.8 GB) | ~20 min | the audio pair |
+    | 4 | full no-friction episode (12.2 GB) | ~1 h | the shipping combination |
+    | 5 | `ltx_8gb` local diffusion (auto, no node pack) | ~1 h | real generated video |
+
+    Rung 1 is the one that gets skipped and should not be: it proves OTR runs on
+    the machine AT ALL with zero download, so a failure there is unambiguous.
+
+14. **Do not spend pod hours on these:** `ltx_av` (hard-requires NVML,
+    `eng_ltx_av.py:753`), `h3_*` and `ideogram4_local` (NVFP4 -- silicon AMD does
+    not have), `chatterbox` / `dia` / `indextts2` (PowerShell-only installers).
+
+15. **RunPod economics change the answer.** Billed hourly, ephemeral storage:
+    download time is money. That is the argument for the 12.2 GB no-friction
+    recipe over the 32.7 GB one -- do not pull `z_image_turbo` onto a box you
+    will destroy. Snapshot the volume once rung 4 passes.
+
+16. **Use `rocm-smi`, not `nvidia-smi`.** The Mac cost real time to the same
+    class of error: `ps rss` under-reported a 14 GB process as 0.33 GB, a 40x
+    miss, because it was the wrong instrument confidently reporting.
+
+17. **The asymmetry that should shape the whole campaign:** on a discrete AMD
+    card an OOM kills a PROCESS. On Apple Silicon it reboots the HOST. Mac
+    testing was slow because a wrong guess cost the machine; AMD testing should
+    be aggressive -- fail fast, read the traceback, move on. Do not carry Mac
+    caution across.
 
 ### F. Correctness debt found today, not yet fixed
 
@@ -1878,15 +1922,19 @@ not fail the episode."* It does.
 * **Memory margin.** It finished at ~44% free, but earlier runs OOM-killed at
   quant `none`; the headroom is thin and uncharacterised.
 * **Wall clock vs CUDA.** ~24 min end to end here; no clean comparison made.
-* **Everything outside the canonical.** There is no local image engine and no
-  local video-diffusion engine on this platform -- `flux_gen1`, `flux2_klein`,
-  `lumina_image`, `z_image_turbo` and every LTX/Wan/AnimateDiff row declare
-  `["cuda"]`. The visualizer lanes are the only fully-local video path Apple
-  Silicon has, which is why the shipped Mac canonical is not a conservative
-  choice but the only one that runs.
-* **`ltx_8gb` (LTX 0.9.8) may be mis-declared.** Its adapter contains no
-  NVIDIA-specific code; its `["cuda"]` row looks untested rather than measured.
-  Unverified either way.
+* ~~**Everything outside the canonical.** There is no local image engine and no
+  local video-diffusion engine on this platform.~~ **FALSE as of 2026-09-09, and
+  it was already false when written.** `sd15` declares `["cuda","cpu","mps"]`
+  and minted the stills in FOUR published Mac episodes; `ltx_8gb` declares
+  `["cuda","mps"]` and published TWO; `animatediff15_lightning_video` declares
+  `["mps","cuda"]` and published one 23-beat episode. The visualizer lanes are
+  not the only local video path -- they are the cheapest one.
+  Still true of the REST: `flux_gen1`, `flux2_klein`, `lumina_image`,
+  `z_image_turbo` and every Wan/LTX-2.x row declare `["cuda"]`, and `flux2_klein`
+  withholds `mps` ON PURPOSE (it rendered on an M4 at 22 GB peak, surviving only
+  on swap).
+* ~~**`ltx_8gb` may be mis-declared.**~~ **Resolved:** it carries `mps` and has
+  the receipts. The suspicion was right and is now measured.
 
 ## For the 5080
 

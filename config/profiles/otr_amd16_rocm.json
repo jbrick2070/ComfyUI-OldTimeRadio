@@ -9,7 +9,7 @@
   "allow_sidecars": false,
   "role_overrides": {
     "announcer_visual": "viz_mxc_cpu",
-    "music_visual": "viz_mxc_mandala",
+    "music_visual": "viz_mxc_cpu",
     "character_visual": "still_motion",
     "announcer_image": "z_image_turbo",
     "music_image": "z_image_turbo",

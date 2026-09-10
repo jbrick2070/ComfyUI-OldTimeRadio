@@ -13790,3 +13790,86 @@ one. The published episode's own ledger was untouched and the capture was
 restored from it. This is exactly the "stale harnesses make weird episode-title
 stuff happen" failure the operator warned about twice the same hour: a scratch
 file that later runs read, silently holding one shot at T=500.
+
+---
+
+### PBUG-20260909-02 -- a render took the whole machine down at the writer-to-video handover
+
+**LIVE PRODUCTION FAILURE.** Mac mini M4 / 16 GB, `lightning_mac_proof`-class
+run, 2026-09-09 16:23. The host HARD REBOOTED ~19 minutes in. No kernel panic
+report, which fits memory exhaustion rather than a software fault.
+
+**Where it died, from the artifact:** the episode directory has a COMPLETE
+`audio/` -- master.wav, both music cues, ledger, and the assembled mp4 -- and NO
+`clips/` at all. Writer, cast, TTS and music all finished; it died entering the
+video phase.
+
+**Contributing, and named because it was ours:** a pytest sweep importing torch
+was running concurrently on the same 16 GB machine. The writer measures 14 GB
+(PBUG-20260907-06) and has no margin for a second consumer.
+
+**What this does NOT support:** blaming a single model. See -03 below -- the
+mechanism is the allocator, and the same combination published seven times.
+
+---
+
+### PBUG-20260909-03 -- the MPS allocator ratchets on autoregressive loops, and bark never gives it back
+
+**MEASURED on the M4, three engines end to end, `torch.mps` counters plus
+`footprint -p`:**
+
+```
+                live tensors   reserved pool        returns?
+musicgen  2.2G      2.20 GB       15.88 GB (7.1x)   yes -> 0.05 GB
+bark      4.2G      4.18 GB       16.63 GB (4.0x)   NO  -> 10.85 GB stranded
+upscale   0.06G     --             1.13 GB FLAT     yes -> 0.07 GB
+                                   (96 frames)
+```
+
+**THE RULE, and a first reading of it was too broad.** It is not "long loops
+ratchet on Metal". The dividing line is GROWING STATE. musicgen and bark are
+autoregressive -- each step's KV cache is larger, so the allocator keeps
+requesting bigger blocks. The upscale stage runs the LONGEST loop in the
+pipeline, thousands of fixed-shape convolutional forwards, and its pool is flat
+from the first chunk to the last.
+
+**Sizing rule:** price the autoregressive stages (writer, voice, music) against
+the WHOLE MACHINE; price the fixed-shape stages (upscale, procedural
+visualizers) against their WEIGHTS.
+
+**What condemns bark here is not the growth -- musicgen grows harder and gives
+it all back.** Bark strands 10.85 GB that a second explicit
+`torch.mps.empty_cache()` will not return. With 11.7x-realtime generation on top,
+it is unusable on this machine; `bark` moved to OOM in the dropdown matrix.
+
+**AND `del` + `gc.collect()` RETURNS NOTHING ON METAL.** Measured directly: live
+and reserved both unchanged across a full drop of every reference. Only the
+backend `empty_cache()` moved them. `torch.cuda.empty_cache()` is a SILENT NO-OP
+on Metal, so a teardown that calls only the CUDA one looks like hygiene and does
+nothing -- which is what `_otr_bark_lib._unload_bark` did until this fix.
+
+---
+
+### BIBLE CANDIDATES from 2026-09-09 -- for whoever has the survival-guide repo
+
+The Bible repo is not checked out on this rented Mac, so these are recorded here
+for promotion from the Windows box. Each is portable beyond OTR:
+
+1. **A CUDA `empty_cache()` is a silent no-op on other backends.** Pair every
+   `torch.cuda.empty_cache()` with the backend the code can actually reach, or
+   the teardown is decorative. Verify by measuring, not by reading -- `del` +
+   `gc.collect()` returned literally nothing here.
+2. **`ps rss` under-reports Apple Silicon by ~40x** (0.33 GB for a 14 GB
+   process). Use `footprint -p <pid>` / `phys_footprint`. Already in the Bible's
+   neighbourhood via PBUG-20260907-06; this is a second independent hit.
+3. **A saved COMBO widget value must be a member of the live option list.** A
+   stale label renders red and can silently resolve to index 0 -- a different
+   model with no error. Regenerate saved labels from the live builder, never by
+   hand.
+4. **A directory that is contractually generated-only must reject hand-authored
+   files.** A hand-made variant with no matching profile crashed
+   `build_variants.py --check` outright, and the crash outlived two commits.
+5. **A one-point linear model inverts pairs.** Scaling resident memory by
+   download size put `gemma-4-E2B-it` 4 GB BELOW `Qwen3.5-4B` when it measures
+   LARGER. A measured value must override a projection, and the projection must
+   say which it is.
