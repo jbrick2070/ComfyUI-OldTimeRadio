@@ -332,6 +332,15 @@ def test_patch_creative_allows_whitelisted(schemas, master_copy):
     assert writer["widgets_values"][slots.index("num_characters")] == 4
 
 
+@pytest.mark.parametrize("name", ["story_characters", "story_plot", "story_setting", "story_author"])
+def test_my_story_fields_survive_canonical_headless_conversion(schemas, master_copy, name):
+    text = "The listener's own words: " + name
+    wa.patch_creative(master_copy, 1, name, text, schemas=schemas)
+    prompt = otr_api.workflow_to_api_prompt(master_copy, schemas)
+    assert name in otr_api.CREATIVE_WHITELIST
+    assert prompt["1"]["inputs"][name] == text
+
+
 def test_patch_creative_can_force_the_lemmy_cameo(schemas, master_copy):
     """Chunk D. A qualification render must be able to force the cameo
     DETERMINISTICALLY -- an acceptance run that waits on an 11% roll is not an

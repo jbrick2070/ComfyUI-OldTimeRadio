@@ -460,7 +460,7 @@ def test_the_mux_connectors_are_APPENDED_and_the_tripwire_is_untouched():
     "accepted, hashed, unused", never a use invented for it."""
     optional = MUX.OTRMasterAudioMux.INPUT_TYPES()["optional"]
     names = list(optional)
-    assert names[-2:] == ["video_policy_json", "foley_receipts_json"]
+    assert names[-3:] == ["video_policy_json", "foley_receipts_json", "script_json"]
     for name in ("video_policy_json", "foley_receipts_json"):
         assert optional[name][0] == "STRING"
         assert optional[name][1]["forceInput"] is True
@@ -526,6 +526,8 @@ def test_the_canonical_workflow_wires_all_three_new_links():
     assert slot(7, "video_policy_json") == len(by_id[7]["inputs"]) - 2
     assert slot(7, "replay_descriptor") == len(by_id[7]["inputs"]) - 1
     assert (62, 7, slot(7, "replay_descriptor")) in wired
-    assert slot(85, "foley_receipts_json") == len(by_id[85]["inputs"]) - 1
+    assert slot(85, "foley_receipts_json") == len(by_id[85]["inputs"]) - 2
+    assert slot(85, "script_json") == len(by_id[85]["inputs"]) - 1
+    assert (1, 85, slot(85, "script_json")) in wired
     # The retired connector is still fed, and still by link 278.
     assert any(l[0] == 278 and l[3] == 85 for l in doc["links"])

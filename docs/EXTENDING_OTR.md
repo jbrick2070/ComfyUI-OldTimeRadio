@@ -23,13 +23,13 @@ docstring in `__init__.py` (the upscale one at
 audio/video/image conventions); the audio namespace documents the same shape in
 its module docstring only.
 
-OTR ships five runnable source banks (`media_archive`, `original`,
-`scifi_news_pro`, `public_domain`, `shakespeare`) plus one non-runnable
+OTR ships six runnable source banks (`media_archive`, `original`,
+`scifi_news_pro`, `public_domain`, `shakespeare`, `my_story`) plus one non-runnable
 signpost row, `custom_source_bank` (`+ Add Your Own`). Every runnable bank is
 INDEPENDENT and EQUAL -- its own definition, its own fetch/interpret strategy,
-its own story pack. Adding your own bank means adding a sixth peer, not
+its own story pack. Adding your own bank means adding a peer, not
 plugging into a special "user" tier. Your bank runs through the same trusted
-shared writer and the same production tail as the shipped five.
+shared writer and the same production tail as the shipped banks.
 
 This is not foolproof and is not meant to be. You own your bank. OTR gives you
 one honest contract, loud failures that name the broken field, and a cleanup
@@ -126,7 +126,7 @@ user_packs/source_banks/<bank_id>/
 
 - `<bank_id>` is the folder name, the row's `source_bank_id`, and the dropdown
   value -- all three must match. Use lowercase letters, digits and underscores,
-  starting with a letter. All six ids in `banks.json` -- the five shipped banks
+  starting with a letter. All seven ids in `banks.json` -- the six shipped banks
   and `custom_source_bank` -- are protected: a bundle that tries to shadow one
   is quarantined (`protected_id`), and the shipped row is untouched.
 - Your bank row is parsed by the SAME parser that validates the shipped rows
@@ -248,8 +248,8 @@ user_packs/source_banks/<bank_id>/
   into node 1's `custom_premise` is not extending OTR at all: on any bank with
   a source contract the text becomes a "User Seed" payload that replaces the
   fetch, and on the original lane it rides as an operator hint beside the
-  spark draw. (A dedicated user-facing "My Story" bank for that path is
-  PROPOSED, not shipped.)
+  spark draw. For a story driven by your own idea, characters, plot and setting,
+  select `my_story`; see [My Story](MY_STORY_GUIDE.md).
 - **Validation + quarantine.** `otr_check bank <path> --activate` -- the
   checker is `scripts/otr_check.py`; on Windows run it as
   `scripts\otr_check.bat bank <path> --activate` from the repo root (the
@@ -361,7 +361,7 @@ arrives on, and adding a bank changes no node, no widget and no link.
   Writer (`OTR_LedgerScriptWriter`). That dropdown is not a stored list: its
   choices are read LIVE from the routing registry every time ComfyUI asks the
   node for its inputs, and activated client banks are folded into that registry
-  beside the five shipped banks and the `+ Add Your Own` signpost. Activate,
+  beside the six shipped banks and the `+ Add Your Own` signpost. Activate,
   restart ComfyUI, and your `<bank_id>` is simply there.
 - **Restart is the refresh.** The registry is built once per process and cached,
   so a bank activated while ComfyUI is running does not appear until you restart

@@ -197,7 +197,7 @@ class TestParserValidation:
 
 _CURRENT_BANKS = [
     "media_archive", "original", "scifi_news_pro",
-    "public_domain", "shakespeare",
+    "public_domain", "shakespeare", "my_story",
 ]
 
 

@@ -218,6 +218,70 @@
       ]
     },
     {
+      "story_pipeline_id": "my_story_multipass",
+      "label": "My Story (listener idea -> interpretation -> treatment -> acts -> frame)",
+      "executable": true,
+      "requires_source_contract": false,
+      "declared_seams": [
+        "my_story_interpret_system",
+        "my_story_treatment_system",
+        "my_story_act_system",
+        "my_story_frame_system"
+      ],
+      "passes": [
+        {
+          "pass_id": "interpret",
+          "slot": "technical",
+          "seam_refs": [
+            "my_story_interpret_system"
+          ],
+          "description": "P0 technical: the raw field bundle -> StoryInterpretation (requirements vs incidental mentions, named cast, material assumptions, irreconcilable conflicts, cast-size plan)."
+        },
+        {
+          "pass_id": "treatment",
+          "slot": "creative",
+          "seam_refs": [
+            "my_story_treatment_system"
+          ],
+          "description": "P1 creative: interpretation -> StoryTreatment (title, dramatic question, setting, cast with voice traits, per-act plan, ending). Cast names are born here."
+        },
+        {
+          "pass_id": "acts",
+          "slot": "creative",
+          "seam_refs": [
+            "my_story_act_system"
+          ],
+          "description": "P2 creative, ONE CALL PER ACT: treatment + prior-act digest + the cast not yet heard -> ActScript. The last act must give every remaining cast member a line."
+        },
+        {
+          "pass_id": "frame",
+          "slot": "creative",
+          "seam_refs": [
+            "my_story_frame_system"
+          ],
+          "description": "P3 creative: title + logline + the Python-authored attribution sentence -> StoryFrame (announcer intro/outro, coda, music cues)."
+        },
+        {
+          "pass_id": "voices",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "P4 pure Python, NO model call: deterministic voice-preset assignment from the open voice pool by gender and timbre; two characters never share a voice."
+        },
+        {
+          "pass_id": "assemble",
+          "slot": "technical",
+          "seam_refs": [],
+          "description": "P5 pure Python, NO model call: cast/scenes/shots/beats/lines/music rows, authorship receipt, TTS delivery text, word telemetry and the cast contract."
+        }
+      ],
+      "notes": [
+        "executable:true = nodes/_otr_my_story.py::run_my_story_episode via the writer's _otr_lane_specs.LANE_SPECS dispatch.",
+        "The person's typed fields are the SOLE source authority: no spark deck, no RSS, no manifest, no source_ref.",
+        "The last two passes declare a slot because the registry requires one; neither calls a model.",
+        "Failure NEVER routes to another pipeline."
+      ]
+    },
+    {
       "story_pipeline_id": "simple_4_prompt_experimental",
       "label": "Simple 4-Prompt Experimental",
       "executable": false,

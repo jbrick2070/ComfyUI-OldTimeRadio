@@ -61,7 +61,15 @@ def test_source_ref_slot_pinned_with_llm_policy_tail():
     # was appended as the trailing widget AFTER the gate_in socket, so no
     # earlier pin moved and the saved vector grew 33 -> 34 at its end.
     assert order[33] == "replay_from"
-    assert len(order) == 34
+    # 38 since 2026-09-10: the four My Story creative fields were appended
+    # after replay_from, so again no earlier pin moved. gate_in stays the
+    # only declared entry that consumes no widgets_values slot, which is why
+    # 38 declared inputs carry a 37-wide saved vector.
+    assert order[34] == "story_characters"
+    assert order[35] == "story_plot"
+    assert order[36] == "story_setting"
+    assert order[37] == "story_author"
+    assert len(order) == 38
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
@@ -129,7 +137,7 @@ def test_patch_widget_by_name_lands_source_ref_slot_25():
     # vector tops out at 33. schemas comes from the LIVE INPUT_TYPES()
     # above, so this already reflects the new vector -- only the pin
     # needed updating.
-    assert len(node1["widgets_values"]) == 33  # 33 since 2026-09-02: trailing replay_from (campaign item 0)
+    assert len(node1["widgets_values"]) == 37  # 37 since 2026-09-10: four trailing My Story fields (story_characters/plot/setting/author)
     # 2026-08-15 (operator): canonical ships the roll sentinels on both slots so
     # an unattended run varies bank and style. These two lines are NEIGHBOUR
     # checks -- they exist to prove the source_ref patch landed at 26 without

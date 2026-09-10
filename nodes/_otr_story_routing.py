@@ -65,6 +65,12 @@ _PACK_SIDECAR_FILENAMES_BY_BANK = {
 
 _VALID_PASS_SLOTS = frozenset({"creative", "technical"})
 
+#: `defaults.story_input_mode` values. Absent reads as `legacy`, so a row that
+#: says nothing keeps the source route it always had.
+_STORY_INPUT_LEGACY = "legacy"
+_STORY_INPUT_USER_FIELDS = "user_fields_v1"
+_STORY_INPUT_MODES = frozenset({_STORY_INPUT_LEGACY, _STORY_INPUT_USER_FIELDS})
+
 
 class StoryRoutingError(Exception):
     """Base: any fail-loud story-routing problem."""
@@ -261,6 +267,37 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         raise RegistryValidationError(
             f"{origin}: defaults.story_scaffold must be 'on'|'off', "
             f"got {_ssc!r}"
+        )
+    # defaults.story_input_mode (2026-09-10): WHERE this bank's story comes
+    # from. Absent means the legacy source route -- a fetcher, an interpreter,
+    # or the original lane's spark draw -- which is every shipped bank. The
+    # `user_fields_v1` value means the person's own typed fields ARE the
+    # source, and it is validated here rather than sniffed at runtime so a
+    # typo cannot silently demote a creator bank to the legacy route.
+    _sim = defaults.get("story_input_mode")
+    if _sim is not None and _sim not in _STORY_INPUT_MODES:
+        raise RegistryValidationError(
+            f"{origin}: defaults.story_input_mode must be one of "
+            f"{sorted(_STORY_INPUT_MODES)}, got {_sim!r}"
+        )
+    # defaults.auto_select (2026-09-10): may a blank automatic run ROLL onto
+    # this bank? Absent means yes, so every existing bank keeps its place in
+    # the pool. A bank that requires typed input must set it false.
+    _asel = defaults.get("auto_select")
+    if _asel is not None and not isinstance(_asel, bool):
+        raise RegistryValidationError(
+            f"{origin}: defaults.auto_select must be a bool, got {_asel!r}"
+        )
+    # The one combination that cannot mean anything: a bank whose story is the
+    # person's typed fields, offered to a roll that types nothing. Refused at
+    # PARSE time -- a roll landing there would fail at admission every time,
+    # and an unrunnable row in the pool is a registry fault, not a run fault.
+    if _sim == _STORY_INPUT_USER_FIELDS and _asel is not False:
+        raise RegistryValidationError(
+            f"{origin}: defaults.story_input_mode='{_STORY_INPUT_USER_FIELDS}' "
+            f"requires defaults.auto_select=false -- a bank whose source is "
+            f"the person's own typed input cannot be selected by a blank "
+            f"automatic run."
         )
     for _bkey in (
         "propagate_adaptation_cast",
@@ -547,6 +584,27 @@ def _crossref_bank(bank: SourceBank, pipelines: "dict[str, StoryPipeline]",
     # declared (registered per (a)), or the pipeline brings its own runner
     # (executable=true -- a validation-time read; the "executable is never
     # a RUNTIME gate" law stands).
+    # (b0) A user-fields bank's source is the person's typed input, so it must
+    # own NO source lane at all. Declaring a fetcher here would give one bank
+    # two sources and no rule about which wins; the registry refuses the
+    # ambiguity rather than leaving it to run order.
+    if story_input_mode(bank) == _STORY_INPUT_USER_FIELDS:
+        if bank.fetcher or bank.interpreter:
+            raise RegistryValidationError(
+                f"{origin}: defaults.story_input_mode="
+                f"'{_STORY_INPUT_USER_FIELDS}' means the person's typed "
+                f"fields ARE the source, so this row must declare NO fetcher "
+                f"and NO interpreter (got fetcher={bank.fetcher!r}, "
+                f"interpreter={bank.interpreter!r})"
+            )
+        if pipe.requires_source_contract:
+            raise RegistryValidationError(
+                f"{origin}: defaults.story_input_mode="
+                f"'{_STORY_INPUT_USER_FIELDS}' cannot run on the "
+                f"source-contract pipeline {pipe.story_pipeline_id!r}; it "
+                f"needs a pipeline with its own runner "
+                f"(requires_source_contract=false, executable=true)"
+            )
     if bank.runnable:
         if pipe.requires_source_contract:
             if not bank.fetcher or not bank.interpreter:
@@ -740,6 +798,43 @@ def resolve_story_pack(source_bank_id: str, story_model_id: str | None = None) -
     return _load_routed_pack(path, reg.pipelines)
 
 
+def find_bank(source_bank_id: str) -> "SourceBank | None":
+    """The bank row, or None. NEVER raises on an unknown id.
+
+    The companion to `get_bank`, and the difference is load-bearing. The
+    canonical `source_bank` widget ships the ROLL SENTINEL, which is a UI
+    command and not a registry row, so the earliest question the writer asks --
+    "does the selected bank read typed fields?" -- has to be askable before
+    anything is resolved. `get_bank` answers that with UnknownBankError, which
+    would make the sentinel fatal at the first line of run(); this answers None
+    and lets the caller read it as the legacy route.
+
+    It is NOT a softened `get_bank`: every place that needs a real bank still
+    calls `get_bank` / `require_runnable_bank` and still fails loudly.
+    """
+    return _ensure_loaded().banks.get(str(source_bank_id or ""))
+
+
+def story_input_mode(bank: "SourceBank | None") -> str:
+    """Where this bank's story comes from. None or absent reads as legacy."""
+    if bank is None:
+        return _STORY_INPUT_LEGACY
+    value = (getattr(bank, "defaults", None) or {}).get("story_input_mode")
+    return str(value or _STORY_INPUT_LEGACY)
+
+
+def effective_auto_select(bank: "SourceBank | None") -> bool:
+    """May a blank automatic run roll onto this bank? Absent means yes.
+
+    Defaulting to True is what keeps every existing row's pool membership
+    unchanged by the arrival of this field.
+    """
+    if bank is None:
+        return True
+    value = (getattr(bank, "defaults", None) or {}).get("auto_select")
+    return True if value is None else bool(value)
+
+
 def require_runnable_bank(source_bank_id: str) -> SourceBank:
     """Run-intent gate: raise LOUD if the bank's execution lane is not built.
     bank.runnable is the ONLY runtime gate (pipeline.executable is metadata).
@@ -799,6 +894,9 @@ __all__ = [
     "UnknownBankError",
     "UnknownPipelineError",
     "UnknownStoryModelError",
+    "effective_auto_select",
+    "find_bank",
+    "story_input_mode",
     "get_bank",
     "get_pipeline",
     "list_bank_ids",

@@ -85,6 +85,9 @@ class VisualAssetValidatorTests(unittest.TestCase):
         self.cls = namespace["OTR_WorkflowValidator"]
         self.node = self.cls()
         self.node._assert_stamp = lambda *args: self.events.append("stamp") or "stamp OK"
+        # This isolated seam tests asset ordering. Real story admission is
+        # covered in test_my_story_validator; do not omit its new dependency.
+        self.node._admit_story_input = lambda *args: None
 
     def validate(self, enabled=True, **kwargs):
         return self.node.validate("canonical.json", enabled, True,

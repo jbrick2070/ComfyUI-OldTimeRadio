@@ -94,6 +94,21 @@ def _manifest_path() -> str:
     return otr_env.get(SNAPSHOT_MANIFEST_ENV, "").strip()
 
 
+def manifest_configured() -> bool:
+    """Is a snapshot manifest configured at all? Reads the env var, nothing else.
+
+    A NON-RAISING probe, and that is the whole point of it existing beside
+    :func:`load_snapshot_for_bank`. That function is strict by design: with a
+    manifest configured and no entry for the selected bank it RAISES, because a
+    partially frozen bake-off leg is exactly the silent-drift case it was
+    written to prevent. So it cannot answer "is one configured?" for a bank
+    that will never appear in a manifest -- asking it would turn a leftover
+    environment variable into an unexplained failure on an unrelated run.
+    This answers that question and decides nothing.
+    """
+    return bool(_manifest_path())
+
+
 def _load_manifest():
     """Return ``(manifest_dict, abspath)`` or ``None`` when unconfigured.
 
@@ -278,5 +293,6 @@ __all__ = [
     "SourceSnapshot",
     "SourceSnapshotError",
     "load_snapshot_for_bank",
+    "manifest_configured",
     "snapshot_payload_sha256",
 ]

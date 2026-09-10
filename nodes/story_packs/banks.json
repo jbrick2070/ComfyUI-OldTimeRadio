@@ -164,6 +164,31 @@
       "guide_ref": "Folger Digital Texts are CC BY-NC 3.0; stamp noncommercial rights and do not present this bank as commercially cleared."
     },
     {
+      "source_bank_id": "my_story",
+      "label": "My Story",
+      "source_kind": "user_story",
+      "interpreter": "",
+      "fetcher": "",
+      "default_story_model": "my_story",
+      "default_story_pipeline": "my_story_multipass",
+      "defaults": {
+        "story_form_label": "radio drama from a listener's idea",
+        "source_material_label": "Listener story idea",
+        "source_develop_verb": "build tonight's drama from this listener's own idea",
+        "source_grounding_label": "the listener's story input",
+        "title_form_label": "radio drama",
+        "hud_origin_label": "STORY ORIGIN",
+        "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+        "style_pool_class": "generic",
+        "story_scaffold": "off",
+        "story_input_mode": "user_fields_v1",
+        "auto_select": false
+      },
+      "required_seams": [],
+      "runnable": true,
+      "guide_ref": "Type your idea in Story input, optionally add characters, plot, setting and who the story is by, pick a look, and run. This bank is manual-only: a blank automatic run never rolls onto it, because it has nothing to write from. See docs/MY_STORY_GUIDE.md."
+    },
+    {
       "source_bank_id": "custom_source_bank",
       "label": "+ Add Your Own",
       "source_kind": "custom",
@@ -174,7 +199,7 @@
       "defaults": {},
       "required_seams": [],
       "runnable": false,
-      "guide_ref": "This row is a signpost, not a lane. To add your own bank: author a folder under user_packs/source_banks/<your_bank_id>/ (bank row, fetch/interpret module, at least one story pack), run 'otr_check bank <path> --activate', and restart ComfyUI -- your bank then appears in this dropdown as its own entry, equal to the shipped six. The full contract is docs/EXTENDING_OTR.md."
+      "guide_ref": "This row is a signpost, not a lane. If you only want to tell your own story, pick 'my_story' (My Story) instead and type it in -- no code required. To DEVELOP a bank: author a folder under user_packs/source_banks/<your_bank_id>/ (bank row, fetch/interpret module, at least one story pack), run 'otr_check bank <path> --activate', and restart ComfyUI -- your bank then appears in this dropdown as its own entry, an equal peer of every shipped bank. The full contract is docs/EXTENDING_OTR.md."
     }
   ]
 }

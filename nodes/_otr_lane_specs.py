@@ -77,6 +77,10 @@ LANE_SPECS: "dict[str, LaneSpec]" = {
         module="_otr_scifi_news_pro",
         runner_attr="run_scifi_news_pro_episode",
     ),
+    "my_story_multipass": LaneSpec(
+        module="_otr_my_story",
+        runner_attr="run_my_story_episode",
+    ),
 }
 
 # The pipelines whose execution lane is the writer's own inline body.

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import collections
 import hashlib
+import json
 import math
 import os
 import re
@@ -461,6 +462,14 @@ def _quiet_file_sha256(path: str) -> str:
         return digest.hexdigest()
     except (OSError, ValueError):
         return ""
+
+
+def _quiet_sha256_text(text: str) -> str:
+    """SHA-256 of a string, for a cache key. Empty in, empty out."""
+    raw = str(text or "")
+    if not raw:
+        return ""
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _foley_receipt_digest(receipts_json: str) -> str:
@@ -898,6 +907,157 @@ def _publication_decision(silent_video_path: str):
         )
 
 
+#: The delivery-intent envelope version this node understands. A version it has
+#: never seen is refused rather than guessed at -- an old node must not decide
+#: a delivery contract written under rules it does not know.
+DELIVERY_INTENT_VERSION = "otr_delivery_intent_v1"
+
+
+class DeliveryContractError(ValueError):
+    """The wired ledger does not satisfy the delivery contract it declares.
+
+    A ValueError so it travels the same fail-closed path as every other gate
+    in this node: the run FAILS, and there is no episode. A story that had to
+    publish and did not is not a successful render with a caveat.
+    """
+
+
+def _delivery_intent(script_json):
+    """Read the delivery intent off the wired ledger.
+
+    Returns the intent mapping, or None when this wire carries no contract.
+    The three "no contract" cases are deliberately distinguished:
+
+      * ``None``          -- the input is ABSENT. A legacy direct call, or a
+                             graph that predates the wire. Behaviour unchanged.
+      * a legacy ledger   -- present, valid JSON, but carrying no
+                             ``delivery_intent``. That is a replayed bundle or
+                             an episode written before the stamp existed, and
+                             it is not an error: it simply has nothing to
+                             enforce.
+      * anything else     -- present and unusable. RAISES. A wire that is
+                             connected but unreadable is a wiring fault, and
+                             treating it as "no requirement" is exactly how a
+                             required publication would be silently skipped.
+    """
+    if script_json is None:
+        return None
+    raw = str(script_json)
+    if not raw.strip():
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: script_json is wired but empty. Connect the "
+            "writer's script_json output, or disconnect the input entirely.")
+    try:
+        data = json.loads(raw)
+    except ValueError as exc:
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: script_json is wired but is not JSON (%s). "
+            "Connect the writer's script_json output." % exc) from exc
+    if not isinstance(data, dict):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: script_json is wired but is a %s, not a "
+            "ledger object." % type(data).__name__)
+    meta = data.get("meta")
+    if not isinstance(meta, dict):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: the wired script_json has no meta block; it "
+            "is not a production ledger.")
+    from . import _otr_story_routing as routing
+    bank_id = meta.get("source_bank")
+    user_fields = (routing.story_input_mode(routing.find_bank(bank_id))
+                   == "user_fields_v1")
+    intent = meta.get("delivery_intent")
+    if "delivery_intent" not in meta:
+        if user_fields:
+            raise DeliveryContractError("My Story delivery failed: missing delivery intent")
+        # A ledger written before the stamp, or a replayed bundle carrying its
+        # source episode's meta. Nothing to enforce, and not a fault.
+        log.info("[OTR_MasterAudioMux] legacy ledger has no delivery intent")
+        return None
+    if not isinstance(intent, dict):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: meta.delivery_intent has type %s; expected "
+            "an object." % type(intent).__name__)
+    version = str(intent.get("schema_version") or "")
+    if version != DELIVERY_INTENT_VERSION:
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: meta.delivery_intent version %r; this node "
+            "reads %r." % (version, DELIVERY_INTENT_VERSION))
+    if not isinstance(intent.get("publication_required"), bool):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: meta.delivery_intent.publication_required "
+            "must be true or false.")
+    for key in ("source_bank", "delivery_token", "draft_digest"):
+        if not isinstance(intent.get(key), str):
+            raise DeliveryContractError("meta.delivery_intent.%s must be a string" % key)
+    if not intent["source_bank"] or intent["source_bank"] != bank_id:
+        raise DeliveryContractError("My Story delivery failed: contradictory source bank")
+    if user_fields and not intent["publication_required"]:
+        raise DeliveryContractError("My Story delivery failed: publication is required")
+    if intent["publication_required"] and not re.fullmatch(r"[0-9a-f]{64}", intent["draft_digest"]):
+        raise DeliveryContractError("My Story delivery failed: invalid draft digest")
+    if not intent["delivery_token"].strip():
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: meta.delivery_intent carries no "
+            "delivery_token, so it cannot be matched to a finished episode.")
+    return intent
+
+
+def _terminal_ledger(stem):
+    """The in-flight ledger as it stands NOW, read fresh from disk.
+
+    Deliberately a re-read rather than a value passed down: the ledger has
+    been written by several nodes since the writer stamped it, and the
+    question this answers -- did the publication actually land? -- can only
+    be answered by what is on disk after the publish.
+    """
+    try:
+        try:
+            from . import _otr_ledger as _OTRL
+        except ImportError:  # pragma: no cover -- direct-script fallback
+            import _otr_ledger as _OTRL  # type: ignore
+        path, _ = _inflight_episode_for_stem(stem)
+        if path is None:
+            return None
+        return _OTRL.load_ledger_safe(path)
+    except Exception as exc:  # noqa: BLE001 -- callers all handle None
+        log.info("[OTR_MasterAudioMux] terminal ledger unavailable: %s", exc)
+        return None
+
+
+def _assert_delivery_binding(intent, stem):
+    """The wired contract and the episode on disk must be the same run.
+
+    A draft digest cannot do this: the same words submitted twice are the same
+    draft and two different episodes. The per-run token can, and it survives
+    the episode rename that happens partway through the video phase.
+    """
+    led = _terminal_ledger(stem)
+    if led is None:
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: this episode declares a required delivery "
+            "but no in-flight ledger answers for it, so the requirement "
+            "cannot be verified.")
+    meta = led.get("meta") if isinstance(led, dict) else None
+    live = (meta or {}).get("delivery_intent")
+    if not isinstance(live, dict):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: the episode on disk carries no delivery "
+            "intent, but the wired ledger requires publication. The wire and "
+            "the running episode are not the same run.")
+    if str(live.get("delivery_token") or "") != str(intent.get("delivery_token") or ""):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: the wired delivery token does not match the "
+            "episode being finished. An unrelated ledger cannot satisfy this "
+            "episode's delivery requirement.")
+    if str(live.get("source_bank") or "") != str(intent.get("source_bank") or ""):
+        raise DeliveryContractError(
+            "OTR_MasterAudioMux: the wired ledger is from source bank %r and "
+            "the episode on disk is from %r."
+            % (intent.get("source_bank"), live.get("source_bank")))
+    return led
+
+
 #: Pipeline-stage suffixes the archival stem accumulates on its way through the
 #: graph. They are meaningful in `otr/episodes/` and pure noise in `otr/obs/`.
 #:
@@ -1150,6 +1310,25 @@ class OTRMasterAudioMux:
                                "The bed the mix is built from. Ignored unless "
                                "video_policy_json names a foley route.",
                 }),
+                # THE DELIVERY WIRE (2026-09-10), APPENDED at the end and
+                # never inserted (BUG-LOCAL-097). A forceInput socket, so it
+                # occupies no widgets_values slot.
+                #
+                # It carries the writer's full ledger JSON, and this node
+                # reads exactly ONE thing out of it: does this episode have to
+                # PUBLISH to count as delivered? Everything else in the ledger
+                # is opaque here. The wire expresses a REQUIREMENT; it is
+                # never permission to publish -- the freeze receipt remains
+                # the only thing that grants that.
+                "script_json": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "Writer ledger JSON (OTR_LedgerScriptWriter "
+                               "script_json). Read for ONE question: must this "
+                               "episode reach otr/obs to count as delivered? "
+                               "A story the listener wrote must; the other "
+                               "banks keep their existing withheld-but-"
+                               "successful behaviour.",
+                }),
             },
         }
 
@@ -1350,15 +1529,44 @@ class OTRMasterAudioMux:
         # The REASON rides in the key as well as the digest: a blocked decision
         # has no digest (there is no receipt to hash), and two different
         # blocking reasons must not collide into one cache entry.
+        # THE DELIVERY CONTRACT IS PART OF THE OUTPUT, SO IT IS PART OF THE KEY.
+        #
+        # And so is the PUBLISHED FILE ITSELF, when one is required. A cached
+        # node does not execute, and a mux that does not execute cannot
+        # publish -- so an episode whose obs file was deleted or moved after a
+        # successful run would otherwise serve that run's cached success
+        # forever, with the deliverable gone. Fingerprinting the file the
+        # ledger names makes its disappearance change the key and re-run the
+        # node.
+        #
+        # Read-only and best-effort, in the safe direction: anything
+        # unreadable hashes to "missing", which DIFFERS from a successful
+        # run's key and re-executes. The failure mode is "mux again", never
+        # "serve a vanished episode".
+        delivery_key = _quiet_sha256_text(str(kwargs.get("script_json") or ""))
+        published_key = "n/a"
+        try:
+            intent = _delivery_intent(kwargs.get("script_json"))
+            if intent and intent["publication_required"]:
+                led = _assert_delivery_binding(intent, stem)
+                obs = str(((led.get("meta") or {}) if isinstance(led, dict)
+                           else {}).get("obs_final_path") or "")
+                if obs and os.path.isfile(obs):
+                    st = os.stat(obs)
+                    published_key = "%s|%d|%d" % (obs, st.st_size, st.st_mtime_ns)
+                else:
+                    published_key = "missing"
+        except Exception:  # noqa: BLE001 -- a cache key may never raise
+            published_key = "missing"
         parts = (manifest, stem, episode_id, decision.reason,
                  "1" if decision.publishable else "0", decision.digest,
-                 foley_key)
+                 foley_key, delivery_key, published_key)
         return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
     def mux(self, silent_video_path, master_audio_path, audio_done="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
             ffmpeg="ffmpeg", output_path="", video_policy_json="",
-            foley_receipts_json=""):
+            foley_receipts_json="", script_json=None):
         # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
         # still wired on the canonical graph and hashed by IS_CHANGED, but it
         # feeds nothing -- the SFX bed compiler it once armed is deleted.
@@ -1370,6 +1578,11 @@ class OTRMasterAudioMux:
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
         ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_MasterAudioMux")
+        # READ THE DELIVERY CONTRACT FIRST, BEFORE ANY WORK. A wire that is
+        # connected but unreadable is a wiring fault, and learning that after
+        # a ten-minute mux helps nobody.
+        _intent = _delivery_intent(script_json)
+        _must_publish = bool(_intent and _intent.get("publication_required"))
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
@@ -1381,6 +1594,8 @@ class OTRMasterAudioMux:
                 confine_to_output_tree, reject_remote_paths)
         reject_remote_paths(silent_video_path=silent_video_path, master_audio_path=master_audio_path,
                              output_path=output_path)
+        if _must_publish:
+            _assert_delivery_binding(_intent, _episode_stem(silent_video_path))
         master_audio_path = _reresolve_master_audio(master_audio_path)
         # DECIDE BEFORE WRITING. The verdict is a pure read, and knowing it
         # first is what lets the archival write choose a lawful destination --
@@ -1475,6 +1690,37 @@ class OTRMasterAudioMux:
             # final_video_path over node 93's pre-credits/pre-mux blend.
             report.append(self._stamp_terminal_paths(
                 final, obs_copy, master_audio_path))
+            # THE REQUIRED-DELIVERY GATE. Only after the stamp above, because
+            # what it checks is the state the stamp leaves on disk.
+            #
+            # Checked STRUCTURALLY, not by reading the report line:
+            # `_stamp_terminal_paths` is best-effort by contract -- it catches
+            # everything and always returns prose -- so trusting its return
+            # value would let a silent stamp failure pass as a delivery.
+            if _must_publish:
+                if not decision.publishable:
+                    raise DeliveryContractError(
+                        "OTR_MasterAudioMux: this story had to be published "
+                        "and publication was withheld (%s). The archival "
+                        "final is at %s; nothing reached obs."
+                        % (decision.summary(), final))
+                if not obs_copy or not os.path.isfile(obs_copy):
+                    raise DeliveryContractError(
+                        "OTR_MasterAudioMux: this story had to be published "
+                        "and no file is at the published path (%r)."
+                        % (obs_copy or ""))
+                _led = _assert_delivery_binding(_intent, _episode_stem(silent_video_path))
+                _stamped = str(((_led.get("meta") or {}) if isinstance(_led, dict)
+                                else {}).get("obs_final_path") or "")
+                if os.path.normcase(os.path.abspath(_stamped or "")) != \
+                        os.path.normcase(os.path.abspath(obs_copy)):
+                    raise DeliveryContractError(
+                        "OTR_MasterAudioMux: the published file is at %s but "
+                        "the episode records %r, so the delivery is not "
+                        "recorded where every later reader looks."
+                        % (obs_copy, _stamped))
+                report.append("delivery OK -- required publication verified "
+                              "on disk and on the ledger")
             # OH-3 (output-tree contract 2026-06-11): post-publish janitor
             # pass over episodes/_shared/tmp -- the ONE sanctioned
             # auto-delete; fully fail-soft (PD1, never blocks the mux).

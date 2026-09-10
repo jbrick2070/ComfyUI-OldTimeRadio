@@ -51,6 +51,8 @@ throughout. Cite the generated matrix; do not copy it.
 ## Current Project Docs
 
 - `GO_FORWARD_PLAN.md` - current sprint and next sprint only.
+- [My Story](MY_STORY_GUIDE.md) - use your own idea, characters, plot, setting
+  and optional byline in the normal graph; current qualification limits.
 - `multimodal-story-schema/` - the 2026-07 source-pack and story-schema plans
   plus the `schema-examples/` fixtures. Historical plan of record, last
   changed 2026-07-24: `nodes/_otr_source_payload.py`,
@@ -59,10 +61,9 @@ throughout. Cite the generated matrix; do not copy it.
   contract and the schema examples, but its stage plans also describe a
   per-bank `story_rules` loader that never shipped (there is no
   `nodes/story_rules/` and no `_otr_story_rules.py`) -- read them as history,
-  not as the live design. The five runnable banks live in
-  `nodes/story_packs/banks.json`; the current source-bank work is the PROPOSED
-  My Story bank, scoped in `2026-09-10-my-story-app-scope.md` and tracked as
-  sprints 3-4 in `GO_FORWARD_PLAN.md`.
+  not as the live design. The six runnable banks live in
+  `nodes/story_packs/banks.json`; My Story's native App view and live publication
+  qualification are tracked in `GO_FORWARD_PLAN.md`.
 - `model-license-*.md` plus `model-license-audit-targets.txt` - model license
   audit records used by tests.
 - `conventions.md` - naming and module-shape rules enforced by tests.

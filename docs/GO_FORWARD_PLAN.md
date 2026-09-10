@@ -17,17 +17,11 @@ packing. **THE QUEUE is section 0, THE ATTACK ORDER**; stable row numbers are
 identities, not a second ordering. Read the newest `docs/HANDOFF_LOG.md` entry
 for measured state. The archive holds receipts, not instructions to execute.
 
-**PRIORITY #1 (operator, 2026-09-10): finish the Opus cleanup, then deliver the
-My Story creator flow.** The cleanup half LANDED 2026-09-10 (sprints 1-2, commits
-`cc09b54a` / `7aa46655` / `e562e146`; receipt in
-`docs/2026-09-10-cleanup-opus/HANDOFF.md`). Sprint 3 LANDED the same day:
-documentation currentization ([D0 receipt](2026-09-10-my-story-d0-receipt.md))
-and the reviewed independent bank design
-([**D1 -- the coding plan**](2026-09-10-my-story-d1-design.md)). **Sprint 4 is
-next and needs no further design: code from D1.** Follow the five dependent
-sprints under **WHERE TO PICK UP**. This latest instruction takes precedence over
-older next-step directions in this file. The remaining queue resumes afterward;
-stable row identities and earlier scope cuts remain intact.
+**PRIORITY #1 (operator, 2026-09-10): finish the My Story creator flow.**
+The current task and next sprint are under **WHERE TO PICK UP**. Completed
+cleanup, documentation and design receipts are in `HANDOFF_LOG.md`,
+`GO_FORWARD_ARCHIVE.md` and `docs/2026-09-10-my-story-s4/`. This priority
+precedes the older queue; its stable row identities and scope cuts remain.
 
 **Dependency rationale for the remaining queue (operator, 2026-09-04, late):** *"I really
 want to get the registry thing fixed, but no sense in fixing it if bug fixes will break it --
@@ -92,56 +86,30 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**PRIORITY #1: Opus cleanup -> My Story.** Read the
-[Opus handoff](2026-09-10-cleanup-opus/HANDOFF.md), its
-[implementation plan](2026-09-10-cleanup-opus/PLAN.md), and the
-[My Story scope](2026-09-10-my-story-app-scope.md). Verify their review receipts
-and the current Windows HEAD before implementation. These are pending delivery
-plans, not evidence that production cleanup or My Story already exists.
+**Active owner: Codex, 2026-09-10, `v2.0-alpha`.** One shared-file editor.
+Next action: prove My Story's real-model ledger through the existing shared
+freeze, then complete the optional native App and publication qualification.
+Read [the Sprint 4 receipt](2026-09-10-my-story-s4/receipt.json) for measured
+code/test state and [its review](2026-09-10-my-story-s4/review_judgment.md).
 
-**Coding owners (operator confirmed, 2026-09-10): Opus owns sprints 1-2;
-Codex owns sprints 3-5.** Codex starts its dependent work only after verifying
-Opus's three qualified chunks are committed and pushed. A different reviewer
-checks each finished code change under the standing review rule. The split
-preserves handoff context; it does not authorize concurrent shared-file edits.
-
-**Scope cut (operator, 2026-09-10): no replay-system work.** My Story takes
-user input, saves it, and generates a new published episode. Reusing saved
-input means a fresh generation. Do not add saved-episode rerendering, old-bundle
-compatibility, migration or metadata reconstruction. Use the real current
-canonical workflow for checks, never an old harness graph.
-
-| Sprint | Pending work, in dependency order | Exit / next owner |
+| Sprint | Remaining work | Required evidence |
 |---|---|---|
-| **1. Clean audio** -- DONE 2026-09-10 | Opus P1 landed as `cc09b54a`: automatic roomtone bed and tape hiss retired, clean code + canonical enhancement defaults (node 4 all effects off), seven unused SceneSequencer assignments removed. | Fresh three-case canonical CPU check passed (1.50 s / 0.00 s offsets unchanged, silence stays zero); full suite same 54 baseline failures, zero new; reviewed, pushed. |
-| **2. Finish bounded cleanup** -- DONE 2026-09-10 | Opus P2 landed as `7aa46655` (G8 sole owner of duplicate line_id diagnostics). Opus P3 landed as `e562e146` (freeze no longer acquires a model; validation, unload and recovery contracts preserved; fresh-process no-acquisition proof on both banks). | Separate qualified, reviewed, committed and pushed chunks. Codex picks up sprint 3 from HEAD `e562e146`; evidence in `docs/2026-09-10-cleanup-opus/implementation_receipt.json`. |
-| **3. Current docs + independent design** -- DONE 2026-09-10 | D0 currentized seven documents against the cleaned-up code (79 verified edits; receipt: [D0 receipt](2026-09-10-my-story-d0-receipt.md)). D1 specified the independent bank and was reviewed r1-r3, six readers, 19 findings folded: [**D1 design**](2026-09-10-my-story-d1-design.md). | **The D1 design IS the coding plan for sprint 4 -- build from it, do not re-derive it.** Its section 12a lists every folded review finding. Scope convergence is still not a bank preflight PASS. |
-| **4. Complete creator path** -- NEXT, CODE-READY | Build exactly what [D1](2026-09-10-my-story-d1-design.md) specifies: sections 1 (registry rows), 2 (widgets, input helper, two writer check sites, validator admission, drafts), 3 (the five-pass graph), 5-6 (cast count, attribution), 7 (delivery intent, mux wire, canonical wiring), 10 (tests). Ship all functional canonical widget/link changes with their code, before the bank is runnable. | Normal graph use completes the whole path. A saved draft or archive alone is not successful My Story delivery. Qualify, review, commit and push per the linked plan. |
-| **5. Optional App view + qualification** | Add the native App form and final player/report presentation. Prove graph-only use, App/Graph switching, saved parameters, playback/history, cancellation and errors; complete model/canonical qualification and final user documentation. | App Mode/sidebar use remains optional, with graph as the default. Report actual preflight evidence and limits; no release/tag/promotion is implied. |
+| **5. Optional App view + qualification** | Prove a real model's user-input ledger through the existing freeze first. Add native App form and final player/report on the canonical, then qualify graph use, App/Graph switching, saved parameters, playback/history, cancellation and errors. | Actual model/ledger/asset/browser receipts under D1 section 11; distinguish component-only evidence from published episodes and record limits. |
 
-**Sprints 1-3 are DONE (2026-09-10). Start now with SPRINT 4, and it is
-code-ready: build from [the D1 design](2026-09-10-my-story-d1-design.md).**
-That document is the coding plan -- exact registry rows, widget appends, the
-pure input helper and its refusals, the draft coordinator, the five-pass graph
-with every schema and post-validator, the delivery-intent wire, the canonical
-JSON arithmetic (33 -> 37 widgets on node 1; new link 291 into mux node 85
-input 10; `last_link_id` 290 -> 291) and the full test inventory. Its section
-12a records the 19 review findings already folded in, so do not re-litigate
-them. Do not re-run the R1-R4 scope campaign
-([receipt](2026-09-10-my-story-app-review/README.md)) or the D1 review; the
-open obligation is the ONE finished-diff review of the code you write.
+Build from [D1](2026-09-10-my-story-d1-design.md) and
+[the accepted scope](2026-09-10-my-story-app-scope.md). Do not repeat their
+R1-R4 design campaigns. Obtain one independent finished-diff review for the
+next code chunk. Reuse existing calls, ledger ownership and production paths;
+the user's emphasis is proving their own story yields a clean ledger.
 
-One coder owns shared files at a time. Use the cleanup plan's measured failure
-comparison, not a claim that its full suite is green. No stale soak,
-server/GPU run, cache/episode deletion or release change belongs to this work.
-Later My Story qualification follows its own canonical-run gates.
+**Scope cut (operator, 2026-09-10): no replay-system work.** Reusing saved
+input means a fresh generation. No old-bundle migration, saved-episode
+rerendering or metadata reconstruction. Load the real canonical for every run.
 
-**Attribution is part of the creator path (operator, 2026-09-10):** a listener
-may name who the story is by, and the announcer and credits use that name when
-given and a neutral phrase when not. **The operator's own name is never a
-default anywhere in an episode.** D1 section 6 carries the contract; the
-`story_author` widget is the fourth appended field, which is why the writer
-vector goes to 37 and not 36.
+**Attribution (operator, 2026-09-10):** the announcer and credits use a supplied
+byline, or a neutral phrase when blank. The operator's name is never a default.
+The App remains optional; graph is the initial view. No release, tag or
+promotion is authorized. Resume the remaining queue only after this priority.
 
 **Separate optional follow-on: speaker placement.** The preferred listening-test
 starting point is gentle, balanced positions assigned once per episode to stable
@@ -1512,4 +1480,3 @@ which workflow to load and which models are required.
     audio cache that Gemini TTS's documented voice drift demands.
 
 ---
-

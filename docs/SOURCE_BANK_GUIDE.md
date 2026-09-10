@@ -43,7 +43,7 @@ or many. It does not need an announcer. A music-free form must satisfy the
 live output behavior described under the ledger contract.
 
 A no-source bank still needs its own truthful initialization path.
-Do not use empty `fetcher` plus empty `interpreter` as a generic no-source marker: the current writer reserves that shape (runnable, no fetcher, no interpreter -- `nodes/_otr_writer_inputs.py::_bank_has_no_source_contract`) for the `original` bank, whose creative front lives in `nodes/_otr_original_radio.py`. Add explicit bank/pipeline handling or a registered bank-specific local seed path instead of inheriting that design accidentally.
+Do not use empty `fetcher` plus empty `interpreter` as a generic no-source marker. The writer first handles explicit `defaults.story_input_mode="user_fields_v1"` (My Story); the remaining runnable no-fetch/no-interpret shape enters the `original` path through `nodes/_otr_writer_inputs.py::_bank_has_no_source_contract`. Add explicit bank/pipeline handling or a registered bank-specific local seed path instead of inheriting that design accidentally.
 
 The result must still work as audio. Some voice must orient the listener and
 provide closure, but the device and placement are yours. If the canonical
@@ -301,7 +301,7 @@ pipeline must also set `executable=true` when its runner lands.
 
 There is one outer workflow: `workflows/otr_canonical.json`. Do not create a
 copy, generated substitute, or parallel ComfyUI graph.
-A registry-only bank normally appears through the existing `source_bank` selector and may require no workflow JSON edit; prove that path. The shipped canonical default for `source_bank` is the roll sentinel `"roll (any eligible bank)"` (`workflows/otr_canonical.json` writer node, `nodes/_otr_rolls.py`), whose pool is every bank with `runnable=true`; a new runnable row joins that pool automatically. Do not change the saved default merely to expose the new choice. (A PROPOSED `my_story` bank, user-facing label "My Story", would enter the same pool once its row is runnable; it does not exist at HEAD.)
+A registry-only bank normally appears through the existing `source_bank` selector and may require no workflow JSON edit; prove that path. The canonical default is `"roll (any eligible bank)"`. Its pool requires both `runnable=true` and effective `auto_select=true` (omitted means true). My Story sets `auto_select=false` because it needs user input; it is selected manually. Do not change the saved default merely to expose a new choice.
 If a node, widget,
 input, link, or default changes, update the canonical JSON in the same change
 and run the workflow, link, input-name, and positional-widget audits. Append
@@ -324,8 +324,9 @@ leaving them for live integration:
    known-valid JSON example for every model-authored artifact.
 3. Put every cross-artifact invariant inside the originating
    `structured_call(..., post_validator=...)`. In this repository the validator
-   must return an error string (or `None`), not raise; raising bypasses the
-   structured retry catcher. A check performed after the call likewise bypasses
+   returns an error string (or `None`) for a repairable mismatch; a deterministic
+   terminal failure such as unavailable cast capacity raises to bypass retries.
+   A check performed after the call likewise bypasses
    bounded typed repair and turns a repairable mismatch into an immediate
    episode failure.
 4. State deterministic retention checks for immutable ingress. Prompt prose
@@ -338,7 +339,7 @@ leaving them for live integration:
 6. Name the concrete live voice-selection function and returned row contract;
    "use the voice registry" is not sufficiently implementable.
 7. Pin registry ordering tests and any repo-specific static annotation the lane itself introduces, named literally in the plan. (The former `# LLM slot: per-sub-pass` audit tag left the tree with the retired codex lane, commit dae1fb3c; there is no shipped tag to copy.)
-8. State `custom_premise` precedence as the shared resolver implements it (`nodes/_otr_writer_inputs.py::_resolve_inputs`): a source-snapshot replay wins first; on a runnable bank with neither fetcher nor interpreter (the original lane) `custom_premise` rides as `source_meta["operator_hint"]` beside the spark draw and never replaces the payload; on every bank that declares a fetcher a non-blank `custom_premise` becomes a verbatim `"User Seed"` payload that replaces the fetch. A new bank that wants hint semantics while declaring a local synthetic fetcher must add an explicit bank- or pipeline-keyed branch to `_resolve_inputs` in the same change, with a test, rather than assuming the shared order protects its draw.
+8. State `custom_premise` precedence as `nodes/_otr_writer_inputs.py::_resolve_inputs` implements it: explicit `user_fields_v1` admission comes first and refuses source snapshots, `source_ref` and `replay_from`. On other banks a source snapshot wins; the original lane preserves the premise as `source_meta["operator_hint"]` beside its spark draw; a fetch-backed bank receives nonblank premise text as a verbatim `"User Seed"` payload replacing the fetch. A different precedence needs an explicit tested resolver branch.
 9. Identify the exact final writer mutation boundary and the point after the
    last shared LLM call where telemetry is truthfully stamped.
 10. Say which lane-local provenance may remain after a shared generic receipt

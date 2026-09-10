@@ -35,6 +35,7 @@ from typing import Any
 from . import _otr_model_catalog as _otr_model_catalog
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
+from . import _otr_story_input as _otr_story_input
 from . import _otr_story_routing as _otr_story_routing
 from ._otr_shared import llm_policy as _llm_policy
 
@@ -196,6 +197,19 @@ def _resolve_inputs(
     # Defaulted from the choices list rather than a repeated literal: the two
     # spellings drifting apart is the failure this parameter exists to end.
     lemmy_cameo: str = _LEMMY_CAMEO_CHOICES[0],
+    # My Story (2026-09-10): the three optional creative fields plus the
+    # attribution. Empty defaults, so every existing caller and every saved
+    # workflow that predates them resolves exactly as it did before.
+    story_characters: str = "",
+    story_plot: str = "",
+    story_setting: str = "",
+    story_author: str = "",
+    # The PRE-ROLL request captured by run(). Threaded rather than rebuilt so
+    # the bundle digest computed here is the same identity the validator
+    # already persisted -- the rolls have rebound `source_bank` and
+    # `visual_style` by the time this function runs, and recomputing from them
+    # would file the draft under an identity nothing else can reproduce.
+    story_request: Any = None,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -239,7 +253,8 @@ def _resolve_inputs(
     # A REQUEST, not a cap (operator directive 2026-08-12, all banks). The
     # only real ceiling is the voice stock, enforced in the writer against
     # `MAX_SPEAKING_CAST`, because two characters never share a voice.
-    num_characters = max(1, min(_FABLE2_MAX_CAST, int(num_characters)))
+    _raw_num_characters = int(num_characters)
+    num_characters = max(1, min(_FABLE2_MAX_CAST, _raw_num_characters))
 
     # ACT COUNT IS THE ONLY LENGTH-SHAPED KNOB (operator directive
     # 2026-08-14). The widget is an explicit 1..6 combo (narrowed from 1..8,
@@ -276,6 +291,33 @@ def _resolve_inputs(
     # source_meta["operator_hint"] into the concept pass as material
     # (kibitz r4 P2) -- never the payload.
     _rb_bank = _otr_story_routing.get_bank(source_bank or "scifi_news_pro")
+    # MY STORY (2026-09-10): decided BEFORE the snapshot load, and the load is
+    # SKIPPED on this branch rather than merely ignored. `load_snapshot_for_bank`
+    # RAISES when a manifest is configured and the selected bank has no entry --
+    # correct for a bake-off control, wrong here, because no manifest will ever
+    # carry a `my_story` entry and a leftover env var from an unrelated leg
+    # would kill a run whose source is the person's own typing.
+    _user_fields = (
+        _otr_story_routing.story_input_mode(_rb_bank)
+        == _otr_story_input.INPUT_MODE_USER_FIELDS
+    )
+    if not _user_fields:
+        # THE MISMATCH REFUSAL, REPEATED HERE ON PURPOSE. run() already made
+        # this check before the rolls, so on the live path this is dead
+        # weight -- and that is exactly why it belongs here too: a DIRECT
+        # call (a test, a script, a future caller) would otherwise accept
+        # character notes for a bank that never reads them and render an
+        # episode that silently ignored them.
+        _otr_story_input.check_selection(
+            _otr_story_input.capture_raw(
+                idea=custom_premise, characters=story_characters,
+                plot=story_plot, setting=story_setting, author=story_author,
+            ),
+            _otr_story_input.StoryInputPolicy(
+                mode=_otr_story_input.INPUT_MODE_LEGACY,
+                bank_id=_rb_bank.source_bank_id,
+            ),
+        )
     # Bake-off source-snapshot replay (r3 ruling B7). Loaded IMMEDIATELY after
     # bank resolution and BEFORE the three source branches so a frozen source
     # replays across the base/_v2/_v3 triplet -- the ONLY variable under test is
@@ -285,8 +327,11 @@ def _resolve_inputs(
     # live sourcing). The replayed source_meta sidecar carries the same fields a
     # live branch would (spark_atoms for the original lane, cast_hints for the
     # adaptation lanes), so every downstream owner is fed unchanged.
-    _source_snapshot = _otr_source_snapshot.load_snapshot_for_bank(
-        source_bank or "scifi_news_pro",
+    _source_snapshot = (
+        None if _user_fields
+        else _otr_source_snapshot.load_snapshot_for_bank(
+            source_bank or "scifi_news_pro",
+        )
     )
     # Only the live fetch branch can produce one: the snapshot envelope is the
     # seven-key payload whose full_text is already the capped projection, and
@@ -294,7 +339,66 @@ def _resolve_inputs(
     # None means "no whole-body grounding available", which every consumer
     # must handle rather than assume.
     source_document = None
-    if _source_snapshot is not None:
+    if _user_fields:
+        # THE PERSON'S OWN WORDS ARE THE SOURCE. No fetch, no spark draw, no
+        # manifest: the four creative fields are projected into the same
+        # seven-key payload every other lane produces, so nothing downstream
+        # needs to know where the story came from.
+        _raw_fields = _otr_story_input.capture_raw(
+            idea=custom_premise, characters=story_characters,
+            plot=story_plot, setting=story_setting, author=story_author,
+        )
+        _policy = _otr_story_input.StoryInputPolicy(
+            mode=_otr_story_input.INPUT_MODE_USER_FIELDS,
+            bank_id=_rb_bank.source_bank_id,
+        )
+        # Defensive: run() already refused these. A DIRECT call to this
+        # function (a test, a script) gets the same refusal rather than a
+        # half-built payload.
+        _otr_story_input.check_selection(
+            _raw_fields, _policy,
+            source_ref=source_ref,
+            snapshot_manifest_configured=(
+                _otr_source_snapshot.manifest_configured()),
+        )
+        _request = story_request
+        if _request is None:
+            _request = _otr_story_input.StoryRequest(
+                num_characters=_raw_num_characters,
+                act_count=str(act_count),
+                include_act_breaks=bool(include_act_breaks),
+                source_bank_requested=str(source_bank or ""),
+                visual_style_requested=str(visual_style or ""),
+            )
+        _bundle = _otr_story_input.build_bundle(_raw_fields, _request)
+        news_article = _otr_source_payload.validate_source_payload(
+            _otr_story_input.project_payload(
+                _bundle, datetime.now().date().isoformat()),
+            origin="_resolve_inputs my_story",
+        )
+        news_seed = news_article["seed_text"]
+        seed_source = "my_story_fields"
+        source_meta = {
+            "kind": "user_story",
+            "story_input": _bundle.as_dict(),
+            "draft_digest": _bundle.digest,
+            # The RAW request, before the legacy clamp rewrites it. Both
+            # numbers are kept: a request of 8 that casts 4 is a fact worth
+            # reading later, and overwriting the ask hides it.
+            "requested_num_characters": _request.num_characters,
+            "story_author": _bundle.normalized.author,
+        }
+        source_rights = {"license_label": "listener original idea"}
+        log.info(
+            "[OTR_LedgerScriptWriter] my_story: %d creative field(s), "
+            "draft %s%s",
+            sum(1 for f in _otr_story_input.CREATIVE_FIELDS
+                if getattr(_bundle.normalized, f)),
+            _bundle.digest[:12],
+            (" by %r" % _bundle.normalized.author)
+            if _bundle.normalized.author else " (unattributed)",
+        )
+    elif _source_snapshot is not None:
         news_article = _otr_source_payload.validate_source_payload(
             _source_snapshot.payload,
             origin="_resolve_inputs source_snapshot",

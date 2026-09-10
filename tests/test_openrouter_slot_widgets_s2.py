@@ -88,7 +88,7 @@ def test_widget_order_appends_slots_at_end():
     assert order[31] == "gguf_quant"
     # gate_in (S5 validation-order fix) is a forceInput SOCKET -- present
     # in the INPUT_TYPES key order but consumes NO widgets_values slot
-    # (the serialized widget vector stays 33).
+    # (the serialized widget vector stays one shorter than this order).
     assert order[32] == "gate_in"
     # 33 since 2026-08-28: refine_target_grade (was slot 20) was removed
     # as an inert widget, with all 62 saved graphs re-indexed.
@@ -96,7 +96,8 @@ def test_widget_order_appends_slots_at_end():
     # appended as the trailing widget after the gate_in socket -- the
     # append-only rule this test exists to enforce.
     assert order[33] == "replay_from"
-    assert len(order) == 34
+    assert order[34:] == ["story_characters", "story_plot", "story_setting", "story_author"]
+    assert len(order) == 38
 
 
 # --- conditional creative default; technical never flips --------------------

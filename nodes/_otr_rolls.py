@@ -180,19 +180,29 @@ def draw(
 def eligible_bank_ids() -> "tuple[str, ...]":
     """Bank ids the roll may select, sorted.
 
-    ONE filter (operator ruling 2026-07-12: the roll does NOT filter on
-    rights, and no `rights_class` field exists -- understanding the terms
-    under which AI output is used is the end user's call, not a gate inside
-    the writer): `bank.runnable`, the ONE curation surface.
+    TWO filters, and each answers a different question.
 
-    The second filter -- "the lane's declared request compatibility" -- was
-    removed 2026-08-14 with the word authority. It existed solely so a lane
-    could refuse a `target_words` outside its band, and there is no longer a
-    target to refuse. See `_otr_lane_specs`.
+    `bank.runnable` is the ONE curation surface: is this lane built? (Operator
+    ruling 2026-07-12: the roll does NOT filter on rights, and no
+    `rights_class` field exists -- understanding the terms under which AI
+    output is used is the end user's call, not a gate inside the writer.)
+
+    `defaults.auto_select` (2026-09-10) answers a question runnable cannot:
+    may an UNATTENDED run land here? A bank whose story is the person's own
+    typed fields is perfectly runnable and completely unrollable -- a blank
+    automatic run has nothing to write. Absent means true, so every bank that
+    predates the field keeps its place in the pool; only a bank that declares
+    itself manual-only leaves it.
+
+    The retired third filter -- "the lane's declared request compatibility" --
+    went 2026-08-14 with the word authority. It existed solely so a lane could
+    refuse a `target_words` outside its band, and there is no longer a target
+    to refuse. See `_otr_lane_specs`.
     """
     banks = _ROUTING._ensure_loaded().banks
     return tuple(sorted(
-        bank_id for bank_id, bank in banks.items() if bank.runnable
+        bank_id for bank_id, bank in banks.items()
+        if bank.runnable and _ROUTING.effective_auto_select(bank)
     ))
 
 
@@ -200,10 +210,14 @@ def _bank_pool_diagnosis() -> str:
     """Name every filter that emptied the pool, and how many each removed."""
     banks = _ROUTING._ensure_loaded().banks
     not_runnable = [b for b in banks.values() if not b.runnable]
+    manual_only = [b for b in banks.values()
+                   if b.runnable and not _ROUTING.effective_auto_select(b)]
     return (
         f"{len(banks)} registered bank(s): "
         f"{len(not_runnable)} removed by runnable=false "
-        f"({sorted(b.source_bank_id for b in not_runnable)})"
+        f"({sorted(b.source_bank_id for b in not_runnable)}); "
+        f"{len(manual_only)} removed by auto_select=false "
+        f"({sorted(b.source_bank_id for b in manual_only)})"
     )
 
 

@@ -50,4 +50,4 @@ class OneActTemplateTests(unittest.TestCase):
         self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB(, [\w\- ]+)?\)$",
                          "the size suffix is part of the COMBO value; a bare "
                          "repo id matches no choice and can resolve to index 0")
-        self.assertEqual(len(values), 33)
+        self.assertEqual(len(values), 37)

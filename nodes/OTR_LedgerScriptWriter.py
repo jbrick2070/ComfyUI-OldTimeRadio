@@ -110,11 +110,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 import logging
 import random
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -174,6 +175,12 @@ from . import _otr_rolls as _ROLLS
 # only variable. Stdlib-only leaf (imports only _otr_bank_variants) -- safe at
 # module-import time, same posture as the routing/source-payload imports.
 from . import _otr_source_snapshot as _otr_source_snapshot
+# My Story input admission (2026-09-10). Pure, stdlib-only, imports nothing
+# from this module -- safe at module-import time beside the routing leaves. It
+# owns the ONE admission contract the writer, the resolver and the workflow
+# validator all call, so the cheap early refusal and the real one cannot
+# disagree about what is admissible.
+from . import _otr_story_input as _otr_story_input
 from . import _otr_word_delivery as _OTRWD
 # MODULE SCOPE ON PURPOSE (item F, 2026-08-17). This module was previously
 # imported ONLY inside the `provenance_normalize` branch below, which is true
@@ -2126,21 +2133,13 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     "multiline": True,
                     "default": "",
                     "placeholder": (
-                        "(optional) type a custom story premise here — "
-                        "overrides the RSS news fetch"
+                        "Type your story idea here"
                     ),
                     "tooltip": (
-                        "Empty (default) -> RSS fetcher pulls a fresh "
-                        "real-world science headline as the episode "
-                        "seed.\n\n"
-                        "Non-empty -> uses your text verbatim as the "
-                        "seed and skips RSS entirely.\n\n"
-                        "Use cases for the override:\n"
-                        "  - test a specific story idea\n"
-                        "  - reproduce a previous run with controlled "
-                        "inputs\n"
-                        "  - work offline / skip RSS when the network "
-                        "is slow."
+                        "For My Story, enter your idea here and optionally "
+                        "add characters, plot, setting and who it is by. "
+                        "At least one creative field must contain text. "
+                        "Other banks keep their own source and premise rules."
                     ),
                 }),
                 "include_act_breaks": ("BOOLEAN", {
@@ -2758,6 +2757,77 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "no writer, no TTS, no music, no stills minted; same seeds, "
                         "same audio, only the video phase runs. The A/A null."),
                 }),
+                # MY STORY (2026-09-10). The four fields a person fills in to
+                # tell their own story, APPENDED after replay_from so every
+                # earlier saved value keeps its index (BUG-LOCAL-097). All
+                # four default to "" -- a workflow saved before they existed
+                # resolves them as empty and behaves exactly as it did.
+                #
+                # They are read ONLY by the My Story bank. Filling one while
+                # another source is selected FAILS EARLY and says so, rather
+                # than rendering an episode that quietly ignored them.
+                "story_characters": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) who is in it -- names, how they know each "
+                        "other, what they are like"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Character names and notes, in ordinary "
+                        "words: 'Ada, the lighthouse keeper. Her brother Tom, "
+                        "who does not believe her.'\n\n"
+                        "Names you write here are kept exactly as you type "
+                        "them. If you say someone is a man or a woman, that is "
+                        "honoured; if you do not say, it is a free choice and "
+                        "is never guessed from the name.\n\n"
+                        "Someone merely mentioned does not become a speaking "
+                        "part. Leave it empty and the cast is invented for you."
+                    ),
+                }),
+                "story_plot": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) what happens -- events, the trouble, how "
+                        "it ends"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Plot ideas: events, the conflict, a "
+                        "twist, an ending you want. Rough notes are fine.\n\n"
+                        "What you ask for here outranks anything the model "
+                        "would rather invent. What you leave out is invented "
+                        "to fit."
+                    ),
+                }),
+                "story_setting": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) where and when -- place, era, atmosphere"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Setting: place, era, weather, mood, "
+                        "the world it happens in.\n\n"
+                        "This is the story's setting, not its LOOK -- the "
+                        "visual style dropdown chooses the look, and changing "
+                        "it never rewrites your setting."
+                    ),
+                }),
+                "story_author": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "(optional) who the story is by",
+                    "tooltip": (
+                        "MY STORY ONLY. Who the story is by. Put your own "
+                        "name here, or a pen name, or anyone you want it "
+                        "credited to.\n\n"
+                        "The announcer says it out loud and the closing "
+                        "credits print it. Leave it empty and the episode "
+                        "credits 'one of our listeners' -- no name is ever "
+                        "filled in for you."
+                    ),
+                }),
             },
             # ComfyUI injects the configured Comfy API key into this hidden
             # input at execution time (the API-nodes auth convention). The
@@ -2890,8 +2960,58 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # OTR_WorkflowValidator -- never parsed, just sequenced.
         gate_in="",
         replay_from="",
+        # MY STORY (2026-09-10), appended after replay_from in widget order.
+        story_characters="",
+        story_plot="",
+        story_setting="",
+        story_author="",
     ):
         """Generate one accepted v2.0 LPL story artifact."""
+        # ------------------------------------------------------------------ #
+        # MY STORY ADMISSION, CHECK SITE 1 -- the FIRST thing that happens,
+        # before the replay shortcut, before the two rolls, before a single
+        # import. Everything here is pure: it reads the widget values and
+        # decides whether this combination can mean anything at all.
+        #
+        # It is first because the refusals it owns are the cheap ones. Typing
+        # character notes with the archive lane selected costs nothing to
+        # catch now, and costs an entire render to discover later -- the
+        # episode would finish, ignore the notes, and look correct.
+        #
+        # The REQUEST captured here is the pre-roll one, and that matters: the
+        # two rolls below rebind `source_bank` and `visual_style` to concrete
+        # ids, so a request rebuilt after them would record the drawn result
+        # as though the person had asked for it, and would file the saved
+        # draft under an identity the validator cannot reproduce.
+        # ------------------------------------------------------------------ #
+        _story_raw = _otr_story_input.capture_raw(
+            idea=custom_premise, characters=story_characters,
+            plot=story_plot, setting=story_setting, author=story_author,
+        )
+        _story_request = _otr_story_input.StoryRequest(
+            num_characters=int(num_characters),
+            act_count=str(act_count),
+            include_act_breaks=bool(include_act_breaks),
+            source_bank_requested=str(source_bank or ""),
+            visual_style_requested=str(visual_style or ""),
+        )
+        # `find_bank` and NOT `get_bank`: the canonical ships the roll
+        # sentinel in this widget, which is a UI command and not a registry
+        # row, so `get_bank` would raise on the default graph. None reads as
+        # the legacy route, which is what every non-My-Story run is.
+        _story_row_early = _otr_story_routing.find_bank(source_bank)
+        _otr_story_input.check_selection(
+            _story_raw,
+            _otr_story_input.StoryInputPolicy(
+                mode=_otr_story_routing.story_input_mode(_story_row_early),
+                bank_id=getattr(_story_row_early, "source_bank_id", "")
+                or str(source_bank or ""),
+            ),
+            source_ref=source_ref,
+            replay_from=replay_from,
+            snapshot_manifest_configured=(
+                _otr_source_snapshot.manifest_configured()),
+        )
         # ------------------------------------------------------------------ #
         # CANONICAL REPLAY (campaign item 0, 2026-09-02). THE FIRST STATEMENT
         # OF run(), before the bank and style rolls, require_runnable_bank, the
@@ -2955,6 +3075,50 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         visual_style, _style_roll = _ROLLS.resolve_style_selection(
             visual_style)
         _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
+        # ------------------------------------------------------------------ #
+        # MY STORY ADMISSION, CHECK SITE 2 -- the bank row is bound, so this
+        # is the first point the answer is authoritative. Deliberately BEFORE
+        # the LLM preflight, the scaffold env mutation, the budget resets and
+        # _resolve_inputs: nothing has been loaded or mutated yet, so a
+        # refusal here costs nothing and leaves nothing behind.
+        #
+        # The same check, from the same contract, as site 1 -- by construction
+        # it agrees. What is NEW here is the SAVE: the person's words go to
+        # disk before any generation starts, so a failure, a cancellation or a
+        # crash minutes from now still leaves them something to retry from.
+        # ------------------------------------------------------------------ #
+        _story_bundle = None
+        _story_draft = None
+        if (_otr_story_routing.story_input_mode(_source_bank_row)
+                == _otr_story_input.INPUT_MODE_USER_FIELDS):
+            _otr_story_input.check_selection(
+                _story_raw,
+                _otr_story_input.StoryInputPolicy(
+                    mode=_otr_story_input.INPUT_MODE_USER_FIELDS,
+                    bank_id=_source_bank_row.source_bank_id,
+                ),
+                source_ref=source_ref,
+                replay_from=replay_from,
+                snapshot_manifest_configured=(
+                    _otr_source_snapshot.manifest_configured()),
+            )
+            # Built from the PRE-ROLL capture, never from the locals above --
+            # `source_bank` and `visual_style` have just been rebound by the
+            # rolls, and rebuilding from them would change the digest between
+            # the validator (which already saved this draft) and here.
+            from . import _otr_story_drafts as _otr_story_drafts
+            _story_bundle = _otr_story_input.build_bundle(
+                _story_raw, _story_request)
+            _story_draft = _otr_story_drafts.ensure_draft(
+                _story_bundle,
+                caller="OTR_LedgerScriptWriter.run",
+                now=datetime.now(timezone.utc).isoformat(),
+            )
+            log.info(
+                "[OTR_LedgerScriptWriter] my_story input %s (%s) -> %s",
+                _story_bundle.digest[:12], _story_draft.status,
+                _story_draft.path,
+            )
         # Stage 3C visual-style gate -- beside the bank gate, same zero-side-
         # effect contract: an unknown visual_style id raises
         # UnknownVisualStyleError here, before ANY story work (no fallback).
@@ -3102,6 +3266,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # the gemma env fallback.
             preflight_policy=_llm_preflight.policy,
             technical_load_config=_llm_preflight.load_config_by_slot.get("technical"),
+            # My Story: the three optional creative fields plus the
+            # attribution, and the PRE-ROLL request so the resolver's bundle
+            # digest matches the one already saved above.
+            story_characters=story_characters,
+            story_plot=story_plot,
+            story_setting=story_setting,
+            story_author=story_author,
+            story_request=_story_request,
             # THE FORWARDING WHOSE ABSENCE MADE THE WIDGET INERT. Without this
             # line the dispatched lane runners never saw the operator's cameo
             # choice at all -- only the legacy in-line path did, by reading the
@@ -3234,6 +3406,28 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        # DELIVERY INTENT (2026-09-10) -- stamped on EVERY new run, not only
+        # My Story ones. A field that appears on some runs and not others
+        # cannot be read as a contract: the terminal mux needs to tell "this
+        # episode must publish" from "this episode was written before the
+        # wire existed", and only an always-present envelope answers that.
+        #
+        # `delivery_token` is fresh per run and is the binding key. The
+        # episode id cannot be: video_engine renames the episode directory
+        # partway through, so the writer's pending id and the terminal id
+        # differ by design. The token survives the rename.
+        #
+        # The replay shortcut returns long before this line, so a replayed
+        # bundle keeps its source ledger's meta and stamps nothing.
+        meta["delivery_intent"] = {
+            "schema_version": "otr_delivery_intent_v1",
+            "source_bank": resolved["source_bank"],
+            "publication_required": _story_bundle is not None,
+            "draft_digest": (_story_bundle.digest if _story_bundle else ""),
+            "delivery_token": uuid.uuid4().hex,
+        }
+        if _story_draft is not None:
+            meta["story_draft"] = _story_draft.to_meta()
         # Randomizer receipt (2026-07-31). Written ONLY when the bank
         # actually rolled: on a manual pick the key is ABSENT -- not null,
         # not a stub -- so the frozen ledger answers "was this rolled?"
@@ -3287,6 +3481,21 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         )
         if _credits_line:
             meta["credits_source_line"] = _credits_line
+        # ATTRIBUTION, AND IT HAS TO BE STAMPED HERE -- AFTER the bank-default
+        # credit above, never at the top of D.1 with the other stamps. That
+        # block is unconditional for any bank whose row defines the default,
+        # and My Story's row does, so an override written earlier would be
+        # silently overwritten by the generic line and the person's name would
+        # never reach the credits.
+        #
+        # Python authors both strings. A model asked to "mention the author"
+        # paraphrases, and a paraphrased name is the wrong name.
+        if _story_bundle is not None:
+            _story_author_name = _story_bundle.normalized.author
+            meta["story_attribution"] = _otr_story_input.attribution_receipt(
+                _story_author_name)
+            meta["credits_source_line"] = _otr_story_input.credits_source_line(
+                _story_author_name)
         # v4 P1(viii): opt-in source-provenance normalizer. Map source_rights ->
         # one normalized record; stamp the spoken coda line + fill
         # credits_source_line when the bank default did not. A research_only

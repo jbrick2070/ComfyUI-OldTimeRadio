@@ -133,11 +133,50 @@ def test_bank_pool_is_runnable_and_sorted():
 
 
 def test_bank_pool_is_derived_from_the_live_registry_not_a_literal():
-    """A client bank admitted at runtime must be an ordinary peer."""
+    """A client bank admitted at runtime must be an ordinary peer.
+
+    TWO filters since 2026-09-10, and the pool is the intersection. `runnable`
+    asks whether the lane is built; `defaults.auto_select` asks whether an
+    UNATTENDED run may land there. They are different questions, and a bank
+    can honestly answer yes to the first and no to the second: the creator
+    bank is perfectly runnable and has nothing whatever to write from when
+    nobody has typed anything.
+
+    Still derived from the live registry, never a literal -- which is what
+    this test was written to protect.
+    """
     order = ROLLS.eligible_bank_ids()
-    runnable = {b.source_bank_id for b in ROUTING._ensure_loaded().banks.values()
-                if b.runnable}
-    assert set(order) == runnable
+    banks = ROUTING._ensure_loaded().banks.values()
+    expected = {b.source_bank_id for b in banks
+                if b.runnable and ROUTING.effective_auto_select(b)}
+    assert set(order) == expected
+
+
+def test_a_manual_only_bank_is_runnable_but_never_rolled():
+    """The creator bank must be selectable by hand and unreachable by a roll.
+
+    Both halves matter. If it left the pool by becoming non-runnable, picking
+    it deliberately would fail too; if it stayed in the pool, an unattended
+    overnight run would eventually draw a bank with no story to tell and die
+    at admission.
+    """
+    bank = ROUTING.require_runnable_bank("my_story")
+    assert bank.runnable is True
+    assert ROUTING.effective_auto_select(bank) is False
+    assert "my_story" not in ROLLS.eligible_bank_ids()
+    # Every other shipped bank keeps its place: the new field defaults to
+    # true, so its arrival changed nothing for banks that do not declare it.
+    for other in ("media_archive", "original", "scifi_news_pro",
+                  "public_domain", "shakespeare"):
+        assert other in ROLLS.eligible_bank_ids(), other
+
+
+def test_the_pool_diagnosis_names_the_filter_that_removed_each_bank():
+    """An empty or surprising pool has to explain itself by NAME."""
+    message = ROLLS._bank_pool_diagnosis()
+    assert "auto_select=false" in message
+    assert "my_story" in message
+    assert "runnable=false" in message
 
 
 def test_style_pool_is_registry_plus_dynamic_sorted():

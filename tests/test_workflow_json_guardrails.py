@@ -646,11 +646,21 @@ class TestWriterB2aSurface:
         # ["1".."8"] default "3": 'auto' meant "derive the act count from
         # target_words", which no longer exists, so there is no derive
         # path left to default to.
-        assert len(wv) == 33, (
-            f"writer widgets_values length drift: {len(wv)} (expected 33: "
+        #
+        # 2026-09-10 (My Story): four optional creative fields --
+        # story_characters, story_plot, story_setting, story_author -- were
+        # APPENDED after replay_from at slots 33-36 (append-only,
+        # BUG-LOCAL-097), taking the vector 33 -> 37. All four default to ""
+        # and are read only by the my_story bank, so a saved 33-slot workflow
+        # resolves them empty and behaves exactly as it did. gate_in remains a
+        # socket-only forceInput at INPUT slot 32 and still consumes no
+        # widgets_values slot; link 279 is unchanged.
+        assert len(wv) == 37, (
+            f"writer widgets_values length drift: {len(wv)} (expected 37: "
             f"32 after the 2026-08-14 target_words removal and the 2026-08-28 "
             f"refine_target_grade removal, plus the trailing replay_from "
-            f"widget appended 2026-09-02 for the canonical replay)"
+            f"widget appended 2026-09-02 for the canonical replay, plus the "
+            f"four My Story fields appended 2026-09-10)"
         )
         # 2026-09-06 operator directive: the shipped template starts with
         # ONE ACT for first-run portability. The generic node/legacy-input

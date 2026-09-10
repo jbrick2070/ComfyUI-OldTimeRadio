@@ -51,8 +51,14 @@ Creative quality remains a taste decision, not a runtime validator.
 
 ## Gate 2 -- Source, access, evidence, and rights
 
-- [ ] **Hard:** The source mode is explicit: no-source, local/package,
+- [ ] **Hard:** The source mode is explicit: user fields, no-source, local/package,
   operator-pinned `source_ref`, or automatic public/keyless selection.
+- [ ] **Hard, My Story:** Manual selection is excluded from bank rolls. Empty
+  creative input and conflicting source/replay settings fail before downloads.
+  Queue admission and writer execution preserve one input digest, including
+  pre-roll controls; linked values defer persistence until evaluated. Named
+  cast, optional attribution and required publication have executable coverage.
+  An offline result does not replace the live ledger, freeze and OBS proof.
 - [ ] **Hard:** A no-source bank has an explicit bank-specific initialization
   path. It does not use empty `fetcher` plus empty `interpreter` and
   accidentally enter the reserved `original` architecture. **N/A**

@@ -13,6 +13,7 @@ def test_source_bank_selector_has_only_canonical_ids():
         "scifi_news_pro",
         "public_domain",
         "shakespeare",
+        "my_story",
         "custom_source_bank",
     ]
 

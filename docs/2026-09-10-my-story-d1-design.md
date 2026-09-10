@@ -1,7 +1,7 @@
 # My Story -- D1 independent bank design
 
-Date: 2026-09-10. Status: DESIGN FOR REVIEW, then code (sprint 4). Nothing in
-this file has been built yet; every "is" about the new bank is a proposal.
+Date: 2026-09-10. Status: Sprint 4 implementation under final verification.
+Sprint 5 native App and live publication qualification remain pending.
 
 Baseline: `v2.0-alpha` HEAD `75bb405b` == origin. Canonical SHA-256
 `b24221b6f672a99cfe6448684ef79d08dc832051dea7c66c050c04b6f4465629`
@@ -421,7 +421,7 @@ cast names, and the target shape (a single scene per act).
 ActScript
   n: int
   scene_setting: str
-  lines: list[Line{speaker, text}]        # 6..40 lines
+  lines: list[Line{speaker, text}]        # nonempty; 6..40 is prompt guidance only
 ```
 
 Post-validator: `n` matches; every `speaker` is a treatment cast name
@@ -447,8 +447,8 @@ music cues are wanted (`include_act_breaks and act_count > 1`).
 
 ```
 StoryFrame
-  announcer_intro: list[str]   # 1..3 lines; must contain the attribution sentence when given
-  announcer_outro: list[str]   # 1..2 lines
+  announcer_intro: list[str]   # nonempty; 1..3 is prompt guidance only
+  announcer_outro: list[str]   # nonempty; 1..2 is prompt guidance only
   coda: str                    # one closing line
   music_open: str              # cue description
   music_close: str

@@ -21,8 +21,10 @@ INPUT_TYPES:
     workflow JSON. If empty, falls back to the canonical fixture path
     under workflows/otr_canonical.json relative to this file.
   - validate_anyway (BOOLEAN, default True): set False to skip the
-    check for diagnostic loads (e.g. running a deliberately-broken
-    workflow to inspect intermediate state).
+    STRUCTURAL check for diagnostic loads (e.g. running a
+    deliberately-broken workflow to inspect intermediate state). It does
+    NOT skip creator-input admission, which runs in both settings --
+    see `_admit_story_input`.
   - strict_unknown_types (BOOLEAN, default True): when True, an
     OTR_-prefixed type missing from NODE_CLASS_MAPPINGS raises
     `WorkflowUnknownNodeTypeError`. False matches the CI test default.
@@ -249,7 +251,12 @@ class WorkflowValidator:
                                "contract or widget-vector violation, halting the "
                                "queue before any model loads. False: skip the "
                                "audit body and report 'skipped' -- the diagnostic "
-                               "bypass for a deliberately drifted graph.",
+                               "bypass for a deliberately drifted graph.\n\n"
+                               "This flag governs the STRUCTURAL AUDIT only. "
+                               "Creator-input admission (My Story) always runs, "
+                               "in both settings, because it is what stops a "
+                               "blank or misdirected submission from costing an "
+                               "asset download.",
                 }),
                 "strict_unknown_types": ("BOOLEAN", {
                     "default": True,
@@ -478,6 +485,65 @@ class WorkflowValidator:
                  msg, master_hash[:12] or "n/a")
         return msg
 
+    @staticmethod
+    def _admit_story_input(prompt, unique_id) -> None:
+        """Judge queued creator input, and save it, before any asset download.
+
+        WHY THIS LIVES IN THE VALIDATOR. This node runs first by wiring (its
+        report gates the writer's `gate_in`) and it is what fetches visual
+        weights. A submission with nothing to write from, or creator fields
+        typed against a bank that never reads them, should cost a clear
+        message -- not a download and then a failure minutes later.
+
+        It speaks only for writers that actually depend on THIS validator, so
+        an unrelated writer elsewhere in the graph is none of its business.
+
+        Saving here is what makes the promise true: the words reach disk
+        before anything expensive starts. The writer re-derives the same
+        identity later and verifies the same file, so the two cannot disagree.
+
+        A refusal RAISES. Everything else -- an unreadable prompt, a registry
+        that will not load -- is left to the checks that own it: this method
+        must never be the reason a healthy run fails.
+        """
+        try:
+            from . import _otr_source_snapshot as _snap
+            from . import _otr_story_input as _si
+            from . import _otr_story_routing as _routing
+        except ImportError:  # pragma: no cover -- standalone/import-isolated
+            return
+        try:
+            admitted = _si.check_queued_prompt(
+                prompt, unique_id,
+                resolve_policy=lambda bank_id: _si.StoryInputPolicy(
+                    mode=_routing.story_input_mode(_routing.find_bank(bank_id)),
+                    bank_id=bank_id,
+                ),
+                snapshot_manifest_configured=_snap.manifest_configured(),
+            )
+        except _si.StoryInputError:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- never fail a healthy run here
+            log.info("[OTR_WorkflowValidator] story-input admission skipped: "
+                     "%s: %s", type(exc).__name__, exc)
+            return
+        if not admitted:
+            return
+        from datetime import datetime, timezone
+
+        from . import _otr_story_drafts as _drafts
+        submitter = _drafts.resolve_context(caller="OTR_WorkflowValidator")
+        for writer in admitted:
+            receipt = _drafts.ensure_draft(
+                writer.bundle,
+                context=_drafts.SubmissionContext(
+                    prompt_id=submitter.prompt_id, node_id=str(writer.node_id),
+                    caller=submitter.caller),
+                now=datetime.now(timezone.utc).isoformat(),
+            )
+            log.info("[OTR_WorkflowValidator] story input for node %s: %s (%s)",
+                     writer.node_id, receipt.digest[:12], receipt.status)
+
     def validate(self, workflow_json_path: str,
                  validate_anyway: bool,
                  strict_unknown_types: bool,
@@ -493,6 +559,12 @@ class WorkflowValidator:
             stamp_msg = self._assert_stamp(
                 workflow_json_path, profile_id.strip(),
                 str(master_hash or ""), str(generated_by or ""))
+        # THE LISTENER'S INPUT IS ADMITTED BEFORE ANY ASSET IS FETCHED, in
+        # BOTH branches. `validate_anyway=False` skips the CONTRACT AUDIT --
+        # the structural check on a deliberately drifted graph -- and it was
+        # never a licence to start a multi-gigabyte download for a submission
+        # with no story in it. See `_admit_story_input`.
+        self._admit_story_input(prompt, unique_id)
         if not validate_anyway:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))

@@ -1040,9 +1040,9 @@ Story bank → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
      → SilentComposite → CaptionBurn → CreditsRoll → MasterAudioMux  ==> final MP4 in otr/obs
 ```
 
-Only two of the five story banks (`scifi_news_pro`, `media_archive`) actually pull from a news
+Only two of the six story banks (`scifi_news_pro`, `media_archive`) actually pull from a news
 or archive feed — `public_domain` and `shakespeare` adapt a fixed source text, and `original` is
-entropy-seeded with no external input at all. "Story bank" above covers all five; see
+entropy-seeded. `my_story` uses the listener's typed fields. "Story bank" covers all six; see
 [Story sources](#story-sources-source-banks) for what each one actually consumes.
 
 ---
@@ -1063,19 +1063,23 @@ nodes/story_packs/banks.json) with no dependency on any other lane.
 | `public_domain` | faithful radio adaptation of a public-domain source |
 | `shakespeare` | Folger scene adaptation. **The Folger Digital Texts are CC BY-NC 3.0 (noncommercial)** — episodes from this bank inherit that restriction on the source text. |
 | `original` | no-source original fiction seeded from an entropy spark draw |
+| `my_story` | your idea, characters, plot and setting developed into a radio story; manual selection, optional byline |
 
-A typed `custom_premise` is handled by lane shape. On `original` it rides along as an
-operator hint beside the random spark draw. On every other bank -- `scifi_news_pro`,
+A typed `custom_premise` is handled by lane shape. On `my_story` it is your idea,
+alongside the four appended fields for characters, plot, setting and author. No feed
+or random premise is used. My Story requires your input and is excluded from automatic
+bank rolls. See [the My Story guide](docs/MY_STORY_GUIDE.md) for use and qualification status.
+On `original` the premise rides along as an
+operator hint beside the random spark draw. On the source-backed banks -- `scifi_news_pro`,
 `media_archive`, `public_domain` and `shakespeare` -- it replaces the fetch outright: your
 text becomes the whole source payload and no feed item, archive item, or source text is
-pulled for that run. (A dedicated My Story bank that takes a pasted text as its own lane is
-PROPOSED, not shipped; today the premise field is the only paste-your-own-text path.)
+pulled for that run.
 Every lane is fail-closed: a bad source, context
 overflow, or contract violation stops loudly instead of shipping a degraded story, and
 the LLM writes all story text — Python validates, it never rewrites prose.
 
-**Add your own source bank:** every bank is independent, and you can author a sixth
-peer to the shipped five — your own feed, archive, or source strategy — running through
+**Add your own source bank:** every bank is independent, and you can author another
+peer — your own feed, archive, or source strategy — running through
 the same trusted writer. The requirements contract (above all: the episode ledger must
 be COMPLETE for every downstream consumer) lives in
 [`docs/EXTENDING_OTR.md`](docs/EXTENDING_OTR.md); read it before authoring.
@@ -1428,7 +1432,7 @@ project's generations. Born of the machine, still raising hell on the airwaves. 
 ## Changelog
 
 The current line is **v2.0-alpha** (Open Video Model Platform; per-role video AND image
-engines; five independent story source banks; one canonical workflow whose dropdowns you set
+engines; six independent story source banks; one canonical workflow whose dropdowns you set
 per machine -- the per-platform variants were removed and will be regenerated from the
 canonical once it is final; frozen 48 kHz audio master, byte-identical in the archival copy).
 Full per-version history is in the git log and the GitHub Releases page.

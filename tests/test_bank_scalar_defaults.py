@@ -28,6 +28,7 @@ EXPECTED = {
     "scifi_news_pro": ("generic", False),
     "public_domain": ("adaptation", True),
     "shakespeare": ("adaptation", True),
+    "my_story": ("generic", False),
 }
 
 

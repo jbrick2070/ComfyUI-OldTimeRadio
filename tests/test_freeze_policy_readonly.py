@@ -41,7 +41,11 @@ def test_inline_banks_receive_same_story_cleanup_policy(bank_id):
     assert policy.terminal_error == ""
 
 
-@pytest.mark.parametrize("bank_id", ["scifi_news_pro"])
+# A bank is content-owned when its pack declares NO line_composer_system
+# seam -- the lane wrote its own lines, so the freeze verifies them instead
+# of running the inline mutators over them. Derived from the pack, never
+# from a bank-id list in the code.
+@pytest.mark.parametrize("bank_id", ["scifi_news_pro", "my_story"])
 def test_fixed_topology_banks_are_content_owned(bank_id):
     policy = LFC.resolve_freeze_policy({"source_bank": bank_id})
     assert policy.name == "content_owned_readonly"

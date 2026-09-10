@@ -832,6 +832,7 @@ CREATIVE_WHITELIST = frozenset({
     "num_characters", "act_count", "request_seed",
     "seed_mode",
     "episode_title", "custom_premise", "style_custom",
+    "story_characters", "story_plot", "story_setting", "story_author",
     "openrouter_slot_a_model", "openrouter_slot_b_model",
     "comfy_slot_a_model", "comfy_slot_b_model",
     "creative_writing_model", "technical_model",

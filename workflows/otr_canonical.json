@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 95,
-  "last_link_id": 290,
+  "last_link_id": 291,
   "nodes": [
     {
       "id": 63,
@@ -452,6 +452,38 @@
             "name": "replay_from"
           },
           "link": null
+        },
+        {
+          "name": "story_characters",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_characters"
+          }
+        },
+        {
+          "name": "story_plot",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_plot"
+          }
+        },
+        {
+          "name": "story_setting",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_setting"
+          }
+        },
+        {
+          "name": "story_author",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_author"
+          }
         }
       ],
       "outputs": [
@@ -470,7 +502,8 @@
           "type": "STRING",
           "slot_index": 1,
           "links": [
-            230
+            230,
+            291
           ]
         },
         {
@@ -538,6 +571,10 @@
         10.0,
         4096,
         "Q8_0",
+        "",
+        "",
+        "",
+        "",
         ""
       ],
       "color": "#2B3C5A",
@@ -1801,6 +1838,11 @@
           "shape": 7,
           "type": "STRING",
           "link": 288
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 291
         }
       ],
       "outputs": [
@@ -3476,6 +3518,14 @@
       0,
       81,
       2,
+      "STRING"
+    ],
+    [
+      291,
+      1,
+      1,
+      85,
+      10,
       "STRING"
     ]
   ],

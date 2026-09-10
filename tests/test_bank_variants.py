@@ -19,6 +19,11 @@ LIVE_BANKS = (
     "scifi_news_pro",
     "public_domain",
     "shakespeare",
+    # 2026-09-10: the creator bank. Runnable like the rest; the thing that
+    # makes it different is invisible here and lives in the roll pool --
+    # `defaults.auto_select=false`, so a blank automatic run never lands on
+    # a bank that has nothing to write from. See test_rolls_*.
+    "my_story",
 )
 
 EXPECTED_PIPELINES = {
@@ -27,6 +32,7 @@ EXPECTED_PIPELINES = {
     "scifi_news_pro": "scifi_news_pro_multipass",
     "public_domain": "legacy_many_pass_adapt",
     "shakespeare": "legacy_many_pass_adapt",
+    "my_story": "my_story_multipass",
 }
 
 

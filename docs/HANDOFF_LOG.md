@@ -1,3 +1,36 @@
+## 2026-09-10 22:44 UTC -- My Story Sprint 4 implementation verified
+
+Codex completed Claude's interrupted implementation from `c7cbf45b` on
+`v2.0-alpha`. The manual My Story bank admits and saves user fields, writes
+one act at a time through the existing structured-call helpers, assembles a
+production ledger, and enters the shared tail/read-only freeze. The canonical
+carries 37 writer widgets and link 291 to the mux's required-delivery input.
+Named cast, optional attribution, draft/run identity, and real publication
+checks are covered. No RSS/random premise is used on this bank.
+
+Focused: 138 My Story tests and 35 workflow-applier tests pass. Full Windows
+suite: 14,646 JUnit cases, 54 failures, 184 skipped, zero errors in 524.531 s;
+exit 2 is disclosed. All failing IDs are present in the fresh detached baseline
+(14,487 cases, 59 failures). Zero new failures; five baseline-only IDs do not
+fail in the active checkout. No quarantine added. Bug Bible: 22 passed,
+27 skipped, 3 xfailed. Canonical validator/round-trip: 23 nodes, 63 links;
+variants check soft-skips because no variants are committed.
+
+One Cursor Grok 4.6 High CLI review completed, grounded by Codex with two
+read-only internal audits. The reviewed fixes check incremental saves and
+shared queue/writer digest identity; capacity errors remain terminal and
+line counts remain guidance. Both headless creative whitelists include all
+four fields. Receipt, exact changed-file inventory, external review and
+judgment: `docs/2026-09-10-my-story-s4/`. Green relative-to-baseline chunk is
+committed and pushed together; no release/tag/promotion. Inherited `diff.txt`
+and `diff_utf8.txt` remain untouched and excluded.
+
+Next: actual canonical writer/freeze model proof, then Sprint 5 native App and
+publication/browser qualification. Offline tests do not claim preflight PASS
+or a published My Story episode. The user's priority is a clean ledger using
+existing machinery, preserving their supplied story as the authority.
+
+---
 ## 2026-09-10 19:25 UTC -- Clean-audio cleanup plan converged; fresh canonical check qualified
 
 **Preparation base: b9d7be0863788e2507de5e68f9273e61c27268ba, v2.0-alpha.**
