@@ -753,11 +753,11 @@
       },
       "widgets_values": [
         48000,
-        0.3,
-        0.8,
-        0.15,
-        16000,
-        "subtle"
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        "off"
       ],
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
@@ -3492,7 +3492,7 @@
     "info": {
       "name": "Old-Time Radio Sci-Fi Anthology",
       "author": "Jeffrey Brick",
-      "description": "Full pipeline: LLM scripts + TTS + spatial audio + dropdown-routed image/video model selection.",
+      "description": "Full pipeline: LLM scripts + TTS + clean stereo audio + dropdown-routed image/video model selection.",
       "version": "2.0-alpha"
     }
   },

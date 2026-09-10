@@ -5,6 +5,13 @@ incoming voice/music assets and ledger are supplied by this check. Sequencing,
 DSP, assembly, ledger persistence and WAV writing are the production functions.
 This is a bounded segment check, not an end-to-end episode/render qualification.
 Run in a fresh process; no pytest fixtures or old harness modules are imported.
+
+Three cases run against the same real graph: a chirp with an opening cue, a
+chirp without one, and exact silence with an opening cue. The chirp cases prove
+placement and timing; the silent case proves that the clean canonical settings
+add nothing to the supplied signal. Direct AudioEnhance probes before any
+episode fixture is bound prove the clean public defaults and that no tape mode
+adds noise.
 """
 from __future__ import annotations
 
@@ -23,6 +30,16 @@ import wave
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = ROOT / "workflows" / "otr_canonical.json"
 ROUTE = ("OTR_SceneSequencer", "OTR_AudioEnhance", "OTR_EpisodeAssembler")
+CLEAN_ENHANCE_SETTINGS = {
+    "target_sample_rate": 48000,
+    "spatial_width": 0.0,
+    "haas_delay_ms": 0.0,
+    "bass_warmth": 0.0,
+    "lpf_cutoff_hz": 0.0,
+    "tape_emulation": "off",
+}
+PROBE_RATE = 48000
+PROBE_SAMPLES = 2 * PROBE_RATE
 
 
 def require(condition, message):
@@ -96,6 +113,12 @@ class CanonicalAudioRoute:
     def input(self, kind, name):
         return next(i for i in self.selected[kind]["inputs"] if i["name"] == name)
 
+    def saved_widgets(self, kind):
+        """Saved widget values bound by widget name, in saved order."""
+        node = self.selected[kind]
+        names = [i["name"] for i in node["inputs"] if i.get("widget")]
+        return dict(zip(names, node["widgets_values"]))
+
     def supply(self, kind, name, value, source_type):
         item = self.input(kind, name)
         require(item.get("link") is not None, f"Boundary {kind}.{name} is unwired")
@@ -136,21 +159,91 @@ class CanonicalAudioRoute:
         return result
 
 
-def check_case(package, output_root, opening):
+def check_public_defaults(package):
+    """Direct AudioEnhance probes; must run before any episode ledger is bound.
+
+    AudioEnhance writes its gate to the in-flight ledger when one exists, so
+    these probes run first and confirm that no ledger is bound before or after.
+    Returns the clean-default receipt and the per-tape-mode receipt.
+    """
+    import torch
+
+    ledger_module = importlib.import_module(package.__name__ + ".nodes._otr_ledger")
+    require(ledger_module.in_flight_ledger_path() is None,
+            "An in-flight ledger is already bound; direct probes must run first")
+    route = CanonicalAudioRoute(package)
+    kind = ROUTE[1]
+    node = route.selected[kind]
+    cls = route.classes[kind]
+    schema = cls.INPUT_TYPES()
+    declared = {**schema.get("required", {}), **schema.get("optional", {})}
+    saved = route.saved_widgets(kind)
+    require(list(saved) == list(CLEAN_ENHANCE_SETTINGS),
+            f"{kind} widget names/order differ from the clean contract: {list(saved)}")
+    defaults = {name: declared[name][1]["default"] for name in CLEAN_ENHANCE_SETTINGS}
+    require(defaults == CLEAN_ENHANCE_SETTINGS,
+            f"{kind} schema defaults are not clean: {defaults}")
+    require(saved == CLEAN_ENHANCE_SETTINGS,
+            f"Canonical node {node['id']} saved widgets are not clean: {saved}")
+    tape_modes = list(declared["tape_emulation"][0])
+    require(tape_modes == ["off", "subtle", "medium", "heavy"],
+            f"Public tape modes changed: {tape_modes}")
+
+    enhance = getattr(cls(), cls.FUNCTION)
+
+    # Function defaults on an asymmetric stereo signal: the canonical mono
+    # chirp has no Side component, so only this probe can expose added width.
+    left = torch.linspace(-0.1, 0.1, PROBE_SAMPLES, dtype=torch.float32)
+    right = left.flip(0) * 0.5
+    stereo = torch.stack([left, right]).unsqueeze(0)
+    reference = stereo.clone()
+    out = enhance({"waveform": stereo, "sample_rate": PROBE_RATE})[0]
+    require(int(out["sample_rate"]) == PROBE_RATE, "Default enhancement changed the rate")
+    require(torch.isfinite(out["waveform"]).all().item(), "Default enhancement produced nonfinite audio")
+    require(tuple(out["waveform"].shape) == (1, 2, PROBE_SAMPLES),
+            f"Default enhancement changed the shape: {tuple(out['waveform'].shape)}")
+    require(torch.equal(out["waveform"], reference),
+            "Default enhancement altered an asymmetric stereo signal")
+    clean_default_check = {
+        "node_id": node["id"],
+        "schema_defaults": defaults,
+        "saved_node_widgets": saved,
+        "asymmetric_stereo": {"shape": [1, 2, PROBE_SAMPLES],
+                              "sample_rate": PROBE_RATE, "equal": True},
+    }
+
+    # Every public tape mode over exact silence with the other effects off.
+    public_tape_checks = {}
+    for mode in tape_modes:
+        zero = torch.zeros(1, 1, PROBE_SAMPLES, dtype=torch.float32)
+        settings = {**CLEAN_ENHANCE_SETTINGS, "tape_emulation": mode}
+        out = enhance({"waveform": zero, "sample_rate": PROBE_RATE}, **settings)[0]
+        waveform = out["waveform"]
+        require(torch.isfinite(waveform).all().item(), f"Tape mode {mode!r} produced nonfinite audio")
+        result = {"nonzero_samples": int(torch.count_nonzero(waveform).item()),
+                  "shape": list(waveform.shape), "sample_rate": int(out["sample_rate"])}
+        require(result == {"nonzero_samples": 0, "shape": [1, 2, PROBE_SAMPLES],
+                           "sample_rate": PROBE_RATE},
+                f"Tape mode {mode!r} altered silence: {result}")
+        public_tape_checks[mode] = result
+    require(ledger_module.in_flight_ledger_path() is None,
+            "Direct probes bound an in-flight ledger")
+    return clean_default_check, public_tape_checks
+
+
+def check_case(package, output_root, opening, silence=False):
     import numpy as np
     import torch
-    from scipy.signal import correlate
 
+    require(opening or not silence, "The silent case is defined with the opening cue")
     namespace = package.__name__ + ".nodes."
     pl = importlib.import_module(namespace + "production_ledger")
     cm = importlib.import_module(namespace + "_otr_cue_manifest")
     route = CanonicalAudioRoute(package)
-    # Roomtone and tape hiss are real DSP randomness. Control the fixture RNG
-    # so same-environment before/after WAV comparisons can detect a code change.
-    rng_seed = 20260910
-    np.random.seed(rng_seed)
-    torch.manual_seed(rng_seed)
-    episode = "canonical_audio_opening" if opening else "canonical_audio_no_opening"
+    if silence:
+        episode = "canonical_audio_silence_opening"
+    else:
+        episode = "canonical_audio_opening" if opening else "canonical_audio_no_opening"
     audio_dir = output_root / "otr" / "episodes" / episode / "audio"
     led = pl.new_ledger(episode, str(audio_dir))
     led.data["meta"] = {"title": "Canonical audio check"}
@@ -165,13 +258,18 @@ def check_case(package, output_root, opening):
 
     def audio(seconds, frequency):
         t = torch.arange(round(seconds * rate), dtype=torch.float32) / rate
-        signal = 0.1 * torch.sin(2 * torch.pi * (frequency * t + 180 * t * t))
+        if silence:
+            signal = torch.zeros_like(t)
+        else:
+            signal = 0.1 * torch.sin(2 * torch.pi * (frequency * t + 180 * t * t))
         return {"waveform": signal.reshape(1, 1, -1), "sample_rate": rate}
 
     route.supply(ROUTE[0], "script_json", json.dumps(led.data), "OTR_CastLock")
     route.supply(ROUTE[0], "tts_audio_clips", audio(1, 430), "OTR_BatchCharacterVoices")
     route.supply(ROUTE[0], "announcer_audio_clips", audio(1, 710), "OTR_AnnouncerVoice")
-    route.run(ROUTE[0])
+    scene = route.run(ROUTE[0])[0]
+    scene_copy = scene["waveform"].detach().clone()
+    scene_rate = int(scene["sample_rate"])
     before = json.loads(Path(led.path).read_text(encoding="utf-8"))
     require(all(row.get("start_s_space") == "scene_audio" for row in before["lines"]),
             "Sequencer did not persist line positions")
@@ -179,6 +277,17 @@ def check_case(package, output_root, opening):
     enhanced = route.run(ROUTE[1])[0]
     require(torch.isfinite(enhanced["waveform"]).all().item(), "DSP produced nonfinite audio")
     rate = int(enhanced["sample_rate"])
+    # Clean enhancement at the canonical 48000-Hz target must hand the scene
+    # signal through unchanged apart from mono-to-stereo duplication. A changed
+    # target rate is a declared-assumption failure: requalify resampling rather
+    # than comparing bit equality at unequal rates.
+    require(scene_rate == 48000 and rate == 48000,
+            f"Fixture assumes 48000 Hz on both sides; got {scene_rate}/{rate}")
+    require(scene_copy.shape[1] == 1, "Fixture assumes a mono scene bus")
+    require(torch.equal(enhanced["waveform"], torch.cat([scene_copy, scene_copy], dim=1)),
+            "Clean enhancement changed the supplied 48000-Hz scene signal")
+    nonzero = {"scene": int(torch.count_nonzero(scene_copy).item()),
+               "enhanced": int(torch.count_nonzero(enhanced["waveform"]).item())}
 
     # Durable prior state: no mock of ledger loading, patching, or saving.
     current = json.loads(Path(led.path).read_text(encoding="utf-8"))
@@ -208,26 +317,42 @@ def check_case(package, output_root, opening):
     require(master.parent == audio_dir.resolve() and master.is_file(), "Master WAV missing/misplaced")
     with wave.open(str(master), "rb") as wav:
         saved_rate = wav.getframerate()
-        decoded = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2")
-        decoded = decoded.reshape(-1, wav.getnchannels()).mean(axis=1)
-    # Locate the actual enhanced signal inside the written master. This measures
-    # placement independently: it does not reproduce the production shift loop.
-    template = enhanced["waveform"][0].mean(dim=0).numpy()
-    start, stop = round(0.65 * rate), round(1.25 * rate)
-    lag = int(np.argmax(correlate(decoded, template[start:stop], mode="valid", method="fft"))) - start
+        channels = wav.getnchannels()
+        # Raw interleaved int16 samples, kept before any channel averaging so a
+        # zero count cannot be hidden by opposite-sign channel noise.
+        raw = np.frombuffer(wav.readframes(wav.getnframes()), dtype="<i2")
     require(saved_rate == rate, "Master rate differs from the measured signal")
-    measured_offset = lag / saved_rate
-    require(lag > 0 if opening else lag == 0, "Written audio placement is wrong")
+    require(channels == 2, f"Master is not stereo: {channels} channel(s)")
+    nonzero["master"] = int(np.count_nonzero(raw))
+
+    if silence:
+        # Silence proves zero preservation only; it is never a timing golden.
+        require(nonzero == {"scene": 0, "enhanced": 0, "master": 0},
+                f"Silent input did not stay silent: {nonzero}")
+        measured_offset = None
+    else:
+        from scipy.signal import correlate
+        decoded = raw.reshape(-1, channels).mean(axis=1)
+        # Locate the actual enhanced signal inside the written master. This
+        # measures placement independently: it does not reproduce the
+        # production shift loop.
+        template = enhanced["waveform"][0].mean(dim=0).numpy()
+        start, stop = round(0.65 * rate), round(1.25 * rate)
+        lag = int(np.argmax(correlate(decoded, template[start:stop], mode="valid", method="fft"))) - start
+        measured_offset = lag / saved_rate
+        require(lag > 0 if opening else lag == 0, "Written audio placement is wrong")
     saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
     by_id = {row["line_id"]: row for row in saved["lines"]}
     for line_id, start_s in positions.items():
         row = by_id[line_id]
-        require(abs(row["start_s"] - start_s - measured_offset) <= 1 / rate,
-                f"{line_id}: persisted timing disagrees with written audio")
+        if measured_offset is not None:
+            require(abs(row["start_s"] - start_s - measured_offset) <= 1 / rate,
+                    f"{line_id}: persisted timing disagrees with written audio")
         require(row["start_s_space"] == ("master_mix" if opening else "scene_audio"),
                 f"{line_id}: wrong coordinate-space marker")
-    require(abs(saved["clips"][0]["start_s"] - 0.25 - measured_offset) <= 1 / rate,
-            "Pre-existing clip did not follow the written audio")
+    if measured_offset is not None:
+        require(abs(saved["clips"][0]["start_s"] - 0.25 - measured_offset) <= 1 / rate,
+                "Pre-existing clip did not follow the written audio")
     require(saved["clips"][1]["start_s"] == 7.0, "Master-space clip shifted again")
     require("start_s" not in saved["clips"][2], "Missing clip time was invented")
     timing = [(row.get("line_id"), row.get("start_s"), row.get("start_s_space"))
@@ -243,9 +368,9 @@ def check_case(package, output_root, opening):
         current_hash = hashlib.sha256(Path(inspect.getfile(route.classes[call["type"]])).read_bytes()).hexdigest()
         require(current_hash == call["source_sha256"], "Production code changed during check")
     return {"episode": episode, "canonical_sha256": route.sha256,
-            "rng_seed": rng_seed,
             "calls": route.calls, "supplied_boundaries": route.boundaries,
-            "measured_scene_offset_s": measured_offset, "ledger": str(led.path),
+            "measured_scene_offset_s": measured_offset,
+            "nonzero_samples": nonzero, "ledger": str(led.path),
             "master": str(master), "master_sha256": hashlib.sha256(master.read_bytes()).hexdigest()}
 
 
@@ -262,12 +387,18 @@ def main():
     package = load_package()
     import torch
     torch.set_num_threads(1)
-    cases = [check_case(package, output, opening) for opening in (True, False)]
+    clean_default_check, public_tape_checks = check_public_defaults(package)
+    cases = [check_case(package, output, True),
+             check_case(package, output, False),
+             check_case(package, output, True, silence=True)]
     require(head == subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "HEAD changed during check")
     receipt = {"scope": "canonical non-foley CPU audio segment; synthetic upstream assets; no model/server/publish",
                "head": head,
-               "canonical": str(CANONICAL), "cases": cases}
+               "canonical": str(CANONICAL),
+               "clean_default_check": clean_default_check,
+               "public_tape_checks": public_tape_checks,
+               "cases": cases}
     path = output / "canonical_audio_check.json"
     path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(f"CANONICAL AUDIO CHECK PASSED: {path}")

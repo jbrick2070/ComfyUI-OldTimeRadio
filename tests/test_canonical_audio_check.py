@@ -10,6 +10,20 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+CASE_LABELS = {
+    "canonical_audio_opening",
+    "canonical_audio_no_opening",
+    "canonical_audio_silence_opening",
+}
+CLEAN_ENHANCE_SETTINGS = {
+    "target_sample_rate": 48000,
+    "spatial_width": 0.0,
+    "haas_delay_ms": 0.0,
+    "bass_warmth": 0.0,
+    "lpf_cutoff_hz": 0.0,
+    "tape_emulation": "off",
+}
+ZERO_PROBE = {"nonzero_samples": 0, "shape": [1, 2, 96000], "sample_rate": 48000}
 
 
 def test_current_canonical_audio_route_and_durable_outputs(tmp_path):
@@ -27,15 +41,36 @@ def test_current_canonical_audio_route_and_durable_outputs(tmp_path):
     canonical = ROOT / "workflows" / "otr_canonical.json"
     assert receipt["canonical"] == str(canonical)
     digest = hashlib.sha256(canonical.read_bytes()).hexdigest()
-    assert len(receipt["cases"]) == 2
-    for case in receipt["cases"]:
+
+    # Clean public contract: schema defaults, the saved canonical widgets and a
+    # default call over asymmetric stereo that must come back untouched.
+    clean = receipt["clean_default_check"]
+    assert clean["schema_defaults"] == CLEAN_ENHANCE_SETTINGS
+    assert clean["saved_node_widgets"] == CLEAN_ENHANCE_SETTINGS
+    assert clean["asymmetric_stereo"] == {"shape": [1, 2, 96000],
+                                          "sample_rate": 48000, "equal": True}
+    # No public tape mode may add anything to silence.
+    tape = receipt["public_tape_checks"]
+    assert set(tape) == {"off", "subtle", "medium", "heavy"}
+    assert all(probe == ZERO_PROBE for probe in tape.values()), tape
+
+    cases = receipt["cases"]
+    assert {case["episode"] for case in cases} == CASE_LABELS
+    assert len(cases) == len(CASE_LABELS)
+    for case in cases:
         assert case["canonical_sha256"] == digest
-        assert case["rng_seed"] == 20260910
         assert Path(case["ledger"]).is_file()
         assert hashlib.sha256(Path(case["master"]).read_bytes()).hexdigest() == case["master_sha256"]
+        if case["episode"] == "canonical_audio_silence_opening":
+            assert case["measured_scene_offset_s"] is None
+            assert case["nonzero_samples"] == {"scene": 0, "enhanced": 0, "master": 0}
+        else:
+            assert isinstance(case["measured_scene_offset_s"], float)
+            assert case["nonzero_samples"]["master"] > 0
 
-    # A separate fresh process must reproduce the WAVs under the same fixture
-    # seed; otherwise a before/after cleanup comparison would flag random hiss.
+    # A separate fresh process must reproduce the WAVs byte for byte: the
+    # supplied chirps are deterministic and the clean settings add nothing, so
+    # no fixture seed is needed and any drift is a real production change.
     independent_output = tmp_path / "independent_canonical_audio"
     independent = subprocess.run(command[:-1] + [str(independent_output)],
                                  cwd=ROOT, env=env, capture_output=True,

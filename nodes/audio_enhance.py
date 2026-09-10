@@ -1,29 +1,35 @@
 """
-OTR_AudioEnhance - Broadcast-quality spatial audio enhancement.
+OTR_AudioEnhance - 48 kHz stereo audio mastering with optional spatial effects.
 
-Upscales mono TTS audio (typically 24kHz from Bark) to stereo at a target
-sample rate with faux-spatial widening and bass warmth. It does NOT set
-the delivery level -- see the note in the step list below.
+Converts the scene bus (mono or stereo, any sample rate) to stereo at the
+target sample rate. Every effect is opt-in and off by default: the clean
+canonical settings hand the supplied signal through unchanged apart from
+rate/channel conversion. It does NOT set the delivery level -- see the note
+in the step list below.
 
 Pipeline position:  SceneSequencer - AudioEnhance - EpisodeAssembler
 
 Processing chain:
   1. Resample to target rate (sinc-interpolated via torchaudio - zero aliasing)
-  2. Mono - Stereo duplication
-  3. Low-frequency warmth (bass biquad shelf filter - no comb ripples)
-  4. High-frequency cleanup - gentle LPF at 16kHz kills Bark "chirp" artifacts
-  5. Haas-effect spatial widening (delay one channel 0.2-0.8 ms)
-  6. Mid-side stereo decorrelation for image width
+  2. Mono - Stereo duplication (an existing stereo input keeps its channels)
+  3. Optional low-frequency warmth (bass biquad shelf filter); 0 = off
+  4. Optional low-pass cleanup for voices with chirp artifacts; 0 = off
+  5. Optional Haas-effect spatial widening (delay one channel); 0 = off
+  6. Optional deterministic tape saturation / wow-flutter; "off" = off
+  7. Optional mid-side stereo widening; 0 = no added width
   (There is no normalisation step here. One used to be listed and it
    never ran -- delivery level is set downstream, once, in LUFS by
    scene_sequencer._master_loudness. Removed 2026-08-28.)
+  (Synthetic tape hiss was removed 2026-09-10 -- clean audio. No setting
+   adds noise to the signal.)
 
 All DSP is fully vectorized (no Python for-loops over samples).
 
 Input:   AUDIO  (mono or stereo, any sample rate)
-Output:  AUDIO  (stereo, target sample rate, spatially widened)
+Output:  AUDIO  (stereo, target sample rate)
 
 v1.0  2026-04-04  Jeffrey Brick
+v1.1  2026-09-10  clean defaults; tape hiss retired
 """
 
 import logging
@@ -118,7 +124,7 @@ def _stereo_decorrelate(waveform: torch.Tensor, amount: float = 0.15) -> torch.T
     """Mid-side stereo width enhancement.
 
     Boosts the Side (L-R) component relative to Mid (L+R).
-    amount: 0.0 = mono, 0.15 = subtle, 0.5 = very wide.
+    amount: 0.0 = unchanged width, 0.15 = subtle, 0.5 = very wide.
     """
     if waveform.shape[1] < 2:
         return waveform
@@ -248,16 +254,20 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
 
 
 def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_str: str) -> torch.Tensor:
-    """Apply analog tape emulation (saturation, hiss, wow/flutter) using numpy/scipy."""
+    """Apply deterministic analog tape emulation (saturation, wow/flutter).
+
+    Synthetic tape hiss was removed 2026-09-10 (clean audio): no intensity
+    adds noise, so silence in is silence out at every setting.
+    """
     if intensity_str == "off":
         return waveform
 
     import numpy as np
 
     intensities = {
-        "subtle": {"sat": 1.2, "hiss": 0.002, "wow": 0.0005},
-        "medium": {"sat": 1.5, "hiss": 0.005, "wow": 0.0015},
-        "heavy":  {"sat": 2.0, "hiss": 0.010, "wow": 0.003},
+        "subtle": {"sat": 1.2, "wow": 0.0005},
+        "medium": {"sat": 1.5, "wow": 0.0015},
+        "heavy":  {"sat": 2.0, "wow": 0.003},
     }
     params = intensities.get(intensity_str, intensities["subtle"])
 
@@ -273,19 +283,7 @@ def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_st
     # tanh(x * drive) / tanh(drive) limits peak to 1.0 but adds harmonic warmth
     waveform_np = np.tanh(waveform_np * drive) / np.tanh(drive)
 
-    # 2. Tape Hiss (simple noise approx via LP filtered white noise)
-    hiss_amp = params["hiss"]
-    noise = np.random.randn(B, C, N).astype(np.float32)
-    try:
-        from scipy.signal import butter, sosfilt
-        # Gentle 4000Hz lowpass to make noise sound more like tape hiss than digital static
-        sos = butter(2, 4000, btype='lowpass', fs=sample_rate, output='sos')
-        noise = sosfilt(sos, noise).astype(np.float32)
-    except ImportError:
-        pass # fallback to white noise if scipy missing
-    waveform_np += noise * hiss_amp
-
-    # 3. Wow and Flutter (pitch modulation via delay line interpolation)
+    # 2. Wow and Flutter (pitch modulation via delay line interpolation)
     wow_depth = params["wow"]
     if wow_depth > 0:
         try:
@@ -312,7 +310,7 @@ def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_st
 # -- ComfyUI Node --------------------------------------------------------------
 
 class AudioEnhance:
-    """Broadcast-quality spatial audio enhancement for TTS output."""
+    """48 kHz stereo mastering for the scene bus; every effect is opt-in."""
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "enhance"
@@ -331,29 +329,35 @@ class AudioEnhance:
                     "tooltip": "Target sample rate in Hz (48000 = broadcast standard)"
                 }),
                 "spatial_width": ("FLOAT", {
-                    "default": 0.3, "min": 0.0, "max": 1.0, "step": 0.05,
-                    "tooltip": "Stereo width: 0=mono, 0.3=natural, 1.0=extreme"
+                    "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05,
+                    "tooltip": "Mid-side stereo width ADDED to the signal: "
+                               "0=none (default; the supplied image is kept), "
+                               "0.3=natural, 1.0=extreme"
                 }),
                 "haas_delay_ms": ("FLOAT", {
-                    "default": 0.4, "min": 0.0, "max": 2.0, "step": 0.1,
-                    "tooltip": "Haas effect delay ms (0.2-0.8 = natural, 0=off)"
+                    "default": 0.0, "min": 0.0, "max": 2.0, "step": 0.1,
+                    "tooltip": "Haas effect delay ms (0=off, default; "
+                               "0.2-0.8 = natural widening)"
                 }),
                 "bass_warmth": ("FLOAT", {
-                    "default": 0.1, "min": 0.0, "max": 0.5, "step": 0.05,
-                    "tooltip": "Low-freq warmth for broadcast tone (0=off, 0.1=subtle)"
+                    "default": 0.0, "min": 0.0, "max": 0.5, "step": 0.05,
+                    "tooltip": "Low-freq warmth shelf (0=off, default; 0.1=subtle)"
                 }),
                 "lpf_cutoff_hz": ("FLOAT", {
-                    "default": 16000.0, "min": 8000.0, "max": 24000.0, "step": 1000.0,
-                    "tooltip": "Low-pass filter cutoff Hz - kills Bark chirp artifacts (0=off, 16000=default)"
+                    "default": 0.0, "min": 0.0, "max": 24000.0, "step": 1000.0,
+                    "tooltip": "Optional low-pass cutoff Hz for a voice engine "
+                               "that leaves high-frequency chirp artifacts "
+                               "(0=off, default; 16000 is a gentle cleanup)"
                 }),
                 "tape_emulation": (["off", "subtle", "medium", "heavy"], {
                     "default": "off",
-                    "tooltip": "Analog tape emulation intensity. Each step up "
-                               "adds more period character (saturation, wow/"
-                               "flutter, hiss) and costs more clarity -- "
-                               "'heavy' audibly softens dialogue. 'off' is "
-                               "the clean master; this is an audible "
-                               "episode-facing choice, not a technical knob."
+                    "tooltip": "Deterministic analog tape emulation. Each "
+                               "step up adds more period character "
+                               "(saturation, wow/flutter; no synthetic hiss) "
+                               "and costs more clarity -- 'heavy' audibly "
+                               "softens dialogue. 'off' is the clean master; "
+                               "this is an audible episode-facing choice, "
+                               "not a technical knob."
                 }),
                 # `normalize_dbfs` was REMOVED 2026-08-28. It was inert TWICE
                 # over: nothing read the parameter, AND `_normalize()` -- the
@@ -371,8 +375,8 @@ class AudioEnhance:
             },
         }
 
-    def enhance(self, audio, target_sample_rate=48000, spatial_width=0.3,
-                haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
+    def enhance(self, audio, target_sample_rate=48000, spatial_width=0.0,
+                haas_delay_ms=0.0, bass_warmth=0.0, lpf_cutoff_hz=0.0,
                 tape_emulation="off"):
 
         # Schema l3 (2026-04-28): wall-clock for meta.phase_ms.audio_enhance.

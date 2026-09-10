@@ -1,9 +1,9 @@
 """tests/test_sequencer_ledger.py -- self-test for the ledger-pure
 SceneSequencer rewrite.
 
-Mocks the heavy paths (story_orchestrator._unload_llm, room-tone
-generation, inline-Bark fallback) so the dispatch + clip-match +
-write-back logic is exercised CPU-only in well under a second.
+Mocks the heavy paths (the LLM unload handoff and the ledger I/O) so
+the dispatch + clip-match + write-back logic is exercised CPU-only in
+well under a second. The sequencer generates nothing and adds no bed.
 
 Covers four canonical Pattern 7 cases adapted for Sequencer:
   - test_sequencer_processes_dialogue_and_sfx_skips_music
@@ -17,7 +17,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import numpy as np
 import pytest
 import torch
 
@@ -63,11 +62,6 @@ def patched_sequencer_env(tmp_path):
         state["led_disk"] = led
         return True
 
-    # _generate_room_tone is heavy on the assembled-mix path; replace
-    # with a zero buffer so the test runs CPU-only.
-    def _fake_room_tone(span_len_sec, sr, intensity=0.01, descriptors=""):
-        return np.zeros(int(span_len_sec * sr), dtype=np.float32)
-
     # `_fake_bark_for_line` was removed 2026-08-28 with the deleted
     # inline-Bark fallback it stubbed -- nothing patched it any more.
 
@@ -79,9 +73,6 @@ def patched_sequencer_env(tmp_path):
         "nodes._otr_model_loader.unload_llm", side_effect=_no_op,
     ), patch(
         "nodes.scene_sequencer._runtime_log", side_effect=_no_op,
-    ), patch(
-        "nodes.scene_sequencer._generate_room_tone",
-        side_effect=_fake_room_tone,
     ), patch(
         "nodes._otr_ledger.in_flight_ledger_path",
         side_effect=_fake_in_flight_path,

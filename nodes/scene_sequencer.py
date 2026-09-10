@@ -1,18 +1,18 @@
 r"""
-Scene Sequencer + Episode Assembler - Orchestrate the Full Radio Show
-======================================================================
+Scene Sequencer + Episode Assembler - Assemble the Radio Show Audio
+====================================================================
 
 Two nodes:
-  1. SceneSequencer - Takes the L3 ledger and renders each line through
-     the appropriate TTS engine (Bark or Parler), passes music
-     cues through, and outputs a scene. Features:
-     intelligent pacing (breath buffers, BEAT/PAUSE tags), continuous
-     room tone bed, voice_assignments dispatch from the ledger's cast
-     block.
+  1. SceneSequencer - Sequences the supplied character and announcer
+     clips against the ledger's dialogue lines: resamples each clip to
+     the 48 kHz scene rate, levels the dialogue, lays the clips end to
+     end, and writes each line's durable scene-audio position back to
+     the ledger. It generates no speech and adds no room tone or other
+     bed; music lines pass through untouched.
 
-  2. EpisodeAssembler - Takes multiple rendered scenes, adds act
-     breaks, opening/closing themes, and assembles the complete
-     episode WAV.
+  2. EpisodeAssembler - Combines the supplied scene bus with the music
+     cues (opening / closing / interstitial), sets the delivery level,
+     and writes the master WAV.
 
 These nodes consume the L3 ledger produced by LedgerScriptWriter and
 emitted via the FreezeCascade.script_json fanout. The legacy parser-
@@ -21,6 +21,7 @@ S2-S8; forensic comments downstream mark the migration points.
 
 v1.0  2026-04-04  Jeffrey Brick
 v2.0  2026-05-13  voice-path-cleanbreak S23.4 (docstring scrub)
+v2.1  2026-09-10  clean audio: the automatic room-tone bed is retired
 """
 
 import json
@@ -514,7 +515,7 @@ def _loudness_normalize_clip(clip_np, target_rms_dbfs, max_boost_db,
     clamped to [``max_cut_db``, ``max_boost_db``], convert to linear, then cap
     by ``peak_ceiling``. The peak-safety cap may attenuate BELOW max_cut to
     avoid clipping -- that is intentional. Deterministic, CPU/numpy-only.
-    All non-finite / empty / silent / room-tone paths return float32 unchanged.
+    All non-finite / empty / silent / below-gate paths return float32 unchanged.
     """
     x = np.asarray(clip_np)
     if x.size == 0 or not np.all(np.isfinite(x)):
@@ -529,7 +530,7 @@ def _loudness_normalize_clip(clip_np, target_rms_dbfs, max_boost_db,
         return np.asarray(clip_np, dtype=np.float32)
     rms_dbfs = 20.0 * math.log10(max(rms, 1e-10))
     if rms_dbfs <= gate_dbfs:
-        return np.asarray(clip_np, dtype=np.float32)  # room tone -> no gain
+        return np.asarray(clip_np, dtype=np.float32)  # below the gate -> no gain
     gain_db = min(max(target_rms_dbfs - rms_dbfs, max_cut_db), max_boost_db)
     gain_lin = 10.0 ** (gain_db / 20.0)               # dB -> linear
     gain_lin = min(gain_lin, peak_ceiling / peak)     # peak-safety cap
@@ -625,109 +626,6 @@ def _resample_audio(clip_np, src_rate, dst_rate):
 #: machine it was written on is a portability defect wearing a constant's
 #: clothes, and it is now the empty string, which means "the ledger decides".
 DEFAULT_OUT = ""
-
-
-# -----------------------------------------------------------------------------
-# ROOM TONE BED - continuous background that fills silence between dialogue
-# -----------------------------------------------------------------------------
-
-def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descriptors=""):
-    """Generate a dynamic background bed based on Canonical 1.0 ENV descriptors.
-
-    Uses the descriptors (e.g. 'night city street, distant traffic') to skew
-    the noise profile and add textures like wind, sirens, or electronic hums.
-
-    Path selection (RTX 5080 optimized):
-      - CUDA + duration > 60s - GPU torch path (noise + sin on Tensor Cores)
-      - Otherwise - CPU numpy path (low overhead for short beds)
-    """
-    import torch
-    n_samples = int(duration_sec * sample_rate)
-    desc = descriptors.lower()
-    _use_gpu = (torch.cuda.is_available() and duration_sec >= 60)
-
-    if _use_gpu:
-        # -- GPU path: all noise + trig on CUDA ------------------------------
-        dev = torch.device("cuda")
-        t = torch.arange(n_samples, dtype=torch.float32, device=dev) / sample_rate
-
-        # Base: tape hiss
-        hiss = torch.randn(n_samples, dtype=torch.float32, device=dev)
-        hiss_cutoff = 800 if ("wind" in desc or "storm" in desc) else 4000
-        hiss_intensity = intensity * 1.5 if ("wind" in desc or "storm" in desc) else intensity
-        # FFT bandpass on GPU (replaces scipy.sosfilt)
-        freqs = torch.fft.rfftfreq(n_samples, d=1.0 / sample_rate, device=dev)
-        mask = ((freqs >= 100) & (freqs <= hiss_cutoff)).float()
-        hiss = torch.fft.irfft(torch.fft.rfft(hiss) * mask, n=n_samples)
-        hiss *= hiss_intensity * 0.6
-
-        # Mains hum
-        hum_freq = 50 if "euro" in desc else 60
-        hum_amp = intensity * 0.15 if ("electronic" in desc or "fluorescent" in desc or "ship" in desc) else intensity * 0.1
-        hum = torch.sin(2 * math.pi * hum_freq * t) * hum_amp
-
-        # Textures
-        texture = torch.zeros(n_samples, dtype=torch.float32, device=dev)
-        if "traffic" in desc or "street" in desc:
-            texture += torch.sin(2 * math.pi * 30 * t) * (intensity * 0.2)
-        if "siren" in desc:
-            siren_mod = torch.sin(2 * math.pi * 0.2 * t) * 100 + 400
-            texture += torch.sin(2 * math.pi * siren_mod * t) * (intensity * 0.05)
-
-        # Sporadic crackle (stays on CPU - tiny loop, negligible cost)
-        crackle = np.zeros(n_samples, dtype=np.float32)
-        n_pops = int(duration_sec * (8 if "vinyl" in desc else 3))
-        pop_positions = np.random.randint(0, n_samples, size=n_pops)
-        for pos in pop_positions:
-            p_len = np.random.randint(int(sample_rate * 0.001), int(sample_rate * 0.004))
-            end = min(pos + p_len, n_samples)
-            crackle[pos:end] += np.linspace(1.0, 0, end - pos) * intensity * 0.4
-        crackle_t = torch.from_numpy(crackle).to(dev, non_blocking=True)
-
-        result = hiss + hum + texture + crackle_t
-        log.info("[SceneSequencer] Room tone: GPU path (%.1fs, %d samples)", duration_sec, n_samples)
-        return result.cpu().numpy()
-
-    # -- CPU path: numpy (low overhead for short beds) -----------------------
-    hiss = np.random.randn(n_samples).astype(np.float32)
-    if "wind" in desc or "storm" in desc:
-        cutoff = 800
-        intensity *= 1.5
-    else:
-        cutoff = 4000
-
-    try:
-        from scipy.signal import butter, sosfilt
-        sos = butter(4, [100, cutoff], btype='bandpass', fs=sample_rate, output='sos')
-        hiss = sosfilt(sos, hiss).astype(np.float32)
-    except Exception:
-        pass
-    hiss *= intensity * 0.6
-
-    # Mains Hum
-    hum_freq = 50 if "euro" in desc else 60
-    hum_amp = intensity * 0.3 if ("electronic" in desc or "fluorescent" in desc or "ship" in desc) else intensity * 0.1
-    t = np.arange(n_samples, dtype=np.float32) / sample_rate
-    hum = np.sin(2 * np.pi * hum_freq * t) * hum_amp
-
-    # Textures
-    texture = np.zeros(n_samples, dtype=np.float32)
-    if "traffic" in desc or "street" in desc:
-        texture += np.sin(2 * np.pi * 30 * t) * (intensity * 0.2)
-    if "siren" in desc:
-        siren_mod = np.sin(2 * np.pi * 0.2 * t) * 100 + 400
-        texture += np.sin(2 * np.pi * siren_mod * t) * (intensity * 0.05)
-
-    # Sporadic crackle
-    crackle = np.zeros(n_samples, dtype=np.float32)
-    n_pops = int(duration_sec * (8 if "vinyl" in desc else 3))
-    pop_positions = np.random.randint(0, n_samples, size=n_pops)
-    for pos in pop_positions:
-        p_len = np.random.randint(int(sample_rate * 0.001), int(sample_rate * 0.004))
-        end = min(pos + p_len, n_samples)
-        crackle[pos:end] += np.linspace(1.0, 0, end - pos) * intensity * 0.4
-
-    return hiss + hum + texture + crackle
 
 
 # -----------------------------------------------------------------------------
@@ -893,8 +791,10 @@ class SceneSequencer:
                  ):
 
         # CANONICAL REPLAY (campaign item 0): no mix is built; node 7 copies the
-        # frozen master. The placeholder is a DSP-SAFE CPU batch (node 4's
-        # resample + Haas + LPF run over it unbranched), not the empty batch.
+        # frozen master, which is what the downstream consumers receive. The
+        # placeholder is a DSP-SAFE CPU batch (node 4's resample and channel
+        # handling run over it unbranched; the clean canonical settings leave
+        # every optional effect off), not the empty batch.
         try:
             from .production_ledger import replay_descriptor as _replay_descriptor
             _parsed = json.loads(script_json or "{}")
@@ -919,17 +819,11 @@ class SceneSequencer:
         # Sequencer is in the loud-fail group (Pattern 1) -- bad wiring
         # halts the run early. The legacy Director production_plan_json
         # secondary input was deleted in voice-path-cleanbreak 2026-05-12 --
-        # pacing defaults are inlined here, voice_map was unused.
+        # its pacing overrides and voice_map were unused. The inlined pacing
+        # constants that replaced them were never read either and are gone:
+        # clips are laid end to end and only `dialogue_offset_ms` adds silence.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-
-        # PACING: Breath buffer + dramatic pauses (v1.4 - 50% duration reduction).
-        # Defaults inlined; the legacy Director pacing override is gone.
-        breath_ms = 200          # between every dialogue line
-        beat_pause_ms = 750      # [BEAT] tag - dramatic beat
-        pause_ms = 1000          # [PAUSE] tag - longer pause
-        scene_transition_ms = 1250
-        act_break_ms = 2500
 
         # THE `output_dir` MKDIR IS GONE (2026-09-05). It read
         # `os.makedirs(output_dir, exist_ok=True)` on a value that came straight
@@ -983,11 +877,6 @@ class SceneSequencer:
         sample_rate = 48000  # standardize output
         all_segments = []
         render_log = []
-
-        # Canonical 1.0+ state tracking
-        current_character_name = None
-        current_env = "silent room"
-        env_timeline = []  # List of (start_sample, end_sample, desc)
 
         # v1.5 Phase 3: Convert TA offset from ms to samples
         dialogue_offset_samples = int(dialogue_offset_ms * sample_rate / 1000.0)
@@ -1121,9 +1010,7 @@ class SceneSequencer:
                         f"per dialogue line; fix the upstream clip count."
                     )
 
-                current_character_name = character_name
-
-            # -- Accumulate Audio and Track Environment Span --------------
+            # -- Accumulate Audio and Record Line Position ----------------
             if segment_np is not None:
                 # v1.5: Apply dialogue TA_Offset for dialogue/announcer items
                 if item_type == "dialogue" and dialogue_offset_samples != 0:
@@ -1134,7 +1021,6 @@ class SceneSequencer:
                             segment_np
                         ])
                 seg_len = len(segment_np)
-                env_timeline.append((current_sample_pos, current_sample_pos + seg_len, current_env))
                 all_segments.append(segment_np)
                 # BUG-LOCAL-106: capture authoritative scene-audio
                 # position for every dialogue line so the ledger
@@ -1179,24 +1065,8 @@ class SceneSequencer:
         else:
             combined = np.zeros(int(sample_rate * 1), dtype=np.float32)
 
-        # -- CANONICAL 1.0 ENVIRONMENT MIXING --------------------------
-        total_len = len(combined)
-        final_bed = np.zeros(total_len, dtype=np.float32)
-        # vintage_settings was legacy Director-derived; default room tone
-        # intensity inlined here after the production_plan_json socket
-        # deletion (P2).
-        room_intensity = 0.01
-        
-        for start, end, desc in env_timeline:
-            span_len_sec = (end - start) / sample_rate
-            # Generate a specialized texture for this description
-            bed_segment = _generate_room_tone(span_len_sec, sample_rate, intensity=room_intensity, descriptors=desc)
-            fit_len = min(len(bed_segment), end - start)
-            final_bed[start : start + fit_len] += bed_segment[:fit_len]
-            
-        combined = combined + final_bed
-        render_log.append(f"--- Layered {len(env_timeline)} environment segments")
-
+        # No bed is added: the automatic room-tone layer was retired
+        # 2026-09-10 (clean audio). The scene bus is the supplied dialogue only.
         total_len = len(combined)
         total_sec = total_len / sample_rate
         _runtime_log(f"SceneSequencer: 1.0 Mix complete ({total_sec:.1f}s)")
