@@ -33,6 +33,29 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+@pytest.fixture(autouse=True)
+def _cold_font_state():
+    """Every test starts from a COLD resolver. This is not hygiene, it is the
+    reason twelve source mutants survived a QA pass.
+
+    `_FONT_PATH` / `_FONT_PATH_KEY` / `_FONT_CACHE` are MODULE GLOBALS that
+    outlive a test. Whichever test ran first warmed them, so every later test
+    was served a cached answer and never executed the discovery code at all --
+    which is exactly why deleting the entire bare-name tier, or bypassing the
+    path cache, left all eleven tests green. A test suite that shares a process
+    with a process-lifetime cache tests the cache, once.
+    """
+    import nodes.video_engine as ve
+    def reset():
+        ve._FONT_CACHE.clear()
+        ve._FONT_PATH = None
+        ve._FONT_PATH_KEY = object()
+        ve._WARNED_BITMAP_FALLBACK = False
+    reset()
+    yield
+    reset()
+
+
 def _font(size):
     from nodes.video_engine import _FONT_CACHE, _load_font
     _FONT_CACHE.pop(size, None)          # the cache is global and per-size
@@ -256,3 +279,133 @@ def test_windows_and_macos_are_untouched_by_the_linux_regrouping(monkeypatch):
     assert _resolve_on(monkeypatch, "darwin", [mac]) == mac, (
         "the darwin branch must still resolve Menlo, the family the ASS style "
         "names for macOS")
+
+
+# ---------------------------------------------------------------------------
+# The three defects a QA mutation pass found the tests above could not catch.
+# Each of these drives the REAL resolver against REAL Pillow discovery.
+# ---------------------------------------------------------------------------
+
+def test_the_bare_name_tier_is_load_bearing(monkeypatch):
+    """Delete the bare-name tier and this must go red.
+
+    Uses REAL Pillow discovery -- `ImageFont.truetype` is NOT stubbed. Only
+    `os.path.isfile` is, so every enumerated absolute path misses and the only
+    way to return a face at all is PIL's own recursive search. A QA pass
+    removed that tier entirely and all eleven existing tests stayed green,
+    because they either stub `truetype` (bypassing discovery) or were served
+    the warm module cache.
+    """
+    pytest.importorskip("PIL")
+    import nodes.video_engine as ve
+
+    monkeypatch.setattr(ve.os.path, "isfile", lambda q: False)
+    found = ve._find_mono_font_path()
+
+    assert found, (
+        "with every absolute candidate absent, the resolver returned nothing "
+        "on %s. PIL's bare-name search is the distro-agnostic safety net -- "
+        "without it, any host whose layout is not enumerated falls to the "
+        "bitmap default and mis-places every centred element." % sys.platform)
+    assert os.path.isabs(found), (
+        "the bare-name tier must return a real resolved PATH, not the name it "
+        "was handed: %r" % found)
+
+
+def test_discovery_runs_once_across_many_sizes(monkeypatch):
+    """The dock sweeps ~30-60 sizes; discovery must not repeat per size.
+
+    Bypass the path cache and this goes red. Counting the calls is the only
+    way to see it -- the RESULT is identical either way, which is why a
+    mutant that removed the cache passed every other test in this file.
+    """
+    pytest.importorskip("PIL")
+    import nodes.video_engine as ve
+
+    calls = []
+    real = ve._find_mono_font_path
+    monkeypatch.setattr(ve, "_find_mono_font_path",
+                        lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+
+    for size in range(60, 100):
+        ve._load_font(size)
+
+    assert len(calls) == 1, (
+        "discovery ran %d times across 40 distinct sizes; it must run ONCE "
+        "per configuration. Each run walks every font root per candidate "
+        "name, so repeating it per size is what the measurement recorded as "
+        "200 attempts before this cache existed." % len(calls))
+
+
+def test_changing_the_override_invalidates_BOTH_caches(monkeypatch):
+    """`_FONT_CACHE` is keyed by SIZE, so it cannot notice a config change.
+
+    ComfyUI runs prompts back to back in one process. A render that set
+    `OTR_VIDEO_FONT` used to poison every later render for the life of the
+    server: the path cache kept the old face, and the size-keyed object cache
+    kept font objects BUILT from it -- so even a correctly re-resolved path was
+    shadowed at any size already loaded. Both must drop together.
+
+    The size is deliberately loaded BEFORE the override so the object cache is
+    warm; that is the arrangement that used to fail.
+    """
+    pytest.importorskip("PIL")
+    import nodes.video_engine as ve
+
+    default = ve._load_font(96).path
+    other = ("/System/Library/Fonts/Monaco.ttf" if sys.platform == "darwin"
+             else None)
+    if not other or not os.path.isfile(other) or other == default:
+        pytest.skip("no second real monospace face to switch to on this host")
+
+    monkeypatch.setenv("OTR_VIDEO_FONT", other)
+    assert ve._load_font(96).path == other, (
+        "size 96 was cached from %r before the override was set, and the "
+        "size-keyed cache served it anyway. A stale font OBJECT is exactly as "
+        "wrong as a stale path." % default)
+
+    monkeypatch.delenv("OTR_VIDEO_FONT")
+    assert ve._load_font(96).path == default, (
+        "clearing the override must restore the platform default; it stayed "
+        "on %r for the rest of the process." % other)
+
+
+def test_a_searched_dejavu_beats_an_absolute_liberation(monkeypatch):
+    """Family preference must hold ACROSS the two search stages, not just within.
+
+    The defect this pins: the resolver used to run every absolute path first
+    and every bare name second, so an absolute Liberation hit returned before
+    the bare-name search for DejaVu ever ran. A host with system Liberation and
+    DejaVu in a user font directory therefore measured Liberation while
+    `_otr_captions` told libass to draw DejaVu. Grouping the absolute list by
+    family fixed only the within-tier half; iterating FAMILY-major fixes both.
+    """
+    pytest.importorskip("PIL")
+    from PIL import ImageFont
+
+    import nodes.video_engine as ve
+
+    liberation = "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
+    dejavu_user = "/home/someone/.local/share/fonts/DejaVuSansMono.ttf"
+
+    class Stub:
+        def __init__(self, path):
+            self.path = path
+
+    def fake(name, size=10, *a, **k):
+        if name == liberation:
+            return Stub(liberation)                    # exact path, present
+        if name in ("DejaVuSansMono.ttf", "DejaVuSansMono"):
+            return Stub(dejavu_user)                   # only PIL's search finds it
+        raise OSError(name)
+
+    monkeypatch.setattr(ve.sys, "platform", "linux", raising=False)
+    monkeypatch.setattr(ve.os.path, "isfile", lambda q: q == liberation)
+    monkeypatch.setattr(ImageFont, "truetype", fake)
+
+    picked = ve._find_mono_font_path()
+    assert picked == dejavu_user, (
+        "resolved %r; DejaVu must win even when it is reachable ONLY through "
+        "PIL's search and a Liberation file sits at an enumerated path, "
+        "because DejaVu Sans Mono is the family the ASS style names."
+        % picked)

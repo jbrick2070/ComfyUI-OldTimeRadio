@@ -27,6 +27,7 @@ import math
 import os
 import re as _re
 import sys
+import threading
 import time as _time
 
 import numpy as np
@@ -85,170 +86,204 @@ _FONT_CACHE = {}
 #: per episode on a font-less host, not the single line it looks like.
 _WARNED_BITMAP_FALLBACK = False
 
-#: The resolved face, and whether resolution has been attempted at all.
-#: ``None`` after a failed attempt is a real answer, not "not yet tried".
+#: The resolved face, plus the CONFIGURATION that produced it. Keying on the
+#: config rather than a bare "have we tried yet" boolean is what lets an
+#: override change mid-process invalidate BOTH caches -- see `_mono_font_path`.
 _FONT_PATH = None
-_FONT_PATH_RESOLVED = False
+_FONT_PATH_KEY = object()          # a sentinel no real key can equal
+_FONT_LOCK = threading.Lock()
 
 
-def _find_mono_font_path(size):
-    """Return the PATH of the first monospace face that opens, else ``None``.
+def _mono_font_families():
+    """Ordered ``(family, absolute paths, bare names)``, most preferred FIRST.
 
-    ``size`` only satisfies PIL's signature -- the answer is the same at every
-    size, which is exactly why :func:`_mono_font_path` caches it once.
+    FAMILY-MAJOR, and that shape is the fix rather than a tidy-up. The list
+    used to be two flat tiers -- every absolute path, then every bare name --
+    which leaks preference ACROSS the tiers: an absolute Liberation hit
+    returned before the bare-name search for DejaVu ever ran, so a host with
+    system Liberation and DejaVu in a user font directory measured Liberation
+    while libass drew DejaVu. Grouping the absolute list by family fixed only
+    the within-tier half of that, and a QA pass caught the rest.
 
-    ``OTR_VIDEO_FONT`` is an explicit PATH and wins outright, mirroring
-    ``otr_credits_roll``'s ``OTR_CREDITS_FONT``. It exists because this
-    function has a partner it cannot see: ``_otr_captions.mono_font()`` picks
-    the family libass DRAWS with (and honours ``OTR_CAPTION_MONO_FONT``) while
-    this picks the face PIL MEASURES with. Overriding one and not the other
-    re-opens the exact measure/draw disagreement documented in the darwin
-    branch below, so an operator who sets the caption family should set this to
-    the matching file. Bare family names are deliberately not accepted -- PIL
-    does not resolve them reliably, which is why every candidate is a path.
+    Iterating family-major means a family's ENTIRE search -- its exact paths
+    and then PIL's own recursive lookup -- completes before the next family is
+    considered at all. The first entry is therefore the family
+    ``_otr_captions.mono_font()`` names for this platform, which is the whole
+    invariant: measure and draw must agree.
     """
-    candidates = []
     if sys.platform == "win32":
         fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
-        candidates = [
-            os.path.join(fd, "consola.ttf"),
-            os.path.join(fd, "cour.ttf"),
-            os.path.join(fd, "lucon.ttf"),
-        ]
-    elif sys.platform == "darwin":
-        # These MUST resolve to the family `_otr_captions._MONO_BY_PLATFORM`
-        # declares for darwin ("Menlo"), because this function and that map are
-        # the MEASURE and the DRAW halves of ONE operation. `_otr_title_card`
-        # centres the hero with `x = centre - tw // 2` using the width measured
-        # HERE, and `_otr_captions` then emits that x as an ASS `\pos()` under
-        # Alignment 7 (top-LEFT) -- so libass plants the left edge exactly where
-        # this measurement said to, drawing in ITS font at the real size.
-        # Nothing anywhere passes a "centre" flag; the arithmetic is the whole
-        # mechanism, and it is only as good as `tw`.
+        return (
+            ("Consolas", [os.path.join(fd, "consola.ttf")], ["consola.ttf"]),
+            ("Courier New", [os.path.join(fd, "cour.ttf")], ["cour.ttf"]),
+            ("Lucida Console", [os.path.join(fd, "lucon.ttf")], ["lucon.ttf"]),
+        )
+
+    if sys.platform == "darwin":
+        # Menlo FIRST because that is what `_otr_captions._MONO_BY_PLATFORM`
+        # declares for darwin. This function and that map are the MEASURE and
+        # the DRAW halves of ONE operation: `_otr_title_card` centres the hero
+        # with `x = centre - tw // 2` using the width measured HERE, and
+        # `_otr_captions` emits that x as an ASS `\pos()` under Alignment 7
+        # (top-LEFT), so libass plants the left edge exactly where this
+        # measurement said and draws in ITS font at the real size. Nothing
+        # passes a "centre" flag anywhere; the arithmetic is the whole
+        # mechanism, and it is only ever as good as `tw`.
         #
-        # WHY THIS BRANCH EXISTS (title cards shipped mis-centred until
-        # 2026-09-09). Neither Linux path below is present on macOS, so every
-        # requested size fell through to `ImageFont.load_default()` -- a ~10px
-        # bitmap face regardless of the size asked for. At title size 96 that
-        # reports tw=131 for a 21-character string instead of 1218, so the
-        # centring subtraction yields x=895 and the real Menlo glyphs run from
-        # 895 to 2113 on a 1920-wide frame: hard against the right edge and
-        # clipped. The operator saw it as "flush right, not centre".
-        #
-        # WINDOWS WAS NEVER AFFECTED and is untouched by this change: its own
-        # branch above finds consola.ttf, measures tw=1218-ish, and centres
-        # correctly -- which is precisely why the defect read as Mac-only.
-        candidates = [
-            "/System/Library/Fonts/Menlo.ttc",
-            "/System/Library/Fonts/Monaco.ttf",
-            "/System/Library/Fonts/Supplemental/Andale Mono.ttf",
-        ]
-    else:
-        # GROUPED BY FAMILY, DejaVu first -- and the grouping is the point,
-        # not the tidiness. `_otr_captions._MONO_FALLBACK` names
-        # "DejaVu Sans Mono" as the family libass DRAWS with on every non-Mac,
-        # non-Windows host, so whenever DejaVu is present this side must
-        # measure it. Ordering these by DISTRO instead put Arch's Liberation
-        # path ahead of Arch's DejaVu path, and a box carrying BOTH -- an
-        # entirely ordinary Arch install -- then measured Liberation while
-        # libass drew DejaVu. A review caught it; the grouping makes the class
-        # unreachable rather than merely fixing the one pair that was wrong.
-        #
-        # Debian/Ubuntu behaviour is UNCHANGED by the regrouping. Its DejaVu
-        # path is still tried first, and its Liberation path still wins on a
-        # box that has only Liberation -- it is simply reached later, after
-        # DejaVu layouts that such a box does not have.
-        #
-        # Every path was checked against the distribution's own package file
-        # list rather than recalled, and three separate reviews corrected this
-        # list on exactly that point: Fedora ships `dejavu-sans-mono-fonts/`
-        # and `liberation-mono-fonts/` (both carrying the `-fonts` suffix),
-        # Arch's ttf-dejavu ships `TTF/` while its ttf-liberation ships
-        # `liberation/` -- NOT `TTF/` -- and openSUSE DOES use a `truetype/`
-        # level, contrary to what this comment claimed for one commit.
-        candidates = [
-            # DejaVu Sans Mono -- the family the ASS side names. It wins
-            # wherever it exists, on every layout, before any Liberation.
+        # WHY THIS BRANCH EXISTS AT ALL: title cards shipped mis-centred until
+        # 2026-09-09. macOS had NO candidate here, so every requested size fell
+        # through to `ImageFont.load_default()` -- a ~10px bitmap face that
+        # IGNORES the size asked for. At title size 96 it measured a
+        # 21-character string at tw=131 instead of 1218, so the subtraction
+        # gave x=895 and the real Menlo glyphs ran 895..2113 on a 1920 frame:
+        # off the right edge, trailing character clipped. Windows was correct
+        # throughout because consola.ttf really is in C:\Windows\Fonts, which
+        # is exactly why the defect read as cosmetic instead of as a platform
+        # gap.
+        return (
+            ("Menlo", ["/System/Library/Fonts/Menlo.ttc"],
+             ["Menlo.ttc", "Menlo"]),
+            ("Monaco", ["/System/Library/Fonts/Monaco.ttf"],
+             ["Monaco.ttf", "Monaco"]),
+            ("Andale Mono", ["/System/Library/Fonts/Supplemental/Andale Mono.ttf"],
+             ["Andale Mono.ttf"]),
+        )
+
+    # Linux and anything else. DejaVu Sans Mono is what
+    # `_otr_captions._MONO_FALLBACK` names, so it must win wherever it exists
+    # -- including when it is only reachable through PIL's own search and a
+    # Liberation file sits at one of the exact paths below.
+    #
+    # Every path was checked against the distribution's own package file list
+    # rather than recalled, and successive reviews corrected this list three
+    # times on exactly that point: Fedora ships `dejavu-sans-mono-fonts/` and
+    # `liberation-mono-fonts/` (both carrying the `-fonts` suffix), Arch's
+    # ttf-dejavu ships `TTF/` while its ttf-liberation ships `liberation/` --
+    # NOT `TTF/` -- and openSUSE DOES use a `truetype/` level, contrary to what
+    # this comment claimed for one commit.
+    #
+    # Liberation Mono is metric-compatible with DejaVu and enormously better
+    # than the bitmap fallback, so it stays -- but reaching it means measure
+    # and draw disagree, which is why it is last and why
+    # docs/SHIPPING_JSON_RECIPES.md tells operators to install DejaVu.
+    return (
+        ("DejaVu Sans Mono", [
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/DejaVuSansMono.ttf",
             "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",
             "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-            # Liberation Mono -- metric-compatible, but NOT the family the ASS
-            # side names, so it is the last resort before the bitmap fallback.
-            # Reaching one of these means measure and draw disagree; see the
-            # note in docs/SHIPPING_JSON_RECIPES.md.
+        ], ["DejaVuSansMono.ttf", "DejaVuSansMono"]),
+        ("Liberation Mono", [
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
             "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
             "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-        ]
+        ], ["LiberationMono-Regular.ttf", "LiberationMono-Regular"]),
+    )
 
+
+def _find_mono_font_path(size=12):
+    """Return the PATH of the best available monospace face, else ``None``.
+
+    ``size`` only satisfies PIL's signature; the answer is size-independent,
+    which is exactly why :func:`_mono_font_path` resolves it once.
+
+    ``OTR_VIDEO_FONT`` is an explicit PATH and wins outright, mirroring
+    ``otr_credits_roll``'s ``OTR_CREDITS_FONT``. It exists because this
+    function has a partner it cannot see: ``_otr_captions.mono_font()`` picks
+    the family libass DRAWS with (honouring ``OTR_CAPTION_MONO_FONT``, which
+    takes a FAMILY NAME) while this picks the file PIL MEASURES with (a PATH).
+    They take different kinds of value; setting one alone re-opens the
+    measure/draw disagreement this whole function exists to close.
+    """
     explicit = (otr_env.get("OTR_VIDEO_FONT") or "").strip()
     if explicit:
-        candidates = [explicit] + candidates
+        try:
+            return ImageFont.truetype(explicit, size).path
+        except OSError:
+            log.warning("OTR: OTR_VIDEO_FONT=%r could not be opened; falling "
+                        "back to the platform search.", explicit)
 
-    for path in candidates:
-        if os.path.isfile(path):
+    for _family, paths, names in _mono_font_families():
+        for path in paths:
+            if os.path.isfile(path):
+                try:
+                    return ImageFont.truetype(path, size).path
+                except OSError:
+                    pass
+        # PIL's own lookup, and it is what makes this distro-agnostic. Handed a
+        # NAME rather than a path, `ImageFont.truetype` recursively walks the
+        # platform font directories (on Linux the XDG set, defaulting to
+        # /usr/share/fonts and /usr/local/share/fonts), so it finds the family
+        # under a layout nobody here enumerated -- including a user-local one.
+        # `otr_credits_roll` has relied on this since it was written.
+        #
+        # It cannot share the loop above because that guards on
+        # `os.path.isfile`, which a bare name can never satisfy.
+        #
+        # The extension-less entries are deliberate and were verified, not
+        # assumed: PIL requires an EXACT stem match, so "DejaVuSansMono" can
+        # only ever match a DejaVu Sans Mono file (no proportional-font risk),
+        # and it is what finds `.ttc`/`.otf` variants the `.ttf` spelling
+        # misses -- measured, "Menlo" -> Menlo.ttc and "Courier" -> Courier.ttc.
+        for name in names:
             try:
-                return ImageFont.truetype(path, size).path
+                return ImageFont.truetype(name, size).path
             except OSError:
                 pass
-
-    # BARE NAMES, the distro-agnostic safety net `otr_credits_roll` has relied
-    # on since it was written. Handed a NAME rather than a path,
-    # `ImageFont.truetype` os.walk()s the platform font directories (on Linux
-    # the XDG set, defaulting to /usr/share/fonts and /usr/local/share/fonts),
-    # recursively -- so it finds DejaVu wherever a distribution put it,
-    # including layouts nobody here has enumerated. The absolute paths stay
-    # FIRST because they are deterministic and cost no walk; this tier runs
-    # only when every one of them missed.
-    #
-    # It needs its own loop because the one above guards on `os.path.isfile`,
-    # which a bare name can never satisfy -- without this they would be skipped
-    # before PIL ever got the chance to search.
-    #
-    # The extension-less entry is deliberate and was verified, not assumed:
-    # PIL requires an EXACT stem match, so "DejaVuSansMono" can only ever match
-    # a DejaVu Sans Mono file (no proportional-font risk), and it is what finds
-    # `.ttc`/`.otf` variants the `.ttf` spelling misses -- measured here,
-    # "Menlo" -> Menlo.ttc and "Courier" -> Courier.ttc.
-    for name in ("DejaVuSansMono.ttf", "DejaVuSansMono",
-                 "LiberationMono-Regular.ttf", "Menlo.ttc", "consola.ttf"):
-        try:
-            return ImageFont.truetype(name, size).path
-        except OSError:
-            pass
 
     return None
 
 
 def _mono_font_path():
-    """The monospace face for this host, resolved ONCE per process.
+    """The monospace face for this host, resolved once per CONFIGURATION.
 
-    Split out from :func:`_load_font` because that cache is keyed by SIZE and
-    the title dock re-measures at every integer size as it shrinks. Resolution
-    is size-independent, so doing it per size meant a font-less Linux host paid
-    up to five RECURSIVE searches for each of ~30-60 distinct sizes -- and each
-    search walks EVERY XDG font root, so on a stock Linux box that is five
-    names x three roots = 15 root walks, repeated per size, to reach a bitmap
-    fallback it was always going to reach. Resolving the FILE once caps the
-    whole process at that single worst-case sweep instead of repeating it:
-    MEASURED over 40 distinct sizes, 200 resolution attempts before, 5 after.
+    Split out from :func:`_load_font` because that cache is keyed by SIZE while
+    the answer is size-independent. Doing discovery per size meant a font-less
+    Linux host paid a full search for each of ~30-60 dock sizes -- and a search
+    walks every XDG font root per name, so the worst case is names x roots
+    repeated per size. MEASURED over 40 distinct sizes: 200 resolution attempts
+    before this split, 5 after.
+
+    KEYED ON ``OTR_VIDEO_FONT``, NOT ON A "HAVE WE TRIED YET" FLAG. ComfyUI
+    runs prompts back to back in ONE process, so an override set for one render
+    and cleared for the next used to leave both caches serving the previous
+    render's face for the life of the server -- and `_FONT_CACHE`, keyed only
+    by size, kept handing back font OBJECTS built from it. Both are dropped
+    together when the key changes, because a stale size-keyed object is exactly
+    as wrong as a stale path.
+
+    The lock and the publish ORDER matter together: `_FONT_PATH` is written
+    before `_FONT_PATH_KEY`, so a concurrent reader either sees the old key and
+    resolves, or sees the new key with the value already in place. Publishing
+    the key first is what made a cold-start race possible.
     """
-    global _FONT_PATH_RESOLVED, _FONT_PATH
-    if not _FONT_PATH_RESOLVED:
-        _FONT_PATH_RESOLVED = True
-        _FONT_PATH = _find_mono_font_path(12)
+    global _FONT_PATH, _FONT_PATH_KEY
+    key = (otr_env.get("OTR_VIDEO_FONT") or "").strip()
+    if key == _FONT_PATH_KEY:
+        return _FONT_PATH
+    with _FONT_LOCK:
+        if key == _FONT_PATH_KEY:          # another thread won the race
+            return _FONT_PATH
+        path = _find_mono_font_path()
+        _FONT_CACHE.clear()                # objects built from the OLD face
+        _FONT_PATH = path
+        _FONT_PATH_KEY = key               # published LAST, on purpose
     return _FONT_PATH
 
 
 def _load_font(size):
-    """Load the host monospace face at ``size``. Cached per size."""
+    """Load the host monospace face at ``size``. Cached per size.
+
+    The per-size cache is checked AFTER `_mono_font_path`, never before, so a
+    configuration change drops it in the same breath as the path. Checking it
+    first is what let a stale font object outlive the override that built it.
+    """
     global _WARNED_BITMAP_FALLBACK
+    path = _mono_font_path()               # may invalidate _FONT_CACHE
     if size in _FONT_CACHE:
         return _FONT_CACHE[size]
 
-    path = _mono_font_path()
     if path:
         try:
             font = ImageFont.truetype(path, size)

@@ -53,6 +53,15 @@ carrying DejaVu or Liberation now resolves whatever layout it uses.
   container image may carry no fonts at all. Install `dejavu-sans-mono` (or
   `liberation-mono`) if the render logs `no monospace TTF found`, or point
   `OTR_VIDEO_FONT` at a TTF path directly.
+* **NixOS, and any host whose fonts are only reachable through fontconfig,
+  needs `OTR_VIDEO_FONT` set -- it is not optional there.** PIL finds fonts two
+  ways and neither is fontconfig: an exact absolute path, or its own recursive
+  walk of the XDG font directories. A Nix host keeps the real files in
+  `/nix/store` and exposes them to applications through fontconfig alone, so
+  both of PIL's routes miss while libass -- which DOES use fontconfig -- draws
+  perfectly. That asymmetry is the worst possible shape of this bug: the text
+  looks right and is positioned wrong. Set `OTR_VIDEO_FONT` to a concrete
+  store path.
 * **The two override variables take DIFFERENT KINDS OF VALUE, and mixing
   them up silently does nothing.** `OTR_CAPTION_MONO_FONT` takes a FAMILY NAME
   (`Liberation Mono`), because that is what an ASS `Style:` line carries and
