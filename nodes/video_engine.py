@@ -85,9 +85,17 @@ _FONT_CACHE = {}
 #: per episode on a font-less host, not the single line it looks like.
 _WARNED_BITMAP_FALLBACK = False
 
+#: The resolved face, and whether resolution has been attempted at all.
+#: ``None`` after a failed attempt is a real answer, not "not yet tried".
+_FONT_PATH = None
+_FONT_PATH_RESOLVED = False
 
-def _load_font(size):
-    """Load a monospace TTF font. Cached per size.
+
+def _find_mono_font_path(size):
+    """Return the PATH of the first monospace face that opens, else ``None``.
+
+    ``size`` only satisfies PIL's signature -- the answer is the same at every
+    size, which is exactly why :func:`_mono_font_path` caches it once.
 
     ``OTR_VIDEO_FONT`` is an explicit PATH and wins outright, mirroring
     ``otr_credits_roll``'s ``OTR_CREDITS_FONT``. It exists because this
@@ -99,10 +107,6 @@ def _load_font(size):
     the matching file. Bare family names are deliberately not accepted -- PIL
     does not resolve them reliably, which is why every candidate is a path.
     """
-    global _WARNED_BITMAP_FALLBACK
-    if size in _FONT_CACHE:
-        return _FONT_CACHE[size]
-
     candidates = []
     if sys.platform == "win32":
         fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
@@ -140,9 +144,31 @@ def _load_font(size):
             "/System/Library/Fonts/Supplemental/Andale Mono.ttf",
         ]
     else:
+        # Debian/Ubuntu FIRST, so a box that already resolved keeps resolving
+        # in exactly the same order -- the rest are appended, never inserted.
+        # They are the same two families under the layouts other distributions
+        # actually use: Fedora, Arch and openSUSE have no `truetype/` level, so
+        # on those hosts this list matched nothing and fell through to the
+        # bitmap default -- the macOS defect documented above, one lane over.
+        # That matters for ROCm/Linux specifically: nothing here has ever run
+        # on it, so the first AMD host would have found it on a published frame.
+        #
+        # Each path below was checked against the distribution's own package
+        # file list rather than recalled: Fedora ships
+        # `dejavu-sans-mono-fonts/` and `liberation-mono-fonts/` (both with the
+        # `-fonts` suffix), Arch's ttf-dejavu ships `TTF/` while its
+        # ttf-liberation ships `liberation/` -- NOT `TTF/`. Two entries here
+        # were wrong on exactly those details and a review caught them; the
+        # bare-name tier would have covered for them, which is precisely why a
+        # wrong path is misinformation rather than a runtime bug.
         candidates = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
         ]
 
     explicit = (otr_env.get("OTR_VIDEO_FONT") or "").strip()
@@ -152,11 +178,71 @@ def _load_font(size):
     for path in candidates:
         if os.path.isfile(path):
             try:
-                font = ImageFont.truetype(path, size)
-                _FONT_CACHE[size] = font
-                return font
+                return ImageFont.truetype(path, size).path
             except OSError:
                 pass
+
+    # BARE NAMES, the distro-agnostic safety net `otr_credits_roll` has relied
+    # on since it was written. Handed a NAME rather than a path,
+    # `ImageFont.truetype` os.walk()s the platform font directories (on Linux
+    # the XDG set, defaulting to /usr/share/fonts and /usr/local/share/fonts),
+    # recursively -- so it finds DejaVu wherever a distribution put it,
+    # including layouts nobody here has enumerated. The absolute paths stay
+    # FIRST because they are deterministic and cost no walk; this tier runs
+    # only when every one of them missed.
+    #
+    # It needs its own loop because the one above guards on `os.path.isfile`,
+    # which a bare name can never satisfy -- without this they would be skipped
+    # before PIL ever got the chance to search.
+    #
+    # The extension-less entry is deliberate and was verified, not assumed:
+    # PIL requires an EXACT stem match, so "DejaVuSansMono" can only ever match
+    # a DejaVu Sans Mono file (no proportional-font risk), and it is what finds
+    # `.ttc`/`.otf` variants the `.ttf` spelling misses -- measured here,
+    # "Menlo" -> Menlo.ttc and "Courier" -> Courier.ttc.
+    for name in ("DejaVuSansMono.ttf", "LiberationMono-Regular.ttf",
+                 "DejaVuSansMono", "Menlo.ttc", "consola.ttf"):
+        try:
+            return ImageFont.truetype(name, size).path
+        except OSError:
+            pass
+
+    return None
+
+
+def _mono_font_path():
+    """The monospace face for this host, resolved ONCE per process.
+
+    Split out from :func:`_load_font` because that cache is keyed by SIZE and
+    the title dock re-measures at every integer size as it shrinks. Resolution
+    is size-independent, so doing it per size meant a font-less Linux host paid
+    up to five RECURSIVE `os.walk`s of /usr/share/fonts for each of ~30-60
+    distinct sizes -- hundreds of full directory walks per render, to reach a
+    bitmap fallback it was always going to reach. Finding the FILE once and
+    re-opening it at each size costs one walk, worst case, for the life of the
+    process.
+    """
+    global _FONT_PATH_RESOLVED, _FONT_PATH
+    if not _FONT_PATH_RESOLVED:
+        _FONT_PATH_RESOLVED = True
+        _FONT_PATH = _find_mono_font_path(12)
+    return _FONT_PATH
+
+
+def _load_font(size):
+    """Load the host monospace face at ``size``. Cached per size."""
+    global _WARNED_BITMAP_FALLBACK
+    if size in _FONT_CACHE:
+        return _FONT_CACHE[size]
+
+    path = _mono_font_path()
+    if path:
+        try:
+            font = ImageFont.truetype(path, size)
+            _FONT_CACHE[size] = font
+            return font
+        except OSError:
+            pass
 
     # The bitmap fallback IGNORES `size`, so anything measured through it is
     # wrong by roughly an order of magnitude at title sizes and silently

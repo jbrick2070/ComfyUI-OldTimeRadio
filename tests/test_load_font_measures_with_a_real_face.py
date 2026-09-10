@@ -131,3 +131,46 @@ def test_this_platform_measures_in_the_family_libass_draws():
         "positioned with one font's metrics and drawn with another's. If this "
         "is a deliberate OTR_CAPTION_MONO_FONT override, set OTR_VIDEO_FONT to "
         "the matching TTF path." % (mono_font(), sys.platform, path))
+
+
+def test_the_family_check_catches_a_liberation_only_linux_host():
+    """The scenario the platform test above CANNOT reach on this machine.
+
+    `_load_font`'s Linux candidates include Liberation Mono, but
+    `_otr_captions._MONO_FALLBACK` names "DejaVu Sans Mono" for every non-Mac,
+    non-Windows host. So a box carrying Liberation and not DejaVu measures in
+    one family while libass is told to draw the other -- the same two-resolver
+    disagreement this whole file exists for, and MORE dangerous than the bug it
+    replaced, because a bitmap fallback at least warns while this one succeeds
+    quietly.
+
+    The live test above cannot see it: it resolves through whatever the real
+    host has, so it passes on macOS (Menlo) and on any Linux box that happens
+    to have DejaVu installed -- which is most of them. That is precisely the
+    gap a reviewer flagged. This test forces the arrangement instead of waiting
+    for a machine that exhibits it, so the check is proven to have teeth before
+    the first AMD/ROCm host ever runs.
+
+    It asserts the DETECTOR works, not that the arrangement is acceptable. The
+    real fix is for the drawing family to be derived from the face that was
+    actually resolved rather than from a parallel hand-maintained map; that
+    crosses a module boundary `_otr_captions` deliberately keeps thin, so it is
+    recorded here rather than smuggled in.
+    """
+    def agrees(family, path):
+        def norm(v):
+            return "".join(ch for ch in v.lower() if ch.isalnum())
+        stem = norm(os.path.splitext(os.path.basename(path))[0])
+        fam = norm(family)
+        return fam.startswith(stem) or stem.startswith(fam)
+
+    dejavu = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+    liberation = "/usr/share/fonts/liberation/LiberationMono-Regular.ttf"
+
+    assert agrees("DejaVu Sans Mono", dejavu), (
+        "the detector must ACCEPT the matched Linux pairing, or it is just a "
+        "test that always fails and proves nothing")
+    assert not agrees("DejaVu Sans Mono", liberation), (
+        "the detector must REJECT a host that measures Liberation Mono while "
+        "the ASS style names DejaVu Sans Mono -- if this ever starts passing, "
+        "the platform test above has gone blind to the mismatch it exists for")

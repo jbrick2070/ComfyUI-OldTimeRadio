@@ -30,6 +30,44 @@ This is not any one combination's fault and it is not avoidable by picking
 different engines. It is the one hand step in every "no-friction" JSON, and it
 should be stated on the tin rather than discovered.
 
+## A MONOSPACE FONT, and on Linux that is not automatic
+
+`video_engine._load_font` measures text by opening a font FILE by absolute
+path; `_otr_captions` then hands libass a family NAME to draw with. Those are
+two different resolvers, joined only by the arithmetic that centres the title
+(`x = centre - tw // 2`). When the measurement side finds nothing it falls back
+to PIL's bitmap default, which ignores the requested size -- so the title is
+still DRAWN at full size, at a position computed from a width roughly ten times
+too small, and lands off the right edge of the frame.
+
+**That is not hypothetical: it shipped on eight published macOS episodes and was
+fixed 2026-09-09.** `f0aa8e6a` added the macOS branch -- the non-Windows list
+held only two Debian/Ubuntu paths, so macOS matched nothing at all. The
+follow-up added the Fedora/Arch/openSUSE layouts plus a bare-name tier that
+lets PIL walk the platform font directories itself, so any distribution
+carrying DejaVu or Liberation now resolves whatever layout it uses.
+
+* **Windows / macOS: nothing to do.** `consola.ttf` and `Menlo.ttc` ship with
+  the OS.
+* **Linux, including the ROCm lane: verify it, do not assume it.** A MINIMAL or
+  container image may carry no fonts at all. Install `dejavu-sans-mono` (or
+  `liberation-mono`) if the render logs `no monospace TTF found`, or point
+  `OTR_VIDEO_FONT` at a TTF path directly.
+* **If you set `OTR_CAPTION_MONO_FONT`, set `OTR_VIDEO_FONT` to the matching
+  file.** The first changes what libass draws; only the second changes what PIL
+  measures. Setting one alone re-opens exactly the defect above.
+* **Prefer DejaVu over Liberation on Linux, and it is not a style preference.**
+  The ASS side names `DejaVu Sans Mono` for every non-Mac, non-Windows host,
+  while the measuring side will accept Liberation Mono if that is what it
+  finds. A Liberation-only box therefore measures one family and draws another
+  -- quietly, with no warning, because both halves individually succeed. The
+  standing fix is for the drawn family to be derived from the face actually
+  resolved instead of a parallel hand-kept map; until that lands, install
+  DejaVu or set both env vars to the same file.
+
+**AMD/Linux is the lane most exposed to this**, for the same reason its whole
+column is 0-of-68: no one has ever run it, so nothing has forced the question.
+
 ---
 
 ## What every recipe shares
