@@ -505,6 +505,12 @@
     "nv8": "proven"
    },
    "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
+  },
+  "google/gemma-4-E2B-it": {
+   "memory": {
+    "mac16": "oom"
+   },
+   "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it. Recorded because a download-size projection puts it 4 GB BELOW Qwen and briefly had this table recommending it to Mac users as the safer pick."
   }
  }
 }

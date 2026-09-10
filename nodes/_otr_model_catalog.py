@@ -1501,6 +1501,48 @@ def _fit_budgets():
     )
 
 
+#: MEASURED bf16 resident on Apple Silicon, GB, standalone. A real number here
+#: OVERRIDES the linear projection below, and it has to, because the projection
+#: is wrong for at least one shipped row.
+#:
+#: `gemma-4-E2B-it` measures ~10 GB at bf16 -- LARGER than Qwen3.5-4B's ~9 GB --
+#: while its download is 6.0 GB against Qwen's 8.68 (docs/MAC_LESSONS_LEARNED.md
+#: "Levers that do NOT work"). Scaling by download size therefore gets the two
+#: rows in the WRONG ORDER, and briefly had this table recommending E2B to Mac
+#: users as the safer pick. The catalog's small figure for E2B is its NF4
+#: number, and there is no Metal NF4 kernel, so nothing on this platform ever
+#: gets it. The lesson's own conclusion: "Qwen3.5-4B at quant `none` is the
+#: smallest viable Mac config, which is why the canonical ships exactly that."
+#:
+#: Add a row here whenever someone measures one with `footprint -p <pid>`;
+#: never infer one.
+MEASURED_METAL_BF16_GB = {
+    # IN COMFYUI, not standalone, and the difference is the whole number:
+    # docs/MAC_LESSONS_LEARNED.md records Qwen3.5-4B at "~9 GB standalone /
+    # ~14 GB in ComfyUI". This table feeds a dropdown inside ComfyUI, so the
+    # standalone figure would understate every row by ~5 GB.
+    "Qwen/Qwen3.5-4B": 14.0,          # PBUG-20260907-06, footprint -p
+    # E2B has no in-ComfyUI measurement. What IS measured is the comparison,
+    # like for like: ~10 GB standalone against Qwen's ~9. So it is at least as
+    # large as Qwen in ComfyUI, and 14.0 is the FLOOR rather than a reading --
+    # recorded as such rather than left to a projection that puts it 4 GB
+    # BELOW Qwen and calls it the safer pick.
+    "google/gemma-4-E2B-it": 14.0,
+}
+
+
+def metal_resident_gb(repo_id: str, download_gb: float) -> tuple:
+    """``(gb, "measured"|"projected")`` -- what this row costs at bf16 on Metal.
+
+    Measurement first, always. The projection is a single-point linear model
+    and is known to invert at least one pair of shipped rows.
+    """
+    known = MEASURED_METAL_BF16_GB.get(repo_id)
+    if known:
+        return (float(known), "measured")
+    return (download_gb * _METAL_BF16_RESIDENT_FACTOR, "projected")
+
+
 def fit_tags_for(repo_id: str) -> tuple:
     """Machine classes this writer FITS, smallest first. Derived, never typed.
 
@@ -1526,7 +1568,7 @@ def fit_tags_for(repo_id: str) -> tuple:
     tags = []
     for name, budget_gb in _fit_budgets():
         # Apple Silicon pays the unquantized price; NVIDIA gets bitsandbytes.
-        resident = (download_gb * _METAL_BF16_RESIDENT_FACTOR
+        resident = (metal_resident_gb(repo_id, download_gb)[0]
                     if name == "mac16" else download_gb / 2.0)
         if resident <= budget_gb:
             tags.append(name)

@@ -122,7 +122,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `google/gemma-2-2b-it` | GATED | 5.2 GiB | fits | fits | fits | ? | ? |
-| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | fits | ? | ? |
+| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | **OOM** | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | fits | **proven** | ? | ? |
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | fits | fits | **tight** | ? | ? |

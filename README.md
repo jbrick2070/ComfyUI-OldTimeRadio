@@ -577,7 +577,7 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
 | `google/gemma-2-2b-it` | GATED | 5.2 GiB | fits | fits | fits |
-| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | fits |
+| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | fits | fits | **OOM** |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | fits | **proven** |
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | fits | fits | **tight** |
@@ -808,16 +808,20 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
   **~14 GB** -- 4.7x the memory for the identical download, purely because of
   the platform. Its entry is therefore tagged `mac16-tight`.
 
-  **`tight` is not `avoid`, and the receipts say so.** All SEVEN episodes ever
-  published on the 16 GB M4 used this writer -- five different video lanes, four
-  source banks, five visual styles. It is the only writer with a Mac receipt at
-  all. Against that: one hard reboot, at the writer-to-video handover, with a
-  test suite competing for RAM at the time. So `tight` means what it says --
-  it works, and it has no margin for anything else running. Close other
-  applications rather than changing writer. `google/gemma-4-E2B-it` is the
-  smaller alternative if you need headroom (6.0 GB, plain `mac16`, equally
-  ungated), but be clear that it is arithmetic: nothing has been rendered with
-  it on a Mac.
+  **`tight` is not `avoid`, and there is no smaller writer to run to.** All
+  SEVEN episodes ever published on the 16 GB M4 used this one -- five video
+  lanes, four source banks, five visual styles -- and it is the only writer with
+  a Mac receipt at all. Against that: one hard reboot, at the writer-to-video
+  handover, with a test suite competing for RAM.
+
+  **Do not swap it for `gemma-4-E2B-it` on the download size.** That looks like
+  the smaller model (6.0 GB against 8.7) and MEASURES LARGER on Metal: ~10 GB at
+  bf16 against Qwen's ~9, like for like. Its small catalog figure is an NF4
+  number, and there is no Metal NF4 kernel, so nothing on this platform ever
+  gets it -- `bitsandbytes` is excluded on macOS by declared intent. The repo's
+  own conclusion, measured: **Qwen3.5-4B at quant `none` IS the smallest viable
+  Mac config, which is why the canonical ships exactly that.** So `tight` means
+  close other applications, not change writer.
 - **RAM:** 32 GB of system memory is the comfortable floor for the video lanes; the 8 GB
   card streams model weights from host RAM. The measured host-RAM peaks so far are on the
   5080 (the H3 clamped run at 27.56 GiB, the HuMo 14B lane at 27.53 GiB); LTX 2.5 on the

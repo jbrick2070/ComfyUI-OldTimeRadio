@@ -749,13 +749,16 @@ shipped default for good reason -- ungated, Apache-2.0, and measured at 2.99 GiB
 resident / 14.47 tok/s on an 8 GB NVIDIA card, the smallest and fastest row
 there is. But that figure is **under NF4**, and bitsandbytes is not installed on
 macOS, so here the same row loads full bf16 at ~14 GB. Its entry is tagged
-`mac16-tight` -- and `tight` is not `avoid`. Every one of the SEVEN episodes
-ever published on this machine used this writer, across five video lanes and
-four source banks; it is the only writer with a Mac receipt at all. The one
-reboot came at the writer-to-video handover with a test suite competing for RAM.
-Close other applications before changing writer. `google/gemma-4-E2B-it` (6.0 GB,
-plain `mac16`, equally ungated) is the headroom option, but nothing has been
-rendered with it here -- that tag is arithmetic, not a receipt.
+`mac16-tight` -- and `tight` is not `avoid`, because there is nowhere smaller to
+go. Every one of the SEVEN episodes ever published on this machine used this
+writer, across five video lanes and four source banks; it is the only writer
+with a Mac receipt at all. The one reboot came at the writer-to-video handover
+with a test suite competing for RAM.
+
+**`gemma-4-E2B-it` is NOT the escape hatch, and section 3 measured why**: ~10 GB
+at bf16 against Qwen's ~9, like for like -- LARGER, despite a smaller download.
+Its "~3 GB resident" catalog figure is NF4, and NF4 has no Metal kernel. Close
+other applications instead.
 
 A separate `otr_mac_lightning.json` held exactly this arrangement and was
 **deleted on 2026-09-09**, for the same reason the profile below was: measured
