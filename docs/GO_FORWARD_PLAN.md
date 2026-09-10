@@ -80,22 +80,23 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**State (2026-09-09 late night, rented Mac M4; UTC 2026-09-10):**
-`v2.0-alpha`; latest receipts are at the top of `docs/HANDOFF_LOG.md`.
-The required five-act forced-Ghost proof needs a CUDA host; row 2.2 remains
-first. **Use the measured test envelope, not the old "151 all pass alone"
-claim:** the controlled Mac baseline has 143 failures, the final run 142,
-with no new failing nodeids. Empty model/cache roots, offline model access,
-and three explicitly deselected audition tests are required on this host to
-avoid loading real models from a nominal unit run. Exact settings and failure
-sets: `docs/2026-09-10-ghost-pool/test_comparison.json`.
-Bug Bible is available at `~/Documents/comfyui-custom-node-survival-guide`:
-standalone 23 passed / 27 skipped / 3 xfailed; against OTR 10 failed /
-29 passed / 11 skipped / 3 xfailed, identical failing nodeids before and after.
-**Box clean:** no renderer or server is resident. Read section 0 before
-picking a row; no registry publish or device promotion is authorized by this
-handoff.
+Continue on the 5080 with the **five-act forced-Ghost canonical publication
+proof in row 2.2**, then follow section 0. Read the newest entry in
+`docs/HANDOFF_LOG.md` and `docs/2026-09-10-mac-final/README.md` before starting.
+The Mac font check is not a pending gate. Preserve the accepted title and
+credits; do not reopen their appearance during the hardware handoff.
 
+**Recovery gate:** verify the nine Mac videos and their episode folders are
+copied off the rental before retiring it. The manifest is
+`docs/2026-09-10-mac-final/transfer_manifest.json`; a staged or queued transfer
+is not proof of arrival. See the handoff receipt for current transfer status.
+
+For any later 16 GB Mac Lightning run, read the additional VAE decode OOM
+receipt in `MAC_PORTABILITY_GUIDE.md` section 2 before interpreting the
+136-latent anchor as sufficient headroom. No registry publish or device
+promotion is authorized by this handoff. An AMD pod, when supplied, is a
+separate portability host; it cannot silently substitute for row 2.2's CUDA
+receipt.
 
 > **The registry paragraphs immediately below are STALE and were not rewritten
 > from this Mac.** They reason about `2.0.0-alpha.19/.20/.21` as the frontier

@@ -1,3 +1,75 @@
+## 2026-09-10 -- Mac font signoff accepted; 5080 handoff; media transfer in progress
+
+**Base code HEAD: `6f9a5586cff084489fbb0aea257eb1f6761af615`, v2.0-alpha.**
+This entry ships in a documentation/evidence commit on top of that code.
+GPT-6 Astra drove in the ladder's rung 5 coder/sole-judge role. The prior Ghost
+code already has its one CLI review and test receipts; no production code,
+profile, canonical graph, font logic, or credits layout changed for this
+final check. No additional coding review or model-loading suite was run.
+
+**Operator signoff:** the credits look good and the real title is centered;
+finish the files and leave the Mac. The proposed credits-layout change was
+therefore dropped before any code was edited. The final canonical replay of
+*The Lantern Burns Bright While Slander Hides* completed in **147.28 s** with
+`RESULT SUCCESS`, `obs_publish OK`, and a **159,640,319-byte** file in `otr/obs/`:
+
+`the_lantern_burns_bright_while_slander_h_20260910_011724__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4`
+
+It is 1920x1080 H.264, 25 fps, 94.320 seconds, including the declared 21.6 s
+credits tail. The frozen script/master audio came from the successful
+2026-09-07 Lantern episode. Music/announcer/character pictures used
+`viz_green` / `viz_mxc_cpu` / `viz_camera`. This proves the current fonts and
+publish tail on the real canonical graph; it does not claim a fresh writer,
+audio-model, or Lightning qualification. Five relevant source files were
+hash-matched to the installed copy before and after; canonical SHA-256 remains
+`9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2`.
+
+**Lightning failed first.** Fresh prompt
+`040b11ea-f572-4545-afe3-53a512505e00` authored *Stones in a Tin Box* and its
+audio, completed the 88-latent opening clip, then hit a Metal command-buffer
+out-of-memory error decoding the 100-latent announcer clip. The process was
+observed around 22 GB footprint with no competing model job/test suite. No
+final published. The failed process was stopped, and the font replay used a
+fresh server and an already successful procgen episode. Earlier Lightning
+publications stand, but the 136-latent anchor is not a whole-episode safety
+guarantee. Additional evidence was appended to PBUG-20260909-01; no new
+threshold, portable rule, or memory fix is claimed.
+
+**Files: copying, NOT all arrived.** There are nine published videos and nine
+complete successful episode folders: **272 files / 7,323,247,396 bytes**.
+DeskIn has nine videos queued to
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` and nine folders queued to
+`C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes`. One video was reported
+complete when this entry was written; the rest were still transferring, at
+roughly 30-180 KB/s. No complete remote checksum verification is claimed.
+A full local ZIP is ready as a backup, but a local ZIP is not an off-machine
+copy. Do not retire the Mac until the transfer is verified. Do not overwrite
+Windows `_shared` state with Mac runtime state. A private Google Drive backup
+was offered, not uploaded without an answer.
+
+**Evidence and recovery inventory:** `docs/2026-09-10-mac-final/README.md`,
+raw success/failure logs, submitted prompts, history, font-source hashes,
+ffprobe output, the exact published-file SHA-256, before/after title frames,
+and a per-file transfer manifest. These are in Git; the multi-gigabyte media
+is being transferred separately. The original `otr/obs/` contents were kept.
+
+**Next:** verify the media copy, then use the 5080 for GO_FORWARD row 2.2's
+five-act forced-Ghost CUDA publication proof. The Mac test is closed by the
+operator; the older rental backlog is not a reason to keep rendering here.
+The CUDA writer-unload check remains in the punch list. An AMD pod, if supplied
+in the morning, is a separate portability handoff. The renderer was stopped
+after an idle-queue check; DeskIn alone remains active for the copy. No registry
+publish, device promotion, new model download, or rental cancellation occurred.
+
+**Validation carried forward, not rerun:** the last code suite has 13,661 pass /
+142 fail / 358 skip / 1 xfail / 3 deselected, no new failures versus its 143-fail
+baseline. Bible standalone 23 pass / 27 skip / 3 xfail; against OTR 10 fail /
+29 pass / 11 skip / 3 xfail, unchanged. Use the isolated-model-cache settings
+in `docs/2026-09-10-ghost-pool/test_comparison.json` for any later Mac suite.
+This documentation-only closeout validates receipts and diff consistency.
+
+---
+
 ## 2026-09-09 (late night; UTC 2026-09-10) -- base 7eb90476 -> row 2.2 allocation built; CUDA publication proof still open
 
 **CODER window.** GPT-6 Astra drove in the model ladder's rung 5 coder/sole-judge

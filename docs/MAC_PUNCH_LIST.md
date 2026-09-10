@@ -1,6 +1,6 @@
 # Mac rental punch list -- what is left to close out Apple Silicon testing
 
-Written 2026-09-08, updated 2026-09-09. The machine is rented and expires
+Written 2026-09-08, closeout added 2026-09-10. The machine is rented and expires
 2026-09-14, so this is ordered by what buys the most closure per hour, not by
 tidiness. Every status below was checked against the repo and the machine on
 2026-09-09, not carried forward.
@@ -9,7 +9,25 @@ Where things stand overall is in `MAC_PORTABILITY_GUIDE.md` section 0 and, per
 engine, in `MAC_COMPLIANCE_MATRIX.md`. This file lists only what is OPEN, what
 closed and how, and what was deliberately left.
 
-## Scoreboard
+## Rental closeout -- 2026-09-10
+
+**The operator accepted the final font replay and closed Mac testing.** The
+centered title and credits were explicitly signed off. Canonical replay
+published the ninth Mac video in 147.28 seconds with the current font fixes;
+the renderer is stopped. Receipt: `2026-09-10-mac-final/README.md`.
+
+The new Lightning attempt failed during VAE decode with a Metal out-of-memory
+error, even though its 100 latents were below the measured 136-latent anchor.
+It is not counted as another successful Lightning episode. No guard, profile,
+recipe, or credits layout was changed to close the font check.
+
+The earlier open items below are retained as the campaign's historical
+backlog, not instructions to keep using the rental. CUDA writer-unload proof
+and GO_FORWARD row 2.2 need the 5080. Confirm the nine videos and their episode
+folders have arrived off the Mac before retiring it; a queued transfer is not
+a completed backup. The handoff receipt records that status separately.
+
+## Scoreboard recorded on 2026-09-09
 
 | item | status | evidence |
 | --- | --- | --- |

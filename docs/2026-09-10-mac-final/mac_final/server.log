@@ -1,0 +1,562 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[32m[INFO][0m setup plugin alembic.autogenerate.checkconstraint_byname
+[1m[33m[WARNING][0m Could not autodetect AIMDO implementation, assuming Nvidia
+[32m[INFO][0m comfy-aimdo unsupported operating system: Darwin
+[32m[INFO][0m NOTE: comfy-aimdo currently only supports Windows and Linux
+[32m[INFO][0m Adding extra search path checkpoints /Users/rentamac/ComfyUI-Shared/models/checkpoints
+[32m[INFO][0m Adding extra search path classifiers /Users/rentamac/ComfyUI-Shared/models/classifiers
+[32m[INFO][0m Adding extra search path clip_vision /Users/rentamac/ComfyUI-Shared/models/clip_vision
+[32m[INFO][0m Adding extra search path configs /Users/rentamac/ComfyUI-Shared/models/configs
+[32m[INFO][0m Adding extra search path controlnet /Users/rentamac/ComfyUI-Shared/models/controlnet
+[32m[INFO][0m Adding extra search path controlnet /Users/rentamac/ComfyUI-Shared/models/t2i_adapter
+[32m[INFO][0m Adding extra search path diffusers /Users/rentamac/ComfyUI-Shared/models/diffusers
+[32m[INFO][0m Adding extra search path diffusion_models /Users/rentamac/ComfyUI-Shared/models/diffusion_models
+[32m[INFO][0m Adding extra search path embeddings /Users/rentamac/ComfyUI-Shared/models/embeddings
+[32m[INFO][0m Adding extra search path gligen /Users/rentamac/ComfyUI-Shared/models/gligen
+[32m[INFO][0m Adding extra search path hypernetworks /Users/rentamac/ComfyUI-Shared/models/hypernetworks
+[32m[INFO][0m Adding extra search path latent_upscale_models /Users/rentamac/ComfyUI-Shared/models/latent_upscale_models
+[32m[INFO][0m Adding extra search path loras /Users/rentamac/ComfyUI-Shared/models/loras
+[32m[INFO][0m Adding extra search path model_patches /Users/rentamac/ComfyUI-Shared/models/model_patches
+[32m[INFO][0m Adding extra search path audio_encoders /Users/rentamac/ComfyUI-Shared/models/audio_encoders
+[32m[INFO][0m Adding extra search path photomaker /Users/rentamac/ComfyUI-Shared/models/photomaker
+[32m[INFO][0m Adding extra search path style_models /Users/rentamac/ComfyUI-Shared/models/style_models
+[32m[INFO][0m Adding extra search path text_encoders /Users/rentamac/ComfyUI-Shared/models/text_encoders
+[32m[INFO][0m Adding extra search path upscale_models /Users/rentamac/ComfyUI-Shared/models/upscale_models
+[32m[INFO][0m Adding extra search path background_removal /Users/rentamac/ComfyUI-Shared/models/background_removal
+[32m[INFO][0m Adding extra search path frame_interpolation /Users/rentamac/ComfyUI-Shared/models/frame_interpolation
+[32m[INFO][0m Adding extra search path geometry_estimation /Users/rentamac/ComfyUI-Shared/models/geometry_estimation
+[32m[INFO][0m Adding extra search path optical_flow /Users/rentamac/ComfyUI-Shared/models/optical_flow
+[32m[INFO][0m Adding extra search path detection /Users/rentamac/ComfyUI-Shared/models/detection
+[32m[INFO][0m Adding extra search path vae /Users/rentamac/ComfyUI-Shared/models/vae
+[32m[INFO][0m Adding extra search path vae_approx /Users/rentamac/ComfyUI-Shared/models/vae_approx
+[32m[INFO][0m Adding extra search path TTS /Users/rentamac/ComfyUI-Shared/models/TTS
+[32m[INFO][0m Adding extra search path huggingface /Users/rentamac/ComfyUI-Shared/models/huggingface
+[32m[INFO][0m Adding extra search path clip /Users/rentamac/ComfyUI-Shared/models/clip
+[32m[INFO][0m Adding extra search path unet /Users/rentamac/ComfyUI-Shared/models/unet
+[32m[INFO][0m Setting output directory to: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface | safetensors_conversion mocked EARLY
+[32m[INFO][0m [OldTimeRadio] mps detected: forcing PyTorch (SDPA) attention. ComfyUI's sub-quadratic default produces structurally wrong output on Metal -- measured on Stable Audio 3, spectral flatness 0.43 (noise) vs 0.16 (music) with every other input identical.
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.4 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: Potential Error in code: Torch already imported, torch should never be imported before this point.
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': False, 'disabled': True, 'unavailable_reason': 'Extension file not found: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/.venv/lib/python3.13/site-packages/comfy_kitchen/backends/cuda/_C.abi3.so', 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 16384 MB, total RAM 16384 MB
+[32m[INFO][0m pytorch version: 2.12.1
+[32m[INFO][0m Mac Version (26, 6, 2)
+[32m[INFO][0m Set vram state to: SHARED
+[32m[INFO][0m Device: mps
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m Python version: 3.13.12 (main, Feb 12 2026, 01:06:02) [Clang 21.1.4 ]
+[32m[INFO][0m ComfyUI version: 0.34.6
+[32m[INFO][0m comfy-aimdo version: 0.4.15
+[32m[INFO][0m comfy-kitchen version: 0.2.31
+[32m[INFO][0m comfyui-frontend-package version: 1.49.6
+[32m[INFO][0m comfyui-workflow-templates version: 0.11.55
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.10
+[32m[INFO][0m comfy-kitchen version: 0.2.31
+[32m[INFO][0m comfy-aimdo version: 0.4.15
+[32m[INFO][0m [Prompt Server] web root: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/.venv/lib/python3.13/site-packages/comfyui_frontend_package/static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+[32m[INFO][0m [hf_token] No HF_TOKEN found in env or HKCU -- public repos only
+/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/nodes/_otr_shared/pathbudget.py:38: SyntaxWarning: invalid escape sequence '\`'
+  2. THE ``\\?\`` EXTENDED-LENGTH PREFIX (:func:`long_path`) is the canonical
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/websocket_image_save.py
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/ComfyUI-GGUF
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/ComfyUI-AnimateDiff-Evolved
+[32m[INFO][0m    0.2 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8188
+[32m[INFO][0m got prompt
+[32m[INFO][0m OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/workflows/otr_canonical.json
+[32m[INFO][0m OTR_WorkflowValidator: OK -- 23 nodes, 62 links, strict_unknown_types=True, path='/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/workflows/otr_canonical.json', widget_vector_drift=0
+[1m[33m[WARNING][0m [OTR.assets] announcer_image_model=sd15 not downloaded: this role's video lane animatediff15_lightning_video mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] music_image_model=sd15 not downloaded: this role's video lane animatediff15_lightning_video mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] character_image_model=sd15 not downloaded: this role's video lane animatediff15_lightning_video mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] animatediff15_lightning_video: automatic visual-weight coverage unavailable; existing adapter checks remain
+[32m[INFO][0m [OTR.assets] EXISTING checkpoints/stable_audio_3_small_music.safetensors bytes=2270384940 native=/Users/rentamac/ComfyUI-Shared/models/checkpoints/stable_audio_3_small_music.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/t5gemma_b_b_ul2.safetensors bytes=1187264003 native=/Users/rentamac/ComfyUI-Shared/models/clip/t5gemma_b_b_ul2.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] READY engines=stable_audio_3 files=2 (availability only; render/GPU/publish success not qualified)
+[32m[INFO][0m [OTR_LedgerScriptWriter] start: creative_model='Qwen/Qwen3.5-4B', technical_model='Qwen/Qwen3.5-4B', act_count=1, num_characters=2, creativity='balanced' (temp=0.85 top_p=0.95), seed_source=original_llm, episode_title='', perfect_run_spacesaver=False
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] skeleton ledger saved up front: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/pending_20260910_003119_ledger.json
+[32m[INFO][0m [OTR_StructuredCall] 'original_concept' attempt 1/3: base call at temperature=0.850
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [OTR_HF_ENV] HF_HOME='/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface' HF_HUB_CACHE='/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface/hub' (source=os.environ); exported to os.environ
+[32m[INFO][0m Loading LLM model: Qwen/Qwen3.5-4B (quantized=False)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved Qwen/Qwen3.5-4B -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights: 100%|██████████| 426/426 [00:00<00:00, 7348.50it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (6.9s) - first generate will not stall
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.9 tok/s | 10.9s | ...side an orchard bothy.",       "hook": "The radio sounds cut off mid-sentence when the ass
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.6 tok/s | 19.5s | ...": "The insurance assessor who tracks lost items and writes fraudulent reports."       }, 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 6.9 tok/s | 28.0s | ...   }       ],       "radio_device": "a confession rehearsed to the wrong listener"     }, 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 7.0 tok/s | 36.5s | ...   "hook": "The tension rises as the assessor realizes the 'missing' person in his file is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 7.1 tok/s | 45.1s | ...ssor hunting for stolen farm animals while avoiding the road on the map."       },       {
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 7.1 tok/s | 53.7s | ...       ],       "radio_device": "a confession rehearsed to the wrong listener"     }   ] }
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 387 tok | 7.1 tok/s | 54.1s | ...      ],       "radio_device": "a confession rehearsed to the wrong listener"     }   ] } 
+[32m[INFO][0m [OTR_StructuredCall] 'original_select' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.5 tok/s | 11.7s | ... him to a hidden ruin inside an orchard bothy.",     "hook": "The radio sounds cut off mid
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.3 tok/s | 20.3s | ...ehearsed to the wrong listener"   },   "cast": [     {       "name": "ARTHUR PENHALIGON", 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 6.6 tok/s | 29.1s | ...et he must follow it to finish the job.",       "relationship": "He is the one who created
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 6.7 tok/s | 37.9s | ...the secret of the hidden ruin safe from any outsider who might claim it.",       "pressure
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 6.8 tok/s | 46.9s | ...as brought to light, forcing him to choose between his greed and survival."     }   ],   "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 6.9 tok/s | 56.0s | ...s immediate, high-stakes tension where every word spoken could be recorded or heard by the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 6.9 tok/s | 65.3s | ... the choice Arthur must make, rather than relying on modern institutions or complex tech."
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 453 tok | 6.9 tok/s | 66.1s | ...e choice Arthur must make, rather than relying on modern institutions or complex tech." } 
+[32m[INFO][0m [OTR_StructuredCall] 'original_brief' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.3 tok/s | 12.0s | ...earsing a line for an audience that isn't there, trembling slightly with the pressure of a
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.2 tok/s | 20.5s | ...eaks not to win, but to survive, her tone shifting from weary warning to desperate plea as
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 6.6 tok/s | 29.0s | ...g a confession to a radio that cuts off mid-sentence, leaving only the sound of his breath
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 6.8 tok/s | 37.4s | ...rgaret Oakhill emerges from the shadows, not to arrest him, but to reveal that the ruin is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 7.0 tok/s | 46.0s | ... forward into the darkness or turn back to the lie that built his career.",   "key_terms":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 7.0 tok/s | 54.5s | ...in",     "orchard bothy",     "radio sounds",     "confession",     "lies",     "inspector
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 410 tok | 7.1 tok/s | 58.0s | ...confession",     "lies",     "inspector"   ],   "news_close_brief": "",   "attempts": 0 } 
+[1m[33m[WARNING][0m [OTR_OriginalRadio] dropped 1 unsupported/empty key_term(s); source-proof terms are optional and never have a count floor
+[32m[INFO][0m [OTR_OriginalRadio] creative front OK: 9 key_terms, cast=2, pick=0
+[32m[INFO][0m [OTR_LedgerScriptWriter] news_interpreter OK: 9 key_terms in 3 attempt(s)
+[32m[INFO][0m [OTR_LedgerScriptWriter] cast RNG seed=2504954580 (OS entropy) -- cast + voices + music randomized per episode (BUG-LOCAL-269)
+[32m[INFO][0m [OTR_StructuredCall] 'llm_write_description:ERIN PIERCE' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.0 tok/s | 10.7s | ...t the corner. Nose: high bridge with a faint scar running down the left side. Hair: silver
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.6 tok/s | 19.3s | ...y still, shoulders squared against the wind, hands clasped tightly behind her back to hide
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 7.0 tok/s | 27.3s | ...ntence weighted like a stone dropped into deep water, her tone shifting from the calm of a
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 212 tok | 7.1 tok/s | 29.8s | ...lm of a lighthouse keeper to the frantic gasp of someone drowning in their own secrets."} 
+[32m[INFO][0m [OTR_Casting] cast ERIN PIERCE -> voice= gender=female (timbre=warm role=lead)
+[32m[INFO][0m [OTR_LedgerScriptWriter] cast locked: 3 rows (announcer + 2 characters, lemmy_hit=True)
+[32m[INFO][0m [OTR_LedgerScriptWriter] act topology: act_count=1, arc_phases=['scene'], per_phase_beats=[4], music_inter=0
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.macro' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.7 tok/s | 11.2s | ...idden ruin.",   "setting": "an ancient orchard bothy and a nearby crumbling stone ruin",  
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 106 tok | 6.4 tok/s | 16.6s | ...p into the darkness to confront his past or retreat into the lies that built his life?" } 
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.phase[scene]' attempt 1/3: base call at temperature=0.350
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.3 tok/s | 10.2s | ...peaker": "ERIN PIERCE"     },     {       "speaker": "LEMMY"     },     {       "speaker":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 82 tok | 6.7 tok/s | 12.3s | ...},     {       "speaker": "LEMMY"     },     {       "speaker": "ERIN PIERCE"     }   ] } 
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.beat[scene.1]' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 55 tok | 5.9 tok/s | 9.3s | ... to compel her to finally speak the location of the truth.",   "mood": "tense coercion" } 
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.beat[scene.2]' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 59 tok | 6.5 tok/s | 9.0s | ...to name the ruin's location before he destroys her.",   "mood": "terrifyingly coercive" } 
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.beat[scene.3]' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 50 tok | 6.4 tok/s | 7.8s | ...at by revealing that his forged career depends on her silence.",   "mood": "terrifying" } 
+[32m[INFO][0m [OTR_StructuredCall] 'OTR_Outline.beat[scene.4]' attempt 1/3: base call at temperature=0.700
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 61 tok | 6.8 tok/s | 9.0s | ...rcing him to choose between his safety and his career.",   "mood": "tense and volatile" } 
+[32m[INFO][0m [OTR_Outline] success: 6 beats (4 voiced, 2 announcer, 0 music_inter); calls used: 1 macro + 1 phase + 4 beat = 6 total
+[32m[INFO][0m [OTR_LedgerScriptWriter] injected 5 optional source term(s) into the composition prompt
+[32m[INFO][0m [OTR_LedgerScriptWriter] episode_canon built; composition header carries EPISODE_TITLE: TBD (late title binding, Sprint 3E); disk write deferred to post-composition title regen
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] phase 2B skeleton stamped: 6 line rows
+[32m[INFO][0m [OTR_StructuredCall] 'derive_dramatic_state' attempt 1/3: base call at temperature=0.500
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.2 tok/s | 10.4s | ...by hiding the forged map and ensuring the insurance assessor never discovers the lie.", "d
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 7.0 tok/s | 18.3s | ...in not to confess, but to destroy the forged map, choosing to let the insurance assessor's
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 141 tok | 7.1 tok/s | 20.0s | ...ng to let the insurance assessor's investigation uncover the lies he once told himself."} 
+[32m[INFO][0m [B1] news-derived DramaticState built from the LLM.
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] B1: news-derived dramatic_state stamped (source=llm, costly_choice_beat=d004, voice_slots=4).
+[32m[INFO][0m [OTR_StructuredCall] 'build_continuity_ledger' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.0 tok/s | 12.9s | ...s": [     {       "fact": "Lemmy has a forged career that depends on Erin Pierce's silence
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.0 tok/s | 21.4s | ..."       ],       "established_beat": 3     },     {       "fact": "Erin Pierce demands Lem
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 191 tok | 6.4 tok/s | 29.8s | ...,       "hidden_from": [         "LEMMY"       ],       "established_beat": 4     }   ] } 
+[32m[INFO][0m [OTR_Continuity] build_continuity_ledger: extracted 2 fact(s), location='forbidden ruin', 2 active prop(s) (technical_repo_id=Qwen/Qwen3.5-4B).
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] Sprint 5A continuity ledger: 2 fact(s), location='forbidden ruin', 2 active prop(s)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 5.7 tok/s | 11.3s | ...": "suppress the tremor in his voice that betrays the map he just handed over" }          
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 6.5 tok/s | 19.8s | ...oice that betrays the map he just handed over" }                                          
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 6.8 tok/s | 28.0s | ...t handed over" }                                                                          
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 6.1 tok/s | 10.5s | ...at revealing the truth will destroy the fragile life they have built together" }          
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 6.9 tok/s | 18.4s | ...roy the fragile life they have built together" }                                          
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.3 tok/s | 26.3s | ...uilt together" }                                                                          
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 6.9 tok/s | 9.3s | ...e ruin's location will expose the life Arthur built as a lie rather than a tragedy" }     
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 7.6 tok/s | 16.8s | ...e life Arthur built as a lie rather than a tragedy" }                                     
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.8 tok/s | 24.6s | ...her than a tragedy" }                                                                     
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 6.8 tok/s | 9.4s | ...n fear that exposing the small disasters he created will destroy his soul" }              
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 7.5 tok/s | 17.0s | ...y his soul" }                                                                             
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.7 tok/s | 24.8s | ...                                                                                          
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 6.9 tok/s | 9.3s | ...ront the lethal truth of his crime without exposing her own vulnerability" }              
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 7.5 tok/s | 17.0s | ...rability" }                                                                               
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.7 tok/s | 25.0s | ...                                                                                          
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 7.1 tok/s | 9.0s | ...age or sound",   "hidden_pressure": "the unspoken force under the line" }                 
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 7.6 tok/s | 16.8s | ...e": "the unspoken force under the line" }                                                 
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.8 tok/s | 24.7s | ...e line" }                                                                                 
+[1m[31m[ERROR][0m [SlotContract] DECODE HALTED (verbatim_cycle): repeated a 48-token run verbatim 3 times. Rerollable. Telemetry: {'halt_reason': 'verbatim_cycle', 'cycle_tokens': 48, 'open_string_tokens': None, 'max_open_string_tokens': 11, 'open_string_bound': 2048, 'required_repeats': 3, 'min_cycle_tokens': 48, 'generated_tokens_seen': 192}
+[32m[INFO][0m [SlotDramaContract] LLM job-field pass failed for d006 (GenerationDegeneracyError): constrained generation was halted by the liveness guard: the output repeated a run of tokens verbatim
+[32m[INFO][0m [SlotContract] heartbeat: 64 tok | 7.1 tok/s | 9.0s | ..."fear that the hidden ruin will consume him before the confession can be heard" }         
+[32m[INFO][0m [SlotContract] heartbeat: 128 tok | 7.6 tok/s | 16.9s | ...consume him before the confession can be heard" }                                         
+[32m[INFO][0m [SlotContract] heartbeat: 192 tok | 7.7 tok/s | 24.9s | ...n can be heard" }                                                                         
+[1m[31m[ERROR][0m [SlotContract] DECODE HALTED (verbatim_cycle): repeated a 48-token run verbatim 3 times. Rerollable. Telemetry: {'halt_reason': 'verbatim_cycle', 'cycle_tokens': 48, 'open_string_tokens': None, 'max_open_string_tokens': 16, 'open_string_bound': 2048, 'required_repeats': 3, 'min_cycle_tokens': 48, 'generated_tokens_seen': 192}
+[32m[INFO][0m [SlotDramaContract] LLM job-field pass failed for d006 (GenerationDegeneracyError): constrained generation was halted by the liveness guard: the output repeated a run of tokens verbatim
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] Build 3 slot drama contracts: 6 slot(s), sources={'llm': 5, 'minimal': 1}, episode_valid=True
+[32m[INFO][0m [OTR_LedgerScriptWriter] phase 1 prompt context built: spine=1067 chars, voice_cards=3 entries
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.8 tok/s | 9.4s | ...this... bit o' scrap. Take it.  d003|ERIN PIERCE: I won't take that, Lemmy, not unless you
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 82 tok | 7.1 tok/s | 11.6s | ... Lemmy, not unless you want to know what happens when a woman's got nothing left to lose. 
+[32m[INFO][0m [ComposeExchange] slots=['d002', 'd003'] ok (attempts=1)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.6 tok/s | 9.7s | ...'t quiet about where that ruin lies, I'll find someone who isn't so particular about their
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 7.1 tok/s | 18.1s | ...e, Lemmy, or I swear on this very rock that I'll leave no part of your fake life standing.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 131 tok | 7.1 tok/s | 18.5s | ..., Lemmy, or I swear on this very rock that I'll leave no part of your fake life standing. 
+[32m[INFO][0m [ComposeExchange] slots=['d004', 'd005'] ok (attempts=1)
+[32m[INFO][0m [OTR_LedgerScriptWriter] Build 4 use_exchange: 4 beat(s) composed via grouped exchange.
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 50 tok | 6.8 tok/s | 7.3s | ...o a static-filled void while the map in his hand points to a ruin waiting in the shadows. 
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 40 words)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 62 words)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 83 words)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 123 words)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 165 words)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 172 words)
+[32m[INFO][0m [OTR_StructuredCall] 'derive_produced_open_brief' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.4 tok/s | 9.9s | ...abruptly with the announcer signing off.", "cast": ["lemmy", "erin pierce", "announcer"]} 
+[32m[INFO][0m [OTR_ProducedOpen] derive ok (model=Qwen/Qwen3.5-4B, cast=3, setting='')
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 46 tok | 7.1 tok/s | 6.5s | ...nd I wonder if the stones they wield will bring them together or tear them apart forever. 
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 170 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] announcer intro rewrite: announcer_intro_rewritten (line b001)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 49 tok | 6.0 tok/s | 8.2s | ...e ruin over the lie, and we leave him standing there with the silence he built all alone. 
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 204 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] announcer outro pass wrote closing line b006 (flags=('announcer_outro',))
+[32m[INFO][0m [OTR_LedgerScriptWriter] optional post-assembly key-term telemetry: 1/9 landed (missing=['insurance assessor', 'small disasters', 'forged map', 'hidden ruin', 'orchard bothy', 'radio sounds', 'confession', 'inspector'])
+[32m[INFO][0m [OTR_LedgerScriptWriter] phase 0 compose_flag_summary: {'announcer_intro': 1, 'announcer_intro_rewritten': 1, 'announcer_outro': 1}
+[32m[INFO][0m [OTR_LedgerScriptWriter] §6.G word counts: character=125 announcer=79 total=204
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 204 words)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 6.5 tok/s | 9.9s | ... Rain Against the Windowpane Stones in a Tin Box The Ruined Map Burned  TITLE: Stones in a
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 69 tok | 6.6 tok/s | 10.5s | ...inst the Windowpane Stones in a Tin Box The Ruined Map Burned  TITLE: Stones in a Tin Box 
+[32m[INFO][0m [OTR_LedgerScriptWriter] title regen -> 'Stones in a Tin Box' (scratchpad pass, from 1277-char script)
+[32m[INFO][0m [OTR_LedgerScriptWriter] episode_canon written with title='Stones in a Tin Box' (source=llm_post_composition) at /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/episode_canon.json
+[32m[INFO][0m [OTR_StructuredCall] 'run_story_brief_reflection' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 5.1 tok/s | 12.5s | ...struction of a map hidden in a tin box.",   "setting_terms": ["small house", "windowpane",
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 6.1 tok/s | 21.0s | ...rmy", "confrontational", "weathered", "fragile"],   "music_mood_terms": ["tense", "ominous
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 6.5 tok/s | 29.6s | ...stone"],   "key_objects": ["handheld brass communicator", "tin box", "stones", "map"],   "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 236 tok | 6.7 tok/s | 35.4s | ...m outside mirrors the internal fracture between two worlds colliding in a single room." } 
+[32m[INFO][0m [OTR_StructuredCall] 'run_produced_story_summary' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 55 tok | 6.3 tok/s | 8.8s | ...nes, allowing him to finally walk away from the lie.", "subject":"Lemmy and Erin Pierce"} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_act_summary' attempt 1/2: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 21 tok | 4.7 tok/s | 4.5s | ...{"going_on": "Erin threatens Lemmy with stones to expose his lies."} 
+[32m[INFO][0m [ledger_clean] the scene: Erin threatens Lemmy with stones to expose his lies.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 17 tok | 2.2 tok/s | 7.9s | ...{"segments_read": 2, "not_speech": []} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 46 tok | 3.7 tok/s | 12.5s | ..."bit o' scrap", "why": "stage business"}, {"quote": "Take it", "why": "stage business"}]} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 35 tok | 4.1 tok/s | 8.6s | ..."You're shakin' like a leaf in a gale, miss, so let me help you out with this. Take it."} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 32 tok | 3.2 tok/s | 9.9s | ...{"segments_read": 2, "not_speech": [{"quote": "bit o' scrap", "why": "stage business"}]} 
+[32m[INFO][0m [ledger_clean] dropped 1 judge finding(s) that were not usable for this line: "bit o' scrap" (not in this line)
+[32m[INFO][0m [ledger_clean] b002 repaired -- judge named 2 segment(s) -- "You're shakin' like a leaf in a gale, miss, so let me help you out wit" -> "You're shakin' like a leaf in a gale, miss, so let me help you out wit"
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 17 tok | 2.2 tok/s | 7.8s | ...{"segments_read": 2, "not_speech": []} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 17 tok | 1.9 tok/s | 8.8s | ...{"segments_read": 2, "not_speech": []} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 41 tok | 3.1 tok/s | 13.2s | ...snapping open a tin box of stones and slamming one against his palm)", "why": "action"}]} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 42 tok | 4.5 tok/s | 9.3s | ...Lemmy, or I swear on this very rock that I'll leave no part of your fake life standing."} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 41 tok | 3.7 tok/s | 11.0s | ...snapping open a tin box of stones and slamming one against his palm)", "why": "action"}]} 
+[32m[INFO][0m [ledger_clean] dropped 1 judge finding(s) that were not usable for this line: '(snapping open a tin box of stones and slamming one against his palm)' (not in this line)
+[32m[INFO][0m [ledger_clean] b005 repaired -- both named 1 segment(s) -- '(snapping open a tin box of stones and slamming one against his palm) ' -> 'Take that trash and burn it before your fingers turn blue, Lemmy, or I'
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 51 tok | 4.0 tok/s | 12.6s | ... leave him standing there with the silence he built all alone.", "why": "scene report"}]} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 54 tok | 5.0 tok/s | 10.9s | ...ruin over the lie, and we leave him standing there with the silence he built all alone."} 
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 51 tok | 4.1 tok/s | 12.5s | ... leave him standing there with the silence he built all alone.", "why": "scene report"}]} 
+[32m[INFO][0m [ledger_clean] dropped 1 judge finding(s) that were not usable for this line: 'We watch Arthur choose the ruin over the lie, and we leave him standing there with the silence he built all alone.' (not in this line)
+[32m[INFO][0m [ledger_clean] b006 repaired -- judge named 1 segment(s) -- 'It is a strange thing to walk away from a lie just by tearing up the m' -> 'It is a strange thing to walk away from a lie just by tearing up the m'
+[32m[INFO][0m [ledger_clean] context 11111 sha dbb1a15c across 12 prompt(s) (line speaker act around complaint)
+[32m[INFO][0m [ledger_clean] 6 voiced row(s): 3 carried something that is not speech (4 segment(s) named), F2 on 0. 3 repaired, 0 improved, 0 still unclean, 0 with no model, in 13 model call(s) (1 of them briefing). Found by: judge only 2, patterns only 0, both 1.
+[32m[INFO][0m [ledger_clean] 2 row(s) were caught ONLY by the judge -- no pattern would have found them. That is the reason the judge is a model.
+[32m[INFO][0m [ledger_cleanup] complete: 6 deterministic fill(s), 0 prose fill(s), safety=retired
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 188 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] DONE: episode_id=pending_20260910_003119, lines=6, words=188, est_minutes=1.3, ledger=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/pending_20260910_003119_ledger.json
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m Loading LLM model: Qwen/Qwen3.5-4B (quantized=False)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved Qwen/Qwen3.5-4B -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:  95%|█████████▌| 406/426 [00:00<00:00, 4044.87it/s]Loading weights: 100%|██████████| 426/426 [00:00<00:00, 4181.27it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (10.8s) - first generate will not stall
+[32m[INFO][0m [OTR_LedgerFreezeCascade] running cascade on ledger pending_20260910_003119 (6 lines)
+[32m[INFO][0m [LFC:phase_0] 1 soft gap(s) detected; advancing.
+[32m[INFO][0m [LFC:phase_7] scanned=6 normalized=0 (abbrev=0 sym=0 num=0)
+[32m[INFO][0m [LFC:phase_8] cast=0/3 with portrait, voiced=0/6 with visual
+[32m[INFO][0m [LFC:phase_10] frozen_with_warns -- 1 soft gap(s).
+[32m[INFO][0m [LFC] freeze landed: verdict=frozen_with_warns cleanup=retired_no_content_policy pre_warns=1 post_warns=1
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 188 words)
+[32m[INFO][0m [OTR_LedgerFreezeCascade] freeze_verdict=frozen_with_warns (pre_warns=1 post_warns=1 cleanup=retired_no_content_policy)
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 188 words)
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=b002 char=c02 -> voice_ref_id=bm_george ref=bm_george engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=2158110431685503001 policy=line_v1 seed_ref=bm_george
+[32m[INFO][0m [OTR.kokoro] backend=onnx provider=CPUExecutionProvider threads=4 model=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/TTS/KokoroTTS/onnx/model.onnx; the ledger's voice_device='mps' is not used by this backend (CPU by design)
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=b003 char=c03 -> voice_ref_id=af_heart ref=af_heart engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=4315807936205810620 policy=line_v1 seed_ref=af_heart
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=b004 char=c02 -> voice_ref_id=bm_george ref=bm_george engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=4861714498407694427 policy=line_v1 seed_ref=bm_george
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=b005 char=c03 -> voice_ref_id=af_heart ref=af_heart engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=444133579178481403 policy=line_v1 seed_ref=af_heart
+[32m[INFO][0m [OTR voice P-OBS] announcer_voice: line=b001 char=announcer -> voice_ref_id=bm_fable ref=bm_fable engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=7543904799939026967 policy=line_v1 seed_ref=bm_fable
+[32m[INFO][0m [OTR.kokoro] backend=onnx provider=CPUExecutionProvider threads=4 model=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/TTS/KokoroTTS/onnx/model.onnx; the ledger's voice_device='mps' is not used by this backend (CPU by design)
+[32m[INFO][0m [OTR voice P-OBS] announcer_voice: line=b006 char=announcer -> voice_ref_id=bm_fable ref=bm_fable engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=9135681456728534297 policy=line_v1 seed_ref=bm_fable
+[32m[INFO][0m model weight dtype torch.float16, manual cast: None
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m VAE load device: mps, offload device: cpu, dtype: torch.bfloat16
+[1m[33m[WARNING][0m no CLIP/text encoder weights in checkpoint, the text encoder model will not be loaded.
+[32m[INFO][0m loaded diffusion model directly to GPU
+[32m[INFO][0m Requested to load StableAudio3
+[32m[INFO][0m loaded completely;  876.12 MB loaded, full load: True
+[32m[INFO][0m Requested to load SAT5GemmaModel
+[32m[INFO][0m loaded completely;  537.07 MB loaded, full load: True
+[32m[INFO][0m CLIP/text encoder model load device: cpu, offload device: cpu, current: cpu, dtype: torch.float16
+  0%|          | 0/100 [00:00<?, ?it/s]  1%|          | 1/100 [00:00<00:40,  2.46it/s]  2%|▏         | 2/100 [00:00<00:27,  3.56it/s]  3%|▎         | 3/100 [00:00<00:23,  4.17it/s]  4%|▍         | 4/100 [00:00<00:21,  4.53it/s]  5%|▌         | 5/100 [00:01<00:19,  4.76it/s]  6%|▌         | 6/100 [00:01<00:19,  4.91it/s]  7%|▋         | 7/100 [00:01<00:18,  5.00it/s]  8%|▊         | 8/100 [00:01<00:18,  5.08it/s]  9%|▉         | 9/100 [00:01<00:17,  5.10it/s] 10%|█         | 10/100 [00:02<00:17,  5.13it/s] 11%|█         | 11/100 [00:02<00:17,  5.17it/s] 12%|█▏        | 12/100 [00:02<00:16,  5.19it/s] 13%|█▎        | 13/100 [00:02<00:16,  5.20it/s] 14%|█▍        | 14/100 [00:02<00:16,  5.21it/s] 15%|█▌        | 15/100 [00:03<00:16,  5.21it/s] 16%|█▌        | 16/100 [00:03<00:16,  5.22it/s] 17%|█▋        | 17/100 [00:03<00:15,  5.23it/s] 18%|█▊        | 18/100 [00:03<00:15,  5.24it/s] 19%|█▉        | 19/100 [00:03<00:15,  5.23it/s] 20%|██        | 20/100 [00:04<00:15,  5.23it/s] 21%|██        | 21/100 [00:04<00:15,  5.23it/s] 22%|██▏       | 22/100 [00:04<00:14,  5.23it/s] 23%|██▎       | 23/100 [00:04<00:14,  5.22it/s] 24%|██▍       | 24/100 [00:04<00:14,  5.23it/s] 25%|██▌       | 25/100 [00:04<00:14,  5.24it/s] 26%|██▌       | 26/100 [00:05<00:14,  5.23it/s] 27%|██▋       | 27/100 [00:05<00:13,  5.24it/s] 28%|██▊       | 28/100 [00:05<00:13,  5.23it/s] 29%|██▉       | 29/100 [00:05<00:13,  5.24it/s] 30%|███       | 30/100 [00:05<00:13,  5.22it/s] 31%|███       | 31/100 [00:06<00:13,  5.23it/s] 32%|███▏      | 32/100 [00:06<00:12,  5.23it/s] 33%|███▎      | 33/100 [00:06<00:12,  5.23it/s] 34%|███▍      | 34/100 [00:06<00:12,  5.24it/s] 35%|███▌      | 35/100 [00:06<00:12,  5.24it/s] 36%|███▌      | 36/100 [00:07<00:12,  5.23it/s] 37%|███▋      | 37/100 [00:07<00:12,  5.24it/s] 38%|███▊      | 38/100 [00:07<00:11,  5.24it/s] 39%|███▉      | 39/100 [00:07<00:11,  5.24it/s] 40%|████      | 40/100 [00:07<00:11,  5.24it/s] 41%|████      | 41/100 [00:08<00:11,  5.22it/s] 42%|████▏     | 42/100 [00:08<00:11,  5.22it/s] 43%|████▎     | 43/100 [00:08<00:10,  5.23it/s] 44%|████▍     | 44/100 [00:08<00:10,  5.23it/s] 45%|████▌     | 45/100 [00:08<00:10,  5.23it/s] 46%|████▌     | 46/100 [00:09<00:10,  5.24it/s] 47%|████▋     | 47/100 [00:09<00:10,  5.24it/s] 48%|████▊     | 48/100 [00:09<00:09,  5.25it/s] 49%|████▉     | 49/100 [00:09<00:09,  5.25it/s] 50%|█████     | 50/100 [00:09<00:09,  5.25it/s] 51%|█████     | 51/100 [00:09<00:09,  5.25it/s] 52%|█████▏    | 52/100 [00:10<00:09,  5.24it/s] 53%|█████▎    | 53/100 [00:10<00:08,  5.25it/s] 54%|█████▍    | 54/100 [00:10<00:08,  5.25it/s] 55%|█████▌    | 55/100 [00:10<00:08,  5.25it/s] 56%|█████▌    | 56/100 [00:10<00:08,  5.25it/s] 57%|█████▋    | 57/100 [00:11<00:08,  5.26it/s] 58%|█████▊    | 58/100 [00:11<00:07,  5.26it/s] 59%|█████▉    | 59/100 [00:11<00:07,  5.26it/s] 60%|██████    | 60/100 [00:11<00:07,  5.26it/s] 61%|██████    | 61/100 [00:11<00:07,  5.27it/s] 62%|██████▏   | 62/100 [00:12<00:07,  5.26it/s] 63%|██████▎   | 63/100 [00:12<00:07,  5.26it/s] 64%|██████▍   | 64/100 [00:12<00:06,  5.26it/s] 65%|██████▌   | 65/100 [00:12<00:06,  5.26it/s] 66%|██████▌   | 66/100 [00:12<00:06,  5.25it/s] 67%|██████▋   | 67/100 [00:13<00:06,  5.25it/s] 68%|██████▊   | 68/100 [00:13<00:06,  5.26it/s] 69%|██████▉   | 69/100 [00:13<00:05,  5.25it/s] 70%|███████   | 70/100 [00:13<00:05,  5.26it/s] 71%|███████   | 71/100 [00:13<00:05,  5.26it/s] 72%|███████▏  | 72/100 [00:13<00:05,  5.26it/s] 73%|███████▎  | 73/100 [00:14<00:05,  5.27it/s] 74%|███████▍  | 74/100 [00:14<00:04,  5.26it/s] 75%|███████▌  | 75/100 [00:14<00:04,  5.26it/s] 76%|███████▌  | 76/100 [00:14<00:04,  5.26it/s] 77%|███████▋  | 77/100 [00:14<00:04,  5.27it/s] 78%|███████▊  | 78/100 [00:15<00:04,  5.27it/s] 79%|███████▉  | 79/100 [00:15<00:03,  5.26it/s] 80%|████████  | 80/100 [00:15<00:03,  5.26it/s] 81%|████████  | 81/100 [00:15<00:03,  5.26it/s] 82%|████████▏ | 82/100 [00:15<00:03,  5.26it/s] 83%|████████▎ | 83/100 [00:16<00:03,  5.26it/s] 84%|████████▍ | 84/100 [00:16<00:03,  5.26it/s] 85%|████████▌ | 85/100 [00:16<00:02,  5.26it/s] 86%|████████▌ | 86/100 [00:16<00:02,  5.26it/s] 87%|████████▋ | 87/100 [00:16<00:02,  5.26it/s] 88%|████████▊ | 88/100 [00:16<00:02,  5.27it/s] 89%|████████▉ | 89/100 [00:17<00:02,  5.26it/s] 90%|█████████ | 90/100 [00:17<00:01,  5.27it/s] 91%|█████████ | 91/100 [00:17<00:01,  5.27it/s] 92%|█████████▏| 92/100 [00:17<00:01,  5.26it/s] 93%|█████████▎| 93/100 [00:17<00:01,  5.27it/s] 94%|█████████▍| 94/100 [00:18<00:01,  5.27it/s] 95%|█████████▌| 95/100 [00:18<00:00,  5.27it/s] 96%|█████████▌| 96/100 [00:18<00:00,  5.26it/s] 97%|█████████▋| 97/100 [00:18<00:00,  5.26it/s] 98%|█████████▊| 98/100 [00:18<00:00,  5.26it/s] 99%|█████████▉| 99/100 [00:19<00:00,  5.26it/s]100%|██████████| 100/100 [00:19<00:00,  5.28it/s]100%|██████████| 100/100 [00:19<00:00,  5.19it/s]
+[32m[INFO][0m Requested to load SA3AudioVAE
+[32m[INFO][0m loaded completely;  206.45 MB loaded, full load: True
+[32m[INFO][0m [OTR.sa3] cue_window start=0.0s total=12.0s dur=12.0s seed=6290922213485679549 steps=100 cfg=7.0 sampler=dpmpp_3m_sde_gpu/exponential prompt_hash=3d63bfc7
+  0%|          | 0/100 [00:00<?, ?it/s]  1%|          | 1/100 [00:00<00:24,  3.98it/s]  2%|▏         | 2/100 [00:00<00:18,  5.26it/s]  3%|▎         | 3/100 [00:00<00:16,  5.87it/s]  4%|▍         | 4/100 [00:00<00:15,  6.18it/s]  5%|▌         | 5/100 [00:00<00:14,  6.40it/s]  6%|▌         | 6/100 [00:00<00:14,  6.54it/s]  7%|▋         | 7/100 [00:01<00:14,  6.63it/s]  8%|▊         | 8/100 [00:01<00:13,  6.69it/s]  9%|▉         | 9/100 [00:01<00:13,  6.72it/s] 10%|█         | 10/100 [00:01<00:13,  6.76it/s] 11%|█         | 11/100 [00:01<00:13,  6.78it/s] 12%|█▏        | 12/100 [00:01<00:12,  6.79it/s] 13%|█▎        | 13/100 [00:02<00:12,  6.79it/s] 14%|█▍        | 14/100 [00:02<00:12,  6.80it/s] 15%|█▌        | 15/100 [00:02<00:12,  6.80it/s] 16%|█▌        | 16/100 [00:02<00:12,  6.82it/s] 17%|█▋        | 17/100 [00:02<00:12,  6.83it/s] 18%|█▊        | 18/100 [00:02<00:12,  6.83it/s] 19%|█▉        | 19/100 [00:02<00:11,  6.81it/s] 20%|██        | 20/100 [00:03<00:11,  6.81it/s] 21%|██        | 21/100 [00:03<00:11,  6.81it/s] 22%|██▏       | 22/100 [00:03<00:11,  6.81it/s] 23%|██▎       | 23/100 [00:03<00:11,  6.81it/s] 24%|██▍       | 24/100 [00:03<00:11,  6.82it/s] 25%|██▌       | 25/100 [00:03<00:10,  6.83it/s] 26%|██▌       | 26/100 [00:03<00:10,  6.81it/s] 27%|██▋       | 27/100 [00:04<00:10,  6.81it/s] 28%|██▊       | 28/100 [00:04<00:10,  6.81it/s] 29%|██▉       | 29/100 [00:04<00:10,  6.82it/s] 30%|███       | 30/100 [00:04<00:10,  6.83it/s] 31%|███       | 31/100 [00:04<00:10,  6.82it/s] 32%|███▏      | 32/100 [00:04<00:09,  6.82it/s] 33%|███▎      | 33/100 [00:04<00:09,  6.81it/s] 34%|███▍      | 34/100 [00:05<00:09,  6.82it/s] 35%|███▌      | 35/100 [00:05<00:09,  6.83it/s] 36%|███▌      | 36/100 [00:05<00:09,  6.83it/s] 37%|███▋      | 37/100 [00:05<00:09,  6.83it/s] 38%|███▊      | 38/100 [00:05<00:09,  6.83it/s] 39%|███▉      | 39/100 [00:05<00:08,  6.81it/s] 40%|████      | 40/100 [00:05<00:08,  6.82it/s] 41%|████      | 41/100 [00:06<00:08,  6.82it/s] 42%|████▏     | 42/100 [00:06<00:08,  6.83it/s] 43%|████▎     | 43/100 [00:06<00:08,  6.83it/s] 44%|████▍     | 44/100 [00:06<00:08,  6.84it/s] 45%|████▌     | 45/100 [00:06<00:08,  6.84it/s] 46%|████▌     | 46/100 [00:06<00:07,  6.84it/s] 47%|████▋     | 47/100 [00:06<00:07,  6.83it/s] 48%|████▊     | 48/100 [00:07<00:07,  6.83it/s] 49%|████▉     | 49/100 [00:07<00:07,  6.84it/s] 50%|█████     | 50/100 [00:07<00:07,  6.83it/s] 51%|█████     | 51/100 [00:07<00:07,  6.83it/s] 52%|█████▏    | 52/100 [00:07<00:07,  6.83it/s] 53%|█████▎    | 53/100 [00:07<00:06,  6.82it/s] 54%|█████▍    | 54/100 [00:08<00:06,  6.84it/s] 55%|█████▌    | 55/100 [00:08<00:06,  6.83it/s] 56%|█████▌    | 56/100 [00:08<00:06,  6.83it/s] 57%|█████▋    | 57/100 [00:08<00:06,  6.81it/s] 58%|█████▊    | 58/100 [00:08<00:06,  6.81it/s] 59%|█████▉    | 59/100 [00:08<00:06,  6.80it/s] 60%|██████    | 60/100 [00:08<00:05,  6.80it/s] 61%|██████    | 61/100 [00:09<00:05,  6.82it/s] 62%|██████▏   | 62/100 [00:09<00:05,  6.82it/s] 63%|██████▎   | 63/100 [00:09<00:05,  6.82it/s] 64%|██████▍   | 64/100 [00:09<00:05,  6.84it/s] 65%|██████▌   | 65/100 [00:09<00:05,  6.83it/s] 66%|██████▌   | 66/100 [00:09<00:04,  6.85it/s] 67%|██████▋   | 67/100 [00:09<00:04,  6.85it/s] 68%|██████▊   | 68/100 [00:10<00:04,  6.86it/s] 69%|██████▉   | 69/100 [00:10<00:04,  6.86it/s] 70%|███████   | 70/100 [00:10<00:04,  6.85it/s] 71%|███████   | 71/100 [00:10<00:04,  6.85it/s] 72%|███████▏  | 72/100 [00:10<00:04,  6.86it/s] 73%|███████▎  | 73/100 [00:10<00:03,  6.84it/s] 74%|███████▍  | 74/100 [00:10<00:03,  6.84it/s] 75%|███████▌  | 75/100 [00:11<00:03,  6.85it/s] 76%|███████▌  | 76/100 [00:11<00:03,  6.85it/s] 77%|███████▋  | 77/100 [00:11<00:03,  6.78it/s] 78%|███████▊  | 78/100 [00:11<00:03,  6.74it/s] 79%|███████▉  | 79/100 [00:11<00:03,  6.74it/s] 80%|████████  | 80/100 [00:11<00:02,  6.76it/s] 81%|████████  | 81/100 [00:11<00:02,  6.75it/s] 82%|████████▏ | 82/100 [00:12<00:02,  6.76it/s] 83%|████████▎ | 83/100 [00:12<00:02,  6.78it/s] 84%|████████▍ | 84/100 [00:12<00:02,  6.78it/s] 85%|████████▌ | 85/100 [00:12<00:02,  6.79it/s] 86%|████████▌ | 86/100 [00:12<00:02,  6.82it/s] 87%|████████▋ | 87/100 [00:12<00:01,  6.84it/s] 88%|████████▊ | 88/100 [00:13<00:01,  6.85it/s] 89%|████████▉ | 89/100 [00:13<00:01,  6.86it/s] 90%|█████████ | 90/100 [00:13<00:01,  6.83it/s] 91%|█████████ | 91/100 [00:13<00:01,  6.82it/s] 92%|█████████▏| 92/100 [00:13<00:01,  6.82it/s] 93%|█████████▎| 93/100 [00:13<00:01,  6.83it/s] 94%|█████████▍| 94/100 [00:13<00:00,  6.85it/s] 95%|█████████▌| 95/100 [00:14<00:00,  6.85it/s] 96%|█████████▌| 96/100 [00:14<00:00,  6.85it/s] 97%|█████████▋| 97/100 [00:14<00:00,  6.85it/s] 98%|█████████▊| 98/100 [00:14<00:00,  6.86it/s] 99%|█████████▉| 99/100 [00:14<00:00,  6.87it/s]100%|██████████| 100/100 [00:14<00:00,  6.89it/s]100%|██████████| 100/100 [00:14<00:00,  6.78it/s]
+[32m[INFO][0m [OTR.sa3] cue_window start=4.0s total=12.0s dur=8.0s seed=2102674315167210378 steps=100 cfg=7.0 sampler=dpmpp_3m_sde_gpu/exponential prompt_hash=9c4c05a3
+[32m[INFO][0m [Ledger] saved pending_20260910_003119_ledger.json (6 lines, 188 words)
+[32m[INFO][0m [SceneSequencer] No local LLM VRAM to free
+[32m[INFO][0m [SceneSequencer] Pre-rendered clips: 4 TTS, 2 ANNOUNCER
+[32m[INFO][0m [SceneSequencer] Rendering ledger lines 0-6
+[32m[INFO][0m [loudnorm] per-segment RMS leveling ON (default) -- target=-16.0 dBFS boost<=9.0 cut>=-12.0 gate=-50.0 ceiling=0.95
+[32m[INFO][0m [SceneSequencer] wrote ledger audio metadata. phase_ms=90 total_sec=58.39 lines_positioned=6/6
+[32m[INFO][0m [OTR_AudioEnhance] Input: 48000Hz 1ch 2802520 samples (58.4s)
+[32m[INFO][0m [OTR_AudioEnhance] Resampled 48000Hz -> 48000Hz (2802520 samples)
+[32m[INFO][0m [OTR_AudioEnhance] Channels: 1 -> 2
+[32m[INFO][0m [OTR_AudioEnhance] Bass warmth 0.15 applied
+[32m[INFO][0m [OTR_AudioEnhance] LPF at 16000Hz applied (chirp cleanup)
+[32m[INFO][0m [OTR_AudioEnhance] Haas delay 0.8ms applied
+[32m[INFO][0m [OTR_AudioEnhance] Tape emulation 'subtle' applied
+[32m[INFO][0m [OTR_AudioEnhance] Stereo width 0.30 applied
+[32m[INFO][0m [OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)
+[32m[INFO][0m [OTR_AudioEnhance] Output: 48000Hz 2ch 2802520 samples (58.4s) spatial=0.30 Haas=0.8ms warmth=0.15
+[32m[INFO][0m [OTR_AudioEnhance] schema-l3 ledger update: phase_ms=286 gate=post_audio_enhance dur=58.4s
+[32m[INFO][0m [EpisodeAssembler] cue-manifest ledger reconciliation: matched=0 created=2 paths=2 total=2
+[32m[INFO][0m [EpisodeAssembler] Resampled theme 44100 Hz -> 48000 Hz
+[32m[INFO][0m [EpisodeAssembler] Resampled theme 44100 Hz -> 48000 Hz
+[32m[INFO][0m [EpisodeAssembler] Assembled 3 segments with 500ms crossfades
+[32m[INFO][0m [EpisodeAssembler] Final loudness master: measured -11.04 LUFS -> target -14.0 LUFS (gain -2.96 dB), true-peak ceiling -1.0 dBFS [peak-limited] (post-crossfade)
+[32m[INFO][0m [EpisodeAssembler] master WAV saved -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/pending_20260910_003119_master.wav (sha256=ad94d97b5381)
+[32m[INFO][0m [EpisodeAssembler] '' - 1.3 min
+[32m[INFO][0m [EpisodeAssembler] music_rows=2 segments=3 (BUG-LOCAL-130 diagnostic)
+[32m[INFO][0m [EpisodeAssembler] music mirror outcome: music_rows=2 appended=2 chunked_cues=0 stale_removed=0 existing_music_ids=6
+[32m[INFO][0m [EpisodeAssembler] music mirror: appended=2, chunked_cues=0, stale_removed=0, total_lines=8 (post-BUG-117e: music chunks <= 22.0s to fit the LTX 22B 25s safe envelope)
+[32m[INFO][0m [EpisodeAssembler] BUG-106 master-mix shift: +9.500s applied to 6 line(s) + 0 clip(s)
+[32m[INFO][0m [EpisodeAssembler] schema-l3 ledger update: phase_ms=129 gate=post_episode_assembler dur=75.4s
+[32m[INFO][0m [EpisodeAssembler] emit audio_done signal: audio_done:length_sec=75.37;sample_rate=48000;length_samples=3617928;segments=3
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from pending_20260910_003119_ledger.json (freeze_timestamp=2026-09-10T07:44:59.706840+00:00, rows=6, music=2, mirrors=2, master_sha=ad94d97b5381)
+[32m[INFO][0m [Video] Starting render: 75.4s audio -> 1885 frames @ 25fps (1920x1080)
+[32m[INFO][0m [Video] Encoder: CPU libx264
+[32m[INFO][0m [Video] Launching ffmpeg: /Users/rentamac/Library/Application Support/ffmpeg-downloader/ffmpeg/ffmpeg -y -f rawvideo -vcodec rawvideo ...
+[32m[INFO][0m [Video] Encoding: frame 0/1885 (0%) -- 0.1s elapsed
+[32m[INFO][0m [Video] Encoding: frame 250/1885 (13%) -- 2.5s elapsed
+[32m[INFO][0m [Video] Encoding: frame 500/1885 (26%) -- 4.8s elapsed
+[32m[INFO][0m [Video] Encoding: frame 750/1885 (39%) -- 7.6s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1000/1885 (53%) -- 10.6s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1250/1885 (66%) -- 13.8s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1500/1885 (79%) -- 16.1s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1750/1885 (92%) -- 18.4s elapsed
+[32m[INFO][0m [Video] Encode complete: 1885 frames in 20.2s (93.3 fps)
+[32m[INFO][0m [Video] Saved: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/signal_lost_stones_in_a_tin_box_20260910_004609.mp4 (8.4 MB, 75.4s, 1885 frames total)
+[32m[INFO][0m [Video] Treatment saved: signal_lost_stones_in_a_tin_box_20260910_004609_treatment.txt
+[32m[INFO][0m [Ledger] per-episode dir moved pending_20260910_003119 -> signal_lost_stones_in_a_tin_box_20260910_004609 (attempt 1)
+[32m[INFO][0m [Ledger] ledger file moved pending_20260910_003119_ledger.json -> signal_lost_stones_in_a_tin_box_20260910_004609_ledger.json
+[32m[INFO][0m [Ledger] renamed pending_20260910_003119 -> signal_lost_stones_in_a_tin_box_20260910_004609 (dir_moved=True, durable_paths_rebased=9, memory_paths_rebased=7)
+[32m[INFO][0m [Video] post-rename mp4 path: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/signal_lost_stones_in_a_tin_box_20260910_004609.mp4 -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_stones_in_a_tin_box_20260910_004609/audio/signal_lost_stones_in_a_tin_box_20260910_004609.mp4
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=2 rejected=0 existing=0
+[32m[INFO][0m [Ledger] saved signal_lost_stones_in_a_tin_box_20260910_004609_ledger.json (6 lines, 188 words)
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from signal_lost_stones_in_a_tin_box_20260910_004609_ledger.json (freeze_timestamp=2026-09-10T07:44:59.706840+00:00, rows=6, music=2, mirrors=2, master_sha=ad94d97b5381)
+[32m[INFO][0m [story_brief:shotlock_m4] status=ok brief_chars=225 terms=setting=3/lighting=3/atmosphere=4
+[32m[INFO][0m [OTR_ShotLock] prompt-owned lane: 2 durable subject sigil(s) stamped (c02, c03)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m Loading LLM model: Qwen/Qwen3.5-4B (quantized=False)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved Qwen/Qwen3.5-4B -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights: 100%|██████████| 426/426 [00:00<00:00, 4391.02it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (10.5s) - first generate will not stall
+[32m[INFO][0m [llm:Qwen/Qwen3.5-4B] heartbeat: 64 tok | 5.4 tok/s | 11.9s | ...spins slowly and the light warms the room"},{"id":"g002","drawable_beat":"the broad figure
+[32m[INFO][0m [llm:Qwen/Qwen3.5-4B] heartbeat: 128 tok | 6.2 tok/s | 20.7s | ...drawable_beat":"the rust jacket arm raises high and the shadow stretches long"},{"id":"g00
+[32m[INFO][0m [llm:Qwen/Qwen3.5-4B] heartbeat: 192 tok | 6.5 tok/s | 29.4s | ...e drops on the record"},{"id":"g007","drawable_beat":"the turntable platter spins fast and
+[32m[INFO][0m [llm:Qwen/Qwen3.5-4B] heartbeat: 204 tok | 6.6 tok/s | 31.0s | ...7","drawable_beat":"the turntable platter spins fast and the shadow blurs on the wall"}]} 
+[32m[INFO][0m [OTR_ShotLock] Ghost Prompt v2: 8 beat(s) authored (writer_llm=8), model=Qwen/Qwen3.5-4B, style=anime
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=7ee5c1b1 chars=206 beat=music_opening_001 | anime style. a broadcast console in the small house, rain-lashed, radio console dial races across fr
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: music_visual beat music_opening_001 mode=object source=writer_llm composed 206 chars / 45 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=af6121ac chars=202 beat=b001 | anime style. a glowing radio dial in the small house, radio console dial needle sweeps in crisp arcs
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: announcer_visual beat b001 mode=signal source=writer_llm composed 202 chars / 47 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=7f7b9ec2 chars=190 beat=b002 | anime style. handheld brass communicator in the small house, rain-lashed, movement passing through a
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: character_video beat b002 mode=figure source=writer_llm composed 190 chars / 43 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=c8a8b03f chars=176 beat=b003 | anime style. handheld brass communicator in the small house, rain-lashed, darkening as the light mov
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: character_video beat b003 mode=object source=writer_llm composed 176 chars / 42 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=7f7b9ec2 chars=190 beat=b004 | anime style. handheld brass communicator in the small house, rain-lashed, movement passing through a
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: character_video beat b004 mode=figure source=writer_llm composed 190 chars / 43 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=5afda1b0 chars=171 beat=b005 | anime style. handheld brass communicator in the small house, the beam swinging wide and back, lit ag
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: character_video beat b005 mode=signal source=writer_llm composed 171 chars / 38 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=d47858af chars=206 beat=b006 | anime style. a bakelite radio set in the small house, rain-lashed, radio console dial needle sweeps 
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: announcer_visual beat b006 mode=object source=writer_llm composed 206 chars / 51 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=a47cea56 chars=181 beat=music_closing_001 | anime style. a spinning turntable in the small house, radio console dial settles, slow dolly pull ba
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: music_visual beat music_closing_001 mode=signal source=writer_llm composed 181 chars / 40 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [OTR_ShotLock] the set speaks throughout: no overheard human face in this episode
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_stones_in_a_tin_box_20260910_004609_ledger.json (8 lines, 237 words)
+[32m[INFO][0m [OTR.image.style_authority] style='anime' token='anime style' styled=0/0 pack_negative=True spread=None
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_stones_in_a_tin_box_20260910_004609_ledger.json (8 lines, 237 words)
+[32m[INFO][0m [OTR_ImageGenDispatcher] banana_route=on candidate_substitutions=0 varieties=SIDEARM=red banana,LONG=long banana
+[32m[INFO][0m [story_brief:ltx_scene_open] status=ok brief_chars=225 terms=setting=3/lighting=3/atmosphere=4
+[1m[33m[WARNING][0m [OTR_MasterAudioMux] LOUD re-resolve: master audio path stale (episode dir renamed after capture); '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/pending_20260910_003119/audio/pending_20260910_003119_master.wav' -> '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_stones_in_a_tin_box_20260910_004609/audio/pending_20260910_003119_master.wav' (same file, post-rename dir)
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (pre-render: all stills minted) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] pre-render residue free: ran=['unload_llm', '_unload_bark', 'gc.collect', 'soft_empty_cache'] failed=[] free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260910_003119_master.wav @0.000+10.000s -> slice_0d8262bb1fe4cf68.wav (beat music_opening_001)
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=7ee5c1b1 chars=206 beat=music_opening_001 | anime style. a broadcast console in the small house, rain-lashed, radio console dial races across fr
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: music_visual beat shot_music_opening_001 mode=object source=writer_llm composed 206 chars / 45 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [gpu_residency] lease acquired pid=71152 token=62358ba7
+[32m[INFO][0m model weight dtype torch.float16, manual cast: None
+[32m[INFO][0m model_type EPS
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: mps, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load SD1ClipModel
+[32m[INFO][0m loaded completely;  235.84 MB loaded, full load: True
+[32m[INFO][0m CLIP/text encoder model load device: cpu, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m loaded diffusion model directly to GPU
+[32m[INFO][0m Requested to load BaseModel
+[32m[INFO][0m loaded completely;  1639.41 MB loaded, full load: True
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: mps, offload device: cpu, dtype: torch.bfloat16
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (ghost-signal post-encode): detached 1 resident model(s) (encoder eviction; no unload_all_models)
+[AnimateDiffEvo] - [0;32mINFO[0m - Loading motion module animatediff_lightning_8step_comfyui.safetensors via Gen2
+[AnimateDiffEvo] - [0;32mINFO[0m - Sliding context window sampling activated - latents passed in (88) greater than context_length 16.
+[AnimateDiffEvo] - [0;32mINFO[0m - Using motion module animatediff_lightning_8step_comfyui.safetensors:v2.
+[32m[INFO][0m Requested to load AnimateDiffModel
+[32m[INFO][0m Requested to load BaseModel
+[32m[INFO][0m loaded completely;  864.43 MB loaded, full load: True
+[32m[INFO][0m loaded completely;  1639.41 MB loaded, full load: True
+  0%|          | 0/8 [00:00<?, ?it/s] 12%|█▎        | 1/8 [00:39<04:36, 39.48s/it] 25%|██▌       | 2/8 [01:17<03:53, 38.89s/it] 38%|███▊      | 3/8 [01:56<03:14, 38.96s/it] 50%|█████     | 4/8 [02:35<02:35, 38.76s/it] 62%|██████▎   | 5/8 [03:13<01:55, 38.60s/it] 75%|███████▌  | 6/8 [03:52<01:17, 38.65s/it] 88%|████████▊ | 7/8 [04:30<00:38, 38.57s/it]100%|██████████| 8/8 [05:09<00:00, 38.72s/it]100%|██████████| 8/8 [05:09<00:00, 38.75s/it]
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (ghost-signal post-sample): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m Requested to load AutoencoderKL
+[32m[INFO][0m loaded completely;  159.56 MB loaded, full load: True
+[32m[INFO][0m [OTR video] animatediff15_lightning_video beat shot_music_opening_001: T=250 U=84 requested=88 decoded=88 tail_trim=2 @ 512x288 -> 1920x1080 lanczos_clean_full_frame
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260910_003119_master.wav @9.500+11.377s -> slice_892970cb4b6081dd.wav (beat b001)
+[32m[INFO][0m [OTR.render_driver] prompt source=ghost_signal sha8=af6121ac chars=202 beat=b001 | anime style. a glowing radio dial in the small house, radio console dial needle sweeps in crisp arcs
+[1m[33m[WARNING][0m [OTR.render_driver] GHOST PROMPT v3: announcer_visual beat shot_b001 mode=signal source=writer_llm composed 202 chars / 47 SD1 tokens in 1 window(s), negative 132 chars / 32 tokens
+[32m[INFO][0m [gpu_residency] lease acquired pid=71152 token=d11ce8d8
+[32m[INFO][0m model weight dtype torch.float16, manual cast: None
+[32m[INFO][0m model_type EPS
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: mps, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load SD1ClipModel
+[32m[INFO][0m loaded completely;  235.84 MB loaded, full load: True
+[32m[INFO][0m CLIP/text encoder model load device: cpu, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m loaded diffusion model directly to GPU
+[32m[INFO][0m Requested to load BaseModel
+[32m[INFO][0m loaded completely;  1639.41 MB loaded, full load: True
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: mps, offload device: cpu, dtype: torch.bfloat16
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (ghost-signal post-encode): detached 1 resident model(s) (encoder eviction; no unload_all_models)
+[AnimateDiffEvo] - [0;32mINFO[0m - Loading motion module animatediff_lightning_8step_comfyui.safetensors via Gen2
+[AnimateDiffEvo] - [0;32mINFO[0m - Sliding context window sampling activated - latents passed in (100) greater than context_length 16.
+[AnimateDiffEvo] - [0;32mINFO[0m - Using motion module animatediff_lightning_8step_comfyui.safetensors:v2.
+[32m[INFO][0m Requested to load AnimateDiffModel
+[32m[INFO][0m Requested to load BaseModel
+[32m[INFO][0m loaded completely;  864.43 MB loaded, full load: True
+[32m[INFO][0m loaded completely;  1639.41 MB loaded, full load: True
+  0%|          | 0/8 [00:00<?, ?it/s] 12%|█▎        | 1/8 [00:45<05:20, 45.80s/it] 25%|██▌       | 2/8 [01:29<04:28, 44.79s/it] 38%|███▊      | 3/8 [02:14<03:43, 44.63s/it] 50%|█████     | 4/8 [03:02<03:03, 45.98s/it] 62%|██████▎   | 5/8 [03:49<02:19, 46.55s/it] 75%|███████▌  | 6/8 [04:36<01:33, 46.50s/it] 88%|████████▊ | 7/8 [05:23<00:46, 46.67s/it]100%|██████████| 8/8 [06:11<00:00, 47.10s/it]100%|██████████| 8/8 [06:11<00:00, 46.42s/it]
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (ghost-signal post-sample): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m Requested to load AutoencoderKL
+[32m[INFO][0m loaded completely;  159.56 MB loaded, full load: True
+Error: command buffer exited with error status.
+	The Metal Performance Shaders operations encoded on it may not have completed.
+	Error: 
+	(null)
+	Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)
+	<AGXG16GFamilyCommandBuffer: 0xd1913b100>
+    label = <none> 
+    device = <AGXG16GDevice: 0x1037c1eb0>
+        name = Apple M4 
+    commandQueue = <AGXG16GFamilyCommandQueue: 0x1037c76c0>
+        label = <none> 
+        device = <AGXG16GDevice: 0x1037c1eb0>
+            name = Apple M4 
+    retainedReferences = 1
+[32m[INFO][0m Global interrupt (no prompt_id specified)
+/Users/rentamac/ComfyUI-Installs/ComfyUI/standalone-env/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-ja26heaz'}
+  warnings.warn(

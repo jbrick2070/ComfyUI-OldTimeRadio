@@ -13905,6 +13905,21 @@ restored from it. This is exactly the "stale harnesses make weird episode-title
 stuff happen" failure the operator warned about twice the same hour: a scratch
 file that later runs read, silently holding one shot at T=500.
 
+**Additional live observation, 2026-09-10 (same limited-calibration issue).**
+The final Mac Lightning attempt, prompt `040b11ea-f572-4545-afe3-53a512505e00`,
+completed its opening clip at 88 latents / 512x288, then sampled 100 latents for
+`b001` and hit `kIOGPUCommandBufferCallbackErrorOutOfMemory` during VAE decode.
+Both counts are below the 136 anchor. The process was observed near 22 GB
+physical footprint, with no parallel test suite or model job. This attempt
+never published; its queue was captured and the process stopped. The exact
+allocation owner remains undiagnosed. The one surviving count is not a
+whole-episode memory guarantee, and this observation does not establish a new
+threshold. No guard or recipe fix is claimed. Receipts:
+`docs/2026-09-10-mac-final/mac_final/`. The operator accepted a separate
+canonical procedural-video replay as the final font check and closed the Mac
+campaign. This is a further observation under the existing PBUG, not a new
+Bible rule invented from an unresolved cause.
+
 ---
 
 ### PBUG-20260909-02 -- a render took the whole machine down at the writer-to-video handover

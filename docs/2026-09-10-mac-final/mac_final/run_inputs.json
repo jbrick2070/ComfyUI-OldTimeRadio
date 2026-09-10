@@ -1,0 +1,77 @@
+{
+  "run_label": "mac_final_fonts",
+  "canonical_sha256": "9ab0abe6f03f2da845983888f4a1e269066d1d915982453469b6e581da96bcf2",
+  "graph_unchanged": true,
+  "changes": [
+    {
+      "node": "1",
+      "type": "OTR_LedgerScriptWriter",
+      "input": "source_bank",
+      "before": "roll (any eligible bank)",
+      "after": "original"
+    },
+    {
+      "node": "1",
+      "type": "OTR_LedgerScriptWriter",
+      "input": "gguf_quant",
+      "before": "Q8_0",
+      "after": "Q4_K_M"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "announcer_video_model",
+      "before": "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
+      "after": "animatediff15_lightning_video"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "music_video_model",
+      "before": "viz_green (16:9) (audio-reactive, no scene image)",
+      "after": "animatediff15_lightning_video"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "character_video_model",
+      "before": "viz_camera (16:9) (audio-reactive, no scene image)",
+      "after": "animatediff15_lightning_video"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "announcer_image_model",
+      "before": "z_image_turbo",
+      "after": "sd15"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "music_image_model",
+      "before": "z_image_turbo",
+      "after": "sd15"
+    },
+    {
+      "node": "87",
+      "type": "OTR_VideoDirector",
+      "input": "character_image_model",
+      "before": "z_image_turbo",
+      "after": "sd15"
+    },
+    {
+      "node": "88",
+      "type": "OTR_ImageDirector",
+      "input": "dtype_policy",
+      "before": "fp8_ok",
+      "after": "no_fp8_no_fp4"
+    },
+    {
+      "node": "92",
+      "type": "OTR_VideoRenderBatch",
+      "input": "frame_count",
+      "before": 25,
+      "after": 17
+    }
+  ]
+}

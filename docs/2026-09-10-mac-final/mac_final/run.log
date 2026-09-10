@@ -1,0 +1,217 @@
+[otr_api] RESOLVED PROFILE otr_mac_mps (Apple Silicon MPS -- VERIFIED on an M4 / 16 GB (2026-09-08: six episodes in otr/obs/). Press Run and it works with NO downloads: the three visual lanes are procgen (viz_mxc_cpu / viz_green / viz_camera), voices are kokoro, music is stable_audio_3. The image roles name sd15 -- INERT under this wiring, because no viz_* lane consumes a still, and the engine that mints one the moment you switch a lane to still_flat / still_pan / still_word (fetch its 2.1 GB checkpoint first). For local video diffusion swap a lane to ltx098_low_video and read docs/MAC_PORTABILITY_GUIDE.md section 7. 16 GB is the floor and it is tight; a 32 GB Mac has more headroom but nothing above has been measured there.) -- 16 overrides:
+  role_overrides.announcer_visual=animatediff15_lightning_video
+  role_overrides.music_visual=animatediff15_lightning_video
+  role_overrides.character_visual=animatediff15_lightning_video
+  role_overrides.announcer_image=sd15
+  role_overrides.music_image=sd15
+  role_overrides.character_image=sd15
+  slot_overrides.voice_bank=kokoro_builtin
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=kokoro
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=viz_camera
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[
+  {
+    "node": "1",
+    "type": "OTR_LedgerScriptWriter",
+    "input": "source_bank",
+    "before": "roll (any eligible bank)",
+    "after": "original"
+  },
+  {
+    "node": "1",
+    "type": "OTR_LedgerScriptWriter",
+    "input": "gguf_quant",
+    "before": "Q8_0",
+    "after": "Q4_K_M"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "announcer_video_model",
+    "before": "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
+    "after": "animatediff15_lightning_video"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "music_video_model",
+    "before": "viz_green (16:9) (audio-reactive, no scene image)",
+    "after": "animatediff15_lightning_video"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "character_video_model",
+    "before": "viz_camera (16:9) (audio-reactive, no scene image)",
+    "after": "animatediff15_lightning_video"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "announcer_image_model",
+    "before": "z_image_turbo",
+    "after": "sd15"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "music_image_model",
+    "before": "z_image_turbo",
+    "after": "sd15"
+  },
+  {
+    "node": "87",
+    "type": "OTR_VideoDirector",
+    "input": "character_image_model",
+    "before": "z_image_turbo",
+    "after": "sd15"
+  },
+  {
+    "node": "88",
+    "type": "OTR_ImageDirector",
+    "input": "dtype_policy",
+    "before": "fp8_ok",
+    "after": "no_fp8_no_fp4"
+  },
+  {
+    "node": "92",
+    "type": "OTR_VideoRenderBatch",
+    "input": "frame_count",
+    "before": 25,
+    "after": 17
+  }
+]
+QUEUED 040b11ea-f572-4545-afe3-53a512505e00
+t=0s status=running
+t=22s status=running
+t=42s status=running
+t=62s status=running
+t=82s status=running
+t=102s status=running
+t=122s status=running
+t=142s status=running
+t=162s status=running
+t=182s status=running
+t=202s status=running
+t=222s status=running
+t=242s status=running
+t=262s status=running
+t=282s status=running
+t=302s status=running
+t=322s status=running
+t=342s status=running
+t=362s status=running
+t=382s status=running
+t=402s status=running
+t=422s status=running
+t=442s status=running
+t=462s status=running
+t=482s status=running
+t=502s status=running
+t=522s status=running
+t=542s status=running
+t=562s status=running
+t=582s status=running
+t=602s status=running
+t=622s status=running
+t=642s status=running
+t=662s status=running
+t=682s status=running
+t=702s status=running
+t=722s status=running
+t=742s status=running
+t=762s status=running
+t=782s status=running
+t=803s status=running
+t=823s status=running
+t=843s status=running
+t=863s status=running
+t=883s status=running
+t=903s status=running
+t=923s status=running
+t=943s status=running
+t=963s status=running
+t=983s status=running
+t=1003s status=running
+t=1023s status=running
+t=1043s status=running
+t=1063s status=running
+t=1084s status=running
+t=1104s status=running
+t=1124s status=running
+t=1144s status=running
+t=1164s status=running
+t=1184s status=running
+t=1204s status=running
+t=1224s status=running
+t=1244s status=running
+t=1264s status=running
+t=1284s status=running
+t=1304s status=running
+t=1324s status=running
+t=1344s status=running
+t=1364s status=running
+t=1385s status=running
+t=1405s status=running
+t=1425s status=running
+t=1445s status=running
+t=1466s status=running
+t=1486s status=running
+t=1506s status=running
+t=1526s status=running
+t=1546s status=running
+t=1567s status=running
+t=1587s status=running
+t=1607s status=running
+t=1627s status=running
+t=1647s status=running
+t=1667s status=running
+t=1687s status=running
+t=1707s status=running
+t=1727s status=running
+t=1747s status=running
+t=1767s status=running
+t=1787s status=running
+t=1807s status=running
+t=1827s status=running
+t=1847s status=running
+t=1867s status=running
+t=1887s status=running
+t=1907s status=running
+t=1927s status=running
+t=1947s status=running
+t=1967s status=running
+t=1987s status=running
+t=2007s status=running
+t=2027s status=running
+t=2047s status=running
+t=2067s status=running
+t=2087s status=running
+t=2107s status=running
+t=2127s status=running
+t=2147s status=running
+t=2167s status=running
+t=2188s status=running
+t=2208s status=running
+t=2228s status=running
+t=2250s status=running
+t=2270s status=running
+t=2290s status=running
+t=2310s status=running
+t=2330s status=running
+t=2350s status=running
+t=2375s status=running
+t=2395s status=running
+t=2415s status=running
+t=2435s status=running
+t=2455s status=running
+t=2475s status=running
+t=2496s status=running
+t=2526s status=running
+t=2556s status=running

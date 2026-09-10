@@ -6155,3 +6155,28 @@ delimiter` is a structural break, not a cut-off.
 The tests that encode the obsolete absolute-leaf rule (`test_ghost_prompt_v2_lane.py:399-405, 437-451`; `test_ghost_signal_author.py:925-931`) are REPLACED with the new invariant, not deleted.
 
 **Open question:** whether "no adjacent repeat" is the right viewer threshold -- check it against frames rather than more reasoning.
+
+
+---
+
+## 2026-09-10 Mac final-check staging notes (historical, superseded by handoff)
+
+## WHERE TO PICK UP
+
+**Operator priority, 2026-09-10: finish the Mac font proof, then hand off to the 5080.** The final Lightning run must use the current font fixes and the canonical graph with Mac dropdowns. It is complete only after publication to `otr/obs/` and inspection of the rendered title, SDH captions, scope labels and credits. The earlier `lightning_mac_proof_3` predates the font fixes and does not close this check. Keep other model jobs and the full test suite off this 16 GB Mac while it runs. Then record the artifact and continue the queue on the 5080.
+
+**State (2026-09-09 late night, rented Mac M4; UTC 2026-09-10):**
+`v2.0-alpha`; latest receipts are at the top of `docs/HANDOFF_LOG.md`.
+After the operator-prioritized Mac font proof, the required five-act
+forced-Ghost proof is row 2.2 on the 5080. **Use the measured test envelope, not the old "151 all pass alone"
+claim:** the controlled Mac baseline has 143 failures, the final run 142,
+with no new failing nodeids. Empty model/cache roots, offline model access,
+and three explicitly deselected audition tests are required on this host to
+avoid loading real models from a nominal unit run. Exact settings and failure
+sets: `docs/2026-09-10-ghost-pool/test_comparison.json`.
+Bug Bible is available at `~/Documents/comfyui-custom-node-survival-guide`:
+standalone 23 passed / 27 skipped / 3 xfailed; against OTR 10 failed /
+29 passed / 11 skipped / 3 xfailed, identical failing nodeids before and after.
+**Mac font proof is now running** (prompt `040b11ea-f572-4545-afe3-53a512505e00`);
+read its result before picking another row; no registry publish or device promotion is authorized by this
+handoff.

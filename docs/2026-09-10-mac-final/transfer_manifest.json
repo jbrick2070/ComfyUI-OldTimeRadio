@@ -1,0 +1,1371 @@
+{
+  "source_code_head": "6f9a5586cff084489fbb0aea257eb1f6761af615",
+  "destination": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr",
+  "published_videos": 9,
+  "episode_directories": 9,
+  "files": [
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "a214c670984dfc588b73a10ad0601a9ba3ab736abb14179a4dbb4412cf377529"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "c91ea01439ae63626a4a5aa7fcd0eb99acddd3be2b9e4aa5382eee6cb03e8e45"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/pending_20260908_010509_master.wav",
+      "bytes": 12326028,
+      "sha256": "4b17cd27c093c4c87f6937ca10e7c8dc7798f35e13bffa1e71872b3b11cea71d"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/signal_lost_a_sharp_note_that_wont_fade_20260908_012201.mp4",
+      "bytes": 19699753,
+      "sha256": "2de54880bd6ef342c07b7cb61f46bbf6507529d3d8cce7c6230ffd01e5fcbe7b"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_ledger.json",
+      "bytes": 120119,
+      "sha256": "235f91de3ac8a60c23c43699614c30b7fee151a566e5584b9c791fc8ddc44bd3"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/audio/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_treatment.txt",
+      "bytes": 7470,
+      "sha256": "94bc5d4fd5e4d577e22f0a793a01abdf7a7fb3761841f2fe35081b703c0678d1"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b001_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 10983620,
+      "sha256": "3fe8e37d2844bbd3d0762f2ec6876c367d5e36c39426472650d48da9763cc986"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b002_character_video_ltx_8gb.mp4",
+      "bytes": 567722,
+      "sha256": "15126bbbe3a57dd0037b0540efdee76f02374c5f373ba484cd5dee5983126064"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b003_character_video_ltx_8gb.mp4",
+      "bytes": 473608,
+      "sha256": "6277eb09bd1fa8302d7d9f1f86c3bd35d49305c6e9da12c1bca8825eeb0ad753"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b004_character_video_ltx_8gb.mp4",
+      "bytes": 1049818,
+      "sha256": "82356595d4aee70b13eee360c6ff2b77961e3de277cf84e78011a20213d2e023"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b005_character_video_ltx_8gb.mp4",
+      "bytes": 739468,
+      "sha256": "9b27cfc8607faa66b647236e7f0501e965201c921c904043ddface84e53e425c"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_b006_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 6017039,
+      "sha256": "f1ef37332a58716d72db99c960478324258781ca9bfe6d2edce7830b28027977"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_music_closing_001_music_visual_viz_green.mp4",
+      "bytes": 5399577,
+      "sha256": "0a81fcb5716e240d4b5fe73488a9686756f5aae57e17e709e9b88de5561fb4b7"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/clips/shot_music_opening_001_music_visual_viz_green.mp4",
+      "bytes": 6396412,
+      "sha256": "e5b524270fa83fe1bee33fc4267111f84e34da36ba25767082d173dd9233f6d8"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/episode_canon.json",
+      "bytes": 316,
+      "sha256": "b91ee914e81ab09fad245ee0f9f99597723763e0bea5b76f1b16c416c4a8eabf"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent.mp4",
+      "bytes": 91465025,
+      "sha256": "c758b47d342ec3a9e5403fd3c9d84d877e810458564ca12cdc42dfdc40237834"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent.mp4.qa.json",
+      "bytes": 2994,
+      "sha256": "8c883e2c14e3ca46978e5be14c182220244625d4590e2d35eed73f8dcda4a539"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended.mp4",
+      "bytes": 91465025,
+      "sha256": "c758b47d342ec3a9e5403fd3c9d84d877e810458564ca12cdc42dfdc40237834"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended_captioned.ass",
+      "bytes": 72270,
+      "sha256": "f2fb2c2e18b93571a8762d5aa08f4611bbf6a790fd8ba4522b08f566f516046b"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended_captioned.mp4",
+      "bytes": 81827851,
+      "sha256": "bbeb0ae2882b9ceecc7552bb7c2089755416266f16a4f056059016bb2776469b"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3345118,
+      "sha256": "33f3a4d8e268e3fe1e2fb9547547c8fe71e0bb9b4225e4584d6d358d1c346754"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 85172635,
+      "sha256": "c443426b7fe0dece90970bee02a930ec23e3a622de4f6efc209da921c2ea9379"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/signal_lost_a_sharp_note_that_wont_fade_20260908_012201_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 97506328,
+      "sha256": "1bdf9ebd9b6888eb7fea614514bd9522b32f18e5df81e4300312515da8b02052"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/stills/still_b002_460973ccecdb.png",
+      "bytes": 522900,
+      "sha256": "1c3484fe4ec8af8bebdac3a7dcc1b7eb8ff595754d85339673def7584059d656"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/stills/still_b003_0b2eb1c4ceff.png",
+      "bytes": 560045,
+      "sha256": "e3eb98d66eedafd3061718b75631863ec2ed06a40757b34a1466e6c4f98c3937"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/stills/still_b004_3d6d93bdcd8a.png",
+      "bytes": 584837,
+      "sha256": "5897c96ebce036b6a170f6a1e165bc5f1efff1f6153a46d8fdf1288dc9db9209"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/stills/still_b005_414198fef757.png",
+      "bytes": 602015,
+      "sha256": "48ee1c5c47696ba785d706b69e718e0db1746b7f0ab5a6ed4806467f1d97f442"
+    },
+    {
+      "path": "episodes/signal_lost_a_sharp_note_that_wont_fade_20260908_012201/stills/stills_manifest.json",
+      "bytes": 4428,
+      "sha256": "0460b99a28e0fc2d78397f1430c9cea119d2de7ce30571d6ca1629f06d4781fe"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "96bf13069230b263d5faf93b20483eef8730725656474f4f6b4a58215c3c1cb0"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "f131078ea84b395808b980892554547f2ef36ab2bbf2f2c8ac976b10d256e492"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/pending_20260909_095829_master.wav",
+      "bytes": 20831036,
+      "sha256": "e7b73868a53bbbfd4b8337b8d2847bfdcd757389512890cef8ecb9868bc958bd"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/signal_lost_lightning_mac_proof_2_20260909_100958.mp4",
+      "bytes": 31183813,
+      "sha256": "24b92036591457278d3e53b4e506f83dbe3513d4df258f72c360b62d679b87a1"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/signal_lost_lightning_mac_proof_2_20260909_100958_ledger.json",
+      "bytes": 250405,
+      "sha256": "e7dbcede8f322874416bff0e6ec50b3d11514c49e543d7961b69cfc4189b15ba"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/audio/signal_lost_lightning_mac_proof_2_20260909_100958_treatment.txt",
+      "bytes": 6459,
+      "sha256": "c86b8005ab71248979df9c52a47974ec270b3e1fdfe4c3073fb89fe34de933f2"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_music_closing_001_music_visual_animatediff15_lightning_video.mp4",
+      "bytes": 2678181,
+      "sha256": "33d2a5994ee90f4f01a1363bb2f4046a8fe0024cea02ac5d79956c5f021bd21c"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_music_opening_001_music_visual_animatediff15_lightning_video.mp4",
+      "bytes": 4079372,
+      "sha256": "ed3b2c74305ea04fac71235f4807a8cc1d41ca53a05a041abc858cec3c3b1002"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_000_b1_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 1616074,
+      "sha256": "8b97debec0da49d286b6624a9b757637a4212367324a6a7d3bd9b71e8cd9c408"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b10_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 802043,
+      "sha256": "68036f90d6879fc0072dd789388e991cd0e15ccb9fa2fce959f24eaa185f28d8"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b11_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1527119,
+      "sha256": "37a17bbc876f34a26d246f960dc468d867f827f5b87dfc438c94c15e7afe087d"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b12_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 408650,
+      "sha256": "a284ff7de501bcccc1d67ba1744aabd6c5f4c7587b0dfc9cb42a571ad72fdb2e"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b13_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1648827,
+      "sha256": "511c39c351248692351829b72b9d963ad931c81b1b774d66a92aa9b719b117ff"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b14_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 510027,
+      "sha256": "99d1d221f9a048dbf35b5b7c8c391a4be8b06dc2495bf91b097f70007bf39eb8"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b15_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1553381,
+      "sha256": "f80cc055ef36ad2266d48e9873b5dfcf7f295596077c6436cea4403ac7b7b3c3"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b16_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 605333,
+      "sha256": "328f37a5c69bfb8493cf3d670c9bcda105e7b8aefeeb3e496db0f21aa54c1bc8"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b17_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1881663,
+      "sha256": "2c70216c057e79ec0ee89f06f7b5b88c9c5a6e61b9524ed335326ef04d96c213"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b1_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1777288,
+      "sha256": "516a231e3bd9df09bbf290dbf03f0f25609bd8bdf6df503eaf35c77a73ef1fde"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b2_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1241303,
+      "sha256": "386c6e58ce3b559e71c5cf1ccc647dca03b2a7846a750d83db2bda4b912a994a"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b3_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 2982848,
+      "sha256": "1d48cc9bfce170f984380289fdd6aed69fb9e6b1e3646bf3c52ef1b3fd8fd35e"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b4_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1491739,
+      "sha256": "60c9117b9c031a5e044f681632ba078a723e45fbf0b2f51fe41aac953077e00c"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b5_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1992517,
+      "sha256": "16ffe9e118b31ed14fee83c25f7dbe9066f089cc7c835969d5164b0a1524c5de"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b6_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1480390,
+      "sha256": "750c1153a61f92dc39c2d55d1b8e4ac80773cf409bf6532ee2f6765e2b9bc460"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b7_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 2306562,
+      "sha256": "dc3a70444075c6b6058934fc3d16a5787eb2821048f9cd5ba089a4ef287830da"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b8_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1986449,
+      "sha256": "8fc546dd89d0a5de9400c971589a108ded59501bc832d717cff0fb8cf207a950"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_001_b9_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1419670,
+      "sha256": "1f60b9982b5542532ee2885af5ccf681e2b1a98ceb14306c1108eff7c2e2c038"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_002_b1_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 2100843,
+      "sha256": "dc07fa218463515e7d5b9a32f7a2ed7c49098b1b43eb689983a66a20480bb2cf"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_002_b2_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 1393224,
+      "sha256": "ee25ef76736c99c8266717f51c7788034b61ed7b61c9ecff60d3a30b3850ca83"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/clips/shot_shot_002_b3_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 3599101,
+      "sha256": "b4b2efe651a1148069e0ab415d653952eb5ae77cb76fbccaab0ee9bd1272a270"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/episode_canon.json",
+      "bytes": 350,
+      "sha256": "982d242191990d4e6263f37f76fa60bf770e1d45dcf5061d10615deb7185775d"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent.mp4",
+      "bytes": 201174686,
+      "sha256": "2da03bae00239a9cc0018ad3395d904a9c4ec2c523a19f055bab6383ec1a0b6a"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent.mp4.qa.json",
+      "bytes": 9108,
+      "sha256": "391e879970f37664b86e6d8d8e95380268a7381420f3d9315df021a7c7dd5aae"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended.mp4",
+      "bytes": 201174686,
+      "sha256": "2da03bae00239a9cc0018ad3395d904a9c4ec2c523a19f055bab6383ec1a0b6a"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended_captioned.ass",
+      "bytes": 63128,
+      "sha256": "e1a8fe28c048489a94a765fed1c905e7a0fb0acb25fa03a6aca0b03ed465e668"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended_captioned.mp4",
+      "bytes": 156878679,
+      "sha256": "677e4d201db281b5b29a99fa34dc59ae5efabaabb898ce58da22f629aaf43bec"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3438979,
+      "sha256": "58e5b622308a087c5287321006bf30d713c06fcc01ef73803fc2f3df75386dd6"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 160319622,
+      "sha256": "6c57ce54343ab87855b9cc490d969c3aae821069918ac55b7f6e5be0cc2556da"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_2_20260909_100958/signal_lost_lightning_mac_proof_2_20260909_100958_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 181163295,
+      "sha256": "0bfd85841ec1dc7e9a2fd12b2779a598a8c3ee24463cf9494062b0b63d2bf889"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "42242256a98efd999ffb19db597241cbb29facc729e173330c9d26d2b83277de"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "222db44daa7013fc4a3a2e4cf87c50f83289f17aa8e7c87dca8e4cbe3ecf7dc5"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/pending_20260909_200252_master.wav",
+      "bytes": 12098860,
+      "sha256": "d583e07c4504a5fd5092f7bb06ccdfdbe385dd662d7656db7b964f1787dc54ad"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/signal_lost_lightning_mac_proof_3_20260909_201719.mp4",
+      "bytes": 23783612,
+      "sha256": "8b5a8fcaf939fad3eb6a56e7d3e48ad0fd883ccb86f8d1896b42d6e598cfe2b7"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/signal_lost_lightning_mac_proof_3_20260909_201719_ledger.json",
+      "bytes": 113535,
+      "sha256": "7ae48b9e815a0b79e135eda554956bed4a270e78edde9f97a162c3fdf121258e"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/audio/signal_lost_lightning_mac_proof_3_20260909_201719_treatment.txt",
+      "bytes": 7276,
+      "sha256": "4ff3648989173be9400ceadaa186d72a652e06ae0aae3ea919b38d8d61800d5b"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b001_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 2125226,
+      "sha256": "b361f8dc6baddc3e770b58c6f015687a5cf899d806705d66bfc146745a14e609"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b002_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 2536331,
+      "sha256": "58645820a6941aba56ad85b8760e7680d2516782dfdfd0e522dfef0812de7812"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b003_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 1899978,
+      "sha256": "a09ce1f24a1f4e4c990f6a22e9b3bcfa31ceaafa9227f423329dfe750116f536"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b004_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 2204865,
+      "sha256": "201ca24a1c6efce5a27302b21439722d870ed784024d6c9acc667bda9826267b"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b005_character_video_animatediff15_lightning_video.mp4",
+      "bytes": 2420041,
+      "sha256": "63e69f4ff6d46a402b86c3e93c56ed8b4ec8dbef736970ae30ee061c76987b50"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_b006_announcer_visual_animatediff15_lightning_video.mp4",
+      "bytes": 1413195,
+      "sha256": "58fc3618640e63f6cd6ed62717218580e302feb865e8fff711d25cb4045edfff"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_music_closing_001_music_visual_animatediff15_lightning_video.mp4",
+      "bytes": 1727449,
+      "sha256": "86cc5af038991bd65f5cdcc690127e5ee0c514b5c48c21bf53d763efac70101c"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/clips/shot_music_opening_001_music_visual_animatediff15_lightning_video.mp4",
+      "bytes": 2586531,
+      "sha256": "601153d46ca7a5875431f55c718b5c76f74d370055025b0bcdf0c3a869f4fca5"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/episode_canon.json",
+      "bytes": 400,
+      "sha256": "6e93823a17238f3ca7c494c238b3986b2e9e0ff3fb3d86cb4043cf9ee4b71197"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent.mp4",
+      "bytes": 82952593,
+      "sha256": "5dcdef04f127e5bd6cd7fee23fb1a4861524b59be80fa6f3db2a2875b3672e6f"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent.mp4.qa.json",
+      "bytes": 3158,
+      "sha256": "abac2c508c6ce1a08de550b41b609632ca1c65492dba373a10a026a69cc47b77"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended.mp4",
+      "bytes": 82952593,
+      "sha256": "5dcdef04f127e5bd6cd7fee23fb1a4861524b59be80fa6f3db2a2875b3672e6f"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended_captioned.ass",
+      "bytes": 68890,
+      "sha256": "5ed098d0024bb4d7d5eba026ed8df9fdafeca32ed79e96d44a6173672a53e678"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended_captioned.mp4",
+      "bytes": 63770920,
+      "sha256": "880b09ccd7848e1fa9cb73d1e06233b9a522439a6d9b1c49364fc8358ac6bbdf"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3413369,
+      "sha256": "1929665f8f0ce74e90f3a2f16bf61ab9fa7472eaec7adf96a1e51e2e4da18681"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 67184686,
+      "sha256": "de50c18ae8ebed230374e76027c3fdcdb77805ddd2b4265ad3832266e33e2d07"
+    },
+    {
+      "path": "episodes/signal_lost_lightning_mac_proof_3_20260909_201719/signal_lost_lightning_mac_proof_3_20260909_201719_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 79291395,
+      "sha256": "7e9647e05982c7d1f8fb99d6fbf34e4ec2601bd3f290df2dab5f47a4dc6d9930"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "cadac58112603160a202c28da9c624a5bae832c68b9d279d68cdfc6142a52d2f"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "ca6361fe8c43b1cd69a70ac626a065d7d35d31467a9c8caecaaf50273ac523bf"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/pending_20260907_195731_master.wav",
+      "bytes": 20691404,
+      "sha256": "b1506eaae9406a5c33069f3f4ea87d251ae85551a62ea24ba4bd71b74ccaa5a3"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/signal_lost_magnetic_pulse_20260907_201810.mp4",
+      "bytes": 8280105,
+      "sha256": "c2362efac7fe2df7b55b41270d7f82cae6457731dfec3aa986bc218d6cc57364"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/signal_lost_magnetic_pulse_20260907_201810_ledger.json",
+      "bytes": 185705,
+      "sha256": "c372e0b1a22ddc9b5df74eac0accffadae600360e8627130c39dedcbd37d6d56"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/audio/signal_lost_magnetic_pulse_20260907_201810_treatment.txt",
+      "bytes": 6492,
+      "sha256": "c82ed5dfa2204f1ecb34f2a32ee5f62a45aeef1e47abaf1e87a43b8cfa410dda"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_music_closing_001_music_visual_viz_green.mp4",
+      "bytes": 3019426,
+      "sha256": "96e5f239dd475eca606f0a629d07bfa5a3077adc9d5a9a8c18ec5d7a4db22761"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_music_opening_001_music_visual_viz_green.mp4",
+      "bytes": 3220564,
+      "sha256": "9e8b3e1c454e4e53e78a34d024619253a2456b700c89a3a500b0caf0c30052e7"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_000_b1_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 7690330,
+      "sha256": "81de7b455abe4e6f59c87c90d92b57790b607b6382f3c64eafd228426fd239b3"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b10_character_video_viz_camera.mp4",
+      "bytes": 2544715,
+      "sha256": "6d4b5225481c5009cb22e0f3532fe566e6c2ed007558115ddb7b543b9bf944ce"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b11_character_video_viz_camera.mp4",
+      "bytes": 3216389,
+      "sha256": "5f25e459e20e35e55a66f38637545659fae361261255fa275206eccc13b2d163"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b12_character_video_viz_camera.mp4",
+      "bytes": 1123685,
+      "sha256": "da717adc1bb6598182fa21a3ce6e03eed1972026b62015e99e0ecd153fb1ea98"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b13_character_video_viz_camera.mp4",
+      "bytes": 3515391,
+      "sha256": "8c90c60622846366e87d2abcd18ac43e11670e214db6e932d36ee95762e0f663"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b14_character_video_viz_camera.mp4",
+      "bytes": 2988813,
+      "sha256": "094bfad635753719a88aed7a9603bd96223374844b2f03ca22bf08742fa62709"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b15_character_video_viz_camera.mp4",
+      "bytes": 2166303,
+      "sha256": "d415e4df61b8ca5cad1a4c73d09cc8d3af53f086a551d802b4ca31951aa84564"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b16_character_video_viz_camera.mp4",
+      "bytes": 2777095,
+      "sha256": "40d729c69d083ea28bf227536f54e7012cbd5352c15f45a37fcf7d31c1cce2e1"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b17_character_video_viz_camera.mp4",
+      "bytes": 4105754,
+      "sha256": "35d5a43da1e5f928dc2969325b631a27e125a3e6d3855b32d07d1f9d4d79a87d"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b1_character_video_viz_camera.mp4",
+      "bytes": 5983625,
+      "sha256": "97cadca55b3adaecc48ce844a76dd152803e830fa8460412026a2ab1b9331a61"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b2_character_video_viz_camera.mp4",
+      "bytes": 5185760,
+      "sha256": "096a9eb5fec084d92445a951a4101077cd8afa50326097f45a200d57baae3dc9"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b3_character_video_viz_camera.mp4",
+      "bytes": 6699713,
+      "sha256": "99f68679c848970b10b631d12d089271037ebfda10cd3e638a2d950e27ce8af0"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b4_character_video_viz_camera.mp4",
+      "bytes": 8285036,
+      "sha256": "127662d40b08a397f1442f4638e5017b7a83221256d2e25b251bd8b24314363d"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b5_character_video_viz_camera.mp4",
+      "bytes": 6432744,
+      "sha256": "e7107c956cd249d1fd8c4d2dca5d698dcdbb3ae2e40c64f7acfdfdc922d0ddf1"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b6_character_video_viz_camera.mp4",
+      "bytes": 3885665,
+      "sha256": "5813893f177d4b21bef3d2a5f572bcfa19bad59c7a3492ee6feed69fdc2351d0"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b7_character_video_viz_camera.mp4",
+      "bytes": 1879898,
+      "sha256": "4feeafda6d487c1813feff94c90531636453656599115857c746cf617b98deec"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b8_character_video_viz_camera.mp4",
+      "bytes": 3556188,
+      "sha256": "18ed8f0e2277ff73c4e12292d7aca585a1ea40be46f00e4e4a1014a725212eca"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_001_b9_character_video_viz_camera.mp4",
+      "bytes": 2686064,
+      "sha256": "1d7525e7ff70c985649f0eecc4cfbbe12aa2b0c1cd292e303c67b5db55b96716"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_002_b1_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 6043539,
+      "sha256": "8be53673753485b051fc70befbcbfdfad981a3ca69a5947b0464786b7e841aa6"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_002_b2_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 5474666,
+      "sha256": "1988b5fc796f6c96653f8ac7982f744c4a05b3683baaa1ced7ea5de908325342"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/clips/shot_shot_002_b3_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 14049898,
+      "sha256": "e0073ed9fba9481baa647e1dfc036a3354b2c8b13b16b0bab384498355a252dd"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/episode_canon.json",
+      "bytes": 236,
+      "sha256": "bfd5f0a10573a1d8197b8d0dfdf51e360c2a6a0e2ce8c265f8c7f78236197be5"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent.mp4",
+      "bytes": 248510268,
+      "sha256": "9ab182fd2d6b77b39bf0e5bcc985780efe4ca3f318140192760393b444d3e641"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent.mp4.qa.json",
+      "bytes": 9070,
+      "sha256": "274e466e860447d79605e7a11d7dc20d8c607dc28dc0d3e65e96a0abc76a464f"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended.mp4",
+      "bytes": 248510268,
+      "sha256": "9ab182fd2d6b77b39bf0e5bcc985780efe4ca3f318140192760393b444d3e641"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended_captioned.ass",
+      "bytes": 60522,
+      "sha256": "70f8853d68224af7634d200aab0d18d0b7c9aefa3305ab9e3c02b7368733974d"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended_captioned.mp4",
+      "bytes": 219087050,
+      "sha256": "6e474b791cb2f735889120ca2ced58fb08bf0e138df9bdf7b153c933fa744ee9"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3565428,
+      "sha256": "7812c9c7a6fd7824c7f71ed1738c6fcf15b0a88dfa8a3ff605a88e132c515b50"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 222652507,
+      "sha256": "e34e0d7708f835a8c1041455efe295387e410bfc876f77e4636aea63ecd2f355"
+    },
+    {
+      "path": "episodes/signal_lost_magnetic_pulse_20260907_201810/signal_lost_magnetic_pulse_20260907_201810_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 243355176,
+      "sha256": "7ea7f16093de9b8165afcf2055e9bafb80a48d3a652b2a9de6228f03e3b2a295"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "04024b1383f5befbb03f0672a0d81b1c8c531a6a7950f8c6fc6b30cf4b13f5d4"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "0d9cf2d05a8d566b5a9e69a0416e2a63e3224f24a169fb544760490d5fa39c43"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/pending_20260907_213438_master.wav",
+      "bytes": 13952300,
+      "sha256": "0fc98272a689e559aea270d89f9245fdd0b96a3d36061710248e6588638d8e6f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731.mp4",
+      "bytes": 21487845,
+      "sha256": "6970071a4d4748b99dd8b66c57744490ce446cb93f287c5f5a3d5c114b0d4343"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_ledger.json",
+      "bytes": 91115,
+      "sha256": "5406c73bda40abd9b4ede99812a021760e2ba9d14bb47b41c021e25e6d337e88"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_treatment.txt",
+      "bytes": 7242,
+      "sha256": "0ec27148a99dfb07db6de312e7d1ab28ff68d10a71492bc18160db4b5d02de0f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b001_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 16401240,
+      "sha256": "64f4835983f903801e4b4b42b72162f1bb3bfc52d2cc14fe512a5528dea9bc5f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b002_character_video_viz_camera.mp4",
+      "bytes": 9726100,
+      "sha256": "d3f62de76fec8cefe22ef3f30ad46fac0d63962e69bf2e48ee959fad724b0e54"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b003_character_video_viz_camera.mp4",
+      "bytes": 8469751,
+      "sha256": "41c0aa908c935f27dce5863cc42a701b7a0a3152648872ef09d4e35ded725973"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b004_character_video_viz_camera.mp4",
+      "bytes": 8323349,
+      "sha256": "1d3a1394f187320402abba2856a98e55174ea65ed6805650dfd0f557395bcf52"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b005_character_video_viz_camera.mp4",
+      "bytes": 10055860,
+      "sha256": "31b839341d6b26c0150c7692e3a1ad67566f5eedc566f517a4def868399a6f20"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_b006_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 10452671,
+      "sha256": "8bf13dc483de8d5328c14ca18dbef7d000bdc2393a6a8665e9d023947f1551ec"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_music_closing_001_music_visual_viz_green.mp4",
+      "bytes": 6255743,
+      "sha256": "00139f42e575b801c31854f61d235a412a18efe88866dfefd02729e4d78dc4fe"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/clips/shot_music_opening_001_music_visual_viz_green.mp4",
+      "bytes": 4548788,
+      "sha256": "9fc5d77705e03e5729ed0f0057e1bdcf1627ed608d57506bb281b292a4958e3b"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/episode_canon.json",
+      "bytes": 915,
+      "sha256": "747a90452cc50642cd495f8b9d331297781171f1c67282fac8d163302b87848f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent.mp4",
+      "bytes": 176808926,
+      "sha256": "431d94d768d114a7d24d24567e07148324f8e9b59b292d6629a9dd366192d9b9"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent.mp4.qa.json",
+      "bytes": 3006,
+      "sha256": "780c0f5782c75924f325bee774c2cd26347ef5b0e3df131c7e7288bd1ea47cd0"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended.mp4",
+      "bytes": 176808926,
+      "sha256": "431d94d768d114a7d24d24567e07148324f8e9b59b292d6629a9dd366192d9b9"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended_captioned.ass",
+      "bytes": 79523,
+      "sha256": "130af7f547ef14dbbd63330d826ffe47798f87026f9d2459e04e4564dcc1559c"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended_captioned.mp4",
+      "bytes": 153598869,
+      "sha256": "3bfe21c001297862da20e5bff3c505e54ace0377cf50ce8859d1ec7609280321"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3610551,
+      "sha256": "b3a298359470843d0fbecc094ba1ae1c445d97c62eb99dc65e243dcc39ae2547"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 157209156,
+      "sha256": "c667b95424cd77b678bcd015a2b37ed1afd7f34dcbb6ad29685c6380eabda701"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 171169197,
+      "sha256": "e33eb41088cfd689f3160ec3e552b98caed44f49ff49b74bb2219aebd922e223"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav",
+      "bytes": 13952300,
+      "sha256": "0fc98272a689e559aea270d89f9245fdd0b96a3d36061710248e6588638d8e6f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724.mp4",
+      "bytes": 18370753,
+      "sha256": "569bb88fd48446c351ec75834b4291ad151a7fff3781f120a716d5dbcd809883"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json",
+      "bytes": 91290,
+      "sha256": "4253b2073a954cdd02ace21c2f1908449305a98ff0732e0247f92c8b6067082a"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_treatment.txt",
+      "bytes": 7409,
+      "sha256": "e5686bcce49617bf19f57621a8aa1ce6f16a014871c02c732e6ad24264bb90f1"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b001_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 16416296,
+      "sha256": "bcd4f9faf83b7a2958a0b2d937776beef13d13944878b3e6674a8ba3a090ab9c"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b002_character_video_viz_camera.mp4",
+      "bytes": 9726100,
+      "sha256": "d3f62de76fec8cefe22ef3f30ad46fac0d63962e69bf2e48ee959fad724b0e54"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b003_character_video_viz_camera.mp4",
+      "bytes": 8469751,
+      "sha256": "41c0aa908c935f27dce5863cc42a701b7a0a3152648872ef09d4e35ded725973"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b004_character_video_viz_camera.mp4",
+      "bytes": 8323349,
+      "sha256": "1d3a1394f187320402abba2856a98e55174ea65ed6805650dfd0f557395bcf52"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b005_character_video_viz_camera.mp4",
+      "bytes": 10055860,
+      "sha256": "31b839341d6b26c0150c7692e3a1ad67566f5eedc566f517a4def868399a6f20"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_b006_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 10504708,
+      "sha256": "512cfd126f12a00be6b214b623ba5f9d3e3f5cc4df46c24ac2dcb5486f60dc8d"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_music_closing_001_music_visual_viz_green.mp4",
+      "bytes": 6055423,
+      "sha256": "d4b85baafee0a4eae328deaf348567076f68d77023e8852e62f4c1307496f0da"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/shot_music_opening_001_music_visual_viz_green.mp4",
+      "bytes": 4335033,
+      "sha256": "27a60a50aaf0b000053b4fa1ee7f79a4f1d76b1edb3271940feb55498636e31f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/episode_canon.json",
+      "bytes": 915,
+      "sha256": "747a90452cc50642cd495f8b9d331297781171f1c67282fac8d163302b87848f"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent.mp4",
+      "bytes": 176110848,
+      "sha256": "b7d797b2b0c61edcc9695d3951ffaf23e5e5b368378a5864cff50e341ab3bc9c"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent.mp4.qa.json",
+      "bytes": 3006,
+      "sha256": "780c0f5782c75924f325bee774c2cd26347ef5b0e3df131c7e7288bd1ea47cd0"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended.mp4",
+      "bytes": 176110848,
+      "sha256": "b7d797b2b0c61edcc9695d3951ffaf23e5e5b368378a5864cff50e341ab3bc9c"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned.ass",
+      "bytes": 115790,
+      "sha256": "e1753e18c1c99b72e90858a295d2e033b8658de7d7931b4535979608a0b0db65"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned.mp4",
+      "bytes": 153279997,
+      "sha256": "60fd1e09dbd0a98c44a0ebde1184d04ac652f5b95546ced192eb9c992c769bb0"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3611943,
+      "sha256": "5c85fb6a036934dd0de9cc01c20b2ff3de0037b78a8275182cd9bf5b546b99a6"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 156891633,
+      "sha256": "940fc301c945d375d0d1bf741b487432944f80d7862001e03527a320ec3ba1d0"
+    },
+    {
+      "path": "episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 170851674,
+      "sha256": "1c956f5d8559d2c09bcf00446c6651b8cdab190d03e1a533079308c91fdb2065"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "011af840a6264e2bd16c18c56c09c4742e03b76a9977ed6546afcb2815ba598e"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "d5b137980e179770097ad4d9da355b16786ed1cfb0ad363560f1403e6ec75b9d"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/pending_20260908_004124_master.wav",
+      "bytes": 11885156,
+      "sha256": "743b368538e1e87dc2e2b9e9f3dfe8b60c711b75bfc823eba83653bed9f9315b"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/signal_lost_the_tick_that_breaks_reason_20260908_005546.mp4",
+      "bytes": 31820797,
+      "sha256": "caee5463a9fa342fcb98616f5888dc3a1a5f4dc15f38e379dabb82c71f103d08"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/signal_lost_the_tick_that_breaks_reason_20260908_005546_ledger.json",
+      "bytes": 111519,
+      "sha256": "c0f71186f442c72189b1176f0aad32ffffd1b3e22fd9b967545cb3531c4a66eb"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/audio/signal_lost_the_tick_that_breaks_reason_20260908_005546_treatment.txt",
+      "bytes": 7607,
+      "sha256": "9aceacdf7a591e29b8e8d6ad3912c6d839ab2f8c67f3e90fb26be29449121eef"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b001_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 7279225,
+      "sha256": "02777281f5e0505ec9d145a9f15f4c89d72b748b3820bf3df75733640e1c9010"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b002_character_video_still_motion.mp4",
+      "bytes": 1274175,
+      "sha256": "5fc5458e81d20b26f15d8db25125e6afa6d5d82efce446567c81d79b57cdcd85"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b003_character_video_still_motion.mp4",
+      "bytes": 1179748,
+      "sha256": "75a89bdd3b7ad7471a3bc87284ed52ef8a9ae65fb1a535c7fc9278f7677fb844"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b004_character_video_still_motion.mp4",
+      "bytes": 1281758,
+      "sha256": "61a5d885159ffdf32072b35a1114cd74820c803b7c2ca934c5ef2a14b3dfd38a"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b005_character_video_still_motion.mp4",
+      "bytes": 1188803,
+      "sha256": "b342e6ba3e4eba40f7f3dafc4392afaeccf7b87a0102115a105bc8ed88759b22"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_b006_announcer_visual_viz_mxc_cpu.mp4",
+      "bytes": 8713905,
+      "sha256": "9d967ef02f4f332d23adc8d46e42f7750957d08e8dfb66050099a3f1c8e22772"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_music_closing_001_music_visual_viz_green.mp4",
+      "bytes": 7794016,
+      "sha256": "59edf42f4939f4c8fa315135c940b13378dcaca695b5b30962a21fc54f5cc074"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/clips/shot_music_opening_001_music_visual_viz_green.mp4",
+      "bytes": 8334307,
+      "sha256": "aba871a9926592a37ca0484892c95aaa0d342754ee0881282e59837fc5165cc3"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/episode_canon.json",
+      "bytes": 872,
+      "sha256": "3f1ea43a2ce785edac37c938b2196621a3c82b7071f7300085c1d00c59074cdc"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent.mp4",
+      "bytes": 86995733,
+      "sha256": "399c4352c5aad06688fd858100deb062d0e174d45cfcb044c997562387f22ab7"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent.mp4.qa.json",
+      "bytes": 3014,
+      "sha256": "f0631f0b327dc84ca9b3cea280125a4de738d9933cb9bf61d64869dfbe99377e"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended.mp4",
+      "bytes": 86995733,
+      "sha256": "399c4352c5aad06688fd858100deb062d0e174d45cfcb044c997562387f22ab7"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended_captioned.ass",
+      "bytes": 71759,
+      "sha256": "28091a614dc15490ee8b0b3a3e07ed12fbf7ec4c9a1f9d8d4ac89416ac91c400"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended_captioned.mp4",
+      "bytes": 77064904,
+      "sha256": "cf7853f0574cbc829edd63ac5540bc5d35bc59d25205b4c5fc3987abcfa4497d"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3207669,
+      "sha256": "b722c2f67b23f3e1998d357adab7cd7721ca25dad4ebfacd5a18925585811078"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 80272258,
+      "sha256": "cc8788f9fbb6d697c7f1c71b0cbcd41fe78f8009f35ae59fb7c5072c94661cd0"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/signal_lost_the_tick_that_breaks_reason_20260908_005546_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 92164915,
+      "sha256": "884f4f95fdf13160b3108e48b647cd555c4f0916efbdf2067160f70a2dcf9131"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/stills/still_b002_dcf27c39f6da.png",
+      "bytes": 498473,
+      "sha256": "d536265041b610f1a7fcc53aaa4dfebe17a2aca64423663b89f6afa321acaf3b"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/stills/still_b003_a1687774c2b6.png",
+      "bytes": 522801,
+      "sha256": "ba45d199b24e09f965c05afc004281f72f955f03c1e948b052588d6a2683da61"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/stills/still_b004_bb0ca12dcbe1.png",
+      "bytes": 524739,
+      "sha256": "cb7f45addccfb2cc96f1391200a28f885c3eb9dd9f1f6728d886abf118a74284"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/stills/still_b005_8cbead939060.png",
+      "bytes": 515229,
+      "sha256": "6306bce9b0040883353f125b9a13800b233c2541488216caefef4c180686d063"
+    },
+    {
+      "path": "episodes/signal_lost_the_tick_that_breaks_reason_20260908_005546/stills/stills_manifest.json",
+      "bytes": 4487,
+      "sha256": "439ca56ce41317420e00aa3a80eb327c4dc774f49410ef8fec779fc0eaaad96c"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "07cae07ccaa4bacc09168b83c36578ff5acba54a131f6ee330637f9f3b073e51"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "dcde277832c08e70b7eff7f7a52db3bee205b825294851bc74e0f809b6535889"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/pending_20260908_025043_master.wav",
+      "bytes": 16413820,
+      "sha256": "28b7c04de22a27c3d6267f1acfc2f76df5a3eaca1f61d7d4e87c3c68bd2ddc74"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426.mp4",
+      "bytes": 15263136,
+      "sha256": "e3cd360785f0b4957ad3544a2a60c31e3aadcce2c950467ce1c0e06f8ded7404"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_ledger.json",
+      "bytes": 142315,
+      "sha256": "f039d306dbb2c36ad09ee3a91796bf8c5d908a775a179a767c0b8ca342e04ff1"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/audio/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_treatment.txt",
+      "bytes": 7707,
+      "sha256": "77a5f6c9757be236c68fc289b04efb54d42b266687599a8a8bdfa1c5c4b4e996"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b001_announcer_visual_ltx_8gb.mp4",
+      "bytes": 1142079,
+      "sha256": "c04c3e864c1f7914debc821a77922aa2c4aa6875a67e03a513157dcdfe19712b"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b002_character_video_ltx_8gb.mp4",
+      "bytes": 1306896,
+      "sha256": "22f67d8acd62357b553ae3066e59197206d362bee2f045107789c530b2407c9f"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b003_character_video_ltx_8gb.mp4",
+      "bytes": 1253211,
+      "sha256": "ba61b17299cd49649a0afda7b9304e7a4129ac5a9005c029f0944a432eb848c4"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b004_character_video_ltx_8gb.mp4",
+      "bytes": 1550698,
+      "sha256": "0c7bb143b5c7c0bfc8e639f07f4cfa4657b464cf16a1a06f8cfe4a51d6b95592"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b005_character_video_ltx_8gb.mp4",
+      "bytes": 2857052,
+      "sha256": "f05eb6d042164a522260a2c3e7de4c4db21fb80a0cc0d252139e87aeeb1a121e"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_b006_announcer_visual_ltx_8gb.mp4",
+      "bytes": 2267811,
+      "sha256": "a42ff98bfd413d4f7130235b92c570b3e92796184db2229deca9b2854ea9dc97"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_music_closing_001_music_visual_ltx_8gb.mp4",
+      "bytes": 1842861,
+      "sha256": "26417848b13736667ea5e17985a099642e6179c999ba1a7564c4d147a2cccb2f"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/clips/shot_music_opening_001_music_visual_ltx_8gb.mp4",
+      "bytes": 2476883,
+      "sha256": "f10f80ceccaa57bbd0211234d699db64673bfcf91d845d30a680ddf289858ab3"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/episode_canon.json",
+      "bytes": 669,
+      "sha256": "75b70338f021e5d328200aebc23de5a3e1042a88bea902d656daa60e5a04a578"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent.mp4",
+      "bytes": 80707946,
+      "sha256": "48e8205fb69f187a45e23d9c1b3cf54d92fbff3b36b5540f9549c244d90e8284"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent.mp4.qa.json",
+      "bytes": 2982,
+      "sha256": "69ce5d01e764d0f40d10054326778931fdecfaf6c4b7ed9bfc0abdaa5f3cbb84"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended.mp4",
+      "bytes": 80707946,
+      "sha256": "48e8205fb69f187a45e23d9c1b3cf54d92fbff3b36b5540f9549c244d90e8284"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended_captioned.ass",
+      "bytes": 76691,
+      "sha256": "56c08c555ac5b6a7a565ca6de666ef0db4bccc6c22278544ab48ddee702e9c8d"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended_captioned.mp4",
+      "bytes": 77544929,
+      "sha256": "543d1e557d538083388de2b9f988bf847c9924f71c47a9ef5287c37d47511cb3"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3757631,
+      "sha256": "b004328cb3a3bc7b8e272b6ff719da2e9cab17039c141d71fad0c356bc8e2666"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 81302347,
+      "sha256": "444d09cbb0ef1e312e63fe36da71737de7bb7a5930c8cd55fa50500dd04ae787"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 97726740,
+      "sha256": "fbfc222f8467c2db9a8c84b58c26e27191c50f8d1d06ca5a16ce52e94622fe0b"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b001_989e2b68cdf6.png",
+      "bytes": 821448,
+      "sha256": "c71b99cb4589fca497481175a1913a714f9b25c3a7e5cc6541b023cd71f09331"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b002_9f1aa99d98e5.png",
+      "bytes": 674990,
+      "sha256": "177c59fc42a9c01dde7fe4da73486559db9db5111827172d756e682dbbbd3aa3"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b003_258ab85e4bf9.png",
+      "bytes": 775014,
+      "sha256": "034602401dc6b60639098ab1cf2eb8ffd201f0d50d03425cbfaefe67fbc60315"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b004_a04617707d05.png",
+      "bytes": 673559,
+      "sha256": "e5c24e63a622febafc10e6da8df66f86508d4e3fb1ec0e01c2c0ab89360b184c"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b005_e9127fc1b844.png",
+      "bytes": 781567,
+      "sha256": "af80cac866017cc4514d7285b6783fe91e7909f9a0b6822552fe119b6d5bd2a6"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_b006_553a01b6c4a0.png",
+      "bytes": 845710,
+      "sha256": "39213dfbadd30fbc9705323dff8d4081592bab485bfc99a03e95c54c3fc376b0"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_music_closing_001_87229ffefd60.png",
+      "bytes": 815700,
+      "sha256": "b34938f834732489df6e910de10ea711f53ed528940d34a0b453eb687f78e14a"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/still_music_opening_001_6a3887f21d33.png",
+      "bytes": 821183,
+      "sha256": "452b08fd1e586ef6ec2a3e27c59224408c5a503f6cad8a6639ecc5d68060efd3"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_the_dead_wifes_phantom_20260908_030426/stills/stills_manifest.json",
+      "bytes": 8678,
+      "sha256": "af0b13dd2bd40228566307bc82c6103d60bf90d8371192f249c9a61616134661"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/music_cue_closing.wav",
+      "bytes": 704556,
+      "sha256": "06a4d2ce50cddd521f90756e8eeb1f19bad57ce525d585d99d6b74447de14372"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/music_cue_opening.wav",
+      "bytes": 1065004,
+      "sha256": "f1cf89f4c68804413d9ba97a35c06d436559c43b16777fc8302e07ff523f2915"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/pending_20260908_041422_master.wav",
+      "bytes": 11168636,
+      "sha256": "198d78169daf17df7418e023667c51ad3b6649b6b211b7fbd822849625b5677f"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/signal_lost_the_weight_of_what_was_broken_20260908_042821.mp4",
+      "bytes": 5104248,
+      "sha256": "22eb6fc728e821934e8bc4e7e2ac65ce56be6d0a3691ce1f41a6f10d0e92a5b7"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/signal_lost_the_weight_of_what_was_broken_20260908_042821_ledger.json",
+      "bytes": 125023,
+      "sha256": "481934f257ff494c3c04bb29a299268aa881d0388a72f16a360fb389d49c309e"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/audio/signal_lost_the_weight_of_what_was_broken_20260908_042821_treatment.txt",
+      "bytes": 6892,
+      "sha256": "311664ae175cb653ddc9cf888ff5766a4b7742204fbf811683b0c0a26e7bdfcb"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b001_announcer_visual_still_flat.mp4",
+      "bytes": 249226,
+      "sha256": "1386a8d111fae2855ded211abdeb3474a41f48f7b61b2752168f00af058d5f8e"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b002_character_video_still_word.mp4",
+      "bytes": 236215,
+      "sha256": "081d8e31da44afd29ac177377ec32cfc98687c831b3db33b50037c2eb46f91cf"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b003_character_video_still_word.mp4",
+      "bytes": 226620,
+      "sha256": "153d7fc920d3ef0d43f3dc251c723e38b60c7e88a232f5472b66902bf0894509"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b004_character_video_still_word.mp4",
+      "bytes": 302733,
+      "sha256": "e15494602d7afd40545440725784416fa90998f2e47e8d197442ff798a3464dc"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b005_character_video_still_word.mp4",
+      "bytes": 258161,
+      "sha256": "c9b92dcd1fbe35c15016d944445dc5d19709d267132e35a53a311ef4bfa8a17d"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_b006_announcer_visual_still_flat.mp4",
+      "bytes": 252002,
+      "sha256": "ce99052ff6f16004930fe10c51893e2210d920588d1630179a82dc6ab843bed9"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_music_closing_001_music_visual_still_pan.mp4",
+      "bytes": 1927205,
+      "sha256": "4083c44fed16c250de64718c00c63a9cea7e3683c22398ae325e26e1f5ac6546"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/clips/shot_music_opening_001_music_visual_still_pan.mp4",
+      "bytes": 2534837,
+      "sha256": "aee73128202654774fb05d3579e40f88d8e9b60e046808135e8763715120f8cc"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/episode_canon.json",
+      "bytes": 339,
+      "sha256": "72404b2744d0fc488f8e68338540dbbae10e645f79582802193018b569ce389e"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent.mp4",
+      "bytes": 11692853,
+      "sha256": "a07b09f39e3b80bc088cdb831ad4f3c0f6a01b1dc0381c81181037b8369c900f"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent.mp4.qa.json",
+      "bytes": 3004,
+      "sha256": "ac886d1670a39ad4affe846c11c76e7b403669f1a71e555773b851b1afc4dbf9"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended.mp4",
+      "bytes": 11692853,
+      "sha256": "a07b09f39e3b80bc088cdb831ad4f3c0f6a01b1dc0381c81181037b8369c900f"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended_captioned.ass",
+      "bytes": 72384,
+      "sha256": "54c2c6ea0c2531f1580a2206e615e4cd58620ba3d6a1250813eebac0a1b8aa2d"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended_captioned.mp4",
+      "bytes": 13081515,
+      "sha256": "afbf99b207523e5093b64ef7f8c5186e1a38c79f0d7b50363485349447e7e4e7"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended_captioned_credits.mp4",
+      "bytes": 3229124,
+      "sha256": "4aebb326756607f96ff9b374ac486d88d6702517392bce25792ac7a83eaead8a"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended_captioned_with_credits.mp4",
+      "bytes": 16310262,
+      "sha256": "859421e47e4efaf7a6c89bd20c1336f029299e67c026538278b75f06e1357b33"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/signal_lost_the_weight_of_what_was_broken_20260908_042821_silent_procgen_blended_captioned_with_credits_final.mp4",
+      "bytes": 27486783,
+      "sha256": "ad59d72739d0af83632baba63e29380c12ea293ce2b2978c094fd96f194f7dd4"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b001_edf20ec1b43a.png",
+      "bytes": 509311,
+      "sha256": "66e66727d6554dcb60c0f5306926e5d9ae03d0ebcc988b98ae20834de238ae8b"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b002_eaf7b86dbd43.png",
+      "bytes": 503765,
+      "sha256": "e64c497455d10c5cd7b88b3712b27c370088be7f5e19a8f8d100854ecb1398a3"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b003_7b155bc78005.png",
+      "bytes": 539142,
+      "sha256": "6e3ee153f4edcacd9969a012415d08fb0b4e57fe6df3350f5b425b2a3acdd0f2"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b004_7cde3539b6b1.png",
+      "bytes": 596999,
+      "sha256": "78159de602da04484e124086953bac1190a95f68d8b61d4810f5199655f38ca1"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b005_22bf9d1fb609.png",
+      "bytes": 559112,
+      "sha256": "ce05855025a07b25cd0d6220150832b77c364ca257585bc4406e181f15270acb"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_b006_3a94090c620a.png",
+      "bytes": 450505,
+      "sha256": "f776b9100eb6b782f05444265f58c9e7035738232cc38a6f4731cde878c30d7c"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_music_closing_001_3361f4aa4a67.png",
+      "bytes": 600018,
+      "sha256": "3ec87c9f17e51db0c40ba0fb961fed38b2f9b487f3f75eb9c53e34afa7b9c042"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/still_music_opening_001_39902f1e4d5f.png",
+      "bytes": 530646,
+      "sha256": "b43a32da9cd7d1f4523d5d7b79b147b692dfd4fee63ef47fb1af745cbf234298"
+    },
+    {
+      "path": "episodes/signal_lost_the_weight_of_what_was_broken_20260908_042821/stills/stills_manifest.json",
+      "bytes": 8477,
+      "sha256": "d044175d55bde2f50758221a88298b699a33ca2fb507d4b09c42dcba46ce6d31"
+    },
+    {
+      "path": "obs/a_sharp_note_that_wont_fade_20260908_012201__vart__lx8g__unk__koko__orig__q354b__sa3_final.mp4",
+      "bytes": 87569485,
+      "sha256": "dffc59f3a65029545ae35d41d81524bdf133ad21a5bbebd0263990c4f49bb121"
+    },
+    {
+      "path": "obs/lightning_mac_proof_2_20260909_100958__arch__adlt__none__koko__news__q354b__sa3_final.mp4",
+      "bytes": 164520569,
+      "sha256": "62c5efa298ee5360a656a4179f7344d41a0a33fdd6c2f0f82b25a6c92cb97e69"
+    },
+    {
+      "path": "obs/lightning_mac_proof_3_20260909_201719__anim__adlt__none__koko__orig__q354b__sa3_final.mp4",
+      "bytes": 69594947,
+      "sha256": "e4d15961be4f41bd2e44b587c0fa19d65d51926798f2eeeb3c15094fea6b6ab8"
+    },
+    {
+      "path": "obs/magnetic_pulse_20260907_201810__rfrc__vcam__none__koko__news__q354b__sa3_final.mp4",
+      "bytes": 226798856,
+      "sha256": "cbff2ab27c91e38301760e3ca71bf44753490ded385f306782dd90fc10a10091"
+    },
+    {
+      "path": "obs/the_lantern_burns_bright_while_slander_h_20260907_214731__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4",
+      "bytes": 159957842,
+      "sha256": "04bd76b083d0d85a0d784a9b5965dbd55757a536f84fbb258b6e04e3990d4dfe"
+    },
+    {
+      "path": "obs/the_lantern_burns_bright_while_slander_h_20260910_011724__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4",
+      "bytes": 159640319,
+      "sha256": "986d2cb71576ce8ac73cf14850f5fecd85dbf460dc7e4fc875c107348f8b88d4"
+    },
+    {
+      "path": "obs/the_tick_that_breaks_reason_20260908_005546__arch__stmo__unk__koko__pubd__q354b__sa3_final.mp4",
+      "bytes": 82647002,
+      "sha256": "5f73f45294bfd3f7010bd185f04d7026f48e319b549418d56425d3fd55d97723"
+    },
+    {
+      "path": "obs/the_weight_of_the_dead_wifes_phantom_20260908_030426__sbke__lx8g__unk__koko__sspr__q354b__sa3_final.mp4",
+      "bytes": 84578057,
+      "sha256": "fcd3e023492403d4785cf96fc048bae4a5387db368054c4148d6eb9cbb0c52f9"
+    },
+    {
+      "path": "obs/the_weight_of_what_was_broken_20260908_042821__cart__stwo__unk__koko__orig__q354b__sa3_final.mp4",
+      "bytes": 18405483,
+      "sha256": "290fd39011bc684f8b7535b0909bed9e0715b2009532dd1f8a3f925f9223be7e"
+    }
+  ],
+  "total_bytes": 7323247396,
+  "machine_shared_state_excluded": true,
+  "transfer_status": "not yet complete"
+}

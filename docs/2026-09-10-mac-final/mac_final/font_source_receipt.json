@@ -1,0 +1,22 @@
+{
+  "nodes/video_engine.py": {
+    "sha256": "84e5d6eb7f730101a397ef0ac929878e76e44a64c2c0b748a748d68ee71f117e",
+    "installed_identical": true
+  },
+  "nodes/_otr_captions.py": {
+    "sha256": "7857ac0e99d5198299ed49359c2805dd56ade05fa5853831f4297e15311bdaf0",
+    "installed_identical": true
+  },
+  "nodes/_otr_title_card.py": {
+    "sha256": "8e7140cf32d0610c68c6e62a6356234f88ac9a1861c1092169c274bdda9c1093",
+    "installed_identical": true
+  },
+  "nodes/otr_credits_roll.py": {
+    "sha256": "d1ab650d9d06791909aa7a31245016297e8bde82f19580873345b9f5751dde75",
+    "installed_identical": true
+  },
+  "nodes/_otr_shared/scope_draw.py": {
+    "sha256": "f3cd4c5a0e1d330f81fbf47d34bc917bda3ad0aeb19d91427d20223eb20a90f9",
+    "installed_identical": true
+  }
+}

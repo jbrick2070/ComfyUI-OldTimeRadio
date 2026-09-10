@@ -4,7 +4,9 @@
 and publishes to `otr/obs/`. First proven 2026-09-07 on a Mac mini M4, 16 GB,
 macOS 26.6.2, ComfyUI Desktop 0.34.6, Python 3.13, torch 2.12.1. Seven episodes
 had published from that machine by 2026-09-09, covering local stills, local
-video diffusion and a distilled AnimateDiff lane.
+video diffusion and a distilled AnimateDiff lane. At rental closeout on
+2026-09-10 there are **nine** published videos, including the final canonical
+font replay accepted by the operator. See `2026-09-10-mac-final/README.md`.
 
 This is the practical guide: what works, what will reboot your machine, what to
 install, and where to look next. It is written for the 16 GB machine it was
@@ -213,6 +215,19 @@ lands, in either direction.
   disarming it, deliberately, so a typo cannot silently turn the guard off.
 
 ### Guard 2: the AnimateDiff latent ceiling -- ONE measured point
+
+**2026-09-10 limit on that interpretation:** a fresh canonical Lightning run
+finished its 88-latent opening clip, then hit a Metal command-buffer
+`Insufficient Memory` error during the next clip's VAE decode after sampling
+100 latents at 512x288. Both counts are below 136. The process was observed
+near 22 GB physical footprint; no parallel test suite or model job was running.
+This run did not publish and was stopped. A count that previously survived
+does not guarantee sufficient memory after the rest of an episode has run.
+The error alone does not establish which allocation owns the retained memory,
+and this closeout did not change the guard or the rendering recipe. Raw
+evidence: `2026-09-10-mac-final/mac_final/server.log`. The earlier successful
+Lightning episodes remain valid receipts; reliable repeatability on this
+16 GB host is not established by them.
 
 `latent_ceiling_for_host` in the same module. The whole calibration is one
 bracket taken on 2026-09-09: **136 latents at 512x288 rendered; 160 rebooted
@@ -1070,7 +1085,26 @@ machines with no CUDA. Neither indicates a CUDA code path.
 
 ---
 
-## 10. Fonts: titles look wrong on macOS -- FIXED 2026-09-08
+## 10. Fonts: title fixes through 2026-09-09, live signoff 2026-09-10
+
+**Final visual check: accepted.** The canonical replay of *The Lantern Burns
+Bright While Slander Hides* published on 2026-09-10 with the current font
+sources, centered two-line title, SDH captions, scopes, and credits. The
+operator explicitly accepted the title and credits and closed the Mac check.
+The final proof uses `viz_green`, `viz_mxc_cpu`, and `viz_camera`, with the
+original frozen script and audio; it is not a fresh Lightning or writer/audio
+qualification. The video, checksums and before/after frames are recorded in
+`2026-09-10-mac-final/README.md`.
+
+The 2026-09-08 family-name fix below was only the first half. On 2026-09-09,
+`video_engine._load_font` was also found to have no macOS font candidate,
+silently measuring a tiny bitmap fallback while libass rendered large text.
+That broke the centering arithmetic. Real scalable font resolution, cache
+identity and the scope-label resolver were fixed before this replay
+(PBUG-20260909-04 / Bible 12.159). Changing the ASS family name alone did not
+close that defect.
+
+### First stage: the ASS family name (2026-09-08)
 
 `Consolas` is **absent** from macOS, and `_otr_captions.py` named it in TWO
 places -- the `otr_crt` caption style (a QA variant) and, the one that shipped
@@ -1103,10 +1137,11 @@ isn't reading the style you think it is.
 renderer cannot find does not error. libass asks fontconfig for a substitute,
 gets a proportional sans, and draws it. There is no warning in any log.
 
-**Still open:** `Monaco.ttf` IS present at `/System/Library/Fonts/Monaco.ttf` on
-macOS 26.6.2, so the credits-roll font search does resolve, and the
-overlapping-columns symptom has a **different, still-undiagnosed cause**. Do not
-assume this fix addressed it.
+**Credits disposition, 2026-09-10:** the font search already resolves a real
+macOS face. Long strings can still overlap columns in the inspected credits
+frame; the operator viewed it and said the credits look good. No layout change
+was made, and this is not a remaining Mac signoff gate. The separate shared
+font-resolver design remains in GO_FORWARD row 3.8.
 
 ---
 

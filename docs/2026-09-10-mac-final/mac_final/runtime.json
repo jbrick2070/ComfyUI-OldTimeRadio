@@ -1,0 +1,21 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python": "3.13.12 (main, Feb 12 2026, 01:06:02) [Clang 21.1.4 ]",
+  "git_head": "6f9a5586cff084489fbb0aea257eb1f6761af615",
+  "versions": {
+    "torch": "2.12.1",
+    "transformers": "5.16.1",
+    "Pillow": "12.3.0",
+    "numpy": "2.5.2",
+    "kokoro-onnx": "0.6.1",
+    "spandrel": "0.4.2"
+  },
+  "fonts": {
+    "/System/Library/Fonts/Menlo.ttc": "dc256e0b39c2a6fec947129d421fef41b8b429f58f9b6e5d1b148c87f775c1f6",
+    "/System/Library/Fonts/Supplemental/Arial.ttf": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9"
+  },
+  "server_pid": 71152,
+  "prompt_id": "040b11ea-f572-4545-afe3-53a512505e00",
+  "output_root": "/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output",
+  "server_log": "/Users/rentamac/Documents/otr-mac/logs/mac_final/server.log"
+}
