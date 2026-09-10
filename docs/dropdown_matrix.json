@@ -387,7 +387,7 @@
     "nv16": "fits",
     "nv8": "fits"
    },
-   "note": "Measured on this M4 2026-09-09 (tests/test_upscale_mps_receipt.py): RealESRGAN_x2plus forward passes on mps in 0.51 s, bit-exact against CPU on the raw forward, and the engine's load -> upscale_frames loop ran 1.06 s on MPS vs 8.37 s on CPU. But those were 64x64 and 288x512 micro-clips: NONE of the seven published Mac episodes ran the upscale stage at all -- every one published with upscale_engine=off. Sustaining ESRGAN over 2,000+ frames in OTR_SilentComposite is unproven here, and on NVIDIA that stage has taken over 105 minutes (docs/SOAK_LEG_GUIDE.md).",
+   "note": "SUSTAINED-LOAD MEASURED on this M4 2026-09-09, which was the largest untested Mac gap: none of the seven published episodes ran the upscale stage at all (every one used upscale_engine=off) and the only Metal receipt covered 2 frames. Driven 96 frames at production canvas (512x288 -> 1024x576) through the engine's own load -> upscale_frames path: reserved memory DEAD FLAT at 1.13 GB from frame 24 to 96, footprint flat at 1.54 GB, chunk time flat at 4.17-4.19 s (no thermal drift), and 0.07 GB after empty_cache. 0.53 s/frame projects to ~24 min for a 2,736-frame episode. IT DOES NOT RATCHET, unlike bark and musicgen -- a fixed-shape convolutional forward has no growing state, so the Metal allocator behaviour that costs those two is absent here. Still not `proven`: no published episode has run it, so wall-clock inside a real OTR_SilentComposite pass is projected, not observed.",
    "size_gb": 0.1
   },
   "stable_audio_3": {

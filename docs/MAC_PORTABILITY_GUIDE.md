@@ -1323,6 +1323,36 @@ and whether anything still holds a reference when it is.
 
 ---
 
+### What ratchets the Metal allocator, and what does not
+
+Three engines were measured end to end on this M4 on 2026-09-09, and the
+pattern is sharper than "long loops are bad on Metal" -- which is what a first
+reading of the first two suggested, and it is wrong.
+
+| engine | live tensors | reserved peak | returns? |
+| --- | --- | --- | --- |
+| `musicgen` (2.2 GB) | 2.20 GB | **15.88 GB** (7.1x weights) | yes, to 0.05 GB |
+| `bark` (4.2 GB) | 4.18 GB | **16.63 GB** (4x weights) | **NO -- 10.85 GB stranded** |
+| `spandrel_esrgan` (0.06 GB) | -- | **1.13 GB, FLAT over 96 frames** | yes, to 0.07 GB |
+
+**The dividing line is growing state, not loop length.** musicgen and bark are
+AUTOREGRESSIVE: each step's KV cache is larger than the last, so the allocator
+keeps requesting bigger blocks and the pool ratchets far past the weights. The
+upscale stage runs the LONGEST loop in the pipeline -- thousands of frames --
+and every iteration is the same fixed-shape convolutional forward, so its pool
+is flat from the first chunk to the last.
+
+So the rule for sizing a Mac render is: **price the autoregressive stages
+(writer, voice, music) against the whole machine, and the fixed-shape stages
+(upscale, the procedural visualizers) against their weights.** A long loop is
+not by itself a memory risk.
+
+Only bark leaves memory STRANDED -- a second explicit `torch.mps.empty_cache()`
+returned none of its 10.85 GB. musicgen's identical-looking ratchet gives it all
+back. That difference, not the growth, is what makes bark unusable here.
+
+---
+
 ### The `llm_vram_ceiling_gb` widget does NOTHING on Apple Silicon
 
 **Set it to whatever you like; on `mps` it cannot refuse any writer in the
