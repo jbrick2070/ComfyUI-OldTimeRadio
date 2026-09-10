@@ -354,7 +354,7 @@
     "nv16": "proven",
     "nv8": "proven"
    },
-   "note": "Measured on this M4 2026-09-07 -- mps 14.1 s vs cpu 14.7 s for 256 tokens, flatness 0.134/0.103, finite. No published episode has used it: all seven Mac episodes used stable_audio_3. Its CC-BY-NC licence is why it is not the default.",
+   "note": "Re-measured end to end on this M4 2026-09-09 through the real adapter (generate_clip, guidance_scale 3.0): 5.1 s of audio in 10.3 s on mps -- 2.1x realtime, and 1.7x FASTER than cpu (17.3 s). Structured audio on both devices. Memory ratchets hard but recovers completely: live tensors stay at 2.20 GB while the MPS reserved pool grows to 15.88 GB (7.1x the weights), then returns to 0.05 GB on empty_cache -- unlike bark, which leaves 10.85 GB stranded. Still MEASURED not PROVEN: no published episode has used it, all seven used stable_audio_3, and its CC-BY-NC licence is why it is not a default candidate. NO QUALITY CLAIM IS MADE HERE: spectral flatness in this repo is a noise detector (~0.43 = noise), not a quality score, and readings vary with prompt and seed -- ours read below the noise floor on both devices and that is all it establishes.",
    "size_gb": 2.2
   },
   "off": {
