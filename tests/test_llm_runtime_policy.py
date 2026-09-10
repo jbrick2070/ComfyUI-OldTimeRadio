@@ -336,15 +336,14 @@ def test_writer_stamps_llm_policy_into_meta_source():
     assert 'meta["llm_policy"]' in src
 
 
-def test_downstream_llm_consumers_thread_the_ledger_policy():
-    """FreezeCascade + shot-lock request_slot calls carry
-    policy=policy_from_meta(...) -- the post-ship audit's MUST-FIX."""
+def test_shot_lock_threads_the_ledger_policy():
+    """Shot-lock's request_slot call carries policy=policy_from_meta(...)
+    -- the post-ship audit's MUST-FIX for the live generating consumer.
+    The freeze cascade no longer requests a slot at all; its
+    no-acquisition proof lives in tests/test_freeze_policy_readonly.py."""
     import pathlib
 
     root = pathlib.Path(__file__).resolve().parents[1] / "nodes"
-    lfc = (root / "OTR_LedgerFreezeCascade.py").read_text(encoding="utf-8")
-    assert "policy_from_meta" in lfc
-    assert "policy=lfc_policy" in lfc
     sl = (root / "otr_shot_lock.py").read_text(encoding="utf-8")
     assert "policy=policy_from_meta(meta)" in sl
 

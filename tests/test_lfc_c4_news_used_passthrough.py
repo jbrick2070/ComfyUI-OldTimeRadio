@@ -41,6 +41,15 @@ def _disposition():
     )
 
 
+def _poison(counter, name):
+    """Fail-fast stand-in: the freeze must never reach the loader's
+    acquisition entry points, so a call is counted and raises."""
+    def sentinel(*args, **kwargs):
+        counter[name] += 1
+        raise AssertionError(f"freeze must not call {name}")
+    return sentinel
+
+
 def _run_cascade(incoming_news_used: str):
     from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
     from nodes import _otr_freeze_cascade as cascade
@@ -48,6 +57,7 @@ def _run_cascade(incoming_news_used: str):
     from nodes import production_ledger
 
     led = _ledger()
+    acquisition = {"request_slot": 0, "make_generate_fn": 0}
     with (
         patch.object(production_ledger, "has_current_ledger", return_value=True),
         patch.object(production_ledger, "peek_ledger", return_value=led),
@@ -56,26 +66,21 @@ def _run_cascade(incoming_news_used: str):
             "assemble_script_text_from_ledger",
             return_value="rebuilt script text",
         ),
+        patch.object(loader, "request_slot", _poison(acquisition, "request_slot")),
         patch.object(
-            loader,
-            "request_slot",
-            return_value={"model": object(), "tokenizer": object()},
-        ),
-        patch.object(
-            loader,
-            "make_generate_fn",
-            return_value=lambda *args, **kwargs: "",
-        ),
+            loader, "make_generate_fn", _poison(acquisition, "make_generate_fn")),
         patch.object(loader, "unload_llm_if_local_resident", return_value=True),
         patch.object(cascade, "run_freeze_cascade", return_value=_disposition()),
     ):
-        return OTR_LedgerFreezeCascade().run(
+        result = OTR_LedgerFreezeCascade().run(
             script_text="incoming",
             script_json="{}",
             news_used=incoming_news_used,
             estimated_minutes=15,
             technical_model="mistralai/Mistral-Nemo-Instruct-2407",
         )
+    assert acquisition == {"request_slot": 0, "make_generate_fn": 0}, acquisition
+    return result
 
 
 @pytest.mark.parametrize(

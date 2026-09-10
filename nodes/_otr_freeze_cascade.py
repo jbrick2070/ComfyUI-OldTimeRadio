@@ -718,12 +718,15 @@ def run_freeze_cascade(
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
 ) -> FreezeDisposition:
-    """Validate, optionally clean narrow safety, then freeze the ledger.
+    """Validate, run the readiness passes, then freeze the ledger.
 
-    Phase 0 records a deterministic preflight. Inline banks receive at most one
-    atomic safety-only patch set; producer-owned banks are verified read-only.
-    Phase 7/8 readiness and Phase 10 structural/safety gates then run. Advisory
-    word, visual, style, craft, and quality observations never affect liveness.
+    Deterministic end to end. Phase 0 records a preflight audit. The
+    same-story safety cleanup pass is retired (2026-08-05): inline banks stamp
+    a retired receipt with zero edits and producer-owned banks stamp their
+    not-applicable receipt, so ``generate_fn`` is accepted for the public
+    signature and never invoked. Phase 7/8 readiness and Phase 10 structural
+    gates then run. Advisory word, visual, style, craft, and quality
+    observations never affect liveness.
     """
     ledger_data = led.data
 

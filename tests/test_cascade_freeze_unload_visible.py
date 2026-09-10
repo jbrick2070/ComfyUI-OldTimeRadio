@@ -40,6 +40,15 @@ def _disposition():
     )
 
 
+def _poison(counter, name):
+    """Fail-fast stand-in: the freeze must never reach the loader's
+    acquisition entry points, so a call is counted and raises."""
+    def sentinel(*args, **kwargs):
+        counter[name] += 1
+        raise AssertionError(f"freeze must not call {name}")
+    return sentinel
+
+
 def _run_node(*, unload_error=None):
     from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
     from nodes import _otr_freeze_cascade as cascade
@@ -48,6 +57,7 @@ def _run_node(*, unload_error=None):
 
     led = _ledger_obj()
     unload = MagicMock(side_effect=unload_error)
+    acquisition = {"request_slot": 0, "make_generate_fn": 0}
     with (
         patch.object(ledger_module, "has_current_ledger", return_value=True),
         patch.object(ledger_module, "peek_ledger", return_value=led),
@@ -56,16 +66,9 @@ def _run_node(*, unload_error=None):
             "assemble_script_text_from_ledger",
             return_value="rebuilt script text",
         ),
+        patch.object(loader, "request_slot", _poison(acquisition, "request_slot")),
         patch.object(
-            loader,
-            "request_slot",
-            return_value={"model": object(), "tokenizer": object()},
-        ),
-        patch.object(
-            loader,
-            "make_generate_fn",
-            return_value=lambda *args, **kwargs: "",
-        ),
+            loader, "make_generate_fn", _poison(acquisition, "make_generate_fn")),
         patch.object(
             loader,
             "unload_llm_if_local_resident",
@@ -84,6 +87,7 @@ def _run_node(*, unload_error=None):
             estimated_minutes=15,
             technical_model="mistralai/Mistral-Nemo-Instruct-2407",
         )
+    assert acquisition == {"request_slot": 0, "make_generate_fn": 0}, acquisition
     return led, unload, result
 
 

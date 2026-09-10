@@ -1,8 +1,9 @@
-"""ComfyUI node for final ledger safety, readiness, and freeze.
+"""ComfyUI node for deterministic ledger validation, readiness, and freeze.
 
-The node preserves the writer's accepted story. It permits only bounded,
-same-story cleanup of the narrow terminal safety policy; word length, visual
-vocabulary, style, craft, and quality never affect publication.
+The node preserves the writer's accepted story: it audits structure, runs the
+audio/video readiness passes, freezes the ledger and releases any local LLM
+still resident. It acquires no model and rewrites no content; word length,
+visual vocabulary, style, craft, and quality never affect publication.
 """
 
 from __future__ import annotations
@@ -133,21 +134,25 @@ class OTR_LedgerFreezeCascade:
                     ),
                 }),
                 # S30 B3: model_id widget + 6 phase-toggle widgets
-                # DELETED. Reviewer passes (Phase 1 / 2 / 9) consume
-                # the writer's broadcast `technical_model` socket via
-                # `technical_model` input below. Phase 3/4/4.5/5/6
-                # toggles were all defaulted OFF and the surrounding
-                # standalone LFC nodes go away in B4 -- the cascade
-                # never invoked those phases in any shipped workflow.
+                # DELETED. The writer's broadcast `technical_model`
+                # socket below is kept for graph compatibility: the
+                # cascade validates only that a non-empty id arrived
+                # (an unwired socket delivers the empty default) and
+                # acquires nothing (the reviewer passes that once
+                # consumed it are gone). Phase 3/4/4.5/5/6 toggles were all
+                # defaulted OFF and the surrounding standalone LFC
+                # nodes went away in B4 -- the cascade never invoked
+                # those phases in any shipped workflow.
                 "technical_model": ("STRING", {
                     "forceInput": True,
                     "tooltip": (
-                        "Resolved technical_model id from the writer's "
-                        "broadcast output. No local widget; the "
-                        "cascade uses it only for bounded same-story "
-                        "safety cleanup on inline banks. Validated via "
+                        "Technical model ID from the writer. Required "
+                        "for compatibility on a normal current-ledger "
+                        "run; freeze does not acquire or generate with "
+                        "this model. Validated via "
                         "_otr_model_inputs.require_model -- an unwired "
-                        "socket raises MissingModelInputError loud."
+                        "or blank socket raises MissingModelInputError "
+                        "loud."
                     ),
                 }),
                 "enable_phase_7_audio_readiness": ("BOOLEAN", {
@@ -210,7 +215,7 @@ class OTR_LedgerFreezeCascade:
 
         # CANONICAL REPLAY (campaign item 0): the bundle's ledger is already
         # frozen (its freeze_timestamp is kept byte-identical by the import), so
-        # the cascade neither loads the technical LLM nor re-mints the receipt.
+        # the cascade neither validates the socket nor re-mints the receipt.
         # Same JSON on script_json and v2_ledger_json, verdict "replay".
         try:
             _rmeta = (json.loads(script_json or "{}") or {}).get("meta") or {}
@@ -262,29 +267,14 @@ class OTR_LedgerFreezeCascade:
                 _no_ledger_error_json(script_json),
             )
 
-        # Resolve the wired technical model for the one permitted inline
-        # content mutation: atomic same-story safety cleanup.
-        resolved_technical_id = _OTRMI.require_model(
-            technical_model, slot="technical",
-        )
-        from ._otr_shared.llm_policy import policy_from_meta
-        from ._otr_gguf_backend import load_config_from_meta
-        lfc_data = getattr(led, "data", led)
-        lfc_meta = (
-            (lfc_data.get("meta") or {})
-            if isinstance(lfc_data, dict)
-            else {}
-        )
-        lfc_policy = policy_from_meta(lfc_meta)
-        lfc_load_config = load_config_from_meta(lfc_meta, "technical")
-        # LLM slot: technical -- bounded same-story safety cleanup only.
-        cache_entry = _OTRML.request_slot(
-            "technical",
-            resolved_technical_id,
-            policy=lfc_policy,
-            load_config=lfc_load_config,
-        )
-        generate_fn = _OTRML.make_generate_fn(cache_entry)
+        # The technical id is validated for graph compatibility only:
+        # require_model rejects a blank/whitespace value, which is what an
+        # unwired socket delivers; it checks neither catalog membership nor
+        # connectivity. The cascade is deterministic and never generates with
+        # this model, so nothing is acquired here. The slot request that used to sit at this
+        # point fed a callback the orchestrator has not invoked since the
+        # same-story cleanup was retired (2026-08-05); removed 2026-09-10.
+        _OTRMI.require_model(technical_model, slot="technical")
 
         log.info(
             "[OTR_LedgerFreezeCascade] running cascade on ledger %s "
@@ -309,9 +299,11 @@ class OTR_LedgerFreezeCascade:
             # S30 B3: Phase 3/4/4.5/5/6 toggles deleted at the
             # cascade-NODE surface. The orchestrator's defaults
             # (all OFF) carry them; B4 deletes the underlying
-            # phase functions from _otr_lfc.py.
+            # phase functions from _otr_lfc.py. The first positional
+            # argument is the orchestrator's public generation
+            # callback; it is never invoked, so no callable is built.
             disp = _LFC_ORCH.run_freeze_cascade(
-                generate_fn,
+                None,
                 led,
                 enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
                 enable_phase_8_video_readiness=enable_phase_8_video_readiness,
@@ -333,12 +325,12 @@ class OTR_LedgerFreezeCascade:
                 ),
             )
 
-            # Serialize + rebuild WHILE the model is still loaded.
-            # Neither touches torch tensors (assemble_script_text_from_ledger
-            # is pure dict/string work; json.dumps walks the meta tree)
-            # so placement order is safe -- the model could already be
-            # released here. We keep the order for cleanliness; the
-            # finally-block unload is the actual VRAM-safe gate.
+            # First serialization + script rebuild, BEFORE the final
+            # unload gate in the finally block. Neither touches torch
+            # tensors (assemble_script_text_from_ledger is pure
+            # dict/string work; json.dumps walks the meta tree). The
+            # second serialization after the finally block carries the
+            # unload receipt when it succeeds.
             try:
                 updated_script_json = json.dumps(
                     led.data, indent=2, ensure_ascii=False,
@@ -364,14 +356,17 @@ class OTR_LedgerFreezeCascade:
                 )
                 rebuilt_script_text = script_text or ""
         finally:
-            # B14 (commit 12.5) + B1 (commit 12.12): unload Mistral-
-            # Nemo before downstream visual nodes load. Wrapped in
-            # best-effort try/except -- an unload failure logs at
-            # WARNING + stamps meta.freeze_unload_ok=False so the
-            # next visual node can branch on the stamp instead of
-            # OOM-ing on top of a leaked cache. The cascade itself
-            # still returns its verdict; the downstream visual
-            # nodes decide what to do about a failed unload.
+            # B14 (commit 12.5) + B1 (commit 12.12): release any local
+            # LLM still resident before downstream visual nodes load.
+            # The freeze acquires nothing itself, but the writer's own
+            # teardown can be skipped (OTR_WRITER_UNLOAD_AFTER_SCRIPT=0),
+            # so this conditional gate stays. Wrapped in best-effort
+            # try/except -- an unload failure logs at WARNING + stamps
+            # meta.freeze_unload_ok=False so the next visual node can
+            # branch on the stamp instead of OOM-ing on top of a leaked
+            # cache. The cascade itself still returns its verdict; the
+            # downstream visual nodes decide what to do about a failed
+            # unload.
             try:
                 _OTRML.unload_llm_if_local_resident()
             except Exception as exc:  # noqa: BLE001
@@ -393,13 +388,13 @@ class OTR_LedgerFreezeCascade:
             except Exception:  # noqa: BLE001
                 pass
 
-        # S34 B2 (2026-05-15): reserialize led.data so the
+        # S34 B2 (2026-05-15): second serialization, so the
         # freeze_unload_ok stamp set in the finally block above is
-        # visible to downstream JSON consumers. The earlier
-        # serialization at L346 happened BEFORE the stamp; without
-        # this reserialization, the comment at L374 claiming "the
-        # next visual node can branch on the stamp" is false because
-        # the JSON they receive doesn't contain it.
+        # visible to downstream JSON consumers. The first
+        # serialization preceded the unload and lacks the stamp; if
+        # this one fails, the first result (or the incoming JSON when
+        # both failed) is returned and the stamp may not reach the
+        # wire.
         try:
             updated_script_json = json.dumps(
                 led.data, indent=2, ensure_ascii=False,
