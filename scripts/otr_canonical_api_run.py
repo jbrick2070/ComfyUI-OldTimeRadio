@@ -381,8 +381,11 @@ def main(argv: list[str] | None = None) -> int:
                              "own and the TITLE CARD shows exactly this. For "
                              "labelling a proof or soak run, use --run-label.")
     parser.add_argument("--run-label", default=None, dest="run_label",
-                        help="a name for THIS RUN, for the console and the "
-                             "receipt. Deliberately does NOT touch "
+                        help="a name for THIS RUN, echoed to the CONSOLE "
+                             "only -- this script writes no receipt; a "
+                             "wrapping harness captures the echo and "
+                             "builds its own, as otr_gpu_soak_matrix.py "
+                             "does. Deliberately does NOT touch "
                              "episode_title, so the writer still names the "
                              "episode and the title card shows the story's "
                              "name rather than your harness label.")

@@ -79,8 +79,27 @@ CRT_CYAN      = (0, 200, 200)      # cyan accent
 # -----------------------------------------------------------------------------
 _FONT_CACHE = {}
 
+#: Set once the bitmap fallback has been reported. `_FONT_CACHE` is keyed by
+#: SIZE, and the title dock re-measures at every integer size between the hero
+#: and the ident as it shrinks -- so a per-size warning is a 30-60 line burst
+#: per episode on a font-less host, not the single line it looks like.
+_WARNED_BITMAP_FALLBACK = False
+
+
 def _load_font(size):
-    """Load a monospace TTF font. Cached per size."""
+    """Load a monospace TTF font. Cached per size.
+
+    ``OTR_VIDEO_FONT`` is an explicit PATH and wins outright, mirroring
+    ``otr_credits_roll``'s ``OTR_CREDITS_FONT``. It exists because this
+    function has a partner it cannot see: ``_otr_captions.mono_font()`` picks
+    the family libass DRAWS with (and honours ``OTR_CAPTION_MONO_FONT``) while
+    this picks the face PIL MEASURES with. Overriding one and not the other
+    re-opens the exact measure/draw disagreement documented in the darwin
+    branch below, so an operator who sets the caption family should set this to
+    the matching file. Bare family names are deliberately not accepted -- PIL
+    does not resolve them reliably, which is why every candidate is a path.
+    """
+    global _WARNED_BITMAP_FALLBACK
     if size in _FONT_CACHE:
         return _FONT_CACHE[size]
 
@@ -92,11 +111,43 @@ def _load_font(size):
             os.path.join(fd, "cour.ttf"),
             os.path.join(fd, "lucon.ttf"),
         ]
+    elif sys.platform == "darwin":
+        # These MUST resolve to the family `_otr_captions._MONO_BY_PLATFORM`
+        # declares for darwin ("Menlo"), because this function and that map are
+        # the MEASURE and the DRAW halves of ONE operation. `_otr_title_card`
+        # centres the hero with `x = centre - tw // 2` using the width measured
+        # HERE, and `_otr_captions` then emits that x as an ASS `\pos()` under
+        # Alignment 7 (top-LEFT) -- so libass plants the left edge exactly where
+        # this measurement said to, drawing in ITS font at the real size.
+        # Nothing anywhere passes a "centre" flag; the arithmetic is the whole
+        # mechanism, and it is only as good as `tw`.
+        #
+        # WHY THIS BRANCH EXISTS (title cards shipped mis-centred until
+        # 2026-09-09). Neither Linux path below is present on macOS, so every
+        # requested size fell through to `ImageFont.load_default()` -- a ~10px
+        # bitmap face regardless of the size asked for. At title size 96 that
+        # reports tw=131 for a 21-character string instead of 1218, so the
+        # centring subtraction yields x=895 and the real Menlo glyphs run from
+        # 895 to 2113 on a 1920-wide frame: hard against the right edge and
+        # clipped. The operator saw it as "flush right, not centre".
+        #
+        # WINDOWS WAS NEVER AFFECTED and is untouched by this change: its own
+        # branch above finds consola.ttf, measures tw=1218-ish, and centres
+        # correctly -- which is precisely why the defect read as Mac-only.
+        candidates = [
+            "/System/Library/Fonts/Menlo.ttc",
+            "/System/Library/Fonts/Monaco.ttf",
+            "/System/Library/Fonts/Supplemental/Andale Mono.ttf",
+        ]
     else:
         candidates = [
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
         ]
+
+    explicit = (otr_env.get("OTR_VIDEO_FONT") or "").strip()
+    if explicit:
+        candidates = [explicit] + candidates
 
     for path in candidates:
         if os.path.isfile(path):
@@ -107,6 +158,20 @@ def _load_font(size):
             except OSError:
                 pass
 
+    # The bitmap fallback IGNORES `size`, so anything measured through it is
+    # wrong by roughly an order of magnitude at title sizes and silently
+    # mis-places every centred element. That silence is what let the macOS gap
+    # above survive to a published episode. Announced ONCE per process --
+    # see _WARNED_BITMAP_FALLBACK -- so one real problem stays one line.
+    if not _WARNED_BITMAP_FALLBACK:
+        _WARNED_BITMAP_FALLBACK = True
+        log.warning(
+            "OTR: no monospace TTF found on platform %s (first miss at size "
+            "%d) -- falling back to PIL's bitmap default, which IGNORES the "
+            "requested size. Text MEASUREMENT will be wrong and centred text "
+            "will be mis-placed. Set OTR_VIDEO_FONT to a monospace TTF path, "
+            "matching OTR_CAPTION_MONO_FONT if that is also set.",
+            sys.platform, size)
     font = ImageFont.load_default()
     _FONT_CACHE[size] = font
     return font
