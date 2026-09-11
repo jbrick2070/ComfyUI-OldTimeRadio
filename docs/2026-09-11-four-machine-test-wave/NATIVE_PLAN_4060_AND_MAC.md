@@ -20,13 +20,14 @@ written to be self-contained: do not assume the reader has seen this conversatio
 
 ## Before anything: the frozen head, and one flag
 
-    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
+    WAVE HEAD: 3e692dc5   (frozen 2026-09-11)
 
-    This line gets a real commit hash when coding stops. Until then, no lane
-    starts. When it is filled in: report the HEAD you ACTUALLY pulled, never
-    check out the frozen hash, and if you pull a commit that touches `nodes/`,
-    `scripts/` or `workflows/` AFTER the hash on that line, STOP and phone home
-    -- that would mean the freeze was broken.
+    Report the HEAD you ACTUALLY pulled -- it will legitimately be LATER than
+    this hash, because documentation commits keep landing after a CODE freeze
+    and that is expected. Never check out the frozen hash. But if you pull a
+    commit that touches `nodes/`, `scripts/` or `workflows/` after 3e692dc5,
+    STOP and phone home: that would mean the freeze was broken and the four
+    machines are no longer qualifying the same code.
 
 **PASS `--timeout 0` ON EVERY LEG. This is the single most likely way to
 manufacture a false failure tonight.** `--timeout` defaults to 5400 seconds --

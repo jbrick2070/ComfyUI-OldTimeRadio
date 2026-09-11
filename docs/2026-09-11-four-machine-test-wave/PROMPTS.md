@@ -16,13 +16,17 @@ list is one fix plus the platform, which is a single bisect instead of six. So t
 frozen hash is written here before the wave starts, and nothing touching the render
 path lands after it:
 
-    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
+    WAVE HEAD: 3e692dc5   (frozen 2026-09-11, and this one is real)
 
-    Operator directive 2026-09-11: NO TESTING UNTIL ALL CODING IS COMPLETE.
-    The wave does not run on a partial tree. An earlier freeze at f5f40bd4 was
-    cut before the coding was finished and is WITHDRAWN -- it is behind the
-    code and qualifying it would prove nothing about what ships.
-    This line gets a real hash when coding stops. Until then, no lane starts.
+    Coding is complete. What remains in GO_FORWARD is blocked on an arc, on an
+    operator ruling, or on evidence this wave itself produces, and each row
+    states which. Four crash/durability fixes and the repair-turn budget are in
+    this head; so is the deterministic Ghost crux resolver, which no episode has
+    ever rendered through -- see the suspect list.
+
+    THE EARLIER f5f40bd4 FREEZE IS WITHDRAWN, not superseded quietly: it was cut
+    before coding finished and was broken within the hour by a074f56e. If you
+    have that hash written down anywhere, discard it.
 
     WHEN IT IS FROZEN, IT WILL BE A CODE FREEZE, NOT A COMMIT FREEZE. Commits
     after the hash will be documentation only -- this file's own freeze line
