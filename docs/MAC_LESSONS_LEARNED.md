@@ -43,6 +43,14 @@ open, it says so. Companion entries: PBUG-20260907-05 through -08 in
 `PROD_BUG_LOG.md`; the plan-level version is the 2026-09-07 section of
 `GO_FORWARD_PLAN.md`.
 
+**SCOPE WARNING: these are results for this named M4 / 16 GB host, not a claim
+about every Mac.** A model marked OOM, unsafe or not offered here may work on a
+Mac with more unified memory, a different macOS/PyTorch generation, or a future
+optimized backend. Keep platform capability separate from this machine's
+qualification status: `failed on this Mac` does not mean `cannot run on
+macOS`. The removed local caches are likewise a storage choice for this host,
+not a cross-platform retirement of those models.
+
 ---
 
 ## 1. Does MPS actually execute? YES -- for the writer.
@@ -113,7 +121,7 @@ apart** between CUDA and Metal.
 
 ---
 
-## 3. 16 GB unified is the wall, and no dropdown gets you under it
+## 3. On this host, 16 GB unified is the wall and no tested dropdown gets under it
 
 | | |
 | --- | --- |
@@ -339,12 +347,14 @@ the same boundary.  The macOS kernel then supplied the missing evidence:
 process exit and absent Python traceback.
 
 Qwen3.5-4B on MPS therefore is not safe for this particular My Story plus
-per-line cleanup workload on the measured 16 GB host, even though shorter
-canonical episodes previously published with the same writer.  Do not repeat
-the identical route after this receipt; select a smaller Mac-offered writer and
-keep the remaining proven Mac dropdowns, then require a real `otr/obs/`
-publication before changing the matrix.  Process residency across many local
-model calls matters more here than the model's static weight size.
+per-line cleanup workload on the measured M4 / 16 GB host, even though shorter
+canonical episodes previously published with the same writer.  This does not
+establish an all-Mac limit: a higher-memory Apple Silicon machine may complete
+the same route, and no such machine was tested here.  Do not repeat the
+identical route on this host after this receipt; select a smaller Mac-offered
+writer and keep the remaining proven Mac dropdowns, then require a real
+`otr/obs/` publication before changing the matrix.  Process residency across
+many local model calls matters more here than the model's static weight size.
 
 The immediate smaller-writer fallback also failed closed, for a different and
 useful reason.  `unsloth/Llama-3.2-3B-Instruct` was not already cached; its
