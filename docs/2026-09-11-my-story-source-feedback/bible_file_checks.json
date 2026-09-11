@@ -1,0 +1,12 @@
+[
+  {
+    "path": "BUG_BIBLE.yaml",
+    "sha256": "14c1feec17e6e85865223a96399ce4c4e8acbbd00bb63c0e52dd6d275df16170",
+    "utf8_no_bom": true
+  },
+  {
+    "path": "tests/bug_bible_regression.py",
+    "sha256": "10634c54ca105e3bf1f791967f6dec4af92dd46eff7c5b443ab3a12f8b7000df",
+    "utf8_no_bom": true
+  }
+]

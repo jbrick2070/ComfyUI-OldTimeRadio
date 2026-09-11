@@ -92,26 +92,26 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: correct the existing spoken-repair mismatch feedback, then
-finish Sonnet QA and regression before further GPU work.** In canonical07 the
-model quoted b1 but named b3 twice; the existing validation error gives neither
-row ID nor selected text. Keep strict ID/interval application and the current
-two-call budget. No automatic rerouting, extra checker, schema or source gate.
-This cannot add a girlfriend fact the model never proposed. Preserve source
-reliability as an open qualification problem; do not re-run until lucky.
+**Next action: ONE fresh full canonical 5080 attempt08 with Gemma4-12B in
+both writer slots, after the qualified code is pushed.** Use the same dinner
+source, one act, profile and sampling as07. The actual submitted graph may
+differ only in the two model selections. Installed route evidence and scope:
+`2026-09-11-my-story-source-feedback/next_measurement.md`. Finished-code QA and
+regression receipt: `2026-09-11-my-story-source-feedback/qualification_receipt.md`.
+Verify origin/file hashes before boot; no code edits during live generation.
 
-Review the measured07 receipt before deciding the next meaningful full canonical
-qualification case: `2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md`.
-Seven attempts remain three writing failures/four source-defective publications,
-ZERO source-qualified episodes. Completed07 must not be restarted. Broader
-stress and Original credit coverage remain below; offline checks do not count.
+Measure actual source actions/ending, applied corrections, ledger seals,
+model/context/EOS, voice credits and scene pixels through canonical audio,
+video and obs publication. The feedback change and family change are both
+recorded; do not claim a pure model comparison or guaranteed Nemo repair.
+Any failure: preserve and diagnose before more generation. Do not reroll
+until lucky. All seven previous attempts remain3writing failures/4source-
+defective publications/0source-qualified; completed07 must not be restarted.
 
-Keep image fidelity separate.05 added a child and06 an adult despite accepted
-two-adult prompts.07 shows two physical dinner participants in all inspected
-frames but mixes paper figures and photographs. A source-writer correction
-does not guarantee pixels. Visual implementation needs its own grounded scope.
-Audio listening also remains open: this session's native audio input is
-unsupported, so a submitted excerpt is not an audition or ASR result.
+Broader Jeffrey/Codex1/3/6-act/source/model stress and Original credits remain
+open below. Image consistency remains unqualified (05/06extra people,07mixed
+paper/photo styles). Native audio input is unsupported in this session, so
+actual listening remains open. Component checks do not qualify full episodes.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

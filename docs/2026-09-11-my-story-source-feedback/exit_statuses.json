@@ -1,0 +1,9 @@
+{
+  "focused_exit": 0,
+  "full_exit": 2,
+  "bible_baseline_exit": 1,
+  "bible_candidate_exit": 1,
+  "canonical_exit": 0,
+  "sonnet_exit": 0,
+  "before_fix": "four expected failures; wrapper did not retain pytest exit"
+}

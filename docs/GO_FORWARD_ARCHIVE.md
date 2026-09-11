@@ -7851,3 +7851,29 @@ writer fix guarantees pixels or invent a dropped-prompt defect. Any visual
 implementation needs its own grounded scope.
 
 ---
+
+
+## 2026-09-11 -- exact-row feedback qualified; superseded directions verbatim
+
+**Next action: correct the existing spoken-repair mismatch feedback, then
+finish Sonnet QA and regression before further GPU work.** In canonical07 the
+model quoted b1 but named b3 twice; the existing validation error gives neither
+row ID nor selected text. Keep strict ID/interval application and the current
+two-call budget. No automatic rerouting, extra checker, schema or source gate.
+This cannot add a girlfriend fact the model never proposed. Preserve source
+reliability as an open qualification problem; do not re-run until lucky.
+
+Review the measured07 receipt before deciding the next meaningful full canonical
+qualification case: `2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md`.
+Seven attempts remain three writing failures/four source-defective publications,
+ZERO source-qualified episodes. Completed07 must not be restarted. Broader
+stress and Original credit coverage remain below; offline checks do not count.
+
+Keep image fidelity separate.05 added a child and06 an adult despite accepted
+two-adult prompts.07 shows two physical dinner participants in all inspected
+frames but mixes paper figures and photographs. A source-writer correction
+does not guarantee pixels. Visual implementation needs its own grounded scope.
+Audio listening also remains open: this session's native audio input is
+unsupported, so a submitted excerpt is not an audition or ASR result.
+
+---

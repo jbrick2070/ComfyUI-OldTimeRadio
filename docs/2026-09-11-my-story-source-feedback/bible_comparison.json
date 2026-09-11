@@ -1,0 +1,19 @@
+{
+  "baseline": {
+    "failure": 11,
+    "pass": 37,
+    "xfail": 3,
+    "skip": 11
+  },
+  "candidate": {
+    "failure": 10,
+    "pass": 38,
+    "xfail": 3,
+    "skip": 11
+  },
+  "new_failures": [],
+  "fixed_guards": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage"
+  ],
+  "changed_normalized_failure_payloads": []
+}

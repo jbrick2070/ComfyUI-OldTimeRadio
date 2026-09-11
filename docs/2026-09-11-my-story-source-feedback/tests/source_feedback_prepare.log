@@ -1,0 +1,4 @@
+warning: in the working copy of 'BUG_BIBLE.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/bug_bible_regression.py', LF will be replaced by CRLF the next time Git touches it
+Previous docs push matches origin; all24 committed evidence blobs match hashes/bytes.
+Prepared exact Sonnet QA packet;4 before-fix failures,250 focused passes; candidate worktree copied.

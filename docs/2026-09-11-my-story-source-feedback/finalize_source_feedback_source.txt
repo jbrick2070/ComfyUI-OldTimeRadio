@@ -1,0 +1,83 @@
+from pathlib import Path
+import hashlib
+import json
+import shutil
+
+r=Path.cwd(); d=r/'docs/2026-09-11-my-story-source-feedback'
+plan=r/'docs/GO_FORWARD_PLAN.md';text=plan.read_text(encoding='utf-8')
+start=text.index('**Next action: correct the existing spoken-repair mismatch feedback')
+end=text.index('**Operator sequencing remains binding.**',start)
+old=text[start:end]
+with (r/'docs/GO_FORWARD_ARCHIVE.md').open('a',encoding='utf-8',newline='') as f:
+    f.write('\n\n## 2026-09-11 -- exact-row feedback qualified; superseded directions verbatim\n\n'+old+'---\n')
+next_step='''**Next action: ONE fresh full canonical 5080 attempt08 with Gemma4-12B in
+both writer slots, after the qualified code is pushed.** Use the same dinner
+source, one act, profile and sampling as07. The actual submitted graph may
+differ only in the two model selections. Installed route evidence and scope:
+`2026-09-11-my-story-source-feedback/next_measurement.md`. Finished-code QA and
+regression receipt: `2026-09-11-my-story-source-feedback/qualification_receipt.md`.
+Verify origin/file hashes before boot; no code edits during live generation.
+
+Measure actual source actions/ending, applied corrections, ledger seals,
+model/context/EOS, voice credits and scene pixels through canonical audio,
+video and obs publication. The feedback change and family change are both
+recorded; do not claim a pure model comparison or guaranteed Nemo repair.
+Any failure: preserve and diagnose before more generation. Do not reroll
+until lucky. All seven previous attempts remain3writing failures/4source-
+defective publications/0source-qualified; completed07 must not be restarted.
+
+Broader Jeffrey/Codex1/3/6-act/source/model stress and Original credits remain
+open below. Image consistency remains unqualified (05/06extra people,07mixed
+paper/photo styles). Native audio input is unsupported in this session, so
+actual listening remains open. Component checks do not qualify full episodes.
+
+'''
+plan.write_text(text[:start]+next_step+text[end:],encoding='utf-8')
+handoff=r/'docs/HANDOFF_LOG.md'
+handoff.write_text('''## 2026-09-11 -- exact-row correction feedback qualified; Gemma canonical08 next
+
+Existing invalid-interval error now identifies line ID, submitted quote/offsets
+and selected draft text for the existing second attempt. No auto-reroute,
+schema/wire/call/gate or budget change. Fournewchecks fail old production;
+250focused pass. Full14,459pass/51sameinherited/183skip/1xfail, exit2guard;
+IDs and normalized payloads unchanged. Bible38pass/10inherited versus37/11;
+canonical23nodes63links unchanged. Existing11.39coverage extended,344entries.
+
+Terra/Luna grounded live07/finalcode; actual Sonnet5 finished QA, USD0.036902.
+Root dispositions reject semantic-success inference and additional cross-row
+search; no unanimous approval or Cursor consensus claimed. Receipt and raw
+evidence:2026-09-11-my-story-source-feedback/. Push both repos before GPU.
+Next meaningful case is Gemma4-12B on the same full canonical dinner source;
+installed native route/prior5080proof documented without claiming current
+source qualification. Seven prior attempts still0qualified. Mac/4060held;
+RunPod noauth/no rental. No production/test edit after finished QA.
+
+---
+
+'''+handoff.read_text(encoding='utf-8'),encoding='utf-8')
+with (r/'docs/PROD_BUG_LOG.md').open('a',encoding='utf-8') as f:
+    f.write('''\n\n### PBUG-20260910-03 follow-up -- exact-row diagnostic correction qualified
+
+_apply_spoken_edits now includes submitted ID/quote/offsets and selected draft
+text in the existing invalid-interval error. Strict ID matching remains; the
+existing second attempt owns the correction. Fournewchecks discriminate the
+old generic error and exercise applied exact-ID/offset repair, stubborn input
+retention and spent re-entry budget.250focused pass; full14,459/51inherited;
+Bible38/10inherited; canonical unchanged. ExistingBible11.39 extended; actual
+Sonnet QA/root judgment and raw evidence:2026-09-11-my-story-source-feedback/.
+Live semantic closure remains OPEN: neither07proposal attempted a girlfriend
+edit. Better diagnostic feedback is not evidence that the missing fact returns.
+''')
+shutil.copyfile(r/'tmp/finalize_source_feedback.py',d/'finalize_source_feedback_source.txt')
+shutil.copyfile(r/'tmp/run_my_story_pairlock_08.py',d/'next_canonical_wrapper_source.txt')
+statuses={'focused_exit':0,'full_exit':2,'bible_baseline_exit':1,'bible_candidate_exit':1,
+          'canonical_exit':0,'sonnet_exit':0,'before_fix':'four expected failures; wrapper did not retain pytest exit'}
+(d/'exit_statuses.json').write_text(json.dumps(statuses,indent=2)+'\n',encoding='utf-8')
+manifest=[]
+for path in sorted(d.rglob('*')):
+    if not path.is_file() or path.name=='evidence_manifest.json': continue
+    raw=path.read_bytes(); assert raw and not raw.startswith(b'\xef\xbb\xbf'),path
+    raw.decode('utf-8')
+    manifest.append(dict(path=path.relative_to(d).as_posix(),bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest()))
+(d/'evidence_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
+print('Final docs/evidence manifest:',len(manifest),'files; GO_FORWARD queues canonical08.')

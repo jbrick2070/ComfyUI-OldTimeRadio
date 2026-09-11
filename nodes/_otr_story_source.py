@@ -313,7 +313,16 @@ def _apply_spoken_edits(edits, candidate, raw_fields):
         interval = _exact_interval(row["text"], {
             "quote": edit.original_quote, "start_char": edit.start_char, "end_char": edit.end_char})
         if interval is None:
-            raise ValueError("Correction must identify an exact, unambiguous original interval")
+            raise ValueError(
+                "Correction must identify an exact, unambiguous original interval in "
+                "the row named by line_id. Copy original_quote from that row's "
+                "draft_text. If supplying start_char/end_char, both must select "
+                "that quote in that row; repeated quotes require exact offsets. "
+                "Mismatch details (quoted data): " + _json({
+                    "line_id": edit.line_id, "original_quote": edit.original_quote,
+                    "start_char": edit.start_char, "end_char": edit.end_char,
+                    "draft_text": row["text"],
+                }))
         grouped.setdefault(edit.line_id, []).append((*interval, edit.replacement))
     replacements = {}
     for line_id, changes in grouped.items():

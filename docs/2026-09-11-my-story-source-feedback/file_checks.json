@@ -1,0 +1,14 @@
+[
+  {
+    "path": "nodes/_otr_story_source.py",
+    "sha256": "2c45d473c988fc771f1b8c18fe4ad1bbba1bf9be99ca5721f0f45661a5d8fbdc",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "tests/test_story_source_review.py",
+    "sha256": "18f7394886d96c60937e7e4f9365229841b186a3e4a95fecc1d0aa38d5110be6",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  }
+]

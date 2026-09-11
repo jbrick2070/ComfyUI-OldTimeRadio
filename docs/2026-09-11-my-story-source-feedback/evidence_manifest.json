@@ -1,0 +1,147 @@
+[
+  {
+    "path": "bible_comparison.json",
+    "bytes": 402,
+    "sha256": "7afd4a9dacc80a10911bc5227d944e288112c486e20c508d65fb3e5f9da4f435"
+  },
+  {
+    "path": "bible_file_checks.json",
+    "bytes": 320,
+    "sha256": "e38ce844abe01f7d9b9e1994cbad8b7134ce2ff2d8dae88daf49db23fde676ab"
+  },
+  {
+    "path": "exit_statuses.json",
+    "bytes": 229,
+    "sha256": "fdbea80eb9ff1546c0650ef1cf9db432cf8a7eb6d564f01dcc03158dbd41d801"
+  },
+  {
+    "path": "file_checks.json",
+    "bytes": 398,
+    "sha256": "8fbf3b52be87c2d438be4842747074cd4b54f3ca373929fe640039ef6a2bb531"
+  },
+  {
+    "path": "finalize_source_feedback_source.txt",
+    "bytes": 5169,
+    "sha256": "4b8997ee161af4162a980952557d8a77702ef86e63170f55da0f2a4cc759bb30"
+  },
+  {
+    "path": "finish_source_feedback_source.txt",
+    "bytes": 4432,
+    "sha256": "0a819b2aeff4dca7876f342fa3d0c55eb1b6d86f5040592500cade202353273a"
+  },
+  {
+    "path": "finished_sonnet_qa.md",
+    "bytes": 31153,
+    "sha256": "b77904ea022c61f0e39e2ed24532967b9fd940f239cecb192ce9561fcf7e17a8"
+  },
+  {
+    "path": "full_comparison.json",
+    "bytes": 292,
+    "sha256": "188c42c470ec9c476eae1ecf5cf735d6a38b6aec5062981905fd207981586d0f"
+  },
+  {
+    "path": "next_canonical_wrapper_source.txt",
+    "bytes": 7270,
+    "sha256": "9eaa95c6e7085fdeecc08f9e77f541be9d0438d91a852af0a5e452f964a2d6c5"
+  },
+  {
+    "path": "next_measurement.md",
+    "bytes": 2775,
+    "sha256": "5520771ffd0494fcf066401800164389a9b73d1f1fb8b96e52fb08e7ae750db0"
+  },
+  {
+    "path": "prepare_source_feedback_source.txt",
+    "bytes": 6262,
+    "sha256": "f82f4279899d38b7a92fa545a7d138b6d26ee2df864218fb891de92aa2e5d1bd"
+  },
+  {
+    "path": "qualification_receipt.md",
+    "bytes": 3168,
+    "sha256": "48a31f81e387678df8386df5e04b9316a9820123d984fe8995aaf14c34de2c37"
+  },
+  {
+    "path": "review_judgment.md",
+    "bytes": 3613,
+    "sha256": "ee3644b49dec863c16f1d0f3ea2fd50012b1c7659b3fee2e642b3f359acc51d9"
+  },
+  {
+    "path": "root_anchor.md",
+    "bytes": 2639,
+    "sha256": "a0027faf5d4b56984c1e960eefd2b06992a1b271e40373f7004e417e22bfa3fd"
+  },
+  {
+    "path": "sonnet/anthropic__claude-sonnet-latest.md",
+    "bytes": 4142,
+    "sha256": "8bc45de0cacd88d6314180cdb0f6e5072b50a7c409e2d125aa7b0cde9898e18d"
+  },
+  {
+    "path": "sonnet/manifest.json",
+    "bytes": 522,
+    "sha256": "f106936a88c3f912719051107f41eb3806844ca26f81c2148e87259d0b7c36d3"
+  },
+  {
+    "path": "tests/source_feedback_before_fix.log",
+    "bytes": 1509,
+    "sha256": "c2d376dcb1eaaf9ffce72ab61c427491158a931a92e7b789624dca094305a124"
+  },
+  {
+    "path": "tests/source_feedback_before_fix.xml",
+    "bytes": 18206,
+    "sha256": "c341b0f7cdc3315c70dc0171e09bc6f365cf59033ff598ff8951f54c129f8d26"
+  },
+  {
+    "path": "tests/source_feedback_bible_baseline.log",
+    "bytes": 32794,
+    "sha256": "998caf801f59e14c3747f33a50b15fa7cc7b9c9c187346f53115307b6b4e9bad"
+  },
+  {
+    "path": "tests/source_feedback_bible_baseline.xml",
+    "bytes": 46170,
+    "sha256": "bc1a21f2734bf3db814c66602e3a581a09066c09e42f8cf395e309743af2783e"
+  },
+  {
+    "path": "tests/source_feedback_bible_candidate.log",
+    "bytes": 27569,
+    "sha256": "cfd914029f4f6a8b99d405425dde1c60e6fb79f65846252610cdb046315a19c5"
+  },
+  {
+    "path": "tests/source_feedback_bible_candidate.xml",
+    "bytes": 40631,
+    "sha256": "e2e3c9917807670118c6174070b0439dd2a52ee7d3318f250ff06ec97f4a1b36"
+  },
+  {
+    "path": "tests/source_feedback_canonical.log",
+    "bytes": 619,
+    "sha256": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2"
+  },
+  {
+    "path": "tests/source_feedback_focused.log",
+    "bytes": 1504,
+    "sha256": "28bd1d967b6cc64d8fab1d155a651f77745cdfe4edfba26b8b0343acd1493fb6"
+  },
+  {
+    "path": "tests/source_feedback_focused.xml",
+    "bytes": 37717,
+    "sha256": "b539a381ec8e991b3bbe6fbabe111d3ce33987eb27910a0113e613fca55a259d"
+  },
+  {
+    "path": "tests/source_feedback_full.log",
+    "bytes": 74915,
+    "sha256": "39f4bfee16610ef947293f0f024e16d7dcef894b104e3c4def978e6574a0fb40"
+  },
+  {
+    "path": "tests/source_feedback_full.xml",
+    "bytes": 2316709,
+    "sha256": "3113c2b0004ed50d5a0da23f48c13575106bc101cf549b0cfec1d8e65a18ce36"
+  },
+  {
+    "path": "tests/source_feedback_prepare.log",
+    "bytes": 420,
+    "sha256": "ca36472319176a940fd545d6643effdea55a65ad2cde16860c309b5ba8f49e12"
+  },
+  {
+    "path": "tests/source_feedback_sonnet.log",
+    "bytes": 612,
+    "sha256": "0492425b9c4e010de1d90b70a051d2632ed5ca0bb9ec3ca175950472944ec4ae"
+  }
+]

@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="4" time="3.280" timestamp="2026-09-11T06:24:59.728936-07:00" hostname="iDream"><testcase classname="tests.test_story_source_review" name="test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair[False]" time="2.740"><failure message="assert (('&quot;line_id&quot;' + ':') + '&quot;l2&quot;') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'&#10; +  where '&quot;line_id&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps&#10; +  and   '&quot;l2&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('l2')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps">repair_id = False
+
+    @pytest.mark.parametrize("repair_id", [False, True])
+    def test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair(repair_id):
+        data = _ledger()
+        before = copy.deepcopy(data["lines"])
+        wrong = _edit(line_id="l2")  # The quote belongs to l1, not l2.
+    
+        def respond(messages):
+            if len(slot.calls) == 1:
+                return {"edits": [wrong]}
+            feedback = messages[-1]["content"]
+            for key, value in {"line_id": "l2", "original_quote": wrong["original_quote"],
+                               "draft_text": before[1]["text"],
+                               "start_char": None, "end_char": None}.items():
+                assert json.dumps(key) + ":" + json.dumps(value) in feedback
+            assert any(m["role"] == "assistant" and json.loads(m["content"]) == {"edits": [wrong]}
+                       for m in messages)
+            assert json.loads(messages[1]["content"])["source"] == {
+                "idea": "Mother is alive.", "characters": "", "plot": "", "setting": ""}
+            assert data["lines"] == before  # Rejected proposal did not mutate a row.
+            return {"edits": [_edit() if repair_id else wrong]}
+    
+        slot = Slot(respond)
+&gt;       receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_story_source_review.py:339: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+nodes\_otr_story_source.py:360: in rewrite_spoken_from_source
+    result, receipt = rewrite_story_source(
+nodes\_otr_story_source.py:241: in rewrite_story_source
+    corrected = structured_call(
+nodes\_otr_structured_call.py:1116: in structured_call
+    last_raw = _invoke_slot(
+nodes\_otr_structured_call.py:659: in invoke_structured_slot
+    return slot_fn(
+nodes\_otr_story_source.py:219: in observed
+    output = owner_fn(messages, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_story_source_review.py:36: in __call__
+    reply = self.reply(messages) if callable(self.reply) else self.reply
+            ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+messages = [{'role': 'system', 'content': 'Check and rewrite the supplied draft against the original story source. Return the cor...ete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'}]
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [wrong]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l2", "original_quote": wrong["original_quote"],
+                           "draft_text": before[1]["text"],
+                           "start_char": None, "end_char": None}.items():
+&gt;           assert json.dumps(key) + ":" + json.dumps(value) in feedback
+E           assert (('"line_id"' + ':') + '"l2"') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'
+E            +  where '"line_id"' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+E            +  and   '"l2"' = &lt;function dumps at 0x000002D7D02B7100&gt;('l2')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+
+tests\test_story_source_review.py:330: AssertionError</failure></testcase><testcase classname="tests.test_story_source_review" name="test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair[True]" time="0.002"><failure message="assert (('&quot;line_id&quot;' + ':') + '&quot;l2&quot;') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'&#10; +  where '&quot;line_id&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps&#10; +  and   '&quot;l2&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('l2')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps">repair_id = True
+
+    @pytest.mark.parametrize("repair_id", [False, True])
+    def test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair(repair_id):
+        data = _ledger()
+        before = copy.deepcopy(data["lines"])
+        wrong = _edit(line_id="l2")  # The quote belongs to l1, not l2.
+    
+        def respond(messages):
+            if len(slot.calls) == 1:
+                return {"edits": [wrong]}
+            feedback = messages[-1]["content"]
+            for key, value in {"line_id": "l2", "original_quote": wrong["original_quote"],
+                               "draft_text": before[1]["text"],
+                               "start_char": None, "end_char": None}.items():
+                assert json.dumps(key) + ":" + json.dumps(value) in feedback
+            assert any(m["role"] == "assistant" and json.loads(m["content"]) == {"edits": [wrong]}
+                       for m in messages)
+            assert json.loads(messages[1]["content"])["source"] == {
+                "idea": "Mother is alive.", "characters": "", "plot": "", "setting": ""}
+            assert data["lines"] == before  # Rejected proposal did not mutate a row.
+            return {"edits": [_edit() if repair_id else wrong]}
+    
+        slot = Slot(respond)
+&gt;       receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_story_source_review.py:339: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+nodes\_otr_story_source.py:360: in rewrite_spoken_from_source
+    result, receipt = rewrite_story_source(
+nodes\_otr_story_source.py:241: in rewrite_story_source
+    corrected = structured_call(
+nodes\_otr_structured_call.py:1116: in structured_call
+    last_raw = _invoke_slot(
+nodes\_otr_structured_call.py:659: in invoke_structured_slot
+    return slot_fn(
+nodes\_otr_story_source.py:219: in observed
+    output = owner_fn(messages, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_story_source_review.py:36: in __call__
+    reply = self.reply(messages) if callable(self.reply) else self.reply
+            ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+messages = [{'role': 'system', 'content': 'Check and rewrite the supplied draft against the original story source. Return the cor...ete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'}]
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [wrong]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l2", "original_quote": wrong["original_quote"],
+                           "draft_text": before[1]["text"],
+                           "start_char": None, "end_char": None}.items():
+&gt;           assert json.dumps(key) + ":" + json.dumps(value) in feedback
+E           assert (('"line_id"' + ':') + '"l2"') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'
+E            +  where '"line_id"' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+E            +  and   '"l2"' = &lt;function dumps at 0x000002D7D02B7100&gt;('l2')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+
+tests\test_story_source_review.py:330: AssertionError</failure></testcase><testcase classname="tests.test_story_source_review" name="test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets[offsets0]" time="0.002"><failure message="assert (('&quot;line_id&quot;' + ':') + '&quot;l1&quot;') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'&#10; +  where '&quot;line_id&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps&#10; +  and   '&quot;l1&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('l1', ensure_ascii=False)&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps">offsets = {}
+
+    @pytest.mark.parametrize("offsets", [{}, {"start_char": 0, "end_char": 1}])
+    def test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets(offsets):
+        data = _ledger()
+        data["lines"][0]["text"] = "#x1F320 Mother died. Mother died.  "
+        before = copy.deepcopy(data["lines"])
+        quote = "Mother died."
+        start = before[0]["text"].rindex(quote)
+    
+        def respond(messages):
+            if len(slot.calls) == 1:
+                return {"edits": [_edit(**offsets)]}
+            feedback = messages[-1]["content"]
+            for key, value in {"line_id": "l1", "original_quote": quote,
+                               "draft_text": before[0]["text"],
+                               "start_char": offsets.get("start_char"),
+                               "end_char": offsets.get("end_char")}.items():
+                assert json.dumps(key) + ":" + json.dumps(value, ensure_ascii=False) in feedback
+            return {"edits": [_edit(start_char=start, end_char=start + len(quote))]}
+    
+        slot = Slot(respond)
+&gt;       receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_story_source_review.py:378: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+nodes\_otr_story_source.py:360: in rewrite_spoken_from_source
+    result, receipt = rewrite_story_source(
+nodes\_otr_story_source.py:241: in rewrite_story_source
+    corrected = structured_call(
+nodes\_otr_structured_call.py:1116: in structured_call
+    last_raw = _invoke_slot(
+nodes\_otr_structured_call.py:659: in invoke_structured_slot
+    return slot_fn(
+nodes\_otr_story_source.py:219: in observed
+    output = owner_fn(messages, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_story_source_review.py:36: in __call__
+    reply = self.reply(messages) if callable(self.reply) else self.reply
+            ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+messages = [{'role': 'system', 'content': 'Check and rewrite the supplied draft against the original story source. Return the cor...ete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'}]
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [_edit(**offsets)]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l1", "original_quote": quote,
+                           "draft_text": before[0]["text"],
+                           "start_char": offsets.get("start_char"),
+                           "end_char": offsets.get("end_char")}.items():
+&gt;           assert json.dumps(key) + ":" + json.dumps(value, ensure_ascii=False) in feedback
+E           assert (('"line_id"' + ':') + '"l1"') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'
+E            +  where '"line_id"' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+E            +  and   '"l1"' = &lt;function dumps at 0x000002D7D02B7100&gt;('l1', ensure_ascii=False)
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+
+tests\test_story_source_review.py:374: AssertionError</failure></testcase><testcase classname="tests.test_story_source_review" name="test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets[offsets1]" time="0.002"><failure message="assert (('&quot;line_id&quot;' + ':') + '&quot;l1&quot;') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'&#10; +  where '&quot;line_id&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps&#10; +  and   '&quot;l1&quot;' = &lt;function dumps at 0x000002D7D02B7100&gt;('l1', ensure_ascii=False)&#10; +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps">offsets = {'end_char': 1, 'start_char': 0}
+
+    @pytest.mark.parametrize("offsets", [{}, {"start_char": 0, "end_char": 1}])
+    def test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets(offsets):
+        data = _ledger()
+        data["lines"][0]["text"] = "#x1F320 Mother died. Mother died.  "
+        before = copy.deepcopy(data["lines"])
+        quote = "Mother died."
+        start = before[0]["text"].rindex(quote)
+    
+        def respond(messages):
+            if len(slot.calls) == 1:
+                return {"edits": [_edit(**offsets)]}
+            feedback = messages[-1]["content"]
+            for key, value in {"line_id": "l1", "original_quote": quote,
+                               "draft_text": before[0]["text"],
+                               "start_char": offsets.get("start_char"),
+                               "end_char": offsets.get("end_char")}.items():
+                assert json.dumps(key) + ":" + json.dumps(value, ensure_ascii=False) in feedback
+            return {"edits": [_edit(start_char=start, end_char=start + len(quote))]}
+    
+        slot = Slot(respond)
+&gt;       receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_story_source_review.py:378: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+nodes\_otr_story_source.py:360: in rewrite_spoken_from_source
+    result, receipt = rewrite_story_source(
+nodes\_otr_story_source.py:241: in rewrite_story_source
+    corrected = structured_call(
+nodes\_otr_structured_call.py:1116: in structured_call
+    last_raw = _invoke_slot(
+nodes\_otr_structured_call.py:659: in invoke_structured_slot
+    return slot_fn(
+nodes\_otr_story_source.py:219: in observed
+    output = owner_fn(messages, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_story_source_review.py:36: in __call__
+    reply = self.reply(messages) if callable(self.reply) else self.reply
+            ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+messages = [{'role': 'system', 'content': 'Check and rewrite the supplied draft against the original story source. Return the cor...ete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'}]
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [_edit(**offsets)]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l1", "original_quote": quote,
+                           "draft_text": before[0]["text"],
+                           "start_char": offsets.get("start_char"),
+                           "end_char": offsets.get("end_char")}.items():
+&gt;           assert json.dumps(key) + ":" + json.dumps(value, ensure_ascii=False) in feedback
+E           assert (('"line_id"' + ':') + '"l1"') in 'This is the one remaining repair attempt. Correct this problem: Correction must identify an exact, unambiguous origin...plete requested JSON. Preserve source facts and unaffected material. Do not return a review or a request to try again.'
+E            +  where '"line_id"' = &lt;function dumps at 0x000002D7D02B7100&gt;('line_id')
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+E            +  and   '"l1"' = &lt;function dumps at 0x000002D7D02B7100&gt;('l1', ensure_ascii=False)
+E            +    where &lt;function dumps at 0x000002D7D02B7100&gt; = json.dumps
+
+tests\test_story_source_review.py:374: AssertionError</failure></testcase></testsuite></testsuites>

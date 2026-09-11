@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "pass": 14455,
+    "skip": 183,
+    "failure": 51,
+    "xfail": 1
+  },
+  "candidate": {
+    "pass": 14459,
+    "skip": 183,
+    "failure": 51,
+    "xfail": 1
+  },
+  "new_failures": [],
+  "fixed_guards": [],
+  "changed_normalized_failure_payloads": []
+}

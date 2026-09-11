@@ -1,3 +1,23 @@
+## 2026-09-11 -- exact-row correction feedback qualified; Gemma canonical08 next
+
+Existing invalid-interval error now identifies line ID, submitted quote/offsets
+and selected draft text for the existing second attempt. No auto-reroute,
+schema/wire/call/gate or budget change. Fournewchecks fail old production;
+250focused pass. Full14,459pass/51sameinherited/183skip/1xfail, exit2guard;
+IDs and normalized payloads unchanged. Bible38pass/10inherited versus37/11;
+canonical23nodes63links unchanged. Existing11.39coverage extended,344entries.
+
+Terra/Luna grounded live07/finalcode; actual Sonnet5 finished QA, USD0.036902.
+Root dispositions reject semantic-success inference and additional cross-row
+search; no unanimous approval or Cursor consensus claimed. Receipt and raw
+evidence:2026-09-11-my-story-source-feedback/. Push both repos before GPU.
+Next meaningful case is Gemma4-12B on the same full canonical dinner source;
+installed native route/prior5080proof documented without claiming current
+source qualification. Seven prior attempts still0qualified. Mac/4060held;
+RunPod noauth/no rental. No production/test edit after finished QA.
+
+---
+
 ## 2026-09-11 -- canonical07 published; exact-row repair feedback lacks context
 
 Full canonical on1e2e2a97, prompt85a16452-51eb-4a01-aa79-d453b022b876,

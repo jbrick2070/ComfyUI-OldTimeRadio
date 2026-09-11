@@ -314,6 +314,75 @@ def test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_cal
     assert receipt['qualified'] is False  # application is not a semantic certificate
 
 
+@pytest.mark.parametrize("repair_id", [False, True])
+def test_spoken_wrong_row_feedback_drives_bounded_exact_id_repair(repair_id):
+    data = _ledger()
+    before = copy.deepcopy(data["lines"])
+    wrong = _edit(line_id="l2")  # The quote belongs to l1, not l2.
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [wrong]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l2", "original_quote": wrong["original_quote"],
+                           "draft_text": before[1]["text"],
+                           "start_char": None, "end_char": None}.items():
+            assert json.dumps(key) + ":" + json.dumps(value) in feedback
+        assert any(m["role"] == "assistant" and json.loads(m["content"]) == {"edits": [wrong]}
+                   for m in messages)
+        assert json.loads(messages[1]["content"])["source"] == {
+            "idea": "Mother is alive.", "characters": "", "plot": "", "setting": ""}
+        assert data["lines"] == before  # Rejected proposal did not mutate a row.
+        return {"edits": [_edit() if repair_id else wrong]}
+
+    slot = Slot(respond)
+    receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+    assert len(slot.calls) == len(receipt["attempts"]) == 2
+    assert receipt["attempts"][0]["status"] == "failed"
+    assert receipt["qualified"] is False
+    assert data["lines"][1] == before[1]
+    assert [row["line_id"] for row in data["lines"]] == ["l1", "l2"]
+    if repair_id:
+        assert receipt["applied"] and receipt["attempts"][1]["status"] == "usable"
+        assert data["lines"][0]["text"] == "  Keep this. Mother lives.  Keep that!"
+        assert data["lines"][0]["speaker"] == before[0]["speaker"]
+        assert receipt["input_sha256"] != receipt["output_sha256"]
+    else:
+        assert receipt["status"] == "unresolved" and not receipt["applied"]
+        assert data["lines"] == before  # Never infer or reassign the submitted ID.
+        assert receipt["input_sha256"] == receipt["output_sha256"]
+    source.rewrite_spoken_from_source(data, slot_fn=slot)
+    assert len(slot.calls) == 2  # Re-entry cannot reset the operation's budget.
+
+
+@pytest.mark.parametrize("offsets", [{}, {"start_char": 0, "end_char": 1}])
+def test_spoken_interval_feedback_repairs_repeated_unicode_quote_with_exact_offsets(offsets):
+    data = _ledger()
+    data["lines"][0]["text"] = "🌠 Mother died. Mother died.  "
+    before = copy.deepcopy(data["lines"])
+    quote = "Mother died."
+    start = before[0]["text"].rindex(quote)
+
+    def respond(messages):
+        if len(slot.calls) == 1:
+            return {"edits": [_edit(**offsets)]}
+        feedback = messages[-1]["content"]
+        for key, value in {"line_id": "l1", "original_quote": quote,
+                           "draft_text": before[0]["text"],
+                           "start_char": offsets.get("start_char"),
+                           "end_char": offsets.get("end_char")}.items():
+            assert json.dumps(key) + ":" + json.dumps(value, ensure_ascii=False) in feedback
+        return {"edits": [_edit(start_char=start, end_char=start + len(quote))]}
+
+    slot = Slot(respond)
+    receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+    assert len(slot.calls) == 2 and receipt["applied"] and not receipt["qualified"]
+    assert data["lines"][0]["text"] == "🌠 Mother died. Mother lives.  "
+    assert data["lines"][1] == before[1]
+    assert receipt["attempts"][0]["status"] == "failed"
+    assert receipt["attempts"][1]["status"] == "usable"
+
+
 @pytest.mark.parametrize("override", [
     {"source_field": "author"}, {"source_quote": "Invented source"},
     {"line_id": "unknown"}, {"original_quote": "invented original"},

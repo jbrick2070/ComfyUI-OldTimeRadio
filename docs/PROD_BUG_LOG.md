@@ -14449,3 +14449,16 @@ terminal ledger. A feedback correction is queued; no fuzzy reassignment or
 new model pass. Neither proposal attempted the girlfriend omission, so fixing
 feedback cannot itself claim semantic recovery. Source closure remains OPEN.
 Full evidence:2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md.
+
+
+### PBUG-20260910-03 follow-up -- exact-row diagnostic correction qualified
+
+_apply_spoken_edits now includes submitted ID/quote/offsets and selected draft
+text in the existing invalid-interval error. Strict ID matching remains; the
+existing second attempt owns the correction. Fournewchecks discriminate the
+old generic error and exercise applied exact-ID/offset repair, stubborn input
+retention and spent re-entry budget.250focused pass; full14,459/51inherited;
+Bible38/10inherited; canonical unchanged. ExistingBible11.39 extended; actual
+Sonnet QA/root judgment and raw evidence:2026-09-11-my-story-source-feedback/.
+Live semantic closure remains OPEN: neither07proposal attempted a girlfriend
+edit. Better diagnostic feedback is not evidence that the missing fact returns.

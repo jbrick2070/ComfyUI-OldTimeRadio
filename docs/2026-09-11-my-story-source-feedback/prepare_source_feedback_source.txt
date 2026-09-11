@@ -1,0 +1,97 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import xml.etree.ElementTree as ET
+
+r = Path.cwd()
+d = r / 'docs/2026-09-11-my-story-source-feedback'
+d.mkdir(exist_ok=True)
+bible = r.parents[1] / 'comfyui-custom-node-survival-guide'
+files = ['nodes/_otr_story_source.py', 'tests/test_story_source_review.py']
+candidate = r.parents[1] / '_worktrees/otr-source-feedback-candidate'
+for relative in files:
+    shutil.copyfile(r / relative, candidate / relative)
+    content = (r / relative).read_bytes()
+    assert content and not content.startswith(b'\xef\xbb\xbf')
+    ast.parse(content.decode('utf-8'), feature_version=(3, 10))
+
+# Verify the prior docs-only push and exact committed evidence bytes.
+assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=r) == subprocess.check_output(
+    ['git','rev-parse','origin/v2.0-alpha'],cwd=r)
+prior = r / 'docs/2026-09-11-my-story-5080-qualification'
+for entry in json.loads((prior/'pairlock_07_manifest.json').read_text(encoding='utf-8')):
+    path = (prior / entry['path']).relative_to(r).as_posix()
+    raw = subprocess.check_output(['git','show','HEAD:'+path],cwd=r)
+    assert len(raw) == entry['bytes'] and hashlib.sha256(raw).hexdigest() == entry['sha256']
+for path in subprocess.check_output(['git','diff-tree','--no-commit-id','--name-only','-r','HEAD'],
+                                   cwd=r,text=True).splitlines():
+    raw = subprocess.check_output(['git','show','HEAD:'+path],cwd=r)
+    assert raw and not raw.startswith(b'\xef\xbb\xbf')
+    if not path.endswith('.png'):
+        raw.decode('utf-8')
+print('Previous docs push matches origin; all24 committed evidence blobs match hashes/bytes.')
+
+before = list(ET.parse(r/'tmp/source_feedback_before_fix.xml').iter('testcase'))
+assert len(before) == 4 and all(x.find('failure') is not None for x in before)
+for case in before:
+    assert 'feedback' in case.find('failure').text
+after = list(ET.parse(r/'tmp/source_feedback_focused.xml').iter('testcase'))
+assert len(after) == 250 and all(x.find('failure') is None and x.find('error') is None for x in after)
+anchor = '''# Scoped existing-owner conformance: exact spoken repair feedback
+
+Root code-grounded anchor, written before finished-code QA. This is a narrow
+follow-up to the existing R1-R4 source correction architecture, not a new design
+campaign. Terra and Luna independently read the real Windows source and07
+ledger before code. Root is sole coder/judge. Actual Opus/Gemini campaign and
+Sonnet QA for prior source-authority revision are preserved separately. Cursor
+followups timed out twice; no current Cursor review or consensus is claimed.
+
+Live07 full canonical published Dinner Recollections on1e2e2a97, with source
+omission. Both final edits quote b1 but identify b3. source_quote IS a valid
+plot substring; ample native context1876/2030 of131072. Generic interval error
+was correct but provided no actionable row/quote context. _complete_repair
+already replays full source/draft/failed proposal within the two-call budget.
+No accepted edit was dropped; model never proposed a girlfriend correction.
+
+Only production change: the existing _apply_spoken_edits failure now names the
+selected line ID, submitted quote, offsets and selected draft text as quoted
+JSON, and explains exact-row/ambiguous-quote requirements. Reuses existing
+_json and exact validator. One selected row, no duplicate whole source/draft,
+no clipping, fuzzy target reassignment, schema relaxation, new wire/widget,
+new call, budget reset or source rejection gate. Structured owner/native fit
+handles actual prompt capacity. Successful/noop paths unchanged. This cannot
+certify or automatically add a missing fact the model never proposed.
+
+Meaningful tests: wrong-row second attempt receives diagnostic plus original
+context, then either corrects ID and applies exact replacement or repeats and
+retains every original row. Re-entry remains spent. Ambiguous Unicode quote
+and incorrect offsets repair to the second exact occurrence. IDs/order/other
+text/metrics and qualified=false conserved. All4 new checks fail old production;
+250 focused tests pass current code. Full suite/Bible running independently;
+no quarantine changes. All live source/stress/audio coverage remains open.
+
+Terra audited07 receipt and raised a 115vs113 count concern, then traced it:
+my_story.delivery_telemetry is explicitly my_story_assembled stage history;
+post-clean/freeze authoritative receipts correctly report113character words.
+No bug or change is justified. Raw stage history remains intact.
+
+Mac/4060 held, no contact. RunPod no authenticated access/no rental. No GPU
+generation during coding. Final Sonnet QA required before code qualification.
+'''
+(d/'root_anchor.md').write_text(anchor,encoding='utf-8')
+packet = '# Sonnet finished-code QA: exact row feedback\n\nReview concrete introduced defects and whether the tests exercise the existing repair. Do not propose a new checker, semantic gate, extra retry, fuzzy ID repair or source-specific patch. Do not treat canned model responses as live semantic success. Return concise findings with code references, or no must-fix if supported.\n\n' + anchor
+for repo, paths, label in [(r,files,'OTR'),(bible,['BUG_BIBLE.yaml','tests/bug_bible_regression.py'],'Bible')]:
+    diff = subprocess.check_output(['git','diff','--',*paths],cwd=repo,text=True,encoding='utf-8')
+    packet += '\n## Exact '+label+' diff\n```diff\n'+diff+'\n```\n'
+for rel, names in [('nodes/_otr_story_source.py',{'_json','_complete_repair','rewrite_story_source','_apply_spoken_edits','rewrite_spoken_from_source'}),
+                   ('nodes/_otr_ledger_clean.py',{'_exact_interval'})]:
+    code = (r/rel).read_text(encoding='utf-8'); lines=code.splitlines()
+    for node in ast.parse(code).body:
+        if getattr(node,'name',None) in names:
+            packet += '\n## '+rel+':'+str(node.lineno)+'\n```python\n'+'\n'.join(lines[node.lineno-1:node.end_lineno])+'\n```\n'
+packet += '\n## Terminal07 exact diagnosis\n'+(prior/'pairlock_07_analysis.log').read_text(encoding='utf-8')
+(d/'finished_sonnet_qa.md').write_text(packet,encoding='utf-8')
+print('Prepared exact Sonnet QA packet;4 before-fix failures,250 focused passes; candidate worktree copied.')
