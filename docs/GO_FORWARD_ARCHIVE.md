@@ -7822,3 +7822,32 @@ Superseded qualification precondition, verbatim:
 
 **Next action: finish qualification and push the treatment repair-context fix,
 then ONE fresh full canonical 5080 pair-lock attempt04.**
+
+
+## 2026-09-11 -- canonical07 measured; superseded directions verbatim
+
+**Next action: ONE fresh full canonical 5080 attempt07 on the pushed
+source/ending correction.** Verify HEAD==origin and final file checks before
+boot. Review/code/offline QA is complete in
+`docs/2026-09-11-my-story-source-authority/qualification_receipt.md`.
+Use the real `workflows/otr_canonical.json` through the shipped canonical API
+runner, with the same dinner source, Mistral pair, profile and controls as06.
+Submitted API graph must match06; internal author/correction prompts have
+intentionally changed. Never substitute a replay, generated graph or partial
+target. Preserve actual attempts, edits, ledger and media, and inspect source
+actions/ending, voices/credits and visible scene people/actions before verdict.
+
+Six prior full canonical attempts remain three writing failures and three
+source-defective publications, ZERO source-qualified episodes. Offline routing
+checks do not change that denominator. No accepted correction was lost in06;
+the model returned unchanged drafts. A new result cannot prove causality or
+reliability. Any missing source fact: preserve and diagnose before another run;
+do not reset budgets or run until lucky. Broader stress and Original credits
+remain open below. Completed06 must not be restarted.
+
+Keep the image failure separate: accepted two-adult prompts reached the
+renderer, but05 added a child and06 added an adult. Do not claim the source
+writer fix guarantees pixels or invent a dropped-prompt defect. Any visual
+implementation needs its own grounded scope.
+
+---

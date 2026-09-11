@@ -1,0 +1,29 @@
+from pathlib import Path
+import hashlib
+import json
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-5080-qualification'
+data=json.loads((d/'pairlock_07_ledger.json').read_text(encoding='utf-8'))
+story=data['meta']['my_story'];clean=data['meta']['ledger_clean']
+raw=data['meta']['source_meta']['story_input']['fields']
+source=next(x for x in story['source_rewrites'] if x['pass_id']=='ledger_clean_spoken')
+print('Source final status',source['status'],'applied',source['applied'],'attempts',len(source['attempts']))
+lines={x['line_id']:x for x in data['lines']}
+for attempt in source['attempts']:
+    result=json.loads(attempt['raw_output'])
+    for edit in result.get('edits',[]):
+        actual=lines.get(edit['line_id'],{}).get('text','')
+        print(json.dumps({'attempt':attempt['number'],'edit':edit,
+            'candidate_text':actual,'source_quote_matches':edit['source_quote'] in raw[edit['source_field']],
+            'original_quote_matches_selected_line':edit['original_quote'] in actual,
+            'original_quote_matches_other_ids':[k for k,x in lines.items() if edit['original_quote'] in x.get('text','')],
+            'fit':attempt.get('fit')},ensure_ascii=False))
+print('Cleanup fields',list(clean))
+print('Cleanup totals', {k:clean.get(k) for k in ['model_calls','briefing_calls','repaired','improved','unclean','judge_only','rows'] if not isinstance(clean.get(k),(dict,list))})
+print('slot helper counts',json.dumps(data['meta'].get('slot_calls_by_helper',{})))
+for cast in data['cast']:
+    print('CAST',json.dumps({k:v for k,v in cast.items() if any(s in k for s in ['name','voice','tts','delivered'])},ensure_ascii=False))
+print('Scene',json.dumps(data['scenes'],ensure_ascii=False))
+print('Image manifest keys',list(data.get('images',{})) if isinstance(data.get('images'),dict) else type(data.get('images')).__name__)
+print('Line word counts',sum(len(x.get('text','').split()) for x in data['lines'] if x.get('speaker_role')=='character'),sum(len(x.get('text','').split()) for x in data['lines'] if x.get('speaker_role')=='announcer'))
+print('source rewrite summary',[(x['pass_id'],x['status'],x.get('applied')) for x in story['source_rewrites']])

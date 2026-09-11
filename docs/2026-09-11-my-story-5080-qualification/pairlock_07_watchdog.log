@@ -1,0 +1,30 @@
+[watchdog] start 05:57:54 :: leg=tmp/my_story_5080_pairlock_07.log stall=300s poll=30s
+[watchdog] 05:58:25 t=22s stalled=0s qfail=0
+[watchdog] 05:58:55 t=52s stalled=0s qfail=0
+[watchdog] 05:59:25 t=82s stalled=0s qfail=0
+[watchdog] 05:59:55 t=112s stalled=0s qfail=0
+[watchdog] 06:00:25 t=142s stalled=0s qfail=0
+[watchdog] 06:00:55 t=172s stalled=0s qfail=0
+[watchdog] 06:01:25 t=202s stalled=0s qfail=0
+[watchdog] 06:01:55 t=232s stalled=0s qfail=0
+[watchdog] 06:02:25 t=262s stalled=0s qfail=0
+[watchdog] 06:02:55 t=292s stalled=0s qfail=0
+[watchdog] 06:03:25 t=322s stalled=0s qfail=0
+[watchdog] 06:03:55 t=352s stalled=0s qfail=0
+[watchdog] 06:04:25 t=382s stalled=0s qfail=0
+[watchdog] 06:04:55 t=412s stalled=0s qfail=0
+[watchdog] 06:05:25 t=443s stalled=0s qfail=0
+[watchdog] 06:05:55 t=473s stalled=0s qfail=0
+[watchdog] 06:06:25 t=503s stalled=0s qfail=0
+[watchdog] 06:06:55 t=529s stalled=0s qfail=0
+[watchdog] 06:07:25 t=559s stalled=0s qfail=0
+[watchdog] 06:07:55 t=589s stalled=0s qfail=0
+[watchdog] 06:08:25 t=619s stalled=0s qfail=0
+[watchdog] 06:08:55 t=649s stalled=0s qfail=0
+[watchdog] 06:09:25 t=680s stalled=0s qfail=0
+[watchdog] 06:09:55 t=711s stalled=0s qfail=0
+[watchdog] 06:10:25 t=741s stalled=0s qfail=0
+[watchdog] 06:10:55 t=772s stalled=0s qfail=0
+[watchdog] 06:11:25 t=802s stalled=0s qfail=0
+[watchdog] 06:11:55 t=832s stalled=0s qfail=0
+[watchdog] DONE 06:12:25 :: [canonical-api] RESULT SUCCESS prompt_id=85a16452-51eb-4a01-aa79-d453b022b876

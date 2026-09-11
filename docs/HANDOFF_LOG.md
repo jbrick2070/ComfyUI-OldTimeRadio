@@ -1,3 +1,23 @@
+## 2026-09-11 -- canonical07 published; exact-row repair feedback lacks context
+
+Full canonical on1e2e2a97, prompt85a16452-51eb-4a01-aa79-d453b022b876,
+published Dinner Recollections in14:00. Source FAIL: girlfriend absent; current
+appreciation is present in dialogue. Both final source attempts quote b1 but
+name b3; source_quote is valid. Generic interval error omits actionable row
+context. Terra/root grounded this; narrow existing-owner correction next.
+No lost accepted rewrite or capacity/budget failure.48cleanup/source calls,
+one retained cleanup change; frozen_clean. Voices/credits agree. All eight
+scene corrections reach dispatch; seven unique PNGs show two physical dinner
+participants, but photo/paper styles vary. No audio audition: input unsupported.
+
+Seven attempts,three writing failures/four source-defective publications/zero
+qualified. Complete history/ledger/logs/pixels and receipt:2026-09-11-my-story-
+5080-qualification/pairlock_07_*. Server selectively stopped,port empty,desktop
+2649-2650MiB/no ComfyUI compute process. No code edit during run, no other host
+contact. Mac/4060 held; RunPod no auth/no rental. GO_FORWARD owns next work.
+
+---
+
 ## 2026-09-11 -- source/ending ownership qualified offline; canonical07 next
 
 Final act now explicitly targets the existing global ending and shares static

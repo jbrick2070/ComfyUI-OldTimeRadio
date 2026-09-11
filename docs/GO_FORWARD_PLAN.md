@@ -92,29 +92,26 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 attempt07 on the pushed
-source/ending correction.** Verify HEAD==origin and final file checks before
-boot. Review/code/offline QA is complete in
-`docs/2026-09-11-my-story-source-authority/qualification_receipt.md`.
-Use the real `workflows/otr_canonical.json` through the shipped canonical API
-runner, with the same dinner source, Mistral pair, profile and controls as06.
-Submitted API graph must match06; internal author/correction prompts have
-intentionally changed. Never substitute a replay, generated graph or partial
-target. Preserve actual attempts, edits, ledger and media, and inspect source
-actions/ending, voices/credits and visible scene people/actions before verdict.
+**Next action: correct the existing spoken-repair mismatch feedback, then
+finish Sonnet QA and regression before further GPU work.** In canonical07 the
+model quoted b1 but named b3 twice; the existing validation error gives neither
+row ID nor selected text. Keep strict ID/interval application and the current
+two-call budget. No automatic rerouting, extra checker, schema or source gate.
+This cannot add a girlfriend fact the model never proposed. Preserve source
+reliability as an open qualification problem; do not re-run until lucky.
 
-Six prior full canonical attempts remain three writing failures and three
-source-defective publications, ZERO source-qualified episodes. Offline routing
-checks do not change that denominator. No accepted correction was lost in06;
-the model returned unchanged drafts. A new result cannot prove causality or
-reliability. Any missing source fact: preserve and diagnose before another run;
-do not reset budgets or run until lucky. Broader stress and Original credits
-remain open below. Completed06 must not be restarted.
+Review the measured07 receipt before deciding the next meaningful full canonical
+qualification case: `2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md`.
+Seven attempts remain three writing failures/four source-defective publications,
+ZERO source-qualified episodes. Completed07 must not be restarted. Broader
+stress and Original credit coverage remain below; offline checks do not count.
 
-Keep the image failure separate: accepted two-adult prompts reached the
-renderer, but05 added a child and06 added an adult. Do not claim the source
-writer fix guarantees pixels or invent a dropped-prompt defect. Any visual
-implementation needs its own grounded scope.
+Keep image fidelity separate.05 added a child and06 an adult despite accepted
+two-adult prompts.07 shows two physical dinner participants in all inspected
+frames but mixes paper figures and photographs. A source-writer correction
+does not guarantee pixels. Visual implementation needs its own grounded scope.
+Audio listening also remains open: this session's native audio input is
+unsupported, so a submitted excerpt is not an audition or ASR result.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

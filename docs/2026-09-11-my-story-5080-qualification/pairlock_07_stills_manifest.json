@@ -1,0 +1,2735 @@
+{
+  "episode_id": "signal_lost_dinner_recollections_20260911_060605",
+  "images": [
+    {
+      "image_id": "img_still_shot_001_b1_a3e82d75d64a",
+      "role": "character_video",
+      "object_id": "still_shot_001_b1",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b1_a3e82d75d64a.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\a3e82d75d64a1bc61c24d393d57358341ee3423b704509a4cfd1eb9543fd85e2.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "8bf31083dc2b0cb230b0eea3893a93aa1637c540d100cd054ac89f21ce517b89",
+      "portrait_content_hash": "a3e82d75d64a1bc61c24d393d57358341ee3423b704509a4cfd1eb9543fd85e2",
+      "content_hash": "a3e82d75d64a1bc61c24d393d57358341ee3423b704509a4cfd1eb9543fd85e2",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "43354841a72271fe4e40a46f6621f00a2da2206d30b76c99664fd2177104c015",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "bbf0f773f6e4ff2e004130f5aeefd45d21ab0d557fc584a3d83a35395a9521e2",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "13110274359e28d107888160533ce7832715c518d83c4d33294a3c034c9190fb",
+      "banana_sha256_after": "13110274359e28d107888160533ce7832715c518d83c4d33294a3c034c9190fb",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "b87b8cb51f5bed75ca40a4d3b3ed4ef0629d291c2866436793e94ea1eb1072ff",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b1",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "9628a39d42ca1592b76e1304fdad275946dbb1cac9fe850d866ddeb95321a7f0",
+        "output_sha256": "ee82d978bf070ef7974b3beca0e1b2653594ed77b95f19705eede3a5aaca4138",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "ba71717d75f6f640e715971c0f36c672453c43cf4e53521c80d2af419d2a6076",
+            "raw_output": "{\"prompt\":\"An adult man in his 30s, seated at a dinner table with his mother in her 50s, both smiling and reminiscing, a plate of food in front of each, a glass of wine for the mother and a beer for the son, a lit candle and a small potted plant on the table, soft warm lighting, handmade paper diorama, earthy tones, papercraft texture, handmade paper edges, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "An adult man in his 30s, seated at a dinner table with his mother in her 50s, both smiling and reminiscing, a plate of food in front of each, a glass of wine for the mother and a beer for the son, a lit candle and a small potted plant on the table, soft warm lighting, handmade paper diorama, earthy tones, papercraft texture, handmade paper edges, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b1",
+          "target_char_id": "c02",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c02",
+            "name": "Jeffrey",
+            "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+            "age_band": "30s",
+            "gender": "male"
+          },
+          "beat": {
+            "beat_id": "shot_001_b1",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Jeffrey",
+            "char_id": "c02",
+            "line_ids": [
+              "shot_001_b1"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b1",
+            "beat_id": "shot_001_b1",
+            "shot_id": "shot_001",
+            "char_id": "c02",
+            "speaker": "Jeffrey",
+            "speaker_role": "character",
+            "text": "Remember when we used to spend summers in Oakland, Mom?",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c03",
+              "name": "Mother",
+              "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+              "age_band": "50s",
+              "gender": "female",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "b87b8cb51f5bed75ca40a4d3b3ed4ef0629d291c2866436793e94ea1eb1072ff",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "An adult man in his 30s, seated at a dinner table with his mother in her 50s, both smiling and reminiscing, a plate of food in front of each, a glass of wine for the mother and a beer for the son, a lit candle and a small potted plant on the table, soft warm lighting, handmade paper diorama, earthy tones, papercraft texture, handmade paper edges, no on-screen text",
+        "base_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+        "finishing": {
+          "input_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+          "output_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+        "dispatch_source_context_hash": "b87b8cb51f5bed75ca40a4d3b3ed4ef0629d291c2866436793e94ea1eb1072ff",
+        "final_prompt_hash": "43354841a72271fe4e40a46f6621f00a2da2206d30b76c99664fd2177104c015",
+        "final_prompt": "folded paper. An adult man in his 30s, seated at a dinner table with his mother in her 50s, both smiling and reminiscing, a plate of food in front of each, a glass of wine for the mother and a beer for the son, a lit candle and a small potted plant on the table, soft warm lighting, handmade paper diorama, earthy tones, papercraft texture, handmade paper edges, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+          "safety_prompt_hash": "710962c428e7321cecd09bdd8c3c121fd906c6f3e7ef8ba961c62648c6bdb5b0",
+          "style_prompt_hash": "43354841a72271fe4e40a46f6621f00a2da2206d30b76c99664fd2177104c015",
+          "final_prompt_hash": "43354841a72271fe4e40a46f6621f00a2da2206d30b76c99664fd2177104c015",
+          "final_prompt": "folded paper. An adult man in his 30s, seated at a dinner table with his mother in her 50s, both smiling and reminiscing, a plate of food in front of each, a glass of wine for the mother and a beer for the son, a lit candle and a small potted plant on the table, soft warm lighting, handmade paper diorama, earthy tones, papercraft texture, handmade paper edges, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c02",
+      "beat_id": "shot_001_b1",
+      "visual_style": "paper_origami",
+      "laplacian": 181.48
+    },
+    {
+      "image_id": "img_still_shot_001_b2_05a35e748f99",
+      "role": "character_video",
+      "object_id": "still_shot_001_b2",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b2_05a35e748f99.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "e2ff7da464cafb123a3f230439e52525bcfdf530d501ea79831c6c4f770d50e0",
+      "portrait_content_hash": "05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14",
+      "content_hash": "05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "ce11430c43fd665ee8523afa367260264cce01859099fe9e009b17fc34322784",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "80484b152d81213b91e103f3359ccb5e4108e43976198ee84ffc638154df4d71",
+      "banana_sha256_after": "80484b152d81213b91e103f3359ccb5e4108e43976198ee84ffc638154df4d71",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "d338a6427669f6ed5b7328aa4695dbce234a3f785585128895064969d209d903",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b2",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "ea1c3d7b5a7c31419472d0e2c1923ca1a4044a936c98bfa526abba4099620d6d",
+        "output_sha256": "fc79ba33d34265391d40c603fa683868632d0e7ee01fa7de3f12abd5c3185b48",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "51461f9fb578bd03e4e60e8c90a15258ea73fe3ad32d60c847435003a369f3b9",
+            "raw_output": "{\"prompt\":\"A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b2",
+          "target_char_id": "c03",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c03",
+            "name": "Mother",
+            "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+            "age_band": "50s",
+            "gender": "female"
+          },
+          "beat": {
+            "beat_id": "shot_001_b2",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Mother",
+            "char_id": "c03",
+            "line_ids": [
+              "shot_001_b2"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b2",
+            "beat_id": "shot_001_b2",
+            "shot_id": "shot_001",
+            "char_id": "c03",
+            "speaker": "Mother",
+            "speaker_role": "character",
+            "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c02",
+              "name": "Jeffrey",
+              "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+              "age_band": "30s",
+              "gender": "male",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "d338a6427669f6ed5b7328aa4695dbce234a3f785585128895064969d209d903",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+        "finishing": {
+          "input_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "output_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+        "dispatch_source_context_hash": "d338a6427669f6ed5b7328aa4695dbce234a3f785585128895064969d209d903",
+        "final_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+        "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "safety_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "style_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+          "final_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+          "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c03",
+      "beat_id": "shot_001_b2",
+      "visual_style": "paper_origami",
+      "laplacian": 49.9
+    },
+    {
+      "image_id": "img_still_shot_001_b3_e5c71a53d95a",
+      "role": "character_video",
+      "object_id": "still_shot_001_b3",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b3_e5c71a53d95a.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\e5c71a53d95a97d62d8f4c544855a15d256175915c04d41d481c58163e050b93.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "e0d4ccf150ba39222c5e59d925fa6987ccdf2eb1f944dd44631572e81441cda6",
+      "portrait_content_hash": "e5c71a53d95a97d62d8f4c544855a15d256175915c04d41d481c58163e050b93",
+      "content_hash": "e5c71a53d95a97d62d8f4c544855a15d256175915c04d41d481c58163e050b93",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "2c55cdc03aa75f2519ca7550968e6c0b42d8191bf351d8bbaad16e5eda12a4ef",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "bbf0f773f6e4ff2e004130f5aeefd45d21ab0d557fc584a3d83a35395a9521e2",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "0dcdcaad8f64b2096115847f38b3dbaed931e3ac74176f84428dcf0fcfc2400a",
+      "banana_sha256_after": "0dcdcaad8f64b2096115847f38b3dbaed931e3ac74176f84428dcf0fcfc2400a",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "9be518bb1b6a7035313f4baa9d9676bdfa144058b10ccd38d1e66345b500256f",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b3",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "9628a39d42ca1592b76e1304fdad275946dbb1cac9fe850d866ddeb95321a7f0",
+        "output_sha256": "6f71f3b0218c9e1c92ad42fe3dadb45b984d43222028d27bf511e71b1da0e158",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "bdc1a7be24ed57e9bae2660b9d85c05a2c1a2e50d1844eef793c3c04f8c372ea",
+            "raw_output": "{\"prompt\":\"An adult man in his 30s, a loving mother in her 50s, sharing dinner at a well-lit table in their Los Angeles home, medium shot, both heads and shoulders visible, focused on Jeffrey's face, Mother's hand gently resting on Jeffrey's, a plate of food in front of each, soft earthy tones, warm glow, papercraft texture, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "An adult man in his 30s, a loving mother in her 50s, sharing dinner at a well-lit table in their Los Angeles home, medium shot, both heads and shoulders visible, focused on Jeffrey's face, Mother's hand gently resting on Jeffrey's, a plate of food in front of each, soft earthy tones, warm glow, papercraft texture, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b3",
+          "target_char_id": "c02",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c02",
+            "name": "Jeffrey",
+            "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+            "age_band": "30s",
+            "gender": "male"
+          },
+          "beat": {
+            "beat_id": "shot_001_b3",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Jeffrey",
+            "char_id": "c02",
+            "line_ids": [
+              "shot_001_b3"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b3",
+            "beat_id": "shot_001_b3",
+            "shot_id": "shot_001",
+            "char_id": "c02",
+            "speaker": "Jeffrey",
+            "speaker_role": "character",
+            "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c03",
+              "name": "Mother",
+              "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+              "age_band": "50s",
+              "gender": "female",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "9be518bb1b6a7035313f4baa9d9676bdfa144058b10ccd38d1e66345b500256f",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "An adult man in his 30s, a loving mother in her 50s, sharing dinner at a well-lit table in their Los Angeles home, medium shot, both heads and shoulders visible, focused on Jeffrey's face, Mother's hand gently resting on Jeffrey's, a plate of food in front of each, soft earthy tones, warm glow, papercraft texture, no on-screen text",
+        "base_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+        "finishing": {
+          "input_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+          "output_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+        "dispatch_source_context_hash": "9be518bb1b6a7035313f4baa9d9676bdfa144058b10ccd38d1e66345b500256f",
+        "final_prompt_hash": "2c55cdc03aa75f2519ca7550968e6c0b42d8191bf351d8bbaad16e5eda12a4ef",
+        "final_prompt": "folded paper. An adult man in his 30s, a loving mother in her 50s, sharing dinner at a well-lit table in their Los Angeles home, medium shot, both heads and shoulders visible, focused on Jeffrey's face, Mother's hand gently resting on Jeffrey's, a plate of food in front of each, soft earthy tones, warm glow, papercraft texture, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+          "safety_prompt_hash": "3b36da68df99b12570e7cad599c00c0e0a16bac1b591c429a6e03a88f15d1815",
+          "style_prompt_hash": "2c55cdc03aa75f2519ca7550968e6c0b42d8191bf351d8bbaad16e5eda12a4ef",
+          "final_prompt_hash": "2c55cdc03aa75f2519ca7550968e6c0b42d8191bf351d8bbaad16e5eda12a4ef",
+          "final_prompt": "folded paper. An adult man in his 30s, a loving mother in her 50s, sharing dinner at a well-lit table in their Los Angeles home, medium shot, both heads and shoulders visible, focused on Jeffrey's face, Mother's hand gently resting on Jeffrey's, a plate of food in front of each, soft earthy tones, warm glow, papercraft texture, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c02",
+      "beat_id": "shot_001_b3",
+      "visual_style": "paper_origami",
+      "laplacian": 91.28
+    },
+    {
+      "image_id": "img_still_shot_001_b4_30da2a7f28bb",
+      "role": "character_video",
+      "object_id": "still_shot_001_b4",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b4_30da2a7f28bb.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\30da2a7f28bbc12c9fea35e305041129f034b67a0a710dcb199a30b9f3cdb229.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "2acfcf461b5c5448d247f8108b66fa560436200ac49e211cb91772dc19b94b71",
+      "portrait_content_hash": "30da2a7f28bbc12c9fea35e305041129f034b67a0a710dcb199a30b9f3cdb229",
+      "content_hash": "30da2a7f28bbc12c9fea35e305041129f034b67a0a710dcb199a30b9f3cdb229",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "b2be5deec4bc46b7a0bf9a04caf37c6c834884d94735e00095c8ba2a7e8f08ff",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "ce11430c43fd665ee8523afa367260264cce01859099fe9e009b17fc34322784",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "fe1c41b3f5c3c33f2cebe2e6eec8d23b25a29614e3c4fd687979c4b294d1c765",
+      "banana_sha256_after": "fe1c41b3f5c3c33f2cebe2e6eec8d23b25a29614e3c4fd687979c4b294d1c765",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "1617611802ca082632a31199c4a7d2888a823975d039a70bfe433184be17d57b",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b4",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "ea1c3d7b5a7c31419472d0e2c1923ca1a4044a936c98bfa526abba4099620d6d",
+        "output_sha256": "cfcd5d3f991e21f97a36d7a1974c1d7e70681de05f9c924178188aaec1178f80",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "4a7d861966d4fef8b6db94985b4e850ed0b65a97e10851ec117513ee6d10f131",
+            "raw_output": "{\"prompt\":\"Mother, a loving woman in her 50s, smiles warmly at Jeffrey, her son in his 30s, as they share a meal at their Los Angeles home's dining table. She leans in, her hands gently folded around a cup of tea, while Jeffrey, with a nostalgic expression, holds a small, flickering candle, a symbol of their cherished memories.\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "Mother, a loving woman in her 50s, smiles warmly at Jeffrey, her son in his 30s, as they share a meal at their Los Angeles home's dining table. She leans in, her hands gently folded around a cup of tea, while Jeffrey, with a nostalgic expression, holds a small, flickering candle, a symbol of their cherished memories."
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b4",
+          "target_char_id": "c03",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c03",
+            "name": "Mother",
+            "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+            "age_band": "50s",
+            "gender": "female"
+          },
+          "beat": {
+            "beat_id": "shot_001_b4",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Mother",
+            "char_id": "c03",
+            "line_ids": [
+              "shot_001_b4"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b4",
+            "beat_id": "shot_001_b4",
+            "shot_id": "shot_001",
+            "char_id": "c03",
+            "speaker": "Mother",
+            "speaker_role": "character",
+            "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c02",
+              "name": "Jeffrey",
+              "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+              "age_band": "30s",
+              "gender": "male",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "1617611802ca082632a31199c4a7d2888a823975d039a70bfe433184be17d57b",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "Mother, a loving woman in her 50s, smiles warmly at Jeffrey, her son in his 30s, as they share a meal at their Los Angeles home's dining table. She leans in, her hands gently folded around a cup of tea, while Jeffrey, with a nostalgic expression, holds a small, flickering candle, a symbol of their cherished memories., no on-screen text",
+        "base_prompt_hash": "7751c51e7eda801d5d41bffe4dcc706632a7b89406c75576c8012d972875361c",
+        "finishing": {
+          "input_prompt_hash": "27fc27445e08c85c46213e94f5c1284efd0f438ae49a69ddc51889c8191fbf93",
+          "output_prompt_hash": "7751c51e7eda801d5d41bffe4dcc706632a7b89406c75576c8012d972875361c",
+          "changed": true,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "7751c51e7eda801d5d41bffe4dcc706632a7b89406c75576c8012d972875361c",
+        "dispatch_source_context_hash": "1617611802ca082632a31199c4a7d2888a823975d039a70bfe433184be17d57b",
+        "final_prompt_hash": "b2be5deec4bc46b7a0bf9a04caf37c6c834884d94735e00095c8ba2a7e8f08ff",
+        "final_prompt": "folded paper. Mother, a loving woman in her 50s, smiles warmly at Jeffrey, her son in his 30s, as they share a meal at their Los Angeles home's dining table. She leans in, her hands gently folded around a cup of tea, while Jeffrey, with a nostalgic expression, holds a small, flickering candle, a symbol of their cherished memories., no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "7751c51e7eda801d5d41bffe4dcc706632a7b89406c75576c8012d972875361c",
+          "safety_prompt_hash": "7751c51e7eda801d5d41bffe4dcc706632a7b89406c75576c8012d972875361c",
+          "style_prompt_hash": "b2be5deec4bc46b7a0bf9a04caf37c6c834884d94735e00095c8ba2a7e8f08ff",
+          "final_prompt_hash": "b2be5deec4bc46b7a0bf9a04caf37c6c834884d94735e00095c8ba2a7e8f08ff",
+          "final_prompt": "folded paper. Mother, a loving woman in her 50s, smiles warmly at Jeffrey, her son in his 30s, as they share a meal at their Los Angeles home's dining table. She leans in, her hands gently folded around a cup of tea, while Jeffrey, with a nostalgic expression, holds a small, flickering candle, a symbol of their cherished memories., no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c03",
+      "beat_id": "shot_001_b4",
+      "visual_style": "paper_origami",
+      "laplacian": 103.99
+    },
+    {
+      "image_id": "img_still_shot_001_b5_21b63f24eb7b",
+      "role": "character_video",
+      "object_id": "still_shot_001_b5",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b5_21b63f24eb7b.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\21b63f24eb7b97293b9fbc2f2ddd58b70cc69ade6db588075f2075b3370581cc.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "c210ee56b6a28286308f2cf334d5f821f858de086ddb5c6cf7895150798bde35",
+      "portrait_content_hash": "21b63f24eb7b97293b9fbc2f2ddd58b70cc69ade6db588075f2075b3370581cc",
+      "content_hash": "21b63f24eb7b97293b9fbc2f2ddd58b70cc69ade6db588075f2075b3370581cc",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "33dd98ff479703d55475cb10e50f373d16e554fa938e82dc50b6afde7e43beb2",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "bbf0f773f6e4ff2e004130f5aeefd45d21ab0d557fc584a3d83a35395a9521e2",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "8cc3ffd59ebd154cadacb735a25fe9f80f6592a69c1d1daf7f0afcd6855a8955",
+      "banana_sha256_after": "8cc3ffd59ebd154cadacb735a25fe9f80f6592a69c1d1daf7f0afcd6855a8955",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "ceed676926f41d8a3d92842fbe0513953c6b9df5068b7a85c6cffdb58a58b89c",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b5",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "9628a39d42ca1592b76e1304fdad275946dbb1cac9fe850d866ddeb95321a7f0",
+        "output_sha256": "82e8a648fbd8d166d5bc034ce67d9dd9ce4439c3a87c36c88bbf07c42681535a",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "54574f71aff6f7ec7a7f6b1cade7598d808283b173589749aabc7e0d98c2f85b",
+            "raw_output": "{\"prompt\":\"An adult man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and reminiscing about their past, the man holding a fork mid-air, a plate of food in front of him, the woman listening attentively, a warm glow from the setting sun filtering through the window, soft, earthy tones, medium shot, full head and shoulders, clear headroom, balanced landscape composition, handmade paper diorama, papercraft texture, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "An adult man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and reminiscing about their past, the man holding a fork mid-air, a plate of food in front of him, the woman listening attentively, a warm glow from the setting sun filtering through the window, soft, earthy tones, medium shot, full head and shoulders, clear headroom, balanced landscape composition, handmade paper diorama, papercraft texture, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b5",
+          "target_char_id": "c02",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c02",
+            "name": "Jeffrey",
+            "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+            "age_band": "30s",
+            "gender": "male"
+          },
+          "beat": {
+            "beat_id": "shot_001_b5",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Jeffrey",
+            "char_id": "c02",
+            "line_ids": [
+              "shot_001_b5"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b5",
+            "beat_id": "shot_001_b5",
+            "shot_id": "shot_001",
+            "char_id": "c02",
+            "speaker": "Jeffrey",
+            "speaker_role": "character",
+            "text": "Yeah, I was quite the romantic, even at eight.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c03",
+              "name": "Mother",
+              "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+              "age_band": "50s",
+              "gender": "female",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "ceed676926f41d8a3d92842fbe0513953c6b9df5068b7a85c6cffdb58a58b89c",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "An adult man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and reminiscing about their past, the man holding a fork mid-air, a plate of food in front of him, the woman listening attentively, a warm glow from the setting sun filtering through the window, soft, earthy tones, medium shot, full head and shoulders, clear headroom, balanced landscape composition, handmade paper diorama, papercraft texture, no on-screen text",
+        "base_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+        "finishing": {
+          "input_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+          "output_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+        "dispatch_source_context_hash": "ceed676926f41d8a3d92842fbe0513953c6b9df5068b7a85c6cffdb58a58b89c",
+        "final_prompt_hash": "33dd98ff479703d55475cb10e50f373d16e554fa938e82dc50b6afde7e43beb2",
+        "final_prompt": "folded paper. An adult man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and reminiscing about their past, the man holding a fork mid-air, a plate of food in front of him, the woman listening attentively, a warm glow from the setting sun filtering through the window, soft, earthy tones, medium shot, full head and shoulders, clear headroom, balanced landscape composition, handmade paper diorama, papercraft texture, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+          "safety_prompt_hash": "372e84eeda6139c62ce12de99fa9bb256263f6a8485ce1afddb6eb31965ec28b",
+          "style_prompt_hash": "33dd98ff479703d55475cb10e50f373d16e554fa938e82dc50b6afde7e43beb2",
+          "final_prompt_hash": "33dd98ff479703d55475cb10e50f373d16e554fa938e82dc50b6afde7e43beb2",
+          "final_prompt": "folded paper. An adult man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and reminiscing about their past, the man holding a fork mid-air, a plate of food in front of him, the woman listening attentively, a warm glow from the setting sun filtering through the window, soft, earthy tones, medium shot, full head and shoulders, clear headroom, balanced landscape composition, handmade paper diorama, papercraft texture, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c02",
+      "beat_id": "shot_001_b5",
+      "visual_style": "paper_origami",
+      "laplacian": 88.58
+    },
+    {
+      "image_id": "img_still_shot_001_b6_05a35e748f99",
+      "role": "character_video",
+      "object_id": "still_shot_001_b6",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b6_05a35e748f99.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "acc406f541e18f99f707ad88800d2950183a5949ee4224917cc0dde45346128e",
+      "portrait_content_hash": "05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14",
+      "content_hash": "05a35e748f9913cd25decf72864551c896c4fc1a2daa6f3f7781cdd38c26ef14",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "ce11430c43fd665ee8523afa367260264cce01859099fe9e009b17fc34322784",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "80484b152d81213b91e103f3359ccb5e4108e43976198ee84ffc638154df4d71",
+      "banana_sha256_after": "80484b152d81213b91e103f3359ccb5e4108e43976198ee84ffc638154df4d71",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "190baa715b13598e14a462a5c56a678313dfba6ee96aa5bc9c8425affccadbb1",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b6",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "ea1c3d7b5a7c31419472d0e2c1923ca1a4044a936c98bfa526abba4099620d6d",
+        "output_sha256": "fc79ba33d34265391d40c603fa683868632d0e7ee01fa7de3f12abd5c3185b48",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "18c80036db5c0f936926edc7237dd793905178e2992e6afca1ef8fe1f34a3a83",
+            "raw_output": "{\"prompt\":\"A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b6",
+          "target_char_id": "c03",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c03",
+            "name": "Mother",
+            "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+            "age_band": "50s",
+            "gender": "female"
+          },
+          "beat": {
+            "beat_id": "shot_001_b6",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Mother",
+            "char_id": "c03",
+            "line_ids": [
+              "shot_001_b6"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b6",
+            "beat_id": "shot_001_b6",
+            "shot_id": "shot_001",
+            "char_id": "c03",
+            "speaker": "Mother",
+            "speaker_role": "character",
+            "text": "Well, you still are. And that's something worth remembering.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c02",
+              "name": "Jeffrey",
+              "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+              "age_band": "30s",
+              "gender": "male",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "190baa715b13598e14a462a5c56a678313dfba6ee96aa5bc9c8425affccadbb1",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+        "finishing": {
+          "input_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "output_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+        "dispatch_source_context_hash": "190baa715b13598e14a462a5c56a678313dfba6ee96aa5bc9c8425affccadbb1",
+        "final_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+        "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "safety_prompt_hash": "508da124fcdad6d9a31aadbd089b226ed63240e9ac4e34dbc84a0ca159243dae",
+          "style_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+          "final_prompt_hash": "8aa7ddaa087160724c4b5d7b5c2ef6a800c4e311ff041ae56f24aa73a5d6e505",
+          "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as the two share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c03",
+      "beat_id": "shot_001_b6",
+      "visual_style": "paper_origami",
+      "laplacian": 49.9
+    },
+    {
+      "image_id": "img_still_shot_001_b7_db01cf8ceef6",
+      "role": "character_video",
+      "object_id": "still_shot_001_b7",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b7_db01cf8ceef6.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\db01cf8ceef6dd23ca2da1e926a91f509798f1b7eb5cd301e7cec3ee800f56f5.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "4b842403123de7882fb90e6d00996c696eb2108308d8560e820e2d48aa655447",
+      "portrait_content_hash": "db01cf8ceef6dd23ca2da1e926a91f509798f1b7eb5cd301e7cec3ee800f56f5",
+      "content_hash": "db01cf8ceef6dd23ca2da1e926a91f509798f1b7eb5cd301e7cec3ee800f56f5",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "23fbf60a90f4d65d1a456e285f4e39ab1e9dee3cf10773ee521a559f9a4cdbdb",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "bbf0f773f6e4ff2e004130f5aeefd45d21ab0d557fc584a3d83a35395a9521e2",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "0290a89c79ce7dab6d3619c626f8dfa3d1f21e366f3a3f2355fc545d58ef8d12",
+      "banana_sha256_after": "0290a89c79ce7dab6d3619c626f8dfa3d1f21e366f3a3f2355fc545d58ef8d12",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "c2d81a9141c99cdfe04e9469ada3ad0dcf5d088e945ba54d97f088dd6477297c",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b7",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "9628a39d42ca1592b76e1304fdad275946dbb1cac9fe850d866ddeb95321a7f0",
+        "output_sha256": "2b050f5ea339f82df814d8f22959df1faaa56053d396c37e62d19b8dd476dc6e",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "ed2cfe823acc2507bf00a2dab1fabf35bfc71b5de52244d9aa2eba7b900a614a",
+            "raw_output": "{\"prompt\":\"A man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and a warm smile, the man's face showing a mix of nostalgia and appreciation, the table set with plates of food, a candle burning softly, and a framed picture of the man with his girlfriend in the background, the room filled with a soft, warm glow, casting gentle shadows, earthy tones, soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "A man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and a warm smile, the man's face showing a mix of nostalgia and appreciation, the table set with plates of food, a candle burning softly, and a framed picture of the man with his girlfriend in the background, the room filled with a soft, warm glow, casting gentle shadows, earthy tones, soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b7",
+          "target_char_id": "c02",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c02",
+            "name": "Jeffrey",
+            "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+            "age_band": "30s",
+            "gender": "male"
+          },
+          "beat": {
+            "beat_id": "shot_001_b7",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Jeffrey",
+            "char_id": "c02",
+            "line_ids": [
+              "shot_001_b7"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b7",
+            "beat_id": "shot_001_b7",
+            "shot_id": "shot_001",
+            "char_id": "c02",
+            "speaker": "Jeffrey",
+            "speaker_role": "character",
+            "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c03",
+              "name": "Mother",
+              "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+              "age_band": "50s",
+              "gender": "female",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "c2d81a9141c99cdfe04e9469ada3ad0dcf5d088e945ba54d97f088dd6477297c",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "A man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and a warm smile, the man's face showing a mix of nostalgia and appreciation, the table set with plates of food, a candle burning softly, and a framed picture of the man with his girlfriend in the background, the room filled with a soft, warm glow, casting gentle shadows, earthy tones, soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "base_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+        "finishing": {
+          "input_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+          "output_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+        "dispatch_source_context_hash": "c2d81a9141c99cdfe04e9469ada3ad0dcf5d088e945ba54d97f088dd6477297c",
+        "final_prompt_hash": "23fbf60a90f4d65d1a456e285f4e39ab1e9dee3cf10773ee521a559f9a4cdbdb",
+        "final_prompt": "folded paper. A man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and a warm smile, the man's face showing a mix of nostalgia and appreciation, the table set with plates of food, a candle burning softly, and a framed picture of the man with his girlfriend in the background, the room filled with a soft, warm glow, casting gentle shadows, earthy tones, soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+          "safety_prompt_hash": "f1171e1503251effd6bc072c0710f486b4b8fbffce9a93ff9c1ac1a10acdba1d",
+          "style_prompt_hash": "23fbf60a90f4d65d1a456e285f4e39ab1e9dee3cf10773ee521a559f9a4cdbdb",
+          "final_prompt_hash": "23fbf60a90f4d65d1a456e285f4e39ab1e9dee3cf10773ee521a559f9a4cdbdb",
+          "final_prompt": "folded paper. A man in his 30s, seated at a dinner table with his mother in her 50s, both sharing a meal and a warm smile, the man's face showing a mix of nostalgia and appreciation, the table set with plates of food, a candle burning softly, and a framed picture of the man with his girlfriend in the background, the room filled with a soft, warm glow, casting gentle shadows, earthy tones, soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c02",
+      "beat_id": "shot_001_b7",
+      "visual_style": "paper_origami",
+      "laplacian": 78.37
+    },
+    {
+      "image_id": "img_still_shot_001_b8_b58934caf996",
+      "role": "character_video",
+      "object_id": "still_shot_001_b8",
+      "kind": "scene_character",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b8_b58934caf996.png",
+      "pool_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\cache\\b58934caf99662d999381ebf13ec80e3c95ab18e3f8426b51d2838071671805e.png",
+      "engine_id": "z_image_turbo",
+      "engine_version": "2",
+      "request_hash": "206fac08cc3c7c918fc0d2c2bf126e113fe28e2872c0e50b0bf79da0588b4f96",
+      "portrait_content_hash": "b58934caf99662d999381ebf13ec80e3c95ab18e3f8426b51d2838071671805e",
+      "content_hash": "b58934caf99662d999381ebf13ec80e3c95ab18e3f8426b51d2838071671805e",
+      "w": 1472,
+      "h": 832,
+      "prompt_hash": "5c057d7ae3105ffd3e199fa6a011f5b68314eb2305d989f1e95a136bd3d1af41",
+      "provenance": {
+        "source": "char_scene_source_rewrite"
+      },
+      "derived_from_portrait_hash": "",
+      "portrait_anchor_mode": "seed",
+      "identity_seed_basis": "ce11430c43fd665ee8523afa367260264cce01859099fe9e009b17fc34322784",
+      "banana_route": "on",
+      "banana_table_version": "3",
+      "banana_substitutions": 0,
+      "banana_sha256_before": "fb0e9f9722496f804880a71cf00c29a84dddba0ea3f0afb6bcf6518aeeaa3299",
+      "banana_sha256_after": "fb0e9f9722496f804880a71cf00c29a84dddba0ea3f0afb6bcf6518aeeaa3299",
+      "banana_varieties": "SIDEARM=red banana,LONG=plantain",
+      "source_context_hash": "17a2cdd73a059c96b1d657a22271d5afcc7c3abe83b560282124722fb9e71cf6",
+      "source_rewrite": {
+        "version": "my_story.source_rewrite.v1",
+        "pass_id": "scene_shot_001_b8",
+        "operation_id": "source_rewrite_1",
+        "coordinate_version": "my_story.raw_python_char.v1",
+        "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+        "raw_field_hashes": {
+          "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+          "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+          "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+          "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+        },
+        "source_intervals": [
+          {
+            "field": "idea",
+            "start_char": 0,
+            "end_char": 187
+          },
+          {
+            "field": "characters",
+            "start_char": 0,
+            "end_char": 379
+          },
+          {
+            "field": "plot",
+            "start_char": 0,
+            "end_char": 785
+          },
+          {
+            "field": "setting",
+            "start_char": 0,
+            "end_char": 360
+          }
+        ],
+        "source_scope": "whole",
+        "input_sha256": "ea1c3d7b5a7c31419472d0e2c1923ca1a4044a936c98bfa526abba4099620d6d",
+        "output_sha256": "972ba359eea8864b1d95842e6e8c53d6cd48bd8d87af06acaecc19eafd09b9aa",
+        "applied": true,
+        "configured_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "executed_model_id": null,
+        "attempt_limit": 2,
+        "attempts": [
+          {
+            "number": 1,
+            "prompt_sha256": "45865db829e035277cee7333924568df97a1f7f3588a3bbb9536b29fa1ecc85e",
+            "raw_output": "{\"prompt\":\"A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as they share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text\"}",
+            "raw_completion": null,
+            "generation_started": true,
+            "fit": {
+              "reason": "slot has no exact prompt inspection",
+              "supported": false
+            },
+            "status": "usable",
+            "validation_error": null
+          }
+        ],
+        "status": "rewritten",
+        "qualified": false,
+        "returned_artifact": {
+          "prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as they share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text"
+        },
+        "scope": "scene_character",
+        "scene_context": {
+          "prompt_contract": "my_story.scene_source.v2",
+          "scope": "scene_character",
+          "beat_id": "shot_001_b8",
+          "target_char_id": "c03",
+          "resolved_setting": "Dining room, Home in Los Angeles",
+          "target_character": {
+            "char_id": "c03",
+            "name": "Mother",
+            "appearance": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+            "age_band": "50s",
+            "gender": "female"
+          },
+          "beat": {
+            "beat_id": "shot_001_b8",
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "speaker": "Mother",
+            "char_id": "c03",
+            "line_ids": [
+              "shot_001_b8"
+            ],
+            "start_s": null,
+            "dur_s": null
+          },
+          "current_line": {
+            "line_id": "shot_001_b8",
+            "beat_id": "shot_001_b8",
+            "shot_id": "shot_001",
+            "char_id": "c03",
+            "speaker": "Mother",
+            "speaker_role": "character",
+            "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+            "beat_intent": null,
+            "traits": null,
+            "arc_phase": null
+          },
+          "shot": {
+            "shot_id": "shot_001",
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "visual_prompt": "",
+            "png_path": null,
+            "start_s": null,
+            "dur_s": null
+          },
+          "scene": {
+            "scene_id": "s01",
+            "description": "Jeffrey and his mother's dinner table",
+            "env": null,
+            "line_count": 8,
+            "word_count": 113
+          },
+          "ordered_scene_dialogue": [
+            {
+              "line_id": "shot_001_b1",
+              "beat_id": "shot_001_b1",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Remember when we used to spend summers in Oakland, Mom?",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b2",
+              "beat_id": "shot_001_b2",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Of course, dear. I can see it in your eyes, you're right there again.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b3",
+              "beat_id": "shot_001_b3",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "I loved catching those fireflies in the backyard. And we'd watch them light up the night.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b4",
+              "beat_id": "shot_001_b4",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "And remember how you'd bring them in, thinking they were gifts for me? You were always so thoughtful, even then.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b5",
+              "beat_id": "shot_001_b5",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "Yeah, I was quite the romantic, even at eight.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b6",
+              "beat_id": "shot_001_b6",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Well, you still are. And that's something worth remembering.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b7",
+              "beat_id": "shot_001_b7",
+              "shot_id": "shot_001",
+              "char_id": "c02",
+              "speaker": "Jeffrey",
+              "speaker_role": "character",
+              "text": "You know, I've been thinking about that a lot lately. About how much I have to appreciate now.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            },
+            {
+              "line_id": "shot_001_b8",
+              "beat_id": "shot_001_b8",
+              "shot_id": "shot_001",
+              "char_id": "c03",
+              "speaker": "Mother",
+              "speaker_role": "character",
+              "text": "Indeed, dear. Me too. And I'm glad we can share these moments, just like we used to.",
+              "beat_intent": null,
+              "traits": null,
+              "arc_phase": null
+            }
+          ],
+          "candidate_companions": [
+            {
+              "char_id": "c02",
+              "name": "Jeffrey",
+              "appearance": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+              "age_band": "30s",
+              "gender": "male",
+              "speaks_in_scene": true
+            }
+          ],
+          "working_treatment": {
+            "title": "Dinner Recollections",
+            "logline": "Jeffrey shares a heartwarming dinner with his living mother, reminiscing about their past and appreciating their present",
+            "dramatic_question": "How does Jeffrey's memory of his childhood influence his appreciation for his current life with his mother in Los Angeles, despite his girlfriend's absence from the dinner table tonight, and his mother's implied response to his shared memory, leaving the mother's direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the shared memory and the story's resolution, with no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend, as explicitly stated in the source interpretation's constraints, ensuring the story maintains its warm, appreciative tone throughout the selected acts, ending with Jeffrey and his mother choosing to appreciate their lives now, still together at that same table, enjoying their meal",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "Son",
+                "character_description": "An adult man who loves Los Angeles and cherishes his memories of growing up in the Bay Area",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "casual, warm",
+                "timbre": "deep, resonant"
+              },
+              {
+                "name": "Mother",
+                "role": "Mother",
+                "character_description": "A loving mother, physically present, sharing dinner with Jeffrey at their home in Los Angeles",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "affectionate, gentle",
+                "timbre": "soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "Establish the scene and introduce the shared memory",
+                "scene_setting": "Jeffrey and his mother's dinner table",
+                "turns": [
+                  "Jeffrey begins talking about his childhood in the Bay Area",
+                  "Mother listens attentively and smiles",
+                  "Jeffrey mentions a specific fond memory",
+                  "Mother's response is implied in the shared memory, leaving her direct response open to listener interpretation, as the requirement was marked as 'preferred' in the source interpretation, but still implied in the story's resolution"
+                ],
+                "ending_state": "Both are smiling, reminiscing, and enjoying their meal"
+              }
+            ],
+            "ending": "Jeffrey and his mother continue their meal, expressing their love and appreciation for their lives now"
+          }
+        },
+        "source_context_hash": "17a2cdd73a059c96b1d657a22271d5afcc7c3abe83b560282124722fb9e71cf6",
+        "binding_model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "retained_prompt": "A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as they share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "base_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+        "finishing": {
+          "input_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+          "output_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+          "changed": false,
+          "stages": [
+            "no_text"
+          ]
+        },
+        "base_matches_rewrite": true,
+        "dispatch_base_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+        "dispatch_source_context_hash": "17a2cdd73a059c96b1d657a22271d5afcc7c3abe83b560282124722fb9e71cf6",
+        "final_prompt_hash": "5c057d7ae3105ffd3e199fa6a011f5b68314eb2305d989f1e95a136bd3d1af41",
+        "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as they share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+        "normalization": {
+          "hash_format": "sha256_json_string_ascii",
+          "base_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+          "safety_prompt_hash": "81c8f7c30af3905837d2c456405462f519c3e935f52b064a5733a85a8cfde0ba",
+          "style_prompt_hash": "5c057d7ae3105ffd3e199fa6a011f5b68314eb2305d989f1e95a136bd3d1af41",
+          "final_prompt_hash": "5c057d7ae3105ffd3e199fa6a011f5b68314eb2305d989f1e95a136bd3d1af41",
+          "final_prompt": "folded paper. A loving mother in her 50s, physically present, sharing dinner with her adult son Jeffrey in his 30s at their home in Los Angeles, Dining room, Home in Los Angeles, cinematic medium shot, the mother framed within a wide 16:9 environment, full head and shoulders with clear headroom inside frame, face unobstructed, balanced landscape composition, The room is filled with a soft, warm glow, casting gentle shadows as they share their memories, Earthy tones, Soft, folded paper diorama, papercraft texture, handmade paper edges, no on-screen text",
+          "safety_changed": false,
+          "style_changed": true,
+          "banana_changed": false,
+          "final_changed": true,
+          "source_qualified": false
+        },
+        "dispatch_disposition": "transformed_after_source_operation"
+      },
+      "char_id": "c03",
+      "beat_id": "shot_001_b8",
+      "visual_style": "paper_origami",
+      "laplacian": 63.12
+    }
+  ],
+  "checks": [
+    {
+      "beat_id": "shot_001_b1",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b1_a3e82d75d64a.png",
+      "artifact": "pairlock_07_still_shot_001_b1_a3e82d75d64a.png",
+      "file_sha256": "7bd92c55013ec5ea47b52c1d100c15a21e426d57d33e1aa5ea74b0b3693f42df"
+    },
+    {
+      "beat_id": "shot_001_b2",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b2_05a35e748f99.png",
+      "artifact": "pairlock_07_still_shot_001_b2_05a35e748f99.png",
+      "file_sha256": "e57fc8304ccfe35528da69bc085a0f60e33e22e431be8aaeeeb858fce8542bbe"
+    },
+    {
+      "beat_id": "shot_001_b3",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b3_e5c71a53d95a.png",
+      "artifact": "pairlock_07_still_shot_001_b3_e5c71a53d95a.png",
+      "file_sha256": "881eba65d229f9f5a876226e73114ef2b7ab045d6dd57ac3834a5c54089621c7"
+    },
+    {
+      "beat_id": "shot_001_b4",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b4_30da2a7f28bb.png",
+      "artifact": "pairlock_07_still_shot_001_b4_30da2a7f28bb.png",
+      "file_sha256": "93d103ab3e69ec6c09bd1659efce51cb4c346326030b95159b1ccc94b007524d"
+    },
+    {
+      "beat_id": "shot_001_b5",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b5_21b63f24eb7b.png",
+      "artifact": "pairlock_07_still_shot_001_b5_21b63f24eb7b.png",
+      "file_sha256": "39e3085d8de961de10aceca2797f7c47255abce5db658a58757c39e95f7dd847"
+    },
+    {
+      "beat_id": "shot_001_b6",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b6_05a35e748f99.png",
+      "artifact": "pairlock_07_still_shot_001_b6_05a35e748f99.png",
+      "file_sha256": "e57fc8304ccfe35528da69bc085a0f60e33e22e431be8aaeeeb858fce8542bbe"
+    },
+    {
+      "beat_id": "shot_001_b7",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b7_db01cf8ceef6.png",
+      "artifact": "pairlock_07_still_shot_001_b7_db01cf8ceef6.png",
+      "file_sha256": "3ad21fccdd0739edb2454af31ec597f2c57bd769fa2a3b9232c5693aa09a018f"
+    },
+    {
+      "beat_id": "shot_001_b8",
+      "source_rewrite_applied": true,
+      "retained_base_matches": true,
+      "dispatch_hash_matches": true,
+      "final_hash_matches": true,
+      "original_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_recollections_20260911_060605\\stills\\still_shot_001_b8_b58934caf996.png",
+      "artifact": "pairlock_07_still_shot_001_b8_b58934caf996.png",
+      "file_sha256": "2299f2b590e1621f8a4da1fcd3ebdfa1c678ba943a40bf802d1abe971a464812"
+    }
+  ]
+}

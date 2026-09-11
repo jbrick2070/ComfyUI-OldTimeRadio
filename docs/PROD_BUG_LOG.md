@@ -14433,3 +14433,19 @@ Bible11.39 verification and real-owner coverage extended;45 targeted checks
 fail before fix. R1-R4 and finished Sonnet QA receipts live under
 2026-09-11-my-story-source-authority/. Live closure remains OPEN pending the
 next full canonical measurement and broader source/audio/pixel qualification.
+
+
+### PBUG-20260910-03 follow-up -- pairlock_07 repeats a misaddressed spoken edit
+
+Full canonical1e2e2a97,prompt85a16452-51eb-4a01-aa79-d453b022b876 published
+Dinner Recollections. Girlfriend mention still absent; present appreciation
+partly represented. Both final source proposals quote actual b1 but name b3.
+Source quote is valid plot data; fit1876/2030 of131072, no capacity refusal.
+_apply_spoken_edits correctly refuses cross-row application, but its generic
+interval error names neither selected row ID/text nor submitted quote. The
+existing complete repair repeats the mismatch within its two-call budget.
+Terra/root independently verified this actionable-feedback gap against the
+terminal ledger. A feedback correction is queued; no fuzzy reassignment or
+new model pass. Neither proposal attempted the girlfriend omission, so fixing
+feedback cannot itself claim semantic recovery. Source closure remains OPEN.
+Full evidence:2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md.

@@ -1,0 +1,242 @@
+[canonical-api] workflow=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[canonical-api] run_label=5080_pairlock_07_source_authority (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_w45_still_pan (45-word run: still_pan) -- 16 overrides:
+  role_overrides.announcer_visual=still_pan
+  role_overrides.music_visual=still_pan
+  role_overrides.character_visual=still_pan
+  role_overrides.announcer_image=z_image_turbo
+  role_overrides.music_image=z_image_turbo
+  role_overrides.character_image=z_image_turbo
+  slot_overrides.voice_bank=default
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=indextts2
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=still_pan
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[canonical-api] comfy_url=http://127.0.0.1:8000
+[canonical-api] prompt_nodes=23
+[canonical-api] prompt_dump=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\docs\2026-09-11-my-story-5080-qualification\pairlock_07_prompt.json
+[canonical-api] applied:
+  profile=otr_w45_still_pan
+  OTR_LedgerScriptWriter.creative_writing_model='mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.technical_model='mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.source_bank='my_story'
+  OTR_LedgerScriptWriter.custom_premise='Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.'
+  OTR_LedgerScriptWriter.story_characters='Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.'
+  OTR_LedgerScriptWriter.story_plot='Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.'
+  OTR_LedgerScriptWriter.story_setting='A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.'
+  OTR_LedgerScriptWriter.story_author=''
+  OTR_LedgerScriptWriter.num_characters=2
+  OTR_LedgerScriptWriter.act_count='1'
+  OTR_LedgerScriptWriter.visual_style='roll (any style)'
+[canonical-api] DRY_RUN complete; prompt not submitted
+[canonical-api] workflow=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[canonical-api] run_label=5080_pairlock_07_source_authority (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_w45_still_pan (45-word run: still_pan) -- 16 overrides:
+  role_overrides.announcer_visual=still_pan
+  role_overrides.music_visual=still_pan
+  role_overrides.character_visual=still_pan
+  role_overrides.announcer_image=z_image_turbo
+  role_overrides.music_image=z_image_turbo
+  role_overrides.character_image=z_image_turbo
+  slot_overrides.voice_bank=default
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=indextts2
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=still_pan
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[canonical-api] comfy_url=http://127.0.0.1:8000
+[canonical-api] prompt_nodes=23
+[canonical-api] prompt_dump=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\docs\2026-09-11-my-story-5080-qualification\pairlock_07_prompt.json
+[canonical-api] applied:
+  profile=otr_w45_still_pan
+  OTR_LedgerScriptWriter.creative_writing_model='mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.technical_model='mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.source_bank='my_story'
+  OTR_LedgerScriptWriter.custom_premise='Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.'
+  OTR_LedgerScriptWriter.story_characters='Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.'
+  OTR_LedgerScriptWriter.story_plot='Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.'
+  OTR_LedgerScriptWriter.story_setting='A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.'
+  OTR_LedgerScriptWriter.story_author=''
+  OTR_LedgerScriptWriter.num_characters=2
+  OTR_LedgerScriptWriter.act_count='1'
+  OTR_LedgerScriptWriter.visual_style='roll (any style)'
+[canonical-api] QUEUED prompt_id=85a16452-51eb-4a01-aa79-d453b022b876
+[canonical-api] t=0s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=queued
+[canonical-api] t=0s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=5s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=10s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=15s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=22s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=27s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=32s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=37s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=42s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=47s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=52s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=57s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=62s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=67s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=72s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=77s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=82s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=87s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=92s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=97s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=102s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=107s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=112s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=117s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=122s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=127s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=132s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=137s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=142s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=147s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=152s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=157s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=162s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=167s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=172s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=177s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=182s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=187s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=192s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=197s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=202s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=207s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=212s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=217s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=222s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=227s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=232s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=237s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=242s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=247s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=252s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=257s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=262s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=267s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=272s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=277s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=282s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=287s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=292s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=297s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=302s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=307s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=312s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=317s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=322s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=327s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=332s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=337s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=342s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=347s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=352s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=357s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=362s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=367s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=372s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=377s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=382s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=387s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=392s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=397s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=402s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=407s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=412s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=417s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=422s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=428s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=433s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=438s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=443s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=448s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=453s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=458s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=463s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=468s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=473s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=478s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=483s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=488s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=493s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=498s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=503s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=508s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=513s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=518s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=523s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=529s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=534s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=539s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=544s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=549s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=554s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=559s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=564s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=569s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=574s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=579s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=584s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=589s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=594s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=599s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=604s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=609s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=614s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=619s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=624s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=629s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=634s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=639s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=644s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=649s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=654s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=659s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=665s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=670s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=675s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=680s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=685s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=690s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=695s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=700s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=706s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=711s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=716s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=721s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=726s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=731s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=736s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=741s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=746s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=751s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=757s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=762s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=767s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=772s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=777s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=782s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=787s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=792s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=797s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=802s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=807s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=812s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=817s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=822s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=827s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=832s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=837s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=pending
+[canonical-api] t=842s prompt_id=85a16452-51eb-4a01-aa79-d453b022b876 status=success
+[canonical-api] RESULT SUCCESS prompt_id=85a16452-51eb-4a01-aa79-d453b022b876
