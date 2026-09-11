@@ -1,0 +1,713 @@
+{
+  "8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73": {
+    "prompt": [
+      0,
+      "8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73",
+      {
+        "63": {
+          "class_type": "OTR_WorkflowValidator",
+          "inputs": {
+            "workflow_json_path": "",
+            "validate_anyway": true,
+            "strict_unknown_types": true,
+            "profile_id": "",
+            "master_hash": "",
+            "generated_by": ""
+          }
+        },
+        "1": {
+          "class_type": "OTR_LedgerScriptWriter",
+          "inputs": {
+            "gate_in": [
+              "63",
+              0
+            ],
+            "episode_title": "",
+            "num_characters": 2,
+            "creative_writing_model": "google/gemma-4-12b-it (23.9 GB, nv16 nv24)",
+            "technical_model": "google/gemma-4-12b-it (23.9 GB, nv16 nv24)",
+            "custom_premise": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+            "include_act_breaks": true,
+            "act_count": "1",
+            "creativity": "balanced",
+            "perfect_run_spacesaver": false,
+            "min_p": 0.05,
+            "repetition_penalty": 1.03,
+            "max_new_tokens_cap": 200,
+            "lemmy_cameo": "roll (~11% chance)",
+            "use_exchange": true,
+            "enable_production_stage3_validators": true,
+            "news_briefs_required": true,
+            "openrouter_slot_a_model": "(enable OpenRouter)",
+            "openrouter_slot_b_model": "(enable OpenRouter)",
+            "comfy_slot_a_model": "(enable Comfy Credits)",
+            "comfy_slot_b_model": "(enable Comfy Credits)",
+            "story_scaffold": "auto",
+            "source_bank": "my_story",
+            "visual_style": "roll (any style)",
+            "google_api_slot_a_model": "(select Google API model)",
+            "google_api_slot_b_model": "(select Google API model)",
+            "source_ref": "",
+            "llm_device": "cuda",
+            "llm_attn_impl": "sdpa",
+            "llm_quant_policy": "bnb_nf4",
+            "llm_vram_ceiling_gb": 14.5,
+            "gguf_n_ctx": 4096,
+            "gguf_quant": "Q8_0",
+            "replay_from": "",
+            "story_characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+            "story_plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+            "story_setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+            "story_author": ""
+          }
+        },
+        "3": {
+          "class_type": "OTR_SceneSequencer",
+          "inputs": {
+            "tts_audio_clips": [
+              "81",
+              0
+            ],
+            "announcer_audio_clips": [
+              "82",
+              0
+            ],
+            "script_json": [
+              "80",
+              0
+            ],
+            "start_line": 0,
+            "end_line": 999,
+            "output_dir": "",
+            "dialogue_offset_ms": 0.0
+          }
+        },
+        "4": {
+          "class_type": "OTR_AudioEnhance",
+          "inputs": {
+            "audio": [
+              "3",
+              0
+            ],
+            "target_sample_rate": 48000,
+            "spatial_width": 0.0,
+            "haas_delay_ms": 0.0,
+            "bass_warmth": 0.0,
+            "lpf_cutoff_hz": 0.0,
+            "tape_emulation": "off"
+          }
+        },
+        "7": {
+          "class_type": "OTR_EpisodeAssembler",
+          "inputs": {
+            "scene_audio": [
+              "4",
+              0
+            ],
+            "music_cue_audio": [
+              "83",
+              0
+            ],
+            "music_cue_manifest_json": [
+              "83",
+              1
+            ],
+            "video_policy_json": [
+              "87",
+              0
+            ],
+            "replay_descriptor": [
+              "62",
+              6
+            ],
+            "episode_title": "",
+            "opening_duration_sec": 10.0,
+            "closing_duration_sec": 8.0,
+            "crossfade_ms": 500
+          }
+        },
+        "12": {
+          "class_type": "OTR_SignalLostVideo",
+          "inputs": {
+            "audio": [
+              "7",
+              0
+            ],
+            "script_json": [
+              "62",
+              1
+            ],
+            "news_used": [
+              "62",
+              2
+            ],
+            "fps": 25,
+            "resolution": "1920x1080",
+            "episode_title": "",
+            "draw_scopes": false
+          }
+        },
+        "62": {
+          "class_type": "OTR_LedgerFreezeCascade",
+          "inputs": {
+            "script_text": [
+              "1",
+              0
+            ],
+            "script_json": [
+              "1",
+              1
+            ],
+            "news_used": [
+              "1",
+              2
+            ],
+            "estimated_minutes": [
+              "1",
+              3
+            ],
+            "technical_model": [
+              "1",
+              4
+            ],
+            "enable_phase_7_audio_readiness": true,
+            "enable_phase_8_video_readiness": true
+          }
+        },
+        "80": {
+          "class_type": "OTR_CastLock",
+          "inputs": {
+            "script_json": [
+              "62",
+              6
+            ],
+            "voice_bank": "default",
+            "cast_voice_policy": "auto_registry",
+            "allow_voice_reuse": true,
+            "char_voice_engine": "indextts2",
+            "announcer_voice_engine": "kokoro",
+            "voice_device": "cuda"
+          }
+        },
+        "81": {
+          "class_type": "OTR_BatchCharacterVoices",
+          "inputs": {
+            "script_json": [
+              "62",
+              1
+            ],
+            "ledger_json": [
+              "80",
+              0
+            ],
+            "gate_in": [
+              "63",
+              0
+            ],
+            "engine": "indextts2"
+          }
+        },
+        "82": {
+          "class_type": "OTR_AnnouncerVoice",
+          "inputs": {
+            "script_json": [
+              "62",
+              1
+            ],
+            "ledger_json": [
+              "80",
+              0
+            ],
+            "gate_in": [
+              "81",
+              2
+            ],
+            "engine": "kokoro"
+          }
+        },
+        "83": {
+          "class_type": "OTR_StableAudioTheme",
+          "inputs": {
+            "script_json": [
+              "62",
+              1
+            ],
+            "ledger_json": [
+              "80",
+              0
+            ],
+            "gate_in": [
+              "82",
+              2
+            ],
+            "engine": "stable_audio_3"
+          }
+        },
+        "84": {
+          "class_type": "OTR_SilentComposite",
+          "inputs": {
+            "base_video_path": [
+              "12",
+              0
+            ],
+            "clip_manifest_json": [
+              "92",
+              1
+            ],
+            "canvas_w": 1920,
+            "canvas_h": 1080,
+            "fps": 25,
+            "ffmpeg": "ffmpeg",
+            "output_path": "",
+            "upscale_engine": "off",
+            "upscale_device": "cpu"
+          }
+        },
+        "85": {
+          "class_type": "OTR_MasterAudioMux",
+          "inputs": {
+            "silent_video_path": [
+              "95",
+              0
+            ],
+            "master_audio_path": [
+              "7",
+              1
+            ],
+            "audio_done": [
+              "7",
+              3
+            ],
+            "declared_credits_tail_s": [
+              "95",
+              1
+            ],
+            "clip_manifest_json": [
+              "92",
+              1
+            ],
+            "video_policy_json": [
+              "87",
+              0
+            ],
+            "foley_receipts_json": [
+              "92",
+              1
+            ],
+            "script_json": [
+              "1",
+              1
+            ],
+            "fps": 25,
+            "ffmpeg": "ffmpeg",
+            "output_path": ""
+          }
+        },
+        "86": {
+          "class_type": "OTR_CaptionBurn",
+          "inputs": {
+            "video_path": [
+              "93",
+              0
+            ],
+            "title_card_plan_json": [
+              "12",
+              1
+            ],
+            "burn_captions": true,
+            "caption_style": "sdh_standard",
+            "fps": 25,
+            "ffmpeg": "ffmpeg",
+            "ledger_path": "",
+            "output_path": ""
+          }
+        },
+        "87": {
+          "class_type": "OTR_VideoDirector",
+          "inputs": {
+            "gate_in": [
+              "63",
+              0
+            ],
+            "announcer_video_model": "still_pan",
+            "music_video_model": "still_pan",
+            "character_video_model": "still_pan",
+            "announcer_image_model": "z_image_turbo",
+            "music_image_model": "z_image_turbo",
+            "character_image_model": "z_image_turbo",
+            "fps": 25,
+            "canvas_w": 832,
+            "canvas_h": 480,
+            "seed_mode": "request_hash",
+            "request_seed": 42,
+            "custom_models_json": "{}",
+            "device_policy": "cuda",
+            "dtype_policy": "fp8_ok",
+            "max_render_frames": 0
+          }
+        },
+        "88": {
+          "class_type": "OTR_ImageDirector",
+          "inputs": {
+            "video_policy_json": [
+              "87",
+              0
+            ],
+            "announcer_granularity": "per_object",
+            "music_granularity": "per_object",
+            "character_granularity": "per_object",
+            "fresh_cap": 15,
+            "seed_mode": "request_hash",
+            "request_seed": 42,
+            "custom_models_json": "{}",
+            "dtype_policy": "fp8_ok"
+          }
+        },
+        "89": {
+          "class_type": "OTR_MetaBriefImagePromptGen",
+          "inputs": {
+            "script_json": [
+              "90",
+              0
+            ],
+            "image_policy_json": [
+              "88",
+              0
+            ]
+          }
+        },
+        "90": {
+          "class_type": "OTR_ShotLock",
+          "inputs": {
+            "script_json": [
+              "62",
+              1
+            ],
+            "audio_done": [
+              "7",
+              3
+            ],
+            "video_policy_json": [
+              "87",
+              0
+            ],
+            "gate_in": [
+              "12",
+              0
+            ]
+          }
+        },
+        "91": {
+          "class_type": "OTR_ImageGenDispatcher",
+          "inputs": {
+            "script_json": [
+              "90",
+              0
+            ],
+            "image_policy_json": [
+              "88",
+              0
+            ],
+            "image_prompts_json": [
+              "89",
+              0
+            ],
+            "gate_in": [
+              "7",
+              3
+            ],
+            "episode_id": [
+              "90",
+              4
+            ]
+          }
+        },
+        "92": {
+          "class_type": "OTR_VideoRenderBatch",
+          "inputs": {
+            "patched_ledger_json": [
+              "91",
+              0
+            ],
+            "master_audio_path": [
+              "7",
+              1
+            ],
+            "image_done": [
+              "91",
+              1
+            ],
+            "mode": "episode",
+            "beats": 40,
+            "oom_index": 20,
+            "frame_count": 25,
+            "engine": "still_pan",
+            "portrait_path": "",
+            "audio_path": ""
+          }
+        },
+        "93": {
+          "class_type": "OTR_PostUpscaleProcgenBlend",
+          "inputs": {
+            "source_mp4_path": [
+              "84",
+              0
+            ],
+            "procgen_mp4_path": [
+              "12",
+              0
+            ],
+            "scopes_mp4_path": [
+              "94",
+              0
+            ],
+            "blend_mode": "screen",
+            "blend_opacity": 1.0,
+            "ffmpeg": "ffmpeg",
+            "bypass": true,
+            "out_suffix": "_procgen_blended",
+            "shadow_crush_threshold": 18,
+            "green_only_overlay": true,
+            "audio_bars": "bottom"
+          }
+        },
+        "94": {
+          "class_type": "OTR_SceneAwareScopes",
+          "inputs": {
+            "audio": [
+              "7",
+              0
+            ],
+            "clip_manifest_json": [
+              "92",
+              1
+            ],
+            "out_w": 1920,
+            "out_h": 1080,
+            "ffmpeg": "ffmpeg",
+            "landscape_bars": "off"
+          }
+        },
+        "95": {
+          "class_type": "OTR_CreditsRoll",
+          "inputs": {
+            "video_path": [
+              "86",
+              0
+            ],
+            "clip_manifest_json": [
+              "92",
+              1
+            ]
+          }
+        }
+      },
+      {
+        "client_id": "88cb88ba-9bc2-4d98-8f19-0348e5830e0b",
+        "create_time": 1789134190609
+      },
+      [
+        "7",
+        "93",
+        "85",
+        "12",
+        "94",
+        "63",
+        "62",
+        "92"
+      ]
+    ],
+    "outputs": {},
+    "status": {
+      "status_str": "error",
+      "completed": false,
+      "messages": [
+        [
+          "execution_start",
+          {
+            "prompt_id": "8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73",
+            "timestamp": 1789134190611
+          }
+        ],
+        [
+          "execution_cached",
+          {
+            "nodes": [],
+            "prompt_id": "8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73",
+            "timestamp": 1789134191226
+          }
+        ],
+        [
+          "execution_error",
+          {
+            "prompt_id": "8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73",
+            "node_id": "1",
+            "node_type": "OTR_LedgerScriptWriter",
+            "executed": [
+              "63"
+            ],
+            "exception_message": "[OTR_StructuredCall] 'my_story_treatment' failed after 2 attempt(s); disposition=primary_ladder_exhausted; last error -> PostValidationError: ANNOUNCER is reserved for the frame; give story characters distinct names\n",
+            "exception_type": "C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_structured_call.StructuredCallFailedError",
+            "traceback": [
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\OTR_LedgerScriptWriter.py\", line 3679, in run\n    _parts = _lane_runner(\n             ^^^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 1055, in run_my_story_episode\n    treatment = _pass_treatment(\n                ^^^^^^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 516, in _pass_treatment\n    return _call(\n           ^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 395, in _call\n    authored = structured_call(on_attempt_complete=completed, **kwargs)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+              "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_structured_call.py\", line 1286, in structured_call\n    raise StructuredCallFailedError(\n"
+            ],
+            "current_inputs": {
+              "gate_in": [
+                "OTR_WorkflowValidator: OK -- 23 nodes, 63 links, strict_unknown_types=True, path='C:\\\\Users\\\\jeffr\\\\Documents\\\\ComfyUI\\\\custom_nodes\\\\ComfyUI-OldTimeRadio\\\\workflows\\\\otr_canonical.json', widget_vector_drift=0"
+              ],
+              "episode_title": [
+                ""
+              ],
+              "num_characters": [
+                2
+              ],
+              "creative_writing_model": [
+                "google/gemma-4-12b-it (23.9 GB, nv16 nv24)"
+              ],
+              "technical_model": [
+                "google/gemma-4-12b-it (23.9 GB, nv16 nv24)"
+              ],
+              "custom_premise": [
+                "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has."
+              ],
+              "include_act_breaks": [
+                true
+              ],
+              "act_count": [
+                "1"
+              ],
+              "creativity": [
+                "balanced"
+              ],
+              "perfect_run_spacesaver": [
+                false
+              ],
+              "min_p": [
+                0.05
+              ],
+              "repetition_penalty": [
+                1.03
+              ],
+              "max_new_tokens_cap": [
+                200
+              ],
+              "lemmy_cameo": [
+                "roll (~11% chance)"
+              ],
+              "use_exchange": [
+                true
+              ],
+              "enable_production_stage3_validators": [
+                true
+              ],
+              "news_briefs_required": [
+                true
+              ],
+              "openrouter_slot_a_model": [
+                "(enable OpenRouter)"
+              ],
+              "openrouter_slot_b_model": [
+                "(enable OpenRouter)"
+              ],
+              "comfy_slot_a_model": [
+                "(enable Comfy Credits)"
+              ],
+              "comfy_slot_b_model": [
+                "(enable Comfy Credits)"
+              ],
+              "story_scaffold": [
+                "auto"
+              ],
+              "source_bank": [
+                "my_story"
+              ],
+              "visual_style": [
+                "roll (any style)"
+              ],
+              "google_api_slot_a_model": [
+                "(select Google API model)"
+              ],
+              "google_api_slot_b_model": [
+                "(select Google API model)"
+              ],
+              "source_ref": [
+                ""
+              ],
+              "llm_device": [
+                "cuda"
+              ],
+              "llm_attn_impl": [
+                "sdpa"
+              ],
+              "llm_quant_policy": [
+                "bnb_nf4"
+              ],
+              "llm_vram_ceiling_gb": [
+                14.5
+              ],
+              "gguf_n_ctx": [
+                4096
+              ],
+              "gguf_quant": [
+                "Q8_0"
+              ],
+              "replay_from": [
+                ""
+              ],
+              "story_characters": [
+                "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer."
+              ],
+              "story_plot": [
+                "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend."
+              ],
+              "story_setting": [
+                "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table."
+              ],
+              "story_author": [
+                ""
+              ],
+              "api_key_comfy_org": [
+                null
+              ]
+            },
+            "current_outputs": [
+              "88",
+              "91",
+              "85",
+              "80",
+              "62",
+              "7",
+              "87",
+              "93",
+              "90",
+              "4",
+              "89",
+              "94",
+              "12",
+              "92",
+              "86",
+              "81",
+              "1",
+              "3",
+              "95",
+              "84",
+              "82",
+              "63",
+              "83"
+            ],
+            "timestamp": 1789134542462
+          }
+        ]
+      ]
+    },
+    "meta": {}
+  }
+}

@@ -7877,3 +7877,29 @@ Audio listening also remains open: this session's native audio input is
 unsupported, so a submitted excerpt is not an audition or ASR result.
 
 ---
+
+
+## 2026-09-11 -- canonical08 failed; superseded directions verbatim
+
+**Next action: ONE fresh full canonical 5080 attempt08 with Gemma4-12B in
+both writer slots, after the qualified code is pushed.** Use the same dinner
+source, one act, profile and sampling as07. The actual submitted graph may
+differ only in the two model selections. Installed route evidence and scope:
+`2026-09-11-my-story-source-feedback/next_measurement.md`. Finished-code QA and
+regression receipt: `2026-09-11-my-story-source-feedback/qualification_receipt.md`.
+Verify origin/file hashes before boot; no code edits during live generation.
+
+Measure actual source actions/ending, applied corrections, ledger seals,
+model/context/EOS, voice credits and scene pixels through canonical audio,
+video and obs publication. The feedback change and family change are both
+recorded; do not claim a pure model comparison or guaranteed Nemo repair.
+Any failure: preserve and diagnose before more generation. Do not reroll
+until lucky. All seven previous attempts remain3writing failures/4source-
+defective publications/0source-qualified; completed07 must not be restarted.
+
+Broader Jeffrey/Codex1/3/6-act/source/model stress and Original credits remain
+open below. Image consistency remains unqualified (05/06extra people,07mixed
+paper/photo styles). Native audio input is unsupported in this session, so
+actual listening remains open. Component checks do not qualify full episodes.
+
+---

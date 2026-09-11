@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\run_my_story_pairlock_08.py", line 53, in <module>
+    assert result.returncode == 0, 'Full canonical dry run failed'
+           ^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Full canonical dry run failed

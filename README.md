@@ -19,12 +19,11 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
-**My Story qualification:** seven full canonical 5080 recovery attempts across
-recorded revisions produced three writing failures and four publications with
-source defects. The latest Mistral Nemo run has matching voice credits and two
-dinner participants in the inspected images, but still omits the girlfriend
-mention and mixes photographic/paper styles. Zero source-qualified episodes.
-See [seventh-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md)
+**My Story qualification:** eight full canonical 5080 recovery attempts across
+recorded revisions produced four writing failures and four publications with
+source defects. The latest Gemma12B attempt stopped on an announcer/story-cast
+collision. The last Nemo publication still omitted the girlfriend mention.
+Zero source-qualified episodes. See [eighth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof retains
 its recorded platform/scope; it does not establish My Story source fidelity.
 The [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md) remain recorded.
@@ -649,12 +648,12 @@ reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
 
-**My Story on the 5080:** four Qwen3.5-4B/NF4 recovery attempts produced three
-treatment-writing failures and one source-defective publication. Three later
-Mistral Nemo/NF4 attempts published with matching voice credits but source
-omissions. The latest preserves two physical dinner participants; earlier runs
-added people. Seven attempts/four publications/zero source-qualified episodes.
-The older matrix's platform proof is unchanged. See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_07_receipt.md)
+**My Story on the 5080:** four Qwen3.5-4B/NF4 attempts produced three writing
+failures and one source-defective publication. Three Nemo/NF4 attempts published
+with source omissions. One Gemma4-12B/NF4 attempt loaded and generated valid JSON
+but failed treatment/frame ownership before media. Eight attempts, four
+publications, zero source-qualified episodes. Older platform proof is unchanged.
+See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 
 ### The cheapest complete setups

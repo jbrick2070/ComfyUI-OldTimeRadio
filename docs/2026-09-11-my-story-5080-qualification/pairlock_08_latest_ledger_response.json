@@ -1,0 +1,405 @@
+{
+  "ok": true,
+  "filename": "pending_20260911_064311_ledger.json",
+  "mtime": 1789134542.4379597,
+  "size": 30322,
+  "ledger": {
+    "schema_version": "l4-2026-08-07",
+    "episode_id": "pending_20260911_064311",
+    "commit": "7b41a7fd",
+    "total_episode_dur_s": null,
+    "total_char_count": 0,
+    "total_word_count": 0,
+    "total_dialogue_lines": 0,
+    "total_beats": 0,
+    "cast": [],
+    "scenes": [],
+    "shots": [],
+    "beats": [],
+    "lines": [],
+    "music": [],
+    "clips": [],
+    "audio": {},
+    "final_audio_path": null,
+    "final_video_path": null,
+    "meta": {
+      "cast_status": "building",
+      "source_bank": "my_story",
+      "delivery_intent": {
+        "schema_version": "otr_delivery_intent_v1",
+        "source_bank": "my_story",
+        "publication_required": true,
+        "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+        "delivery_token": "e70ab85e10c340d0ab6450568b8a5a27"
+      },
+      "story_draft": {
+        "schema_version": "my_story_input_v1",
+        "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+        "path": "input.json",
+        "status": "verified"
+      },
+      "style_pool_class": "generic",
+      "source_ref": "",
+      "source_meta": {
+        "kind": "user_story",
+        "story_input": {
+          "schema_version": "my_story_input_v1",
+          "fields": {
+            "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+            "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+            "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+            "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+            "author": ""
+          },
+          "normalized": {
+            "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+            "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+            "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+            "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+            "author": ""
+          },
+          "request": {
+            "num_characters": 2,
+            "act_count": "1",
+            "include_act_breaks": true,
+            "source_bank_requested": "my_story",
+            "visual_style_requested": "roll (any style)"
+          },
+          "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9"
+        },
+        "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+        "requested_num_characters": 2,
+        "story_author": ""
+      },
+      "source_rights": {
+        "license_label": "listener original idea"
+      },
+      "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+      "story_attribution": {
+        "author": "",
+        "sentence": "Tonight's story comes from one of our listeners.",
+        "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+        "source": "none supplied"
+      },
+      "story_scaffold": "auto",
+      "visual_style": "cartoon",
+      "style_roll": {
+        "receipt_version": 1,
+        "surface": "visual_style",
+        "requested": "roll (any style)",
+        "selected": "cartoon",
+        "seed": 2266832486,
+        "seed_source": "OS entropy",
+        "eligible_order": [
+          "anime",
+          "archival_documentary",
+          "cartoon",
+          "paper_origami",
+          "recur_frac",
+          "sci_fi_radio",
+          "shakespeare_stage_realism",
+          "storybook_engraving",
+          "video_art",
+          "visual_storybased"
+        ]
+      },
+      "character_word_count": 0,
+      "announcer_word_count": 0,
+      "total_word_count": 0,
+      "paths": {
+        "ledger_path": "pending_20260911_064311_ledger.json",
+        "episode_root": "pending_20260911_064311",
+        "audio_dir": "audio",
+        "stills_dir": "stills",
+        "portraits_dir": "portraits",
+        "videos_dir": "videos",
+        "composited_dir": "composited",
+        "obs_final": "pending_20260911_064311.mp4",
+        "obs_dir": "obs",
+        "layout": "per-episode-workspace"
+      },
+      "schema_version": "l4-2026-08-07",
+      "episode_seed": 80503917,
+      "word_budget": {
+        "schema_version": 5,
+        "owner": "my_story",
+        "policy": "actual_count_only"
+      },
+      "my_story": {
+        "schema_version": "my_story_v1",
+        "seed": 80503917,
+        "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+        "attempts": [
+          {
+            "pass_id": "interpret",
+            "attempt": 1,
+            "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"la_dinner\",\n      \"text\": \"The story takes place during a dinner in a comfortable Los Angeles home.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey and his mother discuss an affectionate childhood memory from the Bay Area.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"single_scene\",\n      \"text\": \"The entire story occurs in one continuous scene at the same table.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_tragedy\",\n      \"text\": \"There is no death, grief, abandonment, or emergency.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"An adult man who loves LA and remembers his Bay Area childhood.\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Living and physically present at the dinner table.\",\n      \"stated_gender\": \"female\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Announcer\",\n      \"notes\": \"\",\n      \"stated_gender\": \"\",\n      \"speaking\": true,\n      \"required\": true\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 3,\n    \"exclusive\": false,\n    \"reason\": \"The user explicitly requested an 'announcer' in the character description, bringing the total to three speaking roles.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day, featuring a single dinner table and a warm, domestic atmosphere.\",\n  \"assumptions\": [\n    \"The 'Announcer' is a non-diegetic narrator or a formal introduction figure rather than a guest at the table.\",\n    \"The 'girlfriend' is mentioned in dialogue but does not appear as a character.\"\n  ],\n  \"conflicts\": []\n}",
+            "raw_completion": null,
+            "status": "accepted",
+            "error": null
+          },
+          {
+            "pass_id": "treatment",
+            "attempt": 1,
+            "raw_output": "{\n  \"title\": \"The Table in the Light\",\n  \"logline\": \"In a quiet Los Angeles home, a son and mother find connection through a shared memory of their childhood in the Bay Area as they share a simple dinner together.,\",\n  \"dramatic_question\": \"How does a shared memory of the past solidify the appreciation for a peaceful present togethering,\",\n  \"setting\": \"A comfortable Los Angeles home dining room, bathed in warm evening light\",\n  \"time_of_day\": \"evening\",\n  \"cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"role\": \"A thoughtful adult man\",\n      \"character_description\": \"Reflective and appreciative, he feels a deep sense of gratitude for his current life in Los Angeles and his relationship with his mother. He speaks with the warmth of a son who truly enjoys his mother's company.,\",\n      \"gender\": \"male\",\n      \"age_band\": \"30s\",\n      \"register\": \"Reflective and warm\",\n      \"timbre\": \"Smooth, grounded\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"role\": \"Jeffrey's mother\",\n      \"character_description\": \"Present, vibrant, and affectionate. She is fully engaged in the conversation, possessing a sharp wit and a soft heart for her son's memories.,\",\n      \"gender\": \"female\",\n      \"age_band\": \"50s\",\n      \"register\": \"Kind and nurturing\",\n      \"timbre\": \"Soft, melodic\"\n    },\n    {\n      \"name\": \"ANNOUNCER\",\n      \"role\": \"Narrator\",\n      \"character_description\": \"Provides the frame for the story, offering a brief introduction and conclusion to the intimate scene.,\",\n      \"gender\": \"\",\n      \"age_band\": \"n/a\",\n      \"register\": \"Formal and inviting\",\n      \"timbre\": \"Clear, authoritative\"\n    }\n  ],\n  \"acts\": [\n    {\n      \"n\": 1,\n      \"purpose\": \"To establish the domestic intimacy of the scene and transition from the present meal to a nostalgic memory of the Bay Area, concluding with a recognition of current happiness.\",\"scene_setting\": \"The dining table in Los Angeles, with the sounds of clinking silverware and domestic ambiance.\",\"turns\": [\n        \"The ANNOUNCER introduces the scene, setting the stage for a quiet evening in Los Angeles. (Note: This is the framing element.)\",\n        \"Jeffrey and his Mother are mid-meal, sharing a comfortable, easy-going conversation about the food and the house. (No movement, just dialogue and domestic sound effects.)\",\n        \"Jeffrey brings up a specific, fond memory from their time in the Bay Area, describing the atmosphere of their childhood home. (The memory remains a spoken narrative, not a flashback scene.)\",\n        \"Mother reacts with a smile, adding her own perspective on that specific moment, laughing at a small detail they both remember. (They stay at the table.)\",\n        \"Jeffrey mentions his girlfriend briefly, noting how much she enjoys these moments of family connection, reinforcing his current life structure. (She is not present, just a point of reference.)\",\n        \"The conversation returns to the present moment, with both characters expressing a quiet, profound appreciation for being together at this table right now.\"\n      ],\n      \"ending_state\": \"Jeffrey and his mother remain seated together, finishing their meal in a state of peaceful, contented connection.\"\n    }\n  ],\n  \"ending\": \"The ANNOUNCER provides a closing thought on the enduring strength of family bonds before the scene fades out.\"\n}",
+            "raw_completion": null,
+            "status": "failed",
+            "error": "ANNOUNCER is reserved for the frame; give story characters distinct names"
+          },
+          {
+            "pass_id": "treatment",
+            "attempt": 2,
+            "raw_output": "{\n  \"title\": \"The Table in the Light\",\n  \"logline\": \"In a quiet Los Angeles home, a son and mother find connection through a shared memory of their childhood in the Bay Area as they share a simple dinner together.\",\n  \"dramatic_question\": \"How does a shared memory of the past solidify the appreciation for a peaceful present togethering\",\n  \"setting\": \"A comfortable Los Angeles home dining room, bathed in warm evening light\",\n  \"time_of_day\": \"evening\",\n  \"cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"role\": \"A thoughtful adult man\",\n      \"character_description\": \"Reflective and appreciative, he feels a deep sense of gratitude for his current life in Los Angeles and his relationship with his mother. He speaks with the warmth of a son who truly enjoys his mother's company.\",\n      \"gender\": \"male\",\n      \"age_band\": \"30s\",\n      \"register\": \"Reflective and warm\",\n      \"timbre\": \"Smooth, grounded\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"role\": \"Jeffrey's mother\",\n      \"character_description\": \"Present, vibrant, and affectionate. She is fully engaged in the conversation, possessing a sharp wit and a soft heart for her son's memories.\",\n      \"gender\": \"female\",\n      \"age_band\": \"50s\",\n      \"register\": \"Kind and nurturing\",\n      \"timbre\": \"Soft, melodic\"\n    },\n    {\n      \"name\": \"ANNOUNCER\",\n      \"role\": \"Narrator\",\n      \"character_description\": \"Provides the frame for the story, offering a brief introduction and conclusion to the intimate scene.\",\n      \"gender\": \"\",\n      \"age_band\": \"n/a\",\n      \"register\": \"Formal and inviting\",\n      \"timbre\": \"Clear, authoritative\"\n    }\n  ],\n  \"acts\": [\n    {\n      \"n\": 1,\n      \"purpose\": \"To establish the domestic intimacy of the scene and transition from the present meal to a nostalgic memory of the Bay Area, concluding with a recognition of current happiness.\",\"scene_setting\": \"The dining table in Los Angeles, with the sounds of clinking silverware and domestic ambiance.\",\"turns\": [\n        \"The ANNOUNCER introduces the scene, setting the stage for a quiet evening in Los Angeles. (Note: This is the framing element.)\",\n        \"Jeffrey and his Mother are mid-meal, sharing a comfortable, easy-going conversation about the food and the house. (No movement, just dialogue and domestic sound effects.)\",\n        \"Jeffrey brings up a specific, fond memory from their time in the Bay Area, describing the atmosphere of their childhood home. (The memory remains a spoken narrative, not a flashback scene.)\",\n        \"Mother reacts with a smile, adding her own perspective on that specific moment, laughing at a small detail they both remember. (They stay at the table.)\",\n        \"Jeffrey mentions his girlfriend briefly, noting how much she enjoys these moments of family connection, reinforcing his current life structure. (She is not present, just a point of reference.)\",\n        \"The conversation returns to the present moment, with both characters expressing a quiet, profound appreciation for being together at this table right now.\"\n      ],\n      \"ending_state\": \"Jeffrey and his mother remain seated together, finishing their meal in a state of peaceful, contented connection.\"\n    }\n  ],\n  \"ending\": \"The ANNOUNCER provides a closing thought on the enduring strength of family bonds before the scene fades out.\"\n}",
+            "raw_completion": null,
+            "status": "failed",
+            "error": "ANNOUNCER is reserved for the frame; give story characters distinct names"
+          }
+        ],
+        "source_rewrites": [
+          {
+            "version": "my_story.source_rewrite.v1",
+            "pass_id": "interpret",
+            "operation_id": "source_rewrite_1",
+            "coordinate_version": "my_story.raw_python_char.v1",
+            "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+            "raw_field_hashes": {
+              "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+              "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+              "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+              "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+            },
+            "source_intervals": [
+              {
+                "field": "idea",
+                "start_char": 0,
+                "end_char": 187
+              },
+              {
+                "field": "characters",
+                "start_char": 0,
+                "end_char": 379
+              },
+              {
+                "field": "plot",
+                "start_char": 0,
+                "end_char": 785
+              },
+              {
+                "field": "setting",
+                "start_char": 0,
+                "end_char": 360
+              }
+            ],
+            "source_scope": "whole",
+            "input_sha256": "17fe76eadfa9e110292aed8af30cfe6736bad55d61291295e0d4a82b6772090b",
+            "output_sha256": "2e83919715b857a65654d92f1d71938b5b7ddaadec82d5b27741d5f194eb67fb",
+            "applied": true,
+            "configured_model_id": "google/gemma-4-12b-it",
+            "executed_model_id": null,
+            "attempt_limit": 2,
+            "attempts": [
+              {
+                "number": 1,
+                "prompt_sha256": "7827f401036a77e74323447beae02c341190ce1492f18639637fe36e102ce8c7",
+                "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"la_dinner\",\n      \"text\": \"The story takes place during a dinner in a comfortable Los Angeles home\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey and his mother discuss an affectionate childhood memory from the Bay Area\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"single_scene\",\n      \"text\": \"The entire story occurs in one continuous scene at the same table\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_tragedy\",\n      \"text\": \"There is no death, grief, abandonment, or emergency\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"An adult man who loves LA and remembers his Bay Area childhood\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Living and physically present at the dinner table\",\n      \"stated_gender\": \"female\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Announcer\",\n      \"notes\": \"\",\n      \"stated_gender\": \"\",\n      \"speaking\": true,\n      \"required\": true\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 3,\n    \"exclusive\": false,\n    \"reason\": \"The user explicitly requested an 'announcer' in the character description, bringing the total to three speaking roles.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day, featuring a single dinner table and a warm, domestic atmosphere\",\n  \"assumptions\": [\n    \"The 'Announcer' is a non-diegetic narrator or a formal introduction figure rather than a guest at the table\",\n    \"The 'girlfriend' is mentioned in dialogue but does not appear as a character\"\n  ],\n  \"conflicts\": []\n}",
+                "raw_completion": null,
+                "generation_started": true,
+                "fit": {
+                  "available_output_tokens": 128894,
+                  "capacity_known": true,
+                  "capacity_source": "loaded decoder config (native 131072)",
+                  "context_cap": 131072,
+                  "effective_output_tokens": 128894,
+                  "eos_token_ids": [
+                    1,
+                    106,
+                    50
+                  ],
+                  "fits": true,
+                  "model_id": "google/gemma-4-12b-it",
+                  "prompt_tokens": 2178,
+                  "requested_output_tokens": 131072,
+                  "supported": true
+                },
+                "status": "usable",
+                "validation_error": null
+              }
+            ],
+            "status": "rewritten",
+            "qualified": false,
+            "returned_artifact": {
+              "requirements": [
+                {
+                  "id": "la_dinner",
+                  "text": "The story takes place during a dinner in a comfortable Los Angeles home",
+                  "kind": "setting",
+                  "source_field": "setting",
+                  "strength": "required"
+                },
+                {
+                  "id": "bay_area_memory",
+                  "text": "Jeffrey and his mother discuss an affectionate childhood memory from the Bay Area",
+                  "kind": "plot",
+                  "source_field": "plot",
+                  "strength": "required"
+                },
+                {
+                  "id": "single_scene",
+                  "text": "The entire story occurs in one continuous scene at the same table",
+                  "kind": "plot",
+                  "source_field": "plot",
+                  "strength": "required"
+                },
+                {
+                  "id": "no_tragedy",
+                  "text": "There is no death, grief, abandonment, or emergency",
+                  "kind": "plot",
+                  "source_field": "plot",
+                  "strength": "required"
+                },
+                {
+                  "id": "girlfriend_mention",
+                  "text": "Jeffrey briefly mentions his girlfriend as a separate person",
+                  "kind": "plot",
+                  "source_field": "plot",
+                  "strength": "required"
+                }
+              ],
+              "named_cast": [
+                {
+                  "name": "Jeffrey",
+                  "notes": "An adult man who loves LA and remembers his Bay Area childhood",
+                  "stated_gender": "male",
+                  "speaking": true,
+                  "required": true
+                },
+                {
+                  "name": "Mother",
+                  "notes": "Living and physically present at the dinner table",
+                  "stated_gender": "female",
+                  "speaking": true,
+                  "required": true
+                },
+                {
+                  "name": "Announcer",
+                  "notes": "",
+                  "stated_gender": "",
+                  "speaking": true,
+                  "required": true
+                }
+              ],
+              "cast_plan": {
+                "requested": 2,
+                "planned": 3,
+                "exclusive": false,
+                "reason": "The user explicitly requested an 'announcer' in the character description, bringing the total to three speaking roles."
+              },
+              "setting_brief": "A comfortable Los Angeles home dining room in the present day, featuring a single dinner table and a warm, domestic atmosphere",
+              "assumptions": [
+                "The 'Announcer' is a non-diegetic narrator or a formal introduction figure rather than a guest at the table",
+                "The 'girlfriend' is mentioned in dialogue but does not appear as a character"
+              ],
+              "conflicts": []
+            }
+          }
+        ],
+        "counts": {
+          "requested_acts": 1,
+          "proposed_acts": 1,
+          "accepted_acts": null,
+          "actual_acts": null,
+          "requested_characters": 2,
+          "planned_characters": 3,
+          "proposed_characters": 3,
+          "accepted_characters": null,
+          "actual_characters": null
+        },
+        "notes": [
+          "The person's own typed fields are the sole source.",
+          "Selected acts bind treatment acceptance; character count is flexible guidance."
+        ],
+        "interpretation": {
+          "requirements": [
+            {
+              "id": "la_dinner",
+              "text": "The story takes place during a dinner in a comfortable Los Angeles home",
+              "kind": "setting",
+              "source_field": "setting",
+              "strength": "required"
+            },
+            {
+              "id": "bay_area_memory",
+              "text": "Jeffrey and his mother discuss an affectionate childhood memory from the Bay Area",
+              "kind": "plot",
+              "source_field": "plot",
+              "strength": "required"
+            },
+            {
+              "id": "single_scene",
+              "text": "The entire story occurs in one continuous scene at the same table",
+              "kind": "plot",
+              "source_field": "plot",
+              "strength": "required"
+            },
+            {
+              "id": "no_tragedy",
+              "text": "There is no death, grief, abandonment, or emergency",
+              "kind": "plot",
+              "source_field": "plot",
+              "strength": "required"
+            },
+            {
+              "id": "girlfriend_mention",
+              "text": "Jeffrey briefly mentions his girlfriend as a separate person",
+              "kind": "plot",
+              "source_field": "plot",
+              "strength": "required"
+            }
+          ],
+          "named_cast": [
+            {
+              "name": "Jeffrey",
+              "notes": "An adult man who loves LA and remembers his Bay Area childhood",
+              "stated_gender": "male",
+              "speaking": true,
+              "required": true
+            },
+            {
+              "name": "Mother",
+              "notes": "Living and physically present at the dinner table",
+              "stated_gender": "female",
+              "speaking": true,
+              "required": true
+            },
+            {
+              "name": "Announcer",
+              "notes": "",
+              "stated_gender": "",
+              "speaking": true,
+              "required": true
+            }
+          ],
+          "cast_plan": {
+            "requested": 2,
+            "planned": 3,
+            "exclusive": false,
+            "reason": "The user explicitly requested an 'announcer' in the character description, bringing the total to three speaking roles."
+          },
+          "setting_brief": "A comfortable Los Angeles home dining room in the present day, featuring a single dinner table and a warm, domestic atmosphere",
+          "assumptions": [
+            "The 'Announcer' is a non-diegetic narrator or a formal introduction figure rather than a guest at the table",
+            "The 'girlfriend' is mentioned in dialogue but does not appear as a character"
+          ],
+          "conflicts": []
+        },
+        "cast_plan": {
+          "requested": 2,
+          "planned": 3,
+          "exclusive": false,
+          "reason": "The user explicitly requested an 'announcer' in the character description, bringing the total to three speaking roles."
+        }
+      },
+      "news": null
+    }
+  }
+}

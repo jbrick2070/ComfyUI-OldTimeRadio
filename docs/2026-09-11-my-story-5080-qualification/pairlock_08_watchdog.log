@@ -1,0 +1,16 @@
+[watchdog] start 06:41:43 :: leg=tmp\my_story_5080_pairlock_08.log stall=300s poll=30s
+[watchdog] 06:42:13 waiting for first heartbeat
+[watchdog] 06:42:43 waiting for first heartbeat
+[watchdog] 06:43:13 t=0s stalled=0s qfail=0
+[watchdog] 06:43:43 t=30s stalled=0s qfail=0
+[watchdog] 06:44:14 t=60s stalled=0s qfail=0
+[watchdog] 06:44:44 t=91s stalled=0s qfail=0
+[watchdog] 06:45:14 t=121s stalled=0s qfail=0
+[watchdog] 06:45:44 t=151s stalled=0s qfail=0
+[watchdog] 06:46:14 t=181s stalled=0s qfail=0
+[watchdog] 06:46:44 t=211s stalled=0s qfail=0
+[watchdog] 06:47:14 t=241s stalled=0s qfail=0
+[watchdog] 06:47:44 t=271s stalled=0s qfail=0
+[watchdog] 06:48:14 t=302s stalled=0s qfail=0
+[watchdog] 06:48:44 t=332s stalled=0s qfail=0
+[watchdog] DONE 06:49:14 :: [canonical-api] RESULT FAIL prompt_id=8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73

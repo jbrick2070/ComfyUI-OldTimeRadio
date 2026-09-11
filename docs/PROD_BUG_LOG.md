@@ -14462,3 +14462,20 @@ Bible38/10inherited; canonical unchanged. ExistingBible11.39 extended; actual
 Sonnet QA/root judgment and raw evidence:2026-09-11-my-story-source-feedback/.
 Live semantic closure remains OPEN: neither07proposal attempted a girlfriend
 edit. Better diagnostic feedback is not evidence that the missing fact returns.
+
+
+### PBUG-20260910-03 follow-up -- pairlock_08 frame ownership stops treatment
+
+Live canonical7b41a7fd,prompt8c575ba7-94d1-40b7-b9e8-b43ffc9c9a73,
+Gemma4-12B. P0/source names non-diegeticAnnouncer as required speaking cast.
+Both complete P1drafts include ANNOUNCERcast, an opening turn, and globalending
+as announcerclosingthought, while localending_state is the correct sharedmeal.
+P1fails reserved-name validation twice and never reaches its source correction.
+P3 already owns frame; P4 creates c01. P0 lacks a frame carve-out, P1's explicit
+exclusion is cast-only, and repair wrongly asks for distinct character names.
+Root/Terra verified all three leaks; removing onlycast leaves wrongfinalendpoint.
+No model-capacity/OOM/decoderfailure:4natural-EOS calls, sourcefit2178/131072.
+Zeroauthoredrows/media. Pending scope: existingphaseownership and actionable
+whole-treatmentrepair, without newcall/schema/gate/alias/blindstrip. Portable
+Biblepromotion/coverage accompanies the eventualfix; nofixclaimedyet. Evidence:
+2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md.

@@ -1,3 +1,25 @@
+## 2026-09-11 -- canonical08 failed on frame ownership; preserve before repair
+
+Full canonical7b41a7fd, Gemma4-12B pair, prompt8c575ba7-94d1-40b7-b9e8-
+b43ffc9c9a73. Only model selections differ from07. P0/source accepted; P1
+fails after two complete natural-EOS drafts with ANNOUNCER in cast, first turn
+and global ending. Local ending_state/other dramatic turns preserve requested
+meal/response/girlfriend/current appreciation, but no actual speech is produced.
+P3 owns framing; root/Terra reject blind cast deletion or renaming. Existing
+phase instructions and misleading distinct-names repair require scoped review.
+
+351.85seconds; zero lines/media/freeze. Failed ledger/hash/history/logs and
+actual wrapper preserved under2026-09-11-my-story-5080-qualification/pairlock_08_*.
+Separate bare-dropdown-label dry-run failed beforequeue and was corrected only
+in the harness. Wrapper's media correlation staysfalse on no-output failure;
+serverlog identifies this failed ledger creation/finalsave. No successclaimed.
+Eightattempts:4writingfailures/4source-defectivepublications/0qualified. Server
+selectively stopped37700/34028,portempty,desktop2591-2628MiB. No codeeditduring
+generation; Mac/4060held; RunPodnoauth/norental. GO_FORWARD queues ownership
+review/code/finishedSonnet/regression before any further generation.
+
+---
+
 ## 2026-09-11 -- exact-row correction feedback qualified; Gemma canonical08 next
 
 Existing invalid-interval error now identifies line ID, submitted quote/offsets

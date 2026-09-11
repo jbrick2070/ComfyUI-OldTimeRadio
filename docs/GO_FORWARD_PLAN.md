@@ -92,26 +92,24 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 attempt08 with Gemma4-12B in
-both writer slots, after the qualified code is pushed.** Use the same dinner
-source, one act, profile and sampling as07. The actual submitted graph may
-differ only in the two model selections. Installed route evidence and scope:
-`2026-09-11-my-story-source-feedback/next_measurement.md`. Finished-code QA and
-regression receipt: `2026-09-11-my-story-source-feedback/qualification_receipt.md`.
-Verify origin/file hashes before boot; no code edits during live generation.
+**Next action: review and repair My Story's P0/P1 frame-ownership boundary.**
+Canonical08 failed P1 after two attempts with ANNOUNCER in the dramatic cast,
+opening turn and global ending. P0 had included the non-diegetic announcer in
+named_cast. P3 already owns all framing; do not just delete a cast row and leave
+the wrong ending, or rename the announcer as a story person. Use the existing
+author/correction and typed-repair owners; no new calls, schema/gates or budget
+reset. Ground the scope before code, then finish Sonnet QA/full regression/
+Bible/push before any further GPU generation. Measured08 and diagnosis:
+`2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md`.
 
-Measure actual source actions/ending, applied corrections, ledger seals,
-model/context/EOS, voice credits and scene pixels through canonical audio,
-video and obs publication. The feedback change and family change are both
-recorded; do not claim a pure model comparison or guaranteed Nemo repair.
-Any failure: preserve and diagnose before more generation. Do not reroll
-until lucky. All seven previous attempts remain3writing failures/4source-
-defective publications/0source-qualified; completed07 must not be restarted.
-
-Broader Jeffrey/Codex1/3/6-act/source/model stress and Original credits remain
-open below. Image consistency remains unqualified (05/06extra people,07mixed
-paper/photo styles). Native audio input is unsupported in this session, so
-actual listening remains open. Component checks do not qualify full episodes.
+Eight full canonical attempts remain4writing failures/4source-defective
+publications/0source-qualified.08's separate prequeue dropdown-label failure
+generated nothing and is not another story attempt. Do not restart completed08
+or reroll until lucky. Broad source, Jeffrey/Codex1/3/6-act and model stress,
+Original credit and image consistency checks remain open below. Audio input is
+unsupported in this session; actual listening remains open. Mac/4060 held and
+RunPod unauthenticated/no rental. Keep full raw source, flexible dramatic cast,
+selected acts and every failure receipt. Component checks do not qualify media.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

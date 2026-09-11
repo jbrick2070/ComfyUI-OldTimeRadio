@@ -1,0 +1,37 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import subprocess
+import sys
+
+r=Path.cwd(); d=r/'docs/2026-09-11-my-story-source-feedback'
+bible=r.parents[1]/'comfyui-custom-node-survival-guide'
+for repo,branch in [(r,'v2.0-alpha'),(bible,'main')]:
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo)==subprocess.check_output(['git','rev-parse','origin/'+branch],cwd=repo)
+    for path in subprocess.check_output(['git','diff-tree','--no-commit-id','--name-only','-r','HEAD'],cwd=repo,text=True).splitlines():
+        raw=subprocess.check_output(['git','show','HEAD:'+path],cwd=repo)
+        assert raw and not raw.startswith(b'\xef\xbb\xbf'),path
+        text=raw.decode('utf-8')
+        if path.endswith('.py'): ast.parse(text,filename=path,feature_version=(3,10))
+for repo,name in [(r,'file_checks.json'),(bible,'bible_file_checks.json')]:
+    for item in json.loads((d/name).read_text(encoding='utf-8')):
+        assert hashlib.sha256((repo/item['path']).read_bytes()).hexdigest()==item['sha256'],item['path']
+for item in json.loads((d/'evidence_manifest.json').read_text(encoding='utf-8')):
+    relative=(d/item['path']).relative_to(r).as_posix()
+    raw=subprocess.check_output(['git','show','HEAD:'+relative],cwd=r)
+    assert len(raw)==item['bytes'] and hashlib.sha256(raw).hexdigest()==item['sha256'],relative
+assert hashlib.sha256((r/'workflows/otr_canonical.json').read_bytes()).hexdigest()=='d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c'
+print('Both pushed HEADs match origin; committed files nonempty/UTF8/noBOM; touched Python3.10 AST valid.')
+print('All final production/test file hashes and29 exact committed evidence blobs match qualification.')
+sys.path.insert(0,str(r))
+import transformers
+from nodes._otr_model_loader import _require_transformers_model_support
+_require_transformers_model_support('google/gemma-4-12b-it')
+snapshot=Path('C:/ComfyUI-Models/huggingface/hub/models--google--gemma-4-12b-it/snapshots/66bc78a7534d523aa32004652cb02cc2e6354c62')
+weight=snapshot/'model.safetensors'
+assert weight.is_file() and weight.stat().st_size==23919549408
+print('Gemma preflight metadata:',json.dumps({'transformers':transformers.__version__,
+    'snapshot':str(snapshot),'resolved_weight':str(weight.resolve()),'weight_bytes':weight.stat().st_size,
+    'architecture':json.loads((snapshot/'config.json').read_text(encoding='utf-8'))['architectures']}))
+print('No weights loaded and no generation during this verification.')

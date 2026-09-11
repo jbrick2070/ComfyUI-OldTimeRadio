@@ -1,0 +1,38 @@
+[canonical-api] workflow=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[canonical-api] run_label=5080_pairlock_08_gemma_feedback (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_w45_still_pan (45-word run: still_pan) -- 16 overrides:
+  role_overrides.announcer_visual=still_pan
+  role_overrides.music_visual=still_pan
+  role_overrides.character_visual=still_pan
+  role_overrides.announcer_image=z_image_turbo
+  role_overrides.music_image=z_image_turbo
+  role_overrides.character_image=z_image_turbo
+  slot_overrides.voice_bank=default
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=indextts2
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=still_pan
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+Traceback (most recent call last):
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_canonical_api_run.py", line 514, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_canonical_api_run.py", line 439, in main
+    prompt, applied = build_api_prompt(args)
+                      ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_canonical_api_run.py", line 188, in build_api_prompt
+    applied.extend(_apply_writer_shortcuts(workflow, schemas, args))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_canonical_api_run.py", line 126, in _apply_writer_shortcuts
+    patch_creative(workflow, writer_id, widget, value, schemas)
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_api.py", line 874, in patch_creative
+    patch_widget_by_name(workflow, node_id, widget_name, value, schemas)
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_api.py", line 453, in patch_widget_by_name
+    _validate_widget_value(node_type, widget_name, _spec, value)
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\otr_api.py", line 211, in _validate_widget_value
+    raise ValueError(
+ValueError: widget 'creative_writing_model' on node_type 'OTR_LedgerScriptWriter' is a COMBO with choices ['Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)', 'unsloth/Llama-3.2-3B-Instruct (6.4 GB, mac16 nv8 nv16 nv24)', 'mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)', 'google/gemma-4-E2B-it (6.0 GB, mac16-tight nv8 nv16 nv24)', 'google/gemma-4-E4B-it (9.0 GB, mac16-tight nv8 nv16 nv24)', 'google/gemma-4-12b-it (23.9 GB, nv16 nv24)', 'google/gemma-2-2b-it (5.2 GB, gated mac16 nv8 nv16 nv24)', 'openrouter:slot-a', 'openrouter:slot-b', 'comfy:slot-a', 'comfy:slot-b', 'google_api:slot-a', 'google_api:slot-b', 'Qwen/Qwen3-8B']; got 'google/gemma-4-12b-it' which is not in the choice list.

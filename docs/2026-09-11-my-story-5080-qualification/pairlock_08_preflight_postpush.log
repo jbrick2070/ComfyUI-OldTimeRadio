@@ -1,0 +1,4 @@
+Both pushed HEADs match origin; committed files nonempty/UTF8/noBOM; touched Python3.10 AST valid.
+All final production/test file hashes and29 exact committed evidence blobs match qualification.
+Gemma preflight metadata: {"transformers": "5.10.4", "snapshot": "C:\\ComfyUI-Models\\huggingface\\hub\\models--google--gemma-4-12b-it\\snapshots\\66bc78a7534d523aa32004652cb02cc2e6354c62", "resolved_weight": "C:\\ComfyUI-Models\\huggingface\\hub\\models--google--gemma-4-12b-it\\blobs\\5a84cb313260ac447237b890387116dfa8682e49a6b44bc585ae8353abbff18d", "weight_bytes": 23919549408, "architecture": ["Gemma4UnifiedForConditionalGeneration"]}
+No weights loaded and no generation during this verification.
