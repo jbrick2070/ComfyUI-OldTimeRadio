@@ -1234,8 +1234,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonic
 For a no-queue validation of the exact API prompt shape:
 
 ```
-C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_canonical_api_run.py --offline-schemas --dry-run --act-count 3
+<your ComfyUI python> scripts/otr_canonical_api_run.py --offline-schemas --dry-run --act-count 3
 ```
+
+> Run it with the SAME interpreter that runs ComfyUI (`.venv\Scripts\python.exe` on
+> Windows, `.venv/bin/python` on Mac/Linux). **`scripts/` is a development-tree tool and
+> is NOT in the registry bundle** -- clone the repo from GitHub if you want it.
 
 Cloud route example:
 
@@ -1381,8 +1385,11 @@ every leg, so killing a run mid-flight still leaves a complete record.
   structured extraction, so a bank that survives it survives everything above it.
 
 ```
-C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_bank_engine_sweep.py
+<your ComfyUI python> scripts/otr_bank_engine_sweep.py
 ```
+
+> Same two caveats: the interpreter that runs ComfyUI, and `scripts/` ships only in the
+> GitHub tree, not in the registry bundle.
 
 Engine dropdowns move **only** through profile `role_overrides` in `config/profiles/*.json`
 — exactly what a human clicking the announcer / music / character dropdowns and saving the

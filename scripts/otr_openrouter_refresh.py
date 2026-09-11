@@ -12,8 +12,12 @@ A failed / offline fetch keeps the existing good cache and never raises (the
 backend guarantees this); the script just reports it and exits non-zero so a
 scheduled run can alert.
 
-Usage (Windows, repo root, venv python):
-    C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Scripts\\python.exe scripts\\otr_openrouter_refresh.py
+Usage -- run it with the SAME python that runs ComfyUI, from the repo root:
+    Windows:  path\\to\\ComfyUI\\.venv\\Scripts\\python.exe scripts\\otr_openrouter_refresh.py
+    Mac/Linux:  path/to/ComfyUI/.venv/bin/python scripts/otr_openrouter_refresh.py
+
+It writes the cache the node dropdowns read, so it has to be the interpreter that
+imports this pack -- a different python writes a cache the server never looks at.
 
 OPENROUTER_API_KEY is read from the environment if present (recommended), but
 the OpenRouter /models list is public, so a refresh works without a key too.
