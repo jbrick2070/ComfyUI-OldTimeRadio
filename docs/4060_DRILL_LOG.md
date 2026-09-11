@@ -4947,3 +4947,343 @@ auto-downloaded and nothing is hidden from a dropdown.
 `+ Add Custom Model` even though both directors resolve it through
 `custom_models_json`, so the documented escape hatch was rejected before either
 director ran. It now resolves the sentinel the way the directors do (e4b5dfe).
+
+### Step 116 — September 10, 18:04–18:29 PDT: My Story + all-stills canonical leg publishes, but does not qualify
+
+**Purpose.** Exercise the pulled repository canonical on the 8 GB RTX 4060 as
+one act, with local `my_story`, `z_image_turbo`, and `still_pan` in every video
+lane.  This is deliberately a stills test while LTX is unavailable; it is not a
+Comfy Registry profile or a multi-act run.
+
+**Technical result.** PASS for the stills pipeline.  The run wrote 17 generated
+stills at 1472x832, rendered 15 `still_pan` clips using those materialized
+scene-still paths, assembled and captioned the episode, then published a
+100,334,958-byte final.  The verified final duration is 133.760 s; the master
+audio is 108.848 s plus a declared 24.9 s credit tail.  The delivery check,
+on-disk OBS publication, and master-audio byte-identity check all passed.
+
+**Content qualification: BLOCKED.** The typed story said Jeffrey misses the
+ordinary comfort of childhood with his mother; it did not say she was dead,
+absent, estranged, or replaceable.  My Story nevertheless inferred a deceased
+or absent mother and pushed an inappropriate girlfriend-as-replacement thread
+into the treatment.  `ledger_clean` then exhausted its bounded repairs on one
+spoken-text row and shipped it with `compose_flag=unclean_spoken_text`.  This is
+not a renderer or VRAM failure, but it makes this otherwise complete artifact
+ineligible to qualify the new My Story source.
+
+**Shared-core handoff — content.** Add an explicit prompt contract in My Story
+P0 and P1: never invent death, estrangement, abandonment, disappearance, or
+other family-member absence from nostalgia, longing, childhood recollection, or
+comparison to romance alone; when status is unstated, leave it unstated.  Add a
+CPU prompt-contract regression using this story shape.  Do not patch the shared
+source in this 4060 campaign window; carry the evidence to the 5080 core window.
+
+**Shared-core handoff — observability.** Before image generation, ShotLock
+emitted `MISSING-STILL (LOUD)` for every `still_pan` beat.  Audit confirmed the
+canonical graph correctly gates render behind ImageGen; the message comes from
+ShotLock's intentionally pre-image compatibility pass, while the later render
+path validates the materialized stills and did so successfully here.  Make the
+pre-image path say `CAST-TIME STILL DEFERRED` (or equivalent) and reserve the
+loud missing-still alarm for a post-image/render-time absence.  Add phase-aware
+log-contract tests.
+
+**Warnings retained with disposition.** `BUG-LOCAL-413` reported a soft,
+non-LTX open for the intentionally all-`still_pan` test; expected for this
+LTX-free leg, not a failure.  The composite filled 25 tail frames with the
+permitted floor rather than looping non-closing footage; final timing remained
+within the declared budget.
+
+**Next.** Run another one-act all-stills leg with an explicit assertion that
+Jeffrey's mother is alive, well, loved, and has her own non-replaceable place in
+his life; his girlfriend is a distinct valued partner.
+
+### Step 117 — September 10, 18:29–18:34 PDT: explicit living-mother regression repeats, then P1 exhausts its JSON ladder
+
+**Leg.** The second one-act canonical stills leg tightened every typed field:
+Jeffrey's mother is alive, well, warmly present, living in the Bay Area,
+non-replaceable, and receives a current phone call; the plot explicitly says
+she is never absent or replaceable.
+
+**P0 source-fidelity failure (confirmed).** Its accepted interpretation repeated
+the correct facts in `requirements` and `named_cast`, but its `assumptions[0]`
+also claimed she was "deceased or unavailable ... despite being 'alive'."
+`conflicts` was empty.  This is a direct self-contradiction in a schema-valid
+P0 response, not ambiguous user prose.  The source input and accepted raw P0
+artifact are retained in the pending-leg ledger for the 5080 handoff.
+
+**P1 execution failure (confirmed).** The treatment generator emitted
+JSON-looking but undecodable text three times: base, lowered-temperature
+structural retry, and typed repair.  The structured-call ladder then correctly
+failed closed with `StructuredCallFailedError` after all three attempts.  No
+audio, images, clips, or final media were minted by this leg.  Treat this as a
+separate reproducible My Story/P1 formatting failure; do not infer a successful
+treatment from its otherwise sensible raw prose.
+
+**Shared-core fix specification.** Add a narrow P0 post-validator before the
+interpretation is persisted or passed to P1.  It must reject a direct material
+contradiction between explicit typed source facts (for example, a mother is
+alive/present/living) and an assumption that she is dead, deceased, absent,
+unavailable, estranged, abandoned, or disappeared.  Keep a benign assumption
+such as present-day setting due to phone calls valid.  Mirror the same guard in
+P1 if treatment text can reintroduce the contradiction.  Add prompt language
+that nostalgia and a romance comparison never license those family-status
+inferences.  Add CPU canned-response tests: bad schema-valid P0 must be
+repaired/rejected before P1; corrected P0 and benign present-day assumption pass.
+
+**P1 follow-up.** Add a canned three-attempt treatment test using the observed
+JSON-looking malformed outputs and assert the current fail-closed receipt.  Use
+that fixture to decide whether a targeted extractor/repair can safely handle
+this model shape; do not weaken the decoder to accept unquoted natural-language
+values generically.
+
+**Recovery evidence.** Before restart, preserved the bounded server-log excerpt,
+the zero-line pending ledger, listener ownership, and the exact ComfyUI process
+tree.  Only the identified ComfyUI Python server and its console child are in
+scope for the targeted recovery; no blanket Python termination is authorized.
+
+**Recovery completed.** Stopped only that confirmed server tree, verified its
+8188 listener was gone, then restarted the same local stills launcher and
+verified a fresh loopback 8188 listener.  No unrelated Python or desktop process
+was stopped.
+
+### Step 118 — September 10, 18:36–18:41 PDT: physical-presence My Story regression clears P0 status grounding but repeats the P1 JSON failure
+
+**Leg.** The third one-act canonical stills leg made the family-status facts
+even more concrete: Jeffrey's living, healthy mother took a same-day trip from
+the Bay Area and spoke with him face-to-face over dinner in Los Angeles; his
+girlfriend joined them for dessert as a distinct, valued partner.  Every typed
+field explicitly excluded death, absence, estrangement, replacement, and
+disappearance.
+
+**P0 disposition.** This time P0 retained the mother as alive, healthy,
+physically present, and face-to-face with Jeffrey.  It made no false
+death/absence inference, so this is a useful narrow regression improvement over
+Step 117.  It did nevertheless add the internally inconsistent unstated detail
+that a one-act story has "music playing between acts."  Retain that as a
+separate one-act prompt/validator finding; it did not cause the execution stop.
+
+**P1 repeat failure (confirmed).** The treatment call again produced
+JSON-looking but undecodable output on the base request, its lowered-temperature
+structural retry, and the typed repair request.  The third failure raised the
+same fail-closed `StructuredCallFailedError` with
+`disposition=primary_ladder_exhausted`.  The leg took 256.85 s and left the
+pending ledger at zero lines, zero audio, zero stills, zero clips, and no final
+media.  This reproduces the Step 117 P1 issue despite materially different,
+more explicit source facts and a P0 result without the family-status error; it
+is therefore not attributable solely to the original story ambiguity.
+
+**Evidence retained.** The zero-line ledger is
+`pending_20260910_183653`, and the server log preserves all three decoder
+failures plus the stack into `_otr_structured_call.py`.  The active server tree
+at failure is the identified ComfyUI Python process and its one `conhost.exe`
+child; no unrelated process is in recovery scope.
+
+**Shared-core P1 handoff refinement.** Reproduce with a canned three-attempt
+fixture that contains the observed JSON-looking malformed treatment shapes.
+Keep the current fail-closed behavior as the control.  Evaluate a narrowly
+scoped top-level-object extractor/structural repair only if it can prove it
+repairs JSON punctuation/quoting without converting arbitrary natural-language
+values into accepted schema data; otherwise fix the P1 prompt/decoder contract
+or model adapter.  Add a one-act semantic check that rejects an assumption about
+events "between acts" when `act_count=1`.
+
+**Next.** Preserve this evidence, perform the same targeted ComfyUI-server
+recovery required by the confirmed error, and continue with a smaller ordinary
+one-act all-stills My Story probe to distinguish a prompt-size sensitivity from
+the repeated P1 formatter failure.  No shared-core source is changed in this
+4060 campaign window.
+
+### Step 119 — September 10, 18:51–19:14 PDT: compact My Story formatter microprobe technically passes; P0 still rewrites explicit facts
+
+**Leg.** One-act canonical all-stills microprobe with two characters and compact
+typed source facts: Jeffrey meets his living mother for dinner in Los Angeles
+and they plan another visit.  This isolates P1 formatting/reliability while
+retaining the canonical `my_story` → `z_image_turbo` → `still_pan` path.
+
+**P0 source-fidelity failure (confirmed).** Despite the direct “living mother,
+present for dinner” input, P0 inferred that it implied a deceased parent.  It
+also introduced one-act-incompatible interstitial/between-acts music.  These
+are unsupported inventions, not ambiguity in the supplied story.  Therefore
+this leg is **not content-qualified** regardless of its technical media outcome.
+
+**P1 disposition.** The base and lowered-temperature treatment attempts again
+emitted JSON-looking but undecodable output.  The typed repair attempt produced
+a valid `StoryTreatment`, allowing P2/P3 and downstream still generation to
+proceed.  This narrows the finding: P1 formatting is materially unreliable and
+complexity-sensitive, but not an absolute execution block.  Retain the malformed
+raw artifacts and the accepted repair receipt together.
+
+**Technical outcome (PASS; content qualification NO).** All 25 1472×832
+Z Image Turbo stills materialized, every one passed the post-image still-spine
+gate, and 22 `still_pan` clips assembled into 23 positioned beats.  The
+compositor made a 2458-frame, 98.307-second silent master; it applied the
+declared 25-frame floor fill rather than looping an unprovable closing clip.
+The completed 124.680-second OBS delivery is 53,238,289 bytes and its archival
+PCM-master companion is 69,283,871 bytes.  Publication, on-disk delivery, and
+archival master-audio byte identity all passed.  This establishes the canonical
+all-stills route as technically healthy for this microprobe; it does **not**
+qualify the story because the accepted authored text still invented family
+absence/past-distance despite the supplied present living-mother facts.
+
+**Evidence / gate distinction.** The ledger records exactly one requested,
+proposed, accepted, and actual act; it records the P1 attempt sequence as
+failed, failed, accepted.  Its technical publication eligibility is true and
+the current fidelity-discrepancy list is empty, demonstrating that existing
+fidelity gates did not catch the confirmed semantic drift.  Preserve the
+episode ledger, OBS output, and archival final for the 5080 core window.
+
+**Nonfatal observability retained.** The early pre-image
+`MISSING-STILL (LOUD)` messages retain their known ShotLock-observability
+disposition: every later materialized still was present at render time.  The
+master mux also raised `LOUD re-resolve` when the normal post-capture episode
+directory rename rewrote the stale path to the same master WAV; output proves
+the re-resolution succeeded.  Downgrade that expected rename recovery to an
+informational/path-reconciled receipt, while retaining a loud error for an
+unresolvable or non-identical master path.
+
+**Shared-core P1 handoff — schema binding.** `_pass_treatment` currently calls
+the creative function without consuming its available `_otr_bind_schema` seam,
+while `OTR_LedgerScriptWriter` already exposes the lazy binder.  Before the P1
+structured call, bind only the local P1 callable to `StoryTreatment`:
+
+```python
+bind_schema = getattr(creative_fn, "_otr_bind_schema", None)
+if callable(bind_schema):
+    creative_fn = bind_schema(StoryTreatment)
+```
+
+Do not bind per retry and do not mutate the original callable: P2/P3 remain
+unbound.  Add a CPU seam test proving the binder is called once, P1 uses the
+bound callable, P2/P3 use the original callable, and malformed treatment output
+still fails closed.  Do not add generic regex JSON repair.
+
+**Shared-core P0/one-act handoff.** P0 currently receives “music between acts:
+yes” whenever act breaks are enabled, even for a one-act leg; P3/assembly
+already calculate zero actual interstitials.  Replace the boolean prompt claim
+with `max(0, act_count - 1)` in both P0/P1.  Add prompt language plus a narrow
+P0 post-validator that rejects direct contradiction of explicit source facts
+and rejects between-act/interstitial assertions when `act_count=1`.  Regressions
+must reject both “living mother implies deceased parent” and one-act interstitial
+music, while allowing ordinary source-supported present-day detail.
+
+**Next.** Preserve the finished ledger and render evidence for the 5080 core
+window.  No shared-core `nodes/` source is changed in this 4060 campaign window.
+
+### Step 120 — September 10, 19:09–19:29 PDT: compact face-to-face one-act passes authoring and all-stills delivery; visual planner still drifts
+
+**Leg.** One-act canonical all-stills regression with two characters.  Every
+typed source field made the staging direct: Jeffrey and his mother are seated
+face-to-face at the same Los Angeles dinner table, finish their meal, and plan
+another visit.  It expressly ruled out death, disappearance, estrangement,
+replacement, and either person waiting alone or arriving later.
+
+**P0 / P1 authoring disposition.** P0 accepted the source without a
+family-status invention and correctly stated that a single act has no
+intermission music.  P1 again emitted malformed JSON on its base and
+lower-temperature attempts, but its typed repair was accepted; P2 and P3 each
+accepted on their first attempt.  The completed authored ledger has exactly one
+requested, proposed, accepted, and actual act, with two characters.  Its spoken
+text contains no death, absence, replacement, or estrangement claim.  This is
+the first authoring-level My Story microprobe in this series that meets the
+typed source-fidelity assertion.
+
+**Technical outcome (PASS).** The leg generated 20 1472×832 Z Image Turbo
+stills; every required scene still passed the real post-image spine; 17
+`still_pan` clips assembled into 20 positioned beats and a 2472-frame silent
+master.  The final is 123.120 s with a declared 24.2 s credit tail; its
+58,504,600-byte OBS delivery and 74,544,802-byte archival PCM-master companion
+both exist.  OBS publication, delivery, duration, and archival master-audio
+byte identity passed.  No LTX lane ran.
+
+**Visual-plan fidelity failure (confirmed).** Although the P0/P1 authored
+story kept Jeffrey and his mother together at dinner, the image-plan/portrait
+generation log introduced inverse staging such as the mother waiting for her
+son to arrive and Jeffrey not yet being visible.  That is a direct contradiction
+of the typed face-to-face scene.  The ledger's My Story fidelity-discrepancy
+list is nevertheless empty: its existing guard does not inspect the downstream
+visual-plan text.  Treat the authored script as qualified, but do **not** call
+the end-to-end visual narrative fully source-qualified until this visual
+consistency gap is closed.
+
+**Additional copy-quality finding.** `ledger_clean` correctly finished with
+zero unclean spoken rows, but classified the valid coda “Until next time” as
+non-speech and replaced it with “That's a wrap.”  This is not a media failure,
+but it is unnecessary semantic copy drift.  Preserve the repair receipt and
+add a test that a valid short coda cannot be replaced merely because a judge
+mislabels it as apparatus/non-speech.
+
+**Shared-core handoff — visual facts.** Carry the accepted P0 direct-fact
+contract into ShotLock/ImageDirector and add a narrow post-validator over
+visual prompt/portrait plan text.  When source says named people are visibly
+together face-to-face, reject inverse staging such as waiting alone, an unseen
+person's arrival, separation, disappearance, or absence.  Reject and repair
+the plan rather than rewriting it.  Add a CPU canned-plan test alongside a
+positive case showing an actual shared dinner scene passes.  Keep the existing
+P1 schema-binder and P0 one-act fixes as separate changes.
+
+**Nonfatal observability retained.** The pre-image `MISSING-STILL (LOUD)` and
+post-rename `LOUD re-resolve` messages repeated, but all materialized stills
+were present and the re-resolved master was byte-identical.  Their Step 119
+severity/phase fixes remain required.  No shared-core `nodes/` source was
+changed in this 4060 campaign window.
+
+### Step 121 — September 10, 19:31 PDT onward: pair-lock visual regression reproduces P0 one-act defect and exposes P2 source replacement
+
+**Leg.** One-act canonical all-stills pair-lock regression.  The typed source
+required Jeffrey and his mother to remain visibly together at the same patio
+table from first through last frame, with no waiting alone, arrival, absence,
+offscreen person, separation, disappearance, estrangement, or replacement.
+
+**P0 repeat (confirmed).** P0 retained the shared-table/no-separation facts but
+again emitted an `assumptions` claim and `music_between` requirement for music
+between a single act.  This is the direct, repeatable control-to-narrative
+leak documented in Steps 118–120.
+
+**P2 source-fidelity failure (confirmed before downstream media).** P1 typed
+repair accepted after the usual two malformed JSON attempts, and P2/P3 then
+accepted schema-valid output.  However, the resulting authored script replaced
+the supplied dinner with an invented traumatic “fire” scenario and stated that
+Jeffrey and his mother “sit alone.”  It no longer represents the required
+shared dinner or pair-lock staging.  Preserve the raw P1/P2/P3 receipts and
+pending-leg ledger; this is a text-authoring fidelity failure, not a ComfyUI
+runtime error or a renderer fault.
+
+**Shared-core handoff — source fact propagation.** Carry direct visual facts
+from P0 through P1 and validate the accepted P2 act text before ledger commit.
+For explicit shared-dinner source, reject unrelated major events/trauma (such
+as fire), separation/solitude language, or replacement of the anchored setting
+and action.  Reject and bounded-repair the act; do not silently rewrite prose.
+Add a canned one-act pair-lock regression asserting P0/P1/P2/P3 all preserve
+the same-table, both-present fact and that no one-act interstitial requirement
+survives.
+
+**Terminal technical outcome — PASS; source qualification — NO.** P1 attempts
+one and two were malformed/undecodable; its typed third attempt was accepted,
+and P2 (`act_1`) plus P3 (`frame`) accepted on their first attempts.  The
+all-stills route materialized 15 1472x832 scene stills and persisted 13
+`still_pan` clips.  It produced a 92.840-second 1920x1080 archival H.264/PCM
+master (62,431,761 bytes) and the matching OBS H.264/AAC final (50,983,194
+bytes).  Duration accounting, master-audio byte identity, OBS publication,
+and delivery all passed; the terminal execution time was 17:38.  This proves
+the stills path works, but does not cure the authored-source failure.
+
+**Fidelity and cleanup gates remain insufficient.** The frozen ledger marked
+the result publication-eligible with zero blocking reasons despite the known
+P0 one-act invention and the P2 pair-lock replacement.  Its cleanup pass
+judged five voiced rows dirty, made six model repairs, and left zero rows
+unclean, yet those edits were not constrained by a direct-source
+semantic-preservation check.  Add a post-cleanup validator that compares
+protected listener facts against the accepted P2 act and final TTS text; fail
+closed and request bounded repair if a cleanup edit removes, replaces, or
+contradicts an anchored person, relationship, setting, action, or presence
+fact.  Eligibility must consume the P0/P2/P3/cleanup fidelity receipt rather
+than treating renderer readiness as story qualification.
+
+**Retained nonfatal all-stills findings.** The render emitted five
+`LTX-OPEN HEALTH` warnings even though this authorized leg deliberately used
+only `still_pan`; make that health rule conditional on an LTX-required route
+so a valid all-stills result is not labeled unhealthy.  The compositor also
+used its permitted 24-frame closing-theme floor fill.  Neither condition was
+a runtime error.  No shared-core `nodes/` source was changed in this 4060
+campaign window; preserve the receipts and carry the narrow fixes to the 5080
+core window.
