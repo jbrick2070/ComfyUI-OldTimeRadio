@@ -57,6 +57,36 @@ _CAPTION_STYLE_CHOICES = ["sdh_standard", "otr_crt"]
 _DEFAULT_CAPTION_STYLE = "sdh_standard"
 
 
+class CaptionCapabilityGapError(ValueError):
+    """This BOX cannot burn captions -- proven by probe, not inferred.
+
+    A ValueError SUBCLASS on purpose: every existing handler catches it exactly
+    as before, so raising this changes no behaviour today. What it adds is a
+    machine-readable answer to the one question the caller could not previously
+    ask -- is this failure about the MACHINE, or about the episode?
+
+    THE THREE CLASSES, and why telling them apart is the whole job:
+      * CAPABILITY GAP (this class) -- no ffmpeg, or an ffmpeg built without
+        libass / libx264. Nothing is wrong with the episode; the same render on
+        another box succeeds. A container is the realistic case: the 5080's
+        ffmpeg is a winget build with `--enable-libass`, and PBUG-20260909-04
+        records the Mac publishing eight episodes with burned hero titles, so
+        the "it's the Mac" story was a forecast rather than a finding.
+      * MISCONFIGURATION -- an unknown caption style, a malformed title plan.
+        Degrading these would ship untitled episodes forever in silence, which
+        is strictly worse than refusing, so they must keep refusing. A degrade
+        that caught every ValueError alike was written and reverted inside the
+        hour on exactly this point.
+      * PIPELINE DEFECT -- a missing input video, an unreadable ledger. The
+        episode is broken; refusing is correct.
+
+    NOTHING RESTS ON THIS DISTINCTION YET, deliberately. `OTRCaptionBurn.burn`
+    still refuses a planned title on any ValueError. The classification ships
+    first so a later policy can be built on something proven instead of on a
+    guess about what an ffmpeg exit code meant.
+    """
+
+
 def _ffmpeg_bin(ffmpeg: str) -> str:
     """The ffmpeg this box should run, or ``""`` when it has none.
 
@@ -337,7 +367,24 @@ def burn_captions_on_video(video_path: str, ledger_path: str, out_path: str, *,
     on a hard ffmpeg/input error (the CALLER decides passthrough on failure)."""
     fb = _ffmpeg_bin(ffmpeg)
     if not fb:
-        raise ValueError(f"OTR_CaptionBurn: ffmpeg not found ({ffmpeg!r})")
+        # A HOST WITH NO FFMPEG IS A CAPABILITY GAP, not a broken episode. Still
+        # a ValueError by inheritance, so every caller behaves as it did.
+        raise CaptionCapabilityGapError(
+            f"OTR_CaptionBurn: ffmpeg not found ({ffmpeg!r})")
+    # ASK BEFORE SPENDING, and only believe a positive answer. `caption_support_gap`
+    # returns None both when captions will work AND when the probe could not run --
+    # an unrunnable probe is not evidence of a missing feature, which is exactly the
+    # guess that must not be made here. So this can only ever ADD a refusal that
+    # would have happened seconds later at the ffmpeg exit anyway; it cannot invent
+    # one. What it buys is the reason, before the .ass is built and before the
+    # spawn, in a form a caller can act on instead of a non-zero exit code.
+    try:
+        from ._otr_shared.ffmpeg import caption_support_gap
+    except ImportError:  # pragma: no cover -- flat (sys.path) test import
+        from _otr_shared.ffmpeg import caption_support_gap  # type: ignore
+    _gap = caption_support_gap(fb)
+    if _gap:
+        raise CaptionCapabilityGapError("OTR_CaptionBurn: " + _gap)
     if not os.path.isfile(video_path):
         raise ValueError(f"OTR_CaptionBurn: input video missing: {video_path!r}")
     # Say WHERE the .ass goes rather than letting the builder derive it from the
@@ -551,4 +598,5 @@ class OTRCaptionBurn:
         return (final, head + "\n" + report)
 
 
-__all__ = ["OTRCaptionBurn", "burn_captions_on_video", "_resolve_ledger_path", "_ass_filter_arg"]
+__all__ = ["OTRCaptionBurn", "burn_captions_on_video", "CaptionCapabilityGapError",
+           "_resolve_ledger_path", "_ass_filter_arg"]
