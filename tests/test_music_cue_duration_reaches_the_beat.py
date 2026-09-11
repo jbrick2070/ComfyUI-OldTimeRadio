@@ -132,6 +132,27 @@ def test_the_cue_duration_does_not_cross_the_anchor():
         % total)
 
 
+def test_my_story_null_parent_music_rows_preserve_timeline_identity():
+    from nodes._otr_my_story import _music_sentinel
+
+    ledger = _ledger_sentinel_and_mirror()
+    ledger["lines"][3:] = [
+        _music_sentinel("shot_000", "music_open"),
+        _music_sentinel("shot_002", "music_close"),
+    ]
+    bridge = _music_sentinel("shot_001", "music_inter")
+    assert bridge["beat_id"] is None
+    assert all(row["beat_id"] is None for row in ledger["lines"][3:])
+    ledger["lines"].insert(2, bridge)
+    beats = {b["beat_id"]: b for b in extract_beats(ledger)}
+    assert "shot_000_music" not in beats
+    assert "shot_002_music" not in beats
+    assert beats["music_opening_001"]["dur_s"] == 10.0
+    assert beats["music_closing_001"]["dur_s"] == 8.0
+    assert beats[bridge["line_id"]]["dur_s"] == MUSIC_BRIDGE_FALLBACK_DUR_S
+    assert sum(b["dur_s"] or 0.0 for b in beats.values()) == 21.783 + MUSIC_BRIDGE_FALLBACK_DUR_S
+
+
 # ------------------------------------------------------------ act breaks
 
 def test_an_act_break_bridge_gets_a_duration():

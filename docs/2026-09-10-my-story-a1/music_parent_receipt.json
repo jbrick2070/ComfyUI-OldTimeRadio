@@ -1,0 +1,101 @@
+{
+  "updated_utc": "2026-09-11T01:31:07.615243+00:00",
+  "parent_commit": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "scope": "My Story supplemental music parent references; no change to canonical wiring or story prose",
+  "files": {
+    "nodes/_otr_my_story.py": "d5186f8f6da1ce1a12a751bfccf54138a245ae5a8ff20e4e57a58a915527137f",
+    "tests/test_my_story_runner.py": "c6f98377cbd887052ef6ab3e553768deab0a399365ce9a8e19c9d2ce45a1228c",
+    "tests/test_music_cue_duration_reaches_the_beat.py": "88e77b870822d3ee7078cfe70d7ea4ce1c3acab0d3913189265396d821b341b6"
+  },
+  "focused": {
+    "path": "tmp/my_story_music_final_focused.xml",
+    "sha256": "3466887f2e74b452720604216bc81579efc9d1d118572cbddd94254f63a47f56",
+    "reported_tests": 210,
+    "testcase_elements": 210,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 10.848,
+    "failing_nodeids": []
+  },
+  "full_status": "complete; no new failures or worsened payloads versus S4; existing failures remain",
+  "bible_candidate": {
+    "path": "tmp/my_story_music_bible_otr_candidate.xml",
+    "sha256": "6aa4b8de9a18105bfa46fca559adffa9c74614eee874bb85839e6b7674f0d7a0",
+    "reported_tests": 54,
+    "testcase_elements": 54,
+    "failures": 10,
+    "errors": 0,
+    "skipped": 14,
+    "seconds": 5.785,
+    "failing_nodeids": [
+      ".TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof",
+      ".TestPhase01Paths::test_no_deep_dirname_chains",
+      ".TestPhase01Paths::test_output_nodes_use_folder_paths",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_canonical_ledger_text_metric_owner",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_cast_role_identity_classification_is_covered",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_explicit_word_delivery_is_owned_before_media",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_outer_word_fit_campaign_is_fail_closed",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_rename_transaction_and_active_consumer_join",
+      ".TestPhase07VRAM::test_vram_flush_after_unload",
+      ".TestPhase09Subprocess::test_popen_has_cleanup"
+    ]
+  },
+  "bible_baseline": {
+    "path": "tmp/my_story_music_bible_otr_baseline.xml",
+    "sha256": "af4d2c2c10034bccb2aaaa13eed7c47d28ad9dab07fc6d8d2937afd69ebeec25",
+    "reported_tests": 54,
+    "testcase_elements": 54,
+    "failures": 11,
+    "errors": 0,
+    "skipped": 14,
+    "seconds": 4.77,
+    "failing_nodeids": [
+      ".TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof",
+      ".TestPhase01Paths::test_no_deep_dirname_chains",
+      ".TestPhase01Paths::test_output_nodes_use_folder_paths",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_canonical_ledger_text_metric_owner",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_cast_role_identity_classification_is_covered",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_explicit_word_delivery_is_owned_before_media",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_outer_word_fit_campaign_is_fail_closed",
+      ".TestPhase07To12ProductionRegressionCatalog::test_otr_rename_transaction_and_active_consumer_join",
+      ".TestPhase07VRAM::test_vram_flush_after_unload",
+      ".TestPhase09Subprocess::test_popen_has_cleanup"
+    ]
+  },
+  "bible_comparison": "music_bible_comparison.json",
+  "bible_target_note": "Explicit clean OTR candidate/baseline. Earlier23-pass self-run targeted the survival-guide itself and skipped OTR-specific checks. Shared worktree recursive scanning is contaminated by stale worktrees/vendor fixtures; clean comparison removes that noise without changing checks.",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "canonical_shape": {
+    "nodes": 23,
+    "links": 63,
+    "writer_widgets": 37,
+    "changed": false
+  },
+  "cli_review": "kibitz-runs/2026-09-10-my-story-music-parent-qa/r4",
+  "live_postfix": "docs/2026-09-10-my-story-live/jeffrey_codex_musicfix_qwen4b_6_act_receipt.json",
+  "live_postfix_verdict": "frozen_clean",
+  "live_postfix_counts": {
+    "acts": 6,
+    "requested_characters": 4,
+    "actual_characters": 2
+  },
+  "runpod_baseline": "docs/2026-09-10-my-story-live/runpod4090_release_team_result.json",
+  "publication": false,
+  "remaining": "A2 native HF capacity; Original creative-model credit; credits hero containment; optional App/full media qualification; independent4060/Mac reports.",
+  "full": {
+    "path": "tmp/my_story_music_final_full.xml",
+    "sha256": "f752b3e229b56d8687c0919bf70c406a72156b72639ea82575f7ad992c8db6c0",
+    "collected": 14367,
+    "passed": 14129,
+    "failed": 54,
+    "skipped": 183,
+    "xfailed": 1,
+    "errors": 0,
+    "seconds": 540.927,
+    "reported_tests": 14674,
+    "new_failed_ids_vs_s4": [],
+    "comparison": "Independent normalized failure audit: no worsening. My Story removed from missing-slot annotation failure. A1 disk-space accidental pass reverts to its S4 failure because the temporary directory no longer contains 29."
+  }
+}

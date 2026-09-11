@@ -1,0 +1,190 @@
+{
+  "prompt_id": "e4f6e5a3-8d4b-4de4-a77d-b23d26435e69",
+  "status": "success",
+  "duration_seconds": 196.22,
+  "episode_title": "The Ledger and the Static",
+  "episode_id": "pending_20260911_010935",
+  "ledger_path": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/audio/pending_20260911_010935_ledger.json",
+  "ledger_sha256": "a2114eeff933b781605e76f50745ab4fbd276ef690a9e4318f10b5779017942b",
+  "draft_path": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/_shared/state/story_drafts/38f13bbe925f3abb141b6f546bd3613908e713ccda997456b3299d01ef8671a0/input.json",
+  "draft_exists": true,
+  "draft_sha256": "d0c2a67acd89c5c6a888aac805e8cf35d516bca13faf0e1efbeb559be51ca261",
+  "source_bank": "my_story",
+  "counts": {
+    "requested_acts": 3,
+    "proposed_acts": 3,
+    "accepted_acts": 3,
+    "actual_acts": 3,
+    "requested_characters": 1,
+    "planned_characters": 2,
+    "proposed_characters": 2,
+    "accepted_characters": 2,
+    "actual_characters": 2
+  },
+  "actual_cast_names": [
+    "Jeffrey",
+    "Codex"
+  ],
+  "actual_scene_count": 3,
+  "acts_accepted": 3,
+  "pass_receipts": [
+    {
+      "pass_id": "interpret",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.3,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "treatment",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.85,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "act_1",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.85,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "act_2",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.85,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "act_3",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.85,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "frame",
+      "model_id": "Qwen/Qwen3.5-4B",
+      "temp": 0.6,
+      "max_new_tokens": null,
+      "budget_mode": "provider_capacity",
+      "status": "completed"
+    },
+    {
+      "pass_id": "voices",
+      "model_id": "python",
+      "temp": 0.0,
+      "max_new_tokens": null,
+      "budget_mode": "python",
+      "status": "completed"
+    },
+    {
+      "pass_id": "assemble",
+      "model_id": "python",
+      "temp": 0.0,
+      "max_new_tokens": null,
+      "budget_mode": "python",
+      "status": "completed"
+    }
+  ],
+  "story_attribution": {
+    "author": "",
+    "sentence": "Tonight's story comes from one of our listeners.",
+    "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+    "source": "none supplied"
+  },
+  "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+  "total_word_count": 759,
+  "meta_total_word_count": 759,
+  "freeze_verdict": "frozen_with_warns",
+  "freeze_timestamp": "2026-09-11T01:12:50.041667+00:00",
+  "freeze_warn_taxonomy": {
+    "structural_error": [],
+    "story_accuracy_warning": [],
+    "cosmetic_warning": [
+      "line_id='shot_000_music' beat_id='shot_000_music' does not reference an existing beat",
+      "line_id='shot_001_music' beat_id='shot_001_music' does not reference an existing beat",
+      "line_id='shot_002_music' beat_id='shot_002_music' does not reference an existing beat",
+      "line_id='shot_004_music' beat_id='shot_004_music' does not reference an existing beat"
+    ]
+  },
+  "freeze_capability_receipt": {
+    "policy": "content_owned_readonly",
+    "policy_source": "pack for bank 'my_story' declares NO line_composer_system seam -- the lane owns its own content loop",
+    "skipped_phases": [
+      "same_story_safety_cleanup",
+      "d3_role_sweep_mutation"
+    ],
+    "executed_phases": [
+      "phase_0_gap_audit_pre",
+      "readonly_structural_validation",
+      "word_delivery_telemetry",
+      "phase_8_video_readiness",
+      "phase_10_gap_audit_post_and_freeze"
+    ],
+    "text_sha256_entry": "282ac0d5031b62bc9a440831721cd333d455f108d81a2ed18f47070da15231e6",
+    "text_sha256_exit": "282ac0d5031b62bc9a440831721cd333d455f108d81a2ed18f47070da15231e6",
+    "content_authorship_sha256_entry": "83667fb9c1c0105950095d18daa33136720349c6402e799e6026d6c42bbc33b2",
+    "content_authorship_sha256_exit": "83667fb9c1c0105950095d18daa33136720349c6402e799e6026d6c42bbc33b2",
+    "content_mutations": 0,
+    "structural_errors": [],
+    "terminal_error": ""
+  },
+  "paths": {
+    "ledger_path": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/audio/pending_20260911_010935_ledger.json",
+    "episode_root": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935",
+    "audio_dir": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/audio",
+    "stills_dir": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/stills",
+    "portraits_dir": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/portraits",
+    "videos_dir": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/videos",
+    "composited_dir": "/workspace/runpod-slim/ComfyUI/output/otr/episodes/pending_20260911_010935/composited",
+    "obs_final": "/workspace/runpod-slim/ComfyUI/output/otr/obs/pending_20260911_010935.mp4",
+    "obs_dir": "/workspace/runpod-slim/ComfyUI/output/otr/obs",
+    "layout": "per-episode-workspace"
+  },
+  "requested_models": {
+    "creative_writing_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
+    "llm_policy": {
+      "device": "cuda",
+      "attn_impl": "sdpa",
+      "quant_policy": "none",
+      "vram_ceiling_gb": 10.0,
+      "gguf_n_ctx": 4096,
+      "gguf_quant": "Q8_0",
+      "lane_allowlist": [
+        "transformers",
+        "gguf",
+        "openrouter",
+        "comfy_credits",
+        "google_api"
+      ]
+    }
+  },
+  "sampled_peak_gpu_mib": 9232,
+  "spoken_attribution_lines": [
+    {
+      "line_id": "shot_000_b1",
+      "char_id": "announcer",
+      "text": "Tonight's story comes from one of our listeners."
+    },
+    {
+      "line_id": "shot_000_b2",
+      "char_id": "announcer",
+      "text": "Tonight's story comes from one of our listeners. I'm telling you, the infrastructure holds. The streaming pipeline is humming. I just needed one last verification before we go live, and this... this is unacceptable."
+    }
+  ],
+  "source_default_name_occurrences": 0,
+  "additional_live_quality_finding": {
+    "owner": "shared ledger_clean",
+    "line_id": "shot_000_b2",
+    "effect": "Scene-setting intro replaced with a duplicate listener attribution and first-person story dialogue. Accepted My Story frame had attribution once; final ledger has it twice.",
+    "evidence": "comfyui.log records shot_000_b2 repaired; preserved frame and final lines in ledger."
+  }
+}

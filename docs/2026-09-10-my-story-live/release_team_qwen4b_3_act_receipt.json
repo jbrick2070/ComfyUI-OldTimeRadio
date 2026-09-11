@@ -1,0 +1,32 @@
+{
+  "scope": "canonical writer -> shared freeze only; no audio/video/publication",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runner_sha256": "d053ee9de4f041e96a9982ac48f7f404be1bfc73430436a5f5dd5c0ac68197f5",
+  "pack_sha256": "396320a0d503adc04b258d1a0c02e0900930892d88356d28e67a127efc78c165",
+  "runtime_changes": [
+    [
+      "1",
+      "llm_device",
+      "mps",
+      "cuda"
+    ]
+  ],
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Jeff and Codex, his AI coding partner, are getting their open-source old-time radio studio ready for release. Their vibe-coding team has come a long way, and tonight the finish line finally feels close.",
+    "story_characters": "Jeff is the human creator, warm, impatient with needless rejection gates, stubborn about making things work, and fond of a good story. Codex is his AI coding partner, thoughtful, practical, and willing to admit a mistake and fix it. Only Jeff and Codex speak, apart from the announcer. The computers are tools, not additional speaking characters.",
+    "story_plot": "Jeff and Codex begin another late-night session with a half-finished handoff and a pile of test results. The 5080 laptop, a 4060 machine, a Mac, and a RunPod worker run independently, almost neck and neck. They reuse the parts of the radio studio that already work instead of rebuilding everything. One long title spills across the credits, and a final ledger mismatch threatens to delay release. They trace the actual cause, preserve the listener's story, and let the existing repair passes mend the ledger. A clean ledger finally appears, followed by a playable episode in the output folder. They listen together. End with the release getting closer, not a claim that it has already shipped, and with Jeff choosing the next story.",
+    "story_setting": "A home coding studio late at night, close to an open-source release. Computer fans, keyboard taps, a cooling cup of coffee, and an old-time radio opening theme provide the sounds. The tone is affectionate, lightly funny, and grounded in two collaborators solving a real problem.",
+    "story_author": "",
+    "num_characters": 1,
+    "act_count": "3",
+    "visual_style": "roll (any style)"
+  },
+  "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "prompt_id": "02e2a36a-3e59-4e78-b24e-39bfa92ed22b",
+  "queued_at_unix": 1789088070.830842,
+  "outcome": "Interrupted by operator name correction: Jeffrey, not Jeff; requeued from corrected source fields",
+  "operator_cancelled": true,
+  "media_or_publication": false
+}

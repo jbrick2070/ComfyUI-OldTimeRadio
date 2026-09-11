@@ -6945,3 +6945,70 @@ reject or trim the story merely to make its cast match a requested number.
 6. Finish focused/full/Bible regression comparison and one finished-diff CLI
    review for the clarified contract. Real canonical component proof follows;
    no live PASS from fixtures. No node/widget/wiring changes expected; audit it.
+
+
+## My Story A1 qualification queue superseded 2026-09-11
+
+**Current validation:** 199 focused tests pass. Last completed full suite has
+53 pre-existing failures and zero new IDs versus S4. Final full rerun after
+small review fixes is running; Bug Bible: 23 passed, 27 skipped, 3 xfailed. The operator
+requested an immediate push so 4060 and Mac can try the same implementation.
+No cross-device or live clean-ledger PASS is claimed. Receipts:
+2026-09-10-my-story-a1/. Implementation details are archived, not work to redo.
+
+1. Finish the running final regression and compare IDs with S4/pre-change
+   baselines; never quarantine new failures. Append its measured receipt.
+2. Run exact prior lighthouse input through the actual canonical full graph,
+   native partial_execution_targets62 (validator63 -> writer1 -> freeze62).
+   Use the sanctioned runtime applier to change mps to cuda on the 5080. Check
+   durable freeze verdict, actual source fields/byline/counts and output path.
+   Previous failure receipt: 2026-09-10-my-story-live/qwen4b_1_act_receipt.json.
+3. Vary acts 3/6 and requested characters 1/4 with the same two named people,
+   confirming flexible requested/actual cast receipts and selected act counts.
+   These are ledger component proofs, not media/publication qualification.
+4. Collect operator 4060/Mac results against the pushed commit; do not invent
+   remote results. Keep one code editor while separate machines run trials.
+
+
+Prior pod scheduling constraint, superseded by the operator assigning a scoped RunPod trial to this task:
+
+The pod stays STOPPED until its own item.
+
+
+## My Story component qualification completed, 2026-09-11
+
+1. Finish the running Jeffrey/Codex three-act My Story component requested by the
+   operator, then run six acts with the same supplied pair. Requested character
+   hints1/4 must preserve the two named people. Check durable freeze verdicts,
+   counts, source/byline and output paths. Exact fields and receipts live in
+   2026-09-10-my-story-live/. These are component proofs, not publication tests.
+2. Audit the first successful lighthouse ledger's two music beat-reference
+   warnings against shared assembly. Correct any verified structural defect at
+   its owner, with regression and a fresh live receipt.
+3. Complete RunPod access/sync and the scoped My Story trial if available; stop
+   rented compute after the run. The operator explicitly assigned RunPod to this
+   task and has separate ChatGPT tasks on4060/Mac. Collect their results against
+   the pushed code without touching their machines or inventing remote passes.
+4. Record the live-backed full-artifact repair manifestation under existing
+   Bible11.48 and restore applicable current-owner executable coverage. Do not
+   imply the old400-character excerpt was proven to be the sole failure cause.
+
+## Completed My Story A1 proof requirements, 2026-09-11
+
+Tests and real proof:
+- Requested1/model2 acts repair to1 while retaining all material; irreparable
+  act structure fails honestly after the existing ladder. Character-count
+  differences alone accept without repair, with truthful requested/actual counts.
+- Vary acts1/3/6 and requested/actual casts, including fewer/more characters than
+  requested, exclusive named cast, monologues and missing optional metadata.
+  Include real ledger disk/wire/seals, full-artifact last-act coverage repair,
+  cue surplus/breaks, source labels and supplied/neutral bylines.
+- Preserve provider-capacity markers through actual base/repair slot invocation.
+- Live component loads real canonical and sanctioned runtime applier, full prompt
+  targeting freeze62. Start with the exact failed one-act lighthouse input, then
+  selected3 and6 acts. Record full fields, workflow/model/context, prompt id,
+  requested/actual counts, durable ledger and actual freeze verdict. No timing
+  or length rejection; history success alone is insufficient.
+
+These are component proofs, not App/full-media/publication PASS. Native App,
+browser playback/history and the publication matrix remain later qualification.

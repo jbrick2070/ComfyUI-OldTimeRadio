@@ -1,0 +1,80 @@
+{
+  "scope": "canonical writer -> shared freeze only; no audio/video/publication",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runner_sha256": "012f58cecac4272e423aa5feb1cb0160e800ff6ca293ef483de56605aaffa654",
+  "pack_sha256": "396320a0d503adc04b258d1a0c02e0900930892d88356d28e67a127efc78c165",
+  "runtime_changes": [
+    [
+      "1",
+      "llm_device",
+      "mps",
+      "cuda"
+    ]
+  ],
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Jeffrey and Codex, his AI coding partner, are getting their open-source old-time radio studio ready for release. Their vibe-coding team has come a long way, and tonight the finish line finally feels close.",
+    "story_characters": "Jeffrey is the human creator, warm, impatient with needless rejection gates, stubborn about making things work, and fond of a good story. Codex is his AI coding partner, thoughtful, practical, and willing to admit a mistake and fix it. Only Jeffrey and Codex speak, apart from the announcer. The computers are tools, not additional speaking characters.",
+    "story_plot": "Jeffrey and Codex begin another late-night session with a half-finished handoff and a pile of test results. The 5080 laptop, a 4060 machine, a Mac, and a RunPod worker run independently, almost neck and neck. They reuse the parts of the radio studio that already work instead of rebuilding everything. One long title spills across the credits, and a final ledger mismatch threatens to delay release. They trace the actual cause, preserve the listener's story, and let the existing repair passes mend the ledger. A clean ledger finally appears, followed by a playable episode in the output folder. They listen together. End with the release getting closer, not a claim that it has already shipped, and with Jeffrey choosing the next story.",
+    "story_setting": "A home coding studio late at night, close to an open-source release. Computer fans, keyboard taps, a cooling cup of coffee, and an old-time radio opening theme provide the sounds. The tone is affectionate, lightly funny, and grounded in two collaborators solving a real problem.",
+    "story_author": "",
+    "num_characters": 4,
+    "act_count": "6",
+    "visual_style": "roll (any style)"
+  },
+  "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "prompt_id": "73d4eab0-2ac4-4dc4-a902-f0860a1ec618",
+  "queued_at_unix": 1789089123.0052147,
+  "outcome": "PASS: six acts, flexible cast, frozen_clean with zero gap warnings",
+  "implementation_parent_commit": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260910_181203\\audio\\pending_20260910_181203_ledger.json",
+  "ledger_sha256": "c0b339e837f2a2538579744243928deb1c53ea72052b8de7067cb87873fbffa7",
+  "history_receipt": "jeffrey_codex_musicfix_qwen4b_6_act_history.json",
+  "freeze_executed": true,
+  "freeze_verdict": "frozen_clean",
+  "counts": {
+    "requested_acts": 6,
+    "proposed_acts": 6,
+    "accepted_acts": 6,
+    "actual_acts": 6,
+    "requested_characters": 4,
+    "planned_characters": 3,
+    "proposed_characters": 3,
+    "accepted_characters": 2,
+    "actual_characters": 2
+  },
+  "media_or_publication": false,
+  "final_runner_sha256": "d5186f8f6da1ce1a12a751bfccf54138a245ae5a8ff20e4e57a58a915527137f",
+  "runtime_ast_matches_final": true,
+  "post_boot_change": "Only the LLM-slot comment was corrected to its recognized per-sub-pass prefix; exact AST equality verified.",
+  "duration_seconds": 493.69,
+  "word_count": 1253,
+  "cast_names": [
+    "Jeffrey",
+    "Codex"
+  ],
+  "source_credit": "a story from a listener's own idea, produced by machine for this broadcast",
+  "freeze_capability_receipt": {
+    "policy": "content_owned_readonly",
+    "policy_source": "pack for bank 'my_story' declares NO line_composer_system seam -- the lane owns its own content loop",
+    "skipped_phases": [
+      "same_story_safety_cleanup",
+      "d3_role_sweep_mutation"
+    ],
+    "executed_phases": [
+      "phase_0_gap_audit_pre",
+      "readonly_structural_validation",
+      "word_delivery_telemetry",
+      "phase_8_video_readiness",
+      "phase_10_gap_audit_post_and_freeze"
+    ],
+    "text_sha256_entry": "d08a30d5d07095ef1ef5da56ee79336e26ba03972765a8415ecf27ca2c6d4ead",
+    "text_sha256_exit": "d08a30d5d07095ef1ef5da56ee79336e26ba03972765a8415ecf27ca2c6d4ead",
+    "content_authorship_sha256_entry": "09bea64e1c49649fd71a5e9bdc55d7997e66f4e813e5114247ec2ba4451e3ed8",
+    "content_authorship_sha256_exit": "09bea64e1c49649fd71a5e9bdc55d7997e66f4e813e5114247ec2ba4451e3ed8",
+    "content_mutations": 0,
+    "structural_errors": [],
+    "terminal_error": ""
+  }
+}

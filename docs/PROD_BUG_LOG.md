@@ -14002,3 +14002,59 @@ for promotion from the Windows box. Each is portable beyond OTR:
    download size put `gemma-4-E2B-it` 4 GB BELOW `Qwen3.5-4B` when it measures
    LARGER. A measured value must override a projection, and the projection must
    say which it is.
+
+## PBUG-20260910-01 -- My Story typed repair could not see the full failed treatment
+
+- promotion: BUG-11.48 (existing complete repair-context rule)
+- surfaced: real canonical writer/freeze component prompt
+  e11e5d86-2dda-41fa-b942-bb927a754b83, pending_20260910_154830, Qwen3.5-4B.
+  Exact archived request, failed history and log: docs/2026-09-10-my-story-live/.
+- symptom: selected one act; initial treatment and typed repair both returned
+  two acts, and the writer stopped before assembly. The generic repair prompt
+  echoed only the first400 characters, omitting the treatment's trailing acts.
+- root cause: this authoring seam reused an abbreviated diagnostic echo where
+  the repair needed the complete failed artifact. The failed live run proves
+  unsuccessful repair; it does not prove truncation was its sole cause.
+- fix: A1 at0327850a supplies the full failed response, original source context,
+  exact post-validation problem and preservation instructions to the existing
+  typed repair. No new retry engine, source substitution or story-length gate.
+- verification: real repeat prompt517c2fed-4c37-4306-860e-2bf9c8ca7087 completed
+  one act/two characters and froze with music-reference warnings. That repeat
+  accepted the first treatment, so repair execution is proven separately by
+  test_full_treatment_repair_preserves_material_and_matches_variable_controls:
+  exact full-response equality, ending beyond400 characters, repaired selected
+  acts1/3/6 and durable preserved ending. Bible11.48 coverage now names the
+  current owner independently of its retired legacy catalog.
+- status: ROOT-FIXED; first live component completed; final qualification
+  receipts in docs/2026-09-10-my-story-a1/.
+
+## PBUG-20260910-02 -- supplemental My Story music rows invented parent beat references
+
+- promotion: BUG-12.58 (existing line-versus-parent identity rule)
+- surfaced: canonical prompt517c2fed-4c37-4306-860e-2bf9c8ca7087, durable ledger
+  pending_20260910_175015, freeze verdict frozen_with_warns. Both warnings named
+  nonexistent beat parents for shot_000_music and shot_002_music. Three-act
+  Jeffrey/Codex promptd966611e-c425-47df-b407-4276cffd99c6 repeats the same issue
+  for four music rows. Published SciFi sibling ledgers show the inherited shape.
+- root cause: My Story copied SciFi's music sentinel line_id into beat_id even
+  though the producer creates no corresponding authored beats[] record. Music
+  placement, cue joining, sequencing and render identity already use line_id.
+- fix: the My Story producer uses a null optional parent reference, matching
+  legacy supplemental music. Keep line_id, shot_id, role, order, cue anchors,
+  spoken rows and all downstream consumer identities unchanged. The sibling
+  SciFi producer remains a separately scoped occurrence, not silently fixed.
+- verification: real freeze on1/3/6-act fixtures, breaks on/off, requires
+  frozen_clean on disk, zero gap warnings and unchanged rows/cues. A downstream
+  test preserves timed bookends without duplication and interstitial identity.
+  In-memory replay of the original live ledger clears both warnings with only
+  these two null references and preserves both content seals. Fresh canonical
+  prompt 73d4eab0-2ac4-4dc4-a902-f0860a1ec618 completed six acts with Jeffrey and
+  Codex, frozen_clean, zero warnings/errors and valid seals in 493.69 seconds.
+  Seven music rows retain their own identity with null optional parents. No
+  stored production ledger was rewritten to manufacture a passing receipt.
+- status: ROOT-FIXED and live-verified; 210 focused tests pass. Full suite:
+  14,129 passed, 54 baseline failures, 183 skipped, one xfailed, zero errors;
+  no new failures or worsened payloads versus S4. Explicit clean OTR Bible
+  comparison improves one current-owner check with ten shared failures
+  unchanged. Finished-diff CLI review is grounded and resolved. Exact receipts
+  are in docs/2026-09-10-my-story-a1/music_parent_receipt.json.

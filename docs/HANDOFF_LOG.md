@@ -1,3 +1,73 @@
+## 2026-09-11 01:32 UTC -- My Story clean six-act ledger and final regression
+
+My Story supplemental music now uses a null optional parent, retaining line,
+shot, cue and timeline identity. Real canonical six-act Jeffrey/Codex prompt
+73d4eab0-2ac4-4dc4-a902-f0860a1ec618 froze clean: zero warnings/errors, two named
+characters retained despite a four-character hint, 493.69 seconds. The existing
+full-treatment repair removed a reserved ANNOUNCER cast entry. The durable
+ledger is output/otr/episodes/pending_20260910_181203/audio/
+pending_20260910_181203_ledger.json. No media/publication PASS is claimed.
+
+Final focused tests: 210 passed. Full suite: 14,367 collected, 14,129 passed,
+54 existing failures, 183 skipped, one xfailed, zero errors. Independent audit
+found no new IDs or worsened payloads versus S4. The known disk-space assertion
+reappears after its accidental A1 temporary-directory pass; My Story is removed
+from the slot-annotation failure. No new quarantine was added.
+
+Bible target correction: earlier 23-pass runs tested the survival-guide itself,
+not OTR. Explicit clean OTR baseline/candidate runs give 29/30 passed and 11/10
+failed respectively, both with 11 skipped and three xfailed. All ten shared
+failure payloads and skip/xfail reasons are unchanged; the added My Story
+current-owner coverage check passes on the candidate. Existing rules 11.48 and
+12.58 now carry executable coverage and live-backed production log entries.
+This is baseline-equivalent qualification, not a globally green suite.
+
+RunPod 4090 baseline 0327850a completed the same three-act Jeffrey/Codex source
+in 196.22 seconds: two characters, four music-parent warnings, no structural
+errors. Its receipts and forensic ledger are secured locally. Final repo sync
+and stopped-pod confirmation follow this push; no post-fix RunPod PASS is
+claimed. Independent 4060/Mac results and lessons remain pending. The watcher
+checks incoming repo commits without overwriting local work.
+
+Canonical remains 23 nodes/63 links/37 writer widgets, hash unchanged. One
+finished-diff CLI review was grounded and its small fixes verified. Evidence:
+2026-09-10-my-story-a1/music_parent_receipt.json and ../2026-09-10-my-story-live/.
+GO_FORWARD now starts at A2; completed proof instructions are archived verbatim.
+Shared cleanup attribution duplication is separate evidence for credit work.
+Registry remains alpha.29; this push does not publish a registry release.
+
+---
+## 2026-09-11 01:00 UTC -- My Story final regression and first live freeze
+
+Production code remains0327850a on v2.0-alpha. The final full suite collected
+14,363 items:14,126 passed,53 pre-existing failures,183 skipped,1 xfailed,
+0 errors in527.971 seconds. No new failing IDs or materially worsened failure
+messages versus S4. The apparent disk-space-test improvement comes from its
+faulty assertion matching the temporary-directory number; no fix is claimed.
+Focused199 pass; Bug Bible23 passed,27 skipped,3 xfailed. No quarantine added.
+
+The exact prior lighthouse input now completes the writer/shared tail/freeze
+on the real canonical workflow, partial target62. Durable ledger:
+output/otr/episodes/pending_20260910_175015/audio/pending_20260910_175015_ledger.json.
+Verdict frozen_with_warns: one act, two named characters, no RSS. The two music
+beat-reference warnings and a repeated listener-attribution sentence are being
+audited against shared machinery. This is a component PASS, not a published
+media episode or a claim of zero warnings. Evidence in2026-09-10-my-story-live/.
+
+Operator requested a new story about Jeffrey and Codex nearing release. Its
+corrected three-act/one-character-hint run is active on5080 with two explicit
+speakers. Earlier Jeff input was stopped on name correction; one transient
+harness typo request was removed from the queue before execution. The corrected
+fields file is the only source for further local/RunPod trials. This task owns
+5080 and the explicitly authorized existing RunPod4090; the operator has separate
+ChatGPT tasks on4060 and Mac. RunPod must pull latest v2.0-alpha before testing
+and be stopped after the scoped trial. No remote qualification is yet claimed.
+
+GO_FORWARD remains the only work queue. A2, Original model credit, credits hero
+containment and full publication qualification remain pending. No new code,
+canonical wiring, tag or promotion is included in this receipt update.
+
+---
 ## 2026-09-11 00:44 UTC -- My Story A1 pushed for concurrent device trials
 
 Operator requested immediate push so the 4060 and Mac can try the same code.

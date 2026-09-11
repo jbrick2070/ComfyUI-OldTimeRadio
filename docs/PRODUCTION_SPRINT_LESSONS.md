@@ -475,6 +475,13 @@ fields only on cue identity, and forward only mirrors whose cue passed that
 join. Music may remain an optional creative bus, but when it renders its ledger
 accounting cannot be optional.
 
+Keep a timeline row's identity separate from its authored parent. Supplemental
+music sentinels have a real line ID for cue anchors and downstream timing, but
+no narrative beat parent. Leave that optional parent reference null; copying
+the line ID into beat_id invents a dangling reference. Preserve the sentinel,
+anchor, order and mirror ownership rather than changing render consumers to
+hide the warning (PBUG-20260910-02, Bible12.58).
+
 ## 30. Move serialized identity with a renamed artifact tree
 
 Renaming a directory moves bytes, not the absolute paths serialized inside its

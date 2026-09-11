@@ -373,6 +373,7 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None, **kwargs) -> Any:
                 "error": None if error is None else str(error),
             })
 
+    # LLM slot: per-sub-pass -- caller supplies the creative or technical slot.
     return structured_call(on_attempt_complete=completed, **kwargs)
 
 
@@ -692,7 +693,7 @@ def _music_sentinel(shot_id: str, role: str, seq: int = 0) -> dict:
     """
     lid = "%s_music" % shot_id if seq == 0 else "%s_music_%d" % (shot_id, seq + 1)
     return {
-        "line_id": lid, "beat_id": lid, "shot_id": shot_id,
+        "line_id": lid, "beat_id": None, "shot_id": shot_id,
         "char_id": role, "speaker_role": role, "boundary": None,
         "text": "",
     }

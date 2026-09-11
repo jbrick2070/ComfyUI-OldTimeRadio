@@ -285,15 +285,39 @@ def test_every_line_carries_a_role_the_freeze_accepts():
         assert row["speaker_role"] in ALLOWED_SPEAKER_ROLES, row
 
 
-def test_the_music_cues_anchor_to_real_sentinel_rows():
-    slots = Slots(acts=2, inter=1)
-    led, _ = _run(slots, act_count=2)
+@pytest.mark.parametrize("acts,breaks", [(1, True), (3, True), (3, False), (6, True)])
+def test_the_music_cues_anchor_to_real_sentinel_rows(acts, breaks):
+    from nodes import _otr_freeze_cascade as LFC
+    from nodes._otr_writer_tail import _stamp_story_style_receipt
+
+    slots = Slots(acts=acts, inter=acts - 1)
+    led, parts = _run(slots, act_count=acts, include_act_breaks=breaks)
+    # Normal metadata supplied by the writer tail at this component boundary.
+    led.data["meta"]["episode_title"] = parts.final_title_override
+    _stamp_story_style_receipt(led.data["meta"], contract=None, scaffold_enabled=False)
     line_ids = {r["line_id"] for r in led.data["lines"]}
+    by_id = {r["line_id"]: r for r in led.data["lines"]}
     placements = set()
     for cue in led.data["music"]:
         assert cue["anchor_line_id"] in line_ids, cue
+        assert by_id[cue["anchor_line_id"]]["beat_id"] is None
         placements.add(cue["placement"])
-    assert {"opening", "closing", "interstitial"} == placements
+    expected = {"opening", "closing"}
+    if breaks and acts > 1:
+        expected.add("interstitial")
+    assert expected == placements
+    before_lines = json.loads(json.dumps(led.data["lines"]))
+    before_cues = json.loads(json.dumps(led.data["music"]))
+    def no_model(*args, **kwargs):
+        pytest.fail("read-only freeze must not acquire a model")
+    disposition = LFC.run_freeze_cascade(no_model, led)
+    assert disposition.verdict == "frozen_clean", disposition.gap_audit_pre
+    assert disposition.gap_audit_pre.errors == []
+    assert disposition.gap_audit_pre.warnings == []
+    assert led.data["lines"] == before_lines
+    assert led.data["music"] == before_cues
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    assert saved["meta"]["freeze_verdict"] == "frozen_clean"
 
 
 def test_no_interstitial_cue_when_act_breaks_are_off():
@@ -683,6 +707,7 @@ def test_full_treatment_repair_preserves_material_and_matches_variable_controls(
                 prior = [m for m in messages if m["role"] == "assistant"]
                 if prior:
                     self.repairs += 1
+                    assert prior[-1]["content"] == self.failed_raw
                     assert marker in prior[-1]["content"]
                     assert prior[-1]["content"].index(marker) > 400
                     assert "a keeper hears a voice" in messages[1]["content"]
@@ -693,7 +718,10 @@ def test_full_treatment_repair_preserves_material_and_matches_variable_controls(
                     result = _treatment(acts + 1, (*cast, "Extra"))
                 result["ending"] = marker
                 result["acts"][-1]["ending_state"] = marker
-                return "```json\n" + json.dumps(result) + "\n```"
+                raw = "```json\n" + json.dumps(result) + "\n```"
+                if not prior:
+                    self.failed_raw = raw
+                return raw
             return super()._answer(messages)
     slots = CountRepair(acts=acts, cast=cast)
     led, _ = _run(slots, act_count=acts, num_characters=characters)

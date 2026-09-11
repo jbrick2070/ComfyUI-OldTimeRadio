@@ -1,0 +1,9 @@
+{
+  "source_bank": "my_story",
+  "custom_premise": "Jeffrey and Codex, his AI coding partner, are getting their open-source old-time radio studio ready for release. Their vibe-coding team has come a long way, and tonight the finish line finally feels close.",
+  "story_characters": "Jeffrey is the human creator, warm, impatient with needless rejection gates, stubborn about making things work, and fond of a good story. Codex is his AI coding partner, thoughtful, practical, and willing to admit a mistake and fix it. Only Jeffrey and Codex speak, apart from the announcer. The computers are tools, not additional speaking characters.",
+  "story_plot": "Jeffrey and Codex begin another late-night session with a half-finished handoff and a pile of test results. The 5080 laptop, a 4060 machine, a Mac, and a RunPod worker run independently, almost neck and neck. They reuse the parts of the radio studio that already work instead of rebuilding everything. One long title spills across the credits, and a final ledger mismatch threatens to delay release. They trace the actual cause, preserve the listener's story, and let the existing repair passes mend the ledger. A clean ledger finally appears, followed by a playable episode in the output folder. They listen together. End with the release getting closer, not a claim that it has already shipped, and with Jeffrey choosing the next story.",
+  "story_setting": "A home coding studio late at night, close to an open-source release. Computer fans, keyboard taps, a cooling cup of coffee, and an old-time radio opening theme provide the sounds. The tone is affectionate, lightly funny, and grounded in two collaborators solving a real problem.",
+  "story_author": "",
+  "visual_style": "roll (any style)"
+}

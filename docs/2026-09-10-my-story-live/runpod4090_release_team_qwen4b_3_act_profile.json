@@ -1,0 +1,88 @@
+{
+  "id": "my_story_canonical_cuda_component",
+  "display_name": "Canonical My Story writer on local CUDA",
+  "status": "shipping",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": true,
+  "role_overrides": {
+    "announcer_visual": "viz_mxc_cpu (16:9) (audio-reactive, no scene image)",
+    "music_visual": "viz_green (16:9) (audio-reactive, no scene image)",
+    "character_visual": "viz_camera (16:9) (audio-reactive, no scene image)",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
+  },
+  "slot_overrides": {
+    "voice_bank": "kokoro_builtin",
+    "cast_voice_policy": "auto_registry",
+    "char_voice_engine": "kokoro",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "stable_audio_3",
+    "video_render_engine": "viz_camera"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard"
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 10.0,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q8_0",
+    "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+    "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "mps",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "mps"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": true,
+    "extra_args": [],
+    "env": {}
+  }
+}

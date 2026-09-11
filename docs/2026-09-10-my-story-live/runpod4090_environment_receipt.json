@@ -1,0 +1,48 @@
+{
+  "scope": "canonical writer through shared freeze component; no audio/video/publication",
+  "pod_id": "k0ph3m9491yp6s",
+  "pod_name": "otr-portability-lab-highram-20260901-migration",
+  "image": "runpod/comfyui:cuda13.0",
+  "existing_container_recreated": false,
+  "hourly_compute_usd": 0.74,
+  "resume_utc": "2026-09-11T00:56:44Z",
+  "hard_stop_utc": "2026-09-11T01:25:00Z",
+  "host": "c0b7572b6c43",
+  "gpu": "NVIDIA GeForce RTX 4090, 24564 MiB, 580.159.04",
+  "cgroup_memory_limit_bytes": "61999996928",
+  "network_volume_id": "fmrfaxa73w",
+  "network_volume_gb": 437,
+  "conservative_volume_used_before_download": 426187656192,
+  "comfy_root": "/workspace/runpod-slim/ComfyUI",
+  "comfy_revision": "169fcf35a2fc163fec31338b816503ddac0d3fcf",
+  "otr_root": "/workspace/runpod-slim/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio",
+  "branch": "v2.0-alpha",
+  "before_revision": "0e77c3b965b7f476510c17ef9aebbba1c13a68e9",
+  "revision": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "prior_untracked_preserved": [
+    "docs/2026-08-26-bank-engine-e2b-video-sweep-receipt.json"
+  ],
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "input_sha256": "e711c8b37a4e0ece1f6942e0f6868be6ed856b3f9e9e41e3ffc0b01cc2536400",
+  "runtime_scope": "Verified existing Python/CUDA; no full stack provision claim. Scoped environment drives checked-in otr_boot_profile owner.",
+  "runtime_env_file": "/workspace/otr-config/my-story-20260911/component-runtime.env",
+  "boot_owner": "scripts/otr_pod_runtime.sh:otr_boot_profile",
+  "boot_profile": "otr_w45_viz_mxc_cpu",
+  "actual_launch_argv": "/workspace/runpod-slim/ComfyUI/.venv-cu128/bin/python main.py --listen 0.0.0.0 --port 8188 --output-directory /workspace/runpod-slim/ComfyUI/output --enable-cors-header ",
+  "model_receipt": {
+    "completed": 1789088827.4246697,
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "snapshot": "/workspace/runpod-slim/ComfyUI/models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "total_bytes": 9342907469,
+    "files": 14
+  },
+  "prompt_id": "e4f6e5a3-8d4b-4de4-a77d-b23d26435e69",
+  "request_nodes": 23,
+  "canonical_links": 63,
+  "partial_execution_targets": [
+    "62"
+  ],
+  "recorded_at_utc": "2026-09-11T01:13:19Z",
+  "hold_reason": "At most10minutes idle awaiting qualified music-reference fix; no more generation"
+}

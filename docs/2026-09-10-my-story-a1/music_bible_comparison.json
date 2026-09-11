@@ -1,0 +1,179 @@
+{
+  "baseline_commit": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "baseline_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-my-story-0327850a",
+  "candidate_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-my-story-music-candidate",
+  "new_failure_ids": [],
+  "status_changes": [
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+      "baseline": "failed",
+      "candidate": "passed"
+    }
+  ],
+  "shared_failed_ids": [
+    ".TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof",
+    ".TestPhase01Paths::test_no_deep_dirname_chains",
+    ".TestPhase01Paths::test_output_nodes_use_folder_paths",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_canonical_ledger_text_metric_owner",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_cast_role_identity_classification_is_covered",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_explicit_word_delivery_is_owned_before_media",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_outer_word_fit_campaign_is_fail_closed",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_rename_transaction_and_active_consumer_join",
+    ".TestPhase07VRAM::test_vram_flush_after_unload",
+    ".TestPhase09Subprocess::test_popen_has_cleanup"
+  ],
+  "shared_failure_payload_changes": [],
+  "unchanged_skips": [
+    {
+      "id": ".TestPhase11BoundedRepairContracts::test_otr_localized_repairs_are_typed_wired_and_covered",
+      "message_equal": true,
+      "reason": "BUG-11.39..11.44 guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase11BoundedRepairContracts::test_otr_compact_repairs_repeat_exact_small_artifact_contracts",
+      "message_equal": true,
+      "reason": "BUG-11.38 compact P4 guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase11BoundedRepairContracts::test_otr_spoken_hygiene_allows_only_source_grounded_acronyms",
+      "message_equal": true,
+      "reason": "BUG-11.51 source-grounded acronym guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase11BoundedRepairContracts::test_otr_cast_names_use_bounded_acronym_aware_grammar",
+      "message_equal": true,
+      "reason": "BUG-11.52 acronym-aware cast-name guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase11BoundedRepairContracts::test_otr_role_acronyms_flow_through_every_script_validation_boundary",
+      "message_equal": true,
+      "reason": "BUG-11.53 role acronym guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_live_production_regressions_remain_covered",
+      "message_equal": true,
+      "reason": "BUG-07.22..12.52 catalog is OTR-local"
+    },
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_protected_suffix_final_surface_contract",
+      "message_equal": true,
+      "reason": "BUG-12.60 assembled-coda guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_compiler_owned_p5_text_transport",
+      "message_equal": true,
+      "reason": "BUG-12.68 compact P5 transport guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_p3_prose_patch_transports_are_declared_and_fail_closed",
+      "message_equal": true,
+      "reason": "BUG-11.42 P3 prose patch guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_no_schema_cap_sits_at_its_own_trim_limit",
+      "message_equal": true,
+      "reason": "BUG-12.102 dossier cap guard is OTR-local"
+    },
+    {
+      "id": ".TestPhase02BugBible0214::test_bug_02_14_sd15_ckpt_four_layer_fix",
+      "message_equal": true,
+      "reason": "anchor_gen.py not found on this host; BUG-02.14 test is OTR-local"
+    }
+  ],
+  "unchanged_xfails": [
+    {
+      "id": ".TestPhase11LLM::test_generate_calls_have_length_guard",
+      "message_equal": true,
+      "reason": "BUG-12.33: .generate() without visible length guard in: _otr_decode_guard.py, _otr_writer_heartbeat.py, eng_stable_audio_3.py, otr_audio_dep_pilot.py, otr_lemmy_production_audition.py, _otr_chatterbox_worker.py, _otr_dia_worker.py. Verify manually."
+    },
+    {
+      "id": ".TestPhase11LLM::test_title_extraction_and_dialogue_false_positives",
+      "message_equal": true,
+      "reason": "BUG-04.06/11.08: Title extraction and/or DIALOGUE_FALSE_POSITIVES handling incomplete. Requires integration test with full script generation."
+    },
+    {
+      "id": ".TestThreeFileContract::test_all_bible_ids_covered_in_tests",
+      "message_equal": true,
+      "reason": "BUG-12.35: 229 Bible entries have no test or exclusion comment: ['01.01', '02.01', '02.02', '02.03', '02.04', '02.05', '02.06', '02.07', '02.08', '02.09', '02.10', '02.13', '02.16', '03.04', '03.05', '03.06', '04.03', '04.04', '04.05', '04.07', '04.08', '04.09', '04.10', '04.11', '04.12', '04.13', '04.14', '05.01', '05.02', '05.03', '05.04', '05.08', '05.09', '05.12', '05.13', '05.14', '06.01', '06.02', '06.03', '06.04', '06.05', '06.06', '06.07', '07.02', '07.04', '07.05', '07.06', '07.07', '07.08', '07.09', '07.10', '07.11', '07.12', '07.13', '07.14', '07.15', '07.24', '07.25', '07.26', '07.27', '07.28', '07.29', '07.30', '07.31', '07.32', '08.01', '08.02', '08.03', '08.04', '08.05', '09.01', '09.03', '09.04', '09.07', '09.08', '10.01', '10.02', '10.03', '10.04', '10.06', '10.08', '10.09', '11.01', '11.02', '11.03', '11.04', '11.05', '11.06', '11.07', '11.12', '11.13', '11.14', '11.15', '11.16', '11.17', '11.18', '11.19', '11.20', '11.21', '11.22', '11.23', '11.24', '11.25', '11.54', '11.55', '11.56', '11.57', '11.58', '11.59', '11.60', '12.01', '12.03', '12.04', '12.08', '12.09', '12.10', '12.100', '12.103', '12.104', '12.105', '12.106', '12.107', '12.108', '12.109', '12.11', '12.110', '12.111', '12.112', '12.113', '12.114', '12.115', '12.116', '12.117', '12.118', '12.119', '12.12', '12.121', '12.122', '12.123', '12.124', '12.125', '12.126', '12.127', '12.128', '12.129', '12.13', '12.130', '12.131', '12.132', '12.133', '12.134', '12.135', '12.136', '12.137', '12.138', '12.139', '12.14', '12.140', '12.142', '12.143', '12.144', '12.145', '12.146', '12.147', '12.148', '12.149', '12.15', '12.150', '12.151', '12.152', '12.153', '12.154', '12.155', '12.156', '12.157', '12.158', '12.17', '12.18', '12.19', '12.20', '12.21', '12.22', '12.24', '12.25', '12.26', '12.27', '12.28', '12.29', '12.30', '12.31', '12.32', '12.37', '12.38', '12.39', '12.40', '12.41', '12.42', '12.43', '12.44', '12.45', '12.46', '12.53', '12.72', '12.73', '12.74', '12.75', '12.76', '12.77', '12.78', '12.79', '12.80', '12.81', '12.82', '12.83', '12.84', '12.85', '12.86', '12.88', '12.89', '12.90', '12.91', '12.92', '12.93', '12.94', '12.95', '12.96', '12.97', '12.98', '12.99']"
+    }
+  ],
+  "files": [
+    {
+      "path": "nodes/_otr_my_story.py",
+      "baseline": "0abb104fd82494bb12e4dd05d58211c8fe4d30c86964cb6a8e23d5e49adfc529",
+      "candidate": "d5186f8f6da1ce1a12a751bfccf54138a245ae5a8ff20e4e57a58a915527137f",
+      "shared_checkout": "d5186f8f6da1ce1a12a751bfccf54138a245ae5a8ff20e4e57a58a915527137f",
+      "candidate_matches_shared": true,
+      "candidate_text_matches_shared": true,
+      "candidate_text_sha256": "60146bb1ff17054ce274bbcfa6a3ca4a94d3c1faa962e2b6804fb57d3c38e810",
+      "shared_text_sha256": "60146bb1ff17054ce274bbcfa6a3ca4a94d3c1faa962e2b6804fb57d3c38e810",
+      "byte_hash_difference_reason": null
+    },
+    {
+      "path": "tests/test_music_cue_duration_reaches_the_beat.py",
+      "baseline": "3606a21ab0f65c41e07600112155c3a32735dc1b4b155f158f172a97cad9356f",
+      "candidate": "88e77b870822d3ee7078cfe70d7ea4ce1c3acab0d3913189265396d821b341b6",
+      "shared_checkout": "88e77b870822d3ee7078cfe70d7ea4ce1c3acab0d3913189265396d821b341b6",
+      "candidate_matches_shared": true,
+      "candidate_text_matches_shared": true,
+      "candidate_text_sha256": "88e77b870822d3ee7078cfe70d7ea4ce1c3acab0d3913189265396d821b341b6",
+      "shared_text_sha256": "88e77b870822d3ee7078cfe70d7ea4ce1c3acab0d3913189265396d821b341b6",
+      "byte_hash_difference_reason": null
+    },
+    {
+      "path": "tests/test_my_story_runner.py",
+      "baseline": "ff35af2096843e0e3a5de9da30fd05d3bc5cae71d5774b6cd14e5e197a94830f",
+      "candidate": "c6f98377cbd887052ef6ab3e553768deab0a399365ce9a8e19c9d2ce45a1228c",
+      "shared_checkout": "c6f98377cbd887052ef6ab3e553768deab0a399365ce9a8e19c9d2ce45a1228c",
+      "candidate_matches_shared": true,
+      "candidate_text_matches_shared": true,
+      "candidate_text_sha256": "d571269f70bc6a93e19645ddbfb88b87bc173e1637cede84f8b6fbb1e04d85e4",
+      "shared_text_sha256": "d571269f70bc6a93e19645ddbfb88b87bc173e1637cede84f8b6fbb1e04d85e4",
+      "byte_hash_difference_reason": null
+    }
+  ],
+  "baseline_counts": {
+    "passed": 29,
+    "failed": 11,
+    "error": 0,
+    "skipped": 11,
+    "xfailed": 3
+  },
+  "candidate_counts": {
+    "passed": 30,
+    "failed": 10,
+    "error": 0,
+    "skipped": 11,
+    "xfailed": 3
+  },
+  "verification_input_sha256": {
+    "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_music_candidate.patch": "4a0b6e27fced80fc67df37f390edee1fb58444f336c1bd306bb3ed67b954da38",
+    "C:\\Users\\jeffr\\Documents\\ComfyUI\\comfyui-custom-node-survival-guide\\tests\\bug_bible_regression.py": "828e74820c561d4ba034d897de6c21acf8de943948c070addfc2b74104a1b81b",
+    "C:\\Users\\jeffr\\Documents\\ComfyUI\\comfyui-custom-node-survival-guide\\BUG_BIBLE.yaml": "9688110a8b513636d442cfa014cad65753ffa939d0c56d66d2b4813678ac70e4",
+    "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_music_bible_otr_baseline.xml": "af4d2c2c10034bccb2aaaa13eed7c47d28ad9dab07fc6d8d2937afd69ebeec25",
+    "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_music_bible_otr_candidate.xml": "6aa4b8de9a18105bfa46fca559adffa9c74614eee874bb85839e6b7674f0d7a0"
+  },
+  "conclusion": "No new failure IDs or worsening/masking. The sole status change is the intended new My Story coverage requirement failing baseline and passing candidate. All ten old failure payloads, all 11 skips and all three xfail reasons match. Final candidate three-file bytes match the shared checkout exactly.",
+  "baseline_suite": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "11",
+    "skipped": "14",
+    "tests": "54",
+    "time": "4.770",
+    "timestamp": "2026-09-10T18:13:15.985115-07:00",
+    "hostname": "iDream"
+  },
+  "candidate_suite": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "10",
+    "skipped": "14",
+    "tests": "54",
+    "time": "5.785",
+    "timestamp": "2026-09-10T18:18:17.582774-07:00",
+    "hostname": "iDream"
+  },
+  "candidate_sync": "Final root three-file contents copied verbatim into isolated candidate; supersedes initial patch snapshot after recognized per-sub-pass comment and two null assertions.",
+  "normalization": "Absolute pack paths, Python object addresses, and pytest-truncated py_files fixture representation only; assertion payloads retained."
+}

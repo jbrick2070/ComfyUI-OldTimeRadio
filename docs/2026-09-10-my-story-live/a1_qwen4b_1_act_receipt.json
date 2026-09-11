@@ -1,0 +1,48 @@
+{
+  "scope": "canonical writer -> shared freeze only; no audio/video/publication",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runner_sha256": "d053ee9de4f041e96a9982ac48f7f404be1bfc73430436a5f5dd5c0ac68197f5",
+  "pack_sha256": "396320a0d503adc04b258d1a0c02e0900930892d88356d28e67a127efc78c165",
+  "runtime_changes": [
+    [
+      "1",
+      "llm_device",
+      "mps",
+      "cuda"
+    ]
+  ],
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Two lighthouse keepers must get a warning bell working before a ferry enters the fog.",
+    "story_characters": "Mara, a woman in her thirties, and Jon, a man in his forties. Only these two characters speak, apart from the announcer.",
+    "story_plot": "They find a jammed bell mechanism, disagree about the repair, then work together to sound the warning. The ferry turns safely away. No supernatural explanation.",
+    "story_setting": "An isolated coastal lighthouse in the 1930s, during one stormy night.",
+    "story_author": "",
+    "num_characters": 2,
+    "act_count": "1",
+    "visual_style": "roll (any style)"
+  },
+  "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "prompt_id": "517c2fed-4c37-4306-860e-2bf9c8ca7087",
+  "queued_at_unix": 1789087814.7279184,
+  "outcome": "PASS: durable writer/ledger component, frozen_with_warns",
+  "code_commit": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260910_175015\\audio\\pending_20260910_175015_ledger.json",
+  "ledger_sha256": "a82f38658af25ce0c6b829c2626028a7cda2e77f6ee3794d551cf3b29c4b1aaa",
+  "history_receipt": "a1_qwen4b_1_act_history.json",
+  "freeze_executed": true,
+  "freeze_verdict": "frozen_with_warns",
+  "counts": {
+    "requested_acts": 1,
+    "proposed_acts": 1,
+    "accepted_acts": 1,
+    "actual_acts": 1,
+    "requested_characters": 2,
+    "planned_characters": 2,
+    "proposed_characters": 2,
+    "accepted_characters": 2,
+    "actual_characters": 2
+  },
+  "media_or_publication": false
+}
