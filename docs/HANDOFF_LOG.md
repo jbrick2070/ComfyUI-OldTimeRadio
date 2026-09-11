@@ -1,3 +1,27 @@
+## 2026-09-11 -- pair-lock follow-up qualified after Opus and Sonnet review
+
+Canonical attempt 02 on bd814148 completed in 834 seconds and published The LA
+Table. Source qualification failed: omitted P0 metadata, unknown-gender casting
+provenance/credits, unbound cleanup authorization, and solitary scene prompts/
+pixels. Raw artifacts and audits are preserved; no audio-listening proof claimed.
+PBUG-20260910-03 and -05 are extended; live PBUG-20260911-02 records voice credits.
+
+Existing owners now preserve omitted correction fields, bind authorization,
+stamp actual fallback voices, and carry current shared-scene context. Fixed
+budgets and full raw source remain; no new story gate or report-only checker.
+Final Opus5 and Sonnet5 agree after grounded corrections. Cursor timed out twice
+without a review, so its agreement is not claimed. Final focused 466 passed;
+full 14,404/51 inherited failures/183 skipped/one xfailed, no new failure meaning.
+Controlled Bible 36/10/11/3 versus baseline 34/12/11/3; 344 entries, new 11.65,
+extended 11.63/12.89. Bible 550cafc is pushed. Canonical unchanged and audited.
+
+Receipt: docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md.
+GO_FORWARD owns fresh full canonical attempt 03 and later stress. Attempts 01
+and 02 remain visible; technical publication does not promote model-matrix
+source proof. Mac/4060 held; RunPod blocked by missing authenticated access.
+
+---
+
 ## 2026-09-11 -- EOS repair qualified after Opus/Cursor consensus and Sonnet QA
 
 Shared native/grammar EOS ownership is fixed across all four generate factories.

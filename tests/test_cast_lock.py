@@ -288,14 +288,17 @@ def test_auto_registry_is_deterministic():
     assert a == b
 
 
-def test_auto_registry_skips_genderless_character():
+def test_auto_registry_stamps_genderless_character_without_inventing_gender():
     from nodes.cast_lock import CastLock
 
     cast = [{"char_id": "c1", "name": "MYSTERY", "voice_preset": "v2/en_speaker_2"}]
     out = CastLock().lock(script_json=_ledger(cast), cast_voice_policy="auto_registry")
     led = json.loads(out[0])
-    assert "voice_ref_id" not in led["cast"][0]  # preserved, not cast
-    assert "no gender" in out[2]
+    row = led["cast"][0]
+    assert row["voice_ref_id"] and row["voice_engine"] == "indextts2"
+    assert not row.get("gender")
+    assert row["voice_cast_fallback"] == "gender_unspecified"
+    assert "gender-agnostic reference" in out[2]
 
 
 def test_auto_registry_bark_legacy_preserves_characters():

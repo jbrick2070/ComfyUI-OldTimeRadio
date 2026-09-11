@@ -1595,7 +1595,7 @@ def _build_char_prompt_request(char: dict, meta: dict, setting: str,
 
 
 def _build_char_scene_request(char: dict, meta: dict, setting: str,
-                              line: dict, style=None) -> str:
+                              line: dict, style=None, *, source_scene=False) -> str:
     """BUG 1 follow-up (2026-06-20 operator): the per-beat character still must be
     SHOT/BEAT AWARE -- the character IN the moment of THIS beat -- regardless of
     image model (the video lane conditions on the SAME still). Mirrors
@@ -1618,14 +1618,24 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
     intent = str(ln.get("beat_intent") or "").strip()[:240]
     mood = str(ln.get("traits") or "").strip()[:80]
     said = str(ln.get("text") or "").strip()[:240]
+    scene_direction = (
+        "Compose the CURRENT physical scene: its participants with their current ages, "
+        "shared actions, and the objects those actions require. The active speaker is "
+        "the focus within that scene, not its entire cast. Preserve source-required "
+        "companions in the composition. Spoken memories, metaphors and people only "
+        "mentioned do not become visible people or flashbacks; keep the present scene "
+        "unless the source explicitly changes it. Describe adults as adults even when "
+        "their relationship is son or daughter. Convey the current pose and emotion"
+        if source_scene else
+        "convey the ACTION and EMOTION of this beat. Translate the beat into what is "
+        "VISIBLE (pose, expression, what they are doing)")
     return (
         "Write ONE vivid cinematic STILL-image prompt (a single comma-separated "
         "line, no preamble) for a 16:9 LANDSCAPE shot of this character at THIS "
         "moment of the scene. The image MUST show the CHARACTER THEMSELVES -- a "
         "person with a clearly visible face -- as the subject, a medium/wide shot "
-        "with the full head and headroom, framed inside the story's world; convey "
-        "the ACTION and EMOTION of this beat. Translate the beat into what is "
-        "VISIBLE (pose, expression, what they are doing) -- do NOT write the "
+        "with the full head and headroom, framed inside the story's world; "
+        f"{scene_direction} -- do NOT write the "
         "character's name, dialogue, narration, or any on-screen text. NEVER an "
         "empty room, an object, or scenery alone.\n"
         f"character_appearance: {appearance or '(unspecified)'}\n"
@@ -1684,9 +1694,27 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
         ordered_lines = [scene_line(line)]
     speakers = {str(row.get("char_id") or "") for row in ordered_lines}
     cid = str(target.get("char_id") or "")
+    treatment = (meta.get("my_story") or {}).get("treatment") or {}
+    planned_cast = [row for row in treatment.get("cast", []) if isinstance(row, dict)]
+
+    def character_context(row):
+        # Ledger rows do not retain all treatment casting fields. Join only a
+        # unique exact normalized name; never infer an age or gender from prose.
+        name = str(row.get("name") or "")
+        key = " ".join(name.split()).casefold()
+        matches = [item for item in planned_cast
+                   if key and " ".join(str(item.get("name") or "").split()).casefold() == key]
+        planned = matches[0] if len(matches) == 1 else {}
+        ages = [str(value or "").strip() for value in
+                (row.get("age_band"), planned.get("age_band"))]
+        age = next((value for value in ages if value.casefold() not in {"", "n/a"}), "")
+        return {"char_id": str(row.get("char_id") or ""), "name": name,
+                "appearance": _appearance_for_char([row], str(row.get("char_id") or "")),
+                "age_band": age,
+                "gender": row.get("gender") or planned.get("gender") or ""}
+
     companions = [
-        {"char_id": str(row.get("char_id") or ""), "name": str(row.get("name") or ""),
-         "appearance": _appearance_for_char([row], str(row.get("char_id") or "")),
+        {**character_context(row),
          "speaks_in_scene": str(row.get("char_id") or "") in speakers}
         for row in cast if isinstance(row, dict) and row.get("char_id")
         and str(row.get("char_id")) != cid
@@ -1694,16 +1722,15 @@ def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
         and not row.get("_synthetic_announcer")
     ]
     context = {
+        "prompt_contract": "my_story.scene_source.v2",
         "scope": "scene_character", "beat_id": bid, "target_char_id": cid,
         "resolved_setting": _read_setting(meta),
-        "target_character": next(({
-            "char_id": cid, "name": str(row.get("name") or ""),
-            "appearance": _appearance_for_char([row], cid)}
+        "target_character": next((character_context(row)
             for row in cast if isinstance(row, dict) and str(row.get("char_id") or "") == cid), {}),
         "beat": dict(beat), "current_line": scene_line(line), "shot": dict(shot),
         "scene": dict(scene), "ordered_scene_dialogue": ordered_lines,
         "candidate_companions": companions,
-        "working_treatment": (meta.get("my_story") or {}).get("treatment"),
+        "working_treatment": treatment,
     }
     # A primitive copy prevents later pipeline mutation from changing the receipt.
     return json.loads(json.dumps({"raw_fields": raw, "scene": context}, ensure_ascii=False))
@@ -1720,7 +1747,7 @@ def _rewrite_char_scene_from_source(meta, ce, setting, line, warnings, cid, *,
     candidate = {"prompt": initial}
     # The shared operation supplies source and scene context once. Do not repeat
     # the full source inside visual_request and artificially consume its capacity.
-    request = _build_char_scene_request(ce, meta, setting, line, style=vstyle)
+    request = _build_char_scene_request(ce, meta, setting, line, style=vstyle, source_scene=True)
     context = dict(source_context["scene"])
     context["visual_request"] = request
     context_hash = candidate_sha256(source_context)
@@ -1740,8 +1767,14 @@ def _rewrite_char_scene_from_source(meta, ce, setting, line, warnings, cid, *,
                 max_attempts=min(2, max(0, int(max_reseed)) + 1),
                 instruction=("This artifact is a scene still prompt. Return JSON with only the "
                              "prompt field. Apply source corrections directly, including required "
-                             "companions in this moment; preserve the target face and compatible "
-                             "visual elaboration. Do not force every act speaker into every frame. "
+                             "companions in this moment, their current ages, shared physical "
+                             "action and its necessary objects. A draft centered on one speaker "
+                             "may have omitted the rest of the required scene; restore it. "
+                             "Use explicit current-age descriptions for relatives, so an adult "
+                             "son or daughter does not become a child. Depict the present action, "
+                             "not a childhood memory spoken about during it. Preserve the target "
+                             "face and compatible visual elaboration. "
+                             "Do not force every act speaker into every frame. "
                              "The visual_request supplies framing and style instructions; its "
                              "request for a plain line is superseded by this JSON contract."),
                 author_context=context)

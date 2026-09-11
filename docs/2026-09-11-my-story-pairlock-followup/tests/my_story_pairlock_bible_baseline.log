@@ -1,0 +1,540 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1 OTR_EXTRA_OUTPUT_ROOTS='C:\Users\jeffr\AppData\Local\Temp\pytest-of-jeffr\pytest-9453'
+============================= test session starts =============================
+platform win32 -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\jeffr\Documents\ComfyUI\_worktrees\otr-pairlock-followup-baseline
+configfile: pyproject.toml
+plugins: anyio-4.12.1, hydra-core-1.3.5, jaxtyping-0.3.9, langsmith-0.7.12, asyncio-1.3.0, typeguard-4.5.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 60 items
+
+..\_worktrees\otr-pairlock-followup-baseline FF..........FF......xx.x... [ 45%]
+.ssssss.FF.....FFsFFFss.ssF......                                        [100%]
+
+================================== FAILURES ===================================
+________________ TestPhase01Paths.test_no_deep_dirname_chains _________________
+
+self = <bug_bible_regression.TestPhase01Paths object at 0x000001C91243F6B0>
+py_files = ['C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\prestartup_script.py', 'C:\\Users\...s\\otr-pairlock-followup-baseline\\docs\\2026-09-02-animatediff-ledger-experiments\\prompt-rule\\v3_prototype.py', ...]
+
+    def test_no_deep_dirname_chains(self, py_files):
+        """BUG-01.03: No os.path.dirname chains deeper than 3 levels.
+    
+        Chains of 4+ dirname() calls almost always miscount the
+        directory depth and land in the wrong place.
+        """
+        violations = []
+        # Match dirname(dirname(dirname(dirname(  — 4+ levels
+        pattern = re.compile(
+            r"os\.path\.dirname\s*\(\s*"
+            r"os\.path\.dirname\s*\(\s*"
+            r"os\.path\.dirname\s*\(\s*"
+            r"os\.path\.dirname"
+        )
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            if pattern.search(content):
+                violations.append(os.path.basename(fpath))
+    
+>       assert not violations, (
+            f"BUG-01.03: Deep dirname chains (4+) found in: "
+            f"{', '.join(violations)}. Use folder_paths or a "
+            f"module-level _REPO_ROOT anchor instead."
+        )
+E       AssertionError: BUG-01.03: Deep dirname chains (4+) found in: eng_ltx25.py, eng_ltx_av.py, eng_ltx_video.py, wrapper_bridge.py. Use folder_paths or a module-level _REPO_ROOT anchor instead.
+E       assert not ['eng_ltx25.py', 'eng_ltx_av.py', 'eng_ltx_video.py', 'wrapper_bridge.py']
+
+tests\bug_bible_regression.py:165: AssertionError
+_____________ TestPhase01Paths.test_output_nodes_use_folder_paths _____________
+
+self = <bug_bible_regression.TestPhase01Paths object at 0x000001C91243F890>
+py_files = ['C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\prestartup_script.py', 'C:\\Users\...s\\otr-pairlock-followup-baseline\\docs\\2026-09-02-animatediff-ledger-experiments\\prompt-rule\\v3_prototype.py', ...]
+
+    def test_output_nodes_use_folder_paths(self, py_files):
+        """BUG-01.02: Nodes that write output files should use
+        folder_paths.get_output_directory(), not hand-rolled paths.
+    
+        Checks files containing OUTPUT_NODE = True. Also the static
+        half of BUG-08.06 (an OUTPUT_NODE must write a real artifact
+        via a sanctioned path helper).
+        """
+        warnings = []
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            if "OUTPUT_NODE" not in content:
+                continue
+            if "OUTPUT_NODE = True" in content or "OUTPUT_NODE=True" in content:
+                # This is an output node — check for folder_paths usage
+                # Also allow: _REPO_ROOT anchor, or user-supplied output_dir
+                has_safe_path = (
+                    "get_output_directory" in content or
+                    "folder_paths" in content or
+                    "_REPO_ROOT" in content or
+                    "output_dir" in content or   # user-configurable path
+                    "output_path" in content      # caller-supplied path
+                )
+                if not has_safe_path:
+                    warnings.append(os.path.basename(fpath))
+    
+>       assert not warnings, (
+            f"BUG-01.02: Output nodes without folder_paths usage: "
+            f"{', '.join(warnings)}"
+        )
+E       AssertionError: BUG-01.02: Output nodes without folder_paths usage: OTR_LedgerFreezeCascade.py, otr_scene_aware_scopes.py
+E       assert not ['OTR_LedgerFreezeCascade.py', 'otr_scene_aware_scopes.py']
+
+tests\bug_bible_regression.py:198: AssertionError
+________________ TestPhase07VRAM.test_vram_flush_after_unload _________________
+
+self = <bug_bible_regression.TestPhase07VRAM object at 0x000001C91243CDD0>
+py_files = ['C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\prestartup_script.py', 'C:\\Users\...s\\otr-pairlock-followup-baseline\\docs\\2026-09-02-animatediff-ledger-experiments\\prompt-rule\\v3_prototype.py', ...]
+
+    def test_vram_flush_after_unload(self, py_files):
+        """BUG-07.03: Files that call unload_all_models should also
+        call torch.cuda.empty_cache() to actually free VRAM.
+    
+        Dereferencing a model does not release VRAM. empty_cache() is
+        required.
+        """
+        issues = []
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+    
+            if "unload_all_models" in content:
+                if "empty_cache" not in content:
+                    issues.append(os.path.basename(fpath))
+    
+>       assert not issues, (
+            f"BUG-07.03: unload_all_models without empty_cache: "
+            f"{', '.join(issues)}"
+        )
+E       AssertionError: BUG-07.03: unload_all_models without empty_cache: flux2_klein.py, flux_gen1.py, lumina_image.py, z_image_turbo.py, eng_ghost_signal.py, eng_humo.py, motion_common.py
+E       assert not ['flux2_klein.py', 'flux_gen1.py', 'lumina_image.py', 'z_image_turbo.py', 'eng_ghost_signal.py', 'eng_humo.py', ...]
+
+tests\bug_bible_regression.py:554: AssertionError
+________________ TestPhase09Subprocess.test_popen_has_cleanup _________________
+
+self = <bug_bible_regression.TestPhase09Subprocess object at 0x000001C91243D730>
+py_files = ['C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\prestartup_script.py', 'C:\\Users\...s\\otr-pairlock-followup-baseline\\docs\\2026-09-02-animatediff-ledger-experiments\\prompt-rule\\v3_prototype.py', ...]
+
+    def test_popen_has_cleanup(self, py_files):
+        """BUG-09.02: Every subprocess.Popen must have cleanup logic.
+    
+        Popen without try/finally or context manager can leave zombie
+        processes on error. FFmpeg pipe deadlock is the classic case.
+        """
+        issues = []
+        for fpath in py_files:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+    
+            if "subprocess.Popen" not in content:
+                continue
+    
+            # Check for cleanup patterns
+            has_cleanup = (
+                "finally:" in content or
+                "proc.kill" in content or
+                "proc.terminate" in content or
+                "with subprocess" in content or  # context manager
+                ".wait(" in content
+            )
+    
+            if not has_cleanup:
+                issues.append(os.path.basename(fpath))
+    
+>       assert not issues, (
+            f"BUG-09.02: Popen without cleanup in: "
+            f"{', '.join(issues)}. Add try/finally with proc.kill()."
+        )
+E       AssertionError: BUG-09.02: Popen without cleanup in: proc.py. Add try/finally with proc.kill().
+E       assert not ['proc.py']
+
+tests\bug_bible_regression.py:594: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_sparse_rewrite_conserves_only_omitted_fields _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C91241F0E0>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_sparse_rewrite_conserves_only_omitted_fields(self, pack_dir):
+        """BUG-11.65: execute the actual pure reconstruction without model imports."""
+        path = os.path.join(pack_dir, "nodes", "_otr_story_source.py")
+        if not os.path.isfile(path):
+            pytest.skip("source correction owner is OTR-local")
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read(), filename=path)
+        definitions = [node for node in tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name == "_retain_omitted"]
+>       assert len(definitions) == 1, "BUG-11.65: source conservation owner missing"
+E       AssertionError: BUG-11.65: source conservation owner missing
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests\bug_bible_regression.py:1656: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_pairlock_followup_retains_behavior_coverage _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C9124D0D40>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_pairlock_followup_retains_behavior_coverage(self, pack_dir):
+        """BUG-11.39/11.63/11.65/12.89: retain tests executed by the OTR suite."""
+        if not os.path.isfile(os.path.join(pack_dir, "nodes", "_otr_my_story.py")):
+            pytest.skip("My Story behavior coverage is OTR-local")
+        expected = {
+            "tests/test_my_story_runner.py": {
+                "test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged"},
+            "tests/test_story_source_review.py": {
+                "test_sparse_source_correction_conserves_metadata_by_identity_not_position",
+                "test_explicit_corrections_clears_and_list_membership_are_authoritative",
+                "test_rejected_proposal_is_not_the_next_baseline_and_validator_result_is_journaled"},
+            "tests/test_ledger_clean_stage.py": {
+                "test_scope_authorization_binds_once_and_reuses_bound_slot_for_repair",
+                "test_scope_binder_failure_propagates_without_unconstrained_fallback"},
+            "tests/test_constrained_generate.py": {
+                "test_scope_authorization_real_grammar_accepts_empty_or_omitted_spans_never_null"},
+            "tests/test_my_story_visual_source.py": {
+                "test_scene_owner_receives_current_ages_and_shared_action_without_literalizing_memory"},
+            "tests/test_cast_lock.py": {
+                "test_auto_registry_stamps_genderless_character_without_inventing_gender"},
+            "tests/test_cast_lock_voice_ref_completeness.py": {
+                "test_unspecified_gender_names_the_real_render_reference_without_changing_identity"},
+            "tests/test_credits_roll_spec.py": {
+                "test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference"},
+            "tests/test_credits_s2_durable_stamps.py": {
+                "test_cast_lock_copies_local_wire_ledger_into_singleton"},
+        }
+        for relative, names in expected.items():
+            path = os.path.join(pack_dir, *relative.split("/"))
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read(), filename=path)
+            actual = {node.name for node in ast.walk(tree)
+                      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+>           assert names <= actual, f"missing behavior coverage in {relative}: {names - actual}"
+E           AssertionError: missing behavior coverage in tests/test_my_story_runner.py: {'test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged'}
+E           assert {'test_sparse...ds_unchanged'} <= {'__init__', ..., '_run', ...}
+E             
+E             Extra items in the left set:
+E             'test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged'
+
+tests\bug_bible_regression.py:1714: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_explicit_word_delivery_is_owned_before_media _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C9123BF950>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_explicit_word_delivery_is_owned_before_media(self, pack_dir):
+        """BUG-12.70: requested length is hash-bound before media readiness."""
+        paths = {
+            "shared": os.path.join(pack_dir, "nodes", "_otr_word_delivery.py"),
+            "codex": os.path.join(pack_dir, "nodes", "_otr_scifi_codex.py"),
+            "fable2": os.path.join(pack_dir, "nodes", "_otr_scifi_fable2.py"),
+            "inline": os.path.join(pack_dir, "nodes", "_otr_radio_editor.py"),
+            "writer": os.path.join(pack_dir, "nodes", "OTR_LedgerScriptWriter.py"),
+            "freeze": os.path.join(pack_dir, "nodes", "_otr_freeze_cascade.py"),
+        }
+        if not os.path.isfile(paths["shared"]):
+            pytest.skip("BUG-12.70 explicit word-delivery guard is OTR-local")
+        sources = {
+>           name: open(path, encoding="utf-8").read()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            for name, path in paths.items()
+        }
+E       FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\nodes\\_otr_scifi_codex.py'
+
+tests\bug_bible_regression.py:1991: FileNotFoundError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_outer_word_fit_campaign_is_fail_closed _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C91243F0E0>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_outer_word_fit_campaign_is_fail_closed(self, pack_dir):
+        """BUG-12.71: a non-converging word-fit campaign must stop the queue."""
+        shared_path = os.path.join(pack_dir, "nodes", "_otr_word_delivery.py")
+        test_path = os.path.join(
+            pack_dir, "tests", "test_radio_editor_live_budget_lineage.py",
+        )
+        if not os.path.isfile(shared_path):
+            pytest.skip("BUG-12.71 word-fit ceiling guard is OTR-local")
+    
+        shared_source = open(shared_path, encoding="utf-8").read()
+        for marker in (
+            "DEFAULT_MAX_OUTER_WORD_FIT_CANDIDATES = 12",
+            "def _resolve_outer_candidate_ceiling(",
+            "class WordFitCeilingExceeded(WordDeliveryError)",
+            "OTR_MAX_WORD_FIT_CANDIDATES",
+            "bounded_model_output_retries_until_ledger_legal",
+            'if int(state["active_candidate_index"]) >= ceiling:',
+        ):
+>           assert marker in shared_source, (
+                f"BUG-12.71 fail-closed ceiling marker missing: {marker}"
+            )
+E           AssertionError: BUG-12.71 fail-closed ceiling marker missing: DEFAULT_MAX_OUTER_WORD_FIT_CANDIDATES = 12
+E           assert 'DEFAULT_MAX_OUTER_WORD_FIT_CANDIDATES = 12' in '"""Shared actual-word telemetry for every OTR story producer.\n\nWORDS ARE AN OBSERVATION HERE, AND ONLY AN OBSERVATI...nt",\n    "stamp_actual",\n    "stamp_contract",\n    "total_voiced_text_sha256",\n    "total_voiced_word_count",\n]\n'
+
+tests\bug_bible_regression.py:2063: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_cast_role_identity_classification_is_covered _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C91243D8B0>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_cast_role_identity_classification_is_covered(self, pack_dir):
+        """BUG-12.61: role labels and personal names need distinct projections."""
+        modules = {
+            "tests/test_story_brief_c5a1.py": (
+                "test_generic_role_labels_are_legal_visual_nouns",
+                "test_all_six_bank_personal_name_shapes_stay_forbidden",
+                "test_role_input_forms_preserve_one_identity_without_mapping_articles",
+                "test_private_repair_detail_names_surface_but_public_code_stays_stable",
+            ),
+            "tests/test_brief_prompt_finishing.py": (
+                "test_failed_brief_still_finishes_a_valid_non_authoring_visual_prompt",
+            ),
+        }
+        anchor = os.path.join(pack_dir, "nodes", "_otr_story_brief.py")
+        if not os.path.isfile(anchor):
+            pytest.skip("BUG-12.61 cast-role identity guard is OTR-local")
+        with open(anchor, "r", encoding="utf-8") as f:
+            story_brief_source = f.read()
+        for symbol in (
+            "_is_generic_role_label",
+            "_cast_input_substitution_forms",
+            "_cast_output_forbidden_forms",
+            "_matched_cast_name_token",
+        ):
+>           assert f"def {symbol}(" in story_brief_source, (
+                f"BUG-12.61 production classifier missing: {symbol}"
+            )
+E           AssertionError: BUG-12.61 production classifier missing: _is_generic_role_label
+E           assert 'def _is_generic_role_label(' in '"""nodes/_otr_story_brief.py -- reflection pure module (Sprint C C5a1).\n\nThe reflection pass is a single LLM call t...d not in normalized:\n            normalized.append(cased)\n    return model.model_copy(update={"cast": normalized})\n'
+
+tests\bug_bible_regression.py:2123: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_rename_transaction_and_active_consumer_join _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C91237AA50>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_rename_transaction_and_active_consumer_join(self, pack_dir):
+        """BUG-12.66: a renamed artifact tree must carry durable identity."""
+        ledger_path = os.path.join(pack_dir, "nodes", "production_ledger.py")
+        if not os.path.isfile(ledger_path):
+            pytest.skip("BUG-12.66 artifact-tree rename guard is OTR-local")
+    
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            ledger_source = f.read()
+        tree = ast.parse(ledger_source)
+        function_names = {
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        assert {
+            "_rebase_episode_local_paths",
+            "_same_durable_run",
+            "rename_episode",
+            "_merge_with_disk",
+        } <= function_names
+        assert "save_ledger_safe" in ledger_source
+        assert "mirrored_from" in ledger_source
+        assert "music_cue_spec_sha256" in ledger_source
+    
+        modules = {
+            "tests/test_production_ledger.py": (
+                "test_path_rebase_handles_windows_slashes_and_component_boundaries",
+                "test_rename_rebases_shared_six_bank_episode_paths",
+                "test_merge_rejects_foreign_or_reauthored_disk_only_music_mirrors",
+                "test_durable_identity_rejects_one_sided_freeze",
+            ),
+            "tests/test_video_ledger.py": (
+                "test_shot_lock_identity_rejects_one_sided_freeze",
+                "test_post_audio_overlay_rehydrates_owned_sections_despite_existing_timing",
+                "test_post_audio_overlay_identity_merges_music_and_assembler_mirrors",
+                "test_post_audio_overlay_rejects_cross_episode_freeze",
+            ),
+            "tests/test_image_platform_c1.py": (
+                "test_reresolve_stale_pending_rekeys_to_renamed_episode",
+                "test_reresolve_rejects_active_sibling_with_different_freeze",
+            ),
+            "tests/test_clip_fill.py": (
+                "test_resolve_stale_pending_clip_episode_to_renamed_dir",
+                "test_resolve_stale_pending_clip_rejects_foreign_freeze",
+            ),
+            "tests/test_google_video_sfx_workflow.py": (
+                "test_master_audio_reresolve_uses_active_ledger_not_newest_sibling",
+                "test_master_audio_reresolve_fails_closed_without_active_ledger",
+                "test_master_audio_reresolve_rejects_ledger_directory_identity_mismatch",
+            ),
+            "tests/test_workflow_live_passes_validator.py": (
+                "test_production_workflow_visual_structure_pinned",
+            ),
+        }
+        for relative_path, test_names in modules.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"BUG-12.66 regression module missing: {relative_path}"
+            )
+            with open(path, "r", encoding="utf-8") as f:
+                source = f.read()
+            for test_name in test_names:
+                assert f"def {test_name}(" in source, (
+                    f"BUG-12.66 executable guard missing: "
+                    f"{relative_path}::{test_name}"
+                )
+    
+        workflow_path = os.path.join(pack_dir, "workflows", "otr_canonical.json")
+        with open(workflow_path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        links = {int(row[0]): row for row in workflow.get("links", [])}
+>       assert links.get(284) == [284, 12, 0, 90, 4, "STRING"], (
+            "BUG-12.66: canonical workflow must gate ShotLock on rename owner"
+        )
+E       AssertionError: BUG-12.66: canonical workflow must gate ShotLock on rename owner
+E       assert [284, 12, 0, 90, 3, 'STRING'] == [284, 12, 0, 90, 4, 'STRING']
+E         
+E         At index 4 diff: 3 != 4
+E         Use -v to get more diff
+
+tests\bug_bible_regression.py:2205: AssertionError
+_ TestPhase07To12ProductionRegressionCatalog.test_otr_canonical_ledger_text_metric_owner _
+
+self = <bug_bible_regression.TestPhase07To12ProductionRegressionCatalog object at 0x000001C9124D3B90>
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_otr_canonical_ledger_text_metric_owner(self, pack_dir):
+        """BUG-12.67: every durable text/count surface shares one owner."""
+        import runpy
+    
+        metrics_path = os.path.join(pack_dir, "nodes", "_otr_text_metrics.py")
+        if not os.path.isfile(metrics_path):
+            pytest.skip("BUG-12.67 canonical text-metric guard is OTR-local")
+    
+        metrics = runpy.run_path(metrics_path)
+        count = metrics["canonical_word_count"]
+        assert count("forty-two") == 1
+        assert count("don't don\u2019t") == 2
+        assert count("off\u2014it's") == 2
+        assert count("off\u2013it\u2019s") == 2
+    
+        required_uses = {
+            "nodes/production_ledger.py": "refresh_ledger_text_metrics",
+            "nodes/_otr_ledger_freeze.py": "canonical_word_count",
+            "nodes/_otr_freeze_cascade.py": "refresh_ledger_text_metrics(led)",
+            "nodes/_otr_readiness.py": "set_line_text_metrics",
+            "nodes/_otr_ledger_scrub.py": "set_line_text_metrics",
+            "nodes/_otr_ledger_reviewer.py": "set_line_text_metrics",
+            "nodes/_otr_story_spine.py": "set_line_text_metrics",
+            "nodes/_otr_scifi_codex.py": "set_line_text_metrics",
+        }
+        for relative_path, marker in required_uses.items():
+            path = os.path.join(pack_dir, *relative_path.split("/"))
+            assert os.path.isfile(path), (
+                f"BUG-12.67 production module missing: {relative_path}"
+            )
+            source = open(path, encoding="utf-8").read()
+>           assert marker in source, (
+                f"BUG-12.67 owner marker missing from {relative_path}: {marker}"
+            )
+E           AssertionError: BUG-12.67 owner marker missing from nodes/_otr_readiness.py: set_line_text_metrics
+E           assert 'set_line_text_metrics' in '"""nodes/_otr_readiness.py — LFC Phase 7 (audio) + Phase 8 (video).\n\nBoth phases are deterministic, cheap, and defa...th_portrait, rep.cast_total,\n        rep.voiced_lines_with_visual_mapping, rep.voiced_lines,\n    )\n    return rep\n'
+
+tests\bug_bible_regression.py:2240: AssertionError
+_ TestModelSpecificReferenceAdmission.test_reference_image_capability_requires_checkpoint_and_pixel_proof _
+
+self = <bug_bible_regression.TestModelSpecificReferenceAdmission object at 0x000001C9124D2120>
+py_files = ['C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\prestartup_script.py', 'C:\\Users\...s\\otr-pairlock-followup-baseline\\docs\\2026-09-02-animatediff-ledger-experiments\\prompt-rule\\v3_prototype.py', ...]
+pack_dir = 'C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline'
+
+    def test_reference_image_capability_requires_checkpoint_and_pixel_proof(
+            self, py_files, pack_dir):
+        """A generic ReferenceLatent-style node is structural evidence only.
+    
+        A literal opt-in must name the exact checkpoint and a checked-in matched
+        pixel A/B receipt.  The OTR-local tail pins the live rejection, including
+        the cache-version bump and the independent identity seed.
+        """
+        violations = []
+        for path in py_files:
+            relative = os.path.relpath(path, pack_dir).replace("\\", "/")
+            if any(part in {".claude", "tmp", "scratch", "kibitz",
+                            "otr", "otr_soak_receipts"}
+                   for part in relative.split("/")):
+                continue
+            with open(path, "r", encoding="utf-8-sig",
+                      errors="replace") as fh:
+                if "accepts_reference_image" not in fh.read():
+                    continue
+            for class_name, attrs in self._literal_class_attributes(path):
+                capability = attrs.get("accepts_reference_image")
+                label = f"{os.path.relpath(path, pack_dir)}::{class_name}"
+                if capability is self._NON_LITERAL:
+                    violations.append(
+                        f"{label} has a dynamic accepts_reference_image; "
+                        "shipping capability declarations must be literal"
+                    )
+                    continue
+                if capability is not True:
+                    continue
+                approval = attrs.get("reference_image_approval")
+                violations.extend(
+                    self._approval_violations(pack_dir, label, approval)
+                )
+    
+        assert not violations, "BUG-12.120: " + "; ".join(violations)
+    
+        # OTR-specific executable receipt.  Other packs stop at the generic
+        # admission scan above.
+        zimage_path = os.path.join(
+            pack_dir, "nodes", "_otr_image_engines", "z_image_turbo.py"
+        )
+        if not os.path.isfile(zimage_path):
+            return
+        zimage_attrs = dict(self._literal_class_attributes(zimage_path)).get(
+            "ZImageTurboEngine", {}
+        )
+        assert zimage_attrs.get("accepts_reference_image") is False
+        assert zimage_attrs.get("engine_version") == "2", (
+            "BUG-12.120: disabling the rejected reference path must invalidate "
+            "v1 cached grids"
+        )
+    
+        engine_tests = os.path.join(pack_dir, "tests", "test_image_engine_c2.py")
+        seed_tests = os.path.join(pack_dir, "tests", "test_still_spine_helpers.py")
+        harness = os.path.join(pack_dir, "scripts", "otr_zimage_reference_ab.py")
+        for required in (engine_tests, seed_tests, harness):
+            assert os.path.isfile(required), (
+                f"BUG-12.120: required rejection evidence missing: {required}"
+            )
+        with open(engine_tests, "r", encoding="utf-8") as fh:
+            assert "test_no_shipping_image_engine_advertises_unproven_reference_conditioning" in fh.read()
+        with open(seed_tests, "r", encoding="utf-8") as fh:
+>           assert "test_zimage_reference_rejection_keeps_the_identity_seed" in fh.read()
+E           assert 'test_zimage_reference_rejection_keeps_the_identity_seed' in '"""Still-spine ST-1: shared open-subject + 5-layer still-prompt composer.\n\nLocks the W1 helper seam (STILL_SPINE_SP...                 STILL_FRAMING_SCENE_CHARACTER):\n            assert "/" not in const and "\\\\" not in const, const\n'
+E            +  where '"""Still-spine ST-1: shared open-subject + 5-layer still-prompt composer.\n\nLocks the W1 helper seam (STILL_SPINE_SP...                 STILL_FRAMING_SCENE_CHARACTER):\n            assert "/" not in const and "\\\\" not in const, const\n' = <built-in method read of _io.TextIOWrapper object at 0x000001C914137CA0>()
+E            +    where <built-in method read of _io.TextIOWrapper object at 0x000001C914137CA0> = <_io.TextIOWrapper name='C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-pairlock-followup-baseline\\tests\\test_still_spine_helpers.py' mode='r' encoding='utf-8'>.read
+
+tests\bug_bible_regression.py:2882: AssertionError
+============================== warnings summary ===============================
+::TestPhase07VRAM::test_no_module_scope_model_loads
+::TestSilentFontFallback::test_load_default_is_never_a_silent_fallback
+  <unknown>:38: SyntaxWarning: invalid escape sequence '\`'
+
+::TestPhase12Regression::test_all_py_files_parse
+  C:\Users\jeffr\Documents\ComfyUI\_worktrees\otr-pairlock-followup-baseline\nodes\_otr_shared\pathbudget.py:38: SyntaxWarning: invalid escape sequence '\`'
+    2. THE ``\\?\`` EXTENDED-LENGTH PREFIX (:func:`long_path`) is the canonical
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\my_story_pairlock_bible_baseline.xml -
+=========================== short test summary info ===========================
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase01Paths::test_no_deep_dirname_chains
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase01Paths::test_output_nodes_use_folder_paths
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07VRAM::test_vram_flush_after_unload
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase09Subprocess::test_popen_has_cleanup
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_sparse_rewrite_conserves_only_omitted_fields
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_pairlock_followup_retains_behavior_coverage
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_explicit_word_delivery_is_owned_before_media
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_outer_word_fit_campaign_is_fail_closed
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_cast_role_identity_classification_is_covered
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_rename_transaction_and_active_consumer_join
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestPhase07To12ProductionRegressionCatalog::test_otr_canonical_ledger_text_metric_owner
+FAILED ..\_worktrees\otr-pairlock-followup-baseline::TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof
+====== 12 failed, 34 passed, 11 skipped, 3 xfailed, 3 warnings in 4.77s =======

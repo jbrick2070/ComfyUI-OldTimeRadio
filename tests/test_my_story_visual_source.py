@@ -142,6 +142,54 @@ def test_actual_shared_source_call_does_not_change_neutral_portrait_scope():
     assert "CURRENT SCENE CONTEXT" not in portrait and "candidate_companions" not in portrait
 
 
+@pytest.mark.parametrize("row_age", [None, "", "  ", "n/a", " N/A "])
+def test_scene_owner_receives_current_ages_and_shared_action_without_literalizing_memory(row_age):
+    ledger = _ledger()
+    for row in ledger["cast"]:
+        row["age_band"] = row_age
+    ledger["meta"]["my_story"]["treatment"]["cast"] = [
+        {"name": "Ada", "age_band": "30s", "gender": "female"},
+        {"name": "Mother", "age_band": "50s", "gender": "female"},
+        {"name": "Tom", "age_band": "40s", "gender": "male"}]
+    ledger["lines"][0]["text"] = "Mother, remember when I was small? I love sharing dinner with you now."
+    before_hash = source.candidate_sha256(_context(ledger))
+    slot = Slot()
+    _compose(slot, ledger=ledger)
+    request = json.loads(slot.calls[0][1]["content"])
+    context = request["authoring_context"]
+    assert context["target_character"]["age_band"] == "30s"
+    assert context["candidate_companions"][0]["age_band"] == "50s"
+    visual_request = context["visual_request"]
+    assert "active speaker is the focus within that scene" in visual_request
+    assert "Spoken memories" in visual_request and "objects those actions require" in visual_request
+    assert "Do not force every act speaker into every frame" in slot.calls[0][0]["content"]
+    assert context["candidate_companions"][1]["speaks_in_scene"] is False
+    ledger["meta"]["my_story"]["treatment"]["cast"][0]["age_band"] = "40s"
+    assert source.candidate_sha256(_context(ledger)) != before_hash
+    portrait = mb._build_char_prompt_request(ledger["cast"][0], ledger["meta"], "kitchen")
+    assert "shared actions" not in portrait and "Spoken memories" not in portrait
+
+
+def test_scene_age_join_does_not_borrow_from_a_different_or_ambiguous_cast_name():
+    ledger = _ledger()
+    ledger["meta"]["my_story"]["treatment"]["cast"] = [
+        {"name": "Ada", "age_band": "30s"}, {"name": "ADA", "age_band": "60s"},
+        {"name": "Mother's friend", "age_band": "50s"}]
+    context = _context(ledger)["scene"]
+    assert context["target_character"]["age_band"] == ""
+    assert context["candidate_companions"][0]["age_band"] == ""
+
+
+def test_scene_unknown_treatment_age_is_absent_and_known_row_age_wins():
+    ledger = _ledger()
+    ledger["cast"][0]["age_band"] = "40s"
+    ledger["meta"]["my_story"]["treatment"]["cast"] = [
+        {"name": "Ada", "age_band": "30s"}, {"name": "Mother", "age_band": "n/a"}]
+    context = _context(ledger)["scene"]
+    assert context["target_character"]["age_band"] == "40s"
+    assert context["candidate_companions"][0]["age_band"] == ""
+
+
 def test_corrected_narrative_appearance_is_not_prepended_back_into_prompt():
     ledger = _ledger()
     ledger["cast"][0]["character_description"] = "round face, mourning her dead mother, waiting alone"

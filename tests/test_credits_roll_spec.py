@@ -127,6 +127,37 @@ def _layout(**over):
                                        "clip_count": 3})
 
 
+@pytest.mark.parametrize("gender", [None, ""])
+def test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference(tmp_path, monkeypatch, gender):
+    from nodes import production_ledger as pl
+    from nodes.cast_lock import CastLock
+    from nodes import _otr_voice_node_common as vnc
+    saved = pl._CURRENT
+    try:
+        ledger = pl.new_ledger("credit_ref_contract", str(tmp_path))
+        data = _led()
+        data["meta"].pop("cast_contract", None)
+        data["cast"] = [{"char_id": "c01", "name": "Mother", "gender": gender,
+                         "voice_preset": "v2/en_speaker_2"}]
+        data["lines"] = []
+        ledger.data.update(data)
+        monkeypatch.setenv("OTR_TEST_MODE", "0")
+        result = CastLock().lock(script_json=json.dumps(data), cast_voice_policy="auto_registry")
+        wire = json.loads(result[0])
+        with open(ledger.path, encoding="utf-8") as handle:
+            durable = json.load(handle)
+        assert wire["cast"] == durable["cast"] == ledger.data["cast"]
+        row = durable["cast"][0]
+        assert row["gender"] == gender and row["voice_engine"] == "indextts2"
+        assert vnc._resolve_clone_ref_path(row["voice_engine"], row, 42)
+        layout = cr.build_credits_layout(durable, w=1920, h=1080, manifest={"clips": []})
+        assert layout["col2"]["cast_rows"][0]["line"] == (
+            "indextts2 · " + row["voice_ref_id"])
+    finally:
+        with pl._LEDGER_LOCK:
+            pl._CURRENT = saved
+
+
 def _flat(blocks):
     return json.dumps(blocks, default=str, ensure_ascii=False)
 

@@ -92,25 +92,22 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 pair-lock retry of the qualified code.** Opus and Cursor converge on this
-sequence after grounding; the receipt is
-`docs/2026-09-11-my-story-eos-consensus/consensus_judgment.md`.
-Use the corrected commit, the real `workflows/otr_canonical.json`, the shipped
-full API runner, `otr_w45_still_pan`, and exactly the pairlock_01 source fields,
-Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Do not retune sampling or
-swap models/quantization before this measurement. Record checkout/canonical
-hashes, actual EOS IDs, loaded capacity, schema-enriched fit, and terminal state.
-Keep failed attempt 01 in the denominator. Its one optional source-correction
-operation spent two attempts; P1 separately exhausted three verbatim-cycle
-attempts. No media was produced. EOS alignment does not establish a P1 cure.
+**Next action: ONE fresh full canonical 5080 pair-lock attempt 03 after the
+qualified follow-up is pushed.** Use the real `workflows/otr_canonical.json`,
+the shipped full API runner, `otr_w45_still_pan`, and exactly the pairlock_01
+source fields, Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Record
+checkout/canonical hashes, actual EOS IDs, loaded capacity, schema-enriched fit,
+correction attempts and terminal state. Keep attempts 01 and 02 in the denominator:
+their receipts are in `docs/2026-09-11-my-story-5080-qualification/`.
 
-The recovery case is one act: Jeffrey and his living mother share dinner at the
-same Los Angeles table. Inspect accepted P0-P3, final spoken text, scene prompts,
-correction receipts and image pixels. Both people remain present and the ending
-remains a shared meal; between-act music is zero. Publication alone is not
-source-fidelity proof. If it fails, preserve evidence and diagnose the specific
+The case is one act: Jeffrey and his living mother share dinner at the same
+Los Angeles table. Inspect accepted P0-P3 metadata, final speech, actual voice
+references and durable credits, scene prompts and image pixels. Both adults
+remain present, the ending is a shared meal, and between-act music is zero.
+Publication alone is not source-fidelity proof. Preserve and diagnose any new
 failure before another run. Subsequent stress coverage remains below; Original
-model credits require a fresh Original publication.
+model credits require a fresh Original publication. Qualified code/test/review
+evidence: `docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md`.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

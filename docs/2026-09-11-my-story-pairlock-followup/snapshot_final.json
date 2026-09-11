@@ -1,0 +1,16 @@
+{
+  "nodes/_otr_ledger_clean.py": "cdf89d85434e05e8a6e27e09cb7e89011a2fd0a820409b6c279bf71f8a750c69",
+  "nodes/_otr_my_story.py": "871d45d7883acd1994e4986e14c332150743ee33f1361b53423f16f46d827c4f",
+  "nodes/_otr_story_source.py": "ab67e12acbadddf6922ace6ce3ecf2d0ccb113dfab01f43f858de97f6e29563f",
+  "nodes/cast_lock.py": "529e51e65426bdf59ade2d9c7549446ab973b325c3d184be3d90cb509b5140c5",
+  "nodes/otr_meta_brief_image_prompt.py": "f93bf478e06a7a0dfe3b0416a104ba17f1a2e94570f6f66b746062fbfdccd5be",
+  "nodes/story_packs/my_story/my_story.json": "9332c9ffb693999c8e9f5acfe5daa81f4b3847f4891677c5bbfb516fb43d5f9e",
+  "tests/test_cast_lock.py": "9dcf5f0bb1b2ba3d8ab664d161133594f5d1154993e7c7f92e21ca20dc6f245e",
+  "tests/test_cast_lock_voice_ref_completeness.py": "3faa85505e2a06ebf8bec5e86e08f80464eb640f43229ed0f4f1337f8f6d61c6",
+  "tests/test_constrained_generate.py": "c9ca66127eb94819fcc159d2cb66776880ac1108891f0bdedf3f25c0ca1c8b8a",
+  "tests/test_credits_roll_spec.py": "3c20c4e16a0d5765c6db52e2af2cfa54a5d69097092a58bb0572893794c94b31",
+  "tests/test_ledger_clean_stage.py": "b8f487f65288f5ef1971b8d163e1fd04bb09565594dfa38718d4fb4010fd4e18",
+  "tests/test_my_story_runner.py": "7a91c683d4c8db110e6bf524cc1718c8494e530f58fd734cec7ec59158872061",
+  "tests/test_my_story_visual_source.py": "ac4618c4c6bb9d809bcfcf8a3bf045348cf5e5c6a0516f66c9e6900f0b48c84c",
+  "tests/test_story_source_review.py": "75b7b3e000167ff5dadde5043aa009a02f87dadff299cb943aecab923348c807"
+}

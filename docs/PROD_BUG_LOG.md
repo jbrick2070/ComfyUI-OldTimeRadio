@@ -14263,3 +14263,73 @@ and retry policy are unchanged. Final qualification and Opus/Cursor judgment:
 `2026-09-11-my-story-eos-consensus/consensus_judgment.md`. Existing Bible 12.100
 owns this termination contract. Fresh canonical qualification remains open;
 no new bug ID is minted from an unverified hidden-token hypothesis.
+
+### PBUG-20260910-03 follow-up -- pairlock_02 publishes but source metadata and pixels diverge
+
+Full canonical prompt a6c9d550-12ec-4dd3-b9d2-031e3d265b1b on bd814148
+completed in 834 seconds with final obs publication, a frozen_clean ledger,
+and the same controls/source as failed pairlock_01. Actual native calls used
+EOS [248044,248046] and ended on248046. This is one technical success and one
+earlier terminal failure, not a source-qualified pass. Evidence, terminal
+history, prompt, ledger, logs and media hashes are retained under
+2026-09-11-my-story-5080-qualification/pairlock_02_*.
+
+The P0 source correction omitted metadata; first-authorship Pydantic defaults
+replaced 15 accepted values even though none was explicitly changed in raw JSON.
+The lost values include Jeffrey's stated gender, requirement categories/source
+fields/strength, and assumptions. Bible11.65 records the repeatable data-loss
+contract. The correction owner now conserves omitted accepted fields by explicit
+unique identities, honors explicit clears and returned list membership, validates
+a fresh reconstructed object and journals that exact result. P0-P3 opt in;
+spoken edit scripts and visual prompts retain their distinct response contracts.
+
+P1 separately authored explicit blank genders while describing a man and woman;
+Mother's gender was already omitted in original P0. Clearer existing P0/P1
+instructions/schema descriptions use source relationships, descriptions and
+contextual pronouns, with explicit identity first and no name guessing. No
+new rejection or separate model pass is added. Semantic recovery needs live proof.
+
+Scene corrections received full source, current dialogue, both people and adult
+ages, but echoed singular fallback prompts. Actual pixels show a lone adult man
+and a woman with two young boys at empty tables. The dispatcher preserved those
+prompts; no good correction was lost later. The existing scene owner now asks
+for current physical participants/ages/shared action/necessary objects, with the
+active speaker as focus. Spoken childhood memories do not change the visible
+time. Treatment ages are projected by unique normalized exact name; blank/n/a
+cannot mask an existing known age. Context contract version invalidates old
+scene caches. Neutral portraits and image conditioning policy stay separate.
+Bible11.39 remains the source-grounding authority. Actual final prompt/pixel
+qualification remains OPEN; canned fixtures prove transport and preservation.
+
+### PBUG-20260910-05 follow-up -- cleanup scope authorizer omitted native binding
+
+In the same published pairlock_02, the authorizer returned already_spoken with
+spans:null on both attempts. Its schema requires a list (omission/[] are valid),
+so the original line retained an unclean flag. It had an available scheduler
+schema binder but passed the unbound creative slot to structured_call. The
+affected owner now binds _ScopeAuthorization once and reuses the result on both
+existing attempts. Missing capability retains remote/GGUF routing; binder errors
+propagate. No global binder or nullable relaxation. Public-cleaner tests and real
+LMFE admission prove the path; Bible11.63 is extended. Fresh live closure pending.
+
+## PBUG-20260911-02 -- blank-gender cast skips delivered voice stamps and credits Bark
+
+- Live evidence: pairlock_02's published ledger and server log; actual IndexTTS2
+  references are registry-labeled male, while the cast has no voice_ref_id or
+  voice_engine and credits resolve legacy Bark/v2 presets. The separate source
+  gender issue above remains even when actual-reference reporting is corrected.
+- Root cause: CastLock._auto_registry continued early for blank gender, before
+  the existing unservable-gender fallback/stamp path. Render-time resolution
+  selected a real reference which the durable cast never named.
+- Fix: genuinely unspecified rows use the existing open-pool fallback at the
+  durable casting owner. Stamp actual reference/engine/presentation gender while
+  preserving unknown source gender. Distinguish gender_unspecified from an
+  explicit gender_unservable. Preserve existing Google no-fallback behavior and
+  preserve_ledger semantics; no new TTS-time ledger writer or content gate.
+- Verification: public CastLock -> singleton/disk/wire equality -> actual clone
+  reference resolution -> credits layout equality. The former test that pinned
+  skipping genderless rows now asserts the real contract. Bible12.89 is extended;
+  the portable catalog retains these behavioral regressions.
+- Qualification: final code/tests/reviews and exact snapshots are recorded in
+  2026-09-11-my-story-pairlock-followup/. Fresh canonical source/voice/pixel closure
+  is still required; publication alone did not qualify the supplied story.

@@ -1,0 +1,415 @@
+[
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/bible_comparison.json",
+    "bytes": 25510,
+    "sha256_observed": "81c9e99d5c3fe99bb7343572407b0673f1187365a93d9f2f0669fda555624a9c",
+    "sha256_git_archive": "44443d9e16f9ca999d2ab7fbf7eb8ba8d92d7049ecbd909f2e4b923c615e45dd",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/bible_final_comparison.json",
+    "bytes": 25547,
+    "sha256_observed": "763fcbbee7e1870ecae5d10fe8a75504c0966a810577c423f9ac78b707db142b",
+    "sha256_git_archive": "ced8a82eeedd1b7fc0f153d3a7b63b6e1204ae19f1589560137a1a46610e5bc2",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/code_grounding.md",
+    "bytes": 126430,
+    "sha256_observed": "87a1568923944a4a5a01efd892a6b56d6fb58d063d71c9e2c7cd4091defd252f",
+    "sha256_git_archive": "03251a89e96df21690dfa7c59596cd254788d15cbda32ed2d06803f2b6853a0d",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/consensus_judgment.md",
+    "bytes": 4244,
+    "sha256_observed": "7ed2c2a9af4bb01129b1e1859ac85dc99ab5e0edafe90332f3e6313a5caf0401",
+    "sha256_git_archive": "7ed2c2a9af4bb01129b1e1859ac85dc99ab5e0edafe90332f3e6313a5caf0401",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/driver_anchor.md",
+    "bytes": 5030,
+    "sha256_observed": "2104d30b2a12cbb0670166543c87da97da65839c624f8146418572e30e6260ae",
+    "sha256_git_archive": "2104d30b2a12cbb0670166543c87da97da65839c624f8146418572e30e6260ae",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/final_delta.md",
+    "bytes": 27757,
+    "sha256_observed": "d6cdd4433e9f365de834207b09a0c0caebe8871c3217625ce87c3901f0b9cfc3",
+    "sha256_git_archive": "031c611346de3a8c86f83a29bbd39cce11949692cbbdbaf700d6ae3391c1037f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/full_comparison.json",
+    "bytes": 453,
+    "sha256_observed": "a0e1b90a723b9ed27de88d4dd891806b36fcf9aa1f5a1e59692f08aeff0a96cc",
+    "sha256_git_archive": "85e2ae383e3eba99c58033da86b11630e53caeb1173857eecab6b416bd368722",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/full_final_comparison.json",
+    "bytes": 3783,
+    "sha256_observed": "e715b6f9c137847e0f864ecf2276f835af0e834212dc01cc3dc072d3785094c3",
+    "sha256_git_archive": "b583e463834df0f7b7d9acba6565e62722f805f55d74034e1d6d7cef98f2d005",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_consensus/anthropic__claude-opus-latest.md",
+    "bytes": 7094,
+    "sha256_observed": "b3dbbcdcff42803e4834a656e9fab90105c6a66b60054134ade77311a2e9ad21",
+    "sha256_git_archive": "b3dbbcdcff42803e4834a656e9fab90105c6a66b60054134ade77311a2e9ad21",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_consensus/manifest.json",
+    "bytes": 517,
+    "sha256_observed": "a9043aea3dcea5e71d3821a4f4aea5dee4c91873bbf6d618bf661a8f5825c5fa",
+    "sha256_git_archive": "a9043aea3dcea5e71d3821a4f4aea5dee4c91873bbf6d618bf661a8f5825c5fa",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_final/input.md",
+    "bytes": 27757,
+    "sha256_observed": "d6cdd4433e9f365de834207b09a0c0caebe8871c3217625ce87c3901f0b9cfc3",
+    "sha256_git_archive": "031c611346de3a8c86f83a29bbd39cce11949692cbbdbaf700d6ae3391c1037f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_final/manifest.json",
+    "bytes": 862,
+    "sha256_observed": "3db238368258348e53c2f69492f669aa5f4a1e0b65548da41bffa53086bc2527",
+    "sha256_git_archive": "6e5e6c2e6f4b2ec72f47fb1fbb0cfe5fc62050f1af49d6d0cf4cb6ee5913a698",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_final/request.json",
+    "bytes": 28737,
+    "sha256_observed": "5e8b57df45a9541fa9b76e166e791407146b39e059cea0b0c768951b2f0858b2",
+    "sha256_git_archive": "29e034d3625380e61e8fcf1118bc3ed2275b9d232d02ad362f900c311a0d89d9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_final/response.json",
+    "bytes": 11702,
+    "sha256_observed": "49a2719c1cc31f325c7e451e40203ea6f88ca08c8ff466cb760ce507dd8177b0",
+    "sha256_git_archive": "81185beeee3466fc9644c028537fe82758c25ff32ffd6338077222c70854ca07",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/opus_final/review.md",
+    "bytes": 4753,
+    "sha256_observed": "baacc2494ee0747115509c17d0d244a228a874901915534258bd6df573e5306d",
+    "sha256_git_archive": "2962e68023aadb7730a105f2f216249c39e2ad59f72af2288217dd07d62b0a23",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md",
+    "bytes": 4810,
+    "sha256_observed": "3f41239f77b473834c57db1bd7399f169e84148a5dfdbe129c2e8efa7bad409a",
+    "sha256_git_archive": "6425c9f945412a156370a5162ec4ae3418f46233b3be9ce0817b656f7c1234b9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/snapshot_final.json",
+    "bytes": 1487,
+    "sha256_observed": "16b6cb0fb553689db7c1f4752aac72041b781d632cc787243c2bad1671c845bc",
+    "sha256_git_archive": "8f0e8d1fce5acdfafef2ade04e1f7a4a768b88d0bbb5a9a4827e4829e6281921",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/snapshot_review.json",
+    "bytes": 1487,
+    "sha256_observed": "8a0cd8de0d048425786c0be272e014fe879b9273df511bacebe6a32b91204817",
+    "sha256_git_archive": "fd2850c299bb8236884d3652337a9d06064347f1f1af1bc8bfdfccd5a07a52ba",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_final/input.md",
+    "bytes": 27757,
+    "sha256_observed": "d6cdd4433e9f365de834207b09a0c0caebe8871c3217625ce87c3901f0b9cfc3",
+    "sha256_git_archive": "031c611346de3a8c86f83a29bbd39cce11949692cbbdbaf700d6ae3391c1037f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_final/manifest.json",
+    "bytes": 865,
+    "sha256_observed": "005c2860f31437ca2c4f920b108a8051ecfdc7774718f1598e2e7ccc9b4a8412",
+    "sha256_git_archive": "e99fcc335b2c199e24e47e0763f65e80ee9782832487f5e67ed1724fed3870e6",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_final/request.json",
+    "bytes": 28739,
+    "sha256_observed": "cdb3a13f5eaba20d35bbca14dd4e2151d8634e399f917ea26afccc738aade693",
+    "sha256_git_archive": "ca48585c5f1734a866c53dc19ddbbdd8c314c2f17dec8be3846607651213b93b",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_final/response.json",
+    "bytes": 5228,
+    "sha256_observed": "de9397a2d446c0e35f65666040aba6bd7a47068807e51251122f81b9025e124e",
+    "sha256_git_archive": "4ec9399843c7e38b60a6a9717cc153cffede69d29e30a1d9775fbc13bb846b2c",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_final/review.md",
+    "bytes": 4027,
+    "sha256_observed": "ff493a67ba135e591322a474e2db4fe0cb7c75ea17747a02343f37d1ac6ae66a",
+    "sha256_git_archive": "b7ff9085dac7ddf8f23a4c58207fab7e4a3335268f721653e8ccb500364bfe5f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_qa/anthropic__claude-sonnet-latest.ERROR.txt",
+    "bytes": 141,
+    "sha256_observed": "cc88d045b5ef636fbffa1fb6b0818fcbe93bb41bd423ca09afe93e60aee286f5",
+    "sha256_git_archive": "cc88d045b5ef636fbffa1fb6b0818fcbe93bb41bd423ca09afe93e60aee286f5",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_qa/manifest.json",
+    "bytes": 536,
+    "sha256_observed": "906a57ceae3902f60e4b421d1c10641fedc64f7150ce167195df0fec6751d32c",
+    "sha256_git_archive": "906a57ceae3902f60e4b421d1c10641fedc64f7150ce167195df0fec6751d32c",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_retry/input.md",
+    "bytes": 59032,
+    "sha256_observed": "a3c8cd6932509ee1696a13dce5c9f4686b6537ca4bff0c415f052bd8dbc89fdc",
+    "sha256_git_archive": "e6a2d3c046820127d9670f71aace518979ad1f40534047711d25e2da4977db33",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_retry/manifest.json",
+    "bytes": 869,
+    "sha256_observed": "fa28093bbf3bf11ee215939c801f2c9a3ab846f414e66844add0268d9739dded",
+    "sha256_git_archive": "b8431e0b85ae4fa2ce3c928a3de2bc979feed6610bab51030ba42547ecab9f19",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_retry/request.json",
+    "bytes": 61676,
+    "sha256_observed": "3f802636bd3fe6d7bb02a023296f52a72af0ff77ee895d7d11cc57ff5efdaecb",
+    "sha256_git_archive": "19d8f63116a0d0f044dbc36aaf1b04d9f6a23129531ae7246908d4d70f37d035",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_retry/response.json",
+    "bytes": 14625,
+    "sha256_observed": "aebc24b5c3e9d7a42caff23a03b6031d2ddbfcdfb06a8be60c0787c315a639e1",
+    "sha256_git_archive": "1c223dfe31a63c13896493924a123cb15f9cdd6b06de00aa0a688bc9f9942deb",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/sonnet_retry/review.md",
+    "bytes": 4356,
+    "sha256_observed": "f63d64902cb679044403d2551267059179fb8597316aa6747690763b496e5972",
+    "sha256_git_archive": "ca2f0fbd0ae55e35ea655e9b0533af549313f6e0442cfdc6503e95b34011cd76",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/canonical.log",
+    "bytes": 619,
+    "sha256_observed": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2",
+    "sha256_git_archive": "e18bb3b405ed6c56d999c130f3632002281d21740b4b45a7d6eac0a8c62e47c9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_baseline.log",
+    "bytes": 32258,
+    "sha256_observed": "e284ce10890871f42a4a1e95d78ab3d9fbde25c5468f1ecafb2d3d23b2e5df71",
+    "sha256_git_archive": "37a25ec874bdc888c6a8c0cae25b7e2eea0c875cb70ab9f6b9f037eeddd23eec",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_baseline.xml",
+    "bytes": 45048,
+    "sha256_observed": "46e0e288ff141a350bfdb0d8b0a44e76f33c366760d3256ea35a540f3f5f1e57",
+    "sha256_git_archive": "383f6cfde8424561f54d083b95044ff9046b487d450c2e304319745663d263dd",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_candidate.log",
+    "bytes": 27611,
+    "sha256_observed": "8a9feb4036abdd69e272bacd0919d62bc8c806eba089aa6a9b8794bd0093d005",
+    "sha256_git_archive": "b56344bd0a2f004aedc102560e43880c0519e37f254b943fa7d71b0dad367a36",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_candidate.xml",
+    "bytes": 40348,
+    "sha256_observed": "3239f3724ea0d9034382cfc46726c7fe9d6aac22e24bd69ebff7007165f217d7",
+    "sha256_git_archive": "60166ff6e495d389663aace01fe07fcbbbb5133e8213fd261f324673cfbc7c5a",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_final.log",
+    "bytes": 27607,
+    "sha256_observed": "2e7e5e7a9f8ed97e4c27471a1856bc48ac5a7e3d6c94030e0268b46ee850e2b2",
+    "sha256_git_archive": "6a748aa0a5f33b39615a39f59429746bd2c2098f6d84e342a4f3d486f91692e7",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_bible_final.xml",
+    "bytes": 40348,
+    "sha256_observed": "4e36418e14655beba345b27c1892481530dee1a1d43519a5cb374b47129525b2",
+    "sha256_git_archive": "6e196a2e7af2d1862ebf8b0d3addf77ec73bb4ba16a86cfaafa22f21c983d704",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_credit.log",
+    "bytes": 1270,
+    "sha256_observed": "8f7b44f6ee6ebad3544cc1f229e7c17ba90c354b175c9041ff60ad864234c80c",
+    "sha256_git_archive": "460b3e1a16009464c3ac4927c3fb83fe2a25900eb1679a795b93e010fdbbc380",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_credit.xml",
+    "bytes": 4474,
+    "sha256_observed": "989861b73e4266d5ffcb45879884cbcd90f4cf7947ddf909d227f6e60c286213",
+    "sha256_git_archive": "808c7c4b91d77503e780e2269f0d63c3c30ccdfcf938185f518ca92f0fb72967",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_credit_final.log",
+    "bytes": 972,
+    "sha256_observed": "ddae4452136136c12e34492a6266676caa47e5c3d2c727d1e0fd9ff7cc7085a0",
+    "sha256_git_archive": "7954caeb8de5d1e9ed1a3245fdc26392aa4c679a7389ff4184543b93f22b7a29",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_credit_final.xml",
+    "bytes": 550,
+    "sha256_observed": "7a8124b6ffd7575c8991c26fefaa952cde88251512b7e153d88645f231bcb4f9",
+    "sha256_git_archive": "7a8124b6ffd7575c8991c26fefaa952cde88251512b7e153d88645f231bcb4f9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_final_focus.log",
+    "bytes": 2722,
+    "sha256_observed": "064d78c267bd3bbbba8e06076bbe493a5f209d4e009172d11ebd2568868731ce",
+    "sha256_git_archive": "a2005e3b5c429a7425d8c126ca19935ab71762f14d335ee83fc811c8344064f9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_final_focus.xml",
+    "bytes": 65855,
+    "sha256_observed": "388f4a13d519de9a72fe6df9542060c9d2df69f04589d419dcc0b5a42f59833d",
+    "sha256_git_archive": "388f4a13d519de9a72fe6df9542060c9d2df69f04589d419dcc0b5a42f59833d",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_final_full.log",
+    "bytes": 74834,
+    "sha256_observed": "db81038af9c02a84d8c1b727dd137abc12e4d386223dd8e3f4d8dddf7d616b35",
+    "sha256_git_archive": "b31a284189e8643cb3e788edef033743bfb2ff082a4e6d668bce4caef1cc6570",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_final_full.xml",
+    "bytes": 2306275,
+    "sha256_observed": "5226f575420e583099b6abc315d98728cf3351c2edaee9abb7297b70f2610ee0",
+    "sha256_git_archive": "e4c004dabfd3c4a944e2bdac429da15a4b81d62b6a902adcea65aeb10c00316f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_followup_focus.log",
+    "bytes": 2563,
+    "sha256_observed": "286f771028f175ecde4cec065e7a5baf1ec5fed554e43ea603be70fa808e87f7",
+    "sha256_git_archive": "c26bb18d030ac14f9a50a365519edcc06ee797364ff199b78557ab155b023d5d",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_followup_focus.xml",
+    "bytes": 50465,
+    "sha256_observed": "da3f66738c38cc90b03b18febca1b217900695089851d00852ac55b1c2fc10e9",
+    "sha256_git_archive": "da3f66738c38cc90b03b18febca1b217900695089851d00852ac55b1c2fc10e9",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_followup_full.log",
+    "bytes": 74834,
+    "sha256_observed": "2ab926ee70eb733ffb8f10beb31bee2825c1f294c2f5db8d3fbafd62a94bc2c4",
+    "sha256_git_archive": "249661f86359b23cd1adf139deae923057c041698f58a2a03633a3cfad0fc301",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "docs/2026-09-11-my-story-pairlock-followup/tests/my_story_pairlock_followup_full.xml",
+    "bytes": 2305456,
+    "sha256_observed": "0ed695e8eded4327f608ac4752d2f2182adff2bca4ea32623a518e4f68203640",
+    "sha256_git_archive": "2cacc86df365885c9d81549586be43c54779124bb99b30c3cf3924371686e0cf",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-final/r4/cursor.log",
+    "bytes": 247,
+    "sha256_observed": "af5f06dae16af7a27211f50a91dadf9ffa3510122d6f0239716ff2587bb5d225",
+    "sha256_git_archive": "ef3a8b5e3c2bd160dcc5d467ae25ba55af3f08ee7afb627d0f8c130ca41da201",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-final/r4/cursor_model_selected.txt",
+    "bytes": 119,
+    "sha256_observed": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+    "sha256_git_archive": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-final/r4/cursor_quota_status.txt",
+    "bytes": 182,
+    "sha256_observed": "333681487291361e172d3fb38dff847bf7ba19001cd6ff6dfdc4511fa58d5a0d",
+    "sha256_git_archive": "aca4bd9a185f16bca96ca2d7e02b3e5021de18f26a392ba799334e9888659bc6",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-final/r4/input.md",
+    "bytes": 27757,
+    "sha256_observed": "d6cdd4433e9f365de834207b09a0c0caebe8871c3217625ce87c3901f0b9cfc3",
+    "sha256_git_archive": "031c611346de3a8c86f83a29bbd39cce11949692cbbdbaf700d6ae3391c1037f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-final/r4/profiles_used.txt",
+    "bytes": 8,
+    "sha256_observed": "a9a11813438ba2fc0c6efd97f13b88bf41af82044d04182d865bdd38eaa32423",
+    "sha256_git_archive": "5dfecbf35de344dc6dc4b8a79c4e5327122b2737250403b04abf2060fbc3927f",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-followup/r4/cursor.log",
+    "bytes": 247,
+    "sha256_observed": "af5f06dae16af7a27211f50a91dadf9ffa3510122d6f0239716ff2587bb5d225",
+    "sha256_git_archive": "ef3a8b5e3c2bd160dcc5d467ae25ba55af3f08ee7afb627d0f8c130ca41da201",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-followup/r4/cursor_model_selected.txt",
+    "bytes": 119,
+    "sha256_observed": "70f33ffd9833365ebfb6c34e00ad8aeee5c433b71654217b95c5e3fc6b51c42a",
+    "sha256_git_archive": "789b0843906f0ee8bdf784934d257528cb1f4d20a1edde58a29f0f92344dcc81",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-followup/r4/cursor_quota_status.txt",
+    "bytes": 182,
+    "sha256_observed": "333681487291361e172d3fb38dff847bf7ba19001cd6ff6dfdc4511fa58d5a0d",
+    "sha256_git_archive": "aca4bd9a185f16bca96ca2d7e02b3e5021de18f26a392ba799334e9888659bc6",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-followup/r4/input.md",
+    "bytes": 5030,
+    "sha256_observed": "2104d30b2a12cbb0670166543c87da97da65839c624f8146418572e30e6260ae",
+    "sha256_git_archive": "2104d30b2a12cbb0670166543c87da97da65839c624f8146418572e30e6260ae",
+    "git_archive_equals_lf_normalized": true
+  },
+  {
+    "path": "kibitz-runs/2026-09-11-my-story-pairlock-followup/r4/profiles_used.txt",
+    "bytes": 196,
+    "sha256_observed": "878c3c72b930257a20f97a7b72da3240bd9c3d7bf49515bba65f8187259c5051",
+    "sha256_git_archive": "b42a6d77e629642f6e3813563d449265844f9ed8ce7566bfa268887093ca83c5",
+    "git_archive_equals_lf_normalized": true
+  }
+]

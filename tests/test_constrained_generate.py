@@ -277,6 +277,17 @@ def _feed_json(prefix, text):
     return prefix(0, torch.tensor(ids))
 
 
+def test_scope_authorization_real_grammar_accepts_empty_or_omitted_spans_never_null():
+    from nodes._otr_ledger_clean import _ScopeAuthorization
+    for text in ('{"verdict":"already_spoken"}',
+                 '{"verdict":"already_spoken","spans":[]}'):
+        _, prefix = _real_constraint(_ScopeAuthorization)
+        assert 200 in _feed_json(prefix, text)
+    _, prefix = _real_constraint(_ScopeAuthorization)
+    allowed = _feed_json(prefix, '{"verdict":"already_spoken","spans":')
+    assert ord('[') in allowed and ord('n') not in allowed
+
+
 def test_real_lmfe_uses_shared_model_chat_eos_and_refreshes_without_mutating_history():
     from types import SimpleNamespace
     import torch

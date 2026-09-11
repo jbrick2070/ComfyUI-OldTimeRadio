@@ -1509,10 +1509,14 @@ def _authorize_repair_scope(
         record["calls"].append({"attempt": attempt, "raw_output": raw,
                                 "error": None if error is None else f"{type(error).__name__}: {error}"})
 
+    # Reuse the scheduler's advertised native schema owner for both attempts.
+    # Remote/GGUF slots without this capability retain their existing routing.
+    bind = getattr(slot_fn, "_otr_bind_schema", None)
+    authorization_fn = bind(_ScopeAuthorization) if callable(bind) else slot_fn
     try:
         # LLM slot: creative -- the existing dialogue slot authorizes this edit.
         result = structured_call(
-            prompt=built, schema=_ScopeAuthorization, slot_fn=slot_fn,
+            prompt=built, schema=_ScopeAuthorization, slot_fn=authorization_fn,
             base_temperature=JUDGE_TEMPERATURE, structural_retry_temperature=0.1,
             max_new_tokens=_MAX_NEW_TOKENS, max_attempts=2, post_validator=validate,
             on_attempt_complete=completed, helper_name="ledger_clean_scope_authorization",

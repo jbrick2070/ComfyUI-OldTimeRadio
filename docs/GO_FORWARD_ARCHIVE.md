@@ -7634,3 +7634,30 @@ of this qualified commit before any run; historical receipts are not current sta
 
 
 Code/test/review receipt: docs/2026-09-11-my-story-eos-consensus/qualification_receipt.md. Fresh canonical recovery remains in GO_FORWARD.
+
+## 2026-09-11 -- second canonical recovery measured; follow-up code qualified
+
+Receipt: 2026-09-11-my-story-pairlock-followup/qualification_receipt.md.
+The superseded next-attempt instructions below are preserved verbatim.
+Attempt 02 published, but source qualification failed; GO_FORWARD owns attempt 03.
+
+**Next action: ONE fresh full canonical 5080 pair-lock retry of the qualified code.** Opus and Cursor converge on this
+sequence after grounding; the receipt is
+`docs/2026-09-11-my-story-eos-consensus/consensus_judgment.md`.
+Use the corrected commit, the real `workflows/otr_canonical.json`, the shipped
+full API runner, `otr_w45_still_pan`, and exactly the pairlock_01 source fields,
+Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Do not retune sampling or
+swap models/quantization before this measurement. Record checkout/canonical
+hashes, actual EOS IDs, loaded capacity, schema-enriched fit, and terminal state.
+Keep failed attempt 01 in the denominator. Its one optional source-correction
+operation spent two attempts; P1 separately exhausted three verbatim-cycle
+attempts. No media was produced. EOS alignment does not establish a P1 cure.
+
+The recovery case is one act: Jeffrey and his living mother share dinner at the
+same Los Angeles table. Inspect accepted P0-P3, final spoken text, scene prompts,
+correction receipts and image pixels. Both people remain present and the ending
+remains a shared meal; between-act music is zero. Publication alone is not
+source-fidelity proof. If it fails, preserve evidence and diagnose the specific
+failure before another run. Subsequent stress coverage remains below; Original
+model credits require a fresh Original publication.
+

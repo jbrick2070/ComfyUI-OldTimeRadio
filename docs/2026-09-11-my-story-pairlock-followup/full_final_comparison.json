@@ -1,0 +1,29 @@
+{
+  "baseline": {
+    "total": 14614,
+    "failed": 51,
+    "skipped": 184
+  },
+  "candidate": {
+    "total": 14639,
+    "failed": 51,
+    "skipped": 184
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [],
+  "changed_failure_payloads": {
+    "('tests.test_otr_provision_profile_routes', 'test_amd_profiles_plan_their_exact_image_and_music_dependencies')": {
+      "baseline": "def test_amd_profiles_plan_their_exact_image_and_music_dependencies():\n        provision = _provisioner()\n    \n>       assert provision.profile_lanes(\"otr_amd16_rocm\") == {\n            \"automatic\": [\"stable_audio_3\"],\n            \"manual\": [\"flux2_klein\"],\n        }\nE       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         Use -v to get more diff\n\ntests\\test_otr_provision_profile_routes.py:50: AssertionError",
+      "candidate": "def test_amd_profiles_plan_their_exact_image_and_music_dependencies():\n        provision = _provisioner()\n    \n>       assert provision.profile_lanes(\"otr_amd16_rocm\") == {\n            \"automatic\": [\"stable_audio_3\"],\n            \"manual\": [\"flux2_klein\"],\n        }\nE       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         Use -v to get more diff\n\ntests\\test_otr_provision_profile_routes.py:50: AssertionError"
+    }
+  },
+  "changed_assertion_evidence": {
+    "('tests.test_otr_provision_profile_routes', 'test_amd_profiles_plan_their_exact_image_and_music_dependencies')": {
+      "baseline": "def test_amd_profiles_plan_their_exact_image_and_music_dependencies():\n        provision = _provisioner()\n    \n>       assert provision.profile_lanes(\"otr_amd16_rocm\") == {\n            \"automatic\": [\"stable_audio_3\"],\n            \"manual\": [\"flux2_klein\"],\n        }\nE       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         Use -v to get more diff\n\ntests\\test_otr_provision_profile_routes.py:50: AssertionError",
+      "candidate": "def test_amd_profiles_plan_their_exact_image_and_music_dependencies():\n        provision = _provisioner()\n    \n>       assert provision.profile_lanes(\"otr_amd16_rocm\") == {\n            \"automatic\": [\"stable_audio_3\"],\n            \"manual\": [\"flux2_klein\"],\n        }\nE       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         Use -v to get more diff\n\ntests\\test_otr_provision_profile_routes.py:50: AssertionError"
+    }
+  },
+  "baseline_xml_sha256": "277f001ceb0a2dd6a8e3f87300587bbee2cd0518023479d43038b905b37c2169",
+  "candidate_xml_sha256": "5226f575420e583099b6abc315d98728cf3351c2edaee9abb7297b70f2610ee0",
+  "grounded_disposition": "The sole changed payload contains identical lines in a different order: pytest prints the two unordered dictionary differences in reverse order. Actual and expected values are identical to baseline. No changed failure meaning."
+}

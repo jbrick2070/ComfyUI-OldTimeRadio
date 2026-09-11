@@ -21,8 +21,11 @@ it has offline tests, but has not been released or cold-install/GPU qualified.
 
 **My Story qualification:** code repairs have completed offline tests and review;
 fresh canonical source recovery remains unproven. The first 5080 recovery attempt
-failed during story writing. The next qualified revision and machine sequencing
-come from [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
+failed during story writing. The second published, but exposed source metadata,
+casting credits and scene-fidelity defects. Those follow-up fixes are reviewed
+and offline tested; a fresh canonical qualification remains next. See the
+[repair receipt](docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md).
+The next qualified revision and machine sequencing come from [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 Existing model-matrix proof retains its recorded scope and does not establish
 source fidelity for the repaired My Story flow. See the
 [cross-machine evidence](docs/2026-09-11-my-story-cross-machine/triage.md).

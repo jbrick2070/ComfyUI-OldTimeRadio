@@ -19,6 +19,19 @@ changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
 ## 1. Define ownership before implementation
 
+Pairlock_02 follow-up (2026-09-11): schema defaults suitable for first authorship
+must not erase accepted fields omitted from a correction. Retain field presence,
+match only unique explicit identities, honor explicit clears and returned list
+membership, and validate/persist/hash the same reconstructed object. A scene's
+active speaker is a focus, not an inventory of everyone physically present;
+spoken memories do not automatically change visible time or age. Exact raw source
+and context transport are necessary, but actual returned prompts and pixels
+still need inspection. Unknown source gender is separate from the known selected
+voice: let the existing casting owner stamp the actual reference before rendering
+so credits read it. Shared structured callers must explicitly bind their available
+native schema seam. See pairlock_02 audits, PBUG-20260910-03/05 follow-ups and
+PBUG-20260911-02; Bible11.65/11.39/11.63/12.89. No new model loop or semantic gate.
+
 Native termination follow-up (2026-09-11): grammar admission, model generation
 and completion classification must share the same effective model-plus-chat EOS
 set. A multimodal model's text decoder may inherit an end-of-text token while

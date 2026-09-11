@@ -1025,6 +1025,34 @@ def test_unusable_source_rewrites_stop_at_two_and_keep_a_usable_saved_ledger():
     validate_receipt(saved)
 
 
+def test_sparse_p0_source_reply_keeps_saved_metadata_and_records_unchanged():
+    from nodes._otr_content_authorship import validate_receipt
+
+    class Sparse(Slots):
+        def _answer(self, messages):
+            if messages[0]["content"].startswith("Check and rewrite"):
+                draft = json.loads(messages[1]["content"])["draft"]
+                if "setting_brief" in draft:
+                    return json.dumps({
+                        "requirements": [{"id": r["id"], "text": r["text"]}
+                                         for r in draft["requirements"]],
+                        "named_cast": [{"name": r["name"], "notes": r["notes"]}
+                                       for r in draft["named_cast"]]})
+            return super()._answer(messages)
+
+    slots = Sparse()
+    led, _ = _run(slots)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert story["interpretation"] == MS.StoryInterpretation.model_validate(_interpretation()).model_dump()
+    receipt = story["source_rewrites"][0]
+    assert receipt["status"] == "unchanged" and not receipt["applied"]
+    assert receipt["input_sha256"] == receipt["output_sha256"]
+    assert receipt["returned_artifact"] == story["interpretation"]
+    assert len(receipt["attempts"]) == 1 and len(slots.calls) == 8
+    validate_receipt(saved)
+
+
 def test_source_failure_history_survives_a_provider_exception_after_a_checkpoint(tmp_path):
     class Failed(Slots):
         def _answer(self, messages):

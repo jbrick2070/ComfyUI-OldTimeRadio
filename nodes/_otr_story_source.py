@@ -79,10 +79,53 @@ def _complete_repair(*, original_prompt, failed_output, error):
     ])
 
 
+def _retain_omitted(model, original, identities, path=()):
+    """Conserve omitted fields; explicit values and list membership win.
+
+    The author declares each list's stable identity. Missing, blank or duplicate
+    identities cannot borrow metadata, and list positions never match. Return
+    data for fresh validation, without mutating the candidate or parsed model.
+    """
+    values = model.model_dump(mode="json")
+    for name in type(model).model_fields:
+        if name not in model.model_fields_set:
+            if name in original:
+                values[name] = original[name]
+            continue
+        value = getattr(model, name)
+        prior = original.get(name)
+        field_path = path + (name,)
+        if isinstance(value, BaseModel) and isinstance(prior, dict):
+            values[name] = _retain_omitted(value, prior, identities, field_path)
+        elif isinstance(value, list) and isinstance(prior, list) and field_path in identities:
+            identity = identities[field_path]
+
+            def key(item):
+                if isinstance(item, BaseModel):
+                    if identity not in item.model_fields_set:
+                        return None
+                    result = getattr(item, identity, None)
+                else:
+                    result = item.get(identity) if isinstance(item, dict) else None
+                if isinstance(result, str):
+                    return " ".join(result.split()).casefold() or None
+                return result if isinstance(result, int) and not isinstance(result, bool) else None
+
+            old_keys, new_keys = [key(item) for item in prior], [key(item) for item in value]
+            old = {k: item for k, item in zip(old_keys, prior)
+                   if k is not None and old_keys.count(k) == 1}
+            values[name] = [
+                _retain_omitted(item, old[k], identities, field_path)
+                if isinstance(item, BaseModel) and k in old and new_keys.count(k) == 1
+                else item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+                for item, k in zip(value, new_keys)]
+    return values
+
+
 def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
                          pass_id, post_validator=None, slot_scheduler=None,
                          configured_model_id=None, instruction="", author_context=None,
-                         max_attempts=SOURCE_REWRITE_ATTEMPTS):
+                         max_attempts=SOURCE_REWRITE_ATTEMPTS, preserve_omitted=None):
     """Return (usable correction or None, receipt), with TWO calls at most.
 
     A pass id names one episode-local operation, not a revision counter.
@@ -98,6 +141,21 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
     raw = _raw_values(raw_fields)
     documents = build_raw_documents(raw)
     prior = next((row for row in receipts if row.get("pass_id") == pass_id), None)
+    # Opt-in only for full artifacts. Spoken edits have a different response
+    # shape from their candidate, and must never inherit a draft's fields.
+    original = json.loads(_json(candidate)) if preserve_omitted is not None else None
+    accepted = None
+
+    def validate_artifact(model):
+        nonlocal accepted
+        accepted = None
+        corrected = (schema.model_validate(_retain_omitted(model, original, preserve_omitted))
+                     if original is not None else model)
+        error = post_validator(corrected) if post_validator is not None else None
+        if error is None:
+            accepted = corrected
+        return error
+
     receipt = {
         "version": SOURCE_REWRITE_VERSION, "pass_id": pass_id,
         "operation_id": "source_rewrite_%d" % (len(receipts) + 1),
@@ -181,7 +239,7 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
             # LLM slot: creative/technical -- the caller supplies the artifact's author owner.
             corrected = structured_call(
                 prompt=prompt, schema=schema, slot_fn=observed,
-                post_validator=post_validator, base_temperature=0.35,
+                post_validator=validate_artifact, base_temperature=0.35,
                 structural_retry_temperature=0.15, repair_prompt_factory=_complete_repair,
                 max_attempts=attempt_limit, max_new_tokens=None,
                 helper_name=helper, on_attempt_complete=completed)
@@ -200,8 +258,10 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
     except BaseException as error:
         receipt.update(status="provider_error", error_type=type(error).__name__, error=str(error))
         raise
-    receipt.update(status="usable", returned_artifact=corrected.model_dump(mode="json"))
-    return corrected, receipt
+    # The captured object is exactly what the structural owner validated,
+    # including any authorized normalization. A failed attempt cannot leak it.
+    receipt.update(status="usable", returned_artifact=accepted.model_dump(mode="json"))
+    return accepted, receipt
 
 
 class SpokenSourceEdit(BaseModel):

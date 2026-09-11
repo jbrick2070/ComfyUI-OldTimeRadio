@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "total": 14614,
+    "failed": 51,
+    "skipped": 184
+  },
+  "candidate": {
+    "total": 14634,
+    "failed": 51,
+    "skipped": 184
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [],
+  "changed_failure_payloads": {},
+  "baseline_xml_sha256": "277f001ceb0a2dd6a8e3f87300587bbee2cd0518023479d43038b905b37c2169",
+  "candidate_xml_sha256": "0ed695e8eded4327f608ac4752d2f2182adff2bca4ea32623a518e4f68203640"
+}

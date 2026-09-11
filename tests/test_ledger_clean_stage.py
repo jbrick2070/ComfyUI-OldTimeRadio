@@ -198,6 +198,43 @@ def test_genuine_whole_row_direction_remains_convertible_after_authorization():
     assert slot.authorization_calls == 1 and slot.repair_calls == 1
 
 
+def test_scope_authorization_binds_once_and_reuses_bound_slot_for_repair():
+    original = "Until next time."
+    ledger = _ledger(original, bank="my_story")
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]})
+    bindings, calls = [], []
+
+    def bind(schema):
+        bindings.append(schema)
+
+        def bound(messages, **kwargs):
+            calls.append(messages)
+            return json.dumps({"verdict": "already_spoken",
+                               "spans": None if len(calls) == 1 else []})
+        return bound
+
+    slot._otr_bind_schema = bind
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="my_story")
+    assert bindings == [lcl._ScopeAuthorization]
+    assert len(calls) == 2 and slot.authorization_calls == slot.repair_calls == 0
+    assert ledger["lines"][1]["text"] == original
+    assert "unclean_spoken_text" not in ledger["lines"][1].get("compose_flags", [])
+    assert receipt["rows"][0]["outcome"] == "already_spoken"
+
+
+def test_scope_binder_failure_propagates_without_unconstrained_fallback():
+    original = "Until next time."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]})
+
+    def bind(schema):
+        raise RuntimeError("schema owner unavailable")
+
+    slot._otr_bind_schema = bind
+    with pytest.raises(RuntimeError, match="schema owner unavailable"):
+        lcl.run_ledger_clean(_ledger(original), slot_fn=slot, bank_id="original")
+    assert slot.authorization_calls == slot.repair_calls == 0
+
+
 def test_whole_row_authorization_can_narrow_to_a_real_local_direction():
     original = "Stay here. (He sighs)"
     ledger = _ledger(original)

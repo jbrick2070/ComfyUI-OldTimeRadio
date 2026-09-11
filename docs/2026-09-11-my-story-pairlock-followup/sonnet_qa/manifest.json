@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-09-11T09:53:47.253503+00:00",
+  "doc": "docs\\2026-09-11-my-story-pairlock-followup\\driver_anchor.md",
+  "prompt_tokens_est": 32433,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort",
+      "max_tokens": 7500,
+      "temperature": 0.5,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.0
+}

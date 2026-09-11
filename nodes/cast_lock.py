@@ -1173,14 +1173,11 @@ class CastLock:
             # is now the only consumer.)
             from ._otr_roster_gender import canonical_bank_gender
             gender = canonical_bank_gender(entry.get("gender"))
-            if not gender:
-                if target_engine == "google_tts":
-                    raise VoiceCastingError(
-                        f"{char_id}: google_tts character casting needs a cast "
-                        f"gender to choose a gender-plausible provider voice. "
-                        f"NO FALLBACK.")
-                report.append(f"  {char_id}: no gender -- preserved (not re-cast)")
-                continue
+            if not gender and target_engine == "google_tts":
+                raise VoiceCastingError(
+                    f"{char_id}: google_tts character casting needs a cast "
+                    f"gender to choose a gender-plausible provider voice. "
+                    f"NO FALLBACK.")
             # THE HYBRID LLM VOICE-FIT BRANCH WAS HERE AND IS GONE (2026-08-18).
             # It read meta.voice_cast_decision, re-validated the LLM's proposed
             # voice_ref_id, and on success stamped it and `continue`d -- skipping
@@ -1202,6 +1199,11 @@ class CastLock:
             slot_timbre = slot.get("timbre") or entry.get("timbre") or ()
             slot_age = str(slot.get("age_band") or entry.get("age_band") or "")
             try:
+                if not gender:
+                    # Cast the same real open-pool reference that the renderer
+                    # would select, so the wire, ledger and credits name it.
+                    # This does not invent a gender for the character.
+                    raise VoiceCastingError(f"{char_id}: source gender unspecified")
                 ref = assign_voice_for_slot(
                     role="char_voice",
                     engine=target_engine,
@@ -1233,13 +1235,15 @@ class CastLock:
                 if fallback_ref is None:
                     report.append(f"  {char_id}: NOT cast -- {exc}")
                     continue
-                _stamp_row(entry, fallback_ref, fallback="gender_unservable")
+                _stamp_row(entry, fallback_ref, fallback=(
+                    "gender_unservable" if gender else "gender_unspecified"))
                 _mark_used(fallback_ref)
                 gated += 0 if _delivered_commercial_clean(
                     entry, fallback_ref) else 1
+                reason = f"gender {gender!r} unservable" if gender else "source gender unspecified"
                 report.append(
                     f"  {char_id}: {fallback_ref.voice_ref_id} "
-                    f"({fallback_ref.engine}, gender {gender!r} unservable -- "
+                    f"({fallback_ref.engine}, {reason} -- "
                     f"gender-agnostic reference)"
                 )
                 continue
@@ -1262,7 +1266,7 @@ class CastLock:
         # is the whole correctness of the field. `unrouted` is the honest name for
         # "the ordinary seeded draw chose this voice", which is what every
         # unclaimed row in the tree takes -- but a row the caster never reached
-        # (no character engine in this bank, no usable gender, nothing castable)
+        # (no character engine in this bank, no available references)
         # took no draw at all, and stamping `unrouted` on it would assert a
         # decision that was never made. Such a row keeps exactly what it arrived
         # with, in both modes, and the absence of the field says so.

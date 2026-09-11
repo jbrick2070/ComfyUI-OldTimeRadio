@@ -130,7 +130,10 @@ class Requirement(BaseModel):
 class NamedCast(BaseModel):
     name: str = ""
     notes: str = ""
-    stated_gender: str = ""
+    stated_gender: str = Field(default="", description=(
+        "Gender conveyed by source descriptions, relationships or pronouns in context. "
+        "Explicit identity takes precedence over a conventional role. Never infer from "
+        "a name; leave genuinely unspecified gender empty."))
     speaking: bool = True
     required: bool = True
 
@@ -191,7 +194,10 @@ class CastMember(BaseModel):
     name: str = Field(min_length=1)
     role: str = ""
     character_description: str = ""
-    gender: str = ""
+    gender: str = Field(default="", description=(
+        "Preserve source gender from descriptions, relationships and pronouns in context, "
+        "honoring explicit identity first. Keep gender consistent with the character's "
+        "casting description. Never infer from a name; unspecified remains empty."))
     age_band: str = "n/a"
     # `speech_register`, not `register`: the bare name shadows a pydantic
     # BaseModel attribute and pydantic warns about it at class construction.
@@ -394,7 +400,11 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
         bundle.fields, original, kwargs["slot_fn"], schema=kwargs["schema"],
         receipts=source_rewrite_receipts, pass_id=pass_id,
         post_validator=kwargs.get("post_validator"), slot_scheduler=slot_scheduler,
-        configured_model_id=configured_model_id, author_context=author_context)
+        configured_model_id=configured_model_id, author_context=author_context,
+        preserve_omitted={
+            ("requirements",): "id", ("named_cast",): "name",
+            ("conflicts",): "requirement_id", ("cast",): "name", ("acts",): "n",
+        })
     # This runs once AFTER author acceptance, never inside its validator. A
     # source rewrite cannot restart the author ladder or check its own output.
     if corrected is None:

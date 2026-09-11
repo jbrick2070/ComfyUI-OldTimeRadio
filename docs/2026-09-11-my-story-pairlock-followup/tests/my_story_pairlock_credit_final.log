@@ -1,0 +1,13 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1 OTR_EXTRA_OUTPUT_ROOTS='C:\Users\jeffr\AppData\Local\Temp\pytest-of-jeffr\pytest-9451'
+============================= test session starts =============================
+platform win32 -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+configfile: pyproject.toml
+plugins: anyio-4.12.1, hydra-core-1.3.5, jaxtyping-0.3.9, langsmith-0.7.12, asyncio-1.3.0, typeguard-4.5.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 99 items / 97 deselected / 2 selected
+
+tests\test_credits_roll_spec.py ..                                       [100%]
+
+- generated xml file: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\my_story_pairlock_credit_final.xml -
+====================== 2 passed, 97 deselected in 3.49s =======================

@@ -113,6 +113,104 @@ def test_existing_structural_validator_runs_on_the_exact_returned_model():
     assert receipt["returned_artifact"]["people"] == ["MOTHER"]
 
 
+def _rewrite_interpretation(candidate, reply, **kwargs):
+    from nodes._otr_my_story import StoryInterpretation
+    slot = Slot(reply)
+    result, receipt = source.rewrite_story_source(
+        RawStoryFields(idea="Jeffrey and his mother share dinner."), candidate, slot,
+        schema=StoryInterpretation, receipts=[], pass_id="interpret",
+        preserve_omitted={("requirements",): "id", ("named_cast",): "name"}, **kwargs)
+    return result, receipt, slot
+
+
+def test_sparse_source_correction_conserves_metadata_by_identity_not_position():
+    from nodes._otr_my_story import StoryInterpretation
+    candidate = StoryInterpretation.model_validate({
+        "requirements": [{"id": "dinner", "text": "Share dinner", "kind": "event",
+                          "source_field": "plot", "strength": "preferred"},
+                         {"id": "place", "text": "In LA", "kind": "setting",
+                          "source_field": "setting"}],
+        "named_cast": [{"name": "Jeffrey", "stated_gender": "male"},
+                       {"name": "Mother", "notes": "Present throughout"}],
+        "assumptions": ["A warm evening"],
+    }).model_dump(mode="json")
+    before = copy.deepcopy(candidate)
+    reply = {"requirements": [{"id": "place", "text": "In LA"},
+                              {"id": "dinner", "text": "Share dinner"}],
+             "named_cast": [{"name": "Mother"}, {"name": "Jeffrey"}]}
+    result, receipt, slot = _rewrite_interpretation(candidate, reply)
+    assert result.requirements[1].source_field == "plot"
+    assert result.requirements[1].strength == "preferred"
+    assert result.requirements[0].kind == "setting"
+    assert result.named_cast[1].stated_gender == "male"
+    assert result.named_cast[0].notes == "Present throughout"
+    assert result.assumptions == candidate["assumptions"]
+    assert receipt["returned_artifact"] == result.model_dump(mode="json")
+    assert candidate == before and len(slot.calls) == 1
+
+
+def test_explicit_corrections_clears_and_list_membership_are_authoritative():
+    candidate = {"named_cast": [{"name": "Jeffrey", "stated_gender": "male", "notes": "old"},
+                                {"name": "Removed", "notes": "Do not resurrect"}],
+                 "requirements": [{"id": "old", "kind": "event"}],
+                 "assumptions": ["old"]}
+    reply = {"named_cast": [{"name": "Jeffrey", "stated_gender": "", "notes": "",
+                             "speaking": False, "required": False},
+                            {"name": "Added"}], "requirements": [], "assumptions": []}
+    result, _, _ = _rewrite_interpretation(candidate, reply)
+    assert [r.name for r in result.named_cast] == ["Jeffrey", "Added"]
+    assert result.named_cast[0].stated_gender == result.named_cast[0].notes == ""
+    assert not result.named_cast[0].speaking and not result.named_cast[0].required
+    assert not result.requirements and not result.assumptions
+
+
+@pytest.mark.parametrize("rows", [[{"name": "A"}, {"name": "A"}], [{}], [{"name": "Renamed"}]])
+def test_ambiguous_or_changed_identity_never_inherits_another_cast_member(rows):
+    result, _, _ = _rewrite_interpretation(
+        {"named_cast": [{"name": "A", "stated_gender": "female"}]}, {"named_cast": rows})
+    assert all(not row.stated_gender for row in result.named_cast)
+
+
+def test_rejected_proposal_is_not_the_next_baseline_and_validator_result_is_journaled():
+    from nodes._otr_my_story import StoryInterpretation
+    seen = []
+
+    def validate(model):
+        seen.append(model)
+        if model.setting_brief == "wrong":
+            return "wrong setting"
+        model.setting_brief = "normalized"
+
+    slot = Slot(lambda messages: {"setting_brief": "wrong", "assumptions": ["bad"]}
+                if len(slot.calls) == 1 else {"setting_brief": "right"})
+    result, receipt = source.rewrite_story_source(
+        RawStoryFields(idea="Dinner"), {"assumptions": ["original"]}, slot,
+        schema=StoryInterpretation, receipts=[], pass_id="interpret",
+        preserve_omitted={}, post_validator=validate)
+    assert len(slot.calls) == 2 and result is seen[-1]
+    assert result.assumptions == ["original"] and result.setting_brief == "normalized"
+    assert receipt["returned_artifact"] == result.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("register,expected", [(None, "warm"), ("", ""), ("formal", "formal")])
+def test_treatment_alias_and_explicit_act_identity_preserve_the_correct_metadata(register, expected):
+    from nodes._otr_my_story import StoryTreatment
+    candidate = StoryTreatment.model_validate({
+        "cast": [{"name": "Jeffrey", "register": "warm"}],
+        "acts": [{"n": 1, "purpose": "dinner"}, {"n": 2, "purpose": "departure"}],
+    }).model_dump(mode="json")
+    member = {"name": "Jeffrey"}
+    if register is not None:
+        member["register"] = register
+    slot = Slot({"cast": [member], "acts": [{"n": 2}, {}]})
+    result, _ = source.rewrite_story_source(
+        RawStoryFields(idea="Dinner"), candidate, slot, schema=StoryTreatment,
+        receipts=[], pass_id="treatment", preserve_omitted={("cast",): "name", ("acts",): "n"})
+    assert result.cast[0].speech_register == expected
+    assert result.acts[0].purpose == "departure"
+    assert result.acts[1].purpose == ""  # default n=1 is not an explicit identity
+
+
 @pytest.mark.parametrize("error", [RuntimeError("provider failed"), MemoryError("real OOM"),
                                   KeyboardInterrupt("cancelled")])
 def test_real_failures_propagate_once_and_keep_attempt_evidence(error):

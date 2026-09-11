@@ -1,0 +1,4 @@
+MODEL: cursor-grok-4.6-high
+MODE: ask
+TRANSPORT: stdin
+ARGV (prompt omitted): ['C:\\Users\\jeffr\\AppData\\Local\\cursor-agent\\cursor-agent.cmd', '-p', '--trust', '--mode', 'ask', '--output-format', 'text', '--model', 'cursor-grok-4.6-high']

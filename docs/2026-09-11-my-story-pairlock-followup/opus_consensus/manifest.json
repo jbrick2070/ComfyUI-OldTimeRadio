@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T09:56:07.995058+00:00",
+  "doc": "docs\\2026-09-11-my-story-pairlock-followup\\driver_anchor.md",
+  "prompt_tokens_est": 32433,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 48550,
+      "completion_tokens": 7500,
+      "cost_usd": 0.43025,
+      "max_tokens": 7500,
+      "temperature": 0.5,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.4303
+}

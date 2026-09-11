@@ -112,6 +112,27 @@ def test_voice_cast_fallback_is_defined_on_every_row_it_considers():
     assert cast["c2"]["voice_cast_fallback"] == "gender_unservable"
 
 
+@pytest.mark.parametrize("gender", [None, "", "   "])
+def test_unspecified_gender_names_the_real_render_reference_without_changing_identity(gender):
+    from nodes.cast_lock import CastLock
+    from nodes import _otr_voice_node_common as vnc
+    cast = [{"char_id": "c1", "name": "Jeffrey", "gender": gender,
+             "voice_preset": "v2/en_speaker_1"},
+            {"char_id": "c2", "name": "Mother", "gender": gender,
+             "voice_preset": "v2/en_speaker_2"}]
+    out = CastLock().lock(script_json=_ledger(cast), cast_voice_policy="auto_registry")
+    rows = json.loads(out[0])["cast"]
+    assert rows[0]["voice_ref_id"] != rows[1]["voice_ref_id"]
+    entries, _ = load_voice_bank()
+    for row in rows:
+        assert row["gender"] == gender
+        assert row["voice_engine"] == "indextts2"
+        ref = next(e for e in entries if e.voice_ref_id == row["voice_ref_id"])
+        path = vnc._resolve_clone_ref_path(row["voice_engine"], row, 42)
+        assert path and path.endswith(ref.ref_path.replace("/", "\\").split("\\")[-1])
+        assert row["voice_cast_fallback"] == "gender_unspecified"
+
+
 def test_the_unservable_row_is_not_refused_or_gender_restricted():
     """This is a LEDGER fix, not a content gate. The row still renders, and the
     roll that produced 'other' is untouched.
