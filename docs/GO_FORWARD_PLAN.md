@@ -1,236 +1,180 @@
 # OTR Go-Forward Plan
 
-This is the main and sole executable work queue. Only unfinished work belongs
-here. Read AGENTS.md, CLAUDE.md and [standing rulings](OTR_STANDING_RULINGS.md)
-before acting. Current measured status, commits and test receipts are in
-[session_handoff.md](../session_handoff.md) and [HANDOFF_LOG](HANDOFF_LOG.md).
-When work finishes, move its receipt to the log/archive and remove it here.
+> **"As long as it doesn't crash when it's not supposed to."**
+> -- the operator, 2026-09-11. That is the bar, and it is the same rule as
+> "obs is the success signal": a leg passed if it reached `otr/obs/` without an
+> unexpected crash. What it LOOKS like is not the test.
 
-## Next owner and sequencing
+**The one rule for this file: ONLY UNFINISHED WORK BELONGS HERE.** When work
+finishes, its receipt moves to [HANDOFF_LOG](HANDOFF_LOG.md) or its own evidence
+folder and the row leaves this page. Read AGENTS.md, CLAUDE.md and
+[standing rulings](OTR_STANDING_RULINGS.md) first; this file does not restate them.
+Measured status and commits: [session_handoff.md](../session_handoff.md).
 
-Opus takes the next coding sprints when Jeffrey starts that window. One
-production coder at a time, branch v2.0-alpha. No build or GPU run is active.
+## 0. The bar
 
-**CODE ALL DAY, TEST TONIGHT ON FOUR MACHINES (operator directive 2026-09-11).**
-Operator: *"I'd rather spend all day coding and test tonight rather than code and
-test code and test, so I can have all 4 machines -- 4060, 5080, RunPod and virtual
-Mac -- at once."* So coding chunks BATCH; they do not alternate with legs. The Mac,
-the 4060 and RunPod are RELEASED for that evening wave (the earlier hold is lifted
-by the same directive), and their copy-paste prompts live in
-[the four-machine wave](2026-09-11-four-machine-test-wave/PROMPTS.md). Those lanes
-write findings to `docs/` and DO NOT PUSH -- the push stays with this box so four
-machines cannot collide on one branch -- and they phone home per leg rather than
-streaming. Work the coding scopes below before starting that wave. Review
-genuine design choices through R1 arc, R2 implementation, R3 wiring and R4
-convergence; a deterministic conformance fix needs the finished-diff review
-specified in CLAUDE.md. Obtain actual Sonnet QA after any production revision,
-ground its findings, and record the reviewers who really ran. Substitute an
-unavailable reviewer under the standing rule; do not fabricate consensus.
+**"As long as it doesn't crash when it's not supposed to."** (Operator, 2026-09-11.)
 
-## Sprint 1 -- CODED 2026-09-11; only the live receipt remains
+That is the priority filter for everything below. This is a fun experimental app and
+**exactness is not the goal** -- operator, same day: *"I realize my visual pack and
+story source combined is quite complex. I'm not expecting anything exact."* So:
 
-PBUG-20260911-03 is fixed in code and offline-qualified; it is NOT closed, because
-no render has exercised it yet. The remaining work is one line in the qualification
-table below ("Repair requalification") and the 5080's Leg A in the four-machine
-wave -- there is no coding left here.
+- **Crash-class and durability-class defects are the work.** An uncaught exception, a
+  live asset written where a sweeper can delete it, an identity that silently
+  resolves outside its episode.
+- **Aesthetic drift is NOT the work.** A Shakespearean staging of a modern dinner is
+  emergent behaviour from combining two independent surfaces, not a broken contract.
+  Do not reopen it. See
+  [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
+- **Prompts are hand-crafted per model and CHARACTER-BUDGETED.** Do not swashbuckle
+  them. Adding conditional nuance spends budget that does not exist and reintroduces
+  the per-prompt subtleties the operator has already rejected; removing words edits a
+  tuned recipe. Both directions are closed.
 
-What shipped: the scopes MP4 now resolves its episode identity at entry and writes
-through `otr_composited_dir(manifest episode_id)`; the shared-scratch selection and
-the ambient system-temp fallback are both gone. Two further defects were found and
-fixed in the same chunk -- `_validate_episode_id` accepted a dots-only id that
-collapsed to a directory OUTSIDE any episode, and both real-producer tests ran with
-an unpinned output root, so after the re-homing they would have minted phantom
-episodes in the live production tree on every suite run. `key` also seeds the
-idle-scope RNG, so old and new derivations were compared across 18 inputs to prove
-ZERO seed drift; rendered pixels are unchanged. Full detail, reviewers and receipts:
-the PBUG-20260911-03 entry in [PROD_BUG_LOG](PROD_BUG_LOG.md), Bible rules 01.05 and
-01.06.
+## 1. Tonight -- the four-machine wave (nearest deadline)
 
-## Sprint 2 -- DIAGNOSED 2026-09-11; closed with NO code change
+Copy-paste prompts, one block per machine:
+[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md). That file restates the
+six-act fixture on purpose -- it has to be self-contained to paste.
 
-Not deferred and not abandoned: the arc ran, the design did not survive, and the
-operator's constraints closed the question. Full receipt:
-[ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
+**Freeze ONE head and qualify it.** Four machines qualify one hash. Every render-path
+push stacked on top adds a suspect to the 5080's Leg A, the one leg that must pass;
+and if the wave goes badly, a render-inert delta means the suspect list is one fix
+plus the platform -- a single bisect, not six. Write the frozen hash into the
+`WAVE HEAD:` line in PROMPTS.md before anything starts.
 
-Three rounds, one reviewer each as directed (r1 codex, r2 cursor, r3 codex). **All
-three returned "no."** Every one of them converged on the same remedy -- rewrite the
-visual-pack prompt strings -- and that remedy is disqualified by four operator
-constraints, each independently sufficient:
+Every lane: pulls first and reports the HEAD it ran, writes findings to `docs/`,
+**does NOT push** (the push stays with the 5080), phones home per leg, and reports
+its rolled `visual_style`.
 
-1. The pack and the story are a COMBINATION; neither wins, which invalidates every
-   precedence design the arc produced.
-2. Every still and video model treats prompts differently, so chasing delivered
-   pixels back to a style-plus-story intent is a rabbit hole. Sprint 2's own old
-   acceptance line already conceded it: an applied prompt correction proves
-   application, not correct pixels.
-3. The prompts were crafted per model; rewriting tuned strings is the swashbuckling
-   this project has been burned by.
-4. Prompts are CHARACTER-BUDGETED (motion_registers 240 chars enforced at load,
-   BUG-LOCAL-112; `_fit_motion_slot` truncating to 60) and the per-prompt subtleties
-   problem is already settled. Adding a conditional clause spends budget that does
-   not exist; removing era words edits a tuned prompt. Both directions blocked.
-
-What the arc produced that is worth keeping, none of it a prompt change: the
-mechanism (`positive_tail` is a SHARED field reaching house frame, drama AND plate,
-which is why a faceless radio subject rendered as a costumed man in a kitchen); the
-scope (six of nine packs carry zero era words -- the proven packs are already clean);
-a structural, prompt-free wiring fact (ShotLock node 90 plans before image prompts
-exist, so anything image-node-owned arrives too late for video); and the fact that no
-rule about packs and eras exists anywhere -- `validate_pack` checks types, not content.
-
-**What decides this next is tonight's wave, not more analysis.** Every lane reports
-its rolled `visual_style`, so era-bearing and era-free episodes land side by side.
-Judge the delivered episodes as radio drama; do not reopen this from prompt reading.
-
-## Coding batch before the evening wave -- re-grounded 2026-09-11
-
-Every backlog row below was re-read against the CURRENT tree and then adversarially
-verified; the verification REFUTED most of the first pass's optimism, so this list
-is deliberately shorter than the backlog table suggests. Sizes are S/M/L.
-
-**Needs its design arc FIRST (the arc is $0, needs no GPU, and is the honest way to
-fill a coding day):** 3.8 shared font-family/file resolution (M, and the only row
-whose CODE_NOW classification survived verification outright); 3.2 shared
-silent-video composer face/crux (L, touches eleven lanes on both machines, so
-section 0B applies); 3.3 orphan generation occupancy (L, several narrow fixes each
-surfaced a new race -- that is the two-strikes signal); 3.1 Ghost v3 Half-B (L,
-restart the arc, r2 never converged); 3.4 clean-install manifest/fetch (L, and its
-"blocked on 1.1" clause is stale -- there is no 1.1 row any more).
-
-**Mechanical, no arc needed:** the confirmed sub-items of 3.5 (redirect the runtime
-pack cache roots through `_otr_paths`), A2 follow-up (thread the creative slot's
-resolved capacity into Sci-Fi's repair-turn fit, which still budgets against a flat
-VRAM constant), and the file-scoped half of the 2.4 audit tail.
-
-**A3 needs one short review before code, not a full arc:** exact-match versus a
-tolerance band for the selected-act/scene comparison. Selected acts are binding, so
-this is not a word-count or duration gate and must route into the EXISTING ladder --
-never a new standalone checker.
-
-**Verified already closed; removed from the backlog table below:** image-phase route
-ownership (route_freeze.py is the single authority and all four call sites use it)
-and long hero-title containment (PBUG-20260911-01, fixed today).
-
-## Qualification after coding and QA
-
-Every qualifying run loads workflows/otr_canonical.json through
-scripts/otr_canonical_api_run.py, with no --workflow override, replay substitute
-or partial_execution_targets. Configure installed models using the approved
-runtime/profile inputs and save the dumped API graph. All assets go straight to
-their canonical episode paths; final publication must exist in otr/obs.
-
-| Remaining coverage | Required evidence |
+| Lane | Legs |
 |---|---|
-| Repair requalification | Full canonical episode on the pushed correction, with scopes path, supplied facts, actual voices, credits, pictures and durable OBS file checked. |
-| Six-act Jeffrey/Codex repeatability | Three fresh full canonical runs. Include clean boot and resident reuse only where the actual runtime supports it; record observed loads/reuse. |
-| Source and cast variety | One-act monologue, three-act ensemble and detailed six-act source; requested/actual cast differences, supplied/neutral byline, breaks on/off. These may overlap repeatability runs only when the recorded fixture genuinely covers both. |
-| Second installed model family | One/three/six acts with a compatible locally installed family. Verify actual runtime IDs, not dropdown labels alone. |
-| Original credits | One fresh Original full publication: observed creative model agrees across wire, saved ledger and rendered credit. Only live proof is pending. |
-| Listening | Opening/middle/ending audition on at least two publications, including six acts. This session cannot ingest audio; do not label waveform checks or reading TTS text as listening. |
-| Inherited regression debt | Re-ground the 51 OTR and ten Bible failures against recorded baseline IDs AND normalized payloads. The Bible strict metadata validator also has 149 unchanged issues; its baseline/candidate logs are in the handoff receipt. Fix genuine open causes in separate qualified chunks; never silently quarantine them or call the suite all-green. |
+| 5080 | Leg A, the PBUG-20260911-03 scopes requalification (**the one that must pass**), verified on disk not from logs, with the consumer run at bypass true AND false. Leg B, the six-act Jeffrey/Codex fixture. |
+| 4060 | One-act and three-act on `otr_4060_12b_gguf_offload` (status shipping -- **NOT** `8gb_lite` or `otr_4060_floor`, both draft; `8gb_lite` refuses in 20s on two of three banks, PBUG-20260904-05). Scopes path on 8 GB. Fresh-install friction to `4060_DRILL_LOG.md`. |
+| Virtual Mac | One full canonical on Apple Silicon. Then look hard at title/caption/credits TEXT in the delivered frames -- eight macOS episodes shipped with the hero title off the right edge. |
+| RunPod | Second installed model family at one/three/six acts, verifying actual runtime IDs not dropdown labels. One fresh Original publication for the credits proof. **Stop the pod when done.** |
 
-The next six-act fixture is Jeffrey and Codex getting closer to release during
-one continuous evening in Jeffrey's workspace. Jeffrey is the physically present
-adult; Codex is a named AI dramatic speaker heard through the computer speakers,
-with only an on-screen interface, no embodied human, age or gender invented.
-Only these two dramatic voices. Reports from other machines are displayed text
-or discussed by them, not new speaking characters. The standard house announcer
-is production framing, outside dramatic cast, turns and ending. Request four
-characters to exercise the flexible actual-two cast; select six acts and normal
-act breaks. Breaks are broadcast framing, not new times or locations.
+Not covered by the wave: **listening** (the operator's own ear; no agent here can
+ingest audio, and reading TTS text or checking a waveform is not listening).
 
-Story arc: check the real canonical; reproduce a lost supplied fact; repair
-through existing owners; use a bounded checker+rewriter; compare the recorded
-reports; finish together appreciating progress while honestly leaving remaining
-release checks open. This fictional plot does not guarantee an actual model
-error/repair in the test. Record actual applied corrections, no-ops and failures.
-No test has been queued for this fixture.
+## 2. Open defects with an owner
+
+| Defect | State | Next action |
+|---|---|---|
+| PBUG-20260911-03 scopes path | Code fixed, offline-qualified, pushed. NOT closed. | 5080 Leg A. Nothing left to code. |
+| Sci-Fi repair-turn capacity overflow | **Open, crash-class.** `nodes/_otr_scifi_news_pro.py` never catches `PromptContextOverflowError` / `GenerationContextOverflowError` (`nodes/_otr_generation_budget.py`), so a too-generous cap propagates uncaught mid-episode. | Splits in two. **The catch is shippable** -- it fires only where today it crashes, so every currently-succeeding episode is unchanged. **Changing the cap VALUE is not** -- it decides repair-vs-cold-regeneration and therefore which script comes back. Take the catch; leave the value. |
+| 8 GB draft-profile refusal | Known (PBUG-20260904-05). Decides whether the 4060 publishes anything tonight. | Handled in the wave by naming the shipping profile. No code. |
+| Runtime writes INSIDE the pack directory | **Open, durability-class -- this is the bar's own second bullet.** `nodes/_otr_openrouter_backend.py:792` still resolves its catalog cache to `Path(__file__)/../models`, and `nodes/_otr_shared/cloud_media_backend.py:209` puts `billing_ledger.jsonl` (a real-money audit trail, and the ONLY copy) under `<repo>/otr/cache/`. A registry update or reinstall wipes both. | NOT the mechanical edit it looks like -- grounded 2026-09-11: relocating the catalog default cold-starts a populated cache, which drops `resolve_context_window` to the 8192 default and changes the writer's token budget. So it needs a migration step, and the billing ledger should NOT land in a tier whose contract says "never the only copy". Do this AFTER the wave, with the migration. |
+
+## 3. Qualification coverage still owed
+
+Every qualifying run loads `workflows/otr_canonical.json` through
+`scripts/otr_canonical_api_run.py` -- no `--workflow` override, no replay substitute,
+no `partial_execution_targets`. Assets go straight to canonical episode paths; final
+publication must exist in `otr/obs`.
+
+| Coverage | Required evidence |
+|---|---|
+| Repair requalification | Full canonical on the pushed correction: scopes path, supplied facts, actual voices, credits, pictures, durable OBS file. |
+| Six-act repeatability | Three fresh full canonical runs. Record observed loads/reuse; claim clean boot and resident reuse only where the runtime actually supports it. |
+| Source and cast variety | One-act monologue, three-act ensemble, detailed six-act. Requested vs actual cast, supplied/neutral byline, breaks on and off. May overlap repeatability only where the recorded fixture genuinely covers both. |
+| Second model family | One/three/six acts on a compatible installed family. Verify actual runtime IDs. |
+| Original credits | One fresh Original publication: observed creative model agrees across wire, saved ledger and rendered credit. Only live proof is pending. |
+| Listening | Opening/middle/ending on at least two publications including a six-act. Operator's ear only. |
+| 5.7 chunked music | Full canonical on `otr_8gb_fastwan` (**that is the real profile id -- "fastwan_8gb" appears nowhere on disk, and the profile is status `draft`**) with long opening/closing cues, to prove the existing chunked-music repair. One leg, not a design row. |
+| Inherited regression debt | **Load-bearing, not a footnote** -- it is what makes any "suite is green" claim mean something. Re-ground 51 OTR and 10 Bible failures against baseline IDs **and normalized payloads**. The Bible strict metadata validator separately has 149 unchanged issues. Never quarantine silently; never call the suite all-green. |
+
+**The six-act fixture:** Jeffrey and Codex getting closer to release across one
+continuous evening in Jeffrey's workspace. Jeffrey is the physically present adult;
+Codex is a named AI dramatic speaker heard through the computer speakers, with only
+an on-screen interface -- no embodied human, age or gender invented. Only those two
+dramatic voices; reports from other machines are displayed text or discussed by them,
+never new speaking characters. The house announcer is production framing, outside
+dramatic cast, turns and ending. Request four characters to exercise the flexible
+actual-two cast. Six acts, normal breaks; breaks are framing, not new times or places.
 
 For every attempt record source fields, code/canonical/graph hashes, actual
-model/quantization/profile settings, prompt ID, elapsed time, memory and loads,
-all repair attempts, requested/actual acts/cast, ledger seals and final paths.
-Preserve terminal failure evidence before assertions. Diagnose a live failure
-before further generation. Keep the full denominator and do not edit production
-while a run is active. Use shipped watchdog/reset procedures; never blanket-kill
-Python processes. Do not change story controls merely to meet a time target.
+model/quantization/profile, prompt ID, elapsed time, memory and loads, all repair
+attempts, requested vs actual acts and cast, ledger seals and final paths. Preserve
+terminal failure evidence before asserting anything. Keep the full denominator.
 
-## Held hardware and publication work
+## 4. Design rows awaiting an arc
 
-- Mac and 4060: RELEASED 2026-09-11 for the evening four-machine wave, with
-  prompts in [the wave doc](2026-09-11-four-machine-test-wave/PROMPTS.md). Their own
-  proven routes and owners remain authoritative, they write findings to `docs/`, and
-  they DO NOT PUSH -- the push stays with the 5080.
-- RunPod: authorized by the operator 2026-09-11 for the evening wave ("this 5080
-  is yours, you can spin RunPod"); it carries the second-model-family and Original-
-  credits legs. Stop the pod when its legs finish. Pull the qualified repository/image before testing, record the actual
-  revision, use the real canonical, and stop rented compute afterward. No rental
-  is active. Historical pod results are not current access or qualification.
-- Registry versions, public review messages, tags and release promotions require
-  the operator's existing approval process. Pushes to v2.0-alpha are required;
-  they are not a release or registry publish. Never send old review drafts.
+None of these get coded without their arc first. Arcs cost no GPU and no money.
 
-## Constraints on the remaining sprints
-
-- Full listener source, no RSS. Selected acts are binding. Cast count is flexible
-  and records requested/actual values; the house announcer is excluded.
-- Use existing author/correction/ledger/freeze owners. Model checking returns
-  actual applied rewrites with a fixed total attempt budget including repairs.
-  No separate chunker, report-only checker, recursive loop or fourth/fifth round.
-- Exhausted optional correction retains a usable ledger with unresolved evidence.
-  Only existing usable-ledger requirements may refuse after applicable repair;
-  provider, storage, cancellation and real OOM failures stay truthful. No
-  predictive word, duration, story-length or cast-size rejection.
-- Supplied byline or neutral listener attribution for My Story; observed creative
-  model attribution for Original; genuine authors preserved in adaptation banks.
-- No replay-system/migration/re-render project. Saved input means fresh generation.
-  Do not hide test publications from OBS. No better-prose campaign.
-- Windows venv, UTF-8, pytest -q -p no:cacheprovider. Code chunks need focused/full
-  OTR tests and Bug Bible, compared against the recorded inherited baseline.
-  Validate canonical JSON roundtrip, live widgets/input names and link integrity.
-  Commit and immediately push each qualified chunk; verify HEAD equals origin,
-  nonempty/UTF-8/no-BOM files and touched Python AST. No production code in this
-  documentation handoff.
-
-## Later open work -- stable IDs, not the next sprint
-
-This index preserves the backlog under this plan. The detailed historical scope
-and all rulings were moved verbatim to
-[the pre-Opus archive](GO_FORWARD_ARCHIVE.md#2026-09-11----pre-opus-queue-preserved-verbatim).
-Those historical status/version/model claims are not current instructions.
-Re-ground a retained candidate against current code and receipts before coding;
-remove it here when closure is established. Do not revive the deleted ROADMAP.md
-or create a parallel executable queue.
-
-| Stable row | Remaining action / scope |
+| Row | Scope |
 |---|---|
-| 2.2 | After My Story: five-act forced-Ghost CUDA canonical publication, stored prompt/admission/reuse inspection; no new Ghost schema field. |
-| A2 follow-up | Separately assess unknown native capacity, remote token-estimate accounting and Sci-Fi's legacy character estimate; do not reopen the shared native capacity/EOS fix. |
-| A3 | Review selected-act acceptance in Sci-Fi's existing markup repair, including salvage. Preserve flexible casts, whole failed drafts and bounded existing retries. |
-| 2.4 source | HTML block joins without changing accepted source digests (ruling needed); scifi_news P0 literal-span convergence/live reverify; scifi_news_pro provider/output capacity and P9/GGUF follow-ups. No deterministic source-prune rung. |
-| 2.4 routing/canvas | ShotLock write-side canvas validation, ltx_av long-beat underruns and matrix declared-vs-effective limits; wants_talking_prompt capture needs design. Image-phase route ownership is CLOSED (route_freeze.py owns it; all four call sites verified 2026-09-11). |
-| 2.4 voice/credits | Opt-in Bark non-speech output repair with a bounded keep-best policy; small-canvas credits layout. Long hero-title containment is CLOSED (PBUG-20260911-01, 2026-09-11). |
-| 2.4 audit tail | Re-ground test catalog/output-root dependencies, hidden output-env exporter and protected model-root consolidation. Do not repeat the completed scan collapse or worktree-credit fix. |
-| 2.5 | If scheduled, effective clone-reference preflight before the writer, using real dispatch fallback/policy resolution; CastLock is too late and declared paths are insufficient. |
-| 3.1 | Resume the saved Ghost v3 Half-B arc: the current author excludes beat dialogue and still picks objects by ordinal. The physical-artifact subject remains open; Half A/pool proof does not close it. No claim that old reviewers are still running. |
-| 3.2 | Shared silent-video composer face/crux decision; preserve audio-in/text-to-video requirements and measure truncation at the actual engine. |
-| 3.3 | Orphan generation occupancy versus cleared model-cache state; independent design, actual in-flight ownership. |
-| 3.8 | Shared torch-free font-family/file resolution across captions, titles, credits and scopes; symptom containment does not close this design. |
-| 3.4 | Reconcile remaining manifest/queue-time download/ffprobe clean-install gaps with already-shipped auto-downloaders. Do not rebuild implemented fetch paths. |
-| 3.5 | Re-ground surviving runtime pack writes, dtype capability admission, janitor granularity, explicit cloud billing/opt-in and per-beat model reloads. Each true design survivor needs its own arc. |
-| 3.6 | Shakespeare authenticated segmented/verbatim source artifact and field-owner table first; preserve Public Domain paraphrase/flexible cast and current no-word-gate rulings. |
-| 3.7 | Remaining content-derived style, pitch/cast name reconciliation, dead-field ownership and meta cleanup. meta.style still has readers/writers, but meta.story_scaffold already means a separate control; resolve ownership instead of blindly renaming into it. |
-| 4 / 4B | Re-read actual registry latest/status_reason/node extraction and compare exact published bundle to commit. Resolve remaining cnr_id/install evidence and prepare one current review note for operator posting. Revalidate the old discriminator/bisection hypothesis before any destructive strip-down. |
-| 5.1-5.2 | Physical 8 GB combination/cold-install proof, measured profile choices and model matrix updates after operator release. One canonical JSON; lab profiles are not new shipping graphs. |
-| 5.3 / 5.6 | Re-ground unqualified installed LLM family/slot combinations and GGUF opt-in availability. Do not rerun the completed historical Leg0 merely because an old task says next. |
-| 5.4-5.5 | Read H3 policy receipts before another run; settle outstanding image-mode elements/refusal question with a real selected route. |
-| 5.7 | Full canonical fastwan_8gb with long opening/closing music cues to prove existing chunked-music repair. |
-| 5.8-5.10 | Remaining cfg promotion comparisons, failed-proof re-derivations, clean-room legs and eyewitness checks; do not call old component evidence full media proof. |
-| 5.11-5.12 / AMD | Scoped pod/platform acceptance after access and prerequisite checks, actual ROCm/bitsandbytes capability before claims; retain deferred render blockers. |
-| 6 | Still-unruled product choices and Bible fan-out candidates: confirm each remains unanswered; no assumed permission for version bumps, public posting or destructive installation. |
-| 7 | Operator-parked casting/adaptation/AnimateDiff image-input ideas, OTR-Lite after v2, word_razzle placement and remote-recipe identity; activate only within their recorded scope. |
-| 8 | Live client-bank end-to-end proof, coordinated activation instructions, remaining cleanup-tail/zero-frame/RenderError cases and live-backed Bible deltas. Preserve protected code and source contracts. |
-| Release runway | Existing LEAN_MEAN_CLEANUP scope after this queue, representative platform acceptance, clean install, product documentation and operator-authorized release. Optional App/player, gentle stable speaker placement and useful native-video ambience remain separate designs. |
+| 3.5 per-beat model reload | A ~14 GiB LTX reload per beat. Framed as an **OOM surface** rather than a speed complaint -- under the section 0 bar it earns its place because reloading that much per beat is where a render falls over, not because it is slow. It sits here, below section 2, deliberately. |
+| 3.5 janitor granularity | The janitor cannot sweep `tmp/audio_slices` -- no such reference exists in `nodes/_otr_janitor.py`, and 9.3 GB was measured sitting there. Durability. It widens an auto-delete, so it lands with a test and never without one. |
+| 3.8 | Shared torch-free font-family/file resolution across captions, titles, credits, scopes. The Mac's text-rendering leg tonight is its evidence. |
+| 3.2 | Shared silent-video composer face/crux. Touches eleven lanes on both machines, so CLAUDE.md section 0B applies -- prove the unchanged machine is unchanged, measured. **Guard: preserve the audio-in / text-to-video requirements, and measure truncation at the ACTUAL engine, not from a declared limit.** |
+| 3.3 | Orphan generation occupancy vs cleared model-cache state. Several narrow fixes each surfaced a new race; that is the two-strikes signal. |
+| 3.1 | Ghost v3 Half-B: the author still picks objects by ordinal and excludes beat dialogue. Restart the arc; r2 never converged. |
+| 3.4 | Clean-install manifest / queue-time download / ffprobe gaps. Its "blocked on 1.1" clause is STALE -- there is no 1.1 row. The 4060 and RunPod pull steps tonight produce the real gap list, so do not arc it before that. |
+| 3.6 | Shakespeare segmented/verbatim source artifact and field-owner table. Explicitly not next. |
+| 3.7 | Pitch/cast name reconciliation and dead-field ownership. `meta.style` still has readers and writers; `meta.story_scaffold` already means a separate control -- resolve ownership, do not blind-rename. **"Content-derived style" is STRUCK** -- deriving style from content is picking a winner between pack and story, which [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md) settled. Do not reopen it. |
+| 2.4 routing/canvas | ShotLock write-side canvas validation; ltx_av long-beat underruns; matrix declared-vs-effective limits; `wants_talking_prompt` capture. |
+| 2.4 voice/credits | Opt-in Bark non-speech repair with a bounded keep-best policy; small-canvas credits layout (known -- report it, do not chase it). |
+| 2.4 audit tail | Remaining output-root/env-exporter and protected model-root items. The cold-cache test dependency is FIXED; the google/veo unpinned-fixture and worktree-credit claims were re-grounded and REFUTED -- do not re-derive them. |
+| 2.4 source | HTML block joins pending an operator digest ruling; scifi_news P0 literal-span convergence; scifi_news_pro provider/output capacity and P9/GGUF follow-ups. No deterministic source-prune rung. |
+| A3 | Selected-act acceptance in Sci-Fi's markup repair. Needs one short review, not a full arc: exact match vs tolerance band. Routes into the EXISTING ladder; never a new checker. Stated once, here. |
+| A2 follow-up | Unknown native capacity and remote token-estimate accounting. The Sci-Fi character-estimate half is tracked as the crash-class row in section 2. **Guard: do NOT reopen the shared native-capacity/EOS fix -- it landed and is receipted.** |
+| 2.2 | Five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. No new Ghost schema field. Needs a CUDA proving host. |
 
-Stable-ID renumbering and the detailed withdrawn/rejected proposals remain in
-the archive and standing rulings. Preserve those decisions when resuming a row;
-their existence is not authorization to repeat completed work.
+## 5. Blocked on the operator -- each unblocks with one word
+
+2.4 source digest ruling (HTML block joins) · A3 exact-match vs tolerance ·
+4 / 4B registry review note for posting (**guard: revalidate the old
+discriminator/bisection hypothesis before ANY destructive strip-down**) · 5.1-5.2 release after physical 8 GB proof ·
+6 unruled product choices and Bible fan-out candidates.
+
+## 6. Hardware and publication state
+
+- **Mac, 4060, RunPod: RELEASED** for tonight's wave. Their own proven routes and
+  owners remain authoritative. Findings to `docs/`; they do not push.
+- **Registry versions, tags, public posts and release promotions** need the operator's
+  approval process. Pushes to `v2.0-alpha` are required and are not a release. Never
+  send an old review draft.
+- **2.5 clone-reference preflight is a conditional tombstone.** Attempted and reverted
+  2026-09-04 after a grounded review killed it on three counts, all still true. Not
+  scheduled. Do not revive without new evidence.
+
+## 7. Constraints specific to this plan
+
+Only the ones not already in CLAUDE.md or the standing rulings.
+
+- Full listener source, no RSS. **Selected acts are binding.** Cast count is flexible
+  and records requested vs actual; the house announcer is excluded from dramatic cast.
+- Model checking returns actually-applied rewrites under a fixed total attempt budget
+  including repairs. No separate chunker, report-only checker, recursive loop, or
+  fourth/fifth round.
+- An exhausted optional correction still yields a usable ledger with unresolved
+  evidence recorded. Only existing usable-ledger requirements may refuse after
+  applicable repair. Provider, storage, cancellation and real OOM failures stay
+  truthful. **No predictive word, duration, story-length or cast-size rejection.**
+- Supplied byline or neutral listener attribution for My Story; observed creative
+  model for Original; genuine authors preserved in adaptation banks.
+- No replay-system, migration or re-render project. Saved input means fresh
+  generation. Do not hide test publications from OBS.
+
+## 8. Parked -- preserved, not work
+
+`5.3`/`5.6` unqualified installed family and GGUF opt-in combinations ·
+`5.4`-`5.5` H3 policy receipts and the image-mode refusal question ·
+`5.8`-`5.10` cfg promotion comparisons, failed-proof re-derivations and clean-room
+legs · `5.11`-`5.12`/AMD scoped pod and platform acceptance after access, including
+`3.5` dtype capability admission on ROCm · `3.5` explicit cloud billing/opt-in:
+`config/profiles/cpu_floor.json` still routes all three image roles to
+`google_image` with no ceiling (`otr_mac_mps.json` was re-pinned to `sd15`, so
+tonight's Mac lane is not exposed) ·
+`7` operator-parked casting/adaptation/AnimateDiff ideas, OTR-Lite after v2,
+word_razzle placement · `8` live client-bank proof and remaining
+cleanup-tail/zero-frame/RenderError cases · **Release runway**: LEAN_MEAN_CLEANUP,
+representative platform acceptance, clean install, product documentation,
+operator-authorized release.
+
+Detail for every row on this page lives in
+[the archive](GO_FORWARD_ARCHIVE.md#2026-09-11----pre-opus-queue-preserved-verbatim).
+Historical status, version and model claims there are **not current instructions** --
+re-ground against current code before coding, and remove a row from this page once
+closure is established. Do not revive the deleted ROADMAP.md or start a parallel queue.
