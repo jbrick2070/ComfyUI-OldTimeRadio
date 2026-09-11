@@ -1,0 +1,28 @@
+{
+  "baseline": "my_story_grammar_bible_baseline.xml",
+  "candidate": "my_story_grammar_bible_candidate.xml",
+  "baseline_counts": {
+    "failure": 11,
+    "passed": 29,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "candidate_counts": {
+    "failure": 10,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "status_changes": [
+    {
+      "test": ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+      "before": "failure",
+      "after": "passed"
+    }
+  ],
+  "new_tests": [],
+  "removed_tests": []
+}

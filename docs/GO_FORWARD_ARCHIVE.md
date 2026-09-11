@@ -1,5 +1,20 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- grammar and P1 implementation complete
+
+Prior queue item preserved verbatim. Implementation and regression receipt:
+docs/2026-09-11-my-story-cross-machine/grammar_receipt.md. Live qualification
+remains in GO_FORWARD; no source-fidelity or Mac-memory cure is claimed.
+
+1. First isolate mutable grammar state per generation while retaining reusable
+   tokenizer preprocessing. This is a confirmed static defect, not an established
+   cause of the Mac kill: the failing My Story cleanup route did not bind a
+   grammar. Remove implicit array/string limits from provider-capacity authoring
+   while retaining explicit schema constraints and real repetition detection.
+   Then bind only P1's local creative callable through its existing
+   `_otr_bind_schema(StoryTreatment)` seam. Preserve P2/P3's original callable,
+   all three fail-closed attempts, and no generic JSON repair.
+
 ## 2026-09-11 -- diagnostic follow-up queue superseded
 
 Previous combined item, preserved verbatim; O1/O3 are complete, O2 remains in

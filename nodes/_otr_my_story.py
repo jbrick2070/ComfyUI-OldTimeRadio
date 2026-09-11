@@ -374,6 +374,7 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None, **kwargs) -> Any:
         if attempt_receipts is not None:
             attempt_receipts.append({
                 "pass_id": pass_id, "attempt": number, "raw_output": raw,
+                "raw_completion": getattr(error, "raw_completion", None),
                 "status": "accepted" if error is None else "failed",
                 "error": None if error is None else str(error),
             })
@@ -472,6 +473,8 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
                     *, act_count: int, requested_characters: int,
                     include_act_breaks: bool, attempt_receipts=None) -> StoryTreatment:
     base, retry = _TEMP["treatment"]
+    bind_schema = getattr(creative_fn, "_otr_bind_schema", None)
+    treatment_fn = bind_schema(StoryTreatment) if callable(bind_schema) else creative_fn
     return _call(
         "treatment", bundle, attempt_receipts=attempt_receipts,
         prompt=[
@@ -490,7 +493,7 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
             )},
         ],
         schema=StoryTreatment,
-        slot_fn=creative_fn,
+        slot_fn=treatment_fn,
         base_temperature=base,
         structural_retry_temperature=retry,
         repair_prompt_factory=_full_artifact_repair(

@@ -839,17 +839,9 @@ def _build_truncating_generate_fn(
     # normalize_messages_for_tokenizer folds system content into the
     # first user turn. Closure-cell idiom matches `_min_p_unsupported`.
     _system_role_supported = [None]
-    schema_parser = None
-    prefix_allowed_tokens_fn = None
     if schema_model is not None:
         from ._otr_constrained_generate import (
             get_cached_transformers_schema_constraint,
-        )
-
-        schema_parser, prefix_allowed_tokens_fn = (
-            get_cached_transformers_schema_constraint(
-                cache_entry, schema_model,
-            )
         )
 
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
@@ -864,6 +856,9 @@ def _build_truncating_generate_fn(
         bounded_capacity = reserve_remaining and max_new_tokens is not None
         fail_on_output_limit = bool(getattr(
             messages, "_otr_fail_on_output_limit", False,
+        ))
+        unbounded_json_field = bool(getattr(
+            messages, "_otr_unbounded_json_field", False,
         ))
         if _system_role_supported[0] is None:
             _system_role_supported[0] = (
@@ -940,12 +935,11 @@ def _build_truncating_generate_fn(
             gen_kwargs["min_p"] = active_min_p
         if active_rep_penalty != 1.0:
             gen_kwargs["repetition_penalty"] = active_rep_penalty
-        if prefix_allowed_tokens_fn is not None:
+        if schema_model is not None:
             # Local structured passes are constrained at token selection:
             # tokens that cannot continue a schema-valid JSON document are
             # never sampleable. Keep one beam; constrained sampling does not
             # benefit from multiplying parser state across beams.
-            gen_kwargs["prefix_allowed_tokens_fn"] = prefix_allowed_tokens_fn
             gen_kwargs["num_beams"] = 1
 
         # THE LIVENESS GUARD (2026-08-13). Installed UNCONDITIONALLY, and NOT
@@ -965,10 +959,13 @@ def _build_truncating_generate_fn(
         # to have. So this one raises.
         from transformers import StoppingCriteriaList  # noqa: I001
         try:
-            from ._otr_decode_guard import make_degeneracy_criterion
+            from ._otr_decode_guard import (
+                make_degeneracy_criterion, MAX_OPEN_STRING_TOKENS,
+            )
         except ImportError:  # pragma: no cover - flat/standalone import path
             from _otr_decode_guard import (  # type: ignore
                 make_degeneracy_criterion,
+                MAX_OPEN_STRING_TOKENS,
             )
         # NO try/except AROUND THE CONSTRUCTION. An r1 panel caught the first
         # version claiming "construction failure must be loud" in a comment
@@ -981,9 +978,13 @@ def _build_truncating_generate_fn(
         # 15,355 tokens, which the cycle detector is structurally blind to).
         # It reads quotes as STRUCTURE, so it must never run on a free-prose
         # or markup pass where a quotation mark is dialogue.
+        # Provider-capacity prose also opts out of the open-string size limit;
+        # cycle detection stays active on every route.
         _degeneracy_guard = make_degeneracy_criterion(
             inputs["input_ids"].shape[1],
             tokenizer=tokenizer if schema_model is not None else None,
+            max_open_string_tokens=(
+                None if unbounded_json_field else MAX_OPEN_STRING_TOKENS),
         )
         gen_kwargs["stopping_criteria"] = StoppingCriteriaList(
             [_degeneracy_guard]
@@ -1037,6 +1038,10 @@ def _build_truncating_generate_fn(
 
         with torch.no_grad():
             try:
+                if schema_model is not None:
+                    _, gen_kwargs["prefix_allowed_tokens_fn"] = (
+                        get_cached_transformers_schema_constraint(cache_entry, schema_model)
+                    )
                 out = model.generate(**inputs, **gen_kwargs)
             except TypeError as exc:
                 # Tier 1 fix #8: min_p kwarg unsupported on
@@ -1048,7 +1053,7 @@ def _build_truncating_generate_fn(
                         "supported by this transformers version; "
                         "disabling for the remainder of this run "
                         "(error was: %s)",
-                        exc,
+                        str(exc),
                     )
                     _min_p_unsupported[0] = True
                     gen_kwargs.pop("min_p", None)
@@ -1056,6 +1061,10 @@ def _build_truncating_generate_fn(
                     # state, so without this the retry path would diverge from
                     # a run that never hit the TypeError.
                     _seed_writer_sampling(inputs)
+                    if schema_model is not None:
+                        _, gen_kwargs["prefix_allowed_tokens_fn"] = (
+                            get_cached_transformers_schema_constraint(cache_entry, schema_model)
+                        )
                     out = model.generate(**inputs, **gen_kwargs)
                 else:
                     raise
@@ -1102,16 +1111,13 @@ def _build_truncating_generate_fn(
             _degeneracy_guard, "hit", False
         ):
             telemetry = _degeneracy_guard.telemetry()
+            reason = ("an open JSON string exceeded its token allowance"
+                      if _degeneracy_guard.reason == "open_string"
+                      else "the output repeated a run of tokens verbatim")
             log.error(
-                "[OTR_LedgerScriptWriter] DECODE HALTED (%s): the output "
-                "repeated a %s-token run verbatim %s times in a row, after %s "
-                "generated tokens of a %d-token allowance. The model did not "
-                "run out of room and this is not a long artifact -- it was "
-                "CYCLING, and the transport stopped it. REROLLABLE: the "
-                "ladder's next rung runs at a lower temperature. Telemetry: %s",
-                _degeneracy_guard.reason,
-                telemetry.get("cycle_tokens"),
-                telemetry.get("required_repeats"),
+                "[OTR_LedgerScriptWriter] DECODE HALTED (%s): %s, after %s "
+                "generated tokens of a %d-token allowance. Rerollable. Telemetry: %s",
+                _degeneracy_guard.reason, reason,
                 generated_tokens, effective_max_new_tokens,
                 telemetry,
             )
@@ -1128,11 +1134,9 @@ def _build_truncating_generate_fn(
                 _halt_raw[-400:].replace("\n", " "),
             )
             raise GenerationDegeneracyError(
-                "generation was halted by the in-decode liveness guard: the "
-                "output repeated a run of tokens verbatim, which is a decode "
-                "that is cycling rather than a long artifact",
+                "generation was halted by the in-decode liveness guard: " + reason,
                 halt_reason=_degeneracy_guard.reason,
-                open_string_tokens=None,
+                open_string_tokens=telemetry.get("open_string_tokens"),
                 repetition=telemetry,
                 raw_completion=decoded,
                 prompt_tokens=prompt_len,
@@ -1266,8 +1270,6 @@ def _build_truncating_generate_fn(
 
     if schema_model is not None:
         generate_fn.schema_model = schema_model  # type: ignore[attr-defined]
-        generate_fn.json_schema_parser = schema_parser  # type: ignore[attr-defined]
-        generate_fn.prefix_allowed_tokens_fn = prefix_allowed_tokens_fn  # type: ignore[attr-defined]
     return generate_fn
 
 

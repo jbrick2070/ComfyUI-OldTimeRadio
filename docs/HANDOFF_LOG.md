@@ -1,3 +1,24 @@
+## 2026-09-11 -- grammar state and P1 binder implementation
+
+Closed M1 static request-state retention and the S1 local binder connection.
+Tokenizer preprocessing is reusable; grammar history is per actual generation,
+including retries. Implicit array/open-string limits are removed for provider-
+capacity authoring, with explicit schema limits and cycle detection retained.
+Only P1 binds StoryTreatment; transport error completions remain evidence.
+
+197 focused passed. Full 14,154 passed / 53 unchanged baseline failures /
+183 skipped / 1 xfailed, with no new or changed failures. Bible candidate
+30 passed / 10 unchanged failures / 11 skipped / 3 xfailed; baseline 29/11/11/3
+under the new guard. Live PBUG-20260910-05 maps to new Bible 11.63. Canonical
+audit passes, hash unchanged. Two scoped single-CLI reviews are grounded and
+converged. Full evidence: grammar_receipt.md and adjacent comparison JSONs.
+
+No new live run. M1 is not a demonstrated cause or cure of the Mac OS kill.
+GO_FORWARD starts with A2 actual native capacity, then source/cleanup/visual
+closure and instrumentation before common-commit full canonical qualification.
+
+---
+
 ## 2026-09-11 -- reported diagnostic fixes and architecture convergence
 
 Closed diagnostic O1/O3: cast-preflight missing stills now defer at INFO;

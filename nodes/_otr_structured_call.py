@@ -546,6 +546,8 @@ def _inherit_generation_contract(source: Any, target: Any) -> Any:
     """Rewrap repair rows in the original list subtype and all its markers."""
     if not isinstance(source, list) or type(source) is list:
         return target
+    if isinstance(target, str):
+        target = [{"role": "user", "content": target}]
     if not isinstance(target, (list, tuple)):
         return target
     copied = copy.copy(source)

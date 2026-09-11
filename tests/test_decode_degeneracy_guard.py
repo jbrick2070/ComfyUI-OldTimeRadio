@@ -398,6 +398,26 @@ def test_the_spiral_signal_is_OFF_when_no_tokenizer_is_supplied():
     assert criterion.telemetry()["open_string_bound"] is None
 
 
+def test_unbounded_json_field_skips_decoding_but_still_stops_a_cycle():
+    class NoDecode:
+        def decode(self, *_args, **_kwargs):
+            pytest.fail("disabled open-string tracking must not decode tokens")
+
+    ids = [QUOTE] + list(range(1000, 7000))
+    criterion = guard.make_degeneracy_criterion(
+        0, tokenizer=NoDecode(), max_open_string_tokens=None,
+    )
+    assert criterion(_FakeIds(ids), None) is False
+    assert criterion.telemetry()["open_string_bound"] is None
+    assert criterion._tracker is None
+    # A new actual repetition must still halt with the same optional tokenizer.
+    criterion = guard.make_degeneracy_criterion(
+        0, tokenizer=NoDecode(), max_open_string_tokens=None,
+    )
+    assert criterion(_FakeIds(list(range(100, 160)) * 4), None) is True
+    assert criterion.reason == "verbatim_cycle"
+
+
 def test_an_escaped_quote_does_not_close_the_string():
     """The classic lexer trap: an escaped quote is content, not a terminator."""
     tracker = guard.OpenStringTracker()

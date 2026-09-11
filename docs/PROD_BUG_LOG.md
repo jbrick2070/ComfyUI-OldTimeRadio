@@ -14085,7 +14085,11 @@ for promotion from the Windows box. Each is portable beyond OTR:
   death/absence, P2 fire/solitude, inverse visual staging, and cleanup removal,
   while accepting the source-compatible dinner through final spoken text and
   publication eligibility.
-- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+- status: CODE FIXED / PROMOTED -- P1 binding and all three retry routes are
+  covered; repeated real-model qualification is pending. The focused set
+  passes 197 tests; full regression has no new or changed failures.
+  See docs/2026-09-11-my-story-cross-machine/grammar_receipt.md.
+  Do not treat this wiring proof as complete source-fidelity qualification.
 
 ## PBUG-20260910-04 -- one selected act is prompted as music "between acts"
 
@@ -14117,7 +14121,7 @@ for promotion from the Windows box. Each is portable beyond OTR:
 
 ## PBUG-20260910-05 -- My Story P1 bypasses its available local schema binder
 
-- promotion: no exact existing binder rule found. This is separate from
+- promotion: BUG-11.63 in the separate survival-guide repo. This is separate from
   PBUG-20260910-01 / BUG-11.48, whose full-failed-treatment repair-context fix
   is already landed.
 - surfaced: 4060 Steps 117--121 after that repair-context fix. Base and

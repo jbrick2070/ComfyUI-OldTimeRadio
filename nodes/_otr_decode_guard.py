@@ -275,12 +275,12 @@ def make_degeneracy_criterion(
     min_cycle_tokens: int = MIN_CYCLE_TOKENS,
     required_repeats: int = REQUIRED_REPEATS,
     tokenizer: "Any | None" = None,
-    max_open_string_tokens: int = MAX_OPEN_STRING_TOKENS,
+    max_open_string_tokens: int | None = MAX_OPEN_STRING_TOKENS,
 ):
     """Build the latched StoppingCriteria. Raises if transformers is absent.
 
-    Takes no tokenizer: the detector reads token IDs and never decodes, which
-    is what makes it safe across every tokenizer and every output format.
+    Cycle detection reads token IDs. A supplied tokenizer enables the optional
+    open-string signal unless its bound is None, as on provider-capacity prose.
     """
     from transformers import StoppingCriteria  # raises if unavailable
 
@@ -295,7 +295,8 @@ def make_degeneracy_criterion(
             self._since_check = 0
             # The open-string half only runs when a tokenizer was supplied,
             # which the caller does ONLY on a schema-bound route.
-            self._tracker = OpenStringTracker() if tokenizer is not None else None
+            self._tracker = (OpenStringTracker() if tokenizer is not None
+                             and max_open_string_tokens is not None else None)
             self._decoded: dict[int, str] = {}
 
         def _text(self, token_id: int) -> str:

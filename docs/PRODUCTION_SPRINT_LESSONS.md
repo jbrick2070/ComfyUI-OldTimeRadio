@@ -44,6 +44,16 @@ schema.
 
 ## 2. Keep five representations in lockstep
 
+My Story P1 follow-up (2026-09-11): supplying a schema to validation does
+not bind it to token generation. Use the slot's existing binder once for
+the affected pass and preserve that callable across its typed repairs.
+Test the runner, scheduler and actual generation constraint separately.
+Cache tokenizer preprocessing, never request-specific grammar histories;
+fresh state is required even for a retry in the same closure. Removing
+implicit prose limits must preserve explicit schema bounds and cycle
+detection. See PBUG-20260910-05 / Bible 11.63 and grammar_receipt.md.
+The separate static history defect is not a diagnosed Mac-kill cause.
+
 Every structured LLM pass has five representations that must agree:
 
 1. base prompt;

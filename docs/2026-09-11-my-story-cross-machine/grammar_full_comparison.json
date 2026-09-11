@@ -1,0 +1,45 @@
+{
+  "baseline": "my_story_diagnostics_verified_full.xml",
+  "candidate": "my_story_grammar_full.xml",
+  "baseline_counts": {
+    "passed": 14135,
+    "skipped": 183,
+    "failure": 53,
+    "xfailed": 1
+  },
+  "candidate_counts": {
+    "passed": 14154,
+    "skipped": 183,
+    "failure": 53,
+    "xfailed": 1
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "status_changes": [],
+  "new_tests": [
+    "tests.test_constrained_generate.TestFactoryContract::test_constraint_cache_reuses_only_tokenizer_scan",
+    "tests.test_constrained_generate::test_capacity_marker_survives_normalization_without_changing_default_guard[standalone]",
+    "tests.test_constrained_generate::test_capacity_marker_survives_normalization_without_changing_default_guard[writer]",
+    "tests.test_constrained_generate::test_each_actual_generation_has_fresh_collectible_history[standalone-error]",
+    "tests.test_constrained_generate::test_each_actual_generation_has_fresh_collectible_history[standalone-success]",
+    "tests.test_constrained_generate::test_each_actual_generation_has_fresh_collectible_history[writer-error]",
+    "tests.test_constrained_generate::test_each_actual_generation_has_fresh_collectible_history[writer-min_p]",
+    "tests.test_constrained_generate::test_each_actual_generation_has_fresh_collectible_history[writer-success]",
+    "tests.test_constrained_generate::test_open_string_halt_reports_its_actual_reason_and_evidence[standalone]",
+    "tests.test_constrained_generate::test_open_string_halt_reports_its_actual_reason_and_evidence[writer]",
+    "tests.test_constrained_generate::test_real_lmfe_accepts_twenty_five_items_without_implicit_limit[False]",
+    "tests.test_constrained_generate::test_real_lmfe_accepts_twenty_five_items_without_implicit_limit[True]",
+    "tests.test_constrained_generate::test_real_lmfe_preserves_explicit_array_limit[25]",
+    "tests.test_constrained_generate::test_real_lmfe_preserves_explicit_array_limit[2]",
+    "tests.test_constrained_generate::test_resident_tokenizer_cache_does_not_retain_dynamic_schema",
+    "tests.test_decode_degeneracy_guard::test_unbounded_json_field_skips_decoding_but_still_stops_a_cycle",
+    "tests.test_my_story_runner::test_only_p1_binds_once_and_all_its_retries_use_that_callable[False]",
+    "tests.test_my_story_runner::test_only_p1_binds_once_and_all_its_retries_use_that_callable[True]",
+    "tests.test_my_story_runner::test_raised_completion_is_durable_evidence_not_a_completed_proposal",
+    "tests.test_structured_call::test_custom_message_contract_survives_string_repair_without_mutating_input"
+  ],
+  "removed_tests": [
+    "tests.test_constrained_generate.TestFactoryContract::test_constraint_cache_reuses_tokenizer_scan_and_schema_prefix"
+  ]
+}

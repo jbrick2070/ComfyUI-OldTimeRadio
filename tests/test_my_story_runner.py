@@ -898,3 +898,72 @@ def test_provider_capacity_contract_reaches_every_slot_and_typed_repair():
     led, _ = _run(CapacitySlots())
     assert all(p["budget_mode"] == "provider_capacity" and p["max_new_tokens"] is None
                for p in led.data["meta"]["my_story"]["pass_receipts"] if p["model_id"] != "python")
+
+
+@pytest.mark.parametrize("succeeds", [True, False])
+def test_only_p1_binds_once_and_all_its_retries_use_that_callable(succeeds, tmp_path):
+    from nodes._otr_structured_call import StructuredCallFailedError
+    slots = Slots()
+    original = slots.creative
+    bindings, bound_calls, unbound_calls = [], [], []
+
+    def unbound(messages, **kwargs):
+        assert "radio dramatist" not in messages[0]["content"]
+        unbound_calls.append(messages)
+        return original(messages, **kwargs)
+
+    def bind(schema):
+        bindings.append(schema)
+        assert schema is MS.StoryTreatment
+
+        def bound(messages, **kwargs):
+            assert messages._otr_unbounded_json_field is True
+            assert kwargs["max_new_tokens"] is None
+            bound_calls.append(messages)
+            if succeeds and len(bound_calls) == 3:
+                return original(messages, **kwargs)
+            return '{"incomplete":'
+        return bound
+
+    unbound._otr_bind_schema = bind
+    slots.creative = unbound
+    if succeeds:
+        led, _ = _run(slots)
+        story = led.data["meta"]["my_story"]
+        assert len(unbound_calls) == 2  # act and frame retain the original route
+        assert [a["status"] for a in story["attempts"] if a["pass_id"] == "treatment"] == ["failed", "failed", "accepted"]
+    else:
+        with pytest.raises(StructuredCallFailedError):
+            _run(slots)
+        assert not unbound_calls
+        path, = tmp_path.rglob("*_ledger.json")
+        story = json.loads(path.read_text(encoding="utf-8"))["meta"]["my_story"]
+        assert story["counts"]["actual_acts"] is None
+    assert bindings == [MS.StoryTreatment]
+    assert len(bound_calls) == 3
+
+
+def test_raised_completion_is_durable_evidence_not_a_completed_proposal(tmp_path):
+    from nodes._otr_generation_budget import PromptContextOverflowError, CAPACITY_PHASE_OUTPUT_LIMIT
+    from nodes._otr_structured_call import StructuredCallFailedError
+    completion = json.dumps(_treatment(acts=9, cast=("Ada", "Tom", "Never accepted")))
+
+    class CapacityFailure(Slots):
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                raise PromptContextOverflowError(
+                    "The actual output allowance was exhausted.",
+                    phase=CAPACITY_PHASE_OUTPUT_LIMIT, raw_completion=completion,
+                )
+            return super()._answer(messages)
+
+    with pytest.raises(StructuredCallFailedError):
+        _run(CapacityFailure())
+    path, = tmp_path.rglob("*_ledger.json")
+    story = json.loads(path.read_text(encoding="utf-8"))["meta"]["my_story"]
+    failed = [a for a in story["attempts"] if a["pass_id"] == "treatment"]
+    assert len(failed) == 3
+    assert all(a["raw_output"] == "" and a["raw_completion"] == completion for a in failed)
+    assert story["counts"]["proposed_acts"] is None
+    assert story["counts"]["proposed_characters"] is None
+    assert story["counts"]["actual_acts"] is None

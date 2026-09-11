@@ -15,8 +15,8 @@ class ProviderCapacityMessages(list):
 
     Transports reserve their full remaining provider/context capacity. If the
     provider consumes that capacity before reaching its own stop condition, the
-    call fails as a capacity defect and the caller must not reinterpret the
-    partial artifact as bad prose or feed it into a retry ladder.
+    call fails as a capacity defect. Existing retries may run, but the partial
+    artifact must never be treated as a completed proposal or a prose defect.
     """
 
     _otr_prompt_must_fit = True
@@ -24,6 +24,7 @@ class ProviderCapacityMessages(list):
     _otr_reserve_remaining_output_capacity = True
     _otr_fail_on_output_limit = True
     _otr_strict_remote_output_budget = True
+    _otr_unbounded_json_field = True
 
 
 # A-4 (2026-07-30, writer repair): a capacity failure has a PHASE, and the

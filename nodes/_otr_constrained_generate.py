@@ -96,14 +96,15 @@ def get_cached_transformers_schema_constraint(
     cache_entry: dict[str, Any],
     schema_model: Type[BaseModel],
 ) -> tuple[Any, Any]:
-    """Return ``(JsonSchemaParser, prefix_fn)`` for one resident model.
+    """Return fresh request state while reusing resident tokenizer preprocessing.
 
     LMFE's expensive step is tokenizer-wide and schema-independent: it
     decodes/scans every token to build ``TokenEnforcerTokenizerData``. Gemma 4
     has a roughly 256K-token vocabulary, so rebuilding that data for every
     P0-P9 pass or retry is material. Cache it on the resident ``cache_entry``
-    and cache the cheap schema-specific prefix functions beside it. Unloading
-    the model drops the cache naturally with the tokenizer.
+    only. Parser/enforcer prefix history belongs to one generation; retaining it
+    would accumulate past requests on the resident model. Unloading the model
+    drops the tokenizer preprocessing naturally.
     """
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
@@ -114,7 +115,7 @@ def get_cached_transformers_schema_constraint(
     tokenizer = cache_entry["tokenizer"]
 
     _otr_lmfe_compat.ensure_lmfe_transformers_compat()
-    from lmformatenforcer import JsonSchemaParser
+    from lmformatenforcer import CharacterLevelParserConfig, JsonSchemaParser
     from lmformatenforcer.integrations.transformers import (
         build_token_enforcer_tokenizer_data,
         build_transformers_prefix_allowed_tokens_fn,
@@ -125,20 +126,24 @@ def get_cached_transformers_schema_constraint(
         cache = {
             "tokenizer": tokenizer,
             "tokenizer_data": build_token_enforcer_tokenizer_data(tokenizer),
-            "by_schema": {},
         }
         cache_entry["_otr_lmfe_constraint_cache"] = cache
 
-    by_schema = cache["by_schema"]
-    cached = by_schema.get(schema_model)
-    if cached is None:
-        parser = JsonSchemaParser(schema_model.model_json_schema())
-        prefix_fn = build_transformers_prefix_allowed_tokens_fn(
-            cache["tokenizer_data"], parser,
-        )
-        cached = (parser, prefix_fn)
-        by_schema[schema_model] = cached
-    return cached
+    # Release history left by an already-warm entry from the earlier cache shape.
+    cache.pop("by_schema", None)
+    parser = JsonSchemaParser(
+        schema_model.model_json_schema(),
+        config=CharacterLevelParserConfig(max_json_array_length=0),
+    )
+    prefix_fn = build_transformers_prefix_allowed_tokens_fn(
+        cache["tokenizer_data"], parser,
+    )
+    # The builder replaces config to install the tokenizer alphabet. Root lists
+    # capture their bound during construction; nested lists read this later.
+    # Disable only LMFE's implicit20-item default at BOTH boundaries; explicit
+    # schema maxItems remains authoritative. Preserve the installed alphabet.
+    parser.config.max_json_array_length = 0
+    return parser, prefix_fn
 
 
 # ---------------------------------------------------------------------------
@@ -234,11 +239,6 @@ def make_constrained_generate_fn(
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
 
-    # Build once per resident tokenizer + schema; see the cache helper above.
-    parser, prefix_fn = get_cached_transformers_schema_constraint(
-        cache_entry, schema_model,
-    )
-
     def constrained_generate_fn(
         messages: List[dict],
         *,
@@ -252,6 +252,9 @@ def make_constrained_generate_fn(
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
+        unbounded_json_field = bool(getattr(
+            messages, "_otr_unbounded_json_field", False,
+        ))
         messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         from ._otr_loader_backends import chat_template_kwargs
         prompt = tokenizer.apply_chat_template(
@@ -280,16 +283,20 @@ def make_constrained_generate_fn(
         # whatever the caller happened to pass" is not a liveness contract.
         from transformers import StoppingCriteriaList  # noqa: I001
         try:
-            from ._otr_decode_guard import make_degeneracy_criterion
+            from ._otr_decode_guard import (
+                make_degeneracy_criterion, MAX_OPEN_STRING_TOKENS,
+            )
         except ImportError:  # pragma: no cover - flat/standalone import path
             from _otr_decode_guard import (  # type: ignore
                 make_degeneracy_criterion,
+                MAX_OPEN_STRING_TOKENS,
             )
-        # Tokenizer supplied: this route is ALWAYS schema-bound (it exists to
-        # run lm-format-enforcer), so the open-string spiral signal applies and
-        # a quote here is structure, never dialogue.
+        # This route is schema-bound. Ordinary calls retain open-string tracking;
+        # provider-capacity prose opts out of that size limit, keeping cycles.
         _guard = make_degeneracy_criterion(
             inputs["input_ids"].shape[1], tokenizer=tokenizer,
+            max_open_string_tokens=(
+                None if unbounded_json_field else MAX_OPEN_STRING_TOKENS),
         )
 
         # temperature 0.0 means GREEDY. transformers raises on
@@ -302,6 +309,9 @@ def make_constrained_generate_fn(
         else:
             sampling = {"do_sample": False}
         with torch.no_grad():
+            parser, prefix_fn = get_cached_transformers_schema_constraint(
+                cache_entry, schema_model,
+            )
             out = model.generate(
                 **inputs,
                 **sampling,
@@ -337,27 +347,23 @@ def make_constrained_generate_fn(
             # path uses it and one that does not fails loudly instead of
             # quietly accepting half a JSON object.
             telemetry = _guard.telemetry()
-            log.error(
-                "[%s] DECODE HALTED (%s): repeated a %s-token run verbatim %s "
-                "times. Rerollable. Telemetry: %s",
-                heartbeat_label or "constrained-generate",
-                _guard.reason, telemetry.get("cycle_tokens"),
-                telemetry.get("required_repeats"), telemetry,
-            )
+            reason = ("an open JSON string exceeded its token allowance"
+                      if _guard.reason == "open_string"
+                      else "the output repeated a run of tokens verbatim")
+            log.error("[%s] DECODE HALTED (%s): %s. Rerollable. Telemetry: %s",
+                      heartbeat_label or "constrained-generate", _guard.reason,
+                      reason, telemetry)
             raise GenerationDegeneracyError(
-                "constrained generation was halted by the liveness guard: the "
-                "output repeated a run of tokens verbatim",
+                "constrained generation was halted by the liveness guard: " + reason,
                 halt_reason=_guard.reason,
+                open_string_tokens=telemetry.get("open_string_tokens"),
                 repetition=telemetry,
                 raw_completion=decoded,
                 prompt_tokens=prompt_len,
             )
         return decoded
 
-    # Expose the parser + prefix-fn on the closure for tests that want
-    # to assert the binding without invoking generate().
+    # Schema metadata is stable. Mutable parser/prefix state must stay call-local.
     constrained_generate_fn.schema_model = schema_model       # type: ignore[attr-defined]
-    constrained_generate_fn.json_schema_parser = parser       # type: ignore[attr-defined]
-    constrained_generate_fn.prefix_allowed_tokens_fn = prefix_fn  # type: ignore[attr-defined]
 
     return constrained_generate_fn

@@ -1,0 +1,48 @@
+{
+  "base": "e07476ebcd652a731d5e76d0dca207c6f998902c",
+  "snapshot": "C:/Users/jeffr/Documents/ComfyUI/_worktrees/otr-my-story-grammar-candidate",
+  "source": "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio",
+  "files": [
+    {
+      "file": "nodes/OTR_LedgerScriptWriter.py",
+      "sha256": "d970c4a07975d678bc07a8fc51ea1de064d619254515c6edf6e165f03ba3a2c3"
+    },
+    {
+      "file": "nodes/_otr_constrained_generate.py",
+      "sha256": "51a4f786e91379553ed4c2deb82d4a784b8810e1a34dbb6ccb54a2d8969d66f5"
+    },
+    {
+      "file": "nodes/_otr_decode_guard.py",
+      "sha256": "3a9c43557674fc4ee085f18ccc104ce566a115987f3b6ea2749dc6cf10617192"
+    },
+    {
+      "file": "nodes/_otr_generation_budget.py",
+      "sha256": "58081d96fac1466922498b7601fedff50f73249f4fc4190917e8b50e218916ac"
+    },
+    {
+      "file": "nodes/_otr_my_story.py",
+      "sha256": "7143cf57809dabc991c8cfeab5f8b2a929eff6d538cd2c6cdfeaa457109e9313"
+    },
+    {
+      "file": "nodes/_otr_structured_call.py",
+      "sha256": "4618364e47d028d0edf23102b988c2d6231d5c4a31638c1db4e2e25170df534c"
+    },
+    {
+      "file": "tests/test_constrained_generate.py",
+      "sha256": "efbba64c07837d4282c995c40756999d99ce8562a1e207ff739b021e8ccce3be"
+    },
+    {
+      "file": "tests/test_decode_degeneracy_guard.py",
+      "sha256": "b8cb519aef9a72fa212aa59f50affd3ea846724bdcc23cf557cf3e03d68db228"
+    },
+    {
+      "file": "tests/test_my_story_runner.py",
+      "sha256": "382345f6c2c34a84625b0e15d0f2714812d764b8fd175aec8b1a48944eb72fa1"
+    },
+    {
+      "file": "tests/test_structured_call.py",
+      "sha256": "7db9bc7f221253d63c99355a864e8b4902b03c5a1d6fd4d998f24022eae342e7"
+    }
+  ],
+  "post_review_note": "Two fixture-only corrections after full run; final focused and Bible rerun cover the resynchronized snapshot."
+}

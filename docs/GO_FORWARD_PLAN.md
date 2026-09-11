@@ -92,8 +92,8 @@ below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
 
 **Next action:** close A1R, the received 4060 My Story source-fidelity and
-structured-output defects, in focused shared-core chunks. Start with grammar/P1;
-then A2 native-HF capacity must precede adaptive source reading. The six-leg receipt is
+structured-output defects, in focused shared-core chunks. Next is A2 native-HF
+capacity, which must precede adaptive source reading. The six-leg receipt is
 `docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
 end-to-end source-qualified My Story output exists. Keep each tested code
 revision distinct; an earlier passing run is not proof of the final correction.
@@ -105,7 +105,7 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 
 | Sprint | Remaining work | Required evidence |
 |---|---|---|
-| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, and final spoken text; make P1 schema enforcement reliable. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and source-check receipts preserve the supplied facts. |
+| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, and final spoken text; qualify the repaired P1 binding. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and source-check receipts preserve the supplied facts. |
 | **A2. Native HF capacity** | Use actual loaded model capacity while preserving explicit context settings and truthful runtime failures. | Capacity/cache/adapter regression coverage and real canonical component proof. |
 | **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
 | **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
@@ -161,7 +161,7 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 2. Close A1R with its A2 capacity dependency. Do not spend further baseline media legs on the
    known-unprotected My Story implementation; use focused checks until the
    repair is ready for a fresh canonical recovery leg.
-3. After grammar/P1, qualify the shared native HF capacity correction before
+3. Qualify the shared native HF capacity correction before
    adaptive reading; then finish A1R. Implement the reviewed Original model credit and
    credits title containment sprints. The new App and full media qualification
    follow them.
@@ -180,14 +180,6 @@ second queue. This file remains the only work queue. Root
 owns production edits. Reviewers are read-only, with an independent reader at
 each design step and a CLI review of each finished code chunk before push.
 
-1. First isolate mutable grammar state per generation while retaining reusable
-   tokenizer preprocessing. This is a confirmed static defect, not an established
-   cause of the Mac kill: the failing My Story cleanup route did not bind a
-   grammar. Remove implicit array/string limits from provider-capacity authoring
-   while retaining explicit schema constraints and real repetition detection.
-   Then bind only P1's local creative callable through its existing
-   `_otr_bind_schema(StoryTreatment)` seam. Preserve P2/P3's original callable,
-   all three fail-closed attempts, and no generic JSON repair.
 2. Verify zero between-act music in the full canonical one-act recovery after
    the remaining source repairs. The boundary code receipt is in HANDOFF_LOG;
    do not reopen it as uncoded work or add a keyword rejection of planning prose.

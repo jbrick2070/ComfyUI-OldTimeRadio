@@ -77,6 +77,33 @@ class SampleSchema(BaseModel):
     score: int = Field(ge=0, le=100)
 
 
+def test_custom_message_contract_survives_string_repair_without_mutating_input():
+    class CustomMessages(list):
+        _otr_unbounded_json_field = True
+
+    original = CustomMessages([{"role": "user", "content": "Write the requested artifact."}])
+    original.request_tag = "preserved-instance-attribute"
+    calls = []
+
+    def slot(messages, **_kwargs):
+        assert type(messages) is CustomMessages
+        assert messages._otr_unbounded_json_field is True
+        assert messages.request_tag == original.request_tag
+        calls.append(messages)
+        return '{"title":"Valid","score":200}' if len(calls) == 1 else _valid_json()
+
+    result = sc.structured_call(
+        prompt=original, schema=SampleSchema, slot_fn=slot,
+        base_temperature=.6, structural_retry_temperature=.2,
+        repair_prompt_factory=lambda **_kwargs: "Repair the score.",
+        helper_name="custom_contract",
+    )
+    assert result.score == 42 and len(calls) == 2
+    assert calls[1][0]["role"] == "user"
+    assert "Repair the score." in calls[1][0]["content"]
+    assert original == [{"role": "user", "content": "Write the requested artifact."}]
+
+
 class ContractLeaf(BaseModel):
     label: str = Field(min_length=2, max_length=9, pattern=r"^[A-Z]+$")
     mode: Literal["warm", "dry"]
