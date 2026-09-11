@@ -14492,3 +14492,46 @@ prose-only frame leakage can still pass structure. No semantic PASS from tests,
 new gate/call/schema/alias/blindcaststrip. Actual finalSonnet QA grounded; next
 fullcanonical09 must inspect all fields/final speech. ExistingBible11.39 carries
 portable coverage and residuals. Receipt:2026-09-11-my-story-frame-ownership/.
+
+
+### PBUG-20260910-03 follow-up -- canonical09 preserves the supplied spoken story
+
+Full canonical9367f2fd, prompt64f1c56e-5ab6-48eb-9e15-e0cb94b728f7,
+Gemma4-12B pair, publishes The Bay Area Table in31:14. All raw dinner facts are
+present in the saved spoken rows, including separate absent girlfriend and
+present-day appreciation. P1 liveness interruption recovers on its existing
+structural retry; accepted cast/turns/ending exclude the house frame. P0/P2/P3
+source corrections apply, P1/final spoken correction remain unchanged. Cleanup
+25calls plus1final-source call; no budget reset. Existing spoken rows conserved.
+Actual voice references and inspected credits agree; no default Jeffrey author.
+Sixteen inspected dramatic stills keep the adult/mother meal but clothing,
+seating and room details vary under the selected stage style. This is one
+saved-dialogue fidelity pass, not full visual/audio/repeatability closure.
+No audition was possible. Full hashes/logs/pixels/OBS file:
+2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md.
+
+## PBUG-20260911-03 -- scopes video persists outside its owning episode
+
+- Status: OPEN, no production fix in this documentation handoff.
+- Live evidence: the same canonical09 server log records SceneAwareScopes
+  rendering 3580frames to output/otr/episodes/_shared/tmp/
+  otr_scopes_signal_lost_the_bay_area_table_20260911_074902_20260911_080240.mp4.
+  The retained file exists,1,593,341bytes. Its episode assets live under
+  episodes/signal_lost_the_bay_area_table_20260911_074902. Publication succeeds;
+  node93 bypasses blending, so the generated scopes are not used in09's image.
+- Root cause: nodes/otr_scene_aware_scopes.py chooses otr_shared_tmp_dir and
+  falls back to tempfile.gettempdir. It has no output-directory widget.
+  Canonical node94 already gets manifest episode identity from node92/link271
+  and sends the returned path to node93/link273. The June30 hygiene repair
+  avoided ambient temp but retained shared scratch; no explicit episode-asset
+  exemption was found. This is longstanding behavior, not a9367f2fd regression.
+- Proper pending scope: write directly through the existing validated
+  otr_composited_dir(manifest episode_id) authority; remove the scratch/system
+  fallback, preserve the consumer contract and all existing files. No post-hoc
+  move, episode rename change, new path owner or story gate.
+- Verification owed: real producer path under the active episode, invalid-ID/
+  path-failure behavior, no shared/system-temp fallback, and a full canonical
+  scopes/episode/OBS disk receipt. Update obsolete test_node_temp_hygiene.py
+  expectations with the production fix. No executable coverage or live fix is
+  claimed yet. Existing Bible01.02 class (12.66 cross-reference) is indexed with
+  this OPEN occurrence; portable contract/test expansion belongs to that chunk.

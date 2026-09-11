@@ -1,0 +1,74 @@
+"""Archive obsolete guidance before removing its competing entry points."""
+from pathlib import Path
+import hashlib
+import json
+import subprocess
+
+root = Path.cwd().resolve()
+receipt_dir = root / 'docs/2026-09-11-my-story-opus-handoff'
+archive = root / 'docs/GO_FORWARD_ARCHIVE.md'
+targets = {
+    '_START_HERE.md': 'Retired outside-repository video-build queue; forbids the current story sprint.',
+    'SKILL.md': 'Retired SPRINT.md-only workflow and superseded branch, test, model and runtime instructions.',
+    'docs/OWNERSHIP_HANDOFF_4060.md': 'September 5 active-owner handoff and registry/model snapshot are superseded by the current operator-held hardware and GO_FORWARD sequence. Its historical operator rulings are retained verbatim.',
+    'docs/skills-backup/otr-handoff-SKILL.md': 'Unreferenced backup of superseded handoff instructions; current installed otr-handoff skill owns this workflow.',
+    'docs/skills-backup/otr-handoff-SKILL-v2.md': 'Second unreferenced backup of superseded handoff instructions.',
+}
+receipt = receipt_dir / 'retired_guidance.json'
+assert not receipt.exists(), 'Already applied; do not repeat the archive append.'
+records = []
+pieces = [b'\n\n## 2026-09-11 -- retired guidance preserved verbatim\n\n'
+          b'These files were removed at the operator\'s request to delete stale docs.\n'
+          b'They are historical evidence, not execution instructions. GO_FORWARD\n'
+          b'owns the remaining work. Mac/4060 stay held; proven-profile ownership\n'
+          b'is unchanged. No archived operator quote is silently discarded.\n']
+for relative, reason in targets.items():
+    path = (root / relative).resolve()
+    assert path.is_relative_to(root) and path.is_file()
+    assert subprocess.run(['git', 'ls-files', '--error-unmatch', relative], cwd=root,
+                          capture_output=True).returncode == 0
+    raw = path.read_bytes()
+    content = raw.decode('utf-8')
+    assert not raw.startswith(b'\xef\xbb\xbf')
+    records.append({'path': relative, 'reason': reason, 'bytes': len(raw),
+                    'sha256': hashlib.sha256(raw).hexdigest(),
+                    'utf8_text_verbatim': content})
+    pieces.extend([f'\n### Retired file: {relative}\n\n{reason}\n\n'.encode(), raw, b'\n'])
+receipt.write_text(json.dumps({'scope': 'obsolete guidance only; preserve immutable evidence packets',
+    'retained': ['docs/2026-09-11-my-story-source-feedback/next_measurement.md',
+                 'dated review/qualification packets, baselines, production assets and operator history'],
+    'inbound_audit': 'No runtime/test consumers. Root entry points have historical ship-audit mentions and .comfyignore exclusions only. Retained next_measurement.md is hashed by its evidence manifest.',
+    'files': records}, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
+with archive.open('ab') as stream:
+    stream.write(b''.join(pieces))
+for record in records:
+    path = (root / record['path']).resolve()
+    assert path.is_relative_to(root) and path.is_file()
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == record['sha256']
+    path.unlink()
+
+attributes = root / '.gitattributes'
+raw = attributes.read_bytes()
+line = b'docs/2026-09-11-my-story-opus-handoff/** -text'
+assert line not in raw
+with attributes.open('ab') as stream:
+    stream.write(b'\n# Preserve exact handoff snapshots and evidence hashes across checkouts.\n' + line + b'\n')
+
+for relative in ['session_handoff.md', 'docs/2026-09-11-my-story-opus-handoff/README.md']:
+    path = root / relative
+    text = path.read_text(encoding='utf-8')
+    text += ('\nObsolete guidance cleanup: removed the retired root _START_HERE.md and\n'
+             'SKILL.md, the September 5 OWNERSHIP_HANDOFF_4060.md snapshot, and two\n'
+             'unreferenced docs/skills-backup handoff copies. Their full text and\n'
+             'deletion reasons are preserved in GO_FORWARD_ARCHIVE and the handoff\n'
+             'retired_guidance.json receipt. Immutable review packets, including the\n'
+             'completed next_measurement.md baseline, remain intact.\n')
+    path.write_text(text, encoding='utf-8', newline='\n')
+log = root / 'docs/HANDOFF_LOG.md'
+text = log.read_text(encoding='utf-8')
+heading_end = text.find('\n', text.find('## '))
+text = text[:heading_end + 1] + ('\nStale guidance cleanup: five obsolete entry points/backup instructions removed;\n'
+    'all original text and operator rulings preserved verbatim in GO_FORWARD_ARCHIVE\n'
+    'and the handoff retired_guidance.json receipt. Immutable proof packets retained.\n') + text[heading_end + 1:]
+log.write_text(text, encoding='utf-8', newline='\n')
+print(json.dumps({'deleted_guidance_files': list(targets), 'archived': True}, indent=2))

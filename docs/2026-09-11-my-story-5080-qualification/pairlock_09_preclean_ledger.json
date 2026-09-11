@@ -1,0 +1,2239 @@
+{
+  "schema_version": "l4-2026-08-07",
+  "episode_id": "pending_20260911_073304",
+  "commit": "9367f2fd",
+  "total_episode_dur_s": null,
+  "total_char_count": 2105,
+  "total_word_count": 405,
+  "total_dialogue_lines": 25,
+  "total_beats": 23,
+  "cast": [
+    {
+      "char_id": "c01",
+      "name": "ANNOUNCER",
+      "character_description": "Period radio announcer; reads the science story and frames the drama between beats.",
+      "gender": "male",
+      "tts_model": "kokoro",
+      "voice_preset": "bm_george",
+      "voice_params": null,
+      "line_count": 0,
+      "word_count": 0
+    },
+    {
+      "char_id": "c02",
+      "name": "Jeffrey",
+      "character_description": "An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.",
+      "gender": "male",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_5",
+      "voice_params": null,
+      "line_count": 8,
+      "word_count": 171
+    },
+    {
+      "char_id": "c03",
+      "name": "mother",
+      "character_description": "A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.",
+      "gender": "female",
+      "tts_model": "bark",
+      "voice_preset": "v2/en_speaker_7",
+      "voice_params": null,
+      "line_count": 8,
+      "word_count": 183
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "s01",
+      "description": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.  ",
+      "env": null,
+      "line_count": 16,
+      "word_count": 354
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "description": "preamble",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "description": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.  ",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "shot_id": "shot_002",
+      "scene_id": null,
+      "description": "postamble",
+      "visual_prompt": "",
+      "png_path": null,
+      "start_s": null,
+      "dur_s": null
+    }
+  ],
+  "beats": [
+    {
+      "beat_id": "shot_000_b1",
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_000_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_000_b2",
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_000_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_000_b3",
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_000_b3"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_000_b4",
+      "shot_id": "shot_000",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_000_b4"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b1",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b2",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b3",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b3"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b4",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b4"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b5",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b5"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b6",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b6"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b7",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b7"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b8",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b8"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b9",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b9"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b10",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b10"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b11",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b11"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b12",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b12"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b13",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b13"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b14",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b14"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b15",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "mother",
+      "char_id": "c03",
+      "line_ids": [
+        "shot_001_b15"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_001_b16",
+      "shot_id": "shot_001",
+      "scene_id": "s01",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "line_ids": [
+        "shot_001_b16"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_002_b1",
+      "shot_id": "shot_002",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_002_b1"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_002_b2",
+      "shot_id": "shot_002",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_002_b2"
+      ],
+      "start_s": null,
+      "dur_s": null
+    },
+    {
+      "beat_id": "shot_002_b3",
+      "shot_id": "shot_002",
+      "scene_id": null,
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "line_ids": [
+        "shot_002_b3"
+      ],
+      "start_s": null,
+      "dur_s": null
+    }
+  ],
+  "lines": [
+    {
+      "line_id": "shot_000_music",
+      "shot_id": "shot_000",
+      "beat_id": null,
+      "speaker": null,
+      "char_id": "music_open",
+      "text": "",
+      "traits": null,
+      "boundary": null,
+      "char_count": 0,
+      "word_count": 0,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "music_open",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    },
+    {
+      "line_id": "shot_000_b1",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_b1",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "Welcome to tonight's production.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 32,
+      "word_count": 4,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Welcome to tonight's production.",
+      "text_for_tts_source_sha256": "473140c0de1de884939b173adcc1684e18fa0ef4becbb4c9291b335ce0e925eb",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_000_b2",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_b2",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "Tonight's story comes from one of our listeners.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 48,
+      "word_count": 8,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Tonight's story comes from one of our listeners.",
+      "text_for_tts_source_sha256": "972911d140e2fe53ef617e22c9ef8710b30168d2b214524972a70b497b00d2cf",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_000_b3",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_b3",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "In a quiet home in Los Angeles, a simple meal becomes a bridge across time.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 75,
+      "word_count": 15,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "In a quiet home in Los Angeles, a simple meal becomes a bridge across time.",
+      "text_for_tts_source_sha256": "b46a83a7b42bbadc98bdc34937ba6c5c20b27b05594192f1388e8fd180da4312",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_000_b4",
+      "shot_id": "shot_000",
+      "beat_id": "shot_000_b4",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "Join us for 'The Bay Area Table'.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 33,
+      "word_count": 7,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Join us for 'The Bay Area Table'.",
+      "text_for_tts_source_sha256": "c39debc4538f8bafa4bc62ad72931d6230fd612805ebe659bb3410c94b4ff963",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b1",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b1",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "You have to put more of the roasted garlic in your potatoes, Jeffrey. You always were a bit of a picky eater.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 109,
+      "word_count": 22,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "You have to put more of the roasted garlic in your potatoes, Jeffrey. You always were a bit of a picky eater.",
+      "text_for_tts_source_sha256": "1e8e3c9a637fce436b36442ff165ea91911029b317563ac89dffbb7f257d684a",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b2",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b2",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "I'm not picky, Mom. I just appreciate the balance. And honestly, this is much better than the takeout we had last week.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 119,
+      "word_count": 22,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "I'm not picky, Mom. I just appreciate the balance. And honestly, this is much better than the takeout we had last week.",
+      "text_for_tts_source_sha256": "be0f9372ecb7c780a297a945d0115e12e53b8138d9c1b08b37a315b145649e84",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b3",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b3",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "It is nice to sit down properly. The house feels full when we're both here.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 75,
+      "word_count": 15,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It is nice to sit down properly. The house feels full when we're both here.",
+      "text_for_tts_source_sha256": "f86f5741c36a83ba95b94a17f36a661c3bedb486d5b6cdaee9231dbf081bfad8",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b4",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b4",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "It does. You know, I was sitting on the patio earlier and I caught a whiff of something—a certain kind of dampness in the air—and it took me straight back to the Bay Area.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 171,
+      "word_count": 36,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It does. You know, I was sitting on the patio earlier and I caught a whiff of something—a certain kind of dampness in the air—and it took me straight back to the Bay Area.",
+      "text_for_tts_source_sha256": "17afcab6dba485fe6328881bec7f4efcf17918a7b9164c82afe54e507e41eb93",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b5",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b5",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "The fog? Or the salt?",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 21,
+      "word_count": 5,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "The fog? Or the salt?",
+      "text_for_tts_source_sha256": "e13b277650901e9d0b56a6be0f87afbe5cded8f42f033badfd30ad5861aa4b84",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b6",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b6",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "It was definitely the fog. That heavy, grey mist that would roll over the hills so quickly it felt like the world was just shrinking around our backyard.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 153,
+      "word_count": 28,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It was definitely the fog. That heavy, grey mist that would roll over the hills so quickly it felt like the world was just shrinking around our backyard.",
+      "text_for_tts_source_sha256": "56058d1c5f7b73a682bc7aecd74d7c57ff79e68d617a5eabc1051ee443f67833",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b7",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b7",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "Oh, I remember those mornings! You used to complain that it ruined your hair, but I loved it. I remember standing by the window with my coffee, watching the grass turn that specific shade of deep emerald. It felt like we were living inside a painting.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 251,
+      "word_count": 46,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Oh, I remember those mornings! You used to complain that it ruined your hair, but I loved it. I remember standing by the window with my coffee, watching the grass turn that specific shade of deep emerald. It felt like we were living inside a painting.",
+      "text_for_tts_source_sha256": "889fc44b0f64a54075c7d995efbb09f459a3efdd83d0c9779a8c3a85204dcb99",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b8",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b8",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "I don't think I ever complained that much. I just remember how quiet everything got. It was like the world held its breath.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 123,
+      "word_count": 23,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "I don't think I ever complained that much. I just remember how quiet everything got. It was like the world held its breath.",
+      "text_for_tts_source_sha256": "3c8fe0f3faf742a3069c8b9e33f9ea721c43fb3fe88a50de9b27434b2c188208",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b9",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b9",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "It did. It was a very different kind of quiet than we have here now. But it was a good life we had there, too.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 110,
+      "word_count": 25,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It did. It was a very different kind of quiet than we have here now. But it was a good life we had there, too.",
+      "text_for_tts_source_sha256": "4348cec91cf8191c96c1163737103972c678ad330b8d50528e8424afa71c55e1",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b10",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b10",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "It was. And I’m glad we have these memories. Even when I'm here in LA, working and seeing my girlfriend, I still find myself thinking about those foggy mornings.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 161,
+      "word_count": 29,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It was. And I’m glad we have these memories. Even when I'm here in LA, working and seeing my girlfriend, I still find myself thinking about those foggy mornings.",
+      "text_for_tts_source_sha256": "d6b087c52ed9c6c171b1cdaceca69ae8f50c22dc8931756018eb510c7ffd72bb",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b11",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b11",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "She's a lucky girl to have you, and you're lucky to have her. But I'm glad she's not at the table tonight. It's nice to just have our time.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 139,
+      "word_count": 29,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "She's a lucky girl to have you, and you're lucky to have her. But I'm glad she's not at the table tonight. It's nice to just have our time.",
+      "text_for_tts_source_sha256": "58b91d35755e6d7a5b9b056c430883550df1338e8c0112760dec4ea3bca0d875",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b12",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b12",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "It is. It's funny, isn't it? We've traveled so far from those hills. From that house to this house.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 99,
+      "word_count": 19,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It is. It's funny, isn't it? We've traveled so far from those hills. From that house to this house.",
+      "text_for_tts_source_sha256": "8faf990f9e23ebb0ce8a7cc26ebb71986e441ef7df31388b083f26cde1a33423",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b13",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b13",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "We have. But the table is still the same, isn't it? It's still about the food, and the company, and the stories.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 112,
+      "word_count": 22,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "We have. But the table is still the same, isn't it? It's still about the food, and the company, and the stories.",
+      "text_for_tts_source_sha256": "8728d9b64a2aed59db1fdcfbc514ef0a690b99d3e27cb8103ed0f5431198aaa9",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b14",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b14",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "Exactly. I really appreciate this, Mom. Just sitting here with you.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 67,
+      "word_count": 11,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Exactly. I really appreciate this, Mom. Just sitting here with you.",
+      "text_for_tts_source_sha256": "042bf2399af12a2bf9b0caa441e14a37ffd147279595cfa65357f5b9f2dc4dff",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b15",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b15",
+      "speaker": "mother",
+      "char_id": "c03",
+      "text": "I appreciate it too, honey. Pass me that pitcher of water, would you? This is a very good dinner.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 97,
+      "word_count": 19,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "I appreciate it too, honey. Pass me that pitcher of water, would you? This is a very good dinner.",
+      "text_for_tts_source_sha256": "e17cf5524b0512b85bd1971ee98ba4a681e5006539f84cce260f69ab2f482ca1",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_001_b16",
+      "shot_id": "shot_001",
+      "beat_id": "shot_001_b16",
+      "speaker": "Jeffrey",
+      "char_id": "c02",
+      "text": "It really is.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 13,
+      "word_count": 3,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "character",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "It really is.",
+      "text_for_tts_source_sha256": "bd79152e67ddb19bc78782d58016cdd61934fe83e68c022753c6c673748327fc",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_002_b1",
+      "shot_id": "shot_002",
+      "beat_id": "shot_002_b1",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "A moment of reflection, a meal shared, and a memory preserved.",
+      "traits": null,
+      "boundary": "shot_start",
+      "char_count": 62,
+      "word_count": 11,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "A moment of reflection, a meal shared, and a memory preserved.",
+      "text_for_tts_source_sha256": "b42857e023a6bc1d603dc6e2e5338ca24820e3e8ea79d523a49074c378e1baa0",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_002_b2",
+      "shot_id": "shot_002",
+      "beat_id": "shot_002_b2",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "Thank you for joining us.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 25,
+      "word_count": 5,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Thank you for joining us.",
+      "text_for_tts_source_sha256": "52478e93cb8d86813bd4a803f9d33012e3efbad28d4d6046cc4e4c16e3b51b49",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_002_b3",
+      "shot_id": "shot_002",
+      "beat_id": "shot_002_b3",
+      "speaker": "ANNOUNCER",
+      "char_id": "announcer",
+      "text": "Goodnight.",
+      "traits": null,
+      "boundary": "beat_start",
+      "char_count": 10,
+      "word_count": 1,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "announcer",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null,
+      "text_for_tts": "Goodnight.",
+      "text_for_tts_source_sha256": "e69d2d137ec21f9f0c8ea02a87d2738bde009ddce995791f6a817ac5447e8a69",
+      "text_for_tts_receipt": {
+        "abbreviations_expanded": 0,
+        "symbols_expanded": 0,
+        "numbers_expanded": 0,
+        "unparseable_numbers": [],
+        "num2words_available": true,
+        "changed": false
+      }
+    },
+    {
+      "line_id": "shot_002_music",
+      "shot_id": "shot_002",
+      "beat_id": null,
+      "speaker": null,
+      "char_id": "music_close",
+      "text": "",
+      "traits": null,
+      "boundary": null,
+      "char_count": 0,
+      "word_count": 0,
+      "bark_wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "speaker_role": "music_close",
+      "arc_phase": null,
+      "compose_flags": [],
+      "beat_intent": null,
+      "target_words": null,
+      "dialogue_slot_id": null
+    }
+  ],
+  "music": [
+    {
+      "cue_id": "opening",
+      "description": "A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  ",
+      "generation_prompt": "A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  ",
+      "anchor_line_id": "shot_000_music",
+      "placement": "opening",
+      "target_duration_s": null,
+      "wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "cue_spec_sha256": "a95897a5bb8c09b0e475742dbd67f7a58f8e6a05a546eb7c7b6bc6397346965f"
+    },
+    {
+      "cue_id": "closing",
+      "description": "The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  ",
+      "generation_prompt": "The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  ",
+      "anchor_line_id": "shot_002_music",
+      "placement": "closing",
+      "target_duration_s": null,
+      "wav_path": null,
+      "start_s": null,
+      "dur_s": null,
+      "cue_spec_sha256": "17767c730a906153c1bef85097d6cc46def7abab2c8011d8fc24f4ed3dac46bb"
+    }
+  ],
+  "clips": [],
+  "audio": {},
+  "final_audio_path": null,
+  "final_video_path": null,
+  "meta": {
+    "cast_status": "locked",
+    "source_bank": "my_story",
+    "delivery_intent": {
+      "schema_version": "otr_delivery_intent_v1",
+      "source_bank": "my_story",
+      "publication_required": true,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "delivery_token": "8f7f09b139aa497aafcf7861bfc1809b"
+    },
+    "story_draft": {
+      "schema_version": "my_story_input_v1",
+      "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\state\\story_drafts\\b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9\\input.json",
+      "status": "verified"
+    },
+    "style_pool_class": "generic",
+    "source_ref": "",
+    "source_meta": {
+      "kind": "user_story",
+      "story_input": {
+        "schema_version": "my_story_input_v1",
+        "fields": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "normalized": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "request": {
+          "num_characters": 2,
+          "act_count": "1",
+          "include_act_breaks": true,
+          "source_bank_requested": "my_story",
+          "visual_style_requested": "roll (any style)"
+        },
+        "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9"
+      },
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "requested_num_characters": 2,
+      "story_author": ""
+    },
+    "source_rights": {
+      "license_label": "listener original idea"
+    },
+    "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+    "story_attribution": {
+      "author": "",
+      "sentence": "Tonight's story comes from one of our listeners.",
+      "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+      "source": "none supplied"
+    },
+    "story_scaffold": "auto",
+    "visual_style": "shakespeare_stage_realism",
+    "style_roll": {
+      "receipt_version": 1,
+      "surface": "visual_style",
+      "requested": "roll (any style)",
+      "selected": "shakespeare_stage_realism",
+      "seed": 2362783444,
+      "seed_source": "OS entropy",
+      "eligible_order": [
+        "anime",
+        "archival_documentary",
+        "cartoon",
+        "paper_origami",
+        "recur_frac",
+        "sci_fi_radio",
+        "shakespeare_stage_realism",
+        "storybook_engraving",
+        "video_art",
+        "visual_storybased"
+      ]
+    },
+    "character_word_count": 354,
+    "announcer_word_count": 51,
+    "total_word_count": 405,
+    "paths": {
+      "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\audio\\pending_20260911_073304_ledger.json",
+      "episode_root": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304",
+      "audio_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\audio",
+      "stills_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\stills",
+      "portraits_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\portraits",
+      "videos_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\videos",
+      "composited_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_073304\\composited",
+      "obs_final": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\pending_20260911_073304.mp4",
+      "obs_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs",
+      "layout": "per-episode-workspace"
+    },
+    "schema_version": "l4-2026-08-07",
+    "episode_seed": 3696618124,
+    "word_budget": {
+      "schema_version": 5,
+      "owner": "my_story",
+      "policy": "actual_count_only",
+      "stage": "my_story_assembled",
+      "target_status": "not_requested",
+      "actual_character_words": 354,
+      "actual_announcer_words": 51,
+      "actual_total_voiced_words": 405,
+      "actual_character_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca",
+      "actual_announcer_text_sha256": "c78c6cd715c081e8f7111d51e8cf52862f6c1464381ba5b0258f0e5c2a6e4676",
+      "actual_total_voiced_text_sha256": "054f2434a3cdba214f514782f54f35859222b299ea67253b5be4a9956c7dfdb2",
+      "actual_voiced_words": 354,
+      "actual_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca",
+      "actual_receipts": {
+        "my_story_assembled": {
+          "schema_version": 5,
+          "stage": "my_story_assembled",
+          "target_status": "not_requested",
+          "actual_character_words": 354,
+          "actual_announcer_words": 51,
+          "actual_total_voiced_words": 405,
+          "actual_character_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca",
+          "actual_announcer_text_sha256": "c78c6cd715c081e8f7111d51e8cf52862f6c1464381ba5b0258f0e5c2a6e4676",
+          "actual_total_voiced_text_sha256": "054f2434a3cdba214f514782f54f35859222b299ea67253b5be4a9956c7dfdb2",
+          "actual_voiced_words": 354,
+          "actual_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca"
+        }
+      }
+    },
+    "my_story": {
+      "schema_version": "my_story_v1",
+      "seed": 3696618124,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "attempts": [
+        {
+          "pass_id": "interpret",
+          "attempt": 1,
+          "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"la_dinner\",\n      \"text\": \"The story takes place at a dinner table in a comfortable Los Angeles home in the present day.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey and his mother discuss an affectionate memory from his childhood in the Bay Area.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_separation\",\n      \"text\": \"The characters must remain physically present at the same table throughout the entire scene without moving to other locations.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_tragedy\",\n      \"text\": \"There is no death, grief, abandonment, or emergency; the tone is warm and appreciative.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not present.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"An adult man who loves Los Angeles and remembers his Bay Area childhood.\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"mother\",\n      \"notes\": \"Jeffrey's living mother, physically present at the dinner.\",\n      \"stated_gender\": \"female\",\n      \"speaking\": true,\n      \"required\": true\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The user explicitly requested only two characters and specified that only these two speak.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room during a present-day evening dinner.\",\n  \"assumptions\": [\n    \"The 'girlfriend' is a character mentioned in dialogue but does not appear or have a presence in the script.\",\n    \"The 'announcer' is a functional role for the production and does not participate in the dramatic interaction between mother and son.\"\n  ],\n  \"conflicts\": []\n}",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 1,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"The Bay Area Table\",\n  \"logline\": \"Over a quiet dinner in Los Angeles, a son and his mother share memories of their childhood in the Bay Area, finding deep gratitude for the life they have built together today.,\",\n  \"dramatic_question\": \"Can a simple shared meal bridge the distance between the past and the present, strengthening the bond of a family todaying together?,\",\n  \"setting\": \"A comfortable Los Angeles home dining room\",\n  \"time_of_day\": \"evening\",\n  \"cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"role\": \"Adult son\",\n      \"character_description\": \"A thoughtful man who has built a successful life in Los Angeles but keeps his roots in the Bay Area close to his heart. He is reflective and deeply appreciative of his mother's presence.,\",\n      \"gender\": \"male\",\n      \"age_band\": \"30s\",\n      \"register\": \"Reflective, warm, conversational\",\n      \"timbre\": \"Smooth, grounded\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"role\": \"Jeffrey's Mother\",\n      \"character_description\": \"A nurturing and sharp-witted woman who enjoys the fruits of her children's success. She is present, alert, and full of maternal warmth.,\",\n      \"gender\": \"female\",\n      \"age_band\": \"60s\",\n      \"register\": \"Kind, slightly nostalgic, melodic\",\n      \"timbre\": \"Soft, resonant\"\n    }\n  ],\n  \"acts\": [\n    {\n      \"n\": 1,\n      \"purpose\": \"To establish the intimate connection between mother and son through a shared memory and a celebration of the present moment.,\",\n      \"scene_setting\": \"A dining table in a cozy Los Angeles home. The sounds of clinking silverware and the, occasional steam of food provide the atmosphere.,\",\n      \"turns\": [\n        \"Jeffrey and his mother are mid-meal, sharing a comfortable, easy silence before Jeffrey brings up a specific memory of the Bay Area.,\",\n        \"Jeffrey describes a sensory detail from their childhood home—perhaps a specific tree or a local landmark—evoking a nostalgic smile from his mother.,\",\n        \"The mother takes over the story, adding a detail he had forgotten, showing how they are still 'in sync' even years later.,\",\n        \"Jeffrey mentions his girlfriend briefly, noting how she would have loved that specific memory, acknowledging his current life in LA.,\",\n        \"The conversation circles back to the present, with both acknowledging how lucky they are to be sitting across from each other right now.,\",\n      \"ending_state\",\n      \"The meal continues in a state of peaceful, satisfied companionship.\"\n    ]\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  },\n  {\n    \"ending_state\": \"The meal continues in a state of peaceful, satisfied companionship.\"\n  ",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 2,
+          "raw_output": "{\n  \"title\": \"The Bay Area Table\",\n  \"logline\": \"In a cozy Los Angeles home, a son and his mother share a meal and a nostalgic journey back to their childhood in the Bay Area through the power of memory alone, celebrating the life they have built together today.\",\n  \"dramatic_question\": \"How does a shared memory of the past strengthen the bond of a present-day relationship without the need for tragedy or loss?\",\n  \"setting\": \"A comfortable Los Angeles home dining room\",\n  \"time_of_day\": \"evening\",\n  \"cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"role\": \"A reflective adult son\",\n      \"character_description\": \"An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.\",\n      \"gender\": \"male\",\n      \"age_band\": \"30s\",\n      \"register\": \"Thoughtful, warm, conversational\",\n      \"timbre\": \"Steady, resonant\"\n    },\n    {\n      \"name\": \"mother\",\n      \"role\": \"Jeffrey's loving mother\",\n      \"character_description\": \"A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.\",\n      \"gender\": \"female\",\n      \"age_band\": \"50s\",\n      \"register\": \"Gentle, wise, slightly humorous\",\n      \"timbre\": \"Soft, melodic\"\n    }\n  ],\n  \"acts\": [\n    {\n      \"n\": 1,\n      \"purpose\": \"To establish the warmth of the present moment and transition into a shared memory of the Bay Area childhood, concluding with a celebration of their current life together.\",\n      \"scene_setting\": \"A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.\",\n      \"turns\": [\n        \"Jeffrey and his mother share a lighthearted moment over their dinner, establishing their easy rapport and the comfort of their LA home. (Sound of clinking cutlery.)\",\n        \"Jeffrey initiates a conversation about the Bay Area, specifically recalling a sensory detail from their childhood home there. (e.g., the smell of the air or a specific local landmark.)\",\n        \"Mother takes the lead, offering her own vivid recollection of a specific event or feeling from that time, laughing at a small detail they both remember perfectly. (A shared moment of nostalgia.)\",\n        \"Jeffrey briefly mentions his girlfriend, acknowledging her as a part of his current life while keeping the focus on the intimate connection with his mother at the table. (A brief, grounded mention of his current life.)\",\n        \"The conversation circles back to the present, with both acknowledging how far they have come from the Bay Area to this table in Los Angeles. (A moment of mutual appreciation.)\",\n        \"They conclude the meal with a sense of profound contentment, choosing to savor the simple fact that they are both here, together, in the present.\"\n      ],\n      \"ending_state\": \"Jeffrey and his mother are still seated together, finishing their meal with a lingering sense of warmth and gratitude for their shared life.\"\n    }\n  ],\n  \"ending\": \"The scene closes with the sounds of satisfied dining and soft laughter, leaving the listener with the image of two people fully present in a moment of quiet, enduring love.\"\n}",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        },
+        {
+          "pass_id": "act_1",
+          "attempt": 1,
+          "raw_output": "{\n  \"n\": 1,\n  \"scene_setting\": \"A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation.\",\n  \"lines\": [\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"You have to put more of the roasted garlic in your potatoes, Jeffrey. You always were a bit of a picky eater.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"I'm not picky, Mom. I just appreciate the balance. And honestly, this is much better than the takeout we had last week.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"It is nice to sit down properly. The house feels full when we're both here.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It does. You know, I was sitting on the patio earlier and I caught a whiff of something—a certain kind of dampness in the air—and it took me straight back to the Bay Area.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"The fog? Or the salt?\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It was definitely the fog. That heavy, grey mist that would roll over the hills so quickly it felt like the world was just shrinking around our backyard.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"Oh, I remember those mornings! You used to complain that it ruined your hair, but I loved it. I remember standing by the window with my coffee, watching the grass turn that specific shade of deep emerald. It felt like we were living inside a painting.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"I don't think I ever complained that much. I just remember how quiet everything got. It was like the world held its breath.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"It did. It was a very different kind of quiet than we have here now. But it was a good life we had there, too.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It was. And I’m glad we have these memories. Even when I'm here in LA, working and seeing my girlfriend, I still find myself thinking about those foggy mornings.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"She's a lucky girl to have you, and you're lucky to have her. But I'm glad she's not at the table tonight. It's nice to just have our time.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It is. It's funny, isn't it? We've traveled so far from those hills. From that house to this house.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"We have. But the table is still the same, isn't it? It's still about the food, and the company, and the stories.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"Exactly. I really appreciate this, Mom. Just sitting here with you.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"I appreciate it too, honey. Pass me that pitcher of water, would you? This is a very good dinner.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It really is.\"\n    }\n  ]\n}",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        },
+        {
+          "pass_id": "frame",
+          "attempt": 1,
+          "raw_output": "{\n  \"announcer_intro\": [\n    \"Welcome to tonight's production.\",\n    \"Tonight's story comes from one of our listeners.\",\n    \"In a quiet home in Los Angeles, a simple meal becomes a bridge across time.\",\n    \"Join us for 'The Bay Area Table'.\"\n  ],\n  \"announcer_outro\": [\n    \"A moment of reflection, a meal shared, and a memory preserved.\",\n    \"Thank you for joining us.\"\n  ],\n  \"coda\": \"Goodnight.\",\n  \"music_open\": \"A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.\",\n  \"music_close\": \"The acoustic guitar returns, fading slowly into a soft, lingering piano chord.\",\n  \"music_inter\": []\n}",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        }
+      ],
+      "source_rewrites": [
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "interpret",
+          "operation_id": "source_rewrite_1",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "37602c753a8e8235d4adadd2f4cfd1dd4c39dcaa5d41929e4c037fab243ce6f9",
+          "output_sha256": "5df854f6092a8e6d16942dea836531b484409bcbbc7201b424f375847d823091",
+          "applied": true,
+          "configured_model_id": "google/gemma-4-12b-it",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "c58ac75b607fd3b76f91820caf349f78682115ddae6286a2b9ff0d08a4db2623",
+              "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"la_dinner\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\",\n      \"text\": \"The story takes place at a dinner table in a comfortable Los Angeles home in the present day.\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\",\n      \"text\": \"Jeffrey and his mother discuss an affectionate memory from his childhood in the Bay Area.\"\n    },\n    {\n      \"id\": \"no_separation\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\",\n      \"text\": \"The characters must remain physically present at the same table throughout the entire scene without moving to other locations.\"\n    },\n    {\n      \"id\": \"no_tragedy\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\",\n      \"text\": \"There is no death, grief, abandonment, or emergency; the tone is warm and appreciative.\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not present.\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"An adult man who loves Los Angeles and remembers his Bay Area childhood\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"mother\",\n      \"notes\": \"Jeffrey's living mother, physically present at the dinner\",\n      \"stated_gender\": \"female\",\n      \"speaking\": true,\n      \"required\": true\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The user explicitly requested only two characters and specified that only these two speak, excluding the announcer from the dramatic count.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room during a present-day evening dinner at a shared table. The atmosphere is warm and domestic with the sound of clinking cutlery and affectionate humor. The Bay Area childhood is a spoken memory, while the physical setting remains the Los Angeles table throughout.\"\n  ,\n  \"assumptions\": [\n    \"The 'girlfriend' is a character mentioned in dialogue but does not appear or have a presence in the script\",\n    \"The 'announcer' is a functional role for the production and does not participate in the dramatic interaction between mother and son\"\n  ],\n  \"conflicts\": []\n}",
+              "raw_completion": null,
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 128713,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 131072)",
+                "context_cap": 131072,
+                "effective_output_tokens": 128713,
+                "eos_token_ids": [
+                  1,
+                  106,
+                  50
+                ],
+                "fits": true,
+                "model_id": "google/gemma-4-12b-it",
+                "prompt_tokens": 2359,
+                "requested_output_tokens": 131072,
+                "supported": true
+              },
+              "status": "usable",
+              "validation_error": null
+            }
+          ],
+          "status": "rewritten",
+          "qualified": false,
+          "returned_artifact": {
+            "requirements": [
+              {
+                "id": "la_dinner",
+                "text": "The story takes place at a dinner table in a comfortable Los Angeles home in the present day.",
+                "kind": "setting",
+                "source_field": "setting",
+                "strength": "required"
+              },
+              {
+                "id": "bay_area_memory",
+                "text": "Jeffrey and his mother discuss an affectionate memory from his childhood in the Bay Area.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "no_separation",
+                "text": "The characters must remain physically present at the same table throughout the entire scene without moving to other locations.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "no_tragedy",
+                "text": "There is no death, grief, abandonment, or emergency; the tone is warm and appreciative.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "girlfriend_mention",
+                "text": "Jeffrey briefly mentions his girlfriend as a separate person who is not present.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              }
+            ],
+            "named_cast": [
+              {
+                "name": "Jeffrey",
+                "notes": "An adult man who loves Los Angeles and remembers his Bay Area childhood",
+                "stated_gender": "male",
+                "speaking": true,
+                "required": true
+              },
+              {
+                "name": "mother",
+                "notes": "Jeffrey's living mother, physically present at the dinner",
+                "stated_gender": "female",
+                "speaking": true,
+                "required": true
+              }
+            ],
+            "cast_plan": {
+              "requested": 2,
+              "planned": 2,
+              "exclusive": true,
+              "reason": "The user explicitly requested only two characters and specified that only these two speak, excluding the announcer from the dramatic count."
+            },
+            "setting_brief": "A comfortable Los Angeles home dining room during a present-day evening dinner at a shared table. The atmosphere is warm and domestic with the sound of clinking cutlery and affectionate humor. The Bay Area childhood is a spoken memory, while the physical setting remains the Los Angeles table throughout.",
+            "assumptions": [
+              "The 'girlfriend' is a character mentioned in dialogue but does not appear or have a presence in the script",
+              "The 'announcer' is a functional role for the production and does not participate in the dramatic interaction between mother and son"
+            ],
+            "conflicts": []
+          }
+        },
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "treatment",
+          "operation_id": "source_rewrite_2",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "872ec7fcb1b462128d9789f98b69aa89dc26af233eb783b8c926a375eb2c40b2",
+          "output_sha256": "872ec7fcb1b462128d9789f98b69aa89dc26af233eb783b8c926a375eb2c40b2",
+          "applied": false,
+          "configured_model_id": "google/gemma-4-12b-it",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "20bac01d9e681005ab5e5ed348780c83e1fb240eb2508bdf36a6402486f3f669",
+              "raw_output": "{\n  \"title\": \"The Bay Area Table\",\n  \"logline\": \"In a cozy Los Angeles home, a son and his mother share a meal and a nostalgic journey back to their childhood in the Bay Area through the power of memory alone, celebrating the life they have built together today.\",\n  \"dramatic_question\": \"How does a shared memory of the past strengthen the bond of a present-day relationship without the need for tragedy or loss?\",\n  \"setting\": \"A comfortable Los Angeles home dining room\",\n  \"time_of_day\": \"evening\",\n  \"cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"role\": \"A reflective adult son\",\n      \"character_description\": \"An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.\",\n      \"gender\": \"male\",\n      \"age_band\": \"30s\",\n      \"register\": \"Thoughtful, warm, conversational\",\n      \"timbre\": \"Steady, resonant\"\n    },\n    {\n      \"name\": \"mother\",\n      \"role\": \"Jeffrey's loving mother\",\n      \"character_description\": \"A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.\",\n      \"gender\": \"female\",\n      \"age_band\": \"50s\",\n      \"register\": \"Gentle, wise, slightly humorous\",\n      \"timbre\": \"Soft, melodic\"\n    }\n  ],\n  \"acts\": [\n    {\n      \"n\": 1,\n      \"purpose\": \"To establish the warmth of the present moment and transition into a shared memory of the Bay Area childhood, concluding with a celebration of their current life together.\",\n      \"scene_setting\": \"A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.\",\n      \"turns\": [\n        \"Jeffrey and his mother share a lighthearted moment over their dinner, establishing their easy rapport and the comfort of their LA home. (Sound of clinking cutlery.)\",\n        \"Jeffrey initiates a conversation about the Bay Area, specifically recalling a sensory detail from their childhood home there. (e.g., the smell of the air or a specific local landmark.)\",\n        \"Mother takes the lead, offering her own vivid recollection of a specific event or feeling from that time, laughing at a small detail they both remember perfectly. (A shared moment of nostalgia.)\",\n        \"Jeffrey briefly mentions his girlfriend, acknowledging her as a part of his current life while keeping the focus on the intimate connection with his mother at the table. (A brief, grounded mention of his current life.)\",\n        \"The conversation circles back to the present, with both acknowledging how far they have come from the Bay Area to this table in Los Angeles. (A moment of mutual appreciation.)\",\n        \"They conclude the meal with a sense of profound contentment, choosing to savor the simple fact that they are both here, together, in the present.\"\n      ],\n      \"ending_state\": \"Jeffrey and his mother are still seated together, finishing their meal with a lingering sense of warmth and gratitude for their shared life.\"\n    }\n  ],\n  \"ending\": \"The scene closes with the sounds of satisfied dining and soft laughter, leaving the listener with the image of two people fully present in a moment of quiet, enduring love.\"\n}",
+              "raw_completion": null,
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 127845,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 131072)",
+                "context_cap": 131072,
+                "effective_output_tokens": 127845,
+                "eos_token_ids": [
+                  1,
+                  106,
+                  50
+                ],
+                "fits": true,
+                "model_id": "google/gemma-4-12b-it",
+                "prompt_tokens": 3227,
+                "requested_output_tokens": 131072,
+                "supported": true
+              },
+              "status": "usable",
+              "validation_error": null
+            }
+          ],
+          "status": "unchanged",
+          "qualified": false,
+          "returned_artifact": {
+            "title": "The Bay Area Table",
+            "logline": "In a cozy Los Angeles home, a son and his mother share a meal and a nostalgic journey back to their childhood in the Bay Area through the power of memory alone, celebrating the life they have built together today.",
+            "dramatic_question": "How does a shared memory of the past strengthen the bond of a present-day relationship without the need for tragedy or loss?",
+            "setting": "A comfortable Los Angeles home dining room",
+            "time_of_day": "evening",
+            "cast": [
+              {
+                "name": "Jeffrey",
+                "role": "A reflective adult son",
+                "character_description": "An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.",
+                "gender": "male",
+                "age_band": "30s",
+                "speech_register": "Thoughtful, warm, conversational",
+                "timbre": "Steady, resonant"
+              },
+              {
+                "name": "mother",
+                "role": "Jeffrey's loving mother",
+                "character_description": "A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.",
+                "gender": "female",
+                "age_band": "50s",
+                "speech_register": "Gentle, wise, slightly humorous",
+                "timbre": "Soft, melodic"
+              }
+            ],
+            "acts": [
+              {
+                "n": 1,
+                "purpose": "To establish the warmth of the present moment and transition into a shared memory of the Bay Area childhood, concluding with a celebration of their current life together.",
+                "scene_setting": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.",
+                "turns": [
+                  "Jeffrey and his mother share a lighthearted moment over their dinner, establishing their easy rapport and the comfort of their LA home. (Sound of clinking cutlery.)",
+                  "Jeffrey initiates a conversation about the Bay Area, specifically recalling a sensory detail from their childhood home there. (e.g., the smell of the air or a specific local landmark.)",
+                  "Mother takes the lead, offering her own vivid recollection of a specific event or feeling from that time, laughing at a small detail they both remember perfectly. (A shared moment of nostalgia.)",
+                  "Jeffrey briefly mentions his girlfriend, acknowledging her as a part of his current life while keeping the focus on the intimate connection with his mother at the table. (A brief, grounded mention of his current life.)",
+                  "The conversation circles back to the present, with both acknowledging how far they have come from the Bay Area to this table in Los Angeles. (A moment of mutual appreciation.)",
+                  "They conclude the meal with a sense of profound contentment, choosing to savor the simple fact that they are both here, together, in the present."
+                ],
+                "ending_state": "Jeffrey and his mother are still seated together, finishing their meal with a lingering sense of warmth and gratitude for their shared life."
+              }
+            ],
+            "ending": "The scene closes with the sounds of satisfied dining and soft laughter, leaving the listener with the image of two people fully present in a moment of quiet, enduring love."
+          }
+        },
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "act_1",
+          "operation_id": "source_rewrite_3",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "f8f48521a3048ea44a938542c5a37b5cc9618a52e77db3243961b100cc032be7",
+          "output_sha256": "71268880c93711a84350ddef7a06684768687d6c1956d91c12bb53b7383c8a29",
+          "applied": true,
+          "configured_model_id": "google/gemma-4-12b-it",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "9447d656591b0d28613a5e40e104620a23b1f1014403dfaf9184b8cafb0d20e9",
+              "raw_output": "{\n  \"n\": 1,\n  \"scene_setting\": \"A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.  \",\n  \"lines\": [\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"You have to put more of the roasted garlic in your potatoes, Jeffrey. You always were a bit of a picky eater.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"I'm not picky, Mom. I just appreciate the balance. And honestly, this is much better than the takeout we had last week.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"It is nice to sit down properly. The house feels full when we're both here.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It does. You know, I was sitting on the patio earlier and I caught a whiff of something—a certain kind of dampness in the air—and it took me straight back to the Bay Area.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"The fog? Or the salt?\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It was definitely the fog. That heavy, grey mist that would roll over the hills so quickly it felt like the world was just shrinking around our backyard.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"Oh, I remember those mornings! You used to complain that it ruined your hair, but I loved it. I remember standing by the window with my coffee, watching the grass turn that specific shade of deep emerald. It felt like we were living inside a painting.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"I don't think I ever complained that much. I just remember how quiet everything got. It was like the world held its breath.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"It did. It was a very different kind of quiet than we have here now. But it was a good life we had there, too.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It was. And I’m glad we have these memories. Even when I'm here in LA, working and seeing my girlfriend, I still find myself thinking about those foggy mornings.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"She's a lucky girl to have you, and you're lucky to have her. But I'm glad she's not at the table tonight. It's nice to just have our time.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It is. It's funny, isn't it? We've traveled so far from those hills. From that house to this house.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"We have. But the table is still the same, isn't it? It's still about the food, and the company, and the stories.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"Exactly. I really appreciate this, Mom. Just sitting here with you.\"\n    },\n    {\n      \"speaker\": \"mother\",\n      \"text\": \"I appreciate it too, honey. Pass me that pitcher of water, would you? This is a very good dinner.\"\n    },\n    {\n      \"speaker\": \"Jeffrey\",\n      \"text\": \"It really is.\"\n    }\n  ]\n}",
+              "raw_completion": null,
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 128234,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 131072)",
+                "context_cap": 131072,
+                "effective_output_tokens": 128234,
+                "eos_token_ids": [
+                  1,
+                  106,
+                  50
+                ],
+                "fits": true,
+                "model_id": "google/gemma-4-12b-it",
+                "prompt_tokens": 2838,
+                "requested_output_tokens": 131072,
+                "supported": true
+              },
+              "status": "usable",
+              "validation_error": null
+            }
+          ],
+          "status": "rewritten",
+          "qualified": false,
+          "returned_artifact": {
+            "n": 1,
+            "scene_setting": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.  ",
+            "lines": [
+              {
+                "speaker": "mother",
+                "text": "You have to put more of the roasted garlic in your potatoes, Jeffrey. You always were a bit of a picky eater."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "I'm not picky, Mom. I just appreciate the balance. And honestly, this is much better than the takeout we had last week."
+              },
+              {
+                "speaker": "mother",
+                "text": "It is nice to sit down properly. The house feels full when we're both here."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "It does. You know, I was sitting on the patio earlier and I caught a whiff of something—a certain kind of dampness in the air—and it took me straight back to the Bay Area."
+              },
+              {
+                "speaker": "mother",
+                "text": "The fog? Or the salt?"
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "It was definitely the fog. That heavy, grey mist that would roll over the hills so quickly it felt like the world was just shrinking around our backyard."
+              },
+              {
+                "speaker": "mother",
+                "text": "Oh, I remember those mornings! You used to complain that it ruined your hair, but I loved it. I remember standing by the window with my coffee, watching the grass turn that specific shade of deep emerald. It felt like we were living inside a painting."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "I don't think I ever complained that much. I just remember how quiet everything got. It was like the world held its breath."
+              },
+              {
+                "speaker": "mother",
+                "text": "It did. It was a very different kind of quiet than we have here now. But it was a good life we had there, too."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "It was. And I’m glad we have these memories. Even when I'm here in LA, working and seeing my girlfriend, I still find myself thinking about those foggy mornings."
+              },
+              {
+                "speaker": "mother",
+                "text": "She's a lucky girl to have you, and you're lucky to have her. But I'm glad she's not at the table tonight. It's nice to just have our time."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "It is. It's funny, isn't it? We've traveled so far from those hills. From that house to this house."
+              },
+              {
+                "speaker": "mother",
+                "text": "We have. But the table is still the same, isn't it? It's still about the food, and the company, and the stories."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "Exactly. I really appreciate this, Mom. Just sitting here with you."
+              },
+              {
+                "speaker": "mother",
+                "text": "I appreciate it too, honey. Pass me that pitcher of water, would you? This is a very good dinner."
+              },
+              {
+                "speaker": "Jeffrey",
+                "text": "It really is."
+              }
+            ]
+          }
+        },
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "frame",
+          "operation_id": "source_rewrite_4",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "eb4b39c072011ba6cbd2ebe07a1898001d09fedd094f42251ca2d47ba57c4ff2",
+          "output_sha256": "d053c37a6ebc4ccc0c2e16ff1dc307ce184efbf4ca5494f2e7c6624d6600afe4",
+          "applied": true,
+          "configured_model_id": "google/gemma-4-12b-it",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "0199848a6d535776fd09dd49cb364668a6be9253c29224cdcede2a3c7060814a",
+              "raw_output": "{\n  \"announcer_intro\": [\n    \"Welcome to tonight's production.  \",\n    \"Tonight's story comes from one of our listeners.  \",\n    \"In a quiet home in Los Angeles, a simple meal becomes a bridge across time.  \",\n    \"Join us for 'The Bay Area Table'.\"\n  ],\n  \"announcer_outro\": [\n    \"A moment of reflection, a meal shared, and a memory preserved.  \",\n    \"Thank you for joining us.\"\n  ],\n  \"coda\": \"Goodnight.  \",\n  \"music_open\": \"A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  \",\n  \"music_close\": \"The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  \",\n  \"music_inter\": []\n}",
+              "raw_completion": null,
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 129787,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 131072)",
+                "context_cap": 131072,
+                "effective_output_tokens": 129787,
+                "eos_token_ids": [
+                  1,
+                  106,
+                  50
+                ],
+                "fits": true,
+                "model_id": "google/gemma-4-12b-it",
+                "prompt_tokens": 1285,
+                "requested_output_tokens": 131072,
+                "supported": true
+              },
+              "status": "usable",
+              "validation_error": null
+            }
+          ],
+          "status": "rewritten",
+          "qualified": false,
+          "returned_artifact": {
+            "announcer_intro": [
+              "Welcome to tonight's production.  ",
+              "Tonight's story comes from one of our listeners.  ",
+              "In a quiet home in Los Angeles, a simple meal becomes a bridge across time.  ",
+              "Join us for 'The Bay Area Table'."
+            ],
+            "announcer_outro": [
+              "A moment of reflection, a meal shared, and a memory preserved.  ",
+              "Thank you for joining us."
+            ],
+            "coda": "Goodnight.  ",
+            "music_open": "A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  ",
+            "music_close": "The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  ",
+            "music_inter": []
+          }
+        }
+      ],
+      "counts": {
+        "requested_acts": 1,
+        "proposed_acts": 1,
+        "accepted_acts": 1,
+        "actual_acts": 1,
+        "requested_characters": 2,
+        "planned_characters": 2,
+        "proposed_characters": 2,
+        "accepted_characters": 2,
+        "actual_characters": 2
+      },
+      "notes": [
+        "The person's own typed fields are the sole source.",
+        "Selected acts bind treatment acceptance; character count is flexible guidance."
+      ],
+      "interpretation": {
+        "requirements": [
+          {
+            "id": "la_dinner",
+            "text": "The story takes place at a dinner table in a comfortable Los Angeles home in the present day.",
+            "kind": "setting",
+            "source_field": "setting",
+            "strength": "required"
+          },
+          {
+            "id": "bay_area_memory",
+            "text": "Jeffrey and his mother discuss an affectionate memory from his childhood in the Bay Area.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "no_separation",
+            "text": "The characters must remain physically present at the same table throughout the entire scene without moving to other locations.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "no_tragedy",
+            "text": "There is no death, grief, abandonment, or emergency; the tone is warm and appreciative.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "girlfriend_mention",
+            "text": "Jeffrey briefly mentions his girlfriend as a separate person who is not present.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          }
+        ],
+        "named_cast": [
+          {
+            "name": "Jeffrey",
+            "notes": "An adult man who loves Los Angeles and remembers his Bay Area childhood",
+            "stated_gender": "male",
+            "speaking": true,
+            "required": true
+          },
+          {
+            "name": "mother",
+            "notes": "Jeffrey's living mother, physically present at the dinner",
+            "stated_gender": "female",
+            "speaking": true,
+            "required": true
+          }
+        ],
+        "cast_plan": {
+          "requested": 2,
+          "planned": 2,
+          "exclusive": true,
+          "reason": "The user explicitly requested only two characters and specified that only these two speak, excluding the announcer from the dramatic count."
+        },
+        "setting_brief": "A comfortable Los Angeles home dining room during a present-day evening dinner at a shared table. The atmosphere is warm and domestic with the sound of clinking cutlery and affectionate humor. The Bay Area childhood is a spoken memory, while the physical setting remains the Los Angeles table throughout.",
+        "assumptions": [
+          "The 'girlfriend' is a character mentioned in dialogue but does not appear or have a presence in the script",
+          "The 'announcer' is a functional role for the production and does not participate in the dramatic interaction between mother and son"
+        ],
+        "conflicts": []
+      },
+      "cast_plan": {
+        "requested": 2,
+        "planned": 2,
+        "exclusive": true,
+        "reason": "The user explicitly requested only two characters and specified that only these two speak, excluding the announcer from the dramatic count."
+      },
+      "treatment_proposal": {
+        "title": "The Bay Area Table",
+        "logline": "In a cozy Los Angeles home, a son and his mother share a meal and a nostalgic journey back to their childhood in the Bay Area through the power of memory alone, celebrating the life they have built together today.",
+        "dramatic_question": "How does a shared memory of the past strengthen the bond of a present-day relationship without the need for tragedy or loss?",
+        "setting": "A comfortable Los Angeles home dining room",
+        "time_of_day": "evening",
+        "cast": [
+          {
+            "name": "Jeffrey",
+            "role": "A reflective adult son",
+            "character_description": "An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.",
+            "gender": "male",
+            "age_band": "30s",
+            "speech_register": "Thoughtful, warm, conversational",
+            "timbre": "Steady, resonant"
+          },
+          {
+            "name": "mother",
+            "role": "Jeffrey's loving mother",
+            "character_description": "A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.",
+            "gender": "female",
+            "age_band": "50s",
+            "speech_register": "Gentle, wise, slightly humorous",
+            "timbre": "Soft, melodic"
+          }
+        ],
+        "acts": [
+          {
+            "n": 1,
+            "purpose": "To establish the warmth of the present moment and transition into a shared memory of the Bay Area childhood, concluding with a celebration of their current life together.",
+            "scene_setting": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.",
+            "turns": [
+              "Jeffrey and his mother share a lighthearted moment over their dinner, establishing their easy rapport and the comfort of their LA home. (Sound of clinking cutlery.)",
+              "Jeffrey initiates a conversation about the Bay Area, specifically recalling a sensory detail from their childhood home there. (e.g., the smell of the air or a specific local landmark.)",
+              "Mother takes the lead, offering her own vivid recollection of a specific event or feeling from that time, laughing at a small detail they both remember perfectly. (A shared moment of nostalgia.)",
+              "Jeffrey briefly mentions his girlfriend, acknowledging her as a part of his current life while keeping the focus on the intimate connection with his mother at the table. (A brief, grounded mention of his current life.)",
+              "The conversation circles back to the present, with both acknowledging how far they have come from the Bay Area to this table in Los Angeles. (A moment of mutual appreciation.)",
+              "They conclude the meal with a sense of profound contentment, choosing to savor the simple fact that they are both here, together, in the present."
+            ],
+            "ending_state": "Jeffrey and his mother are still seated together, finishing their meal with a lingering sense of warmth and gratitude for their shared life."
+          }
+        ],
+        "ending": "The scene closes with the sounds of satisfied dining and soft laughter, leaving the listener with the image of two people fully present in a moment of quiet, enduring love."
+      },
+      "act_number_normalization": {
+        "treatment": [
+          {
+            "original": 1,
+            "slot": 1
+          }
+        ],
+        "replies": [
+          {
+            "original": 1,
+            "slot": 1
+          }
+        ]
+      },
+      "fidelity_discrepancies": [],
+      "treatment": {
+        "title": "The Bay Area Table",
+        "logline": "In a cozy Los Angeles home, a son and his mother share a meal and a nostalgic journey back to their childhood in the Bay Area through the power of memory alone, celebrating the life they have built together today.",
+        "dramatic_question": "How does a shared memory of the past strengthen the bond of a present-day relationship without the need for tragedy or loss?",
+        "setting": "A comfortable Los Angeles home dining room",
+        "time_of_day": "evening",
+        "cast": [
+          {
+            "name": "Jeffrey",
+            "role": "A reflective adult son",
+            "character_description": "An appreciative man who finds beauty in the transition from his youth to his current life in Los Angeles. He is deeply connected to his mother's stories.",
+            "gender": "male",
+            "age_band": "30s",
+            "speech_register": "Thoughtful, warm, conversational",
+            "timbre": "Steady, resonant"
+          },
+          {
+            "name": "mother",
+            "role": "Jeffrey's loving mother",
+            "character_description": "A woman who carries her history with pride and finds joy in her son's success and presence. She is attentive and nostalgic.",
+            "gender": "female",
+            "age_band": "50s",
+            "speech_register": "Gentle, wise, slightly humorous",
+            "timbre": "Soft, melodic"
+          }
+        ],
+        "acts": [
+          {
+            "n": 1,
+            "purpose": "To establish the warmth of the present moment and transition into a shared memory of the Bay Area childhood, concluding with a celebration of their current life together.",
+            "scene_setting": "A dining table in Los Angeles. The sound of clinking silverware and the hum of a domestic evening provide the backdrop for their conversation. They never leave the table or change locations throughout the scene.",
+            "turns": [
+              "Jeffrey and his mother share a lighthearted moment over their dinner, establishing their easy rapport and the comfort of their LA home. (Sound of clinking cutlery.)",
+              "Jeffrey initiates a conversation about the Bay Area, specifically recalling a sensory detail from their childhood home there. (e.g., the smell of the air or a specific local landmark.)",
+              "Mother takes the lead, offering her own vivid recollection of a specific event or feeling from that time, laughing at a small detail they both remember perfectly. (A shared moment of nostalgia.)",
+              "Jeffrey briefly mentions his girlfriend, acknowledging her as a part of his current life while keeping the focus on the intimate connection with his mother at the table. (A brief, grounded mention of his current life.)",
+              "The conversation circles back to the present, with both acknowledging how far they have come from the Bay Area to this table in Los Angeles. (A moment of mutual appreciation.)",
+              "They conclude the meal with a sense of profound contentment, choosing to savor the simple fact that they are both here, together, in the present."
+            ],
+            "ending_state": "Jeffrey and his mother are still seated together, finishing their meal with a lingering sense of warmth and gratitude for their shared life."
+          }
+        ],
+        "ending": "The scene closes with the sounds of satisfied dining and soft laughter, leaving the listener with the image of two people fully present in a moment of quiet, enduring love."
+      },
+      "acts_accepted": 1,
+      "frame_proposal": {
+        "announcer_intro": [
+          "Welcome to tonight's production.  ",
+          "Tonight's story comes from one of our listeners.  ",
+          "In a quiet home in Los Angeles, a simple meal becomes a bridge across time.  ",
+          "Join us for 'The Bay Area Table'."
+        ],
+        "announcer_outro": [
+          "A moment of reflection, a meal shared, and a memory preserved.  ",
+          "Thank you for joining us."
+        ],
+        "coda": "Goodnight.  ",
+        "music_open": "A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  ",
+        "music_close": "The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  ",
+        "music_inter": []
+      },
+      "frame": {
+        "announcer_intro": [
+          "Welcome to tonight's production.  ",
+          "Tonight's story comes from one of our listeners.  ",
+          "In a quiet home in Los Angeles, a simple meal becomes a bridge across time.  ",
+          "Join us for 'The Bay Area Table'."
+        ],
+        "announcer_outro": [
+          "A moment of reflection, a meal shared, and a memory preserved.  ",
+          "Thank you for joining us."
+        ],
+        "coda": "Goodnight.  ",
+        "music_open": "A warm, acoustic guitar melody, intimate and steady, establishing a domestic atmosphere.  ",
+        "music_close": "The acoustic guitar returns, fading slowly into a soft, lingering piano chord.  ",
+        "music_inter": []
+      },
+      "attribution": {
+        "author": "",
+        "sentence": "Tonight's story comes from one of our listeners.",
+        "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+        "source": "none supplied"
+      },
+      "music_cue_disposition": [],
+      "pass_receipts": [
+        {
+          "pass_id": "interpret",
+          "model_id": "google/gemma-4-12b-it",
+          "temp": 0.3,
+          "max_new_tokens": null,
+          "budget_mode": "provider_capacity",
+          "status": "completed"
+        },
+        {
+          "pass_id": "treatment",
+          "model_id": "google/gemma-4-12b-it",
+          "temp": 0.85,
+          "max_new_tokens": null,
+          "budget_mode": "provider_capacity",
+          "status": "completed"
+        },
+        {
+          "pass_id": "act_1",
+          "model_id": "google/gemma-4-12b-it",
+          "temp": 0.85,
+          "max_new_tokens": null,
+          "budget_mode": "provider_capacity",
+          "status": "completed"
+        },
+        {
+          "pass_id": "frame",
+          "model_id": "google/gemma-4-12b-it",
+          "temp": 0.6,
+          "max_new_tokens": null,
+          "budget_mode": "provider_capacity",
+          "status": "completed"
+        },
+        {
+          "pass_id": "voices",
+          "model_id": "python",
+          "temp": 0.0,
+          "max_new_tokens": null,
+          "budget_mode": "python",
+          "status": "completed"
+        },
+        {
+          "pass_id": "assemble",
+          "model_id": "python",
+          "temp": 0.0,
+          "max_new_tokens": null,
+          "budget_mode": "python",
+          "status": "completed"
+        }
+      ],
+      "delivery_telemetry": {
+        "schema_version": 5,
+        "stage": "my_story_assembled",
+        "target_status": "not_requested",
+        "actual_character_words": 354,
+        "actual_announcer_words": 51,
+        "actual_total_voiced_words": 405,
+        "actual_character_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca",
+        "actual_announcer_text_sha256": "c78c6cd715c081e8f7111d51e8cf52862f6c1464381ba5b0258f0e5c2a6e4676",
+        "actual_total_voiced_text_sha256": "054f2434a3cdba214f514782f54f35859222b299ea67253b5be4a9956c7dfdb2",
+        "actual_voiced_words": 354,
+        "actual_text_sha256": "30c41fa77416b9593acb45fb53aa3f8c4fececc42361700298a8e7661f98b5ca"
+      }
+    },
+    "news": null,
+    "content_authorship": {
+      "schema_version": 1,
+      "owner_bank": "my_story",
+      "accepted_artifacts": [
+        {
+          "artifact_id": "interpretation",
+          "sha256": "5df854f6092a8e6d16942dea836531b484409bcbbc7201b424f375847d823091"
+        },
+        {
+          "artifact_id": "treatment",
+          "sha256": "872ec7fcb1b462128d9789f98b69aa89dc26af233eb783b8c926a375eb2c40b2"
+        },
+        {
+          "artifact_id": "acts",
+          "sha256": "4b7ba442a30748dc2d8756bccfef1aa7cc0f7cba8eb934bec1b1b02e6615d886"
+        },
+        {
+          "artifact_id": "frame",
+          "sha256": "d053c37a6ebc4ccc0c2e16ff1dc307ce184efbf4ca5494f2e7c6624d6600afe4"
+        }
+      ],
+      "line_proofs": [
+        {
+          "line_id": "shot_000_b1",
+          "text_sha256": "473140c0de1de884939b173adcc1684e18fa0ef4becbb4c9291b335ce0e925eb"
+        },
+        {
+          "line_id": "shot_000_b2",
+          "text_sha256": "972911d140e2fe53ef617e22c9ef8710b30168d2b214524972a70b497b00d2cf"
+        },
+        {
+          "line_id": "shot_000_b3",
+          "text_sha256": "b46a83a7b42bbadc98bdc34937ba6c5c20b27b05594192f1388e8fd180da4312"
+        },
+        {
+          "line_id": "shot_000_b4",
+          "text_sha256": "c39debc4538f8bafa4bc62ad72931d6230fd612805ebe659bb3410c94b4ff963"
+        },
+        {
+          "line_id": "shot_001_b1",
+          "text_sha256": "1e8e3c9a637fce436b36442ff165ea91911029b317563ac89dffbb7f257d684a"
+        },
+        {
+          "line_id": "shot_001_b2",
+          "text_sha256": "be0f9372ecb7c780a297a945d0115e12e53b8138d9c1b08b37a315b145649e84"
+        },
+        {
+          "line_id": "shot_001_b3",
+          "text_sha256": "f86f5741c36a83ba95b94a17f36a661c3bedb486d5b6cdaee9231dbf081bfad8"
+        },
+        {
+          "line_id": "shot_001_b4",
+          "text_sha256": "17afcab6dba485fe6328881bec7f4efcf17918a7b9164c82afe54e507e41eb93"
+        },
+        {
+          "line_id": "shot_001_b5",
+          "text_sha256": "e13b277650901e9d0b56a6be0f87afbe5cded8f42f033badfd30ad5861aa4b84"
+        },
+        {
+          "line_id": "shot_001_b6",
+          "text_sha256": "56058d1c5f7b73a682bc7aecd74d7c57ff79e68d617a5eabc1051ee443f67833"
+        },
+        {
+          "line_id": "shot_001_b7",
+          "text_sha256": "889fc44b0f64a54075c7d995efbb09f459a3efdd83d0c9779a8c3a85204dcb99"
+        },
+        {
+          "line_id": "shot_001_b8",
+          "text_sha256": "3c8fe0f3faf742a3069c8b9e33f9ea721c43fb3fe88a50de9b27434b2c188208"
+        },
+        {
+          "line_id": "shot_001_b9",
+          "text_sha256": "4348cec91cf8191c96c1163737103972c678ad330b8d50528e8424afa71c55e1"
+        },
+        {
+          "line_id": "shot_001_b10",
+          "text_sha256": "d6b087c52ed9c6c171b1cdaceca69ae8f50c22dc8931756018eb510c7ffd72bb"
+        },
+        {
+          "line_id": "shot_001_b11",
+          "text_sha256": "58b91d35755e6d7a5b9b056c430883550df1338e8c0112760dec4ea3bca0d875"
+        },
+        {
+          "line_id": "shot_001_b12",
+          "text_sha256": "8faf990f9e23ebb0ce8a7cc26ebb71986e441ef7df31388b083f26cde1a33423"
+        },
+        {
+          "line_id": "shot_001_b13",
+          "text_sha256": "8728d9b64a2aed59db1fdcfbc514ef0a690b99d3e27cb8103ed0f5431198aaa9"
+        },
+        {
+          "line_id": "shot_001_b14",
+          "text_sha256": "042bf2399af12a2bf9b0caa441e14a37ffd147279595cfa65357f5b9f2dc4dff"
+        },
+        {
+          "line_id": "shot_001_b15",
+          "text_sha256": "e17cf5524b0512b85bd1971ee98ba4a681e5006539f84cce260f69ab2f482ca1"
+        },
+        {
+          "line_id": "shot_001_b16",
+          "text_sha256": "bd79152e67ddb19bc78782d58016cdd61934fe83e68c022753c6c673748327fc"
+        },
+        {
+          "line_id": "shot_002_b1",
+          "text_sha256": "b42857e023a6bc1d603dc6e2e5338ca24820e3e8ea79d523a49074c378e1baa0"
+        },
+        {
+          "line_id": "shot_002_b2",
+          "text_sha256": "52478e93cb8d86813bd4a803f9d33012e3efbad28d4d6046cc4e4c16e3b51b49"
+        },
+        {
+          "line_id": "shot_002_b3",
+          "text_sha256": "e69d2d137ec21f9f0c8ea02a87d2738bde009ddce995791f6a817ac5447e8a69"
+        }
+      ],
+      "coverage": {
+        "voiced_line_count": 23,
+        "proved_line_count": 23,
+        "complete": true
+      }
+    },
+    "text_for_tts_delivery": {
+      "mode": "content_owned_delivery_stamp",
+      "lines_stamped": 23,
+      "lines_delivery_differs": 0
+    },
+    "cast_contract": {
+      "lemmy_hit": false,
+      "lemmy_policy": "content_owned_cast_no_cameo_roll",
+      "casting_attempts": [],
+      "num_characters_request": 2,
+      "num_characters_locked": 2
+    }
+  }
+}

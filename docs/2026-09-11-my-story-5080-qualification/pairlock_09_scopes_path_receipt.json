@@ -1,0 +1,11 @@
+{
+  "bug": "PBUG-20260911-03",
+  "status": "OPEN",
+  "path": "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/_shared/tmp/otr_scopes_signal_lost_the_bay_area_table_20260911_074902_20260911_080240.mp4",
+  "bytes": 1593341,
+  "sha256": "c6c10e4d6c5d08685715f16dde60060d5cc4514483edb4f0eeeb5654641116b4",
+  "producer": "nodes/otr_scene_aware_scopes.py",
+  "blend_bypassed": true,
+  "retained_in_place": true,
+  "fix_or_new_production_test_claimed": false
+}

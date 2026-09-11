@@ -1,0 +1,64 @@
+"""Read and preserve completed canonical09 delivery evidence; no generation."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import subprocess
+
+root = Path.cwd()
+folder = root / 'docs/2026-09-11-my-story-5080-qualification'
+request = json.loads((folder / 'pairlock_09_request.json').read_text(encoding='utf-8'))
+assert request['status'] == 'success', request['status']
+assert request['ledger_prompt_correlated'] and request['code_unchanged_during_run']
+ledger_path = Path(request['ledger_path'])
+assert ledger_path.is_file()
+ledger_bytes = ledger_path.read_bytes()
+assert hashlib.sha256(ledger_bytes).hexdigest() == request['ledger_sha256']
+ledger = json.loads(ledger_bytes)
+episode = ledger_path.parent.parent
+
+def file_receipt(path):
+    raw = path.read_bytes()
+    assert raw, path
+    return dict(path=str(path), bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+
+images = ledger.get('images', [])
+if isinstance(images, dict):
+    images = images['images']
+image_receipts = []
+for entry in images:
+    path = Path(entry['path'])
+    assert path.is_relative_to(episode), path
+    saved = folder / ('pairlock_09_' + path.name)
+    shutil.copyfile(path, saved)
+    image_receipts.append(dict(**file_receipt(path), evidence_path=saved.name, entry=entry))
+
+canon_path = episode / 'episode_canon.json'
+canon = json.loads(canon_path.read_text(encoding='utf-8'))
+shutil.copyfile(canon_path, folder / 'pairlock_09_episode_canon.json')
+report = dict(request=request, episode_files=[file_receipt(p) for p in episode.rglob('*') if p.is_file()],
+              episode_canon=canon, image_receipts=image_receipts,
+              cast=ledger['cast'], counts=ledger['meta']['my_story']['counts'],
+              freeze_verdict=ledger['meta']['freeze_verdict'],
+              source_rewrites=ledger['meta']['my_story']['source_rewrites'])
+obs_path = Path(ledger['meta']['paths']['obs_final'])
+assert obs_path.parent == episode.parent.parent / 'obs'
+report['obs_file'] = file_receipt(obs_path)
+probe = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
+    'format=duration,size:stream=codec_name,codec_type,width,height,r_frame_rate,sample_rate,channels,duration',
+    '-of', 'json', str(obs_path)], text=True)
+(folder / 'pairlock_09_ffprobe.json').write_text(probe, encoding='utf-8')
+checks_dir = episode / 'qualification_checks'
+checks_dir.mkdir(exist_ok=True)
+credit_frame = checks_dir / 'credits_150s.png'
+subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-ss', '150',
+                '-i', str(obs_path), '-frames:v', '1', str(credit_frame)], check=True)
+shutil.copyfile(credit_frame, folder / 'pairlock_09_credits_150s.png')
+report['credits_frame'] = file_receipt(credit_frame)
+(folder / 'pairlock_09_delivery_analysis.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
+(folder / 'pairlock_09_stills_manifest.json').write_text(json.dumps(dict(episode_id=ledger['episode_id'], images=images), indent=2)+'\n', encoding='utf-8')
+for entry in image_receipts:
+    print('IMAGE', entry['path'], entry['sha256'])
+print('EPISODE_CANON', json.dumps(canon))
+print('META_DELIVERY', json.dumps({k:v for k,v in ledger['meta'].items() if any(s in k for s in ('deliver', 'publish', 'credits', 'output'))}))
+print('CANDIDATE_OBS', json.dumps([str(p) for p in (episode.parent.parent / 'obs').glob('*the_bay_area_table*')]))

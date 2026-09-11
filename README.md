@@ -19,16 +19,16 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
-**My Story qualification:** eight full canonical 5080 recovery attempts across
-recorded revisions produced four writing failures and four publications with
-source defects. The latest Gemma12B attempt stopped on an announcer/story-cast
-collision. The last Nemo publication still omitted the girlfriend mention.
-The frame-ownership repair now has offline regression coverage; a fresh full
-canonical qualification is still required.
-Zero source-qualified episodes. See [eighth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md)
-and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof retains
-its recorded platform/scope; it does not establish My Story source fidelity.
-The [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md) remain recorded.
+**My Story qualification:** nine full canonical 5080 recovery attempts across
+recorded revisions produced four writing failures and five publications. Four
+publications have source omissions; the latest Gemma4-12B episode preserves all
+requested facts in its saved spoken dialogue and publishes to OBS. Its voice
+credits match the actual render. Visual continuity, audio listening and broader
+repeatability remain unqualified. A retained scopes-video output path still
+needs correction. See [ninth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md)
+and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof keeps its
+recorded platform and scope. The [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md)
+remain recorded.
 
 100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
 any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
@@ -651,11 +651,14 @@ than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
 
 **My Story on the 5080:** four Qwen3.5-4B/NF4 attempts produced three writing
-failures and one source-defective publication. Three Nemo/NF4 attempts published
-with source omissions. One Gemma4-12B/NF4 attempt loaded and generated valid JSON
-but failed treatment/frame ownership before media. Eight attempts, four
-publications, zero source-qualified episodes. Older platform proof is unchanged.
-See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md)
+failures and one source-defective publication; three Nemo/NF4 attempts published
+with source omissions. Of two Gemma4-12B/NF4 attempts, one failed before media and
+one published with all supplied facts in saved dialogue. The latter ran both
+Gemma slots, Z-Image-Turbo stills, still_pan video, IndexTTS2 character voices,
+Kokoro announcer and Stable Audio3 music on the 5080 Laptop GPU. This is measured
+publication/metadata evidence, not an audio audition or a cross-platform promise.
+Nine attempts, five publications, one saved-dialogue fidelity pass; full-media
+qualification remains open. See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 
 ### The cheapest complete setups

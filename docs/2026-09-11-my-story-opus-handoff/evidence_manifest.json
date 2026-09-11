@@ -1,0 +1,67 @@
+{
+  "scope": "immutable evidence; excludes this manifest itself",
+  "code_base": "9367f2fdef6aefa6d33287ffe95fe2ce2316b98c",
+  "file_count": 12,
+  "files": [
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/bible_rules_baseline.txt",
+      "bytes": 681819,
+      "sha256": "717e730692f5c0596eeb220791c82a3a6864d1285d69bf1b0fd08d6c9e5fd1cc"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/bible_schema_baseline.log",
+      "bytes": 9848,
+      "sha256": "0310ac4d2bb45e5891c1b16f6a18b3cb20637f6658f9cd909008d296f634749c"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/bible_schema_candidate.log",
+      "bytes": 9801,
+      "sha256": "d529c6fcff655b36f9e622358b401becaecc0068c9144b9e1b25a51aa6bc0dcf"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/documentation_scope.json",
+      "bytes": 513,
+      "sha256": "51f817bbae1a27fd4dc70f8abfd7f4e47d448b877f637f316a5f8dca23e28288"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/finalize_handoff_source.txt",
+      "bytes": 34069,
+      "sha256": "d141be437af4898c32ae6bd3ca2f6fa4eae448373e55edc99f8f4c6fdcd39ca1"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/go_forward_before.md",
+      "bytes": 129696,
+      "sha256": "0c7b269c789986c46a1b4f818bb404c26208d75f7145ce2350ae4621aecdd49e"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/README.md",
+      "bytes": 2759,
+      "sha256": "8aa99dc520fef60d30f1a26013e27c065c4e87af17aeb2d8dd4c7a09e6fe75c2"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/retire_guidance_source.txt",
+      "bytes": 4749,
+      "sha256": "29ff88be1f57863298120e2fcbc8fd8965536af055d02dc3d4c1fe1b2a871be8"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/retired_guidance.json",
+      "bytes": 38012,
+      "sha256": "c3d57526f0706ca6ed42fc6dd0ef5bf7c337890d8fb98bb2a7f5bd2522848dd2"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/session_handoff_before.md",
+      "bytes": 4191,
+      "sha256": "a1eb4a2f5b3972437e604ca28bce5e2f8b89dae5eeb150b74506b2fea3a0a2a3"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/validation.json",
+      "bytes": 2323,
+      "sha256": "ec5de2f7073475d94fffb2f9c3b67f2e865db25c302a9c5af77528c45be75180"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-opus-handoff/validation_source.txt",
+      "bytes": 12574,
+      "sha256": "34e6922a72e75e0a76eb921da2c621477d63272de76d5ee114fa16a573867d3b"
+    }
+  ]
+}

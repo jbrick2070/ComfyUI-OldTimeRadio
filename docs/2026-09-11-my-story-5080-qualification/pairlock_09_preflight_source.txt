@@ -1,0 +1,35 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import subprocess
+import sys
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+b=r.parents[1]/'comfyui-custom-node-survival-guide'
+for root,branch,checkfile in [(r,'v2.0-alpha','file_checks.json'),(b,'main','bible_file_checks.json')]:
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=root)==subprocess.check_output(['git','rev-parse','origin/'+branch],cwd=root)
+    for name in subprocess.check_output(['git','diff-tree','--no-commit-id','--name-only','-r','HEAD'],cwd=root,text=True).splitlines():
+        raw=subprocess.check_output(['git','show','HEAD:'+name],cwd=root)
+        assert raw and not raw.startswith(b'\xef\xbb\xbf'),name
+        text=raw.decode('utf-8')
+        if name.endswith('.py'):ast.parse(text,filename=name,feature_version=(3,10))
+    for item in json.loads((d/checkfile).read_text(encoding='utf-8')):
+        raw=(root/item['path']).read_bytes()
+        committed=subprocess.check_output(['git','show','HEAD:'+item['path']],cwd=root)
+        assert raw==committed and hashlib.sha256(raw).hexdigest()==item['sha256'],item['path']
+for item in json.loads((d/'evidence_manifest.json').read_text(encoding='utf-8')):
+    name=(d/item['path']).relative_to(r).as_posix()
+    raw=subprocess.check_output(['git','show','HEAD:'+name],cwd=r)
+    assert len(raw)==item['bytes'] and hashlib.sha256(raw).hexdigest()==item['sha256'],name
+assert hashlib.sha256((r/'workflows/otr_canonical.json').read_bytes()).hexdigest()=='d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c'
+sys.path.insert(0,str(r))
+from nodes._otr_story_routing import resolve_story_pack
+pack=resolve_story_pack('my_story')
+on_disk=json.loads((r/'nodes/story_packs/my_story/my_story.json').read_text(encoding='utf-8'))
+assert pack.prompt_stages==on_disk['prompt_stages']
+assert 'separate frame' in pack.prompt_stages['my_story_interpret_system']
+assert 'phase-assignment mistake' in pack.prompt_stages['my_story_treatment_system']
+print('Both pushed HEADs match origin. Final code/test/Bible blobs and65 committed evidence files match qualification hashes.')
+print('Changed files nonempty/UTF8/noBOM; Python3.10 grammar valid; unchanged canonical hash matches.')
+print('Fresh process resolves the revised shipped My Story pack exactly. No weights loaded or generation performed.')

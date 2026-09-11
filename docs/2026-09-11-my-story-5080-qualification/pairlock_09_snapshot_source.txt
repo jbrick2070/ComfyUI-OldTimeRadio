@@ -1,0 +1,21 @@
+from pathlib import Path
+import hashlib
+import json
+import urllib.request
+
+r=Path.cwd();folder=r/'docs/2026-09-11-my-story-5080-qualification'
+with urllib.request.urlopen('http://127.0.0.1:8000/otr/latest_ledger',timeout=10) as response:
+    latest=json.load(response)
+if not latest.get('ok'):
+    print(json.dumps(latest));raise SystemExit(0)
+paths=list(Path('C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes').glob('*/audio/'+latest['filename']))
+assert len(paths)==1,paths
+p=paths[0];raw=p.read_bytes();ledger=json.loads(raw);meta=ledger.get('meta',{});story=meta.get('my_story',{})
+report=dict(path=str(p),sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),episode_id=ledger.get('episode_id'),
+            counts=story.get('counts'),interpretation=story.get('interpretation'),treatment=story.get('treatment'),
+            acts_accepted=story.get('acts_accepted'),frame=story.get('frame'),
+            attempts=[dict(pass_id=a.get('pass_id'),attempt=a.get('attempt'),status=a.get('status'),error=a.get('error')) for a in story.get('attempts',[])],
+            source_rewrites=[dict(pass_id=a.get('pass_id'),status=a.get('status'),applied=a.get('applied'),attempts=len(a.get('attempts',[]))) for a in story.get('source_rewrites',[])],
+            cast=[{k:c.get(k) for k in ('char_id','name','gender','tts_model','voice_preset','voice_engine','voice_ref_id')} for c in ledger.get('cast',[])],
+            lines=[{k:line.get(k) for k in ('line_id','char_id','speaker_role','text')} for line in ledger.get('lines',[])])
+print(json.dumps(report,indent=2,ensure_ascii=False))

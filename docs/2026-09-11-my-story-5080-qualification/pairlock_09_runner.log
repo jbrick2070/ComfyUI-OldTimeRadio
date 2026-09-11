@@ -1,0 +1,448 @@
+[canonical-api] workflow=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[canonical-api] run_label=5080_pairlock_09_gemma_frame (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_w45_still_pan (45-word run: still_pan) -- 16 overrides:
+  role_overrides.announcer_visual=still_pan
+  role_overrides.music_visual=still_pan
+  role_overrides.character_visual=still_pan
+  role_overrides.announcer_image=z_image_turbo
+  role_overrides.music_image=z_image_turbo
+  role_overrides.character_image=z_image_turbo
+  slot_overrides.voice_bank=default
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=indextts2
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=still_pan
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[canonical-api] comfy_url=http://127.0.0.1:8000
+[canonical-api] prompt_nodes=23
+[canonical-api] prompt_dump=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\docs\2026-09-11-my-story-5080-qualification\pairlock_09_prompt.json
+[canonical-api] applied:
+  profile=otr_w45_still_pan
+  OTR_LedgerScriptWriter.creative_writing_model='google/gemma-4-12b-it (23.9 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.technical_model='google/gemma-4-12b-it (23.9 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.source_bank='my_story'
+  OTR_LedgerScriptWriter.custom_premise='Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.'
+  OTR_LedgerScriptWriter.story_characters='Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.'
+  OTR_LedgerScriptWriter.story_plot='Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.'
+  OTR_LedgerScriptWriter.story_setting='A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.'
+  OTR_LedgerScriptWriter.story_author=''
+  OTR_LedgerScriptWriter.num_characters=2
+  OTR_LedgerScriptWriter.act_count='1'
+  OTR_LedgerScriptWriter.visual_style='roll (any style)'
+[canonical-api] DRY_RUN complete; prompt not submitted
+[canonical-api] workflow=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[canonical-api] run_label=5080_pairlock_09_gemma_frame (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_w45_still_pan (45-word run: still_pan) -- 16 overrides:
+  role_overrides.announcer_visual=still_pan
+  role_overrides.music_visual=still_pan
+  role_overrides.character_visual=still_pan
+  role_overrides.announcer_image=z_image_turbo
+  role_overrides.music_image=z_image_turbo
+  role_overrides.character_image=z_image_turbo
+  slot_overrides.voice_bank=default
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=indextts2
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=still_pan
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[canonical-api] comfy_url=http://127.0.0.1:8000
+[canonical-api] prompt_nodes=23
+[canonical-api] prompt_dump=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\docs\2026-09-11-my-story-5080-qualification\pairlock_09_prompt.json
+[canonical-api] applied:
+  profile=otr_w45_still_pan
+  OTR_LedgerScriptWriter.creative_writing_model='google/gemma-4-12b-it (23.9 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.technical_model='google/gemma-4-12b-it (23.9 GB, nv16 nv24)'
+  OTR_LedgerScriptWriter.source_bank='my_story'
+  OTR_LedgerScriptWriter.custom_premise='Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.'
+  OTR_LedgerScriptWriter.story_characters='Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.'
+  OTR_LedgerScriptWriter.story_plot='Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.'
+  OTR_LedgerScriptWriter.story_setting='A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.'
+  OTR_LedgerScriptWriter.story_author=''
+  OTR_LedgerScriptWriter.num_characters=2
+  OTR_LedgerScriptWriter.act_count='1'
+  OTR_LedgerScriptWriter.visual_style='roll (any style)'
+[canonical-api] QUEUED prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7
+[canonical-api] t=0s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=queued
+[canonical-api] t=0s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=5s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=10s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=15s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=22s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=27s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=32s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=37s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=42s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=47s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=52s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=57s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=62s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=67s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=72s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=77s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=82s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=87s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=92s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=97s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=102s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=107s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=112s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=117s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=122s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=127s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=132s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=137s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=142s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=147s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=152s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=157s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=162s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=167s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=172s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=177s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=182s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=187s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=192s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=197s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=202s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=207s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=213s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=218s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=223s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=228s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=233s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=238s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=243s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=248s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=253s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=258s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=263s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=268s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=273s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=278s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=283s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=288s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=293s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=298s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=303s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=308s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=313s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=318s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=323s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=328s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=333s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=338s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=343s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=348s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=353s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=358s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=363s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=368s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=373s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=378s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=383s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=388s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=393s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=398s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=403s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=408s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=413s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=418s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=423s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=428s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=433s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=438s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=443s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=448s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=453s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=458s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=463s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=468s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=473s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=478s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=483s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=488s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=493s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=499s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=504s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=509s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=514s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=519s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=524s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=529s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=534s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=539s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=544s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=549s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=554s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=559s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=564s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=569s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=574s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=579s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=584s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=589s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=594s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=599s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=604s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=609s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=614s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=619s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=624s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=629s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=634s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=639s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=644s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=649s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=654s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=659s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=664s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=669s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=674s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=679s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=684s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=689s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=694s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=699s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=704s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=709s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=714s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=719s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=724s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=729s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=734s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=739s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=744s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=749s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=754s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=759s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=764s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=769s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=774s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=779s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=784s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=789s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=794s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=799s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=804s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=809s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=814s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=819s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=824s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=829s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=834s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=839s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=844s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=849s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=854s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=859s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=864s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=869s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=874s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=879s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=884s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=890s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=895s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=900s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=905s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=910s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=915s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=920s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=925s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=930s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=935s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=940s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=945s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=950s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=955s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=960s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=965s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=970s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=975s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=980s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=985s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=990s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=995s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1000s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1005s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1010s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1016s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1021s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1026s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1031s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1036s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1042s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1047s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1052s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1057s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1062s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1067s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1072s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1077s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1082s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1087s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1092s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1097s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1102s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1107s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1112s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1117s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1122s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1127s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1132s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1137s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1142s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1147s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1152s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1157s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1162s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1167s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1172s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1177s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1182s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1187s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1192s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1197s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1202s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1207s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1212s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1217s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1222s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1227s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1232s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1237s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1242s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1247s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1252s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1257s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1262s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1267s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1272s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1277s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1282s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1287s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1292s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1297s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1302s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1307s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1312s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1317s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1322s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1327s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1332s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1337s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1342s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1347s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1352s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1357s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1362s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1367s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1372s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1377s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1382s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1387s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1392s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1397s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1402s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1407s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1412s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1417s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1422s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1427s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1432s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1437s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1442s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1447s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1452s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1457s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1462s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1467s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1472s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1477s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1482s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1487s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1492s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1497s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1502s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1507s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1512s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1517s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1522s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1527s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1532s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1537s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1543s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1548s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1553s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1558s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1563s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1568s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1573s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1578s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1583s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1588s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1593s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1598s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1603s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1608s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1613s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1618s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1623s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1628s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1633s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1638s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1643s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1648s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1653s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1658s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1663s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1668s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1673s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1678s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1683s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1688s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1694s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1699s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1704s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1709s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1714s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1719s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1724s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1729s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1734s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1739s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1744s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1749s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1754s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1759s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1764s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1769s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1774s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1779s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1784s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1789s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1794s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1799s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1804s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1809s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1814s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1819s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1824s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1829s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1834s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1839s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1844s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1849s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1854s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1859s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1864s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1869s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=pending
+[canonical-api] t=1874s prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7 status=success
+[canonical-api] RESULT SUCCESS prompt_id=64f1c56e-5ab6-48eb-9e15-e0cb94b728f7

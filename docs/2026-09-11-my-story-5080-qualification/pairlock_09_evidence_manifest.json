@@ -1,0 +1,247 @@
+{
+  "scope": "immutable evidence; excludes this manifest itself",
+  "code_base": "9367f2fdef6aefa6d33287ffe95fe2ce2316b98c",
+  "file_count": 48,
+  "files": [
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_credits_150s.png",
+      "bytes": 753045,
+      "sha256": "4832ad9985842f2bf6a12e9a97a1a430a23cb89554e8540e985cc468f6275495"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_delivery_analysis.json",
+      "bytes": 499012,
+      "sha256": "db0100b7b574fd1db4396761aaf38545e952f5515318cfcf0bcba47c9fe0f5f4"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_delivery_analysis_source.txt",
+      "bytes": 3382,
+      "sha256": "2042121bf37c3917bca8a9f826b0600046581603902d847041f686f0c96adaae"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_episode_canon.json",
+      "bytes": 292,
+      "sha256": "f733df7de21c83c1cf54c2e35501eb773a32e466bc592e081b9d9cca24bf6258"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_ffprobe.json",
+      "bytes": 639,
+      "sha256": "af6fa4d093f28b7148d85589bd55c275a05fac92d7a362b9ce345a373b5c10e5"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_history.json",
+      "bytes": 23146,
+      "sha256": "c7e50d28174cb61e0d4ab4a008fdbb99ef2f213c13d051417f6dae09d0b9df7c"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_latest_ledger_response.json",
+      "bytes": 757451,
+      "sha256": "c34a41c1ced8c1474fb4b1a749ed19b6060259b53d4e2221d6a4b62792f23aa9"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_ledger.json",
+      "bytes": 738386,
+      "sha256": "ba852d36e649e9269513335507b6e64e9f8da8ed1b9a1ff2b0d7d21ec77696cc"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_preclean_ledger.json",
+      "bytes": 112941,
+      "sha256": "b30abb24086bce8513381b0ccaa332f2c56c136bb92697de358ef5b78e576357"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_preflight_postpush.log",
+      "bytes": 326,
+      "sha256": "0346d0988c4b04ce93109aa730da4783e7d6ccb600a8368c719c5e8537dec6e5"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_preflight_source.txt",
+      "bytes": 2364,
+      "sha256": "9256fcf63bf1516b6eb818d884b2e6f768cb7ad7166e1f93d3f7f0f4063fe5ec"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_prompt.json",
+      "bytes": 11827,
+      "sha256": "e6247f8759f59d2745c7be9f2cc0b85286ba787e6a8faed80628c76534b8fb47"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md",
+      "bytes": 6724,
+      "sha256": "f1726003498a8852c45cf7b4009291761a294d1aa526800cffedb8a4a19dfb62"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_request.json",
+      "bytes": 4582,
+      "sha256": "476f3b4dcfbf6c72af4be4a2bdca2bb7ba7e8f322e66092f4208eaf759a595c2"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_runner.log",
+      "bytes": 39794,
+      "sha256": "111bec1a6668a7d7f80ab59d43fcb3bdbbdbecf87edc07e05664bf2639a05d4a"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_scopes_path_receipt.json",
+      "bytes": 459,
+      "sha256": "cf880ac2f880831bd0d7ebc7a9fd2c12fd2311f9c8e6dda7dc06e197708d5f41"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_server.log",
+      "bytes": 246563,
+      "sha256": "e942b4f60331b79daf95d7902f0e81e82c51e8ae520faec967d2b134c76d5643"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_snapshot_source.txt",
+      "bytes": 1581,
+      "sha256": "088c8ba1fd2c7677cdc13ea1fe10e178e28d46ad9644ab3a2859ac86942a1c0d"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_music_closing_001_49c5dc31cd7c.png",
+      "bytes": 1698866,
+      "sha256": "d551224a72aefcdf0e920f82efd2ff339842434bbd6e4af54b758131b96ccf3b"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_music_opening_001_645814edc451.png",
+      "bytes": 1606902,
+      "sha256": "dfd63775323a1d339e702e234dd0cee8a0d80fb4b4886a9d72bbbaa396f7babb"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_000_b1_499a71d9792f.png",
+      "bytes": 1657855,
+      "sha256": "85ebeb472361f6188bdabc7cbb3ada289d687dfedf846bdef3e1b8e2cc42f035"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_000_b2_60e8e85b555d.png",
+      "bytes": 1600735,
+      "sha256": "cc56e6afa04dda67aa46c1676aabdabf22774d0b5e83f9f14642fa253c866ab2"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_000_b3_d3c912c0d161.png",
+      "bytes": 1647294,
+      "sha256": "28a212078893fc72e6053224312adcdcbfd62796269d64dc494ee47037624a25"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_000_b4_ae97cda3acf7.png",
+      "bytes": 1710223,
+      "sha256": "059a345d268db6304e55602453dfe2ed6145364f0144c86706dd9b283905be3e"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_000_music_bee3281562e8.png",
+      "bytes": 1661594,
+      "sha256": "d1df09a40332d2f27fca8e63c0c870781c073480b5c35ac960d843576419b126"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b10_b82b214d8b65.png",
+      "bytes": 1650797,
+      "sha256": "326b0f17a15010899ac95d61a303161ea4e9b89162d12e45610ae7fa88e3c56d"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b11_29029034a8d9.png",
+      "bytes": 1543040,
+      "sha256": "2bf11b9f4e2c9c091a8214bec949ee6d3b39d7dfe3a4f106a34bd4419af2d100"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b12_764212fbe174.png",
+      "bytes": 1643826,
+      "sha256": "ef6d8fba20f62475fbf591f006cca329fbd379367550df9c868bbd77225db90a"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b13_906b1100dc8a.png",
+      "bytes": 1571594,
+      "sha256": "25f4a34f3ac3860bddc0cd74cc9be8410663068acae6565be19eefe71bd3182f"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b14_adbfaa34a6b9.png",
+      "bytes": 1711920,
+      "sha256": "536b56db2eae2cf2eaea41e63ecdbb67d8cedc4d7e0db4596b754fab07d8572e"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b15_6a391e4ffc02.png",
+      "bytes": 1594803,
+      "sha256": "ca64b871b22dcdb40eaec3a3b665daf8903910637540bb1ea2d9a270a16d482f"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b16_689d072b795d.png",
+      "bytes": 1636516,
+      "sha256": "2bba561ee8751eccc18fe41e18212e60e6870e97a83ddf95f6f156bc164ba49a"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b1_f83ba409fb58.png",
+      "bytes": 1446373,
+      "sha256": "efffe659e479bafcf8eb5ae3b230444df48c1aac01b437b80bcb288bc817c0b9"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b2_63323bdd3ac8.png",
+      "bytes": 1675741,
+      "sha256": "df77e1d93d8ab6d4b3a3d6c071f22b3c14e3be3820187402cbec48983ee65801"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b3_2cd8298092d1.png",
+      "bytes": 1615344,
+      "sha256": "5a6aeb64f7ba54e14d20abc70576641eb61b5aaba123adf8db74657dea260069"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b4_b73ccb5e7014.png",
+      "bytes": 1664434,
+      "sha256": "09f6f5182b02c1d097740b9a3b11a4aa57ed29b7eae04d27e29298be018c3bbd"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b5_7a8f6cb79367.png",
+      "bytes": 1566443,
+      "sha256": "f87745c0fb465b27a5dab279c1a864280a8e3618bfe73fe7cd47ada5bed8f0f2"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b6_4b1dc46cb646.png",
+      "bytes": 1654812,
+      "sha256": "4cb1b121768a4ad4f04552047ab148a08cbfbbb729e456bc57078510ddca1e74"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b7_efe45201e8c3.png",
+      "bytes": 1518956,
+      "sha256": "59a12ba8a851bd15b657b2ac2693909c4bc2f3b93218061689a186f5d7b0d95a"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b8_f0cabb06c28a.png",
+      "bytes": 1643558,
+      "sha256": "22023c90f0cf5d388c73e0f82431330ff90d67ea2bc848d02183c29bd158435a"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_001_b9_d02ac2532f0e.png",
+      "bytes": 1536831,
+      "sha256": "98cb918faaa1c8f00db53dcd1e54113b46b2cc227ab8830748bff5113e06e87c"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_002_b1_b502084fc3d4.png",
+      "bytes": 1632059,
+      "sha256": "b61e73e090ec1ca9cec31d0ef997dc05045cdeb7c962450fea3aa2a59e3700c6"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_002_b2_da7f83f15a65.png",
+      "bytes": 1651001,
+      "sha256": "372156ea01a05d676bc3523449bf324591ac8c335352ff7e3ad0c7ecec2c1f60"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_002_b3_d4474e453be9.png",
+      "bytes": 1681968,
+      "sha256": "e8a41b0742b7911669a28b51906662b10052deb72299983474c97341e205e782"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_still_shot_002_music_22df81ab972e.png",
+      "bytes": 1621488,
+      "sha256": "3848fc37e1f6f7c05d50d47f62f0d62e279072149b498dbdb19a4a555972eaec"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_stills_manifest.json",
+      "bytes": 411912,
+      "sha256": "5ba371426b565559d9a4db0da024620a8315a9a42aaa496486c0d941a0101115"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_watchdog.log",
+      "bytes": 3135,
+      "sha256": "5e584a3499fdbdf5249f97a2108ef6375a324dae40bfed1414d4a0d349e2603b"
+    },
+    {
+      "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_09_wrapper_source.txt",
+      "bytes": 7335,
+      "sha256": "69e3008ffba931fd07dd0938c42d624e5afd72e86187ceca72a11462b4772f52"
+    }
+  ]
+}

@@ -1,64 +1,100 @@
-# SESSION HANDOFF -- 2026-07-02 night (talking-radio S4x + cloud-S3 core window)
+# OTR handoff to Opus -- 2026-09-11
 
-Fresh window: read CLAUDE.md + docs/GO_FORWARD_PLAN.md first. Branch v2.0-alpha,
-HEAD == origin @ 13de2a60 (verify). Suite 6059/0 + Bug Bible 16/0 at last push.
+Read AGENTS.md, CLAUDE.md, then [GO_FORWARD_PLAN](docs/GO_FORWARD_PLAN.md).
+GO_FORWARD is the main and sole executable queue. Jeffrey requested this handoff
+before another code change. Codex has stopped coding and generation; no active
+build task or GPU job remains. Do not start two production coders or wake Mac/4060.
 
-## What SHIPPED this session (all pushed)
-- f9eed360 cloud-S0 c4: invoke_partner_node bridge + watchdog + gated smokes
-  (scripts/otr_cloud_s0_smoke.py; operator env still unset -> smokes exit 3).
-- 820f6df3 S4: ia2v character beats init on the cast PORTRAIT (A/B: scene 0.57
-  vs portrait 2.86 lag 0). PROOF7_VERDICT.md in docs/2026-07-02-canonical-ia2v.
-- a415ad18 S4b+S4c: talking portraits mint FACE-FORWARD+warm (era/grade tails
-  skipped; `talking` map VideoDirector->ImageDirector->MetaBrief) + radio-face
-  A/B RETIRED into default-on under the ia2v register (fail-LOUD missing face).
-- a9440980 cloud-S3 CORE (operator evening GO): eng_cloud_video.py 4 dark rows
-  + REAL canonicalize_video (audio strip + post-strip proof). wan sends the
-  exact pinned static set (OTR_CLOUD_WAN_MODEL env); seedance = honest dark row
-  until the S1 V3-expansion pin; kling pair fully pinned.
-- 9eb7e29d/d8f34835 scripts/otr_ia2v_server_boot.cmd (the bare soak launcher
-  has NO engine env; FLAT unet name -- ltx2\ prefix breaks the resolve).
-- Story-writer director-note leak fix REVERTED out of production and PARKED in
-  UpstreamStoryLab docs/GO_FORWARD_PLAN.md "DEFERRED STORY-LLM FIXES" (7df7c80
-  in THAT repo). Operator hold: NO story-LLM changes before the transplant.
+## Current status
 
-## IN FLIGHT right now
-- **proof9b** (the S4b/c verdict episode): launched ~18:12 via the env'd cmd
-  (OTR_ENABLE_LTX_AV=1, dev unet flat name, ZIMAGE trio), driver log
-  %TEMP%\proof9_driver.log, server log C:\Users\jeffr\Documents\ComfyUI\
-  comfyui_8000.log. SCORE on land: mux each slice wav onto its raw clip
-  (clips are SILENT by design) then scripts/otr_talking_radio_probe_eval.py
-  (same-file-twice trick); slice map from the "sliced ... (beat bNNN)" server
-  log lines; clips at output\otr\episodes\pending_*\clips\. Bar: speech >=2.0
-  (music exempt). Expect: face-forward portraits + radio-face bookends
-  (S4c fired on b000, log-proven).
-- SOAKS ALREADY QUEUED (2026-07-02 ~18:28): proof9b breached the ceiling
-  (14659 > 14500; desktop-session baseline crept to ~2.9GB), so the server was
-  rebooted with OTR_LTX_AV_RENDER_CANVAS=768x416 (server-env, THIS boot only)
-  and proof9c relaunched at that canvas; a 120w soak (%TEMP%\soak1_120w.log)
-  and a 30w soak (%TEMP%\soak2_30w.log) are chained behind it in one detached
-  cmd. Morning window: score proof9c + QA both soaks (metric is roughly
-  scale-invariant; note the 768x416 canvas in any comparison), and consider a
-  permanent baseline-aware canvas step-down if the desktop keeps squatting.
+Tested/pushed OTR code: **9367f2fdef6aefa6d33287ffe95fe2ce2316b98c**, v2.0-alpha.
+Tested Bible base: **7c87b17bed48bfe3c36a362a755b91d5bab95a47**, main. This handoff
+adds documentation and raw live evidence only. Verify current HEAD against origin.
 
-## Ops gotchas burned tonight (do not relose)
-- ComfyUI main.py RE-EXECS itself under a uv-python CHILD: killing the venv
-  parent leaves the child serving :8000 with STALE ENV. Kill by PORT OWNER
-  (Get-NetTCPConnection -LocalPort 8000 -> OwningProcess) + CIM sweep.
-- Desktop backend relaunch squats ~4GB VRAM -> 832x448 full-pipeline breaches
-  the 14.5GB ceiling. Baseline must be <=~2.5GB before a proof/soak.
-- The full pytest suite POLLUTES repo-root otr_runtime.log while a render is
-  in flight (same box/file) -- read timestamps before declaring a stall.
-- Set-Content -Encoding UTF8 writes BOM (PS5.1). Use [IO.File]::WriteAllText.
+Canonical09 published **The Bay Area Table**, prompt
+64f1c56e-5ab6-48eb-9e15-e0cb94b728f7, in **31:14**; runner exit0, watchdog SUCCESS.
+RTX5080 Laptop GPU, Gemma4-12B/NF4 in both slots, otr_w45_still_pan. The real
+canonical and shipped full API runner were used; dumped graph equals actual08.
+All supplied dinner facts are present in saved spoken text. Voice fields and
+inspected credits match. One interrupted P1 call recovered through its existing
+bounded retry. No production changes occurred during the run.
 
-## NEXT (priority order)
-1. proof9b verdict (+ side-by-side for the operator; b005 announcer dip watch).
-2. Soaks x2 unattended; morning QA vs the new bars.
-3. S5 (task #16, operator ratified): port the two-stage HQ recipe (upsample +
-   refine, guide chain; NO audio latent) to eng_ltx_video; dev-unet family
-   auto recipe like eng_ltx_av._detect_recipe; 2 LTX rows, NO ltx_lowvram.
-   Measured silent-vs-audio-in VRAM/time A/B on first live clip.
-4. Cloud: operator env for live smokes (leg1/leg2) -> S1 stills lane (V3
-   expansion pin unblocks seedance + wan prompt) -> S3 FULL (reactive
-   auto-defaults + ShotLock stamps + fallback chains).
-5. Parked: director-note scrub (transplant repo), OTR_LTX_RADIO_FACE env now
-   only meaningful on single-pass recipes.
+Nine full recovery attempts: four writing failures, five publications. Four
+publications have source omissions;09 is the first saved-dialogue fidelity pass.
+Clothes, hair arrangement, room details and seating vary in its images. No face
+defect is inferred from clothing. Audio listening and full-media/repeatability
+qualification remain open. Receipt, exact paths/hashes, graph, ledger, logs,
+all 27 stills and inspected credits:
+[pairlock_09_receipt.md](docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md).
+The 87,722,712-byte OBS file remains visible at:
+`C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/the_bay_area_table_20260911_074902__shst__stpa__zimg__idx2__unk__g412__sa3_final.mp4`.
+
+## Next action
+
+Take Sprint1 in GO_FORWARD: **OPEN PBUG-20260911-03**, retained scopes video under
+shared/tmp. Use the existing episode path authority at the actual producer;
+this is not the already-fixed pending-to-final rename bug. No fix was started.
+Sprint2 addresses the observed visual-continuity cause at existing owners, then
+full canonical stress, Original-credit publication and listening evidence follow.
+All coding and actual finished Sonnet QA precede further generation.
+
+The Bible indexes this OPEN incident under existing 01.02 (12.66 related) and
+records 09's source outcome under 11.39. Its 344 parsed rules and tests are unchanged.
+The episode-path rule/test expansion belongs with the production fix; do not
+claim a new executable assertion already covers it.
+
+## Validation and review baseline
+
+- OTR:181 focused passes; full14,466 passed,51 inherited failures,183 skipped,
+  1xfailed. Actual exit2 is the known-failure guard. All inherited failure IDs
+  AND normalized payloads match the prior baseline; no new quarantine.
+- Bible:38 passed,10 inherited failures,11 skipped,3xfailed; actual exit1.
+  These are documented inherited failures, not an all-green suite.
+- Actual canonical validator, roundtrip and widget/link audit:23nodes,63links;
+  SHA256 d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c.
+- Actual R1-R4: Opus5/Gemini3.1Pro. Finished Sonnet5 QA returned "Not clean"
+  for recorded semantic residuals; root grounded these and retained the user's
+  no-new-gates policy. No unanimous-clean or Cursor-consensus claim. Cursor
+  timed out twice earlier. Full packets, judgment and baseline XML:
+  [frame-ownership qualification](docs/2026-09-11-my-story-frame-ownership/qualification_receipt.md).
+- This docs-only handoff has encoding, YAML/count/index, link, exact archive
+  preservation and evidence checks in
+  [validation.json](docs/2026-09-11-my-story-opus-handoff/validation.json).
+  No repeated full suite or new GPU run is claimed for documentation changes.
+  The Bible's strict metadata validator exits 1 with 149 issues on both the
+  committed baseline and this update; exact issue payloads match. YAML parsing,
+  all 344 unique rule objects and new coverage references pass independently.
+
+Windows test interpreter: `C:/Users/jeffr/Documents/ComfyUI/.venv/Scripts/python.exe`;
+set PYTHONUTF8=1 and use `-m pytest -q -p no:cacheprovider`. Run Bible from
+`C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide` with relative
+`tests/bug_bible_regression.py --pack-dir <OTR-root>`. Use the committed final XML
+and normalization receipts for inherited-failure comparisons; do not hide failures.
+
+## Files, Git and blockers
+
+Production already shipped: nodes/_otr_my_story.py,
+nodes/story_packs/my_story/my_story.json, tests/test_my_story_runner.py, with
+Bible11.39 coverage. No canonical edit. Handoff files: README, GO_FORWARD/log/
+archive, PROD_BUG_LOG, session_handoff and evidence; Bible incident comments,
+README and coverage index. Both repositories are pushed as part of this handoff;
+the final response records the resulting hashes.
+
+Preserve unrelated OTR diff.txt/diff_utf8.txt and Bible bug_bible_codex.log,
+bug_bible_gemini.log, bug_bible_postspan.log, bug_bible_sonnet.log,
+reddit_post_v2_1.md, tests/interface_integrity_check.py. Controlled baseline and
+candidate worktrees remain under C:/Users/jeffr/Documents/ComfyUI/_worktrees.
+
+Owned ComfyUI PIDs18316/51372 are stopped; port8000 empty, desktop GPU2,425MiB
+at shutdown verification. Reset/verify before a fresh headless run. Mac/4060
+remain held until Jeffrey explicitly releases them. RunPod is authorized in
+scope but unauthenticated here, with no rental active. No09 audition occurred;
+this session cannot ingest audio. No hardware prompts, public messages, version
+bumps, tags or promotions were issued. Preserve full source and all nine attempts.
+
+Obsolete guidance cleanup: removed the retired root _START_HERE.md and
+SKILL.md, the September 5 OWNERSHIP_HANDOFF_4060.md snapshot, and two
+unreferenced docs/skills-backup handoff copies. Their full text and
+deletion reasons are preserved in GO_FORWARD_ARCHIVE and the handoff
+retired_guidance.json receipt. Immutable review packets, including the
+completed next_measurement.md baseline, remain intact.

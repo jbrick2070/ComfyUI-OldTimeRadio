@@ -1,3 +1,47 @@
+## 2026-09-11 -- canonical09 publishes; pending-only handoff to Opus
+
+Stale guidance cleanup: five obsolete entry points/backup instructions removed;
+all original text and operator rulings preserved verbatim in GO_FORWARD_ARCHIVE
+and the handoff retired_guidance.json receipt. Immutable proof packets retained.
+
+The operator requested GO_FORWARD/Bug Bible updates and an Opus handoff before
+another code change. Full canonical09 on pushed 9367f2fd publishes The Bay Area
+Table in 31:14, prompt 64f1c56e-5ab6-48eb-9e15-e0cb94b728f7. Runner exit 0,
+watchdog SUCCESS, terminal ledger/history/OBS path agree. Saved spoken dialogue
+preserves every supplied dinner fact; actual bf_emma/vz_bill_boerst/
+vz_donor_bathri credits agree. P1 recovers one interrupted call within the
+existing retry budget. This is the first saved-dialogue fidelity pass among
+nine full attempts (four writing failures, five publications). Visual continuity,
+listening and broader repeatability remain unqualified. Raw receipt, graph,
+ledger/logs, all 27 stills and credits: 2026-09-11-my-story-5080-qualification/.
+
+New observed longstanding defect PBUG-20260911-03 is OPEN: SceneAwareScopes
+retains a rendered intermediate in shared/tmp, despite owning episode identity.
+The producer chooses that tier; it is not the prior rename bug. No fix begun.
+The scopes blend was bypassed in 09 and final publication succeeded separately.
+Next scopes/continuity/stress scopes live only in GO_FORWARD. This handoff makes
+no production, canonical or executable-test changes and starts no further run.
+
+GO_FORWARD is reduced to pending sprints and a stable-ID backlog index. Its
+entire prior contents and the superseded July session handoff are preserved
+verbatim in the archive and as byte-exact snapshots. Completed scan collapse,
+worktree-credit repair, title containment, old test obligations and obsolete SA3
+first-render claims are no longer active tasks. Ghost HalfB and the unresolved
+style-field ownership decision remain. Bible content (344 rules) and tests are
+unchanged; incident annotations and the index record OPEN 01.02 scopes work
+and 11.39's measured 09 source result. Path verification is owed with the fix.
+
+Latest production validation: 181 focused passes; full 14,466 passed, 51 inherited
+failures, 183 skipped, one xfail (exit 2). Bible: 38 passed, ten inherited failures,
+11 skipped, three xfails (exit 1). No all-green claim. Prior actual Opus/Gemini
+R1-R4 and Sonnet residuals remain visible. The strict Bible metadata validator
+has 149 identical baseline/candidate issues; its exit 1 is recorded separately.
+Documentation validation and review dispositions: 2026-09-11-my-story-opus-handoff/.
+Owned server PIDs 18316/51372 stopped, port 8000 empty, desktop GPU 2,425 MiB.
+Mac/4060 held; RunPod unauthenticated/no rental; no acoustic audition, messages,
+version bumps, tags or promotions. Unrelated files preserved. Both docs repos
+are committed/pushed together with this handoff; verify current HEAD/origin.
+
 ## 2026-09-11 -- frame ownership repair qualified offline; canonical09 next
 
 Existing P0/P1 and source-correction scopes now separate dramatic cast/ending

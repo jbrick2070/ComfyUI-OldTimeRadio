@@ -1,0 +1,225 @@
+"""Check documentation, preserved evidence and unchanged executable state."""
+from pathlib import Path
+from datetime import datetime, timezone
+import hashlib
+import json
+import re
+import shutil
+import socket
+import subprocess
+import sys
+from urllib.parse import unquote
+import yaml
+
+root = Path.cwd().resolve()
+bible = root.parents[1] / 'comfyui-custom-node-survival-guide'
+handoff = root / 'docs/2026-09-11-my-story-opus-handoff'
+evidence = root / 'docs/2026-09-11-my-story-5080-qualification'
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+def write_json(path, data):
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
+def git(where, *args):
+    return subprocess.check_output(['git', *args], cwd=where)
+def norm(text):
+    return text.replace('\r\n', '\n')
+
+report = {'utc': datetime.now(timezone.utc).isoformat(), 'scope': 'documentation and immutable live evidence only'}
+report['code_base'] = git(root, 'rev-parse', 'HEAD').decode().strip()
+report['bible_base'] = git(bible, 'rev-parse', 'HEAD').decode().strip()
+assert report['code_base'] == '9367f2fdef6aefa6d33287ffe95fe2ce2316b98c'
+assert report['bible_base'] == '7c87b17bed48bfe3c36a362a755b91d5bab95a47'
+
+# Compare the existing strict validator with the exact committed rule file.
+baseline = handoff / 'bible_rules_baseline.txt'
+baseline.write_bytes(git(bible, 'show', 'HEAD:BUG_BIBLE.yaml'))
+results = {}
+for label, path in [('baseline', baseline), ('candidate', bible / 'BUG_BIBLE.yaml')]:
+    result = subprocess.run([sys.executable, str(bible / 'tools/reload_bug_bible.py'), '--bible', str(path)],
+                            cwd=bible, capture_output=True, text=True, encoding='utf-8')
+    output = result.stdout + result.stderr
+    (handoff / f'bible_schema_{label}.log').write_text(output, encoding='utf-8', newline='\n')
+    results[label] = {'exit_code': result.returncode, 'issues': [x for x in output.splitlines() if x.startswith('  - ')]}
+assert results['baseline'] == results['candidate']
+report['bible_strict_validator'] = {'baseline_exit': results['baseline']['exit_code'],
+    'candidate_exit': results['candidate']['exit_code'], 'unchanged_issue_count': len(results['candidate']['issues']),
+    'exact_issue_payloads_match': True}
+old_rules = yaml.safe_load(baseline.read_text(encoding='utf-8'))
+new_rules = yaml.safe_load((bible / 'BUG_BIBLE.yaml').read_text(encoding='utf-8'))
+assert old_rules == new_rules
+ids = [str(row['id']) for row in new_rules['bugs']]
+assert len(ids) == len(set(ids)) == 344
+index = yaml.safe_load((bible / 'otr_coverage_index.yaml').read_text(encoding='utf-8'))
+assert index['bible_entries'] == 344
+new_records = index['records'][-2:]
+assert [str(row['bible_id']) for row in new_records] == ['01.02', '11.39']
+assert all(str(row['bible_id']) in ids for row in new_records)
+assert 'OPEN' in new_records[0]['record']
+assert '344' in (bible / 'README.md').read_text(encoding='utf-8')
+report['bible_yaml'] = {'parse': 'pass', 'unique_entries': 344,
+    'rule_objects_unchanged': True, 'new_index_references_valid': True, 'readme_index_count_matches': True}
+
+# Exact source snapshots survive separately; archive preserves all text.
+scope = json.loads((handoff / 'documentation_scope.json').read_text(encoding='utf-8'))
+archive = norm((root / 'docs/GO_FORWARD_ARCHIVE.md').read_bytes().decode('utf-8'))
+for filename, key in [('go_forward_before.md', 'archived_plan_sha256'), ('session_handoff_before.md', 'archived_session_sha256')]:
+    raw = (handoff / filename).read_bytes()
+    assert sha(raw) == scope[key]
+    assert norm(raw.decode('utf-8')) in archive
+retired = json.loads((handoff / 'retired_guidance.json').read_text(encoding='utf-8'))
+for item in retired['files']:
+    assert not (root / item['path']).exists()
+    raw = item['utf8_text_verbatim'].encode('utf-8')
+    assert len(raw) == item['bytes'] and sha(raw) == item['sha256']
+    assert norm(raw.decode('utf-8')) in archive
+    assert norm(git(root, 'show', 'HEAD:' + item['path']).decode('utf-8')) == norm(raw.decode('utf-8'))
+report['archives'] = {'prior_plan_and_session_exact_hashes': True,
+    'retired_guidance_exact_recoverable_files': len(retired['files']), 'all_text_preserved_verbatim': True,
+    'immutable_source_feedback_packet_retained': (root / retired['retained'][0]).is_file()}
+
+# Preserve the actual scripts as inert receipt sources, then remove only owned helpers.
+copies = {
+    'tmp/run_my_story_pairlock_09.py': evidence / 'pairlock_09_wrapper_source.txt',
+    'tmp/preflight_pairlock_09.py': evidence / 'pairlock_09_preflight_source.txt',
+    'tmp/audit_pairlock_09.py': evidence / 'pairlock_09_snapshot_source.txt',
+    'tmp/inspect_pairlock_09_delivery.py': evidence / 'pairlock_09_delivery_analysis_source.txt',
+    'tmp/finalize_pairlock_09_handoff.py': handoff / 'finalize_handoff_source.txt',
+    'tmp/retire_stale_handoff_docs.py': handoff / 'retire_guidance_source.txt',
+    'tmp/validate_opus_handoff.py': handoff / 'validation_source.txt',
+}
+for relative, target in copies.items():
+    path = root / relative
+    if path.exists():
+        shutil.copyfile(path, target)
+    assert target.is_file()
+
+# Verify the live artifact paths/hashes without regenerating or moving them.
+request = json.loads((evidence / 'pairlock_09_request.json').read_text(encoding='utf-8'))
+analysis = json.loads((evidence / 'pairlock_09_delivery_analysis.json').read_text(encoding='utf-8'))
+assert request['status'] == 'success' and request['runner_returncode'] == 0
+assert request['ledger_prompt_correlated'] and request['code_unchanged_during_run']
+assert request['submitted_graph_matches_attempt08']
+ledger_raw = (evidence / 'pairlock_09_ledger.json').read_bytes()
+assert ledger_raw == Path(request['ledger_path']).read_bytes()
+assert sha(ledger_raw) == request['ledger_sha256']
+obs = analysis['obs_file']
+obs_raw = Path(obs['path']).read_bytes()
+assert len(obs_raw) == obs['bytes'] == 87722712 and sha(obs_raw) == obs['sha256']
+stills = json.loads((evidence / 'pairlock_09_stills_manifest.json').read_text(encoding='utf-8'))['images']
+assert len(stills) == 27
+for row in stills:
+    source = Path(row['path'])
+    assert source.read_bytes() == (evidence / ('pairlock_09_' + source.name)).read_bytes()
+scopes_path = root.parents[1] / 'output/otr/episodes/_shared/tmp/otr_scopes_signal_lost_the_bay_area_table_20260911_074902_20260911_080240.mp4'
+scopes_raw = scopes_path.read_bytes()
+assert len(scopes_raw) == 1593341
+write_json(evidence / 'pairlock_09_scopes_path_receipt.json', {'bug': 'PBUG-20260911-03',
+    'status': 'OPEN', 'path': scopes_path.as_posix(), 'bytes': len(scopes_raw), 'sha256': sha(scopes_raw),
+    'producer': 'nodes/otr_scene_aware_scopes.py', 'blend_bypassed': True,
+    'retained_in_place': True, 'fix_or_new_production_test_claimed': False})
+canonical = (root / 'workflows/otr_canonical.json').read_bytes()
+assert sha(canonical) == request['canonical_sha256']
+parsed = json.loads(canonical)
+assert json.loads(json.dumps(parsed)) == parsed
+report['evidence'] = {'prompt_id': request['prompt_id'], 'canonical_sha256': sha(canonical),
+    'canonical_roundtrip': True, 'nodes': len(parsed['nodes']), 'links': len(parsed['links']),
+    'ledger_hash_and_live_file_match': True, 'obs_bytes_and_hash_match': True, 'exact_still_copies': len(stills),
+    'scopes_live_receipt': 'pairlock_09_scopes_path_receipt.json',
+    'new_live_or_audio_test': False, 'prior_runtime_schema_audit': 'unchanged qualified code/canonical; see frame-ownership receipt'}
+
+allowed = {'.gitattributes', 'README.md', 'docs/GO_FORWARD_ARCHIVE.md', 'docs/GO_FORWARD_PLAN.md',
+           'docs/HANDOFF_LOG.md', 'docs/PROD_BUG_LOG.md', 'session_handoff.md', *[row['path'] for row in retired['files']]}
+changed = set(git(root, 'diff', '--name-only', 'HEAD').decode().splitlines())
+assert changed <= allowed, changed - allowed
+assert set(git(bible, 'diff', '--name-only', 'HEAD').decode().splitlines()) <= {'BUG_BIBLE.yaml', 'README.md', 'otr_coverage_index.yaml'}
+report['executable_state'] = {'production_workflow_config_tests_unchanged': True,
+                            'tracked_document_changes': sorted(changed)}
+with socket.socket() as probe:
+    probe.settimeout(1)
+    assert probe.connect_ex(('127.0.0.1', 8000)) != 0
+report['local_server'] = {'port8000_listening': False, 'no_generation_queued': True}
+
+write_json(handoff / 'validation.json', report)
+
+# Check active handoff links; dated archives deliberately keep their historical targets.
+active = ['docs/GO_FORWARD_PLAN.md', 'session_handoff.md',
+          'docs/2026-09-11-my-story-opus-handoff/README.md',
+          'docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md']
+checked_links = []
+link_re = re.compile(r'\[[^\]\n]*\]\(([^)\n]+)\)')
+for relative in active:
+    path = root / relative
+    for raw_target in link_re.findall(path.read_text(encoding='utf-8')):
+        target = unquote(raw_target.strip('<>'))
+        if re.match(r'\w+://', target):
+            continue
+        name, _, anchor = target.partition('#')
+        resolved = (path.parent / name).resolve() if name else path
+        assert resolved.exists(), (relative, target)
+        if anchor:
+            headings = re.findall(r'^#{1,6} (.+)$', resolved.read_text(encoding='utf-8'), re.M)
+            slugs = [re.sub(r'[^\w\- ]', '', heading.lower()).replace(' ', '-') for heading in headings]
+            assert anchor in slugs, (relative, target)
+        checked_links.append({'file': relative, 'target': target})
+
+# Only new links in broader living logs/README are this handoff's scope.
+for relative in ['README.md', 'docs/HANDOFF_LOG.md', 'docs/PROD_BUG_LOG.md']:
+    before = set(link_re.findall(git(root, 'show', 'HEAD:' + relative).decode('utf-8')))
+    path = root / relative
+    for target in set(link_re.findall(path.read_text(encoding='utf-8'))) - before:
+        if re.match(r'\w+://', target):
+            continue
+        name = unquote(target.split('#')[0].strip('<>'))
+        assert (path.parent / name).resolve().exists(), (relative, target)
+        checked_links.append({'file': relative, 'target': target})
+width = None
+for line in (root / 'docs/GO_FORWARD_PLAN.md').read_text(encoding='utf-8').splitlines():
+    if not line.startswith('|'):
+        width = None
+        continue
+    count = len(re.split(r'(?<!\\)\|', line))
+    if width is None:
+        width = count
+    assert count == width, line
+report['markdown'] = {'active_and_new_links_checked': len(checked_links), 'broken_links': [],
+    'go_forward_table_widths': 'pass', 'historical_archive_links_not_reinterpreted': True}
+
+text_files = [root / p for p in changed if (root / p).is_file()]
+text_files += list(handoff.glob('*')) + list(evidence.glob('pairlock_09*'))
+text_files += [bible / p for p in ['BUG_BIBLE.yaml', 'README.md', 'otr_coverage_index.yaml']]
+secret_hits = []
+for path in text_files:
+    raw = path.read_bytes()
+    assert raw, path
+    if path.suffix.lower() == '.png':
+        continue
+    assert not raw.startswith(b'\xef\xbb\xbf'), path
+    text = raw.decode('utf-8')
+    if re.search(r'(?:sk-or-v1-[a-f0-9]{30,}|hf_[A-Za-z0-9]{30,})', text):
+        secret_hits.append(str(path))
+assert not secret_hits, secret_hits
+report['files'] = {'nonempty': True, 'text_utf8_no_bom': True, 'credential_pattern_hits': 0}
+report['result'] = 'PASS: handoff changes; strict Bible validator has 149 exactly inherited metadata issues'
+write_json(handoff / 'validation.json', report)
+
+for relative in list(copies) + ['tmp/opus_session_handoff.md']:
+    path = (root / relative).resolve()
+    assert path.is_relative_to(root / 'tmp')
+    if path.exists():
+        path.unlink()
+
+def manifest(folder, candidates, filename):
+    rows = []
+    for path in sorted(candidates):
+        if path.name == filename:
+            continue
+        raw = path.read_bytes()
+        rows.append({'path': path.relative_to(root).as_posix(), 'bytes': len(raw), 'sha256': sha(raw)})
+    write_json(folder / filename, {'scope': 'immutable evidence; excludes this manifest itself',
+        'code_base': report['code_base'], 'file_count': len(rows), 'files': rows})
+    return len(rows)
+counts = {'canonical09': manifest(evidence, evidence.glob('pairlock_09*'), 'pairlock_09_evidence_manifest.json'),
+          'handoff': manifest(handoff, handoff.glob('*'), 'evidence_manifest.json')}
+print(json.dumps({'result': report['result'], 'bible': report['bible_yaml'],
+    'strict_validator': report['bible_strict_validator'], 'archives': report['archives'],
+    'markdown': report['markdown'], 'manifest_files': counts}, indent=2))

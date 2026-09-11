@@ -76,3 +76,6 @@ docs/PROD_BUG_LOG.md   merge=union
 docs/4060_DRILL_LOG.md merge=union
 docs/known-failures.md merge=union
 BUG_LOG.md             merge=union
+
+# Preserve exact handoff snapshots and evidence hashes across checkouts.
+docs/2026-09-11-my-story-opus-handoff/** -text

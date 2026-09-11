@@ -1,0 +1,71 @@
+{
+  "utc": "2026-09-11T15:34:41.968682+00:00",
+  "scope": "documentation and immutable live evidence only",
+  "code_base": "9367f2fdef6aefa6d33287ffe95fe2ce2316b98c",
+  "bible_base": "7c87b17bed48bfe3c36a362a755b91d5bab95a47",
+  "bible_strict_validator": {
+    "baseline_exit": 1,
+    "candidate_exit": 1,
+    "unchanged_issue_count": 149,
+    "exact_issue_payloads_match": true
+  },
+  "bible_yaml": {
+    "parse": "pass",
+    "unique_entries": 344,
+    "rule_objects_unchanged": true,
+    "new_index_references_valid": true,
+    "readme_index_count_matches": true
+  },
+  "archives": {
+    "prior_plan_and_session_exact_hashes": true,
+    "retired_guidance_exact_recoverable_files": 5,
+    "all_text_preserved_verbatim": true,
+    "immutable_source_feedback_packet_retained": true
+  },
+  "evidence": {
+    "prompt_id": "64f1c56e-5ab6-48eb-9e15-e0cb94b728f7",
+    "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+    "canonical_roundtrip": true,
+    "nodes": 23,
+    "links": 63,
+    "ledger_hash_and_live_file_match": true,
+    "obs_bytes_and_hash_match": true,
+    "exact_still_copies": 27,
+    "scopes_live_receipt": "pairlock_09_scopes_path_receipt.json",
+    "new_live_or_audio_test": false,
+    "prior_runtime_schema_audit": "unchanged qualified code/canonical; see frame-ownership receipt"
+  },
+  "executable_state": {
+    "production_workflow_config_tests_unchanged": true,
+    "tracked_document_changes": [
+      ".gitattributes",
+      "README.md",
+      "SKILL.md",
+      "_START_HERE.md",
+      "docs/GO_FORWARD_ARCHIVE.md",
+      "docs/GO_FORWARD_PLAN.md",
+      "docs/HANDOFF_LOG.md",
+      "docs/OWNERSHIP_HANDOFF_4060.md",
+      "docs/PROD_BUG_LOG.md",
+      "docs/skills-backup/otr-handoff-SKILL-v2.md",
+      "docs/skills-backup/otr-handoff-SKILL.md",
+      "session_handoff.md"
+    ]
+  },
+  "local_server": {
+    "port8000_listening": false,
+    "no_generation_queued": true
+  },
+  "markdown": {
+    "active_and_new_links_checked": 14,
+    "broken_links": [],
+    "go_forward_table_widths": "pass",
+    "historical_archive_links_not_reinterpreted": true
+  },
+  "files": {
+    "nonempty": true,
+    "text_utf8_no_bom": true,
+    "credential_pattern_hits": 0
+  },
+  "result": "PASS: handoff changes; strict Bible validator has 149 exactly inherited metadata issues"
+}

@@ -1,0 +1,11 @@
+{
+  "production_changed": false,
+  "bible_rules_semantically_unchanged": true,
+  "bible_entries": 344,
+  "tests_unchanged": true,
+  "archived_plan_sha256": "0c7b269c789986c46a1b4f818bb404c26208d75f7145ce2350ae4621aecdd49e",
+  "archived_session_sha256": "a1eb4a2f5b3972437e604ca28bce5e2f8b89dae5eeb150b74506b2fea3a0a2a3",
+  "new_bug": "PBUG-20260911-03",
+  "bug_status": "OPEN; root fix and executable verification owed",
+  "operator_handoff": "No further production edit or GPU run before Opus takes ownership"
+}
