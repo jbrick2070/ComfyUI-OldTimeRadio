@@ -14479,3 +14479,16 @@ Zeroauthoredrows/media. Pending scope: existingphaseownership and actionable
 whole-treatmentrepair, without newcall/schema/gate/alias/blindstrip. Portable
 Biblepromotion/coverage accompanies the eventualfix; nofixclaimedyet. Evidence:
 2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md.
+
+
+### PBUG-20260910-03 follow-up -- frame ownership repair qualified offline
+
+Existing P0/P1 authored/correction scopes now exclude the house frame from
+dramatic cast, act beats and ending. The reserved-cast typed repair names a
+conditional whole-treatment correction and simultaneous act-count mismatch.
+Seven tests fail original code;181focusedpass,full14,466/51sameinherited/183/1,
+Bible38/10inherited,canonical23nodes63links unchanged. P0 remains non-blocking;
+prose-only frame leakage can still pass structure. No semantic PASS from tests,
+new gate/call/schema/alias/blindcaststrip. Actual finalSonnet QA grounded; next
+fullcanonical09 must inspect all fields/final speech. ExistingBible11.39 carries
+portable coverage and residuals. Receipt:2026-09-11-my-story-frame-ownership/.

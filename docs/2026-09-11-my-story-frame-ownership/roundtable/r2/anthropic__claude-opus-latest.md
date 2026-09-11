@@ -1,0 +1,29 @@
+<!-- requested_model: ~anthropic/claude-opus-latest | resolved_model: anthropic/claude-opus-5 -->
+
+## Blocking implementation defects
+
+**A. §3's new concluding sentence fights §2's error (prompt ordering).**
+`_full_artifact_repair` assembles: instruction → "The validation problem is: %s" → shared sentence. §2's error demands *changing* the ending; §3's shared sentence ("preserve … the original source's intended ending") lands **last**, i.e. in the strongest recency position, and a 12B model that already repeated all three leaks verbatim (attempt 2 differed only in punctuation) is being asked to both change and preserve "the ending" in one prompt. Fix concretely: emit the defect direction *after* the preservation clause, or make the shared clause say "the original source's intended ending — not the failed draft's ending" (R1 already conceded the wording is "needlessly ambiguous" but §3 leaves the ordering untouched).
+
+**B. §2 relies on a validator that short-circuits.** `_make_treatment_validator` returns the reserved-name error *before* appending the act-count problem. A canned/real draft with ANNOUNCER **and** wrong act count reports only the frame defect; the act mismatch surfaces on the next attempt and consumes budget. §5 parameterizes acts 1/3/6 but never tests the combined case. Either append both problems or state that the combined case is out of scope.
+
+**C. §4 does not say *how* the P1 instruction is passed, and there is a real collision.** `_pass_act` (line 588) **mutates** `source_kwargs["source_rewrite_instruction"]`. If P1's instruction is passed as an explicit keyword to `_call` while `source_kwargs` already carries the key, Python raises `TypeError: got multiple values`; if it is injected into a shared `source_kwargs` dict by the caller, it leaks into later passes. Specify the exact mechanism (per-call keyword, dict copied) and add a test that P1's and each act's instruction are the exact expected strings.
+
+**D. P0 correction can silently resurrect the ANNOUNCER row.** `_retain_omitted` restores the *original* list whenever the field is **not in `model_fields_set`** — only explicit list membership wins. §4 asserts "explicit list membership wins" but nothing in the proposal requires the corrector to *emit* `named_cast` at all. Add to the P0 instruction: "return the complete named_cast and cast_plan explicitly." Likewise `cast_plan.planned` must be **recounted to 2**; §4 says "exclude from planned" but `_pass_interpret` has **no `post_validator`**, so nothing checks planned == speaking count. State that P0 correctness is unenforced best-effort.
+
+**E. Retaining the frame requirement row is both unguaranteed and a P1 re-leak vector.** Requirements use the same membership rule, so a corrector may drop the frame row despite §1. Worse, `_pass_treatment` injects the whole interpretation JSON into P1's prompt; a `kind: frame` row whose *text* reads "an announcer introduces the story" is precisely the input that produced the leak. §1 puts the ownership note only in `cast_plan.reason`. Require the **requirement text itself** to name the separate frame pass as owner.
+
+**F. Two of the three leaks have no enforcement at all.** The validator checks only cast names and act count. A repaired treatment whose `acts[0].turns[0]` is an ANNOUNCER opening, or whose `ending` is "the announcer closes," **passes** and is then foregrounded by `_pass_act`'s `global_ending` branch. §5 explicitly concedes canned outcomes are routing proof only, but the proposal never states the **run-09 acceptance criterion** for a schema-valid-but-frame-flavoured ending. Define it now, or run 09 is unfalsifiable.
+
+**G. Root cause in the source text is unaddressed.** The raw `characters` field says "apart from the announcer," and P0 dutifully made it a required speaking cast member. §1/§4's abstract rules never handle that phrasing. Add the concrete pattern ("only X and Y speak, apart from the announcer" → two dramatic speakers + one frame requirement) or expect the same P0 output.
+
+**H. §6's "no ID change" claim is unverified.** §3 edits a shared string used by four callers (interpret/treatment/act/frame). Any existing test asserting the old concluding sentence or the old treatment instruction changes payload. Enumerate those tests before claiming 14459/51/183/1 identity.
+
+**I. §5 freezes "two actual typed calls" without grounding.** `max_attempts=3`, yet run 08 stopped at 2. The proposal asserts the number rather than citing the ladder rule that produces it. If the third attempt is suppressed by a temperature/disposition path, the test encodes an unexplained constant; name the mechanism.
+
+## Over-engineering
+
+§1 adds four paragraphs of carve-outs (announcer-as-profession, "frame reference is not a conflict", P3 ownership, ending-correction procedure) across P0 **and** P1, then §4 restates ~80% of it as `source_rewrite_instruction`. That is double instruction against a model whose outputs are 638–801 tokens; every added clause is another surface to misread, and §4 itself admits "author P0/P1 already receive equivalent pack instructions." Trim to one binding sentence per seam: P0 = "the house ANNOUNCER is not dramatic cast; record it as a `frame` requirement"; P1 = "no announcer cast row, no frame turns, no frame ending — the frame pass owns intro/outro/coda." Keep the announcer-as-profession exception only in P0 (P1 inherits it via `named_cast`).
+
+## Not defects
+Rejecting the prose keyword gate (§ "R1 grounded judgment") is right; `_make_act_validator` + `_assemble`'s `char_id_by_name` exclusion means an ANNOUNCER dialogue line is rejected before assembly, so no KeyError lane exists. `_assign_voices` c02.. numbering is unaffected by cast-row removal.

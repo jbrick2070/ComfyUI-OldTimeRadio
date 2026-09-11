@@ -1,0 +1,110 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+judgment='''# R2 grounded judgment
+
+Actual Opus5/Gemini3.1Pro, two calls, USD0.334. Root verified all visible claims.
+Accept Gemini's conditional whole-treatment repair: a cast failure proves a
+reserved identity, not corrupt prose. Say IF house-frame openings/closings were
+included in acts/ending, replace those with source-grounded dramatic events and
+conclusion; preserve already-correct fields. Accept moving the validation defect
+after the shared preservation direction to make the requested correction clear.
+
+Accept aggregate reserved-frame and act-count diagnostics in the existing
+problems list. Same conditions; no new gate. Keep duplicate/empty-name behavior.
+Add a combined wrong-count/reserved-frame fixture to prove one remaining typed
+repair receives both and fixes both, rather than spending another call.
+
+Use source_kwargs['source_rewrite_instruction']=... inside each phase, like the
+existing act owner. **kwargs creates a fresh dict, so this cannot mutate the
+caller's mapping or leak to another phase; no duplicate explicit keyword. Actual
+runner source_kwargs() creates only receipts/scheduler/model keys per pass.
+Opus's claimed current collision/leak is hypothetical, prevented by this exact
+implementation. Test caller mapping unchanged and phase isolation, not long
+identical literal pins.
+
+Accept explicit complete named_cast and cast_plan in P0 correction instruction;
+conservation of omitted fields remains. Require explicit house frame requests to
+name frame ownership in requirement text as well as kind frame. Explain house
+frame exclusion in reason only when relevant, retaining the dramatic cast-count
+reason. P0 remains interpretation, not another admission gate or proven semantic
+count check. Existing schema does not equate planned to speaking; no new check.
+
+Keep the named dramatic announcer profession; do not introduce a generated alias
+for a person literally named ANNOUNCER. The latter is an existing reserved-name
+limitation, not evidenced by08 and not a newly introduced regression. Gemini's
+suggested name invention violates source identity policy. Full raw source remains.
+No hardcoded Jeffrey/Mother example needed; general house-versus-dramatic scope
+handles 'apart from the announcer'. Keep instructions concise, no architecture
+lecture; author pack defines output fields, correction instruction restates only
+owner scope/explicit returned fields as with existing P2 correction.
+
+No source/prose keyword gate; both reviewers now agree. Partial compliance is
+observable by reading raw actual treatment/acts/final rows, not parser inference.
+09 qualification requires house-role exclusion across cast, act beats and global
+ending, retained two dramatic speakers/present shared dinner, spoken childhood
+memory and mother's own response, girlfriend mention, present-day appreciation
+ending, correct gender/actual voice/credits, published canonical assets and honest
+images/audio limits. Schema-valid frame leakage is a failure, not a silent PASS.
+
+Budget grounded: _otr_structured_call.py:1000-1018 skips structural retry for
+PostValidationError (it is only for JSON decode/rerollable capacity errors);
+1057 onward is one typed-repair final rung. Two actual calls on this failure,
+despite max_attempts3. No semantic reroll/repair after failure. Existing count
+repair test has the only matching 'exactly N acts' pin, retained by new wording.
+No test pins the old concluding sentence. Full failure comparison is a future
+check, not a promise that test outcomes must match.
+'''
+(d/'roundtable/pass01_judgment.md').write_text(judgment,encoding='utf-8')
+anchor='''# R3 wiring and sequencing -- root grounded before panel
+
+Reply with concrete wiring/integration blockers within 900 words. R2 judgment
+below supersedes earlier proposed wording. No implementation has occurred.
+
+Fresh canonical09 uses workflows/otr_canonical.json, unchanged SHA256
+d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c (23 nodes/63 links).
+The actual canonical writer is node1 OTR_LedgerScriptWriter. Its routed source
+bank selects my_story_multipass; _otr_lane_specs imports _otr_my_story and calls
+run_my_story_episode. Writer dispatch resolves the shipped bank pack at execution
+time; P0/P1 _seam reads its existing prompt_stages. Existing _call consumes the
+phase scope before native slot invocation, passes it to source correction's
+system message, and keeps full raw source/draft/author context. One source
+correction after accepted author; fixed two calls, no recursive model checker.
+The reserved-name typed repair is inside the existing author ladder, never a
+source rescue. No schema/control/widget/node/link changes, so no cosmetic edit
+to canonical JSON. Still run full live-class workflow validator/widget/link audit.
+
+No frozen ledger/replay mutation or embedded pack retrofit. New server/process
+loads the changed shipped pack; qualification uses freshly authored ledger and
+full canonical API graph, not a replay or component harness. No change to pack
+identity/schema version/bank or routing; existing runtime receives edited seams.
+
+Edit one production chunk after R4: nodes/_otr_my_story.py, existing my_story.json,
+tests/test_my_story_runner.py. Aggregate only existing reserved/count errors,
+conditional repair wording, explicit source authority and per-phase scope.
+Bible11.39 existing production failure followup plus inventory of exercised OTR
+tests; no new bug from invented fixtures. Root sole coder, delegates read-only.
+Use current fresh detached baseline/candidate worktrees at1d623f96 for controlled
+Bible checks; compare new OTR full XML with previous14459/51/183/1 baseline by
+IDs AND normalized failure payloads. Meaningful new tests must fail original
+code, then pass revised code; no new quarantine. Actual Sonnet finished-code QA
+after final edit; if QA causes edits, recheck affected tests/full/Bible and Sonnet.
+Push Biblemain/OTRv2.0-alpha, verify HEAD/origin and committed evidence bytes.
+Update GO_FORWARD remaining-only/archive completed instructions verbatim.
+
+Only then selective reset, empty:8000, desktop VRAM baseline, UTF8 launcher and
+full canonical09 on Gemma4-12B both slots/exact decorated labels, same source/
+profile/settings as08. Prequeue dryrun graph equality with08 required. Retain all
+8 prior attempts, qualified code/canonical hashes pre/post, raw prompt/history/
+ledger/model output/terminal logs and actual direct episode/obs asset checks.
+Failure is archived and diagnosed before more generation. No production edits
+during live run, no Mac/4060 contact, no unauthenticated RunPod/rental.
+'''
+packet=anchor+'\n'+judgment+'\n## Exact preceding R2 input\n'+(d/'roundtable/pass01_plan.md').read_text(encoding='utf-8')
+for rel,start,end in [('nodes/OTR_LedgerScriptWriter.py',3660,3705),('nodes/_otr_lane_specs.py',72,128),('nodes/_otr_story_routing.py',785,800),('nodes/_otr_my_story.py',1018,1070),('nodes/_otr_structured_call.py',998,1065)]:
+    packet+='\n## '+rel+':'+str(start)+'\n```python\n'+'\n'.join((r/rel).read_text(encoding='utf-8').splitlines()[start-1:end])+'\n```\n'
+(d/'roundtable/pass02_plan.md').write_text(packet,encoding='utf-8')
+print('R2 judged; R3 wiring proposal and actual dispatch evidence written.')

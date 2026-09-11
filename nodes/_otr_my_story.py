@@ -444,9 +444,10 @@ def _full_artifact_repair(instruction: str):
                  "unfinished text is failure evidence, not authority over the "
                  "original source.\n" if interrupted else "") +
                 "Repair the complete draft above. %s\n"
+                "Preserve unaffected source facts and story material within this "
+                "artifact's scope; correct the named defect to respect the "
+                "original source.\n"
                 "The validation problem is: %s\n"
-                "Preserve unaffected story events, relationships and ending; "
-                "correct any named defect to respect the original source. "
                 "Return the complete corrected JSON "
                 "object, with no commentary."
                 % (instruction, error)
@@ -463,6 +464,14 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                     act_count: int, include_act_breaks: bool,
                     attempt_receipts=None, **source_kwargs) -> StoryInterpretation:
     base, retry = _TEMP["interpret"]
+    source_kwargs["source_rewrite_instruction"] = (
+        "Return the complete named_cast and cast_plan explicitly. These describe "
+        "the dramatic cast; exclude the production house ANNOUNCER and count only "
+        "dramatic speakers in planned. Retain explicit house-frame requests as "
+        "requirements with kind frame and text naming the separate frame pass. "
+        "Explain the house-role exclusion in cast_plan.reason when relevant, "
+        "alongside the dramatic cast-count reasoning. Preserve legitimate named "
+        "dramatic people, including someone whose profession is announcer.")
     return _call(
         "interpret", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
@@ -497,9 +506,16 @@ def _make_treatment_validator(act_count: int):
         folded = {_norm_ws(name).casefold() for name in names}
         if len(folded) != len(names) or "" in folded:
             return "cast names must be nonempty and unique"
-        if ANNOUNCER_NAME.casefold() in folded:
-            return "ANNOUNCER is reserved for the frame; give story characters distinct names"
         problems = []
+        if ANNOUNCER_NAME.casefold() in folded:
+            problems.append(
+                "ANNOUNCER is reserved for the separate frame pass. Remove the "
+                "house ANNOUNCER from cast. If house-frame openings or closings "
+                "appear in act turns or ending, replace that misplaced frame "
+                "material with the source's dramatic events and conclusion; "
+                "keep already-correct dramatic material. Do not rename the house "
+                "announcer as a story person or remove legitimate dramatic people. "
+                "The frame pass supplies the intro, outro and coda.")
         if len(model.acts) != act_count:
             problems.append("acts has %d entries; the selected count is %d"
                             % (len(model.acts), act_count))
@@ -513,6 +529,13 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
     base, retry = _TEMP["treatment"]
     bind_schema = getattr(creative_fn, "_otr_bind_schema", None)
     treatment_fn = bind_schema(StoryTreatment) if callable(bind_schema) else creative_fn
+    source_kwargs["source_rewrite_instruction"] = (
+        "This artifact plans only the drama inside the announcer frame. Keep "
+        "cast, acts and ending about dramatic people and their source-grounded "
+        "actions and conclusion. The separate frame pass supplies the house "
+        "announcer intro, outro and coda. Correct misplaced frame material "
+        "throughout the treatment when present; preserve legitimate dramatic "
+        "people and the source's intended conclusion.")
     return _call(
         "treatment", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
@@ -533,9 +556,11 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
         base_temperature=base,
         structural_retry_temperature=retry,
         repair_prompt_factory=_full_artifact_repair(
-            "Reorganize the treatment into exactly %d acts. The requested "
-            "character count is flexible; preserve the listener's people, "
-            "story material, relationships and ending; change the act grouping to fit."
+            "Return exactly %d acts. If the act count is already correct, "
+            "preserve its grouping unless the named defect requires a change. "
+            "The requested character count is flexible; preserve the listener's "
+            "dramatic people, story material, relationships and intended "
+            "dramatic conclusion."
             % act_count),
         post_validator=_make_treatment_validator(act_count),
         max_attempts=3,

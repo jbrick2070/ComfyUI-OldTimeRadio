@@ -1,0 +1,105 @@
+"""Fresh full canonical Gemma measurement after frame ownership QA."""
+from pathlib import Path
+from datetime import datetime, timezone
+import ast, copy, hashlib, json, re, shutil, subprocess, sys, urllib.request
+
+root = Path(__file__).resolve().parents[1]
+folder = root / 'docs/2026-09-11-my-story-5080-qualification'
+head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=root, text=True).strip()
+assert head == subprocess.check_output(['git','rev-parse','origin/v2.0-alpha'], cwd=root, text=True).strip()
+assert not subprocess.check_output(['git','diff','HEAD','--','nodes','tests','scripts','config','workflows'], cwd=root)
+checks = json.loads((root/'docs/2026-09-11-my-story-frame-ownership/file_checks.json').read_text(encoding='utf-8'))
+for check in checks:
+    raw = (root/check['path']).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == check['sha256'], check['path']
+    assert raw and not raw.startswith(b'\xef\xbb\xbf')
+    if check['path'].endswith('.py'):
+        ast.parse(raw.decode('utf-8'), filename=check['path'])
+    else:
+        json.loads(raw.decode('utf-8'))
+old = json.loads((folder/'pairlock_08_request.json').read_text(encoding='utf-8'))
+request = {k: old[k] for k in ('canonical_path','canonical_sha256','runner','profile','fields','quant_policy','scope','source_note','runpod','mac_4060','actual_sampling')}
+label = 'google/gemma-4-12b-it (23.9 GB, nv16 nv24)'
+request.update(creative_model=label, technical_model=label, code_commit=head,
+    executable_code_revision=head,
+    previous_attempts=['pairlock_01','pairlock_02','pairlock_03','pairlock_04','pairlock_05','pairlock_06','pairlock_07','pairlock_08'],
+    status='Full canonical submission; terminal outcome pending',
+    created_utc=datetime.now(timezone.utc).isoformat(), run_label='5080_pairlock_09_gemma_frame',
+    changed_control='Qualified frame ownership repair; same Gemma12B pair, raw source, profile and configured sampling as attempt08.',
+    model_dependent_differences='No model/control change from08. Fresh entropy and corrected code/pack; no reliability claim from one result.',
+    desktop_memory_before_boot_mib=int(sys.argv[1]))
+assert hashlib.sha256((root/'workflows/otr_canonical.json').read_bytes()).hexdigest() == request['canonical_sha256']
+def save(): (folder/'pairlock_09_request.json').write_text(json.dumps(request, indent=2)+'\n', encoding='utf-8')
+save()
+def graph_unchanged(actual, prior):
+    return actual == prior
+
+with urllib.request.urlopen('http://127.0.0.1:8000/object_info', timeout=10) as response:
+    info = json.load(response)
+assert 'OTR_LedgerScriptWriter' in info
+for model_key in ('creative_writing_model', 'technical_model'):
+    choices = info['OTR_LedgerScriptWriter']['input']['optional'][model_key][0]
+    assert label in choices, (model_key, 'exact Gemma label is unavailable; no prompt queued')
+args = ['--comfyui-url','http://127.0.0.1:8000','--profile',request['profile'],
+        '--creative-model',label,'--technical-model',label,'--run-label',request['run_label'],
+        '--dump-prompt',str(folder/'pairlock_09_prompt.json'),'--timeout','0','--poll-s','5']
+for key,value in request['fields'].items(): args.extend(['--set','OTR_LedgerScriptWriter.'+key+'='+json.dumps(value)])
+logpath = root/'tmp/my_story_5080_pairlock_09.log'
+with logpath.open('w', encoding='utf-8') as log:
+    command = [sys.executable,'-u',str(root/request['runner']),*args]
+    result = subprocess.run([*command,'--dry-run'], cwd=root, stdout=log, stderr=subprocess.STDOUT)
+    assert result.returncode == 0, 'Full canonical dry run failed'
+    prior = json.loads((folder/'pairlock_08_prompt.json').read_text(encoding='utf-8'))
+    assert graph_unchanged(json.loads((folder/'pairlock_09_prompt.json').read_text(encoding='utf-8')), prior), 'Unexpected API prompt change from actual attempt08'
+    request['graph_matches_attempt08'] = True
+    save()
+    result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
+request['runner_returncode'] = result.returncode
+request['runner_returned_utc'] = datetime.now(timezone.utc).isoformat()
+save()
+print('Shipped canonical runner exited', result.returncode, flush=True)
+for source,target in [('my_story_5080_pairlock_09.log','pairlock_09_runner.log'),('my_story_5080_pairlock_09_server.log','pairlock_09_server.log')]:
+    shutil.copyfile(root/'tmp'/source, folder/target)
+match = re.search(r'QUEUED prompt_id=([a-f0-9-]+)', logpath.read_text(encoding='utf-8'))
+if not match:
+    request['status'] = 'no_prompt_id'
+    save()
+    raise RuntimeError('No queued prompt; request and logs preserved, not a story attempt')
+pid = match.group(1)
+with urllib.request.urlopen('http://127.0.0.1:8000/history/'+pid, timeout=10) as response: history=json.load(response)
+(folder/'pairlock_09_history.json').write_text(json.dumps(history,indent=2)+'\n', encoding='utf-8')
+request.update(prompt_id=pid, status=history[pid]['status']['status_str'], terminal_utc=datetime.now(timezone.utc).isoformat())
+save()
+with urllib.request.urlopen('http://127.0.0.1:8000/otr/latest_ledger',timeout=10) as response: latest=json.load(response)
+(folder/'pairlock_09_latest_ledger_response.json').write_text(json.dumps(latest,indent=2)+'\n',encoding='utf-8')
+request['ledger_prompt_correlated'] = False
+request['latest_ledger_ok'] = bool(latest.get('ok'))
+if latest.get('ok'):
+    matches=list(Path('C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes').glob('*/audio/'+latest['filename']))
+    assert len(matches)==1, matches
+    ledger=matches[0]
+    ledger_data=json.loads(ledger.read_text(encoding='utf-8'))
+    episode_ids=set()
+    for output in history[pid].get('outputs',{}).values():
+        for media in output.get('gifs',[]):
+            parts=str(media.get('subfolder','')).replace('\\','/').split('/')
+            if len(parts)>2 and parts[:2]==['otr','episodes']:
+                episode_ids.add(parts[2])
+    request['terminal_history_episode_ids']=sorted(episode_ids)
+    request['ledger_prompt_correlated']=ledger_data.get('episode_id') in episode_ids
+    request.update(ledger_path=str(ledger), ledger_sha256=hashlib.sha256(ledger.read_bytes()).hexdigest())
+    shutil.copyfile(ledger, folder/'pairlock_09_ledger.json')
+save()
+print('Terminal history, ledger and logs preserved.', flush=True)
+request['code_unchanged_during_run'] = (
+    subprocess.check_output(['git','rev-parse','HEAD'], cwd=root, text=True).strip() == head
+    and not subprocess.check_output(['git','diff','HEAD','--','nodes','tests','scripts','config','workflows'], cwd=root)
+    and all(hashlib.sha256((root/check['path']).read_bytes()).hexdigest() == check['sha256'] for check in checks)
+    and hashlib.sha256((root/'workflows/otr_canonical.json').read_bytes()).hexdigest() == request['canonical_sha256'])
+request['submitted_graph_matches_attempt08'] = graph_unchanged(
+    json.loads((folder/'pairlock_09_prompt.json').read_text(encoding='utf-8')),
+    json.loads((folder/'pairlock_08_prompt.json').read_text(encoding='utf-8')))
+save()
+assert request['ledger_prompt_correlated'], 'Ledger candidate preserved but not correlated to terminal prompt output; diagnose before qualification'
+assert request['code_unchanged_during_run'] and request['submitted_graph_matches_attempt08'], 'Post-run provenance changed; terminal evidence is preserved'
+sys.exit(result.returncode)

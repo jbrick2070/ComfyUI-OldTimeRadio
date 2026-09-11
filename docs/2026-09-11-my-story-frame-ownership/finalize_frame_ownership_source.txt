@@ -1,0 +1,158 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+import yaml
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+b=r.parents[1]/'comfyui-custom-node-survival-guide'
+fc=json.loads((d/'full_comparison.json').read_text(encoding='utf-8'))
+assert fc['candidate']=={'pass':14466,'failure':51,'skip':183,'xfail':1}
+assert not fc['new_failures'] and not fc['changed_normalized_failure_payloads'] and not fc['fixed_guards']
+assert len(yaml.safe_load((b/'BUG_BIBLE.yaml').read_text(encoding='utf-8'))['bugs'])==344
+assert json.loads((d/'sonnet/manifest.json').read_text(encoding='utf-8'))['models'][0]['resolved_model']=='anthropic/claude-sonnet-5'
+assert int((r/'tmp/frame_ownership_sonnet.exit').read_text().strip())==0
+receipt='''# Frame ownership correction -- offline qualification receipt
+
+Base OTR1d623f96; root sole coder. Actual canonical08's reserved announcer cast,
+opening beat and global ending grounded the repair. Existing P0/P1 prompts now
+assign the house frame to its own pass; existing source corrections share that
+scope. The reserved-cast retry conditionally repairs the complete treatment and
+reports any simultaneous selected-act mismatch. Full source/failed draft and
+interrupted prefix survive; preservation stays within artifact scope. No new
+schema, workflow control, semantic gate, model call, cast alias, filter or loop.
+
+Seven new regression cases fail original code on intended missing instructions;
+181 focused runner/source tests pass. Full14,466pass/51same inherited failures/
+183skip/1xfail, actual process exit2 from the known-failure guard. Baseline
+14,459/51/183/1: all inherited IDs AND normalized failure payloads match, no new
+quarantine. Controlled final Bible against clean1d623f96baseline37pass/11fail/
+11skip/3xfail versus samebase plus exactly3finalOTRfiles38pass/10fail/11skip/3xfail.
+Only updated behavior-inventory guard distinguishes them; ten common failure
+payloads match. Actual Bible process exits1, not an all-green claim. Last Bible
+change after those runs only clarifies semantic residuals in YAML prose; YAML
+parses with344entries and executable coverage is unchanged.
+
+Canonical unchanged SHA256d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c;
+actual shipped OTR_WorkflowValidator, JSON roundtrip and live widget/link audit
+pass23nodes63links. Runner tests resolve the actual shipped pack. Changed Python
+parses under3.10grammar; touched files UTF8/noBOM/nonempty. Exact hashes and raw
+XML/logs under this directory. Before-fix failures are intentional test evidence,
+not fabricated production bugs. Existing PBUG20260910-03/Bible11.39 extended.
+
+R1-R4: actual Opus5/Gemini3.1Pro,8APIcalls,USD1.2143. Actual finished Sonnet5 QA:
+1call,USD0.117424. Root's grounded dispositions in review_judgment.md and round
+judgments; no unanimous-clean or Cursor-consensus claim. Terra independently
+grounded ownership/cache/dispatch; Luna checked before-fix evidence/candidate
+files. No production/test change after Sonnet. P0 and free-prose frame semantics
+can still be wrong; existing model correction and actual09 inspection own them.
+
+Next: commit/push both repos, verify HEAD/origin and committed evidence hashes,
+then fresh full canonical09 using the same Gemma pair/source/profile as08.
+Eight prior attempts remain4writingfailures/4source-defectivepublications and
+zero source-qualified. New wrapper is prepared, not executed. Reread actual
+dropdown, require full08 APIgraph equality, fresh server to clear pack/module
+cache, archive terminal evidence before success assertions and inspect actual
+spoken source/frames/credits/assets. No production edits during generation.
+Mac/4060held; RunPodunauthenticated/no rental. Audio input unsupported here.
+'''
+(d/'qualification_receipt.md').write_text(receipt,encoding='utf-8')
+gf=r/'docs/GO_FORWARD_PLAN.md';text=gf.read_text(encoding='utf-8')
+start=text.index('**Next action: review and repair My Story\'s P0/P1 frame-ownership boundary.**')
+end=text.index('Eight full canonical attempts',start)
+old=text[start:end]
+archive=r/'docs/GO_FORWARD_ARCHIVE.md'
+with archive.open('a',encoding='utf-8') as f:
+    f.write('\n\n## 2026-09-11 -- completed frame ownership repair instructions (verbatim)\n\n'+old)
+new='''**Next action: full canonical09 qualification of the frame-ownership repair.**
+After verifying both pushed HEADs and evidence hashes, restart the5080 server
+so it loads the revised shipped pack. Use the real canonical runner, same
+Gemma4-12B pair, source/profile/controls as08, and require dumped APIgraph equality
+before queue. Exact next wrapper and qualification receipt:
+`2026-09-11-my-story-frame-ownership/`. Keep source_bank=my_story and replay blank.
+Inspect P0 cast/count and P1 cast/act beats/global ending, final spoken source
+requirements, actual gender/voices/credits, images and canonical episode/obs
+assets; schema validity or clean ledger alone is not source qualification.
+Preserve every terminal artifact before assertions; diagnose a live failure
+before further generation. No production edit while the run is active.
+
+'''
+gf.write_text(text[:start]+new+text[end:],encoding='utf-8')
+handoff=r/'docs/HANDOFF_LOG.md'
+entry='''## 2026-09-11 -- frame ownership repair qualified offline; canonical09 next
+
+Existing P0/P1 and source-correction scopes now separate dramatic cast/ending
+from the house frame. Reserved-cast typed repair corrects misplaced material
+throughout the returned treatment and names a simultaneous act-count defect.
+No new call/gate/schema/wire/alias/filter or retry reset. Full raw/failed output
+and interrupted prefix preserved; shared repair honors artifact scope.
+
+Seven intended failures beforefix;181focused pass. Full14,466pass/51same
+inheritedfail/183skip/1xfail, exit2guard; IDs AND normalized payloads unchanged.
+Controlled Bible38pass/10inherited versus37/11; canonical23nodes63links passes
+unchanged. Existing11.39coverage extended;344entries. Exact raw receipts:
+2026-09-11-my-story-frame-ownership/qualification_receipt.md.
+
+Actual Opus/Gemini R1-R4 eightcalls USD1.2143; finalSonnet5 QA USD0.117424.
+Root grounds residual semantic concerns, no new deterministic fidelity gate or
+unanimousclean/ Cursor consensus claim. No post-QA production/test revision.
+Terra/Luna independent owner/wiring/evidence audits. Push both repos beforeGPU,
+then sameGemma/source/profile fullcanonical09; wrapperprepped/notrun. Eight
+priorattempts remainzero sourcequalified. Mac/4060held; RunPodnoauth/norental.
+
+---
+
+'''
+handoff.write_text(entry+handoff.read_text(encoding='utf-8'),encoding='utf-8')
+with (r/'docs/PROD_BUG_LOG.md').open('a',encoding='utf-8') as f:
+    f.write('''\n\n### PBUG-20260910-03 follow-up -- frame ownership repair qualified offline
+
+Existing P0/P1 authored/correction scopes now exclude the house frame from
+dramatic cast, act beats and ending. The reserved-cast typed repair names a
+conditional whole-treatment correction and simultaneous act-count mismatch.
+Seven tests fail original code;181focusedpass,full14,466/51sameinherited/183/1,
+Bible38/10inherited,canonical23nodes63links unchanged. P0 remains non-blocking;
+prose-only frame leakage can still pass structure. No semantic PASS from tests,
+new gate/call/schema/alias/blindcaststrip. Actual finalSonnet QA grounded; next
+fullcanonical09 must inspect all fields/final speech. ExistingBible11.39 carries
+portable coverage and residuals. Receipt:2026-09-11-my-story-frame-ownership/.
+''')
+lessons=r/'docs/PRODUCTION_SPRINT_LESSONS.md';text=lessons.read_text(encoding='utf-8')
+anchor='## 1. Define ownership before implementation\n'
+note='''
+Canonical08 frame ownership (2026-09-11): a house narrator belongs to the
+separate frame, not the dramatic cast, opening beat or global ending. Clarify
+that scope in interpretation, treatment and their existing corrections. On the
+existing reserved-cast failure, ask the same bounded repair to return a complete
+treatment and correct any misplaced frame prose; deleting only the cast row
+leaves the wrong endpoint behind. Report simultaneous known structural defects
+in that one repair. Preserve unaffected source material within artifact scope,
+not an erroneous draft ending. Do not scan narrative prose for reserved words:
+a dramatic person's profession may be announcer. Canned repairs prove transport
+and application; inspect actual output for semantic correctness. See
+PBUG-20260910-03 / Bible11.39 and the frame-ownership qualification receipt.
+
+'''
+assert anchor in text;lessons.write_text(text.replace(anchor,anchor+'\n'+note,1),encoding='utf-8')
+readme=r/'README.md';text=readme.read_text(encoding='utf-8')
+needle='The last Nemo publication still omitted the girlfriend mention.'
+assert needle in text
+text=text.replace(needle,needle+'\nThe frame-ownership repair now has offline regression coverage; a fresh full\ncanonical qualification is still required.',1)
+readme.write_text(text,encoding='utf-8')
+for name in ('prepare_pairlock_09','finalize_frame_ownership'):
+    shutil.copyfile(r/'tmp'/f'{name}.py',d/f'{name}_source.txt')
+# Preserve source before deleting exact owned temporary probes, never other files.
+for name in ('prepare_frame_ownership_r1','prepare_frame_ownership_r2','prepare_frame_ownership_r3','prepare_frame_ownership_r4','edit_frame_ownership_pack','prepare_frame_ownership_qa','finish_frame_ownership','prepare_pairlock_09','finalize_frame_ownership','archive_pairlock_08','run_my_story_pairlock_08'):
+    p=r/'tmp'/f'{name}.py'
+    assert p.resolve().parent == (r/'tmp').resolve()
+    if p.exists():p.unlink()
+manifest=[]
+for p in sorted(d.rglob('*')):
+    if not p.is_file() or p.name=='evidence_manifest.json':continue
+    raw=p.read_bytes();assert raw and not raw.startswith(b'\xef\xbb\xbf'),p
+    raw.decode('utf-8')
+    manifest.append(dict(path=p.relative_to(d).as_posix(),bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest()))
+(d/'evidence_manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
+print('Qualified docs finalized, completed instructions archived verbatim,',len(manifest),'evidence files hashed.')

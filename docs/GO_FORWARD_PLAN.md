@@ -92,15 +92,17 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: review and repair My Story's P0/P1 frame-ownership boundary.**
-Canonical08 failed P1 after two attempts with ANNOUNCER in the dramatic cast,
-opening turn and global ending. P0 had included the non-diegetic announcer in
-named_cast. P3 already owns all framing; do not just delete a cast row and leave
-the wrong ending, or rename the announcer as a story person. Use the existing
-author/correction and typed-repair owners; no new calls, schema/gates or budget
-reset. Ground the scope before code, then finish Sonnet QA/full regression/
-Bible/push before any further GPU generation. Measured08 and diagnosis:
-`2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md`.
+**Next action: full canonical09 qualification of the frame-ownership repair.**
+After verifying both pushed HEADs and evidence hashes, restart the5080 server
+so it loads the revised shipped pack. Use the real canonical runner, same
+Gemma4-12B pair, source/profile/controls as08, and require dumped APIgraph equality
+before queue. Exact next wrapper and qualification receipt:
+`2026-09-11-my-story-frame-ownership/`. Keep source_bank=my_story and replay blank.
+Inspect P0 cast/count and P1 cast/act beats/global ending, final spoken source
+requirements, actual gender/voices/credits, images and canonical episode/obs
+assets; schema validity or clean ledger alone is not source qualification.
+Preserve every terminal artifact before assertions; diagnose a live failure
+before further generation. No production edit while the run is active.
 
 Eight full canonical attempts remain4writing failures/4source-defective
 publications/0source-qualified.08's separate prequeue dropdown-label failure

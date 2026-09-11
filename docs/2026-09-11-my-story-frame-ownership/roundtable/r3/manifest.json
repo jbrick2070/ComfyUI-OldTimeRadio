@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-09-11T14:11:40.355360+00:00",
+  "doc": "docs/2026-09-11-my-story-frame-ownership/roundtable/pass02_plan.md",
+  "prompt_tokens_est": 22866,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 32963,
+      "completion_tokens": 4883,
+      "cost_usd": 0.28689,
+      "max_tokens": 6500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 23033,
+      "completion_tokens": 2394,
+      "cost_usd": 0.074794,
+      "max_tokens": 6500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.3617
+}

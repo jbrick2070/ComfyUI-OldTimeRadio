@@ -1,0 +1,43 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+src=(r/'docs/2026-09-11-my-story-5080-qualification/pairlock_08_wrapper_source.txt').read_text(encoding='utf-8')
+src=src.replace('Fresh full canonical Gemma measurement after exact-row feedback QA.',
+                'Fresh full canonical Gemma measurement after frame ownership QA.')
+src=src.replace('pairlock_08', 'pairlock_09').replace('pairlock_07', 'pairlock_08')
+src=src.replace('2026-09-11-my-story-source-feedback/file_checks.json', '2026-09-11-my-story-frame-ownership/file_checks.json')
+src=src.replace("'pairlock_06','pairlock_08']", "'pairlock_06','pairlock_07','pairlock_08']")
+src=src.replace('5080_pairlock_09_gemma_feedback', '5080_pairlock_09_gemma_frame')
+src=src.replace('Qualified exact-row feedback and Gemma12B in both writer slots; same raw source, profile and configured sampling as attempt07.',
+                'Qualified frame ownership repair; same Gemma12B pair, raw source, profile and configured sampling as attempt08.')
+src=src.replace('Different installed family from07 plus diagnostic feedback change; no pure model-causality or reliability claim.',
+                'No model/control change from08. Fresh entropy and corrected code/pack; no reliability claim from one result.')
+start=src.index('def model_only_change(');end=src.index('\nwith urllib.request.urlopen',start)
+src=src[:start]+'''def graph_unchanged(actual, prior):
+    return actual == prior
+'''+src[end:]
+src=src.replace('model_only_change(', 'graph_unchanged(')
+src=src.replace('only_models_differ_from_attempt07','graph_matches_attempt08')
+src=src.replace('submitted_only_models_differ_from_attempt07','submitted_graph_matches_attempt08')
+src=src.replace('Unexpected API prompt change beyond the two writer models','Unexpected API prompt change from actual attempt08')
+src=src.replace("assert 'OTR_LedgerScriptWriter' in info", "assert 'OTR_LedgerScriptWriter' in info\nfor model_key in ('creative_writing_model', 'technical_model'):\n    choices = info['OTR_LedgerScriptWriter']['input']['optional'][model_key][0]\n    assert label in choices, (model_key, 'exact Gemma label is unavailable; no prompt queued')")
+src=src.replace("print('Shipped canonical runner exited', result.returncode, flush=True)",
+                "request['runner_returncode'] = result.returncode\nrequest['runner_returned_utc'] = datetime.now(timezone.utc).isoformat()\nsave()\nprint('Shipped canonical runner exited', result.returncode, flush=True)")
+src=src.replace("assert match, 'No queued prompt; preserve runner failure separately'", "if not match:\n    request['status'] = 'no_prompt_id'\n    save()\n    raise RuntimeError('No queued prompt; request and logs preserved, not a story attempt')")
+src=src.replace("assert latest.get('ok'), 'Terminal history saved, but no durable ledger is available'", "request['ledger_prompt_correlated'] = False\nrequest['latest_ledger_ok'] = bool(latest.get('ok'))")
+ast.parse(src,feature_version=(3,10))
+assert 'pairlock_07_prompt' not in src and 'source-feedback' not in src
+assert "'pairlock_07','pairlock_08']" in src
+p=r/'tmp/run_my_story_pairlock_09.py';p.write_bytes(src.encode('utf-8'))
+(d/'next_canonical_wrapper_source.txt').write_bytes(p.read_bytes())
+
+b=r.parents[1]/'comfyui-custom-node-survival-guide'
+checks=json.loads((d/'bible_file_checks.json').read_text(encoding='utf-8'))
+for item in checks:
+    p=b/item['path'];p.write_bytes(p.read_text(encoding='utf-8').encode('utf-8'))
+    raw=p.read_bytes();item.update(sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw))
+(d/'bible_file_checks.json').write_text(json.dumps(checks,indent=2)+'\n',encoding='utf-8')
+print('09 wrapper prepared only, not executed. Bible doc-only residual clarification hash refreshed.')

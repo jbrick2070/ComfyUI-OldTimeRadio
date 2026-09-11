@@ -1,0 +1,67 @@
+from pathlib import Path
+from collections import Counter
+import ast
+import hashlib
+import json
+import re
+import shutil
+import xml.etree.ElementTree as ET
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+
+def tally(p):
+    return dict(Counter('failure' if c.find('failure') is not None else 'error'
+        if c.find('error') is not None else 'xfail' if c.find('skipped') is not None
+        and c.find('skipped').get('type')=='pytest.xfail' else 'skip'
+        if c.find('skipped') is not None else 'pass' for c in ET.parse(p).iter('testcase')))
+
+def norm(s):
+    s=re.sub(r'otr-(?:source-(?:authority|feedback)|frame-ownership)-(?:baseline|candidate)','PACK',s)
+    s=re.sub(r'0x[0-9a-fA-F]+','ADDRESS',s)
+    s=re.sub(r'pytest-[0-9]+','pytest-N',s)
+    s=re.sub(r'pytest_[a-zA-Z0-9_]+[\\/]','pytest_TEMP/',s)
+    s=re.sub(r'^py_files = .*$', 'py_files = <truncated fixture repr>',s,flags=re.M)
+    return re.sub(r'(E\s+Differing items:\n)((?:E\s+\{[^\n]+\n)+)',lambda m:m[1]+''.join(sorted(m[2].splitlines(keepends=True))),s)
+
+def failures(p):
+    result={}
+    for c in ET.parse(p).iter('testcase'):
+        f=c.find('failure')
+        if f is None:f=c.find('error')
+        if f is not None:result[norm(c.attrib['classname']+'::'+c.attrib['name'])]=norm(f.text or '')
+    return result
+
+def compare(a,b,name):
+    old,new=failures(a),failures(b)
+    result=dict(baseline=tally(a),candidate=tally(b),new_failures=sorted(new.keys()-old.keys()),
+                fixed_guards=sorted(old.keys()-new.keys()),changed_normalized_failure_payloads=sorted(k for k in old.keys()&new.keys() if old[k]!=new[k]))
+    (d/name).write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
+    print(name,json.dumps(result))
+    assert not result['new_failures'] and not result['changed_normalized_failure_payloads'],result
+    return result
+
+bc=compare(r/'tmp/frame_ownership_bible_baseline.xml',r/'tmp/frame_ownership_bible_candidate.xml','bible_comparison.json')
+assert len(bc['fixed_guards'])==1 and 'pairlock_followup_retains_behavior_coverage' in bc['fixed_guards'][0]
+assert tally(r/'tmp/frame_ownership_before_fix.xml')=={'failure':7}
+assert tally(r/'tmp/frame_ownership_focused.xml')=={'pass':181}
+if not (r/'tmp/frame_ownership_full.exit').exists():
+    print('Full regression still running; no final qualification claim.')
+    raise SystemExit(0)
+fc=compare(r/'docs/2026-09-11-my-story-source-feedback/tests/source_feedback_full.xml',r/'tmp/frame_ownership_full.xml','full_comparison.json')
+assert not fc['fixed_guards'] and fc['candidate']=={'pass':14466,'failure':51,'skip':183,'xfail':1},fc
+assert '(23 nodes, 63 links)' in (r/'tmp/frame_ownership_canonical.log').read_text(encoding='utf-8')
+assert hashlib.sha256((r/'workflows/otr_canonical.json').read_bytes()).hexdigest()=='d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c'
+for root,name in [(r,'file_checks.json'),(r.parents[1]/'comfyui-custom-node-survival-guide','bible_file_checks.json')]:
+    for check in json.loads((d/name).read_text(encoding='utf-8')):
+        raw=(root/check['path']).read_bytes()
+        assert len(raw)==check['bytes'] and hashlib.sha256(raw).hexdigest()==check['sha256']
+        assert raw and not raw.startswith(b'\xef\xbb\xbf')
+        if check['path'].endswith('.py'):ast.parse(raw.decode('utf-8'),feature_version=(3,10))
+tests=d/'tests';tests.mkdir(exist_ok=True)
+for p in (r/'tmp').glob('frame_ownership_*'):
+    if p.suffix in ('.xml','.log','.exit'):shutil.copyfile(p,tests/p.name)
+for name in ('prepare_frame_ownership_r1','prepare_frame_ownership_r2','prepare_frame_ownership_r3','prepare_frame_ownership_r4','edit_frame_ownership_pack','prepare_frame_ownership_qa','finish_frame_ownership'):
+    shutil.copyfile(r/'tmp'/f'{name}.py',d/f'{name}_source.txt')
+statuses={p.stem.removeprefix('frame_ownership_'):int(p.read_text(encoding='utf-8-sig').strip()) for p in (r/'tmp').glob('frame_ownership_*.exit')}
+(d/'exit_statuses.json').write_text(json.dumps(statuses,indent=2)+'\n',encoding='utf-8')
+print('Final checks match hashes; all raw tests/helpers archived. Review judgment/push still required.')

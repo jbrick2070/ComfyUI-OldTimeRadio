@@ -1,3 +1,26 @@
+## 2026-09-11 -- frame ownership repair qualified offline; canonical09 next
+
+Existing P0/P1 and source-correction scopes now separate dramatic cast/ending
+from the house frame. Reserved-cast typed repair corrects misplaced material
+throughout the returned treatment and names a simultaneous act-count defect.
+No new call/gate/schema/wire/alias/filter or retry reset. Full raw/failed output
+and interrupted prefix preserved; shared repair honors artifact scope.
+
+Seven intended failures beforefix;181focused pass. Full14,466pass/51same
+inheritedfail/183skip/1xfail, exit2guard; IDs AND normalized payloads unchanged.
+Controlled Bible38pass/10inherited versus37/11; canonical23nodes63links passes
+unchanged. Existing11.39coverage extended;344entries. Exact raw receipts:
+2026-09-11-my-story-frame-ownership/qualification_receipt.md.
+
+Actual Opus/Gemini R1-R4 eightcalls USD1.2143; finalSonnet5 QA USD0.117424.
+Root grounds residual semantic concerns, no new deterministic fidelity gate or
+unanimousclean/ Cursor consensus claim. No post-QA production/test revision.
+Terra/Luna independent owner/wiring/evidence audits. Push both repos beforeGPU,
+then sameGemma/source/profile fullcanonical09; wrapperprepped/notrun. Eight
+priorattempts remainzero sourcequalified. Mac/4060held; RunPodnoauth/norental.
+
+---
+
 ## 2026-09-11 -- canonical08 failed on frame ownership; preserve before repair
 
 Full canonical7b41a7fd, Gemma4-12B pair, prompt8c575ba7-94d1-40b7-b9e8-

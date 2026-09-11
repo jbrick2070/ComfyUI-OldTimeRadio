@@ -1,0 +1,17 @@
+[
+  {
+    "path": "nodes/_otr_my_story.py",
+    "sha256": "79280cb74e5507f28b35b6bb573d54ad3a3a2b34fd758dba1b0c9360558783b6",
+    "bytes": 55850
+  },
+  {
+    "path": "nodes/story_packs/my_story/my_story.json",
+    "sha256": "b0f41f39e151787cae02fe5b629a8a229ab687ac6edb6fb7e0482d847e88dc5c",
+    "bytes": 10628
+  },
+  {
+    "path": "tests/test_my_story_runner.py",
+    "sha256": "56730d1bbe4cd27aadf620df797bbd204e6276aeaac842455f240a09a31371bc",
+    "bytes": 68515
+  }
+]

@@ -1273,3 +1273,177 @@ def test_act_scope_does_not_leak_to_other_phases_of_the_real_runner():
     assert "episode conclusion" in act_scopes[-1]
     saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
     assert saved["meta"]["my_story"]["acts_accepted"] == 6
+
+
+@pytest.mark.parametrize("acts,extra_acts", [(1, 0), (3, 0), (6, 0), (1, 1)])
+def test_treatment_frame_repair_replaces_owned_fields_in_the_saved_ledger(acts, extra_acts):
+    """Canned returns prove repair delivery/application, not model fidelity."""
+    from nodes._otr_content_authorship import validate_receipt
+
+    cast = ("Ada", "Tom", "Mabel")
+    idea = ("Ada, Tom and Mabel hear the bell together. Mabel is a station announcer "
+            "by profession, speaking here as their friend. The house announcer "
+            "opens and closes the show separately. End with all three answering the bell.")
+    fixed = _treatment(acts, cast)
+    fixed["cast"][-1]["role"] = "station announcer and friend"
+    fixed["acts"][0]["turns"] = ["Ada hears the bell.", "Mabel, an announcer, calls Tom over."]
+    fixed["ending"] = "Ada, Tom and Mabel answer the bell together."
+    fixed["acts"][-1]["ending_state"] = fixed["ending"]
+    failed = _treatment(acts + extra_acts, (*cast, "ANNOUNCER"))
+    failed["acts"][0]["turns"] = ["ANNOUNCER introduces the show.", "Ada hears the bell."]
+    failed["ending"] = "ANNOUNCER closes the show."
+    failed_raw = json.dumps(failed)
+
+    class FrameRepair(Slots):
+        treatment_calls = 0
+
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                self.treatment_calls += 1
+                if self.treatment_calls == 1:
+                    return failed_raw
+                assert self.treatment_calls == 2
+                assert messages[-2] == {"role": "assistant", "content": failed_raw}
+                assert idea in messages[1]["content"]
+                direction = messages[-1]["content"]
+                assert "If house-frame openings or closings" in direction
+                assert "act turns or ending" in direction
+                assert "keep already-correct dramatic material" in direction
+                assert direction.index("within this artifact's scope") < direction.index("validation problem")
+                assert f"exactly {acts} acts" in direction
+                if extra_acts:
+                    assert f"acts has {acts + extra_acts} entries; the selected count is {acts}" in direction
+                return json.dumps(fixed)
+            return super()._answer(messages)
+
+    slots = FrameRepair(acts=acts, cast=cast, inter=acts - 1,
+                        interpretation=_interpretation(planned=3, named=cast))
+    led, _ = _run(slots, act_count=acts, num_characters=2, idea=idea)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert slots.treatment_calls == 2
+    assert len(slots.calls) == 2 * (acts + 3) + 1
+    assert story["treatment"] == MS.StoryTreatment.model_validate(fixed).model_dump()
+    assert story["counts"]["requested_characters"] == 2
+    assert story["counts"]["actual_characters"] == 3
+    assert story["counts"]["actual_acts"] == acts
+    attempts = [a for a in story["attempts"] if a["pass_id"] == "treatment"]
+    assert [a["status"] for a in attempts] == ["failed", "accepted"]
+    assert attempts[0]["raw_output"] == failed_raw
+    act_prompts = [p for p in slots.prompts if "one act of a radio drama" in p[0]["content"]]
+    target_area = act_prompts[-1][1]["content"].rsplit("\nACT SCOPE: ", 1)[0]
+    assert target_area.endswith("\n- where it should leave the story: " + fixed["ending"])
+    assert story["frame"] == MS.StoryFrame.model_validate(_frame(slots._attr, acts - 1)).model_dump()
+    announcers = [c for c in saved["cast"] if c["name"] == "ANNOUNCER"]
+    assert len(announcers) == 1
+    assert any(c["name"] == "Mabel" for c in saved["cast"])
+    assert saved["meta"]["source_meta"]["story_input"]["fields"]["idea"] == idea
+    validate_receipt(saved)
+
+
+def test_stubborn_frame_treatment_uses_one_typed_repair_and_saves_failure(tmp_path):
+    from nodes._otr_structured_call import StructuredCallFailedError
+
+    class Stubborn(Slots):
+        treatment_calls = 0
+
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                self.treatment_calls += 1
+                if self.treatment_calls == 2:
+                    assert "If house-frame openings or closings" in messages[-1]["content"]
+                return json.dumps(_treatment(cast=("Ada", "Tom", "ANNOUNCER")))
+            return super()._answer(messages)
+
+    slots = Stubborn()
+    with pytest.raises(StructuredCallFailedError) as caught:
+        _run(slots)
+    assert caught.value.terminal_disposition == "primary_ladder_exhausted"
+    assert slots.treatment_calls == 2  # valid JSON skips the structural retry rung
+    assert len(slots.calls) == 4  # P0 author/correction, then two P1 calls
+    path, = tmp_path.rglob("*_ledger.json")
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert story["counts"]["accepted_acts"] is None
+    assert story["counts"]["actual_characters"] is None
+    assert "treatment" not in story
+    assert [a["status"] for a in story["attempts"] if a["pass_id"] == "treatment"] == ["failed", "failed"]
+    assert len(story["source_rewrites"]) == 1  # no source rescue of rejected P1
+    assert not saved.get("lines") and not saved.get("cast")
+
+
+def test_p0_frame_correction_explicitly_replaces_cast_and_preserves_frame_request():
+    from nodes._otr_content_authorship import validate_receipt
+
+    idea = "Ada and Tom speak in the drama, apart from the house announcer who opens and closes it."
+    original = _interpretation(planned=3, named=("Ada", "Tom", "Announcer"))
+    original["requirements"].append({"id": "house_frame", "text": "The announcer opens and closes.",
+                                      "kind": "frame", "source_field": "idea", "strength": "required"})
+
+    class CorrectingFrame(Slots):
+        def _answer(self, messages):
+            if messages[0]["content"].startswith("Check and rewrite"):
+                payload = json.loads(messages[1]["content"])
+                draft = payload["draft"]
+                if "setting_brief" in draft:
+                    assert payload["source"]["idea"] == idea
+                    assert "complete named_cast and cast_plan" in messages[0]["content"]
+                    assert "separate frame" in payload["authoring_context"][0]["content"]
+                    assert draft == MS.StoryInterpretation.model_validate(original).model_dump()
+                    draft["named_cast"] = draft["named_cast"][:2]
+                    draft["cast_plan"]["planned"] = 2
+                    draft["cast_plan"]["reason"] = "Ada and Tom speak in the drama; the house frame is separate."
+                    draft["requirements"][-1]["text"] = "The separate frame pass supplies the announcer's opening and closing."
+                    return json.dumps(draft)
+            return super()._answer(messages)
+
+    slots = CorrectingFrame(interpretation=original)
+    led, _ = _run(slots, idea=idea)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    result = story["interpretation"]
+    assert [c["name"] for c in result["named_cast"]] == ["Ada", "Tom"]
+    assert result["cast_plan"]["planned"] == story["counts"]["planned_characters"] == 2
+    assert result["requirements"][-1]["id"] == "house_frame"
+    assert result["requirements"][-1]["kind"] == "frame"
+    assert "separate frame pass" in result["requirements"][-1]["text"]
+    assert result["named_cast"] == original["named_cast"][:2]
+    assert original["cast_plan"]["planned"] == 3 and len(original["named_cast"]) == 3
+    rewrite = story["source_rewrites"][0]
+    assert rewrite["applied"] and rewrite["returned_artifact"] == result
+    assert len(rewrite["attempts"]) == 1 and not rewrite["qualified"]
+    assert len(slots.calls) == 8
+    validate_receipt(saved)
+
+
+def test_p0_p1_scope_stays_local_and_reaches_existing_source_owner(monkeypatch):
+    real_call = MS.structured_call
+
+    def strict_call(**kwargs):
+        assert "source_rewrite_instruction" not in kwargs
+        return real_call(**kwargs)
+
+    monkeypatch.setattr(MS, "structured_call", strict_call)
+    source = "  Ada and Tom answer the bell.\nThe house announcer frames their story.  "
+    bundle = SI.build_bundle(SI.capture_raw(idea=source), SI.StoryRequest())
+    journal = []
+    caller_kwargs = {"source_rewrite_receipts": journal, "source_rewrite_instruction": "CALLER SENTINEL"}
+    slots = Slots()
+    pack = RT.resolve_story_pack("my_story")
+    interpretation = MS._pass_interpret(slots.technical, pack, bundle, requested=2,
+                                       act_count=1, include_act_breaks=False, **caller_kwargs)
+    MS._pass_treatment(slots.creative, pack, bundle, interpretation, act_count=1,
+                       requested_characters=2, include_act_breaks=False, **caller_kwargs)
+    assert caller_kwargs["source_rewrite_instruction"] == "CALLER SENTINEL"
+    assert len(slots.calls) == 4 and len(journal) == 2
+    for author, correction in ((slots.prompts[0], slots.prompts[1]), (slots.prompts[2], slots.prompts[3])):
+        payload = json.loads(correction[1]["content"])
+        assert payload["source"]["idea"] == source
+        assert source in author[1]["content"]
+        assert "separate frame" in author[0]["content"]
+        assert "separate frame" in correction[0]["content"]
+        assert "CALLER SENTINEL" not in correction[0]["content"]
+        assert "This is the final act." not in correction[0]["content"]
+    assert "complete named_cast and cast_plan" in slots.prompts[1][0]["content"]
+    assert "cast, acts and ending" in slots.prompts[3][0]["content"]
+    assert "complete named_cast and cast_plan" not in slots.prompts[3][0]["content"]

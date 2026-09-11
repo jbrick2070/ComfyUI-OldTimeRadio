@@ -1,0 +1,24 @@
+from pathlib import Path
+import json
+
+p = Path('nodes/story_packs/my_story/my_story.json')
+pack = json.loads(p.read_text(encoding='utf-8'))
+stages = pack['prompt_stages']
+p0 = stages['my_story_interpret_system']
+p0 = p0.replace('"named_cast": array of objects, each:', '"named_cast": array of dramatic people, each:')
+p0 = p0.replace('true if this person should have lines;', 'true if this person should have lines in the drama;')
+p0 = p0.replace('integer, the speaking cast you recommend;', 'integer, the dramatic speaking cast you recommend;')
+old = '- Every noun is not a speaker. Someone who is talked about is not automatically someone who talks.'
+assert old in p0
+p0 = p0.replace(old, old + '\n- The production house ANNOUNCER belongs to the separate frame pass, not named_cast or the planned dramatic speaker count. Retain explicit house-frame requests as requirements with kind frame and text naming that owner. When relevant, explain the house-role exclusion in cast_plan.reason alongside the dramatic cast-count reasoning. A named dramatic person whose profession is announcer remains a story person; do not confuse that person with the house role.')
+stages['my_story_interpret_system'] = p0
+p1 = stages['my_story_treatment_system']
+p1 = p1.replace("the plan for tonight's episode", 'the plan for the drama inside the announcer frame')
+p1 = p1.replace('"turns": array of short strings, the beats of the act;', '"turns": array of short strings, the dramatic beats of the act;')
+p1 = p1.replace('"ending": how it ends, one or two sentences', '"ending": the dramatic characters\' realized conclusion, one or two sentences')
+old = '- The cast array contains the story\'s speaking characters, excluding ANNOUNCER. Preserve named people and exclusive cast notes; do not drop someone or invent extra people solely to match the requested character count. ANNOUNCER is reserved for the frame.'
+assert old in p1
+p1 = p1.replace(old, old + '\n- The separate frame pass supplies the house announcer intro, outro and coda. Keep cast, act turns, ending_state and ending about the dramatic people, events and conclusion. If the interpretation placed the house announcer in named_cast, correct that phase-assignment mistake; do not rename it as a story person. Preserve legitimate dramatic people. Replace misplaced frame endings with the source\'s intended dramatic conclusion, consistent with the final act\'s ending_state; do not invent new events to fill a frame slot.')
+stages['my_story_treatment_system'] = p1
+p.write_text(json.dumps(pack, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+print('Existing P0/P1 pack scopes updated; no schema/control/graph changes.')

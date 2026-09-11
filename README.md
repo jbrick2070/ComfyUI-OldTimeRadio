@@ -23,6 +23,8 @@ it has offline tests, but has not been released or cold-install/GPU qualified.
 recorded revisions produced four writing failures and four publications with
 source defects. The latest Gemma12B attempt stopped on an announcer/story-cast
 collision. The last Nemo publication still omitted the girlfriend mention.
+The frame-ownership repair now has offline regression coverage; a fresh full
+canonical qualification is still required.
 Zero source-qualified episodes. See [eighth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof retains
 its recorded platform/scope; it does not establish My Story source fidelity.

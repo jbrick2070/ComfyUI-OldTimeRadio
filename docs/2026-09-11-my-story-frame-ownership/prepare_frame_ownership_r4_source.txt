@@ -1,0 +1,169 @@
+from pathlib import Path
+import ast
+import json
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+judgment='''# R3 grounded judgment
+
+Actual Opus5/Gemini3.1Pro, two calls, USD0.3617. Root judged actual current code.
+Many comments repeated superseded R2 wording despite the explicit R3 precedence.
+R4 will contain only the consolidated proposal and current evidence, not nested
+historical proposals. Retain actual historical inputs/reviews for audit.
+
+Reserved/count aggregation is indeed control flow: duplicate/empty still returns;
+problems=[] moves before reserved branch, reserved appends, count appends, joined
+error returned. This was intended in R2, now explicit. The sole reserved-message
+test asserts a truthy error; grep found no old-message exact pin in tests. The
+new full repair emits preservation scope before the concrete validation problem.
+Conditional frame replacement was accepted in R2; Gemini critiqued obsolete text.
+
+Accept Gemini's useful scope refinement: common repair preserves unaffected
+source/story material WITHIN THIS ARTIFACT'S SCOPE, rather than unqualified
+ending language in P0/P2/P3. P1's own instruction preserves intended dramatic
+conclusion. No global instruction to add a story ending to a frame or earlier act.
+
+Reject Gemini's Python kwargs claim: def f(x=0,**kw):... can receive f(**{'x':1});
+it is not a duplicate argument. The proposed call passes the mapping once, just
+as the working act owner does. Root read all callers. Test phase scope transport
+and unchanged caller mapping; no forced explicit duplicate keyword.
+
+P1 source instruction is active on accepted treatments and tested there; it
+cannot fix08's rejected author. Both facts already explicit in R1-R3. Keeping
+accepted treatments from reintroducing frame material is relevant, live code.
+Do not add an omission-rejection gate: existing sparse correction tests already
+prove omitted named_cast/cast_plan fields are conserved; new explicit correction
+test proves complete replacement. P0 semantic/count mistakes remain possible
+and must be inspected in09. No quality/semantic claim from canned fixtures.
+
+Fresh registry resolution occurs in actual runner regression and prelaunch
+process, in addition to canonical structural audit. No need to alter cache
+policy. Restart server and resolve shipped pack. Match actual08 API graph,
+not failed bare-model prequeue request; reread object_info choices before submit.
+No automatic acceptance of label/graph drift: resolve exact same model selection,
+explain any genuine drift before queue. No code/model causality overclaim.
+
+Keep1/3/6 boundary coverage per operator's requested variable acts; these exercise
+the real runner/final endpoint/ledger, not merely len(). Add one combined-error
+case. Stubborn case asserts numeric2 P1 calls; no fourth/fifth loop. Root does
+not change required engineering QA to an arbitrary cap: one final Sonnet pass,
+revise only grounded blockers, then QA the revision as explicitly requested.
+No ritual re-review on clean code, and no automatic review script loop.
+
+Both controlled worktrees start1d623f96. Baseline remains byte-clean; candidate
+receives exactly the three final OTR changed files. Run the same final Bible
+against both and retain XML/failure payload comparisons. Full OTR uses main tree
+after final code against prior committed baseline. No before/after sleight of hand.
+'''
+(d/'roundtable/pass02_judgment.md').write_text(judgment,encoding='utf-8')
+plan='''# R4 final convergence: consolidated implementation contract
+
+This is the sole current proposal. Historical R1-R3 proposals are superseded.
+Root grounded this before review. Return ONLY remaining concrete must-fix issues
+with code evidence, or NO NEW MUST-FIX; at most700 words. Do not require a new
+semantic gate, schema, alias, model call, retry loop or source filter. User explicitly
+rejects them. Prompt delivery is not semantic guarantee; live09 judges behavior.
+
+Production changes, exact scope:
+
+A. Existing my_story.json P0 schema: named_cast contains dramatic people; speaking
+means lines in the drama; planned counts dramatic speakers. Rules: the production
+house ANNOUNCER belongs to separate frame pass and is excluded from named_cast/
+planned; retain explicit frame requests in requirements with kind frame and text
+naming frame ownership; explain exclusion in cast_plan.reason when relevant,
+alongside actual cast-count reasoning. Legitimate named dramatic people with
+announcer profession remain; no alias for a person literally named ANNOUNCER
+(existing reserved-identity limitation, outside08). No new field/required pack key.
+P1 schema/rules: plan drama inside house frame, cast/act beats/local/global ending
+describe dramatic people/actions/realized conclusion; separate frame pass owns
+intro/outro/coda. An interpretation's house-frame cast row is a phase-assignment
+mistake, not a new story person. Raw listener source remains higher authority.
+
+B. _make_treatment_validator: duplicate/empty identity test unchanged early return.
+Then problems=[]; existing reserved-identity condition appends this message:
+'ANNOUNCER is reserved for the separate frame pass. Remove the house ANNOUNCER
+from cast. If house-frame openings or closings appear in act turns or ending,
+replace that misplaced frame material with the source's dramatic events and
+conclusion; keep already-correct dramatic material. Do not rename the house
+announcer as a story person or remove legitimate dramatic people. The frame
+pass supplies the intro, outro and coda.' Existing count mismatch appended next;
+return joined problems or None. Same rejection conditions, no prose scan.
+
+C. _pass_treatment existing full-repair instruction:
+'Return exactly %d acts. If the act count is already correct, preserve its
+grouping unless the named defect requires a change. The requested character
+count is flexible; preserve the listener's dramatic people, story material,
+relationships and intended dramatic conclusion.'
+Shared _full_artifact_repair preserves original full prompt and failed output/
+interrupted completion selection. Only last user message wording/order changes:
+'Repair the complete draft above. [phase instruction]\n'
+'Preserve unaffected source facts and story material within this artifact's
+scope; correct the named defect to respect the original source.\n'
+'The validation problem is: [error]\n'
+'Return the complete corrected JSON object, with no commentary.'
+No global order to realize ending outside its owned scope.
+
+D. In _pass_interpret and _pass_treatment, set local
+source_kwargs['source_rewrite_instruction'] to concise respective scope and then
+pass **source_kwargs exactly once to _call, as _pass_act already does. Function
+**kwargs is a fresh dict. _call consumes this named parameter, never sends it as
+native model kwarg. P0 instruction requires explicit complete named_cast and
+cast_plan excluding house role; explicit frame requirements retained under their
+owner. P1 instruction: correct house-frame material throughout cast/acts/ending
+when present; preserve dramatic people/source conclusion; frame owns intro/outro/
+coda. Source correction still follows accepted author only, shares raw source/
+draft/author_context/post-validator, bounded2 attempts including malformed retries.
+Existing preserved-omission logic unchanged; explicit list membership wins.
+
+Tests through real runner/ledger and canned slot returns (not semantic model proof):
+1) acts1/3/6 + one combined extra-act case: initial reserved house cast + frame
+opening/global ending, then complete model replacement. Assert full raw failed
+draft, actual conditional correction direction, both defects where applicable,
+exact saved corrected cast/turns/ending, three legit dramatic people vs hint2,
+correct final P2 target, separate P3 frame rows, valid content receipt, exactly2
+P1 author calls. No programmatic cast deletion; raw failed artifact retained.
+2) stubborn same validJSON/reserved failure twice: exactly2 P1 calls, original
+primary_ladder_exhausted, saved failed journal with no accepted story/rows.
+3) P0 source correction explicitly removes erroneous house named_cast row,
+recounts planned, preserves explicit house frame requirement and real people,
+saved interpretation/receipt reflect returned artifact, no resurrection.
+4) P0/P1 author and correction prompt scope/full raw source; phase kwargs isolation
+and no native kwarg leak. Existing combined correction and sparse omission tests
+reused where possible. Named dramatic person with announcer profession/prose
+reference is accepted and preserved, proving no new keyword gate.
+
+Integration/qualification:
+OTR_LedgerScriptWriter node1 selects source_bank=my_story explicitly (canonical
+default is rolled), blank replay/source_ref/snapshot, routed shipped my_story.json
+and my_story_multipass lane. No new schema/widgets/links; canonical hash unchanged
+d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c. Fresh server required
+because pack/module cached per process. Full validator/roundtrip/widget/link audit
+AND resolve_story_pack in real runner tests/preflight. New tests fail old code and
+pass new; focused/full/Bible and final Sonnet QA, no new quarantine, push OTRalpha/
+Biblemain immediately and verify HEAD/origin/committed evidence. Bible11.39 extends
+existing live08 failure; no new PBUG from tests. Full baseline14459pass51failure183skip
+1xfail IDs AND normalized payloads; controlled Bible baselineclean1d623f96 versus
+samecommit plus exactly3finalOTRfiles. Keep process exit codes honestly.
+
+Then canonical09 same raw source/model/profile/controls as08; real shipped API
+runner, fresh boot UTF8/empty8000/desktopbaseline, exact observed Gemma label,
+prequeue graph equality to actual08. Preserve terminal/history/logs/ledger before
+assertions; no edits during generation, failure diagnosed before more runs.
+Qualify ALL observed cast/act beats/globalending plus actual final spoken source
+requirements (shared living dinner, childhood spoken memory, mother's response,
+girlfriend mention, present-day appreciation ending), gender/voices/credits,
+actual canonical episode/obs assets/pixels. Record unaudited audio as unverified.
+P0 planned/named cast mistakes or surviving frame leaks are explicitly inspected;
+usable schema/clean ledger alone cannot claim source-qualified. Eight prior
+attempts retained, zero source-qualified. Mac/4060held; RunPodunauthenticated.
+'''
+packet=plan+'\n'+judgment
+ledger=json.loads((r/'docs/2026-09-11-my-story-5080-qualification/pairlock_08_ledger.json').read_text(encoding='utf-8'))
+packet+='\n## Actual terminal08 artifacts\n```json\n'+json.dumps({'source':ledger['meta']['source_meta']['story_input']['fields'],'interpretation':ledger['meta']['my_story']['interpretation'],'failed_treatments':[json.loads(a['raw_output']) for a in ledger['meta']['my_story']['attempts'] if a['pass_id']=='treatment']},indent=2)+'\n```\n'
+for rel,names in [('nodes/_otr_my_story.py',{'_call','_full_artifact_repair','_pass_interpret','_make_treatment_validator','_pass_treatment','_make_act_validator','_pass_act','_pass_frame'}),('nodes/_otr_story_source.py',{'_retain_omitted','rewrite_story_source'})]:
+    src=(r/rel).read_text(encoding='utf-8'); lines=src.splitlines()
+    for n in ast.parse(src).body:
+        if getattr(n,'name','') in names:
+            packet+='\n## CURRENT code (not yet modified): '+rel+':'+str(n.lineno)+'\n```python\n'+'\n'.join(lines[n.lineno-1:n.end_lineno])+'\n```\n'
+packet+='\n## CURRENT pack (not yet modified)\n```json\n'+(r/'nodes/story_packs/my_story/my_story.json').read_text(encoding='utf-8')+'\n```\n'
+(d/'roundtable/pass03_plan.md').write_text(packet,encoding='utf-8')
+print('R3 grounded; consolidated R4 final contract written.')

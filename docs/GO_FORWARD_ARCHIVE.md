@@ -7903,3 +7903,18 @@ paper/photo styles). Native audio input is unsupported in this session, so
 actual listening remains open. Component checks do not qualify full episodes.
 
 ---
+
+
+## 2026-09-11 -- completed frame ownership repair instructions (verbatim)
+
+**Next action: review and repair My Story's P0/P1 frame-ownership boundary.**
+Canonical08 failed P1 after two attempts with ANNOUNCER in the dramatic cast,
+opening turn and global ending. P0 had included the non-diegetic announcer in
+named_cast. P3 already owns all framing; do not just delete a cast row and leave
+the wrong ending, or rename the announcer as a story person. Use the existing
+author/correction and typed-repair owners; no new calls, schema/gates or budget
+reset. Ground the scope before code, then finish Sonnet QA/full regression/
+Bible/push before any further GPU generation. Measured08 and diagnosis:
+`2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md`.
+
+Receipt: docs/2026-09-11-my-story-frame-ownership/qualification_receipt.md

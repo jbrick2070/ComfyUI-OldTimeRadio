@@ -33,6 +33,20 @@ qualifies source fidelity. PBUG-20260910-03 and Bible11.39 retain this distincti
 
 ## 1. Define ownership before implementation
 
+
+Canonical08 frame ownership (2026-09-11): a house narrator belongs to the
+separate frame, not the dramatic cast, opening beat or global ending. Clarify
+that scope in interpretation, treatment and their existing corrections. On the
+existing reserved-cast failure, ask the same bounded repair to return a complete
+treatment and correct any misplaced frame prose; deleting only the cast row
+leaves the wrong endpoint behind. Report simultaneous known structural defects
+in that one repair. Preserve unaffected source material within artifact scope,
+not an erroneous draft ending. Do not scan narrative prose for reserved words:
+a dramatic person's profession may be announcer. Canned repairs prove transport
+and application; inspect actual output for semantic correctness. See
+PBUG-20260910-03 / Bible11.39 and the frame-ownership qualification receipt.
+
+
 Pairlock_03 (2026-09-11): a generation that raises never assigns the shared
 caller's return variable. A lane that promises full-artifact repair must use the
 latest error's captured text when returned text is absent; an empty assistant

@@ -1,0 +1,19 @@
+<!-- requested_model: ~anthropic/claude-opus-latest | resolved_model: anthropic/claude-opus-5 -->
+
+## MUST-FIX
+
+**1. Test 2's "exactly 2 P1 calls" contradicts the live attempt budget.**
+`_pass_treatment` (line 510) sets `max_attempts=3`. A stubborn artifact that returns valid JSON and re-fails the reserved check twice will, absent an unshown early-abort rule in `structured_call`, be authored a third time before `primary_ladder_exhausted`. The plan asserts a numeric `2` for the stubborn case ("Stubborn case asserts numeric2 P1 calls; no fourth/fifth loop") without citing the code path that stops at 2. Either fix the expected number to 3, or cite the exact dedupe/abort condition in `structured_call`. As written this test is likely to fail on correct code — or worse, be "made to pass" by weakening the ladder.
+
+**2. Section C must explicitly retain the interrupted-draft preamble.**
+The current `_full_artifact_repair` (line 420) prepends, conditionally, *"The draft was interrupted during generation… not authority over the original source."* Section C quotes the new last-user message as four lines starting at "Repair the complete draft above" and says only "wording/order changes". The quoted text omits the preamble entirely. If implemented literally, interrupted-generation repairs lose the only signal that the echoed draft is failure evidence — a regression in the one place `raw_completion` is surfaced. State that the `interrupted` prefix is unchanged and prepended before "Repair the complete draft above", and pin it in a test (no existing test is cited as covering it).
+
+**3. Repair-prompt escalation has direct counter-evidence; make the preserved cast concrete.**
+The two entries in `failed_treatments` are byte-identical except for the stray trailing commas: the repair attempt fixed JSON only and reproduced `"name": "ANNOUNCER"`, `"turns"[0]` = ANNOUNCER intro, and the ANNOUNCER `ending` verbatim. The proposal's remedy is a longer prose message (Section B) delivered through the same channel that already failed twice with *"ANNOUNCER is reserved for the frame; give story characters distinct names"* (line 499). Without a new gate (correctly excluded), the only cheap deterministic lever left is data: the repair/author message should enumerate the names to keep and the name to drop — e.g. the non-reserved `model.names()` from the failing draft — rather than describing the policy abstractly. Section B's message is static and names nothing. Flag this or expect a ninth non-qualified attempt.
+
+**4. P0 has no enforcement path at all — say so in the qualification criteria, not just the narrative.**
+`_pass_interpret` (line 462) passes no `post_validator`, and `_call` forwards `post_validator=kwargs.get("post_validator")` into `rewrite_story_source`, so the interpretation correction runs with `post_validator=None` (line 125, `validate_artifact`). The 08 artifact's defect (`named_cast` ANNOUNCER, `planned: 3`) is therefore addressed solely by Section A/D prompt text plus one optional rewrite call. Test 3 proves only that a *canned* removal survives `_retain_omitted` list-membership semantics (line 82). The plan should state explicitly that a P0 announcer row in live09 is a non-blocking-by-construction outcome, so it cannot later be reported as a code regression.
+
+**5. Baseline arithmetic.** The plan pins `14459pass51failure183skip 1xfail` *and* adds new tests in cases 1–4. Give the expected post-change counts, or the comparison is unfalsifiable.
+
+Otherwise: kwargs analysis (D) is correct — `_call` consumes `source_rewrite_instruction` by name and never forwards it to `structured_call`.

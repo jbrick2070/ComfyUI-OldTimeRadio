@@ -1,0 +1,134 @@
+from pathlib import Path
+import ast
+
+r = Path.cwd()
+d = r / 'docs/2026-09-11-my-story-frame-ownership'
+judgment = '''# R1 grounded judgment
+
+Two actual API lanes: Opus 5 and Gemini 3.1 Pro; USD0.285. Opus's output ends
+mid-claim at its 5500-token ceiling; only visible claims are judged. No full
+Opus verdict/convergence inferred. Cursor failed twice earlier; no consensus.
+
+Accept upstream P0 correction as primary, not secondary. named_cast contains
+dramatic people only; cast_plan.planned counts them. Preserve explicit house
+frame requests in existing requirements with kind frame and source_field;
+cast_plan.reason explains the separate house frame. This is supported, not a
+conflict or assumption. Full raw source remains immutable and P3 receives it.
+
+Accept whole-treatment repair, conditional on existing reserved cast failure.
+Put the concrete action in that validator's returned error, which the existing
+repair factory already inserts verbatim. No new dispatch/factory is needed.
+Remove the unconditional act regrouping direction. Clarify the shared repair
+wrapper to preserve the source's intended ending, not the failed draft's ending.
+Its current 'unaffected' qualification already excludes an identified defect;
+the review's claim of a strict logical contradiction is overstated, but the
+wording is needlessly ambiguous for this production failure and will be fixed.
+
+Reject proposed ANNOUNCER keyword validation of free prose: a profession,
+quotation or discussion is not an illegal speaker identity. Existing actor-name
+validation remains unchanged. User prohibits new rejection gates. No source
+normalization/filtering, new schema, alias or extra call. Prompt correction is
+not a guarantee: inspect all three fields of the next actual complete result,
+retain failed attempts and classify partial compliance honestly.
+
+Opus's suspected normal-flow assembler KeyError is excluded by the actual
+_make_act_validator (unknown speakers rejected before acceptance/assembly).
+Terra independently confirmed the owner path and false-positive risk. P1
+source correction receives original author_context but follows author acceptance;
+it cannot rescue terminal08. Strengthen its existing scope instruction directly,
+not by adding a rescue. Explicit list membership in _retain_omitted wins, so a
+model's explicit corrected named_cast list does not resurrect a removed house
+row. Keep preservation of omitted fields and unaffected dramatic people.
+
+Luna's earlier suggested exact-message test loosening was a misread: the test
+already asserts any error; do not make that unrelated edit. Regression fixtures
+prove actual model-return application and budget, not model semantic reliability.
+'''
+(d / 'roundtable/pass00_judgment.md').write_text(judgment, encoding='utf-8')
+plan = '''# R2 exact coding proposal -- root grounded before panel
+
+Judge only concrete implementation defects; reply within 1000 words. No new
+gates or calls. This is the next round of the R1 decision, not a new campaign.
+
+1. nodes/story_packs/my_story/my_story.json: existing P0 schema describes
+named_cast as dramatic people only; speaking means lines in the drama, planned
+means dramatic speaking cast. Add explicit rules: production's house ANNOUNCER
+belongs to separate frame pass, excluded from named_cast/planned, supported
+frame requests remain requirements (kind frame) and cast_plan.reason explains
+house frame. A named person whose profession is announcer remains a dramatic
+person when source requires. No name-based guessing/deleting. Frame reference
+is not a conflict. P1's remit/schema becomes plan for drama inside frame; cast,
+all act beats and ending_state, global ending describe dramatic people/actions/
+realized conclusion only. P3 owns opening/closing/coda. An interpretation's
+house-frame row is a phase-assignment mistake, not a demand to invent a dramatic
+participant. Keep legitimate source people. Use raw source and final dramatic
+ending_state to correct a house-frame global ending; do not invent new events.
+
+2. nodes/_otr_my_story.py: unchanged reserved-name condition returns actionable
+error: 'ANNOUNCER is reserved for the separate frame pass. Rewrite the complete
+treatment: remove the house ANNOUNCER from cast; replace house-frame openings
+or closings in act turns with source-grounded dramatic beats; make ending and
+the final act ending_state the source's realized dramatic conclusion. Do not
+rename the house announcer as a story person or delete legitimate dramatic
+people. The frame pass supplies the announcer intro, outro and coda.'
+Only existing reserved-name branch emits this. Existing full repair includes
+the exact error and full source/draft; no new conditional callback needed.
+
+3. Existing _pass_treatment repair instruction becomes 'Return exactly %d acts.
+If the act count is already correct, preserve its grouping unless the named
+defect requires a change. The requested character count is flexible; preserve
+the listener's dramatic people, story material, relationships and intended
+dramatic conclusion.' _full_artifact_repair shared concluding sentence becomes
+'Preserve unaffected story events and relationships and the original source's
+intended ending; correct any named defect to respect the original source.'
+This clarifies source authority for all four existing uses without changing
+repair data, routing, attempt budgets or validators.
+
+4. Existing P0 and P1 calls pass a short source_rewrite_instruction, consumed
+by _call and already supported by rewrite_story_source. P0: 'This artifact plans
+the dramatic cast. The production house ANNOUNCER belongs to the separate frame
+pass: exclude it from named_cast and cast_plan.planned; retain explicit frame
+requests in requirements with kind frame and explain the separate owner in
+cast_plan.reason. Preserve actual dramatic people, including an announcer as
+a profession.' P1: 'This artifact plans only the drama inside the announcer
+frame. Keep cast, acts and ending about dramatic people and their source-grounded
+actions/conclusion. The separate frame pass supplies the house announcer intro,
+outro and coda. Correct misplaced frame material throughout the treatment;
+preserve legitimate dramatic people and the source's intended conclusion.'
+Author P0/P1 already receive equivalent pack instructions; correction also keeps
+complete raw source/draft/original author context. No native-slot kwargs leak.
+
+5. Meaningful runner tests: a canned model returns invalid house cast + opening
+turn + closing ending; bounded retry must receive exact full failed draft and
+actionable defect, and return a complete replacement correcting all three.
+Parameter acts1/3/6; three legitimate dramatic speakers vs hint2; accepted
+saved treatment, P2 endpoint and P3 house-frame rows/receipt all checked. A
+stubborn model repeats invalid artifact twice: current two actual typed calls,
+failure receipt and no acceptance/postfilter. Extend existing combined-source
+correction test with explicit P0 frame-row removal and saved cast_plan/requirement
+retention, and ownership scope/full raw source reaching P0/P1 author/correction.
+Test a legitimate named dramatic person whose profession is announcer and a
+prose reference are preserved (no keyword gate). Existing unknown-speaker tests
+and interrupted/full-draft tests remain. Canned outcomes are routing proof only.
+
+6. No schema/widget/node/control or canonical-file change. Existing my_story
+registry/pack/canonical resolve these same P0/P1 functions at runtime. Run shipped
+OTR_WorkflowValidator, JSON roundtrip and all link/widget checks. Full regression
+compare current14459/51/183/1 IDs and normalized payloads. Bible existing11.39
+followup and executable test inventory coverage from actual08. Final Sonnet QA
+after code, push both repos immediately, verify HEAD/origin and evidence hashes.
+Only then reset/boot for full canonical09, same source/Gemma/profile as08 to
+measure correction; not a reroll without an intervening fix. Keep denominator8.
+No other host contact; RunPod remains unauthenticated.
+'''
+packet = plan + '\n' + judgment + '\n## R1 exact input and grounded owner evidence\n' + (d / 'roundtable/pass00_plan.md').read_text(encoding='utf-8')
+for name in ('_make_act_validator',):
+    source = (r / 'nodes/_otr_my_story.py').read_text(encoding='utf-8')
+    n = next(n for n in ast.parse(source).body if getattr(n, 'name', '') == name)
+    packet += '\n```python\n' + '\n'.join(source.splitlines()[n.lineno-1:n.end_lineno]) + '\n```\n'
+source = (r / 'nodes/_otr_story_source.py').read_text(encoding='utf-8')
+for n in ast.parse(source).body:
+    if getattr(n, 'name', '') in ('_retain_omitted', 'rewrite_story_source'):
+        packet += '\n```python\n' + '\n'.join(source.splitlines()[n.lineno-1:n.end_lineno]) + '\n```\n'
+(d / 'roundtable/pass01_plan.md').write_text(packet, encoding='utf-8')
+print('R1 grounded; exact R2 proposal written, production unchanged.')

@@ -1,0 +1,17 @@
+[
+  {
+    "path": "BUG_BIBLE.yaml",
+    "sha256": "717e730692f5c0596eeb220791c82a3a6864d1285d69bf1b0fd08d6c9e5fd1cc",
+    "bytes": 681819
+  },
+  {
+    "path": "tests/bug_bible_regression.py",
+    "sha256": "ea5ca036a19023602d75cc31f11adc2fa79911f02f7a3af06f06b0c5125b0e3e",
+    "bytes": 162232
+  },
+  {
+    "path": "README.md",
+    "sha256": "b248ba10c87d5c57fddf2068240c9425fc1d95cb7ae0a6a5a6cde0dea9478f6f",
+    "bytes": 16164
+  }
+]

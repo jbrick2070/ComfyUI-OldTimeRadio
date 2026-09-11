@@ -1,0 +1,327 @@
+[
+  {
+    "path": "bible_comparison.json",
+    "bytes": 393,
+    "sha256": "a8dad4eae3f661257706db4a433a478f0987ba9ca5516ed3574cb3118a0241ec"
+  },
+  {
+    "path": "bible_file_checks.json",
+    "bytes": 452,
+    "sha256": "59737a9fe18e71cae8b87209d94851c39386e6b618e6671bc42548492799663d"
+  },
+  {
+    "path": "edit_frame_ownership_pack_source.txt",
+    "bytes": 2674,
+    "sha256": "ef1a26fc2b0b31b6dad5df5c95049be39d8ea0a292a4e71a711981be3ee9dbef"
+  },
+  {
+    "path": "exit_statuses.json",
+    "bytes": 140,
+    "sha256": "46d90a75690f39ff00dc84049282423736f72af31ae707564a9d6fec086cfbd8"
+  },
+  {
+    "path": "file_checks.json",
+    "bytes": 489,
+    "sha256": "f68ebba6d289c2f215f35f1e1dc4e5cf27ab5ee76aa98f82b6d5dfb3683c12a1"
+  },
+  {
+    "path": "finalize_frame_ownership_source.txt",
+    "bytes": 10103,
+    "sha256": "955caa7cc48915eaa78955511bb9a1fd82dffab982a9fe0f7f93ad500fa6945f"
+  },
+  {
+    "path": "finish_frame_ownership_source.txt",
+    "bytes": 4120,
+    "sha256": "3fc189a2c9fa8e5a226a07bd841347d0ed39cbfb7e3a067b49e2fe84dd767551"
+  },
+  {
+    "path": "finished_sonnet_qa.md",
+    "bytes": 83176,
+    "sha256": "68e854142e465359f5a365a0c7ed99b1fed01f0355b2ebd1e9ff1e7bdaf84874"
+  },
+  {
+    "path": "full_comparison.json",
+    "bytes": 292,
+    "sha256": "bbf42948cc3d7b510713f7b04a0acb1cc6e0d3f7909855ca7730fb1df5460965"
+  },
+  {
+    "path": "next_canonical_wrapper_source.txt",
+    "bytes": 7335,
+    "sha256": "69e3008ffba931fd07dd0938c42d624e5afd72e86187ceca72a11462b4772f52"
+  },
+  {
+    "path": "prepare_frame_ownership_qa_source.txt",
+    "bytes": 4345,
+    "sha256": "e600c77c8ca4be0b77faf1b2c392756834c545e246c06b47baeccf80b36970a1"
+  },
+  {
+    "path": "prepare_frame_ownership_r1_source.txt",
+    "bytes": 7311,
+    "sha256": "c3750d3112054b72943a14c2b4b51ea7f2ba34e2ee46c88420863778e65b623b"
+  },
+  {
+    "path": "prepare_frame_ownership_r2_source.txt",
+    "bytes": 8906,
+    "sha256": "488d39e2f1698b6ef77d132fc318475db4c71cf77a2fd6221e61fb9fe3aa7bc7"
+  },
+  {
+    "path": "prepare_frame_ownership_r3_source.txt",
+    "bytes": 7346,
+    "sha256": "6beeea5ffa9ec84c8e7f150a9b0d155e1192ac12961b2fb10ec95c0e681b1898"
+  },
+  {
+    "path": "prepare_frame_ownership_r4_source.txt",
+    "bytes": 11733,
+    "sha256": "c91f1438bbfe1a125256219e2c0242b8a6e91496135e10157d0d8b0e7bc0d057"
+  },
+  {
+    "path": "prepare_pairlock_09_source.txt",
+    "bytes": 3815,
+    "sha256": "b8bc4e89640a7ed0308a7e21e340c141bbe6e46ec1f49f8aa869c2f9a41d45e7"
+  },
+  {
+    "path": "qualification_receipt.md",
+    "bytes": 3030,
+    "sha256": "97317a44ff1b4c4476ec7454e5cdf41e6bf0143e752b11fa9e8dee7489cc210d"
+  },
+  {
+    "path": "review_judgment.md",
+    "bytes": 2846,
+    "sha256": "9c4d7ade02a4642f499cea05bbd66766fe40a947ef251ce4ee6b047063d7b4b9"
+  },
+  {
+    "path": "root_anchor.md",
+    "bytes": 4592,
+    "sha256": "fe5defe425126b1466df404a1996015b27e3574e6ec1e66b21f83887bee3262f"
+  },
+  {
+    "path": "roundtable/pass00_judgment.md",
+    "bytes": 2617,
+    "sha256": "9a3bff08ebb294449bbc79da76bc66fc19fd65045bc47bf9d13d5b7e0cf1bc46"
+  },
+  {
+    "path": "roundtable/pass00_plan.md",
+    "bytes": 55020,
+    "sha256": "bc182fee6033faa150c400830abe23b1fba701e8814866f64c16600c8c673b4b"
+  },
+  {
+    "path": "roundtable/pass01_judgment.md",
+    "bytes": 3559,
+    "sha256": "0aefd51deaf3483ba8184fc6c06e7d039d1618a814cd7aa383f52f5bc8fcf3b5"
+  },
+  {
+    "path": "roundtable/pass01_plan.md",
+    "bytes": 74451,
+    "sha256": "758289ed212b581f8ff0500ddc3f6c862da9498cd1b15ec8e4487daa39e4ac0c"
+  },
+  {
+    "path": "roundtable/pass02_judgment.md",
+    "bytes": 3311,
+    "sha256": "e1d022acab71df8a7629960271bde24dd163b332f2da5ed5ebd9918945a0b536"
+  },
+  {
+    "path": "roundtable/pass02_plan.md",
+    "bytes": 92852,
+    "sha256": "999d600a50746365d93cd21e922f40f677e8a70981928223513d1748160e7e70"
+  },
+  {
+    "path": "roundtable/pass03_judgment.md",
+    "bytes": 2064,
+    "sha256": "0712d758e0b6c3a0a07269ffbbca73f3aae15b8beacaa1ba3f6c1dc3024d2366"
+  },
+  {
+    "path": "roundtable/pass03_plan.md",
+    "bytes": 56568,
+    "sha256": "edbc1b8337bc0c30d81999b74370d693979f2631e8686c288242a150b8f2e028"
+  },
+  {
+    "path": "roundtable/r1/anthropic__claude-opus-latest.md",
+    "bytes": 5649,
+    "sha256": "7ecb30d5a34afd546b2a4fde378e736f82703c40f5f943831470fa5815634922"
+  },
+  {
+    "path": "roundtable/r1/google__gemini-pro-latest.md",
+    "bytes": 3375,
+    "sha256": "7826a03d2840d8b9bac58966914524fee183b9cc83ab1585e95bf8ba87f1f11a"
+  },
+  {
+    "path": "roundtable/r1/manifest.json",
+    "bytes": 839,
+    "sha256": "08a25478981b3879028bf9f4af22b1971cd9431862b70b7accfd6bd008eceb71"
+  },
+  {
+    "path": "roundtable/r2/anthropic__claude-opus-latest.md",
+    "bytes": 5765,
+    "sha256": "5d113e6eb6d018b06dcaf79b6b3e6f05979e9304e5bdf350cbd27bf014c6d1b7"
+  },
+  {
+    "path": "roundtable/r2/google__gemini-pro-latest.md",
+    "bytes": 4985,
+    "sha256": "cc797d7a006c7386f8d90ae1df885929fc5ed0f889f3c75514c4dc2b361fe67f"
+  },
+  {
+    "path": "roundtable/r2/manifest.json",
+    "bytes": 837,
+    "sha256": "4b18507fd67ea7072aed7dbb9f7462609071130cf47dd0a41dd95574b14ec814"
+  },
+  {
+    "path": "roundtable/r3/anthropic__claude-opus-latest.md",
+    "bytes": 5899,
+    "sha256": "a99ac15b6d45dc6f674459042c6953374755bf81155a348a202c4550101e1aea"
+  },
+  {
+    "path": "roundtable/r3/google__gemini-pro-latest.md",
+    "bytes": 4137,
+    "sha256": "98f1a05e8afdc78b5f5d7fa197e262329b78f5114a5ca8cd1c7828bbf93cd415"
+  },
+  {
+    "path": "roundtable/r3/manifest.json",
+    "bytes": 839,
+    "sha256": "72724e5ebee32a325af75a00c9570001786a3386982691752b8a22e665af090b"
+  },
+  {
+    "path": "roundtable/r4/anthropic__claude-opus-latest.md",
+    "bytes": 3649,
+    "sha256": "586af66d12c9321f15776fdfad5a4817b9df058c140a4f576d0d2235aedfe22c"
+  },
+  {
+    "path": "roundtable/r4/google__gemini-pro-latest.md",
+    "bytes": 697,
+    "sha256": "85f43be336c9d3611ad04d329286335e887ffbc233c674bc1310883ba4865b35"
+  },
+  {
+    "path": "roundtable/r4/manifest.json",
+    "bytes": 839,
+    "sha256": "be4b5480c05eaf1041654991c0796d723431e52843c6aebfe3c95bbfc19374f0"
+  },
+  {
+    "path": "sonnet/anthropic__claude-sonnet-latest.md",
+    "bytes": 6273,
+    "sha256": "d2c90fc99948ffd4ee77de08dbf08dec4e2b49c6415d1c68578076fefb9dd675"
+  },
+  {
+    "path": "sonnet/manifest.json",
+    "bytes": 523,
+    "sha256": "9549c920dc604dae44250c01cf58e3c56d953ccc7ba5e6560399855cd4a14507"
+  },
+  {
+    "path": "tests/frame_ownership_before_fix.exit",
+    "bytes": 3,
+    "sha256": "df4e26a04a444901b95afef44e4a96cfae34690fff2ad2c66389c70079cdff2b"
+  },
+  {
+    "path": "tests/frame_ownership_before_fix.log",
+    "bytes": 1797,
+    "sha256": "a226d41d1442e446621ef97f9e050518259d750d30513d9ca866131ace48e3f3"
+  },
+  {
+    "path": "tests/frame_ownership_before_fix.xml",
+    "bytes": 32864,
+    "sha256": "dd0ad72992e2cd736ac09cc94a337a746764d023a387fa1ec2b705178d734fe4"
+  },
+  {
+    "path": "tests/frame_ownership_bible_baseline.exit",
+    "bytes": 3,
+    "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+  },
+  {
+    "path": "tests/frame_ownership_bible_baseline.log",
+    "bytes": 31991,
+    "sha256": "7a5f16484f86ff4f1b17b5c6fa5880d6157033c62c4ac52c8a0f617af0313906"
+  },
+  {
+    "path": "tests/frame_ownership_bible_baseline.xml",
+    "bytes": 45667,
+    "sha256": "276f7075ebf9518b5cd24a01bab996a5d15fff53a2ac8387ff2a7675c3f056c9"
+  },
+  {
+    "path": "tests/frame_ownership_bible_candidate.exit",
+    "bytes": 3,
+    "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+  },
+  {
+    "path": "tests/frame_ownership_bible_candidate.log",
+    "bytes": 27569,
+    "sha256": "9f1789f169eb1defa1f65a38aa0b0563ef80a5848b6963710b73e6dc01e2573e"
+  },
+  {
+    "path": "tests/frame_ownership_bible_candidate.xml",
+    "bytes": 40631,
+    "sha256": "c8fd514f6878322e68d65442acb498164d8e29763ee42e0ae49d031802eda82d"
+  },
+  {
+    "path": "tests/frame_ownership_canonical.exit",
+    "bytes": 3,
+    "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+    "path": "tests/frame_ownership_canonical.log",
+    "bytes": 619,
+    "sha256": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2"
+  },
+  {
+    "path": "tests/frame_ownership_focused.exit",
+    "bytes": 3,
+    "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+    "path": "tests/frame_ownership_focused.log",
+    "bytes": 1261,
+    "sha256": "aecd3ae0d962907a55c74f69fa376a3a0c2b367e1110e69c3839b221c15e51f3"
+  },
+  {
+    "path": "tests/frame_ownership_focused.xml",
+    "bytes": 28219,
+    "sha256": "a470edb8d0f66ec3e09a7570789b6fea89b63864ebd7ce5a7bd5227a5bff3ce9"
+  },
+  {
+    "path": "tests/frame_ownership_full.exit",
+    "bytes": 3,
+    "sha256": "df4e26a04a444901b95afef44e4a96cfae34690fff2ad2c66389c70079cdff2b"
+  },
+  {
+    "path": "tests/frame_ownership_full.log",
+    "bytes": 74915,
+    "sha256": "cab424fff5887d06325fdcff640338cb187c1a7fd64520745d8f8166bf683fa3"
+  },
+  {
+    "path": "tests/frame_ownership_full.xml",
+    "bytes": 2317715,
+    "sha256": "17914bcc14fe1ca7b409cd0d0dda352a2e675fd8b139f8a6f28ced98734dbe7f"
+  },
+  {
+    "path": "tests/frame_ownership_prepare.log",
+    "bytes": 161,
+    "sha256": "a6b911225b43ff1e2bd9db26a05e7e4a2057415674cec89d90eff50f7dc0e97e"
+  },
+  {
+    "path": "tests/frame_ownership_r1.log",
+    "bytes": 845,
+    "sha256": "3308d82def5298efee2681984e1629e2503dbcbfc8553d15b72d1083040ba682"
+  },
+  {
+    "path": "tests/frame_ownership_r2.log",
+    "bytes": 845,
+    "sha256": "33705548a49d7c23503b85bcaa07e0c76cf756ffe571fc50cb0ae6bb3ac3fefb"
+  },
+  {
+    "path": "tests/frame_ownership_r3.log",
+    "bytes": 845,
+    "sha256": "58b6b81d331cb0b8893ef799b03b1b2188eb33e948daa346b89b5757c85fa96e"
+  },
+  {
+    "path": "tests/frame_ownership_r4.log",
+    "bytes": 845,
+    "sha256": "ab5ab5e8c5ab28c5605f81102988c8189ab42400cad8cf15c4ef796255d6d89a"
+  },
+  {
+    "path": "tests/frame_ownership_sonnet.exit",
+    "bytes": 3,
+    "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+    "path": "tests/frame_ownership_sonnet.log",
+    "bytes": 613,
+    "sha256": "45a14af5774e3734f4b15bfd7857be27f883874b67ae8ded3224bce262565acd"
+  }
+]

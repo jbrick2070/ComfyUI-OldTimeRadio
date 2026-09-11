@@ -28,6 +28,8 @@ docs/2026-09-11-my-story-source-authority/** -text
 docs/2026-09-11-my-story-5080-qualification/pairlock_07_* -text
 docs/2026-09-11-my-story-5080-qualification/pairlock_08_* -text
 docs/2026-09-11-my-story-source-feedback/** -text
+docs/2026-09-11-my-story-frame-ownership/** -text
+docs/2026-09-11-my-story-5080-qualification/pairlock_09_* -text
 
 # Binary files - never touch line endings
 *.wav binary

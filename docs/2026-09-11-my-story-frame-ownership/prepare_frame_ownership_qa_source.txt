@@ -1,0 +1,59 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import subprocess
+
+r=Path.cwd();d=r/'docs/2026-09-11-my-story-frame-ownership'
+b=r.parents[1]/'comfyui-custom-node-survival-guide'
+files=['nodes/_otr_my_story.py','nodes/story_packs/my_story/my_story.json','tests/test_my_story_runner.py']
+for root,paths in [(r,files),(b,['BUG_BIBLE.yaml','tests/bug_bible_regression.py','README.md'])]:
+    checks=[]
+    for rel in paths:
+        p=root/rel;p.write_bytes(p.read_text(encoding='utf-8').encode('utf-8'))
+        raw=p.read_bytes();assert raw and not raw.startswith(b'\xef\xbb\xbf')
+        if rel.endswith('.py'):ast.parse(raw.decode('utf-8'),filename=rel,feature_version=(3,10))
+        checks.append(dict(path=rel,sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw)))
+    (d/('file_checks.json' if root==r else 'bible_file_checks.json')).write_text(json.dumps(checks,indent=2)+'\n',encoding='utf-8')
+candidate=r.parents[1]/'_worktrees/otr-frame-ownership-candidate'
+baseline=r.parents[1]/'_worktrees/otr-frame-ownership-baseline'
+assert not subprocess.check_output(['git','status','--porcelain'],cwd=baseline)
+for rel in files:shutil.copyfile(r/rel,candidate/rel)
+assert hashlib.sha256((r/'workflows/otr_canonical.json').read_bytes()).hexdigest()=='d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c'
+packet='''# Finished-code Sonnet QA: My Story frame ownership
+
+Root's grounded judgment before independent QA: the current diff applies the
+completed R1-R4 contract. No new semantic rejection, model call, schema, widget,
+workflow change or budget reset. P0/P1 and their existing source correction own
+drama only. The same reserved cast error condition now gives conditional whole-
+treatment action and simultaneous existing act-count diagnostics. Shared repair
+retains full source/draft/interrupted evidence and preserves material within its
+scope before stating the concrete defect. Separate frame still owns announcer.
+
+Seven new cases failed original code, all181 focused runner/source tests pass
+after final code. Full/Bible checks are running, not claimed green. Baseline
+14459pass/51inherited failures/183skip/1xfail; compare IDs AND normalized payloads.
+Actual08 evidence grounds this failure; fixtures prove rewrite routing/application,
+not live semantic quality. Full canonical09 after QA/push will measure all fields.
+Do not add gates, fuzzy aliases, programmatic source rewriting or new loops.
+
+Review finished code for concrete blockers/regressions, within1000 words; if clean
+say so. Do not re-open settled general design objections without new code evidence.
+P0 no semantic post-validator by design. Exactly2 actual P1 calls on valid-JSON
+post-validation failure: structured_call skips structural retry for this error
+and uses one final typed repair; max_attempts3 is a ceiling, not a loop target.
+No Cursor consensus; it failed twice previously. Actual Sonnet5 requested.
+'''
+packet+='\n## Exact finished OTR diff\n```diff\n'+subprocess.check_output(['git','diff','--',*files],cwd=r,text=True)+'\n```\n'
+packet+='\n## Exact finished Bible diff\n```diff\n'+subprocess.check_output(['git','diff','--','BUG_BIBLE.yaml','tests/bug_bible_regression.py','README.md'],cwd=b,text=True)+'\n```\n'
+for rel,names in [('nodes/_otr_my_story.py',{'_call','_full_artifact_repair','_pass_interpret','_make_treatment_validator','_pass_treatment','_make_act_validator','_pass_act','_pass_frame'}),('nodes/_otr_story_source.py',{'_retain_omitted','rewrite_story_source'})]:
+    src=(r/rel).read_text(encoding='utf-8');lines=src.splitlines()
+    for n in ast.parse(src).body:
+        if getattr(n,'name','') in names:
+            packet+='\n## '+rel+':'+str(n.lineno)+'\n```python\n'+'\n'.join(lines[n.lineno-1:n.end_lineno])+'\n```\n'
+packet+='\n## Finished routed pack\n```json\n'+(r/files[1]).read_text(encoding='utf-8')+'\n```\n'
+packet+='\n## Actual08 receipt\n'+(r/'docs/2026-09-11-my-story-5080-qualification/pairlock_08_receipt.md').read_text(encoding='utf-8')
+packet+='\n## Actual ladder skip and final repair\n```python\n'+'\n'.join((r/'nodes/_otr_structured_call.py').read_text(encoding='utf-8').splitlines()[998:1064])+'\n```\n'
+(d/'finished_sonnet_qa.md').write_text(packet,encoding='utf-8')
+print('Final LF/AST/hash checks written; controlled candidate has exactly three edited OTR files.')
