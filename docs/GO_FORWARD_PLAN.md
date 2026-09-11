@@ -26,12 +26,38 @@ story source combined is quite complex. I'm not expecting anything exact."* So:
   emergent behaviour from combining two independent surfaces, not a broken contract.
   Do not reopen it. See
   [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
+- **AN ARC IS CODING (operator ruling 2026-09-11).** Operator: *"when I say code I
+  include arc -- I consider arc coding."* So section 4 is not deferred work sitting
+  behind the real work; **section 4 IS the remaining work**, and "do all the coding
+  before testing" means do the arcs. Arcs cost no GPU and no money, so the only
+  budget they spend is wall clock.
 - **Prompts are hand-crafted per model and CHARACTER-BUDGETED.** Do not swashbuckle
   them. Adding conditional nuance spends budget that does not exist and reintroduces
   the per-prompt subtleties the operator has already rejected; removing words edits a
   tuned recipe. Both directions are closed.
 
-## 1. Tonight -- the four-machine wave (nearest deadline)
+## 1. The sequence -- ARC, then CODE, then TEST ON ALL FOUR
+
+Operator, 2026-09-11: *"arcs -- rebase go-forward to strategically optimise: arc,
+code, test on all 4."* That is the spine of this file, and an arc IS coding.
+
+**But the honest optimisation is not a straight line, and pretending otherwise costs
+a day.** Tonight's wave does not depend on any arc below -- it qualifies the scopes
+fix and gathers evidence -- and it is itself the EVIDENCE SOURCE several arcs need.
+Serialising everything behind "all arcs done" would idle four machines tonight and
+then arc blind tomorrow. So:
+
+| Phase | What | Why here |
+|---|---|---|
+| **A. ARC now** | 3.3 orphan occupancy, 3.5 per-beat reload, Sci-Fi cap value, runtime pack writes (all Tier 1), then Tier 2 rows that need no live evidence. | Crash/OOM class first, per the bar. Costs no GPU and no money, so it runs alongside the wave without competing for anything. |
+| **B. CODE what each arc converges on** | Implement, one CLI review per change, focused + full suite compared against baseline IDs **and normalized payloads**, then push. | An arc that never becomes a diff bought nothing. |
+| **C. TEST on all four** | The wave in section 2. **Freeze one hash first.** | Four machines qualify ONE commit. Every render-path push after the freeze adds a suspect to the one leg that must pass. |
+| **D. The evidence-fed arcs** | 3.8 fonts (needs the Mac's text leg), 3.4 clean-install (needs the 4060 and RunPod pull steps), and the visual-continuity A/B (needs several rolled styles side by side). | Arcing these BEFORE the wave re-derives what the wave will hand you for free. |
+
+**The one ordering rule that matters:** anything render-affecting either lands before
+the freeze or waits for phase D. Nothing render-affecting goes in between.
+
+## 2. Tonight -- the four-machine wave (the TEST phase)
 
 Copy-paste prompts, one block per machine:
 [PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md). That file restates the
@@ -57,16 +83,15 @@ its rolled `visual_style`.
 Not covered by the wave: **listening** (the operator's own ear; no agent here can
 ingest audio, and reading TTS text or checking a waveform is not listening).
 
-## 2. Open defects with an owner
+## 3. Open defects with an owner
 
 | Defect | State | Next action |
 |---|---|---|
 | PBUG-20260911-03 scopes path | Code fixed, offline-qualified, pushed. NOT closed. | 5080 Leg A. Nothing left to code. |
-| Sci-Fi repair-turn capacity overflow | **Open, crash-class.** `nodes/_otr_scifi_news_pro.py` never catches `PromptContextOverflowError` / `GenerationContextOverflowError` (`nodes/_otr_generation_budget.py`), so a too-generous cap propagates uncaught mid-episode. | Splits in two. **The catch is shippable** -- it fires only where today it crashes, so every currently-succeeding episode is unchanged. **Changing the cap VALUE is not** -- it decides repair-vs-cold-regeneration and therefore which script comes back. Take the catch; leave the value. |
-| 8 GB draft-profile refusal | Known (PBUG-20260904-05). Decides whether the 4060 publishes anything tonight. | Handled in the wave by naming the shipping profile. No code. |
+| Sci-Fi repair-turn cap VALUE | Half open. The CATCH shipped 2026-09-11 -- an overflow on the repair turn no longer kills the episode. The remaining half is that `_draft_fits_repair_turn` still predicts fit against a flat `HARD_VRAM_CONTEXT_LIMIT` rather than the transport's real window. | RENDER-AFFECTING: the cap decides repair-vs-cold-regeneration, so it changes which script comes back. Not before a wave. It is also not one fix -- local, GGUF-native and OpenRouter each resolve capacity differently -- so it needs an arc, not a constant swap. |
 | Runtime writes INSIDE the pack directory | **Open, durability-class -- this is the bar's own second bullet.** `nodes/_otr_openrouter_backend.py:792` still resolves its catalog cache to `Path(__file__)/../models`, and `nodes/_otr_shared/cloud_media_backend.py:209` puts `billing_ledger.jsonl` (a real-money audit trail, and the ONLY copy) under `<repo>/otr/cache/`. A registry update or reinstall wipes both. | NOT the mechanical edit it looks like -- grounded 2026-09-11: relocating the catalog default cold-starts a populated cache, which drops `resolve_context_window` to the 8192 default and changes the writer's token budget. So it needs a migration step, and the billing ledger should NOT land in a tier whose contract says "never the only copy". Do this AFTER the wave, with the migration. |
 
-## 3. Qualification coverage still owed
+## 4. Qualification coverage still owed
 
 Every qualifying run loads `workflows/otr_canonical.json` through
 `scripts/otr_canonical_api_run.py` -- no `--workflow` override, no replay substitute,
@@ -98,37 +123,49 @@ model/quantization/profile, prompt ID, elapsed time, memory and loads, all repai
 attempts, requested vs actual acts and cast, ledger seals and final paths. Preserve
 terminal failure evidence before asserting anything. Keep the full denominator.
 
-## 4. Design rows awaiting an arc
+## 5. Design rows -- the ARC phase, and this IS the remaining work
 
-None of these get coded without their arc first. Arcs cost no GPU and no money.
+Ordered by the section 0 bar: what can crash or lose an episode comes first. None of
+these is coded without its arc, and the arc IS the coding.
+
+**Tier 1 -- crash / OOM class. Arc these first.**
 
 | Row | Scope |
 |---|---|
-| 3.5 per-beat model reload | A ~14 GiB LTX reload per beat. Framed as an **OOM surface** rather than a speed complaint -- under the section 0 bar it earns its place because reloading that much per beat is where a render falls over, not because it is slow. It sits here, below section 2, deliberately. |
-| 3.5 janitor granularity | The janitor cannot sweep `tmp/audio_slices` -- no such reference exists in `nodes/_otr_janitor.py`, and 9.3 GB was measured sitting there. Durability. It widens an auto-delete, so it lands with a test and never without one. |
-| 3.8 | Shared torch-free font-family/file resolution across captions, titles, credits, scopes. The Mac's text-rendering leg tonight is its evidence. |
-| 3.2 | Shared silent-video composer face/crux. Touches eleven lanes on both machines, so CLAUDE.md section 0B applies -- prove the unchanged machine is unchanged, measured. **Guard: preserve the audio-in / text-to-video requirements, and measure truncation at the ACTUAL engine, not from a declared limit.** |
-| 3.3 | Orphan generation occupancy vs cleared model-cache state. Several narrow fixes each surfaced a new race; that is the two-strikes signal. |
-| 3.1 | Ghost v3 Half-B: the author still picks objects by ordinal and excludes beat dialogue. Restart the arc; r2 never converged. |
-| 3.4 | Clean-install manifest / queue-time download / ffprobe gaps. Its "blocked on 1.1" clause is STALE -- there is no 1.1 row. The 4060 and RunPod pull steps tonight produce the real gap list, so do not arc it before that. |
-| 3.6 | Shakespeare segmented/verbatim source artifact and field-owner table. Explicitly not next. |
-| 3.7 | Pitch/cast name reconciliation and dead-field ownership. `meta.style` still has readers and writers; `meta.story_scaffold` already means a separate control -- resolve ownership, do not blind-rename. **"Content-derived style" is STRUCK** -- deriving style from content is picking a winner between pack and story, which [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md) settled. Do not reopen it. |
+| 3.3 | Orphan generation occupancy vs cleared model-cache state. `has_local_resident_llm()`'s own docstring says it does NOT make orphan GPU occupancy visible, so the process can believe nothing is resident while a previous generation still holds VRAM. Several narrow fixes each surfaced a NEW race -- that is the two-strikes signal, and why it takes an arc rather than a sixth patch. |
+| 3.5 per-beat model reload | A ~14 GiB LTX reload per beat. Framed as an OOM SURFACE, not a speed complaint: reloading that much per beat is where a long episode falls over. |
+| Sci-Fi repair-turn cap VALUE | See section 2. Local, GGUF-native and OpenRouter each resolve capacity differently, so the "read the real window" fix is a three-transport design, not a constant swap. Render-affecting; arc now, code after a wave. |
+| 3.5 runtime pack writes | See section 2. Needs a migration step or it cold-starts a populated cache and moves the writer's token budget; and the billing ledger must not land in a tier whose contract says "never the only copy". |
+
+**Tier 2 -- correctness, no crash.**
+
+| Row | Scope |
+|---|---|
+| 3.8 | Shared torch-free font-family/file resolution across captions, titles, credits, scopes. Its evidence arrives tonight from the Mac's text-rendering leg -- eight macOS episodes shipped with the hero title off the right edge. Arc it AFTER that leg reports, or the arc re-derives what the leg will hand you. |
+| 3.2 | Shared silent-video composer face/crux. Touches eleven lanes on both machines, so CLAUDE.md 0B applies -- prove the unchanged machine is unchanged, measured. **Guard: preserve the audio-in / text-to-video requirements, and measure truncation at the ACTUAL engine, not from a declared limit.** |
+| 3.7 | Pitch/cast name reconciliation and dead-field ownership. `meta.style` still has readers and writers; `meta.story_scaffold` already means a separate control -- resolve ownership, do not blind-rename. **"Content-derived style" is STRUCK**: deriving style from content is picking a winner between pack and story, which [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md) settled. |
 | 2.4 routing/canvas | ShotLock write-side canvas validation; ltx_av long-beat underruns; matrix declared-vs-effective limits; `wants_talking_prompt` capture. |
 | 2.4 voice/credits | Opt-in Bark non-speech repair with a bounded keep-best policy; small-canvas credits layout (known -- report it, do not chase it). |
 | 2.4 audit tail | Remaining output-root/env-exporter and protected model-root items. The cold-cache test dependency is FIXED; the google/veo unpinned-fixture and worktree-credit claims were re-grounded and REFUTED -- do not re-derive them. |
 | 2.4 source | HTML block joins pending an operator digest ruling; scifi_news P0 literal-span convergence; scifi_news_pro provider/output capacity and P9/GGUF follow-ups. No deterministic source-prune rung. |
-| A3 | Selected-act acceptance in Sci-Fi's markup repair. Needs one short review, not a full arc: exact match vs tolerance band. Routes into the EXISTING ladder; never a new checker. Stated once, here. |
-| A2 follow-up | Unknown native capacity and remote token-estimate accounting. The Sci-Fi character-estimate half is tracked as the crash-class row in section 2. **Guard: do NOT reopen the shared native-capacity/EOS fix -- it landed and is receipted.** |
+| A2 follow-up | Unknown native capacity and remote token-estimate accounting. **Guard: do NOT reopen the shared native-capacity/EOS fix -- it landed and is receipted.** |
+
+**Tier 3 -- wait for evidence, or explicitly not next.**
+
+| Row | Scope |
+|---|---|
+| 3.4 | Clean-install manifest / queue-time download / ffprobe gaps. Its "blocked on 1.1" clause is STALE -- there is no 1.1 row. **The 4060 and RunPod pull steps tonight produce the real gap list**, so arcing it first re-derives it. |
+| 3.1 | Ghost v3 Half-B: the author picks objects by ordinal and excludes beat dialogue. Restart the arc; r2 never converged. Weigh against the bar -- this is authoring quality, and story quality is DONE. Arc it only if the ordinal selection is a correctness fault rather than a taste one. |
+| 3.6 | Shakespeare segmented/verbatim source artifact and field-owner table. Explicitly not next. |
 | 2.2 | Five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. No new Ghost schema field. Needs a CUDA proving host. |
 
-## 5. Blocked on the operator -- each unblocks with one word
+## 6. Blocked on the operator -- each unblocks with one word
 
-2.4 source digest ruling (HTML block joins) · A3 exact-match vs tolerance ·
-4 / 4B registry review note for posting (**guard: revalidate the old
+2.4 source digest ruling (HTML block joins) · 4 / 4B registry review note for posting (**guard: revalidate the old
 discriminator/bisection hypothesis before ANY destructive strip-down**) · 5.1-5.2 release after physical 8 GB proof ·
 6 unruled product choices and Bible fan-out candidates.
 
-## 6. Hardware and publication state
+## 7. Hardware and publication state
 
 - **Mac, 4060, RunPod: RELEASED** for tonight's wave. Their own proven routes and
   owners remain authoritative. Findings to `docs/`; they do not push.
@@ -139,12 +176,23 @@ discriminator/bisection hypothesis before ANY destructive strip-down**) · 5.1-5
   2026-09-04 after a grounded review killed it on three counts, all still true. Not
   scheduled. Do not revive without new evidence.
 
-## 7. Constraints specific to this plan
+## 8. Constraints specific to this plan
 
 Only the ones not already in CLAUDE.md or the standing rulings.
 
-- Full listener source, no RSS. **Selected acts are binding.** Cast count is flexible
-  and records requested vs actual; the house announcer is excluded from dramatic cast.
+- Full listener source, no RSS. Cast count is flexible and records requested vs
+  actual; the house announcer is excluded from dramatic cast.
+- **WE DO NOT CHASE ACT COUNT, exactly as we do not chase word count (operator
+  ruling 2026-09-11).** Operator: *"acts we ask for, we don't chase -- just like
+  words. The LLM does its own thing. I don't have enough horsepower or tokens to
+  chase it. I'd need to build a better act structure and I don't want to now."*
+  The requested act count is a REQUEST to the model, not a gate on its output.
+  **A3 -- adding a selected-act vs parsed-scene comparison to Sci-Fi's markup
+  ladder -- is CLOSED by this ruling and was removed from the design rows above.**
+  Do not add a scene-count check, a tolerance band, a repair rung keyed on act
+  count, or any rejection derived from act count. A better act STRUCTURE is a
+  future project the operator has explicitly declined to start; it is not a
+  validation problem and must not be approached as one.
 - Model checking returns actually-applied rewrites under a fixed total attempt budget
   including repairs. No separate chunker, report-only checker, recursive loop, or
   fourth/fifth round.
@@ -157,7 +205,7 @@ Only the ones not already in CLAUDE.md or the standing rulings.
 - No replay-system, migration or re-render project. Saved input means fresh
   generation. Do not hide test publications from OBS.
 
-## 8. Parked -- preserved, not work
+## 9. Parked -- preserved, not work
 
 `5.3`/`5.6` unqualified installed family and GGUF opt-in combinations ·
 `5.4`-`5.5` H3 policy receipts and the image-mode refusal question ·

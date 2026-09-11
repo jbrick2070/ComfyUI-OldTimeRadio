@@ -52,7 +52,11 @@ try:
     )
     from ._otr_repair_prompts import make_dispatching_repair_factory
     from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
-    from ._otr_generation_budget import ProviderCapacityMessages
+    from ._otr_generation_budget import (
+        CAPACITY_PHASE_PROMPT_NO_ROOM,
+        PromptContextOverflowError,
+        ProviderCapacityMessages,
+    )
     from ._otr_scifi_p0_contract import (
         MAX_QUOTE_CHARS,
         p0_source_chunks,
@@ -83,7 +87,11 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         canonical_word_count,
         set_line_text_metrics,
     )
-    from _otr_generation_budget import ProviderCapacityMessages  # type: ignore
+    from _otr_generation_budget import (  # type: ignore
+        CAPACITY_PHASE_PROMPT_NO_ROOM,
+        PromptContextOverflowError,
+        ProviderCapacityMessages,
+    )
     from _otr_scifi_p0_contract import (  # type: ignore
         MAX_QUOTE_CHARS,
         p0_source_chunks,
@@ -2996,13 +3004,17 @@ def _run_markup_ladder(
             temp = max(temp, last_temp)
             cold_regenerations += 1
         last_temp = temp
-        if format_example is None:
-            messages = ProviderCapacityMessages([
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_content},
-            ])
-        else:
-            messages = ProviderCapacityMessages([
+
+        def _messages_for(content: str) -> "ProviderCapacityMessages":
+            """The rung's messages for a given user turn. Factored out ONLY so
+            the overflow guard below can rebuild them without the draft block;
+            the wording is byte-identical to what it always was."""
+            if format_example is None:
+                return ProviderCapacityMessages([
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": content},
+                ])
+            return ProviderCapacityMessages([
                 {"role": "system", "content": system},
                 {
                     "role": "user",
@@ -3016,14 +3028,66 @@ def _run_markup_ladder(
                     ),
                 },
                 {"role": "assistant", "content": format_example},
-                {"role": "user", "content": user_content},
+                {"role": "user", "content": content},
             ])
+
+        messages = _messages_for(user_content)
         # LLM slot: creative -- whole-play markup authoring/repair.
-        raw = creative_fn(
-            messages,
-            temperature=temp,
-            max_new_tokens=None,
-        )
+        #
+        # THE CARRIED DRAFT CAN OVERFLOW THE PROMPT, AND THAT USED TO CRASH THE
+        # EPISODE. `_draft_fits_repair_turn` PREDICTS whether the draft fits,
+        # using a chars/4 estimate against a flat VRAM-shaped cap. When that
+        # estimate is wrong in the generous direction the draft rides anyway and
+        # the transport refuses at the door -- `PromptContextOverflowError`,
+        # phase `prompt_no_room`, raised BEFORE any tokens are spent. Nothing in
+        # this module caught it, so it left the ladder, left the node, and
+        # surfaced as a failed prompt with nothing in obs.
+        #
+        # The remedy is the one the ladder ALREADY performs when the prediction
+        # says no: drop the draft and go on without it. Doing it here simply
+        # lets the transport's verdict correct the estimate's.
+        #
+        # WHY THIS IS NOT A BANNED RE-ROLL. `prompt_no_room` is deliberately
+        # absent from `REROLLABLE_PHASES` forever, because "the arithmetic that
+        # refused it is deterministic and re-derives the identical refusal".
+        # That is true of the SAME prompt. This does not resend the same prompt:
+        # it removes the draft block first, so the arithmetic is being asked a
+        # different question. Exactly once, and only when there was a draft to
+        # remove -- a bare prompt that does not fit will not fit on a retry, so
+        # that case still raises.
+        #
+        # Scope is deliberately narrow: only phase `prompt_no_room`. A
+        # `GenerationDegeneracyError` SUBCLASSES this exception but means the
+        # transport halted a decode that stopped steering -- a different
+        # condition, and not this guard's to swallow. It re-raises.
+        try:
+            # LLM slot: creative -- whole-play markup authoring/repair.
+            raw = creative_fn(
+                messages,
+                temperature=temp,
+                max_new_tokens=None,
+            )
+        except PromptContextOverflowError as exc:
+            if (getattr(exc, "phase", None) != CAPACITY_PHASE_PROMPT_NO_ROOM
+                    or not draft_block):
+                raise
+            log.warning(
+                "[SciFiNewsPro] attempt %d: the carried draft overflowed the "
+                "prompt (%s). Dropping it and retrying this rung once -- the "
+                "repair-turn fit estimate was too generous.", attempt, exc,
+            )
+            rejected_draft = ""
+            draft_block = ""
+            cold_regenerations += 1
+            user_content = (
+                f"{base_user}\n\n{extra_user}" if extra_user else base_user
+            )
+            # LLM slot: creative -- same rung, retried without the draft.
+            raw = creative_fn(
+                _messages_for(user_content),
+                temperature=temp,
+                max_new_tokens=None,
+            )
         raw = _strip_conversational_wrapper(raw)
         last_raw = raw
         parsed, defects = parse_scifi_news_pro_markup(
