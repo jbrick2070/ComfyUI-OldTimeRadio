@@ -20,6 +20,19 @@ written to be self-contained: do not assume the reader has seen this conversatio
 
 ## Rules both machines follow
 
+**YOUR REPORT FILE IS GITIGNORED BY DEFAULT, AND `git add` WILL NOT SAY SO.**
+`.gitignore:255` is `docs/2026-*/` -- dated folders are local scratch on purpose, and
+this wave folder is only tracked because its two documents were force-added.
+`kibitz-runs/` is ignored the same way. So:
+  * **The phone-home is the delivery mechanism, not the file.** Put the findings IN
+    the message. A report that exists only on your disk did not reach anyone.
+  * If you also want the file in the repo, it needs `git add -f <path>` -- and per
+    rule 1 you still do not push; say in your phone-home that you force-added it and
+    let the 5080 carry it.
+  * The 4060's `docs/4060_DRILL_LOG.md` is a normal tracked path and needs none of
+    this. Prefer it for anything durable.
+
+
 0. **WHAT COUNTS AS A FAILURE, and it is much narrower than you will assume.**
    Operator directive 2026-09-11: *"be careful not to fail anything because of a
    verification round check. Only an out of memory should fail."* With his standing
