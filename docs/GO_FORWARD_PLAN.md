@@ -123,45 +123,58 @@ model/quantization/profile, prompt ID, elapsed time, memory and loads, all repai
 attempts, requested vs actual acts and cast, ledger seals and final paths. Preserve
 terminal failure evidence before asserting anything. Keep the full denominator.
 
-## 5. The remaining work, triaged against current code (2026-09-11)
+## 5. The remaining work, after the arcs (2026-09-11)
 
-**Operator rule: a no-brainer does not get an arc; only genuinely complex items do.**
-Every row below was re-grounded against the CURRENT tree before being classified,
-because the row descriptions are months old and the code moved underneath them. That
-grounding changed almost every verdict -- several "design rows" turned out to be
-already decided, already arced, or already closed.
+Eight arcs ran r1 with one reviewer each (codex), and every verdict was then verified
+against the real files before anything was folded in. **41 of 42 panel claims held.**
+Anchors had been built from adversarially-verified grounding and were STILL wrong in
+seven of eight cases -- establishing the facts and reasoning correctly from them are
+different skills, and that gap is what the arcs caught.
 
-### 5A. CODE IT -- the fork is already settled, so there is nothing to pressure-test
+**r2 was judged unnecessary on all eight.** Each row now turns on a decision, a
+measurement, or a concrete diff -- not on a design argument. Running r2 would be
+ceremony. Receipts: `kibitz-runs/2026-09-11-arc-*/r1/`, anchors in
+`docs/2026-09-11-arcs/*/`.
+
+### 5A. CODE IT -- fork settled or collapsed
 
 | Row | What to write |
 |---|---|
-| 3.1 Ghost Half-B | `ghost_signal_author.py::resolve_crux_kernel` picks the beat's physical-artifact subject by ORDINAL. **The fork was already ruled by the operator** -- `docs/OTR_STANDING_RULINGS.md:759`, 2026-09-03, hard: extend with the beat's own dialogue. Implement the existing ruling. No arc. |
-| 3.6 Shakespeare | **The keystone design was already settled by a full kibitz arc on 2026-08-03** (`kibitz-runs/2026-08-03-adaptation-fid...`): compile source speech deterministically, never generate it. `nodes/_otr_source_document.py` already provides SourceDocument/SourceSpan with `canonical_body_sha256`. What remains is wiring, not design. No arc. |
-| 3.7 meta ownership | Fork NONE. All three sub-questions are decided: style vs `story_scaffold` ownership is already correctly separated in code; content-derived style is STRUCK by [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md); the rest are single-answer documentation corrections. Fix the stale comments. No arc. |
-| Sci-Fi repair-turn cap VALUE | The crash path closed today. A correct uniform value ALREADY EXISTS -- `cache_entry["context_cap"]`, stamped per-provider by each backend's own resolver and trusted by every other transport in the tree. Thread it into `_draft_fits_repair_turn` (`_otr_scifi_news_pro.py:2861`) instead of the flat `HARD_VRAM_CONTEXT_LIMIT`. Narrow. No arc. **Still render-affecting** -- it changes repair-vs-cold-regeneration, so it lands after a wave, not before a freeze. |
-| 3.2 composer face/crux | Fork NONE. `compose_parts` works as intended, and the audio-in / text-to-video requirements are preserved by lane-local code layered around it, not overridden by it. No crash or durability risk. The two findings are stale documentation. Fix the comments. No arc. |
+| 3.1 Ghost Half-B | Fork already ruled by the operator (`OTR_STANDING_RULINGS.md:759`, 2026-09-03): extend with the beat's own dialogue. Implement the existing ruling. |
+| 3.6 Shakespeare | Keystone design settled by a full kibitz arc on 2026-08-03: compile source speech deterministically, never generate it. `_otr_source_document.py` already provides the artifact. Wiring, not design. |
+| 3.7 meta ownership | Fork NONE. Fix the stale comments; the ownership split is already correct in code. |
+| Runtime pack writes | **The arc COLLAPSED this fork.** The anchor's premise that "no suitable tier exists" is false: `otr_state_dir()` (`_otr_paths.py:627`) is already the durable, non-cache, non-swept tier the billing ledger needs, with a live precedent in `_otr_story_drafts.py:111`. Point `cloud_media_backend.ledger_path()` at `otr_state_dir()/cloud_media/billing_ledger.jsonl` with a one-time copy-forward. The catalog-cache half stays separate and still needs its migration. |
+| Sci-Fi cap VALUE | A correct per-provider value already exists in `cache_entry["context_cap"]`. Thread it instead of the flat constant. **RENDER-AFFECTING** -- lands after a wave, never before a freeze. |
+| 3.2 composer | Fork NONE, no crash risk. Fix the stale docs. |
+| 2.4 audit tail, rip half | `comfy_models_dir()` and `resolve_hf_model_path()` have ZERO callers (verified). Rip them outright rather than folding them into any merge -- there is nothing live to preserve. |
 
-### 5B. ARC IT -- a real fork with more than one defensible answer
+### 5B. NEEDS A MEASUREMENT OR A DECISION, not another round
 
-| Row | The fork |
+| Row | What it actually needs |
 |---|---|
-| 3.5 per-beat model reload | `eng_ltx_video.render_clip` builds a FRESH graph every call -- GGUF unet, Gemma-3 text encoder and VAE reloaded per beat; measured ~14.8 GiB peak, paid again every beat. **NOT called OOM-class: there is no PROD_BUG_LOG entry behind that framing, and this repo's admission rule says only a live-verified failure earns it.** What is proven is that the reload is real and expensive -- wall-clock cost, and a plausible feeder for row 3.3's orphan occupancy. Fork: what to cache (text encoder only, ~8.8 GB, matching the proven `eng_ltx25` pattern, vs also the unet), where to hold it, and how either interacts with the cross-engine inter-beat reclaim invariant (CS-3) that exists so two heavy engines never co-reside on a 16 GB card. **The archive's prescribed fix is the WRONG mechanism**: it names `eng_ltx_8gb`'s B1b pattern, which only collapses per-SEGMENT reload inside one beat. The matching precedent is `eng_ltx25.begin_encoder_scope` / `end_encoder_scope`, and `render_driver` already dispatches it generically via getattr -- so the plumbing exists and the fork is only what to cache and where. |
-| Runtime pack writes | Not a one-line path swap: the two files need DIFFERENT target tiers, and there is a migration decision for data already on disk -- a populated catalog cache that cold-starts changes the writer's token budget, and `billing_ledger.jsonl` is the only copy of real spend and must not land in a tier whose contract says "never the only copy". |
-| 3.8 fonts | Build the shared torch-free resolver the bug log already calls for (one candidate table per platform, one override-env convention, one fallback policy) vs formally accept per-platform divergence. **Its evidence arrives tonight from the Mac's text leg** -- arc after that reports. |
-| 2.4 voice/credits | Bark: wire the existing, tested `_otr_bark_lib.py:684-727` high-band artifact scorer into an opt-in bounded retry-and-keep-best -- i.e. un-defer the 2026-06-21 B3 reroll loop that was consciously left as future work once source-side prevention landed. Whether to un-defer it at all is the fork. |
-| 2.4 source | Genuine fork; needs the operator's digest ruling first (section 6). |
-| 2.4 audit tail | Remaining output-root/env-exporter and protected model-root items. NOTE: the cold-cache test dependency is FIXED, and the google/veo unpinned-fixture and worktree-credit claims were re-grounded and REFUTED -- do not re-derive them. |
-| 3.4 clean install | **The headline concern is CLOSED**: `_assert_profile_models_present` is a refuse-only gate for the dev harness, exactly as suspected, and its "blocked on Section 1.1" clause is stale. Two narrower forks survive -- the scope of auto-download coverage (`_COVERED` is deliberately 3 engines today) and where fetch code lives so it ships in the registry bundle. Neither is crash-class. Low priority. |
+| 2.4 routing/canvas | The fork survives, but the 193-frame ceiling **cannot be asserted as production-proven** -- it is a lab-warm isolation number, and this lane has a live receipt of production peaks exceeding lab peaks. Needs a canonical-path qualification leg first. Then a TWO-file diff (`frame_contract.PLANNING_CAP_ENGINES` **and** `otr_16gb_ltx_audio_in.json` `video.max_render_frames`) -- changing one alone narrows nothing. **Not render-inert**: `assert_coverage_plans` refuses any ltx_audio_in ledger planned before the change and rendered after, so in-flight episodes need replanning at cutover. |
+| 3.5 per-beat reload | **Direction undercut by prior art.** Moving this same encoder off-GPU was already tried and REVERTED on live-measured evidence that it did not move the peak (PBUG-20260616-01 / BUG-07.17). The generic scope hook also closes on engine-CHANGE, not every beat, so "even consecutive same-engine beats start cold" was wrong. Per-lane encoder device defaults differ (`ltx_video` GPU vs `ltx_av` CPU). Before any caching work, decide whether it is worth doing at all given the revert. Not OOM-proven -- wall-clock cost. |
+| 2.4 voice/credits | **The instrument does not fit the defect.** `high_band_edge_ratio` detects edge squeal; PBUG-20260902-03 documents a SUSTAINED TONE, and an independent synthetic reproduction of the exact documented frequencies scored ~0 against the real function. Closing this means designing and empirically qualifying a NEW whole-clip speech-shape scorer that does not exist anywhere in the tree. Real work, for a non-crash defect -- weigh against the bar before starting. |
+| 2.4 source | Blocked on the operator's digest ruling (section 6). |
+| 3.4 clean install | r1 verdict was **yes-with-fixes** -- the only one. Keep the existing download scope; the early-tool-check proposal needs narrowing. Low priority, non-crash. |
 
-### 5C. NOT CODE AT ALL
+### 5C. CLOSED, DISSOLVED, OR NOT CODE
 
 | Row | Disposition |
 |---|---|
-| 2.2 Ghost CUDA | Its own spec says "Section 0 explicitly rules NO ARC for this closed specification." A live five-act forced-Ghost CUDA publication, nothing more. Needs a CUDA host. |
-| A2 follow-up | **CLOSED and removed.** Both sub-items -- unknown native capacity and remote token-estimate accounting -- are already deliberate and tested in current code. The row description was stale. |
-| 2.4 routing/canvas | Grounding still in flight at the time of writing; classify before acting. |
+| 3.8 fonts | **DISSOLVED by the arc.** The shared-resolver side does not survive: the four resolvers have genuinely different jobs (measured-monospace, libass-declared-family, deliberately-refusing-branded, proportional-unmeasured), and a unified Python table would not close the real gap because captions and titles are drawn by libass, which never sees the Python side. Removed. It did surface one real operator decision -- see section 6. |
+| A2 follow-up | **CLOSED.** Both sub-items already deliberate and tested; the row text was stale. |
+| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication. Needs a CUDA host. No code, no arc. |
 
 ## 6. Blocked on the operator -- each unblocks with one word
+
+**Credits font exhaustion -- two of your own rulings now conflict.**
+`otr_credits_roll.py:607` hard-RAISES when no font resolves, deliberately and
+documented (*"no-fallback: a point-size-less bitmap hero is unacceptable, Fable
+risk #3"*). The standing rule *"do not reduce how many episodes reach `otr/obs/`"*
+and today's bar point the other way. On a box with no matching font the episode
+currently DIES AT THE CREDITS rather than publishing with an ugly title. Publish
+anyway, or keep failing loudly? Surfaced by the fonts arc. ·
 
 2.4 source digest ruling (HTML block joins) · 4 / 4B registry review note for posting (**guard: revalidate the old
 discriminator/bisection hypothesis before ANY destructive strip-down**) · 5.1-5.2 release after physical 8 GB proof ·
