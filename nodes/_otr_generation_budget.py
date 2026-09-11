@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 
-MIN_OUTPUT_TOKENS = 64
+MIN_OUTPUT_TOKENS = 1
 class ProviderCapacityMessages(list):
     """Message payload for prose whose size must never be pre-judged.
 

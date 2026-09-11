@@ -686,25 +686,30 @@ def _parse_repo_dir_name(name: str) -> str | None:
     return f"{org}/{repo}"
 
 
+def read_native_context(config: Any) -> int | None:
+    """Read the decoder's actual capacity without changing its configuration."""
+    def field(obj, key):
+        return obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
+
+    nested = field(config, "text_config")
+    for owner in (nested, config):
+        if owner is None:
+            continue
+        for key in ("max_position_embeddings", "n_positions", "n_ctx"):
+            value = field(owner, key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                return value
+    return None
+
+
 def _read_advertised_context(snapshot_path: Path) -> int | None:
-    """Best-effort read of max_position_embeddings (or fallback fields)
-    from a snapshot's config.json. Returns None on any failure -- this
-    is informational, not load-bearing."""
-    cfg = snapshot_path / "config.json"
-    if not cfg.is_file():
-        return None
+    """Read native decoder capacity from this exact snapshot, if available."""
     try:
         import json
-
-        with cfg.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        for key in ("max_position_embeddings", "n_positions", "n_ctx"):
-            val = data.get(key)
-            if isinstance(val, int) and val > 0:
-                return val
-    except Exception:
+        with (snapshot_path / "config.json").open("r", encoding="utf-8") as handle:
+            return read_native_context(json.load(handle))
+    except (OSError, ValueError, TypeError):
         return None
-    return None
 
 
 def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
@@ -1792,43 +1797,36 @@ def validate_model_id(
 # ---------------------------------------------------------------------------
 
 
-# Hardware-aware ceiling on the effective context window. A small model
-# like Gemma-4-E4B advertises a 128k context in its config.json, but
-# feeding 128k tokens on a 16 GB card OOMs instantly. The clamp keeps
-# the upper bound sane regardless of the model's claim.
-#
-# Default: 8192 on the 5080 16 GB target. Configurable via
-# OTR_HARD_VRAM_CONTEXT_LIMIT so users on bigger hardware can raise it.
-def _hard_vram_context_limit() -> int:
-    raw = otr_env.get("OTR_HARD_VRAM_CONTEXT_LIMIT")
-    if raw:
-        try:
-            return max(512, int(raw))
-        except (TypeError, ValueError):
-            pass
-    return 8192
+# Legacy estimates remain available when native metadata is unknown. They do
+# not constrain a known model window or reserve KV memory on native HF routes.
+DEFAULT_CONTEXT_ESTIMATE = 8192
+_CONTEXT_PIN_UNSET = object()
 
 
-HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
+def normalized_context_pin(raw: Any) -> int | None:
+    """Normalize an explicit positive integer; absence never invents a pin."""
+    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
 
 
-# Explicit per-model effective-context overrides for the curated set
-# only (where config.json advertises a larger window than what the
-# inference pipeline can sanely feed). A soak-tested override for a
-# vram_fit_tier=="PASS" row is AUTHORITATIVE (see resolve_context_cap):
-# it is the value that row was proven at, not a guess to be re-clamped by
-# the generic HARD_VRAM_CONTEXT_LIMIT. Mistral-Nemo is raised to 16384
-# (2026-07-19) so the local sci-fi 420/720w script pass fits the
-# context window (config.json advertises 131072); NF4 4-bit weights + a
-# DynamicCache keep the ~1.8 GB KV at 720w inside the 16 GB card
-# (live-proven). Short legs never reached the old 8192 output-budget
-# clamp, so C7 audio byte-identity holds. Every other row stays at its
-# soak-tested 8192 (a WARN-tier override stays clamped by the hard limit).
+def _hard_vram_context_limit() -> int | None:
+    return normalized_context_pin(otr_env.get("OTR_HARD_VRAM_CONTEXT_LIMIT"))
+
+
+# Compatibility export for old informational consumers. Runtime resolution
+# reads the explicit setting once per request instead of this import-time value.
+HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit() or DEFAULT_CONTEXT_ESTIMATE
+
+
+# Historical curated working-window estimates, used only without native config.
 CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "Qwen/Qwen3.5-4B": 8192,
-    # Llama 3.2 advertises 131072; pinned to the soak-tested 8192 like every
-    # other row. Its KV cache is what would eat the ~2 GiB of headroom that
-    # makes an unquantized load fit 8 GB at all.
+    # These historical working windows are estimates until config is available.
     "unsloth/Llama-3.2-3B-Instruct": 8192,
     "mistralai/Mistral-Nemo-Instruct-2407": 16384,
     "google/gemma-2-2b-it": 8192,
@@ -1852,6 +1850,8 @@ class ContextCapVerdict:
     tier: Literal["PASS", "WARN", "UNKNOWN"]
     value: int
     source: str
+    native_capacity: int | None = None
+    explicit_pin: int | None = None
 
 
 def _read_config_context(model_id: str, hub_root: Path | None = None) -> int | None:
@@ -1865,68 +1865,33 @@ def _read_config_context(model_id: str, hub_root: Path | None = None) -> int | N
 
 
 def resolve_context_cap(
-    model_id: str, *, hub_root: Path | None = None
+    model_id: str, *, hub_root: Path | None = None,
+    context_pin: Any = _CONTEXT_PIN_UNSET, config: Any = None,
 ) -> ContextCapVerdict:
-    """Resolve the effective context-window cap for `model_id`.
+    """Prefer actual native capacity; label historical fallbacks as estimates.
 
-    Returns a tiered verdict (never raises):
-        PASS    -- model_id has an explicit override (soak-tested cap). For a
-                   vram_fit_tier=="PASS" catalog row the override is
-                   AUTHORITATIVE: value = override (un-clamped), because a
-                   soak-tested cap is not a guess to be re-clamped by the
-                   generic hardware limit -- re-clamping is exactly what pinned
-                   Mistral-Nemo to a false 8192 and truncated the 420/720w
-                   script pass. If the operator has EXPLICITLY set
-                   OTR_HARD_VRAM_CONTEXT_LIMIT (a smaller-card escape hatch) the
-                   value is re-clamped to min(override, limit). A WARN/UNKNOWN
-                   catalog row's override is not soak-tested, so it also stays
-                   min(override, limit).
-        WARN    -- config.json parses cleanly but model isn't in the
-                   override table; value = min(parsed, HARD_VRAM_CONTEXT_LIMIT).
-        UNKNOWN -- neither source resolves; value = HARD_VRAM_CONTEXT_LIMIT
-                   (the only safe default; B1c's request_slot makes the
-                   combined fit/cap decision).
-
-    The clamp handles two real failure modes:
-      * "model says 4k but we feed 8k": parsed used, clamped down to
-        limit if needed.
-      * "model says 128k, we'd OOM on 16 GB": clamped to limit -- except a
-        PASS-tier override, whose window was already proven on the card.
+    Explicit pins constrain a known window, never expand it. Passing None
+    explicitly preserves an unpinned request across download/load/reuse.
     """
-    limit = HARD_VRAM_CONTEXT_LIMIT
-    override = CURATED_CONTEXT_OVERRIDES.get(model_id)
-    if override is not None:
-        row = _by_repo_id().get(model_id)
-        row_is_pass = (
-            row is not None
-            and getattr(row, "vram_fit_tier", None) == "PASS"
-        )
-        # An operator who pins OTR_HARD_VRAM_CONTEXT_LIMIT is on a card whose
-        # budget we must respect even over a soak-tested override.
-        env_pinned = bool(otr_env.get("OTR_HARD_VRAM_CONTEXT_LIMIT"))
-        if row_is_pass and not env_pinned:
-            return ContextCapVerdict(
-                tier="PASS",
-                value=int(override),
-                source=f"curated-override authoritative (PASS, raw {override})",
-            )
-        return ContextCapVerdict(
-            tier="PASS",
-            value=min(override, limit),
-            source=f"curated-override (raw {override}, clamped to {limit})",
-        )
-    parsed = _read_config_context(model_id, hub_root=hub_root)
-    if parsed is not None:
-        return ContextCapVerdict(
-            tier="WARN",
-            value=min(parsed, limit),
-            source=f"config.json (raw {parsed})",
-        )
-    return ContextCapVerdict(
-        tier="UNKNOWN",
-        value=limit,
-        source=f"unresolved -- defaulted to HARD_VRAM_CONTEXT_LIMIT={limit}",
-    )
+    pin = (_hard_vram_context_limit() if context_pin is _CONTEXT_PIN_UNSET
+           else normalized_context_pin(context_pin))
+    native = (read_native_context(config) if config is not None
+              else _read_config_context(model_id, hub_root=hub_root))
+    if native is not None:
+        value = min(native, pin) if pin is not None else native
+        source = ("loaded decoder config" if config is not None else "snapshot config.json")
+        source += f" (native {native})"
+        if pin is not None:
+            source += f", explicit context pin {pin}"
+        return ContextCapVerdict("PASS", value, source, native, pin)
+    estimate = CURATED_CONTEXT_OVERRIDES.get(model_id, DEFAULT_CONTEXT_ESTIMATE)
+    value = min(estimate, pin) if pin is not None else estimate
+    source = ("curated context estimate" if model_id in CURATED_CONTEXT_OVERRIDES
+              else "unknown native capacity; default context estimate")
+    source += f" {estimate}"
+    if pin is not None:
+        source += f", explicit context pin {pin}"
+    return ContextCapVerdict("UNKNOWN", value, source, None, pin)
 
 
 # ---------------------------------------------------------------------------

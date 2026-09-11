@@ -345,5 +345,125 @@ class NativeTextBoundaryTests(unittest.TestCase):
         self.assertNotIn("key_mapping", self.common)
 
 
+class CapacityResolutionTests(unittest.TestCase):
+    """Execute actual loader capacity boundaries without constructing weights."""
+
+    def setUp(self):
+        fn = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == "load_llm")
+        self.outer = next(n for n in fn.body if isinstance(n, ast.Try))
+        self.config_try = next(n for n in ast.walk(fn) if isinstance(n, ast.Try) and any(
+            isinstance(child, ast.ImportFrom) and child.module == "transformers"
+            and any(alias.name == "AutoConfig" for alias in child.names) for child in n.body))
+        self.native = SimpleNamespace(max_position_embeddings=262144)
+        self.parent = SimpleNamespace(max_position_embeddings=8192, text_config=self.native)
+        self.seen = []
+
+    def execute(self, statements, namespace):
+        exec(compile(ast.Module(body=statements, type_ignores=[]), str(SOURCE), "exec"), namespace)
+
+    def namespace(self, pin=None, config_error=False):
+        def load_config(target, **kwargs):
+            self.seen.append((target, kwargs))
+            if config_error:
+                raise OSError("metadata unavailable")
+            return self.parent
+
+        def import_config(name, *args, **kwargs):
+            if name == "transformers":
+                return SimpleNamespace(AutoConfig=SimpleNamespace(from_pretrained=load_config))
+            return builtins.__import__(name, *args, **kwargs)
+
+        return {
+            "__builtins__": dict(vars(builtins), __import__=import_config),
+            "_otr_catalog": CATALOG, "_resolved_id": "Qwen/Qwen3.5-4B",
+            "_hub_root": Path("fixture/hub"), "_context_pin": pin,
+            "cache_dir_path": "fixture/hub", "load_target": "fixture/hub/selected-snapshot",
+            "model_config": None, "_capacity": CATALOG.ContextCapVerdict(
+                "UNKNOWN", 8192, "pre-download estimate", explicit_pin=pin),
+            "log": SimpleNamespace(warning=lambda *args: None),
+            "_runtime_log": lambda *args: None,
+        }
+
+    def finalize(self, namespace, model_config):
+        namespace["model"] = SimpleNamespace(config=model_config)
+        start = next(i for i, n in enumerate(self.outer.body) if isinstance(n, ast.Assign)
+                     and any(isinstance(t, ast.Name) and t.id == "_loaded_config" for t in n.targets))
+        end = next(i for i in range(start, len(self.outer.body)) if isinstance(self.outer.body[i], ast.Return))
+        self.execute(self.outer.body[start:end], namespace)
+
+    def test_first_download_uses_selected_autoconfig_without_mutation(self):
+        ns = self.namespace()
+        self.execute([self.config_try], ns)
+        self.finalize(ns, self.native)
+        self.assertEqual(ns["_capacity"].value, 262144)
+        self.assertEqual(ns["_capacity"].native_capacity, 262144)
+        self.assertEqual(self.parent.max_position_embeddings, 8192)
+        self.assertEqual(self.native.max_position_embeddings, 262144)
+        self.assertEqual(self.seen, [("fixture/hub/selected-snapshot", {
+            "trust_remote_code": False, "local_files_only": True, "cache_dir": "fixture/hub"})])
+
+    def test_explicit_pin_limits_capacity_without_mutating_decoder(self):
+        ns = self.namespace(pin=128)
+        self.execute([self.config_try], ns)
+        self.finalize(ns, self.native)
+        self.assertEqual(ns["_capacity"].value, 128)
+        self.assertEqual(ns["_capacity"].native_capacity, 262144)
+        self.assertEqual(self.native.max_position_embeddings, 262144)
+
+    def test_loaded_config_recovers_after_metadata_failure(self):
+        ns = self.namespace(config_error=True)
+        self.execute([self.config_try], ns)
+        self.assertIsNone(ns["_capacity"].native_capacity)
+        self.finalize(ns, self.native)
+        self.assertEqual(ns["_capacity"].value, 262144)
+
+    def test_missing_final_metadata_preserves_known_autoconfig(self):
+        ns = self.namespace()
+        self.execute([self.config_try], ns)
+        known = ns["_capacity"]
+        self.finalize(ns, SimpleNamespace())
+        self.assertIs(ns["_capacity"], known)
+
+    def test_sparse_autoconfig_and_model_preserve_known_snapshot_capacity(self):
+        self.parent = SimpleNamespace()
+        for pin, expected in ((None, 65536), (4096, 4096)):
+            ns = self.namespace(pin=pin)
+            known = CATALOG.ContextCapVerdict("PASS", expected, "snapshot config.json", 65536, pin)
+            ns["_capacity"] = known
+            self.execute([self.config_try], ns)
+            self.finalize(ns, SimpleNamespace())
+            self.assertIs(ns["_capacity"], known)
+
+    def test_direct_cap_and_selector_snapshot_have_explicit_precedence(self):
+        from unittest.mock import patch
+        start = next(i for i, n in enumerate(self.outer.body) if isinstance(n, ast.Assign)
+                     and any(isinstance(t, ast.Name) and t.id == "_hub_root" for t in n.targets))
+        end = next(i for i in range(start, len(self.outer.body)) if isinstance(self.outer.body[i], ast.Assign)
+                   and any(isinstance(t, ast.Name) and t.id == "_capacity" for t in self.outer.body[i].targets))
+        code = self.outer.body[start:end + 1]
+        cases = [(128, None, 128, 0), (None, None, 4096, 1),
+                 (None, CATALOG.ContextCapVerdict("UNKNOWN", 8192, "captured", explicit_pin=None), None, 0)]
+        for direct_cap, captured, expected_pin, env_reads in cases:
+            ns = self.namespace()
+            events = []
+            ns.update(model_id_full="Qwen/Qwen3.5-4B", context_cap=direct_cap, context_verdict=captured,
+                      hub_root=None, Path=Path,
+                      _OTR_HF=SimpleNamespace(ensure_hf_home=lambda: (events.append("root") or "fixture")))
+            original = CATALOG.resolve_context_cap
+
+            def resolve(*args, **kwargs):
+                self.assertEqual(events, ["root"])
+                self.assertEqual(kwargs["hub_root"], Path("fixture/hub"))
+                return original(*args, **kwargs)
+
+            with patch.object(CATALOG, "_hard_vram_context_limit", return_value=4096) as read_pin, \
+                    patch.object(CATALOG, "resolve_context_cap", side_effect=resolve):
+                self.execute(code, ns)
+            self.assertEqual(ns["_context_pin"], expected_pin)
+            self.assertEqual(ns["_capacity"].explicit_pin, expected_pin)
+            self.assertEqual(read_pin.call_count, env_reads)
+            self.assertEqual(ns["_hf_home_resolved"], "fixture")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -595,6 +595,22 @@ def _prompt_with_schema_contract(prompt: Any, schema: type[BaseModel]) -> Any:
     return [{"role": "system", "content": contract}, *messages]
 
 
+def inspect_structured_fit(
+    slot_fn: Callable[..., str], prompt: Any, schema: type[BaseModel],
+    *, max_new_tokens: int | None, text_parser=None,
+) -> dict[str, Any]:
+    """Inspect the same schema-enriched prompt the structured ladder will send.
+
+    Unsupported transports keep their own admission estimates. No model call,
+    schema repair or alternate transport is introduced by this capability.
+    """
+    inspect_fit = getattr(slot_fn, "_otr_inspect_fit", None)
+    if not callable(inspect_fit):
+        return {"supported": False, "reason": "slot has no exact prompt inspection"}
+    contract = prompt if text_parser is not None else _prompt_with_schema_contract(prompt, schema)
+    return inspect_fit(_prompt_to_messages(contract), max_new_tokens=max_new_tokens)
+
+
 def invoke_structured_slot(
     slot_fn: Callable[..., str],
     messages: Any,

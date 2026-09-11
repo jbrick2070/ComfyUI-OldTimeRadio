@@ -61,9 +61,19 @@ def test_a_policy_that_really_asks_for_8192_is_still_priced_at_8192():
 
 
 def test_a_policy_without_gguf_n_ctx_falls_back_to_the_context_cap():
-    """Transformers rows carry no gguf_n_ctx; the old behaviour must survive."""
+    """Legacy policy-like callers may omit the GGUF setting."""
     pol = types.SimpleNamespace(vram_ceiling_gb=14.5, gguf_quant=None)
     _assert_policy_admits_vram("google/gemma-4-E2B-it", _ctx(8192), pol)
+
+
+def test_native_advertised_window_does_not_price_unallocated_kv():
+    from nodes._otr_shared.llm_policy import LLMRuntimePolicy
+    policy = LLMRuntimePolicy()
+    small = cat.check_vram_fit("Qwen/Qwen3.5-4B", 8192, ceiling_gb=14.5)
+    large = cat.check_vram_fit("Qwen/Qwen3.5-4B", 262144, ceiling_gb=14.5)
+    assert small.estimated_gb == large.estimated_gb
+    for capacity in (8192, 262144):
+        _assert_policy_admits_vram("Qwen/Qwen3.5-4B", _ctx(capacity), policy)
 
 
 def test_the_oversize_guard_still_bites():

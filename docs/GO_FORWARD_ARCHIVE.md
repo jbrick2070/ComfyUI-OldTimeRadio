@@ -1,5 +1,134 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- coordination and prompt preparation withdrawn
+
+The operator's final instruction is to stop everything else until coding is
+done. Root continues as sole coder; coordination heartbeat is paused, and
+uncommitted prompt drafts were removed. The superseded proposed ownership and
+coordination text below is retained verbatim as history, not active authority.
+
+**Coordinator: Codex; next production-code owner: Antigravity when the operator
+starts the handoff, on `v2.0-alpha`.** Cursor independently reviews code. Codex
+owns GO_FORWARD, HANDOFF and the README/matrix; Antigravity writes code/tests and
+its chunk receipt. Hardware owners write only their own report bundles. Use
+2026-09-11-my-story-cross-machine/next_owner_prompts.md and the exact pushed
+checkpoint supplied with that handoff. One editor per owned file.
+
+### Campaign coordination -- CODING; LIVE TESTS ON HOLD
+
+**Common test implementation SHA: not assigned. TEST READY has not been issued.**
+Operator, 2026-09-11: do not start the Mac, 4060, 5080 or RunPod test wave until
+ALL coding in this repair campaign is finished. A green intermediate chunk,
+C1 completion, or source-repair completion alone does not authorize a live run.
+Development regression checks remain part of each coding chunk.
+
+Close all included A1R/A2 implementation work, Original model credit B,
+credits-title containment C, Mac diagnostic instrumentation and O2 intent work
+before that release. A3, the optional App and older numbered release backlog
+remain separately scoped; do not silently move unfinished campaign code out of
+scope to launch tests earlier. Codex then records TEST READY, the exact common
+implementation SHA, proof manifest and assigned legs HERE, after all required
+regression checks. This file is the only release signal.
+
+**Mac and 4060 are INACTIVE until Jeffrey explicitly tells them to start.**
+Codex may prepare their prompts and read already-submitted reports, but must not
+contact those tasks, schedule their check-ins or initiate any work on either
+machine. TEST READY is a readiness signal, not Jeffrey's activation/go-ahead.
+Codex owns the 5080 and RunPod, triages incoming evidence and chooses distinct
+coverage on proven installed routes. Only after Jeffrey activates a hardware
+task does its owner check updates about every five minutes and before each leg;
+fetch/read does not change an active runtime. Once activated, it may
+prepare read-only inventory and report bundles, but must not queue a test,
+load/download models, restart ComfyUI for a run or resume rented compute yet.
+Use 2026-09-11-my-story-cross-machine/hardware_owner_prompts.md.
+
+Report the approved implementation SHA and actual checkout SHA separately.
+Never pull or change code mid-leg. A report-only descendant is equivalent only
+after Codex verifies and records no runtime/workflow changes; latest origin is
+not automatically the approved test version. Owners upload only their assigned
+report files, with no shared code/JSON/profile/plan/matrix edits. Codex integrates
+reports and classifies technical publication separately from source qualification.
+
+The matrix is an evidence record: Codex updates docs/dropdown_matrix.json from
+actual component use in durable receipts, then regenerates README and
+docs/DROPDOWN_MATRIX.md with scripts/otr_dropdown_matrix.py. Published actual use
+is proven; a successful laboratory run is measured; arithmetic alone is fits.
+Preserve host/model/configuration scope, failures and repeatability limits. A
+replay does not newly prove reused stages, and code changes alone do not promote
+any cell. Keep historical evidence, label the new campaign's qualification
+separately, and do not infer source fidelity from a successful MP4.
+
+
+## 2026-09-11 -- A2 native capacity implementation checkpoint
+
+Superseded queue text preserved verbatim below. Implementation and
+verification: 2026-09-11-my-story-cross-machine/a2_receipt.md.
+Live capacity qualification and unknown/remote estimates remain in
+GO_FORWARD. Operator-requested next-owner prompts hand C1 to
+Antigravity, with Cursor as independent reader.
+
+**Active owner: Codex, 2026-09-10, `v2.0-alpha`.** One shared-file editor.
+
+---
+
+structured-output defects, in focused shared-core chunks. Next is A2 native-HF
+capacity, which must precede adaptive source reading. The six-leg receipt is
+
+---
+
+| **A2. Native HF capacity** | Use actual loaded model capacity while preserving explicit context settings and truthful runtime failures. | Capacity/cache/adapter regression coverage and real canonical component proof. |
+
+---
+
+2. Close A1R with its A2 capacity dependency. Do not spend further baseline media legs on the
+
+---
+
+3. Qualify the shared native HF capacity correction before
+   adaptive reading; then finish A1R. Implement the reviewed Original model credit and
+
+---
+
+second queue. This file remains the only work queue. Root
+owns production edits. Reviewers are read-only, with an independent reader at
+
+---
+
+   A2's real native-capacity correction is a prerequisite for this adaptive
+   reading work, rather than building around the stale 8192-token estimate.
+
+---
+
+A2 implementation boundary (shared owners, separate qualified chunk):
+
+- Fix known native HF capacity in _otr_model_catalog, _otr_model_loader,
+  _otr_generation_budget and the adapter precondition. Parse the actual loaded
+  decoder config, nested text_config before wrapper fields. Curated8192 is an
+  estimate; cached Qwen advertises262144. Preserve explicit user context settings,
+  native model configuration and real provider/OOM/cancellation failures.
+- Resolve the canonical HF root before discovery; finalize capacity from actual
+  AutoConfig after snapshot resolution, including first download. Remove mutation
+  of max_position_embeddings to an estimate. Native maximum is not allocation.
+  Store effective capacity/source separately from vram_priced_ctx; keep HF's
+  weights-only estimate and explicit runtime/VRAM policy unchanged.
+- Include normalized explicit context setting in the same HF reuse key at lookup
+  and publication; preserve epoch guards. Allocated GGUF n_ctx already owns its
+  capacity and reuse_key; do not rewrite it.
+- Remove the minimum-model-window rejection against a project estimate. Fit full
+  prompts against actual/configured capacity, one-token default output-room
+  minimum; retain explicit atomic require_full contracts and no truncation.
+- Unknown-capacity and remote-estimate transport changes remain a separately
+  disclosed follow-up here. None currently breaks local arithmetic/defaults20,
+  and omitting remote max_tokens changes spend reservation. Do not claim those
+  paths fixed, disguise estimates as known capacity or weaken accounting.
+
+A2 validation must cover actual/nested config, explicit context changes and
+cache reuse, prompt/output fitting and truthful provider/OOM errors. Repeat a
+real canonical component against the corrected loaded capacity. Native App,
+media playback and publication remain later qualification.
+
+
+
 ## 2026-09-11 -- grammar and P1 implementation complete
 
 Prior queue item preserved verbatim. Implementation and regression receipt:

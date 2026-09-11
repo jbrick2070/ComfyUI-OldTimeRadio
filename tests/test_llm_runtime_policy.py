@@ -92,7 +92,7 @@ def clean_llm_cache(monkeypatch):
 def test_request_slot_lane_backstop(monkeypatch, clean_llm_cache):
     from nodes import _otr_model_catalog as cat
 
-    monkeypatch.setattr(cat, "validate_model_id", lambda mid: mid)
+    monkeypatch.setattr(cat, "validate_model_id", lambda mid, **kwargs: mid)
     row = types.SimpleNamespace(loader_backend="openrouter_http")
     monkeypatch.setattr(cat, "_by_repo_id", lambda: {"fake-remote": row})
 
@@ -107,11 +107,11 @@ def test_request_slot_cache_is_policy_keyed(monkeypatch, clean_llm_cache):
     campaign kills."""
     from nodes import _otr_model_catalog as cat
 
-    monkeypatch.setattr(cat, "validate_model_id", lambda mid: mid)
+    monkeypatch.setattr(cat, "validate_model_id", lambda mid, **kwargs: mid)
     monkeypatch.setattr(cat, "_by_repo_id", lambda: {})
     monkeypatch.setattr(
         cat, "resolve_context_cap",
-        lambda mid: types.SimpleNamespace(tier="PASS", value=8192))
+        lambda mid, **kwargs: cat.ContextCapVerdict("UNKNOWN", 8192, "fixture estimate", explicit_pin=kwargs.get("context_pin")))
     monkeypatch.setattr(
         cat, "check_vram_fit",
         lambda mid, cap, **kw: types.SimpleNamespace(
@@ -161,6 +161,72 @@ def test_request_slot_cache_is_policy_keyed(monkeypatch, clean_llm_cache):
 # --------------------------------------------------------------------------
 # Backends: every .load accepts policy; remote lanes assert admission
 # --------------------------------------------------------------------------
+
+
+def test_native_pin_is_captured_once_and_shapes_reuse(monkeypatch, clean_llm_cache, tmp_path):
+    from nodes import _otr_model_catalog as cat
+    from nodes import _otr_hf_env as hf
+    calls, roots, loaded = [], [], []
+    monkeypatch.setattr(hf, "ensure_hf_home", lambda: (calls.append("root") or str(tmp_path)))
+    original_validate = cat.validate_model_id
+
+    def validate(model_id, **kwargs):
+        assert calls[-1] == "root"
+        roots.append(kwargs["hub_root"])
+        return original_validate(model_id, **kwargs)
+
+    monkeypatch.setattr(cat, "validate_model_id", validate)
+    monkeypatch.setattr(cat, "_read_config_context", lambda mid, **kwargs: 262144)
+    monkeypatch.setattr(cat, "auto_download_if_missing", lambda mid, **kwargs: roots.append(kwargs["hub_root"]))
+    monkeypatch.setattr(ml, "_require_transformers_model_support", lambda *args: None)
+
+    def load(model_id, **kwargs):
+        assert "context_cap" not in kwargs  # estimate must not become a pin
+        verdict = kwargs["context_verdict"]
+        loaded.append(verdict)
+        roots.append(kwargs["hub_root"])
+        monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "999")  # changes while load is running
+        return {"model_id": model_id, "context_cap": verdict.value}
+
+    monkeypatch.setattr(ml, "load_llm", load)
+    policy = lp.LLMRuntimePolicy(vram_ceiling_gb=0)
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", " 000128 ")
+    first = ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)
+    assert first["context_cap"] == 128
+    assert ml.LLM_CACHE["policy_key"] == (policy.cache_key(), 128)
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "128")
+    assert ml.request_slot("technical", "Qwen/Qwen3.5-4B", policy=policy) is first
+    assert len(loaded) == 1
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
+    assert ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)["context_cap"] == 262144
+    assert loaded[-1].explicit_pin is None
+    assert ml.LLM_CACHE["policy_key"] == (policy.cache_key(), None)
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "invalid")
+    ml.request_slot("technical", "Qwen/Qwen3.5-4B", policy=policy)
+    assert len(loaded) == 2
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "256")
+    ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)
+    assert len(loaded) == 3 and loaded[-1].explicit_pin == 256
+    assert all(path == tmp_path / "hub" for path in roots)
+
+
+@pytest.mark.parametrize("backend", ["openrouter_http", "comfy_credits_http", "google_api_http", "gguf_native"])
+def test_virtual_routes_do_not_resolve_or_scan_hf(backend, monkeypatch, clean_llm_cache):
+    from nodes import _otr_model_catalog as cat
+    from nodes import _otr_hf_env as hf
+    row = types.SimpleNamespace(loader_backend=backend, context_window=8192)
+    monkeypatch.setattr(cat, "_by_repo_id", lambda: {"fixture/virtual": row})
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("virtual route must not touch HF discovery")
+
+    monkeypatch.setattr(hf, "ensure_hf_home", forbidden)
+    monkeypatch.setattr(cat, "scan_local_llm_cache", forbidden)
+    monkeypatch.setattr(cat, "resolve_context_cap", forbidden)
+    remote = types.SimpleNamespace(load=lambda *args, **kwargs: {"provider": backend})
+    monkeypatch.setattr("nodes._otr_model_runtime.get_backend_for_row", lambda r: remote)
+    entry = ml.request_slot("creative", "fixture/virtual", policy=lp.LLMRuntimePolicy(vram_ceiling_gb=0))
+    assert entry["provider"] == backend
 
 def _backend_classes():
     from nodes import _otr_comfy_backend as cb
@@ -486,7 +552,7 @@ def test_remote_lane_is_exempt_from_the_ceiling(monkeypatch, clean_llm_cache):
 
     backend = _CountingBackend()
     row = types.SimpleNamespace(loader_backend="openrouter_http")
-    monkeypatch.setattr(cat, "validate_model_id", lambda mid: mid)
+    monkeypatch.setattr(cat, "validate_model_id", lambda mid, **kwargs: mid)
     monkeypatch.setattr(cat, "_by_repo_id", lambda: {"remote/model": row})
     monkeypatch.setattr(
         "nodes._otr_model_runtime.get_backend_for_row", lambda r: backend)
@@ -538,7 +604,7 @@ def test_admission_runs_before_every_cache_read_in_source():
 
     src = inspect.getsource(ml.request_slot)
     gate = src.index("_assert_policy_admits_vram(")
-    assert gate < src.index("in _GGUF_DISPATCH_BACKENDS")
+    assert gate < src.index("_try_cache_hit_locked(")
     assert gate < src.index('LLM_CACHE.get("gguf_load_key")')
     assert gate < src.index('LLM_CACHE.get("policy_key")')
 

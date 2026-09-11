@@ -96,7 +96,10 @@ def test_load_llm_delegates_context_cap_to_catalog():
     through ``_otr_model_catalog.resolve_context_cap`` -- the SAME path
     ``request_slot`` uses -- so every load path agrees on the effective
     window."""
-    assert "resolve_context_cap(_resolved_id)" in _ORCH_SRC, (
+    tree = ast.parse(_ORCH_SRC)
+    loader = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "load_llm")
+    assert any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr == "resolve_context_cap" for n in ast.walk(loader)), (
         "load_llm no longer delegates its context-cap fallback to "
         "resolve_context_cap. The catalog is the single source of truth; a "
         "hardcoded default here is exactly the drift this guard prevents."

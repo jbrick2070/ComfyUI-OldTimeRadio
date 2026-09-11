@@ -17,6 +17,153 @@ class _RequireFullMessages(list):
     _otr_strict_remote_output_budget = True
 
 
+def _exact_prompt_entry(monkeypatch, capacity=32768):
+    torch = pytest.importorskip("torch")
+    import weakref
+    from nodes import _otr_constrained_generate as constrained
+    runs, moves, refs, generated = [], [], [], []
+
+    class Inputs(dict):
+        def to(self, device):
+            moves.append(device)
+            return self
+
+    class Tokenizer:
+        eos_token_id = 20000
+
+        def apply_chat_template(self, messages, **kwargs):
+            assert kwargs["tokenize"] is False and kwargs["add_generation_prompt"] is True
+            if any(m["role"] == "system" for m in messages):
+                raise ValueError("System role not supported")
+            assert kwargs.get("enable_thinking") is False
+            return "<start>" + "|".join(m["role"] + ":" + m["content"] for m in messages) + "<assistant>"
+
+        def __call__(self, prompt, *, return_tensors):
+            assert return_tensors == "pt"
+            ids = [31000, *map(ord, prompt), 31001]
+            runs.append(ids)
+            inputs = Inputs(input_ids=torch.tensor([ids]))
+            refs.append(weakref.ref(inputs))
+            return inputs
+
+        def decode(self, tokens, **kwargs):
+            return '{"value":"ok"}'
+
+    class Model:
+        device = "cpu"
+
+        def generate(self, **kwargs):
+            generated.append((kwargs["input_ids"].tolist()[0], kwargs["max_new_tokens"]))
+            return torch.cat([kwargs["input_ids"], torch.tensor([[20000]])], dim=1)
+
+    monkeypatch.setattr(writer._OTRHB, "make_streamer", lambda *args: None)
+    monkeypatch.setattr(constrained, "get_cached_transformers_schema_constraint",
+                        lambda *args: (None, lambda *args: []))
+    entry = {"model": Model(), "tokenizer": Tokenizer(), "model_id": "Qwen/Qwen3.5-4B",
+             "context_cap": capacity, "native_context_capacity": capacity,
+             "context_capacity_source": "loaded decoder config"}
+    return entry, runs, moves, refs, generated
+
+
+@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(route, monkeypatch):
+    import gc
+    from nodes import _otr_constrained_generate as constrained
+    from nodes._otr_generation_budget import ProviderCapacityMessages
+    entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
+    messages = ProviderCapacityMessages([
+        {"role": "system", "content": "Keep the complete supplied source."},
+        {"role": "user", "content": "Beginning " + "source text " * 850 + " END MARKER"},
+    ])
+    measured = model_loader.inspect_native_prompt_fit(entry, messages, max_new_tokens=None)
+    assert measured["fits"] and measured["prompt_tokens"] > 8192
+    assert measured["capacity_known"] and measured["context_cap"] == 32768
+    assert not moves and not generated
+    gc.collect()
+    assert all(ref() is None for ref in refs)
+    factories = {"writer": writer._build_truncating_generate_fn,
+                 "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
+                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+    result = factories[route](entry)(messages, temperature=.2, max_new_tokens=None)
+    assert result == '{"value":"ok"}'
+    assert runs[0] == runs[1] == generated[0][0]
+    assert generated[0][1] == measured["effective_output_tokens"]
+    assert moves == ["cpu"]
+    assert all(m["role"] in ("system", "user") for m in messages)
+    assert messages[0]["role"] == "system"  # no normalization mutation
+
+
+class _FitSchema(BaseModel):
+    value: str
+
+
+@pytest.mark.parametrize("eos", [20000, [19999, 20000], (19999, 20000), {19999, 20000}])
+def test_constrained_eos_at_exact_capacity_is_a_completed_reply(eos, monkeypatch):
+    from nodes import _otr_constrained_generate as constrained
+    from nodes._otr_generation_budget import ProviderCapacityMessages
+    entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
+    messages = ProviderCapacityMessages([{"role": "user", "content": "Reply."}])
+    prepared = model_loader.prepare_native_prompt(entry, messages)
+    entry["context_cap"] = prepared["prompt_tokens"] + 1
+    entry["tokenizer"].eos_token_id = eos
+    result = constrained.make_constrained_generate_fn(entry, _FitSchema)(
+        messages, temperature=.2, max_new_tokens=None)
+    assert result == '{"value":"ok"}' and generated[-1][1] == 1
+
+
+def test_unmarked_none_budget_is_a_programmer_error_before_prompt_preparation(monkeypatch):
+    entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
+    with pytest.raises(TypeError, match="provider-capacity message contract"):
+        model_loader.inspect_native_prompt_fit(entry, [{"role": "user", "content": "Reply."}],
+                                              max_new_tokens=None)
+    assert not runs and not moves and not generated
+
+
+@pytest.mark.parametrize("bound", [False, True])
+def test_scheduler_fit_includes_schema_and_does_not_count_as_generation(bound, monkeypatch):
+    from nodes._otr_structured_call import inspect_structured_fit, structured_call
+    from nodes._otr_generation_budget import ProviderCapacityMessages
+    entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
+    monkeypatch.setattr(model_loader, "request_slot", lambda *args, **kwargs: entry)
+    scheduler = writer._SlotScheduler(creative_id="Qwen/Qwen3.5-4B", technical_id="Qwen/Qwen3.5-4B",
+                                      top_p=.92, min_p=0, repetition_penalty=1)
+    slot = scheduler.for_slot("creative")
+    if bound:
+        slot = slot._otr_bind_schema(_FitSchema)
+    source = ProviderCapacityMessages([{"role": "user", "content": "Return the value."}])
+    measured = inspect_structured_fit(slot, source, _FitSchema, max_new_tokens=None)
+    assert measured["fits"] and not generated and not moves
+    assert scheduler.calls_by_slot == {"creative": 0, "technical": 0}
+    assert scheduler.slot_calls_by_helper == {}
+    assert len(runs[0]) > len(source[0]["content"]) + 100
+    result = structured_call(helper_name="fit-proof", slot_fn=slot, prompt=source,
+                             schema=_FitSchema, base_temperature=.2, structural_retry_temperature=.1,
+                             max_new_tokens=None, max_attempts=1)
+    assert result.value == "ok"
+    assert generated[0][0] == runs[0] == runs[1]
+    assert scheduler.calls_by_slot == {"creative": 1, "technical": 0}
+    assert source[0]["content"] == "Return the value."
+
+
+@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+def test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move(route, monkeypatch):
+    import gc
+    from nodes import _otr_constrained_generate as constrained
+    entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch, capacity=128)
+    messages = _RequireFullMessages([{"role": "user", "content": "A small complete patch."}])
+    measured = model_loader.inspect_native_prompt_fit(entry, messages, max_new_tokens=128)
+    assert measured["fits"] is False and measured["phase"] == "prompt_no_room"
+    assert not moves and not generated
+    gc.collect()
+    assert all(ref() is None for ref in refs)
+    factories = {"writer": writer._build_truncating_generate_fn,
+                 "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
+                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+    with pytest.raises(writer.PromptContextOverflowError, match="complete requested output"):
+        factories[route](entry)(messages, temperature=.2, max_new_tokens=128)
+    assert not moves and not generated
+
+
 def test_720_word_script_request_is_clamped_to_remaining_context():
     assert fit_output_tokens(
         9520, context_cap=8192, prompt_tokens=3200,
@@ -44,9 +191,13 @@ def test_prod_length_script_fits_only_at_raised_context_cap():
     ) == needed_output
 
 
-def test_context_budget_fails_when_prompt_leaves_no_viable_artifact_room():
+def test_context_budget_accepts_one_token_and_preserves_explicit_minimum():
+    assert fit_output_tokens(512, context_cap=8192, prompt_tokens=8191) == 1
+    assert fit_output_tokens(512, context_cap=8192, prompt_tokens=8150) == 42
     with pytest.raises(GenerationContextOverflowError, match="cannot fit"):
-        fit_output_tokens(512, context_cap=8192, prompt_tokens=8150)
+        fit_output_tokens(512, context_cap=8192, prompt_tokens=8192)
+    with pytest.raises(GenerationContextOverflowError, match="at least 64"):
+        fit_output_tokens(512, context_cap=8192, prompt_tokens=8150, min_output_tokens=64)
 
 
 def test_complete_patch_budget_refuses_clamp_but_default_call_still_clamps():

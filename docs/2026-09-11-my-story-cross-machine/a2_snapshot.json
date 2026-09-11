@@ -1,0 +1,91 @@
+{
+  "base": "af9ccb09bd6380abcdbfe5f7bf16459b3fd02749",
+  "snapshot": "C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-my-story-a2-candidate",
+  "source": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio",
+  "files": [
+    {
+      "file": "nodes/OTR_LedgerScriptWriter.py",
+      "sha256": "483fd6aea4688436840a2f4751e48eeb11e6e933f1a1ff5782debeb4639dfb36"
+    },
+    {
+      "file": "nodes/_otr_constrained_generate.py",
+      "sha256": "1c957102644707c85c8461ac70c16c96f803d9451ec27ec7b77d575355053fcd"
+    },
+    {
+      "file": "nodes/_otr_generation_budget.py",
+      "sha256": "c4993d94ac34018948face933b79c950c2b5694342c8f2efb48ab3bc4f1b8aef"
+    },
+    {
+      "file": "nodes/_otr_loader_backends.py",
+      "sha256": "8e92a40ec84381553069c6354b7039362847d79eb8432c8d2f64cb60cab36cdb"
+    },
+    {
+      "file": "nodes/_otr_model_catalog.py",
+      "sha256": "3824fdac84ef417a07267abae4eaa7d152f8c93c42a07b57cbe5c2861c715d86"
+    },
+    {
+      "file": "nodes/_otr_model_loader.py",
+      "sha256": "53cd29508356c544ecf54df3590096c34e2a9b62c83ed8c5ae9320f7b907784a"
+    },
+    {
+      "file": "nodes/_otr_model_runtime.py",
+      "sha256": "27218f735475e3f8edc9d27746a1b74ddc33a282125b162ad4797871ed7c5015"
+    },
+    {
+      "file": "nodes/_otr_structured_call.py",
+      "sha256": "84af578f9edea0a9b6e007ba16f543cfe1f3ad232112af2a48e4bad7b2b0171b"
+    },
+    {
+      "file": "tests/test_a4_capacity_phase_advances_the_ladder.py",
+      "sha256": "b3533db7f06a7d39e1e264ecd504a5f949d3720043edaf0929a5df31e4eb41c5"
+    },
+    {
+      "file": "tests/test_constrained_generate.py",
+      "sha256": "ca76b2b21f0b233848507a9452b342b2b9b99f6dfd6176c631045e37bc22444d"
+    },
+    {
+      "file": "tests/test_context_window_precondition.py",
+      "sha256": "caa07af68ffa06d3c54752e1b7a8302e3ede1dbf738648d845241f29d76a1095"
+    },
+    {
+      "file": "tests/test_gate_prices_the_policy_context.py",
+      "sha256": "b9da48588abb0dd881b1cd9e4db50fedf1e3bcd741dfdaab58146f2a757474e3"
+    },
+    {
+      "file": "tests/test_generation_budget.py",
+      "sha256": "e1cb56a1e8fb04e2b69f48cbff5574b52287a8701a133103f8994f5526a23161"
+    },
+    {
+      "file": "tests/test_llm_runtime_policy.py",
+      "sha256": "6618d8079085854348c391d45ed7d8bd35eb56a7ebf28b7adfb0d51eb4fd09b9"
+    },
+    {
+      "file": "tests/test_loader_backend_protocol.py",
+      "sha256": "49020ffd81c6b941501eba616d70a319fa2fce0be8e621ddb83b99a0161ec3ce"
+    },
+    {
+      "file": "tests/test_loader_body_profiles.py",
+      "sha256": "f7b687c649c09c2807c64e837046508815fc7e935c0fea2d875678e5b0f1ccd0"
+    },
+    {
+      "file": "tests/test_model_catalog_scan.py",
+      "sha256": "fb81f0577f79d7a2a8b3bdc1d8097259942125db4260764812782c56c44a689a"
+    },
+    {
+      "file": "tests/test_native_text_decoder_load.py",
+      "sha256": "eb39a4a91abc6b3dbdc5df9b1c80d3bc5729eb0da51a7a355d0934392736edbb"
+    },
+    {
+      "file": "tests/test_story_orchestrator_vram_calibration.py",
+      "sha256": "dc90477bd96a9bb289e5683303f40e3c36567efc17aa6d8e3e9e1c181c9546ff"
+    },
+    {
+      "file": "tests/test_system_role_fold.py",
+      "sha256": "786955c2826d8e695b5e1738cc135389bd36ed76d04999d4cf6aacd81f027928"
+    },
+    {
+      "file": "tests/test_vram_envelope_c4.py",
+      "sha256": "be7f86b4d2191429df541979be40027d9d16f45d49ac068e2872b229e43bee45"
+    }
+  ]
+}

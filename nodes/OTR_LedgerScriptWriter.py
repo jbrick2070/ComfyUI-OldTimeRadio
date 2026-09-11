@@ -599,10 +599,12 @@ class _SlotScheduler:
         self.slot_transitions_by_phase: list[dict] = []
         self._current_helper: str | None = None
 
-    def _account_and_get_entry(self, slot: str) -> dict:
-        """Acquire the right cache entry for `slot`. Updates transition
-        count + per-slot call count. Lazy import keeps the writer's
-        module-level import surface stdlib-only."""
+    def _account_and_get_entry(self, slot: str, *, count_generation: bool = True) -> dict:
+        """Acquire the configured slot and record actual model transitions.
+
+        Fit inspection shares acquisition without incrementing generation or
+        helper call counts. Lazy import keeps module loading lightweight.
+        """
         from . import _otr_model_loader as _OTRML
 
         resolved_id = self.ids[slot]
@@ -632,6 +634,8 @@ class _SlotScheduler:
                     self.slot_transitions_by_phase[-1]["from_slot"] = s
                     break
         self._last_resolved_id = resolved_id
+        if not count_generation:
+            return cache_entry
         self.calls_by_slot[slot] = self.calls_by_slot.get(slot, 0) + 1
         # S32 B6: per-helper accounting. When `_current_helper` is
         # unset (helper context not entered), bucket calls under
@@ -732,6 +736,18 @@ class _SlotScheduler:
                     kwargs["response_format"] = response_format
                 return base(messages, **kwargs)
 
+            def inspect_fit(messages, *, max_new_tokens, **kwargs):
+                if any(transport_markers[marker] for marker in (
+                    "_otr_openrouter", "_otr_comfy_credits", "_otr_google_api", "_otr_gguf_native",
+                )):
+                    return {"supported": False, "reason": "native tokenizer inspection unavailable"}
+                from . import _otr_model_loader as loader
+                entry = scheduler._account_and_get_entry(slot, count_generation=False)
+                return loader.inspect_native_prompt_fit(
+                    entry, messages, max_new_tokens=max_new_tokens,
+                )
+
+            generate_fn._otr_inspect_fit = inspect_fit
             for marker, value in transport_markers.items():
                 setattr(generate_fn, marker, value)
             if transport_markers["_otr_local_schema_binding"]:
@@ -823,7 +839,6 @@ def _build_truncating_generate_fn(
         )
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
-    context_cap = int(cache_entry.get("context_cap") or 8192)
     active_top_p = float(top_p)
     active_min_p = float(min_p or 0.0)
     active_rep_penalty = float(repetition_penalty or 1.0)
@@ -833,12 +848,6 @@ def _build_truncating_generate_fn(
     # disable persists across calls within one run without spamming
     # the warning more than once.
     _min_p_unsupported = [False]
-    # BUG-LOCAL-262: probe the tokenizer's chat template once per model
-    # residency. None = not yet probed; True/False = supports a system
-    # role or not. Gemma-2's template hard-rejects the system role, so
-    # normalize_messages_for_tokenizer folds system content into the
-    # first user turn. Closure-cell idiom matches `_min_p_unsupported`.
-    _system_role_supported = [None]
     if schema_model is not None:
         from ._otr_constrained_generate import (
             get_cached_transformers_schema_constraint,
@@ -846,7 +855,7 @@ def _build_truncating_generate_fn(
 
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
-        from . import _otr_loader_backends as _OTRLB
+        from ._otr_model_loader import prepare_native_prompt
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
@@ -860,21 +869,10 @@ def _build_truncating_generate_fn(
         unbounded_json_field = bool(getattr(
             messages, "_otr_unbounded_json_field", False,
         ))
-        if _system_role_supported[0] is None:
-            _system_role_supported[0] = (
-                _OTRLB.tokenizer_supports_system_role(tokenizer)
-            )
-        if not _system_role_supported[0]:
-            messages = _OTRLB.normalize_messages_for_tokenizer(
-                tokenizer, messages,
-            )
-        prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            **_OTRLB.chat_template_kwargs(cache_entry.get("model_id", "")),
-        )
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-
-        input_len = inputs["input_ids"].shape[-1]
+        prepared = prepare_native_prompt(cache_entry, messages)
+        inputs = prepared["inputs"]
+        input_len = prepared["prompt_tokens"]
+        context_cap = prepared["context_cap"]
         requested_max_new_tokens = (
             context_cap if reserve_remaining else max(1, int(max_new_tokens))
         )
@@ -904,6 +902,7 @@ def _build_truncating_generate_fn(
             raise PromptContextOverflowError(
                 str(exc), phase=exc.phase,
             ) from exc
+        inputs = inputs.to(model.device)
         if (not reserve_remaining
                 and effective_max_new_tokens != requested_max_new_tokens):
             log.warning(

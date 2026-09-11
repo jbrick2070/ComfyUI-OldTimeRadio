@@ -19,6 +19,13 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
+**My Story qualification:** cross-machine repairs are still in progress. The
+coordinated live test wave waits until all campaign coding is complete; readiness
+and the exact test revision come from [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
+Existing model-matrix proof retains its recorded scope and does not establish
+source fidelity for the repaired My Story flow. See the
+[cross-machine evidence](docs/2026-09-11-my-story-cross-machine/triage.md).
+
 100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
 any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
 turn them on.

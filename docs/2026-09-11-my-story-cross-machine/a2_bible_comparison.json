@@ -1,0 +1,23 @@
+{
+  "baseline": "my_story_a2_bible_baseline.xml",
+  "candidate": "my_story_a2_bible_candidate.xml",
+  "baseline_counts": {
+    "failure": 10,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "candidate_counts": {
+    "failure": 10,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "shared_failure_source_context_only": [],
+  "status_changes": [],
+  "new_tests": [],
+  "removed_tests": []
+}

@@ -1,3 +1,35 @@
+## 2026-09-11 -- A2 native capacity checkpoint and next-owner handoff
+
+Known native HF capacity now follows actual decoder config, preserving explicit
+settings and cache ownership without mutating the model's configured window.
+All four native generation paths share exact CPU prompt preparation and fit
+before transfer. The scheduler exposes matching primitive structured-fit
+inspection for the next adaptive reader. One remaining output token is usable;
+explicit atomic budgets remain. EOS collections no longer falsely fail a
+completed exact-capacity reply. Google shares the new default; remote estimates
+and Sci-Fi's separate old fit heuristic remain disclosed follow-ups.
+
+Final focused95passed. Full14197passed/51existing failures/183skipped/1xfailed;
+zero new failing IDs or changed assertion evidence versus the prior M1 full
+receipt. Two obsolete failed capacity-policy tests were replaced. Bible30passed/
+10unchanged failures/11skipped/3xfailed against a clean af9ccb09 baseline. The
+final production/tests were included in both final full and candidate Bible runs.
+Canonical audit passes, hash unchanged, no UI wiring change. Single CLI Gemini
+3.8 Flash (High) review plus independent grounded follow-up converged. Receipt:
+docs/2026-09-11-my-story-cross-machine/a2_receipt.md and a2_*.json.
+
+Sonnet CLI supplied the requested final synthesis. Root accepted an explicit
+next-chunk baseline and final source/candidate hash verification. The latest
+operator instruction then withdrew prompt preparation and coordination until
+ALL campaign coding is done. Uncommitted prompt drafts were removed; the
+coordinator heartbeat is PAUSED. Root remains sole production coder and continues
+C1, then the remaining source/visual, Mac/O2, Original credit and title work.
+No Mac/4060 contact or activation, no new live runs, and no matrix proof promotion.
+The existing 68-engine matrix passes its freshness check. No full My Story
+qualification or Mac memory cure is claimed.
+
+---
+
 ## 2026-09-11 -- grammar state and P1 binder implementation
 
 Closed M1 static request-state retention and the S1 local binder connection.

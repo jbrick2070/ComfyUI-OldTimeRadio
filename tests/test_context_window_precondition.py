@@ -1,18 +1,4 @@
-"""Sprint D D4 -- context_window precondition gate.
-
-Two structural assertions. No HF auth no GPU.
-
-  test_context_window_precondition_below_hard_limit_raises
-      A row whose context_window is BELOW HARD_VRAM_CONTEXT_LIMIT
-      trips check_context_window with a clear error message.
-
-  test_context_window_precondition_at_or_above_hard_limit_passes
-      A row whose context_window is at or above HARD_VRAM_CONTEXT_LIMIT
-      passes silently (no return value, no raise).
-
-Plus a real-row smoke for Mistral-Nemo: at context_window=8192 it
-matches the default HARD_VRAM_CONTEXT_LIMIT and does not trip.
-"""
+"""Native prompt fit replaces the old project-minimum model-window gate."""
 from __future__ import annotations
 
 import sys
@@ -34,21 +20,10 @@ class _FakeRow:
     repo_id: str = "fake/repo"
 
 
-def test_context_window_precondition_below_hard_limit_raises() -> None:
-    """A row with context_window < HARD_VRAM_CONTEXT_LIMIT raises
-    RuntimeError with a clear message naming the offending values.
-    """
-    hard_limit = catalog.HARD_VRAM_CONTEXT_LIMIT
-    row = _FakeRow(context_window=max(1, hard_limit - 1024))
-    with pytest.raises(RuntimeError) as excinfo:
-        backends_proto.check_context_window(row)
-    msg = str(excinfo.value)
-    assert "context_window" in msg
-    assert "HARD_VRAM_CONTEXT_LIMIT" in msg
-    assert "G5" in msg, (
-        f"precondition error message does not reference operator "
-        f"gate G5: {msg!r}"
-    )
+@pytest.mark.parametrize("window", [1, 128, 4096])
+def test_small_model_windows_are_not_a_load_rejection(window):
+    assert backends_proto.check_context_window(_FakeRow(window)) is None
+
 
 
 def test_context_window_precondition_at_hard_limit_passes() -> None:

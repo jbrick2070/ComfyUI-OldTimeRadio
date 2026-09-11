@@ -86,14 +86,24 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Active owner: Codex, 2026-09-10, `v2.0-alpha`.** One shared-file editor.
+**Active production-code owner: Codex, `v2.0-alpha`.** Independent reviewers
+are read-only. Continue coding; no handoff is being activated.
 **GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
 below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
 
+**Latest operator ruling: finish coding first.** Coordination automation is
+paused. Do not prepare or send handoff/hardware prompts, contact the Mac/4060,
+or start any four-machine live test until ALL current repair-campaign coding
+is complete. Mac/4060 additionally require Jeffrey's explicit go-ahead.
+Development regression checks remain part of each code chunk. Close included
+A1R/A2 implementation, Original credit B, credits-title C and retained Mac/O2
+diagnostics. A3, optional App and the older backlog remain separately scoped.
+
 **Next action:** close A1R, the received 4060 My Story source-fidelity and
-structured-output defects, in focused shared-core chunks. Next is A2 native-HF
-capacity, which must precede adaptive source reading. The six-leg receipt is
+structured-output defects, in focused shared-core chunks. Next implement C1
+shared cleanup conservation below, then F1 adaptive source organization and
+semantic review, and F2 visual source integration. The six-leg receipt is
 `docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
 end-to-end source-qualified My Story output exists. Keep each tested code
 revision distinct; an earlier passing run is not proof of the final correction.
@@ -106,7 +116,7 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 | Sprint | Remaining work | Required evidence |
 |---|---|---|
 | **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, and final spoken text; qualify the repaired P1 binding. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and source-check receipts preserve the supplied facts. |
-| **A2. Native HF capacity** | Use actual loaded model capacity while preserving explicit context settings and truthful runtime failures. | Capacity/cache/adapter regression coverage and real canonical component proof. |
+| **A2. Capacity qualification/follow-up** | Verify the corrected native route live with the canonical recovery; separately resolve unknown-capacity and remote estimates. | Actual loaded capacity, exact prompt fit, explicit setting and truthful runtime receipts. |
 | **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
 | **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
 | **5. Optional App + qualification** | Native App form/player and full media/browser qualification after A-C. | D1 section 11 component vs publication evidence, App/Graph switching, saved parameters, playback/history, cancellation and errors. |
@@ -158,11 +168,11 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
    sync-only resume for lack of a free GPU. Before any further authorized pod
    trial, pull current v2.0-alpha; its last tested checkout is 0327850a, while
    the music-parent correction is f829c920. Preserve its receipts and volume.
-2. Close A1R with its A2 capacity dependency. Do not spend further baseline media legs on the
+2. Close the remaining A1R cleanup/source/visual repairs. Do not spend further baseline media legs on the
    known-unprotected My Story implementation; use focused checks until the
    repair is ready for a fresh canonical recovery leg.
-3. Qualify the shared native HF capacity correction before
-   adaptive reading; then finish A1R. Implement the reviewed Original model credit and
+3. Integrate exact native fit inspection into adaptive source reading and
+   qualify loaded capacity during canonical recovery after A1R. Implement the reviewed Original model credit and
    credits title containment sprints. The new App and full media qualification
    follow them.
 4. The shared cleaner copied listener attribution into an adjacent intro on
@@ -176,8 +186,8 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 The cross-machine triage is at `docs/2026-09-11-my-story-cross-machine/triage.md`;
 its R1-R4 review has converged at kibitz-runs/2026-09-10-my-story-cross-machine/r4/.
 The judgments and complete r3/final.md are implementation specifications, not a
-second queue. This file remains the only work queue. Root
-owns production edits. Reviewers are read-only, with an independent reader at
+second queue. This file remains the only work queue. The active code owner
+listed above owns production edits. Reviewers are read-only, with an independent reader at
 each design step and a CLI review of each finished code chunk before push.
 
 2. Verify zero between-act music in the full canonical one-act recovery after
@@ -198,8 +208,9 @@ each design step and a CLI review of each finished code chunk before push.
    source coverage; summaries are derived material. The model organizes while
    the actual tokenizer/provider measures fit. Review measured progressive
    reading and non-progress handling; never silently discard an unread tail.
-   A2's real native-capacity correction is a prerequisite for this adaptive
-   reading work, rather than building around the stale 8192-token estimate.
+   Use the native structured-fit inspection with the exact intended output
+   budget. Unknown capacity is not a measured fit; preserve its uncertainty
+   and do not substitute the historical 8192-token estimate for proof.
 5. Instrument the Mac generation/retirement boundary before attributing its OS
    kill to a particular allocation. Existing MPS cache flushing is already
    present. Preserve epoch/orphan-worker protections and correct disk admission;
@@ -260,33 +271,18 @@ MRKT's 4060 campaign remains exactly one act per GUI Run. Its one-act pair-lock
 recovery proof is a repair gate, not a substitute for the authorized 3/6-act
 stress coverage on another host.
 
-A2 implementation boundary (shared owners, separate qualified chunk):
+### A2 -- remaining qualification and capacity follow-up
 
-- Fix known native HF capacity in _otr_model_catalog, _otr_model_loader,
-  _otr_generation_budget and the adapter precondition. Parse the actual loaded
-  decoder config, nested text_config before wrapper fields. Curated8192 is an
-  estimate; cached Qwen advertises262144. Preserve explicit user context settings,
-  native model configuration and real provider/OOM/cancellation failures.
-- Resolve the canonical HF root before discovery; finalize capacity from actual
-  AutoConfig after snapshot resolution, including first download. Remove mutation
-  of max_position_embeddings to an estimate. Native maximum is not allocation.
-  Store effective capacity/source separately from vram_priced_ctx; keep HF's
-  weights-only estimate and explicit runtime/VRAM policy unchanged.
-- Include normalized explicit context setting in the same HF reuse key at lookup
-  and publication; preserve epoch guards. Allocated GGUF n_ctx already owns its
-  capacity and reuse_key; do not rewrite it.
-- Remove the minimum-model-window rejection against a project estimate. Fit full
-  prompts against actual/configured capacity, one-token default output-room
-  minimum; retain explicit atomic require_full contracts and no truncation.
-- Unknown-capacity and remote-estimate transport changes remain a separately
-  disclosed follow-up here. None currently breaks local arithmetic/defaults20,
-  and omitting remote max_tokens changes spend reservation. Do not claim those
-  paths fixed, disguise estimates as known capacity or weaken accounting.
+During the next repaired canonical recovery, record actual loaded native
+capacity, exact schema-enriched prompt tokens and explicit context settings.
+Component regression checks are not a model load or a full publication.
 
-A2 validation must cover actual/nested config, explicit context changes and
-cache reuse, prompt/output fitting and truthful provider/OOM errors. Repeat a
-real canonical component against the corrected loaded capacity. Native App,
-media playback and publication remain later qualification.
+Unknown native capacity and remote-estimate transport changes still need a
+separate scoped decision: local budget arithmetic expects numeric capacity,
+and omitting remote max_tokens changes spend reservation. Do not disguise
+estimates as known capacity or weaken accounting. Sci-Fi's existing
+_draft_fits_repair_turn still uses a character estimate and the legacy
+HARD_VRAM_CONTEXT_LIMIT export; assess that follow-up separately.
 
 ### A3 -- other-bank act-count consistency (separate follow-up)
 

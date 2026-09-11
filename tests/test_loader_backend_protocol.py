@@ -48,6 +48,8 @@ EXPECTED_LOAD_LLM_PARAMS = (
     ("optimization_profile", "Standard"),
     ("context_cap",         None),
     ("policy",              None),     # S1 LLMRuntimePolicy (None=baseline)
+    ("context_verdict",     None),     # captured selector pin/provisional metadata
+    ("hub_root",            None),     # canonical hub captured before discovery
 )
 
 
@@ -63,13 +65,17 @@ def test_protocol_three_callables_present() -> None:
 
 
 def test_existing_safetensors_backend_signatures_unchanged() -> None:
-    """The legacy load_llm signature must match the D1b-time snapshot.
+    """The load_llm signature preserves direct adapter calls and optional metadata.
 
     The TransformersSafetensorsBackend.load delegates to load_llm via
     positional `repo_id` + the legacy function's defaults for the rest.
     A signature drift would silently break the delegate.
     """
     sig = inspect.signature(loader.load_llm)
+    sig.bind("fixture/model")  # existing direct adapter calls still bind
+    for name in ("context_verdict", "hub_root"):
+        assert sig.parameters[name].kind is inspect.Parameter.KEYWORD_ONLY
+        assert sig.parameters[name].default is None
     params = list(sig.parameters.items())
     assert len(params) == len(EXPECTED_LOAD_LLM_PARAMS), (
         f"load_llm signature has {len(params)} params; "

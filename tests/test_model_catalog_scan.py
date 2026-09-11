@@ -495,127 +495,66 @@ def test_require_model_raises_on_whitespace_only():
 # ---------------------------------------------------------------------------
 
 
-def test_hard_vram_context_limit_default_is_8192(monkeypatch):
-    """Test seam: we re-read the env var each call. Module-level constant
-    is fixed at import time so we re-import via the helper."""
+@pytest.mark.parametrize("raw,expected", [
+    (None, None), ("", None), ("junk", None), ("0", None), ("-2", None),
+    ("1.5", None), (True, None), (1.5, None), (" 000128 ", 128), (1, 1),
+])
+def test_context_pin_is_only_an_explicit_positive_integer(raw, expected):
+    assert catalog.normalized_context_pin(raw) == expected
+
+
+def test_context_pin_reads_current_environment(monkeypatch):
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    # The module-level constant captured the value at import; re-test
-    # via the resolver function on a model that triggers the limit.
-    assert catalog._hard_vram_context_limit() == 8192
+    assert catalog._hard_vram_context_limit() is None
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", " 00256 ")
+    assert catalog._hard_vram_context_limit() == 256
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "invalid")
+    assert catalog._hard_vram_context_limit() is None
 
 
-def test_hard_vram_context_limit_env_override(monkeypatch):
-    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "16384")
-    assert catalog._hard_vram_context_limit() == 16384
+@pytest.mark.parametrize("as_object", [False, True])
+def test_native_decoder_context_precedes_wrapper(as_object):
+    from types import SimpleNamespace
+    decoder = {"max_position_embeddings": 262144}
+    config = {"max_position_embeddings": 8192, "text_config": decoder}
+    if as_object:
+        decoder = SimpleNamespace(**decoder)
+        config = SimpleNamespace(max_position_embeddings=8192, text_config=decoder)
+    assert catalog.read_native_context(config) == 262144
+    assert catalog.read_native_context(decoder) == 262144
 
 
-def test_hard_vram_context_limit_garbage_env_falls_back(monkeypatch):
-    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "not-a-number")
-    assert catalog._hard_vram_context_limit() == 8192
+@pytest.mark.parametrize("invalid", [None, True, False, 0, -1, 1.2, "8192", 1e30])
+def test_native_context_rejects_invalid_values_and_uses_valid_fallback(invalid):
+    assert catalog.read_native_context({"max_position_embeddings": invalid}) is None
+    assert catalog.read_native_context({"text_config": {"n_positions": invalid}, "n_ctx": 4096}) == 4096
 
 
-def test_resolve_context_cap_pass_for_curated_override(empty_hub_root, monkeypatch):
-    """Mistral-Nemo (vram_fit_tier=PASS) returns its AUTHORITATIVE soak-tested
-    override, un-clamped, so the local sci-fi 420/720w script pass fits
-    (2026-07-19: raised 8192 -> 16384)."""
+def test_actual_snapshot_capacity_beats_curated_estimate(tmp_path, monkeypatch):
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
-    assert v.tier == "PASS"
-    assert v.value == 16384
-    assert "curated-override" in v.source
+    snapshot = _make_snapshot(tmp_path, "Qwen", "Qwen3.5-4B", advertised_context=8192)
+    (snapshot / "config.json").write_text(json.dumps({
+        "max_position_embeddings": 8192,
+        "text_config": {"max_position_embeddings": 262144},
+    }), encoding="utf-8")
+    verdict = catalog.resolve_context_cap("Qwen/Qwen3.5-4B", hub_root=tmp_path)
+    assert verdict.value == verdict.native_capacity == 262144
+    assert verdict.explicit_pin is None and "snapshot config.json" in verdict.source
+    pinned = catalog.resolve_context_cap("Qwen/Qwen3.5-4B", hub_root=tmp_path, context_pin=128)
+    assert pinned.value == 128 and pinned.native_capacity == 262144
+    assert catalog.resolve_context_cap("Qwen/Qwen3.5-4B", hub_root=tmp_path, context_pin=500000).value == 262144
 
 
-def test_resolve_context_cap_pass_override_exceeds_hard_limit(empty_hub_root, monkeypatch):
-    """The PASS-tier authoritative override is NOT clamped down to the default
-    HARD_VRAM_CONTEXT_LIMIT (8192). That re-clamp was the false-8192 wall that
-    truncated the production-length P5 script pass."""
+def test_unknown_capacity_remains_an_explicit_estimate(empty_hub_root, monkeypatch):
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
-    assert v.value > catalog.HARD_VRAM_CONTEXT_LIMIT
-
-
-def test_resolve_context_cap_env_pin_reclamps_pass_override(empty_hub_root, monkeypatch):
-    """An operator who EXPLICITLY sets OTR_HARD_VRAM_CONTEXT_LIMIT (a smaller
-    card's escape hatch) re-clamps even a PASS-tier soak-tested override."""
-    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "4096")
-    monkeypatch.setattr(catalog, "HARD_VRAM_CONTEXT_LIMIT", 4096)
-    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
-    assert v.tier == "PASS"
-    assert v.value == 4096
-
-
-def test_resolve_context_cap_warn_tier_override_not_authoritative(empty_hub_root, monkeypatch):
-    """A WARN-tier catalog row's override is NOT soak-tested, so it stays on the
-    clamped path even though it sits in CURATED_CONTEXT_OVERRIDES -- the
-    authoritative branch is gated on the real vram_fit_tier=='PASS', not merely
-    on the presence of an override entry.
-
-    2026-08-25: was pinned to the live Qwen2.5-14B row, the catalog's last
-    WARN-tier entry, pruned that day. The row and its override entry are now
-    synthetic so the BRANCH stays covered -- deleting this test along with the
-    model would have removed the only proof that an override alone cannot
-    promote a non-soak-tested row to authoritative.
-    """
-    import nodes._otr_model_catalog as c
-
-    warn_id = "test-only/warn-tier-context-row"
-    fake_warn = catalog.CuratedModel(
-        repo_id=warn_id,
-        requires_auth=False,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="WARN",
-        approx_safetensors_gb=28.0,
-        notes="test-only WARN row",
-    )
-    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    monkeypatch.setattr(c, "CURATED_LLM_MODELS", c.CURATED_LLM_MODELS + (fake_warn,))
-    monkeypatch.setitem(c.CURATED_CONTEXT_OVERRIDES, warn_id, 8192)
-    v = catalog.resolve_context_cap(warn_id, hub_root=empty_hub_root)
-    assert v.tier == "PASS"
-    assert "authoritative" not in v.source
-    assert "clamped" in v.source
-
-
-def test_resolve_context_cap_warn_for_uncurated_with_config(hub_root_with_uncurated):
-    """Uncurated model with parseable config.json returns WARN."""
-    v = catalog.resolve_context_cap(
-        "meta-llama/Llama-3-8B-Instruct", hub_root=hub_root_with_uncurated
-    )
-    assert v.tier == "WARN"
-    # advertised 8192 is below the limit; value matches.
-    assert v.value == 8192
-    assert "config.json" in v.source
-
-
-def test_resolve_context_cap_clamps_warn_to_hard_limit(tmp_path):
-    """Uncurated model advertising 128k must be clamped to HARD_VRAM
-    limit (8192 on the 16 GB target)."""
-    root = tmp_path / "hub"
-    root.mkdir()
-    _make_snapshot(root, "huge", "Context-128k-Model", advertised_context=131072)
-    v = catalog.resolve_context_cap("huge/Context-128k-Model", hub_root=root)
-    assert v.tier == "WARN"
-    assert v.value == 8192
-    assert "131072" in v.source
-
-
-def test_resolve_context_cap_unknown_for_unresolved_model(empty_hub_root):
-    """Neither curated nor locally-scanned -> UNKNOWN @ limit."""
-    v = catalog.resolve_context_cap(
-        "totally/uncurated-no-snapshot", hub_root=empty_hub_root
-    )
-    assert v.tier == "UNKNOWN"
-    assert v.value == catalog.HARD_VRAM_CONTEXT_LIMIT
-
-
-def test_resolve_context_cap_never_raises_on_arbitrary_input(empty_hub_root):
-    """The contract is: return a verdict, never raise. B1c's request_slot
-    makes the combined fit/cap escalation decision; resolve_context_cap
-    is policy-free."""
-    for weird in ["", " ", "foo", "no slash here", "/leading-slash"]:
-        v = catalog.resolve_context_cap(weird, hub_root=empty_hub_root)
-        assert v.tier in ("PASS", "WARN", "UNKNOWN")
-        assert v.value >= 512
+    for model_id, expected in [("mistralai/Mistral-Nemo-Instruct-2407", 16384),
+                               ("unknown/model", 8192)]:
+        verdict = catalog.resolve_context_cap(model_id, hub_root=empty_hub_root)
+        assert verdict.tier == "UNKNOWN" and verdict.value == expected
+        assert verdict.native_capacity is None and "estimate" in verdict.source
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "128")
+    assert catalog.resolve_context_cap("unknown/model", hub_root=empty_hub_root).value == 128
+    assert catalog.resolve_context_cap("unknown/model", hub_root=empty_hub_root, context_pin=None).value == 8192
 
 
 # ---------------------------------------------------------------------------

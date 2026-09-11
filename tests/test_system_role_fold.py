@@ -239,9 +239,8 @@ def test_helpers_are_exported() -> None:
 
 def test_gemma_2_2b_it_row_is_a_clean_technical_pick() -> None:
     """BUG-LOCAL-262: google/gemma-2-2b-it must have a catalog row
-    with transformers_default chat template and an 8192 context
-    window matching HARD_VRAM_CONTEXT_LIMIT so check_context_window
-    does not trip.
+    with its transformers_default chat template. A project estimate
+    cannot impose a minimum model window at load time.
     """
     from nodes import _otr_model_catalog as catalog
 
@@ -251,8 +250,7 @@ def test_gemma_2_2b_it_row_is_a_clean_technical_pick() -> None:
         "google/gemma-2-2b-it missing from CURATED_LLM_MODELS"
     )
     assert row.chat_template_kind == "transformers_default"
-    assert row.context_window >= catalog.HARD_VRAM_CONTEXT_LIMIT
-    # The context-window precondition must not trip for this row.
+    # Actual prompt fit is checked by the generation owner.
     backends.check_context_window(row)
 
 

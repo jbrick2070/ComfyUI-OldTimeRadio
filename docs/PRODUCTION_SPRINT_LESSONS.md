@@ -107,6 +107,19 @@ content, or fall back to a canned artifact.
 
 ## 5. Size context from the real artifact
 
+A2 static implementation lesson (2026-09-11): native model capacity, an
+explicit operator context setting and a historical working-window estimate
+are distinct. Read the selected decoder configuration without rewriting it;
+a later sparse config must not erase known capacity. Capture the explicit
+setting once and include it in both reuse checks and cache publication.
+Inspect the same normalized/template/schema-enriched CPU prompt that will
+generate, before device transfer. Inspection does not count as generation.
+One output token is usable unless the caller has an explicit atomic budget.
+An unmarked absent budget is a programmer error, not an implicit request
+to spend the full capacity. EOS collections count as completion at the
+boundary. This is static regression evidence, not a new production bug or
+live capacity qualification; see a2_receipt.md in the cross-machine folder.
+
 There is no requested word count to size from (`target_words` left with the
 word authority on 2026-08-14; `act_count` sets the act topology and length is
 an observation). Derive output and context budgets from the actual size

@@ -151,9 +151,8 @@ def test_load_llm_8bit_comes_from_policy():
 
 
 def test_load_llm_returns_cache_entry_dict_shape():
-    """The `load_llm` return MUST be a dict literal with exactly the 6
-    documented keys: model, tokenizer, model_id, device, quantized,
-    context_cap.
+    """The `load_llm` return MUST be a dict literal containing model handles and primitive
+    native-capacity provenance, with VRAM pricing stated separately.
 
     Post-S31 B4 the body runs end-to-end every call (no cache-hit
     short-circuit -- request_slot handles caching at the outer layer)
@@ -179,9 +178,10 @@ def test_load_llm_returns_cache_entry_dict_shape():
     for key_node in return_dict.keys:
         if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
             keys.add(key_node.value)
-    expected = {"model", "tokenizer", "model_id", "device", "quantized", "context_cap"}
+    expected = {"model", "tokenizer", "model_id", "device", "quantized", "context_cap",
+                "context_capacity_source", "native_context_capacity", "context_pin", "vram_priced_ctx"}
     assert keys == expected, (
-        f"cache_entry keys drifted from the 6-key contract. "
+        f"cache_entry keys drifted from the documented contract. "
         f"Expected {sorted(expected)}, got {sorted(keys)}."
     )
 

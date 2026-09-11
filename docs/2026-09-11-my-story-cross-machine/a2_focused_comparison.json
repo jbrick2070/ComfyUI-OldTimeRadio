@@ -1,0 +1,42 @@
+{
+  "baseline": "my_story_grammar_full.xml",
+  "candidate": "my_story_a2_final_focused.xml",
+  "baseline_counts": {
+    "passed": 78
+  },
+  "candidate_counts": {
+    "passed": 95
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "shared_failure_source_context_only": [],
+  "status_changes": [],
+  "new_tests": [
+    "tests.test_context_window_precondition::test_small_model_windows_are_not_a_load_rejection[128]",
+    "tests.test_context_window_precondition::test_small_model_windows_are_not_a_load_rejection[1]",
+    "tests.test_context_window_precondition::test_small_model_windows_are_not_a_load_rejection[4096]",
+    "tests.test_generation_budget::test_constrained_eos_at_exact_capacity_is_a_completed_reply[20000]",
+    "tests.test_generation_budget::test_constrained_eos_at_exact_capacity_is_a_completed_reply[eos1]",
+    "tests.test_generation_budget::test_constrained_eos_at_exact_capacity_is_a_completed_reply[eos2]",
+    "tests.test_generation_budget::test_constrained_eos_at_exact_capacity_is_a_completed_reply[eos3]",
+    "tests.test_generation_budget::test_context_budget_accepts_one_token_and_preserves_explicit_minimum",
+    "tests.test_generation_budget::test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move[base]",
+    "tests.test_generation_budget::test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move[constrained]",
+    "tests.test_generation_budget::test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move[polish]",
+    "tests.test_generation_budget::test_fit_inspection_releases_inputs_and_refuses_atomic_budget_before_device_move[writer]",
+    "tests.test_generation_budget::test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation[base]",
+    "tests.test_generation_budget::test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation[constrained]",
+    "tests.test_generation_budget::test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation[polish]",
+    "tests.test_generation_budget::test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation[writer]",
+    "tests.test_generation_budget::test_scheduler_fit_includes_schema_and_does_not_count_as_generation[False]",
+    "tests.test_generation_budget::test_scheduler_fit_includes_schema_and_does_not_count_as_generation[True]",
+    "tests.test_generation_budget::test_unmarked_none_budget_is_a_programmer_error_before_prompt_preparation",
+    "tests.test_vram_envelope_c4::test_unknown_context_estimate_remains_8192"
+  ],
+  "removed_tests": [
+    "tests.test_context_window_precondition::test_context_window_precondition_below_hard_limit_raises",
+    "tests.test_generation_budget::test_context_budget_fails_when_prompt_leaves_no_viable_artifact_room",
+    "tests.test_vram_envelope_c4::test_hard_context_limit_8192"
+  ]
+}

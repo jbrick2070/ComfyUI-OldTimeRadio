@@ -92,19 +92,10 @@ def test_default_vram_ceiling_14_5():
     )
 
 
-def test_hard_context_limit_8192():
-    """S21.1 + S30 B1b: hard context cap of 8192 tokens."""
+def test_unknown_context_estimate_remains_8192():
+    """Historical fallback remains available when native capacity is unknown."""
     catalog = importlib.import_module("nodes._otr_model_catalog")
-    # Default value when OTR_HARD_VRAM_CONTEXT_LIMIT env var is unset
-    # (resolved at module import time by _hard_vram_context_limit()).
-    # Operators on larger hardware can raise via env var; the default
-    # locks 8192 so VRAM budgets are predictable across models.
-    assert catalog.HARD_VRAM_CONTEXT_LIMIT == 8192, (
-        f"HARD_VRAM_CONTEXT_LIMIT drift: expected 8192, got "
-        f"{catalog.HARD_VRAM_CONTEXT_LIMIT}. The 8192 cap matches "
-        "Mistral-Nemo and Gemma-4 native windows AND leaves headroom "
-        "for KV-cache growth without paying the 16K context tax."
-    )
+    assert catalog.DEFAULT_CONTEXT_ESTIMATE == 8192
 
 
 # ---------------------------------------------------------------------------

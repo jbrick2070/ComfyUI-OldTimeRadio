@@ -39,10 +39,13 @@ from pydantic import BaseModel
 
 from . import _otr_lmfe_compat  # compat shim; ensure_lmfe_transformers_compat() called inside factory below
 from . import _otr_writer_heartbeat as _OTRHB
-from ._otr_generation_budget import GenerationDegeneracyError
+from ._otr_generation_budget import (
+    GenerationDegeneracyError, GenerationContextOverflowError,
+    PromptContextOverflowError, fit_output_tokens,
+)
 from ._otr_model_loader import (
     ModelLoaderError,
-    _normalize_messages_for_cache_entry,
+    prepare_native_prompt,
 )
 
 
@@ -255,13 +258,19 @@ def make_constrained_generate_fn(
         unbounded_json_field = bool(getattr(
             messages, "_otr_unbounded_json_field", False,
         ))
-        messages = _normalize_messages_for_cache_entry(cache_entry, messages)
-        from ._otr_loader_backends import chat_template_kwargs
-        prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            **chat_template_kwargs(cache_entry.get("model_id", "")),
-        )
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        prepared = prepare_native_prompt(cache_entry, messages)
+        context_cap = prepared["context_cap"]
+        requested_tokens = context_cap if prepared["reserve_remaining"] else max_new_tokens
+        try:
+            effective_max_new_tokens = fit_output_tokens(
+                requested_tokens, context_cap=context_cap,
+                prompt_tokens=prepared["prompt_tokens"], label="constrained prompt",
+                require_full=(prepared["require_full_output"] or
+                              (prepared["reserve_remaining"] and max_new_tokens is not None)),
+            )
+        except GenerationContextOverflowError as exc:
+            raise PromptContextOverflowError(str(exc), phase=exc.phase) from exc
+        inputs = prepared["inputs"].to(model.device)
 
         # Opt-in live heartbeat (read-only; does not alter sampled tokens).
         streamer = (
@@ -315,7 +324,7 @@ def make_constrained_generate_fn(
             out = model.generate(
                 **inputs,
                 **sampling,
-                max_new_tokens=max_new_tokens,
+                max_new_tokens=effective_max_new_tokens,
                 pad_token_id=tokenizer.eos_token_id,
                 stopping_criteria=StoppingCriteriaList([_guard]),
                 # The schema-binding argument. transformers passes
@@ -360,6 +369,22 @@ def make_constrained_generate_fn(
                 repetition=telemetry,
                 raw_completion=decoded,
                 prompt_tokens=prompt_len,
+            )
+        generated_ids = out[0][prompt_len:]
+        eos = tokenizer.eos_token_id
+        eos_values = {int(value) for value in (
+            eos if isinstance(eos, (list, tuple, set)) else (eos,)
+        ) if value is not None}
+        ended_with_eos = bool(len(generated_ids)) and int(generated_ids[-1]) in eos_values
+        if (prepared["fail_on_output_limit"]
+                and len(generated_ids) >= effective_max_new_tokens and not ended_with_eos):
+            raise PromptContextOverflowError(
+                "constrained generation consumed its output allowance before stopping",
+                phase="output_limit", raw_completion=decoded,
+                prompt_tokens=prompt_len, generated_tokens=len(generated_ids),
+                requested_output_tokens=requested_tokens,
+                effective_output_tokens=effective_max_new_tokens,
+                context_cap=context_cap, ended_with_eos=False,
             )
         return decoded
 

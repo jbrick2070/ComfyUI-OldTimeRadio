@@ -211,7 +211,7 @@ def _detach_and_invalidate_locked(
 
 def _try_cache_hit_locked(
     normalized: str, slot: str, *,
-    gguf_key: str | None = None, policy_key: str | None = None,
+    gguf_key: str | None = None, policy_key: tuple | str | None = None,
 ) -> dict | None:
     """Atomically check a cache-hit predicate and capture+return the
     matching entry (also stamping ``slot``) under the same lock -- a
@@ -821,6 +821,8 @@ def load_llm(
     optimization_profile: str = "Standard",
     context_cap: int | None = None,
     policy: Any = None,
+    context_verdict: Any = None,
+    hub_root: Path | None = None,
 ) -> dict[str, Any]:
     """Load an LLM and return a cache_entry dict.
 
@@ -845,12 +847,12 @@ def load_llm(
                   "[8-bit]" are tolerated and stripped.
         device:   target device. Defaults "cuda".
         optimization_profile: one of "Standard", "Obsidian", "8-bit".
-        context_cap: optional caller-provided context cap. `request_slot`
-                  pre-resolves via `_otr_model_catalog.resolve_context_cap`
-                  (tiered ContextCapVerdict) and forwards the resolved value
-                  through. Defaults to None, in which case load_llm resolves
-                  through the SAME catalog function -- the single source of
-                  truth for every load path.
+        context_cap: optional explicit caller setting; bounds native capacity.
+        context_verdict: selector's provisional capacity and captured pin.
+                  It must never turn an estimate into an explicit setting.
+        hub_root: selector's canonical HF hub directory; direct callers resolve
+                  it here before discovery. Actual decoder config finalizes
+                  capacity after loading without changing model configuration.
 
     Raises ModelLoaderError on any underlying failure (wraps the
     original exception via __cause__).
@@ -879,27 +881,25 @@ def load_llm(
         # production id was NF4, which is exactly the policy default.
         requested_quantized = _policy.quant_policy in ("bnb_nf4", "bnb_8bit")
 
-        # 2026-07-19: context-cap resolution is the catalog's SINGLE source of
-        # truth -- _otr_model_catalog.resolve_context_cap (tiered
-        # PASS/WARN/UNKNOWN; an authoritative soak-tested override for a
-        # vram_fit_tier=="PASS" row, otherwise clamped to
-        # HARD_VRAM_CONTEXT_LIMIT). request_slot already passes the resolved
-        # value in via `context_cap`; a direct/legacy caller that reaches
-        # load_llm WITHOUT it (e.g. the _LegacyTransformersBackendBase
-        # delegate in _otr_model_runtime) now resolves through the SAME path
-        # instead of a stale hardcoded table. This completes the S30 B1b
-        # migration that already deleted the module-level MODEL_CONTEXT_CAPS:
-        # a duplicated function-local table is exactly how Mistral-Nemo would
-        # load at a stale 8192 on the no-cap path while request_slot loaded
-        # 16384 (the BUG-LOCAL-101 lineage -- Mistral was 16384, dropped to
-        # 8192 in S21.2 for audio co-residency; the 420/720w script pass needs
-        # 16384 back and NF4 + a DynamicCache make it fit the 16 GB card).
+        from . import _otr_model_catalog as _otr_catalog
+        from . import _otr_hf_env as _OTR_HF
+
+        # One canonical root precedes every discovery and snapshot operation.
+        # request_slot supplies its captured root and pin; direct callers resolve
+        # them here. An estimate is never forwarded as an explicit user setting.
+        _hub_root = (Path(hub_root) if hub_root is not None
+                     else Path(_OTR_HF.ensure_hf_home()) / "hub")
+        _hf_home_resolved = str(_hub_root.parent)
         _resolved_id = str(model_id_full).split(" ", 1)[0].strip()
-        if context_cap is not None:
-            _cap = int(context_cap)
+        if context_verdict is not None:
+            _context_pin = context_verdict.explicit_pin
         else:
-            from . import _otr_model_catalog as _otr_catalog
-            _cap = int(_otr_catalog.resolve_context_cap(_resolved_id).value)
+            _context_pin = (_otr_catalog.normalized_context_pin(context_cap)
+                            if context_cap is not None
+                            else _otr_catalog._hard_vram_context_limit())
+        _capacity = _otr_catalog.resolve_context_cap(
+            _resolved_id, hub_root=_hub_root, context_pin=_context_pin,
+        )
 
         log.info(f"Loading LLM model: {_stripped_model_id} (quantized={requested_quantized})")
 
@@ -981,13 +981,7 @@ def load_llm(
             cuda_available=torch.cuda.is_available(),
             quant_policy=_policy.quant_policy)
 
-        # _plan_max_memory now returns None for every row (operator directive
-        # 2026-09-06: no caps, no crawling), so there is no budget left to drop
-        # here. The row's LOAD SHAPE is still resolved from the catalog.
-        # Imported here on purpose: the only other binding in this function is
-        # inside the `context_cap is None` else-branch above, and request_slot
-        # always passes a context_cap, so relying on it would NameError on the
-        # normal path.
+        # Resolve the catalog-owned load shape independently of capacity.
         from . import _otr_model_catalog as _otr_catalog_mode
         _native_text_row = (
             _otr_catalog_mode.text_only_load_mode(_stripped_model_id)
@@ -1092,19 +1086,8 @@ def load_llm(
 
         from transformers import AutoTokenizer, AutoModelForCausalLM
 
-        # BUG-LOCAL-085 fix: resolve HF_HOME from HKCU\Environment so
-        # cache_dir is correct even when ComfyUI Desktop's process
-        # didn't inherit User-scope env vars.
-        try:
-            from . import _otr_hf_env as _OTR_HF
-            _hf_home_resolved = _OTR_HF.ensure_hf_home()
-            _runtime_log(f"[StoryOrchestrator] HF_HOME resolved -> {_hf_home_resolved}")
-        except Exception as _hf_err:
-            _runtime_log(f"[StoryOrchestrator] HF_HOME helper unavailable ({_hf_err}); using os.environ fallback")
-            _OTR_HF = None
-            _hf_home_resolved = otr_env.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
-
-        cache_dir_path = os.path.join(_hf_home_resolved, "hub")
+        cache_dir_path = str(_hub_root)
+        _runtime_log(f"[StoryOrchestrator] HF_HOME resolved -> {_hf_home_resolved}")
 
         # Try snapshot path first (preferred for sharded models on Windows).
         snapshot_path = None
@@ -1224,11 +1207,13 @@ def load_llm(
                     "cache_dir": cache_dir_path,
                 }
                 model_config = AutoConfig.from_pretrained(load_target, **_cfg_kwargs)
-                if hasattr(model_config, "max_position_embeddings") and model_config.max_position_embeddings > _cap:
-                    _runtime_log(f"[StoryOrchestrator] Hardening: Capping 128k context to {_cap} (Saves ~6GB VRAM)")
-                    model_config.max_position_embeddings = _cap
+                if _otr_catalog.read_native_context(model_config) is not None:
+                    _capacity = _otr_catalog.resolve_context_cap(
+                        _resolved_id, hub_root=_hub_root, context_pin=_context_pin,
+                        config=model_config,
+                    )
             except Exception as _cfg_err:
-                log.warning("[StoryOrchestrator] Config hardening failed: %s", _cfg_err)
+                log.warning("[StoryOrchestrator] Config metadata unavailable: %s", _cfg_err)
 
             # BUG-LOCAL-098 tripwire setup: measure VRAM before load.
             _bug098_vram_before_gib = (
@@ -1484,13 +1469,26 @@ def load_llm(
             log.warning("[StoryOrchestrator] CUDA warmup failed (non-fatal): %s", _warmup_err)
             _runtime_log(f"WARMUP: Failed (non-fatal): {_warmup_err}")
 
+        # The loaded decoder is the final authority, including a first download
+        # or a successful load after AutoConfig metadata was unavailable.
+        _loaded_config = getattr(model, "config", None)
+        if _otr_catalog.read_native_context(_loaded_config) is not None:
+            _capacity = _otr_catalog.resolve_context_cap(
+                _resolved_id, hub_root=_hub_root, context_pin=_context_pin,
+                config=_loaded_config,
+            )
+        _runtime_log(f"[StoryOrchestrator] Context capacity {_capacity.value}: {_capacity.source}")
         return {
             "model":       model,
             "tokenizer":   tokenizer,
             "model_id":    _stripped_model_id,
             "device":      device,
             "quantized":   actual_quant,
-            "context_cap": _cap,
+            "context_cap": _capacity.value,
+            "context_capacity_source": _capacity.source,
+            "native_context_capacity": _capacity.native_capacity,
+            "context_pin": _context_pin,
+            "vram_priced_ctx": None,  # native HF admission prices weights only
         }
     except ModelLoaderError:
         raise
@@ -1953,8 +1951,19 @@ def request_slot(
     # rather than silently adopted by a later, unrelated caller.
     _my_cache_epoch = _current_cache_epoch()
 
-    # Step 1: normalize.
-    normalized = _otr_catalog.validate_model_id(model_id)
+    # Route curated remote/GGUF entries before any HF filesystem work. Native
+    # validation can scan an uncurated model, so repair its root first.
+    normalized = (_otr_catalog._strip_label_suffix(model_id)
+                  if isinstance(model_id, str) else model_id)
+    _early_row = _otr_catalog._by_repo_id().get(normalized) if isinstance(normalized, str) else None
+    _early_backend = getattr(_early_row, "loader_backend", None)
+    if _early_backend in ("openrouter_http", "comfy_credits_http", "google_api_http", "gguf_native"):
+        normalized = _otr_catalog.validate_model_id(model_id)
+        _hub_root = None
+    else:
+        from . import _otr_hf_env as _otr_hf
+        _hub_root = Path(_otr_hf.ensure_hf_home()) / "hub"
+        normalized = _otr_catalog.validate_model_id(model_id, hub_root=_hub_root)
 
     # [OpenRouter S3] Remote branch (FC2 seam 1) -- the dispatch table is
     # otherwise dormant. A virtual catalog row carries
@@ -2015,7 +2024,18 @@ def request_slot(
     # returns and below the GGUF dispatch, so the ceiling could only ever
     # gate a fresh TRANSFORMERS load -- see _assert_policy_admits_vram for
     # why neither reuse key can carry the ceiling instead.
-    ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
+    _is_gguf = getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
+    if _is_gguf:
+        # Allocated GGUF context and its existing reuse identity are independent.
+        ctx_verdict = _otr_catalog.ContextCapVerdict(
+            "PASS", int(_virtual_row.context_window), "GGUF row; policy n_ctx is priced",
+        )
+    else:
+        _context_pin = _otr_catalog._hard_vram_context_limit()
+        _hf_key = (_policy.cache_key(), _context_pin)
+        ctx_verdict = _otr_catalog.resolve_context_cap(
+            normalized, hub_root=_hub_root, context_pin=_context_pin,
+        )
     _assert_policy_admits_vram(normalized, ctx_verdict, _policy)
 
     if (
@@ -2107,14 +2127,14 @@ def request_slot(
     # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
     # Atomic locked check-and-return (_try_cache_hit_locked) -- see the GGUF
     # branch above for why a separate check-then-return is not safe here.
-    _hit = _try_cache_hit_locked(normalized, slot, policy_key=_policy.cache_key())
+    _hit = _try_cache_hit_locked(normalized, slot, policy_key=_hf_key)
     if _hit is not None:
         log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
         return _hit  # type: ignore[return-value]
     if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
         log.info(
             "[Selector] policy change for %s (%s -> %s): full teardown",
-            normalized, LLM_CACHE.get("policy_key"), _policy.cache_key(),
+            normalized, LLM_CACHE.get("policy_key"), _hf_key,
         )
         _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
 
@@ -2123,14 +2143,6 @@ def request_slot(
     # Step 7: ensure on-disk + handle gating / disk-space pre-flight.
     # Local-cache short-circuit (B1d) fires inside this helper when the
     # snapshot is already on disk.
-    # Resolve the canonical HF root BEFORE the catalog's local-cache probe.
-    # ComfyUI Desktop can inherit a stale/malformed HF_HUB_CACHE; the helper
-    # repairs it to <HF_HOME>/hub so the already-present C:\ComfyUI-Models
-    # snapshot short-circuits without any network call.
-    from pathlib import Path as _Path
-    from . import _otr_hf_env as _otr_hf
-
-    _resolved_hf_home = _otr_hf.ensure_hf_home()
     raise_if_processing_interrupted()
     # PASS THE PROGRESS BAR. auto_download_if_missing has accepted a
     # progress_pbar since it was written and forwards it into
@@ -2148,7 +2160,7 @@ def request_slot(
         _pbar = None
     _otr_catalog.auto_download_if_missing(
         normalized,
-        hub_root=_Path(_resolved_hf_home) / "hub",
+        hub_root=_hub_root,
         progress_pbar=_pbar,
     )
     raise_if_processing_interrupted()
@@ -2187,7 +2199,7 @@ def request_slot(
     # still current, i.e. unless this call still owns whatever is resident.
     try:
         cache_entry = load_llm(
-            normalized, context_cap=ctx_verdict.value, policy=_policy,
+            normalized, context_verdict=ctx_verdict, hub_root=_hub_root, policy=_policy,
         )
     except Exception:
         log.warning(
@@ -2210,7 +2222,7 @@ def request_slot(
         "model_id": normalized,
         "slot": slot,
         "cache_entry": cache_entry,
-        "policy_key": _policy.cache_key(),
+        "policy_key": _hf_key,
     })
     if not _published:
         log.warning(
@@ -2253,6 +2265,75 @@ def _normalize_messages_for_cache_entry(
     return _otr_loader_backends.normalize_messages_for_tokenizer(
         tokenizer, messages,
     )
+
+
+def prepare_native_prompt(cache_entry: dict[str, Any], messages) -> dict[str, Any]:
+    """Prepare the exact generation prompt on CPU; retain no model handles.
+
+    Inputs belong to this one call. A fit inspector returns measurements only;
+    actual generation prepares again after any intervening slot transition.
+    """
+    from ._otr_loader_backends import chat_template_kwargs
+    from . import _otr_model_catalog as catalog
+
+    flags = {
+        name: bool(getattr(messages, marker, False))
+        for name, marker in (
+            ("require_full_output", "_otr_require_full_output_budget"),
+            ("reserve_remaining", "_otr_reserve_remaining_output_capacity"),
+            ("fail_on_output_limit", "_otr_fail_on_output_limit"),
+            ("unbounded_json_field", "_otr_unbounded_json_field"),
+        )
+    }
+    tokenizer = cache_entry["tokenizer"]
+    normalized = _normalize_messages_for_cache_entry(cache_entry, messages)
+    prompt = tokenizer.apply_chat_template(
+        normalized, tokenize=False, add_generation_prompt=True,
+        **chat_template_kwargs(cache_entry.get("model_id", "")),
+    )
+    inputs = tokenizer(prompt, return_tensors="pt")
+    cap = catalog.normalized_context_pin(cache_entry.get("context_cap"))
+    source = cache_entry.get("context_capacity_source")
+    # Old third-party cache entries retain a disclosed estimate. Real native
+    # loads always stamp capacity and provenance at the loader boundary.
+    if cap is None:
+        cap = catalog.DEFAULT_CONTEXT_ESTIMATE
+        source = "legacy entry missing native capacity; default context estimate"
+    return {
+        "inputs": inputs,
+        "prompt_tokens": int(inputs["input_ids"].shape[-1]),
+        "context_cap": cap,
+        "capacity_source": str(source or "entry context setting; native capacity unreported"),
+        "capacity_known": catalog.normalized_context_pin(cache_entry.get("native_context_capacity")) is not None,
+        "model_id": str(cache_entry.get("model_id") or "<unknown>"),
+        **flags,
+    }
+
+
+def inspect_native_prompt_fit(cache_entry: dict[str, Any], messages, *, max_new_tokens) -> dict[str, Any]:
+    """Non-generating exact-token measurement, with only primitive results."""
+    if max_new_tokens is None and not getattr(messages, "_otr_reserve_remaining_output_capacity", False):
+        raise TypeError("max_new_tokens=None requires the provider-capacity message contract")
+    prepared = prepare_native_prompt(cache_entry, messages)
+    measured = {key: prepared[key] for key in (
+        "prompt_tokens", "context_cap", "capacity_source", "capacity_known", "model_id",
+    )}
+    requested = (prepared["context_cap"] if prepared["reserve_remaining"]
+                 else max(1, int(max_new_tokens)))
+    measured.update(supported=True, requested_output_tokens=requested,
+                    available_output_tokens=max(0, prepared["context_cap"] - prepared["prompt_tokens"]))
+    try:
+        effective = fit_output_tokens(
+            requested, context_cap=prepared["context_cap"],
+            prompt_tokens=prepared["prompt_tokens"], label="prompt inspection",
+            require_full=(prepared["require_full_output"]
+                          or (prepared["reserve_remaining"] and max_new_tokens is not None)),
+        )
+    except GenerationContextOverflowError as exc:
+        measured.update(fits=False, effective_output_tokens=0, phase=exc.phase, reason=str(exc))
+    else:
+        measured.update(fits=True, effective_output_tokens=effective)
+    return measured
 
 
 def make_generate_fn(cache_entry: dict[str, Any]):
@@ -2320,14 +2401,9 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         fail_on_output_limit = bool(getattr(
             messages, "_otr_fail_on_output_limit", False,
         ))
-        messages = _normalize_messages_for_cache_entry(cache_entry, messages)
-        from ._otr_loader_backends import chat_template_kwargs
-        prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            **chat_template_kwargs(cache_entry.get("model_id", "")),
-        )
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        context_cap = int(cache_entry.get("context_cap") or 8192)
+        prepared = prepare_native_prompt(cache_entry, messages)
+        inputs = prepared["inputs"]
+        context_cap = prepared["context_cap"]
         requested_tokens = context_cap if reserve_remaining else max_new_tokens
         try:
             effective_max_new_tokens = fit_output_tokens(
@@ -2350,6 +2426,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             raise PromptContextOverflowError(
                 str(exc), phase=exc.phase,
             ) from exc
+        inputs = inputs.to(model.device)
         # THE LIVENESS GUARD (2026-08-13). This transport was unprotected when
         # the guard shipped, because the guard was installed per-WRAPPER in
         # OTR_LedgerScriptWriter instead of at every local generate().
@@ -2531,14 +2608,9 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
         fail_on_output_limit = bool(getattr(
             messages, "_otr_fail_on_output_limit", False,
         ))
-        messages = _normalize_messages_for_cache_entry(cache_entry, messages)
-        from ._otr_loader_backends import chat_template_kwargs
-        prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            **chat_template_kwargs(cache_entry.get("model_id", "")),
-        )
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        context_cap = int(cache_entry.get("context_cap") or 8192)
+        prepared = prepare_native_prompt(cache_entry, messages)
+        inputs = prepared["inputs"]
+        context_cap = prepared["context_cap"]
         requested_tokens = context_cap if reserve_remaining else max_new_tokens
         try:
             effective_max_new_tokens = fit_output_tokens(
@@ -2561,6 +2633,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
             raise PromptContextOverflowError(
                 str(exc), phase=exc.phase,
             ) from exc
+        inputs = inputs.to(model.device)
         from transformers import StoppingCriteriaList  # noqa: I001
         try:
             from ._otr_decode_guard import make_degeneracy_criterion

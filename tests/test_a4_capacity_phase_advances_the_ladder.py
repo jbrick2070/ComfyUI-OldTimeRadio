@@ -185,7 +185,7 @@ def test_an_unrelated_runtime_error_is_still_terminal():
 
 def test_both_budget_refusals_report_the_pre_call_phase():
     with pytest.raises(budget.GenerationContextOverflowError) as no_room:
-        budget.fit_output_tokens(512, context_cap=8192, prompt_tokens=8150)
+        budget.fit_output_tokens(512, context_cap=8192, prompt_tokens=8192)
     with pytest.raises(budget.GenerationContextOverflowError) as no_complete:
         budget.fit_output_tokens(
             2000, context_cap=8192, prompt_tokens=7000, require_full=True,

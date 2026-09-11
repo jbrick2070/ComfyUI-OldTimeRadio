@@ -1,0 +1,32 @@
+{
+  "source": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio",
+  "candidate": "C:\\Users\\jeffr\\Documents\\ComfyUI\\_worktrees\\otr-my-story-a2-candidate",
+  "verified_python_files": [
+    "nodes/OTR_LedgerScriptWriter.py",
+    "nodes/_otr_constrained_generate.py",
+    "nodes/_otr_generation_budget.py",
+    "nodes/_otr_loader_backends.py",
+    "nodes/_otr_model_catalog.py",
+    "nodes/_otr_model_loader.py",
+    "nodes/_otr_model_runtime.py",
+    "nodes/_otr_structured_call.py",
+    "tests/test_a4_capacity_phase_advances_the_ladder.py",
+    "tests/test_constrained_generate.py",
+    "tests/test_context_window_precondition.py",
+    "tests/test_gate_prices_the_policy_context.py",
+    "tests/test_generation_budget.py",
+    "tests/test_llm_runtime_policy.py",
+    "tests/test_loader_backend_protocol.py",
+    "tests/test_loader_body_profiles.py",
+    "tests/test_model_catalog_scan.py",
+    "tests/test_native_text_decoder_load.py",
+    "tests/test_story_orchestrator_vram_calibration.py",
+    "tests/test_system_role_fold.py",
+    "tests/test_vram_envelope_c4.py"
+  ],
+  "count": 21,
+  "match": "main tree and controlled candidate match immutable tested hashes",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "nodes": 23,
+  "links": 63
+}

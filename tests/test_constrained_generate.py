@@ -226,7 +226,7 @@ class TestClosurePassesConstraint:
 
         # Patch torch.no_grad to a context manager passthrough so the
         # closure runs without a real torch install.
-        with patch("nodes._otr_constrained_generate._normalize_messages_for_cache_entry",
+        with patch("nodes._otr_model_loader._normalize_messages_for_cache_entry",
                    side_effect=lambda ce, msgs: msgs):
             fn = make_constrained_generate_fn(cache_entry, _TinySchema)
             # Stub torch import inside the closure.
@@ -354,7 +354,7 @@ def _reusable_native_closure(kind, monkeypatch, outcome):
 
     model = Model()
     entry.update(model=model, context_cap=8192)
-    monkeypatch.setattr(constrained, "_normalize_messages_for_cache_entry", lambda _entry, messages: list(messages))
+    monkeypatch.setattr("nodes._otr_model_loader._normalize_messages_for_cache_entry", lambda _entry, messages: list(messages))
     monkeypatch.setattr(writer._OTRHB, "make_streamer", lambda *_args: None)
     if kind == "writer":
         fn = writer._build_truncating_generate_fn(entry, top_p=.88, min_p=.04,
@@ -422,7 +422,7 @@ def test_capacity_marker_survives_normalization_without_changing_default_guard(k
     monkeypatch.setattr(backends, "normalize_messages_for_tokenizer", lambda _tokenizer, messages: list(messages))
     messages = [{"role": "user", "content": "A complete structured story."}]
     fn(ProviderCapacityMessages(messages), temperature=.2,
-       max_new_tokens=None if kind == "writer" else 100)
+       max_new_tokens=None)
     fn(messages, temperature=.2, max_new_tokens=100)
     assert [entry["open_string_bound"] for entry in knobs] == [None, MAX_OPEN_STRING_TOKENS]
 
