@@ -46,27 +46,41 @@ ZERO seed drift; rendered pixels are unchanged. Full detail, reviewers and recei
 the PBUG-20260911-03 entry in [PROD_BUG_LOG](PROD_BUG_LOG.md), Bible rules 01.05 and
 01.06.
 
-## Sprint 2 -- resolve the observed visual continuity defect at its owner
+## Sprint 2 -- DIAGNOSED 2026-09-11; closed with NO code change
 
-Use canonical09's stored prompts, image receipts and 16 dramatic stills in
-[the evidence folder](2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md).
-Trace why a continuous present-day dinner alternates period/modern clothing
-and seating/room details. The roll legitimately selected
-shakespeare_stage_realism; do not misdiagnose another source bank as leaking.
-Check actual pixels before claiming a face, age, presence or setting defect.
-Close any unsupported claim with evidence instead of engineering around it.
+Not deferred and not abandoned: the arc ran, the design did not survive, and the
+operator's constraints closed the question. Full receipt:
+[ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
 
-This is continuity/source correctness, not better-prose work. Reuse the existing
-scene/portrait/style owners and bounded checker+rewriter. Decide where stable
-scene facts and visual treatment meet; complete R1-R4 before any new ownership,
-schema or wiring design. Do not solve it with forbidden-word lists, a new
-report-only checker, a separate chunker, added retry loops, or a late subjective
-publication veto. Preserve flexible source cast and off-camera framing.
+Three rounds, one reviewer each as directed (r1 codex, r2 cursor, r3 codex). **All
+three returned "no."** Every one of them converged on the same remedy -- rewrite the
+visual-pack prompt strings -- and that remedy is disqualified by four operator
+constraints, each independently sufficient:
 
-Acceptance: regression evidence discriminates the actual cause; a fresh full
-canonical run retains source people/current-time action and stable scene facts.
-An applied prompt correction proves application, not correct pixels. Inspect
-the resulting images. Do not keep rerolling and hide failed attempts.
+1. The pack and the story are a COMBINATION; neither wins, which invalidates every
+   precedence design the arc produced.
+2. Every still and video model treats prompts differently, so chasing delivered
+   pixels back to a style-plus-story intent is a rabbit hole. Sprint 2's own old
+   acceptance line already conceded it: an applied prompt correction proves
+   application, not correct pixels.
+3. The prompts were crafted per model; rewriting tuned strings is the swashbuckling
+   this project has been burned by.
+4. Prompts are CHARACTER-BUDGETED (motion_registers 240 chars enforced at load,
+   BUG-LOCAL-112; `_fit_motion_slot` truncating to 60) and the per-prompt subtleties
+   problem is already settled. Adding a conditional clause spends budget that does
+   not exist; removing era words edits a tuned prompt. Both directions blocked.
+
+What the arc produced that is worth keeping, none of it a prompt change: the
+mechanism (`positive_tail` is a SHARED field reaching house frame, drama AND plate,
+which is why a faceless radio subject rendered as a costumed man in a kitchen); the
+scope (six of nine packs carry zero era words -- the proven packs are already clean);
+a structural, prompt-free wiring fact (ShotLock node 90 plans before image prompts
+exist, so anything image-node-owned arrives too late for video); and the fact that no
+rule about packs and eras exists anywhere -- `validate_pack` checks types, not content.
+
+**What decides this next is tonight's wave, not more analysis.** Every lane reports
+its rolled `visual_style`, so era-bearing and era-free episodes land side by side.
+Judge the delivered episodes as radio drama; do not reopen this from prompt reading.
 
 ## Coding batch before the evening wave -- re-grounded 2026-09-11
 
